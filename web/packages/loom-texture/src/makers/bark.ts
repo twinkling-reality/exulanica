@@ -12,7 +12,7 @@ import {
 import { bits16, pick, stream } from '../hash.js';
 import { FULL, ONE, clamp, floorDiv, smoothstep } from '../integer.js';
 import type { Maker } from '../maker.js';
-import { type CellSample, band, cells, fbm, valueNoise } from '../noise.js';
+import { type CellSample, band, cells, fbm } from '../noise.js';
 import { MAKER_PROFILE_V2, type ProceduralMakerManifest, type Recipe, read } from '../recipe.js';
 import { type Pattern, heightOfLength, jitter, mixColour, permille, setColour, shade } from '../sample.js';
 import { decode } from '../srgb.js';
@@ -36,8 +36,11 @@ import { MM, TILE } from '../tile.js';
  *     to a plate's top, so a furrow is a narrow channel with steep sides and a plate is not a
  *     dome. A crack is a groove over its own width.
  *   - Where a furrow's depth varies, it varies along the trunk: the depth field has the plates' own
- *     cells, so a furrow is shallower beside one plate and deeper beside the next. Plate tops stay
- *     level and only the floor moves, and a shallow furrow is less dark than a deep one.
+ *     cells, so a furrow is shallower beside one plate and deeper beside the next. It is two octaves
+ *     of fractal noise, whose hashed octave shifts keep its lattice off the tile's edges: one octave
+ *     of value noise on so few cells would put a crease in the normals along the tile's top edge.
+ *     Plate tops stay level and only the floor moves, and a shallow furrow is less dark than a
+ *     deep one.
  *   - A furrow's width is measured across the trunk and a crack's down it. The cellular field
  *     measures distance in cells, so a furrow running straight along the trunk, or a crack straight
  *     around it, has the stated width, and one at a slant is wider.
@@ -46,6 +49,11 @@ import { MM, TILE } from '../tile.js';
  *   - A plate's top carries fibrous relief, two octaves of fractal noise, only on the plate. Its
  *     cells are stretched down the trunk as the plates are, because both come from the trunk
  *     splitting as it widens, so the texture runs in fibres along the trunk.
+ *   - Both cellular networks are shifted by half a cell across and down the tile. A plate end or a
+ *     crack runs midway between two jittered points, so they gather along the network's lattice
+ *     lines; unshifted, those lines include the tile's own edges, and the strongest crack on the
+ *     trunk would lie exactly where one tile meets the next. Shifted, the tile's edges fall
+ *     between lattice lines, and a constant shift keeps the network periodic.
  *   - Lichen keeps the top of broad fractal noise (40000 to 52000, about its upper fifth, measured)
  *     and grows only on plate faces, never in a furrow.
  *
@@ -162,21 +170,26 @@ function pattern(recipe: Recipe): Pattern {
   const furrowCells = Math.max(1, floorDiv(furrowWidth * platesAcross * ONE, extentU));
   const crackCells = Math.max(1, floorDiv(crackWidth * cracksDown * ONE, extentV));
   const sway = floorDiv(swayMm * TILE, extentU);
+  // Half a cell, in tile micro-units, for each network along each axis.
+  const plateHalfU = floorDiv(TILE, 2 * platesAcross);
+  const plateHalfV = floorDiv(TILE, 2 * platesDown);
+  const crackHalfU = floorDiv(TILE, 2 * cracksAcross);
+  const crackHalfV = floorDiv(TILE, 2 * cracksDown);
   const plates: CellSample = { nearest: 0, second: 0, id: 0 };
   const cracks: CellSample = { nearest: 0, second: 0, id: 0 };
 
   return (x, y, out) => {
     const shift = floorDiv((fbm(x, y, platesAcross, swayCells, swaySeed, 2) - 32768) * sway, 32768);
-    cells(x + shift, y, platesAcross, platesDown, plateSeed, ONE, plates);
+    cells(x + shift + plateHalfU, y + plateHalfV, platesAcross, platesDown, plateSeed, ONE, plates);
     // 0 across a furrow's floor, rising up its wall to ONE on the flat top of a plate.
     const face = smoothstep(floorDiv(furrowCells, 2), furrowCells, plates.second - plates.nearest);
 
-    cells(x + shift, y, cracksAcross, cracksDown, crackSeed, ONE, cracks);
+    cells(x + shift + crackHalfU, y + crackHalfV, cracksAcross, cracksDown, crackSeed, ONE, cracks);
     const crack = ONE - smoothstep(0, crackCells, cracks.second - cracks.nearest);
 
     // How deep the furrow is here: the full depth, less up to the stated variation.
     const deep = furrowDepth - floorDiv(
-      floorDiv(valueNoise(x + shift, y, platesAcross, platesDown, depthSeed) * depthVariation, 100) * furrowDepth,
+      floorDiv(fbm(x + shift, y, platesAcross, platesDown, depthSeed, 2) * depthVariation, 100) * furrowDepth,
       FULL,
     );
     const groove = floorDiv((ONE - face) * deep, ONE);
