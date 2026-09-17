@@ -24,11 +24,14 @@ from collections.abc import Mapping, Set
 from types import MappingProxyType
 from typing import Any, Final
 
+from exulanica.materials.classes import MAKER_KINDS, MATERIAL_CLASSES, RELIEF_CLASSES
 from exulanica.materials.objects import (
     MAKER_PROFILE,
+    MAKER_PROFILE_V2,
     RECIPE_PROFILE,
     SAFE_INTEGER,
     MaterialObjectError,
+    is_sha256,
     portable,
 )
 
@@ -51,8 +54,9 @@ __all__ = [
 UNITS: Final = ("mm", "mm_1024ths", "q16", "percent", "permille", "count", "cells_per_tile")
 GROUPS: Final = ("colour", "module", "relief", "wear", "detail", "finish", "lighting")
 SURFACES: Final = ("vertical", "horizontal")
-#: Controls every manifest declares because the bake reads them: (unit, lowest minimum,
-#: highest maximum). The bake divides by the first and third.
+#: Controls every procedural maker whose class bakes a height field declares, because the bake reads
+#: them: (unit, lowest minimum, highest maximum). The bake divides by the first and third. A glazing
+#: maker declares none of them, and a model-made maker declares no controls at all.
 COMMON_CONTROLS: Final = MappingProxyType(
     {
         "height_range_mm": ("mm", 1, 64),
@@ -85,6 +89,20 @@ _MANIFEST_KEYS: Final = (
     "controls",
     "constraints",
 )
+_PROCEDURAL_MANIFEST_KEYS: Final = (
+    "profile",
+    "maker_id",
+    "version",
+    "kind",
+    "material_class",
+    "family",
+    "surface",
+    "truth",
+    "controls",
+    "constraints",
+)
+_MODEL_MANIFEST_KEYS: Final = (*_PROCEDURAL_MANIFEST_KEYS, "generation", "maps_produced")
+_GENERATION_KEYS: Final = ("model", "conditioning", "inputs", "seed", "sampler", "runtime")
 _BASE_KEYS: Final = ("key", "kind", "group", "label", "explanation", "default")
 _CONTROL_KEYS: Final = MappingProxyType(
     {
@@ -279,13 +297,113 @@ def _constraint_problem(
     return None
 
 
+def _is_settings(value: object) -> bool:
+    return isinstance(value, Mapping) and all(
+        isinstance(key, str)
+        and _CONTROL_KEY.fullmatch(key) is not None
+        and (_is_integer(item) or _is_text(item))
+        for key, item in value.items()
+    )
+
+
+def _generation_problems(generation: object) -> list[str]:
+    """Why a model-made maker's record of its generation is not well formed, or an empty list."""
+    if not isinstance(generation, Mapping) or not _same_keys(generation, _GENERATION_KEYS):
+        return [f"generation has exactly {', '.join(_GENERATION_KEYS)}"]
+    problems: list[str] = []
+    model = generation["model"]
+    if not (
+        isinstance(model, Mapping)
+        and _same_keys(model, ("id", "revision", "weights_sha256"))
+        and _is_text(model["id"])
+        and _is_text(model["revision"])
+        and is_sha256(model["weights_sha256"])
+    ):
+        problems.append(
+            "generation: model has exactly an id and a revision, non-empty printable ASCII, "
+            "and the weights_sha256 of its weights"
+        )
+    conditioning = generation["conditioning"]
+    if not (
+        _is_list(conditioning)
+        and all(
+            isinstance(given, Mapping)
+            and _same_keys(given, ("role", "sha256"))
+            and _is_text(given["role"])
+            and is_sha256(given["sha256"])
+            for given in conditioning
+        )
+        and len({given["role"] for given in conditioning}) == len(conditioning)
+    ):
+        problems.append(
+            "generation: conditioning is a list of inputs, each a distinct role and the sha256 of "
+            "its bytes"
+        )
+    given = generation["inputs"]
+    prompt = (
+        isinstance(given, Mapping) and _same_keys(given, ("prompt",)) and _is_text(given["prompt"])
+    )
+    parameters = (
+        isinstance(given, Mapping)
+        and _same_keys(given, ("parameters",))
+        and _is_settings(given["parameters"])
+        and len(given["parameters"]) > 0
+    )
+    if not prompt and not parameters:
+        problems.append(
+            "generation: inputs has exactly a prompt, non-empty printable ASCII, or parameters, "
+            "integers and printable ASCII under lowercase keys"
+        )
+    seed = generation["seed"]
+    if not _is_integer(seed) or not 0 <= seed <= 0xFFFFFFFF:
+        problems.append("generation: seed is an unsigned 32-bit integer")
+    sampler = generation["sampler"]
+    if not (_is_settings(sampler) and "name" in sampler and _is_text(sampler["name"])):
+        problems.append(
+            "generation: sampler has a name and its settings, integers and printable ASCII under "
+            "lowercase keys"
+        )
+    runtime = generation["runtime"]
+    libraries = (
+        runtime["libraries"]
+        if isinstance(runtime, Mapping)
+        and "libraries" in runtime
+        and _is_list(runtime["libraries"])
+        else ()
+    )
+    if not (
+        isinstance(runtime, Mapping)
+        and _same_keys(runtime, ("hardware", "libraries"))
+        and _is_text(runtime["hardware"])
+        and len(libraries) > 0
+        and all(
+            isinstance(library, Mapping)
+            and _same_keys(library, ("name", "version"))
+            and _is_text(library["name"])
+            and _is_text(library["version"])
+            for library in libraries
+        )
+        and len({library["name"] for library in libraries}) == len(libraries)
+    ):
+        problems.append(
+            "generation: runtime has exactly the hardware and its libraries, at least one, each a "
+            "distinct name and its version"
+        )
+    return problems
+
+
 def manifest_problems(candidate: object) -> list[str]:
     """Why ``candidate`` is not a well-formed maker manifest, or an empty list."""
-    if not isinstance(candidate, Mapping) or not _same_keys(candidate, _MANIFEST_KEYS):
-        return [f"a maker manifest has exactly {', '.join(_MANIFEST_KEYS)}"]
+    v2 = isinstance(candidate, Mapping) and candidate.get("profile") == MAKER_PROFILE_V2
+    model = v2 and candidate.get("kind") == "model"
+    keys = (
+        _MANIFEST_KEYS if not v2 else _MODEL_MANIFEST_KEYS if model else _PROCEDURAL_MANIFEST_KEYS
+    )
+    if not isinstance(candidate, Mapping) or not _same_keys(candidate, keys):
+        return [f"a maker manifest has exactly {', '.join(keys)}"]
     problems: list[str] = []
-    if candidate["profile"] != MAKER_PROFILE:
-        problems.append(f"profile is {MAKER_PROFILE}")
+    if candidate["profile"] != MAKER_PROFILE and not v2:
+        problems.append(f"profile is {MAKER_PROFILE} or {MAKER_PROFILE_V2}")
     maker_id = candidate["maker_id"]
     if not isinstance(maker_id, str) or _MAKER_ID.fullmatch(maker_id) is None:
         problems.append(
@@ -294,8 +412,12 @@ def manifest_problems(candidate: object) -> list[str]:
     version = candidate["version"]
     if not _is_integer(version) or version < 1:
         problems.append("version is a positive integer")
-    if candidate["kind"] != "procedural":
+    if not v2 and candidate["kind"] != "procedural":
         problems.append("kind is procedural")
+    if v2 and not _inside(candidate["kind"], MAKER_KINDS):
+        problems.append(f"kind is one of {', '.join(MAKER_KINDS)}")
+    if v2 and not _inside(candidate["material_class"], MATERIAL_CLASSES):
+        problems.append(f"material_class is one of {', '.join(MATERIAL_CLASSES)}")
     family = candidate["family"]
     if not isinstance(family, str) or _FAMILY.fullmatch(family) is None:
         problems.append("family is lowercase letters, digits and hyphens, starting with a letter")
@@ -303,12 +425,29 @@ def manifest_problems(candidate: object) -> list[str]:
         problems.append(f"surface is one of {', '.join(SURFACES)}")
     if candidate["truth"] != "invented":
         problems.append("truth is invented")
+    if model:
+        problems.extend(_generation_problems(candidate["generation"]))
+        produced = candidate["maps_produced"]
+        if not (
+            isinstance(produced, Mapping)
+            and _same_keys(produced, ("normal", "height"))
+            and type(produced["normal"]) is bool
+            and type(produced["height"]) is bool
+        ):
+            problems.append("maps_produced has exactly normal and height, each true or false")
     controls = candidate["controls"]
     if not _is_list(controls):
         return [*problems, "controls is a list"]
     constraints = candidate["constraints"]
     if not _is_list(constraints):
         return [*problems, "constraints is a list"]
+    if model and len(controls) > 0:
+        problems.append(
+            "a model-made maker declares no controls; a variation is a new generation and a new "
+            "version"
+        )
+    if model and len(constraints) > 0:
+        problems.append("a model-made maker declares no constraints")
 
     declared: dict[str, Mapping[str, Any]] = {}
     for index, control in enumerate(controls):
@@ -327,9 +466,12 @@ def manifest_problems(candidate: object) -> list[str]:
         problem = _value_problem(control, control["default"])
         if problem is not None:
             problems.append(f"controls[{index}]: default {problem}")
+    # A v1 maker is opaque. A procedural maker of a class that bakes a height field declares the
+    # controls the bake reads; a glazing maker, which bakes none, declares none of them.
+    relief = not v2 or (not model and candidate["material_class"] in RELIEF_CLASSES)
     for key, (unit, lowest, highest) in COMMON_CONTROLS.items():
         control = declared.get(key)
-        if (
+        if relief and (
             control is None
             or control["kind"] != "integer"
             or control["unit"] != unit
@@ -339,6 +481,15 @@ def manifest_problems(candidate: object) -> list[str]:
             problems.append(
                 f"{key} is an integer control in {unit} within {lowest} to {highest}, "
                 "because the bake reads it"
+            )
+        if (
+            not relief
+            and not model
+            and candidate["material_class"] == "glazing"
+            and control is not None
+        ):
+            problems.append(
+                f"{key} is not a control of a glazing maker, whose bake reads no height field"
             )
 
     integer_keys = {key for key, control in declared.items() if control["kind"] == "integer"}
@@ -475,8 +626,10 @@ def recipe_problems(candidate: object, manifest: Mapping[str, Any]) -> list[str]
     if problems:
         return problems
 
-    height_range = parameters["height_range_mm"]
-    if (
+    if manifest["kind"] == "model" and seed != manifest["generation"]["seed"]:
+        problems.append("seed is the seed the model generated with")
+    height_range = parameters.get("height_range_mm")
+    if _is_integer(height_range) and (
         height_range * resolution["width"] > HEIGHT_RANGE_TEXEL_LIMIT * extent["u"]
         or height_range * resolution["height"] > HEIGHT_RANGE_TEXEL_LIMIT * extent["v"]
     ):

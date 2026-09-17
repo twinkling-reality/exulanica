@@ -354,6 +354,59 @@
       ],
       "changes": [],
       "problems": []
+    },
+    {
+      "name": "a model-made maker's recipe states no controls and the generation's seed",
+      "set": "cc0.storefront-metal",
+      "manifest_changes": [
+        {"path": ["profile"], "value": "exulanica.texture-maker/v2"},
+        {"path": ["kind"], "value": "model"},
+        {"path": ["material_class"], "value": "opaque"},
+        {"path": ["controls"], "value": []},
+        {"path": ["generation"], "value": {"model": {"id": "example/texture-model", "revision": "0123456789abcdef0123456789abcdef01234567", "weights_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}, "conditioning": [{"role": "reference", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}], "inputs": {"prompt": "brushed aluminium storefront panel"}, "seed": 2026091605, "sampler": {"name": "an-example-sampler", "steps": 30, "guidance_millionths": 7500000}, "runtime": {"hardware": "an example accelerator", "libraries": [{"name": "an-example-library", "version": "1.0.0"}]}}},
+        {"path": ["maps_produced"], "value": {"normal": true, "height": false}}
+      ],
+      "changes": [
+        {"path": ["parameters"], "value": {}}
+      ],
+      "problems": []
+    },
+    {
+      "name": "a model-made maker's recipe has the seed the model generated with",
+      "set": "cc0.storefront-metal",
+      "manifest_changes": [
+        {"path": ["profile"], "value": "exulanica.texture-maker/v2"},
+        {"path": ["kind"], "value": "model"},
+        {"path": ["material_class"], "value": "opaque"},
+        {"path": ["controls"], "value": []},
+        {"path": ["generation"], "value": {"model": {"id": "example/texture-model", "revision": "0123456789abcdef0123456789abcdef01234567", "weights_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}, "conditioning": [{"role": "reference", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}], "inputs": {"prompt": "brushed aluminium storefront panel"}, "seed": 2026091605, "sampler": {"name": "an-example-sampler", "steps": 30, "guidance_millionths": 7500000}, "runtime": {"hardware": "an example accelerator", "libraries": [{"name": "an-example-library", "version": "1.0.0"}]}}},
+        {"path": ["maps_produced"], "value": {"normal": true, "height": false}}
+      ],
+      "changes": [
+        {"path": ["parameters"], "value": {}},
+        {"path": ["seed"], "value": 7}
+      ],
+      "problems": ["seed is the seed the model generated with"]
+    },
+    {
+      "name": "a glazing maker's recipe has no height rule",
+      "set": "cc0.storefront-metal",
+      "manifest_changes": [
+        {"path": ["profile"], "value": "exulanica.texture-maker/v2"},
+        {"path": ["material_class"], "value": "glazing"},
+        {"path": ["controls", 23], "remove": true},
+        {"path": ["controls", 22], "remove": true},
+        {"path": ["controls", 21], "remove": true},
+        {"path": ["controls", 20], "remove": true}
+      ],
+      "changes": [
+        {"path": ["parameters", "height_range_mm"], "remove": true},
+        {"path": ["parameters", "occlusion_radius_mm"], "remove": true},
+        {"path": ["parameters", "occlusion_depth_mm"], "remove": true},
+        {"path": ["parameters", "occlusion_strength_permille"], "remove": true},
+        {"path": ["extent_mm", "u"], "value": 16}
+      ],
+      "problems": []
     }
   ],
   "manifests": [
@@ -382,7 +435,7 @@
         {"path": ["truth"], "value": "observed"}
       ],
       "problems": [
-        "profile is exulanica.texture-maker/v1",
+        "profile is exulanica.texture-maker/v1 or exulanica.texture-maker/v2",
         "maker_id is lowercase letters, digits, dots and hyphens, starting with a letter",
         "version is a positive integer",
         "kind is procedural",
@@ -614,6 +667,176 @@
       "name": "any constraint may carry a condition",
       "maker": "loom.brick",
       "changes": [{"path": ["constraints", 3, "when"], "value": {"param": "bond", "equals": "stack"}}],
+      "problems": []
+    },
+    {
+      "name": "a v2 procedural maker states its class",
+      "maker": "loom.metal",
+      "changes": [
+        {"path": ["profile"], "value": "exulanica.texture-maker/v2"},
+        {"path": ["material_class"], "value": "opaque"}
+      ],
+      "problems": []
+    },
+    {
+      "name": "a v2 procedural manifest has exactly its fields",
+      "maker": "loom.metal",
+      "changes": [
+        {"path": ["profile"], "value": "exulanica.texture-maker/v2"}
+      ],
+      "problems": ["a maker manifest has exactly profile, maker_id, version, kind, material_class, family, surface, truth, controls, constraints"]
+    },
+    {
+      "name": "a v2 maker's class is one of four",
+      "maker": "loom.metal",
+      "changes": [
+        {"path": ["profile"], "value": "exulanica.texture-maker/v2"},
+        {"path": ["material_class"], "value": "emissive"}
+      ],
+      "problems": ["material_class is one of opaque, cutout, decal, glazing"]
+    },
+    {
+      "name": "a v2 maker's kind is procedural or model",
+      "maker": "loom.metal",
+      "changes": [
+        {"path": ["profile"], "value": "exulanica.texture-maker/v2"},
+        {"path": ["material_class"], "value": "opaque"},
+        {"path": ["kind"], "value": "learned"}
+      ],
+      "problems": ["kind is one of procedural, model"]
+    },
+    {
+      "name": "a glazing maker declares no height or occlusion controls",
+      "maker": "loom.metal",
+      "changes": [
+        {"path": ["profile"], "value": "exulanica.texture-maker/v2"},
+        {"path": ["material_class"], "value": "glazing"}
+      ],
+      "problems": [
+        "height_range_mm is not a control of a glazing maker, whose bake reads no height field",
+        "occlusion_radius_mm is not a control of a glazing maker, whose bake reads no height field",
+        "occlusion_depth_mm is not a control of a glazing maker, whose bake reads no height field",
+        "occlusion_strength_permille is not a control of a glazing maker, whose bake reads no height field"
+      ]
+    },
+    {
+      "name": "a glazing maker without them is well formed",
+      "maker": "loom.metal",
+      "changes": [
+        {"path": ["profile"], "value": "exulanica.texture-maker/v2"},
+        {"path": ["material_class"], "value": "glazing"},
+        {"path": ["controls", 23], "remove": true},
+        {"path": ["controls", 22], "remove": true},
+        {"path": ["controls", 21], "remove": true},
+        {"path": ["controls", 20], "remove": true}
+      ],
+      "problems": []
+    },
+    {
+      "name": "a cutout maker declares the controls its bake reads",
+      "maker": "loom.metal",
+      "changes": [
+        {"path": ["profile"], "value": "exulanica.texture-maker/v2"},
+        {"path": ["material_class"], "value": "cutout"},
+        {"path": ["controls", 20], "remove": true}
+      ],
+      "problems": ["height_range_mm is an integer control in mm within 1 to 64, because the bake reads it"]
+    },
+    {
+      "name": "a model-made maker is well formed",
+      "maker": "loom.metal",
+      "changes": [
+        {"path": ["profile"], "value": "exulanica.texture-maker/v2"},
+        {"path": ["kind"], "value": "model"},
+        {"path": ["material_class"], "value": "opaque"},
+        {"path": ["controls"], "value": []},
+        {"path": ["generation"], "value": {"model": {"id": "example/texture-model", "revision": "0123456789abcdef0123456789abcdef01234567", "weights_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}, "conditioning": [{"role": "reference", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}], "inputs": {"prompt": "brushed aluminium storefront panel"}, "seed": 2026091605, "sampler": {"name": "an-example-sampler", "steps": 30, "guidance_millionths": 7500000}, "runtime": {"hardware": "an example accelerator", "libraries": [{"name": "an-example-library", "version": "1.0.0"}]}}},
+        {"path": ["maps_produced"], "value": {"normal": true, "height": false}}
+      ],
+      "problems": []
+    },
+    {
+      "name": "a model-made manifest has exactly its fields",
+      "maker": "loom.metal",
+      "changes": [
+        {"path": ["profile"], "value": "exulanica.texture-maker/v2"},
+        {"path": ["kind"], "value": "model"},
+        {"path": ["material_class"], "value": "opaque"}
+      ],
+      "problems": ["a maker manifest has exactly profile, maker_id, version, kind, material_class, family, surface, truth, controls, constraints, generation, maps_produced"]
+    },
+    {
+      "name": "a model-made maker declares no controls",
+      "maker": "loom.metal",
+      "changes": [
+        {"path": ["profile"], "value": "exulanica.texture-maker/v2"},
+        {"path": ["kind"], "value": "model"},
+        {"path": ["material_class"], "value": "opaque"},
+        {"path": ["generation"], "value": {"model": {"id": "example/texture-model", "revision": "0123456789abcdef0123456789abcdef01234567", "weights_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}, "conditioning": [{"role": "reference", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}], "inputs": {"prompt": "brushed aluminium storefront panel"}, "seed": 2026091605, "sampler": {"name": "an-example-sampler", "steps": 30, "guidance_millionths": 7500000}, "runtime": {"hardware": "an example accelerator", "libraries": [{"name": "an-example-library", "version": "1.0.0"}]}}},
+        {"path": ["maps_produced"], "value": {"normal": true, "height": false}}
+      ],
+      "problems": ["a model-made maker declares no controls; a variation is a new generation and a new version"]
+    },
+    {
+      "name": "a model-made maker declares no constraints",
+      "maker": "loom.metal",
+      "changes": [
+        {"path": ["profile"], "value": "exulanica.texture-maker/v2"},
+        {"path": ["kind"], "value": "model"},
+        {"path": ["material_class"], "value": "opaque"},
+        {"path": ["controls"], "value": []},
+        {"path": ["generation"], "value": {"model": {"id": "example/texture-model", "revision": "0123456789abcdef0123456789abcdef01234567", "weights_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}, "conditioning": [{"role": "reference", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}], "inputs": {"prompt": "brushed aluminium storefront panel"}, "seed": 2026091605, "sampler": {"name": "an-example-sampler", "steps": 30, "guidance_millionths": 7500000}, "runtime": {"hardware": "an example accelerator", "libraries": [{"name": "an-example-library", "version": "1.0.0"}]}}},
+        {"path": ["maps_produced"], "value": {"normal": true, "height": false}},
+        {"path": ["constraints", 0], "value": {"kind": "less", "left": {"extent": "u"}, "right": {"constant": 100000}, "explanation": "a rule"}}
+      ],
+      "problems": ["a model-made maker declares no constraints"]
+    },
+    {
+      "name": "a generation has exactly its fields",
+      "maker": "loom.metal",
+      "changes": [
+        {"path": ["profile"], "value": "exulanica.texture-maker/v2"},
+        {"path": ["kind"], "value": "model"},
+        {"path": ["material_class"], "value": "opaque"},
+        {"path": ["controls"], "value": []},
+        {"path": ["generation"], "value": {"model": {"id": "example/texture-model", "revision": "0123456789abcdef0123456789abcdef01234567", "weights_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}, "conditioning": [{"role": "reference", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}], "inputs": {"prompt": "brushed aluminium storefront panel"}, "seed": 2026091605, "sampler": {"name": "an-example-sampler", "steps": 30, "guidance_millionths": 7500000}, "runtime": {"hardware": "an example accelerator", "libraries": [{"name": "an-example-library", "version": "1.0.0"}]}}},
+        {"path": ["generation"], "value": {"model": {"id": "example/texture-model", "revision": "0123456789abcdef0123456789abcdef01234567", "weights_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}},
+        {"path": ["maps_produced"], "value": {"normal": true, "height": false}}
+      ],
+      "problems": ["generation has exactly model, conditioning, inputs, seed, sampler, runtime"]
+    },
+    {
+      "name": "every generation field is checked, in order",
+      "maker": "loom.metal",
+      "changes": [
+        {"path": ["profile"], "value": "exulanica.texture-maker/v2"},
+        {"path": ["kind"], "value": "model"},
+        {"path": ["material_class"], "value": "opaque"},
+        {"path": ["controls"], "value": []},
+        {"path": ["generation"], "value": {"model": {"id": "", "revision": "0123456789abcdef0123456789abcdef01234567", "weights_sha256": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"}, "conditioning": [{"role": "reference", "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"}, {"role": "reference", "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"}], "inputs": {"prompt": "brushed aluminium", "parameters": {"steps": 30}}, "seed": -1, "sampler": {"steps": 30}, "runtime": {"hardware": "an example accelerator", "libraries": []}}},
+        {"path": ["maps_produced"], "value": {"normal": "yes", "height": false}}
+      ],
+      "problems": [
+        "generation: model has exactly an id and a revision, non-empty printable ASCII, and the weights_sha256 of its weights",
+        "generation: conditioning is a list of inputs, each a distinct role and the sha256 of its bytes",
+        "generation: inputs has exactly a prompt, non-empty printable ASCII, or parameters, integers and printable ASCII under lowercase keys",
+        "generation: seed is an unsigned 32-bit integer",
+        "generation: sampler has a name and its settings, integers and printable ASCII under lowercase keys",
+        "generation: runtime has exactly the hardware and its libraries, at least one, each a distinct name and its version",
+        "maps_produced has exactly normal and height, each true or false"
+      ]
+    },
+    {
+      "name": "a generation may be given parameters and no conditioning",
+      "maker": "loom.metal",
+      "changes": [
+        {"path": ["profile"], "value": "exulanica.texture-maker/v2"},
+        {"path": ["kind"], "value": "model"},
+        {"path": ["material_class"], "value": "opaque"},
+        {"path": ["controls"], "value": []},
+        {"path": ["generation"], "value": {"model": {"id": "example/texture-model", "revision": "0123456789abcdef0123456789abcdef01234567", "weights_sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}, "conditioning": [], "inputs": {"parameters": {"steps": 30, "style": "weathered"}}, "seed": 2026091605, "sampler": {"name": "an-example-sampler", "steps": 30, "guidance_millionths": 7500000}, "runtime": {"hardware": "an example accelerator", "libraries": [{"name": "an-example-library", "version": "1.0.0"}]}}},
+        {"path": ["maps_produced"], "value": {"normal": true, "height": false}}
+      ],
       "problems": []
     }
   ],

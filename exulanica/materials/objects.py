@@ -35,6 +35,7 @@ __all__ = [
     "CATALOG_PROFILE",
     "LIBRARY_ENTRY_PROFILE",
     "MAKER_PROFILE",
+    "MAKER_PROFILE_V2",
     "MAXIMUM_DEPTH",
     "RECIPE_PROFILE",
     "SAFE_INTEGER",
@@ -54,6 +55,8 @@ __all__ = [
 ]
 
 MAKER_PROFILE: Final = "exulanica.texture-maker/v1"
+#: A maker that states its sets' material class, and is procedural or model-made.
+MAKER_PROFILE_V2: Final = "exulanica.texture-maker/v2"
 RECIPE_PROFILE: Final = "exulanica.texture-recipe/v1"
 LIBRARY_ENTRY_PROFILE: Final = "exulanica.texture-library-entry/v1"
 BAKE_RECEIPT_PROFILE: Final = "exulanica.texture-bake-receipt/v1"

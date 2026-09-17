@@ -1,4 +1,5 @@
 import { canonicalJson } from './canonical-json.js';
+import { MAKER_KINDS, MATERIAL_CLASSES, type MaterialClass, RELIEF_CLASSES } from './classes.js';
 
 /**
  * Recipes and makers as data.
@@ -23,7 +24,16 @@ import { canonicalJson } from './canonical-json.js';
  * length in 1/1024 mm, and the rest are what they say.
  */
 export const RECIPE_PROFILE = 'exulanica.texture-recipe/v1';
+/** A procedural maker of the four-map opaque sets published before material classes. */
 export const MAKER_PROFILE = 'exulanica.texture-maker/v1';
+/**
+ * A maker that states the material class its sets are, and is one of two kinds: `procedural`,
+ * whose sets rebake exactly from a recipe, or `model`, whose sets are a generative model's output,
+ * stored as made. A model-made maker states how its one generation ran and which optional maps the
+ * model produced, and declares no controls: GPU generation is not bit-exact, so a variation is a
+ * new generation, published as a new version, never a replay.
+ */
+export const MAKER_PROFILE_V2 = 'exulanica.texture-maker/v2';
 
 export const UNITS = [
   'mm',
@@ -126,17 +136,59 @@ export type Constraint =
       readonly explanation: string;
     };
 
-export interface MakerManifest {
-  readonly profile: typeof MAKER_PROFILE;
+interface ManifestBase {
   readonly maker_id: string;
   readonly version: number;
-  /** Procedural makers compute every texel from the recipe; nothing else is read. */
-  readonly kind: 'procedural';
   readonly family: string;
   readonly surface: (typeof SURFACES)[number];
   readonly truth: 'invented';
   readonly controls: readonly Control[];
   readonly constraints: readonly Constraint[];
+}
+
+export interface MakerManifestV1 extends ManifestBase {
+  readonly profile: typeof MAKER_PROFILE;
+  /** Procedural makers compute every texel from the recipe; nothing else is read. */
+  readonly kind: 'procedural';
+}
+
+export interface ProceduralMakerManifest extends ManifestBase {
+  readonly profile: typeof MAKER_PROFILE_V2;
+  readonly kind: 'procedural';
+  readonly material_class: MaterialClass;
+}
+
+/** How one generation ran, stated in full, because it can never be run again to the same bytes. */
+export interface Generation {
+  readonly model: { readonly id: string; readonly revision: string; readonly weights_sha256: string };
+  /** Every input the model was conditioned on, by role and by the digest of its bytes. */
+  readonly conditioning: readonly { readonly role: string; readonly sha256: string }[];
+  /** Exactly one of a prompt or the parameters it was given. */
+  readonly inputs:
+    | { readonly prompt: string }
+    | { readonly parameters: Readonly<Record<string, number | string>> };
+  readonly seed: number;
+  readonly sampler: Readonly<Record<string, number | string>> & { readonly name: string };
+  readonly runtime: {
+    readonly hardware: string;
+    readonly libraries: readonly { readonly name: string; readonly version: string }[];
+  };
+}
+
+export interface ModelMakerManifest extends ManifestBase {
+  readonly profile: typeof MAKER_PROFILE_V2;
+  readonly kind: 'model';
+  readonly material_class: MaterialClass;
+  readonly generation: Generation;
+  /** The optional maps the model produced. A map not produced is absent, never filled in. */
+  readonly maps_produced: { readonly normal: boolean; readonly height: boolean };
+}
+
+export type MakerManifest = MakerManifestV1 | ProceduralMakerManifest | ModelMakerManifest;
+
+/** The material class a maker's sets are: every v1 maker's sets are opaque. */
+export function materialClassOf(manifest: MakerManifest): MaterialClass {
+  return manifest.profile === MAKER_PROFILE ? 'opaque' : manifest.material_class;
 }
 
 export type ParameterValue =
@@ -155,9 +207,10 @@ export interface Recipe {
 }
 
 /**
- * Controls every manifest declares, which the bake reads without asking the maker: the height
- * scale and how occlusion is measured. Each is an integer in the stated unit with a range inside
- * the stated bounds, because the bake divides by the first and third.
+ * Controls every procedural maker whose class bakes a height field declares, which the bake reads
+ * without asking the maker: the height scale and how occlusion is measured. Each is an integer in
+ * the stated unit with a range inside the stated bounds, because the bake divides by the first and
+ * third. A glazing maker declares none of them, and a model-made maker declares no controls at all.
  */
 export const COMMON_CONTROLS: Readonly<
   Record<string, { readonly unit: Unit; readonly minimum: number; readonly maximum: number }>
@@ -200,6 +253,21 @@ const MANIFEST_KEYS = [
   'controls',
   'constraints',
 ];
+const PROCEDURAL_MANIFEST_KEYS = [
+  'profile',
+  'maker_id',
+  'version',
+  'kind',
+  'material_class',
+  'family',
+  'surface',
+  'truth',
+  'controls',
+  'constraints',
+];
+const MODEL_MANIFEST_KEYS = [...PROCEDURAL_MANIFEST_KEYS, 'generation', 'maps_produced'];
+const GENERATION_KEYS = ['model', 'conditioning', 'inputs', 'seed', 'sampler', 'runtime'];
+const HEX64 = /^[0-9a-f]{64}$/;
 const BASE_KEYS = ['key', 'kind', 'group', 'label', 'explanation', 'default'];
 const CONTROL_KEYS: ReadonlyMap<string, readonly string[]> = new Map([
   ['integer', [...BASE_KEYS, 'unit', 'minimum', 'maximum']],
@@ -374,27 +442,114 @@ function constraintProblem(
   return null;
 }
 
-/** Why `candidate` is not a well-formed maker manifest, or an empty list. */
-export function manifestProblems(candidate: unknown): string[] {
-  if (!isObject(candidate) || !sameKeys(candidate, MANIFEST_KEYS)) {
-    return [`a maker manifest has exactly ${MANIFEST_KEYS.join(', ')}`];
+const isSettings = (value: unknown): value is Record<string, number | string> =>
+  isObject(value)
+  && Object.entries(value).every(([key, item]) => CONTROL_KEY.test(key) && (isInteger(item) || isText(item)));
+
+/** Why a model-made maker's record of its generation is not well formed, or an empty list. */
+function generationProblems(generation: unknown): string[] {
+  if (!isObject(generation) || !sameKeys(generation, GENERATION_KEYS)) {
+    return [`generation has exactly ${GENERATION_KEYS.join(', ')}`];
   }
   const problems: string[] = [];
-  if (candidate.profile !== MAKER_PROFILE) problems.push(`profile is ${MAKER_PROFILE}`);
+  const model = generation.model;
+  if (!isObject(model) || !sameKeys(model, ['id', 'revision', 'weights_sha256'])
+    || !isText(model.id) || !isText(model.revision)
+    || typeof model.weights_sha256 !== 'string' || !HEX64.test(model.weights_sha256)) {
+    problems.push(
+      'generation: model has exactly an id and a revision, non-empty printable ASCII, and the '
+        + 'weights_sha256 of its weights',
+    );
+  }
+  const conditioning = generation.conditioning;
+  const inputs = Array.isArray(conditioning) ? conditioning : [];
+  const conditioned = Array.isArray(conditioning)
+    && inputs.every((input) => isObject(input) && sameKeys(input, ['role', 'sha256'])
+      && isText(input.role) && typeof input.sha256 === 'string' && HEX64.test(input.sha256))
+    && new Set(inputs.map((input) => (input as Record<string, unknown>).role)).size === inputs.length;
+  if (!conditioned) {
+    problems.push('generation: conditioning is a list of inputs, each a distinct role and the sha256 of its bytes');
+  }
+  const given = generation.inputs;
+  const prompt = isObject(given) && sameKeys(given, ['prompt']) && isText(given.prompt);
+  const parameters = isObject(given) && sameKeys(given, ['parameters']) && isSettings(given.parameters)
+    && Object.keys(given.parameters).length > 0;
+  if (!prompt && !parameters) {
+    problems.push(
+      'generation: inputs has exactly a prompt, non-empty printable ASCII, or parameters, '
+        + 'integers and printable ASCII under lowercase keys',
+    );
+  }
+  if (!isInteger(generation.seed) || generation.seed < 0 || generation.seed > 0xffffffff) {
+    problems.push('generation: seed is an unsigned 32-bit integer');
+  }
+  const sampler = generation.sampler;
+  if (!isSettings(sampler) || !isText(sampler.name)) {
+    problems.push(
+      'generation: sampler has a name and its settings, integers and printable ASCII under '
+        + 'lowercase keys',
+    );
+  }
+  const runtime = generation.runtime;
+  const libraries = isObject(runtime) && Array.isArray(runtime.libraries) ? runtime.libraries : [];
+  const ran = isObject(runtime) && sameKeys(runtime, ['hardware', 'libraries']) && isText(runtime.hardware)
+    && libraries.length > 0
+    && libraries.every((library) => isObject(library) && sameKeys(library, ['name', 'version'])
+      && isText(library.name) && isText(library.version))
+    && new Set(libraries.map((library) => (library as Record<string, unknown>).name)).size === libraries.length;
+  if (!ran) {
+    problems.push(
+      'generation: runtime has exactly the hardware and its libraries, at least one, each a '
+        + 'distinct name and its version',
+    );
+  }
+  return problems;
+}
+
+/** Why `candidate` is not a well-formed maker manifest, or an empty list. */
+export function manifestProblems(candidate: unknown): string[] {
+  const v2 = isObject(candidate) && candidate.profile === MAKER_PROFILE_V2;
+  const model = v2 && (candidate as Record<string, unknown>).kind === 'model';
+  const keys = !v2 ? MANIFEST_KEYS : model ? MODEL_MANIFEST_KEYS : PROCEDURAL_MANIFEST_KEYS;
+  if (!isObject(candidate) || !sameKeys(candidate, keys)) {
+    return [`a maker manifest has exactly ${keys.join(', ')}`];
+  }
+  const problems: string[] = [];
+  if (candidate.profile !== MAKER_PROFILE && !v2) {
+    problems.push(`profile is ${MAKER_PROFILE} or ${MAKER_PROFILE_V2}`);
+  }
   if (typeof candidate.maker_id !== 'string' || !MAKER_ID.test(candidate.maker_id)) {
     problems.push('maker_id is lowercase letters, digits, dots and hyphens, starting with a letter');
   }
   if (!isInteger(candidate.version) || candidate.version < 1) {
     problems.push('version is a positive integer');
   }
-  if (candidate.kind !== 'procedural') problems.push('kind is procedural');
+  if (!v2 && candidate.kind !== 'procedural') problems.push('kind is procedural');
+  if (v2 && !inside(candidate.kind, MAKER_KINDS)) problems.push(`kind is one of ${MAKER_KINDS.join(', ')}`);
+  if (v2 && !inside(candidate.material_class, MATERIAL_CLASSES)) {
+    problems.push(`material_class is one of ${MATERIAL_CLASSES.join(', ')}`);
+  }
   if (typeof candidate.family !== 'string' || !FAMILY.test(candidate.family)) {
     problems.push('family is lowercase letters, digits and hyphens, starting with a letter');
   }
   if (!inside(candidate.surface, SURFACES)) problems.push(`surface is one of ${SURFACES.join(', ')}`);
   if (candidate.truth !== 'invented') problems.push('truth is invented');
+  if (model) {
+    problems.push(...generationProblems(candidate.generation));
+    const produced = candidate.maps_produced;
+    if (!isObject(produced) || !sameKeys(produced, ['normal', 'height'])
+      || typeof produced.normal !== 'boolean' || typeof produced.height !== 'boolean') {
+      problems.push('maps_produced has exactly normal and height, each true or false');
+    }
+  }
   if (!Array.isArray(candidate.controls)) return [...problems, 'controls is a list'];
   if (!Array.isArray(candidate.constraints)) return [...problems, 'constraints is a list'];
+  if (model && candidate.controls.length > 0) {
+    problems.push('a model-made maker declares no controls; a variation is a new generation and a new version');
+  }
+  if (model && candidate.constraints.length > 0) {
+    problems.push('a model-made maker declares no constraints');
+  }
 
   const declared = new Map<string, Control>();
   candidate.controls.forEach((control: unknown, index: number) => {
@@ -416,14 +571,20 @@ export function manifestProblems(candidate: unknown): string[] {
     const problem = checkValue(typed, typed.default);
     if (problem !== null) problems.push(`controls[${index}]: default ${problem}`);
   });
+  // A v1 maker is opaque. A procedural maker of a class that bakes a height field declares the
+  // controls the bake reads; a glazing maker, which bakes none, declares none of them.
+  const relief = !v2 || (!model && RELIEF_CLASSES.includes(candidate.material_class as MaterialClass));
   for (const [key, bounds] of Object.entries(COMMON_CONTROLS)) {
     const control = declared.get(key);
-    if (control === undefined || control.kind !== 'integer' || control.unit !== bounds.unit
-      || control.minimum < bounds.minimum || control.maximum > bounds.maximum) {
+    if (relief && (control === undefined || control.kind !== 'integer' || control.unit !== bounds.unit
+      || control.minimum < bounds.minimum || control.maximum > bounds.maximum)) {
       problems.push(
         `${key} is an integer control in ${bounds.unit} within ${bounds.minimum} to `
           + `${bounds.maximum}, because the bake reads it`,
       );
+    }
+    if (!relief && !model && candidate.material_class === 'glazing' && control !== undefined) {
+      problems.push(`${key} is not a control of a glazing maker, whose bake reads no height field`);
     }
   }
 
@@ -550,9 +711,13 @@ export function recipeProblems(candidate: unknown, manifest: MakerManifest): str
   if (problems.length > 0) return problems;
 
   const recipe = candidate as unknown as Recipe;
-  const range = recipe.parameters.height_range_mm as number;
-  if (range * recipe.resolution.width > HEIGHT_RANGE_TEXEL_LIMIT * recipe.extent_mm.u
-    || range * recipe.resolution.height > HEIGHT_RANGE_TEXEL_LIMIT * recipe.extent_mm.v) {
+  if (manifest.kind === 'model' && recipe.seed !== manifest.generation.seed) {
+    problems.push('seed is the seed the model generated with');
+  }
+  const range = recipe.parameters.height_range_mm;
+  if (isInteger(range)
+    && (range * recipe.resolution.width > HEIGHT_RANGE_TEXEL_LIMIT * recipe.extent_mm.u
+      || range * recipe.resolution.height > HEIGHT_RANGE_TEXEL_LIMIT * recipe.extent_mm.v)) {
     problems.push(
       `height_range_mm times the texels on an axis is at most ${HEIGHT_RANGE_TEXEL_LIMIT} times `
         + 'that axis in mm, a margin that keeps the bake\'s normals exact',
