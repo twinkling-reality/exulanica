@@ -78,6 +78,8 @@ function onSlope(slope: Slope, x: number, y: number): Space {
 
 const FLAT: Slope = { a: 0n, b: 0n, c: 0n, d: 1n };
 const TILT: Slope = { a: 1n, b: 2n, c: 700n, d: 5n };
+/** Below zero everywhere the seeded cases reach, where rounding down and toward zero differ. */
+const SUNK: Slope = { a: 1n, b: 2n, c: -90000n, d: 5n };
 
 /** The square `[0, side] x [0, side]` on a slope, as two triangles split along its diagonal. */
 function square(side: number, slope: Slope): SupportTriangle[] {
@@ -160,6 +162,9 @@ describe('the support clearance rule', () => {
     expect(carveSupport([[[0, 0, 0], [1000, 0, 0], [1000, 3, 0]]], [obstruction], 0, 'case')).toEqual([[[0, 0, 0], [500, 0, 0], [500, 1, 0]]]);
     // The crossing is y = 0.5: on the clip line the part holds only y = 0, which has no area.
     expect(carveSupport([[[0, 0, 0], [1000, 0, 0], [1000, 1, 0]]], [obstruction], 0, 'case')).toEqual([]);
+    // At x = 999 the part spans y in [4.995, 5.005], which holds one integer: one point, (999, 5).
+    expect(carveSupport([[[0, 0, 0], [1000, 5, 0], [0, 10, 0]]], [{ min_x: 1000, min_y: -100, max_x: 2000, max_y: 100 }], 0, 'case'))
+      .toEqual([[[0, 0, 0], [999, 5, 0], [0, 10, 0]]]);
   });
 
   it('keeps the pieces around an obstruction meeting along shared lines, with no crack between them', () => {
@@ -178,9 +183,10 @@ describe('the support clearance rule', () => {
     const next = sequence(20260917);
     const within = (range: number): number => next() % range;
     for (let trial = 0; trial < 60; trial += 1) {
+      const slope = trial % 2 === 0 ? TILT : SUNK;
       const support: SupportTriangle[] = [];
       for (let count = 0; count < 1 + within(4); count += 1) {
-        support.push([onSlope(TILT, within(20000), within(20000)), onSlope(TILT, within(20000), within(20000)), onSlope(TILT, within(20000), within(20000))]);
+        support.push([onSlope(slope, within(20000), within(20000)), onSlope(slope, within(20000), within(20000)), onSlope(slope, within(20000), within(20000))]);
       }
       const obstructions: ClearanceBox[] = [];
       for (let count = 0; count < within(4); count += 1) {
@@ -189,7 +195,7 @@ describe('the support clearance rule', () => {
       }
       const radius = within(500);
       const kept = carveSupport(support, obstructions, radius, `trial ${String(trial)}`);
-      holdsTheRule(support, obstructions, radius, kept, TILT);
+      holdsTheRule(support, obstructions, radius, kept, slope);
 
       const margin = 2n + 2n * BigInt(obstructions.length);
       for (let sample = 0; sample < 200; sample += 1) {
