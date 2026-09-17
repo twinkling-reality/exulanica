@@ -220,10 +220,38 @@ def _records(where: str, raw: object) -> tuple[object, ...]:
         if shape is None or shape is TILE_SHAPE:
             raise InvalidRecordError(f"{where}[{index}] is no city record kind: {kind!r}")
         records.append(shapes.read_record(payload, shape, f"{where}[{index}]"))
+    _require_sorted(where, records)
+    return tuple(records)
+
+
+def _require_sorted(where: str, records: Sequence[object]) -> None:
     keys = [record_sort_key(record) for record in records]
     if keys != sorted(keys) or len(set(keys)) != len(keys):
         raise InvalidRecordError(f"{where} is sorted by kind, version and identity, each once")
-    return tuple(records)
+
+
+def _check_envelope(document: TileDocument) -> None:
+    """What the envelope promises beyond each record: the pins, the grammar, order, membership."""
+    pins = tuple(
+        GrammarPin(entry.grammar_id, entry.grammar_version, entry.descriptor_sha256)
+        for entry in document.grammars
+    )
+    if pins != document.tile.grammar_versions:
+        raise InvalidRecordError("grammars state exactly the tile's grammar pins, in order")
+    for index, entry in enumerate(document.grammars):
+        where = f"grammars[{index}]"
+        key = (entry.grammar_id, entry.grammar_version)
+        if key != (CITY_GRAMMAR_ID, CITY_GRAMMAR_VERSION):
+            raise InvalidRecordError(f"{where}: this reader knows city v2 records only, not {key}")
+        require_identity("subject_identity", entry.subject_identity)
+        _require_sorted(f"{where}.owned", entry.owned)
+        _require_sorted(f"{where}.halo", entry.halo)
+        overlap = {item.identity for item in entry.owned} & {  # type: ignore[attr-defined]
+            item.identity
+            for item in entry.halo  # type: ignore[attr-defined]
+        }
+        if overlap:
+            raise InvalidRecordError(f"identities both owned and halo: {sorted(overlap)}")
 
 
 def read_tile_document(data: bytes) -> TileDocument:
@@ -266,21 +294,9 @@ def read_tile_document(data: bytes) -> TileDocument:
                 halo=_records(f"{where}.halo", item["halo"]),
             )
         )
-    pins = [
-        GrammarPin(entry.grammar_id, entry.grammar_version, entry.descriptor_sha256)
-        for entry in grammars
-    ]
-    if tuple(pins) != tile.grammar_versions:
-        raise InvalidRecordError("grammars state exactly the tile's grammar pins, in order")
-    for entry in grammars:
-        require_identity("subject_identity", entry.subject_identity)
-        overlap = {item.identity for item in entry.owned} & {  # type: ignore[attr-defined]
-            item.identity
-            for item in entry.halo  # type: ignore[attr-defined]
-        }
-        if overlap:
-            raise InvalidRecordError(f"identities both owned and halo: {sorted(overlap)}")
-    return TileDocument(tile, tuple(grammars))
+    document = TileDocument(tile, tuple(grammars))
+    _check_envelope(document)
+    return document
 
 
 @dataclass(slots=True)
@@ -1341,8 +1357,19 @@ def validate_city_document(
     vocabularies: Mapping[str, frozenset[str]] | None = None,
 ) -> CityDocumentReport:
     """Every check a tile's records can be held to without generating them. Refuses the first
-    failure, naming the check that failed in brackets."""
+    failure, naming the check that failed in brackets.
+
+    A document built in memory is held to everything :func:`read_tile_document` holds bytes to:
+    the envelope, and every record's own validator, before any check across records runs.
+    """
     shapes.validate_record(document.tile, TILE_SHAPE)
+    _check_envelope(document)
+    for grammar in document.grammars:
+        for record in grammar.records():
+            shape = _SHAPES_BY_TYPE.get(type(record))
+            if shape is None or shape is TILE_SHAPE:
+                raise InvalidRecordError(f"{type(record).__name__} is no city record kind")
+            shapes.validate_record(record, shape)
     report = CityDocumentReport()
     for grammar in document.grammars:
         checker = _Checker(document, grammar, catalogs)
