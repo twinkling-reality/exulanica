@@ -7,7 +7,7 @@ import {
   validateTileLook,
 } from '../src/playcanvas/generated-tile/look.js';
 
-type Mutable = { -readonly [K: string]: unknown };
+type Mutable = Record<string, unknown>;
 const copy = (): Mutable => structuredClone(TILE_LOOK_V1) as unknown as Mutable;
 const refused = (value: unknown): string => {
   try {

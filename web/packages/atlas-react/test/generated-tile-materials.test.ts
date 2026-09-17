@@ -115,7 +115,7 @@ describe('generated tile materials from texture sets', () => {
     const { library: lib } = library((setId) => {
       if (setId === 'cc0.brick-running-bond') throw new Error('network down');
       const bytes = new Uint8Array(committed(setId));
-      bytes[bytes.length - 1] ^= 1;
+      bytes[bytes.length - 1] = bytes[bytes.length - 1]! ^ 1;
       return bytes;
     });
     const unpinned = await lib.resolve('cc0.invented-marble');
