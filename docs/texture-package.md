@@ -3,9 +3,12 @@
 Status: IMPLEMENTED for eight baked texture sets, their container, the manifest, migration 0065, the
 backend resolver, and the recipes, makers and object store the sets are baked from; and, in
 migration 0066, for a workspace's own recipes and bakes, their erasure, their routes and the bake
-worker (section 14). The appearance of these sets in the rendered product is UNVERIFIED: no
-renderer draws them yet, and that check belongs to the corridor lane, against the gate lane's
-Flatiron baseline. No bake worker runs in any deployment, and no model has been trained.
+worker (section 14). Material classes, the v2 container and the v2 manifest are IMPLEMENTED in the
+readers and the bake (section 16), and nothing is published in them yet: the three makers written
+for glass, foliage and bark are drafts, and no migration pins a v2 set. The appearance of these sets
+in the rendered product is UNVERIFIED: no renderer draws them yet, and that check belongs to the
+corridor lane, against the gate lane's Flatiron baseline. No bake worker runs in any deployment, and
+no model has been trained.
 
 The plan names what shipped and what this package replaces, and both sentences are quoted
 verbatim:
@@ -808,10 +811,19 @@ the record to all of that.
 ## 15. What is not verified
 
 - **The appearance of these sets in the rendered product: UNVERIFIED.** No renderer draws a set yet.
+  That holds for the v2 drafts too, and doubly: no runtime draws a cutout, decal or glazing set at
+  all, so glass, foliage and bark have been judged only on their stored maps and on crude
+  composites written by scratch scripts. Section 16 records the repetition risks those composites
+  did show, and the levers for them.
   The contact sheet was inspected, and it shows the stored maps under a fixed light, which is
   evidence about the bytes and not about the product. The corridor lane verifies appearance against
   the gate lane's Flatiron baseline.
-- The transfer figure in section 7 is gzip over the files, not a measured browser load.
+- The transfer figure in section 7 is gzip over the files, not a measured browser load. No transfer
+  number in this document is a measured corridor load, and section 16 says so plainly.
+- **Soiling by position** (the dirt a pane collects at its edges and along its bottom, which a
+  tiling set cannot hold) is specified but not built. It waits on two grammar inputs, what
+  `soiling_gradient_millionths` means and how deep the soiled bands reach, and on a pane-local
+  frame from the tessellator, because a facade's glazing is one surface covering every pane.
 - That a recipe, run through its maker, produces a set's bytes is checked by the package's suite,
   which runs the TypeScript maker. The backend verifies every binding it can see without the maker,
   and no more, until the planned Node bake worker runs the maker server-side. A stated parameter
@@ -832,3 +844,157 @@ the record to all of that.
 - **Photo-derived recipes have been exercised only in tests**, with their two inert triggers set
   aside. No model has proposed a recipe, no proposed recipe can be stored, and no model has been
   trained.
+
+## 16. Material classes, and the v2 container
+
+Every set in sections 1 to 15 is an opaque tiling surface: brick to kerb, one container layout, one
+way to draw it. A street also needs glass you can see into, leaves you can see between, and paint
+laid over the road, and a renderer cannot draw those the way it draws brick. So a set now DECLARES
+what kind of surface it is, as data, and a renderer binds a material by that declaration and by
+nothing else. A class it does not draw is an unavailable surface with a stated reason, never a
+guess.
+
+### The four classes
+
+The list is closed and append-only: `opaque`, `cutout`, `decal`, `glazing`. The meanings follow
+glTF 2.0 wherever glTF has one, so none of them is a private convention.
+
+| Class | For | How it draws | Maps, in stored order | Bytes a texel |
+| --- | --- | --- | --- | --- |
+| `opaque` | brick to kerb, bark, timber, canvas, panels, ground | as sections 1 to 15 | `base_color` (red, green, blue; sRGB), `normal` (normal_x, normal_y), `orm` | 8 |
+| `cutout` | foliage | glTF `alphaMode: MASK` with `doubleSided: true`: coverage tested against one cutoff, nothing blended | `base_color_coverage` (red, green, blue, coverage), `normal`, `orm` | 9 |
+| `decal` | road paint and markings | glTF `alphaMode: BLEND` on geometry laid over another surface | `base_color_coverage`, `normal`, `orm` | 9 |
+| `glazing` | shop windows and glazed doors | metallic-roughness with metalness 0, plus `KHR_materials_transmission` and `KHR_materials_ior` | `base_color` (red, green, blue; sRGB), `transmission_roughness` (transmission, roughness; linear) | 5 |
+
+A v2 layout carries the normal's x and y only, and no height map at all. `z` follows from x and y
+(`z = sqrt(max(0, 1 - x^2 - y^2))`, the surface pointing out of itself), and the height field is
+never drawn: it can be rebaked exactly from the pinned recipe whenever anything needs it. Measured
+over the eight published sets at brotli 11, dropping the height map saves 15.8 per cent (22,006,082
+bytes to 18,532,589), and dropping the normal's z as well saves 22.8 per cent in all (to
+16,996,931).
+
+### What a class fixes, and what a set declares
+
+The header's `class` object holds the numbers the CLASS fixes, the one the BAKE measures, and, for
+glazing, the film the RECIPE declares. Nothing in it is a number a person would name for a surface;
+those stay recipe controls.
+
+| Class | `class` object |
+| --- | --- |
+| `opaque` | `{}` |
+| `cutout` | `alpha_cutoff: 128` (glTF's default 0.5 in a byte), `coverage_permille` (measured), `double_sided: true` (a leaf is seen from both sides) |
+| `decal` | `coverage_permille` (measured) |
+| `glazing` | `ior_millionths: 1500000` (glTF's default; soda-lime float glass is about 1.52, and 1.5 gives the 0.04 reflectance every PBR renderer assumes for glass), `double_sided: false` (a street is seen from outside its windows), `film_srgb` and `film_roughness_permille` (declared) |
+
+- `coverage_permille` is the share of texels whose coverage is at least the cutoff, floored. Every
+  reader measures it again over the stored texels, so a header cannot state another. A runtime keeps
+  that share in every mip level it generates, or a canopy thins out with distance.
+- `film_srgb` (three integers 0 to 255) and `film_roughness_permille` (0 to 1000) are what the
+  glass looks like where film covers it completely. Readers check their shape and range and never
+  recompute them: they come from the two controls every procedural glazing maker declares,
+  `film_colour` and `film_roughness_permille`. A renderer needs them because a pane collects dirt at
+  its edges and along its bottom, which depends on where in the pane a fragment lies, and a tiling
+  set cannot know that. Soiling by position is stated by the surface and applied by the runtime.
+
+### The v2 header
+
+`exulanica.texture-set/v2` is the same `LTX1` framing as section 3: magic, header length, canonical
+JSON, space padding to 16, contiguous maps. Its header holds exactly `class`, `extent_mm`, `family`,
+`generator`, `layout`, `licence`, `maker_kind`, `maps`, `material_class`, `media_type`, `parameters`,
+`placement`, `profile`, `resolution`, `seed`, `set_id`, `summary`, `tiling`, `title`, `truth` and
+`version`, and then:
+
+- `height_range_mm` and `cavity`, for a procedural set of a class whose bake has a height field
+  (`opaque`, `cutout`, `decal`), because its normals and its occlusion were derived from them;
+- `height_range_mm` alone for a model-made set that ships a height map, and neither key for
+  glazing, which bakes no height field at all.
+
+`maker_kind` is `procedural` or `model`. A procedural set's bytes can be rebaked exactly from its
+recipe, so it publishes the smaller layout. A model-made set cannot be rebaked, because GPU
+generation is not bit-exact, so its stored bytes are the artifact: it ships every map the model
+produced, the normal with its z, and a height map when it has one, and its manifest states which
+maps the model produced at all. A regeneration is a new version, never a replay.
+
+A v1 container stays exactly as sections 3 to 12 describe it, and it is always class `opaque`. The
+eight published sets are not rebaked for this.
+
+### Three readers, one set of cases
+
+A texture set is read by three readers: this package's (`src/container.ts` and
+`src/manifest-reader.ts`), the backend's (`exulanica/world/texture_assets.py` with
+`exulanica/materials/`), and the browser's in `atlas-core`. Every one of them accepts a set, or
+refuses it for exactly one of five reasons: `manifest`, `byte-size`, `digest`, `container` or
+`header`.
+
+`web/packages/loom-texture/test/texture-set-cases.json` is the specification all three run, beside
+the small generated containers in `test/conformance/`. Each refused fixture has exactly one defect,
+so the order a reader happens to check in cannot change the reason it gives, and the case file
+states which reason each case must produce. `test/texture-set-cases.test.ts` also holds the
+committed fixtures to their generator byte for byte, and
+`tests/test_texture_set_cases.py` runs the same file against the backend.
+
+The manifest is `exulanica.texture-manifest/v2`. Its entries hold the nine v1 keys (section 8) plus
+`container_profile` and `material_class`, and an entry's `channels` must be one of the layouts its
+profile and class allow. A v1 container in the manifest is opaque, and nothing else.
+
+### Resolution: a texel no larger than a screen pixel
+
+A set's resolution is not a taste. At the product's default camera, 70 degrees vertically over 900
+pixels, one pixel covers 1.36 mm at 1 m, 2.04 mm at 1.5 m, 2.71 mm at 2 m and 4.07 mm at 3 m; the
+ground 2 m ahead of a 1.62 m eye is 2.57 m away, where a pixel covers 3.49 mm. So the rule is: a
+texel is no larger than a screen pixel at the distance the surface is normally seen from, and the
+resolution follows from the extent and that distance.
+
+| Surfaces | Seen from | Resolution | Texel pitch |
+| --- | --- | --- | --- |
+| Glazing | 1.5 m or more, beside the footway | 1024 over 2000 mm | 1.95 mm |
+| Timber, bark, canvas, sign panel | 1.5 m or more, beside the footway | 512 over 1000 mm | 1.95 mm |
+| Foliage, bare ground | 3 m or more, or ground 2.57 m away | 512 over 2000 mm | 3.91 mm |
+| Road paint | the ground 2.57 m or more away | 256 x 64 over 1000 x 250 mm | 3.91 mm |
+| Tree pit soil | the ground 2.57 m or more away | 256 over 1000 mm | 3.91 mm |
+
+Glazing is twice the extent of the other vertical sets at the same pitch for one reason: a shop pane
+is 1.5 to 3 m wide, so a 1000 mm tile repeats two or three times inside one pane, and a repeat inside
+a single pane reads as wallpaper.
+
+### Draft makers, which nothing publishes
+
+A maker can be written, tested and looked at before any of its sets is published. `DRAFT_MAKERS` in
+`src/makers/index.ts` holds those makers and `library-drafts/` their entries. They go through every
+check `MAKERS` do, including the corner bakes and the tiling proof, but `readLibrary` resolves the
+published library against `MAKERS` alone, so no published recipe and no workspace recipe can name a
+draft maker: `makerFor` refuses its id. A maker joins `MAKERS`, and its entry moves to `library/`, in
+the commit that publishes its first set and pins it in a migration.
+
+The drafts today are `loom.glazing` (`cc0.float-glazing`), `loom.foliage`
+(`cc0.broadleaf-foliage`) and `loom.bark` (`cc0.tree-bark`).
+
+### Known looks risks, and the levers for them
+
+A tiling set repeats, and the eye finds the repeat by its most recognisable feature. Two of the
+drafts have a known risk, recorded here because whoever runs the bench check needs it, and so does
+whoever changes these makers next.
+
+- **Glazing repeats at the pane.** At 1000 mm over a pane 1.5 to 3 m wide, the same dust clusters
+  and rain streaks sat in the same places two or three times in one pane, plainly, in a composite
+  over a dark interior. The set is now 1024 over 2000 mm, which is about one repeat a pane, and the
+  dust is in faint patches rather than an even haze. If the bench still shows it, on a shopfront
+  wider than 4 m drawn as one surface, the levers in order are: less contrast in the dust patches,
+  which are the features the eye recognises, and the streaks less so; then a tile offset per pane,
+  which needs the same pane-local frame that soiling by position needs.
+- **Foliage repeats at the clump.** With clumps of 333 mm and strong clumping, a dense band of
+  leaves repeated every 2 m across a canopy. The set now uses clumps of 200 mm and gentler
+  clumping, and the band is faint. The price is that no large opening in a canopy can come from the
+  texture, so large openings have to come from the canopy's geometry. If a canopy still reads as a
+  leaf-patterned blob at eye level, the answer is not a parameter: it is a non-tiling class of
+  cluster cards in an atlas, with a card expander in the tessellator, which is a design for the
+  orchestrator to schedule across three lanes.
+
+### Every transfer number here is unverified
+
+Every compressed size in this document, in section 7 and anywhere else, is a measurement of files on
+disk with a compressor at a stated setting. None of them is a measured browser load of a corridor,
+and none of them includes the corridor's geometry. Whether a street fits the 28,247,006-byte
+transfer envelope is UNVERIFIED until the corridor lane bakes one and measures it. That measurement
+is also the trigger for republishing the eight v1 sets in the smaller v2 layout, which nothing has
+done and nothing should do before it.
