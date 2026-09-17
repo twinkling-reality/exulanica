@@ -9,7 +9,7 @@
 import * as pc from 'playcanvas';
 import { createObjectContainerAsset, validateGlbContainer } from '../scene-objects.js';
 import type { CatalogAssetRef, CatalogMaterial, CharacterCatalog } from './catalog.js';
-import { sha256Hex } from './digest.js';
+import { hex, sha256Hex } from './digest.js';
 
 export type CharacterAssetLoader = (asset: CatalogAssetRef, signal: AbortSignal) => Promise<ArrayBuffer>;
 
@@ -44,6 +44,13 @@ export interface ContainerLease {
 
 function cancelled(): DOMException {
   return new DOMException('Character request cancelled', 'AbortError');
+}
+
+/** Containers are megabytes: hash them natively off the frame where the platform allows. */
+async function containerSha256(bytes: ArrayBuffer): Promise<string> {
+  const subtle = globalThis.crypto?.subtle;
+  if (!subtle) return sha256Hex(new Uint8Array(bytes));
+  return hex(new Uint8Array(await subtle.digest('SHA-256', bytes)));
 }
 
 export function parseGlb(bytes: ArrayBuffer): { document: GltfDocument; binary: Uint8Array } {
@@ -192,33 +199,8 @@ export class CharacterHost {
     const key = ref.contentSha256;
     let entry = this.containers.get(key);
     if (!entry) {
-      const controller = new AbortController();
-      const created: ContainerEntry = {
-        references: 0,
-        controller,
-        loaded: null,
-        promise: (async () => {
-          const bytes = await loader(ref, controller.signal);
-          if (bytes.byteLength !== ref.byteSize) throw new Error(`Character asset ${ref.assetKey} has the wrong length`);
-          if (sha256Hex(new Uint8Array(bytes)) !== ref.contentSha256) throw new Error(`Character asset ${ref.assetKey} failed its digest`);
-          if (controller.signal.aborted) throw cancelled();
-          const parsed = keepDocument ? parseGlb(bytes) : null;
-          const asset = await createObjectContainerAsset(this.app, `character-${key}`, keepDocument ? bytes.slice(0) : bytes);
-          const loaded: LoadedContainer = {
-            asset,
-            resource: asset.resource as LoadedContainer['resource'],
-            document: parsed?.document ?? null,
-            binary: parsed?.binary ?? null,
-            byteSize: ref.byteSize,
-          };
-          if (created.references === 0 || controller.signal.aborted) {
-            this.dispose(asset);
-            throw cancelled();
-          }
-          created.loaded = loaded;
-          return loaded;
-        })(),
-      };
+      const pending: Omit<ContainerEntry, 'promise'> = { references: 0, controller: new AbortController(), loaded: null };
+      const created: ContainerEntry = Object.assign(pending, { promise: this.load(pending, ref, loader, keepDocument) });
       entry = created;
       this.containers.set(key, entry);
       created.promise.catch(() => {
@@ -255,43 +237,46 @@ export class CharacterHost {
     }
   }
 
+  private async load(
+    entry: { readonly references: number; readonly controller: AbortController; loaded: LoadedContainer | null },
+    ref: CatalogAssetRef,
+    loader: CharacterAssetLoader,
+    keepDocument: boolean,
+  ): Promise<LoadedContainer> {
+    const { signal } = entry.controller;
+    const bytes = await loader(ref, signal);
+    if (bytes.byteLength !== ref.byteSize) throw new Error(`Character asset ${ref.assetKey} has the wrong length`);
+    if ((await containerSha256(bytes)) !== ref.contentSha256) throw new Error(`Character asset ${ref.assetKey} failed its digest`);
+    if (signal.aborted) throw cancelled();
+    const parsed = keepDocument ? parseGlb(bytes) : null;
+    const asset = await createObjectContainerAsset(this.app, `character-${ref.contentSha256}`, keepDocument ? bytes.slice(0) : bytes);
+    if (entry.references === 0 || signal.aborted || this.destroyed) {
+      this.dispose(asset);
+      throw cancelled();
+    }
+    entry.loaded = {
+      asset,
+      resource: asset.resource as LoadedContainer['resource'],
+      document: parsed?.document ?? null,
+      binary: parsed?.binary ?? null,
+      byteSize: ref.byteSize,
+    };
+    return entry.loaded;
+  }
+
   /** A shared material built from a reviewed pack, optionally tinted. */
   async material(material: CatalogMaterial, tint: string | null, signal: AbortSignal): Promise<{ material: pc.StandardMaterial; release(): void }> {
     const key = `${material.asset.contentSha256}:${tint ?? ''}`;
     let entry = this.materials.get(key);
     if (!entry) {
-      const created: MaterialEntry = { references: 0, material: null, lease: null, promise: null as unknown as Promise<pc.StandardMaterial> };
-      const controller = new AbortController();
-      created.promise = (async () => {
-        const lease = await this.acquire(material.asset, controller.signal);
-        created.lease = lease;
-        const textures = lease.container.resource.textures.map((asset) => asset.resource as pc.Texture);
-        const built = new pc.StandardMaterial();
-        built.name = `character:${material.materialId}`;
-        built.diffuseMap = textures[material.roles.baseColor]!;
-        if (tint) built.diffuse.fromString(tint);
-        if (material.roles.normal !== undefined) built.normalMap = textures[material.roles.normal]!;
-        if (material.alphaMode === 'MASK') {
-          built.opacityMap = textures[material.roles.opacity ?? material.roles.baseColor]!;
-          built.opacityMapChannel = material.roles.opacity === undefined ? 'a' : 'r';
-          built.alphaTest = (material.alphaCutoffMilli ?? 500) / 1000;
-          built.alphaToCoverage = this.app.graphicsDevice.samples > 1;
-        }
-        built.cull = material.doubleSided ? pc.CULLFACE_NONE : pc.CULLFACE_BACK;
-        built.useMetalness = true;
-        built.metalness = 0;
-        built.gloss = 1 - material.roughnessMilli / 1000;
-        built.update();
-        created.material = built;
-        return built;
-      })();
+      const pending: Omit<MaterialEntry, 'promise'> = { references: 0, material: null, lease: null };
+      const created: MaterialEntry = Object.assign(pending, { promise: this.buildMaterial(pending, material, tint) });
       created.promise.catch(() => {
         created.lease?.release();
         if (this.materials.get(key) === created) this.materials.delete(key);
       });
       entry = created;
       this.materials.set(key, entry);
-      void controller;
     }
     const held = entry;
     held.references += 1;
@@ -303,7 +288,9 @@ export class CharacterHost {
       if (held.references > 0) return;
       if (this.materials.get(key) === held) this.materials.delete(key);
       held.material?.destroy();
+      held.material = null;
       held.lease?.release();
+      held.lease = null;
     };
     try {
       const built = await held.promise;
@@ -313,6 +300,35 @@ export class CharacterHost {
       release();
       throw error;
     }
+  }
+
+  private async buildMaterial(entry: Omit<MaterialEntry, 'promise'>, material: CatalogMaterial, tint: string | null): Promise<pc.StandardMaterial> {
+    const lease = await this.acquire(material.asset, new AbortController().signal);
+    if (entry.references === 0 || this.destroyed) {
+      // Everyone who asked has gone while the pack loaded.
+      lease.release();
+      throw cancelled();
+    }
+    entry.lease = lease;
+    const textures = lease.container.resource.textures.map((asset) => asset.resource as pc.Texture);
+    const built = new pc.StandardMaterial();
+    built.name = `character:${material.materialId}`;
+    built.diffuseMap = textures[material.roles.baseColor]!;
+    if (tint) built.diffuse.fromString(tint);
+    if (material.roles.normal !== undefined) built.normalMap = textures[material.roles.normal]!;
+    if (material.alphaMode === 'MASK') {
+      built.opacityMap = textures[material.roles.opacity ?? material.roles.baseColor]!;
+      built.opacityMapChannel = material.roles.opacity === undefined ? 'a' : 'r';
+      built.alphaTest = (material.alphaCutoffMilli ?? 500) / 1000;
+      built.alphaToCoverage = this.app.graphicsDevice.samples > 1;
+    }
+    built.cull = material.doubleSided ? pc.CULLFACE_NONE : pc.CULLFACE_BACK;
+    built.useMetalness = true;
+    built.metalness = 0;
+    built.gloss = 1 - material.roughnessMilli / 1000;
+    built.update();
+    entry.material = built;
+    return built;
   }
 
   /**

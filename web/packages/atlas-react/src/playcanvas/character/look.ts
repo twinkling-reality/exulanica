@@ -87,7 +87,7 @@ export function lookSha256(look: CharacterLook): string {
 /** A reproducible stream of 32-bit integers from SHA-256 in counter mode. */
 export class DrawStream {
   private readonly seed: Uint8Array;
-  private block = new Uint8Array(0);
+  private block: Uint8Array = new Uint8Array(0);
   private offset = 0;
   private counter = 0;
   constructor(domain: string, subjectId: string) {
@@ -101,7 +101,7 @@ export class DrawStream {
       this.block = sha256(input);
       this.offset = 0;
     }
-    const value = new DataView(this.block.buffer, this.offset, 4).getUint32(0);
+    const value = new DataView(this.block.buffer, this.block.byteOffset + this.offset, 4).getUint32(0);
     this.offset += 4;
     return value;
   }

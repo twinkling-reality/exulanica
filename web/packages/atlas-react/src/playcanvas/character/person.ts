@@ -57,7 +57,7 @@ export class CharacterPerson {
   private scale = 1;
   private visible = true;
 
-  private constructor(readonly description: CharacterRenderableDescription, private readonly app: pc.AppBase) {
+  private constructor(readonly description: CharacterRenderableDescription, app: pc.AppBase) {
     this.root = new pc.Entity(`character:${description.lookSha256.slice(0, 12)}`, app);
   }
 
