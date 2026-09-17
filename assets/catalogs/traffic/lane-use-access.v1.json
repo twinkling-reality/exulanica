@@ -37,6 +37,21 @@
       }
     },
     {
+      "key": "bus_layover",
+      "label": "Bus layover",
+      "classes": [],
+      "sources": {
+        "classes": "declared: a layover carries no through traffic, so no class drives in one; which vehicle may stand in one is parking-kind-access's bus_layover, and it is the city bus"
+      },
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/traffic-contract.md"
+      }
+    },
+    {
       "key": "cycle",
       "label": "Cycle lane",
       "classes": [

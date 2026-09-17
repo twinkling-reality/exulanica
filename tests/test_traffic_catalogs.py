@@ -83,6 +83,7 @@ DECLARED = (
     ("signal-plan", "fixed_two_phase_60s", "intervals[5].duration_ms"),
     ("lane-use-access", "buffer", "classes"),
     ("lane-use-access", "bus", "classes"),
+    ("lane-use-access", "bus_layover", "classes"),
     ("lane-use-access", "cycle", "classes"),
     ("lane-use-access", "general", "classes"),
     ("lane-use-access", "parking", "classes"),
@@ -184,13 +185,15 @@ def test_the_city_keys_map_to_the_classes_they_admit():
         ("lane-use", catalogs.lane_uses),
         ("parking-kind", catalogs.parking_kinds),
     ):
-        city = json.loads((ROOT / "assets" / "catalogs" / f"{city_catalog}.v1.json").read_text())
+        [path] = sorted((ROOT / "assets" / "catalogs").glob(f"{city_catalog}.v*.json"))
+        city = json.loads(path.read_text())
         assert [mapping.key for mapping in mappings] == sorted(
             entry["key"] for entry in city["entries"]
         )
     assert {mapping.key: mapping.classes for mapping in catalogs.lane_uses} == {
         "buffer": (),
         "bus": ("city_bus",),
+        "bus_layover": (),
         "cycle": ("bicycle",),
         "general": ("bicycle", "city_bus", "passenger_car", "van"),
         "parking": (),
@@ -203,7 +206,8 @@ def test_the_city_keys_map_to_the_classes_they_admit():
         "loading": ("van",),
     }
     # Exactly the lane uses the city says carry no traffic map to no class.
-    city = json.loads((ROOT / "assets" / "catalogs" / "lane-use.v1.json").read_text())
+    [path] = sorted((ROOT / "assets" / "catalogs").glob("lane-use.v*.json"))
+    city = json.loads(path.read_text())
     assert {entry["key"] for entry in city["entries"] if entry["traffic"] == "none"} == {
         mapping.key for mapping in catalogs.lane_uses if not mapping.classes
     }
@@ -271,7 +275,7 @@ def test_every_numeric_field_names_exactly_one_source():
         for mapping in mappings:
             assert {name for name, _ in mapping.sources} == {"classes"}
             rows += [(catalog_id, text) for _, text in mapping.sources]
-    assert len(rows) == 4 * 18 + (3 + 4) + (3 + 1) + 3 + 3 + (8 + 3) + 5 + 5
+    assert len(rows) == 4 * 18 + (3 + 4) + (3 + 1) + 3 + 3 + (8 + 3) + 6 + 5
     for catalog_id, text in rows:
         if text.startswith("declared: "):
             assert len(text) > len("declared: ") + 20, text
@@ -438,7 +442,9 @@ def test_a_mapping_to_an_unknown_class_is_refused(copied):
     _edit(
         copied,
         "lane-use-access.v1.json",
-        lambda document: document["entries"][2].update({"classes": ["bicycle", "tram"]}),
+        lambda document: next(
+            entry for entry in document["entries"] if entry["key"] == "cycle"
+        ).update({"classes": ["bicycle", "tram"]}),
     )
     _refused(copied, "cycle admits unknown classes ['tram']")
 

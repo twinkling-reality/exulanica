@@ -225,7 +225,7 @@ def city_catalog_schemas(*, texture_sets: Mapping[str, TextureSet]) -> tuple[Cat
         ),
         CatalogSchema(
             "lane-use",
-            1,
+            2,
             (
                 ("label", text_field),
                 ("traffic", choice_field(("carries", "none"))),

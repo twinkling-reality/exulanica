@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "catalog_id": "lane-use",
-  "catalog_version": 1,
+  "catalog_version": 2,
   "entries": [
     {
       "key": "buffer",
@@ -25,6 +25,21 @@
       "width_minimum_mm": 3000,
       "width_maximum_mm": 4250,
       "reason": "Authored lane use; the traffic lane maps it to vehicle classes. Transit lanes are discussed in NACTO Urban Street Design Guide (Island Press, 2013), which was not re-read in this build and is not quoted.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "bus_layover",
+      "label": "Bus layover",
+      "traffic": "none",
+      "width_minimum_mm": 3000,
+      "width_maximum_mm": 4250,
+      "reason": "Authored lane use. A bus waiting between runs stands in a layover, which parking-kind has named since version 1 while lane-use could not say it: a layover carries no through traffic, so its traffic is none, and it is as wide as the bus lane it comes off.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
