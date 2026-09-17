@@ -112,13 +112,14 @@ linear light weighted by coverage, and its coverage is then scaled by the one fa
 share of texels at or above the cutoff equal to the set's `coverage_permille` (texels tied with the
 last one wanted are covered together). Each sample is tested against `alpha_cutoff / 255` and nothing
 is blended; depth is written; the shadow pass applies the same test; both faces are drawn and lit, a
-back face with its normal reversed; a set is still one draw. Measured on the bench with a test-only
-leaf coverage field, not yet on published foliage
-(`evidence/cutout-acceptance.log.txt`): silhouette coverage at 30 m is within 4.2 per cent of 5 m for a
-field at 70.5 per cent coverage and within 1.1 per cent at 38.9 per cent, where plain averaged levels
-drift by 10.1 and 5.7 per cent; the cutout's shadow has holes (49.4 per cent of the ground under it
-shadowed, against 100 per cent for the same square drawn opaque); and its back face is lit (91.2
-against 49.7 without two-sided lighting).
+back face with its normal reversed; a set is still one draw. Measured on the bench on the published
+`cc0.broadleaf-foliage` (`evidence/cutout-acceptance.log.txt`): silhouette coverage at 30 m is within
+2.2 per cent of 5 m, where plain averaged levels drift by 12.1 per cent (this set thickens on plain
+levels, because averaging pulls the many part-covered texels at leaf edges over the cutoff; the
+test-only field thinned instead, by 4.2 per cent kept against 10.1 plain). Its shadow is dappled
+(21.1 per cent of the ground under it shadowed, against 100 per cent for the same square drawn
+opaque), and its back face is lit (92.6 against 36.7 without two-sided lighting, where the front face
+in shade reads 36.6).
 
 A `decal` set is glTF's `alphaMode: BLEND` over the surface it lies on: road paint, a stain, a patch
 of grime, geometry that is part of the surface under it rather than a thing of its own. Its
@@ -140,11 +141,13 @@ decal takes bucket 160 and glazing 96, above and below the default 127, so every
 the opaque and cutout scene and before any glass, and a lane line behind a shop window is drawn
 before the window.
 
-**Decal acceptance is not measured yet.** The walk that measures it is committed as the bench's
-`measureDecalWalk`: a test-only worn lane line lying on asphalt in the same plane, walked 30 m at eye
-level beside it, comparing the decal as bound and the same decal with no depth bias against a
-reference drawn with no depth test, pose by pose. Its numbers are owed in
-`evidence/decal-acceptance.log.txt`, and the bias constants stand on argument until they exist.
+Measured on the bench with a test-only worn lane line lying on published asphalt in the same plane,
+walked 30 m at eye level beside it (`evidence/decal-acceptance.log.txt`): at each of 32 poses the line
+is compared against a reference drawn with no depth test, pixel by pixel. As bound it matches the
+reference at every pose (minimum, mean and maximum share 1.000, no pose below 0.99); with both biases
+set to 0 it matches 0.611 of the line's pixels on average, and 19 of the 32 poses fall below 0.99,
+between 0.011 and 1.000. So the bias is not a refinement: without it the road wins a third of the
+line's pixels, and which pixels it wins changes pose by pose, which is the crawling a walker sees.
 
 A `glazing` set is glTF metallic-roughness with metalness 0 plus `KHR_materials_transmission` and
 `KHR_materials_ior`. Its `transmission_roughness` map is uploaded with transmission in red and
@@ -161,12 +164,14 @@ pane is geometry the grammar states; the runtime never draws the far side of a b
 glass, because the scene copy holds only what was drawn in front of it. The film the class object
 declares is for laying more film by position, which waits for its inputs.
 
-Measured on the bench with test-only clean glass and a test-only checker backing 0.6 m behind the
-pane, not yet on the published `cc0.float-glazing` (`evidence/glazing-acceptance.log.txt`): the
-backing reads through at 2, 4 and 6 m (luminance correlation 0.97 to 1.00, at least 86 per cent of its
-contrast kept); with the backing at about a shop interior's brightness the sky's reflection is 70 per
-cent of the pane's light at 70 degrees from its normal and 90 per cent at 80 (against a sunlit backing
-it passes half only beyond 75 degrees); and a pane darkens the ground under it by nothing. Stated
+Measured on the bench on the published `cc0.float-glazing`, against a test-only checker backing 0.6 m
+behind the pane, since no interior stands behind glass yet
+(`evidence/glazing-acceptance.log.txt`): the backing reads through at 2, 4 and 6 m (luminance
+correlation 0.89 to 0.90, 0.89 to 1.00 of its contrast kept); with the backing at about a shop
+interior's brightness the sky's reflection is 38 per cent of the pane's light face on, passes half
+between 50 and 70 degrees, and reaches 73 per cent at 70 degrees and 91 at 80, while what is behind
+the glass fades with it (correlation 0.89 face on, 0.25 at 80); and a pane darkens the ground under it
+by nothing. Stated
 limits: the probe is the look's sky gradient, so glass reflects sky, not the street; one set is one
 draw, so its panes are not sorted against one another.
 

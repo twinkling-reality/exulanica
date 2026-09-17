@@ -493,7 +493,13 @@ export class Bench {
   }
 
   /** The test-only leaf field as a cutout material, bound by the runtime's own class binding. */
-  private cutoutMaterial(discs?: number): { readonly material: pc.StandardMaterial; readonly set: DecodedTextureSet } {
+  private async cutoutMaterial(discs?: number, setId?: string): Promise<{ readonly material: pc.StandardMaterial; readonly set: DecodedTextureSet }> {
+    // A published set id measures the class on what the texture lane shipped; otherwise the test-only field.
+    if (setId !== undefined) {
+      const published = await this.library.resolve(setId);
+      if (published.state !== 'available') throw new Error(`${setId} does not draw: ${published.reason}`);
+      return { material: published.material, set: published.set };
+    }
     const set = testCutoutSet(512, 2000, discs);
     const resolution = this.library.adopt({ state: 'decoded', setId: set.entry.setId, set, transferredBytes: 0 });
     if (resolution.state !== 'available') throw new Error(`the test cutout does not draw: ${resolution.reason}`);
@@ -553,9 +559,9 @@ export class Bench {
    * drawn as an opaque mask; a pixel is covered where the cutout frame differs from the empty frame.
    * Measured with the runtime's coverage-keeping levels and, for comparison, with plain averaged levels.
    */
-  async measureCutoutCoverage(distances: readonly number[], discs?: number): Promise<Record<string, unknown>> {
+  async measureCutoutCoverage(distances: readonly number[], discs?: number, setId?: string): Promise<Record<string, unknown>> {
     this.clear();
-    const { material, set } = this.cutoutMaterial(discs);
+    const { material, set } = await this.cutoutMaterial(discs, setId);
     const plain = this.plainMipMaterial(material, set);
     const mask = this.unlitMask();
     const centre = [0, 40, 0] as const;
@@ -593,9 +599,9 @@ export class Bench {
    * ground samples shadowed (closer to the opaque square's shadow than to open light), for the cutout
    * and for the same square drawn opaque.
    */
-  async measureCutoutShadow(): Promise<Record<string, unknown>> {
+  async measureCutoutShadow(setId?: string): Promise<Record<string, unknown>> {
     this.clear();
-    const { material, set } = this.cutoutMaterial();
+    const { material, set } = await this.cutoutMaterial(undefined, setId);
     const ground = await this.library.resolve('cc0.footway-paving');
     const sun = this.environment!.sun;
     const rotation = sun.getRotation().clone();
@@ -647,9 +653,9 @@ export class Bench {
    * light reaches the back face. Mean luminance of the covered pixels with two-sided lighting (the
    * binding) and, for comparison, without it, and of the front face with the sun on the far side.
    */
-  async measureCutoutBackFace(): Promise<Record<string, unknown>> {
+  async measureCutoutBackFace(setId?: string): Promise<Record<string, unknown>> {
     this.clear();
-    const { material, set } = this.cutoutMaterial();
+    const { material, set } = await this.cutoutMaterial(undefined, setId);
     const oneSided = material.clone() as pc.StandardMaterial;
     oneSided.twoSidedLighting = false; oneSided.update();
     const sun = this.environment!.sun;
@@ -684,7 +690,14 @@ export class Bench {
   }
 
   /** The test-only clean glazing set as a material, bound by the runtime's class binding, with the scene colour copy on. */
-  private glazingMaterial(filmShare = 0): { readonly material: pc.StandardMaterial; readonly set: DecodedTextureSet } {
+  private async glazingMaterial(filmShare = 0, setId?: string): Promise<{ readonly material: pc.StandardMaterial; readonly set: DecodedTextureSet }> {
+    // A published set id measures the class on what the texture lane shipped; otherwise the test-only glass.
+    if (setId !== undefined) {
+      const published = await this.library.resolve(setId);
+      if (published.state !== 'available') throw new Error(`${setId} does not draw: ${published.reason}`);
+      this.environment!.requestSceneColor();
+      return { material: published.material, set: published.set };
+    }
     const set = testGlazingSet(512, 2000, filmShare);
     const resolution = this.library.adopt({ state: 'decoded', setId: set.entry.setId, set, transferredBytes: 0 });
     if (resolution.state !== 'available') throw new Error(`the test glazing does not draw: ${resolution.reason}`);
@@ -717,9 +730,9 @@ export class Bench {
    * face on at each distance. Reflection by angle: the share of A's luminance that R, the reflection
    * alone, accounts for, at 4 m and each angle from the pane's normal.
    */
-  async measureGlazing(distances: readonly number[], angles: readonly number[], backingLevel = 1): Promise<Record<string, unknown>> {
+  async measureGlazing(distances: readonly number[], angles: readonly number[], backingLevel = 1, setId?: string): Promise<Record<string, unknown>> {
     this.clear();
-    const { material, set } = this.glazingMaterial();
+    const { material, set } = await this.glazingMaterial(0, setId);
     const backing = this.backingMaterials(backingLevel);
     const mask = this.unlitMask();
     const centre = [0, 40, 0] as const;
@@ -779,9 +792,9 @@ export class Bench {
    * Glazing casts no shadow: the same scene as measureCutoutShadow with a pane of test glass, which casts
    * shadows exactly as the tile runtime decides for its class (castsShadow).
    */
-  async measureGlazingShadow(): Promise<Record<string, unknown>> {
+  async measureGlazingShadow(setId?: string): Promise<Record<string, unknown>> {
     this.clear();
-    const { material, set } = this.glazingMaterial();
+    const { material, set } = await this.glazingMaterial(0, setId);
     const ground = await this.library.resolve('cc0.footway-paving');
     const sun = this.environment!.sun;
     const rotation = sun.getRotation().clone();
@@ -897,9 +910,9 @@ export class Bench {
   }
 
   /** For screenshots: the pane and its test backing from 4 m at `angle` degrees off the pane's normal, left drawn. */
-  showGlazing(angle: number, filmShare = 0): void {
+  async showGlazing(angle: number, filmShare = 0, setId?: string): Promise<void> {
     this.clear();
-    const { material, set } = this.glazingMaterial(filmShare);
+    const { material, set } = await this.glazingMaterial(filmShare, setId);
     const backing = this.backingMaterials();
     this.cutoutPlane(backing.checker, [0, 40, TEST_BACKING_DEPTH_M], 20, 'front', 2000);
     this.cutoutPlane(material, [0, 40, 0], 2, 'front', set.entry.extentUMm, castsShadow(set));
@@ -909,18 +922,18 @@ export class Bench {
   }
 
   /** For screenshots: a 4 m square of the test field face on at `distance`, left drawn. */
-  showCutoutFaceOn(distance: number, discs?: number): void {
+  async showCutoutFaceOn(distance: number, discs?: number, setId?: string): Promise<void> {
     this.clear();
-    const { material, set } = this.cutoutMaterial(discs);
+    const { material, set } = await this.cutoutMaterial(discs, setId);
     this.cutoutPlane(material, [0, 40, 0], 4, 'front', set.entry.extentUMm);
     this.pose({ position: [0, 40, -distance], target: [0, 40, 0] });
     this.pump(4);
   }
 
   /** For screenshots: the shadow scene of `measureCutoutShadow`, left drawn with the sun straight down. */
-  async showCutoutShadow(): Promise<void> {
+  async showCutoutShadow(setId?: string): Promise<void> {
     this.clear();
-    const { material, set } = this.cutoutMaterial();
+    const { material, set } = await this.cutoutMaterial(undefined, setId);
     const ground = await this.library.resolve('cc0.footway-paving');
     this.environment!.sun.setRotation(new pc.Quat().setFromEulerAngles(0, 0, 0));
     this.cutoutPlane(ground.material, [0, 0, 0], 16, 'up', 1800);

@@ -45,3 +45,38 @@ film lit where transmission falls, checker through the clean glass).
 NOT MEASURED: blur by roughness beyond clean glass; panes overlapping one another (one set is one draw, so its panes are not
 sorted against each other; the scene copy holds only opaque surfaces, so glass is never seen through glass); position-based
 soiling from the class object's film (out of scope until its inputs exist).
+
+
+RE-MEASURED ON THE PUBLISHED SET, 2026-09-17 15:0x
+--------------------------------------------------
+Texture batch 1 published cc0.float-glazing, so the class no longer rests on the test-only glass
+above. Same bench and method, canvas 960 by 600, through .exulanica/bin/gpu-slot; load average 16.32
+before, 16.21 after. measureGlazing(distances, angles, backingLevel, setId) resolves the published set
+through the tile texture library. The backing stays TEST ONLY: a lit checker 0.6 m behind the pane at
+a quarter brightness, standing for a shop interior, since no corridor interior exists to stand behind
+the glass yet.
+
+Reads through (the checker seen through the pane against the checker seen in the open):
+
+  distance   correlation   contrast kept   through   backing   reflection
+  2 m        0.902         0.999           80.0      71.6      27.7
+  4 m        0.890         0.933           84.1      73.2      32.2
+  6 m        0.898         0.886           86.3      73.6      35.1
+
+Reflection by angle off the pane's normal, backing at a quarter brightness:
+
+  angle   reflection share of the pane's light   through   reflection   correlation with backing
+  0       0.382                                  84.1      32.2         0.890
+  30      0.422                                  76.1      32.1         0.896
+  50      0.476                                  71.9      34.2         0.867
+  70      0.728                                  89.9      65.5         0.610
+  80      0.907                                  126.2     114.4        0.246
+
+Reflection passes half the pane's light between 50 and 70 degrees and dominates at 70 and 80, and what
+is behind the glass fades as it does (correlation 0.89 face on, 0.25 at 80). That is the behaviour the
+proposal asks of glass at grazing angles.
+
+Shadow: ground in the open 226.8, ground under the pane 226.8, darkened by 0.000. Glass casts none.
+
+Screenshot: float-glazing-70deg.png beside this record (in .exulanica/briefs/tile-runtime/shots), the
+pane seen at 70 degrees, bright with reflected sky against the checker behind it.

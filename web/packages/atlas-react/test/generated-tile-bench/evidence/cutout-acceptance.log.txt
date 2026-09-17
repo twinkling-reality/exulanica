@@ -40,3 +40,41 @@ UNIT TESTS: test/generated-tile-cutout.test.ts (every level of a 256 x 256 leaf 
 cent of its texels while plain averaging drifts by more than 5 per cent; colour averaged by coverage; the conformance
 cutout fixture binds with alphaTest 128/255, opacity from the colour map's alpha, no blending, depth written, cull
 none, two-sided lighting and a five-level chain).
+
+
+RE-MEASURED ON THE PUBLISHED SET, 2026-09-17 15:0x
+--------------------------------------------------
+Texture batch 1 published cc0.broadleaf-foliage (manifest v2, eleven sets), so the class no longer
+rests on the test-only field above. Same bench, same method, canvas 960 by 600, through
+.exulanica/bin/gpu-slot; load average 16.32 before, 16.21 after. The bench now takes a published set
+id (measureCutoutCoverage(distances, discs, setId)) and resolves it through the tile texture library,
+the same path the runtime uses, rather than adopting a decoded test set.
+
+cc0.broadleaf-foliage measures 561 per mille coverage.
+
+Silhouette coverage of a 4 m square face on, share of its footprint the leaves cover:
+
+  distance   coverage-preserving chain   plain averaged chain
+  5 m        0.5623                      0.5622
+  10 m       0.5718                      0.5720
+  20 m       0.5623                      0.5842
+  30 m       0.5748                      0.6303
+
+  30 m against 5 m:  kept +2.2 per cent, plain +12.1 per cent.
+
+The published set drifts the other way from the test field, which thinned: this foliage THICKENS on
+plain levels, because averaging pulls the many partly covered texels at leaf edges up over the cutoff
+rather than under it. Either way the drift is the mip chain's, and the coverage-preserving chain holds
+the silhouette to 2.2 per cent over the distance a street is walked, inside the 10 per cent the brief
+asks for, where the plain chain is outside it at 12.1.
+
+Shadow (the ground under a 4 m square, sun at the look's elevation):
+  lit ground 227, ground under an opaque square 92, share of the footprint shadowed:
+  cutout 0.211, opaque 1.000. The canopy's shadow is dappled, not a slab.
+
+Back face (the square seen from behind, sun on the far side):
+  two-sided lighting 92.6, one-sided 36.7; the front face unlit reads 36.6.
+  So a leaf seen from behind is lit like a leaf, not like a wall in shade.
+
+Screenshot: foliage-30m.png beside this record (in .exulanica/briefs/tile-runtime/shots), the square
+at 30 m, still a dense green mass with gaps, not thinned away.

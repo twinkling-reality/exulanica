@@ -1,0 +1,64 @@
+Decal acceptance: a test-only worn lane line on asphalt, walked 30 m at eye level beside it.
+
+Run 2026-09-17 14:56, Chromium headless over CDP, WebGL2, Apple M3 Pro, canvas 960 by 600,
+bench dev server on 5191, through .exulanica/bin/gpu-slot. Load average 33.97 before, 34.05 after.
+The whole walk took 1,986 ms.
+
+THE SET IS TEST ONLY (test-decal.ts): 256 by 64 texels over 1000 by 250 mm, a 120 mm band of
+paint whose coverage wears in patches. It is never shipped and never a placeholder for road paint.
+The road under it is the published cc0.carriageway-asphalt, drawn in the same plane (y = 0), so the
+decal and its surface are exactly coplanar, which is the case the depth bias exists for.
+
+METHOD. At each of 32 poses, 1 m apart, four frames are read from the backbuffer:
+  none      the road alone, the line hidden
+  reference the decal drawn with depth test off, so nothing can hide it: what the line should look like
+  bound     the decal exactly as this runtime binds it (depthBias -1, slopeDepthBias -2)
+  unbiased  the same material with both biases set to 0, the control
+A pixel belongs to the line where reference differs from none by more than 30 summed over RGB.
+A pixel matches where it is within 12 summed over RGB of the reference. The share that matches is
+what the table reports: 1 means the line is drawn whole, below 1 means the road shows through it.
+
+RESULT
+  as bound:  min 1, mean 1, max 1, poses below 0.99: 0 of 32
+  unbiased:  min 0, mean 0.6106, max 1, poses below 0.99: 19 of 32
+
+So the bias is not a refinement: without it the surface wins more than a third of the line's pixels,
+and which pixels it wins changes from pose to pose, which is the crawling z-fighting a walker sees.
+With it, every one of the 32 poses draws the line whole, at every distance from 0 to 30 m.
+
+  x (m)   line pixels   bound   unbiased
+  0       11387         1       0.0106
+  0.97    11382         1       0.9935
+  1.94    11377         1       0.1391
+  2.9     11382         1       0.999
+  3.87    11377         1       0.8786
+  4.84    11373         1       0.9895
+  5.81    11375         1       0.0262
+  6.77    11375         1       0.2182
+  7.74    11370         1       0.032
+  8.71    11366         1       0.9982
+  9.68    11369         1       0.0061
+  10.65   11355         1       0.78
+  11.61   11374         1       0.0744
+  12.58   11357         1       0.0012
+  13.55   11367         1       1
+  14.52   11349         1       1
+  15.48   11368         1       0.9971
+  16.45   11353         1       0.9977
+  17.42   11361         1       0.9923
+  18.39   11355         1       0.9932
+  19.35   11355         1       0.997
+  20.32   11352         1       1
+  21.29   11354         1       0.9995
+  22.26   11359         1       0.9486
+  23.23   11343         1       0.0706
+  24.19   11346         1       0.9897
+  25.16   11338         1       0.1813
+  26.13   11342         1       0.2954
+  27.1    11337         1       1
+  28.06   11344         1       0.7183
+  29.03   11331         1       0.2107
+  30      11338         1       0
+
+Screenshot: the same lane line from eye level, showDecal, retained beside this record as
+decal-lane-line.png. The line runs unbroken from the foot of the frame into the fog.
