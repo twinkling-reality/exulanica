@@ -1,0 +1,16 @@
+MUTATION CHECKS, 2026-09-17, lane/tile-runtime at aae2ef35 on main 36e6d2dd. Each mutant applied to a clean committed tree,
+the named test file run with vitest, and the file restored with git checkout.
+
+MUTANT A: web/packages/atlas-core/src/texture-set.ts, the digest refusal removed
+  (line 290: `refuse('digest', ...)` replaced by `void ('digest', ...)`, so bytes that do not hash to the pin decode).
+  packages/atlas-core/test/texture-set.test.ts: 1 failed, 22 passed (23)
+    failed: texture set reader, refusals > refuses bytes whose digest is not the pin
+
+MUTANT B: web/packages/app/src/composition/renderer.ts, the development guard removed
+  (`import.meta.env.DEV ? generatedTileEvaluationName` became `true ? generatedTileEvaluationName`, and
+  `import.meta.env.DEV && tileName !== null` became `tileName !== null`, so a production build keeps the branch).
+  packages/app/test/generated-tile-evaluation.test.ts: 1 failed, 3 passed (4)
+    failed: unreachable from a production build > emits no tile code, no tile and no texture set in a production build
+    AssertionError: data-generated-tile-evaluation: expected true to be false
+
+Earlier (bench-measurements.log.txt): with the tangent handedness flip removed, the normal sign correlation turns negative.
