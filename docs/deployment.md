@@ -490,15 +490,18 @@ end-user control.
 
 | Role | Holds | Why it is separate |
 | --- | --- | --- |
-| `exulanica_app` | select, insert, update. No delete anywhere. Select only on `predicate` and `schema_migrations` | Row-level security is inert for an owner, and a runtime that could update the vocabulary could disarm the rule that stops a model writing a person's name |
+| `exulanica_app` | select, insert, update. No delete anywhere. Select only on `predicate`, `schema_migrations` and the other registries in `READ_ONLY_TABLES`; select and insert, never update, on `tombstone` | Row-level security is inert for an owner, a runtime that could update the vocabulary could disarm the rule that stops a model writing a person's name, and one that could update a tombstone could postpone or rewrite a deletion. `tests/test_runtime_update_grants.py` names every table it may update and why |
 | `exulanica_ro` | select, and nothing else | The Selection executor runs a plan derived from model output. It must not be able to write whatever happened upstream of it |
 | `exulanica_purge` | A **cross-workspace read** of the narrow holder columns on `capture`, `artifact`, `reconstruction_scene_member`, and `person_derivative_dependency`; update of purge markers on `blob` and `artifact`; queue and completion updates; **DELETE on `embedding` only** | Stored bytes may be shared across workspaces, so the destroy decision needs every holder. A person vector has no harmless stub representation, so the dedicated purger removes that row while every other table remains outside its DELETE authority |
 
 Every UPDATE in that row is column by column, and a review measured what the full-table version
 bought: this role could push a tombstone's `effective_at` a year out, which makes it stop blocking
 derivatives and reopens the leak migration 0011 closed, and could set `purge_completed_at` over a
-photograph still on disk. Neither table carries an UPDATE trigger, so the grant was the only thing
-standing there.
+photograph still on disk. Neither table carried an UPDATE trigger then, so the grant was the only
+thing standing there. Migration 0074 now gives `tombstone` one: every change but
+`purge_completed_at` is refused for any role, and that column moves only for the table owner, a
+superuser or BYPASSRLS administrator, or a role whose only write on the table is the column grant
+this row describes.
 
 **`EXULANICA_PURGE_DATABASE_URL` is checked, not trusted.** It is a connection string and says
 nothing about which role is behind it. `exulanica-purge` asks the database for `current_user` and

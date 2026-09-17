@@ -28,6 +28,11 @@ So this module creates the role and grants it exactly what it needs:
 *   **SELECT only on the pinned asset catalogs.** ``world_reviewed_asset`` (migration 0042) and
     ``world_texture_set`` (migration 0065) each pin reviewed bytes by digest, and a new pin is a
     new migration. A runtime process resolves a pinned asset; it never pins one.
+*   **INSERT and SELECT, never UPDATE, on ``tombstone``.** A deletion request is written once. With
+    UPDATE the runtime could push ``effective_at`` out, which stops a tombstone blocking
+    derivatives, rewrite what it names, or mark a purge complete over bytes still on disk.
+    Migration 0074 refuses the same rewrites for any role, and lets only the purge role's column
+    grant or an administrator record a purge completion.
 *   **No ownership and no BYPASSRLS**, which is the whole point.
 
 Every statement here is built with :mod:`psycopg.sql` rather than an f-string. Role names,
@@ -48,6 +53,7 @@ from exulanica.errors import ExulanicaError
 __all__ = [
     "ACCOUNT_ONLY_TABLES",
     "EXECUTOR_ROLE",
+    "INSERT_ONLY_TABLES",
     "PURGE_CROSS_WORKSPACE_TABLES",
     "PURGE_ROLE",
     "READ_ONLY_TABLES",
@@ -89,6 +95,9 @@ READ_ONLY_TABLES: Final = (
     "world_reviewed_asset",
     "world_texture_set",
 )
+
+#: Tables the runtime may read and append to and may not update. See the module docstring.
+INSERT_ONLY_TABLES: Final = ("tombstone",)
 
 #: The vocabulary is administered, not generated. Without revoking this the role could insert a
 #: predicate row even though it cannot update one.
@@ -312,15 +321,18 @@ def provision_runtime_role(
                     "join pg_namespace n on n.oid = c.relnamespace "
                     "where n.nspname = current_schema() and c.relkind in ('r', 'p') "
                     "and c.relname = any(%s)",
-                    (list(READ_ONLY_TABLES),),
+                    ([*READ_ONLY_TABLES, *INSERT_ONLY_TABLES],),
                 ).fetchall()
             }
-            for table in READ_ONLY_TABLES:
+            for table, revoked in (
+                *((table, sql.SQL("insert, update")) for table in READ_ONLY_TABLES),
+                *((table, sql.SQL("update")) for table in INSERT_ONLY_TABLES),
+            ):
                 if table not in present:
                     continue
                 connection.execute(
-                    sql.SQL("revoke insert, update on {} from {}").format(
-                        sql.Identifier(table), role_name
+                    sql.SQL("revoke {} on {} from {}").format(
+                        revoked, sql.Identifier(table), role_name
                     )
                 )
             for sequence in _ADMIN_ONLY_SEQUENCES:
@@ -370,8 +382,10 @@ def provision_purge_role(
     *   **And its UPDATE on the queue and the tombstone is column by column too.** It was not,
         and a review measured what a full-table grant bought: this role could push a tombstone's
         ``effective_at`` a year out, which reopens the leak 0011 closed, and could set
-        ``purge_completed_at`` over a photograph still on disk. Neither table carries an UPDATE
-        trigger, so the grant was the only thing standing there.
+        ``purge_completed_at`` over a photograph still on disk. Neither table carried an UPDATE
+        trigger then, so the grant was the only thing standing there. Migration 0074 now refuses
+        every tombstone change but ``purge_completed_at``, and accepts that one from a role whose
+        only write on the table is this column grant, which is how it recognises this role.
 
     Idempotent, like :func:`provision_runtime_role`, and safe to call at every deployment.
 
