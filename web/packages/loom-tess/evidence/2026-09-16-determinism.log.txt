@@ -1,0 +1,185 @@
+== script
+#!/bin/zsh
+# Bake the conformance tile through the Node entry and the browser entry, in five runs across
+# three Node majors and two CPU architectures, and compare every container byte for byte and
+# every digest against the checked-in golden literals. Then the two deliberate failures the brief
+# asks for: a node:crypto import added to an existing core file, and one integer of the fixture
+# moved. Both are restored from the committed tree. Prints this script, then what it observed.
+set -u
+REPO=/Users/glendonchin/dev/Technology/exulanica-personal-admission
+WEB=$REPO/web
+OUT=$1
+cd $WEB
+echo "== script"
+cat $0
+echo
+echo "== source"
+echo "commit $(git -C $REPO rev-parse HEAD)"
+echo "working tree changes under web/packages/loom-tess: $(git -C $REPO status --short -- web/packages/loom-tess | wc -l | tr -d ' ')"
+node_modules/.bin/tsc --build packages/loom-tess/tsconfig.json || exit 1
+rm -rf $OUT && mkdir -p $OUT
+FIXTURE=packages/loom-tess/test/fixtures/tile-conformance.json
+cat > $OUT/preview.mjs <<'EOF'
+// The browser entry, run under Node's Web Crypto, printing what the preview computed.
+import { readFileSync } from 'node:fs';
+const { previewTile } = await import(process.argv[2]);
+const preview = await previewTile(new Uint8Array(readFileSync(process.argv[3])));
+process.stdout.write(JSON.stringify({
+  container_sha256: preview.containerSha256,
+  tile_inputs_digest: preview.tileInputsDigest,
+  triangle_digests: Object.fromEntries([...preview.triangleDigests].sort()),
+}) + '\n');
+EOF
+run() {
+  local name=$1; shift
+  echo
+  echo "== run $name"
+  echo "runtime: $("$@" -p 'process.version + " " + process.arch + " " + process.platform')"
+  "$@" packages/loom-tess/dist/src/node/cli.js bake $FIXTURE $OUT/$name.owd > $OUT/$name.node.json
+  echo "node entry exit: $?"
+  cat $OUT/$name.node.json
+  "$@" $OUT/preview.mjs $WEB/packages/loom-tess/dist/src/browser/index.js $FIXTURE > $OUT/$name.browser.json
+  echo "browser entry exit: $?"
+  cat $OUT/$name.browser.json
+  shasum -a 256 $OUT/$name.owd | sed "s#$OUT/##"
+}
+run node24-arm64-a /opt/homebrew/opt/node@24/bin/node
+run node24-arm64-b /opt/homebrew/opt/node@24/bin/node
+run node26-arm64 /opt/homebrew/opt/node@26/bin/node
+run node20-arm64 arch -arm64 /usr/local/bin/node
+run node20-x86_64-rosetta arch -x86_64 /usr/local/bin/node
+
+echo
+echo "== cmp, container by container, against node24-arm64-a"
+for other in node24-arm64-b node26-arm64 node20-arm64 node20-x86_64-rosetta; do
+  cmp $OUT/node24-arm64-a.owd $OUT/$other.owd && echo "$other: identical"
+done
+echo
+echo "== digests against the golden literals in test/triangle-digest-conformance.test.ts"
+GOLDEN_RENDER=$(grep -o "render_batch: '[0-9a-f]*'" packages/loom-tess/test/triangle-digest-conformance.test.ts | grep -o "[0-9a-f]\{64\}")
+GOLDEN_NAV=$(grep -o "nav_envelope: '[0-9a-f]*'" packages/loom-tess/test/triangle-digest-conformance.test.ts | grep -o "[0-9a-f]\{64\}")
+echo "golden render_batch $GOLDEN_RENDER"
+echo "golden nav_envelope $GOLDEN_NAV"
+for file in $OUT/*.json; do
+  name=${file:t}
+  render=$(grep -o '"render_batch":"[0-9a-f]*"' $file | grep -o "[0-9a-f]\{64\}")
+  nav=$(grep -o '"nav_envelope":"[0-9a-f]*"' $file | grep -o "[0-9a-f]\{64\}")
+  container=$(grep -o '"container_sha256":"[0-9a-f]*"' $file | grep -o "[0-9a-f]\{64\}")
+  verdict=agrees
+  [[ $render == $GOLDEN_RENDER && $nav == $GOLDEN_NAV ]] || verdict=DISAGREES
+  echo "$name: $verdict, container $container"
+done
+
+echo
+echo "== gate 1: node:crypto added to an existing core file"
+cp packages/loom-tess/src/core/ascii.ts $OUT/ascii.ts.saved
+{ echo "import { createHash } from 'node:crypto';"; echo "export const probe = createHash;"; cat $OUT/ascii.ts.saved; } > packages/loom-tess/src/core/ascii.ts
+pnpm run typecheck 2>&1 | grep -E "error|ELIFECYCLE" | head -5
+echo "typecheck exit ${pipestatus[1]}"
+git -C $REPO checkout -- web/packages/loom-tess/src/core/ascii.ts
+cmp packages/loom-tess/src/core/ascii.ts $OUT/ascii.ts.saved && echo "restored from the committed tree"
+pnpm run typecheck > /dev/null 2>&1
+echo "typecheck exit after restore $?"
+
+echo
+echo "== gate 3: one integer of the fixture moved"
+node -e '
+const fs = require("fs");
+const path = process.argv[1];
+const text = fs.readFileSync(path, "utf8");
+const moved = text.replace("\"height_mm\":[-200,-80,40,160,-40,80,", "\"height_mm\":[-200,-80,40,160,-40,81,");
+if (moved === text) throw new Error("the fixture no longer holds the height this probe moves");
+fs.writeFileSync(path, moved);
+' $FIXTURE
+git -C $REPO diff --stat -- web/$FIXTURE
+pnpm exec vitest run packages/loom-tess/test/triangle-digest-conformance.test.ts 2>&1 | grep -E "✓|×|Tests " | head -12
+git -C $REPO checkout -- web/$FIXTURE
+echo "restored: $(git -C $REPO status --short -- web/$FIXTURE | wc -l | tr -d ' ') changed files"
+pnpm exec vitest run packages/loom-tess/test/triangle-digest-conformance.test.ts 2>&1 | grep -E "Tests " | head -2
+echo
+echo "== git status --short"
+git -C $REPO status --short
+
+== source
+commit e51dd39f670409acd798ed9ad1f631cbf37f99bd
+working tree changes under web/packages/loom-tess: 0
+
+== run node24-arm64-a
+runtime: v24.15.0 arm64 darwin
+node entry exit: 0
+{"byte_size":13776,"container_sha256":"f9c53c32984675142ef6a5f8b5eb879c2710c1d9e45b8d0c809687dc37fe1406","tile_inputs_digest":"c90e5b9ed13b01f5e56c9089c7e10f085f6c0b9545c247bc7f6fec4f17e3ca1b","triangle_digests":{"nav_envelope":"4b9616b60beab2094b9673c0773118d89fd8c1754373edef4c87738d44a97d9e","render_batch":"9daf8516ee7595b2d6ff01db81c3224c6907ebe411d7cdcb422c5faee9b093a4"}}
+browser entry exit: 0
+{"container_sha256":"f9c53c32984675142ef6a5f8b5eb879c2710c1d9e45b8d0c809687dc37fe1406","tile_inputs_digest":"c90e5b9ed13b01f5e56c9089c7e10f085f6c0b9545c247bc7f6fec4f17e3ca1b","triangle_digests":{"nav_envelope":"4b9616b60beab2094b9673c0773118d89fd8c1754373edef4c87738d44a97d9e","render_batch":"9daf8516ee7595b2d6ff01db81c3224c6907ebe411d7cdcb422c5faee9b093a4"}}
+f9c53c32984675142ef6a5f8b5eb879c2710c1d9e45b8d0c809687dc37fe1406  node24-arm64-a.owd
+
+== run node24-arm64-b
+runtime: v24.15.0 arm64 darwin
+node entry exit: 0
+{"byte_size":13776,"container_sha256":"f9c53c32984675142ef6a5f8b5eb879c2710c1d9e45b8d0c809687dc37fe1406","tile_inputs_digest":"c90e5b9ed13b01f5e56c9089c7e10f085f6c0b9545c247bc7f6fec4f17e3ca1b","triangle_digests":{"nav_envelope":"4b9616b60beab2094b9673c0773118d89fd8c1754373edef4c87738d44a97d9e","render_batch":"9daf8516ee7595b2d6ff01db81c3224c6907ebe411d7cdcb422c5faee9b093a4"}}
+browser entry exit: 0
+{"container_sha256":"f9c53c32984675142ef6a5f8b5eb879c2710c1d9e45b8d0c809687dc37fe1406","tile_inputs_digest":"c90e5b9ed13b01f5e56c9089c7e10f085f6c0b9545c247bc7f6fec4f17e3ca1b","triangle_digests":{"nav_envelope":"4b9616b60beab2094b9673c0773118d89fd8c1754373edef4c87738d44a97d9e","render_batch":"9daf8516ee7595b2d6ff01db81c3224c6907ebe411d7cdcb422c5faee9b093a4"}}
+f9c53c32984675142ef6a5f8b5eb879c2710c1d9e45b8d0c809687dc37fe1406  node24-arm64-b.owd
+
+== run node26-arm64
+runtime: v26.7.0 arm64 darwin
+node entry exit: 0
+{"byte_size":13776,"container_sha256":"f9c53c32984675142ef6a5f8b5eb879c2710c1d9e45b8d0c809687dc37fe1406","tile_inputs_digest":"c90e5b9ed13b01f5e56c9089c7e10f085f6c0b9545c247bc7f6fec4f17e3ca1b","triangle_digests":{"nav_envelope":"4b9616b60beab2094b9673c0773118d89fd8c1754373edef4c87738d44a97d9e","render_batch":"9daf8516ee7595b2d6ff01db81c3224c6907ebe411d7cdcb422c5faee9b093a4"}}
+browser entry exit: 0
+{"container_sha256":"f9c53c32984675142ef6a5f8b5eb879c2710c1d9e45b8d0c809687dc37fe1406","tile_inputs_digest":"c90e5b9ed13b01f5e56c9089c7e10f085f6c0b9545c247bc7f6fec4f17e3ca1b","triangle_digests":{"nav_envelope":"4b9616b60beab2094b9673c0773118d89fd8c1754373edef4c87738d44a97d9e","render_batch":"9daf8516ee7595b2d6ff01db81c3224c6907ebe411d7cdcb422c5faee9b093a4"}}
+f9c53c32984675142ef6a5f8b5eb879c2710c1d9e45b8d0c809687dc37fe1406  node26-arm64.owd
+
+== run node20-arm64
+runtime: v20.10.0 arm64 darwin
+node entry exit: 0
+{"byte_size":13776,"container_sha256":"f9c53c32984675142ef6a5f8b5eb879c2710c1d9e45b8d0c809687dc37fe1406","tile_inputs_digest":"c90e5b9ed13b01f5e56c9089c7e10f085f6c0b9545c247bc7f6fec4f17e3ca1b","triangle_digests":{"nav_envelope":"4b9616b60beab2094b9673c0773118d89fd8c1754373edef4c87738d44a97d9e","render_batch":"9daf8516ee7595b2d6ff01db81c3224c6907ebe411d7cdcb422c5faee9b093a4"}}
+browser entry exit: 0
+{"container_sha256":"f9c53c32984675142ef6a5f8b5eb879c2710c1d9e45b8d0c809687dc37fe1406","tile_inputs_digest":"c90e5b9ed13b01f5e56c9089c7e10f085f6c0b9545c247bc7f6fec4f17e3ca1b","triangle_digests":{"nav_envelope":"4b9616b60beab2094b9673c0773118d89fd8c1754373edef4c87738d44a97d9e","render_batch":"9daf8516ee7595b2d6ff01db81c3224c6907ebe411d7cdcb422c5faee9b093a4"}}
+f9c53c32984675142ef6a5f8b5eb879c2710c1d9e45b8d0c809687dc37fe1406  node20-arm64.owd
+
+== run node20-x86_64-rosetta
+runtime: v20.10.0 x64 darwin
+node entry exit: 0
+{"byte_size":13776,"container_sha256":"f9c53c32984675142ef6a5f8b5eb879c2710c1d9e45b8d0c809687dc37fe1406","tile_inputs_digest":"c90e5b9ed13b01f5e56c9089c7e10f085f6c0b9545c247bc7f6fec4f17e3ca1b","triangle_digests":{"nav_envelope":"4b9616b60beab2094b9673c0773118d89fd8c1754373edef4c87738d44a97d9e","render_batch":"9daf8516ee7595b2d6ff01db81c3224c6907ebe411d7cdcb422c5faee9b093a4"}}
+browser entry exit: 0
+{"container_sha256":"f9c53c32984675142ef6a5f8b5eb879c2710c1d9e45b8d0c809687dc37fe1406","tile_inputs_digest":"c90e5b9ed13b01f5e56c9089c7e10f085f6c0b9545c247bc7f6fec4f17e3ca1b","triangle_digests":{"nav_envelope":"4b9616b60beab2094b9673c0773118d89fd8c1754373edef4c87738d44a97d9e","render_batch":"9daf8516ee7595b2d6ff01db81c3224c6907ebe411d7cdcb422c5faee9b093a4"}}
+f9c53c32984675142ef6a5f8b5eb879c2710c1d9e45b8d0c809687dc37fe1406  node20-x86_64-rosetta.owd
+
+== cmp, container by container, against node24-arm64-a
+node24-arm64-b: identical
+node26-arm64: identical
+node20-arm64: identical
+node20-x86_64-rosetta: identical
+
+== digests against the golden literals in test/triangle-digest-conformance.test.ts
+golden render_batch 9daf8516ee7595b2d6ff01db81c3224c6907ebe411d7cdcb422c5faee9b093a4
+golden nav_envelope 4b9616b60beab2094b9673c0773118d89fd8c1754373edef4c87738d44a97d9e
+node20-arm64.browser.json: agrees, container f9c53c32984675142ef6a5f8b5eb879c2710c1d9e45b8d0c809687dc37fe1406
+node20-arm64.node.json: agrees, container f9c53c32984675142ef6a5f8b5eb879c2710c1d9e45b8d0c809687dc37fe1406
+node20-x86_64-rosetta.browser.json: agrees, container f9c53c32984675142ef6a5f8b5eb879c2710c1d9e45b8d0c809687dc37fe1406
+node20-x86_64-rosetta.node.json: agrees, container f9c53c32984675142ef6a5f8b5eb879c2710c1d9e45b8d0c809687dc37fe1406
+node24-arm64-a.browser.json: agrees, container f9c53c32984675142ef6a5f8b5eb879c2710c1d9e45b8d0c809687dc37fe1406
+node24-arm64-a.node.json: agrees, container f9c53c32984675142ef6a5f8b5eb879c2710c1d9e45b8d0c809687dc37fe1406
+node24-arm64-b.browser.json: agrees, container f9c53c32984675142ef6a5f8b5eb879c2710c1d9e45b8d0c809687dc37fe1406
+node24-arm64-b.node.json: agrees, container f9c53c32984675142ef6a5f8b5eb879c2710c1d9e45b8d0c809687dc37fe1406
+node26-arm64.browser.json: agrees, container f9c53c32984675142ef6a5f8b5eb879c2710c1d9e45b8d0c809687dc37fe1406
+node26-arm64.node.json: agrees, container f9c53c32984675142ef6a5f8b5eb879c2710c1d9e45b8d0c809687dc37fe1406
+
+== gate 1: node:crypto added to an existing core file
+packages/loom-tess/src/core/ascii.ts(1,28): error TS2307: Cannot find module 'node:crypto' or its corresponding type declarations.
+ ELIFECYCLE  Command failed with exit code 2.
+typecheck exit 2
+restored from the committed tree
+typecheck exit after restore 0
+
+== gate 3: one integer of the fixture moved
+ web/packages/loom-tess/test/fixtures/tile-conformance.json | 2 +-
+ 1 file changed, 1 insertion(+), 1 deletion(-)
+   × the triangle digest of the conformance fixture > is the golden literal through the Node bake and through the browser preview 27ms
+   × the triangle digest of the conformance fixture > samples support height exactly on the terrain plane 5ms
+   × the triangle digest of the conformance fixture > does not move when the document lists its records in another order 3ms
+⎯⎯⎯⎯⎯⎯⎯ Failed Tests 3 ⎯⎯⎯⎯⎯⎯⎯
+      Tests  3 failed | 6 passed (9)
+restored: 0 changed files
+      Tests  9 passed (9)
+
+== git status --short

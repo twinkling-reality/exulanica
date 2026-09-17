@@ -26,11 +26,15 @@ code path.
 
 `web/.dependency-cruiser.cjs` adds the module half:
 
-- nothing outside this package imports its node entry or its tests;
-- only `atlas-core` and `atlas-react` (the runtime that draws tiles) may import it, and only its
-  core entry;
+- another package may import `@exulanica/loom-tess/core` and nothing else from this package: not
+  the node entry, not the browser preview, not a core module by path, not a test;
 - the package imports no other workspace package;
-- core imports nothing outside `src/core`, not even a `node:` module under another name.
+- core imports nothing outside `src/core`, not even a `node:` module under another name;
+- the node entry and the browser entry never import each other.
+
+`test/fence.test.ts` compiles probes against the three real tsconfigs. The deliberate violations
+of every rule are in `evidence/2026-09-16-fences.log.txt`, including a run with the dependency
+declared, as a consuming package will declare it.
 
 The renderer ban (`engine-specific-code-stays-behind-the-binding`) already covers this package,
 which names no engine.
@@ -179,7 +183,9 @@ pnpm tess shapes
 ```
 
 The bake is deterministic: the same document gives the same bytes on any machine and any Node
-version. The evidence is `evidence/2026-09-16-determinism.log.txt`.
+version. `evidence/2026-09-16-determinism.log.txt` records five runs of the Node entry and the
+browser entry, on Node 20 (arm64, and x86_64 under Rosetta), 24 and 26. It compares the
+containers byte for byte and the digests against the golden literals.
 
 ## What it does not do yet
 
