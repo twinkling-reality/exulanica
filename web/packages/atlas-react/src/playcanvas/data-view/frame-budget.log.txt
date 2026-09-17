@@ -105,10 +105,16 @@ read above 16.7 ms, missed presentations, preparation time, bytes, draw calls.
    per-subject cap of 2,097,152 is what binds here (one district batch asks for more), so the
    4,194,304 budget draws 2,187,735 points and its headroom is unmeasured.
    DECISION: both constants stay as they are, now measured on the district main draws today.
-   NOTE ON THE BASE: these six runs were measured with the lane based on main f07cedb6. The branch was
-   then rebased onto 71e5219d (the texture and living society lanes among 36 commits). The pixel
-   checks were rerun on that base and are byte-identical to it, but these frame times were NOT
-   re-measured there.
+   NOTE ON THE BASE: the six runs above were measured with the lane based on main f07cedb6. The branch
+   was then rebased onto 71e5219d (36 commits, the texture and living society lanes among them), the
+   pixel checks were rerun there and are byte-identical to it, and these two runs re-measured the
+   frame on that base at head e37bc78a:
+  overview 4,194,304 2,097,152 2,187,735  p50  16.7  p95  16.7  p99  16.8  max  16.8  frames 601  >16.7 188  missed 0   prepared  211 ms  draws 62  load 7.98 13.15 9.48
+  street   4,194,304 2,097,152 2,187,735  p50  16.7  p95  16.7  p99  16.8  max  16.8  frames 601  >16.7 209  missed 0   prepared  178 ms  draws 52  load 35.66 32.07 24.66
+   The overview run counts: it started at a one-minute load of 7.98 and held p95 16.7 ms with no
+   missed presentation in 601 frames. The street run held the same numbers but STARTED AT LOAD 35.66,
+   so by this lane's own rule it does not count; the three street runs above, all started under load
+   8, are the ones that do.
 
 Not measured here: WebGPU (the look is WebGL2-only; see the header of data-view/points.ts), a weak machine,
 a ten-minute leak run, and the first slide's preparation hitch per frame (the totals above are
