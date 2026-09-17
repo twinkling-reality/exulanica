@@ -1577,7 +1577,7 @@ FACADE_SURFACES = {
 WEATHERED = (250_000, 150_000, 400_000)
 
 
-def material(surface: str, kind: str, role: str, key: str, weathering=(0, 0, 0)):
+def material(surface: str, kind: str, role: str, key: str, weathering=(0, 0, 0), bands=(0, 0)):
     values = entry("material", key)
     return SurfaceMaterialRecord(
         identity=identity("surface_material", surface, SURFACE_ROLE_CODES[role]),
@@ -1595,6 +1595,8 @@ def material(surface: str, kind: str, role: str, key: str, weathering=(0, 0, 0))
         soiling_gradient_millionths=weathering[0],
         base_weathering_millionths=weathering[1],
         reveal_darkening_millionths=weathering[2],
+        soil_band_bottom_mm=bands[0],
+        soil_band_edge_mm=bands[1],
     )
 
 

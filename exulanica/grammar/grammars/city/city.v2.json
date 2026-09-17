@@ -957,6 +957,30 @@
       "maximum": 1000000
     },
     {
+      "name": "glazing_soil_band_bottom_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "building",
+      "stage": "material",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: how far up a pane the film reaches from its bottom edge, where rain runs down and collects, read by the glazing runtime contract.",
+      "minimum": 0,
+      "maximum": 1200
+    },
+    {
+      "name": "glazing_soil_band_edge_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "building",
+      "stage": "material",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: how far in from a pane's sides and head the film reaches, where hands reach and cleaning misses; shallower than the bottom band.",
+      "minimum": 0,
+      "maximum": 400
+    },
+    {
       "name": "tree_species",
       "kind": "choice",
       "unit": "key",

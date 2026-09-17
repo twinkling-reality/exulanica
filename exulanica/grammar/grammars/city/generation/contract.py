@@ -200,10 +200,14 @@ inside a building volume, so everything behind glass must be closed.
   ``[junction_extent]``) and what each record kind is to a person walking (the descriptor's
   ``navigation`` table, ``[facade_clearance]``, ``[canopy_clearance]``) were stated first, for tess.
 * Surface roles 25 ``canopy`` and 26 ``trunk`` were appended for a street tree's parts.
-* Still open: what lies behind glazing above the ground storey, the meaning of
-  ``soiling_gradient_millionths`` and the glazing soil band depths (the wording is accepted; it
-  amends ``surface_material`` version 2 in place, after the rules above); the role-to-material-class
-  table; ``city_reference_closure`` over a whole generated city; segment pieces no longer than 1 km.
+* What ``soiling_gradient_millionths`` means on glass, and how far the film reaches, were answered
+  on 2026-09-17: ``surface_material`` version 2 carries ``soil_band_bottom_mm`` and
+  ``soil_band_edge_mm``, stated on a glazing surface and 0 on every other role, and
+  ``glazing_soil_band_bottom_mm`` and ``glazing_soil_band_edge_mm`` are derived per building. The
+  record version was amended in place rather than raised, which is honest only while nothing is
+  stored under it: the first bake recorded through migration 0072 freezes city version 2.
+* Still open: what lies behind glazing above the ground storey; the role-to-material-class table;
+  ``city_reference_closure`` over a whole generated city; segment pieces no longer than 1 km.
 * A signal names traffic's signal-plan catalog by SHA-256, which the city grammar never reads, so
   the corridor's junctions are unsignalised (stop and priority controls, zebra crossings) until
   that catalog is on main.

@@ -280,6 +280,14 @@
       "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
     },
     {
+      "target": "glazing_soil_band_bottom_mm",
+      "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
+    },
+    {
+      "target": "glazing_soil_band_edge_mm",
+      "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
+    },
+    {
       "target": "tree_species",
       "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
     },

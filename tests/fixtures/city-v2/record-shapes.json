@@ -2475,6 +2475,18 @@
           "maximum": 1000000,
           "minimum": 0,
           "name": "reveal_darkening_millionths"
+        },
+        {
+          "kind": "integer",
+          "maximum": 100000,
+          "minimum": 0,
+          "name": "soil_band_bottom_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 100000,
+          "minimum": 0,
+          "name": "soil_band_edge_mm"
         }
       ],
       "identity": {
@@ -2515,7 +2527,8 @@
       },
       "kind": "city.surface_material",
       "rules": [
-        "material_role_owner"
+        "material_role_owner",
+        "soil_band_role"
       ],
       "shape": "city.surface_material",
       "version": 2

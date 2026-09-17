@@ -26,6 +26,12 @@ catalog's scaled by the repeat.
 ``soiling_gradient_millionths``, ``base_weathering_millionths`` and
 ``reveal_darkening_millionths`` are building parameters, derived per building for its surfaces; a
 street's surfaces belong to no building, so no parameter states their weathering and it is 0.
+
+**The soiled bands on glass** are ``glazing_soil_band_bottom_mm`` and ``glazing_soil_band_edge_mm``,
+derived per building so one building's shopfronts are dirty alike, and stated on its glazing
+surfaces only: every other role states 0, which the record's ``soil_band_role`` rule holds. No
+published set dresses glazing yet, so this version writes no glazing record at all and the bands
+reach the document the moment one does.
 """
 
 from __future__ import annotations
@@ -102,10 +108,11 @@ def _generate(context: StageContext) -> Iterator[material.SurfaceMaterialRecord]
     }
 
     def record(
-        surface: str, kind: str, role: str, key: str, placement: tuple[int, int, int, int]
+        surface: str, kind: str, role: str, key: str, placement: tuple[int, int, int, int, int, int]
     ) -> material.SurfaceMaterialRecord:
         values = entry("material", key)
-        repeat, soiling, weathering, darkening = placement
+        repeat, soiling, weathering, darkening, band_bottom, band_edge = placement
+        glazing = role == "glazing"
         return material.SurfaceMaterialRecord(
             identity=context.identity("surface_material", surface, SURFACE_ROLE_CODES[role]),
             surface_identity=surface,
@@ -122,6 +129,8 @@ def _generate(context: StageContext) -> Iterator[material.SurfaceMaterialRecord]
             soiling_gradient_millionths=soiling,
             base_weathering_millionths=weathering,
             reveal_darkening_millionths=darkening,
+            soil_band_bottom_mm=band_bottom if glazing else 0,
+            soil_band_edge_mm=band_edge if glazing else 0,
         )
 
     bays_of: dict[str, list[facade.GroundBayRecord]] = {}
@@ -149,6 +158,8 @@ def _generate(context: StageContext) -> Iterator[material.SurfaceMaterialRecord]
             derived(context, "soiling_gradient_millionths", ordinal),
             derived(context, "base_weathering_millionths", ordinal),
             derived(context, "reveal_darkening_millionths", ordinal),
+            derived(context, "glazing_soil_band_bottom_mm", ordinal),
+            derived(context, "glazing_soil_band_edge_mm", ordinal),
         )
         for face in faces_of.get(building.identity, []):
             face_bays = bays_of.get(face.identity, [])
@@ -204,7 +215,7 @@ def _generate(context: StageContext) -> Iterator[material.SurfaceMaterialRecord]
         record.identity: record.street_ordinal
         for record in prior_records(context, streets.STAGE_ID, streets.StreetRecord)
     }
-    street_placement: dict[str, tuple[int, int, int, int]] = {}
+    street_placement: dict[str, tuple[int, int, int, int, int, int]] = {}
     for segment in segment_records:
         street_placement[segment.identity] = (
             derived(
@@ -212,6 +223,8 @@ def _generate(context: StageContext) -> Iterator[material.SurfaceMaterialRecord]
                 "repeat_size_millionths",
                 _STREETS + street_ordinals[segment.street_identity],
             ),
+            0,
+            0,
             0,
             0,
             0,
@@ -253,13 +266,13 @@ def _generate(context: StageContext) -> Iterator[material.SurfaceMaterialRecord]
     for block in prior_records(context, streets.STAGE_ID, streets.BlockRecord):
         repeat = derived(context, "repeat_size_millionths", _GROUNDS + block.block_ordinal)
         yield record(
-            block.identity, "city.block", "lot", _material_for("lot", None), (repeat, 0, 0, 0)
+            block.identity, "city.block", "lot", _material_for("lot", None), (repeat, 0, 0, 0, 0, 0)
         )  # type: ignore[arg-type]
     for lot in lots.values():
         ordinal = block_ordinals[lot.block_identity] * _LOTS_PER_BLOCK + lot.parcel_ordinal
         repeat = derived(context, "repeat_size_millionths", _GROUNDS + _LOTS_PER_BLOCK + ordinal)
         yield record(
-            lot.identity, "city.parcel", "lot", _material_for("lot", None), (repeat, 0, 0, 0)
+            lot.identity, "city.parcel", "lot", _material_for("lot", None), (repeat, 0, 0, 0, 0, 0)
         )  # type: ignore[arg-type]
 
 
