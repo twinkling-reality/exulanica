@@ -2,7 +2,8 @@ from contextlib import suppress
 from copy import deepcopy
 
 import pytest
-from exulanica.world.society import initial_society, society_state_sha256
+from exulanica.world.society import society_state_sha256
+from exulanica.world.society_legacy import initial_society
 from exulanica.world.society_planner import (
     advance_purposeful_society,
     initial_purposeful_society,

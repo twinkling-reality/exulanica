@@ -3,7 +3,8 @@
 import uuid
 from copy import deepcopy
 
-from exulanica.world.society import advance_society, initial_society, society_state_sha256
+from exulanica.world.society import society_state_sha256
+from exulanica.world.society_legacy import advance_society, initial_society
 
 SOCIETY_ID = uuid.UUID("c32c5ab2-f171-4e28-93c0-3b438f90273d")
 SEED = "7a" * 32

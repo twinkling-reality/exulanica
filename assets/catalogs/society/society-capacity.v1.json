@@ -1,0 +1,72 @@
+{
+  "schema_version": 1,
+  "catalog_id": "society-capacity",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "authored_object",
+      "rule": "fixed",
+      "capacity": 1,
+      "reason": "An authored object's reviewed record carries no seating or queue geometry, so one person uses it at a time, at its access node.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "district_target",
+      "rule": "fixed",
+      "capacity": 1,
+      "reason": "A district target in the society input publishes only an access node, with no seating or queue geometry, so one person uses it at a time, at that node.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "premises_unit",
+      "rule": "use_class",
+      "capacity": 0,
+      "reason": "Visitor, staff and resident numbers for a premises unit come from its use-class entry.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "standing_node",
+      "rule": "node_clearance",
+      "capacity": 1,
+      "reason": "The sidewalk graph guarantees clearance only around each node, so a node is one standing spot. The place must publish a clearance at least the standing radius.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "street_furniture",
+      "rule": "use_class",
+      "capacity": 0,
+      "reason": "Seats on a piece of street furniture come from the use-class entry of its item class. Item classes with no entry (a tree species, say) are not destinations.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    }
+  ]
+}

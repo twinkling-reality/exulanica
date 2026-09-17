@@ -1,0 +1,87 @@
+{
+  "schema_version": 1,
+  "catalog_id": "society-need",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "fatigue",
+      "label": "rest",
+      "initial_minimum_milli": 0,
+      "initial_maximum_milli": 500,
+      "growth_milli_per_tick": 2,
+      "urgency_threshold_milli": 500,
+      "reason": "Walking outdoors tires a person. At 2 per simulated minute a rested person wants to sit again after about four hours (500 at 2 per minute is 250 minutes).",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "leisure",
+      "label": "leisure",
+      "initial_minimum_milli": 200,
+      "initial_maximum_milli": 900,
+      "growth_milli_per_tick": 3,
+      "urgency_threshold_milli": 300,
+      "reason": "The wish for somewhere to walk or something to look at. It grows fastest so that a person with nothing else pressing keeps moving rather than standing still.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "meal",
+      "label": "a meal",
+      "initial_minimum_milli": 0,
+      "initial_maximum_milli": 400,
+      "growth_milli_per_tick": 2,
+      "urgency_threshold_milli": 700,
+      "reason": "Meals roughly every six hours while awake: 700 at 2 per minute is 350 minutes. Societies start after breakfast, so the initial range is low.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "provisions",
+      "label": "shopping",
+      "initial_minimum_milli": 0,
+      "initial_maximum_milli": 900,
+      "growth_milli_per_tick": 1,
+      "urgency_threshold_milli": 800,
+      "reason": "Errands come up about once a day: 800 at 1 per minute is a little over thirteen hours.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "sleep",
+      "label": "sleep",
+      "initial_minimum_milli": 0,
+      "initial_maximum_milli": 150,
+      "growth_milli_per_tick": 1,
+      "urgency_threshold_milli": 800,
+      "reason": "Awake about thirteen to sixteen hours a day: 800 at 1 per minute is 800 minutes. Societies start in the morning, so the initial range is low.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    }
+  ]
+}

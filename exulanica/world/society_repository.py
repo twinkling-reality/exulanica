@@ -18,9 +18,7 @@ from exulanica.world.society import (
     StaleSocietyState,
     UnavailableSocietyInput,
     UnknownSociety,
-    advance_society,
     event_document_sha256,
-    initial_society,
     society_state_sha256,
 )
 from exulanica.world.society_action_repository import SocietyActionRepository
@@ -30,6 +28,7 @@ from exulanica.world.society_actions import (
     validate_action_request,
 )
 from exulanica.world.society_decisions import validate_decision_receipt
+from exulanica.world.society_legacy import advance_society, initial_society
 from exulanica.world.society_planner import (
     PURPOSEFUL_PROFILE,
     advance_purposeful_society,

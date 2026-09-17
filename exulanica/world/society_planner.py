@@ -13,10 +13,10 @@ from exulanica.world.society import (
     SOCIETY_NAMESPACE,
     SOCIETY_POPULATION,
     SocietyEvent,
-    initial_society,
     society_state_sha256,
 )
 from exulanica.world.society_input_policy import LOCAL_INPUT, validate_local_affordances
+from exulanica.world.society_legacy import initial_society
 
 PURPOSEFUL_PROFILE = "exulanica-society/v2"
 INPUT_PROFILE = "exulanica.society-input/v1"

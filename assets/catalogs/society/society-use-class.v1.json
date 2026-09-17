@@ -1,0 +1,279 @@
+{
+  "schema_version": 1,
+  "catalog_id": "society-use-class",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "bakery",
+      "label": "bakery",
+      "kind": "workplace",
+      "role_key": "baker",
+      "role_label": "baker",
+      "staff_per_unit": 2,
+      "visitor_capacity": 6,
+      "resident_capacity": 0,
+      "visitor_affordances": [
+        "eat",
+        "shop"
+      ],
+      "shift_start_minute": 360,
+      "shift_minutes": 480,
+      "reason": "A small bakery: two bakers from 06:00 for eight hours, room for six customers.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "bench",
+      "label": "bench",
+      "kind": "furniture",
+      "role_key": "none",
+      "role_label": "none",
+      "staff_per_unit": 0,
+      "shift_start_minute": 0,
+      "shift_minutes": 0,
+      "visitor_capacity": 2,
+      "resident_capacity": 0,
+      "visitor_affordances": [
+        "rest"
+      ],
+      "reason": "A street bench seats two people.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "bookshop",
+      "label": "bookshop",
+      "kind": "workplace",
+      "role_key": "bookseller",
+      "role_label": "bookseller",
+      "staff_per_unit": 1,
+      "visitor_capacity": 8,
+      "resident_capacity": 0,
+      "visitor_affordances": [
+        "shop",
+        "visit"
+      ],
+      "shift_start_minute": 600,
+      "shift_minutes": 480,
+      "reason": "A small bookshop: one bookseller from 10:00 for eight hours, room for eight browsers.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "cafe",
+      "label": "cafe",
+      "kind": "workplace",
+      "role_key": "barista",
+      "role_label": "barista",
+      "staff_per_unit": 2,
+      "visitor_capacity": 12,
+      "resident_capacity": 0,
+      "visitor_affordances": [
+        "eat"
+      ],
+      "shift_start_minute": 420,
+      "shift_minutes": 480,
+      "reason": "A small cafe: two baristas from 07:00 for eight hours, twelve seats.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "grocery",
+      "label": "grocery",
+      "kind": "workplace",
+      "role_key": "grocery_clerk",
+      "role_label": "grocery clerk",
+      "staff_per_unit": 3,
+      "visitor_capacity": 12,
+      "resident_capacity": 0,
+      "visitor_affordances": [
+        "shop"
+      ],
+      "shift_start_minute": 480,
+      "shift_minutes": 540,
+      "reason": "A neighbourhood grocery: three clerks from 08:00 for nine hours, twelve shoppers at a time.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "library",
+      "label": "library",
+      "kind": "workplace",
+      "role_key": "librarian",
+      "role_label": "librarian",
+      "staff_per_unit": 2,
+      "visitor_capacity": 20,
+      "resident_capacity": 0,
+      "visitor_affordances": [
+        "visit"
+      ],
+      "shift_start_minute": 540,
+      "shift_minutes": 480,
+      "reason": "A branch library: two librarians from 09:00 for eight hours, twenty visitors.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "office",
+      "label": "office",
+      "kind": "workplace",
+      "role_key": "office_worker",
+      "role_label": "office worker",
+      "staff_per_unit": 8,
+      "visitor_capacity": 0,
+      "resident_capacity": 0,
+      "visitor_affordances": [],
+      "shift_start_minute": 540,
+      "shift_minutes": 480,
+      "reason": "An office floor: eight workers from 09:00 for eight hours, closed to the public.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "pharmacy",
+      "label": "pharmacy",
+      "kind": "workplace",
+      "role_key": "pharmacist",
+      "role_label": "pharmacist",
+      "staff_per_unit": 2,
+      "visitor_capacity": 6,
+      "resident_capacity": 0,
+      "visitor_affordances": [
+        "shop"
+      ],
+      "shift_start_minute": 540,
+      "shift_minutes": 480,
+      "reason": "A pharmacy: two pharmacists from 09:00 for eight hours, six customers.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "residential",
+      "label": "home",
+      "kind": "residential",
+      "role_key": "resident",
+      "role_label": "resident",
+      "staff_per_unit": 0,
+      "visitor_capacity": 0,
+      "resident_capacity": 2,
+      "visitor_affordances": [],
+      "shift_start_minute": 0,
+      "shift_minutes": 0,
+      "reason": "A dwelling unit houses two synthetic residents. This is a default household size, not a census figure.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "restaurant",
+      "label": "restaurant",
+      "kind": "workplace",
+      "role_key": "cook",
+      "role_label": "cook",
+      "staff_per_unit": 4,
+      "visitor_capacity": 24,
+      "resident_capacity": 0,
+      "visitor_affordances": [
+        "eat"
+      ],
+      "shift_start_minute": 660,
+      "shift_minutes": 540,
+      "reason": "A restaurant: four cooks from 11:00 for nine hours, twenty-four covers.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "school",
+      "label": "school",
+      "kind": "workplace",
+      "role_key": "teacher",
+      "role_label": "teacher",
+      "staff_per_unit": 6,
+      "visitor_capacity": 0,
+      "resident_capacity": 0,
+      "visitor_affordances": [],
+      "shift_start_minute": 480,
+      "shift_minutes": 450,
+      "reason": "A school: six teachers from 08:00 for seven and a half hours. Pupils are not modelled.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "workshop",
+      "label": "workshop",
+      "kind": "workplace",
+      "role_key": "maker",
+      "role_label": "maker",
+      "staff_per_unit": 3,
+      "visitor_capacity": 2,
+      "resident_capacity": 0,
+      "visitor_affordances": [
+        "shop"
+      ],
+      "shift_start_minute": 480,
+      "shift_minutes": 480,
+      "reason": "A small workshop: three makers from 08:00 for eight hours, two customers.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    }
+  ]
+}

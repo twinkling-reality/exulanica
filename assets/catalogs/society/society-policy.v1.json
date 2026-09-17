@@ -1,0 +1,139 @@
+{
+  "schema_version": 1,
+  "catalog_id": "society-policy",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "commute_lead_minutes",
+      "value": 30,
+      "reason": "People set off for a shift up to thirty simulated minutes before it starts.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "memory_limit",
+      "value": 16,
+      "reason": "Each inhabitant keeps its sixteen most recent event references, as the v2 and v3 profiles do.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "occupancy_maximum_milli",
+      "value": 900,
+      "reason": "A requested population may fill at most nine tenths of a place's capacity. More would leave nobody an open place to go.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "occupancy_target_milli",
+      "value": 500,
+      "reason": "A population sized to its place fills half of its capacity, so every choice has an open alternative.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "preference_spread_milli",
+      "value": 200,
+      "reason": "Each inhabitant's activity weights vary by up to plus or minus a tenth, seeded from its identity, so equal needs do not produce identical choices.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "shift_jitter_minutes",
+      "value": 30,
+      "reason": "Each worker's shift starts up to thirty minutes either side of its use class's start, seeded per inhabitant.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "standing_radius_mm",
+      "value": 340,
+      "reason": "Matches the owned district's walking capsule radius of 34 cm.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "standing_spacing_mm",
+      "value": 700,
+      "reason": "Two standing radii plus a small gap between neighbouring people on a destination lattice.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "start_minute_of_day",
+      "value": 480,
+      "reason": "Societies start at 08:00 simulated time, so a first look shows people heading out.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "walk_speed_maximum_mm_per_tick",
+      "value": 84000,
+      "reason": "1.4 metres a second at one simulated minute per tick, the fast end of ordinary adult walking.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    },
+    {
+      "key": "walk_speed_minimum_mm_per_tick",
+      "value": 66000,
+      "reason": "1.1 metres a second at one simulated minute per tick, the slow end of ordinary adult walking.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "Authored for the Exulanica living society routine model; see the entry reason"
+      }
+    }
+  ]
+}
