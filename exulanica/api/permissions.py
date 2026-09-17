@@ -239,6 +239,12 @@ _APPEARANCE = "/world/versions/{version_id}/characters/{subject_kind}/{subject_i
 
 #: The single declaration of what each mounted route requires. Keyed by ``(method, path)`` exactly
 #: as :func:`exulanica.api.routes.routable_paths` reports them.
+#:
+#: **A route added here is added to ``ROUTE_PROBES`` in tests/test_api.py in the same change**, or
+#: to ``PUBLIC_ROUTES`` with the reason it needs no credential. That file's sweep is what holds a
+#: route to refusing an anonymous caller, refusing a bad token and never answering a stranger 403;
+#: a route with its own tests and no probe is held to none of those. The tile routes were added
+#: without probes on 2026-09-17 and nothing but the sweep's own coverage check noticed.
 ROUTE_RULES: Final[Mapping[tuple[str, str], Public | Authentication | Requires]] = MappingProxyType(
     {
         # -- public ------------------------------------------------------------------------
