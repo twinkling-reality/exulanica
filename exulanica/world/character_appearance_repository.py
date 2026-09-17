@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from typing import Any
 
 import psycopg
@@ -21,7 +21,11 @@ from exulanica.world.character_appearance import (
     CharacterSubject,
     RepresentationBinding,
     StaleAppearance,
+    catalog_family_base,
     document_sha256,
+    is_catalog_family,
+    look_containers,
+    look_from_recipe,
     validate_recipe,
 )
 from exulanica.world.errors import UnknownWorldResource
@@ -42,10 +46,11 @@ class CharacterAppearanceRepository:
         authorize_family: Callable[[CharacterFamily], bool] | None = None,
         society_input_authorizer: Callable[[dict[str, Any]], None] | None = None,
         store: ContentAddressedStore | None = None,
+        catalog: Mapping[str, Any] | None = None,
         world_id: str = DEFAULT_WORLD_ID,
     ) -> None:
         self.connection, self.workspace_id, self.actor = connection, workspace_id, actor
-        self.world_id, self.store = world_id, store
+        self.world_id, self.store, self.catalog = world_id, store, catalog
         # Copy declarations to isolate mutable nested data from the host and callers.
         self.families = {
             f.sha256: CharacterFamily.model_validate_json(f.model_dump_json()) for f in families
@@ -172,6 +177,45 @@ class CharacterAppearanceRepository:
             return "asset_bytes_unavailable"
         return "available"
 
+    def _catalog_render_status(self, recipe: CharacterRecipe, family: CharacterFamily) -> str:
+        """Whether every container a catalog look composes is published and present.
+
+        A catalog look has no single prepared body: the browser composes it from the body,
+        worn parts and material packs the catalog names, each fetched as a reviewed asset.
+        """
+        if self.catalog is None:
+            return "catalog_unavailable"
+        try:
+            catalog_family_base(self.catalog, family)
+            look = look_from_recipe(self.catalog, recipe, family)
+            containers = look_containers(self.catalog, look)
+        except ValueError:
+            return "catalog_unavailable"
+        rows = {
+            row["asset_key"]: row
+            for row in self.connection.execute(
+                "select a.asset_key,a.content_sha256,a.byte_size,a.licence_sha256 "
+                "from world_reviewed_asset a "
+                "join world_reviewed_asset_import i using(asset_key,content_sha256) "
+                "where a.asset_key = any(%s)",
+                ([ref["assetKey"] for ref in containers],),
+            ).fetchall()
+        }
+        for ref in containers:
+            row = rows.get(ref["assetKey"])
+            if row is None or (row["content_sha256"], row["byte_size"]) != (
+                ref["contentSha256"],
+                ref["byteSize"],
+            ):
+                return "asset_withdrawn_or_unreviewed"
+        if self.store is None:
+            return "asset_store_unavailable"
+        for ref in containers:
+            for digest in (ref["contentSha256"], rows[ref["assetKey"]]["licence_sha256"]):
+                if not self.store.exists(BlobId.from_hex(digest)):
+                    return "asset_bytes_unavailable"
+        return "available"
+
     def _view(self, row: dict) -> dict:
         recipe, _family = self._validated(row)
         try:
@@ -180,7 +224,12 @@ class CharacterAppearanceRepository:
             status = "family_source_unavailable"
         else:
             subject = CharacterSubject.model_validate(row["document"]["subject"])
-            status = self._render_status(validate_recipe(recipe, current, subject))
+            binding = validate_recipe(recipe, current, subject)
+            status = (
+                self._catalog_render_status(recipe, current)
+                if is_catalog_family(current)
+                else self._render_status(binding)
+            )
         return {
             "revision": row["revision"],
             "operation": row["operation"],

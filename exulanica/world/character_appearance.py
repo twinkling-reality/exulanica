@@ -7,10 +7,12 @@ current source authorization; saving a recipe neither generates nor certifies a 
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 import re
 import uuid
 from collections.abc import Mapping
+from pathlib import Path
 from typing import Annotated, Any, Final, Literal
 
 from pydantic import BaseModel, ConfigDict, Field, StrictInt, model_validator
@@ -204,6 +206,7 @@ def validate_recipe(
 # Catalog looks. The backend twin of web/packages/atlas-react/src/playcanvas/character/look.ts:
 # the same draw, byte for byte, and the recipe families a saved look is validated against.
 
+CHARACTER_DIRECTORY: Final = Path(__file__).resolve().parents[2] / "assets" / "characters"
 CHARACTER_CATALOG_PROFILE: Final = "exulanica.character-catalog/v1"
 CHARACTER_LOOK_PROFILE: Final = "exulanica.character-look/v1"
 CHARACTER_LOOKS_PROFILE: Final = "exulanica.character-looks/v1"
@@ -544,3 +547,66 @@ def look_from_recipe(
         look["parameters"][parameter["key"]] = recipe.parameters.get(parameter["key"])
     validate_look(catalog, look)
     return look
+
+
+def load_character_catalog(
+    directory: Path = CHARACTER_DIRECTORY,
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """The committed catalog and its designed looks, checked against each other.
+
+    Raises FileNotFoundError when the directory holds no catalog, and ValueError when the two
+    disagree, so a host serves either the reviewed pair or nothing.
+    """
+    catalog = json.loads((directory / "catalog.json").read_text())
+    looks = json.loads((directory / "looks.json").read_text())
+    catalog_recipe_families(catalog, looks)
+    return catalog, looks
+
+
+def is_catalog_family(family: CharacterFamily) -> bool:
+    return (family.producer, family.schema_revision) == (
+        CATALOG_FAMILY_PRODUCER,
+        CHARACTER_CATALOG_PROFILE,
+    )
+
+
+def catalog_family_base(
+    catalog: Mapping[str, Any], family: CharacterFamily
+) -> tuple[Mapping[str, Any], Mapping[str, Any]]:
+    """The catalog family and base a recipe family came from, when this catalog is its source."""
+    family_id, _, base_id = family.family_id.rpartition("/")
+    declared = catalog_family(catalog, family_id)
+    base = catalog_base(declared, base_id)
+    if catalog_base_schema_sha256(catalog, declared, base) != family.sources[0].content_sha256:
+        raise ValueError(f"{family.family_id} was derived from another catalog revision")
+    return declared, base
+
+
+def look_containers(
+    catalog: Mapping[str, Any], look: Mapping[str, Any]
+) -> tuple[Mapping[str, Any], ...]:
+    """Every container a near person in this look loads: the body, worn parts and material packs.
+
+    The same set the browser's near description names, ordered by asset key.
+    """
+    family, base = validate_look(catalog, look)
+    materials = {m["materialId"]: m for m in family["materials"]}
+    slots = family["slots"]
+    refs = {base["asset"]["assetKey"]: base["asset"]}
+    for slot in (s for s in slots if s["kind"] == "part"):
+        chosen = look["parts"][slot["slot"]]
+        if chosen is None:
+            continue
+        part = next(p for p in base["parts"] if p["partId"] == chosen)
+        if "asset" in part:
+            refs[part["asset"]["assetKey"]] = part["asset"]
+        override = next(
+            (s for s in slots if s["kind"] == "material" and s.get("appliesTo") == slot["slot"]),
+            None,
+        )
+        material = materials[look["materials"][override["slot"]] if override else part["material"]]
+        refs[material["asset"]["assetKey"]] = material["asset"]
+    skin = next(s for s in slots if s["kind"] == "material" and s.get("appliesTo") == "body")
+    asset = materials[look["materials"][skin["slot"]]]["asset"]
+    refs[asset["assetKey"]] = asset
+    return tuple(refs[key] for key in sorted(refs))

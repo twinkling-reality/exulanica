@@ -3,6 +3,7 @@
     uv run python scripts/prepare_character_people.py --blender PATH [--source DIR]
     uv run python scripts/prepare_character_people.py --looks
     uv run python scripts/prepare_character_people.py --verify-only
+    uv run python scripts/prepare_character_people.py --import [--apply] [--data-dir DIR]
 
 Building needs the pinned Blender 4.5.9 and the pinned MPFB 2 source and MakeHuman system
 assets (see assets/characters/makehuman-parametric-v1/source-lock.json); nothing is fetched.
@@ -10,6 +11,8 @@ assets (see assets/characters/makehuman-parametric-v1/source-lock.json); nothing
 catalog and rewrites their TypeScript module. Verification needs only the repository: every
 catalog entry's bytes, digests and import manifests are checked, no container in a catalog
 family's folder goes unreferenced, and both TypeScript modules are compared with their JSON.
+`--import --apply` publishes every container through the reviewed asset registry, which is how
+a deployment serves them at /world/assets/<asset key>/bytes.
 """
 
 import argparse
@@ -110,8 +113,8 @@ def iter_assets(document):
             yield material["asset"]
 
 
-def verify(document=None):
-    """Raise unless every catalog asset matches its bytes and reviewed import manifest."""
+def catalog_imports(document=None):
+    """Every catalog container with its reviewed import manifest and licence, each verified."""
     from exulanica.world.asset_import import ReviewedAssetImport, validate_asset_import
 
     document = document or json.loads(CATALOG.read_text())
@@ -125,7 +128,7 @@ def verify(document=None):
         manifest_file = licence_path.parent / "imports.json"
         for manifest in json.loads(manifest_file.read_text()):
             imports[manifest["asset_key"]] = (ReviewedAssetImport.model_validate(manifest), licence)
-    count = 0
+    verified = []
     for asset in iter_assets(document):
         payload = (characters / asset["file"]).read_bytes()
         if (
@@ -135,7 +138,28 @@ def verify(document=None):
             raise ValueError(f"{asset['file']} does not match the catalog")
         manifest, licence = imports[asset["assetKey"]]
         validate_asset_import(manifest, payload, licence)
-        count += 1
+        verified.append((manifest, payload, licence))
+    return verified
+
+
+def import_catalog(connection, store, document=None):
+    """Publish every catalog container as a reviewed asset, in the caller's transaction.
+
+    Import is append-only and idempotent: a key already published with the same bytes and
+    receipt is left as it is, and a key bound to anything else refuses the whole batch.
+    """
+    from exulanica.world.asset_import import import_reviewed_asset
+
+    imports = catalog_imports(document)
+    for manifest, payload, licence in imports:
+        import_reviewed_asset(connection, store, manifest, payload, licence)
+    return len(imports)
+
+
+def verify(document=None):
+    """Raise unless every catalog asset matches its bytes and reviewed import manifest."""
+    document = document or json.loads(CATALOG.read_text())
+    count = len(catalog_imports(document))
     expected = TS_HEADER + json.dumps(json.dumps(document, sort_keys=True, separators=(",", ":")))
     if not TS_CATALOG.read_text().startswith(expected):
         raise ValueError("catalog-data.ts is stale; rerun the preparation")
@@ -163,9 +187,37 @@ def main():
     parser.add_argument("--workdir", type=Path)
     parser.add_argument("--verify-only", action="store_true")
     parser.add_argument("--looks", action="store_true", help="rewrite the designed looks module")
+    parser.add_argument(
+        "--import",
+        dest="publish",
+        action="store_true",
+        help="publish every catalog container as a reviewed asset (with --apply)",
+    )
+    parser.add_argument(
+        "--apply",
+        action="store_true",
+        help="with --import: write to EXULANICA_DATABASE_URL and the store; otherwise validate",
+    )
+    parser.add_argument("--data-dir", type=Path)
     args = parser.parse_args()
     if args.looks:
         print(f"Wrote {write_looks()} designed looks")
+        return
+    if args.publish:
+        if not args.apply:
+            print(f"Validated {len(catalog_imports())} character containers for import")
+            return
+        import psycopg
+
+        from exulanica.env import env_get, resolve_data_dir
+        from exulanica.store.local import LocalContentAddressedStore
+
+        url = env_get("DATABASE_URL")
+        if not url:
+            parser.error("EXULANICA_DATABASE_URL is required for publication")
+        store = LocalContentAddressedStore(resolve_data_dir(explicit=args.data_dir) / "blobs")
+        with psycopg.connect(url) as connection, connection.transaction():
+            print(f"Published {import_catalog(connection, store)} character containers")
         return
     if args.verify_only:
         print(f"Verified {verify()} character assets")

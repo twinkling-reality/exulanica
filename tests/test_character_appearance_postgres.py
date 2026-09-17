@@ -450,3 +450,80 @@ def test_current_v2_source_authority_is_required_for_every_subject_operation(app
         == 2
     )
     repo.connection.commit()
+
+
+def test_catalog_look_saves_resets_and_reports_its_published_containers(appearance, tmp_path):
+    import sys
+    from pathlib import Path
+
+    from exulanica.store.local import LocalContentAddressedStore
+    from exulanica.world.asset_import import import_reviewed_asset
+    from exulanica.world.character_appearance import (
+        CharacterRecipe,
+        catalog_recipe_families,
+        designed_looks,
+        load_character_catalog,
+        look_containers,
+        look_from_recipe,
+        recipe_from_look,
+    )
+
+    sys.path.insert(0, str(Path(__file__).parents[1] / "scripts"))
+    import prepare_character_people as people
+
+    repo, version, subject, _ = appearance
+    catalog, looks = load_character_catalog()
+    feminine, masculine = catalog_recipe_families(catalog, looks)
+    designed = designed_looks(catalog, looks)
+    repo.families = {family.sha256: family for family in (feminine, masculine)}
+    store = LocalContentAddressedStore(tmp_path / "character-assets")
+    repo.store = store
+
+    athletic = designed["athletic-feminine"]["look"]
+    saved = repo.save(version, subject, recipe_from_look(athletic, feminine), base_revision=0)
+    assert saved["current"]["render_status"] == "catalog_unavailable"
+    repo.catalog = catalog
+    assert repo.read(version, subject)["current"]["render_status"] == (
+        "asset_withdrawn_or_unreviewed"
+    )
+
+    needed = {ref["assetKey"] for ref in look_containers(catalog, athletic)}
+    assert 10 <= len(needed) <= 14
+    imports = [entry for entry in people.catalog_imports(catalog) if entry[0].asset_key in needed]
+    with repo.connection.transaction():
+        for manifest, payload, licence in imports[:-1]:
+            import_reviewed_asset(repo.connection, store, manifest, payload, licence)
+    assert repo.read(version, subject)["current"]["render_status"] == (
+        "asset_withdrawn_or_unreviewed"
+    )
+    with repo.connection.transaction():
+        import_reviewed_asset(repo.connection, store, *imports[-1])
+    current = repo.read(version, subject)["current"]
+    assert current["render_status"] == "available"
+    assert (
+        look_from_recipe(
+            catalog, CharacterRecipe.model_validate(current["document"]["recipe"]), feminine
+        )
+        == athletic
+    )
+    repo.store = LocalContentAddressedStore(tmp_path / "empty-assets")
+    assert repo.read(version, subject)["current"]["render_status"] == "asset_bytes_unavailable"
+    repo.store = store
+
+    # Changing the body is choosing the other body's family; reset returns that body's default.
+    suit = designed["suit-masculine"]["look"]
+    changed = repo.save(version, subject, recipe_from_look(suit, masculine), base_revision=1)
+    assert changed["current"]["render_status"] == "asset_withdrawn_or_unreviewed"
+    reset = repo.reset(version, subject, base_revision=2)
+    default = designed[looks["defaults"]["bases"]["masculine"]]["look"]
+    assert reset["current"]["document"]["recipe"] == recipe_from_look(
+        default, masculine
+    ).model_dump(mode="json")
+    restored = repo.reset(version, subject, base_revision=3, restore_revision=1)
+    assert restored["current"]["document"]["recipe"] == saved["current"]["document"]["recipe"]
+    assert restored["current"]["render_status"] == "available"
+    assert [row["revision"] for row in repo.history(version, subject)] == [4, 3, 2, 1]
+
+    # A recipe over a catalog revision this host no longer serves keeps its history.
+    repo.families = {masculine.sha256: masculine}
+    assert repo.read(version, subject)["current"]["render_status"] == "family_source_unavailable"

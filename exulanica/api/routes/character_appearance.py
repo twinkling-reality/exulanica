@@ -8,7 +8,7 @@ app.state.society_input_authorizer remains the authority for current synthetic s
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Mapping
 from dataclasses import dataclass
 from typing import Annotated, Any, Literal
 
@@ -38,6 +38,8 @@ class CharacterAppearanceRuntime:
     families: tuple[CharacterFamily, ...]
     authorize_family: Callable[[psycopg.Connection, Session, CharacterFamily], bool]
     store: ContentAddressedStore | None = None
+    #: The character catalog that catalog-derived families compose their looks from.
+    catalog: Mapping[str, Any] | None = None
 
 
 class SaveBody(Record):
@@ -73,6 +75,7 @@ def _repo(
         if authorizer is None
         else lambda doc: authorizer(connection, session, doc),
         store=runtime.store,
+        catalog=runtime.catalog,
     )
 
 
