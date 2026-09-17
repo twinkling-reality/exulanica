@@ -8,6 +8,13 @@ import type { AlternateVersion } from '../src/world-objects-api.js';
 import type { AppEnvironment, SessionState } from '../src/composition/session-state.js';
 import type { SocietyPlaybackControl } from '../src/society-control-api.js';
 
+// Only the NYC footprint renderer is replaced, so a test can see whether one was built.
+const nycOverlay = vi.hoisted(() => vi.fn());
+vi.mock('@exulanica/atlas-react/playcanvas', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('@exulanica/atlas-react/playcanvas')>()),
+  NYCSemanticOverlay: nycOverlay,
+}));
+
 function deferred<T>() {
   let resolve!: (value: T) => void;
   const promise = new Promise<T>((done) => { resolve = done; });
@@ -120,6 +127,40 @@ describe('mounted NYC semantic selection lifecycle', () => {
     expect(controls.onInteract).toBe(prior);
     await expect(mounted.begin()).rejects.toThrow(/disposed/);
     expect(createOverlay).toHaveBeenCalledTimes(1);
+  });
+
+  it('draws NYC footprint lines only when neither an owned district nor a generated tile is in the world', async () => {
+    nycOverlay.mockImplementation(function overlay() { return { pick: () => null, destroy: () => undefined }; });
+    const built = async (world: { readonly ownedDistrict: unknown; readonly generatedTile: unknown }): Promise<number> => {
+      nycOverlay.mockClear();
+      const binding = {
+        controls: { state: { x: 0, y: 1.62, z: 0 }, onInteract: null },
+        camera: { getPosition: () => ({ x: 0, y: 1.62, z: 0 }), forward: { x: 0, y: 0, z: -1 } },
+        device: {},
+        environmentRoot: {},
+        renderRoot: {},
+        invalidate: vi.fn(),
+        ...world,
+      };
+      const mounted = mountEnvironmentSelection({
+        env: {} as AppEnvironment,
+        state: { atlas: { binding } } as unknown as SessionState,
+        scene: { islands: [{ islandId: 'region-a' }] } as unknown as AtlasScene,
+        credentials: { baseUrl: 'https://example.test', token: 'token' },
+        showStatus: vi.fn(),
+        admissionId: '12345678-1234-4123-8123-123456789abc',
+        environmentClient: { catalog: async () => catalog } as never,
+        worldClient: { connect: async () => ({ assets: [], version }) } as never,
+      });
+      await mounted.begin();
+      const count = nycOverlay.mock.calls.length;
+      mounted.dispose();
+      return count;
+    };
+    // The Google reference view: no ground of its own, so the NYC footprints are drawn.
+    expect(await built({ ownedDistrict: null, generatedTile: null })).toBe(1);
+    // A generated city is not New York: no footprint line may draw over it.
+    expect(await built({ ownedDistrict: null, generatedTile: { metrics: {}, dispose: () => undefined } })).toBe(0);
   });
 
   it('does not clobber a newer interaction owner during teardown', async () => {

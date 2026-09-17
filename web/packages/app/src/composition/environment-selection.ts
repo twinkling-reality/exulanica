@@ -835,7 +835,7 @@ export function mountEnvironmentSelection(
         NYC_REFERENCE_FRAME,
       );
       overlay = deps.createOverlay?.(features)
-        ?? (atlas.ownedDistrict != null
+        ?? (atlas.ownedDistrict != null || atlas.generatedTile != null
           ? { pick: () => null, destroy: () => undefined }
           : new NYCSemanticOverlay(atlas.device, atlas.environmentRoot, features));
       reflectMemoryLayer(atlas.memoryLayerVisible);
