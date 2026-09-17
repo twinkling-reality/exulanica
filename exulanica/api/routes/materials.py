@@ -6,8 +6,10 @@ migration 0066. What this module decides is the shape of an answer.
 *   ``GET /materials/makers`` and ``GET /materials/library`` describe what may be varied: every
     published maker's manifest, and every published set with its recipe. A client builds a
     person's recipe from these, and the server checks it again whatever the client did.
-*   ``POST /materials/recipes`` stores a recipe the published maker accepts, or answers 422 with
-    every reason. A photo-derived recipe is refused until the personal model right exists.
+*   ``POST /materials/recipes`` stores a recipe a person authored and the published maker
+    accepts, or answers 422 with every reason. A client can only state ``authored``: a proposal or
+    a photo-derived recipe carries the model that made it, and only the service that records that
+    model may write one, so either origin is a 422 here.
 *   ``POST /materials/recipes/{recipe_id}/withdraw`` hides a recipe and its bake at once.
 *   ``POST /materials/recipes/{recipe_id}/bake`` queues a bake and answers 202. The bake is made
     by the bake worker, never in this request, and a request past the workspace's quota is 429.
@@ -44,7 +46,6 @@ from exulanica.world.material_recipes import (
     MaterialRepository,
     MaterialRuntime,
     MaterialWithdrawn,
-    PhotoDerivedRecipeInert,
     RecipeRecord,
     UnknownMaterial,
 )
@@ -66,7 +67,8 @@ class PublishedSet(_Body):
 
 class RecipeBody(_Body):
     recipe: dict[str, Any]
-    origin: Literal["authored", "proposed", "photo_derived"] = "authored"
+    #: What a client may say about where a recipe came from: that a person authored it.
+    origin: Literal["authored"] = "authored"
     based_on: PublishedSet | None = None
     label: Annotated[str, Field(max_length=400)] | None = None
 
@@ -112,13 +114,6 @@ def _refused(error: Exception) -> JSONResponse:
             "invalid_recipe",
             "the published maker refuses this recipe",
             problems=list(error.problems),
-        )
-    if isinstance(error, PhotoDerivedRecipeInert):
-        return _problem(
-            409,
-            "personal_model_right_required",
-            "a recipe may not be derived from a personal photograph before the personal model "
-            "right exists",
         )
     if isinstance(error, UnknownMaterial):
         return _problem(404, "unknown_reference", "no such recipe")

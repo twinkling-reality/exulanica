@@ -10,9 +10,11 @@ manifest, the same check the baker makes and the published library passes. A rec
 published set must use that set's maker. The person's label is checked and kept outside every
 digest.
 
-**Photo-derived recipes are inert.** :meth:`MaterialRepository.create_recipe` refuses that origin
-before the database does, and neither path can be talked past until the personal model right
-(0073) exists and the service that checks it is written.
+**Only authored recipes are stored today.** A proposal and a photo-derived recipe are a model's
+output, and each carries the model that made it: a proposal waits for the path that records that
+model, and a photo-derived recipe for the migration after 0073 and the service that checks the
+personal model right. :meth:`MaterialRepository.create_recipe` refuses both before the database
+does, and the database refuses both whatever writes them.
 
 **Reads ask the schema whether a recipe is still readable,** through
 ``tombstone_blocks_material_recipe`` in the query itself, and tell "never existed here" (404) from
@@ -77,12 +79,14 @@ __all__ = [
     "MaterialRuntime",
     "MaterialWithdrawn",
     "PhotoDerivedRecipeInert",
+    "ProposedRecipeInert",
     "RecipeRecord",
     "UnknownMaterial",
 ]
 
-#: The origins a recipe may be created with today. `photo_derived` waits for migration 0073.
-AUTHORABLE_ORIGINS: Final = ("authored", "proposed")
+#: The origins a recipe may be created with today. `proposed` waits for a proposal path that
+#: records the model, and `photo_derived` for the migration after 0073.
+AUTHORABLE_ORIGINS: Final = ("authored",)
 _LABEL_LIMIT: Final = 200
 _CONTROL: Final = re.compile(r"[\x00-\x1f\x7f-\x9f]")
 _TOMBSTONED: Final = "tombstoned: write refused"
@@ -104,6 +108,10 @@ class InvalidRecipe(MaterialError):
 
 class PhotoDerivedRecipeInert(MaterialError):
     """No recipe comes from a personal photograph before the personal model right exists."""
+
+
+class ProposedRecipeInert(MaterialError):
+    """No recipe is stored as a proposal before a proposal path records the model that made it."""
 
 
 class UnknownMaterial(MaterialError):
@@ -263,6 +271,8 @@ def _refusals() -> Iterator[None]:
         message = error.diag.message_primary or ""
         if "personal model right" in message:
             raise PhotoDerivedRecipeInert(message) from error
+        if "the model that proposed it" in message:
+            raise ProposedRecipeInert(message) from error
         if message.startswith("permission denied for"):
             raise MaterialReadOnly("this deployment keeps material recipes read-only") from error
         raise
@@ -323,6 +333,11 @@ class MaterialRepository:
             raise PhotoDerivedRecipeInert(
                 "a recipe may not be derived from a personal photograph before the personal "
                 "model right exists"
+            )
+        if origin == "proposed":
+            raise ProposedRecipeInert(
+                "a proposed recipe names the model that proposed it, and no proposal path "
+                "records one yet"
             )
         if origin not in AUTHORABLE_ORIGINS:
             raise InvalidRecipe([f"origin is one of {', '.join(AUTHORABLE_ORIGINS)}"])

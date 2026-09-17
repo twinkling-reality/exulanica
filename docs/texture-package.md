@@ -556,12 +556,13 @@ Migration 0066 is the schema and records why it has this shape. The code is:
 - `exulanica/materials/workspace.py`, the request, receipt and licence;
 - `web/packages/loom-texture/src/workspace/`, the baker's side.
 
-**A recipe is a row, checked before it is stored.** A person varies a published set, or the
-Companion proposes a recipe from words. Each recipe row holds:
+**A recipe is a row, checked before it is stored.** A person varies a published set. Later, the
+Companion will propose recipes from words, and a model will read recipes from photographs. Each
+recipe row holds:
 
 - the recipe's canonical bytes, the same document as jsonb, and the digest over the bytes;
 - the maker, by id, version and manifest digest;
-- the origin: `authored`, `proposed` or `photo_derived`;
+- the origin: `authored`, `proposed` or `photo_derived`. Only `authored` is stored today;
 - the published set it was varied from, if any;
 - the person's own label, which is outside every digest and never reaches a container.
 
@@ -573,6 +574,20 @@ The repository refuses the recipe unless:
   baker makes and the published library passes.
 
 A recipe row never changes; a changed recipe is a new row.
+
+**Only a person's own recipe is stored today.** A proposal and a photo-derived recipe are a
+model's output, and a model's output is a claim about that model, which cannot be checked without
+the model's identity. So:
+
+- `POST /materials/recipes` accepts only `"origin": "authored"`. Any other origin is a 422,
+  because only the service that records a model's identity may write a model's output, never a
+  client.
+- The repository refuses `proposed` (`ProposedRecipeInert`) and `photo_derived`
+  (`PhotoDerivedRecipeInert`) before the database does.
+- The database refuses both, whatever writes them. `tg_material_recipe_awaits_proposal_model`
+  refuses a proposed row until a proposal path records the model's provider, role, id and
+  revision. The migration that adds that path replaces this trigger alone; the origin column
+  still admits the value.
 
 **Removing a recipe hides it and destroys nothing.** Withdrawal is an append-only row in
 `material_recipe_withdrawal`. The recipe and its bake answer 410 at once, and a bake still waiting
@@ -622,6 +637,9 @@ checkpoint exists, in a migration and in the personal model right's code togethe
 
 - **Request.** `POST /materials/recipes/{recipe_id}/bake` queues it. The request counts against the
   workspace's quota: 64 a day and 8 waiting, unless a `material_bake_quota` row says otherwise.
+  The count does not depend on the repository. At commit, a bake that entered the queue in the
+  transaction, new or back from `failed` or `baked`, must have a `material_bake_request` row
+  written in the same transaction, or the transaction is refused.
 - **Claim.** The worker claims the bake with a lease and checks the recipe again before starting
   anything. A pass takes one bake from each workspace in turn, so a busy workspace cannot take
   every bake the pass allows, and an error in one workspace is recorded without stopping the rest.
@@ -721,8 +739,8 @@ need `world.write`. The answers:
 | 404 | the recipe never existed in this workspace |
 | 410 | the recipe was withdrawn or deleted |
 | 403 | the deployment's database role may not write material tables (the judge deployment), for every write whatever the id |
-| 409 | the bake is not ready, its bytes are missing, or the recipe is photo-derived |
-| 422 | the maker refuses the recipe |
+| 409 | the bake is not ready, or its bytes are missing |
+| 422 | the maker refuses the recipe, or the body states an origin other than `authored` |
 | 429 | the bake quota is spent |
 | 503 | the instance has no material catalog, or a delivery kept a write waiting through every retry (with `Retry-After`) |
 
@@ -780,4 +798,5 @@ the record to all of that.
   - the determinism of a re-bake;
   - the package suite, which proves it for the published library only.
 - **Photo-derived recipes have been exercised only in tests**, with their two inert triggers set
-  aside. No model has proposed a recipe, and no model has been trained.
+  aside. No model has proposed a recipe, no proposed recipe can be stored, and no model has been
+  trained.

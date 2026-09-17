@@ -5,9 +5,9 @@
 --
 -- 0065 pinned the published library: eight sets, every one a maker applied to a recipe, and every
 -- recipe an object with a digest. This is the personal half. A person varies a recipe (a darker
--- mortar, a longer brick), the Companion proposes one from a description, and later a recipe may
--- be derived from the person's own photographs. Each is a row here, and each can be baked into a
--- container that belongs to that workspace alone. `docs/texture-package.md` section 14 is the
+-- mortar, a longer brick), the Companion will propose one from a description, and later a recipe
+-- may be derived from the person's own photographs. Each is a row here, and each can be baked into
+-- a container that belongs to that workspace alone. `docs/texture-package.md` section 14 is the
 -- design; what follows records the shape.
 --
 -- THE SHAPE CHOSEN.
@@ -77,8 +77,17 @@
 --     `material_recipe`.
 -- `exulanica.materials.photo_derived` already has that shape.
 --
+-- PROPOSED RECIPES ARE INERT TOO. A proposal is a model's output, and a model's output is a claim
+-- about that model, which cannot be checked without the model's identity. No proposal path records
+-- one yet, so `tg_material_recipe_awaits_proposal_model` refuses every proposed row and does
+-- nothing else. The migration that gives a proposal its model (provider, role, model id and
+-- revision, as the migration after 0073 adds for photo-derived recipes) replaces exactly that
+-- trigger. The origin check keeps the value, so nothing else has to change.
+--
 -- A BAKE IS A COMPUTE AMPLIFIER. `material_bake_quota` bounds how many bakes one workspace may
--- request in a day and how many may wait at once, and the request guard refuses past either.
+-- request in a day and how many may wait at once, and the request guard refuses past either. The
+-- database also holds the count itself: a bake that enters the queue without a request row in the
+-- same transaction is refused at commit, whatever wrote it.
 --
 -- WHAT THIS DELIBERATELY DOES NOT DO. It stores no float. Nothing that reaches a digest carries a
 -- clock: `created_at`, `requested_at` and `baked_at` are facts about the write. It adds no
@@ -97,9 +106,9 @@ select pg_advisory_xact_lock(119622309);
 create table material_recipe (
   workspace_id     uuid not null,
   recipe_id        uuid not null default uuidv7(),
-  -- Who made it. `authored`: a person set the controls. `proposed`: the Companion suggested it
-  -- from words. `photo_derived`: a model read the person's photographs, and until 0073 no row
-  -- may say so.
+  -- Who made it. `authored`: a person set the controls. `proposed`: a model suggested it from
+  -- words, and until a proposal records that model no row may say so. `photo_derived`: a model
+  -- read the person's photographs, and until the migration after 0073 no row may say so.
   origin           text not null check (origin in ('authored', 'proposed', 'photo_derived')),
   maker_id         text not null check (maker_id ~ '^[a-z][a-z0-9.-]*$'),
   maker_version    integer not null check (maker_version >= 1),
@@ -409,6 +418,24 @@ create trigger tg_material_recipe_awaits_model_right
   before insert on material_recipe
   for each row execute function tg_material_recipe_awaits_model_right();
 
+-- Not one of those two: a proposal waits for its own path, which records the model that proposed
+-- it, and the migration that adds that path replaces this trigger alone. It refuses and does
+-- nothing else, and its name sorts it before every other guard on the table, as its twin's does.
+create function tg_material_recipe_awaits_proposal_model() returns trigger
+language plpgsql as $fn$
+begin
+  if new.origin = 'proposed' then
+    raise exception 'a proposed recipe names the model that proposed it, and no proposal path '
+                    'records one yet'
+      using errcode = 'insufficient_privilege';
+  end if;
+  return new;
+end $fn$;
+
+create trigger tg_material_recipe_awaits_proposal_model
+  before insert on material_recipe
+  for each row execute function tg_material_recipe_awaits_proposal_model();
+
 -- At commit, a photo-derived recipe names exactly the photographs it declared. Deferred because
 -- the sources reference the recipe and so arrive after it.
 create function tg_material_recipe_complete() returns trigger
@@ -714,6 +741,35 @@ end $fn$;
 create trigger tg_material_bake_request_guard
   before insert on material_bake_request
   for each row execute function tg_material_bake_request_guard();
+
+-- And the count is not left to whoever writes the queue. At commit, a bake that entered
+-- `requested` in this transaction, as a new row or back from `failed` or `baked`, has a request
+-- row written in this transaction too; the guard above dates every one at its statement, so none
+-- is older than the transaction. A bake that enters twice in one transaction is queued once,
+-- because nothing bakes inside a transaction, and one request counts it.
+create function tg_material_bake_request_counted() returns trigger
+language plpgsql as $fn$
+begin
+  if tg_op = 'UPDATE' and old.state = 'requested' then
+    return null;
+  end if;
+  perform assert_workspace_context(new.workspace_id);
+  if not exists (select 1 from material_bake_request r
+                  where r.workspace_id = new.workspace_id
+                    and r.bake_id = new.bake_id
+                    and r.requested_at >= transaction_timestamp()) then
+    raise exception 'bake % entered the queue without a request that counts it', new.bake_id
+      using errcode = 'check_violation';
+  end if;
+  return null;
+end $fn$;
+
+create constraint trigger tg_material_bake_request_counted
+  after insert or update on material_bake
+  deferrable initially deferred
+  for each row
+  when (new.state = 'requested')
+  execute function tg_material_bake_request_counted();
 
 -- --------------------------------------------------------------------------------------------
 -- 7. Append-only, in the shape of `tg_place_record_append_only`.

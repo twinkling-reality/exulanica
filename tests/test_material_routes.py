@@ -165,14 +165,18 @@ def test_a_recipe_that_is_not_integers_or_not_the_body_shape_is_a_422(api):
     assert extra.status_code == 422
 
 
-def test_a_photo_derived_recipe_is_refused_until_the_right_exists(api):
+@pytest.mark.parametrize("origin", ["proposed", "photo_derived", "scanned"])
+def test_a_client_states_only_that_a_person_authored_the_recipe(api, materials, origin):
+    """A proposal or a photo-derived recipe carries its model, and no client can supply that."""
     refused = api.call(
-        "owner",
-        "POST",
-        "/materials/recipes",
-        json={"recipe": _small(), "origin": "photo_derived"},
+        "owner", "POST", "/materials/recipes", json={"recipe": _small(), "origin": origin}
     )
-    assert (refused.status_code, refused.json()["code"]) == (409, "personal_model_right_required")
+    assert refused.status_code == 422
+    assert materials.rows("select count(*) as n from material_recipe")[0]["n"] == 0
+    stated = api.call(
+        "owner", "POST", "/materials/recipes", json={"recipe": _small(), "origin": "authored"}
+    )
+    assert (stated.status_code, stated.json()["origin"]) == (201, "authored")
 
 
 def test_a_read_only_grant_is_refused_on_every_write(api, materials):

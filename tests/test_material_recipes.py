@@ -61,7 +61,9 @@ from exulanica.world.material_recipes import (
     MaterialRepository,
     MaterialWithdrawn,
     PhotoDerivedRecipeInert,
+    ProposedRecipeInert,
     UnknownMaterial,
+    _refusals,
 )
 from exulanica.world.texture_assets import load_material_catalog
 
@@ -87,6 +89,8 @@ INERT = (
     ("material_recipe", "tg_material_recipe_awaits_model_right"),
     ("material_recipe_source", "tg_material_recipe_source_awaits_model_right"),
 )
+#: The one that keeps a proposed recipe inert until a proposal records its model.
+PROPOSAL_INERT = ("material_recipe", "tg_material_recipe_awaits_proposal_model")
 
 
 def _code(text: str) -> str:
@@ -296,7 +300,7 @@ def test_0066_is_one_transaction_and_shaped_like_its_neighbours():
 
 def test_the_inert_triggers_refuse_and_do_nothing_else():
     code = _code(MIGRATION.read_text())
-    for _, trigger in INERT:
+    for _, trigger in (*INERT, PROPOSAL_INERT):
         pattern = (
             rf"create function {trigger}\(\) returns trigger\s+"
             r"language plpgsql as \$fn\$(.*?)\$fn\$"
@@ -419,6 +423,50 @@ def test_a_photo_derived_recipe_is_refused_by_the_repository_and_by_the_schema(m
             "values (%s, %s, %s, 0)",
             (materials.workspace_id, authored.recipe_id, _capture(materials)),
         )
+
+
+def _insert_recipe(materials, origin: str) -> None:
+    """A recipe row written straight to the table, as nothing in the product writes one."""
+    raw = canonical_bytes(_small())
+    materials.connection.execute(
+        "insert into material_recipe (workspace_id, origin, maker_id, maker_version, "
+        "  maker_sha256, recipe_canonical, recipe_document, recipe_sha256, created_by) "
+        "values (%s, %s, 'loom.brick', 1, %s, %s, convert_from(%s, 'UTF8')::jsonb, %s, %s)",
+        (
+            materials.workspace_id,
+            origin,
+            bytes.fromhex(CATALOG.sets[BRICK].maker.sha256),
+            raw,
+            raw,
+            hashlib.sha256(raw).digest(),
+            materials.actor,
+        ),
+    )
+
+
+def test_a_proposed_recipe_is_refused_until_a_proposal_records_its_model(materials):
+    with pytest.raises(ProposedRecipeInert, match="the model that proposed it"):
+        materials.repository().create_recipe(_small(), origin="proposed")
+    # The schema refuses it whatever writes it, and says so in words the repository names.
+    with pytest.raises(ProposedRecipeInert), _refusals():
+        _insert_recipe(materials, "proposed")
+    # Setting aside the photo-derived triggers does not set this one aside.
+    with (
+        materials.photo_derived_allowed(),
+        pytest.raises(psycopg.errors.InsufficientPrivilege, match="the model that proposed it"),
+    ):
+        _insert_recipe(materials, "proposed")
+    assert materials.rows("select count(*) as n from material_recipe")[0]["n"] == 0
+    # With the trigger set aside the repository still refuses on its own, and the trigger is all
+    # that stands in the schema: the column admits the value, so the migration that records a
+    # proposal's model has only to replace the trigger.
+    table, trigger = PROPOSAL_INERT
+    with materials.connection.transaction(force_rollback=True):
+        materials.connection.execute(f"alter table {table} disable trigger {trigger}")
+        with pytest.raises(ProposedRecipeInert):
+            materials.repository().create_recipe(_small(), origin="proposed")
+        _insert_recipe(materials, "proposed")
+    assert materials.rows("select count(*) as n from material_recipe")[0]["n"] == 0
 
 
 def test_with_the_right_in_place_a_source_must_be_a_live_photograph_of_that_recipe(materials):
@@ -552,6 +600,59 @@ def test_the_daily_quota_and_the_waiting_quota_refuse_past_their_limits(material
     )
     with pytest.raises(BakeQuotaExceeded, match="last day"):
         repository.request_bake(first.recipe_id)
+
+
+def test_a_bake_never_enters_the_queue_without_a_request_that_counts_it(materials):
+    """Whatever writes the queue, the database holds the count: a bare write fails at commit."""
+    record = materials.repository().create_recipe(_small())
+
+    def refused_at_commit(sql: str, *params) -> None:
+        with (
+            pytest.raises(psycopg.errors.CheckViolation, match="without a request that counts it"),
+            materials.connection.transaction(),
+        ):
+            materials.connection.execute(sql, params)
+
+    refused_at_commit(
+        "insert into material_bake (workspace_id, recipe_id, set_id, requested_by) "
+        "values (%s, %s, %s, %s)",
+        materials.workspace_id,
+        record.recipe_id,
+        f"ws.{record.recipe_id.hex}",
+        materials.actor,
+    )
+    assert materials.rows("select count(*) as n from material_bake")[0]["n"] == 0
+
+    # Entering the queue is what counts: a write that leaves a waiting bake waiting is no request.
+    materials.repository().request_bake(record.recipe_id)
+    with materials.connection.transaction():
+        materials.connection.execute(
+            "update material_bake set attempts = attempts where workspace_id = %s",
+            (materials.workspace_id,),
+        )
+
+    # Back from failed: a bare update commits nothing, and asking through the repository does.
+    worker = materials.worker()
+    claim = worker._claim(materials.connection, materials.workspace_id)
+    assert worker._finish_failed(
+        materials.connection, materials.workspace_id, claim, _Failed("bake_failed", "test")
+    )
+    refused_at_commit(
+        "update material_bake set state = 'requested', attempts = 0, failure_class = null, "
+        "  failure_message = null where workspace_id = %s",
+        materials.workspace_id,
+    )
+    assert materials.rows("select state from material_bake")[0]["state"] == "failed"
+    assert materials.repository().request_bake(record.recipe_id).state == "requested"
+
+    # Back from baked: the same.
+    materials.record_synthetic_bake(record.recipe_id)
+    refused_at_commit(
+        "update material_bake set state = 'requested' where workspace_id = %s",
+        materials.workspace_id,
+    )
+    assert materials.rows("select state from material_bake")[0]["state"] == "baked"
+    assert materials.rows("select count(*) as n from material_bake_request")[0]["n"] == 2
 
 
 def test_a_withdrawal_cancels_a_waiting_bake_and_refuses_a_new_request(materials):
