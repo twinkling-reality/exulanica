@@ -77,6 +77,7 @@ if TYPE_CHECKING:
 __all__ = [
     "ACCOUNT_OWNER_PERMISSIONS",
     "ROUTE_RULES",
+    "SELF_CHARGING_TILE_ROUTES",
     "Authentication",
     "Permission",
     "PermissionRefused",
@@ -128,6 +129,21 @@ class Permission(StrEnum):
     OPERATIONS_WRITE = "operations.write"
     #: Materialising a tile on demand. Metered against the workspace tile quota.
     TILES_MATERIALISE = "tiles.materialise"
+
+
+#: Routes that require ``tiles.materialise`` and charge the tile quota themselves, once per tile
+#: rather than once per request, with the reason each does. :func:`authorise_route` charges one
+#: tile for every other route requiring that permission, before it runs; for these it charges
+#: nothing, because charging twice for one delivery would spend a ceiling on nothing.
+SELF_CHARGING_TILE_ROUTES: Final[Mapping[tuple[str, str], str]] = MappingProxyType(
+    {
+        ("GET", "/tiles"): "metadata only: listing what is stored materialises no tile",
+        ("GET", "/tiles/{baked_tile_id}/bytes"): (
+            "migration 0072's ledger spends one tile the first time a workspace is served one, in "
+            "the same statement as the delivery row; a reload of a tile already delivered is free"
+        ),
+    }
+)
 
 
 class RouteDeclarationError(ExulanicaError):
@@ -217,6 +233,7 @@ _CONSENT_WRITE = _requires(_P.CONSENT_WRITE)
 _DELETION = _requires(_P.DELETION_WRITE)
 _ADMISSION_WRITE = _requires(_P.ADMISSION_WRITE)
 _OPERATIONS_READ = _requires(_P.OPERATIONS_READ)
+_TILES = _requires(_P.TILES_MATERIALISE)
 _NOT_DATA = "the schema of the API, which is not data"
 _APPEARANCE = "/world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance"
 
@@ -355,6 +372,9 @@ ROUTE_RULES: Final[Mapping[tuple[str, str], Public | Authentication | Requires]]
         ("GET", _APPEARANCE): _WORLD_READ,
         ("GET", _APPEARANCE + "/history"): _WORLD_READ,
         ("GET", _APPEARANCE + "/families"): _WORLD_READ,
+        # -- baked tiles of a generated city -----------------------------------------------
+        ("GET", "/tiles"): _TILES,
+        ("GET", "/tiles/{baked_tile_id}/bytes"): _TILES,
         ("GET", "/materials/makers"): _WORLD_READ,
         ("GET", "/materials/library"): _WORLD_READ,
         ("GET", "/materials/recipes"): _WORLD_READ,

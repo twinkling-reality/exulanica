@@ -181,12 +181,11 @@ def test_a_public_declaration_without_a_reason_is_refused():
         Requires(frozenset({"library.read"}))  # type: ignore[arg-type]
 
 
-def test_every_permission_is_required_somewhere_or_says_why_not():
+def test_every_permission_is_required_somewhere():
     used = {
         p for rule in ROUTE_RULES.values() if isinstance(rule, Requires) for p in rule.permissions
     }
-    # tiles.materialise waits for the first on-demand tile route, which this floor gates.
-    assert set(Permission) - used == {Permission.TILES_MATERIALISE}
+    assert set(Permission) - used == set()
 
 
 def test_the_consequential_surfaces_are_each_isolated():

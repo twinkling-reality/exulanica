@@ -291,6 +291,39 @@ def test_the_runtime_role_appends_tombstones_and_never_updates_one(
                 app.execute(f"update tombstone set {change} where tombstone_id=%s", (mine,))
 
 
+def test_the_runtime_writes_a_tile_delivery_and_never_a_baked_tile(provisioned):
+    """Migration 0072's two tables, each held to one verb.
+
+    A baked tile is published by the offline bake and read by everybody; the ledger of what a
+    workspace has been served is appended by the runtime and never rewritten, because rewriting a
+    delivery is how a spent quota would be given back.
+    """
+    updatable = _updatable(provisioned, RUNTIME_ROLE)
+    assert "baked_tile" not in updatable and "workspace_baked_tile" not in updatable
+    verbs = {
+        (row["relation"], verb): row[verb]
+        for row in provisioned.execute(
+            "select c.relname as relation, "
+            "has_table_privilege(%s, c.oid, 'SELECT') as select, "
+            "has_table_privilege(%s, c.oid, 'INSERT') as insert, "
+            "has_table_privilege(%s, c.oid, 'DELETE') as delete "
+            "from pg_class c join pg_namespace n on n.oid = c.relnamespace "
+            "where n.nspname = current_schema() "
+            "and c.relname in ('baked_tile', 'workspace_baked_tile')",
+            (RUNTIME_ROLE, RUNTIME_ROLE, RUNTIME_ROLE),
+        ).fetchall()
+        for verb in ("select", "insert", "delete")
+    }
+    assert verbs == {
+        ("baked_tile", "select"): True,
+        ("baked_tile", "insert"): False,
+        ("baked_tile", "delete"): False,
+        ("workspace_baked_tile", "select"): True,
+        ("workspace_baked_tile", "insert"): True,
+        ("workspace_baked_tile", "delete"): False,
+    }
+
+
 def test_reprovisioning_takes_back_an_update_granted_before(provisioned):
     _grant(provisioned, "grant update on tombstone to {}", RUNTIME_ROLE)
     try:

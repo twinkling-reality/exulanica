@@ -27,15 +27,21 @@ from exulanica.store.local import LocalContentAddressedStore
 __all__ = [
     "BLOB_NAMESPACE",
     "MATERIAL_NAMESPACE",
+    "TILE_NAMESPACE",
     "LocalWorkspaceStores",
     "WorkspaceStores",
     "material_stores",
+    "tile_store",
 ]
 
 #: Where the shared, content-addressed evidence store lives under the data directory.
 BLOB_NAMESPACE: Final = "blobs"
 #: Where each workspace's material bakes live under the data directory.
 MATERIAL_NAMESPACE: Final = "materials"
+#: Where baked tiles live under the data directory. One store, not one per workspace: a baked
+#: tile is a pure function of public inputs, so the same key names the same bytes for everyone
+#: (migration 0072).
+TILE_NAMESPACE: Final = "tiles"
 
 
 class WorkspaceStores(abc.ABC):
@@ -72,3 +78,13 @@ def material_stores(data_dir: str | os.PathLike[str]) -> LocalWorkspaceStores:
     if root.is_relative_to(blobs) or blobs.is_relative_to(root):
         raise ValueError(f"material namespaces at {root} would share the blob store at {blobs}")
     return LocalWorkspaceStores(root)
+
+
+def tile_store(data_dir: str | os.PathLike[str]) -> LocalContentAddressedStore:
+    """The one store baked tiles live in, beside the blob store and never inside it."""
+    base = Path(data_dir).resolve()
+    root = base / TILE_NAMESPACE
+    blobs = base / BLOB_NAMESPACE
+    if root.is_relative_to(blobs) or blobs.is_relative_to(root):
+        raise ValueError(f"the tile store at {root} would share the blob store at {blobs}")
+    return LocalContentAddressedStore(root)

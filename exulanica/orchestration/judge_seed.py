@@ -116,6 +116,7 @@ class SeedRefused(ExulanicaError):
 #: the same reason: emptying them empties the vocabulary and every later insert is then refused
 #: by a guard doing its job.
 GLOBAL_TABLES: Final[Mapping[str, str]] = {
+    "baked_tile": "tiles baked offline from a generated city, keyed by their inputs",
     "interaction_capability_registry": "migration-provided interaction vocabulary",
     "predicate": "migration-provided predicate vocabulary",
     "world_art_profile_module": "migration-provided reviewed art profile",

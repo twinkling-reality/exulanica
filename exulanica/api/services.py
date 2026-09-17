@@ -45,7 +45,7 @@ from exulanica.models.egress import EGRESS_ALLOWLIST_ENV
 from exulanica.models.manifest import Role
 from exulanica.store.base import ContentAddressedStore
 from exulanica.store.local import LocalContentAddressedStore
-from exulanica.store.namespaces import BLOB_NAMESPACE, material_stores
+from exulanica.store.namespaces import BLOB_NAMESPACE, material_stores, tile_store
 from exulanica.world.material_recipes import MaterialRuntime
 from exulanica.world.texture_assets import load_material_catalog
 
@@ -109,6 +109,10 @@ class Services:
     #: The published material catalog and each workspace's bake namespace. None when this
     #: instance was started without ``assets/textures``, which ``warnings`` says.
     materials: MaterialRuntime | None = None
+    #: The one store baked tiles live in, shared by every workspace because a baked tile is a
+    #: pure function of public inputs (migration 0072). None in a hand-built Services, which
+    #: makes the tile routes answer 503 rather than reach a store nobody configured.
+    tiles: ContentAddressedStore | None = None
     #: Dedicated account persistence and verified Google browser sessions, when configured.
     accounts: AccountRuntime | None = None
     #: Explicit host allowlist. Empty leaves automatic society playback disabled.
@@ -273,6 +277,7 @@ def build_services(
         environment_admission_root=data_dir / "environment-inbox",
         materials=_material_runtime(data_dir, environ),
         character_appearance=_character_appearance_runtime(store, environ),
+        tiles=tile_store(data_dir),
         runs_derivative_worker=_enabled(env_get("DERIVATIVE_WORKER", environ)),
         runs_society_control_worker=_explicitly_enabled(env_get("SOCIETY_CONTROL_WORKER", environ)),
         restore_state_path=(

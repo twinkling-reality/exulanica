@@ -103,11 +103,13 @@ READ_ONLY_TABLES: Final = (
     "world_reviewed_asset",
     "world_texture_set",
     "world_texture_set_class",
+    "baked_tile",
 )
 
 #: Tables the runtime may read and append to and may not update. See the module docstring.
 INSERT_ONLY_TABLES: Final = (
     "tombstone",
+    "workspace_baked_tile",
     "material_bake_request",
     "material_recipe",
     "material_recipe_source",

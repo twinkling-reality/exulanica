@@ -25,7 +25,9 @@ built without ``create_app`` is not left open by that omission.
 Two things happen in the application-level dependency and nowhere else, because each must happen
 exactly once per request. A refusal is counted in ``route_permission_refusal`` before it is
 raised, and a route whose declaration requires ``tiles.materialise`` is charged one tile against
-the workspace quota before it runs.
+the workspace quota before it runs, unless it is declared in
+:data:`~exulanica.api.permissions.SELF_CHARGING_TILE_ROUTES`, which names the routes that charge
+the quota themselves, once per tile delivered rather than once per request, and why each does.
 """
 
 from __future__ import annotations
@@ -39,6 +41,7 @@ from fastapi import Depends, Header, Request
 from exulanica.api.authorisation import TokenNotAccepted
 from exulanica.api.permissions import (
     ACCOUNT_OWNER_PERMISSIONS,
+    SELF_CHARGING_TILE_ROUTES,
     Authentication,
     Permission,
     PermissionRefused,
@@ -140,7 +143,12 @@ def authorise_route(request: Request) -> None:
                 refused=refused,
             )
         raise
-    if not isinstance(rule, Public) and Permission.TILES_MATERIALISE in rule.permissions:
+    charges_here = (request.method.upper(), path) not in SELF_CHARGING_TILE_ROUTES
+    if (
+        charges_here
+        and not isinstance(rule, Public)
+        and Permission.TILES_MATERIALISE in rule.permissions
+    ):
         with services.database.session(session.workspace_id) as connection:
             charge_tiles(connection, session.workspace_id, TILES_PER_REQUEST)
     setattr(request.state, _AUTHORISED, session)

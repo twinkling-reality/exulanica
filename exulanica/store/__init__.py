@@ -14,7 +14,12 @@ from exulanica.store.base import (
     privileged_purger,
 )
 from exulanica.store.local import LocalContentAddressedStore
-from exulanica.store.namespaces import LocalWorkspaceStores, WorkspaceStores, material_stores
+from exulanica.store.namespaces import (
+    LocalWorkspaceStores,
+    WorkspaceStores,
+    material_stores,
+    tile_store,
+)
 
 __all__ = [
     "ContentAddressedStore",
@@ -26,4 +31,5 @@ __all__ = [
     "WorkspaceStores",
     "material_stores",
     "privileged_purger",
+    "tile_store",
 ]
