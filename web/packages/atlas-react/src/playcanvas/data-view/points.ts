@@ -21,8 +21,10 @@ import type { RepresentationPointAllocation, RepresentationPointLook } from '../
  *
  * WEBGL2 ONLY FOR THE LOOK. WGSL has no point size (see the header of `point-shader.ts`), so on
  * WebGPU this material draws the same samples as one-pixel points in the same colours and with the
- * same cross-fade weight, and nothing else. `data-view/README.md` records the measurement that
- * decided against expanded quads.
+ * same cross-fade weight, and nothing else. Nothing has measured expanded quads yet, and nothing
+ * decided against them: the product creates a WebGL2 device in every configuration
+ * (`atlas-binding.ts`, `deviceTypes` defaults to `['webgl2']`), and only the bake-off harness asks
+ * for WebGPU. A WebGPU sprite look is open work, to be measured before it is chosen.
  *
  * Every value that shapes the look comes from the style descriptor in atlas-core.
  */

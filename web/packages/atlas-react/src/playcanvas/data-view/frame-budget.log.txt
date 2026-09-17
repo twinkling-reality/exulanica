@@ -52,7 +52,7 @@ read above 16.7 ms, missed presentations, preparation time, bytes, draw calls.
   overview  4,194,304 2,097,152 4,110,676  p50  16.7  p95  16.8  p99  16.8  max  16.8  frames 601  >16.7 175  missed 0    prepared  351 ms    156.8 MiB  draws 84
    No missed presentation in 601 frames at either budget, in either view.
 
-Not measured here: WebGPU (the look is WebGL2-only; see data-view/README.md), a weak machine,
+Not measured here: WebGPU (the look is WebGL2-only; see the header of data-view/points.ts), a weak machine,
 a ten-minute leak run, and the first slide's preparation hitch per frame (the totals above are
 synchronous; in the product the preparation is spread at 262,144 points per update).
 
