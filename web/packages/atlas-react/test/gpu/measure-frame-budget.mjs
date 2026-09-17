@@ -27,6 +27,12 @@
  * `--style '<json>'` merges look values into the style the measured runtime is built with (for
  * example `{"points":{"minPixels":1,"maxPixels":1}}`), validated like any style; the product's
  * style is not touched.
+ * `--half-res` draws the data view's points into an offscreen target at half the canvas size, from
+ * a second camera that follows the first, and composites it additively over the frame: a prototype
+ * of that lever for this measurement only, restored afterwards. The target has no scene depth, so
+ * nothing hides a point in it; at the points end the dissolved surfaces hide nothing either, but the
+ * district's lines no longer occlude points. Its look is approximate and is recorded as such.
+ * `--picture <path>` saves the canvas after the run, with the camera and every switch still applied.
  */
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -48,6 +54,8 @@ const views = argument('views', 'street,overview').split(',');
 const hideDistrict = process.argv.includes('--hide-district');
 const hidePoints = process.argv.includes('--hide-points');
 const styleOverride = JSON.parse(argument('style', '{}'));
+const halfRes = process.argv.includes('--half-res');
+const picture = argument('picture', null);
 const port = Number(argument('port', String(9400 + Math.floor(Math.random() * 400))));
 
 class Session {
@@ -176,6 +184,53 @@ const MEASURE = (budget, view) => `(async () => {
       // missed presentation reads as 33 ms or more.
       missed: sorted.filter(v => v > 20).length };
   };
+  let composite = null;
+  if (${halfRes}) {
+    const device = b.device;
+    const width = Math.max(1, Math.floor(device.width / 2)), height = Math.max(1, Math.floor(device.height / 2));
+    const colour = new pc.Texture(device, { name: 'measure-half-points', width, height, format: pc.PIXELFORMAT_RGBA8,
+      mipmaps: false, minFilter: pc.FILTER_LINEAR, magFilter: pc.FILTER_LINEAR,
+      addressU: pc.ADDRESS_CLAMP_TO_EDGE, addressV: pc.ADDRESS_CLAMP_TO_EDGE });
+    const target = new pc.RenderTarget({ colorBuffer: colour, depth: true });
+    const pointsLayer = new pc.Layer({ name: 'measure-half-points' });
+    const overlayLayer = new pc.Layer({ name: 'measure-half-composite' });
+    b.app.scene.layers.pushTransparent(pointsLayer);
+    b.app.scene.layers.pushTransparent(overlayLayer);
+    const moved = [];
+    b.app.root.forEach(e => {
+      if (!e.name.startsWith('data-view-points:') || !e.render) return;
+      moved.push({ e, layers: [...e.render.layers] });
+      e.render.layers = [pointsLayer.id];
+    });
+    const main = b.camera.camera;
+    const half = new pc.Entity('measure-half-camera');
+    half.addComponent('camera', { fov: main.fov, nearClip: main.nearClip, farClip: main.farClip,
+      clearColor: new pc.Color(0, 0, 0, 0), clearColorBuffer: true, clearDepthBuffer: true,
+      layers: [pointsLayer.id], renderTarget: target, priority: main.priority - 1 });
+    b.camera.addChild(half);
+    const mainLayers = [...main.layers];
+    main.layers = [...mainLayers, overlayLayer.id];
+    const material = new pc.StandardMaterial();
+    material.useLighting = false; material.useFog = false; material.useSkybox = false;
+    material.diffuse = new pc.Color(0, 0, 0); material.emissive = new pc.Color(1, 1, 1);
+    material.emissiveMap = colour; material.blendType = pc.BLEND_ADDITIVE;
+    material.depthTest = false; material.depthWrite = false; material.update();
+    const quad = new pc.Entity('measure-half-composite');
+    quad.addComponent('render', { type: 'plane', material, layers: [overlayLayer.id], castShadows: false, receiveShadows: false });
+    const distance = main.nearClip * 2;
+    const tall = 2 * distance * Math.tan(main.fov * Math.PI / 360);
+    quad.setLocalPosition(0, 0, -distance);
+    quad.setLocalEulerAngles(90, 0, 0);
+    quad.setLocalScale(tall * device.width / device.height, 1, tall);
+    b.camera.addChild(quad);
+    composite = { width, height, moved: moved.length, restore: () => {
+      for (const { e, layers } of moved) e.render.layers = layers;
+      main.layers = mainLayers;
+      quad.destroy(); half.destroy();
+      b.app.scene.layers.remove(pointsLayer); b.app.scene.layers.remove(overlayLayer);
+      target.destroy(); colour.destroy(); material.destroy();
+    } };
+  }
   const intervals = [];
   await new Promise(resolve => {
     let last = null; const start = performance.now();
@@ -199,6 +254,13 @@ const MEASURE = (budget, view) => `(async () => {
     gl.readPixels(0, 0, 1, 1, gl.RGBA, gl.UNSIGNED_BYTE, pixel);
     if (i >= 30) costs.push(performance.now() - t);
   }
+  let pictureUrl = null;
+  if (${picture !== null}) {
+    app.renderNextFrame = true; app.update(1 / 60); app.render();
+    pictureUrl = b.device.canvas.toDataURL('image/png');
+  }
+  const compositeReport = composite && { width: composite.width, height: composite.height, movedDraws: composite.moved };
+  composite?.restore();
   if (frozen) delete b.update;
   // Anything that turned itself back on during the run would make the hiding a false result.
   const reshown = hidden.filter(h => h.mi.visible).map(h => h.name);
@@ -208,6 +270,7 @@ const MEASURE = (budget, view) => `(async () => {
     budget: ${budget}, perSubject, view: ${JSON.stringify(view)}, heldCamera: frozen,
     allocatedPoints: report.allocatedPoints, allocatedBytes: report.allocatedBytes, prepareMs: Math.round(prepareMs),
     subjectsWithPoints: inView, drawCalls: app.stats.drawCalls.total,
+    halfResolution: compositeReport, picture: pictureUrl,
     hiddenDistrictDraws: hidden.map(h => ({ name: h.name, primitive: h.primitive, wasVisible: h.wasVisible })),
     reshownDuringRun: reshown,
     interval: summary(intervals), cost: summary(costs),
@@ -255,6 +318,12 @@ async function main() {
     for (const view of views) {
       for (const budget of budgets) {
         const run = await session.evaluate(MEASURE(budget, view));
+        if (run.picture) {
+          const { writeFileSync } = await import('node:fs');
+          writeFileSync(budgets.length > 1 ? picture.replace(/\.png$/, `-${view}-${budget}.png`) : picture,
+            Buffer.from(run.picture.slice(run.picture.indexOf(',') + 1), 'base64'));
+          run.picture = 'written';
+        }
         runs.push(run);
         process.stderr.write(`${new Date().toISOString()} ${view} ${budget}: interval p95 ${run.interval.p95} ms, `
           + `max ${run.interval.max} ms, ${run.interval.missed} missed of ${run.interval.frames}, `
@@ -265,7 +334,7 @@ async function main() {
     process.stdout.write(`${JSON.stringify({
       measuredAt: new Date().toISOString(), url, viewport: VIEWPORT, seconds, browser: version.Browser,
       renderer: attached.renderer, canvas: attached.canvas, subjects: attached.subjects, hideDistrict, hidePoints,
-      styleOverride, runs,
+      styleOverride, halfRes, runs,
     }, null, 2)}\n`);
   } finally {
     chrome.kill('SIGKILL');
