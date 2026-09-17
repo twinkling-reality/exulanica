@@ -190,7 +190,7 @@ def provisioned(repository):
     return connection
 
 
-def test_every_relation_the_runtime_may_update_is_declared(provisioned):
+def test_every_relation_the_runtime_may_update_is_declared(provisioned, repository):
     declared = set(RUNTIME_UPDATES) | WITHOUT_A_RUNTIME_UPDATER
     assert not set(RUNTIME_UPDATES) & WITHOUT_A_RUNTIME_UPDATER
     assert all(reason.strip() for reason in RUNTIME_UPDATES.values())
@@ -201,17 +201,16 @@ def test_every_relation_the_runtime_may_update_is_declared(provisioned):
     )
     assert declared - actual == set(), "declared here but no longer updatable; remove them"
     assert not actual & set(INSERT_ONLY_TABLES)
-    # The partition provisioning created is counted as its parent, so it was really looked at.
-    assert (
-        provisioned.execute(
-            "select count(*) as n from pg_class c join pg_namespace n on n.oid = c.relnamespace "
-            "where n.nspname = current_schema() and c.relispartition "
-            "and pg_partition_root(c.oid) = 'embedding'::regclass "
-            "and has_table_privilege(%s, c.oid, 'UPDATE')",
-            (RUNTIME_ROLE,),
-        ).fetchone()["n"]
-        == 1
-    )
+    # This workspace's partition is counted as its parent, so a partition was really looked at.
+    # Other tests share the schema and add their own, so only this one is asked about.
+    partition = provisioned.execute(
+        "select pg_partition_root(c.oid)::regclass::text as root, "
+        "has_table_privilege(%s, c.oid, 'UPDATE') as updatable "
+        "from pg_class c join pg_namespace n on n.oid = c.relnamespace "
+        "where n.nspname = current_schema() and c.relname = %s",
+        (RUNTIME_ROLE, f"embedding_ws_{repository.workspace_id.hex}"),
+    ).fetchone()
+    assert partition == {"root": "embedding", "updatable": True}
 
 
 def test_the_executor_may_update_nothing(provisioned):
@@ -287,8 +286,10 @@ def test_the_runtime_role_appends_tombstones_and_never_updates_one(
 
 def test_reprovisioning_takes_back_an_update_granted_before(provisioned):
     _grant(provisioned, "grant update on tombstone to {}", RUNTIME_ROLE)
-    assert "tombstone" in _updatable(provisioned, RUNTIME_ROLE)
-    provision_runtime_role(provisioned)
+    try:
+        assert "tombstone" in _updatable(provisioned, RUNTIME_ROLE)
+    finally:
+        provision_runtime_role(provisioned)
     assert "tombstone" not in _updatable(provisioned, RUNTIME_ROLE)
 
 
@@ -308,17 +309,20 @@ def test_a_tombstone_is_written_once_whoever_holds_update(provisioned, repositor
             f"update tombstone set purge_completed_at={value} where tombstone_id=%s", (owned,)
         )
 
-    # A runtime role that still holds the old full-table grant.
+    # A runtime role that still holds the old full-table grant. The schema is shared, so the
+    # grant is taken back whatever happens here.
     _grant(provisioned, "grant update on tombstone to {}", RUNTIME_ROLE)
-    with scratch_role_database(scratch, RUNTIME_ROLE).session(workspace) as app:
-        for change in REWRITES:
-            with pytest.raises(psycopg.errors.CheckViolation, match="written once"):
-                app.execute(f"update tombstone set {change} where tombstone_id=%s", (owned,))
-        with pytest.raises(psycopg.errors.InsufficientPrivilege, match="purge worker"):
-            app.execute(
-                "update tombstone set purge_completed_at=now() where tombstone_id=%s", (owned,)
-            )
-    provision_runtime_role(provisioned)
+    try:
+        with scratch_role_database(scratch, RUNTIME_ROLE).session(workspace) as app:
+            for change in REWRITES:
+                with pytest.raises(psycopg.errors.CheckViolation, match="written once"):
+                    app.execute(f"update tombstone set {change} where tombstone_id=%s", (owned,))
+            with pytest.raises(psycopg.errors.InsufficientPrivilege, match="purge worker"):
+                app.execute(
+                    "update tombstone set purge_completed_at=now() where tombstone_id=%s", (owned,)
+                )
+    finally:
+        provision_runtime_role(provisioned)
 
     # A role with the purger's column grant and the runtime's INSERT is not the purger.
     _create_lookalike(provisioned)
