@@ -97,7 +97,7 @@ function expectContract(outcomes: readonly Outcome[]): void {
 /** What tess's owd/3 draws of the fixture today, pinned so a change here is a deliberate one. */
 function expectToday(outcomes: readonly Outcome[]): void {
   const count = (test: (outcome: Outcome) => boolean) => outcomes.filter(test).length;
-  expect(outcomes).toHaveLength(174);
+  expect(outcomes).toHaveLength(180);
   const street = ['carriageway:record', 'gutter:record'];
   expect(outcomes.filter(outcome => outcome.state === 'drawn').map(outcome => [outcome.kind, outcome.bounded, outcome.surfaces]))
     .toEqual([
@@ -107,7 +107,16 @@ function expectToday(outcomes: readonly Outcome[]): void {
       ['city.terrain', true, ['terrain:none-exists']],
     ]);
   expect(count(outcome => outcome.membership === 'halo' && outcome.subjectId === null)).toBe(3);
-  expect(count(outcome => outcome.state === 'unavailable' && outcome.subjectId !== null && !outcome.bounded)).toBe(58);
+  expect(count(outcome => outcome.state === 'unavailable' && outcome.subjectId !== null && !outcome.bounded)).toBe(64);
+  // The corridor's slice 2 kind. The tile states an extent for each, and the container leaves them
+  // unavailable needing facade_layout, so each is listed with its reason and draws nothing: no box,
+  // no points, exactly like every other spatial record this bake does not draw.
+  const backing = outcomes.filter(outcome => outcome.kind === 'city.interior_backing');
+  expect(backing).toHaveLength(6);
+  for (const outcome of backing) {
+    expect(outcome).toMatchObject({ membership: 'owned', state: 'unavailable', hasExtent: true, bounded: false, surfaces: [] });
+    expect(outcome.subjectId).toMatch(/^generated:city\.interior_backing:[0-9a-f-]{36}$/);
+  }
   expect(count(outcome => outcome.state === 'not_in_projection' && outcome.hasExtent && !outcome.bounded)).toBe(24);
   expect(count(outcome => outcome.membership === 'owned' && !outcome.hasExtent && outcome.subjectId === null)).toBe(85);
 }
