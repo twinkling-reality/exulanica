@@ -65,7 +65,7 @@
 #shell .world-workspace button:hover { background: var(--surface); border-color: var(--accent); }
 #shell .world-workspace button[aria-expanded='true'] { color: var(--ink); background: color-mix(in srgb, var(--raised) 72%, transparent); border-color: var(--accent); box-shadow: inset 0 0 0 1px color-mix(in srgb, var(--raised) 78%, transparent); }
 #shell .world-workspace button:disabled { color: var(--ink-faint); background: var(--surface); opacity: .75; }
-.world-panel { position: fixed; right: 5vw; top: 12vh; bottom: 8vh; z-index: 12; width: min(430px, 42vw); overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; padding: 22px; background: color-mix(in srgb, var(--raised) 68%, transparent); border: 1px solid var(--edge); border-radius: 4px; box-shadow: var(--app-shadow); backdrop-filter: blur(22px) saturate(106%); transform: perspective(1400px) rotateY(-4deg); transform-origin: right center; }
+.world-panel { position: fixed; right: 5vw; top: 12vh; bottom: 8vh; z-index: 12; width: min(430px, 42vw); overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; padding: 22px; color: var(--ink); background: color-mix(in srgb, var(--raised) 68%, transparent); border: 1px solid var(--edge); border-radius: 4px; box-shadow: var(--app-shadow); backdrop-filter: blur(22px) saturate(106%); transform: perspective(1400px) rotateY(-4deg); transform-origin: right center; }
 #shell .world-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 22px; }
 #shell .world-panel-heading h2 { margin: 0; font: 600 21px/1.2 var(--ui-font-display); letter-spacing: -.025em; }
 #shell .world-panel-close { font-size: 12px; min-height: 34px; padding: 7px 10px; }
