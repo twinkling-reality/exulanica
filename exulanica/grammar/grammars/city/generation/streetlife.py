@@ -1,8 +1,9 @@
 """The streetlife generator: street lamps along every curb that bounds a block.
 
-**What this version places, and what it does not.** Lamps and street trees. A bench, a bin, a
-bollard or a hydrant still has no declared spacing or rule of where it stands, so none is
-generated rather than placed by a number nobody declared.
+**What this version places, and what it does not.** Every class the street-furniture catalog places
+on the kerb line, and street trees. A class the catalog places at a crossing or a junction is not
+generated yet, and a class it places nowhere (a hydrant follows a water main, a signal pole follows
+a signal plan) never will be by this stage: the catalog says so and says why.
 
 **Trees.** Along each curb of a block, at ``tree_spacing_mm``, a tree stands in a square pit
 ``tree_pit_width_mm`` across, its centre ``furniture_kerb_offset_mm`` from the kerb face, narrowed
@@ -37,6 +38,7 @@ from exulanica.grammar.grammars.city.common import MILLIONTHS, FormPart
 from exulanica.grammar.grammars.city.corners import along, walk_round_face
 from exulanica.grammar.grammars.city.generation.stage import (
     GeneratorStage,
+    catalog,
     derived,
     entry,
     prior_records,
@@ -52,6 +54,8 @@ _PIT_MARGIN_MM: Final = 450
 _CLEAR_LOW_MM: Final = 2_200
 #: The walking capsule, as the navigation table states it.
 _CAPSULE_HEIGHT_MM: Final = 1_900
+#: How far apart one block's furniture classes draw, so each class has its own rhythm and offset.
+_CLASS_STRIDE: Final = 100
 
 
 def _turned(facing: tuple[int, int], local_x: int, local_y: int) -> tuple[int, int]:
@@ -241,85 +245,148 @@ def _generate(context: StageContext) -> Iterator[object]:
         for record in prior_records(context, streets.STAGE_ID, streets.StreetSegmentRecord)
     }
     grounds = [
-        *prior_records(context, streets.STAGE_ID, streets.BlockRecord),
+        *blocks.values(),
         *prior_records(context, parcels.STAGE_ID, parcels.ParcelRecord),
         *curbs,
     ]
-    lamp = entry("street-furniture", _LAMP)
-    parts = form_parts(lamp["parts"])
-    placed: dict[str, list[tuple[int, int, int]]] = {}
+    classes = [
+        item.key
+        for item in catalog("street-furniture").entries
+        if entry("street-furniture", item.key)["placement"] == "kerb_line"
+    ]
     for curb in curbs:
         if not curb.block_identity:
             continue
-        block = blocks[curb.block_identity[0]]
-        face = block.block_ordinal
-        spacing = derived(context, "lamp_spacing_mm", face)
-        offset = derived(
-            context,
-            "furniture_kerb_offset_mm",
-            face,
-            minimum=lamp["kerb_offset_minimum_mm"],
-            maximum=lamp["kerb_offset_maximum_mm"],
-        )
-        clearance = derived(context, "exclusion_clearance_mm", face)
-        radius = lamp["exclusion_radius_mm"] + clearance  # type: ignore[operator]
-        walk = walk_round_face(curb)
-        start, end = walk[0], walk[-1]
-        direction = (end[0] - start[0], end[1] - start[1])
-        length = abs(direction[0]) + abs(direction[1])
-        unit = _unit(direction)
-        inward = (-unit[1], unit[0])
+        face = blocks[curb.block_identity[0]].block_ordinal
+        segment = segments[curb.segment_identity]
+        taken: list[tuple[int, int, int]] = []
         ordinal = 0
-        position = spacing // 2  # type: ignore[operator]
-        while position <= length - spacing // 2:  # type: ignore[operator]
-            base = (start[0] + unit[0] * position, start[1] + unit[1] * position)
-            shift = along(inward, offset)  # type: ignore[arg-type]
+        for index, key in enumerate(classes):
+            for record in _furniture(context, curb, face, segment, key, index, taken, ordinal):
+                ordinal += 1
+                yield record
+        yield from _trees(context, curb, face, segment, grounds, taken)
+
+
+def _furniture(
+    context: StageContext,
+    curb: streets.CurbEdgeRecord,
+    face: int,
+    segment: streets.StreetSegmentRecord,
+    key: str,
+    index: int,
+    taken: list[tuple[int, int, int]],
+    first_ordinal: int,
+) -> Iterator[streetlife.StreetFurnitureRecord]:
+    """One class of street furniture along one curb, at that class's own spacing.
+
+    A class the catalog places on the kerb line stands every ``furniture_spacing_mm``, narrowed to
+    the class's own band; the lamp keeps ``lamp_spacing_mm``, the one furniture spacing the target
+    architecture named. Each item stands ``furniture_kerb_offset_mm`` back from the kerb face,
+    narrowed to the class's offsets, facing the carriageway. Where a class pairs with another, the
+    paired item stands beside it, just clear of both their exclusions. A position that would crowd
+    anything already placed on this curb carries nothing: the rhythm skips rather than shifts.
+    """
+    values = entry("street-furniture", key)
+    parts = form_parts(values["parts"])
+    draw = face * _CLASS_STRIDE + index
+    if key == _LAMP:
+        spacing = derived(
+            context,
+            "lamp_spacing_mm",
+            face,
+            minimum=values["spacing_minimum_mm"],
+            maximum=values["spacing_maximum_mm"],
+        )
+    else:
+        spacing = derived(
+            context,
+            "furniture_spacing_mm",
+            draw,
+            minimum=values["spacing_minimum_mm"],
+            maximum=values["spacing_maximum_mm"],
+        )
+    offset = derived(
+        context,
+        "furniture_kerb_offset_mm",
+        draw,
+        minimum=values["kerb_offset_minimum_mm"],
+        maximum=values["kerb_offset_maximum_mm"],
+    )
+    clearance = derived(context, "exclusion_clearance_mm", face)
+    radius = values["exclusion_radius_mm"] + clearance  # type: ignore[operator]
+    partner = values["pairs_with"]
+    pair = entry("street-furniture", partner) if partner != "none" else None
+    walk = walk_round_face(curb)
+    start, end = walk[0], walk[-1]
+    direction = (end[0] - start[0], end[1] - start[1])
+    length = abs(direction[0]) + abs(direction[1])
+    unit = _unit(direction)
+    inward = (-unit[1], unit[0])
+    facing = (-inward[0], -inward[1])
+    node = segment.centreline_mm[0]
+    heading = _unit(
+        (segment.centreline_mm[-1][0] - node[0], segment.centreline_mm[-1][1] - node[1])
+    )
+    line_z = curb.kerb_line_mm[0][2]
+    ordinal = first_ordinal
+    position = spacing // 2  # type: ignore[operator]
+    while position <= length - spacing // 2:  # type: ignore[operator]
+        here = position
+        position += spacing  # type: ignore[operator]
+        stand = [(key, values, parts, radius, here)]
+        if pair is not None:
+            pair_radius = pair["exclusion_radius_mm"] + clearance  # type: ignore[operator]
+            stand.append(
+                (
+                    partner,
+                    pair,
+                    form_parts(pair["parts"]),
+                    pair_radius,
+                    here + radius + pair_radius,  # type: ignore[operator]
+                )
+            )
+        for name, fields, item_parts, item_radius, at in stand:
+            if at > length:
+                continue
+            item_offset = min(
+                max(offset, fields["kerb_offset_minimum_mm"]), fields["kerb_offset_maximum_mm"]
+            )
+            base = (start[0] + unit[0] * at, start[1] + unit[1] * at)
+            shift = along(inward, item_offset)  # type: ignore[arg-type]
             x, y = base[0] + shift[0], base[1] + shift[1]
-            line_z = curb.kerb_line_mm[0][2]
+            if any(
+                (x - other_x) * (x - other_x) + (y - other_y) * (y - other_y)
+                < (item_radius + other_radius) * (item_radius + other_radius)
+                for other_x, other_y, other_radius in taken
+            ):
+                continue
             z = (
                 line_z
                 + curb.kerb_height_mm
-                + (offset - curb.kerb_width_mm) * curb.footway_crossfall_millionths // MILLIONTHS  # type: ignore[operator]
+                + (item_offset - curb.kerb_width_mm)
+                * curb.footway_crossfall_millionths
+                // MILLIONTHS
             )
-            facing = (-inward[0], -inward[1])
-            segment = segments[curb.segment_identity]
-            node = segment.centreline_mm[0]
-            heading = _unit(
-                (segment.centreline_mm[-1][0] - node[0], segment.centreline_mm[-1][1] - node[1])
-            )
-            segment_along = (base[0] - node[0]) * heading[0] + (base[1] - node[1]) * heading[1]
-            placed.setdefault(curb.identity, []).append((x, y, radius))
+            taken.append((x, y, item_radius))
             yield streetlife.StreetFurnitureRecord(
                 identity=context.identity("street_furniture", curb.identity, ordinal),
                 curb_identity=curb.identity,
                 segment_identity=curb.segment_identity,
                 item_ordinal=ordinal,
-                furniture_class=_LAMP,
-                along_mm=segment_along,
-                kerb_offset_mm=offset,  # type: ignore[arg-type]
+                furniture_class=name,
+                along_mm=(base[0] - node[0]) * heading[0] + (base[1] - node[1]) * heading[1],
+                kerb_offset_mm=item_offset,
                 x_mm=x,
                 y_mm=y,
                 z_mm=z,
                 facing_dx_mm=facing[0],
                 facing_dy_mm=facing[1],
-                parts=parts,
-                exclusion_radius_mm=radius,
-                extent=_extent(x, y, z, facing, parts),
+                parts=item_parts,
+                exclusion_radius_mm=item_radius,
+                extent=_extent(x, y, z, facing, item_parts),
             )
             ordinal += 1
-            position += spacing  # type: ignore[operator]
-
-    for curb in curbs:
-        if not curb.block_identity:
-            continue
-        yield from _trees(
-            context,
-            curb,
-            blocks[curb.block_identity[0]].block_ordinal,
-            segments[curb.segment_identity],
-            grounds,
-            placed.setdefault(curb.identity, []),
-        )
 
 
 STAGE: Final = GeneratorStage(

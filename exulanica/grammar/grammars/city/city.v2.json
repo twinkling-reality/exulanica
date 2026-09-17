@@ -1210,6 +1210,18 @@
       "maximum": 40000
     },
     {
+      "name": "furniture_spacing_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "block",
+      "stage": "streetlife",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: how far apart one class of street furniture stands along a kerb. Drawn once per class per block and narrowed to that class's band in the street-furniture catalog, which is where a bench's rhythm differs from a sign post's. The lamp keeps lamp_spacing_mm, the one furniture spacing the target architecture named.",
+      "minimum": 15000,
+      "maximum": 120000
+    },
+    {
       "name": "furniture_kerb_offset_mm",
       "kind": "integer",
       "unit": "mm",

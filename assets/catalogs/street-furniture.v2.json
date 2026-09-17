@@ -1,7 +1,7 @@
 {
   "schema_version": 1,
   "catalog_id": "street-furniture",
-  "catalog_version": 1,
+  "catalog_version": 2,
   "entries": [
     {
       "key": "bench",
@@ -11,6 +11,10 @@
       "exclusion_radius_mm": 900,
       "kerb_offset_minimum_mm": 600,
       "kerb_offset_maximum_mm": 2000,
+      "placement": "kerb_line",
+      "spacing_minimum_mm": 25000,
+      "spacing_maximum_mm": 60000,
+      "pairs_with": "litter_bin",
       "parts": [
         {
           "shape": "box",
@@ -65,7 +69,7 @@
           "rings": 1
         }
       ],
-      "reason": "Authored bench. Its key matches the living society lane's furniture key for a place to rest.",
+      "reason": "Authored bench. Its key matches the living society lane's furniture key for a place to rest. A bench stands on the footway along the kerb, a bin beside it.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
@@ -82,6 +86,10 @@
       "exclusion_radius_mm": 300,
       "kerb_offset_minimum_mm": 300,
       "kerb_offset_maximum_mm": 900,
+      "placement": "at_crossing",
+      "spacing_minimum_mm": 0,
+      "spacing_maximum_mm": 0,
+      "pairs_with": "none",
       "parts": [
         {
           "shape": "prism",
@@ -110,7 +118,7 @@
           "rings": 4
         }
       ],
-      "reason": "Authored bollard: a post with a domed cap.",
+      "reason": "Authored bollard: a post with a domed cap. A bollard stands where a crossing meets the footway, keeping a vehicle off it. Spacing is not read: its place is the crossing's.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
@@ -127,6 +135,10 @@
       "exclusion_radius_mm": 400,
       "kerb_offset_minimum_mm": 600,
       "kerb_offset_maximum_mm": 2500,
+      "placement": "kerb_line",
+      "spacing_minimum_mm": 30000,
+      "spacing_maximum_mm": 80000,
+      "pairs_with": "none",
       "parts": [
         {
           "shape": "box",
@@ -168,7 +180,7 @@
           "rings": 1
         }
       ],
-      "reason": "Authored hoop stand. It holds two bicycles, one against each side: a declared figure. Cycle parking is discussed in London Cycling Design Standards (Transport for London, 2016), chapter 8, which was not re-read in this build and is not quoted.",
+      "reason": "Authored hoop stand. It holds two bicycles, one against each side: a declared figure. Cycle parking is discussed in London Cycling Design Standards (Transport for London, 2016), chapter 8, which was not re-read in this build and is not quoted. A stand stands along the kerb where a cycle can be left clear of the walk.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
@@ -185,6 +197,10 @@
       "exclusion_radius_mm": 450,
       "kerb_offset_minimum_mm": 450,
       "kerb_offset_maximum_mm": 900,
+      "placement": "none",
+      "spacing_minimum_mm": 0,
+      "spacing_maximum_mm": 0,
+      "pairs_with": "none",
       "parts": [
         {
           "shape": "prism",
@@ -213,7 +229,7 @@
           "rings": 4
         }
       ],
-      "reason": "Authored hydrant: a short post with a domed top.",
+      "reason": "Authored hydrant: a short post with a domed top. Where a hydrant stands follows a water main, which no record of this city states, so none is placed.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
@@ -230,6 +246,10 @@
       "exclusion_radius_mm": 500,
       "kerb_offset_minimum_mm": 450,
       "kerb_offset_maximum_mm": 1200,
+      "placement": "kerb_line",
+      "spacing_minimum_mm": 30000,
+      "spacing_maximum_mm": 80000,
+      "pairs_with": "none",
       "parts": [
         {
           "shape": "prism",
@@ -258,7 +278,7 @@
           "rings": 1
         }
       ],
-      "reason": "Authored litter bin: a round bin with a lid.",
+      "reason": "Authored litter bin: a round bin with a lid. A bin stands along the kerb, and beside a bench where one is paired with it.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
@@ -275,6 +295,10 @@
       "exclusion_radius_mm": 450,
       "kerb_offset_minimum_mm": 450,
       "kerb_offset_maximum_mm": 1000,
+      "placement": "none",
+      "spacing_minimum_mm": 0,
+      "spacing_maximum_mm": 0,
+      "pairs_with": "none",
       "parts": [
         {
           "shape": "prism",
@@ -303,7 +327,7 @@
           "rings": 1
         }
       ],
-      "reason": "Authored signal pole with one pedestrian head, named by a signal record.",
+      "reason": "Authored signal pole with one pedestrian head, named by a signal record. A signal pole stands where a signal plan says, and the city grammar reads no plan, so none is placed.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
@@ -320,6 +344,10 @@
       "exclusion_radius_mm": 300,
       "kerb_offset_minimum_mm": 450,
       "kerb_offset_maximum_mm": 1000,
+      "placement": "kerb_line",
+      "spacing_minimum_mm": 40000,
+      "spacing_maximum_mm": 120000,
+      "pairs_with": "none",
       "parts": [
         {
           "shape": "prism",
@@ -348,7 +376,7 @@
           "rings": 1
         }
       ],
-      "reason": "Authored sign post carrying a street's name plate.",
+      "reason": "Authored sign post carrying a street's name plate. A sign post stands along the kerb, sparsely.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
@@ -365,6 +393,10 @@
       "exclusion_radius_mm": 600,
       "kerb_offset_minimum_mm": 450,
       "kerb_offset_maximum_mm": 900,
+      "placement": "kerb_line",
+      "spacing_minimum_mm": 15000,
+      "spacing_maximum_mm": 40000,
+      "pairs_with": "none",
       "parts": [
         {
           "shape": "prism",
@@ -406,7 +438,7 @@
           "rings": 1
         }
       ],
-      "reason": "Authored street lamp: a pole with an arm reaching over the carriageway.",
+      "reason": "Authored street lamp: a pole with an arm reaching over the carriageway. A lamp stands along the kerb at lamp_spacing_mm, the one furniture spacing the descriptor declares, narrowed to this band.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
@@ -423,6 +455,10 @@
       "exclusion_radius_mm": 450,
       "kerb_offset_minimum_mm": 450,
       "kerb_offset_maximum_mm": 1000,
+      "placement": "none",
+      "spacing_minimum_mm": 0,
+      "spacing_maximum_mm": 0,
+      "pairs_with": "none",
       "parts": [
         {
           "shape": "prism",
@@ -451,7 +487,7 @@
           "rings": 1
         }
       ],
-      "reason": "Authored signal pole with one vehicle head, named by a signal record.",
+      "reason": "Authored signal pole with one vehicle head, named by a signal record. A signal pole stands where a signal plan says, and the city grammar reads no plan, so none is placed.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",

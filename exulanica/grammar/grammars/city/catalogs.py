@@ -303,7 +303,7 @@ def city_catalog_schemas(*, texture_sets: Mapping[str, TextureSet]) -> tuple[Cat
         ),
         CatalogSchema(
             "street-furniture",
-            1,
+            2,
             (
                 ("label", text_field),
                 (
@@ -325,6 +325,13 @@ def city_catalog_schemas(*, texture_sets: Mapping[str, TextureSet]) -> tuple[Cat
                 ("exclusion_radius_mm", _MILLIMETRES),
                 ("kerb_offset_minimum_mm", _MILLIMETRES),
                 ("kerb_offset_maximum_mm", _MILLIMETRES),
+                # Where a class stands, and how far apart. ``kerb_line`` reads the spacing band;
+                # every other placement states 0 and 0, since its place is not a rhythm.
+                ("placement", choice_field(("kerb_line", "at_crossing", "at_junction", "none"))),
+                ("spacing_minimum_mm", _MILLIMETRES),
+                ("spacing_maximum_mm", _MILLIMETRES),
+                # Another class that stands beside this one where both are placed, or "none".
+                ("pairs_with", text_field),
                 ("parts", form_parts_field),
                 REASON,
             ),

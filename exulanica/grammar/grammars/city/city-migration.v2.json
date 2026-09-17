@@ -394,6 +394,10 @@
     {
       "target": "texture_quarter_turns",
       "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
+    },
+    {
+      "target": "furniture_spacing_mm",
+      "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
     }
   ]
 }

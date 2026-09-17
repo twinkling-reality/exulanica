@@ -49,7 +49,7 @@ _GRAMMARS = ROOT / "exulanica" / "grammar" / "grammars"
 DESCRIPTOR_SHA256 = {
     ("box", 1): "2c2c8481c90e3a33021a014e7a7d5ece016b34fbbaed779a76979f8793d08e46",
     ("city", 1): "1e580ada17333e886ad1067e65585ebd7014006749ba4f84a26ae0f9f673d273",
-    ("city", 2): "c17bcfd2b75ecd4e5e641846523830b381f1c9cadba171dc2b48881d791ef52d",
+    ("city", 2): "dc362d3faee52ab4ccb5233b6a4b0ac2a2c872b6bae2124315717e22c0f10352",
 }
 
 
@@ -96,7 +96,7 @@ def test_the_city_descriptor_states_its_frame_stages_parameters_and_contracts():
     assert CITY_GRAMMAR.cascade.levels == ("city", "district", "block", "lot", "building", "face")
     declared = {kind for stage in CITY_GRAMMAR.declared_stages for kind, _ in stage.records}
     assert declared == {shape.kind for shape in CITY_SHAPES}
-    assert len(CITY_GRAMMAR.parameters.parameters) == 90
+    assert len(CITY_GRAMMAR.parameters.parameters) == 91
     assert {spec.when_unset for spec in CITY_GRAMMAR.parameters.parameters} == {
         "derive",
         "required",
