@@ -9,16 +9,20 @@ the rule below, and hands the sets out frozen, by id. :mod:`exulanica.world.text
 checks each container against its entry and :mod:`exulanica.grammar.textures` keeps the pin a
 catalog entry carries; neither states a rule of its own that could drift from this one.
 
-An entry has exactly nine fields, and:
+A v1 entry has exactly nine fields, and:
 
 - ``set_id`` matches :data:`SET_ID_PATTERN`, the rule an authored-world asset key follows;
 - ``version`` and ``byte_size`` are positive integers;
 - ``content_sha256`` and ``licence_sha256`` are 64 lowercase hex characters;
 - ``resolution`` is a positive ``width`` and ``height``, and ``extent_mm`` a positive
   whole-millimetre ``u`` and ``v``;
-- ``channels`` is :data:`CONTAINER_LAYOUT`, the packing every container declares, map for map;
+- ``channels`` is :data:`CONTAINER_LAYOUT`, the packing every v1 container declares, map for map;
 - ``licence_id`` is :data:`PUBLISHED_LICENCE_ID`. The manifest is the published library, so a set
   under any other licence cannot be listed in it, and that includes a workspace's private bakes.
+
+``exulanica.texture-manifest/v2`` adds two fields to each entry, ``container_profile`` and
+``material_class`` (:mod:`exulanica.materials.classes`), and its ``channels`` must be one of the
+layouts that pair allows. A v1 container is ``opaque``, and every entry of a v1 manifest is one.
 """
 
 from __future__ import annotations
@@ -29,6 +33,15 @@ from dataclasses import dataclass
 from types import MappingProxyType
 from typing import Any, Final
 
+from exulanica.materials.classes import (
+    MATERIAL_CLASSES,
+    TEXTURE_SET_PROFILE_V1,
+    TEXTURE_SET_PROFILES,
+    V1_LAYOUT,
+    TextureMap,
+    allowed_channels,
+    class_layout,
+)
 from exulanica.materials.objects import (
     SAFE_INTEGER,
     MaterialObjectError,
@@ -41,6 +54,8 @@ __all__ = [
     "CONTAINER_LAYOUT",
     "MANIFEST_NAME",
     "MANIFEST_PROFILE",
+    "MANIFEST_PROFILES",
+    "MANIFEST_PROFILE_V2",
     "PUBLISHED_LICENCE_ID",
     "SET_ID",
     "SET_ID_PATTERN",
@@ -50,7 +65,10 @@ __all__ = [
 ]
 
 MANIFEST_NAME: Final = "manifest.json"
+#: The profile of the manifest this repository publishes today.
 MANIFEST_PROFILE: Final = "exulanica.texture-manifest/v1"
+MANIFEST_PROFILE_V2: Final = "exulanica.texture-manifest/v2"
+MANIFEST_PROFILES: Final = (MANIFEST_PROFILE, MANIFEST_PROFILE_V2)
 #: A texture set id: a stable name, never a version or a digest. Identical, character for
 #: character, to ``asset_key`` in migration 0042 and ``set_id`` in migration 0065.
 SET_ID_PATTERN: Final = "^[a-z][a-z0-9.-]*$"
@@ -73,34 +91,10 @@ _ENTRY_KEYS: Final = frozenset(
         "licence_sha256",
     }
 )
+_V2_ENTRY_KEYS: Final = _ENTRY_KEYS | {"container_profile", "material_class"}
 
-
-@dataclass(frozen=True, slots=True)
-class TextureMap:
-    """One map in a set, and exactly how its channels are packed."""
-
-    name: str
-    components: int
-    holds: tuple[str, ...]
-    srgb: bool
-
-    def as_channel(self) -> dict[str, Any]:
-        return {
-            "map": self.name,
-            "components": self.components,
-            "holds": list(self.holds),
-            "srgb": self.srgb,
-        }
-
-
-#: The packing every container declares, in the order its maps are stored.
-CONTAINER_LAYOUT: Final = (
-    TextureMap("base_color", 3, ("red", "green", "blue"), True),
-    TextureMap("normal", 3, ("normal_x", "normal_y", "normal_z"), False),
-    TextureMap("orm", 3, ("occlusion", "roughness", "metalness"), False),
-    TextureMap("height", 1, ("height",), False),
-)
-_CHANNELS: Final = tuple(texture_map.as_channel() for texture_map in CONTAINER_LAYOUT)
+#: The packing every v1 container declares, in the order its maps are stored.
+CONTAINER_LAYOUT: Final = V1_LAYOUT
 
 
 @dataclass(frozen=True, slots=True)
@@ -117,20 +111,28 @@ class ManifestEntry:
     extent_v_mm: int
     licence_id: str
     licence_sha256: str
+    container_profile: str
+    material_class: str
+    #: The layout ``channels`` lists, map for map.
+    maps: tuple[TextureMap, ...]
 
-    def as_entry(self) -> dict[str, Any]:
-        """The entry exactly as the manifest holds it."""
-        return {
+    def as_entry(self, profile: str = MANIFEST_PROFILE) -> dict[str, Any]:
+        """The entry exactly as a manifest of ``profile`` holds it."""
+        entry: dict[str, Any] = {
             "set_id": self.set_id,
             "version": self.version,
             "content_sha256": self.content_sha256,
             "byte_size": self.byte_size,
             "resolution": {"width": self.width, "height": self.height},
-            "channels": [texture_map.as_channel() for texture_map in CONTAINER_LAYOUT],
+            "channels": [texture_map.as_channel() for texture_map in self.maps],
             "extent_mm": {"u": self.extent_u_mm, "v": self.extent_v_mm},
             "licence_id": self.licence_id,
             "licence_sha256": self.licence_sha256,
         }
+        if profile != MANIFEST_PROFILE:
+            entry["container_profile"] = self.container_profile
+            entry["material_class"] = self.material_class
+        return entry
 
 
 def _positive(value: object) -> bool:
@@ -149,9 +151,30 @@ def _pair(value: object, first: str, second: str) -> tuple[int, int] | None:
     return None
 
 
-def _entry(entry: object, where: str) -> ManifestEntry:
-    if not isinstance(entry, dict) or set(entry) != _ENTRY_KEYS:
-        raise MaterialObjectError(f"{where} has keys other than exactly {sorted(_ENTRY_KEYS)}")
+def _layout_of(
+    channels: object, container_profile: str, material_class: str
+) -> tuple[TextureMap, ...]:
+    """The layout ``channels`` lists, if it is one this profile and class allow."""
+    candidates = (
+        [V1_LAYOUT]
+        if container_profile == TEXTURE_SET_PROFILE_V1
+        else [
+            class_layout(material_class, kind, normal=normal, height=height)
+            for kind in ("procedural", "model")
+            for normal in (False, True)
+            for height in (False, True)
+        ]
+    )
+    for layout in candidates:
+        if identical(channels, [texture_map.as_channel() for texture_map in layout]):
+            return layout
+    raise LookupError
+
+
+def _entry(entry: object, where: str, profile: str) -> ManifestEntry:
+    keys = _ENTRY_KEYS if profile == MANIFEST_PROFILE else _V2_ENTRY_KEYS
+    if not isinstance(entry, dict) or set(entry) != keys:
+        raise MaterialObjectError(f"{where} has keys other than exactly {sorted(keys)}")
     set_id = entry["set_id"]
     if type(set_id) is not str or SET_ID.fullmatch(set_id) is None:
         raise MaterialObjectError(f"{where}: set_id {set_id!r} is not a texture set id")
@@ -166,12 +189,33 @@ def _entry(entry: object, where: str) -> ManifestEntry:
     extent = _pair(entry["extent_mm"], "u", "v")
     if extent is None:
         raise MaterialObjectError(f"{where}: extent_mm is a positive whole-millimetre u and v")
-    if not identical(entry["channels"], _CHANNELS):
-        raise MaterialObjectError(f"{where}: channels are not the container layout, map for map")
     if entry["licence_id"] != PUBLISHED_LICENCE_ID:
         raise MaterialObjectError(
             f"{where}: licence_id is {PUBLISHED_LICENCE_ID}; the manifest lists published sets only"
         )
+    container_profile, material_class = TEXTURE_SET_PROFILE_V1, "opaque"
+    if profile != MANIFEST_PROFILE:
+        container_profile, material_class = entry["container_profile"], entry["material_class"]
+        if container_profile not in TEXTURE_SET_PROFILES:
+            raise MaterialObjectError(
+                f"{where}: container_profile is one of {', '.join(TEXTURE_SET_PROFILES)}"
+            )
+        if material_class not in MATERIAL_CLASSES:
+            raise MaterialObjectError(
+                f"{where}: material_class is one of {', '.join(MATERIAL_CLASSES)}"
+            )
+        if not allowed_channels(container_profile, material_class):
+            raise MaterialObjectError(
+                f"{where}: a container of profile {container_profile} is opaque, never "
+                f"{material_class}"
+            )
+    try:
+        maps = _layout_of(entry["channels"], container_profile, material_class)
+    except LookupError:
+        raise MaterialObjectError(
+            f"{where}: channels are not a container layout of profile {container_profile} and "
+            f"class {material_class}, map for map"
+        ) from None
     return ManifestEntry(
         set_id=set_id,
         version=entry["version"],
@@ -183,6 +227,9 @@ def _entry(entry: object, where: str) -> ManifestEntry:
         extent_v_mm=extent[1],
         licence_id=entry["licence_id"],
         licence_sha256=entry["licence_sha256"],
+        container_profile=container_profile,
+        material_class=material_class,
+        maps=maps,
     )
 
 
@@ -191,14 +238,15 @@ def read_texture_manifest(raw: bytes, where: str = MANIFEST_NAME) -> Mapping[str
     document = read_document(raw, where)
     if not isinstance(document, dict) or set(document) != _MANIFEST_KEYS:
         raise MaterialObjectError(f"{where} is an object with exactly profile and sets")
-    if document["profile"] != MANIFEST_PROFILE:
-        raise MaterialObjectError(f"{where}: profile is {MANIFEST_PROFILE!r}")
+    profile = document["profile"]
+    if profile not in MANIFEST_PROFILES:
+        raise MaterialObjectError(f"{where}: profile is one of {', '.join(MANIFEST_PROFILES)}")
     entries = document["sets"]
     if not isinstance(entries, list) or not entries:
         raise MaterialObjectError(f"{where}: sets is a non-empty list")
     sets: dict[str, ManifestEntry] = {}
     for index, candidate in enumerate(entries):
-        entry = _entry(candidate, f"{where} sets[{index}]")
+        entry = _entry(candidate, f"{where} sets[{index}]", profile)
         if sets and entry.set_id <= next(reversed(sets)):
             raise MaterialObjectError(f"{where}: sets are sorted by set_id, each id once")
         sets[entry.set_id] = entry

@@ -157,7 +157,7 @@ function readEntry(value: unknown, profile: string, where: string): ManifestEntr
     stated = null;
   }
   if (!Array.isArray(channels) || !allowed.some((layout) => canonicalJson(layout) === stated)) {
-    refuse('manifest', `${where}: channels are not a layout of profile ${containerProfile} and class ${materialClass}`);
+    refuse('manifest', `${where}: channels are not a container layout of profile ${containerProfile} and class ${materialClass}, map for map`);
   }
   return {
     setId,

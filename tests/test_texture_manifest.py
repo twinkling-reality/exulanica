@@ -81,7 +81,9 @@ CASES = [
     (lambda doc: doc.update(sets=[]), "non-empty list"),
     (lambda doc: doc.update(sets={}), "non-empty list"),
     (lambda doc: doc.update(note=1), "exactly profile and sets"),
-    (lambda doc: doc.update(profile="exulanica.texture-manifest/v2"), "profile is"),
+    (lambda doc: doc.update(profile="exulanica.texture-manifest/v3"), "profile is"),
+    # A v2 manifest states each entry's container profile and class; a v1 entry does not.
+    (lambda doc: doc.update(profile="exulanica.texture-manifest/v2"), "keys other than exactly"),
     (lambda doc: _entry(doc).update(note=1), "keys other than exactly"),
     (lambda doc: _entry(doc).update(set_id="Cc0.Brick"), "is not a texture set id"),
     (lambda doc: _entry(doc).update(set_id="cc0.brick\n"), "a string the baker cannot write"),

@@ -64,6 +64,7 @@ from exulanica.materials import (
     recipe_problems,
     thaw,
 )
+from exulanica.materials.classes import TEXTURE_SET_PROFILE_V1, V1_LAYOUT
 from exulanica.materials.manifest import ManifestEntry
 from exulanica.materials.workspace import (
     MAXIMUM_WORKSPACE_TEXELS,
@@ -758,6 +759,10 @@ class MaterialBakeWorker:
                     extent_v_mm=extent["v"],
                     licence_id=WORKSPACE_LICENCE_ID,
                     licence_sha256=WORKSPACE_LICENCE_SHA256,
+                    # The workspace baker writes the published v1 makers' containers only.
+                    container_profile=TEXTURE_SET_PROFILE_V1,
+                    material_class="opaque",
+                    maps=V1_LAYOUT,
                 ),
                 title=request["title"],
                 summary=request["summary"],

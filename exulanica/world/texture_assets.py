@@ -55,8 +55,20 @@ from exulanica.materials import (
     thaw,
     verify_material_catalog,
 )
+from exulanica.materials.classes import (
+    MAKER_KINDS,
+    MATERIAL_CLASSES,
+    TEXTURE_SET_PROFILE_V1,
+    TEXTURE_SET_PROFILE_V2,
+    TEXTURE_SET_PROFILES,
+    V1_LAYOUT,
+    V2_HEADER_KEYS,
+    class_layout,
+    class_parameters,
+    coverage_permille,
+    relief_keys,
+)
 from exulanica.materials.manifest import (
-    CONTAINER_LAYOUT,
     MANIFEST_NAME,
     MANIFEST_PROFILE,
     PUBLISHED_LICENCE_ID,
@@ -77,6 +89,7 @@ __all__ = [
     "TEXTURE_SET_ID_PATTERN",
     "TEXTURE_SET_MEDIA_TYPE",
     "TEXTURE_SET_PROFILE",
+    "TEXTURE_SET_PROFILE_V2",
     "TEXTURE_TRUTH",
     "DecodedTextureSet",
     "MissingTextureSet",
@@ -84,11 +97,13 @@ __all__ = [
     "TextureCatalog",
     "TextureCatalogError",
     "TextureMap",
+    "TextureSetRefused",
     "TextureSetUnresolved",
     "UnpinnedTextureSet",
     "decode_texture_set",
     "load_material_catalog",
     "load_texture_catalog",
+    "read_texture_set",
     "resolve_texture_set",
     "seed_texture_sets",
     "verify_container",
@@ -96,7 +111,8 @@ __all__ = [
 
 TEXTURE_DIRECTORY: Final = Path(__file__).resolve().parents[2] / "assets" / "textures"
 TEXTURE_MANIFEST_PROFILE: Final = MANIFEST_PROFILE
-TEXTURE_SET_PROFILE: Final = "exulanica.texture-set/v1"
+#: The profile of every set published before material classes.
+TEXTURE_SET_PROFILE: Final = TEXTURE_SET_PROFILE_V1
 TEXTURE_SET_MEDIA_TYPE: Final = "application/vnd.exulanica.texture-set"
 TEXTURE_TRUTH: Final = "invented"
 #: Identical to ``asset_key`` in migration 0042 and ``set_id`` in migration 0065, character for
@@ -137,6 +153,20 @@ class TextureCatalogError(ExulanicaError):
     """The published directory is not what its manifest, or a container's header, says it is."""
 
 
+class TextureSetRefused(TextureCatalogError):
+    """A container this reader will not read, and which of the shared reasons refused it.
+
+    ``reason`` is one of ``byte-size`` and ``digest`` (the bytes are not the ones the entry pins),
+    ``container`` (the file's framing) and ``header`` (what the header says, including where it
+    disagrees with the entry): the reasons ``web/packages/loom-texture/test/texture-set-cases.json``
+    holds every reader to. A manifest the reader refuses is a :class:`MaterialObjectError`.
+    """
+
+    def __init__(self, reason: str, message: str) -> None:
+        super().__init__(message)
+        self.reason = reason
+
+
 class TextureSetUnresolved(ExulanicaError):
     """A material record does not resolve to a pinned set: a schema error, never a default."""
 
@@ -147,10 +177,6 @@ class MissingTextureSet(TextureSetUnresolved):
 
 class UnpinnedTextureSet(TextureSetUnresolved):
     """The material record names a texture set id that no pinned set has."""
-
-
-#: The packing every container declares, in the order its maps are stored.
-_LAYOUT: Final = CONTAINER_LAYOUT
 
 
 @dataclass(frozen=True, slots=True)
@@ -169,6 +195,8 @@ class PinnedTextureSet:
     height: int
     extent_u_mm: int
     extent_v_mm: int
+    container_profile: str
+    material_class: str
     maps: tuple[TextureMap, ...]
     licence_id: str
     licence_sha256: str
@@ -202,6 +230,9 @@ class PinnedTextureSet:
             extent_v_mm=self.extent_v_mm,
             licence_id=self.licence_id,
             licence_sha256=self.licence_sha256,
+            container_profile=self.container_profile,
+            material_class=self.material_class,
+            maps=self.maps,
         ).as_entry()
 
     def read_bytes(self) -> bytes:
@@ -229,18 +260,10 @@ class DecodedTextureSet:
 
     header: Mapping[str, Any]
     maps: Mapping[str, memoryview]
-
-
-def _canonical_document(raw: bytes, where: str) -> Any:
-    """Read JSON that must already be canonical, as :func:`exulanica.materials.read_document` does.
-
-    Floats, repeated keys, integers outside the safe range, deep nesting, non-ASCII text and any
-    byte form other than the canonical one are refused, each as a :class:`TextureCatalogError`.
-    """
-    try:
-        return read_document(raw, where)
-    except MaterialObjectError as error:
-        raise TextureCatalogError(str(error)) from error
+    profile: str
+    material_class: str
+    maker_kind: str
+    layout: tuple[TextureMap, ...]
 
 
 def _positive_int(value: object) -> bool:
@@ -249,13 +272,20 @@ def _positive_int(value: object) -> bool:
 
 def _decode(payload: bytes, where: str) -> DecodedTextureSet:
     if len(payload) < 8 or payload[:4] != _MAGIC:
-        raise TextureCatalogError(f"{where} is not a texture set container")
+        raise TextureSetRefused("container", f"{where} is not a texture set container")
     header_length = int.from_bytes(payload[4:8], "little")
     if 8 + header_length > len(payload):
-        raise TextureCatalogError(f"{where}: the header runs past the end of the file")
-    header = _canonical_document(payload[8 : 8 + header_length], f"{where} header")
-    if not isinstance(header, dict) or header.get("profile") != TEXTURE_SET_PROFILE:
-        raise TextureCatalogError(f"{where} does not declare {TEXTURE_SET_PROFILE}")
+        raise TextureSetRefused("container", f"{where}: the header runs past the end of the file")
+    try:
+        header = read_document(payload[8 : 8 + header_length], f"{where} header")
+    except MaterialObjectError as error:
+        raise TextureSetRefused("header", str(error)) from error
+    profile = header.get("profile") if isinstance(header, dict) else None
+    if type(profile) is not str or profile not in TEXTURE_SET_PROFILES:
+        raise TextureSetRefused(
+            "header",
+            f"{where} does not declare {TEXTURE_SET_PROFILE_V1} or {TEXTURE_SET_PROFILE_V2}",
+        )
     resolution = header.get("resolution")
     if not (
         isinstance(resolution, dict)
@@ -263,40 +293,116 @@ def _decode(payload: bytes, where: str) -> DecodedTextureSet:
         and _positive_int(resolution["width"])
         and _positive_int(resolution["height"])
     ):
-        raise TextureCatalogError(f"{where}: resolution is a positive width and height")
+        raise TextureSetRefused("header", f"{where}: resolution is a positive width and height")
     texels = resolution["width"] * resolution["height"]
     start = -(-(8 + header_length) // _ALIGNMENT) * _ALIGNMENT
     if payload[8 + header_length : start] != b" " * (start - 8 - header_length):
-        raise TextureCatalogError(f"{where}: the header padding is not spaces")
+        raise TextureSetRefused("container", f"{where}: the header padding is not spaces")
     declared = header.get("maps")
-    if not isinstance(declared, list) or len(declared) != len(_LAYOUT):
-        raise TextureCatalogError(f"{where}: the map list is not the declared layout")
+    if not isinstance(declared, list):
+        raise TextureSetRefused("header", f"{where}: the map list is not the declared layout")
+
+    material_class, maker_kind, layout = "opaque", "procedural", V1_LAYOUT
+    if profile == TEXTURE_SET_PROFILE_V2:
+        material_class, maker_kind = header.get("material_class"), header.get("maker_kind")
+        if type(material_class) is not str or material_class not in MATERIAL_CLASSES:
+            raise TextureSetRefused(
+                "header", f"{where}: material_class is one of {', '.join(MATERIAL_CLASSES)}"
+            )
+        if type(maker_kind) is not str or maker_kind not in MAKER_KINDS:
+            raise TextureSetRefused(
+                "header", f"{where}: maker_kind is one of {', '.join(MAKER_KINDS)}"
+            )
+
+        def named(name: str) -> bool:
+            return any(isinstance(entry, dict) and entry.get("name") == name for entry in declared)
+
+        layout = class_layout(
+            material_class, maker_kind, normal=named("normal"), height=named("height")
+        )
+        keys = V2_HEADER_KEYS | relief_keys(
+            material_class, maker_kind, ships_height=named("height")
+        )
+        if set(header) != keys:
+            raise TextureSetRefused(
+                "header",
+                f"{where}: a header of maker kind {maker_kind} and class {material_class} has "
+                f"exactly {', '.join(sorted(keys))}",
+            )
+
+    if len(declared) != len(layout):
+        raise TextureSetRefused("header", f"{where}: the map list is not the declared layout")
     view = memoryview(payload)
     maps: dict[str, memoryview] = {}
     cursor = start
-    for entry, layout in zip(declared, _LAYOUT, strict=True):
-        length = texels * layout.components
-        packing = {
-            "name": layout.name,
-            "components": layout.components,
-            "holds": list(layout.holds),
-            "srgb": layout.srgb,
-            "byte_offset": cursor,
-            "byte_length": length,
-        }
-        # A map may also describe itself (the baker writes how to decode it); what it may not do
-        # is state its packing any other way, and `true` is not `1` here.
-        if not isinstance(entry, dict) or not all(
-            identical(entry.get(key), value) for key, value in packing.items()
-        ):
-            raise TextureCatalogError(f"{where}: map {layout.name} is not packed as declared")
-        maps[layout.name] = view[cursor : cursor + length]
+    for entry, texture_map in zip(declared, layout, strict=True):
+        length = texels * texture_map.components
+        if profile == TEXTURE_SET_PROFILE_V1:
+            packing = {
+                "name": texture_map.name,
+                "components": texture_map.components,
+                "holds": list(texture_map.holds),
+                "srgb": texture_map.srgb,
+                "byte_offset": cursor,
+                "byte_length": length,
+            }
+            # A v1 map may also describe itself (the baker writes how to decode it); what it may
+            # not do is state its packing any other way, and `true` is not `1` here.
+            packed = isinstance(entry, dict) and all(
+                identical(entry.get(key), value) for key, value in packing.items()
+            )
+        else:
+            # A v2 map states exactly its descriptor: a decode or convention in other words is
+            # another claim about the same bytes.
+            packed = identical(
+                entry, {**texture_map.as_descriptor(), "byte_offset": cursor, "byte_length": length}
+            )
+        if not packed:
+            raise TextureSetRefused(
+                "header", f"{where}: map {texture_map.name} is not packed as declared"
+            )
+        maps[texture_map.name] = view[cursor : cursor + length]
         cursor += length
     if cursor != len(payload):
-        raise TextureCatalogError(
-            f"{where}: the maps end at byte {cursor}, the file at {len(payload)}"
+        raise TextureSetRefused(
+            "container", f"{where}: the maps end at byte {cursor}, the file at {len(payload)}"
         )
-    return DecodedTextureSet(header=MappingProxyType(header), maps=MappingProxyType(maps))
+
+    if profile == TEXTURE_SET_PROFILE_V2:
+        colour = maps.get("base_color_coverage")
+        stated = class_parameters(
+            material_class, None if colour is None else coverage_permille(colour)
+        )
+        if not identical(header.get("class"), stated):
+            raise TextureSetRefused(
+                "header",
+                f"{where}: class is {header.get('class')!r}, but a set of class {material_class} "
+                f"with these maps states {stated!r}",
+            )
+        if "height_range_mm" in header and not _positive_int(header["height_range_mm"]):
+            raise TextureSetRefused("header", f"{where}: height_range_mm is a positive integer")
+        if "cavity" in header:
+            cavity = header["cavity"]
+            if not (
+                isinstance(cavity, dict)
+                and set(cavity) == {"radius_mm", "depth_mm", "strength_permille"}
+                and _positive_int(cavity["radius_mm"])
+                and _positive_int(cavity["depth_mm"])
+                and type(cavity["strength_permille"]) is int
+                and cavity["strength_permille"] >= 0
+            ):
+                raise TextureSetRefused(
+                    "header",
+                    f"{where}: cavity is a positive radius_mm and depth_mm and a strength_permille",
+                )
+    return DecodedTextureSet(
+        header=MappingProxyType(header),
+        maps=MappingProxyType(maps),
+        profile=profile,
+        material_class=material_class,
+        maker_kind=maker_kind,
+        layout=layout,
+    )
 
 
 def decode_texture_set(payload: bytes) -> DecodedTextureSet:
@@ -304,8 +410,9 @@ def decode_texture_set(payload: bytes) -> DecodedTextureSet:
     return _decode(payload, "texture set")
 
 
-def _check_header(header: Mapping[str, Any], entry: ManifestEntry, where: str) -> None:
+def _check_header(decoded: DecodedTextureSet, entry: ManifestEntry, where: str) -> None:
     """The header says what the manifest entry says. Its maps were held to the layout on decode."""
+    header = decoded.header
     expected = {
         "media_type": TEXTURE_SET_MEDIA_TYPE,
         "truth": TEXTURE_TRUTH,
@@ -317,15 +424,52 @@ def _check_header(header: Mapping[str, Any], entry: ManifestEntry, where: str) -
     }
     for key, value in expected.items():
         if not identical(header.get(key), value):
-            raise TextureCatalogError(
-                f"{where}: header {key} is {header.get(key)!r}, not {value!r}"
+            raise TextureSetRefused(
+                "header", f"{where}: header {key} is {header.get(key)!r}, not {value!r}"
             )
-    for key in ("seed", "height_range_mm"):
+    if decoded.profile != entry.container_profile:
+        raise TextureSetRefused(
+            "header",
+            f"{where}: the container is {decoded.profile}; the manifest says "
+            f"{entry.container_profile}",
+        )
+    if decoded.material_class != entry.material_class:
+        raise TextureSetRefused(
+            "header",
+            f"{where}: the container is {decoded.material_class}; the manifest says "
+            f"{entry.material_class}",
+        )
+    if decoded.layout != entry.maps:
+        raise TextureSetRefused(
+            "header", f"{where}: the manifest's channels are not the header's maps"
+        )
+    # Every v1 header states a height range; a v2 header states one only when its layout has relief.
+    relief = decoded.profile == TEXTURE_SET_PROFILE_V1 or "height_range_mm" in header
+    for key in ("seed", "height_range_mm") if relief else ("seed",):
         if type(header.get(key)) is not int or header[key] < 0:
-            raise TextureCatalogError(f"{where}: header {key} is a non-negative integer")
+            raise TextureSetRefused("header", f"{where}: header {key} is a non-negative integer")
     for key in ("title", "summary"):
         if type(header.get(key)) is not str or not header[key].strip():
-            raise TextureCatalogError(f"{where}: header {key} is non-empty text")
+            raise TextureSetRefused("header", f"{where}: header {key} is non-empty text")
+
+
+def read_texture_set(payload: bytes, entry: ManifestEntry) -> DecodedTextureSet:
+    """One container held to its manifest entry: its length, its digest, its framing, its header.
+
+    Each refusal is a :class:`TextureSetRefused` naming the shared reason, in this order: the byte
+    count must be the pinned one; the sha256 must be the pinned one; the container must be exactly
+    what the baker writes; and its header must say what the entry says.
+    """
+    where = entry.set_id
+    if len(payload) != entry.byte_size:
+        raise TextureSetRefused(
+            "byte-size", f"{where}: {len(payload)} bytes, {entry.byte_size} expected"
+        )
+    if hashlib.sha256(payload).hexdigest() != entry.content_sha256:
+        raise TextureSetRefused("digest", f"{where}: the bytes do not hash to the expected digest")
+    decoded = _decode(payload, where)
+    _check_header(decoded, entry, where)
+    return decoded
 
 
 def _check_provenance(
@@ -394,15 +538,14 @@ def verify_container(
     workspace bake worker asks it of every container the baker hands back, and stores nothing that
     fails it.
     """
-    where = expected.set_id
-    if len(payload) != expected.byte_size:
-        raise TextureCatalogError(f"{where}: {len(payload)} bytes, {expected.byte_size} expected")
-    if hashlib.sha256(payload).hexdigest() != expected.content_sha256:
-        raise TextureCatalogError(f"{where}: the bytes do not hash to the expected digest")
-    decoded = _decode(payload, where)
-    _check_header(decoded.header, expected, where)
+    decoded = read_texture_set(payload, expected)
     _check_provenance(
-        decoded.header, title=title, summary=summary, recipe=recipe, manifest=manifest, where=where
+        decoded.header,
+        title=title,
+        summary=summary,
+        recipe=recipe,
+        manifest=manifest,
+        where=expected.set_id,
     )
     return decoded
 
@@ -504,15 +647,16 @@ def load_texture_catalog(
             raise TextureCatalogError(f"{set_id}: {path.name} is not in {directory}")
         payload = path.read_bytes()
         if len(payload) != entry.byte_size:
-            raise TextureCatalogError(
-                f"{set_id}: {len(payload)} bytes on disk, {entry.byte_size} pinned"
+            raise TextureSetRefused(
+                "byte-size", f"{set_id}: {len(payload)} bytes on disk, {entry.byte_size} pinned"
             )
         if hashlib.sha256(payload).hexdigest() != entry.content_sha256:
-            raise TextureCatalogError(
-                f"{set_id}: the bytes on disk do not hash to the pinned digest"
+            raise TextureSetRefused(
+                "digest", f"{set_id}: the bytes on disk do not hash to the pinned digest"
             )
-        header = _decode(payload, set_id).header
-        _check_header(header, entry, set_id)
+        decoded = _decode(payload, set_id)
+        _check_header(decoded, entry, set_id)
+        header = decoded.header
         checked[set_id] = (entry, header, path)
         licence_digests.add(entry.licence_sha256)
 
@@ -549,7 +693,9 @@ def load_texture_catalog(
             height=entry.height,
             extent_u_mm=entry.extent_u_mm,
             extent_v_mm=entry.extent_v_mm,
-            maps=_LAYOUT,
+            container_profile=entry.container_profile,
+            material_class=entry.material_class,
+            maps=entry.maps,
             licence_id=entry.licence_id,
             licence_sha256=entry.licence_sha256,
             title=header["title"],
