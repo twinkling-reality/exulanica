@@ -116,3 +116,37 @@ describe('persisted event identity and window', () => {
     }
   });
 });
+
+describe('living society snapshots', () => {
+  const person = (i: number, extra: Record<string, unknown> = {}) => ({
+    id: `person-${i}`, ordinal: i, synthetic: true, role: i ? {key: 'baker', label: 'baker', destination_id: 'premises:b:0'} : null,
+    role_reason: i ? 'works_at_premises' : 'place_publishes_no_premises', walk_speed_mm_per_tick: 70000,
+    needs: {leisure: 300}, position_mm: [4000, i * 4000], motion_path_mm: [[0, i * 4000], [4000, i * 4000]],
+    location: {node_id: `n${i}`, edge: null, spot_id: `n${i}`, destination_id: null, indoors: i === 1},
+    goal: {activity: 'stroll', destination_id: null, spot_id: `n${i}`, node_id: `n${i}`, need: 'leisure', shift_day: null, reason: 'most_pressing_need', because: 'leisure at 300 of 1000'},
+    route: null, action: {kind: 'stroll', status: 'active', destination_id: null, remaining_ticks: 2, reason: 'arrived'},
+    explanation: {summary: 'A person (simulated): action started; arrived.', event_ids: ['e']}, memory: ['e'], ...extra,
+  });
+  const row = (people: unknown[]) => ({
+    society_id: 'society', version_id: 'branch', branch_id: 'branch', place_id: 'place', population_size: 2,
+    current_tick: 3, state_sha256: 'a'.repeat(64), input_seq: 1, input_sha256: 'b'.repeat(64),
+    state: {profile: 'exulanica-society/v4', society_id: 'society', branch_id: 'branch', tick: 3, input_seq: 1,
+      input_sha256: 'b'.repeat(64), clock: {start_minute_of_day: 480, minute_of_day: 483, day: 0},
+      population: {size: 2}, inhabitants: people},
+  });
+  it('presents roles, indoor presence, speed and the simulated clock from canonical fields', () => {
+    const snapshot = parseSociety(row([person(0), person(1)]));
+    expect(snapshot.populationSize).toBe(2);
+    expect(snapshot.state.minute_of_day).toBe(483);
+    expect(snapshot.state.inhabitants.map((p) => [p.role, p.indoors, p.walk_speed_mm_per_tick])).toEqual([
+      [null, false, 70000], ['baker', true, 70000],
+    ]);
+    expect(snapshot.state.inhabitants[0]!.goal).toEqual({activity: 'stroll', destination_id: null, because: 'leisure at 300 of 1000'});
+  });
+  it('refuses names, truncation, detached motion and foreign branches', () => {
+    expect(() => parseSociety(row([person(0, {display_name: 'Emi Fox'}), person(1)]))).toThrow(/living society/);
+    expect(() => parseSociety(row([person(0)]))).toThrow(/living society/);
+    expect(() => parseSociety(row([person(0, {position_mm: [8000, 0]}), person(1)]))).toThrow(/endpoint/);
+    expect(() => parseSociety({...row([person(0), person(1)]), version_id: 'other'})).toThrow(/living society/);
+  });
+});

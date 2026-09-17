@@ -416,7 +416,11 @@ export function mountEnvironmentSelection(
     const where = (destination: string | null | undefined) => destination
       ? `${destination.split('/').at(-1)}${recording?.destinations.get(destination) ? ` (holds ${recording.destinations.get(destination)!.capacity})` : ''}`
       : 'an open spot on the sidewalk';
-    const history = (recording?.eventsBySubject.get(inhabitant.id) ?? [])
+    const live = liveSociety?.inspect(inhabitant.id);
+    const recorded = live
+      ? live.events.map((event) => ({ tick: event.tick, summary: event.document.summary, eventId: event.event_id }))
+      : recording?.eventsBySubject.get(inhabitant.id) ?? [];
+    const history = recorded
       .filter((event) => event.tick <= state.tick).slice(-6)
       .map((event) => `Tick ${event.tick}: ${event.summary} [${event.eventId}]`).join(' ');
     const needs = Object.entries(inhabitant.needs ?? {}).map(([key, value]) => `${key} ${value}`).join(', ');

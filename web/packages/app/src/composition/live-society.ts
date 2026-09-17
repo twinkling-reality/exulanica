@@ -62,8 +62,8 @@ export function createLiveSociety(options: LiveSocietyOptions): LiveSociety {
         (view.snapshot && view.snapshot.societyId !== snapshot.societyId)) {
       throw new Error('Society response does not match the connected world');
     }
-    if (snapshot.state.profile !== 'exulanica-society/v2') {
-      throw new Error('This world does not use the supported purposeful society profile. Its existing history was preserved.');
+    if (snapshot.state.profile !== 'exulanica-society/v2' && snapshot.state.profile !== 'exulanica-society/v4') {
+      throw new Error('This world does not use a supported society profile. Its existing history was preserved.');
     }
     return snapshot;
   };
@@ -101,7 +101,8 @@ export function createLiveSociety(options: LiveSocietyOptions): LiveSociety {
   const refresh = () => run(async () => accept(await client.read(options.versionId)));
   const api: LiveSociety = {
     get view() { return view; },
-    connect: () => run(async () => accept(await client.connect(options.versionId, options.placeId, options.regionId, 'exulanica-society/v2'))),
+    // An existing society keeps its own profile; a new one is created as the living society.
+    connect: () => run(async () => accept(await client.connect(options.versionId, options.placeId, options.regionId, 'exulanica-society/v4'))),
     refresh,
     advance: () => run(async () => {
       const snapshot = view.snapshot;

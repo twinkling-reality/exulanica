@@ -28,7 +28,7 @@ describe('authenticated society composition', () => {
   it('connects to purposeful persisted state and exposes canonical selected reasons independently of nearby rendering', async () => {
     const { live, client } = setup();
     await live.connect();
-    expect(client.connect).toHaveBeenCalledWith('branch', 'place', 'region', 'exulanica-society/v2');
+    expect(client.connect).toHaveBeenCalledWith('branch', 'place', 'region', 'exulanica-society/v4');
     await live.advance();
     expect(live.inspect('person-0').events[0]?.document['reason']).toBe('target_disabled_or_removed');
     expect(live.inspect('person-0').missingEventIds).toEqual(['older-event']);
