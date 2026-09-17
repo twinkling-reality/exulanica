@@ -18,6 +18,11 @@
  * elevated view holds the camera by replacing the binding's per-frame update with a no-op for the
  * duration, which is recorded. Nothing is written to the product; the script prints one JSON
  * record. It needs no package beyond Node's own WebSocket.
+ *
+ * `--views overview` measures one view only. `--hide-district` hides, for the measurement only, every
+ * draw under the owned district that is not a data view point draw (its surfaces and its extent and
+ * datum lines), to tell the district's own drawing cost from the data view's. Each run records what
+ * it hid and whether each draw was already visible, and puts every one back afterwards.
  */
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -35,6 +40,8 @@ function argument(name, fallback) {
 const url = argument('url', 'http://127.0.0.1:5261/?preview=1');
 const budgets = argument('budgets', '65536,262144,524288,1048576,2097152,4194304').split(',').map(Number);
 const seconds = Number(argument('seconds', '8'));
+const views = argument('views', 'street,overview').split(',');
+const hideDistrict = process.argv.includes('--hide-district');
 const port = Number(argument('port', String(9400 + Math.floor(Math.random() * 400))));
 
 class Session {
@@ -117,6 +124,18 @@ const MEASURE = (budget, view) => `(async () => {
   while (report.pendingSubjects > 0) report = b.representation.update();
   const prepareMs = performance.now() - prepareStart;
   const frozen = ${JSON.stringify(view)} === 'overview';
+  const hidden = [];
+  if (${hideDistrict}) {
+    const district = b.app.root.findByName('owned-district');
+    if (!district) throw new Error('No owned-district node to hide');
+    district.forEach(e => {
+      for (const mi of e.render?.meshInstances ?? []) {
+        if (e.name.startsWith('data-view-points:')) continue;
+        hidden.push({ name: e.name, primitive: mi.mesh.primitive[0].type, wasVisible: mi.visible, mi });
+        mi.visible = false;
+      }
+    });
+  }
   if (frozen) {
     // The whole district: every aggregate batch's own box, projected into display space.
     const corners = report.subjects.filter(e => e.subject.subjectKind === 'geometry-group')
@@ -162,11 +181,16 @@ const MEASURE = (budget, view) => `(async () => {
     if (i >= 30) costs.push(performance.now() - t);
   }
   if (frozen) delete b.update;
+  // Anything that turned itself back on during the run would make the hiding a false result.
+  const reshown = hidden.filter(h => h.mi.visible).map(h => h.name);
+  for (const h of hidden) h.mi.visible = h.wasVisible;
   const inView = report.subjects.filter(e => e.resolved.pointWeight > 0).length;
   return {
     budget: ${budget}, perSubject, view: ${JSON.stringify(view)}, heldCamera: frozen,
     allocatedPoints: report.allocatedPoints, allocatedBytes: report.allocatedBytes, prepareMs: Math.round(prepareMs),
     subjectsWithPoints: inView, drawCalls: app.stats.drawCalls.total,
+    hiddenDistrictDraws: hidden.map(h => ({ name: h.name, primitive: h.primitive, wasVisible: h.wasVisible })),
+    reshownDuringRun: reshown,
     interval: summary(intervals), cost: summary(costs),
     heapMB: performance.memory ? Math.round(performance.memory.usedJSHeapSize / 1048576) : null,
   };
@@ -209,7 +233,7 @@ async function main() {
     await sleep(3000);
     const attached = await session.evaluate(ATTACH);
     const runs = [];
-    for (const view of ['street', 'overview']) {
+    for (const view of views) {
       for (const budget of budgets) {
         const run = await session.evaluate(MEASURE(budget, view));
         runs.push(run);
@@ -221,7 +245,7 @@ async function main() {
     socket.close();
     process.stdout.write(`${JSON.stringify({
       measuredAt: new Date().toISOString(), url, viewport: VIEWPORT, seconds, browser: version.Browser,
-      renderer: attached.renderer, canvas: attached.canvas, subjects: attached.subjects, runs,
+      renderer: attached.renderer, canvas: attached.canvas, subjects: attached.subjects, hideDistrict, runs,
     }, null, 2)}\n`);
   } finally {
     chrome.kill('SIGKILL');
