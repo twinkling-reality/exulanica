@@ -85,6 +85,7 @@ import {
   DEFAULT_FOCUS_CONFIG,
 } from '@exulanica/atlas-core';
 import { OwnedDistrictRuntime } from './owned-district-runtime.js';
+import type { GeneratedTileAttachment, GeneratedTileMount } from './generated-tile/binding-contract.js';
 import { PlayerAvatar } from './player-avatar.js';
 import { FollowCamera, playerCameraAimHeight, type PlayerCameraMode } from './player-camera.js';
 import {
@@ -378,6 +379,12 @@ export interface AtlasBindingOptions {
     readonly residentBytes: number;
     readonly interpretation?: import('@exulanica/atlas-core').DistrictInterpretation;
   };
+  /**
+   * Development evaluation of one baked generated tile, reachable only from the preview route.
+   * Replaces the owned district: the tile supplies the ground, the collision and the opening
+   * stance, and draws itself into the environment root.
+   */
+  readonly generatedTile?: GeneratedTileMount;
   /** Optional current rights/record refinements for known renderer subjects. */
   readonly representationSubjects?: readonly RepresentationSubject[];
 }
@@ -474,6 +481,8 @@ export class AtlasBinding {
   /** Null unless explicitly feature-flagged with a key by the application. */
   googleTiles: GoogleTilesEnvironment<unknown> | null = null;
   readonly ownedDistrict: OwnedDistrictRuntime | null;
+  /** The mounted evaluation tile, if the preview route asked for one. */
+  generatedTile: GeneratedTileAttachment | null = null;
   private representationController: RepresentationRuntime | null = null;
   get representation(): RepresentationRuntime {
     return this.representationController ??= new RepresentationRuntime();
@@ -680,7 +689,10 @@ export class AtlasBinding {
   static async create(options: AtlasBindingOptions): Promise<AtlasBinding> {
     const theme = options.theme ?? DAWN_THEME;
     const initialArtProfile = options.artProfile ?? DEFAULT_WORLD_ART_PROFILE;
-    const cityActive = options.ownedDistrict !== undefined ||
+    if (options.ownedDistrict !== undefined && options.generatedTile !== undefined) {
+      throw new TypeError('A generated tile replaces the owned district; pass one or the other');
+    }
+    const cityActive = options.ownedDistrict !== undefined || options.generatedTile !== undefined ||
       (options.googleTiles?.enabled === true && options.googleTiles.apiKey.length > 0);
     const device = await pc.createGraphicsDevice(options.canvas, {
       deviceTypes: [...(options.deviceTypes ?? ['webgl2'])],
@@ -774,7 +786,9 @@ export class AtlasBinding {
     app.root.addChild(environmentRoot);
     const renderRoot = new pc.Entity('atlas-render-origin');
     app.root.addChild(renderRoot);
-    const navigationWorld = options.ownedDistrict === undefined
+    const navigationWorld = options.generatedTile !== undefined
+      ? options.generatedTile.navigationWorld
+      : options.ownedDistrict === undefined
       ? buildNavigationWorld(options.scene)
       // The district owns the ground and the blockers; the scene owns where the memories are. Both
       // are already drawn in the same coordinate space, so withholding the regions from the
@@ -861,7 +875,7 @@ export class AtlasBinding {
       theme,
       options.reducedMotion ?? false,
     );
-    if (options.ownedDistrict !== undefined) field.entity.enabled = false;
+    if (options.ownedDistrict !== undefined || options.generatedTile !== undefined) field.entity.enabled = false;
     renderRoot.addChild(field.entity);
     const topology = composeAtlasWorld(options.scene, {
       availableReconstruction,
@@ -981,14 +995,16 @@ export class AtlasBinding {
       }
     }
 
-    const start = options.ownedDistrict !== undefined
+    const start = options.generatedTile !== undefined
+      ? { ...options.generatedTile.start }
+      : options.ownedDistrict !== undefined
       ? ownedDistrictCameraState(navigationWorld, options.ownedDistrict.document)
       : cityActive
         ? cityCameraState('overview')
         : initialAtlasCameraState(options.scene, navigationWorld);
 
     // The Google-tiles entry is an aerial overview, not a stance. Everything else starts on foot.
-    const aerialStart = options.ownedDistrict === undefined && cityActive;
+    const aerialStart = options.ownedDistrict === undefined && options.generatedTile === undefined && cityActive;
     const controls = new FirstPersonControls(
       options.canvas,
       start,
@@ -1054,6 +1070,10 @@ export class AtlasBinding {
       ownedDistrict,
     );
     if (options.ownedDistrict !== undefined) binding.renderRoot.enabled = false;
+    if (options.generatedTile !== undefined) {
+      binding.renderRoot.enabled = false;
+      binding.generatedTile = options.generatedTile.attach({ app, environmentRoot, camera });
+    }
     if (options.googleTiles?.enabled === true && options.googleTiles.apiKey.length > 0) {
       binding.renderRoot.enabled = false;
       binding.googleTiles = createGoogleTilesEnvironment(
@@ -2298,6 +2318,8 @@ export class AtlasBinding {
     this.nativeCharacters?.destroy();
     this.playerAvatar?.destroy();
     this.ownedDistrict?.destroy();
+    this.generatedTile?.dispose();
+    this.generatedTile = null;
     this.googleTiles?.dispose();
     this.googleTiles = null;
     this.controls.destroy();
