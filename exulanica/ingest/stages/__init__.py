@@ -31,14 +31,22 @@ a version bump still changes the key and still forces regeneration.
 from __future__ import annotations
 
 import hashlib
+import re
 import uuid
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
 from typing import Any, Final
 
 from exulanica.canonical import canonical_json, sha256_of_canonical
 from exulanica.corpus.decode import decoder_inventory
 from exulanica.evidence.blob import BlobId
+from exulanica.grammar.grammars.city import CITY_STAGES
+from exulanica.grammar.grammars.city.tile import (
+    HALO_RADIUS_MM,
+    TILE_SIZE_MM,
+    TileRecord,
+    tile_inputs_digest,
+)
 from exulanica.ingest.vision import SCHEMA_VERSION, prompt_digest
 from exulanica.reconstruction.alignment import ALIGNMENT_POLICY
 from exulanica.reconstruction.place_alignment import PLACE_ALIGNMENT_POLICY
@@ -51,7 +59,10 @@ __all__ = [
     "ScenePoseQualityThresholds",
     "StageSpec",
     "artifact_id_for",
+    "baked_tile_id",
+    "baked_tile_record_shapes",
     "binding_digest_of",
+    "edit_delta_digest_of",
     "idempotency_key",
     "input_digest_of",
     "pipeline_digest",
@@ -209,6 +220,21 @@ def vision_stage_params() -> dict[str, Any]:
         "temperature_milli": 0,
         "response_format": "json_schema_strict",
     }
+
+
+def baked_tile_record_shapes() -> dict[str, int]:
+    """Every record kind the city grammar declares, with its version, derived from the stages.
+
+    The tessellator reads exactly these, so they are the grammar reference the bake is keyed on. A
+    new record kind or a record version bump in the grammar moves this without anybody restating
+    it, and the tessellator refuses the kind until it has a shape and an expander for it.
+    """
+    shapes = {
+        record_type.RECORD_KIND: record_type.RECORD_VERSION
+        for city_stage in CITY_STAGES
+        for record_type, _validator in city_stage.validators
+    }
+    return dict(sorted(shapes.items()))
 
 
 STAGES: Final[dict[str, StageSpec]] = {
@@ -780,6 +806,49 @@ STAGES: Final[dict[str, StageSpec]] = {
             "physically_validated": False,
         },
     ),
+    "baked_tile": StageSpec(
+        key="baked_tile",
+        version=1,
+        output_kind="owd_tile",
+        # Deterministic in the sense the flag carries: integer records in, integer geometry and a
+        # correctly rounded float payload out, no model, no clock and no random source, so two runs
+        # of one tile under one key that write different bytes are a fault worth an event. The bake
+        # is the Node build of `web/packages/loom-tess`, so the served `.owd` bytes are the bytes
+        # this stage digests; the browser build is a preview held to the same triangle digest.
+        deterministic=True,
+        # No `model_role`: nothing here calls a model, and ADR-0017 would force the flag off if
+        # anything did. A tile has no source photograph either, so its key is `baked_tile_id`
+        # below, the `scene_group` shape, and never `idempotency_key` over a made-up blob.
+        #
+        # Every value is a parameter rather than a constant because each one changes the bytes
+        # the bake writes, so each must move the key. `tests/test_bake_determinism.py` holds this
+        # mapping equal to what the tessellator itself states (`exulanica-tess params`).
+        params={
+            # The container format. A new version is a rebake, never an upgrade on read.
+            "container": "owd/1",
+            # The tessellator's source version: its expanders, its statements of what a record
+            # kind lacks, and its fixed tessellation choices, such as a terrain cell's diagonal.
+            "tessellator": 1,
+            # How a projection's triangles are digested; the golden fixture digest depends on it.
+            "triangle_digest": "exulanica.owd-triangle-digest/v1",
+            # The document the bake reads.
+            "tile_document": "exulanica.tile-document/v1",
+            # The records' unit, and the unit of every digested coordinate.
+            "coordinate_unit": "millimetre",
+            # The projections materialised. The others have no representation contract yet, and
+            # a projection added here changes every container.
+            "projections": ["render_batch"],
+            # The only level of detail drawn; a tile at another level is refused.
+            "lod": 0,
+            # Declared by version 1 of the grammar's tile stage, imported rather than restated.
+            "tile_size_mm": TILE_SIZE_MM,
+            "halo_radius_mm": HALO_RADIUS_MM,
+            # The grammar reference: the record kinds and versions the documents are written in.
+            # Grammar ids and versions of a particular tile, and its catalog digest, are not
+            # here: they are inputs of that tile and reach the key through `tile_inputs_digest`.
+            "record_shapes": baked_tile_record_shapes(),
+        },
+    ),
 }
 
 
@@ -864,6 +933,46 @@ def idempotency_key(
         hasher.update(len(part).to_bytes(8, "big"))
         hasher.update(part)
     return hasher.hexdigest()
+
+
+_HEX64: Final = re.compile(r"[0-9a-f]{64}")
+
+
+def edit_delta_digest_of(ordered_edit_digests: Sequence[bytes]) -> str:
+    """The digest of the ordered edit subsequence a tile's `edit_delta_digest` field carries.
+
+    SHA-256 over the canonical JSON array of the edits' own digests, as lowercase hex, IN LOG
+    ORDER and not sorted, unlike `input_digest_of`: replaying two edits in the other order is a
+    different world. What an edit digest is belongs to the edit log, which does not exist yet; this
+    fixes only how a sequence of them folds into the tile record, so that the empty sequence has
+    one encoding from the first bake. The empty sequence is a real value, not a missing one, and
+    it is what every tile carries until an edit targets one of its owned or halo subjects.
+    """
+    for digest in ordered_edit_digests:
+        if not isinstance(digest, bytes) or len(digest) != hashlib.sha256().digest_size:
+            raise ValueError("an edit digest is 32 raw SHA-256 bytes")
+    return sha256_of_canonical([digest.hex() for digest in ordered_edit_digests]).hex()
+
+
+def baked_tile_id(spec: StageSpec, tile: TileRecord) -> uuid.UUID:
+    """The key of one baked tile: ``scene_group``'s shape, with the tile's own key last.
+
+    ``uuid5(ARTIFACT_NAMESPACE, "baked_tile:<version>:<params digest>:<tile_inputs_digest>")``.
+    ``tile_inputs_digest`` is the grammar's digest over the city seed, the grammar versions, the
+    catalog digest, the tile coordinate, the level of detail, the halo radius and
+    ``edit_delta_digest``, so an edit that targets the tile moves the key before any cache exists.
+    The key assumes the tile's records are what its grammar versions generate from those inputs; a
+    document whose records differ under the same inputs is exactly the difference a deterministic
+    stage reports as a fault.
+    """
+    if spec.key != "baked_tile":
+        raise ValueError(f"stage {spec.key!r} is not the tile bake")
+    inputs = tile_inputs_digest(tile)
+    if _HEX64.fullmatch(inputs) is None:
+        raise ValueError("tile_inputs_digest is 64 lowercase hexadecimal characters")
+    return uuid.uuid5(
+        ARTIFACT_NAMESPACE, f"{spec.key}:{spec.version}:{spec.params_digest.hex()}:{inputs}"
+    )
 
 
 def artifact_id_for(key: str, *, workspace_id: uuid.UUID) -> uuid.UUID:
