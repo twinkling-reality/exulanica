@@ -398,7 +398,8 @@ export interface DecodedOwd {
 type JsonObject = { readonly [key: string]: unknown };
 
 function objectAt(value: unknown, where: string): JsonObject {
-  if (typeof value !== 'object' || value === null) fail(`${where} is not an object`);
+  if (typeof value !== 'object') fail(`${where} is not an object`);
+  if (value === null) fail(`${where} is not an object`);
   if (Array.isArray(value)) fail(`${where} is not an object`);
   return value as JsonObject;
 }

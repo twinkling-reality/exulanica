@@ -1,0 +1,329 @@
+loom-tess fences, demonstrated failing on deliberate violations and green again.
+Recorded 2026-09-16 by running the two scripts below from the worktree's web directory.
+Part 1 plants violations with no dependency declared. Part 2 declares @exulanica/loom-tess in
+atlas-react for the length of the probe, as the tile runtime lane will, and shows the core entry
+allowed and the node and browser entries refused, then restores package.json and the lockfile.
+
+== part 1 script
+#!/bin/zsh
+# Plant deliberate violations of the loom-tess fences, show each one fail, remove them, and show
+# the fences green again. Every planted file is untracked and removed by name.
+set -u
+WEB=/Users/glendonchin/dev/Technology/exulanica-personal-admission/web
+cd "$WEB"
+echo "== head: $(git rev-parse HEAD)"
+echo "== node: $(node --version)"
+
+typeset -A PROBES
+PROBES[packages/loom-tess/src/core/_probe_node_builtin.ts]="import { createHash } from 'node:crypto';
+export const probe = createHash;"
+PROBES[packages/loom-tess/src/core/_probe_workspace.ts]="import { canonicalJson } from '../../../scene-synth/src/format/index.js';
+export const probe = canonicalJson;"
+PROBES[packages/loom-tess/src/node/_probe_preview.ts]="import { previewTile } from '../browser/index.js';
+export const probe = previewTile;"
+PROBES[packages/loom-tess/src/browser/_probe_bake.ts]="import { nodeSha256 } from '../node/sha256.js';
+export const probe = nodeSha256;"
+PROBES[packages/app/src/_probe_tess_node.ts]="import { bakeDocumentFile } from '@exulanica/loom-tess/node';
+export const probe = bakeDocumentFile;"
+PROBES[packages/atlas-react/src/_probe_tess_relative.ts]="import { previewTile } from '../../loom-tess/src/browser/index.js';
+export const probe = previewTile;"
+PROBES[packages/atlas-react/src/_probe_tess_core_internal.ts]="import { decodeOwd } from '../../loom-tess/src/core/owd.js';
+export const probe = decodeOwd;"
+# Positive control: the core entry by its specifier. The only expected complaint is that
+# atlas-react has not declared the dependency, which is the consuming lane's commit to make.
+PROBES[packages/atlas-react/src/_probe_tess_core_entry.ts]="import { decodeOwd } from '@exulanica/loom-tess/core';
+export const probe = decodeOwd;"
+
+for file in ${(k)PROBES}; do
+  if [[ -e $file ]]; then echo "refusing to overwrite $file"; exit 1; fi
+done
+for file in ${(k)PROBES}; do
+  print -r -- "${PROBES[$file]}" > "$file"
+  echo "== planted $file"
+  cat "$file"
+done
+
+echo
+echo "== pnpm run boundaries, with the probes"
+pnpm run boundaries 2>&1 | grep -v '^$'
+echo "== exit ${pipestatus[1]}"
+
+echo
+echo "== tsc -p packages/loom-tess/tsconfig.core.json --noEmit, with the probes"
+node_modules/.bin/tsc -p packages/loom-tess/tsconfig.core.json --noEmit 2>&1
+echo "== exit $?"
+echo "== tsc -p packages/loom-tess/tsconfig.browser.json --noEmit, with the probes"
+node_modules/.bin/tsc -p packages/loom-tess/tsconfig.browser.json --noEmit 2>&1
+echo "== exit $?"
+
+for file in ${(k)PROBES}; do rm -- "$file"; echo "== removed $file"; done
+
+echo
+echo "== pnpm run boundaries, probes removed"
+pnpm run boundaries 2>&1 | grep -v '^$'
+echo "== exit ${pipestatus[1]}"
+echo "== tsc -p packages/loom-tess/tsconfig.core.json --noEmit, probes removed"
+node_modules/.bin/tsc -p packages/loom-tess/tsconfig.core.json --noEmit 2>&1
+echo "== exit $?"
+echo "== git status --short"
+git status --short
+
+== part 1 output
+== head: a0d7ccad47a851bd7fd0ef903369cf12ba040463
+== node: v24.15.0
+== planted packages/loom-tess/src/core/_probe_workspace.ts
+import { canonicalJson } from '../../../scene-synth/src/format/index.js';
+export const probe = canonicalJson;
+== planted packages/loom-tess/src/core/_probe_node_builtin.ts
+import { createHash } from 'node:crypto';
+export const probe = createHash;
+== planted packages/atlas-react/src/_probe_tess_core_entry.ts
+import { decodeOwd } from '@exulanica/loom-tess/core';
+export const probe = decodeOwd;
+== planted packages/app/src/_probe_tess_node.ts
+import { bakeDocumentFile } from '@exulanica/loom-tess/node';
+export const probe = bakeDocumentFile;
+== planted packages/atlas-react/src/_probe_tess_relative.ts
+import { previewTile } from '../../loom-tess/src/browser/index.js';
+export const probe = previewTile;
+== planted packages/loom-tess/src/browser/_probe_bake.ts
+import { nodeSha256 } from '../node/sha256.js';
+export const probe = nodeSha256;
+== planted packages/loom-tess/src/node/_probe_preview.ts
+import { previewTile } from '../browser/index.js';
+export const probe = previewTile;
+== planted packages/atlas-react/src/_probe_tess_core_internal.ts
+import { decodeOwd } from '../../loom-tess/src/core/owd.js';
+export const probe = decodeOwd;
+
+== pnpm run boundaries, with the probes
+> exulanica-web@ boundaries /Users/glendonchin/dev/Technology/exulanica-personal-admission/web
+> depcruise --config .dependency-cruiser.cjs packages
+  error scene-synth-is-offline-only: packages/loom-tess/src/core/_probe_workspace.ts → packages/scene-synth/src/format/index.ts
+  error not-to-unresolvable: packages/atlas-react/src/_probe_tess_core_entry.ts → @exulanica/loom-tess/core
+  error not-to-unresolvable: packages/app/src/_probe_tess_node.ts → @exulanica/loom-tess/node
+  error loom-tess-preview-is-unreachable-from-the-bake: packages/loom-tess/src/node/_probe_preview.ts → packages/loom-tess/src/browser/index.ts
+  error loom-tess-is-reached-through-its-core-entry-only: packages/atlas-react/src/_probe_tess_relative.ts → packages/loom-tess/src/browser/index.ts
+  error loom-tess-is-reached-through-its-core-entry-only: packages/atlas-react/src/_probe_tess_core_internal.ts → packages/loom-tess/src/core/owd.ts
+  error loom-tess-is-reached-through-its-core-entry-only: packages/app/src/_probe_tess_node.ts → @exulanica/loom-tess/node
+  error loom-tess-imports-no-workspace-package: packages/loom-tess/src/core/_probe_workspace.ts → packages/scene-synth/src/format/index.ts
+  error loom-tess-core-reaches-only-core: packages/loom-tess/src/core/_probe_workspace.ts → packages/scene-synth/src/format/index.ts
+  error loom-tess-core-reaches-only-core: packages/loom-tess/src/core/_probe_node_builtin.ts → crypto
+  error loom-tess-bake-is-unreachable-from-the-preview: packages/loom-tess/src/browser/_probe_bake.ts → packages/loom-tess/src/node/sha256.ts
+  error app-imports-the-product-packages-only: packages/app/src/_probe_tess_node.ts → @exulanica/loom-tess/node
+x 12 dependency violations (12 errors, 0 warnings). 590 modules, 2004 dependencies cruised.
+ ELIFECYCLE  Command failed with exit code 12.
+== exit 12
+
+== tsc -p packages/loom-tess/tsconfig.core.json --noEmit, with the probes
+packages/loom-tess/src/core/_probe_node_builtin.ts(1,28): error TS2307: Cannot find module 'node:crypto' or its corresponding type declarations.
+packages/loom-tess/src/core/_probe_workspace.ts(1,10): error TS2305: Module '"../../../scene-synth/src/format/index.js"' has no exported member 'canonicalJson'.
+packages/loom-tess/src/core/_probe_workspace.ts(1,31): error TS6059: File '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/format/index.ts' is not under 'rootDir' '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/loom-tess'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/package.json' has field "type" with value "module"
+packages/loom-tess/src/core/_probe_workspace.ts(1,31): error TS6307: File '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/format/index.ts' is not listed within the file list of project '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/loom-tess/tsconfig.core.json'. Projects must list all files or use an 'include' pattern.
+  File is ECMAScript module because '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/package.json' has field "type" with value "module"
+packages/scene-synth/src/format/index.ts(8,8): error TS6059: File '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/format/opm.ts' is not under 'rootDir' '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/loom-tess'. 'rootDir' is expected to contain all source files.
+  The file is in the program because:
+    Imported via './opm.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/format/index.ts'
+    Imported via './opm.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/format/index.ts'
+  File is ECMAScript module because '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/package.json' has field "type" with value "module"
+packages/scene-synth/src/format/index.ts(8,8): error TS6307: File '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/format/opm.ts' is not listed within the file list of project '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/loom-tess/tsconfig.core.json'. Projects must list all files or use an 'include' pattern.
+  The file is in the program because:
+    Imported via './opm.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/format/index.ts'
+    Imported via './opm.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/format/index.ts'
+  File is ECMAScript module because '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/package.json' has field "type" with value "module"
+packages/scene-synth/src/format/index.ts(10,27): error TS6059: File '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/format/ply.ts' is not under 'rootDir' '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/loom-tess'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/package.json' has field "type" with value "module"
+packages/scene-synth/src/format/index.ts(10,27): error TS6307: File '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/format/ply.ts' is not listed within the file list of project '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/loom-tess/tsconfig.core.json'. Projects must list all files or use an 'include' pattern.
+  File is ECMAScript module because '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/package.json' has field "type" with value "module"
+packages/scene-synth/src/format/opm.ts(1,31): error TS6059: File '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/pointmap.ts' is not under 'rootDir' '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/loom-tess'. 'rootDir' is expected to contain all source files.
+  The file is in the program because:
+    Imported via '../pointmap.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/format/opm.ts'
+    Imported via '../pointmap.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/format/opm.ts'
+    Imported via '../pointmap.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/format/ply.ts'
+  File is ECMAScript module because '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/package.json' has field "type" with value "module"
+packages/scene-synth/src/format/opm.ts(1,31): error TS6307: File '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/pointmap.ts' is not listed within the file list of project '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/loom-tess/tsconfig.core.json'. Projects must list all files or use an 'include' pattern.
+  The file is in the program because:
+    Imported via '../pointmap.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/format/opm.ts'
+    Imported via '../pointmap.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/format/opm.ts'
+    Imported via '../pointmap.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/format/ply.ts'
+  File is ECMAScript module because '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/package.json' has field "type" with value "module"
+packages/scene-synth/src/format/opm.ts(209,21): error TS2304: Cannot find name 'TextEncoder'.
+packages/scene-synth/src/format/opm.ts(232,27): error TS2304: Cannot find name 'TextEncoder'.
+packages/scene-synth/src/format/opm.ts(240,15): error TS2304: Cannot find name 'TextEncoder'.
+packages/scene-synth/src/format/opm.ts(274,21): error TS2304: Cannot find name 'TextDecoder'.
+packages/scene-synth/src/format/opm.ts(279,9): error TS2304: Cannot find name 'TextDecoder'.
+packages/scene-synth/src/format/ply.ts(25,27): error TS2304: Cannot find name 'TextEncoder'.
+packages/scene-synth/src/noise.ts(1,29): error TS6059: File '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/rng.ts' is not under 'rootDir' '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/loom-tess'. 'rootDir' is expected to contain all source files.
+  The file is in the program because:
+    Imported via './rng.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/noise.ts'
+    Imported via './rng.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/pointmap.ts'
+  File is ECMAScript module because '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/package.json' has field "type" with value "module"
+packages/scene-synth/src/noise.ts(1,29): error TS6307: File '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/rng.ts' is not listed within the file list of project '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/loom-tess/tsconfig.core.json'. Projects must list all files or use an 'include' pattern.
+  The file is in the program because:
+    Imported via './rng.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/noise.ts'
+    Imported via './rng.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/pointmap.ts'
+  File is ECMAScript module because '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/package.json' has field "type" with value "module"
+packages/scene-synth/src/pointmap.ts(1,33): error TS6059: File '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/camera.ts' is not under 'rootDir' '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/loom-tess'. 'rootDir' is expected to contain all source files.
+  The file is in the program because:
+    Imported via './camera.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/pointmap.ts'
+    Imported via './camera.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/pointmap.ts'
+    Imported via './camera.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/raster.ts'
+    Imported via './camera.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/raster.ts'
+  File is ECMAScript module because '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/package.json' has field "type" with value "module"
+packages/scene-synth/src/pointmap.ts(1,33): error TS6307: File '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/camera.ts' is not listed within the file list of project '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/loom-tess/tsconfig.core.json'. Projects must list all files or use an 'include' pattern.
+  The file is in the program because:
+    Imported via './camera.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/pointmap.ts'
+    Imported via './camera.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/pointmap.ts'
+    Imported via './camera.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/raster.ts'
+    Imported via './camera.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/raster.ts'
+  File is ECMAScript module because '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/package.json' has field "type" with value "module"
+packages/scene-synth/src/pointmap.ts(3,22): error TS6059: File '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/noise.ts' is not under 'rootDir' '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/loom-tess'. 'rootDir' is expected to contain all source files.
+  The file is in the program because:
+    Imported via './noise.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/pointmap.ts'
+    Imported via './noise.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/raster.ts'
+  File is ECMAScript module because '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/package.json' has field "type" with value "module"
+packages/scene-synth/src/pointmap.ts(3,22): error TS6307: File '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/noise.ts' is not listed within the file list of project '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/loom-tess/tsconfig.core.json'. Projects must list all files or use an 'include' pattern.
+  The file is in the program because:
+    Imported via './noise.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/pointmap.ts'
+    Imported via './noise.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/raster.ts'
+  File is ECMAScript module because '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/package.json' has field "type" with value "module"
+packages/scene-synth/src/pointmap.ts(4,41): error TS6059: File '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/primitives.ts' is not under 'rootDir' '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/loom-tess'. 'rootDir' is expected to contain all source files.
+  The file is in the program because:
+    Imported via './primitives.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/pointmap.ts'
+    Imported via './primitives.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/raster.ts'
+    Imported via './primitives.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/raster.ts'
+    Imported via '../primitives.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/format/opm.ts'
+  File is ECMAScript module because '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/package.json' has field "type" with value "module"
+packages/scene-synth/src/pointmap.ts(4,41): error TS6307: File '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/primitives.ts' is not listed within the file list of project '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/loom-tess/tsconfig.core.json'. Projects must list all files or use an 'include' pattern.
+  The file is in the program because:
+    Imported via './primitives.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/pointmap.ts'
+    Imported via './primitives.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/raster.ts'
+    Imported via './primitives.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/raster.ts'
+    Imported via '../primitives.js' from file '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/format/opm.ts'
+  File is ECMAScript module because '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/package.json' has field "type" with value "module"
+packages/scene-synth/src/pointmap.ts(6,35): error TS6059: File '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/raster.ts' is not under 'rootDir' '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/loom-tess'. 'rootDir' is expected to contain all source files.
+  File is ECMAScript module because '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/package.json' has field "type" with value "module"
+packages/scene-synth/src/pointmap.ts(6,35): error TS6307: File '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/src/raster.ts' is not listed within the file list of project '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/loom-tess/tsconfig.core.json'. Projects must list all files or use an 'include' pattern.
+  File is ECMAScript module because '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/scene-synth/package.json' has field "type" with value "module"
+== exit 2
+== tsc -p packages/loom-tess/tsconfig.browser.json --noEmit, with the probes
+packages/loom-tess/src/browser/_probe_bake.ts(1,28): error TS6307: File '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/loom-tess/src/node/sha256.ts' is not listed within the file list of project '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/loom-tess/tsconfig.browser.json'. Projects must list all files or use an 'include' pattern.
+  File is ECMAScript module because '/Users/glendonchin/dev/Technology/exulanica-personal-admission/web/packages/loom-tess/package.json' has field "type" with value "module"
+packages/loom-tess/src/node/sha256.ts(1,28): error TS2307: Cannot find module 'node:crypto' or its corresponding type declarations.
+== exit 2
+== removed packages/loom-tess/src/core/_probe_workspace.ts
+== removed packages/loom-tess/src/core/_probe_node_builtin.ts
+== removed packages/atlas-react/src/_probe_tess_core_entry.ts
+== removed packages/app/src/_probe_tess_node.ts
+== removed packages/atlas-react/src/_probe_tess_relative.ts
+== removed packages/loom-tess/src/browser/_probe_bake.ts
+== removed packages/loom-tess/src/node/_probe_preview.ts
+== removed packages/atlas-react/src/_probe_tess_core_internal.ts
+
+== pnpm run boundaries, probes removed
+> exulanica-web@ boundaries /Users/glendonchin/dev/Technology/exulanica-personal-admission/web
+> depcruise --config .dependency-cruiser.cjs packages
+✔ no dependency violations found (580 modules, 1996 dependencies cruised)
+== exit 0
+== tsc -p packages/loom-tess/tsconfig.core.json --noEmit, probes removed
+== exit 0
+== git status --short
+
+== part 2 script
+#!/bin/zsh
+# The tile runtime lane will declare @exulanica/loom-tess in atlas-react. An installed workspace
+# dependency is where this repository's renderer rules have been seen to go quiet, so declare it
+# here for the length of the probe, show the core entry allowed and every other entry refused,
+# then restore package.json and the lockfile from HEAD and reinstall.
+set -u
+WEB=/Users/glendonchin/dev/Technology/exulanica-personal-admission/web
+cd "$WEB"
+echo "== head: $(git rev-parse HEAD)"
+git diff --quiet -- packages/atlas-react/package.json pnpm-lock.yaml || { echo "refusing: files not clean"; exit 1; }
+
+node -e '
+const fs = require("fs");
+const path = "packages/atlas-react/package.json";
+const pkg = JSON.parse(fs.readFileSync(path, "utf8"));
+pkg.dependencies = { ...pkg.dependencies, "@exulanica/loom-tess": "workspace:*" };
+fs.writeFileSync(path, JSON.stringify(pkg, null, 2) + "\n");
+'
+echo "== declared @exulanica/loom-tess in packages/atlas-react/package.json"
+pnpm install --offline 2>&1 | tail -1
+ls -l node_modules/.pnpm/node_modules/@exulanica 2>/dev/null | grep loom-tess
+ls -l packages/atlas-react/node_modules/@exulanica/ | grep loom-tess
+
+typeset -A PROBES
+PROBES[packages/atlas-react/src/_probe_core_allowed.ts]="import { absoluteVertices } from '@exulanica/loom-tess/core';
+import type { DecodedProjection } from '@exulanica/loom-tess/core';
+export const probe = (projection: DecodedProjection): Float64Array => absoluteVertices(projection);"
+PROBES[packages/atlas-react/src/_probe_node_refused.ts]="import { bakeDocumentFile } from '@exulanica/loom-tess/node';
+export const probe = bakeDocumentFile;"
+PROBES[packages/atlas-react/src/_probe_browser_refused.ts]="import { previewTile } from '@exulanica/loom-tess/browser';
+export const probe = previewTile;"
+for file in ${(k)PROBES}; do
+  if [[ -e $file ]]; then echo "refusing to overwrite $file"; exit 1; fi
+  print -r -- "${PROBES[$file]}" > "$file"
+  echo "== planted $file"
+  cat "$file"
+done
+
+echo
+echo "== pnpm run boundaries, dependency declared, with the probes"
+pnpm run boundaries 2>&1 | grep -v '^$'
+echo "== exit ${pipestatus[1]}"
+
+for file in ${(k)PROBES}; do rm -- "$file"; echo "== removed $file"; done
+git checkout -- packages/atlas-react/package.json pnpm-lock.yaml
+echo "== restored packages/atlas-react/package.json and pnpm-lock.yaml from HEAD"
+pnpm install --offline 2>&1 | tail -1
+echo "== pnpm run boundaries, restored"
+pnpm run boundaries 2>&1 | grep -v '^$'
+echo "== exit ${pipestatus[1]}"
+echo "== git status --short"
+git status --short
+
+== part 2 output
+== head: a0d7ccad47a851bd7fd0ef903369cf12ba040463
+== declared @exulanica/loom-tess in packages/atlas-react/package.json
+Done in 3.1s using pnpm v10.7.1
+lrwxr-xr-x@ 1 glendonchin  staff  30 Sep 16 21:04 loom-tess -> ../../../../packages/loom-tess
+lrwxr-xr-x@ 1 glendonchin  staff  18 Sep 16 21:50 loom-tess -> ../../../loom-tess
+== planted packages/atlas-react/src/_probe_browser_refused.ts
+import { previewTile } from '@exulanica/loom-tess/browser';
+export const probe = previewTile;
+== planted packages/atlas-react/src/_probe_core_allowed.ts
+import { absoluteVertices } from '@exulanica/loom-tess/core';
+import type { DecodedProjection } from '@exulanica/loom-tess/core';
+export const probe = (projection: DecodedProjection): Float64Array => absoluteVertices(projection);
+== planted packages/atlas-react/src/_probe_node_refused.ts
+import { bakeDocumentFile } from '@exulanica/loom-tess/node';
+export const probe = bakeDocumentFile;
+
+== pnpm run boundaries, dependency declared, with the probes
+> exulanica-web@ boundaries /Users/glendonchin/dev/Technology/exulanica-personal-admission/web
+> depcruise --config .dependency-cruiser.cjs packages
+  error loom-tess-is-reached-through-its-core-entry-only: packages/atlas-react/src/_probe_node_refused.ts → packages/loom-tess/src/node/index.ts
+  error loom-tess-is-reached-through-its-core-entry-only: packages/atlas-react/src/_probe_browser_refused.ts → packages/loom-tess/src/browser/index.ts
+x 2 dependency violations (2 errors, 0 warnings). 586 modules, 2015 dependencies cruised.
+ ELIFECYCLE  Command failed with exit code 2.
+== exit 2
+== removed packages/atlas-react/src/_probe_browser_refused.ts
+== removed packages/atlas-react/src/_probe_core_allowed.ts
+== removed packages/atlas-react/src/_probe_node_refused.ts
+== restored packages/atlas-react/package.json and pnpm-lock.yaml from HEAD
+Done in 2.9s using pnpm v10.7.1
+== pnpm run boundaries, restored
+> exulanica-web@ boundaries /Users/glendonchin/dev/Technology/exulanica-personal-admission/web
+> depcruise --config .dependency-cruiser.cjs packages
+✔ no dependency violations found (583 modules, 2011 dependencies cruised)
+== exit 0
+== git status --short
+ M packages/loom-tess/src/core/document.ts
+ M packages/loom-tess/src/core/owd.ts
+ M packages/loom-tess/src/node/cli.ts
+?? packages/loom-tess/evidence/
+?? packages/loom-tess/test/document.test.ts
+?? packages/loom-tess/test/owd.test.ts
+?? packages/loom-tess/test/vocabulary-emptiness.test.ts

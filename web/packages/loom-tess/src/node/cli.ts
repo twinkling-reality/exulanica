@@ -1,3 +1,4 @@
+#!/usr/bin/env tsx
 /**
  * The tessellator's command line.
  *

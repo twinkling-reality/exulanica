@@ -86,7 +86,8 @@ function fail(where: string, why: string): never {
 type JsonObject = { readonly [key: string]: unknown };
 
 function objectAt(value: unknown, where: string): JsonObject {
-  if (typeof value !== 'object' || value === null) fail(where, 'is not an object');
+  if (typeof value !== 'object') fail(where, 'is not an object');
+  if (value === null) fail(where, 'is not an object');
   if (Array.isArray(value)) fail(where, 'is not an object');
   return value as JsonObject;
 }
@@ -307,7 +308,7 @@ export function validateRecord(value: unknown, where: string, expected?: RecordS
   if (record.kind !== shape.kind) fail(`${where}.kind`, `is not ${JSON.stringify(shape.kind)}`);
   integerAt(record.version, `${where}.version`, shape.version, shape.version);
   const fields = objectAt(record.fields, `${where}.fields`);
-  const names = Object.keys(shape.fields);
+  const names = Object.keys(shape.fields).sort(compareCodeUnits);
   exactKeys(fields, names, `${where}.fields`);
   for (const name of names) checkField(shape.fields[name]!, fields[name], `${where}.fields.${name}`);
   for (const rule of shape.rules) checkRule(rule, fields, `${where}.fields`);
