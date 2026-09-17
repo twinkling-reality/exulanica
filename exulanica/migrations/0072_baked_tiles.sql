@@ -48,6 +48,13 @@
 -- back to `baked`, a fault digest equal to the stored one or cleared. A fault cannot be tidied
 -- away, and a faulted tile is never served.
 --
+-- DELETION IS THE OWNER'S, AND IT IS NOT A WAY ROUND THE CEILING. The ledger's guard covers
+-- insert and update, as migration 0062's own quota guard does, and not delete: a workspace that
+-- goes away takes its deliveries with it, and that is an operator's act on tables the operator
+-- owns. A request cannot reach it, because `exulanica.db.roles` lists `workspace_baked_tile`
+-- insert-only for the runtime role, which holds no DELETE on either table; deleting a delivery to
+-- be served the same tile again for free is therefore not a thing a request can do.
+--
 -- WRITES ARE THE OFFLINE BAKE'S. `exulanica.db.roles` lists `baked_tile` read-only for the runtime
 -- role, and the trigger below refuses a non-owner write, as 0065 does for the texture sets: a
 -- process that answers requests reads tiles and never publishes one. `workspace_baked_tile` the
