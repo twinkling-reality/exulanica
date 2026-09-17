@@ -51,6 +51,27 @@ def test_retained_inspection_enforces_read_only_without_allowing_rehearsal(monke
 
 
 @pytest.mark.parametrize(
+    "read_only, verb, retained_named", [(False, "Write only to", False), (True, "Read", True)]
+)
+def test_a_refusal_names_what_this_caller_may_reach_rather_than_the_other_path(
+    read_only, verb, retained_named
+):
+    """A read reaches the retained copy too, so it is not refused in the words of a write.
+
+    inspect_database is the reader, and until 2026-09-17 both paths raised the same sentence about
+    writes, which sent a reader looking for a permission it had never asked for.
+    """
+    with pytest.raises(ValueError) as exc:
+        validate_reference_url(
+            "postgresql://localhost:5432/exulanica_inspect_test", read_only=read_only
+        )
+    message = str(exc.value)
+    assert message.startswith(verb)
+    assert "exulanica_inspect_test" in message
+    assert ("exulanica_spine_test" in message) is retained_named
+
+
+@pytest.mark.parametrize(
     "url",
     [
         RETAINED,

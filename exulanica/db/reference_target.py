@@ -33,7 +33,15 @@ def validate_reference_url(url: str | None, *, read_only: bool = False) -> str:
         or parts.get("hostaddr") not in (None, "127.0.0.1")
         or parts.get("service")
     ):
-        raise ValueError("Use the permitted local reference copy on port 5433 for writes.")
+        # The refusal names what this caller may reach, from the same set the check just used, so a
+        # read is never told it may not write. inspect_database reads the retained data through
+        # this path, and the old wording sent it looking for a write permission it never asked for.
+        permitted = " or ".join(sorted(names))
+        raise ValueError(
+            f"Read the permitted local reference databases on port 5433: {permitted}."
+            if read_only
+            else f"Write only to the permitted local reference copy on port 5433: {permitted}."
+        )
     options = parts.get("options", "-csearch_path=public")
     if read_only:
         options += " -cdefault_transaction_read_only=on"
