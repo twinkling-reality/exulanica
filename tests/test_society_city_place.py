@@ -128,6 +128,18 @@ def test_the_fixture_tile_is_a_connected_place_reached_through_doors_corners_and
     assert flats["resident_capacity"] == 2 and flats["street_segment_ordinal"] == 2
     seats = destinations[f"furniture:{bench.identity}"]
     assert seats["affordances"] == ["rest"] and len(seats["spot_ids"]) == 2
+    # Everyone standing keeps two standing radii from everyone else, seated or not.
+    apart = 2 * routine().policy["standing_radius_mm"]
+    standing = [spot["position_mm"] for spot in document["spots"]]
+    assert all(
+        ceil_distance(a, b) >= apart for i, a in enumerate(standing) for b in standing[i + 1 :]
+    )
+    # A station sits beside its kerb line: the kerb top's width and half the footway away.
+    south = curb(records, 0, "left")
+    assert nodes["footway:0:left:28000"]["position_mm"] == [
+        south.kerb_line_mm[0][0] + 28_000,
+        south.kerb_line_mm[0][1] + south.kerb_width_mm + south.footway_width_mm // 2,
+    ]
 
     crossings = {c["crossing_id"]: c for c in document["crossings"]}
     assert set(crossings) == {r.identity for r in of_kind(records, CrossingRecord)}
@@ -208,11 +220,20 @@ def test_documents_and_their_owned_records_give_one_place_whatever_the_order():
 
 
 def test_a_carriageway_is_crossed_only_on_a_crossing_record():
-    document = records_place([r for r in owned_records() if not isinstance(r, CrossingRecord)])
+    records = owned_records()
+    document = records_place([r for r in records if not isinstance(r, CrossingRecord)])
     validate_place(document, routine())
     assert document["crossings"] == []
     assert not any(edge["kind"] == "crossing" for edge in document["edges"])
     assert len(components(document)) == 3
+    # A crossing whose line never reaches the far kerb joins nothing.
+    crossing = next(r for r in of_kind(records, CrossingRecord) if r.offset_mm == 28_000)
+    (x, _, z), (_, near, _) = crossing.line_mm
+    short = dataclasses.replace(crossing, line_mm=((x, near - 500, z), (x, near, z)))
+    document = records_place([short if r is crossing else r for r in records])
+    assert [c["offset_mm"] for c in document["crossings"]] == [13_000]
+    assert "crossings that do not join two footways in the place (1)" in document["unsupported"]
+    assert len(components(document)) == 2
 
 
 def test_a_unit_with_no_door_onto_a_footway_in_the_place_is_stated_never_given_one():
