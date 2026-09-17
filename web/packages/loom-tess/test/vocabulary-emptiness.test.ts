@@ -51,6 +51,13 @@ const ANYWHERE = new Set([0, 1, 2, 3]);
  * kerb piece's length in (`document._CORNER_LENGTH_SCALE`).
  */
 const NAMED_ONLY = new Set([4, 6, 8, 9, 16, 1000, 1_000_000, 0x20, 0x7e, 0x7fffffff, 0x100000000]);
+/**
+ * Constants whose value is a version rather than a structure, exempt by NAME and not by value: the
+ * number they hold means only which version of this source wrote a container, and it moves whenever
+ * an expander or a contract does. Exempting the value instead would turn the list above from
+ * numbers core may write for a stated structural reason into numbers that happen to appear.
+ */
+const VERSION_CONSTANTS = new Set(['TESSELLATOR_SOURCE_VERSION']);
 
 /** Typology, era, material, use and element words, beyond what the data files name. */
 const WRITTEN_WORDS = [
@@ -157,6 +164,13 @@ function isNamedTopLevelConstant(node: ts.Node): boolean {
   return ts.isVariableStatement(list.parent) && ts.isSourceFile(list.parent.parent);
 }
 
+/** Whether the node is the initialiser of a named top-level constant holding a version. */
+function isVersionConstant(node: ts.Node): boolean {
+  if (!isNamedTopLevelConstant(node)) return false;
+  const declaration = node.parent as ts.VariableDeclaration;
+  return ts.isIdentifier(declaration.name) && VERSION_CONSTANTS.has(declaration.name.text);
+}
+
 /** Every rule this test holds core to, as findings for one source text. */
 export function findings(label: string, text: string, forbiddenWords: ReadonlySet<string>): string[] {
   const found: string[] = [];
@@ -184,7 +198,7 @@ export function findings(label: string, text: string, forbiddenWords: ReadonlySe
       if (FORBIDDEN_CALLS.has(node.text)) flag(node, `${node.text} is a clock, a timer or a host lookup`);
     } else if (ts.isNumericLiteral(node) || ts.isBigIntLiteral(node)) {
       const value = numericValue(node);
-      if (!exempt && !ANYWHERE.has(value)) {
+      if (!exempt && !ANYWHERE.has(value) && !isVersionConstant(node)) {
         if (!NAMED_ONLY.has(value)) flag(node, `numeric literal ${node.text} is not a stated structural number`);
         else if (!isNamedTopLevelConstant(node)) flag(node, `numeric literal ${node.text} must be a named top-level constant`);
       }
