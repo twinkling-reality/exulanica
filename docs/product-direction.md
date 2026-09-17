@@ -334,7 +334,8 @@ Memory evidence, authored state and simulated history remain separate truth clas
 share one place.
 
 The population is canonical simulation state; visible avatars are a representation of it. A
-renderer cap, including the current 24-nearby limit, must never truncate population persistence,
+renderer limit, such as the current 24 full characters nearest the viewer with simpler far figures
+of the same people for everyone else outdoors, must never truncate population persistence,
 queries, events, or model-facing state. Conversely, a visible walk cycle or interpolated position
 must not create a simulation event that the runtime did not record.
 
