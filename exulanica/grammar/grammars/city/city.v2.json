@@ -291,6 +291,30 @@
       "maximum": 200000
     },
     {
+      "name": "storey_band_low",
+      "kind": "integer",
+      "unit": "count",
+      "level": "district",
+      "stage": "massing",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: the fewest storeys a building of this district has. A street wall is a district's decision, not each building's: derived alone, one street ran from two storeys to twelve.",
+      "minimum": 1,
+      "maximum": 40
+    },
+    {
+      "name": "storey_band_high",
+      "kind": "integer",
+      "unit": "count",
+      "level": "district",
+      "stage": "massing",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: the most storeys a building of this district has, no fewer than the low.",
+      "minimum": 1,
+      "maximum": 40
+    },
+    {
       "name": "lane_width_mm",
       "kind": "integer",
       "unit": "mm",
@@ -861,6 +885,20 @@
       "maximum": 1200
     },
     {
+      "name": "awning_present",
+      "kind": "choice",
+      "unit": "key",
+      "level": "face",
+      "stage": "facade",
+      "when_unset": "derive",
+      "vocabulary": "closed",
+      "basis": "authored: whether a face carries awnings at all. Presence is its own choice because a reach of 0 would be a value the awning record refuses.",
+      "options": [
+        "yes",
+        "no"
+      ]
+    },
+    {
       "name": "awning_projection_mm",
       "kind": "integer",
       "unit": "mm",
@@ -868,8 +906,8 @@
       "stage": "facade",
       "when_unset": "derive",
       "vocabulary": "",
-      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': names the awning; its reach is authored, and 0 is none.",
-      "minimum": 0,
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': names the awning; its reach is authored. It starts at 300 mm because a city.awning record refuses less, so every value in this range can be stated; whether a face has one at all is awning_present.",
+      "minimum": 300,
       "maximum": 2500
     },
     {
@@ -883,6 +921,30 @@
       "basis": "authored: the depth of an awning's front drop.",
       "minimum": 0,
       "maximum": 450
+    },
+    {
+      "name": "door_width_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "face",
+      "stage": "facade",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: a door leaf across. A door used to fill its bay, which on a 3.5 m bay is a door no building has.",
+      "minimum": 800,
+      "maximum": 2400
+    },
+    {
+      "name": "door_height_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "face",
+      "stage": "facade",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: a door from its threshold to its head.",
+      "minimum": 2000,
+      "maximum": 3000
     },
     {
       "name": "entrance_recess_mm",
@@ -935,6 +997,42 @@
       "basis": "target architecture 2026-09-15, table 'Why it clears the bar': 'per-instance UV scale'; within a quarter of a set's baked size, so a brick stays brick-sized.",
       "minimum": 800000,
       "maximum": 1250000
+    },
+    {
+      "name": "texture_offset_u_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "building",
+      "stage": "material",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: where a surface's texture starts along u, so two buildings side by side do not line their courses up. Narrowed to the material's own repeat, since beyond it the offset repeats.",
+      "minimum": 0,
+      "maximum": 100000
+    },
+    {
+      "name": "texture_offset_v_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "building",
+      "stage": "material",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: where a surface's texture starts along v, narrowed the same way.",
+      "minimum": 0,
+      "maximum": 100000
+    },
+    {
+      "name": "texture_quarter_turns",
+      "kind": "integer",
+      "unit": "count",
+      "level": "building",
+      "stage": "material",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: quarter turns of a surface's texture. Only a material whose bond is none may turn: a quarter turn of a running bond lays its courses vertically.",
+      "minimum": 0,
+      "maximum": 3
     },
     {
       "name": "soiling_gradient_millionths",

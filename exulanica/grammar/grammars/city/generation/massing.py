@@ -40,7 +40,7 @@ from collections.abc import Iterator, Sequence
 from typing import Final
 
 from exulanica.grammar.contract import StageContext
-from exulanica.grammar.errors import InvalidRecordError
+from exulanica.grammar.errors import InvalidParameterError, InvalidRecordError
 from exulanica.grammar.geometry import Extent
 from exulanica.grammar.grammars.city import massing, parcels, streets
 from exulanica.grammar.grammars.city.catalogs import form_parts
@@ -59,6 +59,8 @@ _EAST: Final = (1, 0)
 #: A block holds fewer lots than this, so a lot's draw ordinal is its block's times this
 #: plus its own.
 _LOTS_PER_BLOCK: Final = 10_000
+#: The one district this version lays out, as the districts stage numbers it.
+_DISTRICT: Final = 0
 
 
 def parts_extent(x: int, y: int, z: int, parts: Sequence[FormPart]) -> Extent:
@@ -133,6 +135,20 @@ def _place_row(
     return placed, len(placed)
 
 
+def _on_high_street(lot: parcels.ParcelRecord, curbs: dict, segments: dict) -> bool:
+    return (
+        segments[curbs[lot.frontages[0].curb_identity].segment_identity].hierarchy == "high_street"
+    )
+
+
+def _storey_reach(typologies: Sequence[str]) -> tuple[int, int]:
+    """The fewest and the most storeys any of these typologies can stand: what a band must meet."""
+    return (
+        min(entry("typology", key)["storeys_minimum"] for key in typologies),
+        max(entry("typology", key)["storeys_maximum"] for key in typologies),
+    )
+
+
 def _generate(context: StageContext) -> Iterator[object]:
     lots = prior_records(context, parcels.STAGE_ID, parcels.ParcelRecord)
     curbs = {
@@ -147,14 +163,43 @@ def _generate(context: StageContext) -> Iterator[object]:
         record.identity: record.block_ordinal
         for record in prior_records(context, streets.STAGE_ID, streets.BlockRecord)
     }
+    # The street wall is the district's decision, not each building's: every building's storeys lie
+    # in this band as well as in its typology's range, and a typology whose range misses the band is
+    # not admitted rather than clamped into it. The band is narrowed to what this district's lots
+    # can actually build, so it never asks for a street no lot of it could stand in.
+    reach = [
+        _storey_reach(
+            _typologies(lot.frontages[0].run_length_mm, _on_high_street(lot, curbs, segments))
+        )
+        for lot in lots
+        if lot.lot_class == "building"
+    ]
+    band_low = derived(
+        context, "storey_band_low", _DISTRICT, maximum=min(high for _low, high in reach)
+    )
+    band_high = derived(
+        context,
+        "storey_band_high",
+        _DISTRICT,
+        minimum=max(band_low, max(low for low, _high in reach)),  # type: ignore[arg-type]
+    )
     for lot in lots:
         if lot.lot_class != "building":
             continue
         # A building's draws are its lot's: stable whatever other lots hold.
         ordinal = block_ordinals[lot.block_identity] * _LOTS_PER_BLOCK + lot.parcel_ordinal
         primary = lot.frontages[0]
-        hierarchy = segments[curbs[primary.curb_identity].segment_identity].hierarchy
-        typologies = _typologies(primary.run_length_mm, hierarchy == "high_street")
+        typologies = [
+            key
+            for key in _typologies(primary.run_length_mm, _on_high_street(lot, curbs, segments))
+            if entry("typology", key)["storeys_minimum"] <= band_high
+            and entry("typology", key)["storeys_maximum"] >= band_low
+        ]
+        if not typologies:
+            raise InvalidParameterError(
+                f"no typology on a {primary.run_length_mm} mm frontage has storeys inside the "
+                f"district's band of {band_low} to {band_high}"
+            )
         if not typologies:
             raise InvalidRecordError(
                 f"no terraced typology fits lot {lot.identity}'s "
@@ -174,8 +219,8 @@ def _generate(context: StageContext) -> Iterator[object]:
             context,
             "storeys",
             ordinal,
-            minimum=kind["storeys_minimum"],
-            maximum=kind["storeys_maximum"],
+            minimum=max(kind["storeys_minimum"], band_low),  # type: ignore[arg-type]
+            maximum=min(kind["storeys_maximum"], band_high),  # type: ignore[arg-type]
         )
         ground = derived(context, "ground_storey_height_mm", ordinal)
         upper = derived(

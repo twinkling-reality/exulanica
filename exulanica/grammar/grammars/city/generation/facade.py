@@ -46,16 +46,18 @@ street or its typology admits no dwelling on the ground floor; otherwise it is a
 * On a dwelling's frontage, the bay at the threshold is the door and the others are wall.
 * A flank or rear face has wall bays.
 
-A door fills its bay's width (an even number of millimetres, so its centre is a whole one) and
-stands from the ground to its transom, no taller than an entrance record holds, so the fascia and
-transom are narrowed to fill the ground band above that height; it is recessed
+A door is ``door_width_mm`` across (an even number of millimetres, so its centre is a whole one)
+and ``door_height_mm`` tall, centred in its bay with the bay's own material either side and above
+it: a shop's door is framed and carries a transom over it, a building's door stands in wall. It is
+no taller than the band under the transom, and no wider than the narrowest bay less a margin each
+side. It is recessed
 ``entrance_recess_mm``, and a building door carries wall where a shop's carries its fascia. The
 threshold stands ``threshold_height_mm`` above the footway, which is exactly the building's base
-above its frontage curb's back edge. An awning ``awning_projection_mm`` deep, level (no parameter
-states a fall), with a ``awning_valance_mm`` valance, hangs from the bottom of the fascia over every
-shop bay. A building with shops has one: its projection is derived from the least an awning record
-holds, 300 mm, since the parameter's range starts at 0 and a record cannot state 1 to 299 mm; a
-building without shops states 0, none.
+above its frontage curb's back edge. Where ``awning_present`` is yes, an awning
+``awning_projection_mm`` deep, level (no parameter states a fall), with a ``awning_valance_mm``
+valance, hangs from the bottom of the fascia over every shop bay. A building with shops has awnings
+and one without has none, which is what ``awning_present`` says; the reach is then any value in its
+own range, since presence is no longer carried by a reach of 0 that an awning record would refuse.
 
 **Extents.** A face's extent is its edge's plan box grown outward by its largest projection and
 inward by its deepest recess, from its first storey's floor to its tier's top; a ground bay's and
@@ -92,6 +94,8 @@ __all__ = ["PITCH_BAND_MM", "STAGE", "building_shop_units", "is_shop_bay", "shop
 
 #: The target architecture's bay pitch band.
 PITCH_BAND_MM: Final = (2_400, 3_500)
+#: What a door leaves of its bay on each side, so a door is never the whole shopfront.
+_DOOR_MARGIN_MM: Final = 100
 _LOTS_PER_BLOCK: Final = 10_000
 _SEMANTICS: Final = DeclaredSemantics(facade.STAGE_ID, CITY_ADMISSIBLE_USES)
 _FACADE_PARAMETERS: Final = tuple(
@@ -291,12 +295,16 @@ def _derive_values(
     )
     put("transom_height_mm", minimum=ground - tallest_door - fascia)
     put("stall_riser_height_mm")
+    # A door is its own size now, centred in its bay: narrowed to leave a margin either side and
+    # to stand no taller than the band under the transom.
+    put("door_width_mm", maximum=smallest_pitch - 2 * _DOOR_MARGIN_MM)
+    put("door_height_mm", maximum=ground - fascia - values["transom_height_mm"])
     put("entrance_recess_mm")
     put("threshold_height_mm", minimum=step, maximum=step)
-    if commercial:
-        put("awning_projection_mm", minimum=_field(facade.AWNING_SHAPE, "projection_mm").minimum)
-    else:
-        put("awning_projection_mm", maximum=0)
+    # Presence first, then the reach: an awning record refuses less than 300 mm, so "none" is a
+    # choice and not a reach of zero.
+    put("awning_present", options=["yes"] if commercial else ["no"])
+    put("awning_projection_mm", minimum=_field(facade.AWNING_SHAPE, "projection_mm").minimum)
     put("awning_valance_mm")
     put("cornice_height_mm")
     if era["cornice"] == "required":
@@ -411,7 +419,8 @@ def _generate(context: StageContext) -> Iterator[object]:
             values["stall_riser_height_mm"],
         )
         glazing_top = ground - fascia - transom
-        door_top = glazing_top
+        door_width = values["door_width_mm"] - values["door_width_mm"] % 2
+        door_top = min(values["door_height_mm"], glazing_top)
         recess = values["entrance_recess_mm"]
         awning = (
             (
@@ -422,7 +431,7 @@ def _generate(context: StageContext) -> Iterator[object]:
                     values["awning_valance_mm"],
                 ),
             )
-            if values["awning_projection_mm"]
+            if values["awning_present"] == "yes"
             else ()
         )
         projections = [
@@ -498,7 +507,18 @@ def _generate(context: StageContext) -> Iterator[object]:
                 for bay_ordinal, kind in enumerate(kinds):
                     u0 = layout.margin_start_mm + bay_ordinal * layout.pitch_mm
                     u1 = u0 + layout.pitch_mm
-                    panels = _panels(kind, u0, u1, ground, fascia, transom, stall, recess)
+                    panels = _panels(
+                        kind,
+                        u0,
+                        u1,
+                        ground,
+                        fascia,
+                        transom,
+                        stall,
+                        recess,
+                        door_width,
+                        door_top,
+                    )
                     bay_awning = awning if kind in ("shopfront", "shop_door") else ()
                     bay_identity = context.identity("ground_bay", identity, bay_ordinal)
                     bays.append(
@@ -538,7 +558,7 @@ def _generate(context: StageContext) -> Iterator[object]:
                                 bay_identity=bay_identity,
                                 entrance_ordinal=entrance_ordinal,
                                 u_centre_mm=centre,
-                                width_mm=layout.pitch_mm - layout.pitch_mm % 2,
+                                width_mm=door_width,
                                 height_mm=door_top,
                                 recess_mm=recess,
                                 step_height_mm=values["threshold_height_mm"],
@@ -627,8 +647,23 @@ def _bay_kinds(
 
 
 def _panels(
-    kind: str, u0: int, u1: int, ground: int, fascia: int, transom: int, stall: int, recess: int
+    kind: str,
+    u0: int,
+    u1: int,
+    ground: int,
+    fascia: int,
+    transom: int,
+    stall: int,
+    recess: int,
+    door_width: int,
+    door_height: int,
 ) -> tuple[facade.GroundPanel, ...]:
+    """The panels that tile one ground bay exactly.
+
+    A door bay is a door of its own width and height, centred, with the bay's own material either
+    side of it and above it: a shop's door is framed and has a transom over it, a building's door
+    stands in wall. The door used to fill its bay, which on a 3.5 m bay is a door no building has.
+    """
     glazing_top = ground - fascia - transom
     band = ground - fascia
     if kind == "wall":
@@ -639,7 +674,18 @@ def _panels(
             facade.GroundPanel("glazing", u0, u1, stall, glazing_top, 0),
         ]
     else:
-        panels = [facade.GroundPanel("door", u0, u1, 0, glazing_top, recess)]
+        side = "frame" if kind == "shop_door" else "wall"
+        width, height = door_width, door_height
+        start = u0 + (u1 - u0 - width) // 2
+        end = start + width
+        panels = [
+            facade.GroundPanel(side, u0, start, 0, glazing_top, 0),
+            facade.GroundPanel("door", start, end, 0, height, recess),
+            facade.GroundPanel(side, end, u1, 0, glazing_top, 0),
+        ]
+        if height < glazing_top:
+            over = "transom" if kind == "shop_door" else side
+            panels.append(facade.GroundPanel(over, start, end, height, glazing_top, recess))
     if transom:
         panels.append(
             facade.GroundPanel(

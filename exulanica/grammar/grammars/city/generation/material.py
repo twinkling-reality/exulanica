@@ -22,9 +22,16 @@ The table is authored and awaits the generated appearance lane's model-made look
 is a measured preference.
 
 **Placement.** ``repeat_size_millionths`` is derived per building for its surfaces, per street for
-a street's and per block or lot for its ground, so one building's brick is one size. No parameter
-states a texture offset or rotation, so both are 0, and the course and mortar modules are the
-catalog's scaled by the repeat.
+a street's and per block or lot for its ground, so one building's brick is one size. The course and
+mortar modules are the catalog's scaled by the repeat.
+
+``texture_offset_u_mm`` and ``texture_offset_v_mm`` are derived the same way and narrowed to the
+material's own modules, so a building's brick starts at its own place in the bond and no two
+neighbours line their courses up. A material with no module along an axis states no offset on it.
+This shifts the pattern within its module and not the set's image, whose repeat the grammar cannot
+know: only the texture manifest holds a set's physical extent. ``texture_quarter_turns`` turns a
+surface a whole number of quarter turns, and only where the material's bond is ``none``: a quarter
+turn of a running bond lays its courses vertically.
 ``soiling_gradient_millionths``, ``base_weathering_millionths`` and
 ``reveal_darkening_millionths`` are building parameters, derived per building for its surfaces; a
 street's surfaces belong to no building, so no parameter states their weathering and it is 0.
@@ -88,6 +95,8 @@ ROLE_MATERIALS: Final = {
 #: An interior backing takes the ``wall`` role and this order, not the building's wall material:
 #: the finish inside a room is not what the street front is built of, and brick reads wrong.
 _BACKING_MATERIALS: Final = ("painted_render", "cast_concrete")
+#: A quarter turn, a half and three quarters, in microradians, rounded to the nearest.
+_QUARTER_TURN_URAD: Final = (0, 1_570_796, 3_141_593, 4_712_389)
 _LOTS_PER_BLOCK: Final = 10_000
 #: Draw ordinals for surfaces no building owns, clear of every building's ordinal.
 _STREETS: Final = 1 << 30
@@ -122,11 +131,30 @@ def _generate(context: StageContext) -> Iterator[material.SurfaceMaterialRecord]
     }
 
     def record(
-        surface: str, kind: str, role: str, key: str, placement: tuple[int, int, int, int, int, int]
+        surface: str,
+        kind: str,
+        role: str,
+        key: str,
+        placement: tuple[int, int, int, int, int, int],
+        ordinal: int,
     ) -> material.SurfaceMaterialRecord:
         values = entry("material", key)
         repeat, soiling, weathering, darkening, band_bottom, band_edge = placement
         glazing = role == "glazing"
+        # The offset shifts the pattern within its own module, so two buildings side by side do not
+        # line their courses up. A material with no module along an axis states no offset on it.
+        # This cannot break the set's own image repeat: the grammar reads the catalog's modules and
+        # never the set's physical extent, which only the texture manifest holds.
+        unit = material.scaled_module_mm(values["unit_length_mm"], repeat)
+        course = material.scaled_module_mm(values["course_module_mm"], repeat)
+        offset_u = derived(context, "texture_offset_u_mm", ordinal, maximum=max(unit - 1, 0))
+        offset_v = derived(context, "texture_offset_v_mm", ordinal, maximum=max(course - 1, 0))
+        turns = derived(
+            context,
+            "texture_quarter_turns",
+            ordinal,
+            maximum=3 if values["bond"] == "none" else 0,
+        )
         return material.SurfaceMaterialRecord(
             identity=context.identity("surface_material", surface, SURFACE_ROLE_CODES[role]),
             surface_identity=surface,
@@ -135,9 +163,9 @@ def _generate(context: StageContext) -> Iterator[material.SurfaceMaterialRecord]
             material=key,
             texture_set_id=values["texture_set_id"],
             repeat_size_millionths=repeat,
-            uv_rotation_urad=0,
-            uv_offset_u_mm=0,
-            uv_offset_v_mm=0,
+            uv_rotation_urad=_QUARTER_TURN_URAD[turns],  # type: ignore[index]
+            uv_offset_u_mm=offset_u,  # type: ignore[arg-type]
+            uv_offset_v_mm=offset_v,  # type: ignore[arg-type]
             course_module_mm=material.scaled_module_mm(values["course_module_mm"], repeat),
             mortar_module_mm=material.scaled_module_mm(values["mortar_module_mm"], repeat),
             soiling_gradient_millionths=soiling,
@@ -158,6 +186,7 @@ def _generate(context: StageContext) -> Iterator[material.SurfaceMaterialRecord]
         rooftops_of.setdefault(item.building_identity, []).append(item)
 
     building_placement: dict[str, tuple[int, int, int, int, int, int]] = {}
+    building_ordinals: dict[str, int] = {}
     for building in buildings:
         lot = lots[building.parcel_identity]
         ordinal = block_ordinals[lot.block_identity] * _LOTS_PER_BLOCK + lot.parcel_ordinal
@@ -177,6 +206,7 @@ def _generate(context: StageContext) -> Iterator[material.SurfaceMaterialRecord]
             derived(context, "glazing_soil_band_edge_mm", ordinal),
         )
         building_placement[building.identity] = placement  # type: ignore[assignment]
+        building_ordinals[building.identity] = ordinal
         for face in faces_of.get(building.identity, []):
             face_bays = bays_of.get(face.identity, [])
             panel_roles = {
@@ -202,6 +232,7 @@ def _generate(context: StageContext) -> Iterator[material.SurfaceMaterialRecord]
                     role,
                     _material_for(role, wall),
                     placement,  # type: ignore[arg-type]
+                    ordinal,
                 )
         roles = ["roof"]
         if any(tier.parapet_height_mm for tier in building.tiers):
@@ -215,6 +246,7 @@ def _generate(context: StageContext) -> Iterator[material.SurfaceMaterialRecord]
                 role,
                 _material_for(role, wall),
                 placement,  # type: ignore[arg-type]
+                ordinal,
             )
         for item in rooftops_of.get(building.identity, []):
             for role in sorted({part.surface_role for part in item.parts}):
@@ -224,6 +256,7 @@ def _generate(context: StageContext) -> Iterator[material.SurfaceMaterialRecord]
                     role,
                     _material_for(role, None),
                     placement,  # type: ignore[arg-type]
+                    ordinal,
                 )
 
     segment_records = prior_records(context, streets.STAGE_ID, streets.StreetSegmentRecord)
@@ -231,6 +264,7 @@ def _generate(context: StageContext) -> Iterator[material.SurfaceMaterialRecord]
         record.identity: record.street_ordinal
         for record in prior_records(context, streets.STAGE_ID, streets.StreetRecord)
     }
+    segments_by_identity = {record.identity: record.street_identity for record in segment_records}
     street_placement: dict[str, tuple[int, int, int, int, int, int]] = {}
     for segment in segment_records:
         street_placement[segment.identity] = (
@@ -252,6 +286,7 @@ def _generate(context: StageContext) -> Iterator[material.SurfaceMaterialRecord]
             "carriageway",
             _material_for("carriageway", None),
             placement,
+            _STREETS + street_ordinals[segment.street_identity],
         )
     curbs = prior_records(context, streets.STAGE_ID, streets.CurbEdgeRecord)
     for segment in segment_records:
@@ -263,12 +298,18 @@ def _generate(context: StageContext) -> Iterator[material.SurfaceMaterialRecord]
                 "gutter",
                 _material_for("gutter", None),
                 placement,
+                _STREETS + street_ordinals[segment.street_identity],
             )
     for curb in curbs:
         placement = street_placement[curb.segment_identity]
         for role in ("kerb", "footway"):
             yield record(
-                curb.identity, "city.curb_edge", role, _material_for(role, None), placement
+                curb.identity,
+                "city.curb_edge",
+                role,
+                _material_for(role, None),
+                placement,
+                _STREETS + street_ordinals[segments_by_identity[curb.segment_identity]],
             )
     for junction in prior_records(context, streets.STAGE_ID, roads.JunctionRecord):
         placement = street_placement[junction.segment_identities[0]]
@@ -278,17 +319,30 @@ def _generate(context: StageContext) -> Iterator[material.SurfaceMaterialRecord]
             "carriageway",
             _material_for("carriageway", None),
             placement,
+            _STREETS + street_ordinals[segments_by_identity[junction.segment_identities[0]]],
         )
     for item in prior_records(context, streetlife.STAGE_ID, streetlife.StreetFurnitureRecord):
         placement = street_placement[item.segment_identity]
         for role in sorted({part.surface_role for part in item.parts}):
             yield record(
-                item.identity, "city.street_furniture", role, _material_for(role, None), placement
+                item.identity,
+                "city.street_furniture",
+                role,
+                _material_for(role, None),
+                placement,
+                _STREETS + street_ordinals[segments_by_identity[item.segment_identity]],
             )
     for case in prior_records(context, vitrine.STAGE_ID, vitrine.VitrineRecord):
         placement = building_placement[case.building_identity]
         for role in sorted({part.surface_role for part in case.parts}):
-            yield record(case.identity, "city.vitrine", role, _material_for(role, None), placement)
+            yield record(
+                case.identity,
+                "city.vitrine",
+                role,
+                _material_for(role, None),
+                placement,
+                building_ordinals[case.building_identity],
+            )
     for backing in prior_records(context, vitrine.STAGE_ID, vitrine.InteriorBackingRecord):
         yield record(
             backing.identity,
@@ -296,18 +350,29 @@ def _generate(context: StageContext) -> Iterator[material.SurfaceMaterialRecord]
             "wall",
             _material_for("wall", None, _BACKING_MATERIALS),
             building_placement[backing.building_identity],
+            building_ordinals[backing.building_identity],
         )
     for block in prior_records(context, streets.STAGE_ID, streets.BlockRecord):
         repeat = derived(context, "repeat_size_millionths", _GROUNDS + block.block_ordinal)
         yield record(
-            block.identity, "city.block", "lot", _material_for("lot", None), (repeat, 0, 0, 0, 0, 0)
-        )  # type: ignore[arg-type]
+            block.identity,
+            "city.block",
+            "lot",
+            _material_for("lot", None),
+            (repeat, 0, 0, 0, 0, 0),  # type: ignore[arg-type]
+            _GROUNDS + block.block_ordinal,
+        )
     for lot in lots.values():
         ordinal = block_ordinals[lot.block_identity] * _LOTS_PER_BLOCK + lot.parcel_ordinal
         repeat = derived(context, "repeat_size_millionths", _GROUNDS + _LOTS_PER_BLOCK + ordinal)
         yield record(
-            lot.identity, "city.parcel", "lot", _material_for("lot", None), (repeat, 0, 0, 0, 0, 0)
-        )  # type: ignore[arg-type]
+            lot.identity,
+            "city.parcel",
+            "lot",
+            _material_for("lot", None),
+            (repeat, 0, 0, 0, 0, 0),  # type: ignore[arg-type]
+            _GROUNDS + _LOTS_PER_BLOCK + ordinal,
+        )
 
 
 STAGE: Final = GeneratorStage(

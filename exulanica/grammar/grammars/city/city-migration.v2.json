@@ -362,6 +362,38 @@
     {
       "target": "units_per_storey",
       "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
+    },
+    {
+      "target": "storey_band_low",
+      "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
+    },
+    {
+      "target": "storey_band_high",
+      "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
+    },
+    {
+      "target": "awning_present",
+      "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
+    },
+    {
+      "target": "door_width_mm",
+      "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
+    },
+    {
+      "target": "door_height_mm",
+      "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
+    },
+    {
+      "target": "texture_offset_u_mm",
+      "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
+    },
+    {
+      "target": "texture_offset_v_mm",
+      "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
+    },
+    {
+      "target": "texture_quarter_turns",
+      "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
     }
   ]
 }

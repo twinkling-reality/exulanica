@@ -870,7 +870,10 @@ rooftops = [
 
 FACADE_PARAMETERS = {spec.name for spec in CITY_SURFACE.parameters.for_stage("facade")}
 FRONT_VALUES = {
+    "awning_present": "yes",
     "awning_projection_mm": 1_200,
+    "door_width_mm": 1_200,
+    "door_height_mm": 2_400,
     "awning_valance_mm": 250,
     "bay_pitch_mm": 2_800,
     "cornice_height_mm": 450,

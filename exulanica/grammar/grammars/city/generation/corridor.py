@@ -28,6 +28,9 @@ street depth to about 270 m.
   its kerb and its corner radius are still derived per block.
 * ``front_setback_mm``: 0, because a high street builds to its frontage line, the unbroken street
   edge the rubric asks for, and the parcels stage reads no other value.
+* ``storey_band_low`` and ``storey_band_high``: 3 and 6. Derived per building alone, one street ran
+  from two storeys to twelve and from 8.4 m of frontage to 43.4 m, which is not a corridor. Three to
+  six storeys against an 16.2 m canyon is the proportion the gate's baseline street has.
 * ``memory_precinct_lots``: 1, the one reserved lot the target architecture requires.
 
 Everything else is derived by the stage that reads it, per subject, from the seed.
@@ -72,6 +75,8 @@ CORRIDOR_BINDINGS: Final = (
             "terrain_relief_mm": 0,
             "block_length_mm": 140_000,
             "block_depth_mm": 56_000,
+            "storey_band_low": 3,
+            "storey_band_high": 6,
             "gutter_width_mm": 300,
             "front_setback_mm": 0,
             "memory_precinct_lots": 1,

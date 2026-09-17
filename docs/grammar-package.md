@@ -11,7 +11,7 @@ that is not architecture with no change to the contract.
 
 This phase is structural. The package produces **no mesh and no vertices**; the only generated
 values are the box grammar's three integer extents. City version 2 declares the whole vocabulary a
-generator will write: 28 record kinds with integer geometry, 82 declared parameters, four
+generator will write: 28 record kinds with integer geometry, 90 declared parameters, four
 projection contracts, 18 licensed catalogs, one identity rule and a hand-written fixture tile that
 exercises all of it. No city stage has a generator: a city generated today is a receipt and eleven
 emissions that each say `not_implemented` and why.
@@ -262,8 +262,8 @@ kerb height 100 to 180 mm, vitrine depth 600 to 1500 mm, ground band 4000 to 600
 declared face parameter. `city.facade` carries the six section 5.1 fields first, by name, and states
 every parameter the facade stage reads with its value and source.
 
-**Parameters.** 82 are declared, at the cascade levels city (4), district (9), block (18), lot (1),
-building (22) and face (28). All but one are `derive`: the reading stage derives a value per
+**Parameters.** 90 are declared, at the cascade levels city (4), district (11), block (18), lot (1),
+building (25) and face (31). All but one are `derive`: the reading stage derives a value per
 subject and the record states it. `driving_side` is `required`, because the side of the road is a
 convention a world states and nothing chooses silently. Every choice with a vocabulary offers
 exactly that catalog's keys (`wall_material` offers exactly the materials that dress a wall), and
