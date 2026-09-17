@@ -200,6 +200,14 @@ interface BuiltMaterial {
 
 const HOSTS = new WeakMap<pc.AppBase, CharacterHost>();
 
+/** The application that owns `device`, found by its canvas identity, or null. */
+export function applicationOf(device: pc.GraphicsDevice): pc.AppBase | null {
+  const canvas = device.canvas as HTMLCanvasElement | OffscreenCanvas;
+  const id = 'id' in canvas ? canvas.id : '';
+  const app = id ? pc.AppBase.getApplication(id) : undefined;
+  return app && app.graphicsDevice === device ? app : null;
+}
+
 export class CharacterHost {
   private readonly containers = new SharedResources<LoadedContainer>((container) => this.disposeContainer(container));
   private readonly packs = new SharedResources<LoadedPack>((pack) => { for (const texture of pack.textures) texture.destroy(); });
@@ -223,12 +231,8 @@ export class CharacterHost {
 
   /** The host of the application that owns `device`, found by its canvas identity. */
   static forDevice(device: pc.GraphicsDevice, catalog: CharacterCatalog): CharacterHost {
-    const canvas = device.canvas as HTMLCanvasElement | OffscreenCanvas;
-    const id = 'id' in canvas ? canvas.id : '';
-    const app = id ? pc.AppBase.getApplication(id) : undefined;
-    if (!app || app.graphicsDevice !== device) {
-      throw new Error('Characters need an application whose canvas has a unique id');
-    }
+    const app = applicationOf(device);
+    if (!app) throw new Error('Characters need an application whose canvas has a unique id');
     return CharacterHost.forApp(app, catalog);
   }
 

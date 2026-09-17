@@ -11,15 +11,30 @@ import {
   shapePoint,
   type CharacterDimensions,
 } from './character-shape.js';
+import { CHARACTER_CATALOG } from './character/catalog-data.js';
+import { CharacterChoices, type CharacterChoice } from './character/choices.js';
+import { CharacterHost, applicationOf } from './character/host.js';
+import { CHARACTER_RENDERABLE_TAG, LayeredCharacterRenderable } from './character/renderable.js';
 
 const skinCache = new Map<number, ReturnType<typeof playerSkinWeights>>();
 const rgb = (hex: string) =>
   [1, 3, 5].map((i) => Number.parseInt(hex.slice(i, i + 2), 16) / 255);
-/** Shared continuous abstract representation. Its caller owns subject identity and canonical position. */
+/**
+ * The local player's body, and the shared continuous abstract representation.
+ *
+ * The player wears a catalog person unless the composition chooses the abstract figure or a
+ * stylized example; the abstract figure also stands in whenever the chosen person cannot be
+ * loaded. Residents drawn through this class with an explicit representation stay abstract. Its
+ * caller owns subject identity and canonical position.
+ */
 export class PlayerAvatar {
   readonly root: pc.Entity;
-  readonly body: CharacterDimensions;
   readonly representation: ResolvedCharacterRepresentation;
+  private readonly dimensions: CharacterDimensions;
+  private readonly parent: pc.Entity;
+  private readonly device: pc.GraphicsDevice;
+  private layered: LayeredCharacterRenderable | null = null;
+  private unsubscribeChoice: (() => void) | null = null;
   private readonly sculpt: ReturnType<typeof buildPlayerSculpt>;
   private readonly skin: ReturnType<typeof playerSkinWeights>;
   private readonly bindPositions: Float32Array;
@@ -47,7 +62,9 @@ export class PlayerAvatar {
     this.representation =
       options.representation ??
       abstractCharacter({ kind: 'player', playerId: 'local-viewer' }, 'near');
-    this.body = this.representation.body ?? BASE_DIMENSIONS;
+    this.dimensions = this.representation.body ?? BASE_DIMENSIONS;
+    this.parent = parent;
+    this.device = device;
     const step = options.detail === 'mid' ? 0.035 : 0.018;
     this.sculpt = buildPlayerSculpt(step);
     this.skin = skinCache.get(step) ?? playerSkinWeights(this.sculpt.positions);
@@ -61,13 +78,13 @@ export class PlayerAvatar {
             this.sculpt.positions[i + 1]!,
             this.sculpt.positions[i + 2]!,
           ],
-          this.body,
+          this.dimensions,
         ),
         i,
       );
     this.positions = new Float32Array(this.bindPositions);
     this.normals = new Float32Array(this.sculpt.normals);
-    this.motion = new CharacterMotion(this.body);
+    this.motion = new CharacterMotion(this.dimensions);
     const appearance = this.representation.appearance;
     const palette =
         appearance?.kind === 'abstract' ? appearance.palette : BASE_PALETTE,
@@ -153,6 +170,44 @@ export class PlayerAvatar {
       castShadows: false,
       receiveShadows: false,
     });
+    const app = options.representation ? null : applicationOf(device);
+    if (app) {
+      const choices = CharacterChoices.forApp(app);
+      this.applyChoice(choices.choice(this.representation.subject));
+      this.unsubscribeChoice = choices.subscribe(this.representation.subject, (choice) => this.applyChoice(choice));
+    }
+  }
+
+  private applyChoice(choice: CharacterChoice): void {
+    this.layered?.destroy();
+    this.layered = null;
+    const app = applicationOf(this.device);
+    if (choice.kind === 'catalog' && app) {
+      const host = CharacterHost.forApp(app, CHARACTER_CATALOG);
+      this.layered = new LayeredCharacterRenderable(host, this.parent, this.representation.subject, choice.look, 'near');
+      this.layered.setVisible(false);
+      // The native runtime draws stylized examples over this root; a catalog person is not one.
+      this.root.tags.add(CHARACTER_RENDERABLE_TAG);
+    } else {
+      this.root.tags.remove(CHARACTER_RENDERABLE_TAG);
+    }
+    this.wasVisible = false;
+  }
+
+  /** The chosen catalog person while it can be drawn, else null and the abstract figure stands in. */
+  private get person(): LayeredCharacterRenderable | null {
+    return this.layered !== null && this.layered.status !== 'unavailable' ? this.layered : null;
+  }
+
+  /** Dimensions the camera frames: the chosen person's height when one is worn. */
+  get body(): CharacterDimensions {
+    const person = this.person;
+    return person ? { ...this.dimensions, heightMm: person.body.heightMm } : this.dimensions;
+  }
+
+  /** The catalog look the player wears now, or null for the abstract figure. */
+  get look(): LayeredCharacterRenderable['look'] | null {
+    return this.person?.look ?? null;
   }
   get textureResidentBytes(): number {
     return this.grain.gpuSize;
@@ -189,11 +244,14 @@ export class PlayerAvatar {
     headingYaw: number | null = null,
   ): void {
     visible = visible && this.representation.availability !== 'hidden';
-    this.root.enabled = visible;
+    const person = this.person;
+    this.root.enabled = visible && person === null;
     if (!visible) {
       this.wasVisible = false;
+      this.layered?.setVisible(false);
       return;
     }
+    const discontinuity = !this.wasVisible;
     if (!this.wasVisible) this.motion.reset();
     const pose = this.motion.update({
       x: player.x,
@@ -209,6 +267,13 @@ export class PlayerAvatar {
     this.lastFacing = pose.facing;
     this.root.setLocalPosition(player.x, groundY, player.z);
     this.root.setLocalEulerAngles(0, (pose.facing * 180) / Math.PI, 0);
+    if (person) {
+      person.setVisible(true);
+      person.pose({ position: [player.x, groundY, player.z], yaw: pose.facing, deltaSeconds: dt, reducedMotion: reduced, discontinuity });
+      this.wasVisible = true;
+      return;
+    }
+    this.layered?.setVisible(false);
     if (this.root.render?.enabled === false) { this.wasVisible = true; return; }
     deformPlayer(
       this.bindPositions,
@@ -255,6 +320,9 @@ export class PlayerAvatar {
     this.wasVisible = true;
   }
   destroy(): void {
+    this.unsubscribeChoice?.();
+    this.layered?.destroy();
+    this.layered = null;
     this.root.destroy();
     this.mesh.destroy();
     this.material.destroy();

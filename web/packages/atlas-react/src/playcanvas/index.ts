@@ -194,6 +194,7 @@ export type { CharacterByteLoader } from './native-character-pool.js';
 export type { NativeCharacterRuntime } from './native-character-runtime.js';
 export {
   CHARACTER_CATALOG,
+  CharacterChoices,
   CharacterCrowdEvaluation,
   CharacterHost,
   DESIGNED_LOOKS,
@@ -208,6 +209,7 @@ export {
   validateLook,
   type CatalogAssetRef,
   type CharacterAssetLoader,
+  type CharacterChoice,
   type CharacterCatalog,
   type CharacterDetail,
   type CharacterLook,

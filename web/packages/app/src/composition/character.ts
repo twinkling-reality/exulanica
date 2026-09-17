@@ -1,6 +1,6 @@
 import { createLatestCharacterPreview } from '../ui/latest-character-preview.js';
 import type { BodyFamily, BodyRecipe } from '../ui/character-body.js';
-import { CharacterCrowdEvaluation, CharacterPreview, FirstPersonGesture, type AtlasBinding, type CharacterByteLoader, type NativeCharacterRuntime } from '@exulanica/atlas-react/playcanvas';
+import { CharacterChoices, CharacterCrowdEvaluation, CharacterPreview, FirstPersonGesture, type AtlasBinding, type CharacterByteLoader, type NativeCharacterRuntime } from '@exulanica/atlas-react/playcanvas';
 import { characterByteLoader, parseCharacterLooks, type CharacterLook, type CharacterSelection } from '../character-catalog.js';
 import { buildCharacterStudio } from '../ui/character-studio.js';
 import { el } from '../ui/dom.js';
@@ -220,6 +220,13 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
     if (!binding || !native) throw new Error('The world is still loading. Try again in a moment.');
     const look = catalog.find(item => item.lookId === selection.lookId);
     if (!look) throw new Error('That look is no longer available.');
+    // A stylized example is drawn by the native runtime, which adopts the player once the player
+    // is no longer wearing a catalog person.
+    CharacterChoices.forApp(binding.app).set(PLAYER, { kind: 'stylized' });
+    for (let frame = 0; frame < 60 && !native.inspect(PLAYER); frame++) {
+      if (disposed) return;
+      await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
+    }
     await native.install(PLAYER, look.descriptor, selection.appearance,
       () => ({ presence: disposed ? 'denied' : 'allowed', source: 'available' }));
     if (native.inspect(PLAYER)?.status !== 'ready') throw new Error('The character could not be applied. Try another look.');
@@ -274,18 +281,13 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
         native = atlas.enableNativeCharacters(loadCharacterBytes);
         const crowdSize = previewCrowdSize(window.location.search, env.preview);
         if (crowdSize > 0) crowd = CharacterCrowdEvaluation.mount(atlas, { count: crowdSize, nearBudget: 24 });
-        await ensureCatalog();
-        if (disposed) return;
-        // Ensure the existing player presentation exists without changing the active camera.
+        // Ensure the existing player presentation exists without changing the active camera. It
+        // wears the catalog's designed default until the person chooses otherwise.
         atlas.setCameraMode(atlas.cameraMode);
-        for (let frame = 0; frame < 60 && !native.inspect(PLAYER); frame++) {
-          if (disposed) return;
-          await new Promise<void>(resolve => requestAnimationFrame(() => resolve()));
-        }
-        if (disposed) return;
-        const selection = state.characterSelection ?? { lookId: catalog[0]!.lookId, appearance: {} };
+        await ensureCatalog();
+        if (disposed || !state.characterSelection) return;
+        const selection = state.characterSelection;
         await install(selection);
-        state.characterSelection = selection;
         void prepareGesture(selection);
       } catch (error) {
         if (!disposed) view.setFailure(error instanceof Error ? error.message : 'Character looks are unavailable.');
