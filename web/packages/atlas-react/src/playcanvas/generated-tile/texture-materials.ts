@@ -30,10 +30,15 @@ import { createUnavailableMaterial } from './unavailable-surface.js';
  * rotation. There is no other scale anywhere, and no constant that guesses one.
  *
  * WHAT A SET BECOMES. A set is drawn by its material class and by nothing else. This runtime draws
- * `opaque` and `cutout` sets, of either container profile; every other class (`decal`, `glazing`) is
- * the stated unavailable surface with the reason {@link undrawnClassReason} gives, so glazing is never
- * drawn as opaque. For an opaque set, base_color is uploaded as sRGB; normal, orm and height as linear
- * bytes. A cutout set is drawn as glTF's `alphaMode: MASK` with `doubleSided: true`: its
+ * `opaque`, `cutout` and `glazing` sets, of either container profile; `decal` is the stated
+ * unavailable surface with the reason {@link undrawnClassReason} gives, and glazing is never drawn as
+ * opaque. For an opaque set, base_color is uploaded as sRGB; normal, orm and height as linear
+ * bytes. A glazing set is metallic-roughness with metalness 0 plus glTF's transmission and index of
+ * refraction: it reflects the environment and the sun by angle, transmits what the scene drew behind
+ * it (a copy the environment keeps when glazing is drawn), tinted by its base colour and blurred by
+ * its roughness, lights the film its maps carry where transmission is below full, writes no depth and
+ * casts no shadow. The film its class object declares is for laying more film by position, which this
+ * runtime does not do yet. A cutout set is drawn as glTF's `alphaMode: MASK` with `doubleSided: true`: its
  * base_color_coverage map is uploaded as sRGB colour with linear coverage, every mip level built by
  * `coveragePreservingMips` so the share of covered texels stays the set's `coverage_permille` at any
  * distance; each sample is tested against `alpha_cutoff / 255` and nothing is blended; depth is
@@ -142,9 +147,24 @@ function rgbToRgba(rgb: Uint8Array): Uint8Array {
 
 /** Why a decoded set is not drawn by this runtime, or null when its class is one it draws. */
 export function undrawnClassReason(set: Pick<DecodedTextureSet, 'materialClass'>): string | null {
-  return set.materialClass === 'opaque' || set.materialClass === 'cutout'
-    ? null
-    : `material class ${set.materialClass} is not drawn by this runtime`;
+  return set.materialClass === 'decal' ? `material class ${set.materialClass} is not drawn by this runtime` : null;
+}
+
+/** Whether surfaces of this class cast shadows: glazing casts none. */
+export function castsShadow(set: Pick<DecodedTextureSet, 'materialClass'>): boolean {
+  return set.materialClass !== 'glazing';
+}
+
+/** The transmission and roughness map as RGBA: transmission in red, roughness in green. */
+export function transmissionRoughnessTexels(bytes: Uint8Array): Uint8Array {
+  const texels = bytes.length / 2;
+  const out = new Uint8Array(texels * 4);
+  for (let texel = 0; texel < texels; texel += 1) {
+    out[texel * 4] = bytes[texel * 2]!;
+    out[texel * 4 + 1] = bytes[texel * 2 + 1]!;
+    out[texel * 4 + 3] = 255;
+  }
+  return out;
 }
 
 /**
@@ -172,6 +192,14 @@ export function normalTexels(set: DecodedTextureSet): Uint8Array | null {
   }
   return out;
 }
+
+/** Transmission inputs PlayCanvas's StandardMaterial has at runtime and its type declarations leave out. */
+type TransmissiveMaterial = pc.StandardMaterial & {
+  refractionMap: pc.Texture | null;
+  refractionMapChannel: string;
+  useDynamicRefraction: boolean;
+  thickness: number;
+};
 
 /** A map the upload needs, which the set's layout must hold. */
 function requiredMap(set: DecodedTextureSet, name: TextureMapName): Uint8Array {
@@ -308,8 +336,12 @@ export class TileTextureUploads {
       ));
     const normalBytes = normalTexels(set);
     const normal = normalBytes === null ? null : texture('normal', pc.PIXELFORMAT_RGBA8, normalBytes);
-    const orm = texture('orm', pc.PIXELFORMAT_RGBA8, rgbToRgba(requiredMap(set, 'orm')));
-    const textures = [baseColor, ...(normal === null ? [] : [normal]), orm];
+    const glazing = set.classParameters.materialClass === 'glazing' ? set.classParameters : null;
+    // Glazing holds transmission and roughness where the other classes hold occlusion, roughness and metalness.
+    const surface = glazing === null
+      ? texture('orm', pc.PIXELFORMAT_RGBA8, rgbToRgba(requiredMap(set, 'orm')))
+      : texture('transmission_roughness', pc.PIXELFORMAT_RGBA8, transmissionRoughnessTexels(requiredMap(set, 'transmission_roughness')));
+    const textures = [baseColor, ...(normal === null ? [] : [normal]), surface];
     let residentBytes = textures.length * mippedBytes(width, height, 4);
 
     const material = new pc.StandardMaterial();
@@ -321,17 +353,36 @@ export class TileTextureUploads {
       material.normalMap = normal;
       material.bumpiness = this.look.surface.normalStrength;
     }
-    material.aoMap = orm;
-    material.aoMapChannel = 'r';
     material.gloss = 1;
-    material.glossMap = orm;
+    material.glossMap = surface;
     material.glossMapChannel = 'g';
     material.glossInvert = true;
-    material.metalness = 1;
-    material.metalnessMap = orm;
-    material.metalnessMapChannel = 'b';
+    if (glazing === null) {
+      material.aoMap = surface;
+      material.aoMapChannel = 'r';
+      material.metalness = 1;
+      material.metalnessMap = surface;
+      material.metalnessMapChannel = 'b';
+    } else {
+      // glTF metallic-roughness with metalness 0, KHR_materials_transmission and KHR_materials_ior.
+      // Reflection is specular with reflectance ((n - 1) / (n + 1))^2 by angle; what was drawn behind
+      // the pane is seen through it, tinted by the base colour, times the transmission map; where
+      // transmission is below full, the rest is the film the base colour and roughness maps carry,
+      // lit like an opaque surface. Drawn after the opaque scene, depth tested, no depth write.
+      const glass = material as TransmissiveMaterial;
+      glass.metalness = 0;
+      glass.refraction = 1;
+      glass.refractionMap = surface;
+      glass.refractionMapChannel = 'r';
+      glass.refractionIndex = 1_000_000 / glazing.iorMillionths;
+      glass.useDynamicRefraction = true;
+      // A pane is thin: the view through it is not displaced.
+      glass.thickness = 0;
+      glass.blendType = pc.BLEND_NORMAL;
+      glass.depthWrite = false;
+    }
     material.useSkybox = true;
-    material.cull = pc.CULLFACE_BACK;
+    material.cull = glazing !== null && glazing.doubleSided ? pc.CULLFACE_NONE : pc.CULLFACE_BACK;
     if (cutout !== null) {
       // glTF alphaMode MASK: tested, never blended, depth written, in the shadow pass as well.
       material.opacityMap = baseColor;

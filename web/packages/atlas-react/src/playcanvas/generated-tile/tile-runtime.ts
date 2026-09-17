@@ -21,6 +21,7 @@ import { TILE_LOOK_V1, type TileLook } from './look.js';
 import { buildSurfaceMesh } from './surface-mesh.js';
 import {
   TileTextureUploads,
+  castsShadow,
   prepareTextureSet,
   surfaceUv,
   unavailableUv,
@@ -521,10 +522,14 @@ function attachTile(
   const meshes: pc.Mesh[] = [];
   for (const batch of batches) {
     let material: pc.Material = uploads.unavailableMaterial;
+    let shadows = true;
     if (batch.key !== '') {
       const resolution = uploads.adopt(prepared.get(batch.key)!);
       if (resolution.state !== 'available') throw new Error(`Texture set ${batch.key} was prepared and then refused`);
       material = resolution.material;
+      shadows = castsShadow(resolution.set);
+      // Glazing transmits what the scene drew behind it, which needs the colour copied before it draws.
+      if (resolution.set.materialClass === 'glazing') environment.requestSceneColor();
     }
     // The UV is already final, so the builder is handed it as the surface pair and passes it on.
     const mesh = buildSurfaceMesh(device, { ...batch, surfaceMm: batch.uvs }, (u, v) => [u, v]);
@@ -532,7 +537,7 @@ function attachTile(
     const entity = new pc.Entity(batch.key === '' ? 'generated-tile:unavailable-surfaces' : `generated-tile:${batch.key}`);
     entity.addComponent('render', {
       meshInstances: [new pc.MeshInstance(mesh, material, entity)],
-      castShadows: true,
+      castShadows: shadows,
       receiveShadows: batch.key !== '',
     });
     root.addChild(entity);

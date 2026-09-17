@@ -25,6 +25,11 @@ export interface TileEnvironment {
   readonly sun: pc.Entity;
   /** The camera frame, or null while the canvas has had no size yet. */
   readonly frame: pc.CameraFrame | null;
+  /**
+   * Keep a copy of the colour drawn before transparent surfaces, which glazing transmits. Requested
+   * only when a glazing set is drawn, since the copy costs a pass; it holds for a frame created later.
+   */
+  requestSceneColor(): void;
   /** GPU bytes held by the probe's cubemap and atlas. */
   readonly residentBytes: number;
   dispose(): void;
@@ -165,6 +170,7 @@ export function applyTileEnvironment(app: pc.AppBase, camera: pc.Entity, look: T
 
   let frame: pc.CameraFrame | null = null;
   let disposed = false;
+  let sceneColor = false;
   const createFrame = (): void => {
     if (disposed || frame !== null || device.width <= 0 || device.height <= 0) return;
     const created = new pc.CameraFrame(app, component);
@@ -178,6 +184,7 @@ export function applyTileEnvironment(app: pc.AppBase, camera: pc.Entity, look: T
     created.ssao.minAngle = look.contactShadow.minAngleDeg;
     created.ssao.blurEnabled = look.contactShadow.blur;
     created.ssao.scale = look.contactShadow.scale;
+    created.rendering.sceneColorMap = sceneColor;
     created.update();
     frame = created;
   };
@@ -189,6 +196,14 @@ export function applyTileEnvironment(app: pc.AppBase, camera: pc.Entity, look: T
     sun,
     get frame() {
       return frame;
+    },
+    requestSceneColor() {
+      if (sceneColor) return;
+      sceneColor = true;
+      if (frame !== null) {
+        frame.rendering.sceneColorMap = true;
+        frame.update();
+      }
     },
     residentBytes: probeBytes,
     dispose() {
