@@ -11,6 +11,7 @@ import { kerbMaker } from './kerb.js';
 import { metalMaker } from './metal.js';
 import { pavingMaker } from './paving.js';
 import { renderMaker } from './render.js';
+import { timberMaker } from './timber.js';
 
 /**
  * Every maker this package has, sorted by id. A recipe names a maker by id and version, and this
@@ -40,7 +41,7 @@ export const MAKERS: readonly Maker[] = Object.freeze(
  * the drafts.
  */
 export const DRAFT_MAKERS: readonly Maker[] = Object.freeze(
-  ([] as Maker[]).sort((a, b) => (a.manifest.maker_id < b.manifest.maker_id ? -1 : 1)),
+  [timberMaker].sort((a, b) => (a.manifest.maker_id < b.manifest.maker_id ? -1 : 1)),
 );
 
 for (const maker of [...MAKERS, ...DRAFT_MAKERS]) {

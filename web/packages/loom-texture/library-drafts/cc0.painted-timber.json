@@ -1,0 +1,55 @@
+{
+  "set_id": "cc0.painted-timber",
+  "version": 1,
+  "title": "Painted timber",
+  "summary": "Painted wood for shopfront doors, frames and stall boards, with grain showing through the paint, brush marks, chips and grime.",
+  "licence_id": "CC0-1.0",
+  "recipe": {
+    "profile": "exulanica.texture-recipe/v1",
+    "maker": {
+      "id": "loom.timber",
+      "version": 1
+    },
+    "seed": 2026091704,
+    "resolution": {
+      "width": 512,
+      "height": 512
+    },
+    "extent_mm": {
+      "u": 1000,
+      "v": 1000
+    },
+    "parameters": {
+      "paint_colour": [48, 78, 62],
+      "primer_colour": [178, 172, 160],
+      "wood_colour": [142, 108, 72],
+      "grime_colour": [58, 54, 48],
+      "boards": "plain",
+      "boards_across": 10,
+      "joint_width_mm": 5,
+      "joint_depth_mm_1024ths": 2048,
+      "grain_cells_across": 220,
+      "grain_cells_down": 5,
+      "grain_relief_mm_1024ths": 300,
+      "grain_tone_q16": 5200,
+      "brush_cells_across": 500,
+      "brush_cells_down": 14,
+      "brush_relief_mm_1024ths": 90,
+      "brush_tone_q16": 2600,
+      "paint_depth_mm_1024ths": 300,
+      "chip_rarity_q16": 50000,
+      "chip_cells": 26,
+      "chip_patch_cells": 9,
+      "bare_wood_rarity_q16": 47000,
+      "grime_percent": 12,
+      "grime_cells": 6,
+      "board_variation_q16": 1200,
+      "paint_roughness_permille": 380,
+      "chip_roughness_permille": 820,
+      "height_range_mm": 4,
+      "occlusion_radius_mm": 4,
+      "occlusion_depth_mm": 1,
+      "occlusion_strength_permille": 400
+    }
+  }
+}
