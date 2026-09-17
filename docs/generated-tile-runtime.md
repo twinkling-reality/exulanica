@@ -46,34 +46,71 @@ reader is pure (no DOM, no Node, no renderer) and returns views over the caller'
 browser runtime's own reader, written from the container's stated layout; it does not import or
 copy `loom-texture`, which is fenced as offline only.
 
-It refuses, with a `TextureSetRefusal` and a reason, and never degrades:
+It reads both profiles of each document. `exulanica.texture-manifest/v1` lists
+`exulanica.texture-set/v1` containers only, every one the four-map `opaque` layout.
+`exulanica.texture-manifest/v2` adds each entry's `container_profile` and `material_class`, and its
+`channels` must be one of the layouts that pair allows: the procedural layout, or a model-made one
+(the entry does not name its maker). A v2 container states its `material_class` (`opaque`,
+`cutout`, `decal` or `glazing`), its `maker_kind` (`procedural` or `model`), a `class` object, and
+exactly that class's and maker's layout:
 
-- every set, before reading a byte, when the page has no `crypto.subtle`, the same posture as the
-  app's geometry reader;
-- bytes whose SHA-256 is not the manifest's pin, or whose size is not the pinned size;
-- a wrong magic, truncated bytes, trailing bytes, padding that is not spaces, a header that is not
-  canonical, a map at an offset its predecessors do not end at, a layout it was not written for,
-  a normal map convention other than the glTF one the binding expects;
-- a header that disagrees with its manifest entry in set id, version, resolution, extent, licence
-  or channels, or that does not declare the set media type, the `invented` truth plane and a
-  vertical or horizontal placement;
-- a manifest that is not the committed bytes' shape: re-serialised with whitespace, a fraction, an
-  unknown or missing key, a repeated set, a wrong profile.
+| Class | Procedural maps | Model-made maps | `class` |
+| --- | --- | --- | --- |
+| `opaque` | `base_color`, `normal` (x, y), `orm` | `base_color`, `normal` (x, y, z) if produced, `orm`, `height` if produced | `{}` |
+| `cutout` | `base_color_coverage`, `normal` (x, y), `orm` | the same pattern with `base_color_coverage` | `alpha_cutoff` 128, `coverage_permille`, `double_sided` true |
+| `decal` | `base_color_coverage`, `normal` (x, y), `orm` | as cutout | `coverage_permille` |
+| `glazing` | `base_color`, `transmission_roughness` | `base_color`, `normal` (x, y, z) if produced, `transmission_roughness`, `height` if produced | `double_sided` false, `ior_millionths` 1500000 |
 
-Conformance: `web/packages/atlas-core/test/texture-set.test.ts` decodes all eight committed
-containers and requires, per map, the byte offset, length, SHA-256 and first and last bytes that
-the Python reader (`exulanica/world/texture_assets.py`) produced. The expected values are a fixture
-beside the test, `texture-set-python-decode.json`, written by `texture-set-python-decode.py.txt`;
-the test imports no Python.
+A procedural set whose class bakes relief states `height_range_mm` and `cavity`; procedural glazing
+states neither; a model-made set states `height_range_mm` only when it ships a height map. Every
+map's description (name, components, what it holds, sRGB or linear, its decode words, and for a
+normal its space and convention) must be exactly the layout's, and `coverage_permille` must equal
+what the reader measures from the coverage channel (texels at or above the cutoff, in thousandths,
+floored). `DecodedTextureSet` carries the profile, class, maker kind, typed class parameters, the
+channels in stored order and the maps present.
+
+It refuses, with a `TextureSetRefusal` and one of the shared reasons, and never degrades:
+
+- `digest-unavailable`: every set, before reading a byte, when the page has no `crypto.subtle`, the
+  same posture as the app's geometry reader;
+- `manifest`: a manifest that is not canonical JSON, names a profile, container profile or class no
+  reader was written for, lists an entry with a missing or extra key, a v1 container of a class
+  other than `opaque`, channels that are no layout of the entry's pair, another licence, or sets out
+  of `set_id` order or twice;
+- `byte-size` and `digest`: bytes that are not the pinned count or do not hash to the pin;
+- `container`: a wrong magic, a header or map running past the end, padding that is not spaces, or
+  bytes after the last map;
+- `header`: a header that is not canonical, names a profile, class or maker kind no reader was
+  written for, has a key its class and maker do not have, describes a map other than the layout does,
+  states a `class` its class and texels do not give, or disagrees with its manifest entry (set id,
+  version, resolution, extent, licence, media type, profile, class or channels).
+
+Conformance, two ways. `web/packages/atlas-core/test/texture-set.test.ts` decodes all eight
+published v1 containers and requires, per map, the byte offset, length, SHA-256 and first and last
+bytes the Python reader (`exulanica/world/texture_assets.py`) produced, from a fixture beside the test
+written by `texture-set-python-decode.py.txt`. `web/packages/atlas-core/test/texture-set-cases.test.ts`
+runs the texture lane's shared case file, `web/packages/loom-texture/test/texture-set-cases.json`, the
+one the baker and the backend run too: every manifest case and every container case, over one v2
+fixture per class plus a v1 and a model-made one, each accepted or refused for the same reason every
+reader gives. The file and its fixtures are read by path, which is not an import, so nothing that ships
+depends on the offline package.
 
 ## 3. Materials and the UV rule
 
-One `pc.StandardMaterial` per set, shared by every surface that names it
+A set is drawn by its material class and by nothing else, never by its id or title. This runtime
+draws `opaque` sets, of either container profile and either maker; `cutout`, `decal` and `glazing`
+draw the stated unavailable surface with the reason "material class X is not drawn by this runtime"
+(`undrawnClassReason`), and nothing of theirs is uploaded, so glazing is never drawn as opaque.
+Drawing those three classes follows section 3 of the texture proposal and comes next.
+
+One `pc.StandardMaterial` per opaque set, shared by every surface that names it
 (`texture-materials.ts`): `base_color` uploaded as sRGB, `normal` as linear bytes, and `orm` driving
-occlusion (red), roughness (green, inverted into gloss) and metalness (blue). Three RGBA maps with
-full mip chains, 16,777,212 bytes for a 1024 by 1024 set. A set whose manifest entry is missing or
-whose bytes are refused draws the stated unavailable surface, with the refusal kept as the reason.
-There is no default set and no flat colour.
+occlusion (red), roughness (green, inverted into gloss) and metalness (blue). A two-component normal
+(a procedural v2 set) gets its z rebuilt where it is uploaded, `z = sqrt(max(0, 1 - x^2 - y^2))`, in
+arithmetic that enters no digest (`normalTexels`); a model-made set that produced no normal draws
+without one. Three RGBA maps with full mip chains, 16,777,212 bytes for a 1024 by 1024 set. A set
+whose manifest entry is missing or whose bytes are refused draws the stated unavailable surface, with
+the refusal kept as the reason. There is no default set and no flat colour.
 
 The texture's placement is interpreted in exactly one function, `surfaceUv`, and it is the city
 vocabulary's final formula for `surface_material` version 2. With `s`, `t` the surface coordinates
