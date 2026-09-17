@@ -1,0 +1,451 @@
+{
+  "profile": "exulanica.character-draw-conformance/v1",
+  "catalog": {
+    "catalogId": "exulanica-characters",
+    "revision": 1,
+    "canonicalSha256": "316412e3f78519247701a3ee6cac51d9b21ab49a5b39b24fd0cb64de2274ebf6"
+  },
+  "domain": "street-population/v1",
+  "vectors": [
+    {
+      "subject": "8e43e9e3-8f42-5f50-8018-ced71bc39ffb",
+      "seed": "{\"domain\":\"street-population/v1\",\"profile\":\"exulanica.character-draw/v1\",\"subject\":\"8e43e9e3-8f42-5f50-8018-ced71bc39ffb\"}",
+      "streamPrefix": [
+        3096073454,
+        3673163213,
+        3727967417,
+        3046232365,
+        928120598,
+        3046595343,
+        2933202802,
+        12282643,
+        2370805650,
+        592601129,
+        3763478360,
+        1758726522
+      ],
+      "look": {
+        "profile": "exulanica.character-look/v1",
+        "familyId": "makehuman-people/v1",
+        "baseId": "masculine",
+        "parts": {
+          "outfit": "masculine/outfit/male_elegantsuit01",
+          "shoes": "masculine/shoes/shoes05",
+          "hair": "masculine/hair/short03",
+          "brows": "masculine/brows/eyebrow001",
+          "lashes": "masculine/lashes/eyelashes01",
+          "eyes": "masculine/eyes/low-poly"
+        },
+        "materials": {
+          "skin": "skin/middleage_african_male",
+          "eyeColour": "eyeColour/brown"
+        },
+        "colours": {
+          "hairColour": "black"
+        },
+        "parameters": {
+          "heightMillimetres": 1852,
+          "fullness": 17,
+          "muscle": 291
+        }
+      },
+      "lookSha256": "d9ad96b7c2d6a340124fe172bedb54cef9544c1d8f1383123d673fb39e7aca1e"
+    },
+    {
+      "subject": "ca97717d-785d-5fb2-b224-0420b62eaaa1",
+      "seed": "{\"domain\":\"street-population/v1\",\"profile\":\"exulanica.character-draw/v1\",\"subject\":\"ca97717d-785d-5fb2-b224-0420b62eaaa1\"}",
+      "streamPrefix": [
+        3977418956,
+        2037634981,
+        994011801,
+        239936843,
+        1625692941,
+        290313941,
+        750432667,
+        784891776,
+        2044657489,
+        861314368,
+        2541636467,
+        1964200075
+      ],
+      "look": {
+        "profile": "exulanica.character-look/v1",
+        "familyId": "makehuman-people/v1",
+        "baseId": "masculine",
+        "parts": {
+          "outfit": "masculine/outfit/male_casualsuit04",
+          "shoes": "masculine/shoes/shoes02",
+          "hair": "masculine/hair/afro01",
+          "brows": "masculine/brows/eyebrow003",
+          "lashes": "masculine/lashes/eyelashes01",
+          "eyes": "masculine/eyes/low-poly"
+        },
+        "materials": {
+          "skin": "skin/middleage_asian_male",
+          "eyeColour": "eyeColour/brown"
+        },
+        "colours": {
+          "hairColour": "black"
+        },
+        "parameters": {
+          "heightMillimetres": 1788,
+          "fullness": 49,
+          "muscle": 342
+        }
+      },
+      "lookSha256": "94b2d5bbc170d470c5e778690a320f27f5266e927d4b8ba90e0e6cf0a1645d3e"
+    },
+    {
+      "subject": "3ec62805-2d6b-5a2b-b5fd-cfb2b7ae8702",
+      "seed": "{\"domain\":\"street-population/v1\",\"profile\":\"exulanica.character-draw/v1\",\"subject\":\"3ec62805-2d6b-5a2b-b5fd-cfb2b7ae8702\"}",
+      "streamPrefix": [
+        138887839,
+        4070903228,
+        2193157028,
+        3576539694,
+        1868531961,
+        1768811694,
+        3876630516,
+        1553877870,
+        1951916234,
+        2709601628,
+        4035542298,
+        2566225307
+      ],
+      "look": {
+        "profile": "exulanica.character-look/v1",
+        "familyId": "makehuman-people/v1",
+        "baseId": "feminine",
+        "parts": {
+          "outfit": "feminine/outfit/male_casualsuit06",
+          "shoes": "feminine/shoes/shoes04",
+          "hair": "feminine/hair/ponytail01",
+          "brows": "feminine/brows/eyebrow006",
+          "lashes": "feminine/lashes/eyelashes01",
+          "eyes": "feminine/eyes/low-poly"
+        },
+        "materials": {
+          "skin": "skin/middleage_caucasian_female",
+          "eyeColour": "eyeColour/brown"
+        },
+        "colours": {
+          "hairColour": "brown"
+        },
+        "parameters": {
+          "heightMillimetres": 1752,
+          "fullness": 154,
+          "muscle": 342
+        }
+      },
+      "lookSha256": "da0ba3ab5b994c26792023706d01c3c417ac6f48b699bbc5e530ca13b158efa7"
+    },
+    {
+      "subject": "c4af9bf8-2840-5f00-94c2-c47d135a2232",
+      "seed": "{\"domain\":\"street-population/v1\",\"profile\":\"exulanica.character-draw/v1\",\"subject\":\"c4af9bf8-2840-5f00-94c2-c47d135a2232\"}",
+      "streamPrefix": [
+        2735276553,
+        3372799848,
+        2255790381,
+        1162637176,
+        795938045,
+        1246080237,
+        1737730656,
+        2308507493,
+        353282972,
+        2510055168,
+        1784078297,
+        2340377270
+      ],
+      "look": {
+        "profile": "exulanica.character-look/v1",
+        "familyId": "makehuman-people/v1",
+        "baseId": "masculine",
+        "parts": {
+          "outfit": "masculine/outfit/male_casualsuit06",
+          "shoes": "masculine/shoes/shoes04",
+          "hair": "masculine/hair/short01",
+          "brows": "masculine/brows/eyebrow001",
+          "lashes": "masculine/lashes/eyelashes01",
+          "eyes": "masculine/eyes/low-poly"
+        },
+        "materials": {
+          "skin": "skin/young_african_male",
+          "eyeColour": "eyeColour/blue"
+        },
+        "colours": {
+          "hairColour": "brown"
+        },
+        "parameters": {
+          "heightMillimetres": 1758,
+          "fullness": 113,
+          "muscle": -46
+        }
+      },
+      "lookSha256": "3d1dd5f5a769327d0ae9c27a3774cf85279cf358a0cf66cdab5727631da63e9f"
+    },
+    {
+      "subject": "4ecd7919-b71b-56e4-b013-7131e4f13a79",
+      "seed": "{\"domain\":\"street-population/v1\",\"profile\":\"exulanica.character-draw/v1\",\"subject\":\"4ecd7919-b71b-56e4-b013-7131e4f13a79\"}",
+      "streamPrefix": [
+        3502547151,
+        2781163479,
+        168112702,
+        1859036908,
+        797229151,
+        522499744,
+        124923120,
+        3348450175,
+        3925125943,
+        1214132642,
+        173419625,
+        981872318
+      ],
+      "look": {
+        "profile": "exulanica.character-look/v1",
+        "familyId": "makehuman-people/v1",
+        "baseId": "masculine",
+        "parts": {
+          "outfit": "masculine/outfit/male_casualsuit05",
+          "shoes": "masculine/shoes/shoes01",
+          "hair": "masculine/hair/short02",
+          "brows": "masculine/brows/eyebrow001",
+          "lashes": "masculine/lashes/eyelashes01",
+          "eyes": "masculine/eyes/low-poly"
+        },
+        "materials": {
+          "skin": "skin/young_asian_male",
+          "eyeColour": "eyeColour/grey"
+        },
+        "colours": {
+          "hairColour": "black"
+        },
+        "parameters": {
+          "heightMillimetres": 1663,
+          "fullness": -115,
+          "muscle": -228
+        }
+      },
+      "lookSha256": "0729caeb158e7f68a0f29c89b4b9abd220252f047b3e854583d53b48e35ec9da"
+    },
+    {
+      "subject": "f96894cf-a8d9-5b9f-a375-0d28152ae738",
+      "seed": "{\"domain\":\"street-population/v1\",\"profile\":\"exulanica.character-draw/v1\",\"subject\":\"f96894cf-a8d9-5b9f-a375-0d28152ae738\"}",
+      "streamPrefix": [
+        1879264213,
+        3250451828,
+        947377195,
+        57815221,
+        2256281111,
+        3531576933,
+        1213910560,
+        833277011,
+        2634479435,
+        130278940,
+        2636276703,
+        2459573588
+      ],
+      "look": {
+        "profile": "exulanica.character-look/v1",
+        "familyId": "makehuman-people/v1",
+        "baseId": "feminine",
+        "parts": {
+          "outfit": "feminine/outfit/male_casualsuit05",
+          "shoes": "feminine/shoes/shoes02",
+          "hair": "feminine/hair/afro01",
+          "brows": "feminine/brows/eyebrow006",
+          "lashes": "feminine/lashes/eyelashes01",
+          "eyes": "feminine/eyes/low-poly"
+        },
+        "materials": {
+          "skin": "skin/middleage_asian_female",
+          "eyeColour": "eyeColour/brownlight"
+        },
+        "colours": {
+          "hairColour": "auburn"
+        },
+        "parameters": {
+          "heightMillimetres": 1677,
+          "fullness": 134,
+          "muscle": -70
+        }
+      },
+      "lookSha256": "ea01e405d87a34ca97026aadddd5ffbab93811ef90c170ee813aba1cb10294ff"
+    },
+    {
+      "subject": "4033e85c-403b-56c3-8636-256a3cfdae8d",
+      "seed": "{\"domain\":\"street-population/v1\",\"profile\":\"exulanica.character-draw/v1\",\"subject\":\"4033e85c-403b-56c3-8636-256a3cfdae8d\"}",
+      "streamPrefix": [
+        327818337,
+        3652628731,
+        3643021889,
+        1694454890,
+        4229588437,
+        2681063381,
+        3802620359,
+        519595198,
+        3171599234,
+        1279992477,
+        1923039177,
+        1593731870
+      ],
+      "look": {
+        "profile": "exulanica.character-look/v1",
+        "familyId": "makehuman-people/v1",
+        "baseId": "feminine",
+        "parts": {
+          "outfit": "feminine/outfit/male_casualsuit05",
+          "shoes": "feminine/shoes/shoes05",
+          "hair": "feminine/hair/bob02",
+          "brows": "feminine/brows/eyebrow010",
+          "lashes": "feminine/lashes/eyelashes01",
+          "eyes": "feminine/eyes/low-poly"
+        },
+        "materials": {
+          "skin": "skin/middleage_african_female",
+          "eyeColour": "eyeColour/brownlight"
+        },
+        "colours": {
+          "hairColour": "black"
+        },
+        "parameters": {
+          "heightMillimetres": 1652,
+          "fullness": -9,
+          "muscle": 272
+        }
+      },
+      "lookSha256": "4c66109af655d2f5087963469e7a231f2ec408552839daaf324a7179968de7a0"
+    },
+    {
+      "subject": "743a82b3-be89-53f4-a261-492c6cd3dfd1",
+      "seed": "{\"domain\":\"street-population/v1\",\"profile\":\"exulanica.character-draw/v1\",\"subject\":\"743a82b3-be89-53f4-a261-492c6cd3dfd1\"}",
+      "streamPrefix": [
+        2641734176,
+        741054160,
+        3104517737,
+        2628685523,
+        1978338327,
+        3289244261,
+        2890114496,
+        215853632,
+        196042251,
+        3085480839,
+        1228642163,
+        65229745
+      ],
+      "look": {
+        "profile": "exulanica.character-look/v1",
+        "familyId": "makehuman-people/v1",
+        "baseId": "masculine",
+        "parts": {
+          "outfit": "masculine/outfit/male_casualsuit02",
+          "shoes": "masculine/shoes/shoes05",
+          "hair": "masculine/hair/short03",
+          "brows": "masculine/brows/eyebrow003",
+          "lashes": "masculine/lashes/eyelashes01",
+          "eyes": "masculine/eyes/low-poly"
+        },
+        "materials": {
+          "skin": "skin/middleage_african_male",
+          "eyeColour": "eyeColour/blue"
+        },
+        "colours": {
+          "hairColour": "dark-brown"
+        },
+        "parameters": {
+          "heightMillimetres": 1735,
+          "fullness": -401,
+          "muscle": 73
+        }
+      },
+      "lookSha256": "ac6b3c80c7b001dd978c13234264768e5c91fded5560bb4d9b3eb1770b2b3e55"
+    },
+    {
+      "subject": "0",
+      "seed": "{\"domain\":\"street-population/v1\",\"profile\":\"exulanica.character-draw/v1\",\"subject\":\"0\"}",
+      "streamPrefix": [
+        1280928795,
+        3631672146,
+        1908620692,
+        3554741149,
+        3307464340,
+        3308155518,
+        3452781990,
+        3037049976,
+        1450312952,
+        1640856581,
+        530661620,
+        531496911
+      ],
+      "look": {
+        "profile": "exulanica.character-look/v1",
+        "familyId": "makehuman-people/v1",
+        "baseId": "feminine",
+        "parts": {
+          "outfit": "feminine/outfit/male_casualsuit05",
+          "shoes": "feminine/shoes/shoes04",
+          "hair": "feminine/hair/ponytail01",
+          "brows": "feminine/brows/eyebrow010",
+          "lashes": "feminine/lashes/eyelashes01",
+          "eyes": "feminine/eyes/low-poly"
+        },
+        "materials": {
+          "skin": "skin/young_asian_female",
+          "eyeColour": "eyeColour/brown"
+        },
+        "colours": {
+          "hairColour": "blonde"
+        },
+        "parameters": {
+          "heightMillimetres": 1589,
+          "fullness": -217,
+          "muscle": -65
+        }
+      },
+      "lookSha256": "7a7adbab9b9c212f9bb4bdefa2d1a2dd69ad1a04ca0d633a47395328c63cd4c4"
+    },
+    {
+      "subject": "a \"quoted\" \\ subject",
+      "seed": "{\"domain\":\"street-population/v1\",\"profile\":\"exulanica.character-draw/v1\",\"subject\":\"a \\\"quoted\\\" \\\\ subject\"}",
+      "streamPrefix": [
+        2962885280,
+        2021691934,
+        1347333808,
+        4122631570,
+        3654352213,
+        634457824,
+        4112073498,
+        2057042084,
+        3491304346,
+        2442030077,
+        783187327,
+        2280055207
+      ],
+      "look": {
+        "profile": "exulanica.character-look/v1",
+        "familyId": "makehuman-people/v1",
+        "baseId": "masculine",
+        "parts": {
+          "outfit": "masculine/outfit/male_casualsuit04",
+          "shoes": "masculine/shoes/shoes02",
+          "hair": null,
+          "brows": "masculine/brows/eyebrow009",
+          "lashes": "masculine/lashes/eyelashes01",
+          "eyes": "masculine/eyes/low-poly"
+        },
+        "materials": {
+          "skin": "skin/middleage_caucasian_male",
+          "eyeColour": "eyeColour/green"
+        },
+        "colours": {
+          "hairColour": "brown"
+        },
+        "parameters": {
+          "heightMillimetres": 1712,
+          "fullness": 102,
+          "muscle": 30
+        }
+      },
+      "lookSha256": "c84317f7a071262e6396ef03d3a2fa2091f5a30e6c6c7a006536ca785a7e8cc3"
+    }
+  ]
+}
