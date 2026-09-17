@@ -20,12 +20,15 @@ from pathlib import Path
 from typing import Any
 
 import pytest
+from exulanica.evaluation.gate_keys import THRESHOLDS
 from exulanica.grammar.contract import (
     PROJECTION_OWN_USE,
     PROJECTION_USES,
+    PROPERTY_MEASURES,
     REFUSED_USES,
     Grammar,
     ParameterSurface,
+    PropertyRow,
 )
 from exulanica.grammar.errors import InvalidParameterError, InvalidRecordError
 from exulanica.grammar.grammars import builtin_registry
@@ -46,7 +49,7 @@ _GRAMMARS = ROOT / "exulanica" / "grammar" / "grammars"
 DESCRIPTOR_SHA256 = {
     ("box", 1): "2c2c8481c90e3a33021a014e7a7d5ece016b34fbbaed779a76979f8793d08e46",
     ("city", 1): "1e580ada17333e886ad1067e65585ebd7014006749ba4f84a26ae0f9f673d273",
-    ("city", 2): "b5527d2cc9519c07fdca512c46ea686ff98b209a0af05e1f654d80dce0109a0e",
+    ("city", 2): "afd33e01690a7727adac450579b5967e46d1407b7a3635db464a8fa9d640bffb",
 }
 
 
@@ -125,6 +128,26 @@ def test_each_contract_admits_its_own_use_and_evaluation_and_refuses_the_rest(pr
 
 def test_no_contract_can_admit_a_personal_world_or_a_citation():
     assert set(REFUSED_USES) == {"personal_world", "citation"}
+
+
+def test_the_nav_envelope_states_its_capsule_as_numbers_the_visual_gate_measures():
+    contract = CITY_GRAMMAR.projection("nav_envelope")
+    [row] = [row for row in contract.preserved if row.property == "capsule_clearance"]
+    assert dict(row.measures) == {
+        "radius_mm": THRESHOLDS["capsuleRadiusMm"],
+        "height_mm": THRESHOLDS["capsuleHeightMm"],
+        "eye_height_mm": THRESHOLDS["eyeHeightMm"],
+    }
+    assert dict(row.measures) == {"radius_mm": 340, "height_mm": 1_900, "eye_height_mm": 1_620}
+    assert not any(character.isdigit() for character in row.statement)
+    measured = [
+        (contract.projection, item.property)
+        for contract in CITY_GRAMMAR.projections
+        for item in (*contract.preserved, *contract.unsupported)
+        if item.measures
+    ]
+    assert measured == [("nav_envelope", "capsule_clearance")]
+    assert set(PROPERTY_MEASURES) == {"capsule_clearance"}
 
 
 # -------------------------------------------------------------------------------------------
@@ -274,6 +297,63 @@ def _time_scope(document: dict[str, Any]) -> None:
     _contract(document, "render_batch")["time_scope"] = "dated"
 
 
+def _capsule(document: dict[str, Any]) -> dict[str, Any]:
+    return next(
+        row
+        for row in _contract(document, "nav_envelope")["preserved"]
+        if row["property"] == "capsule_clearance"
+    )
+
+
+def _capsule_measures_missing(document: dict[str, Any]) -> None:
+    del _capsule(document)["measures"]
+
+
+def _capsule_measures_empty(document: dict[str, Any]) -> None:
+    _capsule(document)["measures"] = {}
+
+
+def _capsule_measure_missing(document: dict[str, Any]) -> None:
+    del _capsule(document)["measures"]["eye_height_mm"]
+
+
+def _capsule_measure_extra(document: dict[str, Any]) -> None:
+    _capsule(document)["measures"]["step_height_mm"] = 180
+
+
+def _capsule_measure_zero(document: dict[str, Any]) -> None:
+    _capsule(document)["measures"]["radius_mm"] = 0
+
+
+def _capsule_measure_text(document: dict[str, Any]) -> None:
+    _capsule(document)["measures"]["height_mm"] = "1900"
+
+
+def _capsule_eye_above_the_top(document: dict[str, Any]) -> None:
+    _capsule(document)["measures"]["eye_height_mm"] = 1_900
+
+
+def _capsule_wider_than_tall(document: dict[str, Any]) -> None:
+    _capsule(document)["measures"]["radius_mm"] = 951
+
+
+def _capsule_measures_not_an_object(document: dict[str, Any]) -> None:
+    _capsule(document)["measures"] = [["radius_mm", 340]]
+
+
+def _measures_on_an_unmeasured_property(document: dict[str, Any]) -> None:
+    _contract(document, "nav_envelope")["preserved"][0]["measures"] = {"radius_mm": 340}
+
+
+def _measures_on_an_unsupported_row(document: dict[str, Any]) -> None:
+    row = next(
+        row
+        for row in _contract(document, "render_batch")["unsupported"]
+        if row["property"] == "capsule_clearance"
+    )
+    row["measures"] = {"eye_height_mm": 1_620, "height_mm": 1_900, "radius_mm": 340}
+
+
 @pytest.mark.parametrize(
     "change",
     [
@@ -304,6 +384,17 @@ def _time_scope(document: dict[str, Any]) -> None:
         _property_both_ways,
         _nothing_unsupported,
         _time_scope,
+        _capsule_measures_missing,
+        _capsule_measures_empty,
+        _capsule_measure_missing,
+        _capsule_measure_extra,
+        _capsule_measure_zero,
+        _capsule_measure_text,
+        _capsule_eye_above_the_top,
+        _capsule_wider_than_tall,
+        _capsule_measures_not_an_object,
+        _measures_on_an_unmeasured_property,
+        _measures_on_an_unsupported_row,
     ],
     ids=lambda change: getattr(change, "__name__", "admit").lstrip("_"),
 )
@@ -358,3 +449,19 @@ def test_a_schema_1_derived_parameter_must_name_its_stage(tmp_path):
     )
     with pytest.raises(InvalidParameterError, match="names its stage"):
         ParameterSurface.read(path)
+
+
+@pytest.mark.parametrize(
+    "measures",
+    [
+        (("radius_mm", 340), ("height_mm", 1_900)),
+        (("height_mm", 1_900), ("height_mm", 1_900)),
+        (("height_mm", 1_900.0),),
+        (("Height_mm", 1_900),),
+        (("height_mm", True),),
+        ["height_mm", 1_900],
+    ],
+)
+def test_a_property_row_refuses_measures_that_are_not_sorted_distinct_integer_pairs(measures):
+    with pytest.raises(InvalidRecordError):
+        PropertyRow("capsule_clearance", "A statement.", measures)

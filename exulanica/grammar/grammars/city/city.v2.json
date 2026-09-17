@@ -1272,7 +1272,12 @@
         },
         {
           "property": "capsule_clearance",
-          "statement": "Clear space for a capsule of 340 mm radius and 1900 mm height, eye at 1620 mm, which is what the visual gate measures."
+          "statement": "Clear space for a vertical capsule of the stated radius and total height, standing on the support, with the eye at the stated height: what the visual gate measures.",
+          "measures": {
+            "eye_height_mm": 1620,
+            "height_mm": 1900,
+            "radius_mm": 340
+          }
         },
         {
           "property": "subject_identity",

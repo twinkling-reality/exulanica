@@ -108,8 +108,9 @@ parameters; the box uses it. **Schema 2** adds what the code is then held to:
   `draw`, `required` or `derive`; there is no default value. A binding may set a parameter at its
   own level or a coarser one, never finer.
 - `projections`: one representation contract per admitted projection, with what it preserves and
-  what it does not as separate rows, and one verdict for each use. A projection admits its own
-  use. **No contract may admit `personal_world` or `citation`**; lifting either is a code change
+  what it does not as separate rows, and one verdict for each use. A preserved property a
+  consumer builds to by number (`PROPERTY_MEASURES`) states its integer measures as data, and no
+  other row states any. A projection admits its own use. **No contract may admit `personal_world` or `citation`**; lifting either is a code change
   in `contract.py`, not a descriptor edit.
 
 `generate(grammar, seed=..., subject_identity=..., bindings=...)` runs the stages in order,
@@ -264,7 +265,10 @@ a test holds them equal.
 
 **Projections.** The descriptor admits `render_batch`, `collision_proxy`, `nav_envelope` and
 `pick_geometry`. Each contract admits its own use and `evaluation` and refuses every other use,
-including `personal_world` and `citation`; each preserves `subject_identity`.
+including `personal_world` and `citation`; each preserves `subject_identity`. The nav envelope's
+`capsule_clearance` row carries its capsule as numbers, `radius_mm` 340, `height_mm` 1900 and
+`eye_height_mm` 1620, so the tessellator carves for the numbers rather than for a sentence; a
+test holds them equal to the visual gate's thresholds.
 
 **Identity.** Every subject record's identity follows section 3's rule over the owner and ordinal
 its shape declares, with append-only codes where an ordinal stands for a side or a surface role.

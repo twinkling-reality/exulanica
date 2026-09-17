@@ -27,11 +27,13 @@ holds the code to it:
   (see :mod:`exulanica.grammar.parameters`).
 * ``projections``: one representation contract per admitted projection, in which what the
   projection preserves and what it does not are separate rows, and every use in
-  :data:`PROJECTION_USES` has exactly one verdict row. A projection admits its own use. No
-  contract may admit ``personal_world``: a generated world reaches no person's world until the
-  superseding governance decision is accepted in writing, and lifting that is a code change
-  here, not a descriptor edit. No contract may admit ``citation``: generated content is never
-  evidence (ADR-0008).
+  :data:`PROJECTION_USES` has exactly one verdict row. A preserved property a consumer builds to
+  by number (:data:`PROPERTY_MEASURES`) states its integer measures as data, not in the
+  statement's prose, so a reader takes the numbers from one place. A projection admits its own
+  use. No contract may admit ``personal_world``: a generated world reaches no person's world
+  until the superseding governance decision is accepted in writing, and lifting that is a code
+  change here, not a descriptor edit. No contract may admit ``citation``: generated content is
+  never evidence (ADR-0008).
 """
 
 from __future__ import annotations
@@ -70,6 +72,7 @@ __all__ = [
     "PLANE",
     "PROJECTION_OWN_USE",
     "PROJECTION_USES",
+    "PROPERTY_MEASURES",
     "REFUSED_USES",
     "STAGE_STATUSES",
     "USE_VERDICTS",
@@ -134,6 +137,23 @@ REFUSED_USES: Final = {
     "citation": "generated content is never evidence (ADR-0008)",
 }
 USE_VERDICTS: Final = ("admitted", "refused")
+
+
+def _capsule_measures(measures: Mapping[str, int]) -> None:
+    if measures["eye_height_mm"] >= measures["height_mm"]:
+        raise InvalidRecordError("capsule_clearance: the eye is below the top of the capsule")
+    if 2 * measures["radius_mm"] > measures["height_mm"]:
+        raise InvalidRecordError("capsule_clearance: a capsule is at least as tall as it is wide")
+
+
+#: Properties a consumer builds to by number, the integer measures a preserved row of each states
+#: (sorted, each at least 1, the unit the suffix of its name) and the check across them. Every other
+#: row, and every unsupported row, states no measures.
+PROPERTY_MEASURES: Final[
+    Mapping[str, tuple[tuple[str, ...], Callable[[Mapping[str, int]], None]]]
+] = {
+    "capsule_clearance": (("eye_height_mm", "height_mm", "radius_mm"), _capsule_measures),
+}
 #: Frame metric classes. An invented grammar never measured anything.
 FRAME_METRIC_CLASSES: Final = (
     "metric_measured",
@@ -388,14 +408,30 @@ class StageDeclaration:
 
 @dataclass(frozen=True, slots=True)
 class PropertyRow:
-    """One property a projection preserves, or one it does not, with a plain statement."""
+    """One property a projection preserves, or one it does not, with a plain statement.
+
+    ``measures`` are the integer quantities a consumer builds to, sorted by name, for the
+    properties :data:`PROPERTY_MEASURES` names; which rows must carry them is the contract's check.
+    """
 
     property: str
     statement: str
+    measures: tuple[tuple[str, int], ...] = ()
 
     def __post_init__(self) -> None:
         require_key("property", self.property)
         require_text(f"{self.property} statement", self.statement)
+        if not isinstance(self.measures, tuple):
+            raise InvalidRecordError(f"{self.property} measures are a tuple of pairs")
+        names = []
+        for pair in self.measures:
+            if not isinstance(pair, tuple) or len(pair) != 2:
+                raise InvalidRecordError(f"{self.property} measures are (name, value) pairs")
+            require_key(f"{self.property} measure", pair[0])
+            require_integer(f"{self.property} {pair[0]}", pair[1], minimum=1)
+            names.append(pair[0])
+        if names != sorted(set(names)):
+            raise InvalidRecordError(f"{self.property} measures are sorted by name, each once")
 
 
 @dataclass(frozen=True, slots=True)
@@ -449,6 +485,25 @@ class ProjectionContract:
             raise InvalidRecordError(
                 f"{self.projection} gives one verdict for each of {PROJECTION_USES}, in order"
             )
+        for row in self.unsupported:
+            if row.measures:
+                raise InvalidRecordError(
+                    f"{self.projection}: {row.property} is not preserved and states no measures"
+                )
+        for row in self.preserved:
+            declared = PROPERTY_MEASURES.get(row.property)
+            names = tuple(name for name, _ in row.measures)
+            if declared is None:
+                if row.measures:
+                    raise InvalidRecordError(
+                        f"{self.projection}: {row.property} is not a measured property"
+                    )
+                continue
+            if names != declared[0]:
+                raise InvalidRecordError(
+                    f"{self.projection}: {row.property} states exactly the measures {declared[0]}"
+                )
+            declared[1](dict(row.measures))
         verdicts = {row.use: row.verdict for row in self.uses}
         own = PROJECTION_OWN_USE[self.projection]
         if verdicts[own] != "admitted":
@@ -485,13 +540,7 @@ class ProjectionContract:
         rows = {}
         for label in ("preserved", "unsupported"):
             rows[label] = tuple(
-                PropertyRow(
-                    **_object(
-                        f"{where}.{label}[{position}]",
-                        entry,
-                        frozenset({"property", "statement"}),
-                    )  # type: ignore[arg-type]
-                )
+                _property_row(f"{where}.{label}[{position}]", entry)
                 for position, entry in enumerate(_list(f"{where}.{label}", document[label]))
             )
         uses = tuple(
@@ -512,6 +561,21 @@ class ProjectionContract:
             uses=uses,
             dependencies=tuple(_list(f"{where}.dependencies", document["dependencies"])),  # type: ignore[arg-type]
         )
+
+
+def _property_row(where: str, value: object) -> PropertyRow:
+    """A row as a descriptor writes it; ``measures``, when present, is a non-empty object."""
+    keys = frozenset({"property", "statement"})
+    if isinstance(value, dict) and "measures" in value:
+        keys = keys | {"measures"}
+    document = _object(where, value, keys)
+    measures: tuple[tuple[str, int], ...] = ()
+    if "measures" in document:
+        raw = document["measures"]
+        if not isinstance(raw, dict) or not raw:
+            raise InvalidRecordError(f"{where}.measures is a non-empty object; omit it when empty")
+        measures = tuple(sorted(raw.items()))  # type: ignore[arg-type]
+    return PropertyRow(document["property"], document["statement"], measures)  # type: ignore[arg-type]
 
 
 def _stage_record_types(stage: Stage) -> tuple[tuple[str, int], ...]:
