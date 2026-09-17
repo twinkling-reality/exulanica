@@ -78,8 +78,12 @@ describe('generated tile UV rule', () => {
     expect(sized[0]).toBeCloseTo(0.25, 12);
   });
 
-  it('lays the unavailable pattern at the look\'s own physical size', () => {
-    expect(unavailableUv(TILE_LOOK_V1.unavailable.tileMm * 3, 0, TILE_LOOK_V1)).toEqual([3, 0]);
+  it('lays the unavailable pattern at the look\'s own physical size, upright on walls and ground', () => {
+    const size = TILE_LOOK_V1.unavailable.tileMm;
+    expect(unavailableUv(size * 3, size, TILE_LOOK_V1)).toEqual([3, 1]);
+    expect(unavailableUv(size * 3, size, TILE_LOOK_V1, 'vertical')).toEqual([3, 1]);
+    // On the ground, t runs away from a viewer facing along it, and the image's top goes that way.
+    expect(unavailableUv(size * 3, size, TILE_LOOK_V1, 'horizontal')).toEqual([3, -1]);
   });
 
   it('flips PlayCanvas tangent handedness once, so +Y of a normal map points toward row 0', () => {

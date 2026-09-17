@@ -87,9 +87,19 @@ export function surfaceUv(
   ];
 }
 
-/** UV for the unavailable pattern, which repeats once per `look.unavailable.tileMm`. */
-export function unavailableUv(sMm: number, tMm: number, look: TileLook): readonly [number, number] {
-  return [sMm / look.unavailable.tileMm, tMm / look.unavailable.tileMm];
+/**
+ * UV for the unavailable pattern, which repeats once per `look.unavailable.tileMm`. The word in it
+ * reads upright: on a vertical face `t` already points down the image; on a horizontal one `t` runs
+ * away from a viewer facing along it, so the image's top is laid that way.
+ */
+export function unavailableUv(
+  sMm: number,
+  tMm: number,
+  look: TileLook,
+  orientation: 'vertical' | 'horizontal' = 'vertical',
+): readonly [number, number] {
+  const size = look.unavailable.tileMm;
+  return [sMm / size, (orientation === 'horizontal' ? -tMm : tMm) / size];
 }
 
 /**

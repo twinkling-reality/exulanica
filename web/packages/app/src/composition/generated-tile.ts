@@ -40,7 +40,7 @@ function statement(tile: LoadedGeneratedTile): HTMLElement {
   }, [
     ...lines.map((line) => el('p', { text: line, style: 'margin:0 0 2px' })),
     el('details', {}, [
-      el('summary', { text: `What is not drawn (${items.length})` }),
+      el('summary', { text: `Unavailable or not drawn (${items.length})` }),
       el('ul', { style: 'margin:4px 0 0;padding-left:16px;max-height:30vh;overflow:auto' }, items),
     ]),
   ]);

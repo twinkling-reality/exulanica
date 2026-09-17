@@ -387,7 +387,7 @@ function attachTile(
     const place = (s: number, t: number): readonly [number, number] =>
       set !== null && set.state === 'decoded' && reference !== undefined
         ? surfaceUv(s, t, reference, set.set.entry)
-        : unavailableUv(s, t, look);
+        : unavailableUv(s, t, look, range.orientation ?? 'vertical');
     const first = batch.positions.length / 3;
     const remap = new Map<number, number>();
     const local: number[] = [];
