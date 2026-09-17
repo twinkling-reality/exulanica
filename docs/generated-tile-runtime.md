@@ -18,13 +18,16 @@ the sets are the texture lane's, documented in [texture-package.md](texture-pack
 
 On the app's development server, `/?preview=1&tile=tile-conformance` opens the normal shell with
 the Companion and the reticle, but the owned district is replaced by the named tile. Today that
-tile is tess's conformance fixture: one terrain patch, drawn in the stated unavailable pattern
-(a magenta hatch carrying the word UNAVAILABLE, unlit), because the only range it draws cites no
-material record. The player stands on the tile's `nav_envelope`, eye 1.62 m above it, and walking
-follows its height. A panel at the bottom left says what this is ("Development evaluation of
+tile is tess's city version 2 conformance fixture: a 128 m terrain patch, drawn whole (512
+triangles) in the stated unavailable pattern (a magenta hatch carrying the word UNAVAILABLE, unlit),
+because no material record dresses terrain and the tile says so. The player stands on the tile's
+`nav_envelope`, eye 1.62 m above it, at the middle of its southern edge, and walking follows it; the
+envelope leaves out the ground around the tile's other records, so the middle of the patch is drawn
+but cannot be stood on. A panel at the bottom left says what this is ("Development evaluation of
 generated tile tile-conformance. Not part of any world."), what the player stands on, what is
-missing (no `collision_proxy`, so nothing blocks the capsule), how many records are drawn, and
-lists every record that is drawn as unavailable or not drawn, with the reason tess stated.
+missing (no `collision_proxy`, so nothing blocks the capsule), how many of the records render_batch
+lists are drawn, and lists every record that is drawn as unavailable or not drawn yet, with the
+geometry it waits on.
 
 The eight texture sets are seen on real surfaces only on the test-only bench,
 `web/packages/atlas-react/test/generated-tile-bench/`: a few metres of hand-built street
@@ -84,7 +87,9 @@ v = (sin(theta) * s + cos(theta) * t + uv_offset_v_mm) / repeat_v
 
 So the size factor is a repeat length (2,000,000 draws the set twice as large), a positive theta
 turns +s toward +t, offsets apply after rotation, and a wall `w` mm wide at size 1,000,000 repeats
-the set `w / extent_u_mm` times. There is no other scale anywhere. A `surface_material` version 1
+the set `w / extent_u_mm` times. There is no other scale anywhere. A drawn range whose material is
+`none-exists` (exact geometry no material record dresses) is drawn as the unavailable surface with
+that reason, never withheld. A `surface_material` version 1
 states no placement, so a range citing one is drawn as unavailable ("version 1 does not state how
 its texture is placed").
 
@@ -101,13 +106,18 @@ Normal map sign: PlayCanvas derives its bitangent toward increasing v and the se
 `@exulanica/loom-tess/core`, the only tess entry shipping code may import (tess's rule in
 `web/.dependency-cruiser.cjs`). It calls `verifyOwd`, which decodes the container and bakes the
 header's records again, requiring every byte to match; there is no second reader and nothing is
-repaired. It refuses a page with no `crypto.subtle`, a tile that fails verification, and a tile with
-no `render_batch`, no surface coordinates or no drawn range.
+repaired. The container is tess's `owd/2`. It refuses a page with no `crypto.subtle`, a tile that
+fails verification, a grammar frame other than `city_local` (section 5 has the capsule it also
+reads), and a tile with no `render_batch`, no surface coordinates or no drawn range.
 
 Only `render_batch` is drawn, and only its drawn ranges, exactly as stored. A drawn range is
-textured when it cites a version 2 `surface_material` whose set is pinned and verifies; otherwise it
-is the unavailable surface, with its reason. Ranges tess marks unavailable or not admitted have no
-geometry and are listed with the needs tess stated. Every set a tile cites, and only those, is
+textured when it cites a version 2 `surface_material` record whose set is pinned and verifies; a
+range whose material is `none-exists`, or whose material does not resolve, is the unavailable
+surface with its reason. An `unavailable` entry is geometry tess has not produced yet: it has no
+triangles and is listed with the needs tess stated ("Not drawn yet: its geometry waits on
+massing_faces."). A `not_admitted` entry is listed too. A `halo` entry is a neighbouring record
+carried as context and is neither drawn nor listed, and neither is `not_in_projection`. Every set a
+tile cites, and only those, is
 fetched and verified before the renderer exists, so an attached tile is complete on its first frame.
 Ranges are batched by set: one draw per set and one for all unavailable surfaces.
 
@@ -117,9 +127,9 @@ the camera's yaw 0.
 
 Identity for picking: `rangeAtTriangle(triangle)` returns the record a `render_batch` triangle
 belongs to, and `pick(origin, direction)` returns the nearest drawn triangle along a ray with its
-record. Data view subjects: a version 1 tile registers none, because its records name no frame.
-Selection through `registerRepresentationSubjects` is wired against version 2 tiles after the data
-view lane merges.
+record. Version 2 records state their identity (the conformance terrain is
+`2f14328d-39f8-5bee-a06a-f963b701ccf3`), and every range carries it. Data view selection through
+`registerRepresentationSubjects` is not wired yet; it waits for the data view lane to merge.
 
 ## 5. Standing and walking
 
@@ -131,8 +141,12 @@ falls back to the district's ground.
 Support comes only from `nav_envelope` (`tile-navigation.ts`): the height of the highest envelope
 triangle over a plan point, exact on its plane, with its normal; walls and downward faces support
 nothing. Navigation is never derived from the render mesh; Melbourne failed capsule clearance there.
-The player is the gate harness's capsule: radius 0.34 m, eye at 1.62 m, support resampled every
-0.05 m along a move. The step and slope limits the controller applies (0.18 m and 12 degrees) are
+The player is the capsule the tile's grammar states for the envelope's `capsule_clearance`, because
+that is the capsule the envelope was carved for: `tileCapsule` reads the radius, height and eye
+height from tess's grammar table (city version 2: 340 mm, 1900 mm and 1620 mm, which is also the gate
+harness's capsule) and builds the navigation world to them. A tile whose grammars state no capsule,
+or two different ones, is refused. Support is resampled every 0.05 m along a move. The step and
+slope limits the controller applies (0.18 m and 12 degrees) are
 the Atlas controller's comfort contract, not a statement about the tile. A tile without a
 `nav_envelope` opens at a stated viewpoint south of it and every move gets the app's "no walkable
 surface" notice.
@@ -151,6 +165,12 @@ enforced there: fog onset 40 to 60 m, an environment probe with no off switch, a
 shadowing with no off switch whose radius must reach a 100 mm kerb without spanning a storey. The
 corridor lane changes the look by editing this descriptor and bumping its version; geometry, UV
 scale and texture choice are world data and are not in it.
+
+`environment.ts` applies the look. Its camera frame (tone mapping and the occlusion pass) builds
+render targets at the canvas's size when it is created, so it is created only once the graphics
+device has a size, at once or on the device's first resize. A page that mounts a tile while its
+canvas is 0 by 0 then logs no incomplete framebuffer for the frame's own targets
+(`evidence/camera-frame-zero-size.log.txt`).
 
 Measured on the bench (Chromium, WebGL2, Apple M3 Pro, 1440 by 900; values from
 `web/packages/atlas-react/test/generated-tile-bench/evidence/bench-measurements.log.txt`):
@@ -215,7 +235,7 @@ headless Chrome through `.exulanica/bin/quiet-slot`, with the load average befor
 | 87 draw calls | 55, shadow cascades, occlusion and compose passes included | Yes |
 | 168 MB decoded texture | 104,857,596 bytes for the 7 cited sets, plus a 1,671,168 byte probe; all 8 sets would be 121,634,808 | Yes |
 | 28 MB transferred | The 7 cited sets: 65,551,200 bytes raw, 21,292,652 gzip, 17,955,391 brotli | Only from a compressing host |
-| About 227,000 faces | 40 on the bench street; 18 on the conformance tile | Not measured at corridor scale |
+| About 227,000 faces | 40 on the bench street; 512 on the conformance tile | Not measured at corridor scale |
 
 Only the sets a tile cites are fetched. A GPU compressed transfer container is a texture lane
 follow-up. The frame figures are the look's per-pixel cost at full screen; what 227,000 faces in a
@@ -229,7 +249,7 @@ runtime's branch and main, first on 2026-09-16 and again after the rebase onto m
 
 - The corridor lane bakes the street and iterates on its look, at most three times, by editing
   `look.ts` and these modules.
-- Tile document version 2 (grammars with `descriptor_sha256`, subject identity, owned and halo
-  records) is read next, with its surface materials drawn by the UV rule above and data view
-  selection wired through `registerRepresentationSubjects`.
+- Dressed surfaces are drawn by the UV rule above as soon as tess draws a range that cites a
+  material record; no tile does yet, so that path is covered by the `surfaceUv` tests only.
+- Data view selection through `registerRepresentationSubjects`, after the data view lane merges.
 - `collision_proxy` is consumed when tess materialises it.
