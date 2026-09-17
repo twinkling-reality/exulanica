@@ -21,8 +21,10 @@ A record payload is exactly ``record_payload``'s. ``grammars`` is sorted by id a
 the pins the tile record's ``grammar_versions`` states, in order. ``owned`` and ``halo`` are each
 sorted by kind, then version, then identity, and no identity is in both. A bake draws owned records
 only and reads halo records for context. Membership follows the tile record's rules (see
-:mod:`~exulanica.grammar.grammars.city.tile`), and a record with no anchor (a district, a named
-street) is always halo: it is context a tile carries because one of its members names it.
+:mod:`~exulanica.grammar.grammars.city.tile`): an owned record's anchor lies in the tile, a halo
+record is not owned and its extent meets the tile grown by the halo radius, and a record with no
+extent (:data:`RELATION_FIELDS`) belongs wherever the record it relates to belongs. A record with
+no anchor (a district, a named street) is never owned.
 Profile 1 of this envelope had no subject identity and no membership, so it could not be checked
 and is not read.
 
@@ -119,6 +121,7 @@ from exulanica.grammar.records import record_payload, require_identity
 
 __all__ = [
     "BAY_PITCH_TARGET_MM",
+    "RELATION_FIELDS",
     "TILE_DOCUMENT_PROFILE",
     "CityDocumentReport",
     "GrammarRecords",
@@ -147,6 +150,12 @@ _GRAMMAR_KEYS: Final = frozenset(
         "halo",
     }
 )
+#: For each record kind with no extent, the field naming the record whose membership it shares.
+RELATION_FIELDS: Final[Mapping[type, str]] = {
+    JunctionApproachRecord: "junction_identity",
+    SignalRecord: "controls_identity",
+    SurfaceMaterialRecord: "surface_identity",
+}
 #: How close, in millimetres, a point derived with one floored integer normal must land.
 _NORMAL_ROUNDING_MM: Final = 2
 
@@ -476,16 +485,22 @@ class _Checker:
             return None
         return self.anchor(self.get(getattr(record, owner)))
 
+    def expected_membership(self, record: Any) -> str:
+        """Where the tile's rules put ``record``: by its anchor and extent, or its relation's."""
+        related = RELATION_FIELDS.get(type(record))
+        if related is not None:
+            return self.expected_membership(self.get(getattr(record, related)))
+        return membership(self.tile, self.anchor(record), record.extent)
+
     def check_membership(self) -> None:
         for listed, records in ((OWNED, self.grammar.owned), (HALO, self.grammar.halo)):
             for record in records:
-                point = self.anchor(record)
-                expected = HALO if point is None else membership(self.tile, *point)
+                expected = self.expected_membership(record)
                 if expected != listed:
                     raise _fail(
                         "membership",
                         f"{_SHAPES_BY_TYPE[type(record)].kind} {record.identity} is listed "
-                        f"{listed} and its anchor makes it {expected}",
+                        f"{listed} and its anchor and extent make it {expected}",
                     )
 
     # -- pins ------------------------------------------------------------------------------

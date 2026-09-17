@@ -284,8 +284,16 @@ descriptor's digest per version. `validate_city_document` runs every record's ow
 the envelope checks, then everything that spans records: references resolve to admitted kinds,
 identities are their rule's derivation, catalog keys resolve and mean what the record says,
 geometry agrees across records (frontage lines, camber, stop lines, connections, parking, parcels
-in blocks, footprints in parcels, facade runs, bays, entrances, vitrines behind glazing), anchors
-match membership, and the pins match what was loaded. Each refusal names its check in brackets.
+in blocks, footprints in parcels, facade runs, bays, entrances, vitrines behind glazing), membership
+matches the tile's rules, and the pins match what was loaded. Each refusal names its check in
+brackets.
+
+**Membership.** A tile owns a subject whose anchor (a parcel's centroid, a node's point, a
+segment's node midpoint, shared down to everything the subject owns) lies in its 128 m square. A
+subject it does not own is in its halo when the subject's extent meets the square grown by 64 m on
+every side (`extent_meets_grown_square`), so a long segment or a large parcel anchored far away
+that still crosses the tile is carried. A record with no extent (a surface material, a junction
+approach, a signal) goes with the record it relates to. Owned and halo never overlap.
 
 **The fixture**, `tests/fixtures/city-v2/tile-document.json`, is written by hand in
 `build_fixture.py`: one signalised T-junction, a memory precinct lot and a four-storey shophouse

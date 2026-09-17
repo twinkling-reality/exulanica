@@ -1663,7 +1663,7 @@ tile = TileRecord(
     tile_size_mm=128_000,
     halo_radius_mm=HALO_RADIUS_MM,
     ownership_rule="anchor_floor_division",
-    halo_rule="chebyshev_square",
+    halo_rule="extent_meets_grown_square",
     edit_delta_digest=EMPTY_EDIT_DELTA_DIGEST,
 )
 

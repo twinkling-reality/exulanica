@@ -12,12 +12,19 @@ A street node's is its point, and its junction, the junction's approaches and co
 signal controlling it share it. A segment's is the floored midpoint of its two nodes, and its
 street, lanes, curbs, crossings, parking, furniture, trees and markings share it (a signal on a
 crossing shares the crossing's). A terrain patch's is its tile's south-west corner. A material
-record shares its surface's. A district and a street have no single anchor: a tile carries each
-one that any of its members names.
+record shares its surface's. A district and a street have no single anchor, so no tile owns one.
 
-**The halo** (``chebyshev_square``). A subject is in a tile's halo when its anchor is outside the
-tile and inside the tile grown by the halo radius on every side. A bake draws owned subjects only
-and reads halo subjects for context.
+**The halo** (``extent_meets_grown_square``). A subject the tile does not own is in its halo when
+the subject's stated extent, in plan, meets the tile grown by the halo radius on every side:
+``[tile_x * 128000 - 64000, (tile_x + 1) * 128000 + 64000)`` on x and likewise on y, whose south
+and west edges belong to it and whose north and east edges do not. The extent is used rather than
+the anchor because a long segment or a large parcel anchored far away can still cross the tile,
+and a bake that left it out would treat that ground as open. A record with no extent (a surface
+material, a junction approach, a signal) belongs wherever the record it relates to belongs. A bake
+draws owned subjects only and reads halo subjects for context.
+
+Ownership reads the anchor alone, so every anchored subject is owned by exactly one tile, and it
+is in the halo of every other tile whose grown square its extent reaches.
 
 :func:`tile_inputs_digest` is the digest over exactly the inputs the target architecture lists:
 the city seed, the grammar version set, the catalog digest, the tile coordinate, the level of
@@ -37,6 +44,7 @@ from typing import ClassVar, Final
 from exulanica.canonical import sha256_of_canonical
 from exulanica.grammar import shapes
 from exulanica.grammar.errors import InvalidRecordError
+from exulanica.grammar.geometry import Extent
 from exulanica.grammar.grammars.city._skeleton import skeleton
 from exulanica.grammar.grammars.city.common import TILE_SIZE_MM
 from exulanica.grammar.records import record_payload
@@ -56,6 +64,8 @@ __all__ = [
     "TILE_SIZE_MM",
     "GrammarPin",
     "TileRecord",
+    "extent_meets_halo",
+    "halo_square",
     "membership",
     "tile_inputs_digest",
     "tile_of",
@@ -65,7 +75,7 @@ STAGE_ID: Final = "tile"
 STAGE_VERSION: Final = 2
 HALO_RADIUS_MM: Final = 64_000
 OWNERSHIP_RULES: Final = ("anchor_floor_division",)
-HALO_RULES: Final = ("chebyshev_square",)
+HALO_RULES: Final = ("extent_meets_grown_square",)
 EMPTY_EDIT_DELTA_DIGEST: Final = sha256_of_canonical([]).hex()
 OWNED: Final = "owned"
 HALO: Final = "halo"
@@ -145,15 +155,36 @@ def tile_of(x_mm: int, y_mm: int) -> tuple[int, int]:
     return x_mm // TILE_SIZE_MM, y_mm // TILE_SIZE_MM
 
 
-def membership(record: TileRecord, x_mm: int, y_mm: int) -> str:
-    """``owned``, ``halo`` or ``outside`` for an anchor point, by the record's rules."""
-    if tile_of(x_mm, y_mm) == (record.tile_x, record.tile_y):
+def halo_square(record: TileRecord) -> tuple[int, int, int, int]:
+    """The tile grown by its halo radius: ``(low_x, low_y, high_x, high_y)``, lows inclusive."""
+    return (
+        record.tile_x * record.tile_size_mm - record.halo_radius_mm,
+        record.tile_y * record.tile_size_mm - record.halo_radius_mm,
+        (record.tile_x + 1) * record.tile_size_mm + record.halo_radius_mm,
+        (record.tile_y + 1) * record.tile_size_mm + record.halo_radius_mm,
+    )
+
+
+def extent_meets_halo(record: TileRecord, extent: Extent) -> bool:
+    """Whether an extent, in plan, shares a point with the tile grown by its halo radius."""
+    low_x, low_y, high_x, high_y = halo_square(record)
+    return (
+        low_x <= extent.max_x_mm
+        and extent.min_x_mm < high_x
+        and low_y <= extent.max_y_mm
+        and extent.min_y_mm < high_y
+    )
+
+
+def membership(record: TileRecord, anchor: tuple[int, int] | None, extent: Extent) -> str:
+    """``owned``, ``halo`` or ``outside`` for a subject with this anchor and extent.
+
+    Owned when the anchor lies in the tile; otherwise halo when the extent meets the grown square.
+    ``anchor`` is ``None`` for a subject with no single anchor, which no tile owns.
+    """
+    if anchor is not None and tile_of(*anchor) == (record.tile_x, record.tile_y):
         return OWNED
-    low_x = record.tile_x * record.tile_size_mm - record.halo_radius_mm
-    low_y = record.tile_y * record.tile_size_mm - record.halo_radius_mm
-    high_x = (record.tile_x + 1) * record.tile_size_mm + record.halo_radius_mm
-    high_y = (record.tile_y + 1) * record.tile_size_mm + record.halo_radius_mm
-    if low_x <= x_mm < high_x and low_y <= y_mm < high_y:
+    if extent_meets_halo(record, extent):
         return HALO
     return OUTSIDE_TILE
 

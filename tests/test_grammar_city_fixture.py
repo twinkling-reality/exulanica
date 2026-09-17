@@ -22,10 +22,12 @@ from typing import Any
 import pytest
 from exulanica.canonical import canonical_json
 from exulanica.grammar.errors import InvalidRecordError, UnresolvedReferenceError
+from exulanica.grammar.geometry import Extent, ring_centroid
 from exulanica.grammar.grammars.city import CITY_SHAPES
 from exulanica.grammar.grammars.city.catalogs import entry_fields, load_city_catalogs
 from exulanica.grammar.grammars.city.descriptor import CITY_V1_DESCRIPTOR_PATH
 from exulanica.grammar.grammars.city.document import (
+    RELATION_FIELDS,
     TILE_DOCUMENT_PROFILE,
     TileDocument,
     document_bytes,
@@ -33,16 +35,25 @@ from exulanica.grammar.grammars.city.document import (
     record_sort_key,
     validate_city_document,
 )
+from exulanica.grammar.grammars.city.streets import BlockRecord
+from exulanica.grammar.grammars.city.tile import (
+    HALO,
+    HALO_RULES,
+    OUTSIDE_TILE,
+    OWNED,
+    halo_square,
+    membership,
+)
 from exulanica.grammar.shapes import describe_shapes
 from exulanica.grammar.textures import read_texture_manifest
 
 from city_v2_fixture import builder
 
 FIXTURE = builder()
-DOCUMENT_SHA256 = "f1ca25e21185beef9408148bdb8f5f5a8257e353d02e7ab011052fda2c8c8ff9"
-DOCUMENT_BYTES = 124_708
-SHAPES_SHA256 = "4d00fd696f3746dfdeccb31485898a9dee1dfde4960ad8753f715bca7b2c4dde"
-SHAPES_BYTES = 59_816
+DOCUMENT_SHA256 = "2e65fee14e41795782c0216ceb92ec8276299853a873eb6e807685f23983c710"
+DOCUMENT_BYTES = 124_717
+SHAPES_SHA256 = "14d981dba098f6fcbf11cc21da44340674f61a009f81a937ba425564d37ec7e9"
+SHAPES_BYTES = 59_825
 
 #: Every city record kind but the tile record, which is the envelope rather than a record in it.
 _RECORD_KINDS = sorted(shape.kind for shape in CITY_SHAPES if shape.kind != "city.tile")
@@ -171,8 +182,10 @@ def _document(
     to_owned: frozenset[str] = frozenset(),
     tile: dict[str, object] | None = None,
     grammar: dict[str, object] | None = None,
+    add_halo: tuple[object, ...] = (),
+    add_owned: tuple[object, ...] = (),
 ) -> TileDocument:
-    """The fixture document with records replaced (by identity), removed or moved."""
+    """The fixture document with records replaced (by identity), removed, moved or added."""
     document = FIXTURE.build_document()
     entry = document.grammars[0]
     replacements = replace or {}
@@ -187,6 +200,8 @@ def _document(
                 listed == "halo" and identity in to_owned
             )
             (halo if (listed == "halo") != moved else owned).append(record)
+    halo.extend(add_halo)
+    owned.extend(add_owned)
     entry = dataclasses.replace(
         entry,
         owned=tuple(sorted(owned, key=record_sort_key)),
@@ -261,6 +276,39 @@ def _building_listed_as_halo() -> TileDocument:
 
 def _district_listed_as_owned() -> TileDocument:
     return _document(to_owned=frozenset({FIXTURE.district.identity}))
+
+
+def _far_block(min_x: int) -> BlockRecord:
+    """A long block anchored well beyond the grown square, reaching back toward the tile."""
+    ring = ((min_x, 0), (900_000, 0), (900_000, 10_000), (min_x, 10_000))
+    return BlockRecord(
+        FIXTURE.identity("block", FIXTURE.CITY, 1),
+        1,
+        FIXTURE.DISTRICT,
+        ring,
+        *ring_centroid(ring),
+        0,
+        Extent(min_x, 0, 0, 900_000, 10_000, 0),
+    )
+
+
+def _halo_block_that_misses_the_grown_square() -> TileDocument:
+    return _document(add_halo=(_far_block(192_000),))
+
+
+def _district_far_away() -> TileDocument:
+    district = FIXTURE.district
+    ring = ((500_000, 500_000), (600_000, 500_000), (600_000, 600_000), (500_000, 600_000))
+    moved = dataclasses.replace(
+        district,
+        boundary_mm=ring,
+        extent=Extent(500_000, 500_000, -95, 600_000, 600_000, 22_585),
+    )
+    return _document(replace={district.identity: moved})
+
+
+def _material_listed_apart_from_its_surface() -> TileDocument:
+    return _document(to_halo=frozenset({FIXTURE.materials[0].identity}))
 
 
 def _descriptor_pinned_elsewhere() -> TileDocument:
@@ -338,6 +386,17 @@ _MUTATIONS: list[tuple[str, Callable[[], TileDocument], str]] = [
     ("a cycle stand outside its space", _stand_outside_its_space, r"\[cycle_parking\]"),
     ("an owned building listed as halo", _building_listed_as_halo, r"\[membership\]"),
     ("a district listed as owned", _district_listed_as_owned, r"\[membership\]"),
+    (
+        "a halo block whose extent misses the grown square",
+        _halo_block_that_misses_the_grown_square,
+        r"\[membership\]",
+    ),
+    ("a district whose extent misses the grown square", _district_far_away, r"\[membership\]"),
+    (
+        "a material listed halo while its surface is owned",
+        _material_listed_apart_from_its_surface,
+        r"\[membership\]",
+    ),
     ("both descriptor pins moved", _descriptor_pinned_elsewhere, r"\[descriptor_pin\]"),
     ("the tile's descriptor pin alone moved", _tile_pin_alone_moved, "exactly the tile's grammar"),
     ("a catalog digest pinned elsewhere", _catalog_pinned_elsewhere, r"\[catalog_pin\]"),
@@ -398,3 +457,59 @@ def test_a_document_is_refused_against_another_descriptor():
             catalogs=FIXTURE.CATALOGS,
             descriptor_path=CITY_V1_DESCRIPTOR_PATH,
         )
+
+
+# -------------------------------------------------------------------------------------------
+# Tile membership
+
+
+def test_the_halo_rule_is_extent_based():
+    assert HALO_RULES == ("extent_meets_grown_square",)
+    assert FIXTURE.tile.halo_rule == "extent_meets_grown_square"
+    assert halo_square(FIXTURE.tile) == (-64_000, -64_000, 192_000, 192_000)
+
+
+@pytest.mark.parametrize(
+    "anchor,extent,expected",
+    [
+        ((0, 0), Extent(0, 0, 0, 0, 0, 0), OWNED),
+        ((127_999, 127_999), Extent(-900_000, 0, 0, 127_999, 127_999, 0), OWNED),
+        ((128_000, 0), Extent(128_000, 0, 0, 128_000, 0, 0), HALO),
+        ((-1, 0), Extent(-1, 0, 0, -1, 0, 0), HALO),
+        # Anchored far outside the grown square, and still crossing the tile.
+        ((540_000, 5_000), Extent(180_000, 0, 0, 900_000, 10_000, 0), HALO),
+        ((540_000, 5_000), Extent(-900_000, 60_000, 0, 900_000, 60_000, 0), HALO),
+        (None, Extent(-10, -10, 0, 10, 10, 0), HALO),
+        # The grown square's north and east edges belong to the next tiles' squares.
+        ((500_000, 0), Extent(192_000, 0, 0, 900_000, 0, 0), OUTSIDE_TILE),
+        ((0, 500_000), Extent(0, 192_000, 0, 0, 900_000, 0), OUTSIDE_TILE),
+        ((-500_000, 0), Extent(-900_000, 0, 0, -64_001, 0, 0), OUTSIDE_TILE),
+        ((-500_000, 0), Extent(-900_000, 0, 0, -64_000, 0, 0), HALO),
+        (None, Extent(-900_000, -900_000, 0, -64_001, 900_000, 0), OUTSIDE_TILE),
+    ],
+)
+def test_membership_reads_the_anchor_for_ownership_and_the_extent_for_the_halo(
+    anchor, extent, expected
+):
+    assert membership(FIXTURE.tile, anchor, extent) == expected
+
+
+def test_a_block_anchored_beyond_the_grown_square_that_reaches_the_tile_is_carried_as_halo():
+    block = _far_block(191_999)
+    assert block.centroid_x_mm > 192_000
+    report = _validate(_document(add_halo=(block,)))
+    assert report.record_counts["city.block"] == 2
+    with pytest.raises(InvalidRecordError, match=r"\[membership\]"):
+        _validate(_document(add_owned=(block,)))
+
+
+def test_every_record_kind_without_an_extent_names_the_record_it_relates_to():
+    without = {
+        shape.record_type
+        for shape in CITY_SHAPES
+        if not shape.extent_field and shape.kind != "city.tile"
+    }
+    assert without == set(RELATION_FIELDS)
+    for record_type, field in RELATION_FIELDS.items():
+        shape = next(item for item in CITY_SHAPES if item.record_type is record_type)
+        assert shape.field(field).kind == "identity"

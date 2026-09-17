@@ -2636,7 +2636,7 @@
           "kind": "choice",
           "name": "halo_rule",
           "values": [
-            "chebyshev_square"
+            "extent_meets_grown_square"
           ]
         },
         {
