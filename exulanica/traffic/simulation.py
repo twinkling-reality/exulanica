@@ -1048,6 +1048,14 @@ def _region(
     return tuple(sorted(set(zones))), tuple(sorted(bands)), exit_lane, extent + vehicle.length
 
 
+def _along(vehicle: Vehicle, network: RoadNetwork, lane: str) -> int | None:
+    """The front's position on ``lane``, negative by the distance still to go before reaching it."""
+    if vehicle.path == lane:
+        return vehicle.position
+    distance = _route_distance(vehicle, network, lane, 0)
+    return None if distance is None else -distance
+
+
 def _exit_room(
     step: _Step, vehicle: Vehicle, lane: str, clear_position: int, transit_ids: set[str]
 ) -> tuple[bool, int]:
@@ -1055,17 +1063,27 @@ def _exit_room(
 
     ``clear_position`` is where this vehicle's front must reach on ``lane``. Returns the verdict
     and the latest ``clear_by`` among the vehicles in transit ahead.
+
+    A vehicle in transit is assumed to move on beyond its own clear point, except one ahead
+    whose trip ends on this lane: it stops at its space and stands there for its parking
+    manoeuvre, so its parked rear is an obstacle like any body beyond. Without that, a follower
+    admitted behind it would be held inside the region it was admitted to cross.
     """
     network = step.network
     needed = clear_position
     latest = step.second
+    region_start = clear_position - vehicle.length
+    anchor = network.paths[lane].length + vehicle.vehicle_class.minimum_gap_mm
+    own = _along(vehicle, network, lane)
     for other_id in sorted(transit_ids):
         other = step.vehicles[other_id]
         needed += other.length + other.vehicle_class.minimum_gap_mm
         assert other.reservation is not None
         latest = max(latest, other.reservation.clear_by)
-    region_start = clear_position - vehicle.length
-    anchor = network.paths[lane].length + vehicle.vehicle_class.minimum_gap_mm
+        if other.route[-1] == lane and own is not None:
+            ahead = _along(other, network, lane)
+            if ahead is not None and ahead > own:
+                anchor = min(anchor, _target_position(other, network) - other.length)
     for rear, front, other_id in step.bodies.get(lane, []):
         if other_id in transit_ids or other_id == vehicle.vehicle_id:
             continue
