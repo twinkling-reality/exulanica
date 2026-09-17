@@ -129,6 +129,25 @@ lanes, nodes and dressings are not surfaces of their own, and say so.
 Every vertex of a drawn range must lie inside the extent its record states, or the tile is
 refused.
 
+## Building blocks not yet wired
+
+These are exact, tested and called by no bake yet, so they change no container. Each is wired in
+by the expander that needs it, with a new tessellator version.
+
+- `src/core/integer-math.ts` has checked integer arithmetic. It refuses any result a double would
+  round, and gives floor division and the floor square root with no `Math`.
+- `src/core/facing.ts` has the facing rule. It turns a local offset by an integer direction
+  vector, scaled toward the grammar's direction bound and then floored.
+- `src/core/ring-triangulation.ts` has the ring rule. It checks a ring by the grammar's own tests,
+  then cuts it by ear clipping into counter-clockwise triangles on the ring's own vertices, in a
+  stated order.
+- `src/core/fillet-arc.ts` has the fillet arc rule. It builds the corner between two kerb lines
+  by integer chord bisection round a centre found from both tangent points. The segment count is
+  an argument; `filletSegmentsWithin` finds the least power of two within a given sagitta, and no
+  sagitta is chosen here.
+
+`test/geometry-blocks.test.ts` holds each to its stated properties and pins one output of each.
+
 ## The triangle digest
 
 `src/core/triangle-digest.ts` defines it. Version 1 was written before either build; version 2
