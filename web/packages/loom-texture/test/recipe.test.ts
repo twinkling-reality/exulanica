@@ -4,13 +4,13 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it } from 'vitest';
 import { canonicalJson } from '../src/canonical-json.js';
-import { LIBRARY } from '../src/catalog.js';
+import { DRAFTS, LIBRARY } from '../src/catalog.js';
 import {
   formatLibrarySource,
   libraryEntryProblems,
   readLibrary,
 } from '../src/library.js';
-import { MAKERS, makerFor } from '../src/makers/index.js';
+import { DRAFT_MAKERS, MAKERS, makerFor } from '../src/makers/index.js';
 import {
   type MakerManifest,
   type Recipe,
@@ -180,19 +180,32 @@ describe('the shared cases', () => {
 });
 
 describe('maker manifests', () => {
-  it('are well formed, canonical, and sorted by id', () => {
-    for (const maker of MAKERS) {
+  it('are well formed, canonical, and sorted by id, drafts among them', () => {
+    for (const maker of [...MAKERS, ...DRAFT_MAKERS]) {
       expect(manifestProblems(maker.manifest), maker.manifest.maker_id).toEqual([]);
       expect(() => canonicalJson(maker.manifest)).not.toThrow();
     }
-    const ids = MAKERS.map((maker) => maker.manifest.maker_id);
-    expect(ids).toEqual([...ids].sort());
+    for (const makers of [MAKERS, DRAFT_MAKERS]) {
+      const ids = makers.map((maker) => maker.manifest.maker_id);
+      expect(ids).toEqual([...ids].sort());
+    }
+    const ids = [...MAKERS, ...DRAFT_MAKERS].map((maker) => maker.manifest.maker_id);
     expect(new Set(ids).size).toBe(ids.length);
   });
 
-  it('name each family once, so a family names its maker', () => {
-    const families = MAKERS.map((maker) => maker.manifest.family);
+  it('name each family once, so a family names its maker, drafts among them', () => {
+    const families = [...MAKERS, ...DRAFT_MAKERS].map((maker) => maker.manifest.family);
     expect(new Set(families).size).toBe(families.length);
+  });
+
+  it('of a draft maker have a draft set to be tested by, and no published recipe can name one', () => {
+    for (const maker of DRAFT_MAKERS) {
+      const { maker_id: id, version } = maker.manifest;
+      expect(DRAFTS.filter((source) => source.maker === maker).length, id).toBeGreaterThan(0);
+      expect(() => makerFor(id, version), id).toThrow(`no maker ${id} version ${version}`);
+      expect(LIBRARY.some((source) => source.entry.recipe.maker.id === id), id).toBe(false);
+    }
+    expect(DRAFTS.every((source) => DRAFT_MAKERS.includes(source.maker))).toBe(true);
   });
 
   it('resolve by exact id and version, or not at all', () => {

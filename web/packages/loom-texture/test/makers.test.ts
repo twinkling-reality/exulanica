@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { LIBRARY, definitionOf } from '../src/catalog.js';
-import { encodeContainer } from '../src/container.js';
+import { DRAFTS, LIBRARY, definitionOf } from '../src/catalog.js';
+import { SET_PROFILE_V1 } from '../src/classes.js';
+import { encodeContainer, encodeContainerV2 } from '../src/container.js';
 import type { LibrarySet } from '../src/library.js';
-import { bakeMaps, sampleFields } from '../src/maps.js';
+import { bakeClassMaps, bakeMaps, sampleFields } from '../src/maps.js';
 import {
   type Control,
   type ParameterValue,
@@ -25,6 +26,7 @@ import { FIELD_NAMES, rollMismatches } from './support.js';
  * by construction, and state each of its integer controls, if it states one at all, under that
  * control's own key with that control's value, which is what the backend checks a header against.
  * Variants the validator refuses are counted, and most of each maker's corners must be reachable.
+ * Draft makers, whose sets are not published yet, are held to all of this from their draft entries.
  */
 const SIDE = 32;
 const SHIFT: readonly [number, number] = [-SIDE - 5, 2 * SIDE + 3];
@@ -77,8 +79,11 @@ function checkStated(source: LibrarySet, recipe: Recipe, label: string): void {
 function checkBakes(source: LibrarySet, recipe: Recipe, label: string): void {
   checkStated(source, recipe, label);
   const def = definitionOf({ ...source, entry: { ...source.entry, recipe } });
-  const maps = bakeMaps(def);
-  expect(() => encodeContainer(def, maps, '0'.repeat(64)), label).not.toThrow();
+  if (def.containerProfile === SET_PROFILE_V1) {
+    expect(() => encodeContainer(def, bakeMaps(def), '0'.repeat(64)), label).not.toThrow();
+  } else {
+    expect(() => encodeContainerV2(def, bakeClassMaps(def), '0'.repeat(64)), label).not.toThrow();
+  }
   const [du, dv] = SHIFT;
   const base = sampleFields(def);
   const shifted = sampleFields(def, { offsetU: du, offsetV: dv });
@@ -92,10 +97,12 @@ function checkBakes(source: LibrarySet, recipe: Recipe, label: string): void {
 
 describe('every maker bakes whatever it accepts', () => {
   it('states its published recipes\' integer controls under their own keys, or not at all', () => {
-    for (const source of LIBRARY) checkStated(source, source.entry.recipe, source.entry.set_id);
+    for (const source of [...LIBRARY, ...DRAFTS]) {
+      checkStated(source, source.entry.recipe, source.entry.set_id);
+    }
   });
 
-  for (const source of LIBRARY) {
+  for (const source of [...LIBRARY, ...DRAFTS]) {
     const { manifest } = source.maker;
     it(`${manifest.maker_id}, at the corners of every control`, () => {
       let baked = 0;

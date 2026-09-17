@@ -26,7 +26,18 @@ export const MAKERS: readonly Maker[] = Object.freeze(
   ].sort((a, b) => (a.manifest.maker_id < b.manifest.maker_id ? -1 : 1)),
 );
 
-for (const maker of MAKERS) {
+/**
+ * Makers written and tested but not yet published, sorted by id. Each joins `MAKERS` in the commit
+ * that publishes its first set, pins that set in a migration, and moves the set's entry from
+ * `library-drafts/` to `library/`. Until then no published recipe can name one: `readLibrary`
+ * resolves the library against `MAKERS` alone, and only this package's tests and inspection read
+ * the drafts.
+ */
+export const DRAFT_MAKERS: readonly Maker[] = Object.freeze(
+  ([] as Maker[]).sort((a, b) => (a.manifest.maker_id < b.manifest.maker_id ? -1 : 1)),
+);
+
+for (const maker of [...MAKERS, ...DRAFT_MAKERS]) {
   const problems = manifestProblems(maker.manifest);
   if (problems.length > 0) {
     throw new Error(`${maker.manifest.maker_id} has a malformed manifest: ${problems.join('; ')}`);

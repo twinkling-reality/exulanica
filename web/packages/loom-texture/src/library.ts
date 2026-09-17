@@ -26,6 +26,8 @@ import { StrictJsonError, parseStrictJsonBytes } from './strict-json.js';
  */
 export const LIBRARY_PACKAGE = '@exulanica/loom-texture';
 export const LIBRARY_FOLDER = 'library';
+/** Entries for sets whose makers are drafts (`DRAFT_MAKERS`): tested and inspected, never published. */
+export const DRAFT_FOLDER = 'library-drafts';
 /** Identical to `asset_key` in migration 0042, and to `set_id` in migration 0065. */
 export const SET_ID_PATTERN = /^[a-z][a-z0-9.-]*$/;
 /** A set id names a surface. It never carries a version or a digest. */
@@ -75,7 +77,7 @@ export function packageRoot(): string {
 }
 
 /** Why `candidate` is not a library entry, or an empty list. The recipe is checked in full. */
-export function libraryEntryProblems(candidate: unknown): string[] {
+export function libraryEntryProblems(candidate: unknown, makers: readonly Maker[] = MAKERS): string[] {
   if (!isObject(candidate)) return ['a library entry is an object'];
   const present = Object.keys(candidate).sort();
   const wanted = [...ENTRY_KEYS].sort();
@@ -95,7 +97,7 @@ export function libraryEntryProblems(candidate: unknown): string[] {
   if (!isText(title) || !isText(summary)) problems.push('title and summary are non-empty printable ASCII');
   if (licenceId !== LICENCE_ID) problems.push(`licence_id is ${LICENCE_ID}`);
   const named = isObject(recipe) && isObject(recipe.maker) ? recipe.maker : undefined;
-  const maker = MAKERS.find(
+  const maker = makers.find(
     (candidateMaker) => named !== undefined
       && candidateMaker.manifest.maker_id === named.id
       && candidateMaker.manifest.version === named.version,
@@ -117,7 +119,10 @@ function deepFreeze<T>(value: T): T {
 }
 
 /** Every entry in the library directory, checked, frozen and sorted by set id; or a refusal. */
-export function readLibrary(directory: string = join(packageRoot(), LIBRARY_FOLDER)): readonly LibrarySet[] {
+export function readLibrary(
+  directory: string = join(packageRoot(), LIBRARY_FOLDER),
+  makers: readonly Maker[] = MAKERS,
+): readonly LibrarySet[] {
   const sets: LibrarySet[] = [];
   for (const name of readdirSync(directory).sort()) {
     const path = join(directory, name);
@@ -129,11 +134,11 @@ export function readLibrary(directory: string = join(packageRoot(), LIBRARY_FOLD
       if (error instanceof StrictJsonError) throw new Error(`${path}: ${error.message}`);
       throw error;
     }
-    const problems = libraryEntryProblems(candidate);
+    const problems = libraryEntryProblems(candidate, makers);
     if (problems.length > 0) throw new Error(`${path}: ${problems.join('; ')}`);
     const entry = deepFreeze(candidate as LibraryEntry);
     if (name !== `${entry.set_id}.json`) throw new Error(`${path} must be named ${entry.set_id}.json`);
-    const maker = MAKERS.find(
+    const maker = makers.find(
       (candidateMaker) => candidateMaker.manifest.maker_id === entry.recipe.maker.id
         && candidateMaker.manifest.version === entry.recipe.maker.version,
     )!;

@@ -1,8 +1,10 @@
+import { join } from 'node:path';
 import { RELIEF_CLASSES, SET_PROFILE_V1, SET_PROFILE_V2 } from './classes.js';
 import { cavityOf, heightRangeOf } from './controls.js';
 import type { TextureSetDefinition } from './definition.js';
-import { type LibrarySet, readLibrary } from './library.js';
+import { DRAFT_FOLDER, type LibrarySet, packageRoot, readLibrary } from './library.js';
 import type { Maker } from './maker.js';
+import { DRAFT_MAKERS } from './makers/index.js';
 import { MAKER_PROFILE, type Recipe, materialClassOf } from './recipe.js';
 
 /**
@@ -71,3 +73,12 @@ export function recipeDefinition(
 export const LIBRARY: readonly LibrarySet[] = readLibrary();
 
 export const CATALOG: readonly TextureSetDefinition[] = Object.freeze(LIBRARY.map(definitionOf));
+
+/**
+ * Draft sets: entries in `library-drafts/`, each naming a draft maker. They are baked by this
+ * package's tests and by inspection, and published by nothing, until their makers join `MAKERS`.
+ * The folder exists exactly while there are draft makers, so none means no folder to read.
+ */
+export const DRAFTS: readonly LibrarySet[] = DRAFT_MAKERS.length === 0
+  ? Object.freeze([])
+  : readLibrary(join(packageRoot(), DRAFT_FOLDER), DRAFT_MAKERS);
