@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // Node's types and no lib.dom. The CLI reads a file, calls core, hashes and writes.
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "outDir": "dist",
+    "rootDir": ".",
+    "tsBuildInfoFile": "dist/node.tsbuildinfo"
+  },
+  "include": ["src/node/**/*.ts"],
+  "references": [{ "path": "./tsconfig.core.json" }]
+}

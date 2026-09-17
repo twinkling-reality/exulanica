@@ -1,10 +1,12 @@
 {
-  "extends": "../../tsconfig.base.json",
-  "compilerOptions": {
-    "lib": ["ES2022"],
-    "types": ["node"],
-    "outDir": "dist",
-    "rootDir": "."
-  },
-  "include": ["src/**/*.ts", "test/**/*.ts"]
+  // The fence is these four projects, not a comment. Each compiles alone with its own `lib` and
+  // `types`, so a Node builtin named in src/core or a DOM global named in src/node is a type
+  // error in the project that names it. See README.md, "The fence".
+  "files": [],
+  "references": [
+    { "path": "./tsconfig.core.json" },
+    { "path": "./tsconfig.node.json" },
+    { "path": "./tsconfig.browser.json" },
+    { "path": "./tsconfig.test.json" }
+  ]
 }

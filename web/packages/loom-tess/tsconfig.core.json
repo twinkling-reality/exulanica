@@ -1,0 +1,14 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // ES2022 and nothing else: no lib.dom and no @types/node. `document`, `window`, `Buffer`,
+    // `process`, `TextEncoder`, `crypto` and every `node:` module are compile errors here. The
+    // tessellator is the one source both builds compile, so it may name neither host.
+    "lib": ["ES2022"],
+    "types": [],
+    "outDir": "dist",
+    "rootDir": ".",
+    "tsBuildInfoFile": "dist/core.tsbuildinfo"
+  },
+  "include": ["src/core/**/*.ts"]
+}

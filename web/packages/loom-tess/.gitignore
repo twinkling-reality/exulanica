@@ -1,0 +1,5 @@
+# web/.gitignore ignores every `fixtures/` directory, for scene-synth's generated bake-off files.
+# This package's fixtures are hand written, small, and are what the conformance digest and the
+# refusal tests read, so a fresh checkout without them would fail for a reason unrelated to any
+# change. Re-include them here, where this package owns the rule.
+!test/fixtures/
