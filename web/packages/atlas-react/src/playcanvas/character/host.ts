@@ -337,7 +337,9 @@ export class CharacterHost {
             name: `character:${ref.assetKey}:${index}`,
             width: bitmap.width,
             height: bitmap.height,
-            format: index === material.roles.baseColor ? pc.PIXELFORMAT_SRGBA8 : pc.PIXELFORMAT_RGBA8,
+            // Colour decodes as sRGB; an opacity-only image needs one channel, a quarter of RGBA.
+            format: index === material.roles.baseColor ? pc.PIXELFORMAT_SRGBA8
+              : index === material.roles.opacity ? pc.PIXELFORMAT_R8 : pc.PIXELFORMAT_RGBA8,
             mipmaps: true,
             minFilter: pc.FILTER_LINEAR_MIPMAP_LINEAR,
             magFilter: pc.FILTER_LINEAR,
