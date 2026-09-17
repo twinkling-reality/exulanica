@@ -222,10 +222,16 @@ describe('society crowd', () => {
     });
     // Staggered, so no frame carries more than its share: 4 + 8 / 2 + 12 / 3.
     expect(new Set(window.perFrame)).toEqual(new Set([12]));
-    // A jump is never carried: every full character is posed from scratch.
+    // Ranks follow the observer: p023 is now nearest and p011 is 12 m away, rank 18.
+    crowd.refresh([23, 0]);
+    const moved = run(60, 60);
+    expect(moved.poses.get('p023')!.length).toBe(60);
+    expect(moved.poses.get('p011')!.length).toBe(20);
+    // A jump is never carried: every full character's next pose starts from scratch.
+    const beforeJump = new Map([...poses].map(([id, list]) => [id, list.length]));
     crowd.set(v4(5, scene.people(1)), [0, 0], { nowMs: 0, intervalMs: 60_000 });
     for (const id of crowd.drawnIds.slice(0, crowd.counts.near)) {
-      expect(poses.get(id)!.at(-1)!.discontinuity, id).toBe(true);
+      expect(poses.get(id)![beforeJump.get(id) ?? 0]?.discontinuity, id).toBe(true);
     }
     crowd.destroy();
     app.destroy();
