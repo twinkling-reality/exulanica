@@ -30,7 +30,7 @@
       "lichen_colour": [132, 138, 108],
       "plate_cells_across": 14,
       "plate_cells_down": 4,
-      "furrow_width_mm": 34,
+      "furrow_width_mm": 16,
       "furrow_depth_mm": 12,
       "sway_mm": 30,
       "sway_cells": 3,

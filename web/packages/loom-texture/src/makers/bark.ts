@@ -32,9 +32,9 @@ import { MM, TILE } from '../tile.js';
  *
  * What the version fixes, each with its reason:
  *
- *   - A furrow's profile: it deepens smoothly from a plate's face to the line where two plates
- *     meet, over the stated furrow width, so a furrow is a groove and not a step. A crack has the
- *     same profile over its own width.
+ *   - A furrow's profile: a flat floor as wide as its two walls together, and walls that rise
+ *     smoothly to a plate's flat top, so a plate reads as a flat-topped block between channels,
+ *     the way bark splits, rather than a dome. A crack is a groove over its own width.
  *   - A furrow's width is measured across the trunk and a crack's down it. The cellular field
  *     measures distance in cells, so a furrow running straight along the trunk, or a crack straight
  *     around it, has the stated width, and one at a slant is wider.
@@ -71,7 +71,7 @@ export const barkManifest: ProceduralMakerManifest = {
       'How many plates fit across one tile, around the trunk.'),
     integer('plate_cells_down', 'module', 'cells_per_tile', [1, 64], 4, 'Plates down',
       'How many plate lengths fit down one tile, along the trunk.'),
-    integer('furrow_width_mm', 'module', 'mm', [1, 60], 34, 'Furrow width',
+    integer('furrow_width_mm', 'module', 'mm', [1, 60], 16, 'Furrow width',
       'How wide a furrow is, measured across the trunk.'),
     integer('furrow_depth_mm', 'relief', 'mm', [0, 48], 12, 'Furrow depth',
       'How far a furrow sinks below the plates beside it.'),
@@ -161,8 +161,8 @@ function pattern(recipe: Recipe): Pattern {
   return (x, y, out) => {
     const shift = floorDiv((fbm(x, y, platesAcross, swayCells, swaySeed, 2) - 32768) * sway, 32768);
     cells(x + shift, y, platesAcross, platesDown, plateSeed, ONE, plates);
-    // 0 on the line where two plates meet, ONE from a furrow's width away onto a plate face.
-    const face = smoothstep(0, furrowCells, plates.second - plates.nearest);
+    // 0 across a furrow's floor, rising up its wall to ONE on the flat top of a plate.
+    const face = smoothstep(floorDiv(furrowCells, 2), furrowCells, plates.second - plates.nearest);
 
     cells(x + shift, y, cracksAcross, cracksDown, crackSeed, ONE, cracks);
     const crack = ONE - smoothstep(0, crackCells, cracks.second - cracks.nearest);
