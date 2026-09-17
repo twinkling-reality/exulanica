@@ -6,9 +6,12 @@ now lives in ``local_roles.depth``. The move is safe only if every artifact iden
 is unchanged, so the values below were recorded on main at 42f296bf, before the move, by the same
 computation this module repeats, and are compared byte for byte.
 
-The two whole-registry digests were recorded again on main at e76503fd, still before the move, when
-the tile bake stage ``baked_tile`` joined the registry. That stage moves only those two values:
-every stage recorded at 42f296bf kept its own parameter digest, and every other value is unchanged.
+The pin reaches an identity through the depth stage's own record, the depth and vision bindings,
+the manifest's pipeline version and its segmentation roles, so those are what is pinned.
+``pipeline_digest`` reads every stage record and the bindings, and the move reaches it only through
+the ones pinned here. The digest of the whole stage registry is not pinned: every stage added or
+changed later moves it, and a value from before the move cannot be recorded again once the code
+that chose MoGe from the environment is gone.
 """
 
 from __future__ import annotations
@@ -24,7 +27,7 @@ from exulanica.canonical import sha256_of_canonical
 from exulanica.evidence.blob import BlobId
 from exulanica.ingest import worker_command
 from exulanica.ingest.personal_admission import role_handoff
-from exulanica.ingest.stages import STAGES, idempotency_key, input_digest_of, pipeline_digest, stage
+from exulanica.ingest.stages import STAGES, idempotency_key, input_digest_of, stage
 from exulanica.ingest.stages import depth as depth_stage
 from exulanica.ingest.stages.segmentation import (
     DEPTH_ROLE,
@@ -37,14 +40,13 @@ from exulanica.models.handoff import ModelHandoff, ModelIdentity
 from exulanica.models.manifest import MANIFEST_PATH, Role, load_manifest
 from exulanica.reconstruction import moge
 
-#: Recorded with the depth pin still in worker defaults: on main 42f296bf, and the two
-#: whole-registry digests again on main e76503fd.
+#: Recorded on main 42f296bf with the depth pin still in worker defaults.
 GOLDEN = {
     "depth_model_id": "Ruicheng/moge-2-vitl@39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
     "depth_key": "b61967020fae53eedf34d3ca0b9e67a5365e743b41b265de99ef1c0bc97c3e4f",
-    "pipeline_digest": "05becde891860583",
+    "depth_stage": [2, "c54dedd4c66b4748319bb5ead477f21ab4e9b8b2d118a5d90429d9cfafcf8c6f"],
+    "vision_model_id": "MiniMaxAI/MiniMax-M3",
     "pipeline_version": 3,
-    "stages_digest": "1ece64d3241453c4dee81b4b5661a16beb30e88e29a27051f1003ca3c0a51817",
     "local_roles_digest": "1ec7d3a7f36817d12a975c5b0a48461d96cf27db1ad7d37cee29a699be7837a5",
     "blob": "e4f90aa67ee4c3c76b62f706472fe2e6d8072ed92ac8151e048492d490a60fee",
     "inputs": "fd2b925e8379846ee7ea096f62a44a127d70deb6baba9e9d3339869ec0f9e0fe",
@@ -123,14 +125,10 @@ def test_moving_the_depth_pin_into_the_manifest_re_keys_no_artifact(loaded):
     assert key == GOLDEN["depth_key"]
 
     manifest = load_manifest()
-    bindings = {
-        "vision": {"model_id": manifest[Role.VISION].primary.model_id},
-        "depth": depth_binding,
-    }
-    assert pipeline_digest(bindings) == GOLDEN["pipeline_digest"]
+    assert manifest[Role.VISION].primary.model_id == GOLDEN["vision_model_id"]
     assert manifest.pipeline_version == GOLDEN["pipeline_version"]
-    params = {key: [spec.version, spec.params_digest.hex()] for key, spec in sorted(STAGES.items())}
-    assert sha256_of_canonical(params).hex() == GOLDEN["stages_digest"]
+    depth_record = STAGES["depth"]
+    assert [depth_record.version, depth_record.params_digest.hex()] == GOLDEN["depth_stage"]
     pins = {
         name: [role.primary.as_identity(), role.fallback.as_identity() if role.fallback else None]
         for name, role in sorted(local_model_roles().items())
