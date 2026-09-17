@@ -1,0 +1,21 @@
+Import wall mutation checks, 2026-09-17T17:51:18Z, branch lane/generated-appearance at 534ac8c8cc2534c77d1963622717f28295298080, clean tree
+Each mutant is applied to the committed tree, run with python -B, then restored from git.
+A first run on 2026-09-17 put M1 in exulanica/__init__.py; the package is absent from the product environment, so collection failed before any test ran. M1 is a static import instead.
+
+== baseline
+8 passed in 3.39s
+Contracts: 10 kept, 0 broken.
+== M1: the product imports the appearance package statically (exulanica/materials/classes.py gains 'if False: import exulanica_appearance')
+FAILED tests/test_training_boundary.py::test_nothing_in_the_product_imports_the_generated_appearance_code
+1 failed, 7 passed in 2.79s
+The product never imports the generated appearance code BROKEN
+Contracts: 9 kept, 1 broken.
+== M2: the appearance package imports the product (sheets.py gains 'import exulanica')
+FAILED tests/test_training_boundary.py::test_the_generated_appearance_code_reaches_nothing_of_the_product
+1 failed, 7 passed in 2.45s
+== M3: torch enters the base environment (ml/appearance/pyproject.toml dependencies gain torch)
+FAILED tests/test_training_boundary.py::test_the_generated_appearance_code_keeps_model_libraries_out_of_its_base_environment
+1 failed, 7 passed in 5.43s
+== after restore
+8 passed in 3.22s
+Contracts: 10 kept, 0 broken.
