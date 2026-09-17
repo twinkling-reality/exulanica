@@ -39,7 +39,7 @@ describe('generated tile evaluation entry: who may ask', () => {
 const MARKERS = [
   GENERATED_TILE_EVALUATION_ATTRIBUTE,
   'Development evaluation of generated tile',
-  'The range cites no surface_material record.',
+  'No surface_material record dresses this range: the tile states that none exists.',
   'generated-tile-sky',
   'exulanica/owd-triangle-digest',
 ] as const;

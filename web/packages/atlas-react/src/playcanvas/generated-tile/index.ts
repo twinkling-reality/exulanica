@@ -31,7 +31,7 @@ export { createUnavailableMaterial, unavailablePatternTexels } from './unavailab
 export type { DrawnTileRange, GeneratedTileRange, GeneratedTileSources, LoadedGeneratedTile, TilePick } from './tile-runtime.js';
 export {
   GeneratedTileRefusal,
-  MATERIAL_NOT_CITED,
+  MATERIAL_NONE_EXISTS_REASON,
   MATERIAL_PLACEMENT_UNSTATED,
   loadGeneratedTile,
 } from './tile-runtime.js';

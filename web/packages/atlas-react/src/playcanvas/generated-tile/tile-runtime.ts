@@ -2,6 +2,7 @@ import * as pc from 'playcanvas';
 import type { TextureSetDigest, TextureSetManifest, TextureSetManifestEntry } from '@exulanica/atlas-core';
 import {
   IDENTITY_NOT_STATED,
+  MATERIAL_NONE_EXISTS,
   OwdError,
   absoluteSurfaceCoordinates,
   absoluteVertices,
@@ -36,9 +37,12 @@ import { rendererToTile, tileNavigation, tileToRenderer, type TileExtentMm, type
  * WHAT IS DRAWN. Only `render_batch`, and only its drawn ranges, each exactly as stored. A drawn
  * range is textured when it cites a `surface_material` record that states its placement (version 2)
  * and whose texture set is pinned and verifies; its UVs come from the container's own surface
- * coordinates through `surfaceUv`. Otherwise it is the stated unavailable surface, and the reason is
- * kept. A range that is not drawn has no geometry at all and is listed with the needs the
- * tessellator stated. No vertex is invented and no default mesh stands in for a missing one.
+ * coordinates through `surfaceUv`. A drawn range whose material is `none-exists` (exact geometry no
+ * material record dresses) is drawn, as the stated unavailable surface, and so is a range whose
+ * material cannot be resolved; the reason is kept. An `unavailable` entry is geometry the
+ * tessellator has not produced yet: it has no triangles and is listed with the needs tess stated.
+ * A `halo` entry is context from a neighbouring record, never drawn and never listed. No vertex is
+ * invented and no default mesh stands in for a missing one.
  *
  * WHAT IS KEPT FOR PICKING. Every triangle maps back to its record: `rangeAtTriangle` answers
  * "which record is this triangle", each range carries its record's extent, and `pick` answers both
@@ -48,7 +52,8 @@ import { rendererToTile, tileNavigation, tileToRenderer, type TileExtentMm, type
  * exists, so an attached tile is complete on its first frame.
  */
 
-export const MATERIAL_NOT_CITED = 'The range cites no surface_material record.';
+/** A drawn range whose material is `none-exists`: no surface_material record dresses it. */
+export const MATERIAL_NONE_EXISTS_REASON = 'No surface_material record dresses this range: the tile states that none exists.';
 export const MATERIAL_PLACEMENT_UNSTATED =
   'The cited surface_material is version 1, which does not state how its texture is placed; version 2 does.';
 
@@ -161,7 +166,9 @@ async function plan(
   for (const entry of render.header.entries) {
     if (entry.state !== 'drawn') continue;
     const material = entry.material;
-    if (material === undefined || material.state !== 'record') { cited.set(entry.record, MATERIAL_NOT_CITED); continue; }
+    // tess's decoder requires a material on every drawn range of a projection that carries surfaces.
+    if (material === undefined) throw new GeneratedTileRefusal(`A render_batch range of record ${entry.record} states no material.`);
+    if (material.state === MATERIAL_NONE_EXISTS) { cited.set(entry.record, MATERIAL_NONE_EXISTS_REASON); continue; }
     const reference = materialReference(records[material.record]!);
     if (typeof reference === 'string') cited.set(entry.record, reference);
     else references.set(entry.record, reference);
@@ -200,7 +207,7 @@ async function plan(
       case 'unavailable':
         ranges.push({
           record: entry.record, kind: record.kind, identity, state: 'unavailable', needs: entry.needs,
-          reason: `Not drawn: the record lacks ${entry.needs.join(', ')}.`,
+          reason: `Not drawn yet: its geometry waits on ${entry.needs.join(', ')}.`,
         });
         break;
       case 'not_admitted':
@@ -209,8 +216,12 @@ async function plan(
           reason: 'Not drawn: its grammar does not admit render_batch.',
         });
         break;
+      // Not a surface of this projection, or context from a neighbour: neither is drawn or listed.
       case 'not_in_projection':
+      case 'halo':
         break;
+      default:
+        throw new GeneratedTileRefusal(`A render_batch entry has a state this runtime was not written for: ${String((entry as { state: unknown }).state)}.`);
     }
   }
   return { ranges, references, prepared };
