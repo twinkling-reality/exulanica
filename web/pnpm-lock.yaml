@@ -71,6 +71,9 @@ importers:
       '@exulanica/graph-client':
         specifier: workspace:*
         version: link:../graph-client
+      '@exulanica/loom-tess':
+        specifier: workspace:*
+        version: link:../loom-tess
       '@exulanica/presentation':
         specifier: workspace:*
         version: link:../presentation

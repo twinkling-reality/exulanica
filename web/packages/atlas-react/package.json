@@ -12,6 +12,7 @@
     "@exulanica/atlas-core": "workspace:*",
     "@exulanica/companion-runtime": "workspace:*",
     "@exulanica/graph-client": "workspace:*",
+    "@exulanica/loom-tess": "workspace:*",
     "@exulanica/presentation": "workspace:*",
     "@exulanica/world-index": "workspace:*"
   },
