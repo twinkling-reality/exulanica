@@ -149,6 +149,9 @@ function yielded(patch: TerrainPatch, stated: readonly CoveringTriangle[]): Yiel
 }
 
 /** Every claim of the rule, for one patch and its coverings, with `samples` seeded rational points. */
+/** How many shared-side crossings each call to `holdsTheRule` checked, for tests that need some. */
+export const crossingsChecked: number[] = [];
+
 export function holdsTheRule(patch: TerrainPatch, stated: readonly CoveringTriangle[], samples: number): Yielded {
   const result = yielded(patch, stated);
   const coverings = stated.filter((covering) => twice(...covering) !== 0);
@@ -182,6 +185,7 @@ export function holdsTheRule(patch: TerrainPatch, stated: readonly CoveringTrian
 
   // Watertight: each covering edge crossing a side two cells share, where the crossing bounds uncovered ground.
   const cells = patch.side - 1;
+  let checked = 0;
   for (const covering of coverings) {
     for (const [from, to] of [[covering[0], covering[1]], [covering[1], covering[2]], [covering[2], covering[0]]] as [Plan, Plan][]) {
       for (let line = 1; line < cells; line += 1) {
@@ -198,8 +202,15 @@ export function holdsTheRule(patch: TerrainPatch, stated: readonly CoveringTrian
           const low = Math.floor(numerator / denominator);
           const origin = axis === 0 ? patch.originY : patch.originX;
           if (low < origin || low + 1 > origin + span) continue;
-          const [cx, cy] = axis === 0 ? [at * denominator, numerator] : [numerator, at * denominator];
-          if (!uncovered(cx, cy, denominator)) continue;
+          // The crossing bounds uncovered ground when a point a thousandth of its denominator along
+          // the line, to either side, is uncovered.
+          const beside = [-1, 1].some((step) => {
+            const scale = 1000 * denominator;
+            const [bx, by] = axis === 0 ? [at * scale, 1000 * numerator + step] : [1000 * numerator + step, at * scale];
+            return uncovered(bx, by, scale);
+          });
+          if (!beside) continue;
+          checked += 1;
           const across = Math.floor((low - origin) / patch.cell);
           const keys = axis === 0
             ? [across * cells + line - 1, across * cells + line]
@@ -214,6 +225,7 @@ export function holdsTheRule(patch: TerrainPatch, stated: readonly CoveringTrian
       }
     }
   }
+  crossingsChecked.push(checked);
   return result;
 }
 

@@ -7,7 +7,7 @@
 import { describe, expect, it } from 'vitest';
 import { metCells } from '../src/core/terrain-yield.js';
 import type { TerrainPatch } from '../src/core/terrain-yield.js';
-import { flat, holdsTheRule, quad, seededCoverings, sequence, twice } from './terrain-yield-claims.js';
+import { crossingsChecked, flat, holdsTheRule, quad, seededCoverings, sequence, twice } from './terrain-yield-claims.js';
 
 describe('the terrain yield rule', () => {
   it('leaves a patch no covering meets as the grid', () => {
@@ -26,7 +26,10 @@ describe('the terrain yield rule', () => {
 
   it('yields to sloping strips, a covering wholly inside a cell, and one touching a corner', () => {
     const patch: TerrainPatch = { originX: 0, originY: 0, cell: 16, side: 5, heights: flat(5) };
+    crossingsChecked.length = 0;
     holdsTheRule(patch, quad([3, 10], [61, 29], [58, 38], [0, 19]), 400);
+    // The strip crosses the sides at x = 16, 32 and 48 off integer points: the watertight claim is exercised.
+    expect(crossingsChecked[0]).toBeGreaterThan(0);
     holdsTheRule(patch, quad([7, 60], [60, 3], [63, 7], [10, 64]), 400);
     holdsTheRule(patch, quad([20, 20], [27, 21], [26, 28], [19, 27]), 400);
     holdsTheRule(patch, [[[16, 16], [24, 18], [20, 25]]], 400);
