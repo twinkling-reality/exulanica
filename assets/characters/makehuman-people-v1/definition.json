@@ -1,0 +1,731 @@
+{
+  "profile": "exulanica.character-family-definition/v1",
+  "familyId": "makehuman-people/v1",
+  "label": "People",
+  "summary": "Fitted MakeHuman adults with interchangeable clothing, hair, skin and body shape, sharing one skeleton per body and Quaternius CC0 locomotion.",
+  "licence": {
+    "id": "CC0-1.0",
+    "file": "LICENSE.md"
+  },
+  "sources": {
+    "makehuman": {
+      "title": "MakeHuman system assets (CC0) through MPFB 2",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+    },
+    "motion": {
+      "title": "Quaternius Ultimate Modular Men locomotion",
+      "url": "https://quaternius.com/packs/ultimatemodularcharacters.html",
+      "asset": "../quaternius-modular-v2/hoodie.glb"
+    }
+  },
+  "rig": "mixamo_unity",
+  "clips": {
+    "Idle": "HumanIdle",
+    "Walk": "HumanWalk",
+    "Run": "HumanRun",
+    "Interact": "HumanInteract",
+    "Wave": "HumanWave"
+  },
+  "idleClip": "Idle",
+  "morphs": [
+    {
+      "key": "fullness-up",
+      "macro": {
+        "weight": 1.0
+      }
+    },
+    {
+      "key": "fullness-down",
+      "macro": {
+        "weight": 0.0
+      }
+    },
+    {
+      "key": "muscle-up",
+      "macro": {
+        "muscle": 1.0
+      }
+    },
+    {
+      "key": "muscle-down",
+      "macro": {
+        "muscle": 0.0
+      }
+    }
+  ],
+  "parameters": {
+    "fullness": {
+      "label": "Body fullness",
+      "negative": "fullness-down",
+      "positive": "fullness-up",
+      "min": -800,
+      "max": 1000,
+      "denominator": 1000
+    },
+    "muscle": {
+      "label": "Muscle definition",
+      "negative": "muscle-down",
+      "positive": "muscle-up",
+      "min": -800,
+      "max": 800,
+      "denominator": 1000
+    },
+    "height": {
+      "label": "Height",
+      "unit": "mm"
+    }
+  },
+  "bases": [
+    {
+      "baseId": "feminine",
+      "label": "Feminine body",
+      "macro": {
+        "gender": 0.0,
+        "age": 0.5,
+        "muscle": 0.5,
+        "weight": 0.5,
+        "height": 0.5,
+        "proportions": 0.5
+      },
+      "heightMillimetres": {
+        "min": 1520,
+        "max": 1800,
+        "default": 1660
+      },
+      "wearables": [
+        {
+          "slot": "eyes",
+          "source": "low-poly",
+          "kind": "eyes"
+        },
+        {
+          "slot": "brows",
+          "source": "eyebrow001",
+          "kind": "eyebrows"
+        },
+        {
+          "slot": "brows",
+          "source": "eyebrow006",
+          "kind": "eyebrows"
+        },
+        {
+          "slot": "brows",
+          "source": "eyebrow010",
+          "kind": "eyebrows"
+        },
+        {
+          "slot": "lashes",
+          "source": "eyelashes01",
+          "kind": "eyelashes"
+        },
+        {
+          "slot": "hair",
+          "source": "bob01",
+          "kind": "hair"
+        },
+        {
+          "slot": "hair",
+          "source": "bob02",
+          "kind": "hair"
+        },
+        {
+          "slot": "hair",
+          "source": "braid01",
+          "kind": "hair"
+        },
+        {
+          "slot": "hair",
+          "source": "long01",
+          "kind": "hair"
+        },
+        {
+          "slot": "hair",
+          "source": "ponytail01",
+          "kind": "hair"
+        },
+        {
+          "slot": "hair",
+          "source": "short02",
+          "kind": "hair"
+        },
+        {
+          "slot": "hair",
+          "source": "afro01",
+          "kind": "hair"
+        },
+        {
+          "slot": "outfit",
+          "source": "female_elegantsuit01",
+          "kind": "clothes",
+          "hideBit": 0
+        },
+        {
+          "slot": "outfit",
+          "source": "female_sportsuit01",
+          "kind": "clothes",
+          "hideBit": 1
+        },
+        {
+          "slot": "outfit",
+          "source": "female_casualsuit01",
+          "kind": "clothes",
+          "hideBit": 2
+        },
+        {
+          "slot": "outfit",
+          "source": "female_casualsuit02",
+          "kind": "clothes",
+          "hideBit": 3
+        },
+        {
+          "slot": "outfit",
+          "source": "male_casualsuit01",
+          "kind": "clothes",
+          "hideBit": 4
+        },
+        {
+          "slot": "outfit",
+          "source": "male_casualsuit03",
+          "kind": "clothes",
+          "hideBit": 5
+        },
+        {
+          "slot": "outfit",
+          "source": "male_casualsuit05",
+          "kind": "clothes",
+          "hideBit": 6
+        },
+        {
+          "slot": "outfit",
+          "source": "male_casualsuit06",
+          "kind": "clothes",
+          "hideBit": 7
+        },
+        {
+          "slot": "shoes",
+          "source": "shoes01",
+          "kind": "clothes",
+          "hideBit": 8
+        },
+        {
+          "slot": "shoes",
+          "source": "shoes02",
+          "kind": "clothes",
+          "hideBit": 9
+        },
+        {
+          "slot": "shoes",
+          "source": "shoes03",
+          "kind": "clothes",
+          "hideBit": 10
+        },
+        {
+          "slot": "shoes",
+          "source": "shoes04",
+          "kind": "clothes",
+          "hideBit": 11
+        },
+        {
+          "slot": "shoes",
+          "source": "shoes05",
+          "kind": "clothes",
+          "hideBit": 12
+        },
+        {
+          "slot": "shoes",
+          "source": "shoes06",
+          "kind": "clothes",
+          "hideBit": 13
+        }
+      ],
+      "skins": [
+        "young_caucasian_female",
+        "young_asian_female",
+        "young_african_female",
+        "middleage_caucasian_female",
+        "middleage_asian_female",
+        "middleage_african_female"
+      ]
+    },
+    {
+      "baseId": "masculine",
+      "label": "Masculine body",
+      "macro": {
+        "gender": 1.0,
+        "age": 0.5,
+        "muscle": 0.5,
+        "weight": 0.5,
+        "height": 0.5,
+        "proportions": 0.5
+      },
+      "heightMillimetres": {
+        "min": 1620,
+        "max": 1930,
+        "default": 1770
+      },
+      "wearables": [
+        {
+          "slot": "eyes",
+          "source": "low-poly",
+          "kind": "eyes"
+        },
+        {
+          "slot": "brows",
+          "source": "eyebrow001",
+          "kind": "eyebrows"
+        },
+        {
+          "slot": "brows",
+          "source": "eyebrow003",
+          "kind": "eyebrows"
+        },
+        {
+          "slot": "brows",
+          "source": "eyebrow009",
+          "kind": "eyebrows"
+        },
+        {
+          "slot": "lashes",
+          "source": "eyelashes01",
+          "kind": "eyelashes"
+        },
+        {
+          "slot": "hair",
+          "source": "short01",
+          "kind": "hair"
+        },
+        {
+          "slot": "hair",
+          "source": "short02",
+          "kind": "hair"
+        },
+        {
+          "slot": "hair",
+          "source": "short03",
+          "kind": "hair"
+        },
+        {
+          "slot": "hair",
+          "source": "short04",
+          "kind": "hair"
+        },
+        {
+          "slot": "hair",
+          "source": "afro01",
+          "kind": "hair"
+        },
+        {
+          "slot": "outfit",
+          "source": "male_casualsuit01",
+          "kind": "clothes",
+          "hideBit": 0
+        },
+        {
+          "slot": "outfit",
+          "source": "male_casualsuit02",
+          "kind": "clothes",
+          "hideBit": 1
+        },
+        {
+          "slot": "outfit",
+          "source": "male_casualsuit03",
+          "kind": "clothes",
+          "hideBit": 2
+        },
+        {
+          "slot": "outfit",
+          "source": "male_casualsuit04",
+          "kind": "clothes",
+          "hideBit": 3
+        },
+        {
+          "slot": "outfit",
+          "source": "male_casualsuit05",
+          "kind": "clothes",
+          "hideBit": 4
+        },
+        {
+          "slot": "outfit",
+          "source": "male_casualsuit06",
+          "kind": "clothes",
+          "hideBit": 5
+        },
+        {
+          "slot": "outfit",
+          "source": "male_elegantsuit01",
+          "kind": "clothes",
+          "hideBit": 6
+        },
+        {
+          "slot": "outfit",
+          "source": "male_worksuit01",
+          "kind": "clothes",
+          "hideBit": 7
+        },
+        {
+          "slot": "shoes",
+          "source": "shoes01",
+          "kind": "clothes",
+          "hideBit": 8
+        },
+        {
+          "slot": "shoes",
+          "source": "shoes02",
+          "kind": "clothes",
+          "hideBit": 9
+        },
+        {
+          "slot": "shoes",
+          "source": "shoes03",
+          "kind": "clothes",
+          "hideBit": 10
+        },
+        {
+          "slot": "shoes",
+          "source": "shoes04",
+          "kind": "clothes",
+          "hideBit": 11
+        },
+        {
+          "slot": "shoes",
+          "source": "shoes05",
+          "kind": "clothes",
+          "hideBit": 12
+        },
+        {
+          "slot": "shoes",
+          "source": "shoes06",
+          "kind": "clothes",
+          "hideBit": 13
+        }
+      ],
+      "skins": [
+        "young_caucasian_male",
+        "young_asian_male",
+        "young_african_male",
+        "middleage_caucasian_male",
+        "middleage_asian_male",
+        "middleage_african_male"
+      ]
+    }
+  ],
+  "materials": {
+    "skin": {
+      "size": 1024,
+      "format": "jpeg",
+      "quality": 86,
+      "roughness": 620
+    },
+    "eyes": {
+      "size": 256,
+      "format": "png",
+      "roughness": 80,
+      "alphaMode": "OPAQUE"
+    },
+    "eyebrows": {
+      "size": 256,
+      "format": "png",
+      "roughness": 900,
+      "alphaMode": "MASK",
+      "alphaCutoff": 300,
+      "doubleSided": true
+    },
+    "eyelashes": {
+      "size": 256,
+      "format": "png",
+      "roughness": 900,
+      "alphaMode": "MASK",
+      "alphaCutoff": 300,
+      "doubleSided": true
+    },
+    "hair": {
+      "size": 512,
+      "alphaSize": 1024,
+      "format": "jpeg",
+      "quality": 86,
+      "roughness": 520,
+      "alphaMode": "MASK",
+      "alphaCutoff": 400,
+      "doubleSided": true,
+      "tint": "normalised"
+    },
+    "outfit": {
+      "size": 1024,
+      "normalSize": 512,
+      "format": "jpeg",
+      "quality": 86,
+      "roughness": 820,
+      "bakeOcclusion": true
+    },
+    "shoes": {
+      "size": 512,
+      "normalSize": 256,
+      "format": "jpeg",
+      "quality": 86,
+      "roughness": 560,
+      "bakeOcclusion": true
+    }
+  },
+  "eyeColours": [
+    "brown",
+    "brownlight",
+    "blue",
+    "green",
+    "grey"
+  ],
+  "textureRepairs": {
+    "female_casualsuit01": [
+      {
+        "rect": [
+          1455,
+          320,
+          1790,
+          630
+        ],
+        "from": [
+          -985,
+          0
+        ],
+        "reason": "remove the MakeHuman emblem"
+      }
+    ],
+    "female_casualsuit02": [
+      {
+        "rect": [
+          1455,
+          320,
+          1790,
+          630
+        ],
+        "from": [
+          -985,
+          0
+        ],
+        "reason": "remove the MakeHuman emblem"
+      }
+    ],
+    "male_casualsuit02": [
+      {
+        "rect": [
+          1015,
+          212,
+          1275,
+          480
+        ],
+        "from": [
+          -820,
+          0
+        ],
+        "reason": "remove the MakeHuman emblem"
+      }
+    ],
+    "male_casualsuit04": [
+      {
+        "rect": [
+          1012,
+          208,
+          1272,
+          472
+        ],
+        "from": [
+          -820,
+          0
+        ],
+        "reason": "remove the MakeHuman emblem"
+      }
+    ],
+    "male_casualsuit06": [
+      {
+        "rect": [
+          915,
+          250,
+          1370,
+          432
+        ],
+        "from": [
+          0,
+          190
+        ],
+        "reason": "remove the MakeHuman lettering"
+      },
+      {
+        "rect": [
+          408,
+          238,
+          708,
+          388
+        ],
+        "from": [
+          0,
+          170
+        ],
+        "reason": "remove the MakeHuman lettering"
+      }
+    ]
+  },
+  "hairColours": [
+    {
+      "key": "black",
+      "label": "Black",
+      "rgb": "#2b2522"
+    },
+    {
+      "key": "dark-brown",
+      "label": "Dark brown",
+      "rgb": "#4a3426"
+    },
+    {
+      "key": "brown",
+      "label": "Brown",
+      "rgb": "#6e4c33"
+    },
+    {
+      "key": "auburn",
+      "label": "Auburn",
+      "rgb": "#7c3f25"
+    },
+    {
+      "key": "blonde",
+      "label": "Blonde",
+      "rgb": "#b89466"
+    },
+    {
+      "key": "grey",
+      "label": "Grey",
+      "rgb": "#9c9690"
+    }
+  ],
+  "labels": {
+    "low-poly": "Eyes",
+    "eyebrow001": "Soft brows",
+    "eyebrow003": "Straight brows",
+    "eyebrow006": "Arched brows",
+    "eyebrow009": "Full brows",
+    "eyebrow010": "Fine brows",
+    "eyelashes01": "Lashes",
+    "bob01": "Side-swept bob",
+    "bob02": "Rounded bob",
+    "braid01": "Braid",
+    "long01": "Long straight",
+    "ponytail01": "Ponytail",
+    "short01": "Cropped",
+    "short02": "Short textured",
+    "short03": "Short parted",
+    "short04": "Short swept",
+    "afro01": "Rounded curls",
+    "female_elegantsuit01": "Striped blouse and skirt",
+    "female_sportsuit01": "Athletic top and leggings",
+    "female_casualsuit01": "Tee and jeans",
+    "female_casualsuit02": "Tee and denim shorts",
+    "male_casualsuit01": "Denim shirt and jeans",
+    "male_casualsuit02": "Long-sleeve tee and jeans",
+    "male_casualsuit03": "Striped shirt and jeans",
+    "male_casualsuit04": "Tee and jeans",
+    "male_casualsuit05": "Jacket and jeans",
+    "male_casualsuit06": "White tee and jeans",
+    "male_elegantsuit01": "Dark suit",
+    "male_worksuit01": "Work overalls",
+    "shoes01": "Brown leather shoes",
+    "shoes02": "Worn trainers",
+    "shoes03": "Boots",
+    "shoes04": "Black shoes",
+    "shoes05": "White trainers",
+    "shoes06": "Blue trainers",
+    "brown": "Brown eyes",
+    "brownlight": "Light brown eyes",
+    "blue": "Blue eyes",
+    "green": "Green eyes",
+    "grey": "Grey eyes"
+  },
+  "baseWeights": {
+    "feminine": 10,
+    "masculine": 10
+  },
+  "population": {
+    "feminine": {
+      "female_elegantsuit01": 8,
+      "female_sportsuit01": 6,
+      "female_casualsuit01": 12,
+      "female_casualsuit02": 6,
+      "male_casualsuit01": 5,
+      "male_casualsuit03": 5,
+      "male_casualsuit05": 8,
+      "male_casualsuit06": 6,
+      "shoes01": 8,
+      "shoes02": 6,
+      "shoes03": 6,
+      "shoes04": 10,
+      "shoes05": 10,
+      "shoes06": 6,
+      "bob01": 10,
+      "bob02": 8,
+      "braid01": 6,
+      "long01": 12,
+      "ponytail01": 12,
+      "short02": 6,
+      "afro01": 6,
+      "eyebrow001": 10,
+      "eyebrow006": 10,
+      "eyebrow010": 10,
+      "eyelashes01": 10,
+      "low-poly": 10,
+      "brown": 14,
+      "brownlight": 8,
+      "blue": 6,
+      "green": 4,
+      "grey": 4
+    },
+    "masculine": {
+      "male_casualsuit01": 10,
+      "male_casualsuit02": 8,
+      "male_casualsuit03": 10,
+      "male_casualsuit04": 8,
+      "male_casualsuit05": 10,
+      "male_casualsuit06": 10,
+      "male_elegantsuit01": 6,
+      "male_worksuit01": 4,
+      "shoes01": 10,
+      "shoes02": 8,
+      "shoes03": 6,
+      "shoes04": 10,
+      "shoes05": 8,
+      "shoes06": 6,
+      "short01": 10,
+      "short02": 10,
+      "short03": 10,
+      "short04": 10,
+      "afro01": 6,
+      "none": 4,
+      "eyebrow001": 10,
+      "eyebrow003": 10,
+      "eyebrow009": 10,
+      "eyelashes01": 10,
+      "low-poly": 10,
+      "brown": 14,
+      "brownlight": 8,
+      "blue": 6,
+      "green": 4,
+      "grey": 4
+    }
+  },
+  "hairColourWeights": {
+    "black": 14,
+    "dark-brown": 14,
+    "brown": 12,
+    "auburn": 5,
+    "blonde": 7,
+    "grey": 6
+  },
+  "parameterSpread": {
+    "fullness": [
+      -500,
+      0,
+      800
+    ],
+    "muscle": [
+      -500,
+      0,
+      500
+    ]
+  }
+}

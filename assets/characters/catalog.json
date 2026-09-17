@@ -1,0 +1,3333 @@
+{
+ "catalogId": "exulanica-characters",
+ "families": [
+  {
+   "bases": [
+    {
+     "asset": {
+      "assetKey": "makehuman.people.feminine.base.v1",
+      "byteSize": 1596024,
+      "contentSha256": "e6c31847a6df176eea18552bb03361b1044eb4607529136c4290cb750dcf002d",
+      "file": "makehuman-people-v1/bases/feminine.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "baseId": "feminine",
+     "bodyNode": "body",
+     "bodyTriangles": 26756,
+     "clips": {
+      "idle": {
+       "durationMilli": 1667,
+       "name": "HumanIdle",
+       "speedMillimetresPerSecond": 0
+      },
+      "interact": {
+       "durationMilli": 1250,
+       "name": "HumanInteract",
+       "speedMillimetresPerSecond": 0
+      },
+      "run": {
+       "durationMilli": 792,
+       "name": "HumanRun",
+       "speedMillimetresPerSecond": 2396
+      },
+      "walk": {
+       "durationMilli": 1333,
+       "name": "HumanWalk",
+       "speedMillimetresPerSecond": 1051
+      },
+      "wave": {
+       "durationMilli": 1667,
+       "name": "HumanWave",
+       "speedMillimetresPerSecond": 0
+      }
+     },
+     "eyeHeightMillimetres": 1487,
+     "heightMillimetres": {
+      "default": 1660,
+      "max": 1800,
+      "min": 1520
+     },
+     "idleFloorMicrometres": -11001,
+     "label": "Feminine body",
+     "materials": {
+      "eyeColour": [
+       "eyeColour/brown",
+       "eyeColour/brownlight",
+       "eyeColour/blue",
+       "eyeColour/green",
+       "eyeColour/grey"
+      ],
+      "skin": [
+       "skin/young_caucasian_female",
+       "skin/young_asian_female",
+       "skin/young_african_female",
+       "skin/middleage_caucasian_female",
+       "skin/middleage_asian_female",
+       "skin/middleage_african_female"
+      ]
+     },
+     "morphTargets": [
+      "fullness-up",
+      "fullness-down",
+      "muscle-up",
+      "muscle-down"
+     ],
+     "parts": [
+      {
+       "farColours": {
+        "lower": "#9c9590",
+        "upper": "#9c9590"
+       },
+       "label": "Eyes",
+       "material": "eyeColour/brown",
+       "morphTargets": [],
+       "node": "eyes.low-poly",
+       "partId": "feminine/eyes/low-poly",
+       "slot": "eyes",
+       "source": {
+        "path": "eyes/low-poly",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 172
+      },
+      {
+       "farColours": {
+        "lower": "#0e0707",
+        "upper": "#0e0707"
+       },
+       "label": "Soft brows",
+       "material": "brows/eyebrow001",
+       "morphTargets": [],
+       "node": "brows.eyebrow001",
+       "partId": "feminine/brows/eyebrow001",
+       "slot": "brows",
+       "source": {
+        "path": "eyebrows/eyebrow001",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 192
+      },
+      {
+       "farColours": {
+        "lower": "#000000",
+        "upper": "#000000"
+       },
+       "label": "Arched brows",
+       "material": "brows/eyebrow006",
+       "morphTargets": [],
+       "node": "brows.eyebrow006",
+       "partId": "feminine/brows/eyebrow006",
+       "slot": "brows",
+       "source": {
+        "path": "eyebrows/eyebrow006",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 192
+      },
+      {
+       "farColours": {
+        "lower": "#0b0000",
+        "upper": "#0b0000"
+       },
+       "label": "Fine brows",
+       "material": "brows/eyebrow010",
+       "morphTargets": [],
+       "node": "brows.eyebrow010",
+       "partId": "feminine/brows/eyebrow010",
+       "slot": "brows",
+       "source": {
+        "path": "eyebrows/eyebrow010",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 192
+      },
+      {
+       "farColours": {
+        "lower": "#090301",
+        "upper": "#090301"
+       },
+       "label": "Lashes",
+       "material": "lashes/eyelashes01",
+       "morphTargets": [],
+       "node": "lashes.eyelashes01",
+       "partId": "feminine/lashes/eyelashes01",
+       "slot": "lashes",
+       "source": {
+        "path": "eyelashes/eyelashes01",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 368
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.feminine.hair.bob01.v1",
+        "byteSize": 273000,
+        "contentSha256": "7c0783eb06c0cf448ace489c0b2bef9f86fe480ce1a5fd8894d77232b00c246c",
+        "file": "makehuman-people-v1/parts/feminine/hair.bob01.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#ababab",
+        "upper": "#ababab"
+       },
+       "label": "Side-swept bob",
+       "material": "hair/bob01",
+       "morphTargets": [
+        "fullness-down"
+       ],
+       "node": "hair.bob01",
+       "partId": "feminine/hair/bob01",
+       "slot": "hair",
+       "source": {
+        "path": "hair/bob01",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "tint": "hair",
+       "triangles": 8474
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.feminine.hair.bob02.v1",
+        "byteSize": 99528,
+        "contentSha256": "fc21f36a5c997f1ef23792cd161adb51ef13f69aaf7068db023ee4e37c6209d2",
+        "file": "makehuman-people-v1/parts/feminine/hair.bob02.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#bcbcbc",
+        "upper": "#bcbcbc"
+       },
+       "label": "Rounded bob",
+       "material": "hair/bob02",
+       "morphTargets": [
+        "fullness-down",
+        "muscle-up"
+       ],
+       "node": "hair.bob02",
+       "partId": "feminine/hair/bob02",
+       "slot": "hair",
+       "source": {
+        "path": "hair/bob02",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "tint": "hair",
+       "triangles": 2248
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.feminine.hair.braid01.v1",
+        "byteSize": 310620,
+        "contentSha256": "bcf02a29595358d93ff5e08c50aad837e863c48a4436122d7ecfc3ce35011c3b",
+        "file": "makehuman-people-v1/parts/feminine/hair.braid01.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#b4b4b4",
+        "upper": "#b4b4b4"
+       },
+       "label": "Braid",
+       "material": "hair/braid01",
+       "morphTargets": [
+        "fullness-up",
+        "fullness-down",
+        "muscle-up",
+        "muscle-down"
+       ],
+       "node": "hair.braid01",
+       "partId": "feminine/hair/braid01",
+       "slot": "hair",
+       "source": {
+        "path": "hair/braid01",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "tint": "hair",
+       "triangles": 5518
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.feminine.hair.long01.v1",
+        "byteSize": 244752,
+        "contentSha256": "65d236812c110ce4f5be9e91dd537c27ea99eeaaf581a38be02deb7d7cff5276",
+        "file": "makehuman-people-v1/parts/feminine/hair.long01.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#4b4b4b",
+        "upper": "#c1c1c1"
+       },
+       "label": "Long straight",
+       "material": "hair/long01",
+       "morphTargets": [
+        "fullness-up",
+        "fullness-down",
+        "muscle-up",
+        "muscle-down"
+       ],
+       "node": "hair.long01",
+       "partId": "feminine/hair/long01",
+       "slot": "hair",
+       "source": {
+        "path": "hair/long01",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "tint": "hair",
+       "triangles": 4108
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.feminine.hair.ponytail01.v1",
+        "byteSize": 203424,
+        "contentSha256": "3a9334a7f943eff47bd4c1e20cb2cb28ab63b58f0e982325826e58bfa0b4f0e1",
+        "file": "makehuman-people-v1/parts/feminine/hair.ponytail01.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#bcbcbc",
+        "upper": "#bcbcbc"
+       },
+       "label": "Ponytail",
+       "material": "hair/ponytail01",
+       "morphTargets": [
+        "fullness-down",
+        "muscle-up",
+        "muscle-down"
+       ],
+       "node": "hair.ponytail01",
+       "partId": "feminine/hair/ponytail01",
+       "slot": "hair",
+       "source": {
+        "path": "hair/ponytail01",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "tint": "hair",
+       "triangles": 5352
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.feminine.hair.short02.v1",
+        "byteSize": 109708,
+        "contentSha256": "33e228a08bba8dc9a634bf2c46fdc1ba30917d6c3c1f7d1128b712bb430bc243",
+        "file": "makehuman-people-v1/parts/feminine/hair.short02.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#cdcdcd",
+        "upper": "#cdcdcd"
+       },
+       "label": "Short textured",
+       "material": "hair/short02",
+       "morphTargets": [
+        "fullness-down",
+        "muscle-up"
+       ],
+       "node": "hair.short02",
+       "partId": "feminine/hair/short02",
+       "slot": "hair",
+       "source": {
+        "path": "hair/short02",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "tint": "hair",
+       "triangles": 3344
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.feminine.hair.afro01.v1",
+        "byteSize": 115876,
+        "contentSha256": "50420f8e6d68f5844f7e7aefb9e420db466b5d729477e59d4124b20cee168ad8",
+        "file": "makehuman-people-v1/parts/feminine/hair.afro01.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#777777",
+        "upper": "#777777"
+       },
+       "label": "Rounded curls",
+       "material": "hair/afro01",
+       "morphTargets": [
+        "fullness-down",
+        "muscle-up"
+       ],
+       "node": "hair.afro01",
+       "partId": "feminine/hair/afro01",
+       "slot": "hair",
+       "source": {
+        "path": "hair/afro01",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "tint": "hair",
+       "triangles": 2192
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.feminine.outfit.female-elegantsuit01.v1",
+        "byteSize": 250192,
+        "contentSha256": "5c96cafd3bf491e76d4b235916c739ad20592644a8dff16d03413d1baae38263",
+        "file": "makehuman-people-v1/parts/feminine/outfit.female-elegantsuit01.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#343632",
+        "upper": "#2d1c20"
+       },
+       "hiddenBodyTriangles": 5004,
+       "hideBit": 0,
+       "label": "Striped blouse and skirt",
+       "material": "outfit/female_elegantsuit01",
+       "morphTargets": [
+        "fullness-up",
+        "fullness-down",
+        "muscle-up",
+        "muscle-down"
+       ],
+       "node": "outfit.female_elegantsuit01",
+       "partId": "feminine/outfit/female_elegantsuit01",
+       "slot": "outfit",
+       "source": {
+        "path": "clothes/female_elegantsuit01",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 4192
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.feminine.outfit.female-sportsuit01.v1",
+        "byteSize": 205900,
+        "contentSha256": "3e65d51b8d42fc9d17280c7a3361321ec125174614815e63e37f06bfa9ab44a0",
+        "file": "makehuman-people-v1/parts/feminine/outfit.female-sportsuit01.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#313131",
+        "upper": "#2c4d7a"
+       },
+       "hiddenBodyTriangles": 3862,
+       "hideBit": 1,
+       "label": "Athletic top and leggings",
+       "material": "outfit/female_sportsuit01",
+       "morphTargets": [
+        "fullness-up",
+        "fullness-down",
+        "muscle-up",
+        "muscle-down"
+       ],
+       "node": "outfit.female_sportsuit01",
+       "partId": "feminine/outfit/female_sportsuit01",
+       "slot": "outfit",
+       "source": {
+        "path": "clothes/female_sportsuit01",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 3436
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.feminine.outfit.female-casualsuit01.v1",
+        "byteSize": 246680,
+        "contentSha256": "2143182c9709e2bfee4ca8e309f4c65b27a52bad97e8c25cf8fc6b4620d416ef",
+        "file": "makehuman-people-v1/parts/feminine/outfit.female-casualsuit01.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#3c556c",
+        "upper": "#2a4c7b"
+       },
+       "hiddenBodyTriangles": 5376,
+       "hideBit": 2,
+       "label": "Tee and jeans",
+       "material": "outfit/female_casualsuit01",
+       "morphTargets": [
+        "fullness-up",
+        "fullness-down",
+        "muscle-up",
+        "muscle-down"
+       ],
+       "node": "outfit.female_casualsuit01",
+       "partId": "feminine/outfit/female_casualsuit01",
+       "slot": "outfit",
+       "source": {
+        "path": "clothes/female_casualsuit01",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 4236
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.feminine.outfit.female-casualsuit02.v1",
+        "byteSize": 315780,
+        "contentSha256": "364327d084c5493c2e06877720ac2c15d1edd7cbb0b47176764de98250fe07b8",
+        "file": "makehuman-people-v1/parts/feminine/outfit.female-casualsuit02.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#4a5773",
+        "upper": "#2d5284"
+       },
+       "hiddenBodyTriangles": 3372,
+       "hideBit": 3,
+       "label": "Tee and denim shorts",
+       "material": "outfit/female_casualsuit02",
+       "morphTargets": [
+        "fullness-up",
+        "fullness-down",
+        "muscle-up",
+        "muscle-down"
+       ],
+       "node": "outfit.female_casualsuit02",
+       "partId": "feminine/outfit/female_casualsuit02",
+       "slot": "outfit",
+       "source": {
+        "path": "clothes/female_casualsuit02",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 5488
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.feminine.outfit.male-casualsuit01.v1",
+        "byteSize": 832608,
+        "contentSha256": "986dd6449bf0556e2cbe29be8b12f94b0ca3c91733713f857643e11520384013",
+        "file": "makehuman-people-v1/parts/feminine/outfit.male-casualsuit01.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#434954",
+        "upper": "#343d52"
+       },
+       "hiddenBodyTriangles": 6726,
+       "hideBit": 4,
+       "label": "Denim shirt and jeans",
+       "material": "outfit/male_casualsuit01",
+       "morphTargets": [
+        "fullness-up",
+        "fullness-down",
+        "muscle-up",
+        "muscle-down"
+       ],
+       "node": "outfit.male_casualsuit01",
+       "partId": "feminine/outfit/male_casualsuit01",
+       "slot": "outfit",
+       "source": {
+        "path": "clothes/male_casualsuit01",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 16672
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.feminine.outfit.male-casualsuit03.v1",
+        "byteSize": 275496,
+        "contentSha256": "e0bddbb1fa4a5322be2da76a47bb15c782bc4fd5c3df9161a7ee3d5d689ff6c6",
+        "file": "makehuman-people-v1/parts/feminine/outfit.male-casualsuit03.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#384c61",
+        "upper": "#311f23"
+       },
+       "hiddenBodyTriangles": 6412,
+       "hideBit": 5,
+       "label": "Striped shirt and jeans",
+       "material": "outfit/male_casualsuit03",
+       "morphTargets": [
+        "fullness-up",
+        "fullness-down",
+        "muscle-up",
+        "muscle-down"
+       ],
+       "node": "outfit.male_casualsuit03",
+       "partId": "feminine/outfit/male_casualsuit03",
+       "slot": "outfit",
+       "source": {
+        "path": "clothes/male_casualsuit03",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 4800
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.feminine.outfit.male-casualsuit05.v1",
+        "byteSize": 347100,
+        "contentSha256": "b3addf8aa6b5c89f08543ee40953cf71fd1da0b2881c8901827a13844ef9432c",
+        "file": "makehuman-people-v1/parts/feminine/outfit.male-casualsuit05.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#334656",
+        "upper": "#2b2d2a"
+       },
+       "hiddenBodyTriangles": 6412,
+       "hideBit": 6,
+       "label": "Jacket and jeans",
+       "material": "outfit/male_casualsuit05",
+       "morphTargets": [
+        "fullness-up",
+        "fullness-down",
+        "muscle-up",
+        "muscle-down"
+       ],
+       "node": "outfit.male_casualsuit05",
+       "partId": "feminine/outfit/male_casualsuit05",
+       "slot": "outfit",
+       "source": {
+        "path": "clothes/male_casualsuit05",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 5996
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.feminine.outfit.male-casualsuit06.v1",
+        "byteSize": 395632,
+        "contentSha256": "7a221bf21f793f0a684b4467b3bdc89c474e51aa6d8acf8c034f66add3ccab19",
+        "file": "makehuman-people-v1/parts/feminine/outfit.male-casualsuit06.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#455a6d",
+        "upper": "#b4b4b4"
+       },
+       "hiddenBodyTriangles": 4972,
+       "hideBit": 7,
+       "label": "White tee and jeans",
+       "material": "outfit/male_casualsuit06",
+       "morphTargets": [
+        "fullness-up",
+        "fullness-down",
+        "muscle-up",
+        "muscle-down"
+       ],
+       "node": "outfit.male_casualsuit06",
+       "partId": "feminine/outfit/male_casualsuit06",
+       "slot": "outfit",
+       "source": {
+        "path": "clothes/male_casualsuit06",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 7168
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.feminine.shoes.shoes01.v1",
+        "byteSize": 154652,
+        "contentSha256": "9111c427d29fc1a038156f4d26d84d31e5278567c47558f0990304d6d0153eaf",
+        "file": "makehuman-people-v1/parts/feminine/shoes.shoes01.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#7f4e35",
+        "upper": "#a19eb2"
+       },
+       "hiddenBodyTriangles": 4528,
+       "hideBit": 8,
+       "label": "Brown leather shoes",
+       "material": "shoes/shoes01",
+       "morphTargets": [
+        "fullness-up",
+        "fullness-down",
+        "muscle-up"
+       ],
+       "node": "shoes.shoes01",
+       "partId": "feminine/shoes/shoes01",
+       "slot": "shoes",
+       "source": {
+        "path": "clothes/shoes01",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 3320
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.feminine.shoes.shoes02.v1",
+        "byteSize": 146640,
+        "contentSha256": "e5884273ccb98ee4d06a53e4563635c17c3b12dd31802197e267bd70f21a72c4",
+        "file": "makehuman-people-v1/parts/feminine/shoes.shoes02.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#5f5d57",
+        "upper": "#a3a0b4"
+       },
+       "hiddenBodyTriangles": 4528,
+       "hideBit": 9,
+       "label": "Worn trainers",
+       "material": "shoes/shoes02",
+       "morphTargets": [
+        "fullness-up",
+        "fullness-down",
+        "muscle-up"
+       ],
+       "node": "shoes.shoes02",
+       "partId": "feminine/shoes/shoes02",
+       "slot": "shoes",
+       "source": {
+        "path": "clothes/shoes02",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 3064
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.feminine.shoes.shoes03.v1",
+        "byteSize": 199348,
+        "contentSha256": "b1780b4fdc86736c7bd37e85a10619e8737ed6067a348ded85b15bec5c35ac73",
+        "file": "makehuman-people-v1/parts/feminine/shoes.shoes03.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#0f0d0f",
+        "upper": "#17161d"
+       },
+       "hiddenBodyTriangles": 4528,
+       "hideBit": 10,
+       "label": "Boots",
+       "material": "shoes/shoes03",
+       "morphTargets": [
+        "fullness-up",
+        "fullness-down",
+        "muscle-up"
+       ],
+       "node": "shoes.shoes03",
+       "partId": "feminine/shoes/shoes03",
+       "slot": "shoes",
+       "source": {
+        "path": "clothes/shoes03",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 4128
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.feminine.shoes.shoes04.v1",
+        "byteSize": 154652,
+        "contentSha256": "498f227f128a80e965f2052b198369cd3a151e46bad073716c6127d7798ae470",
+        "file": "makehuman-people-v1/parts/feminine/shoes.shoes04.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#232323",
+        "upper": "#a29eb2"
+       },
+       "hiddenBodyTriangles": 4528,
+       "hideBit": 11,
+       "label": "Black shoes",
+       "material": "shoes/shoes04",
+       "morphTargets": [
+        "fullness-up",
+        "fullness-down",
+        "muscle-up"
+       ],
+       "node": "shoes.shoes04",
+       "partId": "feminine/shoes/shoes04",
+       "slot": "shoes",
+       "source": {
+        "path": "clothes/shoes04",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 3320
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.feminine.shoes.shoes05.v1",
+        "byteSize": 146640,
+        "contentSha256": "1f89ae677497f0328d6c24da82903bac8f8f427ca26650905f6c16fc14a38c69",
+        "file": "makehuman-people-v1/parts/feminine/shoes.shoes05.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#585454",
+        "upper": "#7d7b89"
+       },
+       "hiddenBodyTriangles": 4528,
+       "hideBit": 12,
+       "label": "White trainers",
+       "material": "shoes/shoes05",
+       "morphTargets": [
+        "fullness-up",
+        "fullness-down",
+        "muscle-up"
+       ],
+       "node": "shoes.shoes05",
+       "partId": "feminine/shoes/shoes05",
+       "slot": "shoes",
+       "source": {
+        "path": "clothes/shoes05",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 3064
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.feminine.shoes.shoes06.v1",
+        "byteSize": 146640,
+        "contentSha256": "6d04c0a9b0584c73b1c54841bcb5fbc7b12c119ce7e3142bff0223fa3bf102bc",
+        "file": "makehuman-people-v1/parts/feminine/shoes.shoes06.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#484e5b",
+        "upper": "#a3a0b4"
+       },
+       "hiddenBodyTriangles": 4528,
+       "hideBit": 13,
+       "label": "Blue trainers",
+       "material": "shoes/shoes06",
+       "morphTargets": [
+        "fullness-up",
+        "fullness-down",
+        "muscle-up"
+       ],
+       "node": "shoes.shoes06",
+       "partId": "feminine/shoes/shoes06",
+       "slot": "shoes",
+       "source": {
+        "path": "clothes/shoes06",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 3064
+      }
+     ],
+     "restHeightMillimetres": 1591,
+     "source": {
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets through MPFB 2",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "asset": {
+      "assetKey": "makehuman.people.masculine.base.v1",
+      "byteSize": 1625096,
+      "contentSha256": "9badd953adf405c3cb75c4caeab30236749ecd3b46979d0765180693c727e5fb",
+      "file": "makehuman-people-v1/bases/masculine.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "baseId": "masculine",
+     "bodyNode": "body",
+     "bodyTriangles": 26756,
+     "clips": {
+      "idle": {
+       "durationMilli": 1667,
+       "name": "HumanIdle",
+       "speedMillimetresPerSecond": 0
+      },
+      "interact": {
+       "durationMilli": 1250,
+       "name": "HumanInteract",
+       "speedMillimetresPerSecond": 0
+      },
+      "run": {
+       "durationMilli": 792,
+       "name": "HumanRun",
+       "speedMillimetresPerSecond": 2734
+      },
+      "walk": {
+       "durationMilli": 1333,
+       "name": "HumanWalk",
+       "speedMillimetresPerSecond": 1223
+      },
+      "wave": {
+       "durationMilli": 1667,
+       "name": "HumanWave",
+       "speedMillimetresPerSecond": 0
+      }
+     },
+     "eyeHeightMillimetres": 1620,
+     "heightMillimetres": {
+      "default": 1770,
+      "max": 1930,
+      "min": 1620
+     },
+     "idleFloorMicrometres": -14243,
+     "label": "Masculine body",
+     "materials": {
+      "eyeColour": [
+       "eyeColour/brown",
+       "eyeColour/brownlight",
+       "eyeColour/blue",
+       "eyeColour/green",
+       "eyeColour/grey"
+      ],
+      "skin": [
+       "skin/young_caucasian_male",
+       "skin/young_asian_male",
+       "skin/young_african_male",
+       "skin/middleage_caucasian_male",
+       "skin/middleage_asian_male",
+       "skin/middleage_african_male"
+      ]
+     },
+     "morphTargets": [
+      "fullness-up",
+      "fullness-down",
+      "muscle-up",
+      "muscle-down"
+     ],
+     "parts": [
+      {
+       "farColours": {
+        "lower": "#9c9590",
+        "upper": "#9c9590"
+       },
+       "label": "Eyes",
+       "material": "eyeColour/brown",
+       "morphTargets": [],
+       "node": "eyes.low-poly",
+       "partId": "masculine/eyes/low-poly",
+       "slot": "eyes",
+       "source": {
+        "path": "eyes/low-poly",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 172
+      },
+      {
+       "farColours": {
+        "lower": "#0e0707",
+        "upper": "#0e0707"
+       },
+       "label": "Soft brows",
+       "material": "brows/eyebrow001",
+       "morphTargets": [],
+       "node": "brows.eyebrow001",
+       "partId": "masculine/brows/eyebrow001",
+       "slot": "brows",
+       "source": {
+        "path": "eyebrows/eyebrow001",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 192
+      },
+      {
+       "farColours": {
+        "lower": "#0c0705",
+        "upper": "#0c0705"
+       },
+       "label": "Straight brows",
+       "material": "brows/eyebrow003",
+       "morphTargets": [],
+       "node": "brows.eyebrow003",
+       "partId": "masculine/brows/eyebrow003",
+       "slot": "brows",
+       "source": {
+        "path": "eyebrows/eyebrow003",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 192
+      },
+      {
+       "farColours": {
+        "lower": "#1a1411",
+        "upper": "#1a1411"
+       },
+       "label": "Full brows",
+       "material": "brows/eyebrow009",
+       "morphTargets": [],
+       "node": "brows.eyebrow009",
+       "partId": "masculine/brows/eyebrow009",
+       "slot": "brows",
+       "source": {
+        "path": "eyebrows/eyebrow009",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 192
+      },
+      {
+       "farColours": {
+        "lower": "#090301",
+        "upper": "#090301"
+       },
+       "label": "Lashes",
+       "material": "lashes/eyelashes01",
+       "morphTargets": [],
+       "node": "lashes.eyelashes01",
+       "partId": "masculine/lashes/eyelashes01",
+       "slot": "lashes",
+       "source": {
+        "path": "eyelashes/eyelashes01",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 368
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.masculine.hair.short01.v1",
+        "byteSize": 194812,
+        "contentSha256": "347584fc3bc4dd1cd1688a087fbe40f5795c49eab9ad0c57c7c53408c3010a0e",
+        "file": "makehuman-people-v1/parts/masculine/hair.short01.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#b5b5b5",
+        "upper": "#b5b5b5"
+       },
+       "label": "Cropped",
+       "material": "hair/short01",
+       "morphTargets": [
+        "fullness-down",
+        "muscle-up",
+        "muscle-down"
+       ],
+       "node": "hair.short01",
+       "partId": "masculine/hair/short01",
+       "slot": "hair",
+       "source": {
+        "path": "hair/short01",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "tint": "hair",
+       "triangles": 3678
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.masculine.hair.short02.v1",
+        "byteSize": 133672,
+        "contentSha256": "0354620b5bf5380f353e97aebffa9ab67e5a6d69e8469658bcc500edae0f9bf3",
+        "file": "makehuman-people-v1/parts/masculine/hair.short02.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#cdcdcd",
+        "upper": "#cdcdcd"
+       },
+       "label": "Short textured",
+       "material": "hair/short02",
+       "morphTargets": [
+        "fullness-down",
+        "muscle-up",
+        "muscle-down"
+       ],
+       "node": "hair.short02",
+       "partId": "masculine/hair/short02",
+       "slot": "hair",
+       "source": {
+        "path": "hair/short02",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "tint": "hair",
+       "triangles": 3344
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.masculine.hair.short03.v1",
+        "byteSize": 86428,
+        "contentSha256": "9add51377a8f0f9cc6a436534fb42ab596595779c23e273c8ba26cbcdf1f1bfa",
+        "file": "makehuman-people-v1/parts/masculine/hair.short03.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#bdbdbd",
+        "upper": "#bdbdbd"
+       },
+       "label": "Short parted",
+       "material": "hair/short03",
+       "morphTargets": [
+        "fullness-down",
+        "muscle-up",
+        "muscle-down"
+       ],
+       "node": "hair.short03",
+       "partId": "masculine/hair/short03",
+       "slot": "hair",
+       "source": {
+        "path": "hair/short03",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "tint": "hair",
+       "triangles": 1922
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.masculine.hair.short04.v1",
+        "byteSize": 83200,
+        "contentSha256": "7e88076b1fd35d491cadaf8ea4f70e45db047973adc3c6120dba72db6f62ddce",
+        "file": "makehuman-people-v1/parts/masculine/hair.short04.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#a6a6a6",
+        "upper": "#a6a6a6"
+       },
+       "label": "Short swept",
+       "material": "hair/short04",
+       "morphTargets": [
+        "fullness-down",
+        "muscle-up",
+        "muscle-down"
+       ],
+       "node": "hair.short04",
+       "partId": "masculine/hair/short04",
+       "slot": "hair",
+       "source": {
+        "path": "hair/short04",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "tint": "hair",
+       "triangles": 1050
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.masculine.hair.afro01.v1",
+        "byteSize": 144868,
+        "contentSha256": "72a0678cc3ccf2d8b89cb0d90a796516e069d0c0d373b43cbececcedc1941893",
+        "file": "makehuman-people-v1/parts/masculine/hair.afro01.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#777777",
+        "upper": "#777777"
+       },
+       "label": "Rounded curls",
+       "material": "hair/afro01",
+       "morphTargets": [
+        "fullness-down",
+        "muscle-up",
+        "muscle-down"
+       ],
+       "node": "hair.afro01",
+       "partId": "masculine/hair/afro01",
+       "slot": "hair",
+       "source": {
+        "path": "hair/afro01",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "tint": "hair",
+       "triangles": 2192
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.masculine.outfit.male-casualsuit01.v1",
+        "byteSize": 867752,
+        "contentSha256": "89ccd65e371ec7b58c28c4ca3cd576b903fceda44929a62a7c8bdbfe63694d7d",
+        "file": "makehuman-people-v1/parts/masculine/outfit.male-casualsuit01.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#434a54",
+        "upper": "#363e52"
+       },
+       "hiddenBodyTriangles": 6726,
+       "hideBit": 0,
+       "label": "Denim shirt and jeans",
+       "material": "outfit/male_casualsuit01",
+       "morphTargets": [
+        "fullness-up",
+        "fullness-down",
+        "muscle-up",
+        "muscle-down"
+       ],
+       "node": "outfit.male_casualsuit01",
+       "partId": "masculine/outfit/male_casualsuit01",
+       "slot": "outfit",
+       "source": {
+        "path": "clothes/male_casualsuit01",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 16672
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.masculine.outfit.male-casualsuit02.v1",
+        "byteSize": 242224,
+        "contentSha256": "39f026485d47d2b6080e6ee072fde1b4ebd357337a862f0e111855476ed676bf",
+        "file": "makehuman-people-v1/parts/masculine/outfit.male-casualsuit02.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#314558",
+        "upper": "#233e64"
+       },
+       "hiddenBodyTriangles": 6412,
+       "hideBit": 1,
+       "label": "Long-sleeve tee and jeans",
+       "material": "outfit/male_casualsuit02",
+       "morphTargets": [
+        "fullness-up",
+        "fullness-down",
+        "muscle-up",
+        "muscle-down"
+       ],
+       "node": "outfit.male_casualsuit02",
+       "partId": "masculine/outfit/male_casualsuit02",
+       "slot": "outfit",
+       "source": {
+        "path": "clothes/male_casualsuit02",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 4120
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.masculine.outfit.male-casualsuit03.v1",
+        "byteSize": 284860,
+        "contentSha256": "229637eecd5c4c3c053accb00e47fec838ec921d01338ab310f153513beeb925",
+        "file": "makehuman-people-v1/parts/masculine/outfit.male-casualsuit03.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#3c566d",
+        "upper": "#2f1e22"
+       },
+       "hiddenBodyTriangles": 6412,
+       "hideBit": 2,
+       "label": "Striped shirt and jeans",
+       "material": "outfit/male_casualsuit03",
+       "morphTargets": [
+        "fullness-up",
+        "fullness-down",
+        "muscle-up",
+        "muscle-down"
+       ],
+       "node": "outfit.male_casualsuit03",
+       "partId": "masculine/outfit/male_casualsuit03",
+       "slot": "outfit",
+       "source": {
+        "path": "clothes/male_casualsuit03",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 4800
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.masculine.outfit.male-casualsuit04.v1",
+        "byteSize": 198132,
+        "contentSha256": "6aa1dfb2a1021694d48924c20ff8d34e2ccbd4eb88cd1a43d3119305c04e6a43",
+        "file": "makehuman-people-v1/parts/masculine/outfit.male-casualsuit04.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#3f5b73",
+        "upper": "#2e4e7b"
+       },
+       "hiddenBodyTriangles": 4972,
+       "hideBit": 3,
+       "label": "Tee and jeans",
+       "material": "outfit/male_casualsuit04",
+       "morphTargets": [
+        "fullness-up",
+        "fullness-down",
+        "muscle-up",
+        "muscle-down"
+       ],
+       "node": "outfit.male_casualsuit04",
+       "partId": "masculine/outfit/male_casualsuit04",
+       "slot": "outfit",
+       "source": {
+        "path": "clothes/male_casualsuit04",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 3240
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.masculine.outfit.male-casualsuit05.v1",
+        "byteSize": 354032,
+        "contentSha256": "8d70e0f1627b13df021211eb7ee513d5ac0b061851643ca8b548192c304ac8ef",
+        "file": "makehuman-people-v1/parts/masculine/outfit.male-casualsuit05.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#395064",
+        "upper": "#292b28"
+       },
+       "hiddenBodyTriangles": 6412,
+       "hideBit": 4,
+       "label": "Jacket and jeans",
+       "material": "outfit/male_casualsuit05",
+       "morphTargets": [
+        "fullness-up",
+        "fullness-down",
+        "muscle-up",
+        "muscle-down"
+       ],
+       "node": "outfit.male_casualsuit05",
+       "partId": "masculine/outfit/male_casualsuit05",
+       "slot": "outfit",
+       "source": {
+        "path": "clothes/male_casualsuit05",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 5996
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.masculine.outfit.male-casualsuit06.v1",
+        "byteSize": 396680,
+        "contentSha256": "8076366a205689c8b1b6a6b6cf6b78e7c22f5651b3d4cf4f79895dd280a957a9",
+        "file": "makehuman-people-v1/parts/masculine/outfit.male-casualsuit06.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#3e576d",
+        "upper": "#a4a4a4"
+       },
+       "hiddenBodyTriangles": 4972,
+       "hideBit": 5,
+       "label": "White tee and jeans",
+       "material": "outfit/male_casualsuit06",
+       "morphTargets": [
+        "fullness-up",
+        "fullness-down",
+        "muscle-up",
+        "muscle-down"
+       ],
+       "node": "outfit.male_casualsuit06",
+       "partId": "masculine/outfit/male_casualsuit06",
+       "slot": "outfit",
+       "source": {
+        "path": "clothes/male_casualsuit06",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 7168
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.masculine.outfit.male-elegantsuit01.v1",
+        "byteSize": 805872,
+        "contentSha256": "a268a615b224f6d0496edc903be2ced1d455597eecdae175b46e04c8d970b380",
+        "file": "makehuman-people-v1/parts/masculine/outfit.male-elegantsuit01.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#272727",
+        "upper": "#2a2a2a"
+       },
+       "hiddenBodyTriangles": 6748,
+       "hideBit": 6,
+       "label": "Dark suit",
+       "material": "outfit/male_elegantsuit01",
+       "morphTargets": [
+        "fullness-up",
+        "fullness-down",
+        "muscle-up",
+        "muscle-down"
+       ],
+       "node": "outfit.male_elegantsuit01",
+       "partId": "masculine/outfit/male_elegantsuit01",
+       "slot": "outfit",
+       "source": {
+        "path": "clothes/male_elegantsuit01",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 14956
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.masculine.outfit.male-worksuit01.v1",
+        "byteSize": 397852,
+        "contentSha256": "215191838e81745e341b793a92b37eb9eee718f8c13db1ed0af4c45156836bde",
+        "file": "makehuman-people-v1/parts/masculine/outfit.male-worksuit01.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#628ec9",
+        "upper": "#7690bc"
+       },
+       "hiddenBodyTriangles": 5620,
+       "hideBit": 7,
+       "label": "Work overalls",
+       "material": "outfit/male_worksuit01",
+       "morphTargets": [
+        "fullness-up",
+        "fullness-down",
+        "muscle-up",
+        "muscle-down"
+       ],
+       "node": "outfit.male_worksuit01",
+       "partId": "masculine/outfit/male_worksuit01",
+       "slot": "outfit",
+       "source": {
+        "path": "clothes/male_worksuit01",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 6986
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.masculine.shoes.shoes01.v1",
+        "byteSize": 198084,
+        "contentSha256": "5e3c71a2e9b001b4513026c9256bd5cc224f560154ced4e1082da945db6cc291",
+        "file": "makehuman-people-v1/parts/masculine/shoes.shoes01.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#7f4e35",
+        "upper": "#a09db1"
+       },
+       "hiddenBodyTriangles": 4528,
+       "hideBit": 8,
+       "label": "Brown leather shoes",
+       "material": "shoes/shoes01",
+       "morphTargets": [
+        "fullness-up",
+        "fullness-down",
+        "muscle-up",
+        "muscle-down"
+       ],
+       "node": "shoes.shoes01",
+       "partId": "masculine/shoes/shoes01",
+       "slot": "shoes",
+       "source": {
+        "path": "clothes/shoes01",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 3320
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.masculine.shoes.shoes02.v1",
+        "byteSize": 187476,
+        "contentSha256": "614f70be439acb32ca21552585a5b7ca84be4c4fabaf525d56141c7680d4e123",
+        "file": "makehuman-people-v1/parts/masculine/shoes.shoes02.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#5f5d57",
+        "upper": "#a3a0b4"
+       },
+       "hiddenBodyTriangles": 4528,
+       "hideBit": 9,
+       "label": "Worn trainers",
+       "material": "shoes/shoes02",
+       "morphTargets": [
+        "fullness-up",
+        "fullness-down",
+        "muscle-up",
+        "muscle-down"
+       ],
+       "node": "shoes.shoes02",
+       "partId": "masculine/shoes/shoes02",
+       "slot": "shoes",
+       "source": {
+        "path": "clothes/shoes02",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 3064
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.masculine.shoes.shoes03.v1",
+        "byteSize": 258712,
+        "contentSha256": "d674b36cac373838c347379cacd58b2f205f86c0f709cb5d5fcd6833f4864dba",
+        "file": "makehuman-people-v1/parts/masculine/shoes.shoes03.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#0f0d0f",
+        "upper": "#17161d"
+       },
+       "hiddenBodyTriangles": 4528,
+       "hideBit": 10,
+       "label": "Boots",
+       "material": "shoes/shoes03",
+       "morphTargets": [
+        "fullness-up",
+        "fullness-down",
+        "muscle-up",
+        "muscle-down"
+       ],
+       "node": "shoes.shoes03",
+       "partId": "masculine/shoes/shoes03",
+       "slot": "shoes",
+       "source": {
+        "path": "clothes/shoes03",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 4128
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.masculine.shoes.shoes04.v1",
+        "byteSize": 198084,
+        "contentSha256": "c89b55ca2baad0c9cfc239aab1339e2fe7898c3465259202d47aad127a2ad67a",
+        "file": "makehuman-people-v1/parts/masculine/shoes.shoes04.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#242324",
+        "upper": "#a19eb1"
+       },
+       "hiddenBodyTriangles": 4528,
+       "hideBit": 11,
+       "label": "Black shoes",
+       "material": "shoes/shoes04",
+       "morphTargets": [
+        "fullness-up",
+        "fullness-down",
+        "muscle-up",
+        "muscle-down"
+       ],
+       "node": "shoes.shoes04",
+       "partId": "masculine/shoes/shoes04",
+       "slot": "shoes",
+       "source": {
+        "path": "clothes/shoes04",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 3320
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.masculine.shoes.shoes05.v1",
+        "byteSize": 187476,
+        "contentSha256": "9d11281a5f982ed4a9f203aeadd35dc313e76c593f3fd7a97df75605be91f400",
+        "file": "makehuman-people-v1/parts/masculine/shoes.shoes05.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#585555",
+        "upper": "#7d7b89"
+       },
+       "hiddenBodyTriangles": 4528,
+       "hideBit": 12,
+       "label": "White trainers",
+       "material": "shoes/shoes05",
+       "morphTargets": [
+        "fullness-up",
+        "fullness-down",
+        "muscle-up",
+        "muscle-down"
+       ],
+       "node": "shoes.shoes05",
+       "partId": "masculine/shoes/shoes05",
+       "slot": "shoes",
+       "source": {
+        "path": "clothes/shoes05",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 3064
+      },
+      {
+       "asset": {
+        "assetKey": "makehuman.people.masculine.shoes.shoes06.v1",
+        "byteSize": 187476,
+        "contentSha256": "84770cebd23a5c58c3bd031e75e898a9651593c4deb3e0b585a5fdb573c27094",
+        "file": "makehuman-people-v1/parts/masculine/shoes.shoes06.glb",
+        "mediaType": "model/gltf-binary"
+       },
+       "farColours": {
+        "lower": "#484e5b",
+        "upper": "#a3a0b4"
+       },
+       "hiddenBodyTriangles": 4528,
+       "hideBit": 13,
+       "label": "Blue trainers",
+       "material": "shoes/shoes06",
+       "morphTargets": [
+        "fullness-up",
+        "fullness-down",
+        "muscle-up",
+        "muscle-down"
+       ],
+       "node": "shoes.shoes06",
+       "partId": "masculine/shoes/shoes06",
+       "slot": "shoes",
+       "source": {
+        "path": "clothes/shoes06",
+        "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+        "title": "MakeHuman system assets",
+        "url": "https://github.com/makehumancommunity/mpfb2"
+       },
+       "triangles": 3064
+      }
+     ],
+     "restHeightMillimetres": 1729,
+     "source": {
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets through MPFB 2",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    }
+   ],
+   "colours": {
+    "hairColour": [
+     {
+      "key": "black",
+      "label": "Black",
+      "rgb": "#2b2522"
+     },
+     {
+      "key": "dark-brown",
+      "label": "Dark brown",
+      "rgb": "#4a3426"
+     },
+     {
+      "key": "brown",
+      "label": "Brown",
+      "rgb": "#6e4c33"
+     },
+     {
+      "key": "auburn",
+      "label": "Auburn",
+      "rgb": "#7c3f25"
+     },
+     {
+      "key": "blonde",
+      "label": "Blonde",
+      "rgb": "#b89466"
+     },
+     {
+      "key": "grey",
+      "label": "Grey",
+      "rgb": "#9c9690"
+     }
+    ]
+   },
+   "familyId": "makehuman-people/v1",
+   "joints": [
+    "mixamorig:Root",
+    "mixamorig:Hips",
+    "mixamorig:Spine",
+    "mixamorig:Spine1",
+    "mixamorig:LeftBreast",
+    "mixamorig:RightBreast",
+    "mixamorig:Spine2",
+    "mixamorig:LeftShoulder",
+    "mixamorig:LeftArm",
+    "mixamorig:LeftForeArm",
+    "mixamorig:LeftHand",
+    "mixamorig:LeftHandIndex1",
+    "mixamorig:LeftHandIndex2",
+    "mixamorig:LeftHandIndex3",
+    "mixamorig:LeftHandMiddle1",
+    "mixamorig:LeftHandMiddle2",
+    "mixamorig:LeftHandMiddle3",
+    "mixamorig:LeftHandPinky1",
+    "mixamorig:LeftHandPinky2",
+    "mixamorig:LeftHandPinky3",
+    "mixamorig:LeftHandRing1",
+    "mixamorig:LeftHandRing2",
+    "mixamorig:LeftHandRing3",
+    "mixamorig:LeftHandThumb1",
+    "mixamorig:LeftHandThumb2",
+    "mixamorig:LeftHandThumb3",
+    "mixamorig:RightShoulder",
+    "mixamorig:RightArm",
+    "mixamorig:RightForeArm",
+    "mixamorig:RightHand",
+    "mixamorig:RightHandIndex1",
+    "mixamorig:RightHandIndex2",
+    "mixamorig:RightHandIndex3",
+    "mixamorig:RightHandMiddle1",
+    "mixamorig:RightHandMiddle2",
+    "mixamorig:RightHandMiddle3",
+    "mixamorig:RightHandPinky1",
+    "mixamorig:RightHandPinky2",
+    "mixamorig:RightHandPinky3",
+    "mixamorig:RightHandRing1",
+    "mixamorig:RightHandRing2",
+    "mixamorig:RightHandRing3",
+    "mixamorig:RightHandThumb1",
+    "mixamorig:RightHandThumb2",
+    "mixamorig:RightHandThumb3",
+    "mixamorig:Neck",
+    "mixamorig:Head",
+    "mixamorig:Jaw",
+    "mixamorig:LeftEye",
+    "mixamorig:RightEye",
+    "mixamorig:LeftOrbicularisTop",
+    "mixamorig:RightOrbicularisTop",
+    "mixamorig:LeftOrbicularisBottom",
+    "mixamorig:RightOrbicularisBottom",
+    "mixamorig:LeftUpLeg",
+    "mixamorig:LeftButtock",
+    "mixamorig:LeftLeg",
+    "mixamorig:LeftFoot",
+    "mixamorig:LeftToeBase",
+    "mixamorig:RightUpLeg",
+    "mixamorig:RightButtock",
+    "mixamorig:RightLeg",
+    "mixamorig:RightFoot",
+    "mixamorig:RightToeBase"
+   ],
+   "kind": "layered-people",
+   "label": "People",
+   "licence": {
+    "file": "makehuman-people-v1/LICENSE.md",
+    "id": "CC0-1.0",
+    "sha256": "f6089cba01cb570a24712b41ab8a586ccd3cc5ef53dc266ca50b95c288956d2c"
+   },
+   "materials": [
+    {
+     "alphaCutoffMilli": 300,
+     "alphaMode": "MASK",
+     "asset": {
+      "assetKey": "makehuman.people.material.brows.eyebrow001.v1",
+      "byteSize": 25048,
+      "contentSha256": "f2affdc83785b0b7002cc21e407c65460f5f82bac0c2fa509c98dd2622c643b3",
+      "file": "makehuman-people-v1/materials/brows.eyebrow001.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#0e0707",
+     "doubleSided": true,
+     "kind": "eyebrows",
+     "label": "Soft brows",
+     "materialId": "brows/eyebrow001",
+     "roles": {
+      "baseColor": 0
+     },
+     "roughnessMilli": 900,
+     "source": {
+      "path": "eyebrows/eyebrow001",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaCutoffMilli": 300,
+     "alphaMode": "MASK",
+     "asset": {
+      "assetKey": "makehuman.people.material.brows.eyebrow003.v1",
+      "byteSize": 26868,
+      "contentSha256": "757cff1146bb81f2aff39144a9af5861338830d30abef6ebc60e1db750f2172c",
+      "file": "makehuman-people-v1/materials/brows.eyebrow003.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#0c0705",
+     "doubleSided": true,
+     "kind": "eyebrows",
+     "label": "Straight brows",
+     "materialId": "brows/eyebrow003",
+     "roles": {
+      "baseColor": 0
+     },
+     "roughnessMilli": 900,
+     "source": {
+      "path": "eyebrows/eyebrow003",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaCutoffMilli": 300,
+     "alphaMode": "MASK",
+     "asset": {
+      "assetKey": "makehuman.people.material.brows.eyebrow006.v1",
+      "byteSize": 6908,
+      "contentSha256": "8290fc63122a411f59ba5fc5871bc2775584aa8e3339cd44e996e64215abb396",
+      "file": "makehuman-people-v1/materials/brows.eyebrow006.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#000000",
+     "doubleSided": true,
+     "kind": "eyebrows",
+     "label": "Arched brows",
+     "materialId": "brows/eyebrow006",
+     "roles": {
+      "baseColor": 0
+     },
+     "roughnessMilli": 900,
+     "source": {
+      "path": "eyebrows/eyebrow006",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaCutoffMilli": 300,
+     "alphaMode": "MASK",
+     "asset": {
+      "assetKey": "makehuman.people.material.brows.eyebrow009.v1",
+      "byteSize": 65056,
+      "contentSha256": "7f9c79499ccedb6606ea727fb0b9380d18acbd660f55e4b2bde2e522b7b6ce62",
+      "file": "makehuman-people-v1/materials/brows.eyebrow009.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#1a1411",
+     "doubleSided": true,
+     "kind": "eyebrows",
+     "label": "Full brows",
+     "materialId": "brows/eyebrow009",
+     "roles": {
+      "baseColor": 0
+     },
+     "roughnessMilli": 900,
+     "source": {
+      "path": "eyebrows/eyebrow009",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaCutoffMilli": 300,
+     "alphaMode": "MASK",
+     "asset": {
+      "assetKey": "makehuman.people.material.brows.eyebrow010.v1",
+      "byteSize": 20368,
+      "contentSha256": "2b84db0e7c4de1eef5e42f574874bacfc01583cc55c5882a930674ad06f474ad",
+      "file": "makehuman-people-v1/materials/brows.eyebrow010.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#0b0000",
+     "doubleSided": true,
+     "kind": "eyebrows",
+     "label": "Fine brows",
+     "materialId": "brows/eyebrow010",
+     "roles": {
+      "baseColor": 0
+     },
+     "roughnessMilli": 900,
+     "source": {
+      "path": "eyebrows/eyebrow010",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.eyecolour.blue.v1",
+      "byteSize": 53940,
+      "contentSha256": "eba792c327fd7c534f4c2cf995f7d3edb45106d20706511faed5438eb37e7204",
+      "file": "makehuman-people-v1/materials/eyecolour.blue.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#989794",
+     "doubleSided": false,
+     "kind": "eyes",
+     "label": "Blue eyes",
+     "materialId": "eyeColour/blue",
+     "roles": {
+      "baseColor": 0
+     },
+     "roughnessMilli": 80,
+     "source": {
+      "path": "eyes/materials/blue",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.eyecolour.brown.v1",
+      "byteSize": 51208,
+      "contentSha256": "a87b851ce8c91d75bec983f2dbdab37daeb81dcf61acdc6953f4c64702311d8f",
+      "file": "makehuman-people-v1/materials/eyecolour.brown.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#9c9590",
+     "doubleSided": false,
+     "kind": "eyes",
+     "label": "Brown eyes",
+     "materialId": "eyeColour/brown",
+     "roles": {
+      "baseColor": 0
+     },
+     "roughnessMilli": 80,
+     "source": {
+      "path": "eyes/materials/brown",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.eyecolour.brownlight.v1",
+      "byteSize": 54860,
+      "contentSha256": "51262168e8f62c0627e194c987dd0fdfac79a741590f7447c945fe6a395b9cd1",
+      "file": "makehuman-people-v1/materials/eyecolour.brownlight.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#9d978f",
+     "doubleSided": false,
+     "kind": "eyes",
+     "label": "Light brown eyes",
+     "materialId": "eyeColour/brownlight",
+     "roles": {
+      "baseColor": 0
+     },
+     "roughnessMilli": 80,
+     "source": {
+      "path": "eyes/materials/brownlight",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.eyecolour.green.v1",
+      "byteSize": 53672,
+      "contentSha256": "26a72931dcef9929c496187f51238fea2b340e5ef93ddf18bd4fae8e79de4b6e",
+      "file": "makehuman-people-v1/materials/eyecolour.green.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#999890",
+     "doubleSided": false,
+     "kind": "eyes",
+     "label": "Green eyes",
+     "materialId": "eyeColour/green",
+     "roles": {
+      "baseColor": 0
+     },
+     "roughnessMilli": 80,
+     "source": {
+      "path": "eyes/materials/green",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.eyecolour.grey.v1",
+      "byteSize": 54212,
+      "contentSha256": "01d09b67dc6509226bac36b075a68e3229e70aa6ce8af586de2f7f39fe72af48",
+      "file": "makehuman-people-v1/materials/eyecolour.grey.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#9f9d97",
+     "doubleSided": false,
+     "kind": "eyes",
+     "label": "Grey eyes",
+     "materialId": "eyeColour/grey",
+     "roles": {
+      "baseColor": 0
+     },
+     "roughnessMilli": 80,
+     "source": {
+      "path": "eyes/materials/grey",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaCutoffMilli": 400,
+     "alphaMode": "MASK",
+     "asset": {
+      "assetKey": "makehuman.people.material.hair.afro01.v1",
+      "byteSize": 501064,
+      "contentSha256": "477fca470ef6afde7074636016b16922cf680a8c3965833610cce60a0711d792",
+      "file": "makehuman-people-v1/materials/hair.afro01.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#0f0505",
+     "doubleSided": true,
+     "kind": "hair",
+     "label": "Rounded curls",
+     "materialId": "hair/afro01",
+     "roles": {
+      "baseColor": 0,
+      "opacity": 1
+     },
+     "roughnessMilli": 520,
+     "source": {
+      "path": "hair/afro01",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     },
+     "tint": "normalised"
+    },
+    {
+     "alphaCutoffMilli": 400,
+     "alphaMode": "MASK",
+     "asset": {
+      "assetKey": "makehuman.people.material.hair.bob01.v1",
+      "byteSize": 138852,
+      "contentSha256": "5f3ce01fa1f7ccb88595dcffb7d59a505adf061e23db1c7cbfe094d83398c3a1",
+      "file": "makehuman-people-v1/materials/hair.bob01.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#261f21",
+     "doubleSided": true,
+     "kind": "hair",
+     "label": "Side-swept bob",
+     "materialId": "hair/bob01",
+     "roles": {
+      "baseColor": 0,
+      "opacity": 1
+     },
+     "roughnessMilli": 520,
+     "source": {
+      "path": "hair/bob01",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     },
+     "tint": "normalised"
+    },
+    {
+     "alphaCutoffMilli": 400,
+     "alphaMode": "MASK",
+     "asset": {
+      "assetKey": "makehuman.people.material.hair.bob02.v1",
+      "byteSize": 127308,
+      "contentSha256": "6c48ca4aa0a5049addf349df6b707aacbc3b7f852bd4f9b968adc584f4067ae5",
+      "file": "makehuman-people-v1/materials/hair.bob02.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#9e9788",
+     "doubleSided": true,
+     "kind": "hair",
+     "label": "Rounded bob",
+     "materialId": "hair/bob02",
+     "roles": {
+      "baseColor": 0,
+      "opacity": 1
+     },
+     "roughnessMilli": 520,
+     "source": {
+      "path": "hair/bob02",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     },
+     "tint": "normalised"
+    },
+    {
+     "alphaCutoffMilli": 400,
+     "alphaMode": "MASK",
+     "asset": {
+      "assetKey": "makehuman.people.material.hair.braid01.v1",
+      "byteSize": 55144,
+      "contentSha256": "c1987f2d38b2fd4105eac5819d41e353d1f0e5edc148eb55b07f84b9ec423b20",
+      "file": "makehuman-people-v1/materials/hair.braid01.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#181410",
+     "doubleSided": true,
+     "kind": "hair",
+     "label": "Braid",
+     "materialId": "hair/braid01",
+     "roles": {
+      "baseColor": 0,
+      "opacity": 1
+     },
+     "roughnessMilli": 520,
+     "source": {
+      "path": "hair/braid01",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     },
+     "tint": "normalised"
+    },
+    {
+     "alphaCutoffMilli": 400,
+     "alphaMode": "MASK",
+     "asset": {
+      "assetKey": "makehuman.people.material.hair.long01.v1",
+      "byteSize": 106428,
+      "contentSha256": "2e6dfe48cb438b7f4e7aa1930cd4613e1a9fc95ce9d702dcc42d8c4bff7eb9b3",
+      "file": "makehuman-people-v1/materials/hair.long01.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#311c15",
+     "doubleSided": true,
+     "kind": "hair",
+     "label": "Long straight",
+     "materialId": "hair/long01",
+     "roles": {
+      "baseColor": 0,
+      "opacity": 1
+     },
+     "roughnessMilli": 520,
+     "source": {
+      "path": "hair/long01",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     },
+     "tint": "normalised"
+    },
+    {
+     "alphaCutoffMilli": 400,
+     "alphaMode": "MASK",
+     "asset": {
+      "assetKey": "makehuman.people.material.hair.ponytail01.v1",
+      "byteSize": 230960,
+      "contentSha256": "6ef83930abf946e40edf863878cf05d776b5b5f9c416ac7eb131bf826302f4dd",
+      "file": "makehuman-people-v1/materials/hair.ponytail01.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#553a29",
+     "doubleSided": true,
+     "kind": "hair",
+     "label": "Ponytail",
+     "materialId": "hair/ponytail01",
+     "roles": {
+      "baseColor": 0,
+      "opacity": 1
+     },
+     "roughnessMilli": 520,
+     "source": {
+      "path": "hair/ponytail01",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     },
+     "tint": "normalised"
+    },
+    {
+     "alphaCutoffMilli": 400,
+     "alphaMode": "MASK",
+     "asset": {
+      "assetKey": "makehuman.people.material.hair.short01.v1",
+      "byteSize": 381680,
+      "contentSha256": "eae0c9dcdf9b88de70c73f65425bd4d84f8ed4fa8d71dd34cfea706a441d34a5",
+      "file": "makehuman-people-v1/materials/hair.short01.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#1b1b1b",
+     "doubleSided": true,
+     "kind": "hair",
+     "label": "Cropped",
+     "materialId": "hair/short01",
+     "roles": {
+      "baseColor": 0,
+      "opacity": 1
+     },
+     "roughnessMilli": 520,
+     "source": {
+      "path": "hair/short01",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     },
+     "tint": "normalised"
+    },
+    {
+     "alphaCutoffMilli": 400,
+     "alphaMode": "MASK",
+     "asset": {
+      "assetKey": "makehuman.people.material.hair.short02.v1",
+      "byteSize": 99136,
+      "contentSha256": "4938654273050f0f5157e8e9a2ccc8f2582877356b2c4adc4c6cb4ca5e7ef1c7",
+      "file": "makehuman-people-v1/materials/hair.short02.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#4b3c32",
+     "doubleSided": true,
+     "kind": "hair",
+     "label": "Short textured",
+     "materialId": "hair/short02",
+     "roles": {
+      "baseColor": 0,
+      "opacity": 1
+     },
+     "roughnessMilli": 520,
+     "source": {
+      "path": "hair/short02",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     },
+     "tint": "normalised"
+    },
+    {
+     "alphaCutoffMilli": 400,
+     "alphaMode": "MASK",
+     "asset": {
+      "assetKey": "makehuman.people.material.hair.short03.v1",
+      "byteSize": 101968,
+      "contentSha256": "92eac7eb21e209de508405846b4de0e617b276b17d7a1cf42120fcd84b6469c9",
+      "file": "makehuman-people-v1/materials/hair.short03.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#4f332a",
+     "doubleSided": true,
+     "kind": "hair",
+     "label": "Short parted",
+     "materialId": "hair/short03",
+     "roles": {
+      "baseColor": 0,
+      "opacity": 1
+     },
+     "roughnessMilli": 520,
+     "source": {
+      "path": "hair/short03",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     },
+     "tint": "normalised"
+    },
+    {
+     "alphaCutoffMilli": 400,
+     "alphaMode": "MASK",
+     "asset": {
+      "assetKey": "makehuman.people.material.hair.short04.v1",
+      "byteSize": 198576,
+      "contentSha256": "7599ff6fd8e250b038e944536e5a0c1b7f4f52c19a1e33e9dc0dccc8793b5329",
+      "file": "makehuman-people-v1/materials/hair.short04.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#242424",
+     "doubleSided": true,
+     "kind": "hair",
+     "label": "Short swept",
+     "materialId": "hair/short04",
+     "roles": {
+      "baseColor": 0,
+      "opacity": 1
+     },
+     "roughnessMilli": 520,
+     "source": {
+      "path": "hair/short04",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     },
+     "tint": "normalised"
+    },
+    {
+     "alphaCutoffMilli": 300,
+     "alphaMode": "MASK",
+     "asset": {
+      "assetKey": "makehuman.people.material.lashes.eyelashes01.v1",
+      "byteSize": 41848,
+      "contentSha256": "ef993d547a58e308eff66eec87142fd3cf020fb9b2e2b83ec042e4888552930f",
+      "file": "makehuman-people-v1/materials/lashes.eyelashes01.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#090301",
+     "doubleSided": true,
+     "kind": "eyelashes",
+     "label": "Lashes",
+     "materialId": "lashes/eyelashes01",
+     "roles": {
+      "baseColor": 0
+     },
+     "roughnessMilli": 900,
+     "source": {
+      "path": "eyelashes/eyelashes01",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.outfit.female-casualsuit01.v1",
+      "byteSize": 138208,
+      "contentSha256": "8c344b7fe2d8b09e1308c6b0881194982f160642923c58a85e4bbf5e9b111ac0",
+      "file": "makehuman-people-v1/materials/outfit.female-casualsuit01.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#6d7e93",
+     "doubleSided": false,
+     "kind": "outfit",
+     "label": "Tee and jeans",
+     "materialId": "outfit/female_casualsuit01",
+     "roles": {
+      "baseColor": 0,
+      "normal": 1
+     },
+     "roughnessMilli": 820,
+     "source": {
+      "path": "clothes/female_casualsuit01",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.outfit.female-casualsuit02.v1",
+      "byteSize": 187092,
+      "contentSha256": "884e61231f9d0193e2ab9d789c6d48ba34d9b56d82eecf5b02234a6e3be8d83d",
+      "file": "makehuman-people-v1/materials/outfit.female-casualsuit02.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#79889e",
+     "doubleSided": false,
+     "kind": "outfit",
+     "label": "Tee and denim shorts",
+     "materialId": "outfit/female_casualsuit02",
+     "roles": {
+      "baseColor": 0,
+      "normal": 1
+     },
+     "roughnessMilli": 820,
+     "source": {
+      "path": "clothes/female_casualsuit02",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.outfit.female-elegantsuit01.v1",
+      "byteSize": 132592,
+      "contentSha256": "b7e4bd0b10717704a8ccce14537f55bbb3effbf0067b5dfd643a78e841783668",
+      "file": "makehuman-people-v1/materials/outfit.female-elegantsuit01.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#353230",
+     "doubleSided": false,
+     "kind": "outfit",
+     "label": "Striped blouse and skirt",
+     "materialId": "outfit/female_elegantsuit01",
+     "roles": {
+      "baseColor": 0,
+      "normal": 1
+     },
+     "roughnessMilli": 820,
+     "source": {
+      "path": "clothes/female_elegantsuit01",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.outfit.female-sportsuit01.v1",
+      "byteSize": 89688,
+      "contentSha256": "6a79b081de92eb7e593d2d259a05408fb98a6e9b7fdda08527b6c6609ddd6c82",
+      "file": "makehuman-people-v1/materials/outfit.female-sportsuit01.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#6a7584",
+     "doubleSided": false,
+     "kind": "outfit",
+     "label": "Athletic top and leggings",
+     "materialId": "outfit/female_sportsuit01",
+     "roles": {
+      "baseColor": 0,
+      "normal": 1
+     },
+     "roughnessMilli": 820,
+     "source": {
+      "path": "clothes/female_sportsuit01",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.outfit.male-casualsuit01.v1",
+      "byteSize": 133852,
+      "contentSha256": "a9cbd14f196830a2ff349c8cb155f596fae59f1b5f521877dbb48949a01fc490",
+      "file": "makehuman-people-v1/materials/outfit.male-casualsuit01.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#3d485d",
+     "doubleSided": false,
+     "kind": "outfit",
+     "label": "Denim shirt and jeans",
+     "materialId": "outfit/male_casualsuit01",
+     "roles": {
+      "baseColor": 0,
+      "normal": 1
+     },
+     "roughnessMilli": 820,
+     "source": {
+      "path": "clothes/male_casualsuit01",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.outfit.male-casualsuit02.v1",
+      "byteSize": 113660,
+      "contentSha256": "59b3c1115e3843e397fb8c5721ee5624d00110e3ce7feee5f84b18bfd5dab589",
+      "file": "makehuman-people-v1/materials/outfit.male-casualsuit02.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#2b4a70",
+     "doubleSided": false,
+     "kind": "outfit",
+     "label": "Long-sleeve tee and jeans",
+     "materialId": "outfit/male_casualsuit02",
+     "roles": {
+      "baseColor": 0,
+      "normal": 1
+     },
+     "roughnessMilli": 820,
+     "source": {
+      "path": "clothes/male_casualsuit02",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.outfit.male-casualsuit03.v1",
+      "byteSize": 211728,
+      "contentSha256": "42f5977f44f92c55a257fa2b0831ca0322ad7a62d2d6ef9a1e54c7d65dca770e",
+      "file": "makehuman-people-v1/materials/outfit.male-casualsuit03.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#23242c",
+     "doubleSided": false,
+     "kind": "outfit",
+     "label": "Striped shirt and jeans",
+     "materialId": "outfit/male_casualsuit03",
+     "roles": {
+      "baseColor": 0,
+      "normal": 1
+     },
+     "roughnessMilli": 820,
+     "source": {
+      "path": "clothes/male_casualsuit03",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.outfit.male-casualsuit04.v1",
+      "byteSize": 116916,
+      "contentSha256": "f3ab94882a0b7a50c287c60efa50fde7d4711c58d97d03c86e49e56e1aa0b509",
+      "file": "makehuman-people-v1/materials/outfit.male-casualsuit04.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#3a5874",
+     "doubleSided": false,
+     "kind": "outfit",
+     "label": "Tee and jeans",
+     "materialId": "outfit/male_casualsuit04",
+     "roles": {
+      "baseColor": 0,
+      "normal": 1
+     },
+     "roughnessMilli": 820,
+     "source": {
+      "path": "clothes/male_casualsuit04",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.outfit.male-casualsuit05.v1",
+      "byteSize": 107616,
+      "contentSha256": "1b6c1eadf5471590d697ac97fbb3efc65030cd64f8fe999591e5193bceb1b8b7",
+      "file": "makehuman-people-v1/materials/outfit.male-casualsuit05.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#15191c",
+     "doubleSided": false,
+     "kind": "outfit",
+     "label": "Jacket and jeans",
+     "materialId": "outfit/male_casualsuit05",
+     "roles": {
+      "baseColor": 0,
+      "normal": 1
+     },
+     "roughnessMilli": 820,
+     "source": {
+      "path": "clothes/male_casualsuit05",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.outfit.male-casualsuit06.v1",
+      "byteSize": 112008,
+      "contentSha256": "77480863cbefe061eacf5f73b75edc0a9107fba9c21626bd41cbd90eef876537",
+      "file": "makehuman-people-v1/materials/outfit.male-casualsuit06.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#99a0a6",
+     "doubleSided": false,
+     "kind": "outfit",
+     "label": "White tee and jeans",
+     "materialId": "outfit/male_casualsuit06",
+     "roles": {
+      "baseColor": 0,
+      "normal": 1
+     },
+     "roughnessMilli": 820,
+     "source": {
+      "path": "clothes/male_casualsuit06",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.outfit.male-elegantsuit01.v1",
+      "byteSize": 45348,
+      "contentSha256": "8dc1260b816850de6dd5a5035b982e8c867ee0c1227266307eb170afcd917d89",
+      "file": "makehuman-people-v1/materials/outfit.male-elegantsuit01.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#272727",
+     "doubleSided": false,
+     "kind": "outfit",
+     "label": "Dark suit",
+     "materialId": "outfit/male_elegantsuit01",
+     "roles": {
+      "baseColor": 0
+     },
+     "roughnessMilli": 820,
+     "source": {
+      "path": "clothes/male_elegantsuit01",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.outfit.male-worksuit01.v1",
+      "byteSize": 168444,
+      "contentSha256": "7dea7caa634676120c278b98169c0512c398933bd1abb59ac89d71b9a99192e7",
+      "file": "makehuman-people-v1/materials/outfit.male-worksuit01.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#3d506d",
+     "doubleSided": false,
+     "kind": "outfit",
+     "label": "Work overalls",
+     "materialId": "outfit/male_worksuit01",
+     "roles": {
+      "baseColor": 0,
+      "normal": 1
+     },
+     "roughnessMilli": 820,
+     "source": {
+      "path": "clothes/male_worksuit01",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.shoes.shoes01.v1",
+      "byteSize": 60864,
+      "contentSha256": "60fa89b95f08d8441bf4e7f4bfd3b36d61637b62047dac735d8bc6dc0278cfa3",
+      "file": "makehuman-people-v1/materials/shoes.shoes01.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#623e2c",
+     "doubleSided": false,
+     "kind": "shoes",
+     "label": "Brown leather shoes",
+     "materialId": "shoes/shoes01",
+     "roles": {
+      "baseColor": 0,
+      "normal": 1
+     },
+     "roughnessMilli": 560,
+     "source": {
+      "path": "clothes/shoes01",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.shoes.shoes02.v1",
+      "byteSize": 44948,
+      "contentSha256": "b70338180141510bc9f0cfa36044f8c400d182f2f09ac7f29175288ffbfb0dec",
+      "file": "makehuman-people-v1/materials/shoes.shoes02.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#3e3c39",
+     "doubleSided": false,
+     "kind": "shoes",
+     "label": "Worn trainers",
+     "materialId": "shoes/shoes02",
+     "roles": {
+      "baseColor": 0
+     },
+     "roughnessMilli": 560,
+     "source": {
+      "path": "clothes/shoes02",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.shoes.shoes03.v1",
+      "byteSize": 17628,
+      "contentSha256": "8df3621a621f21d5f7dfe7bfbad03c5835a442f7929f75439ad7fa528d6ef86d",
+      "file": "makehuman-people-v1/materials/shoes.shoes03.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#080708",
+     "doubleSided": false,
+     "kind": "shoes",
+     "label": "Boots",
+     "materialId": "shoes/shoes03",
+     "roles": {
+      "baseColor": 0
+     },
+     "roughnessMilli": 560,
+     "source": {
+      "path": "clothes/shoes03",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.shoes.shoes04.v1",
+      "byteSize": 48608,
+      "contentSha256": "4a1c0cab9f5734a9c9a77f61f7b8deea2919230002cb5af4f0ecfc3cc3730f5d",
+      "file": "makehuman-people-v1/materials/shoes.shoes04.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#212122",
+     "doubleSided": false,
+     "kind": "shoes",
+     "label": "Black shoes",
+     "materialId": "shoes/shoes04",
+     "roles": {
+      "baseColor": 0,
+      "normal": 1
+     },
+     "roughnessMilli": 560,
+     "source": {
+      "path": "clothes/shoes04",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.shoes.shoes05.v1",
+      "byteSize": 43436,
+      "contentSha256": "88e3290b4dac526ba0fbe22f713b977c00d7917961fd5b27be920de6dc168f7b",
+      "file": "makehuman-people-v1/materials/shoes.shoes05.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#3e3c3d",
+     "doubleSided": false,
+     "kind": "shoes",
+     "label": "White trainers",
+     "materialId": "shoes/shoes05",
+     "roles": {
+      "baseColor": 0
+     },
+     "roughnessMilli": 560,
+     "source": {
+      "path": "clothes/shoes05",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.shoes.shoes06.v1",
+      "byteSize": 53748,
+      "contentSha256": "0faec0e6311731cb876763434f29db781d14d1fa0ba5fd37a97c08ccf5d44e1e",
+      "file": "makehuman-people-v1/materials/shoes.shoes06.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#34373f",
+     "doubleSided": false,
+     "kind": "shoes",
+     "label": "Blue trainers",
+     "materialId": "shoes/shoes06",
+     "roles": {
+      "baseColor": 0
+     },
+     "roughnessMilli": 560,
+     "source": {
+      "path": "clothes/shoes06",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.skin.middleage-african-female.v1",
+      "byteSize": 76840,
+      "contentSha256": "51c4cb3f6302c60e579f6583af34af87a650dab2e7879a60a00dbbde498b9627",
+      "file": "makehuman-people-v1/materials/skin.middleage-african-female.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#623827",
+     "doubleSided": false,
+     "kind": "skin",
+     "label": "Skin feminine 6",
+     "materialId": "skin/middleage_african_female",
+     "roles": {
+      "baseColor": 0
+     },
+     "roughnessMilli": 620,
+     "source": {
+      "path": "skins/middleage_african_female",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.skin.middleage-african-male.v1",
+      "byteSize": 84476,
+      "contentSha256": "75d64fa43d72bbf62ee75dd9f2ea0b66e10d76a3826755a247ca19b7ab0b4e4c",
+      "file": "makehuman-people-v1/materials/skin.middleage-african-male.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#5f3b2a",
+     "doubleSided": false,
+     "kind": "skin",
+     "label": "Skin masculine 6",
+     "materialId": "skin/middleage_african_male",
+     "roles": {
+      "baseColor": 0
+     },
+     "roughnessMilli": 620,
+     "source": {
+      "path": "skins/middleage_african_male",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.skin.middleage-asian-female.v1",
+      "byteSize": 86236,
+      "contentSha256": "8233132d3a6c0a6b1fd6a12d7c59613837b4803e52ad8b749cc633a182ca22d5",
+      "file": "makehuman-people-v1/materials/skin.middleage-asian-female.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#d5a88a",
+     "doubleSided": false,
+     "kind": "skin",
+     "label": "Skin feminine 5",
+     "materialId": "skin/middleage_asian_female",
+     "roles": {
+      "baseColor": 0
+     },
+     "roughnessMilli": 620,
+     "source": {
+      "path": "skins/middleage_asian_female",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.skin.middleage-asian-male.v1",
+      "byteSize": 111392,
+      "contentSha256": "63473ac05d1a680ea63b239dcffcadb7c21a2c535a21ad5557f2b44484ecd5e1",
+      "file": "makehuman-people-v1/materials/skin.middleage-asian-male.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#d1a386",
+     "doubleSided": false,
+     "kind": "skin",
+     "label": "Skin masculine 5",
+     "materialId": "skin/middleage_asian_male",
+     "roles": {
+      "baseColor": 0
+     },
+     "roughnessMilli": 620,
+     "source": {
+      "path": "skins/middleage_asian_male",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.skin.middleage-caucasian-female.v1",
+      "byteSize": 99076,
+      "contentSha256": "d68e055a124d3b6845e764793ec54f3951b43ea302358efc61e7dabe66175e7d",
+      "file": "makehuman-people-v1/materials/skin.middleage-caucasian-female.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#cda185",
+     "doubleSided": false,
+     "kind": "skin",
+     "label": "Skin feminine 4",
+     "materialId": "skin/middleage_caucasian_female",
+     "roles": {
+      "baseColor": 0
+     },
+     "roughnessMilli": 620,
+     "source": {
+      "path": "skins/middleage_caucasian_female",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.skin.middleage-caucasian-male.v1",
+      "byteSize": 105976,
+      "contentSha256": "d288b13ad74e72472f4ae9de5d0032259101b0914d7e0216f8b651664aa4a9af",
+      "file": "makehuman-people-v1/materials/skin.middleage-caucasian-male.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#cda084",
+     "doubleSided": false,
+     "kind": "skin",
+     "label": "Skin masculine 4",
+     "materialId": "skin/middleage_caucasian_male",
+     "roles": {
+      "baseColor": 0
+     },
+     "roughnessMilli": 620,
+     "source": {
+      "path": "skins/middleage_caucasian_male",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.skin.young-african-female.v1",
+      "byteSize": 83036,
+      "contentSha256": "8a9f845a6f08986a1ac0716337355e7d217166831f5cdb70227eb2a1bcb5d308",
+      "file": "makehuman-people-v1/materials/skin.young-african-female.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#603829",
+     "doubleSided": false,
+     "kind": "skin",
+     "label": "Skin feminine 3",
+     "materialId": "skin/young_african_female",
+     "roles": {
+      "baseColor": 0
+     },
+     "roughnessMilli": 620,
+     "source": {
+      "path": "skins/young_african_female",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.skin.young-african-male.v1",
+      "byteSize": 84984,
+      "contentSha256": "6e3b0bbb4d0220105b46addb005d49591a028cd5196d723572c210a9b92a3e49",
+      "file": "makehuman-people-v1/materials/skin.young-african-male.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#573829",
+     "doubleSided": false,
+     "kind": "skin",
+     "label": "Skin masculine 3",
+     "materialId": "skin/young_african_male",
+     "roles": {
+      "baseColor": 0
+     },
+     "roughnessMilli": 620,
+     "source": {
+      "path": "skins/young_african_male",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.skin.young-asian-female.v1",
+      "byteSize": 94452,
+      "contentSha256": "7918e3e379449a6898f6946179f3998cecc123d66ae72d3039a6a4020b14e733",
+      "file": "makehuman-people-v1/materials/skin.young-asian-female.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#cf9e7e",
+     "doubleSided": false,
+     "kind": "skin",
+     "label": "Skin feminine 2",
+     "materialId": "skin/young_asian_female",
+     "roles": {
+      "baseColor": 0
+     },
+     "roughnessMilli": 620,
+     "source": {
+      "path": "skins/young_asian_female",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.skin.young-asian-male.v1",
+      "byteSize": 101164,
+      "contentSha256": "c3b44b471fa69d64c9e8189c19621a5a40b9c36a4e4c74df0f7965f0eafad685",
+      "file": "makehuman-people-v1/materials/skin.young-asian-male.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#c79b82",
+     "doubleSided": false,
+     "kind": "skin",
+     "label": "Skin masculine 2",
+     "materialId": "skin/young_asian_male",
+     "roles": {
+      "baseColor": 0
+     },
+     "roughnessMilli": 620,
+     "source": {
+      "path": "skins/young_asian_male",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.skin.young-caucasian-female.v1",
+      "byteSize": 116392,
+      "contentSha256": "4c5f98e2674b485932c4127d0f475922d366542bc6b98cbc7372c21e16cb8cf1",
+      "file": "makehuman-people-v1/materials/skin.young-caucasian-female.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#ce9e83",
+     "doubleSided": false,
+     "kind": "skin",
+     "label": "Skin feminine 1",
+     "materialId": "skin/young_caucasian_female",
+     "roles": {
+      "baseColor": 0
+     },
+     "roughnessMilli": 620,
+     "source": {
+      "path": "skins/young_caucasian_female",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    },
+    {
+     "alphaMode": "OPAQUE",
+     "asset": {
+      "assetKey": "makehuman.people.material.skin.young-caucasian-male.v1",
+      "byteSize": 107168,
+      "contentSha256": "635855afe61b98273ca8c6d5d6bcbda392530b7f70794a6c542cfd9e27f8075e",
+      "file": "makehuman-people-v1/materials/skin.young-caucasian-male.glb",
+      "mediaType": "model/gltf-binary"
+     },
+     "averageColour": "#e0a989",
+     "doubleSided": false,
+     "kind": "skin",
+     "label": "Skin masculine 1",
+     "materialId": "skin/young_caucasian_male",
+     "roles": {
+      "baseColor": 0
+     },
+     "roughnessMilli": 620,
+     "source": {
+      "path": "skins/young_caucasian_male",
+      "revision": "mpfb2@437dd513888a92399d1d3200d2e80859fae55abc;system-assets@b542127a8e25547c7c29c19f2d1d2adb9a664c80396ecd694095dbc8028a0107",
+      "title": "MakeHuman system assets",
+      "url": "https://github.com/makehumancommunity/mpfb2"
+     }
+    }
+   ],
+   "parameters": [
+    {
+     "key": "heightMillimetres",
+     "label": "Height",
+     "max": 1930,
+     "min": 1520,
+     "unit": "mm"
+    },
+    {
+     "key": "fullness",
+     "label": "Body fullness",
+     "max": 1000,
+     "min": -800,
+     "negative": "fullness-down",
+     "positive": "fullness-up",
+     "unit": "milli"
+    },
+    {
+     "key": "muscle",
+     "label": "Muscle definition",
+     "max": 800,
+     "min": -800,
+     "negative": "muscle-down",
+     "positive": "muscle-up",
+     "unit": "milli"
+    }
+   ],
+   "rigId": "makehuman-mixamo-unity/v1",
+   "slots": [
+    {
+     "kind": "part",
+     "label": "Clothing",
+     "optional": false,
+     "slot": "outfit"
+    },
+    {
+     "kind": "part",
+     "label": "Shoes",
+     "optional": false,
+     "slot": "shoes"
+    },
+    {
+     "kind": "part",
+     "label": "Hair",
+     "optional": true,
+     "slot": "hair"
+    },
+    {
+     "kind": "part",
+     "label": "Eyebrows",
+     "optional": false,
+     "slot": "brows"
+    },
+    {
+     "kind": "part",
+     "label": "Eyelashes",
+     "optional": false,
+     "slot": "lashes"
+    },
+    {
+     "kind": "part",
+     "label": "Eyes",
+     "optional": false,
+     "slot": "eyes"
+    },
+    {
+     "appliesTo": "body",
+     "kind": "material",
+     "label": "Skin",
+     "optional": false,
+     "slot": "skin"
+    },
+    {
+     "appliesTo": "eyes",
+     "kind": "material",
+     "label": "Eye colour",
+     "optional": false,
+     "slot": "eyeColour"
+    },
+    {
+     "appliesTo": "hair",
+     "kind": "colour",
+     "label": "Hair colour",
+     "optional": false,
+     "slot": "hairColour"
+    }
+   ],
+   "summary": "Fitted MakeHuman adults with interchangeable clothing, hair, skin and body shape, sharing one skeleton per body and Quaternius CC0 locomotion."
+  }
+ ],
+ "population": [
+  {
+   "bases": {
+    "feminine": 10,
+    "masculine": 10
+   },
+   "choices": {
+    "feminine": {
+     "brows": {
+      "feminine/brows/eyebrow001": 10,
+      "feminine/brows/eyebrow006": 10,
+      "feminine/brows/eyebrow010": 10
+     },
+     "eyeColour": {
+      "eyeColour/blue": 6,
+      "eyeColour/brown": 14,
+      "eyeColour/brownlight": 8,
+      "eyeColour/green": 4,
+      "eyeColour/grey": 4
+     },
+     "eyes": {
+      "feminine/eyes/low-poly": 10
+     },
+     "hair": {
+      "feminine/hair/afro01": 6,
+      "feminine/hair/bob01": 10,
+      "feminine/hair/bob02": 8,
+      "feminine/hair/braid01": 6,
+      "feminine/hair/long01": 12,
+      "feminine/hair/ponytail01": 12,
+      "feminine/hair/short02": 6
+     },
+     "lashes": {
+      "feminine/lashes/eyelashes01": 10
+     },
+     "outfit": {
+      "feminine/outfit/female_casualsuit01": 12,
+      "feminine/outfit/female_casualsuit02": 6,
+      "feminine/outfit/female_elegantsuit01": 8,
+      "feminine/outfit/female_sportsuit01": 6,
+      "feminine/outfit/male_casualsuit01": 5,
+      "feminine/outfit/male_casualsuit03": 5,
+      "feminine/outfit/male_casualsuit05": 8,
+      "feminine/outfit/male_casualsuit06": 6
+     },
+     "shoes": {
+      "feminine/shoes/shoes01": 8,
+      "feminine/shoes/shoes02": 6,
+      "feminine/shoes/shoes03": 6,
+      "feminine/shoes/shoes04": 10,
+      "feminine/shoes/shoes05": 10,
+      "feminine/shoes/shoes06": 6
+     },
+     "skin": {
+      "skin/middleage_african_female": 10,
+      "skin/middleage_asian_female": 10,
+      "skin/middleage_caucasian_female": 10,
+      "skin/young_african_female": 10,
+      "skin/young_asian_female": 10,
+      "skin/young_caucasian_female": 10
+     }
+    },
+    "masculine": {
+     "brows": {
+      "masculine/brows/eyebrow001": 10,
+      "masculine/brows/eyebrow003": 10,
+      "masculine/brows/eyebrow009": 10
+     },
+     "eyeColour": {
+      "eyeColour/blue": 6,
+      "eyeColour/brown": 14,
+      "eyeColour/brownlight": 8,
+      "eyeColour/green": 4,
+      "eyeColour/grey": 4
+     },
+     "eyes": {
+      "masculine/eyes/low-poly": 10
+     },
+     "hair": {
+      "masculine/hair/afro01": 6,
+      "masculine/hair/short01": 10,
+      "masculine/hair/short02": 10,
+      "masculine/hair/short03": 10,
+      "masculine/hair/short04": 10,
+      "none": 4
+     },
+     "lashes": {
+      "masculine/lashes/eyelashes01": 10
+     },
+     "outfit": {
+      "masculine/outfit/male_casualsuit01": 10,
+      "masculine/outfit/male_casualsuit02": 8,
+      "masculine/outfit/male_casualsuit03": 10,
+      "masculine/outfit/male_casualsuit04": 8,
+      "masculine/outfit/male_casualsuit05": 10,
+      "masculine/outfit/male_casualsuit06": 10,
+      "masculine/outfit/male_elegantsuit01": 6,
+      "masculine/outfit/male_worksuit01": 4
+     },
+     "shoes": {
+      "masculine/shoes/shoes01": 10,
+      "masculine/shoes/shoes02": 8,
+      "masculine/shoes/shoes03": 6,
+      "masculine/shoes/shoes04": 10,
+      "masculine/shoes/shoes05": 8,
+      "masculine/shoes/shoes06": 6
+     },
+     "skin": {
+      "skin/middleage_african_male": 10,
+      "skin/middleage_asian_male": 10,
+      "skin/middleage_caucasian_male": 10,
+      "skin/young_african_male": 10,
+      "skin/young_asian_male": 10,
+      "skin/young_caucasian_male": 10
+     }
+    }
+   },
+   "colours": {
+    "hairColour": {
+     "auburn": 5,
+     "black": 14,
+     "blonde": 7,
+     "brown": 12,
+     "dark-brown": 14,
+     "grey": 6
+    }
+   },
+   "domain": "street-population/v1",
+   "familyId": "makehuman-people/v1",
+   "parameters": {
+    "feminine": {
+     "fullness": {
+      "max": 800,
+      "min": -500,
+      "mode": 0
+     },
+     "heightMillimetres": {
+      "max": 1800,
+      "min": 1520,
+      "mode": 1660
+     },
+     "muscle": {
+      "max": 500,
+      "min": -500,
+      "mode": 0
+     }
+    },
+    "masculine": {
+     "fullness": {
+      "max": 800,
+      "min": -500,
+      "mode": 0
+     },
+     "heightMillimetres": {
+      "max": 1930,
+      "min": 1620,
+      "mode": 1770
+     },
+     "muscle": {
+      "max": 500,
+      "min": -500,
+      "mode": 0
+     }
+    }
+   }
+  }
+ ],
+ "profile": "exulanica.character-catalog/v1",
+ "revision": 1
+}
