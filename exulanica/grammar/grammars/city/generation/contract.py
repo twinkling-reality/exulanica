@@ -26,9 +26,9 @@ identity, the subject kind, the owner identity and the ordinal. The owner and or
 kind are its shape's ``IdentityRule``; a side (``SIDE_CODES``) and a surface role
 (``SURFACE_ROLE_CODES``) stand in for ordinals by their append-only codes.
 
-**Parameters.** 69 are declared in ``city.v2.json``, each with a unit, a cascade level (city,
+**Parameters.** 72 are declared in ``city.v2.json``, each with a unit, a cascade level (city,
 district, block, lot, building, face), the one stage that reads it, a vocabulary and a basis.
-``driving_side`` is ``required``; the other 68 are ``derive``: unset, the reading stage derives a
+``driving_side`` is ``required``; the other 71 are ``derive``: unset, the reading stage derives a
 value per subject within the declared range and the record states it. A binding sets a parameter
 at its own level or a coarser one, one binding per level for the whole city, so a binding is a
 city-wide statement, never a per-subject one. Only ``city.facade`` carries its parameters as
@@ -190,17 +190,23 @@ triangle textured: a glazing, door or marking surface drawn unavailable fails
 ring edge has drawn geometry within 50 mm of its midpoint at 1 m above support. No drawn triangle
 inside a building volume, so everything behind glass must be closed.
 
-6. GAPS NAMED, NOT FILLED
-=========================
+6. GAPS NAMED, AND WHERE EACH WAS ANSWERED
+==========================================
 
-* No declared parameter bounds how far a generation reaches: a city has no extent, and nothing
-  positions a street network. Asked for before any street is generated.
-* The corner a curb's radius makes, and whether a record kind supports, covers or obstructs, are
-  the two grammar rules tess waits on; this lane states them first.
-* What lies behind glazing above the ground storey, what ``soiling_gradient_millionths`` means, and
-  the glazing soil band depths are not stated; the wording goes to the orchestrator first.
+* No declared parameter bounded how far a generation reaches. Answered on 2026-09-17:
+  ``city_extent_x_mm`` and ``city_extent_y_mm`` (city level, read by districts, whole tiles) and
+  ``block_depth_mm`` (district level, read by streets) were added to the descriptor.
+* The corner a curb's radius makes (``corners.py``: ``[curb_extent]``, ``[corner_extent]``,
+  ``[junction_extent]``) and what each record kind is to a person walking (the descriptor's
+  ``navigation`` table, ``[facade_clearance]``, ``[canopy_clearance]``) were stated first, for tess.
+* Surface roles 25 ``canopy`` and 26 ``trunk`` were appended for a street tree's parts.
+* Still open: what lies behind glazing above the ground storey, the meaning of
+  ``soiling_gradient_millionths`` and the glazing soil band depths (the wording is accepted; it
+  amends ``surface_material`` version 2 in place, after the rules above); the role-to-material-class
+  table; ``city_reference_closure`` over a whole generated city; segment pieces no longer than 1 km.
 * A signal names traffic's signal-plan catalog by SHA-256, which the city grammar never reads, so
-  the corridor's junctions are unsignalised until that catalog is on main.
+  the corridor's junctions are unsignalised (stop and priority controls, zebra crossings) until
+  that catalog is on main.
 """
 
 from __future__ import annotations

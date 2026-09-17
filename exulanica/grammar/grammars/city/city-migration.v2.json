@@ -44,11 +44,23 @@
       "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
     },
     {
+      "target": "city_extent_x_mm",
+      "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
+    },
+    {
+      "target": "city_extent_y_mm",
+      "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
+    },
+    {
       "target": "driving_side",
       "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
     },
     {
       "target": "block_length_mm",
+      "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
+    },
+    {
+      "target": "block_depth_mm",
       "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
     },
     {

@@ -3,7 +3,7 @@
 Version 2. Eleven stages, in the order they run: terrain, districts, streets, parcels, massing,
 facade, material, streetlife, vitrine, premises, tile. Each has a version and record shapes whose
 validators hold every field, and ``city.v2.json`` states all of it as data: the frame, the stages
-and the record kinds each validates, 69 declared parameters and the representation contract of
+and the record kinds each validates, 72 declared parameters and the representation contract of
 each admitted projection. **No stage has a generator**, so a city generated today is a receipt
 and eleven emissions that each say ``not_implemented`` with a reason, and nothing else.
 

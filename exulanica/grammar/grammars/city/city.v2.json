@@ -225,6 +225,30 @@
       "maximum": 50000
     },
     {
+      "name": "city_extent_x_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "city",
+      "stage": "districts",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: the bounded work one generation covers, from its south-west corner at the frame origin, along x, east. It is a whole number of 128000 mm tiles, because the terrain stage covers a city with whole patches; the districts stage refuses an extent that ends mid-tile. This stage version divides the extent into one district.",
+      "minimum": 128000,
+      "maximum": 2048000
+    },
+    {
+      "name": "city_extent_y_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "city",
+      "stage": "districts",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: the bounded work one generation covers, from its south-west corner at the frame origin, along y, north. It is a whole number of 128000 mm tiles, because the terrain stage covers a city with whole patches; the districts stage refuses an extent that ends mid-tile. This stage version divides the extent into one district.",
+      "minimum": 128000,
+      "maximum": 2048000
+    },
+    {
       "name": "driving_side",
       "kind": "choice",
       "unit": "key",
@@ -246,9 +270,21 @@
       "stage": "streets",
       "when_unset": "derive",
       "vocabulary": "",
-      "basis": "authored: the spacing of cross streets along a street; a planning choice, not a quoted standard.",
+      "basis": "authored, awaiting admitted statistics: the spacing of cross streets along a street, a planning choice and not a quoted standard. The range stands until an admitted street network statistic replaces it, with no change to this parameter's shape.",
       "minimum": 60000,
       "maximum": 250000
+    },
+    {
+      "name": "block_depth_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "district",
+      "stage": "streets",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored, awaiting admitted statistics: the spacing of the parallel streets across a street, the partner of block_length_mm. The range stands until an admitted street network statistic replaces it, with no change to this parameter's shape.",
+      "minimum": 40000,
+      "maximum": 200000
     },
     {
       "name": "lane_width_mm",

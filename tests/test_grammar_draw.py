@@ -604,7 +604,7 @@ def test_every_city_stage_emits_nothing_and_says_so():
     assert parameters.values == (("driving_side", "right"),)
     sources = dict(parameters.sources)
     assert sources.pop("driving_side") == "city"
-    assert len(sources) == 68
+    assert len(sources) == 71
     assert set(sources.values()) == {"derive"}
 
 
