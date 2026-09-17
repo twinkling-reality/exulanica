@@ -60,7 +60,7 @@ from exulanica.grammar.textures import read_texture_manifest
 from city_v2_fixture import builder
 
 FIXTURE = builder()
-DOCUMENT_SHA256 = "42cc5e0e82f14159e00ddf940894ae4f18d05f40849e7e6d4f5989a7bc4e2f0b"
+DOCUMENT_SHA256 = "e51af0a51af2b7285aca9b88a59ff272f4b49a47f0030d85c9cc7fdb9043d7cc"
 DOCUMENT_BYTES = 124_728
 SHAPES_SHA256 = "8ece5fe7b41800cd5c1c224b97312631dabcaaee439c8012eaf218f65876a572"
 SHAPES_BYTES = 59_962
@@ -497,6 +497,38 @@ def _frontage_corner_off_the_block() -> TileDocument:
     return _document(replace={curb.identity: narrowed})
 
 
+def _awning_at_head_height() -> TileDocument:
+    """The first shopfront's awning hangs to 1800 mm above the building's base."""
+    face = FIXTURE.facades[0]
+    bay = FIXTURE.south_bays[0]
+    [awning] = bay.awning
+    lowered = dataclasses.replace(bay, awning=(dataclasses.replace(awning, front_z_mm=2_050),))
+    bays = tuple(lowered if item.identity == bay.identity else item for item in FIXTURE.south_bays)
+    entrances = tuple(item for item in FIXTURE.entrances if item.facade_identity == face.identity)
+    redigested = dataclasses.replace(
+        face, output_digest=facade_output_digest(face, bays, entrances)
+    )
+    return _document(replace={bay.identity: lowered, face.identity: redigested})
+
+
+def _string_course_at_head_height() -> TileDocument:
+    """The south face's lower string course drops to 1800 mm above the base."""
+    face = FIXTURE.facades[0]
+    first, *rest = face.string_courses
+    lowered = dataclasses.replace(first, z_bottom_mm=1_800, z_top_mm=1_950)
+    return _document(
+        replace={face.identity: dataclasses.replace(face, string_courses=(lowered, *rest))}
+    )
+
+
+def _canopy_at_head_height() -> TileDocument:
+    """The London plane's canopy starts 1000 mm above its trunk base, over the footway."""
+    [tree] = FIXTURE.trees
+    trunk, canopy = tree.parts
+    lowered = dataclasses.replace(canopy, offset_z_mm=1_000)
+    return _document(replace={tree.identity: dataclasses.replace(tree, parts=(trunk, lowered))})
+
+
 def _junction_fill_below_its_extent() -> TileDocument:
     """The junction's extent stops 1 mm above the kerb lines its fill reaches down to."""
     junction = FIXTURE.junction
@@ -626,6 +658,13 @@ _MUTATIONS: list[tuple[str, Callable[[], TileDocument], str]] = [
         _junction_fill_below_its_extent,
         r"\[junction_extent\]",
     ),
+    ("an awning hanging at head height", _awning_at_head_height, r"\[facade_clearance\]"),
+    (
+        "a string course projecting at head height",
+        _string_course_at_head_height,
+        r"\[facade_clearance\]",
+    ),
+    ("a tree canopy at head height", _canopy_at_head_height, r"\[canopy_clearance\]"),
     ("a crossing wider than its type", _crossing_too_wide, r"\[crossing_width\]"),
     ("a kerb below the 100 mm gate", _kerb_below_the_gate, "below its minimum 100"),
     ("a vitrine partly behind a stall riser", _vitrine_not_behind_glass, r"\[vitrine\]"),

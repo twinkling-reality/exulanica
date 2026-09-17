@@ -141,6 +141,7 @@ def _descriptor(version: int, levels: list[str], parameters: list[dict[str, Any]
         "stages": [],
         "parameters": parameters,
         "projections": [],
+        "navigation": [],
     }
 
 

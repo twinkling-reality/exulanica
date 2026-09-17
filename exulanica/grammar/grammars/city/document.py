@@ -102,6 +102,7 @@ from exulanica.grammar.grammars.city.facade import (
 from exulanica.grammar.grammars.city.massing import (
     MassingRecord,
     RooftopObjectRecord,
+    storey_floor_mm,
     tier_top_mm,
 )
 from exulanica.grammar.grammars.city.material import SurfaceMaterialRecord, scaled_module_mm
@@ -145,6 +146,7 @@ __all__ = [
     "BAY_PITCH_TARGET_MM",
     "OWN_ANCHOR_KINDS",
     "RELATION_FIELDS",
+    "SUPPORT_KINDS",
     "TILE_DOCUMENT_PROFILE",
     "CityDocumentReport",
     "GrammarRecords",
@@ -154,6 +156,7 @@ __all__ = [
     "read_tile_document",
     "record_sort_key",
     "select_tile",
+    "support_top_mm",
     "validate_city_document",
 ]
 
@@ -214,6 +217,43 @@ OWN_ANCHOR_KINDS: Final = (
 ANCHORLESS_KINDS: Final = (DistrictRecord, StreetRecord)
 #: How close, in millimetres, a point derived with one floored integer normal must land.
 _NORMAL_ROUNDING_MM: Final = 2
+#: The height of the capsule the nav envelope keeps clear, from the descriptor's measures.
+_CAPSULE_HEIGHT_MM: Final = next(
+    dict(row.measures)["height_mm"]
+    for row in CITY_GRAMMAR.projection("nav_envelope").preserved
+    if row.property == "capsule_clearance"
+)
+#: The record kinds whose drawn horizontal surfaces a person stands on, from the descriptor.
+SUPPORT_KINDS: Final = frozenset(
+    row.kind for row in CITY_GRAMMAR.navigation if row.ground == "support"
+)
+
+
+def support_top_mm(record: Any) -> int:
+    """The highest a support record's drawn surface stands, for a clearance above it.
+
+    Each support kind the descriptor names has a rule here, read from its own fields rather than
+    its extent, which may hold things that are not its surface (a lot's building, a segment's
+    curbs): terrain's highest sample; a segment's highest crown point; a curb's kerb top plus its
+    footway's rise; a junction's and a crossing's extent tops, which hold only their surfaces; a
+    block's and a lot's grade; an entrance's threshold; a tree's pit, at its trunk base.
+    """
+    kind = type(record)
+    if kind is TerrainRecord:
+        return max(record.height_mm)
+    if kind is StreetSegmentRecord:
+        return max(point[2] for point in record.centreline_mm)
+    if kind is CurbEdgeRecord:
+        return strip_box(record).max_z_mm
+    if kind in (JunctionRecord, CrossingRecord):
+        return record.extent.max_z_mm
+    if kind in (BlockRecord, ParcelRecord):
+        return record.grade_elevation_mm
+    if kind is EntranceRecord:
+        return record.threshold_z_mm
+    if kind is StreetTreeRecord:
+        return record.z_mm
+    raise InvalidRecordError(f"{kind.__name__} states no support surface")
 
 
 def descriptor_sha256(path: Path = CITY_DESCRIPTOR_PATH) -> str:
@@ -1335,6 +1375,7 @@ class _Checker:
         )
         if era["cornice"] == "required" and top_frontage and not facade.cornice:
             raise _fail("cornice", f"{where} lacks the cornice its era requires")
+        self._check_facade_clearance(facade, building)
         bays = tuple(
             bay for bay in self.of(GroundBayRecord) if bay.facade_identity == facade.identity
         )
@@ -1369,6 +1410,33 @@ class _Checker:
         if complete and facade.output_digest != facade_output_digest(facade, bays, entrances):
             raise _fail("output_digest", f"{where}'s output digest is not its layout's")
 
+    def _check_facade_clearance(self, facade: FacadeRecord, building: MassingRecord) -> None:
+        """Every part a face puts beyond its building's base ring stands at least the capsule
+        height above the building's base: its mouldings, and its openings' projecting sills and
+        heads. Panels are set into the wall and project nothing."""
+        where = f"facade {facade.identity}"
+        for moulding in (*facade.string_courses, *facade.cornice):
+            if moulding.z_bottom_mm < _CAPSULE_HEIGHT_MM:
+                raise _fail(
+                    "facade_clearance",
+                    f"{where} projects a moulding {moulding.z_bottom_mm} mm above its base, below "
+                    f"the {_CAPSULE_HEIGHT_MM} mm capsule",
+                )
+        for grid in facade.openings:
+            for storey in grid.storeys:
+                floor = storey_floor_mm(building, storey) - building.base_elevation_mm
+                bottoms = []
+                if grid.sill_projection_mm:
+                    bottoms.append(floor + grid.sill_height_mm - grid.sill_thickness_mm)
+                if grid.head_projection_mm:
+                    bottoms.append(floor + grid.sill_height_mm + grid.height_mm)
+                if bottoms and min(bottoms) < _CAPSULE_HEIGHT_MM:
+                    raise _fail(
+                        "facade_clearance",
+                        f"{where} projects an opening's sill or head below the "
+                        f"{_CAPSULE_HEIGHT_MM} mm capsule on storey {storey}",
+                    )
+
     def _check_bay(self, bay: GroundBayRecord) -> None:
         facade = self.get(bay.facade_identity)
         layout = facade.bays
@@ -1384,6 +1452,13 @@ class _Checker:
             raise _fail("ground_bay", f"{where} is not where its face's layout puts it")
         if max(panel.z_top_mm for panel in bay.panels) != facade.band_top_mm:
             raise _fail("ground_bay", f"{where} is not as tall as its ground band")
+        for awning in bay.awning:
+            if awning.front_z_mm - awning.valance_mm < _CAPSULE_HEIGHT_MM:
+                raise _fail(
+                    "facade_clearance",
+                    f"{where}'s awning hangs to {awning.front_z_mm - awning.valance_mm} mm above "
+                    f"its base, below the {_CAPSULE_HEIGHT_MM} mm capsule",
+                )
 
     def _check_entrance(self, entrance: EntranceRecord) -> None:
         facade = self.get(entrance.facade_identity)
@@ -1514,6 +1589,7 @@ class _Checker:
             placed.append(furniture)
         for tree in self.of(StreetTreeRecord):
             self._check_placed(tree, tree.parts, 0)
+            self._check_canopy_clearance(tree)
             placed.append(tree)
         for index, first in enumerate(placed):
             for second in placed[index + 1 :]:
@@ -1522,6 +1598,41 @@ class _Checker:
                 if dx * dx + dy * dy < reach * reach:
                     raise _fail(
                         "exclusion", f"{first.identity} and {second.identity} crowd each other"
+                    )
+
+    def _check_canopy_clearance(self, tree: StreetTreeRecord) -> None:
+        """A canopy part whose plan box meets a support record stands at least the capsule height
+        above that record's support surface."""
+        supports = [
+            record for record in self.records if _SHAPES_BY_TYPE[type(record)].kind in SUPPORT_KINDS
+        ]
+        for index, part in enumerate(tree.parts):
+            if part.surface_role != "canopy":
+                continue
+            half_x, half_y = (part.size_x_mm + 1) // 2, (part.size_y_mm + 1) // 2
+            low_x, high_x = (
+                tree.x_mm + part.offset_x_mm - half_x,
+                tree.x_mm + part.offset_x_mm + half_x,
+            )
+            low_y, high_y = (
+                tree.y_mm + part.offset_y_mm - half_y,
+                tree.y_mm + part.offset_y_mm + half_y,
+            )
+            bottom = tree.z_mm + part.offset_z_mm
+            for support in supports:
+                extent = support.extent
+                if (
+                    extent.min_x_mm <= high_x
+                    and low_x <= extent.max_x_mm
+                    and extent.min_y_mm <= high_y
+                    and low_y <= extent.max_y_mm
+                    and bottom < support_top_mm(support) + _CAPSULE_HEIGHT_MM
+                ):
+                    raise _fail(
+                        "canopy_clearance",
+                        f"tree {tree.identity}'s canopy part {index} hangs to {bottom} mm over "
+                        f"{support.identity}, less than the {_CAPSULE_HEIGHT_MM} mm capsule above "
+                        "its surface",
                     )
 
     def check_vitrines(self) -> None:

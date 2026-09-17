@@ -49,7 +49,7 @@ _GRAMMARS = ROOT / "exulanica" / "grammar" / "grammars"
 DESCRIPTOR_SHA256 = {
     ("box", 1): "2c2c8481c90e3a33021a014e7a7d5ece016b34fbbaed779a76979f8793d08e46",
     ("city", 1): "1e580ada17333e886ad1067e65585ebd7014006749ba4f84a26ae0f9f673d273",
-    ("city", 2): "afd33e01690a7727adac450579b5967e46d1407b7a3635db464a8fa9d640bffb",
+    ("city", 2): "8b7109e5e07a2d0a45235f1c6a667916431c49612053c36f4fe87ee65e7f6b15",
 }
 
 

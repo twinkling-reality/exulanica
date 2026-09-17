@@ -112,6 +112,12 @@ parameters; the box uses it. **Schema 2** adds what the code is then held to:
   consumer builds to by number (`PROPERTY_MEASURES`) states its integer measures as data, and no
   other row states any. A projection admits its own use. **No contract may admit `personal_world` or `citation`**; lifting either is a code change
   in `contract.py`, not a descriptor edit.
+- `navigation`: one row per declared record kind, sorted, stating what the kind is to a person
+  walking, so a navigation projection reads kinds as data. `ground` is `support` (its drawn
+  horizontal surfaces are where a person may stand), `cover` (the ground under the region `cover`
+  names is neither drawn nor stood on) or `none`; `obstruction` is `none`, `base_ring` or
+  `low_parts` (form parts whose bottom is below the measured capsule height). The words are closed
+  and append-only, and a word no kind needs is not added.
 
 `generate(grammar, seed=..., subject_identity=..., bindings=...)` runs the stages in order,
 validates every record with its stage's validator, refuses any float through canonical JSON, and
@@ -315,6 +321,17 @@ radius no wider than the kerb is refused. The junction owns only the carriageway
 kerb arcs, and its extent must hold the kerb line ends nearest its node and every corner arc
 between its legs. `tests/test_grammar_city_corners.py` samples every integer point a corner owns,
 for convex, mitred, concave and slanted corners, and requires it inside the box.
+
+**Navigation** (`navigation` in `city.v2.json`, `[facade_clearance]`, `[canopy_clearance]`).
+Support: terrain, street segments, curbs, junctions, crossings (a crossing draws its own band, not
+only paint on the carriageway), blocks, lots, recessed entrance floors and tree pits. A building
+covers the ground under its base ring and obstructs by that ring; furniture and trees obstruct by
+their parts below the capsule height; every other kind is none. Nothing removes ground under an
+extent box. Two rules keep `none` and `low_parts` honest: every part a facade puts beyond its
+building's base ring (mouldings, projecting sills and heads, awnings to the bottom of their
+valance) stands at least the capsule height above the building's base, and a tree's canopy part
+whose plan box meets a support record stands at least the capsule height above that record's
+surface (`support_top_mm`).
 
 **Membership.** A tile owns a subject whose anchor lies in its 128 m square. A subject it does not
 own is in its halo when the subject's extent meets the square grown by 64 m on every side

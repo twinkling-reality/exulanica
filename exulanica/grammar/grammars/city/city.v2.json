@@ -1423,5 +1423,196 @@
       ],
       "dependencies": []
     }
+  ],
+  "navigation": [
+    {
+      "kind": "city.block",
+      "ground": "support",
+      "cover": "none",
+      "obstruction": "none",
+      "reason": "The ground of a block that no lot covers is drawn level at its grade and stood on."
+    },
+    {
+      "kind": "city.crossing",
+      "ground": "support",
+      "cover": "none",
+      "obstruction": "none",
+      "reason": "A crossing draws its own band across the carriageway, surface role crossing with its own material and kerb upstand, rather than only marking the carriageway, so its drawn horizontal surface is where a person crossing stands."
+    },
+    {
+      "kind": "city.curb_edge",
+      "ground": "support",
+      "cover": "none",
+      "obstruction": "none",
+      "reason": "Its kerb top and footway, along its straight pieces and round the corner it owns, are drawn horizontal surfaces a person stands on; its kerb face is a step, not support."
+    },
+    {
+      "kind": "city.district",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none",
+      "reason": "A region of the parameter cascade; it draws nothing."
+    },
+    {
+      "kind": "city.entrance",
+      "ground": "support",
+      "cover": "none",
+      "obstruction": "none",
+      "reason": "The floor of a recessed entrance, from the face line to the door, is drawn and stood on."
+    },
+    {
+      "kind": "city.facade",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none",
+      "reason": "A facade draws walls, not ground. Every part it puts beyond its building's base ring stands at least the capsule height above the building's base (facade_clearance), so it obstructs no standing capsule, and the building's base ring obstructs for the rest."
+    },
+    {
+      "kind": "city.ground_bay",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none",
+      "reason": "Its panels are set into the building within its base ring, and its awning stands at least the capsule height above the base (facade_clearance)."
+    },
+    {
+      "kind": "city.junction",
+      "ground": "support",
+      "cover": "none",
+      "obstruction": "none",
+      "reason": "Its carriageway fill inside the kerb arcs is drawn and may be stood on."
+    },
+    {
+      "kind": "city.junction_approach",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none",
+      "reason": "A relation stating how a segment enters its junction; it draws nothing."
+    },
+    {
+      "kind": "city.lane",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none",
+      "reason": "A path on its segment's carriageway, which the segment draws and supports."
+    },
+    {
+      "kind": "city.lane_connection",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none",
+      "reason": "A path across its junction's fill, which the junction draws and supports."
+    },
+    {
+      "kind": "city.massing",
+      "ground": "cover",
+      "cover": "base_ring",
+      "obstruction": "base_ring",
+      "reason": "The ground under a building's base ring is neither drawn nor stood on, and a standing capsule keeps its radius clear of that ring."
+    },
+    {
+      "kind": "city.parcel",
+      "ground": "support",
+      "cover": "none",
+      "obstruction": "none",
+      "reason": "A lot outside its building is drawn level at its grade and stood on."
+    },
+    {
+      "kind": "city.parking_space",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none",
+      "reason": "A space on a carriageway or a footway, whose surface that carriageway or footway draws; its bay lines are markings."
+    },
+    {
+      "kind": "city.premises",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none",
+      "reason": "An occupancy of its building; it draws nothing of its own."
+    },
+    {
+      "kind": "city.road_marking",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none",
+      "reason": "Paint on a surface another record draws and supports."
+    },
+    {
+      "kind": "city.rooftop_object",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none",
+      "reason": "It stands on a roof, and no roof supports a person in this version."
+    },
+    {
+      "kind": "city.signal",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none",
+      "reason": "A relation naming the furniture that draws its heads; it draws nothing."
+    },
+    {
+      "kind": "city.street",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none",
+      "reason": "A name over its segments, which draw."
+    },
+    {
+      "kind": "city.street_furniture",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "low_parts",
+      "reason": "Lamps, benches, bins, stands and poles stand on the footway. A standing capsule keeps its radius clear of every part whose bottom is below the capsule height; a lamp's arm or a signal's head above it obstructs nobody."
+    },
+    {
+      "kind": "city.street_node",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none",
+      "reason": "A point of the street network; its junction or its segments' ends draw."
+    },
+    {
+      "kind": "city.street_segment",
+      "ground": "support",
+      "cover": "none",
+      "obstruction": "none",
+      "reason": "Its carriageway and gutters are drawn between its kerb lines and may be stood on."
+    },
+    {
+      "kind": "city.street_tree",
+      "ground": "support",
+      "cover": "none",
+      "obstruction": "low_parts",
+      "reason": "Its pit is drawn ground a person may stand on and its trunk obstructs as a low part; its canopy stands at least the capsule height above every support surface it overhangs (canopy_clearance)."
+    },
+    {
+      "kind": "city.surface_material",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none",
+      "reason": "A dressing a drawn surface cites; it draws nothing."
+    },
+    {
+      "kind": "city.terrain",
+      "ground": "support",
+      "cover": "none",
+      "obstruction": "none",
+      "reason": "The heightfield is drawn and stood on wherever no other record's drawn ground or covered region lies over it."
+    },
+    {
+      "kind": "city.tile",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none",
+      "reason": "The inputs of one bake, not a subject; it draws nothing."
+    },
+    {
+      "kind": "city.vitrine",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none",
+      "reason": "A lit volume inside its building, behind glazing."
+    }
   ]
 }

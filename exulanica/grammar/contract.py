@@ -34,6 +34,19 @@ holds the code to it:
   until the superseding governance decision is accepted in writing, and lifting that is a code
   change here, not a descriptor edit. No contract may admit ``citation``: generated content is
   never evidence (ADR-0008).
+* ``navigation``: one row per record kind the stages declare, sorted by kind, stating what that
+  kind is to a person walking, on two axes a navigation projection reads as data rather than
+  from a list of kinds in its code. ``ground`` is ``support`` (the horizontal surfaces the record
+  draws are where a person may stand, and nothing else of it is), ``cover`` (the ground under the
+  region ``cover`` names is neither drawn nor stood on, and the record stands nobody) or ``none``.
+  ``cover`` names that region, and is ``none`` exactly when ``ground`` is not ``cover``.
+  ``obstruction`` names what a standing capsule keeps its radius clear of: ``none``,
+  ``base_ring`` (the ring the record stands on, as its grammar states it) or ``low_parts`` (each
+  of the record's form parts whose bottom lies below the capsule height the grammar's
+  ``capsule_clearance`` measures, above the record's base point). A table that names
+  ``low_parts`` needs a preserved ``capsule_clearance`` with its measures. The words are closed and
+  append-only (:data:`NAVIGATION_GROUND`, :data:`NAVIGATION_REGIONS`), and a word no kind needs is
+  not added.
 """
 
 from __future__ import annotations
@@ -69,6 +82,9 @@ from exulanica.grammar.subjects import subject_identity as _derive_subject_ident
 __all__ = [
     "ADMISSIBLE_USES",
     "FRAME_METRIC_CLASSES",
+    "NAVIGATION_COVER_REGIONS",
+    "NAVIGATION_GROUND",
+    "NAVIGATION_REGIONS",
     "PLANE",
     "PROJECTION_OWN_USE",
     "PROJECTION_USES",
@@ -82,6 +98,7 @@ __all__ = [
     "GrammarFrame",
     "GrammarKey",
     "GrammarReceipt",
+    "NavigationRow",
     "ParameterSurface",
     "ProjectionContract",
     "PropertyRow",
@@ -175,7 +192,14 @@ _DESCRIPTOR_KEYS: Final = frozenset(
         "parameters",
     }
 )
-_DESCRIPTOR_KEYS_2: Final = _DESCRIPTOR_KEYS | {"frame", "stages", "projections"}
+_DESCRIPTOR_KEYS_2: Final = _DESCRIPTOR_KEYS | {"frame", "stages", "projections", "navigation"}
+
+#: What a record kind's ground is to a person walking. Closed and append-only.
+NAVIGATION_GROUND: Final = ("support", "cover", "none")
+#: The regions a navigation row may name for what it covers or obstructs. Closed and append-only.
+NAVIGATION_REGIONS: Final = ("none", "base_ring", "low_parts")
+#: The regions a ``cover`` row may name.
+NAVIGATION_COVER_REGIONS: Final = ("none", "base_ring")
 
 
 @dataclass(frozen=True, slots=True)
@@ -404,6 +428,40 @@ class StageDeclaration:
             item = _object(f"{where}.records[{position}]", entry, frozenset({"kind", "version"}))
             records.append((item["kind"], item["version"]))
         return cls(document["stage_id"], document["stage_version"], tuple(records))  # type: ignore[arg-type]
+
+
+@dataclass(frozen=True, slots=True)
+class NavigationRow:
+    """What one record kind is to a person walking: its ground, what it covers and obstructs."""
+
+    kind: str
+    ground: str
+    cover: str
+    obstruction: str
+    reason: str
+
+    def __post_init__(self) -> None:
+        require_text("navigation kind", self.kind)
+        if self.ground not in NAVIGATION_GROUND:
+            raise InvalidRecordError(f"{self.kind}: ground is one of {NAVIGATION_GROUND}")
+        if self.cover not in NAVIGATION_COVER_REGIONS:
+            raise InvalidRecordError(f"{self.kind}: cover is one of {NAVIGATION_COVER_REGIONS}")
+        if self.obstruction not in NAVIGATION_REGIONS:
+            raise InvalidRecordError(f"{self.kind}: obstruction is one of {NAVIGATION_REGIONS}")
+        if (self.ground == "cover") != (self.cover != "none"):
+            raise InvalidRecordError(
+                f"{self.kind}: a row names the region it covers exactly when its ground is cover"
+            )
+        require_text(f"{self.kind} navigation reason", self.reason)
+
+    @classmethod
+    def read(cls, index: int, value: object) -> NavigationRow:
+        document = _object(
+            f"navigation[{index}]",
+            value,
+            frozenset({"kind", "ground", "cover", "obstruction", "reason"}),
+        )
+        return cls(**document)  # type: ignore[arg-type]
 
 
 @dataclass(frozen=True, slots=True)
@@ -641,6 +699,7 @@ class Grammar:
     frame: GrammarFrame | None = None
     declared_stages: tuple[StageDeclaration, ...] = ()
     projections: tuple[ProjectionContract, ...] = ()
+    navigation: tuple[NavigationRow, ...] = ()
 
     def __post_init__(self) -> None:
         if not self.stages:
@@ -651,9 +710,14 @@ class Grammar:
         for stage_id in ids:
             require_key("stage_id", stage_id)
         if self.descriptor_schema == 1:
-            if self.frame is not None or self.declared_stages or self.projections:
+            if (
+                self.frame is not None
+                or self.declared_stages
+                or self.projections
+                or self.navigation
+            ):
                 raise InvalidRecordError(
-                    "a schema 1 descriptor declares no frame, stages or contracts"
+                    "a schema 1 descriptor declares no frame, stages, contracts or navigation"
                 )
             if any(spec.declared for spec in self.parameters.parameters):
                 raise InvalidRecordError("a schema 1 descriptor declares no parameter units")
@@ -690,6 +754,19 @@ class Grammar:
         if contracted != self.semantics.admissible_uses:
             raise InvalidRecordError(
                 f"{name} admits {self.semantics.admissible_uses} and has contracts for {contracted}"
+            )
+        rows = [row.kind for row in self.navigation]
+        if rows != sorted(set(rows)) or set(rows) != set(kinds):
+            raise InvalidRecordError(
+                f"{name}: navigation states one row for each declared record kind, sorted by kind"
+            )
+        if any(row.obstruction == "low_parts" for row in self.navigation) and not any(
+            preserved.property == "capsule_clearance" and preserved.measures
+            for contract in self.projections
+            for preserved in contract.preserved
+        ):
+            raise InvalidRecordError(
+                f"{name}: low_parts obstruct below a capsule height no contract measures"
             )
 
     def projection(self, projection: str) -> ProjectionContract:
@@ -735,6 +812,10 @@ class Grammar:
                 "projections": tuple(
                     ProjectionContract.read(index, entry)
                     for index, entry in enumerate(_list("projections", document["projections"]))
+                ),
+                "navigation": tuple(
+                    NavigationRow.read(index, entry)
+                    for index, entry in enumerate(_list("navigation", document["navigation"]))
                 ),
             }
         return cls(
