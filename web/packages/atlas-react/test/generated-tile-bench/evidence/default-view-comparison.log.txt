@@ -1,0 +1,23 @@
+DEFAULT VIEW, NO TILE REQUESTED: lane vs main, GPU readback, 2026-09-16
+Method: headless Chrome 152 (ANGLE Metal, Apple M3 Pro) at 1440x900, prefers-reduced-motion,
+route /?preview=1, 8 s settle, then in one evaluation per pose: place atlas-camera, app.render(),
+bind the default framebuffer, gl.readPixels of the whole backbuffer, SHA-256 of the RGBA bytes.
+Scripts: cdp-capture.mjs.txt and make-default-plans.py.txt in this folder.
+main: detached worktree of 2aa796eb served on 5193. lane: lane/tile-runtime on tess e51dd39f, served on 5192.
+
+[main]
+  arrival: sha256 f05d0c367b53a8591fcf8e454b2bd39f04220ecf5908edc0c71ccea4f8588853 lit 1296000 of 1296000 camera [-37.68, 1.62, -5.83] ownedDistrict nyc-flatiron-owned-v1 generatedTile None
+  arrival-again: sha256 f05d0c367b53a8591fcf8e454b2bd39f04220ecf5908edc0c71ccea4f8588853 lit 1296000 of 1296000 camera [-37.68, 1.62, -5.83] ownedDistrict nyc-flatiron-owned-v1 generatedTile None
+  fixed-a: sha256 f2af810c44fc2a4e5e818e40a697cadee6b170879e318f208247257efed0ddf1 lit 1296000 of 1296000 camera [-40, 1.62, -30] ownedDistrict nyc-flatiron-owned-v1 generatedTile None
+  fixed-a-again: sha256 f2af810c44fc2a4e5e818e40a697cadee6b170879e318f208247257efed0ddf1 lit 1296000 of 1296000 camera [-40, 1.62, -30] ownedDistrict nyc-flatiron-owned-v1 generatedTile None
+  fixed-b: sha256 7ee0bc8f799988e4de8ff9b400a62fe21bd89d25f503e0c129c3d99e050d8fe6 lit 1296000 of 1296000 camera [10, 12, 40] ownedDistrict nyc-flatiron-owned-v1 generatedTile None
+  fixed-b-again: sha256 7ee0bc8f799988e4de8ff9b400a62fe21bd89d25f503e0c129c3d99e050d8fe6 lit 1296000 of 1296000 camera [10, 12, 40] ownedDistrict nyc-flatiron-owned-v1 generatedTile None
+[lane]
+  arrival: sha256 f05d0c367b53a8591fcf8e454b2bd39f04220ecf5908edc0c71ccea4f8588853 lit 1296000 of 1296000 camera [-37.68, 1.62, -5.83] ownedDistrict nyc-flatiron-owned-v1 generatedTile None
+  arrival-again: sha256 f05d0c367b53a8591fcf8e454b2bd39f04220ecf5908edc0c71ccea4f8588853 lit 1296000 of 1296000 camera [-37.68, 1.62, -5.83] ownedDistrict nyc-flatiron-owned-v1 generatedTile None
+  fixed-a: sha256 f2af810c44fc2a4e5e818e40a697cadee6b170879e318f208247257efed0ddf1 lit 1296000 of 1296000 camera [-40, 1.62, -30] ownedDistrict nyc-flatiron-owned-v1 generatedTile None
+  fixed-a-again: sha256 f2af810c44fc2a4e5e818e40a697cadee6b170879e318f208247257efed0ddf1 lit 1296000 of 1296000 camera [-40, 1.62, -30] ownedDistrict nyc-flatiron-owned-v1 generatedTile None
+  fixed-b: sha256 7ee0bc8f799988e4de8ff9b400a62fe21bd89d25f503e0c129c3d99e050d8fe6 lit 1296000 of 1296000 camera [10, 12, 40] ownedDistrict nyc-flatiron-owned-v1 generatedTile None
+  fixed-b-again: sha256 7ee0bc8f799988e4de8ff9b400a62fe21bd89d25f503e0c129c3d99e050d8fe6 lit 1296000 of 1296000 camera [10, 12, 40] ownedDistrict nyc-flatiron-owned-v1 generatedTile None
+
+RESULT: every pose byte-identical between main and lane: True

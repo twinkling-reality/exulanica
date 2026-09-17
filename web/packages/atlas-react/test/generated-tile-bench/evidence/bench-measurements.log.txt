@@ -1,0 +1,43 @@
+BENCH MEASUREMENTS, test-only street (test-street.ts), tile look v1, 2026-09-16
+Driver: the Browser pane (Chromium, WebGL2, Apple M3 Pro), canvas 1440x900 unless stated, frames pumped
+synchronously through window.bench. Values are as printed by the bench methods named.
+
+NORMAL MAP SIGN (measureNormalSign): orthographic calibration wall, one texture repeat texel for texel;
+Pearson correlation of (lit from above minus lit from below) with the height map's downward slope, and of
+(lit from right minus lit from left) with its leftward slope. Positive means relief shades the right way.
+  brick-running-bond   vertical 0.9565  horizontal 0.9635
+  carriageway-asphalt  vertical 0.9899  horizontal 0.9906
+  cast-concrete        vertical 0.9664  horizontal 0.9670
+  footway-paving       vertical 0.9769  horizontal 0.9841
+  kerb-stone           vertical 0.9058  horizontal 0.9071
+  limestone-ashlar     vertical 0.9720  horizontal 0.9782
+  painted-render       vertical 0.9973  horizontal 0.9976
+  storefront-metal     vertical 0.1230  horizontal 0.0263   (1 mm relief, metallic: little diffuse shading)
+  Mutation: with the tangent handedness flip removed, brick vertical -0.9567 and paving vertical -0.9821
+  (horizontal unchanged), so the check detects the error.
+
+FOG ONSET (measureFog): unlit target straight ahead, fog on vs fog off, mean luminance difference.
+  30 to 50 m: 0 at every 2 m step.  52 m: 5.072.  54 m: 9.86.  60 m: 21.791.  70 m: 38.511.  80 m: 53.23.
+  Onset between 50 and 52 m (look v1 fog.startM = 50; target 40 to 60 m).
+
+ENVIRONMENT PROBE (measureProbe), door pose:
+  metal door mean luminance 142.89 with the probe, 0.30 without.  brick wall 150.32 with, 139.70 without.
+
+CONTACT SHADOWING (measureContactShadow), ratio = luminance with occlusion / without, same pixels:
+  sample points checked by eye with on-screen markers (markContactProbe).
+  mode lighting r0.9 i0.6 p3:  kerb 0.927  door-at-reveal 0.093  threshold 0.976  cornice 0.401  controls 1.000
+  mode combine  r0.6 i0.6 p2 (look v1):  kerb 0.705  door-at-reveal 0.560  threshold 0.820  cornice 0.653
+                                         controls: carriageway 1.5 m out 1.000, plinth 1.5 m away 1.000, wall 2.5 m under 1.000
+  Chosen: combine, because lighting darkens only ambient and left the sunlit kerb foot at 0.927.
+  Cast shadow check, cornice pose: wall 0.25 m under the soffit 32 with shadows, 133 without.
+
+HEIGHT MAP (measureParallax), eye-level frames wall, footway, door, parallax off vs on:
+  physical factor (12 mm / 1800 mm = 0.00667): mean |dL| 0.12 / 0.16 / 0.11, pixels changed by 8 or more 0 / 0 / 0,
+    frame p95 4.9 ms off and 4.9 ms on (synchronous), extra decoded texture 8,738,133 bytes.
+  4x factor (0.02667): mean |dL| 0.45 / 0.61 / 0.42, pixels changed by 8 or more 0.61% / 0.79% / 0.45%.
+  Decision: height map unused (look v1 surface.parallax = false).
+
+CLIPPING (luminance histogram), poses wall, footway, street, kerb: 0 pixels at 250 or above, 0 at 5 or below.
+
+DECODED TEXTURE (stats): 7 sets drawn = 121,634,808 bytes; probe 1,671,168 bytes; set containers fetched 76,039,024 bytes
+  (includes painted-render, fetched by the wall captures).

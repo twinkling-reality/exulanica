@@ -1,0 +1,16 @@
+import json, sys
+S = sys.argv[1]
+report = "(()=>{const n=document.getElementById('exulanica-browser-validation-report');return n?JSON.parse(n.textContent):null})()"
+plan = {
+  "url": "http://127.0.0.1:5192/?preview=1&tile=tile-conformance&validation=1&validation-seconds=20&validation-warmup=2",
+  "width": 1440, "height": 900,
+  "outDir": f"{S}/shots/budget-tile",
+  "readyExpression": "!!document.querySelector('.generated-tile-evaluation') && document.getElementById('atlas')?.dataset.worldTopology !== undefined",
+  "readyTimeoutMs": 240000,
+  "steps": [
+    {"wait": 1000, "click": [720, 450]},
+    {"wait": 300, "key": ["ArrowLeft", "ArrowLeft", 37], "holdMs": 26000},
+    {"wait": 2000, "label": "report", "eval": report, "shot": "budget-end"},
+  ],
+}
+json.dump(plan, open(f"{S}/plan-budget-tile.json", "w"))

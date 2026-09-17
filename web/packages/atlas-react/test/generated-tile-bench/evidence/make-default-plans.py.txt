@@ -1,0 +1,18 @@
+import json, sys
+S = sys.argv[1]
+render = """(async()=>{const url=performance.getEntriesByType('resource').map(e=>e.name).find(n=>n.includes('/deps/playcanvas.js'));const pc=await import(url);const app=pc.AppBase.getApplication();const cam=app.root.findByName('atlas-camera');POSE app.render();const canvas=app.graphicsDevice.canvas;const gl=app.graphicsDevice.gl;const w=gl.drawingBufferWidth,h=gl.drawingBufferHeight;const px=new Uint8Array(w*h*4);gl.bindFramebuffer(gl.FRAMEBUFFER,null);gl.readPixels(0,0,w,h,gl.RGBA,gl.UNSIGNED_BYTE,px);const png=canvas.toDataURL('image/png');const hash=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',px)),b=>b.toString(16).padStart(2,'0')).join('');let lit=0;for(let i=0;i<px.length;i+=4)if(px[i]|px[i+1]|px[i+2])lit++;return {hash,w,h,lit,png,camera:cam.getPosition().toArray(),rotation:cam.getEulerAngles().toArray(),ownedDistrict:canvas.dataset.ownedDistrict??null,generatedTile:document.getElementById('shell').getAttribute('data-generated-tile-evaluation')}})()"""
+poses = {
+    "arrival": "",
+    "fixed-a": "cam.setPosition(-40,1.62,-30);cam.lookAt(-10,1.2,-60);",
+    "fixed-b": "cam.setPosition(10,12,40);cam.lookAt(-30,0,-20);",
+}
+steps = [{"wait": 8000}]
+for name, pose in poses.items():
+    steps.append({"label": name, "eval": render.replace("POSE", pose)})
+    steps.append({"wait": 500, "label": name + "-again", "eval": render.replace("POSE", pose)})
+for port, name in [(5193, "main"), (5192, "lane")]:
+    plan = {"url": f"http://127.0.0.1:{port}/?preview=1", "width": 1440, "height": 900, "reducedMotion": True,
+            "outDir": f"{S}/shots/default-{name}",
+            "readyExpression": "document.getElementById('atlas')?.dataset.ownedDistrict !== undefined && document.getElementById('atlas')?.dataset.worldTopology !== undefined",
+            "readyTimeoutMs": 240000, "steps": steps}
+    json.dump(plan, open(f"{S}/plan-default-{name}.json", "w"))

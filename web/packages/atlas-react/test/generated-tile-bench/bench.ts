@@ -480,6 +480,47 @@ export class Bench {
     return results;
   }
 
+  /**
+   * Presented frame times, as the app's own validation recorder measures them: the interval
+   * between `frameend` events while the engine renders every frame and the camera walks along the
+   * street at eye level, so the shadows, probe and occlusion are paid on every frame.
+   */
+  async presentedFrameTimes(seconds: number): Promise<Record<string, number>> {
+    const app = this.app;
+    const intervals: number[] = [];
+    let last = -1;
+    let drawCalls = 0;
+    const eye = KERB_HEIGHT_M + EYE_M;
+    let t = 0;
+    const walk = (dt: number): void => {
+      t += dt;
+      const x = -12 + ((t * 1.65) % 24);
+      this.camera.setPosition(x, eye, 0.8);
+      this.camera.lookAt(x + 6, 2.2, 2.2);
+    };
+    const onEnd = (): void => {
+      const now = performance.now();
+      if (last >= 0) intervals.push(now - last);
+      last = now;
+      drawCalls = Math.max(drawCalls, app.stats.drawCalls.total);
+    };
+    app.on('update', walk);
+    app.on('frameend', onEnd);
+    app.autoRender = true;
+    await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
+    app.autoRender = false;
+    app.off('update', walk);
+    app.off('frameend', onEnd);
+    intervals.sort((a, b) => a - b);
+    const at = (q: number): number => Math.round(intervals[Math.min(intervals.length - 1, Math.round((intervals.length - 1) * q))]! * 100) / 100;
+    const heap = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize;
+    return {
+      frames: intervals.length, p50: at(0.5), p95: at(0.95), p99: at(0.99), max: at(1),
+      over16_7: intervals.filter((value) => value > 16.7).length, drawCalls,
+      jsHeapMb: heap === undefined ? -1 : Math.round((heap / 1048576) * 100) / 100,
+    };
+  }
+
   /** Synchronous frame times: update, render, and a one-pixel read that waits for the GPU. */
   frameTimes(frames: number): { readonly p50: number; readonly p95: number; readonly max: number; readonly drawCalls: number } {
     const gl = this.gl;

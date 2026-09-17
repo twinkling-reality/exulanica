@@ -1,0 +1,20 @@
+TILE ROUTE BUDGET, the app's own validation recorder, 2026-09-16
+Route: /?preview=1&tile=tile-conformance&validation=1&validation-seconds=20&validation-warmup=2
+Driver: headless Chrome 152 at 1440x900, trusted click on the canvas, ArrowLeft held 26 s (continuous turning).
+Script: cdp-capture.mjs.txt and make-budget-plan.py.txt in this folder.
+Tile: tile-conformance.owd, 13,776 bytes, render_batch 18 triangles, cites no texture set.
+
+measurement: {"driver": "requestAnimationFrame", "warmup_seconds": 2, "duration_seconds": 20, "first_meaningful_render_ms": 689.7, "time_to_full_detail_ms": null, "geometry_load_ms": null, "frames": 1201, "frameMeanMs": 16.67, "frameP50Ms": 16.7, "frameP95Ms": 16.7, "frameP99Ms": 16.8, "framesOver16_7Ms": 444, "frameOver16_7Fraction": 0.369692, "fpsP1Low": 59.52, "hidden_during_run": false}
+runtime: {"browser_user_agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/152.0.0.0 Safari/537.36", "platform": "MacIntel", "logical_cpu_count": 12, "device_memory_gb": 16, "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)", "engine": "PlayCanvas 2.21.4", "viewport_css_px": [1440, 900], "canvas_px": [1440, 900], "device_pixel_ratio": 1, "peak_js_heap_mb": 47.57}
+network (Vite development server, unbundled modules, not a production figure): {"transfer_bytes": 17574755, "decoded_body_bytes": 17485055, "resource_count": 299}
+renderer: {"max_draw_calls": 19, "gpu_error": 0, "draw_submission_valid": false}  (draw_submission_valid counts point maps only; not a tile check)
+
+MELBOURNE ENVELOPE per corridor: about 227,000 faces, 28 MB transferred, 168 MB decoded texture, 87 draw calls, 16.7 ms p95 at 1440x900.
+This tile: 18 faces; 13,776 tile bytes; 0 MB texture (no set cited); max 19 draw calls (shadow cascades, occlusion and compose passes included); frame p95 16.7 ms, p99 16.8 ms (vsync-locked).
+
+TEXTURE SETS, measured on the committed containers (all eight):
+  raw 76,039,024 bytes; gzip -9 26,005,075; brotli -q 11 22,005,500.
+  decoded on the GPU (RGBA plus mip chains, three maps per set): 7 sets drawn on the bench = 121,634,808 bytes; all 8 = about 138.4 MB; height maps unused.
+  Trade-off: decoded texture fits the 168 MB envelope; raw transfer of all eight is 2.7 times the 28 MB envelope and fits only with a compressing host.
+
+NOT YET MEASURED: presented frame times with textured geometry at 1440x900 (bench presentedFrameTimes, added but not run), and any real corridor tile.
