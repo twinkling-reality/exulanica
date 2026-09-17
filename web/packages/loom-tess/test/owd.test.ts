@@ -97,6 +97,7 @@ describe('decodeOwd', () => {
     ['an identity the record does not state', () => oneCharacter(/"grammar":0,"identity":"([0-9a-f-]{36})"/), /identity is not the identity the record states/],
     ['a section somewhere else', () => { const b = copy(); const text = headerText(b); const offset = sectionOffset(b, 'nav_envelope', 'position'); const at = text.indexOf(`"byte_offset":${offset}`); b[8 + at + 14] = b[8 + at + 14] === 0x31 ? 0x32 : 0x31; return b; }, /contiguous layout/],
     ['a contract this version does not write', () => sameLength('"sampling support height"', '"sampling support heighT"'), /contract/],
+    ['a material statement that is neither a record nor none', () => sameLength('"material":{"state":"none-exists"}', '"material":{"state":"none-exiSts"}'), /neither record nor none-exists/],
   ] as [string, () => Uint8Array, RegExp][])('refuses %s', (_name, make, pattern) => {
     refused(make(), pattern);
   });

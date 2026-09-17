@@ -27,7 +27,8 @@
  *           `halo` for a record the document lists as halo, which is context and never drawn;
  *        e. for a drawn entry in a projection that carries surfaces (`render_batch`), the
  *           material reference: the record digest of the `city.surface_material` record that
- *           dresses the range. A surface nothing dresses is not drawn. Empty otherwise;
+ *           dresses the range, or `none-exists` when no material record dresses the range's
+ *           record and role. Geometry nothing dresses is still drawn. Empty otherwise;
  *        f. for a drawn entry in a projection that carries surfaces, the surface orientation,
  *           `horizontal` or `vertical`. Empty otherwise;
  *        g. for a drawn entry, the triangles: nine signed 64-bit big-endian integers per triangle,
@@ -90,6 +91,11 @@ export const TRIANGLE_DIGEST_PROFILE = 'exulanica.owd-triangle-digest/v2';
 
 /** The identity text of a record whose kind's shape declares no identity. */
 export const IDENTITY_NOT_STATED = 'not-stated';
+/**
+ * The material text of a drawn range no material record dresses: the render_batch contract's
+ * "or states that none exists". It is the header's material state too.
+ */
+export const MATERIAL_NONE_EXISTS = 'none-exists';
 
 export const ENTRY_STATES = ['drawn', 'unavailable', 'not_admitted', 'not_in_projection', 'halo'] as const;
 export const SURFACE_ORIENTATIONS = ['horizontal', 'vertical'] as const;

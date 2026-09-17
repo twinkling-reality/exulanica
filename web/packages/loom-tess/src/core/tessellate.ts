@@ -15,19 +15,20 @@
  *     breaks it is refused, not written.
  *   - A drawn range in a projection that carries surfaces is dressed by the one surface material
  *     record that names the range's record as its surface and the range's role as its role. With
- *     none, the entry is unavailable and says so; with two, or one that names another kind of
- *     surface, the tile is refused.
+ *     none, the range is still drawn and states that none exists; with two, or one that names
+ *     another kind of surface, the tile is refused.
  */
 import { canonicalBytes, compareCodeUnits } from './canonical-json.js';
 import type { Membership, RecordPayload, TileDocument } from './document.js';
 import { statedIdentity, tableOf } from './document.js';
-import { coversGround, NEEDS, PROJECTION_DEFINITIONS, ruleFor, TessellationError } from './expand.js';
+import { coversGround, PROJECTION_DEFINITIONS, ruleFor, TessellationError } from './expand.js';
 import type { ExpandContext, Need, PlanBox } from './expand.js';
 import { MATERIAL_RECORD_KIND, recordShapeOf } from './record-shapes.js';
 import type { ProjectionName } from './record-shapes.js';
 import {
   COORDINATES_PER_TRIANGLE,
   IDENTITY_NOT_STATED,
+  MATERIAL_NONE_EXISTS,
   SURFACE_COORDINATES_PER_TRIANGLE,
 } from './triangle-digest.js';
 import type { DigestEntry, SurfaceOrientation } from './triangle-digest.js';
@@ -43,11 +44,14 @@ export interface PlacedRecord {
   readonly membership: Membership;
 }
 
-export interface MaterialRef {
-  readonly state: 'record';
-  /** Index into the records, of the surface material record that dresses the range. */
-  readonly record: number;
-}
+export type MaterialRef =
+  | {
+      readonly state: 'record';
+      /** Index into the records, of the surface material record that dresses the range. */
+      readonly record: number;
+    }
+  /** No material record dresses the range's record and role: the statement that none exists. */
+  | { readonly state: typeof MATERIAL_NONE_EXISTS };
 
 export type Triple = readonly [number, number, number];
 
@@ -233,12 +237,13 @@ export function tessellate(document: TileDocument, digests: readonly string[]): 
             }
             const dressing = dressed.get(`${record.identity} ${surface.role}`);
             if (dressing === undefined) {
-              return { record: recordIndex, state: 'unavailable', needs: [NEEDS.surface_material] };
+              material = { state: MATERIAL_NONE_EXISTS };
+            } else {
+              if (placed[dressing]!.payload.fields.surface_kind !== record.payload.kind) {
+                throw new TessellationError(`the material dressing ${record.identity} names another kind of surface`);
+              }
+              material = { state: 'record', record: dressing };
             }
-            if (placed[dressing]!.payload.fields.surface_kind !== record.payload.kind) {
-              throw new TessellationError(`the material dressing ${record.identity} names another kind of surface`);
-            }
-            material = { state: 'record', record: dressing };
           } else if (surface !== undefined) {
             throw new TessellationError(`${name} carries no surfaces`);
           }
@@ -308,7 +313,11 @@ export function digestEntries(
           ...head,
           state: 'drawn',
           triangles,
-          surface: { material: records[entry.material.record]!.sha256, orientation: entry.surface, coordinates },
+          surface: {
+            material: entry.material.state === 'record' ? records[entry.material.record]!.sha256 : MATERIAL_NONE_EXISTS,
+            orientation: entry.surface,
+            coordinates,
+          },
         };
       }
       case 'unavailable':

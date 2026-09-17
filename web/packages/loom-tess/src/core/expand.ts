@@ -4,7 +4,9 @@
  * An expander is a pure function from one record's fields to integer vertices and triangles. It
  * reads the record and the tile it is baked in, and nothing else: no catalog, no table of roles or
  * materials, no default. A record kind with no expander has a statement naming the rule it waits
- * on, and the entry it produces is `unavailable`, never a substituted mesh.
+ * on, and the entry it produces is `unavailable`, never a substituted mesh. Geometry an expander
+ * produces exactly is drawn whether or not a material record dresses it: a range nothing dresses
+ * says that none exists, as the grammar's render_batch contract requires, and is not withheld.
  *
  * MEASURED against city grammar version 2 (lane 20's records at 87865940), the records now carry
  * what every surface needs: footprints, tiers, elevations, facade layouts, kerb lines, crossing
@@ -51,7 +53,7 @@ export const PROJECTION_DEFINITIONS: readonly ProjectionDefinition[] = [
     contract: {
       preserves: [
         'the integer vertex positions of every drawn record',
-        'the record, stated identity and dressing material record of every triangle',
+        'the record and stated identity of every triangle, and the material record that dresses it or the statement that none exists',
         'surface coordinates in millimetres, in the surface frame the grammar fixes',
       ],
       admissible_uses: ['drawing'],
@@ -92,11 +94,10 @@ export const MATERIALISED_LOD = 0;
 /**
  * Why an entry is unavailable, each named for what would have to exist. The first is a fact about
  * a tile's records; the rest are integer rules this package has not built yet, which the records
- * already carry enough for.
+ * already carry enough for. A missing material is not among them: geometry nothing dresses is
+ * drawn, and says so.
  */
 export const NEEDS = {
-  /** No surface material record dresses the surface. The grammar states which roles no set dresses. */
-  surface_material: 'surface_material',
   /** Every cell of a terrain patch meets the stated extent of a record that covers the ground. */
   ground_coverage: 'ground_coverage',
   /** Horizontal faces from a ring: a lot, a block, a tree pit. */
@@ -173,23 +174,17 @@ function safe(value: number, where: string): number {
 }
 
 /**
- * A terrain patch, less every cell that something else covers.
+ * A terrain patch, less every cell whose closed plan square meets one of `omit`.
  *
  * The grammar's terrain rule: samples row-major from the tile's south-west corner, at
  * `tile * tile_size_mm + index * cell_mm` with the sample's own height, and each cell split along
  * the diagonal from its south-west sample to its north-east one (`triangulation` "sw_ne"). With x
- * east and y north, both triangles are counter-clockwise seen from +z.
- *
- * The grammar also says terrain is not a surface where a street, a block or a lot covers it. This
- * version cannot yet draw those surfaces, so it cannot draw their edges either, and it takes the
- * exact conservative reading: a cell whose closed plan square meets the stated extent of any
- * record that covers the ground is left out. An extent contains everything its record generates,
- * so a cell kept is a cell nothing covers. A vertex is emitted only when a kept cell uses it, in
- * row-major order. That rule is fixed by `TESSELLATOR_SOURCE_VERSION`.
+ * east and y north, both triangles are counter-clockwise seen from +z. A vertex is emitted only
+ * when a kept cell uses it, in row-major order.
  *
  * It depends on the grammar's `terrain_grid_matches_tile`, and checks the facts it reads.
  */
-function terrainCells(fields: Fields, context: ExpandContext): Expansion {
+function terrainCells(fields: Fields, context: ExpandContext, omit: readonly PlanBox[]): Expansion {
   const side = fields.samples_per_side as number;
   const cell = fields.cell_mm as number;
   const heights = fields.height_mm as readonly number[];
@@ -209,7 +204,7 @@ function terrainCells(fields: Fields, context: ExpandContext): Expansion {
     for (let column = 0; column + 1 < side; column += 1) {
       const west = safe(originX + column * cell, 'a terrain x');
       const east = west + cell;
-      const covered = context.groundCover.some((box) =>
+      const covered = omit.some((box) =>
         west <= box.max_x && box.min_x <= east && south <= box.max_y && box.min_y <= north);
       if (covered) continue;
       kept.push([row, column]);
@@ -238,9 +233,14 @@ function terrainCells(fields: Fields, context: ExpandContext): Expansion {
   return { state: 'drawn', vertices, triangles };
 }
 
-/** Drawn terrain is a horizontal surface in the plan frame, `s = x` and `t = y`, dressed as terrain. */
+/**
+ * Drawn terrain is the whole patch, a horizontal surface in the plan frame, `s = x` and `t = y`, in
+ * the terrain role. The grammar says terrain is not a surface where a street, a block or a lot
+ * covers it; how it yields to them is exact coverage, and comes with their expanders. Leaving cells
+ * out here instead would draw holes in the ground that read as cuts.
+ */
 function renderTerrain(fields: Fields, context: ExpandContext): Expansion {
-  const grid = terrainCells(fields, context);
+  const grid = terrainCells(fields, context, []);
   if (grid.state === 'unavailable') return grid;
   const coordinates: number[] = [];
   for (let vertex = 0; vertex < grid.vertices.length; vertex += 3) {
@@ -251,12 +251,14 @@ function renderTerrain(fields: Fields, context: ExpandContext): Expansion {
 
 /**
  * Terrain supports whoever stands on it where nothing covers it: a heightfield has one height over
- * each plan point, which is what support sampling needs. Its own rule rather than the render rule,
- * so the two projections part: exposed terrain has no material, so it is unavailable to draw and
- * still supports.
+ * each plan point, which is what support sampling needs. This version cannot draw the surfaces that
+ * cover terrain, so it takes the exact conservative reading: a cell whose closed plan square meets
+ * the stated extent of any record that covers the ground is left out. An extent contains everything
+ * its record generates, so a kept cell is a cell nothing covers. Support never claims ground that
+ * is not there; render draws the whole patch. Both rules are fixed by `TESSELLATOR_SOURCE_VERSION`.
  */
 function supportTerrain(fields: Fields, context: ExpandContext): Expansion {
-  return terrainCells(fields, context);
+  return terrainCells(fields, context, context.groundCover);
 }
 
 const needs = (...list: Need[]): Rule => ({ rule: 'needs', needs: list });

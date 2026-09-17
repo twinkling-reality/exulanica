@@ -46,8 +46,9 @@
  * states why nothing is drawn.
  *
  * VERSION 2 is the container for city grammar version 2: grammars carry their frame and subject
- * identity, records their membership, entries a `halo` state, and a drawn range is always dressed
- * by a material record. A version 1 file is refused at its magic; there is no upgrade on read.
+ * identity, records their membership, entries a `halo` state, and a drawn range cites the material
+ * record that dresses it or states that none exists. A version 1 file is refused at its magic;
+ * there is no upgrade on read.
  *
  * REJECTED, with reasons:
  *
@@ -101,6 +102,7 @@ import type { Entry, MaterialRef, ProjectionMesh, TessellatedTile, Triple } from
 import {
   ENTRY_STATES,
   IDENTITY_NOT_STATED,
+  MATERIAL_NONE_EXISTS,
   SURFACE_ORIENTATIONS,
   TRIANGLE_DIGEST_PROFILE,
 } from './triangle-digest.js';
@@ -482,7 +484,11 @@ function withRefusal<T>(run: () => T): T {
 
 function checkMaterial(value: unknown, where: string, records: readonly OwdRecord[]): MaterialRef {
   const material = objectAt(value, where);
-  if (material.state !== 'record') fail(`${where}.state is not record`);
+  if (material.state === MATERIAL_NONE_EXISTS) {
+    keysAre(material, ['state'], where);
+    return { state: MATERIAL_NONE_EXISTS };
+  }
+  if (material.state !== 'record') fail(`${where}.state is neither record nor ${MATERIAL_NONE_EXISTS}`);
   keysAre(material, ['record', 'state'], where);
   const record = countAt(material.record, `${where}.record`, records.length);
   if (records[record]!.kind !== MATERIAL_RECORD_KIND) fail(`${where} cites a record that is not a material`);

@@ -93,9 +93,10 @@ version 2 admits `render_batch` and `nav_envelope`, among others.
 
 Two projections are materialised, each built from the records by its own rules:
 
-- `render_batch` is what is drawn. Every drawn range is dressed by the surface material record
-  that names the range's record and role, and carries its orientation and surface coordinates. A
-  surface nothing dresses is unavailable, not drawn plain.
+- `render_batch` is what is drawn. Every drawn range cites the surface material record that names
+  the range's record and role, or states that none exists (`none-exists`), as the grammar's
+  render_batch contract requires. It carries its orientation and surface coordinates. Exact
+  geometry nothing dresses is drawn, not withheld.
 - `nav_envelope` is what a person is supported by. Its only admissible use is sampling support
   height.
 
@@ -106,15 +107,16 @@ Each carries a representation contract in the header (`PROJECTION_DEFINITIONS` i
 
 ## What draws today
 
-Only terrain, and only where nothing covers it.
+Only terrain.
 
-The grammar says terrain is not a surface where a street, a block or a lot covers it, and that no
-published texture set dresses terrain. So:
-
-- in `render_batch`, the fixture's terrain is unavailable, needing `surface_material`;
-- in `nav_envelope`, a terrain cell is drawn when its closed plan square meets the stated extent
+- In `render_batch`, the whole patch is drawn. No published texture set dresses terrain, so its
+  range states `none-exists`. The grammar says terrain is not a surface where a street, a block
+  or a lot covers it; how terrain yields to them is exact coverage, and comes with their
+  expanders. Leaving cells out instead would draw holes that read as cuts.
+- In `nav_envelope`, a terrain cell is drawn when its closed plan square meets the stated extent
   of no record that covers the ground (every kind with an extent but terrain and districts). An
-  extent contains everything its record generates, so a kept cell is one nothing covers.
+  extent contains everything its record generates, so a kept cell is one nothing covers. Support
+  never claims ground that is not there.
 
 Every other record kind states the rule it waits on (`NEEDS` in `src/core/expand.ts`):
 `ring_triangulation`, `massing_faces`, `facade_layout`, `segment_surface`, `kerb_offset`,
@@ -143,7 +145,8 @@ Each entry has eight fields:
 2. the record digest, SHA-256 of `canonical_record`;
 3. the identity the record states, or `not-stated` for a kind that declares none;
 4. the state (`drawn`, `unavailable`, `not_admitted`, `not_in_projection` or `halo`);
-5. the record digest of the dressing material (drawn entries in `render_batch` only);
+5. the record digest of the dressing material, or `none-exists` (drawn entries in
+   `render_batch` only);
 6. the surface orientation (drawn entries in `render_batch` only);
 7. for a drawn entry, the triangles, as nine signed 64-bit big-endian millimetre integers each;
    for an unavailable entry, what it needs;
@@ -235,7 +238,7 @@ has been made for version 2 yet.
 
 ## What it does not do yet
 
-- Draw any surface but exposed terrain in `nav_envelope`. Every other kind waits on a named rule.
+- Draw any surface but terrain. Every other kind waits on a named rule.
 - Materialise `collision_proxy` or `pick_geometry`. Each needs a representation contract first.
   The city descriptor's `nav_envelope` contract also names capsule clearance, which this
   `nav_envelope` does not carve; its contract says so.

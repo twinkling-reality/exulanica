@@ -29,7 +29,7 @@ import {
 
 /** Over `test/fixtures/tile-conformance.json`, tessellator 2, digest profile v2. */
 const GOLDEN = {
-  render_batch: 'c7d8aa7a2315ede90991e2153c85bebc561d6a569ee0ecb0de6b846937a7db89',
+  render_batch: '777465e260d2fdfecacd22407695c1a3fee101e3f7f075369ec73de84b652c82',
   nav_envelope: 'e6670a327a191dc71e69dc732484fecde04e4f34146674b1585f2f0c13cc6928',
 } as const;
 
@@ -57,7 +57,7 @@ describe('the triangle digest of the conformance fixture', () => {
     expect(browser.tileInputsDigest).toBe(node.tile_inputs_digest);
   });
 
-  it('draws exposed terrain as support, and states why every other record is not drawn', async () => {
+  it('draws the terrain patch undressed and its exposed cells as support, and states why nothing else draws', async () => {
     const { header, projections } = await decodedFixture();
     const [renderBatch, navEnvelope] = projections;
     expect(renderBatch!.header.name).toBe('render_batch');
@@ -70,13 +70,22 @@ describe('the triangle digest of the conformance fixture', () => {
     });
     const terrain = header.records.findIndex((record) => record.kind === 'city.terrain');
 
-    // Nothing is drawn: the grammar dresses no terrain, and every other surface waits on a rule.
+    // The whole terrain patch is drawn, and says no material dresses it: the grammar admits none.
+    // Every other surface waits on a rule.
     const render = renderBatch!.header.entries.map((entry) => entry.state);
-    expect(renderBatch!.header.vertex_count).toBe(0);
-    expect(count(render, 'drawn')).toBe(0);
+    expect(count(render, 'drawn')).toBe(1);
     expect(count(render, 'halo')).toBe(grammar.halo.length);
-    expect(renderBatch!.header.entries[terrain]).toEqual({ record: terrain, state: 'unavailable', needs: ['surface_material'] });
-    expect(renderBatch!.surfaceMm).toHaveLength(0);
+    expect(renderBatch!.header.entries[terrain]).toMatchObject({
+      state: 'drawn',
+      vertex_count: 17 * 17,
+      triangle_count: 16 * 16 * 2,
+      surface: 'horizontal',
+      material: { state: 'none-exists' },
+    });
+    expect(renderBatch!.surfaceMm).toHaveLength(17 * 17 * 2);
+    for (const entry of renderBatch!.header.entries) {
+      if (entry.state === 'unavailable') expect(entry.needs.length).toBeGreaterThan(0);
+    }
 
     const nav = navEnvelope!.header.entries.map((entry) => entry.state);
     expect(count(nav, 'drawn')).toBe(1);
@@ -131,7 +140,17 @@ describe('the triangle digest of the conformance fixture', () => {
     expect(nav.header.contract.admissible_uses).toEqual(['sampling support height']);
   });
 
-  it('draws dressed terrain with its material and plan surface coordinates, s = x and t = y', async () => {
+  it('gives undressed terrain plan surface coordinates, s = x and t = y', async () => {
+    const renderBatch = (await decodedFixture()).projections[0]!;
+    const vertices = absoluteVertices(renderBatch);
+    const surface = absoluteSurfaceCoordinates(renderBatch)!;
+    for (let vertex = 0; vertex < renderBatch.header.vertex_count; vertex += 1) {
+      expect(surface[vertex * 2]).toBe(vertices[vertex * 3]);
+      expect(surface[vertex * 2 + 1]).toBe(vertices[vertex * 3 + 1]);
+    }
+  });
+
+  it('draws dressed terrain citing its material record', async () => {
     const decoded = await decodedFixture(documentBytes(dressedTerrainObject()));
     const renderBatch = decoded.projections[0]!;
     const drawn = renderBatch.header.entries.filter((entry) => entry.state === 'drawn');
@@ -139,16 +158,12 @@ describe('the triangle digest of the conformance fixture', () => {
     const entry = drawn[0]!;
     if (entry.state !== 'drawn') throw new Error('unreachable');
     expect(entry.surface).toBe('horizontal');
-    const material = decoded.header.records[entry.material!.record]!;
+    if (entry.material?.state !== 'record') throw new Error('the dressed terrain cites no record');
+    const material = decoded.header.records[entry.material.record]!;
     expect(material.kind).toBe('city.surface_material');
     expect(material.fields.surface_identity).toBe(decoded.header.records[entry.record]!.identity);
-    const vertices = absoluteVertices(renderBatch);
-    const surface = absoluteSurfaceCoordinates(renderBatch)!;
-    for (let vertex = 0; vertex < renderBatch.header.vertex_count; vertex += 1) {
-      expect(surface[vertex * 2]).toBe(vertices[vertex * 3]);
-      expect(surface[vertex * 2 + 1]).toBe(vertices[vertex * 3 + 1]);
-    }
-    expect(renderBatch.header.vertex_count).toBe(decoded.projections[1]!.header.vertex_count);
+    expect(renderBatch.header.vertex_count).toBe(17 * 17);
+    expect(decoded.projections[0]!.header.triangle_digest).not.toBe(GOLDEN.render_batch);
   });
 
   it('moves when one integer of the fixture moves, in both builds alike', async () => {

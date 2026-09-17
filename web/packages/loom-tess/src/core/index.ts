@@ -62,6 +62,7 @@ export type { DrawnEntry, Entry, MaterialRef, Triple } from './tessellate.js';
 export {
   ENTRY_STATES,
   IDENTITY_NOT_STATED,
+  MATERIAL_NONE_EXISTS,
   SURFACE_ORIENTATIONS,
   TRIANGLE_DIGEST_DOMAIN,
   TRIANGLE_DIGEST_PROFILE,

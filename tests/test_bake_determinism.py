@@ -99,6 +99,10 @@ def fixture_records() -> list[object]:
     return [record for grammar in document.grammars for record in grammar.records()]
 
 
+def fixture_terrain() -> Any:
+    return next(r for r in fixture_records() if CITY_SHAPES_BY_TYPE[type(r)].kind == "city.terrain")
+
+
 # -- the registry ---------------------------------------------------------------------------------
 
 
@@ -371,10 +375,14 @@ def _independent_triangle_digests(container: bytes) -> dict[str, str]:
                 if not carries_surfaces:
                     stream += [field(b""), field(b""), triangles, field(b"")]
                     continue
-                material = records[entry["material"]["record"]]
-                assert material["kind"] == SurfaceMaterialRecord.RECORD_KIND
+                if entry["material"] == {"state": "none-exists"}:
+                    reference = "none-exists"
+                else:
+                    material = records[entry["material"]["record"]]
+                    assert material["kind"] == SurfaceMaterialRecord.RECORD_KIND
+                    reference = material["sha256"]
                 stream += [
-                    field(material["sha256"].encode("ascii")),
+                    field(reference.encode("ascii")),
                     field(entry["surface"].encode("ascii")),
                     triangles,
                     field(struct.pack(f">{len(surface)}q", *surface)),
@@ -434,13 +442,14 @@ def test_the_container_states_membership_frame_identity_and_what_is_drawn(tmp_pa
             record = header["records"][entry["record"]]
             assert (entry["state"] == "halo") == (record["membership"] == "halo")
     render, nav = header["projections"]
-    assert [e for e in render["entries"] if e["state"] == "drawn"] == []
     terrain = next(i for i, r in enumerate(header["records"]) if r["kind"] == "city.terrain")
-    assert render["entries"][terrain] == {
-        "needs": ["surface_material"],
-        "record": terrain,
-        "state": "unavailable",
-    }
+    # Undressed but exact: the whole patch is drawn and says that no material record dresses it.
+    assert [e["record"] for e in render["entries"] if e["state"] == "drawn"] == [terrain]
+    assert render["entries"][terrain]["material"] == {"state": "none-exists"}
+    assert (
+        render["entries"][terrain]["triangle_count"]
+        == 2 * (fixture_terrain().samples_per_side - 1) ** 2
+    )
     drawn = [
         header["records"][e["record"]]["kind"] for e in nav["entries"] if e["state"] == "drawn"
     ]
@@ -458,11 +467,11 @@ def test_the_tessellator_leaves_out_exactly_the_covered_terrain_cells(tmp_path):
         if shape.extent_field and shape.kind not in NOT_GROUND_COVER:
             extent = getattr(record, shape.extent_field)
             cover.append((extent.min_x_mm, extent.min_y_mm, extent.max_x_mm, extent.max_y_mm))
-    terrain = next(r for r in records if CITY_SHAPES_BY_TYPE[type(r)].kind == "city.terrain")
-    cell = terrain.cell_mm  # type: ignore[attr-defined]
-    side = terrain.samples_per_side  # type: ignore[attr-defined]
-    origin_x = terrain.tile_x * TILE_SIZE_MM  # type: ignore[attr-defined]
-    origin_y = terrain.tile_y * TILE_SIZE_MM  # type: ignore[attr-defined]
+    terrain = fixture_terrain()
+    cell = terrain.cell_mm
+    side = terrain.samples_per_side
+    origin_x = terrain.tile_x * TILE_SIZE_MM
+    origin_y = terrain.tile_y * TILE_SIZE_MM
 
     def covered(west: int, south: int) -> bool:
         return any(
@@ -491,7 +500,7 @@ def test_the_tessellator_leaves_out_exactly_the_covered_terrain_cells(tmp_path):
         drawn.add((min(p[0] for p in points), min(p[1] for p in points)))
         for x, y, z in points:
             sample = ((y - origin_y) // cell) * side + (x - origin_x) // cell
-            assert z == terrain.height_mm[sample]  # type: ignore[attr-defined]
+            assert z == terrain.height_mm[sample]
     assert drawn == expected
     assert nav["triangle_count"] == 2 * len(expected)
 
