@@ -23,6 +23,37 @@ pytestmark = pytest.mark.postgres
 
 
 @pytest.fixture
+def publish_reviewed(repository):
+    """Publish reviewed assets for one test, and take them back out again.
+
+    `world_reviewed_asset` is one of the tables the harness preserves between tests on purpose: the
+    migration seeds it and every later insert reads it, so it is never truncated. A test that
+    publishes into it and walks away therefore leaves rows that every later test in the same worker
+    can see, and `test_world_objects_api` asserts the registry holds exactly the three reviewed CC0
+    markers, which is the right assertion to make. `test_character_asset_delivery` already takes its
+    own row out in a `finally`; this does the same for a whole test's worth of imports, including
+    when an assertion fails part way through. Taking `repository` makes this tear down before the
+    connection it writes through does.
+    """
+    from exulanica.world.asset_import import import_reviewed_asset
+
+    published: list[str] = []
+
+    def publish(connection, store, manifest, payload, licence):
+        receipt = import_reviewed_asset(connection, store, manifest, payload, licence)
+        published.append(manifest.asset_key)
+        return receipt
+
+    yield publish
+    if published:
+        with repository.connection.transaction():
+            repository.connection.execute(
+                "delete from world_reviewed_asset where asset_key = any(%s)", (published,)
+            )
+        repository.connection.commit()
+
+
+@pytest.fixture
 def appearance(world, repository):
     objects, snapshot, _ = world
     actor = uuid.uuid4()
@@ -218,12 +249,14 @@ def test_database_refuses_history_rewrite_and_revision_gap(appearance):
     assert repo.read(version, subject)["revision"] == 1
 
 
-def test_prepared_asset_missing_or_withdrawn_does_not_erase_recipe(appearance, tmp_path):
+def test_prepared_asset_missing_or_withdrawn_does_not_erase_recipe(
+    appearance, tmp_path, publish_reviewed
+):
     import json
     import struct
 
     from exulanica.store.local import LocalContentAddressedStore
-    from exulanica.world.asset_import import ReviewedAssetImport, import_reviewed_asset
+    from exulanica.world.asset_import import ReviewedAssetImport
     from exulanica.world.character_appearance import RepresentationBinding
 
     from character_appearance_fixtures import sha
@@ -248,7 +281,7 @@ def test_prepared_asset_missing_or_withdrawn_does_not_erase_recipe(appearance, t
         producer="test",
     )
     with repo.connection.transaction():
-        receipt_sha = import_reviewed_asset(repo.connection, store, manifest, payload, licence)
+        receipt_sha = publish_reviewed(repo.connection, store, manifest, payload, licence)
     preparation = store.put_bytes(b"explicit test preparation receipt")
     binding = RepresentationBinding(
         binding_id="prepared-test",
@@ -452,12 +485,13 @@ def test_current_v2_source_authority_is_required_for_every_subject_operation(app
     repo.connection.commit()
 
 
-def test_catalog_look_saves_resets_and_reports_its_published_containers(appearance, tmp_path):
+def test_catalog_look_saves_resets_and_reports_its_published_containers(
+    appearance, tmp_path, publish_reviewed
+):
     import sys
     from pathlib import Path
 
     from exulanica.store.local import LocalContentAddressedStore
-    from exulanica.world.asset_import import import_reviewed_asset
     from exulanica.world.character_appearance import (
         CharacterRecipe,
         catalog_recipe_families,
@@ -492,12 +526,12 @@ def test_catalog_look_saves_resets_and_reports_its_published_containers(appearan
     imports = [entry for entry in people.catalog_imports(catalog) if entry[0].asset_key in needed]
     with repo.connection.transaction():
         for manifest, payload, licence in imports[:-1]:
-            import_reviewed_asset(repo.connection, store, manifest, payload, licence)
+            publish_reviewed(repo.connection, store, manifest, payload, licence)
     assert repo.read(version, subject)["current"]["render_status"] == (
         "asset_withdrawn_or_unreviewed"
     )
     with repo.connection.transaction():
-        import_reviewed_asset(repo.connection, store, *imports[-1])
+        publish_reviewed(repo.connection, store, *imports[-1])
     current = repo.read(version, subject)["current"]
     assert current["render_status"] == "available"
     assert (
@@ -527,3 +561,19 @@ def test_catalog_look_saves_resets_and_reports_its_published_containers(appearan
     # A recipe over a catalog revision this host no longer serves keeps its history.
     repo.families = {masculine.sha256: masculine}
     assert repo.read(version, subject)["current"]["render_status"] == "family_source_unavailable"
+
+
+def test_nothing_this_file_published_is_left_in_the_reviewed_registry(appearance):
+    """The registry this file publishes into is preserved between tests, so a leak is another
+    test's failure, not this file's.
+
+    Wave 3 found that by sharding `test_world_objects_api` into the same worker as these tests: it
+    asserts the registry holds exactly the three reviewed CC0 markers and found the catalog's
+    people as well. Source order puts this test after the publishing ones, so a leak fails here,
+    in the file that caused it.
+    """
+    repo, *_ = appearance
+    rows = repo.connection.execute("select asset_key from world_reviewed_asset").fetchall()
+    published = {"makehuman.people.", "test.character"}
+    left = sorted(row["asset_key"] for row in rows if row["asset_key"].startswith(tuple(published)))
+    assert not left
