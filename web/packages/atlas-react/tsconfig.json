@@ -13,6 +13,7 @@
     { "path": "../presentation" },
     { "path": "../companion-runtime" },
     { "path": "../graph-client" },
-    { "path": "../world-index" }
+    { "path": "../world-index" },
+    { "path": "../loom-tess/tsconfig.core.json" }
   ]
 }
