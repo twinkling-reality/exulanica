@@ -100,10 +100,10 @@ depends on the offline package.
 ## 3. Materials and the UV rule
 
 A set is drawn by its material class and by nothing else, never by its id or title. This runtime
-draws `opaque` and `cutout` sets, of either container profile and either maker; `decal` and `glazing`
-draw the stated unavailable surface with the reason "material class X is not drawn by this runtime"
-(`undrawnClassReason`), and nothing of theirs is uploaded, so glazing is never drawn as opaque.
-Drawing those two classes follows section 3 of the texture proposal and comes next.
+draws `opaque`, `cutout` and `glazing` sets, of either container profile and either maker; `decal`
+draws the stated unavailable surface with the reason "material class decal is not drawn by this
+runtime" (`undrawnClassReason`), and nothing of it is uploaded. Drawing decal follows section 3 of
+the texture proposal and comes next.
 
 A `cutout` set is glTF's `alphaMode: MASK` with `doubleSided: true`. Its `base_color_coverage` map is
 uploaded as sRGB colour with linear coverage, and every mip level is built by
@@ -119,6 +119,30 @@ field at 70.5 per cent coverage and within 1.1 per cent at 38.9 per cent, where 
 drift by 10.1 and 5.7 per cent; the cutout's shadow has holes (49.4 per cent of the ground under it
 shadowed, against 100 per cent for the same square drawn opaque); and its back face is lit (91.2
 against 49.7 without two-sided lighting).
+
+A `glazing` set is glTF metallic-roughness with metalness 0 plus `KHR_materials_transmission` and
+`KHR_materials_ior`. Its `transmission_roughness` map is uploaded with transmission in red and
+roughness in green. It reflects the environment probe and the sun with reflectance
+`((n - 1) / (n + 1))^2` face on, from `ior_millionths`, rising with angle by Schlick's approximation
+with its value at grazing incidence the surface's gloss (`glazing-fresnel.ts`): the glazing material
+replaces the engine's Schlick term, whose value at grazing incidence stays at 0.04 for glass. It
+transmits what the scene drew before it, from a copy of the scene colour the environment keeps once
+glazing is drawn (`requestSceneColor`), tinted by the base colour, times the transmission map, times
+(1 - Fresnel), blurred by roughness; where transmission is below full, the rest is the film the base
+colour and roughness maps carry, lit like an opaque surface. It is drawn after the opaque scene,
+depth tested, writes no depth, casts no shadow (`castsShadow`) and is one sided. What lies behind the
+pane is geometry the grammar states; the runtime never draws the far side of a building through
+glass, because the scene copy holds only what was drawn in front of it. The film the class object
+declares is for laying more film by position, which waits for its inputs.
+
+Measured on the bench with test-only clean glass and a test-only checker backing 0.6 m behind the
+pane, not yet on the published `cc0.float-glazing` (`evidence/glazing-acceptance.log.txt`): the
+backing reads through at 2, 4 and 6 m (luminance correlation 0.97 to 1.00, at least 86 per cent of its
+contrast kept); with the backing at about a shop interior's brightness the sky's reflection is 70 per
+cent of the pane's light at 70 degrees from its normal and 90 per cent at 80 (against a sunlit backing
+it passes half only beyond 75 degrees); and a pane darkens the ground under it by nothing. Stated
+limits: the probe is the look's sky gradient, so glass reflects sky, not the street; one set is one
+draw, so its panes are not sorted against one another.
 
 One `pc.StandardMaterial` per opaque set, shared by every surface that names it
 (`texture-materials.ts`): `base_color` uploaded as sRGB, `normal` as linear bytes, and `orm` driving
