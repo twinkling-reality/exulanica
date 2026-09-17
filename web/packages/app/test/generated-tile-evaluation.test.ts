@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
+import { mkdtempSync, readFileSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, relative, resolve } from 'node:path';
 import { afterAll, describe, expect, it } from 'vitest';
@@ -59,8 +59,15 @@ function files(root: string): string[] {
   });
 }
 
+/** The pinned tile's first bytes: its magic, header length and the start of its header. */
+const TILE_PREFIX = readFileSync(join(APP, 'src/dev/tiles/tile-conformance.owd')).subarray(0, 96);
+
 /** Build the app as `vite build` does from a shell, in its own process and environment. */
-function buildApp(mode: 'production' | 'development'): { readonly names: readonly string[]; readonly text: string } {
+function buildApp(mode: 'production' | 'development'): {
+  readonly names: readonly string[];
+  readonly text: string;
+  readonly holdsTileBytes: boolean;
+} {
   const outDir = mkdtempSync(join(tmpdir(), `exulanica-tile-evaluation-${mode}-`));
   scratch.push(outDir);
   execFileSync(process.execPath, [VITE, 'build', '--mode', mode, '--outDir', outDir, '--emptyOutDir', '--logLevel', 'error'], {
@@ -73,7 +80,10 @@ function buildApp(mode: 'production' | 'development'): { readonly names: readonl
     .filter((path) => /\.(?:js|html|css|json)$/.test(path))
     .map((path) => readFileSync(path, 'utf8'))
     .join('\n');
-  return { names: emitted.map((path) => relative(outDir, path)), text };
+  // Every emitted file, whatever its name, searched for the tile's bytes, inlined or not.
+  const holdsTileBytes = emitted.some((path) => readFileSync(path).includes(TILE_PREFIX))
+    || text.includes(TILE_PREFIX.toString('base64').slice(0, 64));
+  return { names: emitted.map((path) => relative(outDir, path)), text, holdsTileBytes };
 }
 
 describe('generated tile evaluation entry: unreachable from a production build', () => {
@@ -83,14 +93,14 @@ describe('generated tile evaluation entry: unreachable from a production build',
     for (const marker of MARKERS) expect(production.text.includes(marker), marker).toBe(false);
     expect(production.names.filter((name) => /\.(?:owd|ltex)$/.test(name))).toEqual([]);
     expect(production.names.filter((name) => /generated-tile/.test(name))).toEqual([]);
+    expect(production.holdsTileBytes).toBe(false);
   }, 180_000);
 
   it('would see all of it if the development branch were reachable (the control)', () => {
     const development = buildApp('development');
     for (const marker of MARKERS) expect(development.text.includes(marker), marker).toBe(true);
     expect(development.names.some((name) => name.endsWith('.ltex'))).toBe(true);
-    if (existsSync(join(APP, 'src/dev/tiles')) && readdirSync(join(APP, 'src/dev/tiles')).some((name) => name.endsWith('.owd'))) {
-      expect(development.names.some((name) => name.endsWith('.owd'))).toBe(true);
-    }
+    expect(development.names.some((name) => name.endsWith('.owd'))).toBe(true);
+    expect(development.holdsTileBytes).toBe(true);
   }, 180_000);
 });
