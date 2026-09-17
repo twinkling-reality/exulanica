@@ -18,6 +18,7 @@ import { worldArtProfile } from '@exulanica/presentation';
 
 import { mountAtlas } from '../atlas.js';
 import {
+  generatedTileEvaluationName,
   ownedDistrict,
 } from '../config.js';
 import { themeForPreferences } from '../theme.js';
@@ -87,7 +88,13 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
   env.shell.append(rendererLoading);
   env.shell.setAttribute('aria-busy', 'true');
   try {
-    const district = await ownedDistrict({ preview: env.preview });
+    // Development only: `import.meta.env.DEV` is false in a production build, so the bundler drops
+    // this branch and the module it imports. The preview route is the only caller.
+    const tileName = import.meta.env.DEV ? generatedTileEvaluationName(window.location.search, env.preview) : null;
+    const generatedTile = import.meta.env.DEV && tileName !== null
+      ? await (await import('./generated-tile.js')).prepareGeneratedTileEvaluation(env, tileName)
+      : undefined;
+    const district = generatedTile === undefined ? await ownedDistrict({ preview: env.preview }) : undefined;
     state.atlas = await mountAtlas(env.canvas, deps.stage, deps.scene, (report) => {
       resolveFirstFrame?.();
       resolveFirstFrame = null;
@@ -144,7 +151,8 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
       trainedGeometry: state.trainedGeometry,
       recoveredCameras: state.recoveredCameras,
       reducedMotion: env.systemReducedMotion.matches,
-      ownedDistrict: district,
+      ...(district === undefined ? {} : { ownedDistrict: district }),
+      ...(generatedTile === undefined ? {} : { generatedTile }),
     }, env.browserMeasurement === null ? undefined : (binding) => {
       env.browserMeasurement!.observeBinding(binding, {
         scenes: current.reconstructionScenes ?? [],
