@@ -72,13 +72,13 @@ describe.runIf(live)('against a running tile route', () => {
     // to the digest the row records) and are still refused, by the reader, for not being a tile.
     const tiles = await listBakedTiles(access, { citySeed: citySeed ?? '' });
     const row = tiles.find((tile) => tile.bakedTileId === notAContainer);
-    const fetched = await fetchBakedTile(access, {
-      bakedTileId: notAContainer ?? '',
-      ...(row === undefined ? {} : { expect: row }),
-      digest,
-    });
-    // The transport is satisfied: the bytes are exactly what the row names.
-    expect(fetched.containerSha256).toBe(row?.containerSha256 ?? fetched.containerSha256);
+    // The row IS the premise: without it there is no independent digest to hold the bytes to, so its
+    // absence fails the run. Comparing the fetched digest with itself would pass and prove nothing.
+    expect(row, `the key in EXULANICA_TILE_NOT_A_CONTAINER is not listed for city ${citySeed ?? ''}`).toBeDefined();
+    const expected = row!.containerSha256;
+    const fetched = await fetchBakedTile(access, { bakedTileId: row!.bakedTileId, expect: row!, digest });
+    // The transport is satisfied: the bytes are exactly what the row, read separately, names.
+    expect(fetched.containerSha256).toBe(expected);
 
     const manifest = parseTextureSetManifest(new Uint8Array(readFileSync(resolve('../assets/textures/manifest.json'))));
     const refusal = await loadGeneratedTile({
