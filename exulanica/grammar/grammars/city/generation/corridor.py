@@ -21,6 +21,11 @@ street depth to about 270 m.
   20 m deep, one facing the high street and one the street behind.
 * ``gutter_width_mm``: 300 mm, one value for the district, because a street keeps one carriageway
   width along its length and the streets stage reads this block parameter bound.
+* ``footway_width_mm``: 5500 mm, bound for the same reason and for the street's proportion. Derived
+  per block it came out between 3050 and 3450 mm, which with a 7100 mm carriageway and 250 mm kerbs
+  made a canyon of about 13.5 m. Bound at 5500 the frontages stand about 18.6 m apart, which is the
+  proportion the gate's baseline street has. Nothing else about the footway changes: its crossfall,
+  its kerb and its corner radius are still derived per block.
 * ``front_setback_mm``: 0, because a high street builds to its frontage line, the unbroken street
   edge the rubric asks for, and the parcels stage reads no other value.
 * ``memory_precinct_lots``: 1, the one reserved lot the target architecture requires.

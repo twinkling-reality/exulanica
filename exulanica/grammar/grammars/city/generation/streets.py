@@ -21,7 +21,8 @@ along x. Walking a face counter-clockwise gives each curb its follower: a left t
 the face's ``corner_radius_mm``, a straight join (where a street ends in a T on the far side) has
 radius 0, and the district's edge ends the walk. Every curb of one face shares that face's kerb
 height, kerb width, footway width and crossfall, each derived once per face and narrowed to the
-ranges of every street hierarchy the face touches; a block's frontage line is then its kerb lines
+ranges of the busiest street hierarchy the face touches, since a footway does not narrow and a kerb
+does not change height as a person turns a corner; a block's frontage line is then its kerb lines
 moved kerb and footway out, and its ring's corners are its corners' frontage corners exactly.
 
 **Cross-sections.** A carriageway is its lanes and two gutters, centred on the crown line. One
@@ -108,6 +109,46 @@ def _modular(context: StageContext, name: str, ordinal: int, low: int, high: int
         return value  # type: ignore[return-value]
     steps = (high - first) // DIMENSION_MODULE_MM
     return first + DIMENSION_MODULE_MM * draw(context, name, ordinal, 0, steps)
+
+
+def _room_for_footways(face: _Face) -> int | None:
+    """The widest footway a block face can carry and still hold its lots, or None when it is open.
+
+    A closed face is a block: two rows of lots between its north and south frontages, each row at
+    least one lot wide along its street. Every millimetre of footway is taken from both sides of
+    both spans, so a footway the busiest street admits can be wider than the block behind it has
+    to give. This is what the face may spare; the caller narrows the draw to it, and refuses when
+    even the narrowest footway does not fit rather than taking the lots.
+    """
+    if not face.closed:
+        return None
+    spans: dict[str, list[int]] = {"x": [], "y": []}
+    for segment, _side in face.edges:
+        street = segment.street
+        axis = "y" if street.axis == _EAST else "x"
+        spans[axis].append(street.position)
+        spans[axis].append(street.carriageway_mm)
+    depth_spec = CITY_SURFACE.parameters.get("lot_depth_mm")
+    frontage_spec = CITY_SURFACE.parameters.get("lot_frontage_mm")
+    room = []
+    for axis, needed in (("y", 2 * depth_spec.minimum), ("x", frontage_spec.minimum)):
+        positions = sorted(spans[axis][0::2])
+        carriageways = spans[axis][1::2]
+        span = positions[-1] - positions[0] - sum(carriageways[:2]) // 2
+        room.append((span - needed - 2 * face.kerb_width_mm) // 2)
+    return min(room)
+
+
+def _busiest(hierarchies: Sequence[str]) -> str:
+    """The busiest street a face touches, by the hierarchy catalog's rank (0 is busiest).
+
+    A block's footway and kerb are one width the whole way round it, and it is the busiest street
+    that decides them: a footway does not narrow as a person turns the corner off a high street,
+    and a kerb that changed height at a corner would be a trip. Intersecting the ranges instead
+    would let the quietest street cap the busiest one, which is how a high street ended up with a
+    3.05 m footway when its own hierarchy admits 6 m.
+    """
+    return min(hierarchies, key=lambda key: entry("street-hierarchy", key)["rank"])
 
 
 def _ranges(hierarchies: Sequence[str], low_key: str, high_key: str) -> tuple[int, int]:
@@ -350,16 +391,23 @@ def _generate(context: StageContext) -> Iterator[object]:
     for face in faces:
         hierarchies = sorted({segment.street.hierarchy for segment, _side in face.edges})
         ordinal = face.ordinal
-        kerb_low, kerb_high = _ranges(
-            hierarchies, "kerb_height_minimum_mm", "kerb_height_maximum_mm"
-        )
+        busiest = entry("street-hierarchy", _busiest(hierarchies))
+        kerb_low = busiest["kerb_height_minimum_mm"]
+        kerb_high = busiest["kerb_height_maximum_mm"]
         face.kerb_height_mm = derived(
             context, "kerb_height_mm", ordinal, minimum=kerb_low, maximum=kerb_high
         )  # type: ignore[assignment]
         face.kerb_width_mm = _modular(context, "kerb_width_mm", ordinal, 0, 1_000_000)
-        foot_low, foot_high = _ranges(
-            hierarchies, "footway_width_minimum_mm", "footway_width_maximum_mm"
-        )
+        foot_low = busiest["footway_width_minimum_mm"]
+        foot_high = busiest["footway_width_maximum_mm"]
+        spare = _room_for_footways(face)
+        if spare is not None:
+            if spare < foot_low:
+                raise InvalidParameterError(
+                    f"face {ordinal} has {spare} mm to spare for a footway and its streets ask "
+                    f"for at least {foot_low} mm; the block is too shallow for its streets"
+                )
+            foot_high = min(foot_high, spare)
         face.footway_width_mm = _modular(context, "footway_width_mm", ordinal, foot_low, foot_high)
         face.crossfall_millionths = derived(context, "footway_crossfall_millionths", ordinal)  # type: ignore[assignment]
         face.radius_mm = _modular(
