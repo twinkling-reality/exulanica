@@ -11,6 +11,7 @@ export { CanonicalJsonError, canonicalBytes, canonicalJson } from './canonical-j
 export { MEMBERSHIPS, readTileDocument, TILE_DOCUMENT_PROFILE, TileDocumentError } from './document.js';
 export type { DeclaredSemantics, GrammarEntry, Membership, RecordPayload, TileDocument } from './document.js';
 export {
+  CAPSULE_RADIUS_MM,
   MATERIALISED_LOD,
   MATERIALISED_PROJECTIONS,
   NEEDS,

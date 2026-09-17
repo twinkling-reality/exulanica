@@ -13,6 +13,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PreviewUnavailable, previewTile } from '../src/browser/index.js';
 import { bakeDocumentFile, nodeSha256 } from '../src/node/index.js';
 import { bakeTile } from '../src/core/bake.js';
+import { CAPSULE_RADIUS_MM } from '../src/core/expand.js';
 import { absoluteSurfaceCoordinates, absoluteVertices, decodeOwd } from '../src/core/owd.js';
 import type { DecodedOwd } from '../src/core/owd.js';
 import {
@@ -99,10 +100,15 @@ describe('the triangle digest of the conformance fixture', () => {
     });
   });
 
-  it('leaves out exactly the terrain cells a covering record meets', async () => {
+  it('leaves out exactly the terrain cells a covering record meets, grown by the capsule radius', async () => {
     const nav = (await decodedFixture()).projections[1]!;
     const vertices = absoluteVertices(nav);
-    const cover = coveringBoxes(fixtureObject());
+    const cover = coveringBoxes(fixtureObject()).map((box) => ({
+      min_x: box.min_x - CAPSULE_RADIUS_MM,
+      min_y: box.min_y - CAPSULE_RADIUS_MM,
+      max_x: box.max_x + CAPSULE_RADIUS_MM,
+      max_y: box.max_y + CAPSULE_RADIUS_MM,
+    }));
     const terrain = recordsOf(fixtureObject(), 'city.terrain')[0].fields;
     const cell = terrain.cell_mm as number;
     const meets = (west: number, south: number): boolean =>

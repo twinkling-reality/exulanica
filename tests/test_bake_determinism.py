@@ -86,8 +86,15 @@ CLI = PACKAGE.joinpath("src", "node", "cli.ts")
 TSX = WEB.joinpath("node_modules", ".bin", "tsx")
 
 #: The record kinds whose stated extent does not cover the ground: a terrain patch is the ground,
-#: and a district is a region. Every other kind with an extent covers the ground under it.
+#: and a district is a region. Every other kind with an extent covers or stands on the ground.
 NOT_GROUND_COVER = frozenset({"city.terrain", "city.district"})
+#: The capsule the city descriptor's nav_envelope contract keeps clear space for, as text until it
+#: is a structured field; the tessellator's CAPSULE_RADIUS_MM is held to the same text.
+CAPSULE_STATEMENT = (
+    "Clear space for a capsule of 340 mm radius and 1900 mm height, eye at 1620 mm, which is what "
+    "the visual gate measures."
+)
+CAPSULE_RADIUS_MM = 340
 
 
 def fixture_document() -> TileDocument:
@@ -456,8 +463,16 @@ def test_the_container_states_membership_frame_identity_and_what_is_drawn(tmp_pa
     assert drawn == ["city.terrain"]
 
 
+def test_the_capsule_radius_is_the_one_the_descriptor_states():
+    descriptor = json.loads(CITY_DESCRIPTOR_PATH.read_bytes())
+    nav = next(p for p in descriptor["projections"] if p["projection"] == "nav_envelope")
+    clearance = next(row for row in nav["preserved"] if row["property"] == "capsule_clearance")
+    assert clearance["statement"] == CAPSULE_STATEMENT
+    assert f"{CAPSULE_RADIUS_MM} mm radius" in CAPSULE_STATEMENT
+
+
 def test_the_tessellator_leaves_out_exactly_the_covered_terrain_cells(tmp_path):
-    """A second reading of the one tessellation rule this version adds, from the records."""
+    """A second reading of the support rule this version adds, from the records."""
     _, container = _bake(tmp_path, "fixture.owd")
     header = _header(container)
     records = fixture_records()
@@ -466,7 +481,14 @@ def test_the_tessellator_leaves_out_exactly_the_covered_terrain_cells(tmp_path):
         shape = CITY_SHAPES_BY_TYPE[type(record)]
         if shape.extent_field and shape.kind not in NOT_GROUND_COVER:
             extent = getattr(record, shape.extent_field)
-            cover.append((extent.min_x_mm, extent.min_y_mm, extent.max_x_mm, extent.max_y_mm))
+            cover.append(
+                (
+                    extent.min_x_mm - CAPSULE_RADIUS_MM,
+                    extent.min_y_mm - CAPSULE_RADIUS_MM,
+                    extent.max_x_mm + CAPSULE_RADIUS_MM,
+                    extent.max_y_mm + CAPSULE_RADIUS_MM,
+                )
+            )
     terrain = fixture_terrain()
     cell = terrain.cell_mm
     side = terrain.samples_per_side

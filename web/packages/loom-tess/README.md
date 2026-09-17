@@ -113,10 +113,13 @@ Only terrain.
   range states `none-exists`. The grammar says terrain is not a surface where a street, a block
   or a lot covers it; how terrain yields to them is exact coverage, and comes with their
   expanders. Leaving cells out instead would draw holes that read as cuts.
-- In `nav_envelope`, a terrain cell is drawn when its closed plan square meets the stated extent
-  of no record that covers the ground (every kind with an extent but terrain and districts). An
-  extent contains everything its record generates, so a kept cell is one nothing covers. Support
-  never claims ground that is not there.
+- In `nav_envelope`, a terrain cell is drawn when its closed plan square meets no stated extent of
+  a record that covers or stands on the ground (every kind with an extent but terrain and
+  districts), each grown by the capsule radius, 340 mm. An extent contains everything its record
+  generates, so a kept cell is one nothing covers, and a capsule stood anywhere on it meets none of
+  those records in plan, at any height. That is the city descriptor's capsule clearance claim. The
+  radius is `CAPSULE_RADIUS_MM` until the descriptor states it as a structured field;
+  `test/capsule-clearance.test.ts` fails if the descriptor's text changes.
 
 Every other record kind states the rule it waits on (`NEEDS` in `src/core/expand.ts`):
 `ring_triangulation`, `massing_faces`, `facade_layout`, `segment_surface`, `kerb_offset`,
@@ -240,8 +243,6 @@ has been made for version 2 yet.
 
 - Draw any surface but terrain. Every other kind waits on a named rule.
 - Materialise `collision_proxy` or `pick_geometry`. Each needs a representation contract first.
-  The city descriptor's `nav_envelope` contract also names capsule clearance, which this
-  `nav_envelope` does not carve; its contract says so.
 - Refuse unwalkable slopes in `nav_envelope`. No record states a slope limit, and the contract
   says so.
 - Recompute membership from anchors, check named rules, or resolve references and catalog keys.

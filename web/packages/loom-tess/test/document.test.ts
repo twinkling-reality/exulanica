@@ -153,6 +153,32 @@ describe('the bake', () => {
     expect(await terrainEntry(covered, 1)).toMatchObject({ state: 'unavailable', needs: ['ground_coverage'] });
   });
 
+  it('keeps support a capsule radius clear of a record that stands just outside a cell', async () => {
+    // A lamp's stated extent 200 mm, then 400 mm, east of the tile's south-east cell, which it
+    // never meets. Within the 340 mm radius the cell is left out; beyond it the cell is kept.
+    const nearEast = (gap: number) => broken((d) => {
+      Object.assign(first(d, 'city.street_furniture').extent, {
+        min_x_mm: 128000 + gap, max_x_mm: 128000 + gap + 100, min_y_mm: 4000, max_y_mm: 4100,
+      });
+    });
+    const southEastCell = async (bytes: Uint8Array): Promise<boolean> => {
+      const baked = await bake(bytes);
+      const nav = baked.tessellation.projections[1]!;
+      for (let triangle = 0; triangle < nav.indices.length / 3; triangle += 1) {
+        const xs = [0, 1, 2].map((corner) => nav.vertices[nav.indices[triangle * 3 + corner]! * 3]!);
+        const ys = [0, 1, 2].map((corner) => nav.vertices[nav.indices[triangle * 3 + corner]! * 3 + 1]!);
+        if (Math.min(...xs) === 120000 && Math.min(...ys) === 0) return true;
+      }
+      return false;
+    };
+    expect(await southEastCell(fixtureBytes())).toBe(true);
+    expect(await southEastCell(nearEast(200))).toBe(false);
+    expect(await southEastCell(nearEast(400))).toBe(true);
+    // Render draws the whole patch either way.
+    const render = (await bake(nearEast(200))).tessellation.projections[0]!;
+    expect(render.indices.length / 3).toBe(16 * 16 * 2);
+  });
+
   it('refuses a terrain grid that does not span its tile', async () => {
     await expect(bake(broken((d) => { first(d, 'city.terrain').cell_mm = 4000; }))).rejects.toThrow(/do not span its tile/);
   });
