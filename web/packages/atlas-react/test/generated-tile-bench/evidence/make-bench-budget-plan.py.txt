@@ -1,0 +1,24 @@
+import json, sys
+S = sys.argv[1]
+run = sys.argv[2]
+faces = ("(()=>{const app=window.bench.app;let faces=0,instances=0;"
+         "for(const r of app.root.findComponents('render')){if(!r.enabled||!r.entity.enabled)continue;"
+         "for(const mi of r.meshInstances){instances+=1;const p=mi.mesh.primitive[0];faces+=p.count/3;}}"
+         "return {faces,instances,canvas:[app.graphicsDevice.width,app.graphicsDevice.height],"
+         "gpu:(()=>{const gl=app.graphicsDevice.gl;const e=gl.getExtension('WEBGL_debug_renderer_info');return e?gl.getParameter(e.UNMASKED_RENDERER_WEBGL):null})(),"
+         "ua:navigator.userAgent,dpr:devicePixelRatio,stats:window.bench.stats()}})()")
+plan = {
+  "url": "http://127.0.0.1:5191/",
+  "width": 1440, "height": 900,
+  "outDir": f"{S}/shots/budget-bench-{run}",
+  "readyExpression": "document.body.dataset.ready==='true'",
+  "readyTimeoutMs": 180000,
+  "steps": [
+    {"wait": 500, "label": "street", "eval": "window.bench.showStreet().then(()=>true)"},
+    {"wait": 500, "label": "scene", "eval": faces},
+    {"wait": 500, "label": "visibility", "eval": "({visibility: document.visibilityState, hasFocus: document.hasFocus()})"},
+    {"wait": 0, "label": "presented", "eval": "window.bench.presentedFrameTimes(20)"},
+    {"wait": 0, "label": "walkEnd", "eval": "true", "shot": "walk-end"},
+  ],
+}
+json.dump(plan, open(f"{S}/plan-bench-{run}.json", "w"))

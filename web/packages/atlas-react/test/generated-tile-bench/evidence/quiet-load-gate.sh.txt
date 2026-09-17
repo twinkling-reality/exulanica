@@ -1,0 +1,13 @@
+#!/bin/zsh
+# Wait (up to 10 minutes) for the one-minute load to fall below 8, then measure, printing load around it.
+S=$1; run=$2
+for i in {1..120}; do
+  one=$(sysctl -n vm.loadavg | awk '{print $2}')
+  (( one < 8 )) && break
+  sleep 5
+done
+print -r -- "measure start $(date '+%H:%M:%S') load $(sysctl -n vm.loadavg)"
+node $S/cdp-capture.mjs $S/plan-bench-$run.json
+rc=$?
+print -r -- "measure end $(date '+%H:%M:%S') load $(sysctl -n vm.loadavg)"
+exit $rc

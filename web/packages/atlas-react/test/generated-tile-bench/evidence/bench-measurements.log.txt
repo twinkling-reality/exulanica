@@ -41,3 +41,6 @@ CLIPPING (luminance histogram), poses wall, footway, street, kerb: 0 pixels at 2
 
 DECODED TEXTURE (stats): 7 sets drawn = 121,634,808 bytes; probe 1,671,168 bytes; set containers fetched 76,039,024 bytes
   (includes painted-render, fetched by the wall captures).
+
+CORRECTION, 2026-09-17: "7 sets drawn = 121,634,808 bytes" above is all 8 sets uploaded; painted-render was uploaded by the wall
+captures. The 7 street sets alone are 104,857,596 bytes (bench counter; tile-route-budget.log.txt has the presented frame run).

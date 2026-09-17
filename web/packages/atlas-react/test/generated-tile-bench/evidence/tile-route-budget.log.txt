@@ -18,3 +18,53 @@ TEXTURE SETS, measured on the committed containers (all eight):
   Trade-off: decoded texture fits the 168 MB envelope; raw transfer of all eight is 2.7 times the 28 MB envelope and fits only with a compressing host.
 
 NOT YET MEASURED: presented frame times with textured geometry at 1440x900 (bench presentedFrameTimes, added but not run), and any real corridor tile.
+
+PRESENTED FRAMES WITH TEXTURED GEOMETRY, test-only bench street (test-street.ts), 2026-09-17, lane rebased on main 36e6d2dd
+Driver: headless Chrome 152 at 1440x900, device pixel ratio 1, ANGLE Metal on Apple M3 Pro; page visible.
+Method: await bench.showStreet(); await bench.presentedFrameTimes(20). The camera walks the footway at eye level (1.62 m
+above the kerb top) at 1.65 m/s, the engine renders every frame: sun with 3 shadow cascades at 2048, the environment probe,
+screen-space contact shadowing at full resolution, fog. Scripts: cdp-capture.mjs.txt, make-bench-budget-plan.py.txt and
+quiet-load-gate.sh.txt in this folder, each run inside .exulanica/bin/quiet-slot (no full suite on the machine), zsh
+no_bg_nice, nice 0.
+Clocks: the top-level figures are the app validation recorder's clock (PlayCanvas `frameupdate`, the interval between
+animation frame timestamps). frameEnd is performance.now() at each `frameend`, which adds the jitter of the frame's own script
+work. work is script time from `frameupdate` to `frameend`; GPU time is not in it.
+Scene: 40 faces in 10 mesh instances; 7 texture sets drawn (brick-running-bond, carriageway-asphalt, cast-concrete,
+footway-paving, kerb-stone, limestone-ashlar, storefront-metal); look exulanica.generated-tile-look@1.
+
+run 1 (08:13:04, load 6.96 before, 7.68 after; bench then timed only frameend, so its figures are that clock):
+  frameend clock: frames 1199, p50 16.7, p95 17.4, p99 17.7, max 18.3 ms; draw calls 55; JS heap 194.6 MB
+run 2 (08:14:46, load 8.36 before): void. Vite reloaded the page during the walk after the bench edit; no frames recorded.
+run 3 (08:15:05, load 8.04 before, 8.71 after; repeated because the one-minute load was above 8):
+  recorder clock: frames 1199, p50 16.7, p95 16.7, p99 16.8, max 16.8 ms
+  frameEnd clock: p50 16.6, p95 17.8, p99 18.3, max 19.2 ms;  work: p50 0.6, p95 1.5, max 2.2 ms
+  draw calls 55; JS heap 191.9 MB
+run 4 (measurement started 08:16:11 at load 7.94 after waiting for it to fall below 8; 10.26 at the end, 08:16:35):
+  recorder clock: frames 1200, p50 16.7, p95 16.7, p99 16.8, max 16.8 ms
+  frameEnd clock: p50 16.7, p95 17.6, p99 18.1, max 19.0 ms;  work: p50 0.5, p95 1.5, max 2.5 ms
+  draw calls 55; JS heap 192.0 MB
+Reading: at 1440x900 the full look costs no presented frame: 60 frames a second held for 20 s, no interval as long as two
+frames, under a machine load of 8 to 10 from other lanes. Script work per frame is 1.5 ms at p95. The frameEnd p95 above
+16.7 ms is timer jitter at the end of the frame, not a missed frame; the recorder's clock, which the Melbourne envelope was
+measured with, reads 16.7 ms.
+
+TRANSFER, only the sets this street cites (orchestrator 2026-09-17: load only cited sets; report what a compressing host sends):
+  brick-running-bond    raw 10,488,032  gzip -9 4,143,738  brotli -q 11 3,401,558
+  carriageway-asphalt   raw 10,487,904  gzip -9 5,347,545  brotli -q 11 4,572,730
+  cast-concrete         raw 10,488,000  gzip -9 3,331,361  brotli -q 11 2,838,439
+  footway-paving        raw 10,487,936  gzip -9 3,497,914  brotli -q 11 2,963,015
+  kerb-stone            raw  2,623,520  gzip -9 1,511,073  brotli -q 11 1,304,221
+  limestone-ashlar      raw 10,488,032  gzip -9 2,933,287  brotli -q 11 2,451,869
+  storefront-metal      raw 10,487,776  gzip -9   527,734  brotli -q 11   423,559
+  7 cited sets          raw 65,551,200  gzip -9 21,292,652  brotli -q 11 17,955,391
+DECODED TEXTURE: 104,857,596 bytes for the 7 cited sets (bench counter, equal to three RGBA maps with full mip chains per set);
+  probe 1,671,168 bytes. All 8 sets would be 121,634,808; height maps are not uploaded (look v1 parallax off).
+CORRECTION to the 2026-09-16 section above: "7 sets drawn on the bench = 121,634,808 bytes" was all 8 sets uploaded
+  (painted-render included by the wall captures), and "all 8 = about 138.4 MB" double-counted one set; all 8 are 121,634,808.
+
+AGAINST THE MELBOURNE ENVELOPE per corridor (about 227,000 faces, 28 MB transferred, 168 MB decoded texture, 87 draw calls,
+16.7 ms p95 at 1440x900):
+  frame p95 16.7 ms on the recorder's clock: within.  draw calls 55: within.  decoded texture 104.9 MB: within.
+  transferred: 18.0 MB brotli or 21.3 MB gzip for the 7 sets, within 28 MB only from a compressing host; 65.6 MB raw is not.
+  faces: 40. NOT MEASURED at corridor scale. No baked corridor tile exists; the frame cost here is the look's per-pixel
+  cost at full screen, and the cost of 227,000 faces in 7 texture batches is unverified.
