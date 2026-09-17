@@ -25,6 +25,7 @@ export {
   unavailableUv,
   undrawnClassReason,
 } from './texture-materials.js';
+export { coveragePreservingMips, coverageShare } from './cutout-coverage.js';
 export type { SurfaceBatch } from './surface-mesh.js';
 export { buildSurfaceMesh, validateSurfaceBatch } from './surface-mesh.js';
 export type { TileEnvironment } from './environment.js';

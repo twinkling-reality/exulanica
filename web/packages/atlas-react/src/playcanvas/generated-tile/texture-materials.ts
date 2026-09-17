@@ -8,6 +8,7 @@ import {
   type TextureSetManifest,
   type TextureSetManifestEntry,
 } from '@exulanica/atlas-core';
+import { coveragePreservingMips } from './cutout-coverage.js';
 import type { TileLook } from './look.js';
 import { createUnavailableMaterial } from './unavailable-surface.js';
 
@@ -29,10 +30,15 @@ import { createUnavailableMaterial } from './unavailable-surface.js';
  * rotation. There is no other scale anywhere, and no constant that guesses one.
  *
  * WHAT A SET BECOMES. A set is drawn by its material class and by nothing else. This runtime draws
- * `opaque` sets, of either container profile; every other class (`cutout`, `decal`, `glazing`) is
+ * `opaque` and `cutout` sets, of either container profile; every other class (`decal`, `glazing`) is
  * the stated unavailable surface with the reason {@link undrawnClassReason} gives, so glazing is never
  * drawn as opaque. For an opaque set, base_color is uploaded as sRGB; normal, orm and height as linear
- * bytes. A two-component normal (a procedural v2 set) gets its z rebuilt where it is uploaded,
+ * bytes. A cutout set is drawn as glTF's `alphaMode: MASK` with `doubleSided: true`: its
+ * base_color_coverage map is uploaded as sRGB colour with linear coverage, every mip level built by
+ * `coveragePreservingMips` so the share of covered texels stays the set's `coverage_permille` at any
+ * distance; each sample is tested against `alpha_cutoff / 255` and nothing is blended; depth is
+ * written; the shadow pass applies the same test; and both faces are lit, a back face with its normal
+ * reversed. A two-component normal (a procedural v2 set) gets its z rebuilt where it is uploaded,
  * z = sqrt(max(0, 1 - x * x - y * y)), in arithmetic that enters no digest; a model-made set that
  * produced no normal map draws without one. The orm map drives three material inputs from its three
  * channels: occlusion (red), roughness (green, inverted into PlayCanvas's gloss) and metalness (blue).
@@ -136,7 +142,9 @@ function rgbToRgba(rgb: Uint8Array): Uint8Array {
 
 /** Why a decoded set is not drawn by this runtime, or null when its class is one it draws. */
 export function undrawnClassReason(set: Pick<DecodedTextureSet, 'materialClass'>): string | null {
-  return set.materialClass === 'opaque' ? null : `material class ${set.materialClass} is not drawn by this runtime`;
+  return set.materialClass === 'opaque' || set.materialClass === 'cutout'
+    ? null
+    : `material class ${set.materialClass} is not drawn by this runtime`;
 }
 
 /**
@@ -275,7 +283,8 @@ export class TileTextureUploads {
     const entry = set.entry;
     const { width, height } = entry;
     const anisotropy = this.look.surface.anisotropy;
-    const texture = (map: string, format: number, levels: Uint8Array): pc.Texture => new pc.Texture(this.device, {
+    // One level lets the device build the chain; a full chain is uploaded exactly as given.
+    const texture = (map: string, format: number, levels: Uint8Array | readonly Uint8Array[]): pc.Texture => new pc.Texture(this.device, {
       name: `${entry.setId}:${map}`,
       width,
       height,
@@ -286,12 +295,17 @@ export class TileTextureUploads {
       addressV: pc.ADDRESS_REPEAT,
       minFilter: pc.FILTER_LINEAR_MIPMAP_LINEAR,
       magFilter: pc.FILTER_LINEAR,
-      levels: [levels],
+      levels: levels instanceof Uint8Array ? [levels] : [...levels],
     });
-    // sRGB8 without alpha cannot generate mipmaps on WebGL2, so every colour map carries an
-    // opaque alpha channel.
     if (undrawnClassReason(set) !== null) throw new Error(`Texture set ${entry.setId} is ${set.materialClass}, which this runtime does not draw`);
-    const baseColor = texture('base_color', pc.PIXELFORMAT_SRGBA8, rgbToRgba(requiredMap(set, 'base_color')));
+    const cutout = set.classParameters.materialClass === 'cutout' ? set.classParameters : null;
+    // sRGB8 without alpha cannot generate mipmaps on WebGL2, so every colour map carries an alpha
+    // channel: opaque for an opaque set, the coverage for a cutout, whose chain keeps its coverage.
+    const baseColor = cutout === null
+      ? texture('base_color', pc.PIXELFORMAT_SRGBA8, rgbToRgba(requiredMap(set, 'base_color')))
+      : texture('base_color_coverage', pc.PIXELFORMAT_SRGBA8, coveragePreservingMips(
+        requiredMap(set, 'base_color_coverage'), width, height, cutout.alphaCutoff, cutout.coveragePermille,
+      ));
     const normalBytes = normalTexels(set);
     const normal = normalBytes === null ? null : texture('normal', pc.PIXELFORMAT_RGBA8, normalBytes);
     const orm = texture('orm', pc.PIXELFORMAT_RGBA8, rgbToRgba(requiredMap(set, 'orm')));
@@ -318,6 +332,17 @@ export class TileTextureUploads {
     material.metalnessMapChannel = 'b';
     material.useSkybox = true;
     material.cull = pc.CULLFACE_BACK;
+    if (cutout !== null) {
+      // glTF alphaMode MASK: tested, never blended, depth written, in the shadow pass as well.
+      material.opacityMap = baseColor;
+      material.opacityMapChannel = 'a';
+      material.alphaTest = cutout.alphaCutoff / 255;
+      material.blendType = pc.BLEND_NONE;
+      material.depthWrite = true;
+      // glTF doubleSided: both faces drawn and lit, a back face with its normal reversed.
+      material.cull = cutout.doubleSided ? pc.CULLFACE_NONE : pc.CULLFACE_BACK;
+      material.twoSidedLighting = cutout.doubleSided;
+    }
     if (this.look.surface.parallax && set.maps.height !== undefined) {
       const heightMap = texture('height', pc.PIXELFORMAT_R8, requiredMap(set, 'height'));
       textures.push(heightMap);
