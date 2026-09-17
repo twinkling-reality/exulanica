@@ -138,6 +138,9 @@ function checkDefinition(def: TextureSetDefinition): void {
   if (def.materialClass === 'glazing' && (def.heightRangeMm !== null || def.cavity !== null)) {
     problems.push('a glazing set bakes no height field, so it states no height range or cavity');
   }
+  if ((def.film !== null) !== (def.materialClass === 'glazing')) {
+    problems.push('a glazing set declares its film, and a set of any other class declares none');
+  }
   if (problems.length > 0) throw new Error(`${def.setId}: ${problems.join('; ')}`);
 }
 

@@ -66,6 +66,7 @@ from exulanica.materials.classes import (
     class_layout,
     class_parameters,
     coverage_permille,
+    declared_film,
     relief_keys,
 )
 from exulanica.materials.manifest import (
@@ -370,8 +371,17 @@ def _decode(payload: bytes, where: str) -> DecodedTextureSet:
 
     if profile == TEXTURE_SET_PROFILE_V2:
         colour = maps.get("base_color_coverage")
+        film = None
+        if material_class == "glazing":
+            film = declared_film(header.get("class"))
+            if film is None:
+                raise TextureSetRefused(
+                    "header",
+                    f"{where}: a glazing set declares film_srgb, three integers from 0 to 255, "
+                    "and film_roughness_permille, an integer from 0 to 1000",
+                )
         stated = class_parameters(
-            material_class, None if colour is None else coverage_permille(colour)
+            material_class, None if colour is None else coverage_permille(colour), film
         )
         if not identical(header.get("class"), stated):
             raise TextureSetRefused(

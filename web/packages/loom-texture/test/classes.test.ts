@@ -27,6 +27,7 @@ import { rollMismatches } from './support.js';
  */
 const LICENCE = 'c'.repeat(64);
 const SIZE = 32;
+const FILM = { srgb: [150, 144, 132], roughnessPermille: 650 } as const;
 
 function definition(materialClass: MaterialClass): TextureSetDefinition {
   const brick = CATALOG.find((def) => def.setId === 'cc0.brick-running-bond')!;
@@ -40,6 +41,7 @@ function definition(materialClass: MaterialClass): TextureSetDefinition {
     materialClass,
     heightRangeMm: relief ? brick.heightRangeMm : null,
     cavity: relief ? brick.cavity : null,
+    film: relief ? null : FILM,
     pattern: () => (x, y, out) => {
       out.height = valueNoise(x, y, 4, 4, 11);
       out.red = valueNoise(x, y, 3, 5, 12);
@@ -73,7 +75,11 @@ describe('a v2 procedural set', () => {
       expect(channelsOf(read.layout)).toEqual(channelsOf(classLayout(materialClass, 'procedural')));
       const colour = read.maps.get('base_color_coverage');
       expect(read.header.class).toEqual(
-        classParameters(materialClass, colour === undefined ? null : coveragePermille(colour)),
+        classParameters(
+          materialClass,
+          colour === undefined ? null : coveragePermille(colour),
+          materialClass === 'glazing' ? FILM : null,
+        ),
       );
       expect('height_range_mm' in read.header).toBe(materialClass !== 'glazing');
       expect('cavity' in read.header).toBe(materialClass !== 'glazing');

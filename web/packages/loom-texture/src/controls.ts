@@ -1,3 +1,4 @@
+import type { GlazingFilm } from './classes.js';
 import type { CavitySpec } from './definition.js';
 import {
   COMMON_CONTROLS,
@@ -137,6 +138,12 @@ export function commonControls(values: {
 }
 
 export const heightRangeOf = (recipe: Recipe): number => read.integer(recipe, 'height_range_mm');
+
+/** A glazing recipe's film, from the two controls every glazing maker declares under these keys. */
+export function filmOf(recipe: Recipe): GlazingFilm {
+  const [red, green, blue] = read.colour(recipe, 'film_colour');
+  return { srgb: [red, green, blue], roughnessPermille: read.integer(recipe, 'film_roughness_permille') };
+}
 
 export function cavityOf(recipe: Recipe): CavitySpec {
   return {

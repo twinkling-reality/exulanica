@@ -1,4 +1,4 @@
-import type { MaterialClass, SetProfile } from './classes.js';
+import type { GlazingFilm, MaterialClass, SetProfile } from './classes.js';
 import type { Pattern } from './sample.js';
 
 /**
@@ -52,6 +52,8 @@ export interface TextureSetDefinition {
   readonly heightRangeMm: number | null;
   /** How the bake measures occlusion from the height field. Null where there is no height field. */
   readonly cavity: CavitySpec | null;
+  /** What a glazing set's film is, from its recipe. Null for every other class. */
+  readonly film: GlazingFilm | null;
   /** What the recipe reads, stated in the header so a reader can see the module it was built on. */
   readonly parameters: Readonly<Record<string, number | string>>;
   /** Build the pattern. Called once per bake, so a pattern may hold scratch state. */

@@ -729,8 +729,8 @@
       "entry": {
         "set_id": "fixture.glazing",
         "version": 1,
-        "content_sha256": "84852b6af0c7658fcaf11288e99eead587f1a68d00b6d3319936d2c8894d5322",
-        "byte_size": 2720,
+        "content_sha256": "cb449ba45d2105d79ef3020a9d61f59708cd00a9d83271f25aa8b5454a05c82a",
+        "byte_size": 2784,
         "resolution": {
           "width": 16,
           "height": 16
@@ -945,8 +945,8 @@
       "entry": {
         "set_id": "fixture.glazing",
         "version": 1,
-        "content_sha256": "3dd62458fb041b1b0c8aaadc4c137a5896cab363d11995dfdaf625cad9d64311",
-        "byte_size": 2736,
+        "content_sha256": "1bafb077f10e6a7cecf3d0e2aca8abe29cd47051ab645201d13ff9e1c84ff1a5",
+        "byte_size": 2784,
         "resolution": {
           "width": 16,
           "height": 16
@@ -1216,8 +1216,8 @@
       "entry": {
         "set_id": "fixture.glazing",
         "version": 1,
-        "content_sha256": "f5c6588459f60b9c0d2b2add891eefbaa2423fe490ff5e9db240dfe671339197",
-        "byte_size": 2736,
+        "content_sha256": "adb7c34663c8612d587d95f85337ab52126f0d9e08cc840c4277222cc410bb35",
+        "byte_size": 2784,
         "resolution": {
           "width": 16,
           "height": 16
@@ -1423,8 +1423,8 @@
       "entry": {
         "set_id": "fixture.glazing",
         "version": 1,
-        "content_sha256": "696699ebb4e19811f3df221312d5ceee2e70095987195371e553376c2022ee00",
-        "byte_size": 2752,
+        "content_sha256": "615c164caf7dc34adda5b19d7a0f69cf8906faf8b6fbe77c258553f8d9ce02dd",
+        "byte_size": 2800,
         "resolution": {
           "width": 16,
           "height": 16
@@ -1741,8 +1741,8 @@
       "entry": {
         "set_id": "fixture.glazing",
         "version": 1,
-        "content_sha256": "fc9d4f2af314e90ef1365f61e971a291772df002d3f1b346fc57498717ab0bc8",
-        "byte_size": 2720,
+        "content_sha256": "6111823549d72556c82932f58e689bdae26aef8804c1a79a0516a808594f3b79",
+        "byte_size": 2784,
         "resolution": {
           "width": 16,
           "height": 16
@@ -2192,8 +2192,8 @@
       "entry": {
         "set_id": "fixture.glazing",
         "version": 1,
-        "content_sha256": "ee682b3de58e0e111e1d76e15f7c1791120eba5542f1f1761852c18e6da2360c",
-        "byte_size": 2736,
+        "content_sha256": "8d33167ba35603af9b7c72104904b6a33d6e374f714efdab8425d36818e77cd2",
+        "byte_size": 2784,
         "resolution": {
           "width": 16,
           "height": 16
@@ -2345,8 +2345,8 @@
       "entry": {
         "set_id": "fixture.glazing",
         "version": 1,
-        "content_sha256": "84852b6af0c7658fcaf11288e99eead587f1a68d00b6d3319936d2c8894d5322",
-        "byte_size": 2720,
+        "content_sha256": "cb449ba45d2105d79ef3020a9d61f59708cd00a9d83271f25aa8b5454a05c82a",
+        "byte_size": 2784,
         "resolution": {
           "width": 16,
           "height": 16
@@ -2563,6 +2563,325 @@
         "material_class": "opaque"
       },
       "reason": "digest"
+    },
+    {
+      "name": "a glazing set does not declare its film colour",
+      "container": "conformance/refused/33-glazing.ltex",
+      "entry": {
+        "set_id": "fixture.glazing",
+        "version": 1,
+        "content_sha256": "c479e9fe092ddaa6d23d63d9ab95a45f5edc5058b9271eb02c2b679846e10e8d",
+        "byte_size": 2752,
+        "resolution": {
+          "width": 16,
+          "height": 16
+        },
+        "channels": [
+          {
+            "map": "base_color",
+            "components": 3,
+            "holds": [
+              "red",
+              "green",
+              "blue"
+            ],
+            "srgb": true
+          },
+          {
+            "map": "transmission_roughness",
+            "components": 2,
+            "holds": [
+              "transmission",
+              "roughness"
+            ],
+            "srgb": false
+          }
+        ],
+        "extent_mm": {
+          "u": 1000,
+          "v": 1000
+        },
+        "licence_id": "CC0-1.0",
+        "licence_sha256": "d51d213f1f5d94acb27403d616b29007802618979c106b075fdbd399fa86310f",
+        "container_profile": "exulanica.texture-set/v2",
+        "material_class": "glazing"
+      },
+      "reason": "header"
+    },
+    {
+      "name": "a glazing set declares a film colour of two channels",
+      "container": "conformance/refused/34-glazing.ltex",
+      "entry": {
+        "set_id": "fixture.glazing",
+        "version": 1,
+        "content_sha256": "edd0f9f1ba199bfa02a8e862644a9593102fe9a9c905771cc33c97ffec660da7",
+        "byte_size": 2784,
+        "resolution": {
+          "width": 16,
+          "height": 16
+        },
+        "channels": [
+          {
+            "map": "base_color",
+            "components": 3,
+            "holds": [
+              "red",
+              "green",
+              "blue"
+            ],
+            "srgb": true
+          },
+          {
+            "map": "transmission_roughness",
+            "components": 2,
+            "holds": [
+              "transmission",
+              "roughness"
+            ],
+            "srgb": false
+          }
+        ],
+        "extent_mm": {
+          "u": 1000,
+          "v": 1000
+        },
+        "licence_id": "CC0-1.0",
+        "licence_sha256": "d51d213f1f5d94acb27403d616b29007802618979c106b075fdbd399fa86310f",
+        "container_profile": "exulanica.texture-set/v2",
+        "material_class": "glazing"
+      },
+      "reason": "header"
+    },
+    {
+      "name": "a glazing set declares a film colour channel above 255",
+      "container": "conformance/refused/35-glazing.ltex",
+      "entry": {
+        "set_id": "fixture.glazing",
+        "version": 1,
+        "content_sha256": "fb69116afe9225f87cd04172008e7be6c6a2502089e553de531c186a8edc7ed6",
+        "byte_size": 2784,
+        "resolution": {
+          "width": 16,
+          "height": 16
+        },
+        "channels": [
+          {
+            "map": "base_color",
+            "components": 3,
+            "holds": [
+              "red",
+              "green",
+              "blue"
+            ],
+            "srgb": true
+          },
+          {
+            "map": "transmission_roughness",
+            "components": 2,
+            "holds": [
+              "transmission",
+              "roughness"
+            ],
+            "srgb": false
+          }
+        ],
+        "extent_mm": {
+          "u": 1000,
+          "v": 1000
+        },
+        "licence_id": "CC0-1.0",
+        "licence_sha256": "d51d213f1f5d94acb27403d616b29007802618979c106b075fdbd399fa86310f",
+        "container_profile": "exulanica.texture-set/v2",
+        "material_class": "glazing"
+      },
+      "reason": "header"
+    },
+    {
+      "name": "a glazing set does not declare its film roughness",
+      "container": "conformance/refused/36-glazing.ltex",
+      "entry": {
+        "set_id": "fixture.glazing",
+        "version": 1,
+        "content_sha256": "c0bccfef1362feae30be747d09361cd785015e9de60e503be6123c6ce63009bf",
+        "byte_size": 2752,
+        "resolution": {
+          "width": 16,
+          "height": 16
+        },
+        "channels": [
+          {
+            "map": "base_color",
+            "components": 3,
+            "holds": [
+              "red",
+              "green",
+              "blue"
+            ],
+            "srgb": true
+          },
+          {
+            "map": "transmission_roughness",
+            "components": 2,
+            "holds": [
+              "transmission",
+              "roughness"
+            ],
+            "srgb": false
+          }
+        ],
+        "extent_mm": {
+          "u": 1000,
+          "v": 1000
+        },
+        "licence_id": "CC0-1.0",
+        "licence_sha256": "d51d213f1f5d94acb27403d616b29007802618979c106b075fdbd399fa86310f",
+        "container_profile": "exulanica.texture-set/v2",
+        "material_class": "glazing"
+      },
+      "reason": "header"
+    },
+    {
+      "name": "a glazing set declares a film roughness above 1000",
+      "container": "conformance/refused/37-glazing.ltex",
+      "entry": {
+        "set_id": "fixture.glazing",
+        "version": 1,
+        "content_sha256": "bd731b4c3088abef46cbdcd7cb03f3af2047f70ade42fbe66986adeb67364cca",
+        "byte_size": 2784,
+        "resolution": {
+          "width": 16,
+          "height": 16
+        },
+        "channels": [
+          {
+            "map": "base_color",
+            "components": 3,
+            "holds": [
+              "red",
+              "green",
+              "blue"
+            ],
+            "srgb": true
+          },
+          {
+            "map": "transmission_roughness",
+            "components": 2,
+            "holds": [
+              "transmission",
+              "roughness"
+            ],
+            "srgb": false
+          }
+        ],
+        "extent_mm": {
+          "u": 1000,
+          "v": 1000
+        },
+        "licence_id": "CC0-1.0",
+        "licence_sha256": "d51d213f1f5d94acb27403d616b29007802618979c106b075fdbd399fa86310f",
+        "container_profile": "exulanica.texture-set/v2",
+        "material_class": "glazing"
+      },
+      "reason": "header"
+    },
+    {
+      "name": "a glazing set declares its film roughness as text",
+      "container": "conformance/refused/38-glazing.ltex",
+      "entry": {
+        "set_id": "fixture.glazing",
+        "version": 1,
+        "content_sha256": "9bf6dec2c42a462a30874ac349c9406347d797805de3f654ef7ee01ed29ad2f1",
+        "byte_size": 2784,
+        "resolution": {
+          "width": 16,
+          "height": 16
+        },
+        "channels": [
+          {
+            "map": "base_color",
+            "components": 3,
+            "holds": [
+              "red",
+              "green",
+              "blue"
+            ],
+            "srgb": true
+          },
+          {
+            "map": "transmission_roughness",
+            "components": 2,
+            "holds": [
+              "transmission",
+              "roughness"
+            ],
+            "srgb": false
+          }
+        ],
+        "extent_mm": {
+          "u": 1000,
+          "v": 1000
+        },
+        "licence_id": "CC0-1.0",
+        "licence_sha256": "d51d213f1f5d94acb27403d616b29007802618979c106b075fdbd399fa86310f",
+        "container_profile": "exulanica.texture-set/v2",
+        "material_class": "glazing"
+      },
+      "reason": "header"
+    },
+    {
+      "name": "a cutout set declares a film colour",
+      "container": "conformance/refused/39-cutout.ltex",
+      "entry": {
+        "set_id": "fixture.cutout",
+        "version": 1,
+        "content_sha256": "4f8c441df9e33a98106a672545b985053deeaad26044edc07fcb425e8859d1cc",
+        "byte_size": 4240,
+        "resolution": {
+          "width": 16,
+          "height": 16
+        },
+        "channels": [
+          {
+            "map": "base_color_coverage",
+            "components": 4,
+            "holds": [
+              "red",
+              "green",
+              "blue",
+              "coverage"
+            ],
+            "srgb": true
+          },
+          {
+            "map": "normal",
+            "components": 2,
+            "holds": [
+              "normal_x",
+              "normal_y"
+            ],
+            "srgb": false
+          },
+          {
+            "map": "orm",
+            "components": 3,
+            "holds": [
+              "occlusion",
+              "roughness",
+              "metalness"
+            ],
+            "srgb": false
+          }
+        ],
+        "extent_mm": {
+          "u": 1000,
+          "v": 1000
+        },
+        "licence_id": "CC0-1.0",
+        "licence_sha256": "d51d213f1f5d94acb27403d616b29007802618979c106b075fdbd399fa86310f",
+        "container_profile": "exulanica.texture-set/v2",
+        "material_class": "cutout"
+      },
+      "reason": "header"
     }
   ]
 }

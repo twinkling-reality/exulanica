@@ -1,6 +1,6 @@
 import { join } from 'node:path';
 import { RELIEF_CLASSES, SET_PROFILE_V1, SET_PROFILE_V2 } from './classes.js';
-import { cavityOf, heightRangeOf } from './controls.js';
+import { cavityOf, filmOf, heightRangeOf } from './controls.js';
 import type { TextureSetDefinition } from './definition.js';
 import { DRAFT_FOLDER, type LibrarySet, packageRoot, readLibrary } from './library.js';
 import type { Maker } from './maker.js';
@@ -65,6 +65,7 @@ export function recipeDefinition(
     materialClass,
     heightRangeMm: relief ? heightRangeOf(recipe) : null,
     cavity: relief ? cavityOf(recipe) : null,
+    film: materialClass === 'glazing' ? filmOf(recipe) : null,
     parameters: maker.stated(recipe),
     pattern: () => maker.pattern(recipe),
   };

@@ -21,6 +21,7 @@ export {
   ALPHA_CUTOFF,
   type Channel,
   GLAZING_IOR_MILLIONTHS,
+  type GlazingFilm,
   MAKER_KINDS,
   type MakerKind,
   type MapDescriptor,
@@ -36,6 +37,7 @@ export {
   classLayout,
   classParameters,
   coveragePermille,
+  declaredFilm,
 } from './classes.js';
 export {
   CONTAINER_MAGIC,

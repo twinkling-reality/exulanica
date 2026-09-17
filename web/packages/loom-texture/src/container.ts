@@ -1,6 +1,7 @@
 import { canonicalBytes, canonicalJson } from './canonical-json.js';
 import {
   type FramedMap,
+  type GlazingFilm,
   MATERIAL_CLASSES,
   MAKER_KINDS,
   type MakerKind,
@@ -14,6 +15,7 @@ import {
   classLayout,
   classParameters,
   coveragePermille,
+  declaredFilm,
   isMakerKind,
   isMaterialClass,
 } from './classes.js';
@@ -281,7 +283,7 @@ export function encodeContainerV2(
       parameters: def.parameters,
       material_class: def.materialClass,
       maker_kind: 'procedural',
-      class: classParameters(def.materialClass, colour === undefined ? null : coveragePermille(colour.bytes)),
+      class: classParameters(def.materialClass, colour === undefined ? null : coveragePermille(colour.bytes), def.film),
       ...relief,
     },
     maps,
@@ -466,7 +468,14 @@ export function readContainer(bytes: Uint8Array): ReadContainer {
   if (profile === SET_PROFILE_V2) {
     const colour = maps.get('base_color_coverage');
     const measured = colour === undefined ? null : coveragePermille(colour);
-    const stated = classParameters(materialClass, measured);
+    let film: GlazingFilm | null = null;
+    if (materialClass === 'glazing') {
+      film = declaredFilm(header.class);
+      if (film === null) {
+        refuse('header', 'a glazing set declares film_srgb, three integers from 0 to 255, and film_roughness_permille, an integer from 0 to 1000');
+      }
+    }
+    const stated = classParameters(materialClass, measured, film);
     if (!isRecord(header.class) || canonicalJson(header.class) !== canonicalJson(stated)) {
       refuse('header', `class is ${JSON.stringify(header.class)}, but a set of class ${materialClass} with these maps states ${canonicalJson(stated)}`);
     }

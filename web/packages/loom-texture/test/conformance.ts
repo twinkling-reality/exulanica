@@ -115,6 +115,7 @@ function commonHeader(setId: string, title: string): Header {
 }
 
 const RELIEF = { height_range_mm: 4, cavity: { radius_mm: 4, depth_mm: 2, strength_permille: 500 } };
+const FILM = { srgb: [150, 144, 132], roughnessPermille: 650 } as const;
 
 function v2Fixture(
   setId: string,
@@ -135,7 +136,11 @@ function v2Fixture(
       profile: SET_PROFILE_V2,
       material_class: materialClass,
       maker_kind: makerKind,
-      class: classParameters(materialClass, colour === undefined ? null : coveragePermille(colour.bytes)),
+      class: classParameters(
+        materialClass,
+        colour === undefined ? null : coveragePermille(colour.bytes),
+        materialClass === 'glazing' ? FILM : null,
+      ),
       ...relief,
     },
     maps,
@@ -480,6 +485,50 @@ const CONTAINER_CASES: readonly ContainerCase[] = [
     bytes: (_fixture, good) => good,
     entryChanges: [{ path: ['content_sha256'], value: 'f'.repeat(64) }],
     reason: 'digest',
+  },
+  // A glazing set's declared film: checked for shape and range, never recomputed. Appended
+  // after the first cases so their files keep their numbers.
+  {
+    name: 'a glazing set does not declare its film colour',
+    base: 'fixture.glazing',
+    bytes: reframed([{ path: ['class', 'film_srgb'], remove: true }]),
+    reason: 'header',
+  },
+  {
+    name: 'a glazing set declares a film colour of two channels',
+    base: 'fixture.glazing',
+    bytes: reframed([{ path: ['class', 'film_srgb'], value: [150, 144] }]),
+    reason: 'header',
+  },
+  {
+    name: 'a glazing set declares a film colour channel above 255',
+    base: 'fixture.glazing',
+    bytes: reframed([{ path: ['class', 'film_srgb'], value: [150, 256, 132] }]),
+    reason: 'header',
+  },
+  {
+    name: 'a glazing set does not declare its film roughness',
+    base: 'fixture.glazing',
+    bytes: reframed([{ path: ['class', 'film_roughness_permille'], remove: true }]),
+    reason: 'header',
+  },
+  {
+    name: 'a glazing set declares a film roughness above 1000',
+    base: 'fixture.glazing',
+    bytes: reframed([{ path: ['class', 'film_roughness_permille'], value: 1001 }]),
+    reason: 'header',
+  },
+  {
+    name: 'a glazing set declares its film roughness as text',
+    base: 'fixture.glazing',
+    bytes: reframed([{ path: ['class', 'film_roughness_permille'], value: '650' }]),
+    reason: 'header',
+  },
+  {
+    name: 'a cutout set declares a film colour',
+    base: 'fixture.cutout',
+    bytes: reframed([{ path: ['class', 'film_srgb'], value: [150, 144, 132] }]),
+    reason: 'header',
   },
 ];
 

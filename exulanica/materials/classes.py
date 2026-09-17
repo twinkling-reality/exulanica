@@ -50,11 +50,13 @@ __all__ = [
     "TRANSMISSION_ROUGHNESS",
     "V1_LAYOUT",
     "V2_HEADER_KEYS",
+    "GlazingFilm",
     "TextureMap",
     "allowed_channels",
     "class_layout",
     "class_parameters",
     "coverage_permille",
+    "declared_film",
     "relief_keys",
 ]
 
@@ -298,12 +300,63 @@ def coverage_permille(colour_coverage: bytes | memoryview) -> int:
     return (len(coverage) - uncovered) * 1000 // len(coverage)
 
 
-def class_parameters(material_class: str, coverage: int | None) -> dict[str, Any]:
-    """What a header states under ``class``: the numbers a class fixes, and one a bake measures."""
+@dataclass(frozen=True, slots=True)
+class GlazingFilm:
+    """What a glazing set's film is where it covers the glass completely.
+
+    A person names both values, so both are recipe controls, and the header declares them so a
+    renderer can lay more of the same film where a pane collects dirt by position, which a tiling
+    set cannot know. A reader checks their shape and range and never recomputes them.
+    """
+
+    srgb: tuple[int, int, int]
+    roughness_permille: int
+
+
+def _is_int_in(value: object, low: int, high: int) -> bool:
+    return type(value) is int and low <= value <= high
+
+
+def declared_film(stated: object) -> GlazingFilm | None:
+    """The film a glazing header's ``class`` object declares, or None when it is out of shape.
+
+    ``film_srgb`` is three integers from 0 to 255 and ``film_roughness_permille`` an integer from 0
+    to 1000; ``True`` is not an integer here.
+    """
+    if not isinstance(stated, dict):
+        return None
+    srgb, roughness = stated.get("film_srgb"), stated.get("film_roughness_permille")
+    if not (
+        isinstance(srgb, list)
+        and len(srgb) == 3
+        and all(_is_int_in(channel, 0, 255) for channel in srgb)
+        and _is_int_in(roughness, 0, 1000)
+    ):
+        return None
+    return GlazingFilm(srgb=(srgb[0], srgb[1], srgb[2]), roughness_permille=roughness)
+
+
+def class_parameters(
+    material_class: str, coverage: int | None, film: GlazingFilm | None = None
+) -> dict[str, Any]:
+    """What a header states under ``class``.
+
+    That is the numbers a class fixes, the one a bake measures, and for glazing the film its recipe
+    declares.
+    """
+    if (film is not None) != (material_class == "glazing"):
+        raise ValueError(
+            f"a {material_class} set {'declares its film' if film is None else 'declares no film'}"
+        )
+    if film is not None:
+        return {
+            "double_sided": False,
+            "film_roughness_permille": film.roughness_permille,
+            "film_srgb": list(film.srgb),
+            "ior_millionths": GLAZING_IOR_MILLIONTHS,
+        }
     if material_class == "opaque":
         return {}
-    if material_class == "glazing":
-        return {"double_sided": False, "ior_millionths": GLAZING_IOR_MILLIONTHS}
     if coverage is None:
         raise ValueError(f"a {material_class} set states the coverage its bake measured")
     if material_class == "cutout":

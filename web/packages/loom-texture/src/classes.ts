@@ -233,6 +233,34 @@ export const ALPHA_CUTOFF = 128;
 export const GLAZING_IOR_MILLIONTHS = 1_500_000;
 
 /**
+ * What a glazing set's film is, where film covers the glass completely: its colour and its roughness.
+ * A person names both, so both are recipe controls, and the header declares them so a renderer can
+ * lay more of the same film where a pane collects dirt by position (its bottom and edges), which a
+ * tiling set cannot know. A reader checks their shape and range and never recomputes them.
+ */
+export interface GlazingFilm {
+  /** sRGB, each channel 0 to 255. */
+  readonly srgb: readonly [number, number, number];
+  /** Perceptual roughness in thousandths, 0 to 1000. */
+  readonly roughnessPermille: number;
+}
+
+const isByte = (value: unknown): boolean => Number.isInteger(value) && (value as number) >= 0 && (value as number) <= 255;
+
+/**
+ * The film a glazing header's `class` object declares, or null when either declared value is
+ * missing or out of shape: `film_srgb` is three integers from 0 to 255, and
+ * `film_roughness_permille` an integer from 0 to 1000.
+ */
+export function declaredFilm(stated: unknown): GlazingFilm | null {
+  if (typeof stated !== 'object' || stated === null || Array.isArray(stated)) return null;
+  const { film_srgb: srgb, film_roughness_permille: roughness } = stated as Record<string, unknown>;
+  if (!Array.isArray(srgb) || srgb.length !== 3 || !srgb.every(isByte)) return null;
+  if (!Number.isInteger(roughness) || (roughness as number) < 0 || (roughness as number) > 1000) return null;
+  return { srgb: [srgb[0], srgb[1], srgb[2]], roughnessPermille: roughness as number };
+}
+
+/**
  * The share of texels whose coverage is at least {@link ALPHA_CUTOFF}, in thousandths, floored.
  * Measured by the bake and measured again by every reader, so a header cannot state another.
  */
@@ -246,13 +274,18 @@ export function coveragePermille(colourCoverage: Uint8Array): number {
 }
 
 /**
- * What a header states under `class`: the numbers a class fixes, each with its reason above, and
- * the one a bake measures. Nothing here is a number a person would name; those are recipe controls.
+ * What a header states under `class`: the numbers a class fixes, each with its reason above, the
+ * one a bake measures, and for glazing the film its recipe declares. The fixed and measured numbers
+ * are none a person would name; the film is, which is why it comes from the recipe's controls.
  */
 export function classParameters(
   materialClass: MaterialClass,
   measuredCoveragePermille: number | null,
-): Record<string, number | boolean> {
+  film: GlazingFilm | null = null,
+): Record<string, number | boolean | number[]> {
+  if ((film !== null) !== (materialClass === 'glazing')) {
+    throw new Error(`a ${materialClass} set ${film === null ? 'declares its film' : 'declares no film'}`);
+  }
   const coverage = (): number => {
     if (measuredCoveragePermille === null) {
       throw new Error(`a ${materialClass} set states the coverage its bake measured`);
@@ -269,7 +302,12 @@ export function classParameters(
       return { coverage_permille: coverage() };
     case 'glazing':
       // A street is seen from outside its windows.
-      return { double_sided: false, ior_millionths: GLAZING_IOR_MILLIONTHS };
+      return {
+        double_sided: false,
+        film_roughness_permille: film!.roughnessPermille,
+        film_srgb: [...film!.srgb],
+        ior_millionths: GLAZING_IOR_MILLIONTHS,
+      };
   }
 }
 
