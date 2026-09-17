@@ -189,8 +189,9 @@ describe('the ring rule', () => {
 
   it('holds its rule on star-shaped and staircase rings', () => {
     const next = sequence(5);
-    for (let index = 0; index < 150; index += 1) holdsTheRingRule(starRing(next, 3 + (index % 40)));
-    for (let steps = 1; steps < 12; steps += 1) holdsTheRingRule(staircase(steps, 700, 1100));
+    // Each ring is tried from every starting vertex, so the sizes stay near a lot's or a roof's.
+    for (let index = 0; index < 60; index += 1) holdsTheRingRule(starRing(next, 3 + (index % 18)));
+    for (let steps = 1; steps < 8; steps += 1) holdsTheRingRule(staircase(steps, 700, 1100));
   });
 
   it('refuses every ring the grammar refuses', () => {
