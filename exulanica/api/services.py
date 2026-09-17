@@ -174,6 +174,11 @@ class Services:
                 "the published material catalog is not readable here, so the /materials routes "
                 "answer 503 and no recipe can be created or baked."
             )
+        if self.character_appearance is None:
+            notes.append(
+                "the character catalog is not readable here, so saving a look answers 424 and a "
+                "person's chosen look lasts only as long as their browser keeps it."
+            )
         if self.runs_derivative_worker:
             notes.append(
                 "the derivative worker runs no depth model, so an uploaded photograph is a rung "
@@ -255,17 +260,19 @@ def build_services(
     client = model_client
     if client is None and environ.get("NEBIUS_API_KEY"):
         client = ModelClient()
+    store = LocalContentAddressedStore(data_dir / BLOB_NAMESPACE)
 
     return Services(
         database=database,
         readonly_database=Database(url=readonly_url) if readonly_url else database,
-        store=LocalContentAddressedStore(data_dir / BLOB_NAMESPACE),
+        store=store,
         tokens=tokens,
         executor_shares_the_write_role=readonly_url is None,
         model_client=client,
         accounts=accounts,
         environment_admission_root=data_dir / "environment-inbox",
         materials=_material_runtime(data_dir, environ),
+        character_appearance=_character_appearance_runtime(store, environ),
         runs_derivative_worker=_enabled(env_get("DERIVATIVE_WORKER", environ)),
         runs_society_control_worker=_explicitly_enabled(env_get("SOCIETY_CONTROL_WORKER", environ)),
         restore_state_path=(
@@ -288,6 +295,41 @@ def _material_runtime(data_dir: Path, environ: Mapping[str, str]) -> MaterialRun
     except FileNotFoundError:
         return None
     return MaterialRuntime(catalog=catalog, stores=material_stores(data_dir))
+
+
+def _character_appearance_runtime(
+    store: ContentAddressedStore, environ: Mapping[str, str]
+) -> CharacterAppearanceRuntime | None:
+    """Saved looks over the committed character catalog, when the catalog is here.
+
+    ``EXULANICA_CHARACTER_DIRECTORY`` names the catalog in an image; a checkout finds its own. Each
+    body's recipe family is derived from the catalog and its designed looks, and a family is
+    authorized exactly while this instance serves it. The containers a look composes are
+    reviewed assets, published by ``scripts/prepare_character_people.py --import --apply``. A
+    catalog and designed looks that disagree stop startup; only a missing catalog is an absence,
+    and ``warnings`` says so.
+    """
+    from exulanica.api.routes.character_appearance import CharacterAppearanceRuntime
+    from exulanica.world.character_appearance import (
+        catalog_recipe_families,
+        load_character_catalog,
+    )
+
+    directory = env_get("CHARACTER_DIRECTORY", environ)
+    try:
+        catalog, looks = (
+            load_character_catalog(Path(directory)) if directory else load_character_catalog()
+        )
+    except FileNotFoundError:
+        return None
+    families = catalog_recipe_families(catalog, looks)
+    served = frozenset(family.sha256 for family in families)
+    return CharacterAppearanceRuntime(
+        families=families,
+        authorize_family=lambda _connection, _session, family: family.sha256 in served,
+        store=store,
+        catalog=catalog,
+    )
 
 
 def _enabled(value: str | None) -> bool:
