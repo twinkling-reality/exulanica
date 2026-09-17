@@ -81,7 +81,7 @@ describe('loading a baked tile through tess\'s decoder', () => {
     expect(tile.ranges.some((range) => halo.includes(range.record))).toBe(false);
     const listed = header.entries.filter((entry) => entry.state !== 'not_in_projection' && entry.state !== 'halo').length;
     expect(tile.ranges).toHaveLength(listed);
-    expect(listed).toBe(62);
+    expect(listed).toBe(68);
     for (const range of tile.ranges) {
       if (range.state === 'drawn') continue;
       expect(range.state).toBe('unavailable');

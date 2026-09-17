@@ -391,6 +391,9 @@ const KIND_RULES: ReadonlyMap<string, KindRules> = new Map<string, KindRules>([
   ['city.facade', { render_batch: needs(NEEDS.facade_layout), nav_envelope: notInProjection, covers_ground: true }],
   ['city.ground_bay', { render_batch: needs(NEEDS.facade_layout), nav_envelope: notInProjection, covers_ground: true }],
   ['city.junction', { render_batch: needs(NEEDS.junction_fill), nav_envelope: needs(NEEDS.junction_fill), covers_ground: true }],
+  // A room's near wall inside its building, behind its glazing: laid out on its facade, standing on
+  // nothing, so it is no more a surface of the ground than the vitrine beside it.
+  ['city.interior_backing', { render_batch: needs(NEEDS.facade_layout), nav_envelope: notInProjection, covers_ground: true }],
   ['city.junction_approach', { render_batch: notInProjection, nav_envelope: notInProjection, covers_ground: false }],
   // A lane is a path on its segment's carriageway, and draws as that carriageway.
   ['city.lane', { render_batch: notInProjection, nav_envelope: notInProjection, covers_ground: true }],

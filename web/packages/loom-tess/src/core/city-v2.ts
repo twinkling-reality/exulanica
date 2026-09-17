@@ -73,6 +73,12 @@ export const CITY_V2: GrammarTable = {
       "obstruction": "none"
     },
     {
+      "kind": "city.interior_backing",
+      "ground": "none",
+      "cover": "none",
+      "obstruction": "none"
+    },
+    {
       "kind": "city.junction",
       "ground": "support",
       "cover": "none",
@@ -1317,6 +1323,76 @@ export const CITY_V2: GrammarTable = {
           },
           {
             "kind": "identity",
+            "name": "facade_identity",
+            "refers_to": [
+              "city.facade"
+            ]
+          },
+          {
+            "kind": "identity",
+            "name": "building_identity",
+            "refers_to": [
+              "city.massing"
+            ]
+          },
+          {
+            "kind": "integer",
+            "minimum": 0,
+            "name": "u_start_mm"
+          },
+          {
+            "kind": "integer",
+            "minimum": 1,
+            "name": "width_mm"
+          },
+          {
+            "kind": "integer",
+            "minimum": 0,
+            "name": "sill_mm"
+          },
+          {
+            "kind": "integer",
+            "minimum": 1,
+            "name": "height_mm"
+          },
+          {
+            "kind": "integer",
+            "maximum": 3000,
+            "minimum": 300,
+            "name": "depth_mm"
+          },
+          {
+            "kind": "integer",
+            "maximum": 1000000,
+            "minimum": 0,
+            "name": "light_level_millionths"
+          },
+          {
+            "kind": "record",
+            "name": "extent",
+            "shape": "Extent"
+          }
+        ],
+        "identity": {
+          "field": "identity",
+          "ordinal": 0,
+          "owner_field": "facade_identity",
+          "subject_kind": "interior_backing"
+        },
+        "kind": "city.interior_backing",
+        "rules": [],
+        "shape": "city.interior_backing",
+        "version": 1
+      },
+      {
+        "extent_field": "extent",
+        "fields": [
+          {
+            "kind": "identity",
+            "name": "identity"
+          },
+          {
+            "kind": "identity",
             "name": "node_identity",
             "refers_to": [
               "city.street_node"
@@ -1402,6 +1478,12 @@ export const CITY_V2: GrammarTable = {
             "maximum": 16,
             "minimum": 0,
             "name": "priority_rank"
+          },
+          {
+            "kind": "integer",
+            "maximum": 30000,
+            "minimum": 0,
+            "name": "turning_radius_mm"
           }
         ],
         "identity": {
@@ -1413,7 +1495,7 @@ export const CITY_V2: GrammarTable = {
         "kind": "city.junction_approach",
         "rules": [],
         "shape": "city.junction_approach",
-        "version": 1
+        "version": 2
       },
       {
         "extent_field": "extent",
@@ -2544,6 +2626,7 @@ export const CITY_V2: GrammarTable = {
               "city.crossing",
               "city.curb_edge",
               "city.facade",
+              "city.interior_backing",
               "city.junction",
               "city.massing",
               "city.parcel",
@@ -2564,6 +2647,7 @@ export const CITY_V2: GrammarTable = {
               "city.crossing",
               "city.curb_edge",
               "city.facade",
+              "city.interior_backing",
               "city.junction",
               "city.massing",
               "city.parcel",
@@ -2670,6 +2754,18 @@ export const CITY_V2: GrammarTable = {
             "maximum": 1000000,
             "minimum": 0,
             "name": "reveal_darkening_millionths"
+          },
+          {
+            "kind": "integer",
+            "maximum": 100000,
+            "minimum": 0,
+            "name": "soil_band_bottom_mm"
+          },
+          {
+            "kind": "integer",
+            "maximum": 100000,
+            "minimum": 0,
+            "name": "soil_band_edge_mm"
           }
         ],
         "identity": {
@@ -2710,7 +2806,8 @@ export const CITY_V2: GrammarTable = {
         },
         "kind": "city.surface_material",
         "rules": [
-          "material_role_owner"
+          "material_role_owner",
+          "soil_band_role"
         ],
         "shape": "city.surface_material",
         "version": 2

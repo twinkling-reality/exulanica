@@ -79,6 +79,9 @@ export function dressedTerrainObject(): any {
       repeat_size_millionths: 1_000_000,
       reveal_darkening_millionths: 0,
       role: 'terrain',
+      // Zero on every role but glazing, which the grammar's soil_band_role rule holds.
+      soil_band_bottom_mm: 0,
+      soil_band_edge_mm: 0,
       soiling_gradient_millionths: 0,
       surface_identity: terrain.fields.identity,
       surface_kind: 'city.terrain',
