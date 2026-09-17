@@ -188,7 +188,7 @@ describe('drawing a set by its material class', () => {
   const fixtureLibrary = () => new TileTextureLibrary(device(), TILE_LOOK_V1, fixtures, async (entry) =>
     new Uint8Array(readFileSync(`${CONFORMANCE}${entry.setId}.ltex`)), subtle);
 
-  it('draws opaque, cutout and glazing sets, and decal as the stated unavailable surface', async () => {
+  it('draws a set of every class the closed list names, by its class', async () => {
     const textures = fixtureLibrary();
     const drawn: Record<string, string> = {};
     for (const entry of fixtures.sets) {
@@ -198,14 +198,13 @@ describe('drawing a set by its material class', () => {
     }
     expect(drawn).toEqual({
       'fixture.cutout': 'available',
-      'fixture.decal': 'material class decal is not drawn by this runtime',
+      'fixture.decal': 'available',
       'fixture.glazing': 'available',
       'fixture.legacy-opaque': 'available',
       'fixture.model-opaque': 'available',
       'fixture.opaque': 'available',
     });
-    // Nothing of a class it does not draw is uploaded.
-    expect(textures.resolvedSetIds).toEqual(['fixture.cutout', 'fixture.glazing', 'fixture.legacy-opaque', 'fixture.model-opaque', 'fixture.opaque']);
+    expect(textures.resolvedSetIds).toEqual(['fixture.cutout', 'fixture.decal', 'fixture.glazing', 'fixture.legacy-opaque', 'fixture.model-opaque', 'fixture.opaque']);
     textures.destroy();
   });
 

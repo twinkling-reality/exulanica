@@ -93,9 +93,9 @@ describe('a glazing set as a material', () => {
     expect([...transmissionRoughnessTexels(new Uint8Array([255, 5, 128, 200]))]).toEqual([255, 5, 0, 255, 128, 200, 0, 255]);
   });
 
-  it('keeps shadows for every class but glazing', () => {
-    for (const materialClass of ['opaque', 'cutout', 'decal'] as const) expect(castsShadow({ materialClass })).toBe(true);
-    expect(castsShadow({ materialClass: 'glazing' })).toBe(false);
+  it('keeps shadows for opaque and cutout, and casts none for glazing or decal', () => {
+    for (const materialClass of ['opaque', 'cutout'] as const) expect(castsShadow({ materialClass })).toBe(true);
+    for (const materialClass of ['glazing', 'decal'] as const) expect(castsShadow({ materialClass })).toBe(false);
   });
 });
 

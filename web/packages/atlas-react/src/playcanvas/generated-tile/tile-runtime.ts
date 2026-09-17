@@ -22,6 +22,7 @@ import { buildSurfaceMesh } from './surface-mesh.js';
 import {
   TileTextureUploads,
   castsShadow,
+  drawBucket,
   prepareTextureSet,
   surfaceUv,
   unavailableUv,
@@ -523,11 +524,13 @@ function attachTile(
   for (const batch of batches) {
     let material: pc.Material = uploads.unavailableMaterial;
     let shadows = true;
+    let bucket: number | null = null;
     if (batch.key !== '') {
       const resolution = uploads.adopt(prepared.get(batch.key)!);
       if (resolution.state !== 'available') throw new Error(`Texture set ${batch.key} was prepared and then refused`);
       material = resolution.material;
       shadows = castsShadow(resolution.set);
+      bucket = drawBucket(resolution.set);
       // Glazing transmits what the scene drew behind it, which needs the colour copied before it draws.
       if (resolution.set.materialClass === 'glazing') environment.requestSceneColor();
     }
@@ -535,8 +538,11 @@ function attachTile(
     const mesh = buildSurfaceMesh(device, { ...batch, surfaceMm: batch.uvs }, (u, v) => [u, v]);
     meshes.push(mesh);
     const entity = new pc.Entity(batch.key === '' ? 'generated-tile:unavailable-surfaces' : `generated-tile:${batch.key}`);
+    const instance = new pc.MeshInstance(mesh, material, entity);
+    // Decal before glazing among blended surfaces; within one set, triangles draw in record order.
+    if (bucket !== null) instance.drawBucket = bucket;
     entity.addComponent('render', {
-      meshInstances: [new pc.MeshInstance(mesh, material, entity)],
+      meshInstances: [instance],
       castShadows: shadows,
       receiveShadows: batch.key !== '',
     });

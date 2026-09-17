@@ -30,10 +30,13 @@ import { createUnavailableMaterial } from './unavailable-surface.js';
  * the repeat length, so a non-square set (the kerb is 1800 by 450 mm) keeps its proportions under
  * rotation. There is no other scale anywhere, and no constant that guesses one.
  *
- * WHAT A SET BECOMES. A set is drawn by its material class and by nothing else. This runtime draws
- * `opaque`, `cutout` and `glazing` sets, of either container profile; `decal` is the stated
- * unavailable surface with the reason {@link undrawnClassReason} gives, and glazing is never drawn as
- * opaque. For an opaque set, base_color is uploaded as sRGB; normal, orm and height as linear
+ * WHAT A SET BECOMES. A set is drawn by its material class and by nothing else. This runtime draws all
+ * four classes, `opaque`, `cutout`, `decal` and `glazing`, of either container profile; a class added
+ * to the closed list later is the stated unavailable surface with the reason {@link undrawnClassReason}
+ * gives until it is taught here, and glazing is never drawn as opaque. A decal set is glTF's
+ * `alphaMode: BLEND` laid over another surface: blended by its coverage, depth tested with no depth
+ * write, pulled toward the camera by a depth bias, lit with its own maps, receiving shadows and casting
+ * none, drawn after opaque and cutout surfaces and before glazing ({@link drawBucket}). For an opaque set, base_color is uploaded as sRGB; normal, orm and height as linear
  * bytes. A glazing set is metallic-roughness with metalness 0 plus glTF's transmission and index of
  * refraction: it reflects the environment and the sun by angle, transmits what the scene drew behind
  * it (a copy the environment keeps when glazing is drawn), tinted by its base colour and blurred by
@@ -148,13 +151,36 @@ function rgbToRgba(rgb: Uint8Array): Uint8Array {
 
 /** Why a decoded set is not drawn by this runtime, or null when its class is one it draws. */
 export function undrawnClassReason(set: Pick<DecodedTextureSet, 'materialClass'>): string | null {
-  return set.materialClass === 'decal' ? `material class ${set.materialClass} is not drawn by this runtime` : null;
+  return DRAWN_CLASSES.includes(set.materialClass) ? null : `material class ${set.materialClass} is not drawn by this runtime`;
 }
 
-/** Whether surfaces of this class cast shadows: glazing casts none. */
+/** The classes this runtime draws. A class added to the closed list draws unavailable until it is added here. */
+const DRAWN_CLASSES: readonly DecodedTextureSet['materialClass'][] = ['opaque', 'cutout', 'decal', 'glazing'];
+
+/** Whether surfaces of this class cast shadows: glazing and decal cast none. */
 export function castsShadow(set: Pick<DecodedTextureSet, 'materialClass'>): boolean {
-  return set.materialClass !== 'glazing';
+  return set.materialClass !== 'glazing' && set.materialClass !== 'decal';
 }
+
+/**
+ * Where a class draws among blended surfaces. The engine's back-to-front pass sorts by bucket before
+ * distance and draws higher buckets first, around its default of 127: decal after every opaque and
+ * cutout surface and before other blended content, glazing after it, so what decal lies behind a pane is
+ * drawn before the pane. Opaque and cutout keep the default.
+ */
+export const DECAL_DRAW_BUCKET = 160;
+export const GLAZING_DRAW_BUCKET = 96;
+export function drawBucket(set: Pick<DecodedTextureSet, 'materialClass'>): number | null {
+  return set.materialClass === 'decal' ? DECAL_DRAW_BUCKET : set.materialClass === 'glazing' ? GLAZING_DRAW_BUCKET : null;
+}
+
+/**
+ * How far a decal is pulled toward the camera so it stays in front of the coplanar surface it lies on,
+ * in the depth buffer's own units: a constant offset and one that grows with the surface's slope to the
+ * view, which is what holds at eye level along a road. Measured on the bench (evidence/decal-acceptance).
+ */
+export const DECAL_DEPTH_BIAS = -1;
+export const DECAL_SLOPE_DEPTH_BIAS = -2;
 
 /** The transmission and roughness map as RGBA: transmission in red, roughness in green. */
 export function transmissionRoughnessTexels(bytes: Uint8Array): Uint8Array {
@@ -328,13 +354,17 @@ export class TileTextureUploads {
     });
     if (undrawnClassReason(set) !== null) throw new Error(`Texture set ${entry.setId} is ${set.materialClass}, which this runtime does not draw`);
     const cutout = set.classParameters.materialClass === 'cutout' ? set.classParameters : null;
+    const decal = set.classParameters.materialClass === 'decal' ? set.classParameters : null;
     // sRGB8 without alpha cannot generate mipmaps on WebGL2, so every colour map carries an alpha
-    // channel: opaque for an opaque set, the coverage for a cutout, whose chain keeps its coverage.
-    const baseColor = cutout === null
-      ? texture('base_color', pc.PIXELFORMAT_SRGBA8, rgbToRgba(requiredMap(set, 'base_color')))
-      : texture('base_color_coverage', pc.PIXELFORMAT_SRGBA8, coveragePreservingMips(
+    // channel: opaque for an opaque set; the coverage for a cutout, whose chain keeps its coverage;
+    // the coverage for a decal, which is blended by it, so plain averaged levels are right.
+    const baseColor = cutout !== null
+      ? texture('base_color_coverage', pc.PIXELFORMAT_SRGBA8, coveragePreservingMips(
         requiredMap(set, 'base_color_coverage'), width, height, cutout.alphaCutoff, cutout.coveragePermille,
-      ));
+      ))
+      : decal !== null
+        ? texture('base_color_coverage', pc.PIXELFORMAT_SRGBA8, requiredMap(set, 'base_color_coverage'))
+        : texture('base_color', pc.PIXELFORMAT_SRGBA8, rgbToRgba(requiredMap(set, 'base_color')));
     const normalBytes = normalTexels(set);
     const normal = normalBytes === null ? null : texture('normal', pc.PIXELFORMAT_RGBA8, normalBytes);
     const glazing = set.classParameters.materialClass === 'glazing' ? set.classParameters : null;
@@ -397,6 +427,17 @@ export class TileTextureUploads {
       // glTF doubleSided: both faces drawn and lit, a back face with its normal reversed.
       material.cull = cutout.doubleSided ? pc.CULLFACE_NONE : pc.CULLFACE_BACK;
       material.twoSidedLighting = cutout.doubleSided;
+    }
+    if (decal !== null) {
+      // glTF alphaMode BLEND over the surface it lies on: source over by coverage, depth tested, no
+      // depth write, pulled toward the camera so the coplanar surface never shows through, lit with its
+      // own maps, receiving shadows and casting none. It draws after opaque and cutout surfaces.
+      material.opacityMap = baseColor;
+      material.opacityMapChannel = 'a';
+      material.blendType = pc.BLEND_NORMAL;
+      material.depthWrite = false;
+      material.depthBias = DECAL_DEPTH_BIAS;
+      material.slopeDepthBias = DECAL_SLOPE_DEPTH_BIAS;
     }
     if (this.look.surface.parallax && set.maps.height !== undefined) {
       const heightMap = texture('height', pc.PIXELFORMAT_R8, requiredMap(set, 'height'));
