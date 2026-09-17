@@ -20,7 +20,7 @@
  * outside the obstructions themselves.
  */
 import { bigFloorQuotient, exact, GeometryError, multiply, subtract } from './integer-math.js';
-import type { Plan } from './integer-math.js';
+import type { Plan, Space } from './integer-math.js';
 import { sideOf, uncoveredRegions } from './plan-arrangement.js';
 import type { RationalPoint } from './plan-arrangement.js';
 
@@ -45,6 +45,18 @@ export function withArea(obstructions: readonly ObstructionTriangle[], where: st
   return out;
 }
 
+/** The height at an integer plan point on the plane through a piece's first three corners, floored. */
+export function heightOnPlane(corners: readonly Space[], point: Plan, where: string): number {
+  const [a, b, c] = corners as [Space, Space, Space];
+  const plan = (space: Space): Plan => [space[0], space[1]];
+  const whole = BigInt(twiceArea(plan(a), plan(b), plan(c), where));
+  if (whole <= 0n) throw new GeometryError(`${where} takes heights from a piece of no area`);
+  const weighted = BigInt(a[2]) * BigInt(twiceArea(point, plan(b), plan(c), where))
+    + BigInt(b[2]) * BigInt(twiceArea(plan(a), point, plan(c), where))
+    + BigInt(c[2]) * BigInt(twiceArea(plan(a), plan(b), point, where));
+  return exact(Number(bigFloorQuotient(weighted, whole)), where);
+}
+
 /** A piece's rows, step 1: the distinct heights of the obstruction vertices in the closed piece, ascending. */
 function rowsOf(piece: readonly Plan[], obstructions: readonly ObstructionTriangle[], where: string): number[] {
   const rows = new Set<number>();
@@ -67,7 +79,7 @@ const lessPoint = (a: Plan, b: Plan): number => (a[0] !== b[0] ? a[0] - b[0] : a
  * The convex hull of integer points, counter-clockwise, keeping every point that lies along an edge
  * of it, so a neighbour that holds the same points on a shared line meets it vertex to vertex.
  */
-function hullKeepingEdges(points: readonly Plan[], where: string): Plan[] {
+export function hullKeepingEdges(points: readonly Plan[], where: string): Plan[] {
   const sorted = [...points].sort(lessPoint).filter((point, index, all) => index === 0 ? true : lessPoint(point, all[index - 1]!) !== 0);
   if (sorted.length < 3) return [];
   const chain = (ordered: readonly Plan[]): Plan[] => {

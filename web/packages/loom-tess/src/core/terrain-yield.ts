@@ -45,9 +45,9 @@
  * Met cells follow the untouched grid, in row-major order of cells, then pieces, then faces in the
  * arrangement's order.
  */
-import { add, bigFloorQuotient, exact, floorDivide, GeometryError, multiply, subtract } from './integer-math.js';
+import { add, floorDivide, multiply, subtract } from './integer-math.js';
 import type { Plan, Space } from './integer-math.js';
-import { carvedPiece, twiceArea, withArea } from './piece-carve.js';
+import { carvedPiece, heightOnPlane, twiceArea, withArea } from './piece-carve.js';
 import type { ObstructionTriangle } from './piece-carve.js';
 import { triangulateRing } from './ring-triangulation.js';
 
@@ -119,18 +119,6 @@ export function metCells(patch: TerrainPatch, coverings: readonly CoveringTriang
   return met;
 }
 
-/** The height at an integer plan point on the plane through three corners, floored. */
-function heightOn(corners: readonly Space[], point: Plan, where: string): number {
-  const [a, b, c] = corners as [Space, Space, Space];
-  const plan = (space: Space): Plan => [space[0], space[1]];
-  const whole = BigInt(twiceArea(plan(a), plan(b), plan(c), where));
-  if (whole <= 0n) throw new GeometryError(`${where} takes heights from a piece of no area`);
-  const weighted = BigInt(a[2]) * BigInt(twiceArea(point, plan(b), plan(c), where))
-    + BigInt(b[2]) * BigInt(twiceArea(plan(a), point, plan(c), where))
-    + BigInt(c[2]) * BigInt(twiceArea(plan(a), plan(b), point, where));
-  return exact(Number(bigFloorQuotient(weighted, whole)), where);
-}
-
 /** A met cell's terrain, by the terrain yield rule. */
 export function yieldedCell(
   patch: TerrainPatch,
@@ -156,7 +144,7 @@ export function yieldedCell(
     const ring: Plan[] = piece.map((corner) => [corner[0], corner[1]]);
     for (const hull of carvedPiece(ring, coverings, where)) {
       const first = vertices.length;
-      for (const point of hull) vertices.push([point[0], point[1], heightOn(piece, point, where)]);
+      for (const point of hull) vertices.push([point[0], point[1], heightOnPlane(piece, point, where)]);
       for (const index of triangulateRing(hull, where)) triangles.push(first + index);
     }
   }
