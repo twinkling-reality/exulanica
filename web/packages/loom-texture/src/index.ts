@@ -52,6 +52,7 @@ export {
   TRUTH,
   decodeContainer,
   encodeContainer,
+  encodeContainerV2,
   frameContainer,
   readContainer,
 } from './container.js';
@@ -98,7 +99,7 @@ export {
 export { LICENCE_ID, LICENCE_TEXT, licenceBytes } from './licence.js';
 export type { Maker } from './maker.js';
 export { MAKERS, makerFor } from './makers/index.js';
-export { type Fields, type Maps, bakeMaps, sampleFields } from './maps.js';
+export { type Fields, type Maps, bakeClassMaps, bakeMaps, classMaps, sampleFields } from './maps.js';
 export {
   BAKE_PIPELINE,
   BAKE_RECEIPT_PROFILE,

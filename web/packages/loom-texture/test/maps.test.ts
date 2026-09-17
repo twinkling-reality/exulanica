@@ -85,6 +85,8 @@ describe('the normal map follows the glTF convention', () => {
       roughness: zero,
       metalness: zero,
       occlusion: zero,
+      coverage: zero,
+      transmission: zero,
     };
   };
   const at = (normal: Uint8Array, x: number, y: number) => {

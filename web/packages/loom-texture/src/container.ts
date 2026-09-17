@@ -1,5 +1,6 @@
 import { canonicalBytes, canonicalJson } from './canonical-json.js';
 import {
+  type FramedMap,
   MATERIAL_CLASSES,
   MAKER_KINDS,
   type MakerKind,
@@ -112,6 +113,9 @@ function headerBody(
   def: TextureSetDefinition,
   licenceSha256: string,
 ): Record<string, unknown> {
+  if (def.containerProfile !== SET_PROFILE_V1 || def.heightRangeMm === null || def.cavity === null) {
+    throw new Error(`${def.setId} is not a v1 set; encodeContainerV2 writes a set that states its class`);
+  }
   return {
     profile: SET_PROFILE,
     media_type: MEDIA_TYPE,
@@ -154,11 +158,7 @@ function mapBytes(maps: Maps, name: string): Uint8Array {
   }
 }
 
-/** One map to frame: how the header states it, and its bytes. */
-export interface FramedMap {
-  readonly descriptor: MapDescriptor;
-  readonly bytes: Uint8Array;
-}
+export type { FramedMap } from './classes.js';
 
 /**
  * Frame a header body and its maps: preamble, canonical header, space padding, contiguous maps.
@@ -225,6 +225,69 @@ export function encodeContainer(
     return { descriptor: layout, bytes };
   });
   return frameContainer(headerBody(def, licenceSha256), framed);
+}
+
+/**
+ * A v2 set of a procedural maker: the header states its class, its maker's kind and what its class
+ * fixes, and the maps are its class layout. The writer reads back what it wrote, so it never writes
+ * a container its own reader would refuse.
+ */
+export function encodeContainerV2(
+  def: TextureSetDefinition,
+  maps: readonly FramedMap[],
+  licenceSha256: string,
+): Uint8Array {
+  if (def.containerProfile !== SET_PROFILE_V2) {
+    throw new Error(`${def.setId} is a v1 set; encodeContainer writes it`);
+  }
+  const texels = def.width * def.height;
+  for (const map of maps) {
+    if (map.bytes.length !== texels * map.descriptor.components) {
+      throw new Error(
+        `${def.setId} is ${def.width}x${def.height}; its ${map.descriptor.name} holds ${map.bytes.length} bytes, `
+          + 'so the bake is a preview, not the set',
+      );
+    }
+  }
+  const colour = maps.find((map) => map.descriptor.name === 'base_color_coverage');
+  const relief = def.heightRangeMm !== null && def.cavity !== null
+    ? {
+      height_range_mm: def.heightRangeMm,
+      cavity: {
+        radius_mm: def.cavity.radiusMm,
+        depth_mm: def.cavity.depthMm,
+        strength_permille: def.cavity.strengthPermille,
+      },
+    }
+    : {};
+  const bytes = frameContainer(
+    {
+      profile: SET_PROFILE_V2,
+      media_type: MEDIA_TYPE,
+      generator: GENERATOR,
+      set_id: def.setId,
+      version: def.version,
+      seed: def.seed,
+      family: def.family,
+      title: def.title,
+      summary: def.summary,
+      truth: TRUTH,
+      licence: { id: def.licenceId, sha256: licenceSha256 },
+      resolution: { width: def.width, height: def.height },
+      extent_mm: { u: def.extentU, v: def.extentV },
+      placement: placement(def.surface),
+      layout: TEXEL_LAYOUT,
+      tiling: TILING,
+      parameters: def.parameters,
+      material_class: def.materialClass,
+      maker_kind: 'procedural',
+      class: classParameters(def.materialClass, colour === undefined ? null : coveragePermille(colour.bytes)),
+      ...relief,
+    },
+    maps,
+  );
+  readContainer(bytes);
+  return bytes;
 }
 
 /** Every key a v2 header holds whatever its class and maker. */

@@ -131,9 +131,12 @@ function checkDefinition(def: TextureSetDefinition): void {
     height: def.height,
     extentU: def.extentU,
     extentV: def.extentV,
-    heightRangeMm: def.heightRangeMm,
+    ...(def.materialClass === 'glazing' ? {} : { heightRangeMm: def.heightRangeMm }),
   })) {
-    if (!positive(value)) problems.push(`${name} is a positive integer, got ${value}`);
+    if (value === null || !positive(value)) problems.push(`${name} is a positive integer, got ${value}`);
+  }
+  if (def.materialClass === 'glazing' && (def.heightRangeMm !== null || def.cavity !== null)) {
+    problems.push('a glazing set bakes no height field, so it states no height range or cavity');
   }
   if (problems.length > 0) throw new Error(`${def.setId}: ${problems.join('; ')}`);
 }

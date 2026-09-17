@@ -1,8 +1,9 @@
+import { RELIEF_CLASSES, SET_PROFILE_V1, SET_PROFILE_V2 } from './classes.js';
 import { cavityOf, heightRangeOf } from './controls.js';
 import type { TextureSetDefinition } from './definition.js';
 import { type LibrarySet, readLibrary } from './library.js';
 import type { Maker } from './maker.js';
-import type { Recipe } from './recipe.js';
+import { MAKER_PROFILE, type Recipe, materialClassOf } from './recipe.js';
 
 /**
  * The published sets, as the bake reads them.
@@ -44,6 +45,11 @@ export function recipeDefinition(
   recipe: Recipe,
   maker: Maker,
 ): TextureSetDefinition {
+  if (maker.manifest.kind === 'model') {
+    throw new Error(`${maker.manifest.maker_id} is model-made; its sets are imported as made, never baked`);
+  }
+  const materialClass = materialClassOf(maker.manifest);
+  const relief = RELIEF_CLASSES.includes(materialClass);
   return {
     ...identity,
     seed: recipe.seed,
@@ -53,8 +59,10 @@ export function recipeDefinition(
     extentU: recipe.extent_mm.u,
     extentV: recipe.extent_mm.v,
     surface: maker.manifest.surface,
-    heightRangeMm: heightRangeOf(recipe),
-    cavity: cavityOf(recipe),
+    containerProfile: maker.manifest.profile === MAKER_PROFILE ? SET_PROFILE_V1 : SET_PROFILE_V2,
+    materialClass,
+    heightRangeMm: relief ? heightRangeOf(recipe) : null,
+    cavity: relief ? cavityOf(recipe) : null,
     parameters: maker.stated(recipe),
     pattern: () => maker.pattern(recipe),
   };

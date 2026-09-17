@@ -1,3 +1,4 @@
+import type { MaterialClass, SetProfile } from './classes.js';
 import type { Pattern } from './sample.js';
 
 /**
@@ -41,10 +42,16 @@ export interface TextureSetDefinition {
    * up is toward row 0. `horizontal`: u runs along the carriageway, footway or kerb and v across it.
    */
   readonly surface: 'vertical' | 'horizontal';
-  /** Millimetres between height 0 and height 255. */
-  readonly heightRangeMm: number;
-  /** How the bake measures occlusion from the height field. */
-  readonly cavity: CavitySpec;
+  /**
+   * The container the set is baked into: `exulanica.texture-set/v1` for a v1 maker's set, which is
+   * always opaque, or `exulanica.texture-set/v2` for a maker that states its class.
+   */
+  readonly containerProfile: SetProfile;
+  readonly materialClass: MaterialClass;
+  /** Millimetres between height 0 and height 255. Null for a class whose bake has no height field. */
+  readonly heightRangeMm: number | null;
+  /** How the bake measures occlusion from the height field. Null where there is no height field. */
+  readonly cavity: CavitySpec | null;
   /** What the recipe reads, stated in the header so a reader can see the module it was built on. */
   readonly parameters: Readonly<Record<string, number | string>>;
   /** Build the pattern. Called once per bake, so a pattern may hold scratch state. */

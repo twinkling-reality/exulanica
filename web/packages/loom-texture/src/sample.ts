@@ -20,10 +20,31 @@ export interface Sample {
    * multiplies in the cavity term it measures from the height field itself.
    */
   occlusion: number;
+  /**
+   * How much of the point is covered, FULL for all of it: a leaf or the paint, where the rest is a
+   * gap or the surface beneath. Read only for the classes that store coverage, and a maker of such
+   * a class sets it on every call.
+   */
+  coverage: number;
+  /**
+   * How much of the light the surface does not reflect passes through it, FULL for clean glass.
+   * Read only for glazing, and a glazing maker sets it on every call.
+   */
+  transmission: number;
 }
 
 export function newSample(): Sample {
-  return { height: 0, red: 0, green: 0, blue: 0, roughness: 0, metalness: 0, occlusion: ONE };
+  return {
+    height: 0,
+    red: 0,
+    green: 0,
+    blue: 0,
+    roughness: 0,
+    metalness: 0,
+    occlusion: ONE,
+    coverage: 0,
+    transmission: 0,
+  };
 }
 
 /**

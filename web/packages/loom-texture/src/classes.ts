@@ -127,6 +127,12 @@ export const HEIGHT: MapDescriptor = {
   decode: 'mm = b * height_range_mm / 255, above the lowest point the set can hold',
 };
 
+/** One map to frame: how the header states it, and its bytes. */
+export interface FramedMap {
+  readonly descriptor: MapDescriptor;
+  readonly bytes: Uint8Array;
+}
+
 /** `exulanica.texture-set/v1`: the only v1 layout, and every v1 set is `opaque`. */
 export const V1_LAYOUT: readonly MapDescriptor[] = [BASE_COLOR, NORMAL_XYZ, ORM, HEIGHT];
 

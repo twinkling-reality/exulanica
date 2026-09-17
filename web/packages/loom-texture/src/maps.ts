@@ -1,3 +1,9 @@
+import {
+  type FramedMap,
+  type MapDescriptor,
+  SET_PROFILE_V2,
+  classLayout,
+} from './classes.js';
 import type { TextureSetDefinition } from './definition.js';
 import { FULL, ONE, clamp, floorDiv, isqrt, roundDiv } from './integer.js';
 import { newSample } from './sample.js';
@@ -23,6 +29,8 @@ export interface Fields {
   readonly roughness: Uint16Array;
   readonly metalness: Uint16Array;
   readonly occlusion: Uint16Array;
+  readonly coverage: Uint16Array;
+  readonly transmission: Uint16Array;
 }
 
 export interface SampleOptions {
@@ -51,6 +59,8 @@ export function sampleFields(def: TextureSetDefinition, options: SampleOptions =
     roughness: new Uint16Array(count),
     metalness: new Uint16Array(count),
     occlusion: new Uint16Array(count),
+    coverage: new Uint16Array(count),
+    transmission: new Uint16Array(count),
   };
   const pattern = def.pattern();
   const sample = newSample();
@@ -69,6 +79,8 @@ export function sampleFields(def: TextureSetDefinition, options: SampleOptions =
       fields.roughness[index] = channel(sample.roughness);
       fields.metalness[index] = channel(sample.metalness);
       fields.occlusion[index] = channel(sample.occlusion);
+      fields.coverage[index] = channel(sample.coverage);
+      fields.transmission[index] = channel(sample.transmission);
     }
   }
   return fields;
@@ -86,6 +98,7 @@ export function normalMap(fields: Fields, def: TextureSetDefinition): Uint8Array
   const { width, height, relief } = fields;
   const out = new Uint8Array(width * height * 3);
   const range = def.heightRangeMm;
+  if (range === null) throw new Error(`${def.setId} bakes no height field, so it has no normals`);
   const denominatorU = 2 * FULL * def.extentU;
   const denominatorV = 2 * FULL * def.extentV;
   for (let j = 0; j < height; j += 1) {
@@ -164,6 +177,9 @@ function boxBlur(
  */
 export function cavityFactor(fields: Fields, def: TextureSetDefinition): Uint16Array {
   const { width, height, relief } = fields;
+  if (def.cavity === null || def.heightRangeMm === null) {
+    throw new Error(`${def.setId} bakes no height field, so it measures no cavity`);
+  }
   const { radiusMm, depthMm, strengthPermille } = def.cavity;
   const radiusU = Math.max(1, roundDiv(radiusMm * width, def.extentU));
   const radiusV = Math.max(1, roundDiv(radiusMm * height, def.extentV));
@@ -222,4 +238,64 @@ export function quantise(fields: Fields, def: TextureSetDefinition): Maps {
 /** Sample, derive and quantise: the whole bake of one set, short of its container. */
 export function bakeMaps(def: TextureSetDefinition, options: SampleOptions = {}): Maps {
   return quantise(sampleFields(def, options), def);
+}
+
+/**
+ * The maps a v2 set of a procedural maker stores, in its class layout's order.
+ *
+ * Every derivation is the v1 bake's: base colour through the sRGB table, roughness and metalness to
+ * a byte, occlusion times the cavity the height field shows, and the normal from the height field.
+ * What differs is what is kept. A relief class keeps the normal's x and y, which are the same bytes
+ * the v1 normal map holds, and drops z and the height map, which rebake exactly from the recipe;
+ * `cutout` and `decal` store coverage beside the colour; glazing stores transmission beside
+ * roughness and has no height field at all.
+ */
+export function classMaps(fields: Fields, def: TextureSetDefinition): FramedMap[] {
+  if (def.containerProfile !== SET_PROFILE_V2) {
+    throw new Error(`${def.setId} is a v1 set; bakeMaps and encodeContainer make it`);
+  }
+  const { width, height } = fields;
+  const count = width * height;
+  const layout = classLayout(def.materialClass, 'procedural');
+  const coverage = def.materialClass === 'cutout' || def.materialClass === 'decal';
+  const colour = new Uint8Array(count * (coverage ? 4 : 3));
+  for (let index = 0; index < count; index += 1) {
+    const at = index * (coverage ? 4 : 3);
+    colour[at] = encodeChannel(fields.red[index]!);
+    colour[at + 1] = encodeChannel(fields.green[index]!);
+    colour[at + 2] = encodeChannel(fields.blue[index]!);
+    if (coverage) colour[at + 3] = toByte(fields.coverage[index]!);
+  }
+  const bytes = new Map<string, Uint8Array>([[layout[0]!.name, colour]]);
+  if (def.materialClass === 'glazing') {
+    const surface = new Uint8Array(count * 2);
+    for (let index = 0; index < count; index += 1) {
+      surface[index * 2] = toByte(fields.transmission[index]!);
+      surface[index * 2 + 1] = toByte(fields.roughness[index]!);
+    }
+    bytes.set('transmission_roughness', surface);
+  } else {
+    const cavity = cavityFactor(fields, def);
+    const orm = new Uint8Array(count * 3);
+    for (let index = 0; index < count; index += 1) {
+      const at = index * 3;
+      orm[at] = toByte(floorDiv(fields.occlusion[index]! * cavity[index]!, ONE));
+      orm[at + 1] = toByte(fields.roughness[index]!);
+      orm[at + 2] = toByte(fields.metalness[index]!);
+    }
+    const full = normalMap(fields, def);
+    const normal = new Uint8Array(count * 2);
+    for (let index = 0; index < count; index += 1) {
+      normal[index * 2] = full[index * 3]!;
+      normal[index * 2 + 1] = full[index * 3 + 1]!;
+    }
+    bytes.set('normal', normal);
+    bytes.set('orm', orm);
+  }
+  return layout.map((descriptor: MapDescriptor) => ({ descriptor, bytes: bytes.get(descriptor.name)! }));
+}
+
+/** Sample and derive a v2 procedural set: its maps, in stored order, short of its container. */
+export function bakeClassMaps(def: TextureSetDefinition, options: SampleOptions = {}): FramedMap[] {
+  return classMaps(sampleFields(def, options), def);
 }

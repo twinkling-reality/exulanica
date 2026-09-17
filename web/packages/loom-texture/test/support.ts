@@ -87,6 +87,8 @@ export const FIELD_NAMES = [
   'roughness',
   'metalness',
   'occlusion',
+  'coverage',
+  'transmission',
 ] as const satisfies readonly (keyof Fields)[];
 
 /** Where `shifted` disagrees with `base` rolled by (du, dv), as a count per named plane. */
