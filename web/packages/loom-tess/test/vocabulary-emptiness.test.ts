@@ -47,9 +47,10 @@ const ANYWHERE = new Set([0, 1, 2, 3]);
  * 4 bytes in an int32, float32 or uint32; 8 bytes in a preamble or an int64; 9 coordinates in a
  * triangle; 6 surface coordinates in a triangle; 16, ADR-0010's alignment; 1000 millimetres in a
  * metre; 0x20 and 0x7e, printable ASCII's bounds; 0x7fffffff and 0x100000000, int32's largest value
- * and uint32's size.
+ * and uint32's size; 1_000_000, the millionths of a millimetre the grammar's corner rule measures a
+ * kerb piece's length in (`document._CORNER_LENGTH_SCALE`).
  */
-const NAMED_ONLY = new Set([4, 6, 8, 9, 16, 1000, 0x20, 0x7e, 0x7fffffff, 0x100000000]);
+const NAMED_ONLY = new Set([4, 6, 8, 9, 16, 1000, 1_000_000, 0x20, 0x7e, 0x7fffffff, 0x100000000]);
 
 /** Typology, era, material, use and element words, beyond what the data files name. */
 const WRITTEN_WORDS = [

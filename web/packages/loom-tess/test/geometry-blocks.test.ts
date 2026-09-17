@@ -5,7 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { FACING_LIMIT_MM, turnByFacing } from '../src/core/facing.js';
-import { filletArc, filletCentre, filletSegmentsWithin } from '../src/core/fillet-arc.js';
+import { alongByCornerRule, cornerCentre, filletArc, filletCentre, filletSegmentsWithin } from '../src/core/fillet-arc.js';
 import { absolute, cross, floorDivide, floorSquareRoot, GeometryError, multiply } from '../src/core/integer-math.js';
 import type { Plan, Space } from '../src/core/integer-math.js';
 import { ringTwiceArea, requireSimpleRing, triangulateRing, triangulateRingWithHoles } from '../src/core/ring-triangulation.js';
@@ -294,11 +294,53 @@ describe('the ring rule with holes', () => {
   });
 });
 
+/** The corner rule's arc on a piece whose components pass a kilometre, which the facing limit refuses. */
+const ARC_OVER_A_KILOMETRE: Space[] = [
+  [5000000, 7000000, 0],
+  [5012316, 6984869, 0],
+  [5029485, 6975604, 0],
+  [5048892, 6973615, 0],
+  [5067584, 6979205, 0],
+];
+
 describe('the fillet arc rule', () => {
   // A kerb line travels east to (1000, 0), turns left round a 2000 mm corner, and leaves north
   // from (3000, 2000): the centre is (1000, 2000).
   const p: Space = [1000, 0, -100];
   const q: Space = [3000, 2000, -60];
+
+  it('finds each tangent point\'s centre exactly as the grammar\'s corner rule does', () => {
+    // Computed by exulanica.grammar.grammars.city.document._corner_centre at lane 20's cc09474b,
+    // for these same arguments. The Python test holds this parity directly once the base carries it.
+    const cases: [Plan, Plan, number, 1 | -1, Plan][] = [
+      [[1000, 0], [5, 0], 2000, 1, [1000, 2000]],
+      [[3000, 2000], [0, 3], 2000, 1, [1000, 2000]],
+      [[3000, -4000], [4, 3], 5000, 1, [0, 0]],
+      [[4010, 3010], [-3010, 4010], 5000, 1, [11, 8]],
+      [[1000, 0], [1, 0], 2000, -1, [1000, -2000]],
+      [[123457, -98765], [-7, 13], 3001, -1, [126099, -97343]],
+      [[5_000_000, 7_000_000], [900_001, -1_700_003], 50_000, 1, [5044189, 7023394]],
+      [[0, 0], [1, 1], 1, 1, [-1, 0]],
+    ];
+    for (const [point, direction, radius, turn, centre] of cases) {
+      expect(cornerCentre(point, direction, radius, turn, 'case'), `${point} ${direction}`).toEqual(centre);
+    }
+  });
+
+  it('turns a corner on a kerb piece over a kilometre long', () => {
+    const into: Plan = [900_001, -1_700_003];
+    const out: Plan = [1_700_003, 900_001];
+    const p: Space = [5_000_000, 7_000_000, 0];
+    const centre = cornerCentre([p[0], p[1]], into, 50_000, 1, 'case');
+    const back = alongByCornerRule([-out[1], out[0]], 50_000, 'case');
+    const q: Space = [centre[0] - back[0], centre[1] - back[1], 0];
+    const arc = filletArc(p, into, q, out, 50_000, 4, 'case');
+    const found = filletCentre(p, into, q, out, 50_000, 'case');
+    for (const point of arc) {
+      expect(Math.abs(Math.hypot(point[0] - found[0], point[1] - found[1]) - 50_000)).toBeLessThanOrEqual(2);
+    }
+    expect(arc).toEqual(ARC_OVER_A_KILOMETRE);
+  });
 
   it('finds the centre on the turning side, from both tangent points', () => {
     expect(filletCentre(p, [5, 0], q, [0, 3], 2000, 'case')).toEqual([1000, 2000]);
