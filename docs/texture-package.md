@@ -251,7 +251,16 @@ dedication, the 32 objects, the manifest, the catalog and `.gitattributes`) was 
 way: 0 differ, the manifest and every set are the same bytes as in the first record, and the x86_64
 run, which executes the compiled output, found the library through the package root. The package's
 `test/published.test.ts` rebakes the whole library on every test run and compares each committed
-file byte for byte, and `tests/test_texture_sets.py` holds both records to the committed files.
+file byte for byte.
+
+Both records are of the library before batch 1, whose manifest was `exulanica.texture-manifest/v1`,
+and are kept as history. `web/packages/loom-texture/evidence/2026-09-17-determinism-batch1.log.txt`
+is the same script run at the commit that published glazing, foliage and bark and turned the
+manifest to v2, again with no uncommitted change in the package or in `assets/textures/`, on the
+same five runtimes. Every one of the 59 files it wrote (the 11 sets, the dedication, the 44 objects,
+the manifest, the catalog and `.gitattributes`) was compared the same way: 0 differ between runs,
+and 0 differ from the committed directory. The eight first sets are the same bytes as in both
+earlier records. `tests/test_texture_sets.py` holds this record to the committed files.
 
 ## 5. Tiling
 

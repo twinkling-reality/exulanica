@@ -43,10 +43,15 @@ ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = TEXTURE_DIRECTORY / "manifest.json"
 DOC = ROOT / "docs" / "texture-package.md"
 EVIDENCE_DIRECTORY = ROOT / "web" / "packages" / "loom-texture" / "evidence"
-#: The bake before recipes were objects: the eleven files that existed then.
-EVIDENCE = EVIDENCE_DIRECTORY / "2026-09-16-determinism.log.txt"
-#: The bake from recipes: every file the directory holds, objects and catalog included.
-OBJECT_EVIDENCE = EVIDENCE_DIRECTORY / "2026-09-16-determinism-objects.log.txt"
+#: The published library's bake on five runtimes, at the commit that published batch 1: every file
+#: the directory holds, sets, objects and indexes included. The two records from 2026-09-16 are of
+#: the library before batch 1 and are kept as history, not held to the committed files.
+EVIDENCE = EVIDENCE_DIRECTORY / "2026-09-17-determinism-batch1.log.txt"
+OBJECT_EVIDENCE = EVIDENCE
+HISTORY = (
+    EVIDENCE_DIRECTORY / "2026-09-16-determinism.log.txt",
+    EVIDENCE_DIRECTORY / "2026-09-16-determinism-objects.log.txt",
+)
 #: A workspace bake of every published recipe, through the command the bake worker runs.
 WORKSPACE_EVIDENCE = EVIDENCE_DIRECTORY / "2026-09-16-workspace-bake-determinism.log.txt"
 WORKSPACE_RUNS = ("node24-arm64", "node26-arm64", "node20-x86_64-rosetta")
@@ -504,7 +509,8 @@ def test_the_document_names_every_pinned_set_and_the_evidence_it_cites(manifest)
         assert entry["content_sha256"] in row.group(0), entry["set_id"]
         assert re.search(rf"\|\s*{entry['version']}\s*\|", row.group(0)), entry["set_id"]
     assert EVIDENCE.relative_to(ROOT).as_posix() in text
-    assert OBJECT_EVIDENCE.relative_to(ROOT).as_posix() in text
+    for record in HISTORY:
+        assert record.is_file() and record.relative_to(ROOT).as_posix() in text
     assert WORKSPACE_EVIDENCE.relative_to(ROOT).as_posix() in text
     assert "\u2014" not in text
 
@@ -524,9 +530,10 @@ def test_the_determinism_record_is_of_the_published_bytes(manifest):
         assert listed == digests, run
         manifest_line = re.search(r"^([0-9a-f]{64})  \./manifest\.json$", section, re.MULTILINE)
         assert manifest_line.group(1) == hashlib.sha256(MANIFEST.read_bytes()).hexdigest(), run
+    count = sum(1 for path in TEXTURE_DIRECTORY.rglob("*") if path.is_file())
     for run in RUNS[1:]:
-        assert f"{run}: 0 of 11 files differ; 11 files present" in record
-    assert "committed: 0 of 11 files differ; 11 files present" in record
+        assert f"{run}: 0 of {count} files differ; {count} files present" in record
+    assert f"committed: 0 of {count} files differ; {count} files present" in record
 
 
 def test_the_object_determinism_record_is_of_every_published_file(manifest, catalog):
