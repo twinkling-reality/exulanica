@@ -10,7 +10,7 @@ vi.mock('../src/playcanvas/native-character-actor.js',()=>({
 }));
 const descriptor={} as NativeCharacterDescriptor;
 function frame(id:string,branch='main'):NativeCharacterFrame{
- const render={enabled:true};return{subject:{kind:'synthetic-inhabitant',societyId:'society',branchId:branch,inhabitantId:id},parent:{} as pc.Entity,fallback:{findComponents:()=>[render],tags:{add:vi.fn(),remove:vi.fn()}} as unknown as pc.Entity,visible:true,position:[0,0,0],yaw:0,deltaSeconds:1/60};
+ const render={enabled:true};return{subject:{kind:'synthetic-inhabitant',societyId:'society',branchId:branch,inhabitantId:id},parent:{} as pc.Entity,fallback:{findComponents:()=>[render],tags:{add:vi.fn(),remove:vi.fn(),has:()=>false}} as unknown as pc.Entity,visible:true,position:[0,0,0],yaw:0,deltaSeconds:1/60};
 }
 describe('native residency and current permission',()=>{
  it('uses capped subjects, rejects overflow, and releases an old branch even for matching inhabitant IDs',async()=>{

@@ -3,6 +3,7 @@ import { characterSubjectKey, type CharacterSubject } from '@exulanica/atlas-cor
 import { NativeCharacterActor, currentNativeAuthorityStatus } from './native-character-actor.js';
 import { NativeCharacterPool, type CharacterByteLoader } from './native-character-pool.js';
 import type { NativeCharacterAppearance, NativeCharacterAuthority, NativeCharacterDescriptor, NativeCharacterMotion } from './native-character.js';
+import { CHARACTER_RENDERABLE_TAG } from './character/renderable.js';
 
 export interface NativeCharacterFrame extends NativeCharacterMotion {
   readonly subject:CharacterSubject;
@@ -37,8 +38,10 @@ export class NativeCharacterRuntime {
       if(this.residentListeners.has(listener))listener(subjects);
     }
   }
-  syncFrames(frames:readonly NativeCharacterFrame[]):void{
+  syncFrames(all:readonly NativeCharacterFrame[]):void{
     if(this.destroyed)return;
+    // Catalog renderables draw and animate themselves; this runtime never adopts them.
+    const frames=all.filter(frame=>!frame.fallback.tags.has(CHARACTER_RENDERABLE_TAG));
     let residencyChanged=false;
     const keys=new Set(frames.map(frame=>characterSubjectKey(frame.subject)));
     if(keys.size!==frames.length||frames.filter(frame=>frame.subject.kind==='synthetic-inhabitant').length>24)throw new Error('Invalid native character resident set');
@@ -89,12 +92,19 @@ export class NativeCharacterRuntime {
   inspect(subject:CharacterSubject){const r=this.residents.get(characterSubjectKey(subject));return r?{subject:r.frame.subject,status:r.status,error:r.error,rigId:r.actor?.descriptor.rigId??null,asset:r.actor?.descriptor.asset??null,gait:r.actor?.currentGait??null,speed:r.actor?.resolvedSpeed??0,mutableBytes:r.actor?.mutableResidentBytes??0}:null;}
   get mutableResidentBytes():number{return [...this.residents.values()].reduce((sum,r)=>sum+(r.actor?.mutableResidentBytes??0),0);}
   private present(resident:Resident):void{
+    // An abstract resident was never installed: its owner decides what its root draws.
+    if(resident.status==='abstract')return;
     if(resident.status==='hidden')resident.frame.fallback.tags.add('native-character-hidden');
     else resident.frame.fallback.tags.remove('native-character-hidden');
     // Keep the fallback root available to existing stable-subject picking and co-location logic.
     for(const component of resident.frame.fallback.findComponents('render') as pc.RenderComponent[])component.enabled=resident.status!=='ready'&&resident.status!=='hidden';
   }
-  private release(resident:Resident):void{resident.frame.fallback.tags.remove('native-character-hidden');resident.request?.abort();resident.request=null;resident.actor?.destroy();resident.actor=null;for(const component of resident.frame.fallback.findComponents('render') as pc.RenderComponent[])component.enabled=true;}
+  private release(resident:Resident):void{
+    resident.request?.abort();resident.request=null;resident.actor?.destroy();resident.actor=null;
+    if(resident.status==='abstract')return;
+    resident.frame.fallback.tags.remove('native-character-hidden');
+    for(const component of resident.frame.fallback.findComponents('render') as pc.RenderComponent[])component.enabled=true;
+  }
   clear(subject:CharacterSubject):void{const r=this.residents.get(characterSubjectKey(subject));if(r){this.release(r);r.authority=null;r.status='abstract';r.error=null;}}
   destroy():void{if(this.destroyed)return;this.destroyed=true;this.residentListeners.clear();for(const r of this.residents.values())this.release(r);this.residents.clear();this.pool.destroy();}
 }
