@@ -68,6 +68,18 @@ The reader refuses anything that is not already canonical, as well as:
 A projection is emitted for a record only when its grammar's declared semantics admit it. City
 version 1 admits none, so a real city tile draws nothing today.
 
+Two projections are materialised, each built from the records by its own rules:
+
+- `render_batch` is what is drawn. Its ranges carry a material reference, an orientation and
+  surface coordinates.
+- `nav_envelope` is what a person is supported by. Its only admissible use is sampling support
+  height.
+
+Each carries a representation contract in the header (`PROJECTION_DEFINITIONS` in
+`src/core/expand.ts`). Navigation is never read back out of the render mesh.
+
+`collision_proxy` and `pick_geometry` wait for contracts of their own.
+
 ## The triangle digest
 
 `src/core/triangle-digest.ts` defines it and was written before either build.
@@ -80,15 +92,28 @@ length-framed fields:
 3. the projection name;
 4. the number of entries, followed by one entry per record in canonical order.
 
-Each entry has six fields:
+Each entry has eight fields:
 
 1. the record kind;
 2. the record digest, SHA-256 of `canonical_record`;
 3. the identity the record states, or `not-stated`;
-4. the state (`drawn`, `unavailable`, `not_admitted` or `not_a_surface`);
-5. the material reference (drawn entries only);
-6. for a drawn entry, the triangles, as nine signed 64-bit big-endian millimetre integers each;
-   for an unavailable entry, what the record kind lacks.
+4. the state (`drawn`, `unavailable`, `not_admitted` or `not_in_projection`);
+5. the material reference (drawn entries in `render_batch` only);
+6. the surface orientation (drawn entries in `render_batch` only);
+7. for a drawn entry, the triangles, as nine signed 64-bit big-endian millimetre integers each;
+   for an unavailable entry, what the record kind lacks;
+8. the surface coordinates, as six signed 64-bit integers per triangle (drawn entries in
+   `render_batch` only).
+
+Empty fields are still framed.
+
+**Surface coordinates** are absolute millimetres, so a texture's physical extent scales them and
+adjacent tiles meet seamlessly:
+
+- a horizontal surface uses `s = x`, `t = -y`;
+- a vertical surface uses `s` = the distance along its base edge from the edge's first vertex, and
+  `t = -z`, so `t` runs downward and courses line up around a corner. No record draws a vertical
+  surface yet.
 
 **What does not enter:** the float32 payload, the index buffer (triangles are digested
 de-indexed), texture bytes, header layout and padding, and any time.
@@ -108,8 +133,11 @@ as `idempotency_key` does, because unframed concatenation is not injective.
 2. a little-endian uint32 header length;
 3. the header as canonical JSON;
 4. space padding to a 16-byte boundary;
-5. for each projection, three contiguous sections: `position_mm` (int32, offset from
-   `origin_mm`), `position` (float32 metres, payload) and `index` (uint32).
+5. for each projection, contiguous sections:
+   - `position_mm`: int32, offset from `origin_mm`;
+   - `position`: float32 metres, payload;
+   - in `render_batch` only, `surface_mm`: int32, offset from `surface_origin_mm`;
+   - `index`: uint32.
 
 Only the start of the data is aligned. Every element is four bytes wide, so no section needs
 padding. This is ADR-0010's correction, carried over from OPM.
@@ -119,7 +147,8 @@ The header carries:
 - the tile record and its inputs digest;
 - the grammars;
 - every record with its digest and stated identity;
-- per projection, the triangle digest, the origin, the counts and one entry per record.
+- per projection, its contract, the triangle digest, the origins, the counts and one entry per
+  record.
 
 A drawn entry is a contiguous range with its integer extent. So one lookup answers "which record
 does this triangle belong to" and "what is that record's extent".
@@ -154,8 +183,9 @@ version. The evidence is `evidence/2026-09-16-determinism.log.txt`.
 
 - Draw anything but terrain. Everything else waits on record fields the grammar does not carry
   (`src/core/expand.ts`, `NEEDS`), routed to the city vocabulary lane.
-- Materialise `collision_proxy`, `nav_envelope` or `pick_geometry`. Each needs a representation
-  contract first.
+- Materialise `collision_proxy` or `pick_geometry`. Each needs a representation contract first.
+- Refuse unwalkable slopes in `nav_envelope`. No record states a slope limit, and the contract
+  says so.
 - Check that a subject lies in its tile, or that a record belongs to a stage of the grammar it is
   listed under. The Python side checks the second for the fixture.
 - Persist a bake or report a differing rebake. The table and its fault path arrive with

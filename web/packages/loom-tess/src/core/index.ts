@@ -10,9 +10,17 @@ export type { Bake, Sha256Hex } from './bake.js';
 export { CanonicalJsonError, canonicalBytes, canonicalJson } from './canonical-json.js';
 export { readTileDocument, TILE_DOCUMENT_PROFILE, TileDocumentError } from './document.js';
 export type { DeclaredSemantics, GrammarEntry, RecordPayload, TileDocument } from './document.js';
-export { MATERIALISED_LOD, MATERIALISED_PROJECTIONS, NEEDS, TESSELLATOR_SOURCE_VERSION, TessellationError } from './expand.js';
-export type { Need } from './expand.js';
 export {
+  MATERIALISED_LOD,
+  MATERIALISED_PROJECTIONS,
+  NEEDS,
+  PROJECTION_DEFINITIONS,
+  TESSELLATOR_SOURCE_VERSION,
+  TessellationError,
+} from './expand.js';
+export type { Need, ProjectionDefinition } from './expand.js';
+export {
+  absoluteSurfaceCoordinates,
   absoluteVertices,
   COORDINATES,
   decodeOwd,
@@ -22,17 +30,29 @@ export {
   OWD_MEDIA_TYPE,
   OWD_PROFILE,
   OwdError,
-  SECTION_LAYOUT,
+  sectionLayout,
 } from './owd.js';
-export type { DecodedOwd, DecodedProjection, OwdGrammar, OwdHeader, OwdProjection, OwdRecord, OwdSection } from './owd.js';
+export type {
+  DecodedOwd,
+  DecodedProjection,
+  OwdGrammar,
+  OwdHeader,
+  OwdProjection,
+  OwdRecord,
+  OwdSection,
+  SectionName,
+} from './owd.js';
 export { PROJECTIONS, RECORD_SHAPES, TILE_SHAPE } from './record-shapes.js';
 export type { FieldShape, ProjectionName, RecordShape } from './record-shapes.js';
-export type { Entry, MaterialRef, Triple } from './tessellate.js';
+export type { DrawnEntry, Entry, MaterialRef, Triple } from './tessellate.js';
 export {
+  ENTRY_STATES,
   IDENTITY_NOT_STATED,
   MATERIAL_NOT_CARRIED,
+  SURFACE_ORIENTATIONS,
   TRIANGLE_DIGEST_DOMAIN,
   TRIANGLE_DIGEST_PROFILE,
   TRIANGLE_DIGEST_VERSION,
   trianglePreimage,
 } from './triangle-digest.js';
+export type { SurfaceOrientation } from './triangle-digest.js';

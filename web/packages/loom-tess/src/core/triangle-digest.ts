@@ -2,9 +2,9 @@
  * THE TRIANGLE DIGEST. Written before either build existed, so it describes a definition and not
  * whichever implementation came second. `README.md` states the same thing in prose.
  *
- * ONE DIGEST PER PROJECTION. A projection (`render_batch`, and later `collision_proxy`,
- * `nav_envelope`, `pick_geometry`) is a separate declared output, so each gets its own digest and
- * a change to one never moves another.
+ * ONE DIGEST PER PROJECTION. A projection (`render_batch`, `nav_envelope`, and later
+ * `collision_proxy` and `pick_geometry`) is a separate declared output, so each gets its own
+ * digest and a change to one never moves another.
  *
  * WHAT ENTERS, in this order, and nothing else:
  *
@@ -14,26 +14,40 @@
  *   3. the projection name;
  *   4. the number of entries, as a signed 64-bit integer. There is exactly one entry per record
  *      the tile document carries, drawn or not;
- *   5. for each entry, in the canonical record order below, exactly six fields:
+ *   5. for each entry, in the canonical record order below, exactly eight fields:
  *        a. the record kind, for example `city.terrain`;
  *        b. the record digest: lowercase hex SHA-256 of the record's canonical JSON payload
  *           `{"fields", "kind", "version"}`, which is `exulanica.grammar.records.canonical_record`;
  *        c. the identity the record states, as its canonical UUID text, or `not-stated` when the
  *           record kind carries no identity field. An identity is never minted here;
- *        d. the entry state: `drawn`, `unavailable`, `not_admitted` or `not_a_surface`;
- *        e. for a drawn entry, the material reference: the record digest of the
- *           `city.surface_material` record the range is bound to, or `not-carried` when the
- *           record kind has no material record shape at all. Empty for every other state;
- *        f. for a drawn entry, the triangles: nine signed 64-bit big-endian integers per triangle,
+ *        d. the entry state: `drawn`, `unavailable`, `not_admitted` or `not_in_projection`;
+ *        e. for a drawn entry in a projection that carries surfaces (`render_batch`), the
+ *           material reference: the record digest of the `city.surface_material` record the
+ *           range is bound to, or `not-carried` when the record kind has no material record shape
+ *           at all. Empty otherwise;
+ *        f. for a drawn entry in a projection that carries surfaces, the surface orientation,
+ *           `horizontal` or `vertical`. Empty otherwise;
+ *        g. for a drawn entry, the triangles: nine signed 64-bit big-endian integers per triangle,
  *           vertex a, b, c, each x, y, z, in the declared unit, in the order the expander emitted
  *           them. For an unavailable entry, the canonical JSON array of what the record kind
- *           lacks. Empty for `not_admitted` and `not_a_surface`.
+ *           lacks. Empty for `not_admitted` and `not_in_projection`;
+ *        h. for a drawn entry in a projection that carries surfaces, the surface coordinates: six
+ *           signed 64-bit big-endian integers per triangle, vertex a, b, c, each s, t, in
+ *           millimetres. Empty otherwise.
+ *
+ * SURFACE COORDINATES are absolute millimetres on the surface, so a texture's physical extent
+ * scales them with no guessed constant, and two tiles tile seamlessly. A horizontal surface uses
+ * the plan: `s = x`, `t = -y` (an image laid on the ground reads north up). A vertical surface uses
+ * `s` = the distance along its base edge from the edge's first vertex and `t = -z`, so `t` runs
+ * downward, as `loom-texture`'s vertical placement states, and courses line up around a corner.
+ * No drawn record is vertical yet; the orientation is defined now so a reader can rely on it.
  *
  * WHAT DOES NOT ENTER: the float32 payload, the index buffer (triangles are digested
  * de-indexed, so how vertices are shared cannot move the digest), texture bytes, the container
- * header's layout and padding, section offsets, the tile inputs digest (the bake key covers it),
- * and any time. Digesting the float32 bytes would make the digest a statement about a lossy
- * rounding rather than about the geometry, which is why they are payload and nothing more.
+ * header's layout and padding, section offsets, each projection's representation contract text
+ * (the tessellator version covers it), the tile inputs digest (the bake key covers it), and any
+ * time. Digesting the float32 bytes would make the digest a statement about a lossy rounding
+ * rather than about the geometry, which is why they are payload and nothing more.
  *
  * THE UNIT is the records' own: millimetres, integers. Every coordinate is quantised before it
  * is a vertex, by the expander, in integer arithmetic; nothing is quantised after the fact.
@@ -64,12 +78,15 @@ export const IDENTITY_NOT_STATED = 'not-stated';
 /** The material text of a range whose record kind has no material record shape. */
 export const MATERIAL_NOT_CARRIED = 'not-carried';
 
-export const ENTRY_STATES = ['drawn', 'unavailable', 'not_admitted', 'not_a_surface'] as const;
+export const ENTRY_STATES = ['drawn', 'unavailable', 'not_admitted', 'not_in_projection'] as const;
+export const SURFACE_ORIENTATIONS = ['horizontal', 'vertical'] as const;
+export type SurfaceOrientation = (typeof SURFACE_ORIENTATIONS)[number];
 export type EntryState = (typeof ENTRY_STATES)[number];
 
 /** Signed 64-bit integers take eight bytes, and a triangle is three vertices of three. */
 const INT64_BYTES = 8;
 export const COORDINATES_PER_TRIANGLE = 9;
+export const SURFACE_COORDINATES_PER_TRIANGLE = 6;
 
 interface EntryHead {
   readonly kind: string;
@@ -80,12 +97,18 @@ interface EntryHead {
 export type DigestEntry =
   | (EntryHead & {
       readonly state: 'drawn';
-      readonly material: string;
       /** Absolute coordinates, nine per triangle, in emission order. */
       readonly triangles: ArrayLike<number>;
+      /** Present exactly when the projection carries surfaces. */
+      readonly surface?: {
+        readonly material: string;
+        readonly orientation: SurfaceOrientation;
+        /** Absolute surface coordinates, six per triangle, in emission order. */
+        readonly coordinates: ArrayLike<number>;
+      };
     })
   | (EntryHead & { readonly state: 'unavailable'; readonly needs: readonly string[] })
-  | (EntryHead & { readonly state: 'not_admitted' | 'not_a_surface' });
+  | (EntryHead & { readonly state: 'not_admitted' | 'not_in_projection' });
 
 class Framer {
   private readonly parts: Uint8Array[] = [];
@@ -145,19 +168,38 @@ export function trianglePreimage(projection: string, entries: readonly DigestEnt
     framer.text(entry.identity, where);
     framer.text(entry.state, where);
     switch (entry.state) {
-      case 'drawn':
-        if (entry.triangles.length % COORDINATES_PER_TRIANGLE !== 0) {
+      case 'drawn': {
+        const triangles = entry.triangles.length / COORDINATES_PER_TRIANGLE;
+        if (!Number.isInteger(triangles)) {
           throw new RangeError(`${where}: the triangle stream is not whole triangles`);
         }
-        framer.text(entry.material, where);
+        const surface = entry.surface;
+        if (surface === undefined) {
+          framer.text('', where);
+          framer.text('', where);
+          framer.field(int64Bytes(entry.triangles, where));
+          framer.text('', where);
+          return;
+        }
+        if (surface.coordinates.length !== triangles * SURFACE_COORDINATES_PER_TRIANGLE) {
+          throw new RangeError(`${where}: the surface coordinates do not match the triangles`);
+        }
+        framer.text(surface.material, where);
+        framer.text(surface.orientation, where);
         framer.field(int64Bytes(entry.triangles, where));
+        framer.field(int64Bytes(surface.coordinates, where));
         return;
+      }
       case 'unavailable':
         framer.text('', where);
+        framer.text('', where);
         framer.text(canonicalJson(entry.needs), where);
+        framer.text('', where);
         return;
       case 'not_admitted':
-      case 'not_a_surface':
+      case 'not_in_projection':
+        framer.text('', where);
+        framer.text('', where);
         framer.text('', where);
         framer.text('', where);
         return;

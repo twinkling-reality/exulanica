@@ -14,12 +14,17 @@
  * them contiguously after an aligned start keeps every typed-array view legal with no gap. The
  * header states every offset anyway (ADR-0010 D2) and the decoder refuses any other layout.
  *
- * WHAT IS DIGESTED AND WHAT IS PAYLOAD. For each projection the file carries three sections:
+ * WHAT IS DIGESTED AND WHAT IS PAYLOAD. For each projection the file carries these sections, in
+ * this order:
  *
  *   position_mm  int32   x, y, z per vertex: the integer vertex minus `origin_mm`. DIGESTED,
  *                        through the triangle digest, together with `origin_mm`.
  *   position     float32 x, y, z per vertex, in metres from `origin_mm`: `fround(offset / 1000)`.
  *                        PAYLOAD. A renderer wants floats; nothing is ever digested over them.
+ *   surface_mm   int32   s, t per vertex, surface millimetres minus `surface_origin_mm`, in a
+ *                        projection that carries surfaces (`render_batch`). DIGESTED. The rule
+ *                        for s and t is in `triangle-digest.ts`; a texture's physical extent
+ *                        scales them, with the material record's own scale and rotation.
  *   index        uint32  three per triangle. PAYLOAD for the digest, which reads triangles
  *                        de-indexed, so vertex sharing cannot move it.
  *
@@ -32,10 +37,11 @@
  * WHAT THE HEADER CARRIES, so a runtime needs nothing else: the tile record and its inputs
  * digest; each grammar's identity, descriptor digest and declared semantics; every record, in the
  * canonical record order, with its digest, the identity it states (or `not-stated`) and its
- * fields; and per projection, the triangle digest, the payload origin, the counts, and one entry
- * per record. A drawn entry is a contiguous vertex and triangle range with its material reference
- * and its integer extent, which answers "which record does this triangle belong to" and "what is
- * that record's extent". Any other entry states why nothing is drawn.
+ * fields; and per projection, its representation contract, the triangle digest, the origins, the
+ * counts, and one entry per record. A drawn entry is a contiguous vertex and triangle range with
+ * its integer extent (and, where the projection carries surfaces, its material reference and
+ * orientation), which answers "which record does this triangle belong to" and "what is that
+ * record's extent". Any other entry states why nothing is drawn.
  *
  * REJECTED, with reasons:
  *
@@ -62,18 +68,23 @@
  *   The name. `atlas-core/src/corridor.ts` means a reconstruction corridor; nothing here uses that
  *   word, its profile string or its wire type.
  */
-import { ASCII_SPACE, asciiBytes, asciiText } from './ascii.js';
-import { AsciiError } from './ascii.js';
+import { AsciiError, ASCII_SPACE, asciiBytes, asciiText } from './ascii.js';
 import { CanonicalJsonError, canonicalBytes, canonicalJson, compareCodeUnits, parseCanonical } from './canonical-json.js';
 import type { CanonicalValue } from './canonical-json.js';
 import { shapeOf, TileDocumentError, validateRecord, validateSemantics } from './document.js';
 import type { DeclaredSemantics, RecordPayload } from './document.js';
-import { MATERIALISED_PROJECTIONS, NEEDS, TESSELLATOR_SOURCE_VERSION } from './expand.js';
-import type { Need } from './expand.js';
+import { NEEDS, PROJECTION_DEFINITIONS, TESSELLATOR_SOURCE_VERSION } from './expand.js';
+import type { Need, ProjectionDefinition } from './expand.js';
 import { HEX64_PATTERN, IDENTITY_PATTERN, MATERIAL_RECORD_KIND, TILE_SHAPE } from './record-shapes.js';
 import type { ProjectionName } from './record-shapes.js';
-import type { Entry, MaterialRef, TessellatedTile, Triple } from './tessellate.js';
-import { ENTRY_STATES, IDENTITY_NOT_STATED, MATERIAL_NOT_CARRIED, TRIANGLE_DIGEST_PROFILE } from './triangle-digest.js';
+import type { Entry, MaterialRef, ProjectionMesh, TessellatedTile, Triple } from './tessellate.js';
+import {
+  ENTRY_STATES,
+  IDENTITY_NOT_STATED,
+  MATERIAL_NOT_CARRIED,
+  SURFACE_ORIENTATIONS,
+  TRIANGLE_DIGEST_PROFILE,
+} from './triangle-digest.js';
 
 export const OWD_MAGIC = 'OWD1';
 export const OWD_PROFILE = 'exulanica.owd/v1';
@@ -89,8 +100,9 @@ const ALIGNMENT = 16;
 const PREAMBLE_BYTES = 8;
 const ELEMENT_BYTES = 4;
 const COMPONENTS = 3;
+const SURFACE_COMPONENTS = 2;
 const MILLIMETRES_PER_METRE = 1000;
-/** Offsets from the origin are stored as int32. */
+/** Offsets from an origin are stored as int32. */
 const INT32_MAX = 0x7fffffff;
 /** Indices are stored as uint32. */
 const UINT32_LIMIT = 0x100000000;
@@ -101,18 +113,34 @@ export const COORDINATES = {
   up: 'z is the height the records state, increasing upward',
   winding: 'counter-clockwise seen from +z, with x to the right and y up',
   payload: 'position is float32 metres from origin_mm: fround((mm - origin_mm) / 1000)',
+  surface: 'surface_mm plus surface_origin_mm is s, t in millimetres; horizontal s = x, t = -y; '
+    + 'vertical s = distance along the base edge from its first vertex, t = -z',
 } as const;
 
-export const SECTION_LAYOUT = [
-  { name: 'position_mm', type: 'int32', components: COMPONENTS, per: 'vertex' },
-  { name: 'position', type: 'float32', components: COMPONENTS, per: 'vertex' },
-  { name: 'index', type: 'uint32', components: COMPONENTS, per: 'triangle' },
-] as const;
+export type SectionName = 'position_mm' | 'position' | 'surface_mm' | 'index';
+
+interface SectionLayout {
+  readonly name: SectionName;
+  readonly type: 'int32' | 'float32' | 'uint32';
+  readonly components: number;
+  readonly per: 'vertex' | 'triangle';
+}
+
+const POSITION_MM: SectionLayout = { name: 'position_mm', type: 'int32', components: COMPONENTS, per: 'vertex' };
+const POSITION: SectionLayout = { name: 'position', type: 'float32', components: COMPONENTS, per: 'vertex' };
+const SURFACE_MM: SectionLayout = { name: 'surface_mm', type: 'int32', components: SURFACE_COMPONENTS, per: 'vertex' };
+const INDEX: SectionLayout = { name: 'index', type: 'uint32', components: COMPONENTS, per: 'triangle' };
+
+/** The sections one projection carries, in packing order. */
+export function sectionLayout(definition: ProjectionDefinition): readonly SectionLayout[] {
+  if (definition.surfaces) return [POSITION_MM, POSITION, SURFACE_MM, INDEX];
+  return [POSITION_MM, POSITION, INDEX];
+}
 
 export interface OwdSection {
   readonly projection: ProjectionName;
-  readonly name: (typeof SECTION_LAYOUT)[number]['name'];
-  readonly type: (typeof SECTION_LAYOUT)[number]['type'];
+  readonly name: SectionName;
+  readonly type: SectionLayout['type'];
   readonly components: number;
   readonly byte_offset: number;
   readonly byte_length: number;
@@ -134,9 +162,12 @@ export interface OwdGrammar {
 
 export interface OwdProjection {
   readonly name: ProjectionName;
+  readonly contract: ProjectionDefinition['contract'];
   readonly triangle_digest: string;
   /** The minimum integer vertex, or empty when the projection draws nothing. */
   readonly origin_mm: Triple | readonly [];
+  /** The minimum surface coordinate, in a projection that carries surfaces and draws something. */
+  readonly surface_origin_mm?: readonly [number, number] | readonly [];
   readonly vertex_count: number;
   readonly triangle_count: number;
   readonly entries: readonly Entry[];
@@ -172,55 +203,106 @@ function fail(why: string): never {
 
 const align = (value: number): number => value + ((ALIGNMENT - (value % ALIGNMENT)) % ALIGNMENT);
 
-function originOf(vertices: readonly number[]): Triple | readonly [] {
-  if (vertices.length === 0) return [];
-  const origin = [vertices[0]!, vertices[1]!, vertices[2]!];
-  for (let index = 0; index < vertices.length; index += 1) {
-    const axis = index % COMPONENTS;
-    if (vertices[index]! < origin[axis]!) origin[axis] = vertices[index]!;
-  }
-  return [origin[0]!, origin[1]!, origin[2]!];
+function definitionOf(name: ProjectionName): ProjectionDefinition {
+  const definition = PROJECTION_DEFINITIONS.find((candidate) => candidate.name === name);
+  if (definition === undefined) throw new OwdError(`${name} is not materialised`);
+  return definition;
+}
+
+/** The per-axis minimum of flat `values` with `components` per item, or empty for none. */
+function minimumOf(values: readonly number[], components: number): number[] {
+  const minimum = values.slice(0, components);
+  values.forEach((value, index) => {
+    if (value < minimum[index % components]!) minimum[index % components] = value;
+  });
+  return minimum;
+}
+
+/** Offsets from `origin` as int32, refusing a span int32 cannot hold. */
+function offsetsFrom(values: readonly number[], origin: readonly number[], what: string): Int32Array {
+  const out = new Int32Array(values.length);
+  values.forEach((value, index) => {
+    const offset = value - origin[index % origin.length]!;
+    if (offset > INT32_MAX) throw new OwdError(`${what} spans more millimetres than int32 holds from its origin`);
+    out[index] = offset;
+  });
+  return out;
 }
 
 interface PackedProjection {
   readonly header: OwdProjection;
-  readonly positionMm: Int32Array;
-  readonly position: Float32Array;
-  readonly index: Uint32Array;
+  readonly layout: readonly SectionLayout[];
+  readonly views: Readonly<Record<SectionName, Int32Array | Float32Array | Uint32Array | undefined>>;
 }
 
-function pack(tile: TessellatedTile, digests: OwdDigests): PackedProjection[] {
-  return tile.projections.map((mesh) => {
-    const triangleDigest = digests.triangles.get(mesh.name);
-    if (triangleDigest === undefined) throw new OwdError(`no triangle digest for ${mesh.name}`);
-    const origin = originOf(mesh.vertices);
-    const vertexCount = mesh.vertices.length / COMPONENTS;
-    const triangleCount = mesh.indices.length / COMPONENTS;
-    if (vertexCount >= UINT32_LIMIT) throw new OwdError(`${mesh.name} has more vertices than uint32 indexes`);
-    const positionMm = new Int32Array(mesh.vertices.length);
-    const position = new Float32Array(mesh.vertices.length);
-    mesh.vertices.forEach((value, index) => {
-      const offset = value - origin[index % COMPONENTS]!;
-      if (offset > INT32_MAX) {
-        throw new OwdError(`${mesh.name} spans more millimetres than int32 holds from its origin`);
-      }
-      positionMm[index] = offset;
-      position[index] = Math.fround(offset / MILLIMETRES_PER_METRE);
-    });
-    return {
-      header: {
-        name: mesh.name,
-        triangle_digest: triangleDigest,
-        origin_mm: origin,
-        vertex_count: vertexCount,
-        triangle_count: triangleCount,
-        entries: mesh.entries,
-      },
-      positionMm,
-      position,
-      index: Uint32Array.from(mesh.indices),
-    };
+function packProjection(mesh: ProjectionMesh, digests: OwdDigests): PackedProjection {
+  const definition = definitionOf(mesh.name);
+  const triangleDigest = digests.triangles.get(mesh.name);
+  if (triangleDigest === undefined) throw new OwdError(`no triangle digest for ${mesh.name}`);
+  const vertexCount = mesh.vertices.length / COMPONENTS;
+  if (vertexCount >= UINT32_LIMIT) throw new OwdError(`${mesh.name} has more vertices than uint32 indexes`);
+  const origin = minimumOf(mesh.vertices, COMPONENTS);
+  const positionMm = offsetsFrom(mesh.vertices, origin, mesh.name);
+  const position = new Float32Array(positionMm.length);
+  positionMm.forEach((offset, index) => {
+    position[index] = Math.fround(offset / MILLIMETRES_PER_METRE);
   });
+  const base = {
+    name: mesh.name,
+    contract: definition.contract,
+    triangle_digest: triangleDigest,
+    origin_mm: origin as unknown as Triple | readonly [],
+    vertex_count: vertexCount,
+    triangle_count: mesh.indices.length / COMPONENTS,
+    entries: mesh.entries,
+  };
+  const index = Uint32Array.from(mesh.indices);
+  if (!definition.surfaces) {
+    return {
+      header: base,
+      layout: sectionLayout(definition),
+      views: { position_mm: positionMm, position, surface_mm: undefined, index },
+    };
+  }
+  const coordinates = mesh.surfaceCoordinates;
+  if (coordinates === undefined) throw new OwdError(`${mesh.name} carries surfaces and has none`);
+  const surfaceOrigin = minimumOf(coordinates, SURFACE_COMPONENTS);
+  return {
+    header: { ...base, surface_origin_mm: surfaceOrigin as unknown as readonly [number, number] | readonly [] },
+    layout: sectionLayout(definition),
+    views: {
+      position_mm: positionMm,
+      position,
+      surface_mm: offsetsFrom(coordinates, surfaceOrigin, `${mesh.name} surface`),
+      index,
+    },
+  };
+}
+
+function viewOf(projection: PackedProjection, layout: SectionLayout): Int32Array | Float32Array | Uint32Array {
+  const view = projection.views[layout.name];
+  if (view === undefined) throw new OwdError(`${projection.header.name} has no ${layout.name}`);
+  return view;
+}
+
+function sectionsFrom(packed: readonly PackedProjection[], start: number): OwdSection[] {
+  let cursor = start;
+  const sections: OwdSection[] = [];
+  for (const projection of packed) {
+    for (const layout of projection.layout) {
+      const length = viewOf(projection, layout).byteLength;
+      sections.push({
+        projection: projection.header.name,
+        name: layout.name,
+        type: layout.type,
+        components: layout.components,
+        byte_offset: cursor,
+        byte_length: length,
+      });
+      cursor += length;
+    }
+  }
+  return sections;
 }
 
 function headerFor(
@@ -258,33 +340,9 @@ function headerFor(
   };
 }
 
-function sectionsFrom(packed: readonly PackedProjection[], start: number): OwdSection[] {
-  let cursor = start;
-  const sections: OwdSection[] = [];
-  for (const projection of packed) {
-    const lengths = [
-      projection.positionMm.byteLength,
-      projection.position.byteLength,
-      projection.index.byteLength,
-    ];
-    SECTION_LAYOUT.forEach((layout, index) => {
-      sections.push({
-        projection: projection.header.name,
-        name: layout.name,
-        type: layout.type,
-        components: layout.components,
-        byte_offset: cursor,
-        byte_length: lengths[index]!,
-      });
-      cursor += lengths[index]!;
-    });
-  }
-  return sections;
-}
-
 /** Write the container. The same tessellation and digests give the same bytes, everywhere. */
 export function encodeOwd(tile: TessellatedTile, digests: OwdDigests): Uint8Array {
-  const packed = pack(tile, digests);
+  const packed = tile.projections.map((mesh) => packProjection(mesh, digests));
   const projections = packed.map((projection) => projection.header);
   const build = (start: number): Uint8Array =>
     canonicalBytes(headerFor(tile, digests, projections, sectionsFrom(packed, start)) as unknown as CanonicalValue);
@@ -313,7 +371,8 @@ export function encodeOwd(tile: TessellatedTile, digests: OwdDigests): Uint8Arra
   out.fill(ASCII_SPACE, PREAMBLE_BYTES + header.length, start);
   let cursor = start;
   for (const projection of packed) {
-    for (const view of [projection.positionMm, projection.position, projection.index]) {
+    for (const layout of projection.layout) {
+      const view = viewOf(projection, layout);
       out.set(new Uint8Array(view.buffer, view.byteOffset, view.byteLength), cursor);
       cursor += view.byteLength;
     }
@@ -325,6 +384,8 @@ export interface DecodedProjection {
   readonly header: OwdProjection;
   readonly positionMm: Int32Array;
   readonly position: Float32Array;
+  /** Present exactly in a projection that carries surfaces. */
+  readonly surfaceMm?: Int32Array;
   readonly index: Uint32Array;
 }
 
@@ -347,8 +408,8 @@ function arrayAt(value: unknown, where: string): readonly unknown[] {
 }
 
 function keysAre(value: JsonObject, keys: readonly string[], where: string): void {
-  const present = Object.keys(value).sort();
-  const wanted = [...keys].sort();
+  const present = Object.keys(value).sort(compareCodeUnits);
+  const wanted = [...keys].sort(compareCodeUnits);
   if (canonicalJson(present) !== canonicalJson(wanted)) {
     fail(`${where} has keys ${canonicalJson(present)}, expected ${canonicalJson(wanted)}`);
   }
@@ -368,14 +429,14 @@ function hexAt(value: unknown, where: string): string {
   return value;
 }
 
-function tripleAt(value: unknown, where: string): Triple {
-  const triple = arrayAt(value, where);
-  if (triple.length !== COMPONENTS) fail(`${where} is not three integers`);
-  triple.forEach((item) => {
-    if (typeof item !== 'number') fail(`${where} is not three integers`);
-    if (!Number.isSafeInteger(item)) fail(`${where} is not three integers`);
+function integersAt(value: unknown, where: string, length: number): number[] {
+  const items = arrayAt(value, where);
+  if (items.length !== length) fail(`${where} is not ${length} integers`);
+  items.forEach((item) => {
+    if (typeof item !== 'number') fail(`${where} is not ${length} integers`);
+    if (!Number.isSafeInteger(item)) fail(`${where} is not ${length} integers`);
   });
-  return [triple[0] as number, triple[1] as number, triple[2] as number];
+  return items as number[];
 }
 
 function withRefusal<T>(run: () => T): T {
@@ -403,10 +464,13 @@ function checkMaterial(value: unknown, where: string, records: readonly OwdRecor
 }
 
 /** `NEEDS` maps each need to itself, so its sorted keys are its values. */
-const NEED_VALUES: readonly string[] = Object.keys(NEEDS).sort();
+const NEED_VALUES: readonly string[] = Object.keys(NEEDS).sort(compareCodeUnits);
+
+const DRAWN_KEYS = ['extent_mm', 'first_triangle', 'first_vertex', 'record', 'state', 'triangle_count', 'vertex_count'];
 
 function checkEntries(
   projection: JsonObject,
+  definition: ProjectionDefinition,
   where: string,
   records: readonly OwdRecord[],
   vertexCount: number,
@@ -423,25 +487,28 @@ function checkEntries(
     if (!ENTRY_STATES.some((state) => state === entry.state)) fail(`${at}.state is not an entry state`);
     switch (entry.state) {
       case 'drawn': {
-        keysAre(
-          entry,
-          ['extent_mm', 'first_triangle', 'first_vertex', 'material', 'record', 'state', 'triangle_count', 'vertex_count'],
-          at,
-        );
-        checkMaterial(entry.material, `${at}.material`, records);
-        // A drawn range draws something: a triangle needs three vertices.
-        if (typeof entry.triangle_count !== 'number') fail(`${at}.triangle_count is not a count`);
-        if (entry.triangle_count < 1) fail(`${at} is drawn and has no triangle`);
-        if (typeof entry.vertex_count !== 'number') fail(`${at}.vertex_count is not a count`);
-        if (entry.vertex_count < COMPONENTS) fail(`${at} is drawn and has fewer than three vertices`);
+        if (definition.surfaces) {
+          keysAre(entry, [...DRAWN_KEYS, 'material', 'surface'], at);
+          checkMaterial(entry.material, `${at}.material`, records);
+          if (!SURFACE_ORIENTATIONS.some((orientation) => orientation === entry.surface)) {
+            fail(`${at}.surface is not an orientation`);
+          }
+        } else {
+          keysAre(entry, DRAWN_KEYS, at);
+        }
         if (entry.first_vertex !== nextVertex) fail(`${at}.first_vertex does not follow the range before it`);
         if (entry.first_triangle !== nextTriangle) fail(`${at}.first_triangle does not follow the range before it`);
-        nextVertex += countAt(entry.vertex_count, `${at}.vertex_count`, vertexCount + 1);
-        nextTriangle += countAt(entry.triangle_count, `${at}.triangle_count`, triangleCount + 1);
+        const vertices = countAt(entry.vertex_count, `${at}.vertex_count`, vertexCount + 1);
+        const triangles = countAt(entry.triangle_count, `${at}.triangle_count`, triangleCount + 1);
+        // A drawn range draws something: a triangle needs three vertices.
+        if (triangles < 1) fail(`${at} is drawn and has no triangle`);
+        if (vertices < COMPONENTS) fail(`${at} is drawn and has fewer than three vertices`);
+        nextVertex += vertices;
+        nextTriangle += triangles;
         const extent = objectAt(entry.extent_mm, `${at}.extent_mm`);
         keysAre(extent, ['max', 'min'], `${at}.extent_mm`);
-        tripleAt(extent.min, `${at}.extent_mm.min`);
-        tripleAt(extent.max, `${at}.extent_mm.max`);
+        integersAt(extent.min, `${at}.extent_mm.min`, COMPONENTS);
+        integersAt(extent.max, `${at}.extent_mm.max`, COMPONENTS);
         return;
       }
       case 'unavailable': {
@@ -455,13 +522,35 @@ function checkEntries(
         return;
       }
       case 'not_admitted':
-      case 'not_a_surface':
+      case 'not_in_projection':
         keysAre(entry, ['record', 'state'], at);
         return;
     }
   });
   if (nextVertex !== vertexCount) fail(`${where} ranges do not cover its vertices exactly`);
   if (nextTriangle !== triangleCount) fail(`${where} ranges do not cover its triangles exactly`);
+}
+
+function checkProjection(value: unknown, index: number, records: readonly OwdRecord[]): void {
+  const at = `projections[${index}]`;
+  const projection = objectAt(value, at);
+  const definition = PROJECTION_DEFINITIONS[index]!;
+  const keys = ['contract', 'entries', 'name', 'origin_mm', 'triangle_count', 'triangle_digest', 'vertex_count'];
+  keysAre(projection, definition.surfaces ? [...keys, 'surface_origin_mm'] : keys, at);
+  if (projection.name !== definition.name) fail(`${at}.name is not ${definition.name}`);
+  if (canonicalJson(projection.contract as CanonicalValue) !== canonicalJson(definition.contract)) {
+    fail(`${at}.contract is not the contract this version states`);
+  }
+  hexAt(projection.triangle_digest, `${at}.triangle_digest`);
+  const vertexCount = countAt(projection.vertex_count, `${at}.vertex_count`, UINT32_LIMIT);
+  const triangleCount = countAt(projection.triangle_count, `${at}.triangle_count`, UINT32_LIMIT);
+  const origins: [string, number][] = [['origin_mm', COMPONENTS]];
+  if (definition.surfaces) origins.push(['surface_origin_mm', SURFACE_COMPONENTS]);
+  for (const [key, components] of origins) {
+    const length = vertexCount === 0 ? 0 : components;
+    integersAt(projection[key], `${at}.${key}`, length);
+  }
+  checkEntries(projection, definition, at, records, vertexCount, triangleCount);
 }
 
 function checkHeader(value: unknown): OwdHeader {
@@ -493,9 +582,9 @@ function checkHeader(value: unknown): OwdHeader {
   const declared = (header.tile as RecordPayload).fields.grammar_versions as readonly (readonly [string, number])[];
   const grammars = arrayAt(header.grammars, 'grammars');
   if (grammars.length !== declared.length) fail('grammars does not match tile.grammar_versions');
-  grammars.forEach((value, index) => {
+  grammars.forEach((entry, index) => {
     const at = `grammars[${index}]`;
-    const grammar = objectAt(value, at);
+    const grammar = objectAt(entry, at);
     keysAre(grammar, ['declared_semantics', 'descriptor_sha256', 'grammar_id', 'grammar_version'], at);
     if (grammar.grammar_id !== declared[index]![0]) fail(`${at}.grammar_id does not match the tile`);
     if (grammar.grammar_version !== declared[index]![1]) fail(`${at}.grammar_version does not match the tile`);
@@ -503,20 +592,21 @@ function checkHeader(value: unknown): OwdHeader {
     withRefusal(() => validateSemantics(grammar.declared_semantics, `${at}.declared_semantics`));
   });
 
-  const records = arrayAt(header.records, 'records').map((value, index): OwdRecord => {
+  const records = arrayAt(header.records, 'records').map((entry, index): OwdRecord => {
     const at = `records[${index}]`;
-    const record = objectAt(value, at);
+    const record = objectAt(entry, at);
     keysAre(record, ['fields', 'grammar', 'identity', 'kind', 'sha256', 'version'], at);
     const grammar = countAt(record.grammar, `${at}.grammar`, grammars.length);
     const payload = withRefusal(() =>
       validateRecord({ fields: record.fields, kind: record.kind, version: record.version }, at),
     );
     const sha256 = hexAt(record.sha256, `${at}.sha256`);
-    const field = shapeOf(payload.kind).identity_field;
-    const expected = field === undefined ? IDENTITY_NOT_STATED : payload.fields[field];
-    if (record.identity !== expected) fail(`${at}.identity is not the identity the record states`);
     if (typeof record.identity !== 'string') fail(`${at}.identity is not text`);
-    if (field !== undefined) {
+    const field = shapeOf(payload.kind).identity_field;
+    if (field === undefined) {
+      if (record.identity !== IDENTITY_NOT_STATED) fail(`${at}.identity is not ${IDENTITY_NOT_STATED}`);
+    } else {
+      if (record.identity !== payload.fields[field]) fail(`${at}.identity is not the identity the record states`);
       if (!IDENTITY_PATTERN.test(record.identity)) fail(`${at}.identity is not a UUID`);
     }
     return { ...payload, sha256, identity: record.identity, grammar };
@@ -525,29 +615,18 @@ function checkHeader(value: unknown): OwdHeader {
     if (index > 0) {
       const before = records[index - 1]!;
       const byKind = compareCodeUnits(before.kind, record.kind);
-      const after = byKind < 0 ? true : byKind === 0 ? compareCodeUnits(before.sha256, record.sha256) < 0 : false;
-      if (!after) fail(`records[${index}] is not after records[${index - 1}] in the canonical order`);
+      if (byKind > 0) fail(`records[${index}] is not after records[${index - 1}] in the canonical order`);
+      if (byKind === 0) {
+        if (compareCodeUnits(before.sha256, record.sha256) >= 0) {
+          fail(`records[${index}] is not after records[${index - 1}] in the canonical order`);
+        }
+      }
     }
   });
 
   const projections = arrayAt(header.projections, 'projections');
-  if (projections.length !== MATERIALISED_PROJECTIONS.length) fail('projections is not the materialised set');
-  projections.forEach((value, index) => {
-    const at = `projections[${index}]`;
-    const projection = objectAt(value, at);
-    keysAre(projection, ['entries', 'name', 'origin_mm', 'triangle_count', 'triangle_digest', 'vertex_count'], at);
-    if (projection.name !== MATERIALISED_PROJECTIONS[index]) fail(`${at}.name is not ${MATERIALISED_PROJECTIONS[index]}`);
-    hexAt(projection.triangle_digest, `${at}.triangle_digest`);
-    const vertexCount = countAt(projection.vertex_count, `${at}.vertex_count`, UINT32_LIMIT);
-    const triangleCount = countAt(projection.triangle_count, `${at}.triangle_count`, UINT32_LIMIT);
-    const origin = arrayAt(projection.origin_mm, `${at}.origin_mm`);
-    if (vertexCount === 0) {
-      if (origin.length !== 0) fail(`${at}.origin_mm names an origin for no vertices`);
-    } else {
-      tripleAt(origin, `${at}.origin_mm`);
-    }
-    checkEntries(projection, at, records, vertexCount, triangleCount);
-  });
+  if (projections.length !== PROJECTION_DEFINITIONS.length) fail('projections is not the materialised set');
+  projections.forEach((projection, index) => checkProjection(projection, index, records));
   return header as unknown as OwdHeader;
 }
 
@@ -560,7 +639,8 @@ function littleEndian(): boolean {
  * produced. It proves the layout and every index safe to use; `verifyOwd` in `bake.ts` proves the
  * content, by baking the header's own records again and comparing every byte.
  *
- * The typed arrays are views over `bytes`, so no vertex is copied.
+ * The typed arrays are views over the bytes, so no vertex is copied, unless the bytes do not start
+ * on a four-byte boundary, in which case they are copied once.
  */
 export function decodeOwd(input: Uint8Array): DecodedOwd {
   if (!littleEndian()) fail('this host is big-endian, and the sections are little-endian views');
@@ -568,7 +648,9 @@ export function decodeOwd(input: Uint8Array): DecodedOwd {
   // offsets, so bytes that do not start on one are copied once to a buffer of their own.
   const bytes = input.byteOffset % ELEMENT_BYTES === 0 ? input : input.slice();
   if (bytes.length < PREAMBLE_BYTES) fail('shorter than its preamble');
-  if (asciiText(bytes.subarray(0, ELEMENT_BYTES), 'magic') !== OWD_MAGIC) fail(`magic is not ${OWD_MAGIC}`);
+  if (withRefusal(() => asciiText(bytes.subarray(0, ELEMENT_BYTES), 'magic')) !== OWD_MAGIC) {
+    fail(`magic is not ${OWD_MAGIC}`);
+  }
   const headerLength = new DataView(bytes.buffer, bytes.byteOffset, PREAMBLE_BYTES).getUint32(ELEMENT_BYTES, true);
   if (PREAMBLE_BYTES + headerLength > bytes.length) fail('the header runs past the end of the file');
   const parsed = withRefusal(() =>
@@ -580,11 +662,10 @@ export function decodeOwd(input: Uint8Array): DecodedOwd {
     if (bytes[at] !== ASCII_SPACE) fail(`padding byte ${at} is not a space`);
   }
 
-  const sections = arrayAt(header.sections, 'sections');
   const expected: OwdSection[] = [];
   let cursor = start;
-  for (const projection of header.projections) {
-    for (const layout of SECTION_LAYOUT) {
+  header.projections.forEach((projection, index) => {
+    for (const layout of sectionLayout(PROJECTION_DEFINITIONS[index]!)) {
       const count = layout.per === 'vertex' ? projection.vertex_count : projection.triangle_count;
       const length = count * layout.components * ELEMENT_BYTES;
       expected.push({
@@ -597,24 +678,29 @@ export function decodeOwd(input: Uint8Array): DecodedOwd {
       });
       cursor += length;
     }
-  }
-  if (canonicalJson(sections as CanonicalValue) !== canonicalJson(expected as unknown as CanonicalValue)) {
+  });
+  if (canonicalJson(header.sections as unknown as CanonicalValue) !== canonicalJson(expected as unknown as CanonicalValue)) {
     fail('sections are not the contiguous layout the counts imply');
   }
   if (cursor !== bytes.length) fail(`the file is ${bytes.length} bytes and its sections end at ${cursor}`);
 
   const base = bytes.byteOffset;
-  const projections = header.projections.map((projection, index): DecodedProjection => {
-    const first = index * SECTION_LAYOUT.length;
-    const positionMm = expected[first]!;
-    const position = expected[first + 1]!;
-    const triangles = expected[first + 2]!;
-    const decoded = {
+  const view = (projection: ProjectionName, name: SectionName): OwdSection | undefined =>
+    expected.find((section) => section.projection === projection && section.name === name);
+  const ints = (section: OwdSection): Int32Array =>
+    new Int32Array(bytes.buffer, base + section.byte_offset, section.byte_length / ELEMENT_BYTES);
+  const projections = header.projections.map((projection): DecodedProjection => {
+    const positionMm = view(projection.name, 'position_mm')!;
+    const position = view(projection.name, 'position')!;
+    const triangles = view(projection.name, 'index')!;
+    const surface = view(projection.name, 'surface_mm');
+    const shared = {
       header: projection,
-      positionMm: new Int32Array(bytes.buffer, base + positionMm.byte_offset, positionMm.byte_length / ELEMENT_BYTES),
+      positionMm: ints(positionMm),
       position: new Float32Array(bytes.buffer, base + position.byte_offset, position.byte_length / ELEMENT_BYTES),
       index: new Uint32Array(bytes.buffer, base + triangles.byte_offset, triangles.byte_length / ELEMENT_BYTES),
     };
+    const decoded: DecodedProjection = surface === undefined ? shared : { ...shared, surfaceMm: ints(surface) };
     checkRanges(decoded);
     return decoded;
   });
@@ -655,6 +741,19 @@ export function absoluteVertices(projection: DecodedProjection): Float64Array {
   const origin = projection.header.origin_mm;
   for (let index = 0; index < out.length; index += 1) {
     out[index] = projection.positionMm[index]! + (origin[index % COMPONENTS] as number);
+  }
+  return out;
+}
+
+/** The absolute surface coordinates of a decoded projection, two per vertex, where it has them. */
+export function absoluteSurfaceCoordinates(projection: DecodedProjection): Float64Array | undefined {
+  const surface = projection.surfaceMm;
+  const origin = projection.header.surface_origin_mm;
+  if (surface === undefined) return undefined;
+  if (origin === undefined) return undefined;
+  const out = new Float64Array(surface.length);
+  for (let index = 0; index < out.length; index += 1) {
+    out[index] = surface[index]! + (origin[index % SURFACE_COMPONENTS] as number);
   }
   return out;
 }

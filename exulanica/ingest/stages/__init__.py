@@ -835,9 +835,10 @@ STAGES: Final[dict[str, StageSpec]] = {
             "tile_document": "exulanica.tile-document/v1",
             # The records' unit, and the unit of every digested coordinate.
             "coordinate_unit": "millimetre",
-            # The projections materialised. The others have no representation contract yet, and
-            # a projection added here changes every container.
-            "projections": ["render_batch"],
+            # The projections materialised, each from the records by its own rules and with its
+            # own representation contract. `collision_proxy` and `pick_geometry` have no contract
+            # yet, and a projection added here changes every container.
+            "projections": ["render_batch", "nav_envelope"],
             # The only level of detail drawn; a tile at another level is refused.
             "lod": 0,
             # Declared by version 1 of the grammar's tile stage, imported rather than restated.

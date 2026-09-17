@@ -28,11 +28,11 @@ the committed bytes to it. Regenerate with::
     uv run python tests/test_bake_determinism.py --write-fixture
 
 Its grammar is a TEST-ONLY descriptor beside it, ``cityrenderfixture.v1.json``, which admits
-``render_batch`` over the real city record classes; city version 1 admits no projection, so a
-city version 1 tile draws nothing at all. Every key field the empty catalogs cannot source carries
-an ``unresolved_`` value, and a test below proves none of them resolves. Everything else is either
-read from the grammar and the pinned texture sets, or is a chosen fixture input, listed in the
-fixture's README.
+``render_batch`` and ``nav_envelope`` over the real city record classes; city version 1 admits no
+projection, so a city version 1 tile draws nothing at all. Every key field the empty catalogs
+cannot source carries an ``unresolved_`` value, and a test below proves none of them resolves.
+Everything else is either read from the grammar and the pinned texture sets, or is a chosen
+fixture input, listed in the fixture's README.
 """
 
 from __future__ import annotations
@@ -463,7 +463,7 @@ def test_every_fixture_record_passes_its_own_grammar_validator():
             validated += 1
             break
     assert validated == len(records)
-    assert grammar.semantics.admissible_uses == ("render_batch",)
+    assert grammar.semantics.admissible_uses == ("render_batch", "nav_envelope")
     document = json.loads(DOCUMENT.read_bytes())
     entry = document["grammars"][0]
     assert entry["descriptor_sha256"] == descriptor_sha256()
@@ -638,18 +638,19 @@ def _independent_triangle_digests(container: bytes) -> dict[str, str]:
     def field(data: bytes) -> bytes:
         return struct.pack(">Q", len(data)) + data
 
+    def ints(section: dict[str, int], code: str) -> tuple[int, ...]:
+        count = section["byte_length"] // 4
+        return struct.unpack_from(f"<{count}{code}", container, section["byte_offset"])
+
     digests = {}
     for projection in header["projections"]:
         name = projection["name"]
         origin = projection["origin_mm"]
-        positions = sections[(name, "position_mm")]
-        indices = sections[(name, "index")]
-        offsets = struct.unpack_from(
-            f"<{positions['byte_length'] // 4}i", container, positions["byte_offset"]
-        )
-        corners = struct.unpack_from(
-            f"<{indices['byte_length'] // 4}I", container, indices["byte_offset"]
-        )
+        offsets = ints(sections[(name, "position_mm")], "i")
+        corners = ints(sections[(name, "index")], "I")
+        carries_surfaces = (name, "surface_mm") in sections
+        surface_offsets = ints(sections[(name, "surface_mm")], "i") if carries_surfaces else ()
+        surface_origin = projection.get("surface_origin_mm", [])
         stream = [
             field(b"exulanica/owd-triangle-digest"),
             field(b"1"),
@@ -669,25 +670,42 @@ def _independent_triangle_digests(container: bytes) -> dict[str, str]:
                 field(entry["state"].encode("ascii")),
             ]
             if entry["state"] == "drawn":
+                values = []
+                surface = []
+                first = entry["first_triangle"] * 3
+                for corner in corners[first : first + entry["triangle_count"] * 3]:
+                    for axis in range(3):
+                        values.append(offsets[corner * 3 + axis] + origin[axis])
+                    if carries_surfaces:
+                        for axis in range(2):
+                            surface.append(
+                                surface_offsets[corner * 2 + axis] + surface_origin[axis]
+                            )
+                triangles = field(struct.pack(f">{len(values)}q", *values))
+                if not carries_surfaces:
+                    stream += [field(b""), field(b""), triangles, field(b"")]
+                    continue
                 material = entry["material"]
                 reference = (
                     material["state"]
                     if material["state"] == "not-carried"
                     else records[material["record"]]["sha256"]
                 )
-                values = []
-                first = entry["first_triangle"] * 3
-                for corner in corners[first : first + entry["triangle_count"] * 3]:
-                    for axis in range(3):
-                        values.append(offsets[corner * 3 + axis] + origin[axis])
                 stream += [
                     field(reference.encode("ascii")),
-                    field(struct.pack(f">{len(values)}q", *values)),
+                    field(entry["surface"].encode("ascii")),
+                    triangles,
+                    field(struct.pack(f">{len(surface)}q", *surface)),
                 ]
             elif entry["state"] == "unavailable":
-                stream += [field(b""), field(canonical_json(entry["needs"]))]
+                stream += [
+                    field(b""),
+                    field(b""),
+                    field(canonical_json(entry["needs"])),
+                    field(b""),
+                ]
             else:
-                stream += [field(b""), field(b"")]
+                stream += [field(b""), field(b""), field(b""), field(b"")]
         digests[name] = hashlib.sha256(b"".join(stream)).hexdigest()
     return digests
 
@@ -711,9 +729,11 @@ def test_two_node_bakes_under_one_key_write_identical_bytes(tmp_path):
     header = json.loads(first[8 : 8 + header_length])
     assert header["tile_inputs_digest"] == tile_inputs_digest(tile)
     assert header["truth"] == "invented"
-    entries = header["projections"][0]["entries"]
-    drawn = [header["records"][e["record"]]["kind"] for e in entries if e["state"] == "drawn"]
-    assert drawn == ["city.terrain"]
+    for projection in header["projections"]:
+        entries = projection["entries"]
+        drawn = [header["records"][e["record"]]["kind"] for e in entries if e["state"] == "drawn"]
+        assert drawn == ["city.terrain"], projection["name"]
+    assert [p["name"] for p in header["projections"]] == ["render_batch", "nav_envelope"]
     assert json.loads(_tess("verify", tmp_path.joinpath("first.owd")).stdout) == {
         "tile_inputs_digest": first_report["tile_inputs_digest"],
         "triangle_digests": first_report["triangle_digests"],

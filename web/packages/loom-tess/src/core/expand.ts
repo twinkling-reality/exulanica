@@ -10,13 +10,14 @@
  * terrain grid is fully determined. Everything else waits on a record field the grammar does not
  * carry yet; the list below is the requirement sent to the city vocabulary lane (lane 20).
  *
- * `render_batch` is the only projection materialised. The others need a representation contract
- * (what the projection preserves and what it may be used for) that does not exist yet, and a
- * collision proxy or navigation envelope invented here would be the ad hoc derivation Melbourne
- * failed on.
+ * Two projections are materialised, each from the records by its own rules and each with its own
+ * representation contract: `render_batch`, what is drawn, and `nav_envelope`, what a person is
+ * supported by. Navigation is never read back out of the render mesh; Melbourne failed exactly
+ * there. `collision_proxy` and `pick_geometry` wait for contracts of their own.
  */
 import { RECORD_SHAPES } from './record-shapes.js';
 import type { ProjectionName } from './record-shapes.js';
+import type { SurfaceOrientation } from './triangle-digest.js';
 
 /**
  * Bumped whenever an expander, a statement or the materialised projection set changes, because
@@ -24,7 +25,57 @@ import type { ProjectionName } from './record-shapes.js';
  */
 export const TESSELLATOR_SOURCE_VERSION = 1;
 
-export const MATERIALISED_PROJECTIONS: readonly ProjectionName[] = ['render_batch'];
+/**
+ * What each materialised projection preserves and what it may be used for, as separate rows, the
+ * target architecture's representation contract. The header of every container carries these, and
+ * `TESSELLATOR_SOURCE_VERSION` versions them.
+ */
+export interface ProjectionDefinition {
+  readonly name: ProjectionName;
+  /** Whether drawn ranges carry a material reference, an orientation and surface coordinates. */
+  readonly surfaces: boolean;
+  readonly contract: {
+    readonly preserves: readonly string[];
+    readonly admissible_uses: readonly string[];
+    readonly inadmissible_uses: readonly string[];
+  };
+}
+
+export const PROJECTION_DEFINITIONS: readonly ProjectionDefinition[] = [
+  {
+    name: 'render_batch',
+    surfaces: true,
+    contract: {
+      preserves: [
+        'the integer vertex positions of every drawn record',
+        'the record, stated identity and material reference of every triangle',
+        'surface coordinates in millimetres, for texture scale from physical extent',
+      ],
+      admissible_uses: ['drawing'],
+      inadmissible_uses: ['support height', 'collision', 'measurement'],
+    },
+  },
+  {
+    name: 'nav_envelope',
+    surfaces: false,
+    contract: {
+      preserves: [
+        'the integer vertex positions of every surface a person may be supported by',
+        'support height at a plan point inside a triangle, by linear interpolation over them',
+      ],
+      admissible_uses: ['sampling support height'],
+      inadmissible_uses: [
+        'drawing',
+        'collision: obstacles are not carved out of the envelope',
+        'deciding walkability: no record states a slope limit, so no slope is refused',
+      ],
+    },
+  },
+];
+
+export const MATERIALISED_PROJECTIONS: readonly ProjectionName[] = PROJECTION_DEFINITIONS.map(
+  (definition) => definition.name,
+);
 
 /**
  * The only level of detail this version draws. Nothing here varies with a level of detail yet, so
@@ -56,6 +107,14 @@ export type Need = (typeof NEEDS)[keyof typeof NEEDS];
 
 export type Fields = { readonly [name: string]: unknown };
 
+export interface SurfaceExpansion {
+  /** The record kind has no material record shape, so the range binds none. */
+  readonly material: 'not-carried';
+  readonly orientation: SurfaceOrientation;
+  /** Absolute surface coordinates in millimetres, two per vertex. */
+  readonly coordinates: readonly number[];
+}
+
 export type Expansion =
   | {
       readonly state: 'drawn';
@@ -63,15 +122,15 @@ export type Expansion =
       readonly vertices: readonly number[];
       /** Indices into `vertices`, three per triangle, counter-clockwise seen from +z. */
       readonly triangles: readonly number[];
-      /** The record kind has no material record shape, so the range binds none. */
-      readonly material: 'not-carried';
+      /** Present exactly when the projection carries surfaces. */
+      readonly surface?: SurfaceExpansion;
     }
   | { readonly state: 'unavailable'; readonly needs: readonly Need[] };
 
 export type Rule =
   | { readonly rule: 'expand'; readonly expand: (fields: Fields) => Expansion }
   | { readonly rule: 'needs'; readonly needs: readonly Need[] }
-  | { readonly rule: 'not_a_surface' };
+  | { readonly rule: 'not_in_projection' };
 
 export class TessellationError extends Error {}
 
@@ -91,7 +150,7 @@ const SAMPLES_FOR_AN_EDGE = 2;
  * corner to its highest. With x to the right and y up, both are counter-clockwise seen from +z.
  * The diagonal is a tessellation choice and is fixed by `TESSELLATOR_SOURCE_VERSION`.
  */
-function expandTerrain(fields: Fields): Expansion {
+function terrainGrid(fields: Fields): Expansion {
   const originX = fields.origin_x_mm as number;
   const originY = fields.origin_y_mm as number;
   const cell = fields.cell_mm as number;
@@ -118,10 +177,32 @@ function expandTerrain(fields: Fields): Expansion {
       triangles.push(low, right, high, low, high, up);
     }
   }
-  return { state: 'drawn', vertices, triangles, material: 'not-carried' };
+  return { state: 'drawn', vertices, triangles };
+}
+
+/** Drawn terrain is a horizontal surface in plan coordinates: `s = x`, `t = -y`. */
+function renderTerrain(fields: Fields): Expansion {
+  const grid = terrainGrid(fields);
+  if (grid.state === 'unavailable') return grid;
+  const coordinates: number[] = [];
+  for (let vertex = 0; vertex < grid.vertices.length; vertex += 3) {
+    // `0 - y` rather than `-y`, so a y of zero gives zero and never negative zero.
+    coordinates.push(grid.vertices[vertex]!, 0 - grid.vertices[vertex + 1]!);
+  }
+  return { ...grid, surface: { material: 'not-carried', orientation: 'horizontal', coordinates } };
+}
+
+/**
+ * A terrain grid supports whoever stands on it, everywhere: a heightfield has one height over each
+ * plan point, which is what support sampling needs. Its own rule rather than the render rule, so
+ * the two projections can part when the grammar says where a surface is not walkable.
+ */
+function supportTerrain(fields: Fields): Expansion {
+  return terrainGrid(fields);
 }
 
 const needs = (...list: Need[]): Rule => ({ rule: 'needs', needs: list });
+const notInProjection: Rule = { rule: 'not_in_projection' };
 
 /** `render_batch`, per record kind. Every kind in `RECORD_SHAPES` has exactly one rule. */
 const RENDER_BATCH: ReadonlyMap<string, Rule> = new Map<string, Rule>([
@@ -134,13 +215,32 @@ const RENDER_BATCH: ReadonlyMap<string, Rule> = new Map<string, Rule>([
   ['city.street_node', needs(NEEDS.base_elevation)],
   ['city.street_segment', needs(NEEDS.base_elevation, NEEDS.crossing_width)],
   // A material is not a surface. A drawn range cites it; it draws nothing of its own.
-  ['city.surface_material', { rule: 'not_a_surface' }],
-  ['city.terrain', { rule: 'expand', expand: expandTerrain }],
+  ['city.surface_material', notInProjection],
+  ['city.terrain', { rule: 'expand', expand: renderTerrain }],
   ['city.vitrine', needs(NEEDS.footprint_ring, NEEDS.base_elevation, NEEDS.bay_geometry)],
+]);
+
+/**
+ * `nav_envelope`, per record kind. A facade, a vitrine behind glass, a sign and a material support
+ * nobody. Street furniture is an obstacle, which is collision's concern, not support's.
+ */
+const NAV_ENVELOPE: ReadonlyMap<string, Rule> = new Map<string, Rule>([
+  ['city.curb_edge', needs(NEEDS.base_elevation)],
+  ['city.facade', notInProjection],
+  ['city.massing', needs(NEEDS.footprint_ring, NEEDS.base_elevation)],
+  ['city.parcel', needs(NEEDS.base_elevation)],
+  ['city.premises', notInProjection],
+  ['city.street_furniture', notInProjection],
+  ['city.street_node', needs(NEEDS.base_elevation)],
+  ['city.street_segment', needs(NEEDS.base_elevation, NEEDS.crossing_width)],
+  ['city.surface_material', notInProjection],
+  ['city.terrain', { rule: 'expand', expand: supportTerrain }],
+  ['city.vitrine', notInProjection],
 ]);
 
 const RULES: ReadonlyMap<ProjectionName, ReadonlyMap<string, Rule>> = new Map([
   ['render_batch', RENDER_BATCH],
+  ['nav_envelope', NAV_ENVELOPE],
 ]);
 
 /** The rule for one record kind in one materialised projection. */

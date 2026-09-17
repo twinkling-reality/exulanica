@@ -11,11 +11,16 @@
 import { canonicalBytes, compareCodeUnits } from './canonical-json.js';
 import type { RecordPayload, TileDocument } from './document.js';
 import { shapeOf } from './document.js';
-import { MATERIALISED_PROJECTIONS, ruleFor } from './expand.js';
+import { PROJECTION_DEFINITIONS, ruleFor, TessellationError } from './expand.js';
 import type { Need } from './expand.js';
 import type { ProjectionName } from './record-shapes.js';
-import { COORDINATES_PER_TRIANGLE, IDENTITY_NOT_STATED, MATERIAL_NOT_CARRIED } from './triangle-digest.js';
-import type { DigestEntry } from './triangle-digest.js';
+import {
+  COORDINATES_PER_TRIANGLE,
+  IDENTITY_NOT_STATED,
+  MATERIAL_NOT_CARRIED,
+  SURFACE_COORDINATES_PER_TRIANGLE,
+} from './triangle-digest.js';
+import type { DigestEntry, SurfaceOrientation } from './triangle-digest.js';
 
 export interface PlacedRecord {
   readonly payload: RecordPayload;
@@ -33,20 +38,25 @@ export type MaterialRef =
 
 export type Triple = readonly [number, number, number];
 
+export interface DrawnEntry {
+  readonly record: number;
+  readonly state: 'drawn';
+  readonly first_vertex: number;
+  readonly vertex_count: number;
+  readonly first_triangle: number;
+  readonly triangle_count: number;
+  readonly extent_mm: { readonly min: Triple; readonly max: Triple };
+  /** Present exactly in a projection that carries surfaces. */
+  readonly material?: MaterialRef;
+  /** Present exactly in a projection that carries surfaces. */
+  readonly surface?: SurfaceOrientation;
+}
+
 export type Entry =
-  | {
-      readonly record: number;
-      readonly state: 'drawn';
-      readonly material: MaterialRef;
-      readonly first_vertex: number;
-      readonly vertex_count: number;
-      readonly first_triangle: number;
-      readonly triangle_count: number;
-      readonly extent_mm: { readonly min: Triple; readonly max: Triple };
-    }
+  | DrawnEntry
   | { readonly record: number; readonly state: 'unavailable'; readonly needs: readonly Need[] }
   | { readonly record: number; readonly state: 'not_admitted' }
-  | { readonly record: number; readonly state: 'not_a_surface' };
+  | { readonly record: number; readonly state: 'not_in_projection' };
 
 export interface ProjectionMesh {
   readonly name: ProjectionName;
@@ -55,6 +65,8 @@ export interface ProjectionMesh {
   readonly vertices: readonly number[];
   /** Indices into `vertices`, three per triangle. */
   readonly indices: readonly number[];
+  /** Absolute surface coordinates, two per vertex, in a projection that carries surfaces. */
+  readonly surfaceCoordinates?: readonly number[];
 }
 
 export interface TessellatedTile {
@@ -126,16 +138,18 @@ export function tessellate(document: TileDocument, digests: readonly string[]): 
     }
   });
 
-  const projections = MATERIALISED_PROJECTIONS.map((name): ProjectionMesh => {
+  const projections = PROJECTION_DEFINITIONS.map((definition): ProjectionMesh => {
+    const name = definition.name;
     const vertices: number[] = [];
     const indices: number[] = [];
+    const surfaceCoordinates: number[] = [];
     const entries = placed.map((record, recordIndex): Entry => {
       const admitted = document.grammars[record.grammar]!.declared_semantics.admissible_uses;
       if (!admitted.includes(name)) return { record: recordIndex, state: 'not_admitted' };
       const rule = ruleFor(name, record.payload.kind);
       switch (rule.rule) {
-        case 'not_a_surface':
-          return { record: recordIndex, state: 'not_a_surface' };
+        case 'not_in_projection':
+          return { record: recordIndex, state: 'not_in_projection' };
         case 'needs':
           return { record: recordIndex, state: 'unavailable', needs: rule.needs };
         case 'expand': {
@@ -147,20 +161,31 @@ export function tessellate(document: TileDocument, digests: readonly string[]): 
           const firstTriangle = indices.length / 3;
           for (const value of expansion.vertices) vertices.push(value);
           for (const index of expansion.triangles) indices.push(firstVertex + index);
-          return {
+          const drawn = {
             record: recordIndex,
             state: 'drawn',
-            material: { state: expansion.material },
             first_vertex: firstVertex,
             vertex_count: expansion.vertices.length / 3,
             first_triangle: firstTriangle,
             triangle_count: expansion.triangles.length / 3,
             extent_mm: extentOf(expansion.vertices),
-          };
+          } as const;
+          const surface = expansion.surface;
+          if (!definition.surfaces) {
+            if (surface !== undefined) throw new TessellationError(`${name} carries no surfaces`);
+            return drawn;
+          }
+          if (surface === undefined) throw new TessellationError(`${name} needs a surface for ${record.payload.kind}`);
+          if (surface.coordinates.length !== (expansion.vertices.length / 3) * 2) {
+            throw new TessellationError(`${record.payload.kind} gave surface coordinates for other vertices`);
+          }
+          for (const value of surface.coordinates) surfaceCoordinates.push(value);
+          return { ...drawn, material: { state: surface.material }, surface: surface.orientation };
         }
       }
     });
-    return { name, entries, vertices, indices };
+    if (!definition.surfaces) return { name, entries, vertices, indices };
+    return { name, entries, vertices, indices, surfaceCoordinates };
   });
   return { document, records: placed, projections };
 }
@@ -171,7 +196,12 @@ export function tessellate(document: TileDocument, digests: readonly string[]): 
  */
 export function digestEntries(
   records: readonly Pick<PlacedRecord, 'payload' | 'sha256' | 'identity'>[],
-  mesh: Pick<ProjectionMesh, 'entries' | 'indices'> & { readonly vertices: ArrayLike<number> },
+  mesh: {
+    readonly entries: readonly Entry[];
+    readonly indices: ArrayLike<number>;
+    readonly vertices: ArrayLike<number>;
+    readonly surfaceCoordinates?: ArrayLike<number>;
+  },
 ): DigestEntry[] {
   return mesh.entries.map((entry): DigestEntry => {
     const record = records[entry.record]!;
@@ -179,24 +209,38 @@ export function digestEntries(
     switch (entry.state) {
       case 'drawn': {
         const triangles = new Array<number>(entry.triangle_count * COORDINATES_PER_TRIANGLE);
-        let out = 0;
+        const coordinates = new Array<number>(entry.triangle_count * SURFACE_COORDINATES_PER_TRIANGLE);
         const end = (entry.first_triangle + entry.triangle_count) * 3;
+        let out = 0;
+        let outSurface = 0;
         for (let corner = entry.first_triangle * 3; corner < end; corner += 1) {
           const vertex = mesh.indices[corner]!;
           triangles[out] = mesh.vertices[vertex * 3]!;
           triangles[out + 1] = mesh.vertices[vertex * 3 + 1]!;
           triangles[out + 2] = mesh.vertices[vertex * 3 + 2]!;
           out += 3;
+          if (mesh.surfaceCoordinates !== undefined) {
+            coordinates[outSurface] = mesh.surfaceCoordinates[vertex * 2]!;
+            coordinates[outSurface + 1] = mesh.surfaceCoordinates[vertex * 2 + 1]!;
+            outSurface += 2;
+          }
         }
+        if (entry.material === undefined) return { ...head, state: 'drawn', triangles };
+        if (entry.surface === undefined) throw new TessellationError('a material with no orientation');
         const material = entry.material.state === 'record'
           ? records[entry.material.record]!.sha256
           : MATERIAL_NOT_CARRIED;
-        return { ...head, state: 'drawn', material, triangles };
+        return {
+          ...head,
+          state: 'drawn',
+          triangles,
+          surface: { material, orientation: entry.surface, coordinates },
+        };
       }
       case 'unavailable':
         return { ...head, state: 'unavailable', needs: entry.needs };
       case 'not_admitted':
-      case 'not_a_surface':
+      case 'not_in_projection':
         return { ...head, state: entry.state };
     }
   });
