@@ -158,6 +158,10 @@ removes terrain, since that would cut holes nothing fills. Every record whose ex
 coverings is expanded first; entries are still written in record order. A cell no covering meets is
 drawn exactly as the grid draws it.
 
+Yielding costs vertices, and that is the price of the boundary being exact: on the conformance
+tile, where three segments draw their carriageways and gutters, terrain goes from the grid's 289
+vertices and 512 triangles to 483 and 572. A cell no covering meets keeps its two triangles.
+
 A met cell is cut into pieces that each lie on one plane of the terrain. Each piece, less the union
 of the coverings, is found exactly by a rational plan arrangement (`src/core/plan-arrangement.ts`)
 and cut into convex faces along the rows of the covering vertices inside it. Each face is drawn as
