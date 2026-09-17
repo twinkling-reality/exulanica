@@ -1,0 +1,41 @@
+The tile route loader against a RUNNING route, 2026-09-17.
+
+Server: the corridor lane's own development server on this machine, its own migrated database, the
+API as the non-owner exulanica_app role. Its scratch credential was held for this run only: it is
+not in this record, was never committed, and the corridor lane drops the database when it is done.
+
+WHAT THE BYTES ARE. The tile this server serves is NOT a corridor street and NOT a container. It is
+74 bytes of ASCII standing in for one until tess's port lets the real bake run, so it does not parse
+as owd/3 and nothing here draws it. This record proves the transport and the checking: that the
+right bytes arrive, that they are held to the digest their row records, and that the route's
+refusals are carried without being dressed up. Drawing is proved elsewhere, on committed goldens.
+
+Run: npx vitest run --root packages/atlas-react test/generated-tile-route-live
+(the file skips itself unless a route, a token and a city seed are named in the environment, so it
+never runs in a suite and no credential is ever committed).
+
+MEASURED
+  list of the city                1 tile, state baked, 74 bytes,
+                                  container_sha256 ccf5701d85ded679e328b2400eccc8831557650655b9381f50912d0e214e8c97
+  first fetch                     origin "fetched", 74 bytes across the network, and the bytes hash
+                                  to ccf5701d..., which is what the row records and what the ETag named
+  reload holding the row          origin "held", 0 bytes: no request was made at all, because the
+                                  digest the list named is the digest already held
+  revalidation without the row    origin "not-modified", 0 bytes: the request carried If-None-Match
+                                  and the route answered 304
+  unknown key                     404, code unknown_reference
+  a credential the route does not know
+                                  401, code unauthenticated
+
+THE 304 IS NEW, AND IT IS THE CORRIDOR LANE'S FIX. Before today the route had no If-None-Match
+branch and a plain Starlette Response does no conditional handling, so every revalidation was
+answered 200 with the whole container while the documentation said a reload cost nothing. This lane
+found that by reading `read_tile_bytes` and `starlette/responses.py` rather than the docstring, the
+corridor lane implemented the branch with its own route tests, and the "not-modified" line above is
+that branch working. The loader sends If-None-Match either way and prefers the held digest, so it
+would have been correct with or without the fix.
+
+NOT PROVED HERE: a credential that authenticates but does not hold tiles.materialise, which the
+route answers 404 unknown_reference so that it cannot be told apart from an unknown key. This run
+had one token and it holds the permission. The unit tests assert the loader keeps the two answers
+byte for byte identical; proving it end to end needs a second token from the corridor lane.
