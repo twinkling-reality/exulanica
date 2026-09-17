@@ -3,8 +3,11 @@
 Status: IMPLEMENTED as a development evaluation only: the browser reads baked texture sets and
 baked `.owd` tiles, draws a tile's `render_batch` with physically based materials under one
 versioned look, and stands the player on its `nav_envelope`. No generated tile appears in any
-person's world, and none may until a superseding governance ADR is accepted in writing. No baked
-corridor street exists yet, so textured tile geometry has been seen only on a test-only bench.
+person's world, and none may until a superseding governance ADR is accepted in writing. A baked
+corridor street now exists in the tile store and has been loaded through the product route and
+walked on the development page (2026-09-17): 4 of its 854 records drew, and 851 named a tessellator
+expander that does not exist yet, so what a walker saw was the stated unavailable hatch rather than a
+street. Textured tile geometry has still been seen only on a test-only bench.
 
 The code is `web/packages/atlas-core/src/texture-set.ts` (the texture set reader),
 `web/packages/atlas-react/src/playcanvas/generated-tile/` (materials, look, environment, tile
@@ -339,6 +342,50 @@ The control builds in development mode and finds all of them, so the test can fa
 checks that a workspace query (`?tile=` without `preview=1`) and every path-like name get no tile.
 `web/packages/app/test/generated-tile-golden.test.ts` rebakes `tile-conformance.owd` through tess's
 own bake command and requires identical bytes.
+
+### 7.1 The second entry: a tile fetched from the product route
+
+A baked corridor street is never a file in this repository, so the preview route's goldens cannot
+reach one. The second entry loads a tile from the product route instead, on the same development
+page, and the difference between the two is where the container comes from:
+
+- `bakedTileRequest(search, preview)` in `config.ts` reads `?preview=1&city=<64 hex>&tile_x=&tile_y=`
+  with `lod` defaulting to 0, and `&baked_tile=<uuid>` as a shortcut that wins when both are given.
+  A seed must be a 64 hex digest, a key a UUID and the coordinates bounded whole numbers, so no
+  reading of that query can become a path. The coordinate is the public door because a key is uuid5
+  over the stage version and inputs digest and so moves with every bake, while the coordinate a walk
+  wants does not.
+- `tile-route.ts` lists the city (metadata, no tile quota), picks the tile with `tileAt`, and fetches
+  the container. It hashes what arrived and refuses anything whose digest is not the one the row
+  records, naming both digests; refuses a container that carries no digest to check it against; and
+  refuses from the list, with no request at all, a tile whose state is not `baked`.
+- A reload asks for nothing. The list names each tile's `container_sha256`, so a container already
+  held is used without a request, which is cheaper than a revalidation per tile. The request carries
+  `If-None-Match` as well, so a 304 costs nothing where the route answers one.
+- Refusals carry the route's own code and status and never a guess at the cause. An unknown key and a
+  credential without `tiles.materialise` are both 404 `unknown_reference`: MEASURED against the
+  running route, they share the status and the code and differ in detail and headers, because the
+  permission floor refuses an id-addressed route before the route's own function runs. The pair this
+  runtime relies on is the status and the code, and nothing here turns either answer into a claim
+  about which one it was.
+- With no development token the page refuses in plain words rather than asking anonymously, because
+  an anonymous ask is answered exactly as an unknown tile is and a walker would be told the wrong
+  thing.
+
+**The split, which is a decision and not an accident.** The CONTAINER comes from the route with a
+credential, because a generated tile must never be committed. The TEXTURE SETS come from the
+committed library through the development page (`committedTextureLibrary()`), because they are
+committed and no route serves the published texture library yet. A published-texture route is a real
+gap and a future lane's work. The statement panel says both, with the container's digest and whether
+the bytes were fetched, held or not modified, so no picture of a walk can imply a product path that
+does not exist; the golden path prints its own line, so the two can never be mistaken for each other.
+
+Proof: `atlas-react/test/generated-tile-route.test.ts` drives every status, header and problem body
+the route really gives; `app/test/generated-tile-walk.test.ts` runs the whole page path with the
+committed golden's bytes served as if fetched, and asserts the statement names the route and the
+digest; `atlas-react/test/generated-tile-route-live.test.ts` runs against a RUNNING route and skips
+itself unless one is named in the environment, so no credential can ever reach a suite. The live
+proof is retained in `evidence/tile-route-loader.log.txt`.
 
 ## 8. Budget
 
