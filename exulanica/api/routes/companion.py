@@ -302,9 +302,7 @@ def correct_answer(
     status_code=204,
     summary="Delete one memory, and every correction of it, for good.",
 )
-def delete_answer(
-    answer_id: Annotated[uuid.UUID, Path()], repository: WriteMemory
-) -> Response:
+def delete_answer(answer_id: Annotated[uuid.UUID, Path()], repository: WriteMemory) -> Response:
     # `Response` rather than `Response | JSONResponse`, because FastAPI reads a union return
     # annotation as a response model and refuses to build one for a 204. `JSONResponse` is a
     # `Response`, so the 404 branch below still returns what it says it returns.

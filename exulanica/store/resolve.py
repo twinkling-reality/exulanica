@@ -29,6 +29,7 @@ from exulanica.store.base import ContentAddressedStore
 
 __all__ = ["address_from_span_row", "resolve_original_bytes"]
 
+
 def address_from_span_row(row: Mapping[str, Any]) -> EvidenceAddress:
     """Rebuild an address from a stored span. The digest must come out identical.
 

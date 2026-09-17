@@ -103,9 +103,7 @@ class BodyTooLarge(HTTPException):
     """
 
     def __init__(self, read: int, limit: int) -> None:
-        super().__init__(
-            status_code=413, detail=f"the request body exceeded {limit} bytes"
-        )
+        super().__init__(status_code=413, detail=f"the request body exceeded {limit} bytes")
         self.read = read
         self.limit = limit
 
