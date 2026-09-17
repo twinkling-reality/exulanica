@@ -87,7 +87,7 @@ from exulanica.grammar.grammars.city.generation.stage import (
 )
 from exulanica.grammar.parameters import ParameterBinding
 
-__all__ = ["MAXIMUM_PITCH_MM", "STAGE", "is_shop_bay", "shop_units"]
+__all__ = ["MAXIMUM_PITCH_MM", "STAGE", "building_shop_units", "is_shop_bay", "shop_units"]
 
 #: The target architecture's widest bay: no pitch this generator lays out exceeds it.
 MAXIMUM_PITCH_MM: Final = 3_500
@@ -117,6 +117,41 @@ def shop_units(bays: Sequence[facade.GroundBayRecord]) -> list[list[facade.Groun
             units.append([bay])
         else:
             units[-1].append(bay)
+    return units
+
+
+def building_shop_units(
+    lot: parcels.ParcelRecord,
+    faces: Sequence[facade.FacadeRecord],
+    bays: Sequence[facade.GroundBayRecord],
+) -> list[list[facade.GroundBayRecord]]:
+    """A building's shop units: its primary frontage's units, with each second frontage's
+    shopfronts joined to the unit at the end they adjoin (edge ``i + 1`` adjoins the primary
+    face's end, edge ``i - 1`` its start)."""
+    primary_edge = lot.frontages[0].edge_ordinal
+    ground = [face for face in faces if face.tier_ordinal == 0 and face.exposure == "frontage"]
+    by_face: dict[str, list[facade.GroundBayRecord]] = {}
+    for bay in bays:
+        by_face.setdefault(bay.facade_identity, []).append(bay)
+    primary = next((face for face in ground if face.edge_ordinal == primary_edge), None)
+    if primary is None:
+        return []
+    units = shop_units(by_face.get(primary.identity, []))
+    if not units:
+        return units
+    for face in ground:
+        if face is primary:
+            continue
+        shopfronts = sorted(
+            (bay for bay in by_face.get(face.identity, []) if bay.bay_kind == "shopfront"),
+            key=lambda item: item.bay_ordinal,
+        )
+        if not shopfronts:
+            continue
+        if face.edge_ordinal == (primary_edge + 1) % 4:
+            units[-1] = units[-1] + shopfronts
+        else:
+            units[0] = units[0] + shopfronts
     return units
 
 

@@ -46,9 +46,11 @@ from exulanica.grammar.grammars.city.generation import facade as facade_generato
 from exulanica.grammar.grammars.city.generation import massing as massing_generator
 from exulanica.grammar.grammars.city.generation import material as material_generator
 from exulanica.grammar.grammars.city.generation import parcels as parcels_generator
+from exulanica.grammar.grammars.city.generation import premises as premises_generator
 from exulanica.grammar.grammars.city.generation import streetlife as streetlife_generator
 from exulanica.grammar.grammars.city.generation import streets as streets_generator
 from exulanica.grammar.grammars.city.generation import terrain as terrain_generator
+from exulanica.grammar.grammars.city.generation import vitrine as vitrine_generator
 from exulanica.grammar.shapes import RecordShape
 
 __all__ = ["CITY_GRAMMAR", "CITY_SHAPES", "CITY_SHAPES_BY_TYPE", "CITY_STAGES"]
@@ -62,8 +64,8 @@ CITY_STAGES: Final = (
     facade_generator.STAGE,
     material_generator.STAGE,
     streetlife_generator.STAGE,
-    vitrine.STAGE,
-    premises.STAGE,
+    vitrine_generator.STAGE,
+    premises_generator.STAGE,
     tile.STAGE,
 )
 
