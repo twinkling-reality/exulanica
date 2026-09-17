@@ -63,8 +63,8 @@ export async function prepareGeneratedTileEvaluation(env: AppEnvironment, name: 
     manifest,
     fetchSet: (entry) => source.textureSet(entry.contentSha256),
   });
+  // The title stays the preview's own: the visual gate harness holds the shell to it.
   env.shell.setAttribute(GENERATED_TILE_EVALUATION_ATTRIBUTE, name);
-  document.title = `${document.title}: generated tile ${name}`;
   env.shell.querySelector('.generated-tile-evaluation')?.remove();
   env.shell.append(statement(tile));
   return tile;
