@@ -21,3 +21,18 @@ export { buildSurfaceMesh, validateSurfaceBatch } from './surface-mesh.js';
 export type { TileEnvironment } from './environment.js';
 export { applyTileEnvironment, skyRadiance } from './environment.js';
 export { createUnavailableMaterial, unavailablePatternTexels } from './unavailable-surface.js';
+export type { GeneratedTileRange, GeneratedTileSources, LoadedGeneratedTile } from './tile-runtime.js';
+export {
+  GeneratedTileRefusal,
+  MATERIAL_NOT_CITED,
+  SURFACE_COORDINATES_NOT_CARRIED,
+  loadGeneratedTile,
+} from './tile-runtime.js';
+export type { TileCollisionState, TileExtentMm, TileNavigation, TileSupportState } from './tile-navigation.js';
+export {
+  SUPPORT_SAMPLE_SPACING_M,
+  navEnvelopeSupport,
+  rendererToTile,
+  tileNavigation,
+  tileToRenderer,
+} from './tile-navigation.js';
