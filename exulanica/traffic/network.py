@@ -1175,6 +1175,8 @@ def compile_network(
             raise _refuse(f"lane {path.ordinal} is too short to leave its junction region")
 
     catalog_sha256 = catalogs.digest
+    # Sorted before the document is built, so the digest does not depend on record order.
+    ordered_spaces = dict(sorted(spaces.items()))
     document = _document(
         scope,
         driving_side,
@@ -1182,7 +1184,7 @@ def compile_network(
         junctions,
         zones,
         bands,
-        spaces,
+        ordered_spaces,
         exit_extent,
         joint_extent,
         restrictions,
@@ -1195,7 +1197,7 @@ def compile_network(
         junctions=junctions,
         zones=tuple(zones),
         bands=tuple(bands),
-        spaces=dict(sorted(spaces.items())),
+        spaces=ordered_spaces,
         exit_extent=exit_extent,
         gates={path_id: tuple(items) for path_id, items in sorted(gates.items())},
         zones_by_path={key: tuple(sorted(value)) for key, value in zones_by_path.items()},
