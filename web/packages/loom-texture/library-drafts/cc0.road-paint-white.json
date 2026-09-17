@@ -1,0 +1,45 @@
+{
+  "set_id": "cc0.road-paint-white",
+  "version": 1,
+  "title": "Road paint, white",
+  "summary": "White thermoplastic road marking for lane lines, stop bars and crossings, worn through in the tracks where tyres run.",
+  "licence_id": "CC0-1.0",
+  "recipe": {
+    "profile": "exulanica.texture-recipe/v1",
+    "maker": {
+      "id": "loom.paint",
+      "version": 1
+    },
+    "seed": 2026091707,
+    "resolution": {
+      "width": 256,
+      "height": 64
+    },
+    "extent_mm": {
+      "u": 1000,
+      "v": 250
+    },
+    "parameters": {
+      "paint_colour": [236, 234, 226],
+      "grime_colour": [96, 94, 88],
+      "edge_bite_mm": 12,
+      "edge_cells_along": 9,
+      "wear_percent": 32,
+      "wear_cells": 26,
+      "wear_patch_cells": 6,
+      "thinning_percent": 40,
+      "bead_cells": 168,
+      "bead_relief_mm_1024ths": 420,
+      "bead_tone_q16": 3400,
+      "paint_thickness_mm_1024ths": 1500,
+      "grime_percent": 28,
+      "grime_cells": 4,
+      "paint_roughness_permille": 620,
+      "grime_roughness_percent": 12,
+      "height_range_mm": 4,
+      "occlusion_radius_mm": 3,
+      "occlusion_depth_mm": 1,
+      "occlusion_strength_permille": 300
+    }
+  }
+}
