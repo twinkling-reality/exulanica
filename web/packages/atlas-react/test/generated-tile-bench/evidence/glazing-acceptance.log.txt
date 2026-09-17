@@ -1,0 +1,47 @@
+GLAZING ACCEPTANCE, texture proposal section 3, 2026-09-17, lane/tile-runtime-glazing (stacked on the cutout head 6d650699)
+Driver: headless Chrome 152 at 1440x900 against the bench (tile-runtime-bench, 5191), ANGLE Metal on Apple M3 Pro,
+look exulanica.generated-tile-look@1 with the camera frame's scene colour copy on (requested by the glazing binding).
+Frames pumped synchronously through window.bench; pixels read back from the default framebuffer; luminance Rec. 709.
+
+INPUTS, BOTH TEST-ONLY (test/generated-tile-bench/test-glazing.ts), never shipped:
+- Glass: clean float glass shaped as a v2 procedural glazing set, 512 x 512 texels over 2000 mm, tint (246, 250, 247),
+  transmission 255, roughness 5 (20 in 1000), ior_millionths 1500000, bound through TileTextureUploads.adopt.
+  The published cc0.float-glazing is NOT measured: texture batch 1 is not on main yet.
+- Backing: a TEST-ONLY surface standing in for what the grammar will state lies behind glazing (a vitrine or an interior
+  backing, not yet in the grammar): a lit black and white checker of 200 mm squares, 20 m wide, 0.6 m behind the pane.
+  Level 1 is the checker in open light; level 0.25 scales its diffuse to a quarter, nearer a shop interior's brightness.
+
+SCENE (bench.measureGlazing): a 2 m pane facing -Z at (0, 40, 0), drawn with the runtime's glazing material and casting
+shadows as the runtime decides for its class (none). Per view: the pane's footprint (pane drawn as an opaque mask), and
+frames of the backing alone (C), the backing seen through the pane (A), and the pane over a matte black backing (R, the
+reflection alone).
+
+1. THE FITOUT READS THROUGH CLEAN GLASS, 2 TO 6 m, face on. Correlation of luminance of A with C inside the footprint, and
+   the share of C's contrast (standard deviation) A keeps.
+   backing level 1:     2 m  corr 0.998  contrast 0.957    4 m  0.998  0.935    6 m  0.996  0.915
+   backing level 0.25:  2 m  corr 0.967  contrast 0.957    4 m  0.969  0.905    6 m  0.980  0.863
+   Met: the checker keeps its pattern and at least 86 per cent of its contrast through the glass at every distance.
+
+2. THE SKY'S REFLECTION DOMINATES PAST 70 DEGREES. At 4 m, the camera swung about the pane's vertical axis; reflection share
+   is mean luminance of R over mean luminance of A in the footprint.
+   angle from normal        0     30     50     60     70     75     80     85
+   backing level 1        0.164  0.168  0.184  0.234  0.376  0.488  0.621  0.738
+   backing level 0.25     0.319  0.355  0.412  0.508  0.701  0.810  0.901  0.958
+   With the interior-bright backing the reflection is half the light at 60 degrees and 70 per cent at 70: met. Against the
+   sunlit checker, as bright as the street outside, reflection passes half only beyond 75 degrees.
+   Reflection alone (mean luminance of R) with the runtime's reflectance: 25.5 at 0 degrees, 60.3 at 70, 139.2 at 85.
+   Before the glazing material replaced PlayCanvas's Schlick term (whose value at grazing incidence is capped at
+   max(gloss^2 * F0, F0), 0.04 for glass), the same reflection-only frames read 25.5 at 0 degrees and 24.4 at 85: flat.
+
+3. GLAZING CASTS NO SHADOW (bench.measureGlazingShadow). A horizontal 4 m pane 2.5 m above lit paving, sun straight down,
+   1,600 ground samples: open mean 226.8, under the pane 226.8, darkened by 0.000.
+   An earlier run whose bench helper cast shadows for every class darkened the ground by 0.593 and put a shadow of the
+   pane on the backing; both were bench errors, and every figure above is from after the fix.
+
+SCREENSHOTS (not in git): .exulanica/briefs/tile-runtime/shots/glazing/ glazing-face-on.png (checker through clean glass),
+glazing-78deg.png (sky reflection on the pane), glazing-film-20deg.png (a test variant with film patches over 35 per cent:
+film lit where transmission falls, checker through the clean glass).
+
+NOT MEASURED: blur by roughness beyond clean glass; panes overlapping one another (one set is one draw, so its panes are not
+sorted against each other; the scene copy holds only opaque surfaces, so glass is never seen through glass); position-based
+soiling from the class object's film (out of scope until its inputs exist).

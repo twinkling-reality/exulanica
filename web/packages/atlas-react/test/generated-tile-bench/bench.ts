@@ -11,7 +11,7 @@
 import * as pc from 'playcanvas';
 import { parseTextureSetManifest, textureSetBlobPath, type TextureSetManifest } from '@exulanica/atlas-core';
 import { TILE_LOOK_V1, validateTileLook, type TileLook } from '../../src/playcanvas/generated-tile/look.js';
-import { TileTextureLibrary, surfaceUv, type TileMaterialReference } from '../../src/playcanvas/generated-tile/texture-materials.js';
+import { TileTextureLibrary, castsShadow, surfaceUv, type TileMaterialReference } from '../../src/playcanvas/generated-tile/texture-materials.js';
 import { buildSurfaceMesh } from '../../src/playcanvas/generated-tile/surface-mesh.js';
 import { applyTileEnvironment, type TileEnvironment } from '../../src/playcanvas/generated-tile/environment.js';
 import {
@@ -19,6 +19,7 @@ import {
   calibrationWall, testStreet, type TestStreetSets, type TestSurface,
 } from './test-street.js';
 import { testCutoutSet } from './test-cutout.js';
+import { TEST_BACKING_DEPTH_M, backingTexels, testGlazingSet } from './test-glazing.js';
 import type { DecodedTextureSet } from '@exulanica/atlas-core';
 
 declare const __TEXTURE_ROOT__: string;
@@ -513,7 +514,7 @@ export class Bench {
   }
 
   /** A square of the test field, `size` metres, facing -Z (vertical) or +Y (horizontal), one repeat per extent. */
-  private cutoutPlane(material: pc.Material, centre: readonly [number, number, number], size: number, facing: 'front' | 'up', extentMm: number): pc.Entity {
+  private cutoutPlane(material: pc.Material, centre: readonly [number, number, number], size: number, facing: 'front' | 'up', extentMm: number, castShadows = true): pc.Entity {
     const h = size / 2;
     const [x, y, z] = centre;
     const corners = facing === 'front'
@@ -527,7 +528,7 @@ export class Bench {
       surfaceMm: [0, 0, mm, 0, mm, mm, 0, mm], indices: facing === 'front' ? [0, 1, 2, 0, 2, 3] : [0, 2, 1, 0, 3, 2],
     }, (s, t) => [s / extentMm, t / extentMm]);
     const entity = new pc.Entity('bench:cutout-plane');
-    entity.addComponent('render', { meshInstances: [new pc.MeshInstance(mesh, material, entity)], castShadows: true, receiveShadows: true });
+    entity.addComponent('render', { meshInstances: [new pc.MeshInstance(mesh, material, entity)], castShadows, receiveShadows: true });
     this.root.addChild(entity);
     this.surfaces.push(entity);
     this.meshes.push(mesh);
@@ -679,6 +680,146 @@ export class Bench {
     this.clear();
     oneSided.destroy();
     return result;
+  }
+
+  /** The test-only clean glazing set as a material, bound by the runtime's class binding, with the scene colour copy on. */
+  private glazingMaterial(filmShare = 0): { readonly material: pc.StandardMaterial; readonly set: DecodedTextureSet } {
+    const set = testGlazingSet(512, 2000, filmShare);
+    const resolution = this.library.adopt({ state: 'decoded', setId: set.entry.setId, set, transferredBytes: 0 });
+    if (resolution.state !== 'available') throw new Error(`the test glazing does not draw: ${resolution.reason}`);
+    this.environment!.requestSceneColor();
+    return { material: resolution.material, set };
+  }
+
+  /**
+   * The test-only backing: a lit checker of 200 mm squares, its diffuse scaled by `level` (1 is the checker
+   * in open light, as bright as the street; a shop interior is far dimmer), or matte black to see reflection alone.
+   */
+  private backingMaterials(level = 1): { readonly checker: pc.StandardMaterial; readonly black: pc.StandardMaterial; destroy(): void } {
+    const texture = new pc.Texture(this.app.graphicsDevice, {
+      name: 'bench:backing-checker', width: 256, height: 256, format: pc.PIXELFORMAT_SRGBA8, mipmaps: true,
+      addressU: pc.ADDRESS_REPEAT, addressV: pc.ADDRESS_REPEAT, levels: [backingTexels(256, 4)],
+    });
+    const checker = new pc.StandardMaterial();
+    checker.diffuseMap = texture; checker.diffuse = new pc.Color(level, level, level); checker.useMetalness = true; checker.metalness = 0; checker.gloss = 0.2; checker.cull = pc.CULLFACE_NONE; checker.update();
+    const black = new pc.StandardMaterial();
+    black.useLighting = false; black.useSkybox = false; black.diffuse = new pc.Color(0, 0, 0); black.emissive = new pc.Color(0, 0, 0); black.cull = pc.CULLFACE_NONE; black.update();
+    return { checker, black, destroy() { checker.destroy(); black.destroy(); texture.destroy(); } };
+  }
+
+  /**
+   * Glazing acceptance. A 2 m pane of test clean glass faces -Z at (0, 40, 0), with a test-only backing
+   * square 20 m wide standing TEST_BACKING_DEPTH_M behind it. For each view: the pane's footprint (the
+   * pane drawn as an opaque mask); frames with the backing seen through the pane (A), the backing
+   * alone (C), and the pane over a matte black backing (R, reflection alone).
+   * Reads through: correlation of luminance of A with C inside the footprint, and the contrast kept,
+   * face on at each distance. Reflection by angle: the share of A's luminance that R, the reflection
+   * alone, accounts for, at 4 m and each angle from the pane's normal.
+   */
+  async measureGlazing(distances: readonly number[], angles: readonly number[], backingLevel = 1): Promise<Record<string, unknown>> {
+    this.clear();
+    const { material, set } = this.glazingMaterial();
+    const backing = this.backingMaterials(backingLevel);
+    const mask = this.unlitMask();
+    const centre = [0, 40, 0] as const;
+    const pane = this.cutoutPlane(material, centre, 2, 'front', set.entry.extentUMm, castsShadow(set));
+    const behind = this.cutoutPlane(backing.checker, [0, 40, TEST_BACKING_DEPTH_M], 20, 'front', 2000);
+    const paneRender = pane.render!;
+    const behindRender = behind.render!;
+    const view = (position: readonly [number, number, number]) => {
+      this.pose({ position, target: centre });
+      pane.enabled = true; behind.enabled = false; paneRender.meshInstances[0]!.material = mask; this.pump(4);
+      const masked = this.pixels();
+      pane.enabled = false; this.pump(4);
+      const empty = this.pixels();
+      behind.enabled = true; behindRender.meshInstances[0]!.material = backing.checker; this.pump(4);
+      const backingOnly = this.pixels();
+      pane.enabled = true; paneRender.meshInstances[0]!.material = material; this.pump(4);
+      const through = this.pixels();
+      behindRender.meshInstances[0]!.material = backing.black; this.pump(4);
+      const reflection = this.pixels();
+      const footprint: number[] = [];
+      for (let at = 0; at < empty.data.length; at += 4) if (Bench.differs(masked.data, empty.data, at)) footprint.push(at);
+      const lum = (frame: ReturnType<Bench['pixels']>): Float64Array =>
+        Float64Array.from(footprint, (at) => luminance(frame.data[at]!, frame.data[at + 1]!, frame.data[at + 2]!));
+      return { footprint: footprint.length, through: lum(through), backingOnly: lum(backingOnly), reflection: lum(reflection) };
+    };
+    const mean = (values: Float64Array): number => values.reduce((a, b) => a + b, 0) / Math.max(1, values.length);
+    const deviation = (values: Float64Array): number => {
+      const m = mean(values);
+      return Math.sqrt(values.reduce((a, b) => a + (b - m) ** 2, 0) / Math.max(1, values.length));
+    };
+    const round = (value: number, places = 3): number => Math.round(value * 10 ** places) / 10 ** places;
+    const readsThrough = distances.map((distance) => {
+      const frames = view([0, 40, -distance]);
+      return {
+        distance, footprintPixels: frames.footprint,
+        correlation: round(pearson(frames.through, frames.backingOnly)),
+        contrastKept: round(deviation(frames.through) / deviation(frames.backingOnly)),
+        meanThrough: round(mean(frames.through), 1), meanBacking: round(mean(frames.backingOnly), 1), meanReflection: round(mean(frames.reflection), 1),
+      };
+    });
+    const byAngle = angles.map((angle) => {
+      const radians = (angle * Math.PI) / 180;
+      const frames = view([Math.sin(radians) * 4, 40, -Math.cos(radians) * 4]);
+      return {
+        angle, footprintPixels: frames.footprint,
+        reflectionShare: round(mean(frames.reflection) / mean(frames.through)),
+        meanThrough: round(mean(frames.through), 1), meanReflection: round(mean(frames.reflection), 1), meanBacking: round(mean(frames.backingOnly), 1),
+        correlationWithBacking: round(pearson(frames.through, frames.backingOnly)),
+      };
+    });
+    this.clear();
+    mask.destroy(); backing.destroy();
+    return { backingDepthM: TEST_BACKING_DEPTH_M, backingLevel, readsThrough, byAngle };
+  }
+
+  /**
+   * Glazing casts no shadow: the same scene as measureCutoutShadow with a pane of test glass, which casts
+   * shadows exactly as the tile runtime decides for its class (castsShadow).
+   */
+  async measureGlazingShadow(): Promise<Record<string, unknown>> {
+    this.clear();
+    const { material, set } = this.glazingMaterial();
+    const ground = await this.library.resolve('cc0.footway-paving');
+    const sun = this.environment!.sun;
+    const rotation = sun.getRotation().clone();
+    sun.setRotation(new pc.Quat().setFromEulerAngles(0, 0, 0));
+    this.cutoutPlane(ground.material, [0, 0, 0], 16, 'up', 1800);
+    const pane = this.cutoutPlane(material, [0, 2.5, 0], 4, 'up', set.entry.extentUMm, castsShadow(set));
+    this.pose({ position: [0, 1.3, -7], target: [0, 0, 0] });
+    const samples: (readonly [number, number])[] = [];
+    for (let i = 0; i < 40; i += 1) {
+      for (let j = 0; j < 40; j += 1) {
+        const [sx, sy] = this.screen([-1.6 + (3.2 * (i + 0.5)) / 40, 0.001, -1.6 + (3.2 * (j + 0.5)) / 40]);
+        samples.push([Math.round(sx), Math.round(sy)]);
+      }
+    }
+    const luma = (frame: ReturnType<Bench['pixels']>): number[] => samples.map(([x, y]) => {
+      const at = (y * frame.width + x) * 4;
+      return luminance(frame.data[at]!, frame.data[at + 1]!, frame.data[at + 2]!);
+    });
+    pane.enabled = false; this.pump(6);
+    const open = luma(this.pixels());
+    pane.enabled = true; this.pump(6);
+    const under = luma(this.pixels());
+    const meanOpen = open.reduce((a, b) => a + b, 0) / open.length;
+    const meanUnder = under.reduce((a, b) => a + b, 0) / under.length;
+    sun.setRotation(rotation);
+    this.clear();
+    return { openMean: Math.round(meanOpen * 10) / 10, underPaneMean: Math.round(meanUnder * 10) / 10, darkenedBy: Math.round(((meanOpen - meanUnder) / meanOpen) * 1000) / 1000 };
+  }
+
+  /** For screenshots: the pane and its test backing from 4 m at `angle` degrees off the pane's normal, left drawn. */
+  showGlazing(angle: number, filmShare = 0): void {
+    this.clear();
+    const { material, set } = this.glazingMaterial(filmShare);
+    const backing = this.backingMaterials();
+    this.cutoutPlane(backing.checker, [0, 40, TEST_BACKING_DEPTH_M], 20, 'front', 2000);
+    this.cutoutPlane(material, [0, 40, 0], 2, 'front', set.entry.extentUMm, castsShadow(set));
+    const radians = (angle * Math.PI) / 180;
+    this.pose({ position: [Math.sin(radians) * 4, 40, -Math.cos(radians) * 4], target: [0, 40, 0] });
+    this.pump(6);
   }
 
   /** For screenshots: a 4 m square of the test field face on at `distance`, left drawn. */
