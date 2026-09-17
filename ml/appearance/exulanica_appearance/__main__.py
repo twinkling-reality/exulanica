@@ -10,6 +10,7 @@
     runner run       --staged DIR --weights DIR --out DIR
     runner check     --out DIR
     runner dry-run   --repository . --out DIR
+    runner gate      --results DIR --staged DIR --billed-seconds N --budget-seconds N --rate-cents N --out FILE
 
 Every command reads and writes files only. None downloads a model, and none needs a GPU.
 """
@@ -142,6 +143,35 @@ def _runner_check(args: argparse.Namespace) -> int:
     return 0
 
 
+def _runner_gate(args: argparse.Namespace) -> int:
+    """Apply the smoke job's pass conditions; exit 0 to continue the session, 1 to stop and delete."""
+    from exulanica_appearance.canonical import sha256_hex
+    from exulanica_appearance.runner.gate import read_gate, smoke_gate
+    from exulanica_appearance.runner.job import read_job
+
+    out = Path(args.results)
+    results_raw = (out / "results.json").read_bytes()
+    job = read_job((Path(args.staged) / "job.json").read_bytes())
+    records = {path.stem: path.read_bytes() for path in sorted((out / "records").glob("*.json"))}
+    raw = smoke_gate(
+        results_raw=results_raw,
+        job=job,
+        records=records,
+        billed_seconds=args.billed_seconds,
+        budget_seconds=args.budget_seconds,
+        rate_cents_per_hour=args.rate_cents,
+    )
+    Path(args.out).write_bytes(raw)
+    gate = read_gate(raw)
+    for name in sorted(gate["checks"]):
+        entry = gate["checks"][name]
+        print(f"{'passed' if entry['passed'] else 'FAILED'}  {name}: {entry['detail']}")
+    print(
+        f"gate {sha256_hex(raw)}: {'continue' if gate['continue'] else 'stop, delete the machine and report'}"
+    )
+    return 0 if gate["continue"] else 1
+
+
 def _runner_dry_run(args: argparse.Namespace) -> int:
     from exulanica_appearance.runner.dry_run import dry_run
 
@@ -212,6 +242,14 @@ def main(argv: list[str] | None = None) -> int:
     check = runner.add_parser("check")
     check.add_argument("--out", required=True)
     check.set_defaults(run=_runner_check)
+    gate = runner.add_parser("gate")
+    gate.add_argument("--results", required=True)
+    gate.add_argument("--staged", required=True)
+    gate.add_argument("--billed-seconds", type=int, required=True)
+    gate.add_argument("--budget-seconds", type=int, required=True)
+    gate.add_argument("--rate-cents", type=int, required=True)
+    gate.add_argument("--out", required=True)
+    gate.set_defaults(run=_runner_gate)
     dry = runner.add_parser("dry-run")
     dry.add_argument("--repository", required=True)
     dry.add_argument("--out", required=True)

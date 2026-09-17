@@ -157,6 +157,30 @@ def _control_tensor(conditioning: NDArray[np.uint8]) -> Any:
     )
 
 
+def _refuse_fallbacks(model: Any, expected_dtype: Any, where: str) -> None:
+    """Refuse a model that is not wholly on the GPU in the dtype the job named.
+
+    A fallback is the failure this lane most wants to catch: a model quietly on the CPU, in a
+    smaller dtype, or with a parameter left on the meta device because a weight was missing, all
+    produce pictures that say nothing about the model the record names.
+    """
+    import torch
+
+    if not torch.cuda.is_available():
+        raise RuntimeError(f"{where}: no CUDA device; this lane never runs a model on the CPU")
+    for name, parameter in model.named_parameters():
+        if parameter.dtype != expected_dtype:
+            raise RuntimeError(
+                f"{where}: parameter {name} is {parameter.dtype}, not the {expected_dtype} the job named"
+            )
+        if parameter.device.type != "cuda":
+            raise RuntimeError(f"{where}: parameter {name} is on {parameter.device}, not the GPU")
+        if parameter.is_meta:
+            raise RuntimeError(
+                f"{where}: parameter {name} is on the meta device; a weight did not load"
+            )
+
+
 class _Base:
     name = "videox"
 
@@ -226,6 +250,8 @@ class QwenImageFunControl(_Base):
             transformer=transformer,
             scheduler=FlowMatchEulerDiscreteScheduler.from_pretrained(base, subfolder="scheduler"),
         ).to(self.device)
+        _refuse_fallbacks(transformer, self.dtype, "the Qwen-Image control transformer")
+        _refuse_fallbacks(self.vae, self.dtype, "the Qwen-Image VAE")
         self._wrap_transformer(transformer)
 
     def _wrap_transformer(self, transformer: Any) -> None:
@@ -344,6 +370,8 @@ class ZImageFunControl(_Base):
             transformer=transformer,
             scheduler=FlowMatchEulerDiscreteScheduler.from_pretrained(base, subfolder="scheduler"),
         ).to(self.device)
+        _refuse_fallbacks(transformer, self.dtype, "the Z-Image control transformer")
+        _refuse_fallbacks(self.vae, self.dtype, "the Z-Image VAE")
         self._wrap_transformer(transformer)
 
     def _wrap_transformer(self, transformer: Any) -> None:

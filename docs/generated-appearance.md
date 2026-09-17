@@ -225,9 +225,14 @@ the numbers are copied into `ml/appearance/evidence/baseline-measurements.log.tx
 - **The instance is announced twice:** its name, provider and hard deadline the moment it exists,
   and again when it is deleted. Both instants and the name are in the run record and in the
   committed ledger, because the orchestrator keeps a watchdog that outlives this session's.
-- **The smoke job stops the session:** after it, the lane reports whether the backends loaded, what
-  tiling and decoding did, seconds per image and spend, and waits. A broken setup costs one smoke
-  job rather than sixty-four generations.
+- **The smoke job gates the session by machine-checkable conditions**
+  (`exulanica.appearance-smoke-gate/v1`): both backends loaded, every output decoded at the size the
+  job names, the seam ratio computed on each, seconds per image within 150 per cent of the estimate,
+  no refusal anywhere, spend inside the smoke budget, and no fallback (every record's runtime names
+  an NVIDIA device, and the backends refuse at load time a parameter that is not on the GPU, not the
+  dtype the job named, or on the meta device because a weight did not load). If every check holds
+  the session continues at once, so the machine never idles waiting for an answer; if any fails, or
+  anything surprises the lane, the machine is deleted and the report says which branch was taken.
 - **Local captures take the machine-wide GPU slot** (`.exulanica/bin/gpu-slot`), and a
   timing-sensitive capture takes both slots in order (`quiet-slot gpu-slot <command>`), because two
   lanes capturing at once blocked a page's main thread for ten minutes. Nothing about the rented

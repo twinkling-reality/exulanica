@@ -303,3 +303,139 @@ def test_the_committed_job_specs_stage_and_read(tmp_path, repository):
             * len(job["targets"][0]["conditioning"])
         )
         assert len(list(generations(job))) == expected
+
+
+def _smoke(tmp_path, repository):
+    """A finished stub run, and everything the gate reads about it."""
+    summary = _dry(tmp_path, repository)
+    out = tmp_path / "dry" / "run"
+    results_raw = (out / "results.json").read_bytes()
+    job = read_job((tmp_path / "dry" / "staged" / "job.json").read_bytes())
+    records = {
+        item["record_sha256"]: (out / "records" / f"{item['record_sha256']}.json").read_bytes()
+        for item in summary["summary"]["generations"]
+    }
+    return results_raw, job, records
+
+
+def test_the_smoke_gate_refuses_a_stub_run_because_it_did_not_run_on_a_gpu(tmp_path, repository):
+    from exulanica_appearance.runner.gate import CHECKS, read_gate, smoke_gate
+
+    results_raw, job, records = _smoke(tmp_path, repository)
+    gate = read_gate(
+        smoke_gate(
+            results_raw=results_raw,
+            job=job,
+            records=records,
+            billed_seconds=1200,
+            budget_seconds=5400,
+            rate_cents_per_hour=263,
+        )
+    )
+    assert tuple(sorted(gate["checks"])) == CHECKS
+    assert gate["continue"] is False, "the stub is not an NVIDIA device, so no_fallback must fail"
+    assert gate["checks"]["no_fallback"]["passed"] is False
+    assert "stub backend" in gate["checks"]["no_fallback"]["detail"]
+    for name in (
+        "backends_loaded",
+        "no_refusal",
+        "outputs_decoded_at_size",
+        "seam_ratio_computed",
+        "seconds_within_estimate",
+        "spend_within_budget",
+    ):
+        assert gate["checks"][name]["passed"] is True, name
+
+
+def _gpu_records(records: dict[str, bytes]) -> dict[str, bytes]:
+    """The same records as if they had run on the card, so the other checks can be exercised."""
+    out = {}
+    for digest, raw in records.items():
+        document = parse_canonical(raw, "the record")
+        document["runtime"] = {
+            **document["runtime"],
+            "cuda": "12.8",
+            "hardware": "NVIDIA RTX PRO 6000 Blackwell, 103079215104 bytes",
+        }
+        out[digest] = canonical_bytes(document)
+    return out
+
+
+def test_the_smoke_gate_passes_a_run_that_holds_every_condition(tmp_path, repository):
+    from exulanica_appearance.runner.gate import read_gate, smoke_gate
+
+    results_raw, job, records = _smoke(tmp_path, repository)
+    gate = read_gate(
+        smoke_gate(
+            results_raw=results_raw,
+            job=job,
+            records=_gpu_records(records),
+            billed_seconds=1200,
+            budget_seconds=5400,
+            rate_cents_per_hour=263,
+        )
+    )
+    assert gate["continue"] is True
+    assert all(entry["passed"] for entry in gate["checks"].values())
+    assert gate["checks"]["spend_within_budget"]["detail"].startswith("1200 s billed")
+
+
+@pytest.mark.parametrize(
+    "name, change",
+    [
+        ("spend_within_budget", lambda kwargs: kwargs.update(billed_seconds=9000)),
+        ("no_refusal", lambda kwargs: kwargs.update(results_raw=_stopped(kwargs["results_raw"]))),
+        (
+            "seam_ratio_computed",
+            lambda kwargs: kwargs.update(results_raw=_without_seams(kwargs["results_raw"])),
+        ),
+        (
+            "seconds_within_estimate",
+            lambda kwargs: kwargs.update(results_raw=_slow(kwargs["results_raw"])),
+        ),
+        (
+            "backends_loaded",
+            lambda kwargs: kwargs.update(results_raw=_one_candidate_missing(kwargs["results_raw"])),
+        ),
+    ],
+)
+def test_each_pass_condition_can_fail(tmp_path, repository, name, change):
+    from exulanica_appearance.runner.gate import read_gate, smoke_gate
+
+    results_raw, job, records = _smoke(tmp_path, repository)
+    kwargs = {
+        "results_raw": results_raw,
+        "job": job,
+        "records": _gpu_records(records),
+        "billed_seconds": 1200,
+        "budget_seconds": 5400,
+        "rate_cents_per_hour": 263,
+    }
+    change(kwargs)
+    gate = read_gate(smoke_gate(**kwargs))
+    assert gate["continue"] is False
+    assert gate["checks"][name]["passed"] is False, gate["checks"][name]["detail"]
+
+
+def _edit_results(raw: bytes, change) -> bytes:
+    document = parse_canonical(raw, "the results")
+    change(document)
+    return canonical_bytes(document)
+
+
+def _stopped(raw: bytes) -> bytes:
+    return _edit_results(
+        raw, lambda d: d.update(stopped="stopped before generation 2: out of time")
+    )
+
+
+def _without_seams(raw: bytes) -> bytes:
+    return _edit_results(raw, lambda d: d["generations"][0].update(seams_ppm={"u": 1000000}))
+
+
+def _slow(raw: bytes) -> bytes:
+    return _edit_results(raw, lambda d: d["generations"][0].update(seconds=99))
+
+
+def _one_candidate_missing(raw: bytes) -> bytes:
+    return _edit_results(raw, lambda d: d.update(generations=[]))
