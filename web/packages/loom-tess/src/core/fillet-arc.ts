@@ -36,34 +36,20 @@
  *
  * Not yet wired into a bake. It changes no container until an expander calls it.
  */
-import { add, crossVectors, dot, exact, floorDivide, GeometryError, multiply, subtract } from './integer-math.js';
+import {
+  add,
+  bigFloorQuotient,
+  bigFloorRoot,
+  CORNER_LENGTH_SCALE,
+  crossVectors,
+  dot,
+  exact,
+  floorDivide,
+  GeometryError,
+  multiply,
+  subtract,
+} from './integer-math.js';
 import type { Plan, Space } from './integer-math.js';
-
-/** `document._CORNER_LENGTH_SCALE`: a piece's length is measured in millionths of a millimetre. */
-const CORNER_LENGTH_SCALE = 1_000_000;
-
-/** The floor of `a / b` in BigInt, for a positive `b`. */
-function floorQuotient(a: bigint, b: bigint): bigint {
-  const quotient = a / b;
-  return a % b !== 0n && a < 0n ? quotient - 1n : quotient;
-}
-
-/** The floor square root of a non-negative BigInt, by Newton's method. */
-function floorRoot(value: bigint): bigint {
-  if (value < 2n) return value;
-  let estimate = value;
-  let better = (estimate + value / estimate) / 2n;
-  while (better < estimate) {
-    estimate = better;
-    better = (estimate + value / estimate) / 2n;
-  }
-  return estimate;
-}
-
-/** A BigInt result as a number, refused unless a double holds it exactly. */
-function safeNumber(value: bigint, where: string): number {
-  return exact(Number(value), where);
-}
 
 /**
  * `distance` along `vector`, each component floored, measured as the grammar's corner rule
@@ -73,9 +59,9 @@ export function alongByCornerRule(vector: Plan, distance: number, where: string)
   const [x, y] = [BigInt(exact(vector[0], where)), BigInt(exact(vector[1], where))];
   if (x === 0n && y === 0n) throw new GeometryError(`${where} measures along a zero vector`);
   const scale = BigInt(CORNER_LENGTH_SCALE);
-  const length = floorRoot((x * x + y * y) * scale * scale);
+  const length = bigFloorRoot((x * x + y * y) * scale * scale);
   const reach = BigInt(exact(distance, where)) * scale;
-  return [safeNumber(floorQuotient(x * reach, length), where), safeNumber(floorQuotient(y * reach, length), where)];
+  return [exact(Number(bigFloorQuotient(x * reach, length)), where), exact(Number(bigFloorQuotient(y * reach, length)), where)];
 }
 
 /** `document._corner_centre`: the tangent point plus the radius along its piece's normal toward the turn. */

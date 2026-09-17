@@ -82,3 +82,42 @@ export const crossVectors = (a: Plan, b: Plan, where: string): number =>
 /** The dot product of two vectors. */
 export const dot = (a: Plan, b: Plan, where: string): number =>
   add(multiply(a[0], b[0], where), multiply(a[1], b[1], where), where);
+
+/** `document._CORNER_LENGTH_SCALE`: a length is measured in millionths of a millimetre. */
+export const CORNER_LENGTH_SCALE = 1_000_000;
+
+/** The floor of `a / b` in BigInt, for a positive `b`. */
+export function bigFloorQuotient(a: bigint, b: bigint): bigint {
+  const quotient = a / b;
+  return a % b !== 0n && a < 0n ? quotient - 1n : quotient;
+}
+
+/** The floor square root of a non-negative BigInt, by Newton's method. */
+export function bigFloorRoot(value: bigint): bigint {
+  if (value < 2n) return value;
+  let estimate = value;
+  let better = (estimate + value / estimate) / 2n;
+  while (better < estimate) {
+    estimate = better;
+    better = (estimate + value / estimate) / 2n;
+  }
+  return estimate;
+}
+
+/**
+ * Where `point` lies against the line through `origin` along `direction`, in plan, measured as the
+ * grammar's corner rule measures a piece: `along = floor(dot(point - origin, direction) * S / L)`
+ * and `across = floor(cross(direction, point - origin) * S / L)`, positive to the left, with
+ * `S = 10^6` and `L = isqrt(|direction|^2 * S^2)`. Exact in BigInt on every engine.
+ */
+export function measureAgainst(origin: Plan, direction: Plan, point: Plan, where: string): { along: number; across: number } {
+  const [dx, dy] = [BigInt(exact(direction[0], where)), BigInt(exact(direction[1], where))];
+  if (dx === 0n && dy === 0n) throw new GeometryError(`${where} measures against a zero direction`);
+  const [px, py] = [BigInt(exact(point[0], where)) - BigInt(exact(origin[0], where)), BigInt(exact(point[1], where)) - BigInt(exact(origin[1], where))];
+  const scale = BigInt(CORNER_LENGTH_SCALE);
+  const length = bigFloorRoot((dx * dx + dy * dy) * scale * scale);
+  return {
+    along: exact(Number(bigFloorQuotient((px * dx + py * dy) * scale, length)), where),
+    across: exact(Number(bigFloorQuotient((dx * py - dy * px) * scale, length)), where),
+  };
+}
