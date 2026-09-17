@@ -197,6 +197,53 @@ An optional saved interaction policy failing to load
 does not leave the document blank. Native reconstruction decoding has its own
 visible loading state.
 
+## World to data view
+
+The **World → data** panel holds one slider from **Rendered** to **Points**. Sliding it
+turns the same street, building or photographed rock into glowing points, and moves no
+camera, selection, navigation authority or source permission. Every point is a sample of
+geometry the view already holds, and the panel says which kind: **Retained points**,
+**Trained Gaussian centres**, **Sampled mesh points** or **Generated surface samples**. A
+sampled generated or authored mesh keeps its origin and is never labelled a measurement.
+A subject with no point form keeps its surface and says so.
+
+What moves how is stated per subject in the display record. District batches dissolve
+their surface as their points appear. Personal point maps and trained splats cannot fade
+their own look, so their points appear over it and the look leaves only at the points
+end. The owned district is registered as aggregate render batches, labelled **Grouped
+geometry, not separately extracted objects**, never as separate buildings.
+
+**Boxes**, **Ids** and **Labels** draw only from a subject's own record: a box needs its
+own bounds, an id tag its own id and bounds, a label tag its own label and bounds.
+Anything without them gets no mark and a stated reason. Links join only subjects of the
+same scene. The overlays are not pickable; the panel's subject list is the selection, and
+the selected subject's box is highlighted. Withdrawn, unavailable or hidden subjects draw
+nothing at any slider position.
+
+**Colour by** is where a subject came from (the closed origin set) or what it is (its own
+kind, never a guessed class), with a legend of only the colours in view. The
+**Visualization look** draws dashes and a moving band and is labelled a visualization,
+not artifact bytes. Every look value lives in one versioned descriptor,
+`DATA_VIEW_STYLE` in `web/packages/atlas-core/src/data-view-style.ts`, whose id and
+version appear in the panel and the display record. It is client presentation, not the
+world style registry: it writes nothing, is not stored and enters no digest.
+
+At **Rendered** with every overlay off the frame is byte-identical to the view without
+the data view, proven by readPixels checks retained in
+`web/packages/atlas-react/test/gpu/pixel-checks.log.txt`. The point budget of 4,194,304
+is a measurement, retained in
+`web/packages/atlas-react/src/playcanvas/data-view/frame-budget.log.txt`. The sprite look
+is WebGL2 only; on WebGPU the same samples draw as one-pixel points, and nothing has
+measured an expanded-quad alternative.
+
+A generated tile registers subjects through the contract in
+`web/packages/atlas-core/src/representation.ts`. Version 2 gives one subject to each
+record the tile owns that states an extent, with the id `generated:<kind>:<identity>`, a
+box from the drawn range that must lie inside the record's declared extent, and the frame
+`city_local:<city subject identity>`. Halo records, relation records and surface materials
+get no subject; a surface material is listed under the subject it dresses. Nothing wires
+the contract to a tile yet.
+
 ## Evidence limits
 
 The opt-in production browser recorder (`?validation=1`) records authenticated loads,
