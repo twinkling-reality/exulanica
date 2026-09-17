@@ -1,0 +1,95 @@
+{
+  "schema_version": 1,
+  "catalog_id": "parking-kind-access",
+  "catalog_version": 1,
+  "references": {},
+  "entries": [
+    {
+      "key": "accessible",
+      "label": "Accessible bay",
+      "classes": [
+        "passenger_car",
+        "van"
+      ],
+      "sources": {
+        "classes": "declared: an accessible bay is kept for a car or van carrying a person who needs room beside it; permits are not modelled, so either class may use it"
+      },
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/traffic-contract.md"
+      }
+    },
+    {
+      "key": "bus_layover",
+      "label": "Bus layover",
+      "classes": [
+        "city_bus"
+      ],
+      "sources": {
+        "classes": "declared: a layover is where a bus waits at the end of a trip, and no other class uses it"
+      },
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/traffic-contract.md"
+      }
+    },
+    {
+      "key": "cycle_stand",
+      "label": "Cycle parking",
+      "classes": [
+        "bicycle"
+      ],
+      "sources": {
+        "classes": "declared: cycle stands hold bicycles only; how many is the space record's capacity, never this mapping"
+      },
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/traffic-contract.md"
+      }
+    },
+    {
+      "key": "general",
+      "label": "General bay",
+      "classes": [
+        "passenger_car",
+        "van"
+      ],
+      "sources": {
+        "classes": "declared: a kerbside bay for one car; the van class has the passenger car's design dimensions in the vehicle-class catalog, so it fits the same bay"
+      },
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/traffic-contract.md"
+      }
+    },
+    {
+      "key": "loading",
+      "label": "Loading bay",
+      "classes": [
+        "van"
+      ],
+      "sources": {
+        "classes": "declared: a loading bay is for deliveries, and of this catalog's classes only the van carries goods"
+      },
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/traffic-contract.md"
+      }
+    }
+  ]
+}

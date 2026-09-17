@@ -18,6 +18,7 @@ from typing import Any, Final
 
 from exulanica.grammar.draw import draw_integer
 from exulanica.traffic.catalogs import TrafficCatalogs, load_traffic_catalogs
+from exulanica.traffic.city_roads import road_input_from_city
 from exulanica.traffic.inputs import (
     LOOKAHEAD_S,
     CrossingEntry,
@@ -28,7 +29,7 @@ from exulanica.traffic.inputs import (
 from exulanica.traffic.network import RoadNetwork, compile_network
 from exulanica.traffic.simulation import advance_traffic, initial_traffic
 
-from traffic_network_fixture import SCOPE, build_records
+from traffic_network_fixture import CITY, build_records
 
 FLEET: Final = {"bicycle": 6, "city_bus": 2, "passenger_car": 14, "van": 4}
 BUSY_FLEET: Final = {"bicycle": 10, "city_bus": 4, "passenger_car": 18, "van": 8}
@@ -44,7 +45,8 @@ WALK_MM_PER_S: Final = 1066
 @lru_cache(maxsize=1)
 def fixture() -> tuple[RoadNetwork, TrafficCatalogs]:
     catalogs = load_traffic_catalogs()
-    return compile_network(build_records(), catalogs, scope=SCOPE), catalogs
+    road = road_input_from_city(build_records(), catalogs, city_identity=CITY)
+    return compile_network(road, catalogs), catalogs
 
 
 def seed_for(label: str) -> str:
@@ -80,7 +82,9 @@ def build_scenario(
     seed = seed_for(label)
     traffic_id = traffic_id_for(label)
     initial = initial_traffic(traffic_id, seed, network, catalogs, fleet or FLEET)
-    segments = sorted({space.segment_ordinal for space in network.spaces.values()})
+    segments = sorted(
+        {network.segment_ordinals[space.segment] for space in network.spaces.values()}
+    )
     trips = []
     for vehicle in initial["vehicles"]:
         ordinal = vehicle["ordinal"]
@@ -184,9 +188,20 @@ class AdaptiveRun:
 
 
 def _free_spaces(network: RoadNetwork, state: dict[str, Any]) -> set[str]:
-    taken = {vehicle["space"] for vehicle in state["vehicles"] if vehicle["mode"] == "parked"}
-    taken |= {vehicle["target_space"] for vehicle in state["vehicles"] if vehicle["target_space"]}
-    return set(network.spaces) - taken
+    """Spaces with a place no parked vehicle holds and no vehicle is heading for."""
+    holding: dict[str, int] = {}
+    for vehicle in state["vehicles"]:
+        for held in (
+            vehicle["space"] if vehicle["mode"] == "parked" else "",
+            vehicle["target_space"],
+        ):
+            if held:
+                holding[held] = holding.get(held, 0) + 1
+    return {
+        identity
+        for identity, space in network.spaces.items()
+        if holding.get(identity, 0) < space.capacity
+    }
 
 
 def run_adaptive(
@@ -248,13 +263,13 @@ def run_adaptive(
                     )
                 if ready_at[vehicle["id"]] > second:
                     continue
-                here = network.spaces[vehicle["space"]].segment_ordinal
+                here = network.segment_ordinals[network.spaces[vehicle["space"]].segment]
                 options = sorted(
                     {
-                        network.spaces[space].segment_ordinal
+                        network.segment_ordinals[network.spaces[space].segment]
                         for space in free
                         if vehicle["vehicle_class"] in network.spaces[space].classes
-                        and network.spaces[space].segment_ordinal != here
+                        and network.segment_ordinals[network.spaces[space].segment] != here
                     }
                 )
                 if not options:
@@ -286,7 +301,7 @@ def run_adaptive(
                 free -= {
                     space
                     for space in sorted(free)
-                    if network.spaces[space].segment_ordinal == segment
+                    if network.segment_ordinals[network.spaces[space].segment] == segment
                     and vehicle["vehicle_class"] in network.spaces[space].classes
                 }
                 added = True

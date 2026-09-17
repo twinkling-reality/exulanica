@@ -2,14 +2,15 @@
 
 What is pinned here, and why.
 
-*   The three catalogs **load**, and hold the classes, policies and plan the simulation names.
+*   The five catalogs **load**, and hold the classes, policies and plan the simulation names, and
+    the vehicle classes each of the city's lane uses and parking kinds admits.
 *   Every numeric field names **exactly one source**, either a citation of a reference the file
     lists or a declared reason, and the **declared values are the listed ones**: adding a declared
     number is a reviewed change, not a quiet one.
 *   The loader **refuses** an unknown key, a missing or unparseable source, a citation of an
     unknown reference, an unused reference, a float, a stray or missing file, dimensions that do
-    not add up, a policy whose headways do not match its rule, and a signal group that never
-    gets right of way.
+    not add up, a policy whose headways do not match its rule, a signal group that never gets
+    right of way, a mapping to an unknown class, and a parking kind that admits nothing.
 *   The **digest** is the same in a new process under another hash seed, and changes when a
     citation changes, because a citation is part of what was decided.
 *   The **file digest** is the SHA-256 of the file bytes, and the signal plan's bytes are the
@@ -80,6 +81,16 @@ DECLARED = (
     ("right-of-way-policy", "uncontrolled_continuation", "turn_priority"),
     ("signal-plan", "fixed_two_phase_60s", "intervals[1].duration_ms"),
     ("signal-plan", "fixed_two_phase_60s", "intervals[5].duration_ms"),
+    ("lane-use-access", "buffer", "classes"),
+    ("lane-use-access", "bus", "classes"),
+    ("lane-use-access", "cycle", "classes"),
+    ("lane-use-access", "general", "classes"),
+    ("lane-use-access", "parking", "classes"),
+    ("parking-kind-access", "accessible", "classes"),
+    ("parking-kind-access", "bus_layover", "classes"),
+    ("parking-kind-access", "cycle_stand", "classes"),
+    ("parking-kind-access", "general", "classes"),
+    ("parking-kind-access", "loading", "classes"),
 )
 
 _VEHICLE_NUMBERS = (
@@ -131,6 +142,8 @@ def test_the_catalogs_live_in_their_own_directory_under_the_catalog_root():
     # The city catalog loader refuses unknown files in assets/catalogs, so traffic has its own.
     assert CATALOG_DIRECTORY == ROOT / "assets" / "catalogs" / "traffic"
     assert sorted(path.name for path in CATALOG_DIRECTORY.iterdir()) == [
+        "lane-use-access.v1.json",
+        "parking-kind-access.v1.json",
         "right-of-way-policy.v1.json",
         "signal-plan.v1.json",
         "vehicle-class.v1.json",
@@ -138,7 +151,7 @@ def test_the_catalogs_live_in_their_own_directory_under_the_catalog_root():
     assert not list(CATALOG_DIRECTORY.parent.glob("vehicle-class*.json"))
 
 
-def test_the_three_catalogs_load_with_the_entries_the_simulation_names():
+def test_the_catalogs_load_with_the_entries_the_simulation_names():
     catalogs = load_traffic_catalogs()
     assert [entry.key for entry in catalogs.vehicle_classes] == [
         "bicycle",
@@ -162,6 +175,38 @@ def test_the_three_catalogs_load_with_the_entries_the_simulation_names():
     plan = catalogs.plan("fixed_two_phase_60s")
     assert plan.cycle_ms == 60_000
     assert [group.key for group in plan.groups] == ["phase_a", "phase_b", "walk_a", "walk_b"]
+
+
+def test_the_city_keys_map_to_the_classes_they_admit():
+    """Keyed by the city's own lane-use and parking-kind keys, every key of each city catalog."""
+    catalogs = load_traffic_catalogs()
+    for city_catalog, mappings in (
+        ("lane-use", catalogs.lane_uses),
+        ("parking-kind", catalogs.parking_kinds),
+    ):
+        city = json.loads((ROOT / "assets" / "catalogs" / f"{city_catalog}.v1.json").read_text())
+        assert [mapping.key for mapping in mappings] == sorted(
+            entry["key"] for entry in city["entries"]
+        )
+    assert {mapping.key: mapping.classes for mapping in catalogs.lane_uses} == {
+        "buffer": (),
+        "bus": ("city_bus",),
+        "cycle": ("bicycle",),
+        "general": ("bicycle", "city_bus", "passenger_car", "van"),
+        "parking": (),
+    }
+    assert {mapping.key: mapping.classes for mapping in catalogs.parking_kinds} == {
+        "accessible": ("passenger_car", "van"),
+        "bus_layover": ("city_bus",),
+        "cycle_stand": ("bicycle",),
+        "general": ("passenger_car", "van"),
+        "loading": ("van",),
+    }
+    # Exactly the lane uses the city says carry no traffic map to no class.
+    city = json.loads((ROOT / "assets" / "catalogs" / "lane-use.v1.json").read_text())
+    assert {entry["key"] for entry in city["entries"] if entry["traffic"] == "none"} == {
+        mapping.key for mapping in catalogs.lane_uses if not mapping.classes
+    }
 
 
 def test_the_design_vehicles_carry_the_cited_numbers():
@@ -219,7 +264,14 @@ def test_every_numeric_field_names_exactly_one_source():
         }
         assert {name for name, _ in plan.sources} == expected
         rows += [("signal-plan", text) for _, text in plan.sources]
-    assert len(rows) == 4 * 18 + (3 + 4) + (3 + 1) + 3 + 3 + (8 + 3)
+    for catalog_id, mappings in (
+        ("lane-use-access", catalogs.lane_uses),
+        ("parking-kind-access", catalogs.parking_kinds),
+    ):
+        for mapping in mappings:
+            assert {name for name, _ in mapping.sources} == {"classes"}
+            rows += [(catalog_id, text) for _, text in mapping.sources]
+    assert len(rows) == 4 * 18 + (3 + 4) + (3 + 1) + 3 + 3 + (8 + 3) + 5 + 5
     for catalog_id, text in rows:
         if text.startswith("declared: "):
             assert len(text) > len("declared: ") + 20, text
@@ -380,6 +432,24 @@ def test_a_group_green_and_amber_at_once_is_refused(copied):
         lambda document: document["entries"][0]["intervals"][0]["vehicle_amber"].append("phase_a"),
     )
     _refused(copied, "a group is green and amber at once")
+
+
+def test_a_mapping_to_an_unknown_class_is_refused(copied):
+    _edit(
+        copied,
+        "lane-use-access.v1.json",
+        lambda document: document["entries"][2].update({"classes": ["bicycle", "tram"]}),
+    )
+    _refused(copied, "cycle admits unknown classes ['tram']")
+
+
+def test_a_parking_kind_that_admits_nothing_is_refused(copied):
+    _edit(
+        copied,
+        "parking-kind-access.v1.json",
+        lambda document: document["entries"][4].update({"classes": []}),
+    )
+    _refused(copied, "is a non-empty list of keys")
 
 
 def test_entries_out_of_key_order_are_refused(copied):

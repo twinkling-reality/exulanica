@@ -1,9 +1,10 @@
-"""The road network compiler: road records in, a checked network or a stated refusal out.
+"""The road network compiler: city records in through the converter, a checked network or a refusal.
 
-The fixture in ``traffic_network_fixture`` is built only from the road record shapes. This file
-pins what it compiles to, that every record identity is the uuid5 of its stable tuple, that the
-compiled conflict zones really contain every place two corridors meet on that geometry, and
-that each thing v1 cannot simulate correctly is refused with its reason rather than approximated.
+The fixture in ``traffic_network_fixture`` is built only from city grammar version 2 records. This
+file pins what it compiles to, that the network names every path, junction, crossing and space by
+the identity of the city record it came from, that the compiled conflict zones really contain
+every place two corridors meet on that geometry, and that each thing v1 cannot simulate correctly
+is refused with its reason rather than approximated.
 """
 
 from __future__ import annotations
@@ -12,57 +13,97 @@ import dataclasses
 import json
 import random
 import shutil
-import uuid
+from collections import Counter
 from functools import cache
 from itertools import pairwise
 from math import isqrt
 from pathlib import Path
 
 import pytest
-from exulanica.canonical import canonical_json, sha256_of_canonical
-from exulanica.traffic import provisional_records as rec
+from exulanica.canonical import sha256_of_canonical
+from exulanica.grammar.geometry import Extent
+from exulanica.grammar.grammars.city.districts import DistrictRecord
+from exulanica.grammar.grammars.city.roads import (
+    JunctionApproachRecord,
+    JunctionRecord,
+    LaneConnectionRecord,
+    LaneRecord,
+    ParkingSpaceRecord,
+    SignalGroup,
+    SignalRecord,
+)
+from exulanica.grammar.grammars.city.streets import CrossingRecord, StreetSegmentRecord
 from exulanica.traffic.catalogs import CATALOG_DIRECTORY, load_traffic_catalogs
+from exulanica.traffic.city_roads import road_input_from_city
 from exulanica.traffic.errors import UnsupportedNetworkError
 from exulanica.traffic.geometry import Polyline, convex_overlap, rectangle
 from exulanica.traffic.network import NETWORK_PROFILE, compile_network
 
 import traffic_network_fixture as fixture_module
-from traffic_network_fixture import SCOPE, build_records
+from traffic_network_fixture import CITY, NODES, build_records, identity
 
 
-@cache
-def _base() -> tuple[object, ...]:
-    return build_records()
+def _compile(records, catalogs=None):
+    catalogs = catalogs or load_traffic_catalogs()
+    return compile_network(road_input_from_city(records, catalogs, city_identity=CITY), catalogs)
 
 
 @cache
 def _network():
-    return compile_network(_base(), load_traffic_catalogs(), scope=SCOPE)
-
-
-def _identity(kind: str, *parts: int | str) -> str:
-    return rec.street_record_identity(SCOPE, kind, *parts)
+    return _compile(build_records())
 
 
 def _of(kind: type) -> list:
-    return [record for record in _base() if isinstance(record, kind)]
+    return [record for record in build_records() if type(record) is kind]
 
 
 def _changed(change) -> tuple[object, ...]:
     """The fixture records with ``change`` applied to each; ``None`` drops a record."""
     out = []
-    for record in _base():
+    for record in build_records():
         changed = change(record)
         if changed is not None:
             out.append(changed)
-    assert out != list(_base()), "the change touched nothing"
+    assert out != list(build_records()), "the change touched nothing"
     return tuple(out)
 
 
 def _refused(records, fragment: str, catalogs=None) -> None:
     with pytest.raises(UnsupportedNetworkError) as caught:
-        compile_network(records, catalogs or load_traffic_catalogs(), scope=SCOPE)
+        _compile(records, catalogs)
     assert fragment in str(caught.value), str(caught.value)
+
+
+def _segment(ordinal: int) -> StreetSegmentRecord:
+    [segment] = [record for record in _of(StreetSegmentRecord) if record.segment_ordinal == ordinal]
+    return segment
+
+
+def _lane(segment: int, index: int) -> LaneRecord:
+    owner = _segment(segment).identity
+    [lane] = [
+        record
+        for record in _of(LaneRecord)
+        if record.segment_identity == owner and record.lane_index == index
+    ]
+    return lane
+
+
+def _node(name: str) -> str:
+    return identity("street_node", CITY, NODES[name])
+
+
+def _junction(name: str) -> JunctionRecord:
+    return next(record for record in _of(JunctionRecord) if record.node_identity == _node(name))
+
+
+def _crossing(segment: int, ordinal: int) -> CrossingRecord:
+    owner = _segment(segment).identity
+    return next(
+        record
+        for record in _of(CrossingRecord)
+        if record.segment_identity == owner and record.crossing_ordinal == ordinal
+    )
 
 
 # ---------------------------------------------------------------------------------------------
@@ -73,23 +114,51 @@ def test_the_fixture_compiles_to_the_expected_network():
     network = _network()
     lanes = [path for path in network.paths.values() if path.kind == "lane"]
     connectors = [path for path in network.paths.values() if path.kind == "connector"]
+    # 24 lane records, of which the 8 parking lanes carry no traffic and are no path.
+    assert len(_of(LaneRecord)) == 24
     assert (len(network.paths), len(lanes), len(connectors)) == (52, 16, 36)
     assert len(network.zones) == 88
-    assert len(network.spaces) == 56
-    assert {ordinal: junction.policy for ordinal, junction in network.junctions.items()} == {
-        0: "signalised",
-        1: "priority_two_way_stop",
-        2: "all_way_stop",
-        3: "priority_two_way_stop",
-        4: "all_way_stop",
+    assert Counter((space.kind, space.capacity) for space in network.spaces.values()) == {
+        ("general", 1): 16,
+        ("bus_layover", 1): 8,
+        ("loading", 1): 8,
+        ("accessible", 1): 8,
+        ("cycle_stand", 4): 8,
     }
-    assert network.junctions[0].signal is not None
-    assert network.junctions[0].signal.plan == "fixed_two_phase_60s"
-    assert all(network.junctions[ordinal].signal is None for ordinal in (1, 2, 3, 4))
+    policies = {junction.node: junction.policy for junction in network.junctions.values()}
+    assert policies == {_node(name): control for name, control in fixture_module.CONTROLS.items()}
+    signalised = network.junctions[_junction("C").identity]
+    assert signalised.signal is not None and signalised.signal.plan == "fixed_two_phase_60s"
+    assert sum(junction.signal is not None for junction in network.junctions.values()) == 1
     assert network.restrictions == ()
-    assert network.driving_side == "right"
+    assert network.driving_side == "right" and network.city == CITY
     # Twelve movements at the four-way centre, six at each T junction.
-    assert [len(network.junctions[ordinal].connectors) for ordinal in range(5)] == [12, 6, 6, 6, 6]
+    assert sorted(len(junction.connectors) for junction in network.junctions.values()) == [
+        6,
+        6,
+        6,
+        6,
+        12,
+    ]
+    assert network.segment_ordinals == {
+        segment.identity: segment.segment_ordinal for segment in _of(StreetSegmentRecord)
+    }
+
+
+def test_the_network_names_everything_by_the_identity_of_its_city_record():
+    network = _network()
+    traffic_lanes = {record.identity for record in _of(LaneRecord) if record.direction != "none"}
+    lanes = {path.identity for path in network.paths.values() if path.kind == "lane"}
+    assert lanes == traffic_lanes
+    assert {path.identity for path in network.paths.values() if path.kind == "connector"} == {
+        record.identity for record in _of(LaneConnectionRecord)
+    }
+    assert all(path_id.endswith(path.identity) for path_id, path in network.paths.items())
+    assert set(network.junctions) == {record.identity for record in _of(JunctionRecord)}
+    assert {band.identity for band in network.bands} == {
+        record.identity for record in _of(CrossingRecord)
+    }
+    assert set(network.spaces) == {record.identity for record in _of(ParkingSpaceRecord)}
 
 
 def test_crossings_are_bands_at_junctions_and_mid_block():
@@ -103,14 +172,25 @@ def test_crossings_are_bands_at_junctions_and_mid_block():
     ]
     signalised = [band for band in network.bands if band.control == "signalised"]
     assert len(signalised) == 4
-    assert all(band.junction == 0 and band.signal is not None for band in signalised)
+    centre = _junction("C").identity
+    assert all(band.junction == centre and band.signal is not None for band in signalised)
     for band in network.bands:
         assert network.band_by_society_id(band.society_crossing_id) is band
+        assert network.band(band.identity) is band
         segment, offset = band.society_crossing_id.split(":")[1:]
-        assert int(segment) == band.segment_ordinal and int(offset) > 0
+        assert int(segment) == network.segment_ordinals[band.segment] and int(offset) > 0
         assert band.intervals, band.society_crossing_id
     with pytest.raises(UnsupportedNetworkError, match="no crossing"):
         network.band_by_society_id("crossing:9:1")
+
+
+def test_a_crossing_on_a_lane_holds_exactly_the_positions_under_its_band():
+    network = _network()
+    [band] = [band for band in network.bands if band.society_crossing_id == "crossing:0:52750"]
+    forward = f"lane:{_lane(0, 2).identity}"
+    # The forward lane starts 20 m out, so the 3 m band centred 52.75 m out spans 31.25 to 34.25
+    # m along it, and a millimetre each way.
+    assert (forward, 31_249, 34_251) in band.intervals
 
 
 def test_gates_sit_at_stop_lines_and_mid_block_crossings_far_enough_apart():
@@ -124,7 +204,7 @@ def test_gates_sit_at_stop_lines_and_mid_block_crossings_far_enough_apart():
         assert path.kind == "lane" and gate.position == path.length
         assert gate.target == path.end_junction
     for gate in band_gates:
-        band = network.bands[gate.target]
+        band = network.band(gate.target)
         assert band.junction is None
         assert (gate.path_id, gate.position) in {(path, low) for path, low, _ in band.intervals}
     for path_id, items in network.gates.items():
@@ -147,8 +227,8 @@ def test_zones_joints_and_exit_extents_stay_on_their_paths():
     for (first, second), extent in network.joint_extent.items():
         assert second in network.paths[first].successors
         assert 0 <= extent <= network.paths[second].length
-    # Lanes start 20 m out, beyond every connector corridor, so no junction region reaches onto
-    # a lane in this fixture and no crossing band lies on a lane end.
+    # Lanes start 20 m out, beyond every connection corridor, so no junction region reaches onto
+    # a lane in this fixture, and no crossing band lies on a lane end.
     assert set(network.exit_extent.values()) == {0}
 
 
@@ -204,7 +284,7 @@ def test_every_place_two_movements_meet_lies_inside_their_conflict_zone():
         outbound = [
             path.path_id
             for path in network.paths.values()
-            if path.kind == "lane" and path.start_junction == junction.ordinal
+            if path.kind == "lane" and path.start_junction == junction.identity
         ]
         for connector in junction.connectors:
             others = [other for other in junction.connectors if other != connector]
@@ -216,7 +296,7 @@ def test_every_place_two_movements_meet_lies_inside_their_conflict_zone():
                     if not spans:
                         continue
                     meetings += len(spans)
-                    assert (connector, other) in zones, (junction.ordinal, first, second, spans)
+                    assert (connector, other) in zones, (junction.identity, first, second, spans)
                     low, high = zones[(connector, other)][side]
                     for start, end in spans:
                         assert low <= end and start <= high, (first, second, start, end, low, high)
@@ -227,32 +307,7 @@ def test_every_place_two_movements_meet_lies_inside_their_conflict_zone():
 
 
 # ---------------------------------------------------------------------------------------------
-# Identity and digest
-
-
-def test_a_record_identity_is_the_uuid5_of_scope_kind_and_its_stable_tuple():
-    expected = uuid.uuid5(
-        rec.STREET_IDENTITY_NAMESPACE,
-        canonical_json([SCOPE, "carriageway_lane", 3, "with_segment", 0]).decode(),
-    )
-    assert _identity("carriageway_lane", 3, "with_segment", 0) == str(expected)
-    assert _identity("carriageway_lane", 3, "with_segment", 0) != _identity(
-        "carriageway_lane", 3, "against_segment", 0
-    )
-    lanes = {lane.lane_ordinal: lane for lane in _of(rec.CarriagewayLaneRecord)}
-    for lane in lanes.values():
-        assert lane.identity == _identity(
-            "carriageway_lane", lane.segment_ordinal, lane.direction, lane.lane_index
-        )
-    for connector in _of(rec.LaneConnectorRecord):
-        source, target = lanes[connector.from_lane_ordinal], lanes[connector.to_lane_ordinal]
-        assert connector.identity == _identity("lane_connector", source.identity, target.identity)
-    for space in _of(rec.ParkingSpaceRecord):
-        assert space.identity == _identity(
-            "parking_space", space.segment_ordinal, space.side, space.space_index
-        )
-    with pytest.raises(UnsupportedNetworkError, match="an int or a str"):
-        _identity("junction", 1.5)  # type: ignore[arg-type]
+# Digest
 
 
 def _shuffled(records: tuple[object, ...]) -> tuple[object, ...]:
@@ -267,35 +322,18 @@ def test_the_digest_is_the_canonical_document_and_ignores_record_order():
     assert network.document["profile"] == NETWORK_PROFILE
     assert network.digest == sha256_of_canonical(network.document).hex()
     assert network.catalog_sha256 == load_traffic_catalogs().digest
-    for records in (tuple(reversed(_base())), _shuffled(_base())):
-        reordered = compile_network(records, load_traffic_catalogs(), scope=SCOPE)
+    for records in (tuple(reversed(build_records())), _shuffled(build_records())):
+        reordered = _compile(records)
         assert reordered.document == network.document
         assert reordered.digest == network.digest
     faster = _changed(
         lambda record: (
-            dataclasses.replace(record, speed_limit_mm_per_h=40_000_000)
-            if isinstance(record, rec.CarriagewayLaneRecord) and record.lane_ordinal == 0
+            dataclasses.replace(record, speed_limit_mm_s=11_111)
+            if type(record) is StreetSegmentRecord and record.segment_ordinal == 0
             else record
         )
     )
-    assert compile_network(faster, load_traffic_catalogs(), scope=SCOPE).digest != network.digest
-
-
-def test_a_record_whose_identity_does_not_match_its_tuple_is_refused():
-    _refused(
-        _changed(
-            lambda record: (
-                dataclasses.replace(record, identity=_identity("junction", 3))
-                if isinstance(record, rec.JunctionRecord) and record.junction_ordinal == 2
-                else record
-            )
-        ),
-        "junction (2,) has identity",
-    )
-
-
-def test_a_record_of_a_kind_traffic_does_not_read_is_refused():
-    _refused((*_base(), object()), "traffic reads no record type object")
+    assert _compile(faster).digest != network.digest
 
 
 # ---------------------------------------------------------------------------------------------
@@ -306,238 +344,328 @@ def test_left_hand_traffic_is_refused():
     _refused(
         _changed(
             lambda record: (
-                rec.RoadRulesRecord("left") if isinstance(record, rec.RoadRulesRecord) else record
+                dataclasses.replace(record, driving_side="left")
+                if type(record) is DistrictRecord
+                else record
             )
         ),
         "traffic v1 simulates right-hand traffic only",
     )
-    _refused((*_base(), rec.RoadRulesRecord("right")), "exactly one road rules record, found 2")
 
 
 def test_lanes_whose_corridors_meet_are_refused(monkeypatch):
-    # A 40 m ring corner makes the bus's rear axle track inside far enough to meet the other lane.
-    monkeypatch.setattr(fixture_module, "RING_RADIUS_MM", 40_000)
-    _refused(fixture_module.build_records(), "come too close")
+    # A 30 m ring corner makes the bus's rear axle track inside far enough to meet the other lane.
+    monkeypatch.setattr(fixture_module, "RING_RADIUS_MM", 30_000)
+    _refused(fixture_module.build_records.__wrapped__(), "come too close")
 
 
 def test_a_junction_whose_approaches_miss_an_inbound_lane_is_refused():
+    junction = _junction("N").identity
     _refused(
         _changed(
             lambda record: (
                 None
-                if isinstance(record, rec.JunctionApproachRecord) and record.approach_ordinal == 10
+                if type(record) is JunctionApproachRecord
+                and record.junction_identity == junction
+                and record.approach_ordinal == 0
                 else record
             )
         ),
-        "junction 1 approaches do not cover its inbound lanes once each",
+        f"junction {junction} approaches do not cover its inbound lanes once each",
     )
 
 
 def test_a_u_turn_is_refused():
-    lanes = _of(rec.CarriagewayLaneRecord)
-    on_spoke = {lane.direction: lane for lane in lanes if lane.segment_ordinal == 0}
-    forward, backward = on_spoke["with_segment"], on_spoke["against_segment"]
+    forward, backward = _lane(0, 2), _lane(0, 1)
+    junction = _junction("N").identity
     records = _changed(
         lambda record: (
-            dataclasses.replace(record, permitted_turns=("left", "straight", "right", "u_turn"))
+            dataclasses.replace(record, turns=("left", "straight", "right", "u_turn"))
             if record is forward
             else record
         )
     )
-    u_turn = rec.LaneConnectorRecord(
-        _identity("lane_connector", forward.identity, backward.identity),
-        999,
-        1,
-        forward.lane_ordinal,
-        backward.lane_ordinal,
+    u_turn = LaneConnectionRecord(
+        identity("lane_connection", junction, 99),
+        junction,
+        99,
+        forward.identity,
+        backward.identity,
         "u_turn",
-        (forward.centreline_mm[-1], (0, 83_000), backward.centreline_mm[0]),
+        (forward.centreline_mm[-1], (0, 83_000, 0), backward.centreline_mm[0]),
+        Extent(-1_875, 80_000, 0, 1_875, 83_000, 0),
     )
     _refused((*records, u_turn), "traffic v1 does not simulate u-turns")
 
 
+def _straight_from(lane: LaneRecord, movement: str) -> LaneConnectionRecord:
+    [connection] = [
+        record
+        for record in _of(LaneConnectionRecord)
+        if record.from_lane_identity == lane.identity and record.movement == movement
+    ]
+    return connection
+
+
+def _with_path(connection: LaneConnectionRecord, path) -> tuple[object, ...]:
+    xs, ys = [point[0] for point in path], [point[1] for point in path]
+    extent = Extent(min(xs), min(ys), 0, max(xs), max(ys), 0)
+    return _changed(
+        lambda record: (
+            dataclasses.replace(record, path_mm=path, extent=extent)
+            if record is connection
+            else record
+        )
+    )
+
+
+def test_a_turn_sharper_than_a_right_angle_at_one_vertex_is_refused():
+    # The north spoke's southbound lane runs straight through the centre.
+    straight = _straight_from(_lane(0, 1), "straight")
+    (x0, y0, _), (x1, y1, _) = straight.path_mm
+    kinked = ((x0, y0, 0), (x0, y0 + 8_000, 0), (x0 - 3_000, y0 + 4_000, 0), (x1, y1, 0))
+    _refused(
+        _with_path(straight, kinked),
+        f"connection {straight.identity} turns by more than a right angle",
+    )
+
+
+def test_a_connection_whose_corner_no_class_can_drive_is_refused():
+    right = _straight_from(_lane(0, 2), "right")
+    start, end = right.path_mm[0], right.path_mm[-1]
+    # A square corner a metre before the far lane: a tangent arc there is under 500 mm.
+    squared = (start, (start[0], end[1] - 1_000, 0), (end[0], end[1] - 1_000, 0), end)
+    _refused(
+        _with_path(right, squared),
+        f"connection {right.identity} carries no class: its tightest corner is",
+    )
+
+
 def test_a_crossing_on_a_curved_lane_piece_is_refused():
-    [segment] = [record for record in _of(rec.StreetSegmentRecord) if record.segment_ordinal == 4]
-    line = Polyline.of(segment.centreline_mm)
-    middle = line.length // 2
+    segment = _segment(4)
+    line = Polyline.of(tuple((x, y) for x, y, _ in segment.centreline_mm))
+    middle = segment.length_mm // 2
     centre = line.point_at(middle)
     a, b = line.piece(line.piece_index(middle))
     direction = (b[0] - a[0], b[1] - a[1])
     length = isqrt(direction[0] ** 2 + direction[1] ** 2)
     across = (-direction[1] * 6_350 // length, direction[0] * 6_350 // length)
-    offsets = (segment.crossing_offsets_mm[0], middle, segment.crossing_offsets_mm[1])
-
-    def change(record):
-        if record is segment:
-            return dataclasses.replace(record, crossing_offsets_mm=offsets)
-        if isinstance(record, rec.CrossingRecord) and (
-            record.segment_ordinal,
-            record.offset_index,
-        ) == (4, 1):
-            # The crossing at the far end moves up one offset to make room.
-            return dataclasses.replace(record, offset_index=2, identity=_identity("crossing", 4, 2))
-        return record
-
-    on_the_arc = rec.CrossingRecord(
-        _identity("crossing", 4, 1),
-        100,
-        4,
-        1,
-        "marked_priority",
-        (
-            (centre[0] - across[0], centre[1] - across[1]),
-            (centre[0] + across[0], centre[1] + across[1]),
-        ),
-        3_000,
+    ends = (
+        (centre[0] - across[0], centre[1] - across[1], 0),
+        (centre[0] + across[0], centre[1] + across[1], 0),
     )
-    _refused((*_changed(change), on_the_arc), "crossing 100 lies on a curved lane piece")
+    xs, ys = [end[0] for end in ends], [end[1] for end in ends]
+    crossing = CrossingRecord(
+        identity("crossing", segment.identity, 7),
+        segment.identity,
+        7,
+        "zebra",
+        middle,
+        3_000,
+        ends,
+        6,
+        (),
+        Extent(min(xs), min(ys), 0, max(xs), max(ys), 0),
+    )
+    _refused(
+        (*build_records(), crossing), f"crossing {crossing.identity} lies on a curved lane piece"
+    )
 
 
-def _signal_groups() -> dict[str, rec.SignalGroupRecord]:
-    return {record.group: record for record in _of(rec.SignalGroupRecord)}
+def _signal() -> SignalRecord:
+    [signal] = _of(SignalRecord)
+    return signal
+
+
+def _with_groups(groups) -> tuple[object, ...]:
+    signal = _signal()
+    return _changed(
+        lambda record: dataclasses.replace(record, groups=groups) if record is signal else record
+    )
 
 
 def test_a_plan_releasing_two_conflicting_straight_movements_together_is_refused():
-    lanes = {lane.lane_ordinal: lane for lane in _of(rec.CarriagewayLaneRecord)}
-
-    def east_west(connector) -> bool:
-        a, b = lanes[connector.from_lane_ordinal].centreline_mm[-2:]
-        return a[1] == b[1]
-
-    moved = next(
-        connector
-        for connector in _of(rec.LaneConnectorRecord)
-        if connector.junction_ordinal == 0 and connector.turn == "straight" and east_west(connector)
+    groups = {group.group: group for group in _signal().groups}
+    moved = _straight_from(_lane(1, 1), "straight").identity
+    assert moved in groups["phase_b"].connection_identities
+    changed = (
+        SignalGroup(
+            "phase_a", tuple(sorted((*groups["phase_a"].connection_identities, moved))), ()
+        ),
+        SignalGroup(
+            "phase_b",
+            tuple(item for item in groups["phase_b"].connection_identities if item != moved),
+            (),
+        ),
+        groups["walk_a"],
+        groups["walk_b"],
     )
-    assert moved.connector_ordinal in _signal_groups()["phase_b"].connector_ordinals
-
-    def change(record):
-        if isinstance(record, rec.SignalGroupRecord) and record.group == "phase_a":
-            ordinals = tuple(sorted((*record.connector_ordinals, moved.connector_ordinal)))
-            return dataclasses.replace(record, connector_ordinals=ordinals)
-        if isinstance(record, rec.SignalGroupRecord) and record.group == "phase_b":
-            ordinals = tuple(o for o in record.connector_ordinals if o != moved.connector_ordinal)
-            return dataclasses.replace(record, connector_ordinals=ordinals)
-        return record
-
-    _refused(_changed(change), "lets conflicting straight movements")
+    _refused(_with_groups(changed), "lets conflicting straight movements")
 
 
 def test_a_straight_movement_through_a_crosswalk_that_is_walking_is_refused():
-    groups = _signal_groups()
+    groups = {group.group: group for group in _signal().groups}
+    swapped = (
+        groups["phase_a"],
+        groups["phase_b"],
+        SignalGroup("walk_a", (), groups["walk_b"].crossing_identities),
+        SignalGroup("walk_b", (), groups["walk_a"].crossing_identities),
+    )
+    _refused(_with_groups(swapped), "while it walks")
 
-    def change(record):
-        if isinstance(record, rec.SignalGroupRecord) and record.group in ("walk_a", "walk_b"):
-            other = groups["walk_b" if record.group == "walk_a" else "walk_a"]
-            return dataclasses.replace(record, crossing_ordinals=other.crossing_ordinals)
-        return record
 
-    _refused(_changed(change), "through crossing 0 while it walks")
+def _move_far_crossing(offset: int) -> tuple[object, ...]:
+    crossing = _crossing(0, 2)
+    assert crossing.offset_mm == 83_500
+    shift = offset - crossing.offset_mm
+    return _changed(
+        lambda record: (
+            dataclasses.replace(
+                record,
+                offset_mm=offset,
+                line_mm=tuple((x, y + shift, z) for x, y, z in record.line_mm),
+                extent=dataclasses.replace(
+                    record.extent,
+                    min_y_mm=record.extent.min_y_mm + shift,
+                    max_y_mm=record.extent.max_y_mm + shift,
+                ),
+            )
+            if record is crossing
+            else record
+        )
+    )
 
 
 def test_a_crossing_band_that_reaches_a_stop_line_is_refused():
-    [segment] = [record for record in _of(rec.StreetSegmentRecord) if record.segment_ordinal == 0]
-    [crossing] = [
+    _refused(
+        _move_far_crossing(79_000),
+        f"crossing {_crossing(0, 2).identity} reaches the stop line of lane",
+    )
+
+
+def test_a_stop_line_four_feet_before_the_crosswalk_compiles():
+    """A stop line 4 ft (1219 mm) before the crosswalk's near edge, as MUTCD practice places it."""
+    network = _compile(_move_far_crossing(80_000 + 1_219 + 1_500))
+    band = network.band(_crossing(0, 2).identity)
+    assert all(path.startswith("connector:") for path, _, _ in band.intervals)
+
+
+def _bay(segment: int, side: str, ordinal: int) -> ParkingSpaceRecord:
+    curb = identity("curb_edge", _segment(segment).identity, 1 if side == "right" else 0)
+    return next(
         record
-        for record in _of(rec.CrossingRecord)
-        if (record.segment_ordinal, record.offset_index) == (0, 2)
-    ]
-    assert segment.crossing_offsets_mm == (16_500, 52_750, 83_500)
+        for record in _of(ParkingSpaceRecord)
+        if record.curb_identity == curb and record.space_ordinal == ordinal
+    )
 
-    def change(record):
-        if record is segment:
-            return dataclasses.replace(record, crossing_offsets_mm=(16_500, 52_750, 79_000))
-        if record is crossing:
-            return dataclasses.replace(
-                record, line_mm=tuple((x, y - 4_500) for x, y in record.line_mm)
-            )
-        return record
 
-    _refused(_changed(change), "crossing 2 reaches the stop line of lane 0")
+def _with_access(space: ParkingSpaceRecord, start: int, end: int) -> tuple[object, ...]:
+    return _changed(
+        lambda record: (
+            dataclasses.replace(record, access_start_mm=start, access_end_mm=end)
+            if record is space
+            else record
+        )
+    )
 
 
 def test_parking_reached_inside_a_junction_region_or_across_a_crossing_is_refused():
-    spaces = {
-        (space.segment_ordinal, space.side, space.space_index): space
-        for space in _of(rec.ParkingSpaceRecord)
-    }
-    bus = spaces[(0, "right", 0)]
-    assert (bus.access_start_mm, bus.access_end_mm) == (2_000, 16_000)
-    _refused(
-        _changed(
-            lambda record: (
-                dataclasses.replace(record, access_start_mm=0) if record is bus else record
-            )
-        ),
-        "space 0 is reached inside a junction region",
+    bus = _bay(0, "right", 0)
+    assert (bus.parking_kind, bus.access_start_mm, bus.access_end_mm) == (
+        "bus_layover",
+        22_000,
+        36_000,
     )
-    car = spaces[(0, "right", 3)]
-    assert (car.access_start_mm, car.access_end_mm) == (36_100, 42_800)
+    _refused(_with_access(bus, 20_000, 36_000), f"space {bus.identity} is reached inside")
+    loading = _bay(0, "right", 3)
+    assert (loading.parking_kind, loading.access_start_mm) == ("loading", 56_100)
     _refused(
-        _changed(
-            lambda record: (
-                dataclasses.replace(record, access_start_mm=33_000) if record is car else record
-            )
-        ),
-        "space 3 is reached across crossing 1",
+        _with_access(loading, 53_000, 62_800),
+        f"space {loading.identity} is reached across crossing {_crossing(0, 1).identity}",
     )
 
 
 def test_too_little_pedestrian_time_for_a_long_signalised_crossing_is_refused():
-    [crossing] = [
-        record
-        for record in _of(rec.CrossingRecord)
-        if (record.segment_ordinal, record.offset_index) == (0, 0)
-    ]
-    (x0, y0), (x1, y1) = crossing.line_mm
+    crossing = _crossing(0, 0)
+    (x0, y0, z0), (x1, y1, z1) = crossing.line_mm
+    longer = ((x0 - 9_000, y0, z0), (x1 + 9_000, y1, z1))
     _refused(
         _changed(
             lambda record: (
-                dataclasses.replace(record, line_mm=((x0 - 9_000, y0), (x1 + 9_000, y1)))
+                dataclasses.replace(
+                    record,
+                    line_mm=longer,
+                    extent=dataclasses.replace(
+                        record.extent,
+                        min_x_mm=record.extent.min_x_mm - 9_000,
+                        max_x_mm=record.extent.max_x_mm + 9_000,
+                    ),
+                )
                 if record is crossing
                 else record
             )
         ),
-        "gives crossing 0 too little pedestrian time",
+        f"gives crossing {crossing.identity} too little pedestrian time",
     )
 
 
 def test_a_signalised_mid_block_crossing_is_refused():
+    crossing = _crossing(0, 1)
     _refused(
         _changed(
             lambda record: (
-                dataclasses.replace(record, control="signalised")
-                if isinstance(record, rec.CrossingRecord)
-                and (record.segment_ordinal, record.offset_index) == (0, 1)
+                dataclasses.replace(record, signal_identity=(_signal().identity,))
+                if record is crossing
                 else record
             )
         ),
-        "mid-block crossing 1 is signalised; v1 has no mid-block signals",
+        f"mid-block crossing {crossing.identity} is signalised; v1 has no mid-block signals",
     )
 
 
-def test_a_signal_junction_needs_its_controller():
+def test_a_signal_junction_needs_its_signal():
+    signal = _signal().identity
+
+    def unsignal(record):
+        if type(record) is SignalRecord:
+            return None
+        if type(record) in (JunctionRecord, CrossingRecord) and record.signal_identity == (signal,):
+            return dataclasses.replace(record, signal_identity=())
+        return record
+
     _refused(
-        _changed(
-            lambda record: (
-                None
-                if isinstance(record, rec.SignalControllerRecord | rec.SignalGroupRecord)
-                else record
-            )
-        ),
-        "junction 0: a signal controller exists exactly when the rule is signal",
+        _changed(unsignal),
+        f"junction {_junction('C').identity}: a signal exists exactly when the rule is signal",
     )
 
 
 def test_an_uncontrolled_junction_with_conflicting_approaches_is_refused():
+    junction = _junction("N").identity
+
     def change(record):
-        if isinstance(record, rec.JunctionRecord) and record.junction_ordinal == 1:
-            return dataclasses.replace(record, policy="uncontrolled_continuation")
-        if isinstance(record, rec.JunctionApproachRecord) and record.junction_ordinal == 1:
+        if type(record) is JunctionRecord and record.identity == junction:
+            return dataclasses.replace(record, control="uncontrolled_continuation")
+        if type(record) is JunctionApproachRecord and record.junction_identity == junction:
             return dataclasses.replace(record, control="priority", priority_rank=0)
         return record
 
-    _refused(_changed(change), "uncontrolled junction 1 has conflicting movements")
+    _refused(_changed(change), f"uncontrolled junction {junction} has conflicting movements")
+
+
+def test_ranks_at_a_signalised_junction_are_read_by_no_rule():
+    junction = _junction("C").identity
+    network = _compile(
+        _changed(
+            lambda record: (
+                dataclasses.replace(record, priority_rank=1)
+                if type(record) is JunctionApproachRecord
+                and record.junction_identity == junction
+                and record.approach_ordinal == 0
+                else record
+            )
+        )
+    )
+    assert network.junctions[junction].policy == "signalised"
 
 
 # ---------------------------------------------------------------------------------------------
@@ -545,17 +673,11 @@ def test_an_uncontrolled_junction_with_conflicting_approaches_is_refused():
 
 
 def test_a_lane_narrower_than_a_body_drops_that_class_and_says_why():
-    [lane] = [
-        record
-        for record in _of(rec.CarriagewayLaneRecord)
-        if record.segment_ordinal == 4 and record.direction == "with_segment"
-    ]
-    network = compile_network(
+    lane = _lane(4, 1)
+    network = _compile(
         _changed(
             lambda record: dataclasses.replace(record, width_mm=2_500) if record is lane else record
-        ),
-        load_traffic_catalogs(),
-        scope=SCOPE,
+        )
     )
     path_id = f"lane:{lane.identity}"
     assert network.restrictions == ((path_id, "city_bus", "body wider than the lane"),)
@@ -572,8 +694,7 @@ def test_a_turn_tighter_than_a_class_minimum_drops_that_class_on_the_turn(tmp_pa
     [bus] = [entry for entry in document["entries"] if entry["key"] == "city_bus"]
     bus["minimum_turning_radius_mm"] = 14_000
     path.write_text(json.dumps(document, indent=2) + "\n", encoding="utf-8")
-    catalogs = load_traffic_catalogs(directory)
-    network = compile_network(_base(), catalogs, scope=SCOPE)
+    network = _compile(build_records(), load_traffic_catalogs(directory))
     turns = [reason for _, key, reason in network.restrictions if key == "city_bus"]
     # Every right turn in the fixture is a 13.125 m arc and left turns are wider: four right
     # turns at the centre and two at each T junction.

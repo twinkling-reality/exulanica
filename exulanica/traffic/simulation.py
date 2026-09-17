@@ -92,7 +92,8 @@ def _ceil_seconds(milliseconds: int) -> int:
 @dataclass(slots=True)
 class Reservation:
     kind: str
-    target: int
+    #: The junction's identity for a junction reservation, the crossing's for a band.
+    target: str
     gate_index: int
     gate_path: str
     gate_position: int
@@ -150,6 +151,8 @@ class Vehicle:
     colour: str
     mode: str
     space: str
+    #: Which of its space's places a parked vehicle stands in, from 0; -1 when not parked.
+    slot: int
     target_space: str
     trip_id: str
     route: list[str]
@@ -181,6 +184,7 @@ class Vehicle:
             "colour": self.colour,
             "mode": self.mode,
             "space": self.space,
+            "slot": self.slot,
             "target_space": self.target_space,
             "trip_id": self.trip_id,
             "route": list(self.route),
@@ -244,7 +248,10 @@ def initial_traffic(
     catalogs: TrafficCatalogs,
     fleet: Mapping[str, int],
 ) -> dict[str, Any]:
-    """A parked fleet, every vehicle in a space its class fits, chosen by seeded draws."""
+    """A parked fleet, every vehicle in a place of a space its class fits, chosen by seeded draws.
+
+    A space holds as many vehicles as its capacity; each takes the lowest free slot.
+    """
     require_seed(seed)
     try:
         uuid.UUID(traffic_id)
@@ -252,7 +259,7 @@ def initial_traffic(
         raise InvalidTrafficInputError("traffic_id is a UUID") from error
     if network.catalog_sha256 != catalogs.digest:
         raise InvalidTrafficInputError("the network was compiled against other catalogs")
-    free = sorted(network.spaces)
+    used: dict[str, int] = {}
     vehicles = []
     ordinal = 0
     for class_key in sorted(fleet):
@@ -261,11 +268,16 @@ def initial_traffic(
             raise InvalidTrafficInputError(f"fleet count for {class_key} is a non-negative int")
         vehicle_class = catalogs.vehicle_class(class_key)
         for index in range(count):
-            fits = [space for space in free if class_key in network.spaces[space].classes]
+            fits = [
+                identity
+                for identity, space in network.spaces.items()
+                if class_key in space.classes and used.get(identity, 0) < space.capacity
+            ]
             if not fits:
                 raise InvalidTrafficInputError(f"no free space fits another {class_key}")
             space = fits[draw_integer(seed, f"traffic.fleet.{class_key}", index, 0, len(fits) - 1)]
-            free.remove(space)
+            slot = used.get(space, 0)
+            used[space] = slot + 1
             families = vehicle_class.body_families
             colours = vehicle_class.colours
             vehicles.append(
@@ -281,6 +293,7 @@ def initial_traffic(
                     ],
                     mode="parked",
                     space=space,
+                    slot=slot,
                     target_space="",
                     trip_id="",
                     route=[],
@@ -333,6 +346,7 @@ def _read_state(
                 colour=item["colour"],
                 mode=item["mode"],
                 space=item["space"],
+                slot=item["slot"],
                 target_space=item["target_space"],
                 trip_id=item["trip_id"],
                 route=list(item["route"]),
@@ -462,7 +476,7 @@ class _Step:
         return vehicle_indication(plan, signal.offset_s, second, signal.group_of(connector))
 
     def until_red(self, junction: JunctionSpec, connector: str) -> int:
-        key = (junction.ordinal, connector)
+        key = (junction.identity, connector)
         if key not in self.red_cache:
             signal = junction.signal
             assert signal is not None
@@ -652,8 +666,16 @@ def _start_trip(step: _Step, request: TripRequest) -> None:
     if vehicle.mode != "parked" or vehicle.trip_id:
         block("vehicle_busy")
         return
-    taken = {other.space for other in step.vehicles.values() if other.mode == "parked"}
-    taken |= {other.target_space for other in step.vehicles.values() if other.target_space}
+    # A space is full when its parked vehicles and the vehicles heading for it reach its capacity.
+    holding: dict[str, int] = {}
+    for other in step.vehicles.values():
+        for held in (other.space if other.mode == "parked" else "", other.target_space):
+            if held:
+                holding[held] = holding.get(held, 0) + 1
+
+    def full(identity: str) -> bool:
+        return holding.get(identity, 0) >= network.spaces[identity].capacity
+
     class_key = vehicle.vehicle_class.key
     if request.destination_kind == "space":
         space = network.spaces.get(request.destination)
@@ -663,17 +685,17 @@ def _start_trip(step: _Step, request: TripRequest) -> None:
         if class_key not in space.classes:
             block("space_does_not_fit_class")
             return
-        if space.identity in taken:
+        if full(space.identity):
             block("destination_space_taken")
             return
         target = space.identity
     else:
         candidates = [
             space.identity
-            for space in sorted(network.spaces.values(), key=lambda item: item.ordinal)
-            if space.segment_ordinal == request.street_segment_ordinal
+            for space in network.spaces.values()
+            if network.segment_ordinals[space.segment] == request.street_segment_ordinal
             and class_key in space.classes
-            and space.identity not in taken
+            and not full(space.identity)
         ]
         if not candidates:
             block("no_parking_at_destination")
@@ -724,8 +746,8 @@ def _signal_changes(step: _Step) -> None:
         interval = plan.intervals[now]
         step.emit(
             "signal_interval",
-            junction=junction.ordinal,
-            controller=signal.controller_identity,
+            junction=junction.identity,
+            signal=signal.identity,
             interval=now,
             vehicle_green=list(interval.vehicle_green),
             vehicle_amber=list(interval.vehicle_amber),
@@ -743,6 +765,7 @@ def _finish_manoeuvres(step: _Step) -> None:
             vehicle.mode = "driving"
             vehicle.manoeuvre_until = -1
             vehicle.space = ""
+            vehicle.slot = -1
             trip.departed_second = step.second
             if trip.status != "blocked":
                 trip.status = "driving"
@@ -770,6 +793,12 @@ def _finish_manoeuvres(step: _Step) -> None:
             vehicle.mode = "parked"
             vehicle.manoeuvre_until = -1
             vehicle.space = vehicle.target_space
+            taken_slots = {
+                other.slot
+                for other in step.vehicles.values()
+                if other.mode == "parked" and other.space == vehicle.space and other is not vehicle
+            }
+            vehicle.slot = min(set(range(len(taken_slots) + 1)) - taken_slots)
             vehicle.target_space = ""
             vehicle.route = []
             vehicle.route_index = 0
@@ -985,7 +1014,7 @@ def _approaching(step: _Step, junction: JunctionSpec) -> dict[str, list[tuple[Ve
         if upcoming is None:
             continue
         gate, index, distance = upcoming
-        if gate.kind != "junction" or gate.target != junction.ordinal:
+        if gate.kind != "junction" or gate.target != junction.identity:
             continue
         if index + 1 >= len(vehicle.route):
             continue
@@ -1130,7 +1159,7 @@ def _grant(
     step: _Step,
     vehicle: Vehicle,
     kind: str,
-    target: int,
+    target: str,
     gate_index: int,
     gate: Gate,
     connector: str,
@@ -1264,8 +1293,8 @@ def _candidate_rank(policy: Any, candidate: _Candidate) -> tuple[Any, ...]:
 
 def _admit(step: _Step) -> None:
     network = step.network
-    for ordinal in sorted(network.junctions):
-        junction = network.junctions[ordinal]
+    for junction_id in sorted(network.junctions):
+        junction = network.junctions[junction_id]
         policy = step.catalogs.policy(junction.policy)
         approaching = _approaching(step, junction)
         approach_of = {
@@ -1367,7 +1396,7 @@ def _admit(step: _Step) -> None:
                 step,
                 vehicle,
                 "junction",
-                ordinal,
+                junction_id,
                 candidate.gate_index,
                 network.gates[candidate.lane][-1],
                 connector,
@@ -1454,7 +1483,7 @@ def _admit_bands(step: _Step) -> None:
             gate = next(
                 item
                 for item in network.gates[path_id]
-                if item.kind == "band" and item.target == band.band_id
+                if item.kind == "band" and item.target == band.identity
             )
             candidates = []
             for vehicle in step.vehicles.values():
@@ -1505,7 +1534,7 @@ def _admit_bands(step: _Step) -> None:
                 step,
                 vehicle,
                 "band",
-                band.band_id,
+                band.identity,
                 gate_index,
                 gate,
                 "",
@@ -1770,8 +1799,8 @@ def _record_entry(step: _Step, vehicle: Vehicle, gate: Gate, index: int) -> None
             "crossing_entered",
             vehicle_id=vehicle.vehicle_id,
             trip_id=vehicle.trip_id,
-            band=gate.target,
-            crossing=network.bands[gate.target].society_crossing_id,
+            crossing_identity=gate.target,
+            crossing=network.band(gate.target).society_crossing_id,
         )
 
 

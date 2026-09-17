@@ -1,7 +1,11 @@
-"""The traffic catalogs: vehicle classes, right-of-way policies and signal plans.
+"""The traffic catalogs: vehicle classes, right-of-way policies, signal plans and access mappings.
 
-Every number the simulation uses about a vehicle, a rule or a signal comes from one of three
-versioned files under ``assets/catalogs/traffic``. None is a constant in code.
+Every number the simulation uses about a vehicle, a rule or a signal comes from one of the
+versioned files under ``assets/catalogs/traffic``. None is a constant in code. Two of the files
+map the city's own keys to vehicle classes: ``lane-use-access`` says which classes a lane of each
+lane use carries (none for a lane that carries no traffic), and ``parking-kind-access`` which
+classes a parking space of each kind admits. The city records carry the keys; traffic owns what
+they admit.
 
 **Envelope.** ``schema_version`` (1), ``catalog_id``, ``catalog_version``, ``references`` and
 ``entries``, and nothing else. The id and version match the file name, the same rule the grammar
@@ -17,7 +21,7 @@ or unparseable source is refused, so a number cannot be added without saying whe
 catalogs. Entries are authored here, so they are ``original`` and Apache-2.0; the facts they
 cite are facts, and the citation says where they were read.
 
-**Digest.** :func:`catalogs_digest` covers the canonical form of all three catalogs, references
+**Digest.** :func:`catalogs_digest` covers the canonical form of all five catalogs, references
 and sources included, so changing a citation changes the digest. :attr:`TrafficCatalogs.file_sha256`
 keeps the SHA-256 of each file's bytes, because a city signal record names the signal-plan catalog
 by that byte digest.
@@ -46,6 +50,7 @@ __all__ = [
     "POLICY_RULES",
     "SIGNAL_GROUP_KINDS",
     "TURNS",
+    "AccessMapping",
     "RightOfWayPolicy",
     "SignalGroupSpec",
     "SignalInterval",
@@ -88,6 +93,8 @@ _FILES: Final = {
     "vehicle-class": "vehicle-class.v1.json",
     "right-of-way-policy": "right-of-way-policy.v1.json",
     "signal-plan": "signal-plan.v1.json",
+    "lane-use-access": "lane-use-access.v1.json",
+    "parking-kind-access": "parking-kind-access.v1.json",
 }
 
 
@@ -269,10 +276,22 @@ class SignalPlan:
 
 
 @dataclass(frozen=True, slots=True)
+class AccessMapping:
+    """The vehicle classes one city key admits: a lane use's traffic, or a parking kind's."""
+
+    key: str
+    label: str
+    classes: tuple[str, ...]
+    sources: tuple[tuple[str, str], ...]
+
+
+@dataclass(frozen=True, slots=True)
 class TrafficCatalogs:
     vehicle_classes: tuple[VehicleClass, ...]
     policies: tuple[RightOfWayPolicy, ...]
     plans: tuple[SignalPlan, ...]
+    lane_uses: tuple[AccessMapping, ...]
+    parking_kinds: tuple[AccessMapping, ...]
     #: ``(catalog_id, canonical payload)`` for each file, which is what the digest covers.
     payloads: tuple[tuple[str, Mapping[str, Any]], ...]
     #: ``(catalog_id, sha256 of the file bytes)``, the digest a city signal record carries.
@@ -298,6 +317,18 @@ class TrafficCatalogs:
             if entry.key == key:
                 return entry
         raise TrafficCatalogError(f"no signal plan {key!r}")
+
+    def lane_use(self, key: str) -> AccessMapping:
+        for entry in self.lane_uses:
+            if entry.key == key:
+                return entry
+        raise TrafficCatalogError(f"no lane use {key!r} in lane-use-access")
+
+    def parking_kind(self, key: str) -> AccessMapping:
+        for entry in self.parking_kinds:
+            if entry.key == key:
+                return entry
+        raise TrafficCatalogError(f"no parking kind {key!r} in parking-kind-access")
 
     def file_digest(self, catalog_id: str) -> str:
         return dict(self.file_sha256)[catalog_id]
@@ -529,6 +560,30 @@ def _plan(where: str, raw: object, references: Mapping[str, str]) -> SignalPlan:
     )
 
 
+_ACCESS_KEYS: Final = frozenset({"key", "label", "classes", "sources", "licence"})
+
+
+def _access(
+    where: str, raw: object, references: Mapping[str, str], *, empty: bool
+) -> AccessMapping:
+    entry = _object(where, raw, _ACCESS_KEYS)
+    return AccessMapping(
+        key=_key(f"{where}.key", entry["key"]),
+        label=_text(f"{where}.label", entry["label"]),
+        classes=_keys(f"{where}.classes", entry["classes"], empty=empty),
+        sources=_sources(f"{where}.sources", entry["sources"], {"classes"}, references),
+    )
+
+
+def _lane_use(where: str, raw: object, references: Mapping[str, str]) -> AccessMapping:
+    # A lane use may carry no traffic at all: a parking lane or a buffer.
+    return _access(where, raw, references, empty=True)
+
+
+def _parking_kind(where: str, raw: object, references: Mapping[str, str]) -> AccessMapping:
+    return _access(where, raw, references, empty=False)
+
+
 def _read(path: Path, catalog_id: str) -> tuple[dict[str, Any], str]:
     try:
         stem, version = split_versioned_name(path)
@@ -545,8 +600,9 @@ def _read(path: Path, catalog_id: str) -> tuple[dict[str, Any], str]:
     ) is not int:
         raise _fail(path.name, "declares an id or version that is not its file name")
     references = envelope["references"]
-    if not isinstance(references, dict) or not references:
-        raise _fail(path.name, "references is a non-empty object")
+    # A catalog whose every value is declared has nothing to cite, so it may list no reference.
+    if not isinstance(references, dict):
+        raise _fail(path.name, "references is an object")
     for ref, citation in references.items():
         _key(f"{path.name} references key", ref)
         _text(f"{path.name} references.{ref}", citation)
@@ -600,7 +656,7 @@ def load_traffic_catalogs(directory: Path = CATALOG_DIRECTORY) -> TrafficCatalog
         envelopes[catalog_id] = envelope
         digests.append((catalog_id, file_digest))
     payloads = tuple(sorted(envelopes.items()))
-    return TrafficCatalogs(
+    catalogs = TrafficCatalogs(
         vehicle_classes=_entries(
             directory.joinpath(_FILES["vehicle-class"]), envelopes["vehicle-class"], _vehicle
         ),
@@ -610,10 +666,30 @@ def load_traffic_catalogs(directory: Path = CATALOG_DIRECTORY) -> TrafficCatalog
             _policy,
         ),
         plans=_entries(directory.joinpath(_FILES["signal-plan"]), envelopes["signal-plan"], _plan),
+        lane_uses=_entries(
+            directory.joinpath(_FILES["lane-use-access"]), envelopes["lane-use-access"], _lane_use
+        ),
+        parking_kinds=_entries(
+            directory.joinpath(_FILES["parking-kind-access"]),
+            envelopes["parking-kind-access"],
+            _parking_kind,
+        ),
         payloads=payloads,
         file_sha256=tuple(digests),
         digest=_payloads_digest(payloads),
     )
+    known = {vehicle.key for vehicle in catalogs.vehicle_classes}
+    for catalog_id, mappings in (
+        ("lane-use-access", catalogs.lane_uses),
+        ("parking-kind-access", catalogs.parking_kinds),
+    ):
+        for mapping in mappings:
+            unknown = set(mapping.classes) - known
+            if unknown:
+                raise _fail(
+                    _FILES[catalog_id], f"{mapping.key} admits unknown classes {sorted(unknown)}"
+                )
+    return catalogs
 
 
 def _payloads_digest(payloads: tuple[tuple[str, Mapping[str, Any]], ...]) -> str:
@@ -634,6 +710,8 @@ def declared_values(catalogs: TrafficCatalogs) -> tuple[tuple[str, str, str, str
         ("vehicle-class", catalogs.vehicle_classes),
         ("right-of-way-policy", catalogs.policies),
         ("signal-plan", catalogs.plans),
+        ("lane-use-access", catalogs.lane_uses),
+        ("parking-kind-access", catalogs.parking_kinds),
     ):
         for entry in entries:
             for field, text in entry.sources:

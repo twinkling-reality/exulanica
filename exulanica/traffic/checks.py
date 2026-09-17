@@ -7,9 +7,14 @@ sweeps are recomputed here from the states.
 
 **Footprint model.** A vehicle's body is its front position minus its length, back along its
 route. Each route piece it covers is a flat-ended rectangle reaching, either side, the class's
-half-width, plus on a lane piece the rear-axle off-tracking of the class's wheelbase at the
-piece's bends, and on a turning connector piece the class's turning envelope (inward extent on
-the inside of the turn, outward extent outside). A parked vehicle is its whole stall.
+half-width, plus, on the inside of the turn at each end vertex of the piece, the rear-axle
+off-tracking of the class's wheelbase at that corner's radius, and on a turning connection piece
+the class's turning envelope (inward extent on the inside of the turn, outward extent outside).
+Where the body bends round a vertex, the wedge the two flat ends leave on the outside of the bend
+is covered by a strip on each piece, as wide as the larger outer reach and as long as that reach
+times ``tan(theta / 2)``, which together hold the kite round the wedge for any turn up to a right
+angle, the most the compiler admits. A vehicle parked in a carriageway bay is the whole bay; a
+vehicle at a footway stand is off the carriageway and has no body here.
 
 **Checks.**
 
@@ -36,17 +41,20 @@ from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
 from dataclasses import dataclass, field
+from itertools import pairwise
+from math import isqrt
 from typing import Any, Final
 
 from exulanica.traffic.catalogs import TrafficCatalogs, VehicleClass
 from exulanica.traffic.geometry import (
     Point,
-    circumradius_floor,
     convex_overlap,
+    corner_radius_floor,
     cross,
     dot,
     offtracking_mm,
     rectangle,
+    step_along,
 )
 from exulanica.traffic.inputs import TrafficInputs
 from exulanica.traffic.network import JunctionSpec, RoadNetwork
@@ -110,43 +118,51 @@ class TransitionChecker:
             return self._extents[key]
         path = self.network.paths[path_id]
         line = path.line
+        points = line.points
         half = -(-vehicle.width_mm // 2)
+        first = line.piece_direction(0)
+        last = line.piece_direction(line.piece_count - 1)
         extents = []
-        if path.kind == "lane":
-            for index in range(line.piece_count):
-                extra = 0
-                for vertex in (index, index + 1):
-                    if 0 < vertex < len(line.points) - 1:
-                        radius = circumradius_floor(
-                            line.points[vertex - 1], line.points[vertex], line.points[vertex + 1]
-                        )
-                        if radius is not None:
-                            extra = max(extra, offtracking_mm(radius, vehicle.wheelbase_mm))
-                extents.append((half + extra, half + extra))
-        else:
-            first = line.piece_direction(0)
-            last = line.piece_direction(line.piece_count - 1)
-            inward = max(half, vehicle.turning_inward_extent_mm)
-            outward = max(half, vehicle.turning_outward_extent_mm)
-            for index in range(line.piece_count):
-                direction = line.piece_direction(index)
-                straight = path.turn == "straight" or any(
+        for index in range(line.piece_count):
+            left = right = half
+            for vertex in (index, index + 1):
+                if not 0 < vertex < len(points) - 1:
+                    continue
+                before, here, after = points[vertex - 1], points[vertex], points[vertex + 1]
+                radius = corner_radius_floor(before, here, after)
+                if radius is None:
+                    continue
+                tracked = half + offtracking_mm(radius, vehicle.wheelbase_mm)
+                turn = cross(
+                    (here[0] - before[0], here[1] - before[1]),
+                    (after[0] - here[0], after[1] - here[1]),
+                )
+                if turn > 0:
+                    left = max(left, tracked)
+                elif turn < 0:
+                    right = max(right, tracked)
+            direction = line.piece_direction(index)
+            turning = (
+                path.kind == "connector"
+                and path.turn != "straight"
+                and not any(
                     cross(direction, end) == 0 and dot(direction, end) > 0 for end in (first, last)
                 )
-                if straight:
-                    extents.append((half, half))
-                elif path.turn == "right":
-                    extents.append((outward, inward))
-                else:
-                    extents.append((inward, outward))
+            )
+            if turning:
+                inward = max(half, vehicle.turning_inward_extent_mm)
+                outward = max(half, vehicle.turning_outward_extent_mm)
+                envelope = (outward, inward) if path.turn == "right" else (inward, outward)
+                left, right = max(left, envelope[0]), max(right, envelope[1])
+            extents.append((left, right))
         self._extents[key] = extents
         return extents
 
     def span_rectangles(
         self, route: Sequence[str], vehicle: VehicleClass, start: int, end: int
     ) -> list[tuple[Point, ...]]:
-        """Rectangles covering route coordinates ``[start, end]``."""
-        rectangles = []
+        """Convex pieces covering route coordinates ``[start, end]``: rectangles and bend strips."""
+        pieces: list[tuple[Point, Point, int, int]] = []
         offset = 0
         for path_id in route:
             line = self.network.paths[path_id].line
@@ -154,13 +170,37 @@ class TransitionChecker:
             if low <= high and (high > low or start == end):
                 extents = self.piece_extents(path_id, vehicle)
                 for index, a, b in line.span(low, high):
-                    shape = rectangle(a, b, *extents[index])
-                    if shape is not None:
-                        rectangles.append(shape)
+                    if a != b:
+                        pieces.append((a, b, *extents[index]))
             offset += line.length
             if offset > end:
                 break
-        return rectangles
+        shapes = []
+        for a, b, left, right in pieces:
+            shape = rectangle(a, b, left, right)
+            if shape is not None:
+                shapes.append(shape)
+        for (a0, b0, left0, right0), (a1, b1, left1, right1) in pairwise(pieces):
+            if b0 != a1:
+                continue
+            first, second = (b0[0] - a0[0], b0[1] - a0[1]), (b1[0] - a1[0], b1[1] - a1[1])
+            turn = cross(first, second)
+            if turn == 0:
+                continue
+            # The two flat ends leave a wedge on the outside of the bend. The kite round it reaches
+            # tan(theta / 2) of the outer reach along each piece, and tan(theta / 2) is
+            # |cross| / (|u| |v| + dot); the compiler admits no bend over a right angle.
+            outer = max(right0, right1) if turn > 0 else max(left0, left1)
+            sides = (0, outer) if turn > 0 else (outer, 0)
+            root = isqrt(dot(first, first) * dot(second, second))
+            reach = -(-outer * abs(turn) // (root + dot(first, second)))
+            for strip in (
+                rectangle(b0, step_along(b0, first, reach), *sides),
+                rectangle(step_along(a1, second, -reach), a1, *sides),
+            ):
+                if strip is not None:
+                    shapes.append(strip)
+        return shapes
 
     def route_front(self, vehicle: Mapping[str, Any]) -> int:
         paths = self.network.paths
@@ -172,8 +212,10 @@ class TransitionChecker:
     def body(self, vehicle: Mapping[str, Any]) -> _Body | None:
         vehicle_class = self.catalogs.vehicle_class(vehicle["vehicle_class"])
         if vehicle["mode"] == "parked":
-            stall = self.network.spaces[vehicle["space"]].footprint
-            return _Body(vehicle["id"], [stall], _box_of([stall]))
+            space = self.network.spaces[vehicle["space"]]
+            if space.placement != "carriageway":
+                return None
+            return _Body(vehicle["id"], [space.footprint], _box_of([space.footprint]))
         front = self.route_front(vehicle)
         rectangles = self.span_rectangles(
             vehicle["route"], vehicle_class, max(front - vehicle_class.length_mm, 0), front
@@ -272,7 +314,7 @@ class TransitionChecker:
             if vehicle["mode"] != "driving" or vehicle["reservation"] is not None:
                 continue
             gate = self._gate_ahead(vehicle)
-            if gate is None or gate[3] != "junction" or gate[4] != junction.ordinal:
+            if gate is None or gate[3] != "junction" or gate[4] != junction.identity:
                 continue
             route = vehicle["route"]
             index = route.index(gate[0], vehicle["route_index"])
@@ -318,7 +360,7 @@ class TransitionChecker:
             if (policy.rule == "all_way_stop" or approach.control == "stop") and not stopped_here:
                 violations.append(
                     Violation(
-                        "did_not_stop", second, (vehicle["id"],), f"junction {junction.ordinal}"
+                        "did_not_stop", second, (vehicle["id"],), f"junction {junction.identity}"
                     )
                 )
             if policy.rule == "signal" and self.indication(junction, connector, second) != "green":
@@ -372,7 +414,7 @@ class TransitionChecker:
                                 "gap_not_given",
                                 second,
                                 (vehicle["id"], other["id"]),
-                                f"junction {junction.ordinal}",
+                                f"junction {junction.identity}",
                             )
                         )
             if policy.rule == "all_way_stop" and stopped_here:
@@ -457,7 +499,7 @@ class TransitionChecker:
                                     "entered_on_red",
                                     second,
                                     (vehicle["id"],),
-                                    f"junction {junction.ordinal}",
+                                    f"junction {junction.identity}",
                                 )
                             )
                 offset += self.network.paths[path_id].length

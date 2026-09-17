@@ -8,8 +8,8 @@ occupancy is in parts per million of space-seconds.
     entry. An entry's delay is the time from reaching its approach lane to crossing the stop line,
     minus the free-flow time for that distance at the lane's cap, never below zero.
 ``parking``
-    Per group of spaces with the same permitted classes: how many spaces, and the share of
-    space-seconds a vehicle stood in one.
+    Per parking kind: how many spaces, how many vehicles they hold together, and the share of
+    those places a vehicle stood in, over every second.
 ``trips``
     Requested, arrived and blocked trips with their reasons, and the mean door-to-door time
     of arrived trips (from the request second to the arrival second).
@@ -35,9 +35,9 @@ _SECONDS_PER_HOUR: Final = 3600
 class MetricsAccumulator:
     network: RoadNetwork
     seconds: int = 0
-    entries: Counter[int] = field(default_factory=Counter)
-    delay_ms: Counter[int] = field(default_factory=Counter)
-    occupied_seconds: Counter[tuple[str, ...]] = field(default_factory=Counter)
+    entries: Counter[str] = field(default_factory=Counter)
+    delay_ms: Counter[str] = field(default_factory=Counter)
+    occupied_seconds: Counter[str] = field(default_factory=Counter)
 
     def observe(self, state: Mapping[str, Any], events: Iterable[Mapping[str, Any]]) -> None:
         """Account one completed second: the state after it and the events it produced."""
@@ -49,10 +49,13 @@ class MetricsAccumulator:
                 self.delay_ms[document["junction"]] += document["delay_ms"]
         for vehicle in state["vehicles"]:
             if vehicle["mode"] == "parked":
-                self.occupied_seconds[self.network.spaces[vehicle["space"]].classes] += 1
+                self.occupied_seconds[self.network.spaces[vehicle["space"]].kind] += 1
 
     def report(self, final_state: Mapping[str, Any]) -> dict[str, Any]:
-        groups = Counter(space.classes for space in self.network.spaces.values())
+        spaces = Counter(space.kind for space in self.network.spaces.values())
+        places = Counter()
+        for space in self.network.spaces.values():
+            places[space.kind] += space.capacity
         trips = final_state["trips"]
         arrived = [trip for trip in trips if trip["status"] == "arrived"]
         return {
@@ -60,27 +63,28 @@ class MetricsAccumulator:
             "seconds": self.seconds,
             "junctions": [
                 {
-                    "junction": ordinal,
-                    "policy": self.network.junctions[ordinal].policy,
-                    "entries": self.entries[ordinal],
-                    "entries_per_hour": self.entries[ordinal]
+                    "junction": identity,
+                    "policy": self.network.junctions[identity].policy,
+                    "entries": self.entries[identity],
+                    "entries_per_hour": self.entries[identity]
                     * _SECONDS_PER_HOUR
                     // max(self.seconds, 1),
-                    "mean_delay_ms": self.delay_ms[ordinal] // self.entries[ordinal]
-                    if self.entries[ordinal]
+                    "mean_delay_ms": self.delay_ms[identity] // self.entries[identity]
+                    if self.entries[identity]
                     else 0,
                 }
-                for ordinal in sorted(self.network.junctions)
+                for identity in sorted(self.network.junctions)
             ],
             "parking": [
                 {
-                    "classes": list(classes),
+                    "kind": kind,
                     "spaces": count,
-                    "occupancy_ppm": self.occupied_seconds[classes]
+                    "places": places[kind],
+                    "occupancy_ppm": self.occupied_seconds[kind]
                     * _PARTS
-                    // max(count * self.seconds, 1),
+                    // max(places[kind] * self.seconds, 1),
                 }
-                for classes, count in sorted(groups.items())
+                for kind, count in sorted(spaces.items())
             ],
             "trips": {
                 "requested": len(trips),

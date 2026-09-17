@@ -1,66 +1,80 @@
-"""The road network compiler: road records and catalogs in, a checked simulation network out.
+"""The road network compiler: a road input and the catalogs in, a checked simulation network out.
 
 :func:`compile_network` refuses a network it cannot simulate correctly, with the reason, rather
-than approximating it. It reads the provisional road records (until the city vocabulary lane
-lands the real ones) and the three traffic catalogs, and produces a :class:`RoadNetwork`.
+than approximating it. It reads a :class:`~exulanica.traffic.road_input.RoadInput`, which only
+:func:`~exulanica.traffic.city_roads.road_input_from_city` builds from city records, and the
+traffic catalogs, and produces a :class:`RoadNetwork` whose paths, junctions, crossings and
+spaces are named by the identities of the city records they came from.
 
-**Paths.** Every lane and every lane connector is a :class:`PathSpec`: a polyline a vehicle's
-front follows, the classes allowed on it, a speed limit, and a corridor half-width per piece.
-A lane piece's half-width is the widest permitted body plus the rear-axle off-tracking of its
-wheelbase on the piece's curve. A connector piece that is not collinear with the connector's
-first or last piece uses the design vehicle's turning envelope from the catalog instead.
+**Paths.** Every lane and every lane connection is a :class:`PathSpec`: a polyline a vehicle's
+front follows, the classes allowed on it, a speed limit, and a corridor reach either side of each
+piece. A piece reaches the widest permitted body's half-width, plus, on the inside of the turn at
+each of its end vertices, the rear-axle off-tracking of each class's wheelbase at that corner's
+radius. A connection piece that is not collinear with the connection's first or last piece also
+reaches the design vehicles' turning envelope from the catalog, inward on the inside of the turn.
 
-**Zones.** Two paths through one junction whose corridors meet form a :class:`Zone`: an
-interval on each. Vehicles on opposite sides of a zone may never be inside their intervals at
-the same time; that is the collision rule for crossing, merging and diverging movements, and
-it is conservative because the intervals are supersets. A lane and the connector that follows
-it touch only at their joint, which car following handles.
+**Corners.** A corner's radius is :func:`~exulanica.traffic.geometry.corner_radius_floor`: a chain
+of points along an arc has the arc's radius, and a sharp corner between long pieces has a small
+one. A class whose minimum turning radius exceeds a path's tightest corner is dropped from that
+path, with the reason; a path no class can drive is refused.
 
-**Regions.** Crossing a junction stop line means reserving a region: the connector and the
-start of the lane it leads to, up to the lane's *exit extent*. The vehicle may not stop until
-it has left the region, so it is only admitted when there is room beyond it.
+**Zones.** Two paths through one junction whose corridors meet form a :class:`Zone`: an interval
+on each. Vehicles on opposite sides of a zone may never be inside their intervals at the same
+time; that is the collision rule for crossing, merging and diverging movements, and it is
+conservative because the intervals are supersets. A lane and the connection that follows it touch
+only at their joint, which car following handles.
 
-**Bands.** A pedestrian crossing is a :class:`Band` with an interval on every path it meets.
-A band on a connector or at the start of a lane belongs to its junction's region; a band
-further along a lane is a mid-block band with its own gate.
+**Regions.** Crossing a junction stop line means reserving a region: the connection and the start
+of the lane it leads to, up to the lane's *exit extent*. The vehicle may not stop until it has
+left the region, so it is only admitted when there is room beyond it.
 
-**What v1 refuses**, each with a message: lane changes between junctions (lanes are chosen only
-through connectors), a lane end or a lane start that another junction path comes near other than
-by its own joint, two lanes whose corridors meet, a crossing or a parking access interval on a
-curved lane piece, a signal plan that lets two conflicting movements of equal turn rank go
-together, a straight movement crossing a walking crosswalk, a priority junction with more than
-one inbound lane on a major approach or with a u-turn, and a left-hand network.
+**Bands.** A pedestrian crossing is a :class:`Band` with an interval on every path it meets. On a
+lane, where a crossing must cross a straight piece at right angles, the interval is exact: the
+positions whose flat cross-section lies within the band. On a connection it is the corridor
+superset. A band on a connection or at the start of a lane belongs to its junction's region; a
+band further along a lane is a mid-block band with its own gate.
+
+**Network edges.** A lane may begin or end at a node with no junction, where the records stop. No
+vehicle enters or leaves there: such a lane is used only by trips that start or end on it.
+
+**What v1 refuses**, each with a message: left-hand traffic, lane changes between junctions
+(lanes are chosen only through connections), a lane end or start that another junction path comes
+near other than by its own joint, two lanes whose corridors meet, a crossing or a parking access
+stretch on a curved lane piece, a signal plan that lets two conflicting movements of equal turn
+rank go together, a straight movement crossing a walking crosswalk, a priority junction with more
+than one inbound lane on a major approach, a u-turn, a mid-block signal, and a path no class can
+drive.
 """
 
 from __future__ import annotations
 
-from collections.abc import Iterable, Mapping, Sequence
-from dataclasses import dataclass, field
+from collections.abc import Mapping, Sequence
+from dataclasses import dataclass, field, replace
 from itertools import pairwise
 from typing import Any, Final
 
 from exulanica.canonical import sha256_of_canonical
-from exulanica.grammar.errors import GrammarError
 from exulanica.grammar.records import require_identity
-from exulanica.traffic import provisional_records as rec
 from exulanica.traffic.catalogs import TrafficCatalogs, VehicleClass
-from exulanica.traffic.errors import UnsupportedNetworkError
+from exulanica.traffic.errors import TrafficCatalogError, UnsupportedNetworkError
 from exulanica.traffic.geometry import (
     Point,
     Polyline,
-    circumradius_floor,
+    ceil_sqrt,
     convex_overlap,
+    corner_radius_floor,
     cross,
     dot,
     near_interval,
     offtracking_mm,
     point_segment_within,
-    segments_intersect,
     segments_within,
 )
+from exulanica.traffic.road_input import RoadInput
 
 __all__ = [
     "NETWORK_PROFILE",
+    "ApproachSpec",
     "Band",
     "Gate",
     "JunctionSpec",
@@ -72,9 +86,8 @@ __all__ = [
     "compile_network",
 ]
 
-NETWORK_PROFILE: Final = "exulanica.traffic-network/v1"
+NETWORK_PROFILE: Final = "exulanica.traffic-network/v2"
 _MS_PER_SECOND: Final = 1000
-_MS_PER_HOUR: Final = 3_600_000
 
 
 def _refuse(message: str) -> UnsupportedNetworkError:
@@ -86,7 +99,6 @@ class PathSpec:
     path_id: str
     kind: str
     identity: str
-    ordinal: int
     line: Polyline
     classes: tuple[str, ...]
     speed_limit_mm_per_s: int
@@ -94,11 +106,13 @@ class PathSpec:
     extents: tuple[tuple[int, int], ...]
     successors: tuple[str, ...]
     predecessors: tuple[str, ...]
-    #: Lanes: the junction the lane flows into and the one it leaves. Connectors: their junction.
-    end_junction: int | None
-    start_junction: int | None
+    #: Lanes: the junction the lane flows into and the one it leaves, ``None`` at a network edge.
+    #: Connections: their junction, both times.
+    end_junction: str | None
+    start_junction: str | None
     turn: str = ""
-    segment_ordinal: int = -1
+    #: The segment a lane runs along; empty for a connection.
+    segment: str = ""
     #: The largest body length and minimum gap of any class allowed, for region sizing.
     longest_body_mm: int = 0
     widest_gap_mm: int = 0
@@ -115,7 +129,7 @@ class PathSpec:
 @dataclass(frozen=True, slots=True)
 class Zone:
     zone_id: int
-    junction: int
+    junction: str
     first: str
     first_interval: tuple[int, int]
     second: str
@@ -134,9 +148,8 @@ class Zone:
 class Band:
     band_id: int
     identity: str
-    ordinal: int
     society_crossing_id: str
-    segment_ordinal: int
+    segment: str
     control: str
     line: tuple[Point, Point]
     width_mm: int
@@ -144,9 +157,9 @@ class Band:
     #: ``(path, lower, upper)``: the positions on each path whose corridor meets the band.
     intervals: tuple[tuple[str, int, int], ...]
     #: The junction whose region holds this band, or ``None`` for a mid-block band.
-    junction: int | None
-    #: ``(controller junction, pedestrian group)`` for a signalised crossing.
-    signal: tuple[int, str] | None
+    junction: str | None
+    #: ``(junction, pedestrian group)`` for a signalised crossing.
+    signal: tuple[str, str] | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -156,18 +169,18 @@ class Gate:
     path_id: str
     position: int
     kind: str
-    #: The junction for a junction gate, the band for a band gate.
-    target: int
+    #: The junction's identity for a junction gate, the crossing's for a band gate.
+    target: str
 
 
 @dataclass(frozen=True, slots=True)
 class SignalSpec:
-    controller_identity: str
+    identity: str
     plan: str
     offset_s: int
-    #: ``(connector path, group)`` for every connector of the junction.
+    #: ``(connector path, group)`` for every connection of the junction.
     connector_groups: tuple[tuple[str, str], ...]
-    #: ``(band id, group)`` for every signalised crossing the controller governs.
+    #: ``(band id, group)`` for every signalised crossing the signal releases.
     band_groups: tuple[tuple[int, str], ...]
 
     def group_of(self, path_id: str) -> str:
@@ -176,7 +189,7 @@ class SignalSpec:
 
 @dataclass(frozen=True, slots=True)
 class ApproachSpec:
-    segment_ordinal: int
+    segment: str
     identity: str
     control: str
     rank: int
@@ -187,9 +200,8 @@ class ApproachSpec:
 
 @dataclass(frozen=True, slots=True)
 class JunctionSpec:
-    ordinal: int
     identity: str
-    node_ordinal: int
+    node: str
     position: Point
     policy: str
     rule: str
@@ -203,15 +215,16 @@ class JunctionSpec:
         for approach in self.approaches:
             if lane_id in approach.inbound_lanes:
                 return approach
-        raise _refuse(f"lane {lane_id} is not an approach of junction {self.ordinal}")
+        raise _refuse(f"lane {lane_id} is not an approach of junction {self.identity}")
 
 
 @dataclass(frozen=True, slots=True)
 class SpaceSpec:
     identity: str
-    ordinal: int
-    segment_ordinal: int
-    layout: str
+    segment: str
+    kind: str
+    placement: str
+    capacity: int
     footprint: tuple[Point, ...]
     access_path: str
     access_start: int
@@ -221,13 +234,15 @@ class SpaceSpec:
 
 @dataclass(frozen=True)
 class RoadNetwork:
-    scope: str
+    city: str
     driving_side: str
     paths: Mapping[str, PathSpec]
-    junctions: Mapping[int, JunctionSpec]
+    junctions: Mapping[str, JunctionSpec]
     zones: tuple[Zone, ...]
     bands: tuple[Band, ...]
     spaces: Mapping[str, SpaceSpec]
+    #: Each segment's ordinal, by identity: the society place contract names streets by ordinal.
+    segment_ordinals: Mapping[str, int]
     #: Per lane: how far from its start the region of its start junction reaches.
     exit_extent: Mapping[str, int]
     #: Per path, gates sorted by position.
@@ -244,8 +259,11 @@ class RoadNetwork:
     document: Mapping[str, Any] = field(repr=False)
     digest: str = ""
 
-    def band(self, band_id: int) -> Band:
-        return self.bands[band_id]
+    def band(self, identity: str) -> Band:
+        for band in self.bands:
+            if band.identity == identity:
+                return band
+        raise _refuse(f"no crossing {identity} in this network")
 
     def band_by_society_id(self, crossing_id: str) -> Band:
         for band in self.bands:
@@ -254,81 +272,76 @@ class RoadNetwork:
         raise _refuse(f"no crossing {crossing_id!r} in this network")
 
 
-def _unique(records: Iterable[Any], attribute: str, what: str) -> dict[int, Any]:
-    by_ordinal: dict[int, Any] = {}
-    for record in records:
-        key = getattr(record, attribute)
-        if key in by_ordinal:
-            raise _refuse(f"two {what} records share {attribute} {key}")
-        by_ordinal[key] = record
-    return by_ordinal
-
-
-def _check_identity(scope: str, record: Any, kind: str, *parts: int | str) -> None:
-    expected = rec.street_record_identity(scope, kind, *parts)
-    if record.identity != expected:
-        raise _refuse(f"{kind} {parts} has identity {record.identity}, expected {expected}")
-
-
 def _collinear(first: Point, second: Point) -> bool:
     return cross(first, second) == 0 and dot(first, second) > 0
 
 
-def _lane_extents(line: Polyline, classes: Sequence[VehicleClass]) -> tuple[tuple[int, int], ...]:
-    radii: list[int | None] = [None] * len(line.points)
+def _corners(line: Polyline) -> list[tuple[int | None, int]]:
+    """``(radius, side)`` per vertex: side 1 turns left, -1 right, 0 at an end or straight on."""
+    found: list[tuple[int | None, int]] = [(None, 0)] * len(line.points)
     for index in range(1, len(line.points) - 1):
-        radii[index] = circumradius_floor(
-            line.points[index - 1], line.points[index], line.points[index + 1]
+        before, here, after = line.points[index - 1], line.points[index], line.points[index + 1]
+        turn = cross(
+            (here[0] - before[0], here[1] - before[1]), (after[0] - here[0], after[1] - here[1])
         )
-    extents = []
-    for index in range(line.piece_count):
-        bends = [radius for radius in (radii[index], radii[index + 1]) if radius is not None]
-        widest = 0
-        for vehicle in classes:
-            extra = max(
-                (offtracking_mm(radius, vehicle.wheelbase_mm) for radius in bends), default=0
+        found[index] = (corner_radius_floor(before, here, after), (turn > 0) - (turn < 0))
+    return found
+
+
+def _refuse_sharp_turns(what: str, line: Polyline) -> None:
+    """A path bends by at most a right angle at one vertex; sharper is no drivable path."""
+    for before, here, after in zip(line.points, line.points[1:], line.points[2:], strict=False):
+        if (
+            dot(
+                (here[0] - before[0], here[1] - before[1]), (after[0] - here[0], after[1] - here[1])
             )
-            widest = max(widest, vehicle.half_width_mm + extra)
-        extents.append((widest, widest))
-    return tuple(extents)
+            < 0
+        ):
+            raise _refuse(f"{what} turns by more than a right angle at {here}")
 
 
-def _connector_extents(
+def _tightest_corner(line: Polyline) -> int | None:
+    radii = [radius for radius, _ in _corners(line) if radius is not None]
+    return min(radii) if radii else None
+
+
+def _extents(
     line: Polyline, classes: Sequence[VehicleClass], turn: str
 ) -> tuple[tuple[int, int], ...]:
-    """Straight pieces carry the widest body; turning pieces the design vehicles' swept path.
-
-    Off-tracking is inward, so a turning piece reaches the inward extent on the inside of the
-    turn and the outward extent on the outside.
-    """
-    base = max(vehicle.half_width_mm for vehicle in classes)
-    if turn == "straight":
-        return ((base, base),) * line.piece_count
-    inward = max(
-        max(vehicle.turning_inward_extent_mm, vehicle.half_width_mm) for vehicle in classes
-    )
-    outward = max(
-        max(vehicle.turning_outward_extent_mm, vehicle.half_width_mm) for vehicle in classes
-    )
+    """The corridor reach ``(left, right)`` of each piece, for the widest of ``classes``."""
+    corners = _corners(line)
     first = line.piece_direction(0)
     last = line.piece_direction(line.piece_count - 1)
-    turning = (outward, inward) if turn == "right" else (inward, outward)
-    return tuple(
-        (base, base)
-        if _collinear(line.piece_direction(index), first)
-        or _collinear(line.piece_direction(index), last)
-        else turning
-        for index in range(line.piece_count)
-    )
-
-
-def _min_radius(line: Polyline) -> int | None:
-    radii = [
-        circumradius_floor(line.points[i - 1], line.points[i], line.points[i + 1])
-        for i in range(1, len(line.points) - 1)
-    ]
-    finite = [radius for radius in radii if radius is not None]
-    return min(finite) if finite else None
+    extents = []
+    for index in range(line.piece_count):
+        direction = line.piece_direction(index)
+        turning = (
+            turn not in ("", "straight")
+            and not _collinear(direction, first)
+            and not _collinear(direction, last)
+        )
+        left = right = 0
+        for vehicle in classes:
+            inside_left = inside_right = 0
+            for radius, side in (corners[index], corners[index + 1]):
+                if radius is None or side == 0:
+                    continue
+                tracked = offtracking_mm(radius, vehicle.wheelbase_mm)
+                if side > 0:
+                    inside_left = max(inside_left, tracked)
+                else:
+                    inside_right = max(inside_right, tracked)
+            reach_left = vehicle.half_width_mm + inside_left
+            reach_right = vehicle.half_width_mm + inside_right
+            if turning:
+                inward = max(vehicle.turning_inward_extent_mm, vehicle.half_width_mm)
+                outward = max(vehicle.turning_outward_extent_mm, vehicle.half_width_mm)
+                envelope = (outward, inward) if turn == "right" else (inward, outward)
+                reach_left = max(reach_left, envelope[0])
+                reach_right = max(reach_right, envelope[1])
+            left, right = max(left, reach_left), max(right, reach_right)
+        extents.append((left, right))
+    return tuple(extents)
 
 
 def _polygon_area2(points: Sequence[Point]) -> int:
@@ -348,167 +361,164 @@ def _straight_at(line: Polyline, start: int, end: int) -> bool:
     return line.piece_index(max(start, 0)) == line.piece_index(max(min(end, line.length) - 1, 0))
 
 
-def compile_network(
-    records: Sequence[object], catalogs: TrafficCatalogs, *, scope: str
-) -> RoadNetwork:
-    """Check the records and build the network, or raise :class:`UnsupportedNetworkError`."""
-    require_identity("scope", scope)
-    by_type: dict[type, list[Any]] = {}
-    for record in records:
-        try:
-            rec.validate_record(record)
-        except GrammarError as error:
-            raise _refuse(f"{type(record).__name__}: {error}") from error
-        by_type.setdefault(type(record), []).append(record)
+def _band_on_straight_piece(
+    line: Polyline, index: int, band_line: tuple[Point, Point], width_mm: int
+) -> tuple[int, int] | None:
+    """Positions on piece ``index`` whose flat cross-section lies within the band, exactly.
 
-    rules = by_type.get(rec.RoadRulesRecord, [])
-    if len(rules) != 1:
-        raise _refuse(f"a network has exactly one road rules record, found {len(rules)}")
-    driving_side = rules[0].driving_side
-    if driving_side != "right":
+    The band line crosses the piece at right angles, so every point of it projects to one
+    position ``p``, and a cross-section meets the band exactly when it is within half the band's
+    width of ``p``. The bound is rounded outward by a millimetre each way.
+    """
+    a, b = line.piece(index)
+    direction = (b[0] - a[0], b[1] - a[1])
+    squared = dot(direction, direction)
+    along = dot((band_line[0][0] - a[0], band_line[0][1] - a[1]), direction)
+    reach = (-(-width_mm // 2) + 1) * ceil_sqrt(squared)
+    piece_length = line.offsets[index + 1] - line.offsets[index]
+    low = line.offsets[index] + (along - reach) * piece_length // squared
+    high = line.offsets[index] + -(-(along + reach) * piece_length // squared)
+    low, high = max(low, line.offsets[index]), min(high, line.offsets[index + 1])
+    return (low, high) if low <= high else None
+
+
+def compile_network(road: RoadInput, catalogs: TrafficCatalogs) -> RoadNetwork:
+    """Check the road input and build the network, or raise :class:`UnsupportedNetworkError`."""
+    require_identity("city", road.city)
+    if road.driving_side != "right":
         raise _refuse(
             "traffic v1 simulates right-hand traffic only; this network drives on the left"
         )
 
-    nodes = _unique(by_type.get(rec.StreetNodeRecord, []), "node_ordinal", "street node")
-    segments = _unique(by_type.get(rec.StreetSegmentRecord, []), "segment_ordinal", "segment")
+    nodes = {node.identity: node for node in road.nodes}
+    segments = {segment.identity: segment for segment in road.segments}
     for segment in segments.values():
         for node in (segment.start_node, segment.end_node):
             if node not in nodes:
-                raise _refuse(f"segment {segment.segment_ordinal} names missing node {node}")
-    junction_records = _unique(by_type.get(rec.JunctionRecord, []), "junction_ordinal", "junction")
-    junction_at_node: dict[int, int] = {}
-    for junction in junction_records.values():
-        if junction.node_ordinal not in nodes:
-            raise _refuse(f"junction {junction.junction_ordinal} names missing node")
-        if junction.node_ordinal in junction_at_node:
-            raise _refuse(f"node {junction.node_ordinal} has two junctions")
-        junction_at_node[junction.node_ordinal] = junction.junction_ordinal
-        _check_identity(scope, junction, "junction", junction.node_ordinal)
-        policy = catalogs.policy(junction.policy)
-        if driving_side not in policy.driving_sides:
-            raise _refuse(f"policy {policy.key} does not apply to {driving_side}-hand traffic")
+                raise _refuse(f"segment {segment.identity} names missing node {node}")
+    junction_inputs = {junction.identity: junction for junction in road.junctions}
+    junction_at_node: dict[str, str] = {}
+    for junction in junction_inputs.values():
+        if junction.node not in nodes:
+            raise _refuse(f"junction {junction.identity} names a missing node")
+        if junction.node in junction_at_node:
+            raise _refuse(f"node {junction.node} has two junctions")
+        junction_at_node[junction.node] = junction.identity
+        try:
+            policy = catalogs.policy(junction.policy)
+        except TrafficCatalogError as error:
+            raise _refuse(f"junction {junction.identity}: {error}") from error
+        if road.driving_side not in policy.driving_sides:
+            raise _refuse(f"policy {policy.key} does not apply to {road.driving_side}-hand traffic")
 
     classes_by_key = {vehicle.key: vehicle for vehicle in catalogs.vehicle_classes}
     restrictions: list[tuple[str, str, str]] = []
 
-    # Lanes.
-    lane_records = _unique(by_type.get(rec.CarriagewayLaneRecord, []), "lane_ordinal", "lane")
-    lane_slots: set[tuple[int, str, int]] = set()
-    lanes: dict[int, dict[str, Any]] = {}
-    for lane in lane_records.values():
-        segment = segments.get(lane.segment_ordinal)
-        if segment is None:
-            raise _refuse(f"lane {lane.lane_ordinal} names missing segment {lane.segment_ordinal}")
-        slot = (lane.segment_ordinal, lane.direction, lane.lane_index)
-        if slot in lane_slots:
-            raise _refuse(f"lane slot {slot} is used twice")
-        lane_slots.add(slot)
-        _check_identity(
-            scope, lane, "carriageway_lane", lane.segment_ordinal, lane.direction, lane.lane_index
-        )
-        try:
-            line = Polyline.of(lane.centreline_mm)
-        except ValueError as error:
-            raise _refuse(f"lane {lane.lane_ordinal}: {error}") from error
-        start_node, end_node = nodes[segment.start_node], nodes[segment.end_node]
-        axis = (end_node.x_mm - start_node.x_mm, end_node.y_mm - start_node.y_mm)
-        travel = (line.points[-1][0] - line.points[0][0], line.points[-1][1] - line.points[0][1])
-        along = dot(axis, travel)
-        forward = lane.direction == "with_segment"
-        if (along > 0) != forward or along == 0:
-            raise _refuse(f"lane {lane.lane_ordinal} is digitised against its direction")
-        to_node = segment.end_node if forward else segment.start_node
-        from_node = segment.start_node if forward else segment.end_node
-        unknown = set(lane.permitted_classes) - set(classes_by_key)
-        if unknown:
-            raise _refuse(f"lane {lane.lane_ordinal} permits unknown classes {sorted(unknown)}")
-        allowed = [classes_by_key[key] for key in lane.permitted_classes]
-        fitting = []
-        for vehicle in allowed:
-            if vehicle.width_mm > lane.width_mm:
+    def carried(
+        path_id: str, line: Polyline, offered: Sequence[VehicleClass]
+    ) -> list[VehicleClass]:
+        """The classes a path's corners let through, recording each one dropped."""
+        tightest = _tightest_corner(line)
+        kept = []
+        for vehicle in offered:
+            if tightest is not None and tightest < vehicle.minimum_turning_radius_mm:
                 restrictions.append(
-                    (f"lane:{lane.identity}", vehicle.key, "body wider than the lane")
+                    (path_id, vehicle.key, f"turn radius {tightest} mm below the class minimum")
                 )
                 continue
+            kept.append(vehicle)
+        return kept
+
+    # Lanes.
+    lanes: dict[str, dict[str, Any]] = {}
+    for lane in road.lanes:
+        segment = segments.get(lane.segment)
+        if segment is None:
+            raise _refuse(f"lane {lane.identity} names missing segment {lane.segment}")
+        try:
+            line = Polyline.of(lane.centreline)
+        except ValueError as error:
+            raise _refuse(f"lane {lane.identity}: {error}") from error
+        _refuse_sharp_turns(f"lane {lane.identity}", line)
+        start_node, end_node = nodes[segment.start_node], nodes[segment.end_node]
+        axis = (end_node.point[0] - start_node.point[0], end_node.point[1] - start_node.point[1])
+        travel = (line.points[-1][0] - line.points[0][0], line.points[-1][1] - line.points[0][1])
+        along = dot(axis, travel)
+        forward = lane.direction == "forward"
+        if (along > 0) != forward or along == 0:
+            raise _refuse(f"lane {lane.identity} is digitised against its direction")
+        to_node = segment.end_node if forward else segment.start_node
+        from_node = segment.start_node if forward else segment.end_node
+        unknown = set(lane.classes) - set(classes_by_key)
+        if unknown:
+            raise _refuse(f"lane {lane.identity} carries unknown classes {sorted(unknown)}")
+        path_id = f"lane:{lane.identity}"
+        fitting = []
+        for key in lane.classes:
+            vehicle = classes_by_key[key]
+            if vehicle.width_mm > lane.width_mm:
+                restrictions.append((path_id, vehicle.key, "body wider than the lane"))
+                continue
             fitting.append(vehicle)
+        fitting = carried(path_id, line, fitting)
         if not fitting:
-            raise _refuse(f"lane {lane.lane_ordinal} carries no permitted class")
-        if to_node not in junction_at_node or from_node not in junction_at_node:
-            raise _refuse(
-                f"lane {lane.lane_ordinal} must start and end at junctions; v1 has no network edge"
-            )
-        lanes[lane.lane_ordinal] = {
-            "record": lane,
+            raise _refuse(f"lane {lane.identity} carries no class it permits")
+        lanes[lane.identity] = {
+            "input": lane,
             "line": line,
             "classes": fitting,
-            "to_junction": junction_at_node[to_node],
-            "from_junction": junction_at_node[from_node],
-            "limit": lane.speed_limit_mm_per_h * _MS_PER_SECOND // _MS_PER_HOUR,
+            "to_junction": junction_at_node.get(to_node),
+            "from_junction": junction_at_node.get(from_node),
+            "limit": segment.speed_limit_mm_per_s,
+            "path_id": path_id,
         }
 
-    # Connectors.
-    connector_records = _unique(
-        by_type.get(rec.LaneConnectorRecord, []), "connector_ordinal", "lane connector"
-    )
-    connectors: dict[int, dict[str, Any]] = {}
-    seen_pairs: set[tuple[int, int]] = set()
-    for connector in connector_records.values():
-        if connector.junction_ordinal not in junction_records:
-            raise _refuse(f"connector {connector.connector_ordinal} names a missing junction")
-        source = lanes.get(connector.from_lane_ordinal)
-        target = lanes.get(connector.to_lane_ordinal)
+    # Connections.
+    connectors: dict[str, dict[str, Any]] = {}
+    seen_pairs: set[tuple[str, str]] = set()
+    for connection in road.connections:
+        if connection.junction not in junction_inputs:
+            raise _refuse(f"connection {connection.identity} names a missing junction")
+        source = lanes.get(connection.from_lane)
+        target = lanes.get(connection.to_lane)
         if source is None or target is None:
-            raise _refuse(f"connector {connector.connector_ordinal} names a missing lane")
-        if source["to_junction"] != connector.junction_ordinal:
-            raise _refuse(
-                f"connector {connector.connector_ordinal}: its from lane does not flow in"
-            )
-        if target["from_junction"] != connector.junction_ordinal:
-            raise _refuse(f"connector {connector.connector_ordinal}: its to lane does not flow out")
-        pair = (connector.from_lane_ordinal, connector.to_lane_ordinal)
+            raise _refuse(f"connection {connection.identity} names a missing lane")
+        if source["to_junction"] != connection.junction:
+            raise _refuse(f"connection {connection.identity}: its from lane does not flow in")
+        if target["from_junction"] != connection.junction:
+            raise _refuse(f"connection {connection.identity}: its to lane does not flow out")
+        pair = (connection.from_lane, connection.to_lane)
         if pair in seen_pairs:
             raise _refuse(f"lanes {pair} are connected twice")
         seen_pairs.add(pair)
-        _check_identity(
-            scope,
-            connector,
-            "lane_connector",
-            source["record"].identity,
-            target["record"].identity,
-        )
-        if connector.turn not in source["record"].permitted_turns:
-            raise _refuse(f"connector {connector.connector_ordinal} makes a turn its lane forbids")
-        if connector.turn == "u_turn":
+        if connection.turn not in source["input"].turns:
+            raise _refuse(f"connection {connection.identity} makes a turn its lane forbids")
+        if connection.turn == "u_turn":
             raise _refuse("traffic v1 does not simulate u-turns")
         try:
-            line = Polyline.of(connector.path_mm)
+            line = Polyline.of(connection.path)
         except ValueError as error:
-            raise _refuse(f"connector {connector.connector_ordinal}: {error}") from error
+            raise _refuse(f"connection {connection.identity}: {error}") from error
+        _refuse_sharp_turns(f"connection {connection.identity}", line)
         if (
             line.points[0] != source["line"].points[-1]
             or line.points[-1] != target["line"].points[0]
         ):
-            raise _refuse(f"connector {connector.connector_ordinal} does not meet its lane ends")
-        path_id = f"connector:{connector.identity}"
-        allowed = [
+            raise _refuse(f"connection {connection.identity} does not meet its lane ends")
+        path_id = f"connector:{connection.identity}"
+        offered = [
             vehicle
             for vehicle in source["classes"]
             if vehicle.key in {other.key for other in target["classes"]}
         ]
-        radius = _min_radius(line) if connector.turn != "straight" else None
-        fitting = []
-        for vehicle in allowed:
-            if radius is not None and radius < vehicle.minimum_turning_radius_mm:
-                restrictions.append(
-                    (path_id, vehicle.key, f"turn radius {radius} mm below the class minimum")
-                )
-                continue
-            fitting.append(vehicle)
+        fitting = carried(path_id, line, offered)
         if not fitting:
-            raise _refuse(f"connector {connector.connector_ordinal} carries no class")
-        connectors[connector.connector_ordinal] = {
-            "record": connector,
+            raise _refuse(
+                f"connection {connection.identity} carries no class: "
+                f"its tightest corner is {_tightest_corner(line)} mm"
+            )
+        connectors[connection.identity] = {
+            "input": connection,
             "line": line,
             "classes": fitting,
             "limit": min(source["limit"], target["limit"]),
@@ -516,95 +526,86 @@ def compile_network(
         }
 
     # Paths.
-    lane_path = {ordinal: f"lane:{data['record'].identity}" for ordinal, data in lanes.items()}
-    successors: dict[str, list[str]] = {path: [] for path in lane_path.values()}
-    predecessors: dict[str, list[str]] = {path: [] for path in lane_path.values()}
+    successors: dict[str, list[str]] = {data["path_id"]: [] for data in lanes.values()}
+    predecessors: dict[str, list[str]] = {data["path_id"]: [] for data in lanes.values()}
     for data in connectors.values():
-        record = data["record"]
-        successors[lane_path[record.from_lane_ordinal]].append(data["path_id"])
-        predecessors[lane_path[record.to_lane_ordinal]].append(data["path_id"])
+        successors[lanes[data["input"].from_lane]["path_id"]].append(data["path_id"])
+        predecessors[lanes[data["input"].to_lane]["path_id"]].append(data["path_id"])
     paths: dict[str, PathSpec] = {}
-    for ordinal, data in lanes.items():
-        record = data["record"]
-        path_id = lane_path[ordinal]
-        if not successors[path_id]:
+    for data in lanes.values():
+        lane = data["input"]
+        path_id = data["path_id"]
+        if data["to_junction"] is not None and not successors[path_id]:
             raise _refuse(
-                f"lane {ordinal} flows into junction {data['to_junction']} and goes nowhere"
+                f"lane {lane.identity} flows into junction {data['to_junction']} and goes nowhere"
             )
         paths[path_id] = PathSpec(
             path_id=path_id,
             kind="lane",
-            identity=record.identity,
-            ordinal=ordinal,
+            identity=lane.identity,
             line=data["line"],
             classes=tuple(sorted(vehicle.key for vehicle in data["classes"])),
             speed_limit_mm_per_s=data["limit"],
-            extents=_lane_extents(data["line"], data["classes"]),
+            extents=_extents(data["line"], data["classes"], ""),
             successors=tuple(sorted(successors[path_id])),
             predecessors=tuple(sorted(predecessors[path_id])),
             end_junction=data["to_junction"],
             start_junction=data["from_junction"],
-            segment_ordinal=record.segment_ordinal,
+            segment=lane.segment,
             longest_body_mm=max(vehicle.length_mm for vehicle in data["classes"]),
             widest_gap_mm=max(vehicle.minimum_gap_mm for vehicle in data["classes"]),
         )
-    for ordinal, data in connectors.items():
-        record = data["record"]
+    for data in connectors.values():
+        connection = data["input"]
         path_id = data["path_id"]
         paths[path_id] = PathSpec(
             path_id=path_id,
             kind="connector",
-            identity=record.identity,
-            ordinal=ordinal,
+            identity=connection.identity,
             line=data["line"],
             classes=tuple(sorted(vehicle.key for vehicle in data["classes"])),
             speed_limit_mm_per_s=data["limit"],
-            extents=_connector_extents(data["line"], data["classes"], record.turn),
-            successors=(lane_path[record.to_lane_ordinal],),
-            predecessors=(lane_path[record.from_lane_ordinal],),
-            end_junction=record.junction_ordinal,
-            start_junction=record.junction_ordinal,
-            turn=record.turn,
+            extents=_extents(data["line"], data["classes"], connection.turn),
+            successors=(lanes[connection.to_lane]["path_id"],),
+            predecessors=(lanes[connection.from_lane]["path_id"],),
+            end_junction=connection.junction,
+            start_junction=connection.junction,
+            turn=connection.turn,
             longest_body_mm=max(vehicle.length_mm for vehicle in data["classes"]),
             widest_gap_mm=max(vehicle.minimum_gap_mm for vehicle in data["classes"]),
         )
     ordered_paths = dict(sorted(paths.items()))
+    lane_ids = sorted(path_id for path_id, path in paths.items() if path.kind == "lane")
 
-    # Lanes on one segment, and lanes meeting at a node, must keep their corridors apart.
-    lane_ids = [lane_path[ordinal] for ordinal in sorted(lanes)]
+    # Lanes on one segment, and lanes meeting at a junction, must keep their corridors apart.
     for index, first_id in enumerate(lane_ids):
         first = paths[first_id]
+        ends = {first.start_junction, first.end_junction} - {None}
         for second_id in lane_ids[index + 1 :]:
             second = paths[second_id]
-            related = first.segment_ordinal == second.segment_ordinal or {
-                first.start_junction,
-                first.end_junction,
-            } & {second.start_junction, second.end_junction}
+            related = first.segment == second.segment or ends & (
+                {second.start_junction, second.end_junction} - {None}
+            )
             if not related:
                 continue
             if near_interval(first.line, first.extents, second.line, second.extents):
-                raise _refuse(f"lanes {first.ordinal} and {second.ordinal} come too close")
+                raise _refuse(f"lanes {first.identity} and {second.identity} come too close")
 
     # Junction approaches.
-    approach_records = _unique(
-        by_type.get(rec.JunctionApproachRecord, []), "approach_ordinal", "approach"
-    )
-    approaches_by_junction: dict[int, list[Any]] = {}
-    for approach in approach_records.values():
-        junction = junction_records.get(approach.junction_ordinal)
+    approaches_by_junction: dict[str, list[Any]] = {}
+    for approach in road.approaches:
+        junction = junction_inputs.get(approach.junction)
         if junction is None:
-            raise _refuse(f"approach {approach.approach_ordinal} names a missing junction")
-        segment = segments.get(approach.segment_ordinal)
-        if segment is None or junction.node_ordinal not in (segment.start_node, segment.end_node):
-            raise _refuse(f"approach {approach.approach_ordinal} is not on a leg of its junction")
-        _check_identity(
-            scope, approach, "junction_approach", junction.node_ordinal, approach.segment_ordinal
-        )
-        approaches_by_junction.setdefault(approach.junction_ordinal, []).append(approach)
+            raise _refuse(f"approach {approach.identity} names a missing junction")
+        segment = segments.get(approach.segment)
+        if segment is None or junction.node not in (segment.start_node, segment.end_node):
+            raise _refuse(f"approach {approach.identity} is not on a leg of its junction")
+        approaches_by_junction.setdefault(approach.junction, []).append(approach)
 
     # Joints and zones.
     joint_extent: dict[tuple[str, str], int] = {}
-    for path in paths.values():
+    for path_id in sorted(paths):
+        path = paths[path_id]
         for successor_id in path.successors:
             successor = paths[successor_id]
             on_first = near_interval(path.line, path.extents, successor.line, successor.extents)
@@ -624,19 +625,15 @@ def compile_network(
             joint_extent[(path.path_id, successor_id)] = on_second[1]
 
     zones: list[Zone] = []
-    junction_paths: dict[int, list[str]] = {}
-    for path in paths.values():
-        if path.kind == "connector":
-            junction_paths.setdefault(path.end_junction, []).append(path.path_id)
+    junction_paths: dict[str, list[str]] = {}
+    for path_id in sorted(paths):
+        if paths[path_id].kind == "connector":
+            junction_paths.setdefault(paths[path_id].end_junction, []).append(path_id)  # type: ignore[arg-type]
     exit_extent: dict[str, int] = {path_id: 0 for path_id in lane_ids}
-    for junction_ordinal in sorted(junction_records):
-        members = sorted(junction_paths.get(junction_ordinal, []))
-        inbound = sorted(
-            path_id for path_id in lane_ids if paths[path_id].end_junction == junction_ordinal
-        )
-        outbound = sorted(
-            path_id for path_id in lane_ids if paths[path_id].start_junction == junction_ordinal
-        )
+    for junction_id in sorted(junction_inputs):
+        members = junction_paths.get(junction_id, [])
+        inbound = [path_id for path_id in lane_ids if paths[path_id].end_junction == junction_id]
+        outbound = [path_id for path_id in lane_ids if paths[path_id].start_junction == junction_id]
         for index, first_id in enumerate(members):
             first = paths[first_id]
             for second_id in members[index + 1 :]:
@@ -646,7 +643,7 @@ def compile_network(
                 if on_first is None or on_second is None:
                     continue
                 zones.append(
-                    Zone(len(zones), junction_ordinal, first_id, on_first, second_id, on_second)
+                    Zone(len(zones), junction_id, first_id, on_first, second_id, on_second)
                 )
             for lane_id in inbound:
                 if lane_id in first.predecessors:
@@ -654,7 +651,8 @@ def compile_network(
                 lane = paths[lane_id]
                 if near_interval(lane.line, lane.extents, first.line, first.extents):
                     raise _refuse(
-                        f"connector {first.ordinal} comes near the stop line of lane {lane.ordinal}"
+                        f"connection {first.identity} comes near the stop line "
+                        f"of lane {lane.identity}"
                     )
             for lane_id in outbound:
                 if lane_id in first.successors:
@@ -666,69 +664,60 @@ def compile_network(
                     continue
                 if on_lane[0] > lane.longest_body_mm:
                     raise _refuse(
-                        f"connector {first.ordinal} comes near lane {lane.ordinal} "
+                        f"connection {first.identity} comes near lane {lane.identity} "
                         "away from its start"
                     )
                 zones.append(
-                    Zone(len(zones), junction_ordinal, first_id, on_connector, lane_id, on_lane)
+                    Zone(len(zones), junction_id, first_id, on_connector, lane_id, on_lane)
                 )
                 exit_extent[lane_id] = max(exit_extent[lane_id], on_lane[1])
 
     # Crossings.
-    crossing_records = _unique(by_type.get(rec.CrossingRecord, []), "crossing_ordinal", "crossing")
-    covered: set[tuple[int, int]] = set()
     bands: list[Band] = []
-    band_of_crossing: dict[int, int] = {}
-    for crossing in sorted(crossing_records.values(), key=lambda item: item.crossing_ordinal):
-        segment = segments.get(crossing.segment_ordinal)
+    band_of_crossing: dict[str, int] = {}
+    crossings = {crossing.identity: crossing for crossing in road.crossings}
+    for crossing in sorted(crossings.values(), key=lambda item: item.identity):
+        segment = segments.get(crossing.segment)
         if segment is None:
-            raise _refuse(f"crossing {crossing.crossing_ordinal} names a missing segment")
-        if crossing.offset_index >= len(segment.crossing_offsets_mm):
-            raise _refuse(f"crossing {crossing.crossing_ordinal} names a missing crossing offset")
-        slot = (crossing.segment_ordinal, crossing.offset_index)
-        if slot in covered:
-            raise _refuse(f"crossing offset {slot} has two crossing records")
-        covered.add(slot)
-        _check_identity(
-            scope, crossing, "crossing", crossing.segment_ordinal, crossing.offset_index
-        )
-        offset = segment.crossing_offsets_mm[crossing.offset_index]
-        centreline = Polyline.of(segment.centreline_mm)
-        centre = centreline.point_at(offset)
-        a, b = crossing.line_mm
-        if not point_segment_within(centre, a, b, crossing.width_mm // 2 + 1):
-            raise _refuse(f"crossing {crossing.crossing_ordinal} does not sit at its offset")
-        line = Polyline.of([a, b])
+            raise _refuse(f"crossing {crossing.identity} names a missing segment")
+        a, b = crossing.line
+        if not point_segment_within(crossing.centre, a, b, crossing.width_mm // 2 + 1):
+            raise _refuse(f"crossing {crossing.identity} does not sit at its offset")
+        band_line = Polyline.of([a, b])
+        half_band = -(-crossing.width_mm // 2)
         intervals: list[tuple[str, int, int]] = []
-        junction_owner: int | None = None
+        junction_owner: str | None = None
         end_nodes = {segment.start_node, segment.end_node}
         nearby = [
             path
-            for path in paths.values()
-            if path.segment_ordinal == crossing.segment_ordinal
-            or (
-                path.kind == "connector"
-                and junction_records[path.end_junction].node_ordinal in end_nodes
-            )
+            for path in ordered_paths.values()
+            if path.segment == crossing.segment
+            or (path.kind == "connector" and junction_inputs[path.end_junction].node in end_nodes)  # type: ignore[index]
         ]
-        for path in sorted(nearby, key=lambda item: item.path_id):
-            half_band = -(-crossing.width_mm // 2)
-            interval = near_interval(path.line, path.extents, line, ((half_band, half_band),))
+        for path in nearby:
+            interval = near_interval(path.line, path.extents, band_line, ((half_band, half_band),))
             if interval is None:
                 continue
-            if path.kind == "lane" and interval[1] >= path.length - 1 and interval[0] > 0:
-                raise _refuse(
-                    f"crossing {crossing.crossing_ordinal} reaches the stop line "
-                    f"of lane {path.ordinal}"
-                )
-            if path.kind == "lane" and not _straight_at(path.line, interval[0], interval[1]):
-                raise _refuse(f"crossing {crossing.crossing_ordinal} lies on a curved lane piece")
             if path.kind == "lane":
-                direction = path.line.piece_direction(path.line.piece_index(interval[0]))
-                if dot(direction, (b[0] - a[0], b[1] - a[1])) != 0:
+                if not _straight_at(path.line, interval[0], interval[1]):
+                    raise _refuse(f"crossing {crossing.identity} lies on a curved lane piece")
+                piece = path.line.piece_index(interval[0])
+                if dot(path.line.piece_direction(piece), (b[0] - a[0], b[1] - a[1])) != 0:
                     raise _refuse(
-                        f"crossing {crossing.crossing_ordinal} is not perpendicular "
-                        f"to lane {path.ordinal}"
+                        f"crossing {crossing.identity} is not perpendicular to lane {path.identity}"
+                    )
+                exact = _band_on_straight_piece(path.line, piece, (a, b), crossing.width_mm)
+                if exact is None or exact[1] < interval[0] or interval[1] < exact[0]:
+                    continue
+                interval = (max(interval[0], exact[0]), min(interval[1], exact[1]))
+                if (
+                    path.end_junction is not None
+                    and interval[1] >= path.length - 1
+                    and interval[0] > 0
+                ):
+                    raise _refuse(
+                        f"crossing {crossing.identity} reaches the stop line "
+                        f"of lane {path.identity}"
                     )
             intervals.append((path.path_id, interval[0], interval[1]))
             if path.kind == "connector":
@@ -737,10 +726,11 @@ def compile_network(
             path = paths[path_id]
             if (
                 path.kind == "lane"
+                and path.start_junction is not None
                 and low <= exit_extent[path_id] + path.longest_body_mm + path.widest_gap_mm
             ):
                 if junction_owner not in (None, path.start_junction):
-                    raise _refuse(f"crossing {crossing.crossing_ordinal} belongs to two junctions")
+                    raise _refuse(f"crossing {crossing.identity} belongs to two junctions")
                 junction_owner = path.start_junction
         if junction_owner is not None:
             for path_id, low, high in intervals:
@@ -750,94 +740,58 @@ def compile_network(
                         exit_extent[path_id] + path.longest_body_mm + path.widest_gap_mm
                     ):
                         raise _refuse(
-                            f"crossing {crossing.crossing_ordinal} is part junction band, "
-                            "part mid-block"
+                            f"crossing {crossing.identity} is part junction band, part mid-block"
                         )
                     exit_extent[path_id] = max(exit_extent[path_id], high)
-        band_of_crossing[crossing.crossing_ordinal] = len(bands)
+        band_of_crossing[crossing.identity] = len(bands)
         bands.append(
             Band(
                 band_id=len(bands),
                 identity=crossing.identity,
-                ordinal=crossing.crossing_ordinal,
-                society_crossing_id=f"crossing:{crossing.segment_ordinal}:{offset}",
-                segment_ordinal=crossing.segment_ordinal,
+                society_crossing_id=f"crossing:{segment.ordinal}:{crossing.offset_mm}",
+                segment=crossing.segment,
                 control=crossing.control,
                 line=(a, b),
                 width_mm=crossing.width_mm,
-                length_mm=line.length,
+                length_mm=band_line.length,
                 intervals=tuple(intervals),
                 junction=junction_owner,
                 signal=None,
             )
         )
-    for segment in segments.values():
-        for index in range(len(segment.crossing_offsets_mm)):
-            if (segment.segment_ordinal, index) not in covered:
-                raise _refuse(
-                    f"segment {segment.segment_ordinal} crossing offset {index} "
-                    "has no crossing record"
-                )
 
     # Signals.
-    controllers = _unique(
-        by_type.get(rec.SignalControllerRecord, []), "controller_ordinal", "signal controller"
-    )
-    controller_of_junction: dict[int, Any] = {}
-    for controller in controllers.values():
-        junction = junction_records.get(controller.junction_ordinal)
-        if junction is None:
-            raise _refuse(f"controller {controller.controller_ordinal} names a missing junction")
-        if controller.junction_ordinal in controller_of_junction:
-            raise _refuse(f"junction {controller.junction_ordinal} has two controllers")
-        controller_of_junction[controller.junction_ordinal] = controller
-        _check_identity(scope, controller, "signal_controller", junction.node_ordinal)
-        plan = catalogs.plan(controller.plan)
+    signal_of_junction: dict[str, Any] = {}
+    for signal in sorted(road.signals, key=lambda item: item.identity):
+        if signal.junction not in junction_inputs:
+            raise _refuse(f"signal {signal.identity} names a missing junction")
+        if signal.junction in signal_of_junction:
+            raise _refuse(f"junction {signal.junction} has two signals")
+        signal_of_junction[signal.junction] = signal
+        try:
+            plan = catalogs.plan(signal.plan)
+        except TrafficCatalogError as error:
+            raise _refuse(f"signal {signal.identity}: {error}") from error
         if any(interval.duration_ms % _MS_PER_SECOND for interval in plan.intervals):
             raise _refuse(f"plan {plan.key} has an interval that is not whole seconds")
-        if controller.offset_s * _MS_PER_SECOND >= plan.cycle_ms:
-            raise _refuse(
-                f"controller {controller.controller_ordinal} offset is not below its cycle"
-            )
-    group_records = by_type.get(rec.SignalGroupRecord, [])
-    groups_by_controller: dict[int, dict[str, Any]] = {}
-    for group in group_records:
-        controller = controllers.get(group.controller_ordinal)
-        if controller is None:
-            raise _refuse(f"signal group {group.group} names a missing controller")
-        junction = junction_records[controller.junction_ordinal]
-        _check_identity(scope, group, "signal_group", junction.node_ordinal, group.group)
-        owned = groups_by_controller.setdefault(group.controller_ordinal, {})
-        if group.group in owned:
-            raise _refuse(f"controller {group.controller_ordinal} lists group {group.group} twice")
-        owned[group.group] = group
+        if signal.offset_s * _MS_PER_SECOND >= plan.cycle_ms:
+            raise _refuse(f"signal {signal.identity} offset is not below its cycle")
 
     # Parking.
-    space_records = _unique(
-        by_type.get(rec.ParkingSpaceRecord, []), "space_ordinal", "parking space"
-    )
     spaces: dict[str, SpaceSpec] = {}
     stalls: list[tuple[str, tuple[Point, ...]]] = []
-    space_slots: set[tuple[int, str, int]] = set()
-    for space in space_records.values():
-        slot = (space.segment_ordinal, space.side, space.space_index)
-        if slot in space_slots:
-            raise _refuse(f"parking slot {slot} is used twice")
-        space_slots.add(slot)
-        _check_identity(
-            scope, space, "parking_space", space.segment_ordinal, space.side, space.space_index
-        )
-        lane = lanes.get(space.access_lane_ordinal)
-        if lane is None or lane["record"].segment_ordinal != space.segment_ordinal:
-            raise _refuse(f"space {space.space_ordinal} is not reached from a lane of its segment")
-        path = paths[lane_path[space.access_lane_ordinal]]
+    for space in sorted(road.spaces, key=lambda item: item.identity):
+        lane = lanes.get(space.access_lane)
+        if lane is None or lane["input"].segment != space.segment:
+            raise _refuse(f"space {space.identity} is not reached from a lane of its segment")
+        path = paths[lane["path_id"]]
         if space.access_end_mm > path.length:
-            raise _refuse(f"space {space.space_ordinal} access interval runs off its lane")
+            raise _refuse(f"space {space.identity} access stretch runs off its lane")
         if not _straight_at(path.line, space.access_start_mm, space.access_end_mm):
-            raise _refuse(f"space {space.space_ordinal} is reached from a curved lane piece")
-        footprint = tuple(space.footprint_mm)
-        if _polygon_area2(footprint) <= 0:
-            raise _refuse(f"space {space.space_ordinal} footprint is not counter-clockwise")
+            raise _refuse(f"space {space.identity} is reached from a curved lane piece")
+        footprint = tuple(space.footprint)
+        if len(footprint) != 4 or _polygon_area2(footprint) <= 0:
+            raise _refuse(f"space {space.identity} footprint is not a counter-clockwise quad")
         sides = [
             (following[0] - corner[0], following[1] - corner[1])
             for corner, following in zip(footprint, footprint[1:] + footprint[:1], strict=True)
@@ -846,28 +800,32 @@ def compile_network(
         stall_width_squared, stall_length_squared = edges[0], edges[-1]
         access = space.access_end_mm - space.access_start_mm
         fitting = []
-        for key in space.permitted_classes:
+        for key in space.classes:
             vehicle = classes_by_key.get(key)
             if vehicle is None:
-                raise _refuse(f"space {space.space_ordinal} permits unknown class {key}")
+                raise _refuse(f"space {space.identity} admits unknown class {key}")
             if key not in path.classes:
                 restrictions.append(
                     (space.identity, key, "its access lane does not carry the class")
                 )
                 continue
-            if (
-                vehicle.width_mm * vehicle.width_mm > stall_width_squared
-                or vehicle.length_mm * vehicle.length_mm > stall_length_squared
-                or vehicle.length_mm > access
-            ):
+            too_small = vehicle.length_mm > access
+            # A bay holds its one vehicle; a footway stand group's footprint is the area of its
+            # stands, and its capacity, not its outline, says how many it holds.
+            if space.placement == "carriageway":
+                too_small = too_small or (
+                    vehicle.width_mm * vehicle.width_mm > stall_width_squared
+                    or vehicle.length_mm * vehicle.length_mm > stall_length_squared
+                )
+            if too_small:
                 restrictions.append((space.identity, key, "the stall is too small"))
                 continue
             fitting.append(key)
         for other_id, other in stalls:
             if convex_overlap(footprint, other):
-                raise _refuse(f"space {space.space_ordinal} overlaps space {other_id}")
-        for other in paths.values():
-            if other.kind == "lane" and other.segment_ordinal != space.segment_ordinal:
+                raise _refuse(f"space {space.identity} overlaps space {other_id}")
+        for other in ordered_paths.values():
+            if other.kind == "lane" and other.segment != space.segment:
                 continue
             for index in range(other.line.piece_count):
                 a, b = other.line.piece(index)
@@ -878,14 +836,13 @@ def compile_network(
                     for i in range(4)
                 )
                 if inside or touching:
-                    raise _refuse(f"space {space.space_ordinal} intrudes on {other.path_id}")
-        for zone_id, interval in (
-            (zone.zone_id, zone.side(path.path_id)[1]) for zone in zones if zone.side(path.path_id)
-        ):
-            if interval[0] <= space.access_end_mm and space.access_start_mm <= interval[1]:
-                raise _refuse(f"space {space.space_ordinal} is reached inside zone {zone_id}")
+                    raise _refuse(f"space {space.identity} intrudes on {other.path_id}")
+        for zone in zones:
+            own = zone.side(path.path_id)
+            if own and own[1][0] <= space.access_end_mm and space.access_start_mm <= own[1][1]:
+                raise _refuse(f"space {space.identity} is reached inside zone {zone.zone_id}")
         if space.access_start_mm <= exit_extent[path.path_id]:
-            raise _refuse(f"space {space.space_ordinal} is reached inside a junction region")
+            raise _refuse(f"space {space.identity} is reached inside a junction region")
         for band in bands:
             for band_path, low, high in band.intervals:
                 if (
@@ -894,16 +851,17 @@ def compile_network(
                     and space.access_start_mm <= high
                 ):
                     raise _refuse(
-                        f"space {space.space_ordinal} is reached across crossing {band.ordinal}"
+                        f"space {space.identity} is reached across crossing {band.identity}"
                     )
         stalls.append((space.identity, footprint))
         if not fitting:
             restrictions.append((space.identity, "*", "no class can use the space"))
         spaces[space.identity] = SpaceSpec(
             identity=space.identity,
-            ordinal=space.space_ordinal,
-            segment_ordinal=space.segment_ordinal,
-            layout=space.layout,
+            segment=space.segment,
+            kind=space.kind,
+            placement=space.placement,
+            capacity=space.capacity,
             footprint=footprint,
             access_path=path.path_id,
             access_start=space.access_start_mm,
@@ -934,13 +892,14 @@ def compile_network(
         }
         return found
 
-    junctions: dict[int, JunctionSpec] = {}
+    connector_of_connection = {identity: data["path_id"] for identity, data in connectors.items()}
+    junctions: dict[str, JunctionSpec] = {}
     gates: dict[str, list[Gate]] = {}
-    for ordinal in sorted(junction_records):
-        record = junction_records[ordinal]
+    for junction_id in sorted(junction_inputs):
+        record = junction_inputs[junction_id]
         policy = catalogs.policy(record.policy)
-        members = sorted(junction_paths.get(ordinal, []))
-        node = nodes[record.node_ordinal]
+        members = junction_paths.get(junction_id, [])
+        node = nodes[record.node]
         conflicts = []
         region_of = {member: region_zone_ids(member) for member in members}
         for index, first_id in enumerate(members):
@@ -954,29 +913,27 @@ def compile_network(
                 ]
                 if touching:
                     conflicts.append((first_id, second_id))
-        inbound = sorted(path_id for path_id in lane_ids if paths[path_id].end_junction == ordinal)
+        inbound = [path_id for path_id in lane_ids if paths[path_id].end_junction == junction_id]
         approach_list = []
         for approach in sorted(
-            approaches_by_junction.get(ordinal, []), key=lambda item: item.approach_ordinal
+            approaches_by_junction.get(junction_id, []), key=lambda item: item.ordinal
         ):
             lanes_in = tuple(
-                path_id
-                for path_id in inbound
-                if paths[path_id].segment_ordinal == approach.segment_ordinal
+                path_id for path_id in inbound if paths[path_id].segment == approach.segment
             )
             if not lanes_in:
-                raise _refuse(f"approach {approach.approach_ordinal} has no inbound lane")
+                # A leg no lane flows in from, such as a one-way street leaving the junction,
+                # has nothing to control.
+                continue
             if approach.control not in policy.approach_controls:
-                raise _refuse(
-                    f"approach {approach.approach_ordinal} control breaks policy {policy.key}"
-                )
+                raise _refuse(f"approach {approach.identity} control breaks policy {policy.key}")
             first_lane = paths[lanes_in[0]].line
             approach_list.append(
                 ApproachSpec(
-                    segment_ordinal=approach.segment_ordinal,
+                    segment=approach.segment,
                     identity=approach.identity,
                     control=approach.control,
-                    rank=approach.priority_rank,
+                    rank=approach.rank,
                     inbound_lanes=lanes_in,
                     direction=first_lane.piece_direction(first_lane.piece_count - 1),
                 )
@@ -984,31 +941,31 @@ def compile_network(
         covered_lanes = sorted(
             lane for approach in approach_list for lane in approach.inbound_lanes
         )
-        if covered_lanes != inbound or len(set(covered_lanes)) != len(covered_lanes):
-            raise _refuse(f"junction {ordinal} approaches do not cover its inbound lanes once each")
+        if covered_lanes != inbound:
+            raise _refuse(
+                f"junction {junction_id} approaches do not cover its inbound lanes once each"
+            )
         approach_of = {
             lane: approach for approach in approach_list for lane in approach.inbound_lanes
         }
         ranks = sorted({approach.rank for approach in approach_list})
         if policy.rule == "priority":
             if len(ranks) < 2:
-                raise _refuse(f"priority junction {ordinal} has no minor approach")
+                raise _refuse(f"priority junction {junction_id} has no minor approach")
             for approach in approach_list:
                 major = approach.rank == ranks[0]
                 if major and approach.control != "priority":
                     raise _refuse(
-                        f"junction {ordinal}: a major approach is stop or yield controlled"
+                        f"junction {junction_id}: a major approach is stop or yield controlled"
                     )
                 if not major and approach.control not in ("stop", "yield"):
                     raise _refuse(
-                        f"junction {ordinal}: a minor approach has no stop or yield control"
+                        f"junction {junction_id}: a minor approach has no stop or yield control"
                     )
                 if major and len(approach.inbound_lanes) > 1:
                     raise _refuse(
-                        f"junction {ordinal}: v1 has headways for a two-lane major street only"
+                        f"junction {junction_id}: v1 has headways for a two-lane major street only"
                     )
-        elif len(ranks) > 1:
-            raise _refuse(f"junction {ordinal}: only a priority junction ranks its approaches")
         if policy.rule == "uncontrolled":
             for first_id, second_id in conflicts:
                 if (
@@ -1016,57 +973,60 @@ def compile_network(
                     != approach_of[paths[second_id].predecessors[0]]
                 ):
                     raise _refuse(
-                        f"uncontrolled junction {ordinal} has conflicting movements "
+                        f"uncontrolled junction {junction_id} has conflicting movements "
                         "from two approaches"
                     )
-        signal = None
-        controller = controller_of_junction.get(ordinal)
-        if (policy.rule == "signal") != (controller is not None):
+        signal_spec = None
+        signal = signal_of_junction.get(junction_id)
+        if (policy.rule == "signal") != (signal is not None):
             raise _refuse(
-                f"junction {ordinal}: a signal controller exists exactly when the rule is signal"
+                f"junction {junction_id}: a signal exists exactly when the rule is signal"
             )
-        if controller is not None:
-            plan = catalogs.plan(controller.plan)
-            owned = groups_by_controller.get(controller.controller_ordinal, {})
+        if signal is not None:
+            plan = catalogs.plan(signal.plan)
             connector_groups: dict[str, str] = {}
             band_groups: dict[int, str] = {}
-            for group in owned.values():
-                kind = plan.group_kind(group.group)
-                if kind == "vehicle" and group.crossing_ordinals:
+            for group in signal.groups:
+                try:
+                    kind = plan.group_kind(group.group)
+                except TrafficCatalogError as error:
+                    raise _refuse(f"signal {signal.identity}: {error}") from error
+                if kind == "vehicle" and group.crossings:
                     raise _refuse(f"vehicle group {group.group} lists crossings")
-                if kind == "pedestrian" and group.connector_ordinals:
-                    raise _refuse(f"pedestrian group {group.group} lists connectors")
-                for connector_ordinal in group.connector_ordinals:
-                    data = connectors.get(connector_ordinal)
-                    if data is None or data["record"].junction_ordinal != ordinal:
-                        raise _refuse(f"group {group.group} lists a connector of another junction")
-                    if data["path_id"] in connector_groups:
-                        raise _refuse(f"connector {connector_ordinal} is in two groups")
-                    connector_groups[data["path_id"]] = group.group
-                for crossing_ordinal in group.crossing_ordinals:
-                    band_id = band_of_crossing.get(crossing_ordinal)
-                    if band_id is None or bands[band_id].junction != ordinal:
+                if kind == "pedestrian" and group.connections:
+                    raise _refuse(f"pedestrian group {group.group} lists connections")
+                for connection_id in group.connections:
+                    path_id = connector_of_connection.get(connection_id)
+                    if path_id is None or paths[path_id].end_junction != junction_id:
+                        raise _refuse(f"group {group.group} lists a connection of another junction")
+                    if path_id in connector_groups:
+                        raise _refuse(f"connection {connection_id} is in two groups")
+                    connector_groups[path_id] = group.group
+                for crossing_id in group.crossings:
+                    band_id = band_of_crossing.get(crossing_id)
+                    if band_id is None or bands[band_id].junction != junction_id:
                         raise _refuse(
-                            f"group {group.group} lists a crossing outside junction {ordinal}"
+                            f"group {group.group} lists a crossing outside junction {junction_id}"
                         )
-                    if bands[band_id].control != "signalised":
+                    if crossings[crossing_id].signal != signal.identity:
                         raise _refuse(
-                            f"crossing {crossing_ordinal} is signalled but marked priority"
+                            f"crossing {crossing_id} is released by signal {signal.identity} "
+                            "but does not name it"
                         )
                     if band_id in band_groups:
-                        raise _refuse(f"crossing {crossing_ordinal} is in two groups")
+                        raise _refuse(f"crossing {crossing_id} is in two groups")
                     band_groups[band_id] = group.group
             if sorted(connector_groups) != members:
                 raise _refuse(
-                    f"junction {ordinal}: every connector is in exactly one vehicle group"
+                    f"junction {junction_id}: every connection is in exactly one vehicle group"
                 )
             for band in bands:
                 if (
-                    band.junction == ordinal
+                    band.junction == junction_id
                     and band.control == "signalised"
                     and band.band_id not in band_groups
                 ):
-                    raise _refuse(f"signalised crossing {band.ordinal} is in no group")
+                    raise _refuse(f"signalised crossing {band.identity} is in no group")
             # Conflicting movements may share right of way only when one yields by turn rank.
             for first_id, second_id in conflicts:
                 first_group, second_group = connector_groups[first_id], connector_groups[second_id]
@@ -1088,12 +1048,11 @@ def compile_network(
                 ):
                     raise _refuse(
                         f"plan {plan.key} lets conflicting {paths[first_id].turn} movements "
-                        f"{paths[first_id].ordinal} and {paths[second_id].ordinal} go together"
+                        f"{paths[first_id].identity} and {paths[second_id].identity} go together"
                     )
             for band_id, group in band_groups.items():
                 band = bands[band_id]
-                clearance = _pedestrian_windows(plan, group)
-                for walk_ms, clearance_ms in clearance:
+                for walk_ms, clearance_ms in _pedestrian_windows(plan, group):
                     need_clear = -(
                         -band.length_mm * _MS_PER_SECOND // plan.pedestrian_clearance_speed_mm_per_s
                     )
@@ -1104,7 +1063,7 @@ def compile_network(
                     )
                     if clearance_ms < need_clear or walk_ms + clearance_ms < need_total:
                         raise _refuse(
-                            f"plan {plan.key} gives crossing {band.ordinal} "
+                            f"plan {plan.key} gives crossing {band.identity} "
                             "too little pedestrian time"
                         )
                 walking = [
@@ -1119,45 +1078,48 @@ def compile_network(
                     moving = connector_groups[path_id]
                     if any(moving in interval.vehicle_green for interval in walking):
                         raise _refuse(
-                            f"plan {plan.key} sends straight connector {path.ordinal} "
-                            f"through crossing {band.ordinal} while it walks"
+                            f"plan {plan.key} sends straight connection {path.identity} "
+                            f"through crossing {band.identity} while it walks"
                         )
-                bands[band_id] = _replace_signal(band, (ordinal, group))
-            signal = SignalSpec(
-                controller_identity=controller.identity,
+                bands[band_id] = replace(band, signal=(junction_id, group))
+            signal_spec = SignalSpec(
+                identity=signal.identity,
                 plan=plan.key,
-                offset_s=controller.offset_s,
+                offset_s=signal.offset_s,
                 connector_groups=tuple(sorted(connector_groups.items())),
                 band_groups=tuple(sorted(band_groups.items())),
             )
         for band in bands:
-            if band.junction == ordinal and band.control == "signalised" and signal is None:
-                raise _refuse(f"crossing {band.ordinal} is signalised at an unsignalled junction")
-        junctions[ordinal] = JunctionSpec(
-            ordinal=ordinal,
-            identity=record.identity,
-            node_ordinal=record.node_ordinal,
-            position=(node.x_mm, node.y_mm),
+            if (
+                band.junction == junction_id
+                and band.control == "signalised"
+                and signal_spec is None
+            ):
+                raise _refuse(f"crossing {band.identity} is signalised at an unsignalled junction")
+        junctions[junction_id] = JunctionSpec(
+            identity=junction_id,
+            node=record.node,
+            position=node.point,
             policy=policy.key,
             rule=policy.rule,
             approaches=tuple(approach_list),
             connectors=tuple(members),
-            signal=signal,
+            signal=signal_spec,
             conflicts=tuple(sorted(conflicts)),
         )
         for lane_id in inbound:
             gates.setdefault(lane_id, []).append(
-                Gate(lane_id, paths[lane_id].length, "junction", ordinal)
+                Gate(lane_id, paths[lane_id].length, "junction", junction_id)
             )
     for band in bands:
         if band.junction is not None:
             continue
         if band.control == "signalised":
             raise _refuse(
-                f"mid-block crossing {band.ordinal} is signalised; v1 has no mid-block signals"
+                f"mid-block crossing {band.identity} is signalised; v1 has no mid-block signals"
             )
         for path_id, low, _ in band.intervals:
-            gates.setdefault(path_id, []).append(Gate(path_id, low, "band", band.band_id))
+            gates.setdefault(path_id, []).append(Gate(path_id, low, "band", band.identity))
     for path_id, path_gates in gates.items():
         path_gates.sort(key=lambda gate: (gate.position, gate.kind, gate.target))
         for first, second in pairwise(path_gates):
@@ -1168,16 +1130,19 @@ def compile_network(
                 raise _refuse(f"two gates on {path_id} are closer than one vehicle and its gap")
     for lane_id in lane_ids:
         path = paths[lane_id]
-        need = exit_extent[lane_id] + path.longest_body_mm + path.widest_gap_mm
-        if need > path.length:
-            raise _refuse(f"lane {path.ordinal} is too short to leave its junction region")
+        if path.start_junction is None:
+            continue
+        if exit_extent[lane_id] + path.longest_body_mm + path.widest_gap_mm > path.length:
+            raise _refuse(f"lane {path.identity} is too short to leave its junction region")
 
     catalog_sha256 = catalogs.digest
-    # Sorted before the document is built, so the digest does not depend on record order.
+    # Sorted before the document is built, so the digest does not depend on input order.
     ordered_spaces = dict(sorted(spaces.items()))
+    segment_ordinals = {segment.identity: segment.ordinal for segment in road.segments}
     document = _document(
-        scope,
-        driving_side,
+        road.city,
+        road.driving_side,
+        segment_ordinals,
         ordered_paths,
         junctions,
         zones,
@@ -1188,14 +1153,15 @@ def compile_network(
         restrictions,
         catalog_sha256,
     )
-    network = RoadNetwork(
-        scope=scope,
-        driving_side=driving_side,
+    return RoadNetwork(
+        city=road.city,
+        driving_side=road.driving_side,
         paths=ordered_paths,
         junctions=junctions,
         zones=tuple(zones),
         bands=tuple(bands),
         spaces=ordered_spaces,
+        segment_ordinals=dict(sorted(segment_ordinals.items())),
         exit_extent=exit_extent,
         gates={path_id: tuple(items) for path_id, items in sorted(gates.items())},
         zones_by_path={key: tuple(sorted(value)) for key, value in zones_by_path.items()},
@@ -1205,24 +1171,6 @@ def compile_network(
         catalog_sha256=catalog_sha256,
         document=document,
         digest=sha256_of_canonical(document).hex(),
-    )
-    return network
-
-
-def _replace_signal(band: Band, signal: tuple[int, str]) -> Band:
-    return Band(
-        band_id=band.band_id,
-        identity=band.identity,
-        ordinal=band.ordinal,
-        society_crossing_id=band.society_crossing_id,
-        segment_ordinal=band.segment_ordinal,
-        control=band.control,
-        line=band.line,
-        width_mm=band.width_mm,
-        length_mm=band.length_mm,
-        intervals=band.intervals,
-        junction=band.junction,
-        signal=signal,
     )
 
 
@@ -1251,10 +1199,11 @@ def _pedestrian_windows(plan: Any, group: str) -> list[tuple[int, int]]:
 
 
 def _document(
-    scope: str,
+    city: str,
     driving_side: str,
+    segment_ordinals: Mapping[str, int],
     paths: Mapping[str, PathSpec],
-    junctions: Mapping[int, JunctionSpec],
+    junctions: Mapping[str, JunctionSpec],
     zones: Sequence[Zone],
     bands: Sequence[Band],
     spaces: Mapping[str, SpaceSpec],
@@ -1266,9 +1215,13 @@ def _document(
     """The canonical description a network digest covers. Everything the simulation reads."""
     return {
         "profile": NETWORK_PROFILE,
-        "scope": scope,
+        "city": city,
         "driving_side": driving_side,
         "catalog_sha256": catalog_sha256,
+        "segments": [
+            {"identity": identity, "ordinal": ordinal}
+            for identity, ordinal in sorted(segment_ordinals.items())
+        ],
         "paths": [
             {
                 "path_id": path.path_id,
@@ -1279,6 +1232,8 @@ def _document(
                 "extents": [list(pair) for pair in path.extents],
                 "successors": list(path.successors),
                 "turn": path.turn,
+                "start_junction": path.start_junction,
+                "end_junction": path.end_junction,
                 "exit_extent_mm": exit_extent.get(path.path_id, 0),
             }
             for path in paths.values()
@@ -1289,7 +1244,6 @@ def _document(
         ],
         "junctions": [
             {
-                "ordinal": junction.ordinal,
                 "identity": junction.identity,
                 "policy": junction.policy,
                 "approaches": [
@@ -1305,6 +1259,7 @@ def _document(
                 "signal": None
                 if junction.signal is None
                 else {
+                    "identity": junction.signal.identity,
                     "plan": junction.signal.plan,
                     "offset_s": junction.signal.offset_s,
                     "connector_groups": [list(pair) for pair in junction.signal.connector_groups],
@@ -1316,6 +1271,7 @@ def _document(
         "zones": [
             {
                 "zone_id": zone.zone_id,
+                "junction": zone.junction,
                 "first": zone.first,
                 "first_interval": list(zone.first_interval),
                 "second": zone.second,
@@ -1340,6 +1296,9 @@ def _document(
         "spaces": [
             {
                 "identity": space.identity,
+                "kind": space.kind,
+                "placement": space.placement,
+                "capacity": space.capacity,
                 "footprint": [list(point) for point in space.footprint],
                 "access_path": space.access_path,
                 "access": [space.access_start, space.access_end],
@@ -1349,12 +1308,3 @@ def _document(
         ],
         "restrictions": [list(item) for item in sorted(restrictions)],
     }
-
-
-def segments_cross(first: Polyline, second: Polyline) -> bool:
-    """Whether two polylines share a point. Used by tests of the fixture."""
-    return any(
-        segments_intersect(*first.piece(i), *second.piece(j))
-        for i in range(first.piece_count)
-        for j in range(second.piece_count)
-    )

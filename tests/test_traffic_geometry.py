@@ -13,6 +13,7 @@ from __future__ import annotations
 
 import random
 from fractions import Fraction
+from math import isqrt
 
 import pytest
 from exulanica.traffic.geometry import (
@@ -21,6 +22,7 @@ from exulanica.traffic.geometry import (
     circumradius_at_least,
     circumradius_floor,
     convex_overlap,
+    corner_radius_floor,
     corridor_piece,
     near_interval,
     offtracking_mm,
@@ -28,6 +30,7 @@ from exulanica.traffic.geometry import (
     rectangle,
     segments_intersect,
     segments_within,
+    step_along,
 )
 
 SEED = 20260917
@@ -106,6 +109,62 @@ def test_the_circumradius_floor_is_consistent_with_the_exact_comparison():
         assert not circumradius_at_least(a, b, c, floor + 1)
         checked += 1
     assert checked > 2_900
+
+
+def test_a_corner_radius_is_the_arc_a_chain_traces_and_small_at_a_sharp_corner():
+    # A right-angled corner between a 15.5 m and a 7.575 m piece fits an arc of half the shorter
+    # piece, although the circle through the three points is 8.6 m.
+    corner = ((46_000, 37_175), (61_500, 37_175), (61_500, 44_750))
+    assert circumradius_floor(*corner) == 8_625
+    assert corner_radius_floor(*corner) == 3_787
+    assert corner_radius_floor((0, 0), (10, 0), (20, 0)) is None
+    assert corner_radius_floor((0, 0), (10, 0), (0, 0)) == 0
+    # Points on a 13.125 m arc, 7.5 degrees apart: the arc's radius times cos(3.75 degrees).
+    arc = [(13_125, 0), (13_013, 1_713), (12_678, 3_397)]
+    radius = corner_radius_floor(*arc)
+    assert radius is not None and 13_000 <= radius <= circumradius_floor(*arc)
+
+
+def test_the_corner_radius_never_exceeds_either_rule_it_takes_the_smaller_of():
+    rng = random.Random(SEED + 10)
+    checked = 0
+    for _ in range(5_000):
+        a, b, c = _point(rng, 40_000), _point(rng, 40_000), _point(rng, 40_000)
+        if a == b or b == c:
+            continue
+        u, v = (b[0] - a[0], b[1] - a[1]), (c[0] - b[0], c[1] - b[1])
+        turn, along = u[0] * v[1] - u[1] * v[0], u[0] * v[0] + u[1] * v[1]
+        radius = corner_radius_floor(a, b, c)
+        if turn == 0:
+            assert radius == (None if along > 0 else 0)
+            continue
+        circle = circumradius_floor(a, b, c)
+        assert circle is not None and radius <= circle
+        # The tangent arc: half the shorter piece over tan(theta / 2), exactly in rationals.
+        half = Fraction(min(isqrt(u[0] ** 2 + u[1] ** 2), isqrt(v[0] ** 2 + v[1] ** 2)) // 2)
+        lengths = Fraction(isqrt((u[0] ** 2 + u[1] ** 2) * (v[0] ** 2 + v[1] ** 2)))
+        if lengths + along > 0:
+            assert radius <= half * (lengths + along) / abs(turn)
+        checked += 1
+    assert checked > 4_000
+
+
+def test_step_along_moves_at_least_the_distance_and_by_under_a_millimetre_more():
+    rng = random.Random(SEED + 11)
+    for _ in range(3_000):
+        point = _point(rng, 50_000)
+        direction = _point(rng, 9_000)
+        if direction == (0, 0):
+            continue
+        distance = rng.randint(-5_000, 5_000)
+        moved = step_along(point, direction, distance)
+        offset = (moved[0] - point[0], moved[1] - point[1])
+        squared = direction[0] ** 2 + direction[1] ** 2
+        along = offset[0] * direction[0] + offset[1] * direction[1]
+        # Each component rounds away from zero, so the move reaches the distance along the line.
+        assert along * along >= distance * distance * squared
+        assert abs(offset[0]) <= abs(direction[0] * distance) // isqrt(squared) + 1
+        assert abs(offset[1]) <= abs(direction[1] * distance) // isqrt(squared) + 1
 
 
 # ---------------------------------------------------------------------------------------------

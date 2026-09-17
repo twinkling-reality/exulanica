@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "catalog_id": "lane-use-access",
+  "catalog_version": 1,
+  "references": {},
+  "entries": [
+    {
+      "key": "buffer",
+      "label": "Buffer",
+      "classes": [],
+      "sources": {
+        "classes": "declared: a painted buffer carries no traffic, as the city's lane-use catalog states, so no class may drive in it"
+      },
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/traffic-contract.md"
+      }
+    },
+    {
+      "key": "bus",
+      "label": "Bus lane",
+      "classes": [
+        "city_bus"
+      ],
+      "sources": {
+        "classes": "declared: a bus lane is modelled as carrying buses only; local rules often also admit bicycles or taxis, which this mapping does not model and no source read for this catalog settles"
+      },
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/traffic-contract.md"
+      }
+    },
+    {
+      "key": "cycle",
+      "label": "Cycle lane",
+      "classes": [
+        "bicycle"
+      ],
+      "sources": {
+        "classes": "declared: a cycle lane carries bicycles and no motor vehicle"
+      },
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/traffic-contract.md"
+      }
+    },
+    {
+      "key": "general",
+      "label": "General traffic lane",
+      "classes": [
+        "bicycle",
+        "city_bus",
+        "passenger_car",
+        "van"
+      ],
+      "sources": {
+        "classes": "declared: a general traffic lane carries every vehicle class this catalog knows; a class the geometry cannot carry is dropped by the network compiler with its reason, never by this mapping"
+      },
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/traffic-contract.md"
+      }
+    },
+    {
+      "key": "parking",
+      "label": "Parking lane",
+      "classes": [],
+      "sources": {
+        "classes": "declared: a parking lane carries no through traffic, as the city's lane-use catalog states; a vehicle reaches a bay in it from the traffic lane its parking space names"
+      },
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/traffic-contract.md"
+      }
+    }
+  ]
+}

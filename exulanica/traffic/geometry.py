@@ -39,6 +39,7 @@ __all__ = [
     "circumradius_at_least",
     "circumradius_floor",
     "convex_overlap",
+    "corner_radius_floor",
     "corridor_piece",
     "cross",
     "dot",
@@ -48,6 +49,7 @@ __all__ = [
     "rectangle",
     "segments_intersect",
     "segments_within",
+    "step_along",
 ]
 
 Point = tuple[int, int]
@@ -89,6 +91,15 @@ def _away_scaled(value: int, length_squared: int) -> int:
     """
     magnitude = ceil_sqrt(-(-value * value // length_squared))
     return magnitude if value >= 0 else -magnitude
+
+
+def step_along(point: Point, direction: Point, distance: int) -> Point:
+    """``point`` moved ``distance`` along ``direction``, each component rounded away from zero."""
+    squared = dot(direction, direction)
+    return (
+        point[0] + _away_scaled(direction[0] * distance, squared),
+        point[1] + _away_scaled(direction[1] * distance, squared),
+    )
 
 
 def _nearest_half_scaled(value: int, length_squared: int) -> int:
@@ -135,6 +146,29 @@ def circumradius_floor(a: Point, b: Point, c: Point) -> int | None:
     numerator = dot(ab, ab) * dot(bc, bc) * dot(ca, ca)
     denominator = 4 * turn * turn
     return isqrt(numerator // denominator)
+
+
+def corner_radius_floor(a: Point, b: Point, c: Point) -> int | None:
+    """How tight the turn at ``b`` is, as a radius rounded down; ``None`` where it runs straight on.
+
+    The smaller of two radii. The circle through the three points is the radius of the arc a
+    chain of such points traces. The largest arc tangent to both pieces whose tangent points lie
+    within half of each piece catches what that circle misses: a sharp corner between two long
+    pieces, which the circle through the points calls gentle. With ``theta`` the turn,
+    ``tan(theta / 2) = |cross| / (|u| |v| + dot)``, so that arc's radius is half the shorter piece
+    times ``(|u| |v| + dot) / |cross|``; every square root is floored, so the radius can only come
+    out smaller. A reversal has radius 0.
+    """
+    u, v = _sub(b, a), _sub(c, b)
+    turn, along = cross(u, v), dot(u, v)
+    if turn == 0:
+        return None if along > 0 else 0
+    circle = circumradius_floor(a, b, c)
+    assert circle is not None
+    half = isqrt(min(dot(u, u), dot(v, v))) // 2
+    numerator = half * (isqrt(dot(u, u) * dot(v, v)) + along)
+    fillet = numerator // abs(turn) if numerator > 0 else 0
+    return min(circle, fillet)
 
 
 def _orientation(a: Point, b: Point, c: Point) -> int:
