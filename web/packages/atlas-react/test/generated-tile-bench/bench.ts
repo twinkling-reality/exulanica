@@ -481,14 +481,22 @@ export class Bench {
   }
 
   /**
-   * Presented frame times, as the app's own validation recorder measures them: the interval
-   * between `frameend` events while the engine renders every frame and the camera walks along the
+   * Presented frame times while the engine renders every frame and the camera walks along the
    * street at eye level, so the shadows, probe and occlusion are paid on every frame.
+   *
+   * The top-level percentiles use the app's own validation recorder's clock: the `frameupdate`
+   * interval, which PlayCanvas takes from the animation frame timestamps. `frameEnd` is the
+   * interval between `performance.now()` readings at `frameend`, which adds the jitter of the
+   * frame's own script work; `work` is the script time from `frameupdate` to `frameend` (GPU time
+   * is not in it).
    */
-  async presentedFrameTimes(seconds: number): Promise<Record<string, number>> {
+  async presentedFrameTimes(seconds: number): Promise<Record<string, unknown>> {
     const app = this.app;
+    const presented: number[] = [];
     const intervals: number[] = [];
+    const work: number[] = [];
     let last = -1;
+    let started = -1;
     let drawCalls = 0;
     const eye = KERB_HEIGHT_M + EYE_M;
     let t = 0;
@@ -498,25 +506,40 @@ export class Bench {
       this.camera.setPosition(x, eye, 0.8);
       this.camera.lookAt(x + 6, 2.2, 2.2);
     };
+    const onUpdate = (ms: number): void => {
+      if (last >= 0) presented.push(ms);
+      started = performance.now();
+    };
     const onEnd = (): void => {
       const now = performance.now();
       if (last >= 0) intervals.push(now - last);
+      if (started >= 0) work.push(now - started);
       last = now;
       drawCalls = Math.max(drawCalls, app.stats.drawCalls.total);
     };
     app.on('update', walk);
+    app.on('frameupdate', onUpdate);
     app.on('frameend', onEnd);
     app.autoRender = true;
     await new Promise((resolve) => setTimeout(resolve, seconds * 1000));
     app.autoRender = false;
     app.off('update', walk);
+    app.off('frameupdate', onUpdate);
     app.off('frameend', onEnd);
-    intervals.sort((a, b) => a - b);
-    const at = (q: number): number => Math.round(intervals[Math.min(intervals.length - 1, Math.round((intervals.length - 1) * q))]! * 100) / 100;
+    const summary = (values: number[]): Record<string, number> => {
+      const sorted = [...values].sort((a, b) => a - b);
+      const at = (q: number): number => Math.round(sorted[Math.min(sorted.length - 1, Math.round((sorted.length - 1) * q))]! * 100) / 100;
+      return {
+        frames: sorted.length, p50: at(0.5), p95: at(0.95), p99: at(0.99), max: at(1),
+        over16_7: sorted.filter((value) => value > 16.7).length,
+      };
+    };
     const heap = (performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize;
     return {
-      frames: intervals.length, p50: at(0.5), p95: at(0.95), p99: at(0.99), max: at(1),
-      over16_7: intervals.filter((value) => value > 16.7).length, drawCalls,
+      ...summary(presented),
+      frameEnd: summary(intervals),
+      work: summary(work),
+      drawCalls,
       jsHeapMb: heap === undefined ? -1 : Math.round((heap / 1048576) * 100) / 100,
     };
   }
