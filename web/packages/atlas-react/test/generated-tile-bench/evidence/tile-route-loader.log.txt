@@ -53,3 +53,25 @@ ids exist, while an authorised caller keeps a detail that helps it debug. The pa
 and the only pair this loader relies on, is the status and the code: 404 and unknown_reference. The
 unit test now asserts exactly that, and asserts as well that neither refusal's message claims which
 of the two it was.
+
+BYTES THAT PASS THE TRANSPORT AND ARE STILL REFUSED, measured 2026-09-17 19:26
+------------------------------------------------------------------------------
+The one path nothing else in the store can show. The corridor lane's 74 byte stand-in is a real row
+with a real digest: it passes every check the transport makes, and it is not a tile.
+
+  fetched through the loader     74 bytes, hashing to
+                                 ccf5701d85ded679e328b2400eccc8831557650655b9381f50912d0e214e8c97,
+                                 which is exactly what the row records and what the ETag named
+  handed to the reader           refused: "Tile 603b9404-... refused: .owd refused: magic is not OWD3"
+  texture sets asked for         none. The test fails the run if one is requested, because a container
+                                 that never parsed must not cause a single set to be fetched
+
+So the digest check and the reader are two separate guarantees and both are load bearing. The digest
+says the bytes are the ones the row names; it says nothing about what those bytes ARE. A row can name
+74 bytes of ASCII, and the row would be right. Only the reader can refuse a thing that is not a tile,
+and the refusal names the reason rather than failing somewhere later with a parse error nobody can
+place.
+
+This was measured headlessly, with no renderer: the refusal happens in the reader before any texture,
+mesh or device is touched, which is itself the property worth having. A picture of the same refusal on
+screen is worth taking when a browser is free, but it would show the same sentence this run printed.

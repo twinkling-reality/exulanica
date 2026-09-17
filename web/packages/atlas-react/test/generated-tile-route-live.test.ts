@@ -13,7 +13,10 @@
 
 import { webcrypto } from 'node:crypto';
 import { describe, expect, it } from 'vitest';
-import { TileRouteRefusal, fetchBakedTile, listBakedTiles } from '../src/playcanvas/generated-tile/index.js';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { parseTextureSetManifest } from '@exulanica/atlas-core';
+import { GeneratedTileRefusal, TileRouteRefusal, fetchBakedTile, listBakedTiles, loadGeneratedTile } from '../src/playcanvas/generated-tile/index.js';
 
 const baseUrl = process.env['EXULANICA_TILE_ROUTE'];
 const token = process.env['EXULANICA_TILE_TOKEN'];
@@ -21,6 +24,8 @@ const citySeed = process.env['EXULANICA_TILE_CITY'];
 const live = baseUrl !== undefined && token !== undefined && citySeed !== undefined;
 /** A credential that authenticates but does not hold `tiles.materialise`, where one was named. */
 const permissionless = process.env['EXULANICA_TILE_TOKEN_NO_PERMISSION'];
+/** A key whose stored bytes are deliberately NOT a container, where one was named. */
+const notAContainer = process.env['EXULANICA_TILE_NOT_A_CONTAINER'];
 
 describe.runIf(live)('against a running tile route', () => {
   const access = { baseUrl: baseUrl ?? '', token: token ?? '' };
@@ -60,6 +65,31 @@ describe.runIf(live)('against a running tile route', () => {
       revalidatedOrigin: revalidated.origin,
       revalidatedTransferred: revalidated.transferredBytes,
     }));
+  });
+
+  it.runIf(notAContainer !== undefined)('verifies bytes that are not a container, then refuses to read them as a tile', async () => {
+    // The one path nothing else can show: bytes that pass every check the TRANSPORT makes (they hash
+    // to the digest the row records) and are still refused, by the reader, for not being a tile.
+    const tiles = await listBakedTiles(access, { citySeed: citySeed ?? '' });
+    const row = tiles.find((tile) => tile.bakedTileId === notAContainer);
+    const fetched = await fetchBakedTile(access, {
+      bakedTileId: notAContainer ?? '',
+      ...(row === undefined ? {} : { expect: row }),
+      digest,
+    });
+    // The transport is satisfied: the bytes are exactly what the row names.
+    expect(fetched.containerSha256).toBe(row?.containerSha256 ?? fetched.containerSha256);
+
+    const manifest = parseTextureSetManifest(new Uint8Array(readFileSync(resolve('../assets/textures/manifest.json'))));
+    const refusal = await loadGeneratedTile({
+      name: fetched.bakedTileId,
+      bytes: fetched.bytes,
+      manifest,
+      fetchSet: () => { throw new Error('no texture set should be asked for: the container never parsed'); },
+    }).then(() => null, (error: unknown) => error as Error);
+    expect(refusal).toBeInstanceOf(GeneratedTileRefusal);
+    // eslint-disable-next-line no-console
+    console.log(JSON.stringify({ bytes: fetched.bytes.length, digestChecked: fetched.containerSha256, refusal: refusal?.message }));
   });
 
   it('answers an unknown key 404 unknown_reference', async () => {
