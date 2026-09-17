@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 import { describe, expect, it, vi } from 'vitest';
 import { CHARACTER_CATALOG, DESIGNED_LOOKS, designedLook, validateLook, type CharacterLook } from '@exulanica/atlas-react/playcanvas';
-import { buildLookEditor, lookOverBase } from '../src/ui/character-look-editor.js';
+import { buildLookEditor } from '../src/ui/character-look-editor.js';
+import { lookOverBase } from '../src/character-look.js';
 
 function setup() {
   const onChange = vi.fn<(look: CharacterLook) => void>();

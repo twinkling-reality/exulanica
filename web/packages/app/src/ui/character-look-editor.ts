@@ -6,12 +6,8 @@
  * yields a whole, valid look over one body. Choosing the other body keeps every choice that body
  * also offers and takes that body's designed default for the rest.
  */
-import {
-  validateLook,
-  type CharacterCatalog,
-  type CharacterLook,
-  type DesignedLooks,
-} from '@exulanica/atlas-react/playcanvas';
+import type { CharacterCatalog, CharacterLook, DesignedLooks } from '@exulanica/atlas-react/playcanvas';
+import { checkedLook, designedLook, lookOverBase, sameLook } from '../character-look.js';
 import { el, replace } from './dom.js';
 
 type Family = CharacterCatalog['families'][number];
@@ -23,63 +19,9 @@ export interface LookEditorSections {
   readonly style: HTMLElement;
 }
 
-function designed(looks: DesignedLooks, lookId: string): CharacterLook {
-  const entry = looks.looks.find((candidate) => candidate.lookId === lookId);
-  if (!entry) throw new TypeError(`Unknown designed look ${lookId}`);
-  return entry.look;
-}
-
-/** Two looks name the same choices, whatever order their fields were written in. */
-export function sameLook(a: CharacterLook, b: CharacterLook): boolean {
-  return JSON.stringify(canonical(a)) === JSON.stringify(canonical(b));
-}
-
-function canonical(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(canonical);
-  if (value && typeof value === 'object') {
-    return Object.fromEntries(Object.keys(value).sort().map((key) => [key, canonical((value as Record<string, unknown>)[key])]));
-  }
-  return value;
-}
-
-/** The same person over another body: shared choices kept, the rest from that body's default. */
-export function lookOverBase(catalog: CharacterCatalog, looks: DesignedLooks, look: CharacterLook, baseId: string): CharacterLook {
-  if (look.baseId === baseId) return look;
-  const family = catalog.families.find((candidate) => candidate.familyId === look.familyId)!;
-  const from = family.bases.find((candidate) => candidate.baseId === look.baseId)!;
-  const to = family.bases.find((candidate) => candidate.baseId === baseId);
-  const fallback = designed(looks, looks.defaults.bases[baseId] ?? '');
-  if (!to) throw new TypeError(`Unknown base ${baseId}`);
-  const parts: Record<string, string | null> = {};
-  for (const slot of family.slots.filter((candidate) => candidate.kind === 'part')) {
-    const chosen = look.parts[slot.slot] ?? null;
-    if (chosen === null) {
-      parts[slot.slot] = slot.optional ? null : fallback.parts[slot.slot] ?? null;
-      continue;
-    }
-    const twin = `${baseId}${chosen.slice(chosen.indexOf('/'))}`;
-    parts[slot.slot] = to.parts.some((part) => part.partId === twin && part.slot === slot.slot) ? twin : fallback.parts[slot.slot] ?? null;
-  }
-  const materials: Record<string, string> = {};
-  for (const slot of family.slots.filter((candidate) => candidate.kind === 'material')) {
-    const index = (from.materials[slot.slot] ?? []).indexOf(look.materials[slot.slot]!);
-    const options = to.materials[slot.slot] ?? [];
-    materials[slot.slot] = index >= 0 && index < options.length ? options[index]! : fallback.materials[slot.slot]!;
-  }
-  const parameters: Record<string, number> = {};
-  for (const parameter of family.parameters) {
-    const value = look.parameters[parameter.key]!;
-    const bounds = parameter.unit === 'mm' ? to.heightMillimetres : parameter;
-    parameters[parameter.key] = Math.max(bounds.min, Math.min(bounds.max, value));
-  }
-  const next: CharacterLook = { ...look, baseId, parts, materials, colours: { ...look.colours }, parameters };
-  validateLook(catalog, next);
-  return next;
-}
-
 export function buildLookEditor(catalog: CharacterCatalog, looks: DesignedLooks, onChange: (look: CharacterLook) => void) {
   const family: Family = catalog.families[0]!;
-  let look: CharacterLook = designed(looks, looks.defaults.player);
+  let look: CharacterLook = designedLook(looks, looks.defaults.player);
   const sections: LookEditorSections = {
     body: el('div', { class: 'character-look-body' }),
     face: el('div', { class: 'character-look-face' }),
@@ -89,8 +31,7 @@ export function buildLookEditor(catalog: CharacterCatalog, looks: DesignedLooks,
   const materialLabel = (id: string): string => family.materials.find((material) => material.materialId === id)?.label ?? id;
 
   function change(next: CharacterLook, rerender = true): void {
-    validateLook(catalog, next);
-    look = next;
+    look = checkedLook(catalog, next);
     if (rerender) render();
     onChange(next);
   }
@@ -181,8 +122,7 @@ export function buildLookEditor(catalog: CharacterCatalog, looks: DesignedLooks,
     sections,
     get look(): CharacterLook { return look; },
     setLook(next: CharacterLook): void {
-      validateLook(catalog, next);
-      look = next;
+      look = checkedLook(catalog, next);
       render();
     },
   };

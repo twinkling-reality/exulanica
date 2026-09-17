@@ -4,6 +4,7 @@ import {
 } from '@exulanica/atlas-core';
 import {
   localizeNYCFeatures,
+  NEAR_CHARACTER_BUDGET,
   NYCSemanticOverlay,
   NYC_REFERENCE_FRAME,
   type OwnedSocietyState,
@@ -395,7 +396,7 @@ export function mountEnvironmentSelection(
         ['Input', state.input_sha256 ?? 'Unavailable'],
         ['Permitted use', 'Inspect simulation state; not historical evidence'],
         ['Shared position', `${deps.state.atlas?.binding.ownedDistrict?.coincidentInhabitants(inhabitant.id).length ?? 1} inhabitants at this position, all drawn where the simulation placed them.`],
-        ...characterDisplayDetails(nativeCharacter, representation?.representationId),
+        ...characterDisplayDetails(nativeCharacter, representation?.representationId, NEAR_CHARACTER_BUDGET),
         ['Unavailable dependencies', v2 ? 'Personal evidence and model explanation not established by this view.' : 'Routes, goals, event history and authenticated persistence unavailable.'],
       ],
     });

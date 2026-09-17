@@ -1,7 +1,8 @@
 import { buildCharacterBody, type BodyFamily, type BodyRecipe, type CharacterStep } from './character-body.js';
 import type { CharacterLook, CharacterSelection } from '../character-catalog.js';
 import type { SavedRevision } from '../character-looks-store.js';
-import { buildLookEditor, sameLook } from './character-look-editor.js';
+import { buildLookEditor } from './character-look-editor.js';
+import { sameLook } from '../character-look.js';
 import { el, replace } from './dom.js';
 import { createModalFocus } from './modal-focus.js';
 import type { CharacterCatalog, CharacterLook as PersonLook, DesignedLooks } from '@exulanica/atlas-react/playcanvas';
