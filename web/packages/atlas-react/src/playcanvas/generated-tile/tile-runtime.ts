@@ -3,16 +3,27 @@ import type { TextureSetDigest, TextureSetManifest, TextureSetManifestEntry } fr
 import {
   IDENTITY_NOT_STATED,
   OwdError,
+  absoluteSurfaceCoordinates,
+  absoluteVertices,
   verifyOwd,
   type DecodedOwd,
   type DecodedProjection,
   type OwdHeader,
+  type OwdRecord,
+  type SurfaceOrientation,
 } from '@exulanica/loom-tess/core';
 import type { GeneratedTileAttachment, GeneratedTileHost, GeneratedTileMetrics, GeneratedTileMount } from './binding-contract.js';
 import { applyTileEnvironment } from './environment.js';
 import { TILE_LOOK_V1, type TileLook } from './look.js';
 import { buildSurfaceMesh } from './surface-mesh.js';
-import { TileTextureLibrary, unavailableUv } from './texture-materials.js';
+import {
+  TileTextureUploads,
+  prepareTextureSet,
+  surfaceUv,
+  unavailableUv,
+  type PreparedTextureSet,
+  type TileMaterialReference,
+} from './texture-materials.js';
 import { rendererToTile, tileNavigation, tileToRenderer, type TileExtentMm, type TileNavigation, type Vec3 } from './tile-navigation.js';
 
 /**
@@ -23,22 +34,23 @@ import { rendererToTile, tileNavigation, tileToRenderer, type TileExtentMm, type
  * records say. There is no second reader here and nothing is repaired.
  *
  * WHAT IS DRAWN. Only `render_batch`, and only its drawn ranges, each exactly as stored. A drawn
- * range is textured when it cites a `surface_material` record whose texture set resolves AND the
- * container says where on the surface each vertex lies. Otherwise it is the stated unavailable
- * surface, with the reason kept. A range that is not drawn (unavailable, not admitted) has no
- * geometry at all, and is listed with the needs the tessellator stated. No vertex is invented and
- * no default mesh stands in for a missing one.
+ * range is textured when it cites a `surface_material` record that states its placement (version 2)
+ * and whose texture set is pinned and verifies; its UVs come from the container's own surface
+ * coordinates through `surfaceUv`. Otherwise it is the stated unavailable surface, and the reason is
+ * kept. A range that is not drawn has no geometry at all and is listed with the needs the
+ * tessellator stated. No vertex is invented and no default mesh stands in for a missing one.
  *
- * WHAT IS KEPT FOR PICKING. Every triangle maps back to its record: the range table answers "which
- * record is this triangle" and "what is that record's extent", and `pick` answers it for a ray.
+ * WHAT IS KEPT FOR PICKING. Every triangle maps back to its record: `rangeAtTriangle` answers
+ * "which record is this triangle", each range carries its record's extent, and `pick` answers both
+ * for a ray.
  *
- * `.owd` version 1 (loom-tess 5d0f15de) carries no per-vertex surface coordinates, so no range can
- * be textured yet; every drawn range reads as unavailable, and says why.
+ * Every texture set a tile cites is fetched and verified while the tile loads, before the renderer
+ * exists, so an attached tile is complete on its first frame.
  */
 
-export const SURFACE_COORDINATES_NOT_CARRIED =
-  'The container carries no surface coordinates, so no texture set can be placed on this range.';
 export const MATERIAL_NOT_CITED = 'The range cites no surface_material record.';
+export const MATERIAL_PLACEMENT_UNSTATED =
+  'The cited surface_material is version 1, which does not state how its texture is placed; version 2 does.';
 
 export type GeneratedTileRange =
   | {
@@ -48,6 +60,7 @@ export type GeneratedTileRange =
       readonly identity: string | null;
       readonly state: 'drawn';
       readonly surface: 'textured' | 'unavailable';
+      readonly orientation: SurfaceOrientation | null;
       readonly textureSetId: string | null;
       readonly reason: string | null;
       readonly firstTriangle: number;
@@ -63,6 +76,8 @@ export type GeneratedTileRange =
       readonly needs: readonly string[];
     };
 
+export type DrawnTileRange = Extract<GeneratedTileRange, { readonly state: 'drawn' }>;
+
 export class GeneratedTileRefusal extends Error {
   override readonly name = 'GeneratedTileRefusal';
 }
@@ -77,15 +92,25 @@ export interface GeneratedTileSources {
   readonly digest?: TextureSetDigest | null;
 }
 
+export interface TilePick {
+  readonly range: DrawnTileRange;
+  readonly triangle: number;
+  /** Along the ray, in metres. */
+  readonly distance: number;
+}
+
 export interface LoadedGeneratedTile extends GeneratedTileMount {
   readonly name: string;
   readonly header: OwdHeader;
   readonly look: TileLook;
   readonly ranges: readonly GeneratedTileRange[];
   readonly navigation: TileNavigation;
+  /** The tile's bytes and every texture set it cites. */
   readonly transferredBytes: number;
   /** The record a render_batch triangle belongs to. */
-  rangeAtTriangle(triangle: number): GeneratedTileRange | null;
+  rangeAtTriangle(triangle: number): DrawnTileRange | null;
+  /** The nearest drawn triangle along a renderer-space ray, and its record. */
+  pick(origin: Vec3, direction: Vec3): TilePick | null;
 }
 
 function ambientDigest(): TextureSetDigest | null {
@@ -97,29 +122,75 @@ function hexOf(buffer: ArrayBuffer): string {
   return Array.from(new Uint8Array(buffer), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
-function describeNeeds(needs: readonly string[]): string {
-  return `Not drawn: the record lacks ${needs.join(', ')}.`;
+const integerField = (record: OwdRecord, name: string): number | null => {
+  const value = record.fields[name];
+  return typeof value === 'number' && Number.isSafeInteger(value) ? value : null;
+};
+
+/** How a cited material record places its texture, or why it cannot. */
+function materialReference(record: OwdRecord): TileMaterialReference | string {
+  const setId = record.fields['texture_set_id'];
+  if (typeof setId !== 'string') return 'The cited surface_material names no texture set.';
+  if (record.version !== 2) return MATERIAL_PLACEMENT_UNSTATED;
+  const repeat = integerField(record, 'repeat_size_millionths');
+  const rotation = integerField(record, 'uv_rotation_urad');
+  const offsetU = integerField(record, 'uv_offset_u_mm');
+  const offsetV = integerField(record, 'uv_offset_v_mm');
+  if (repeat === null || rotation === null || offsetU === null || offsetV === null || repeat <= 0) {
+    return 'The cited surface_material does not state its repeat size, rotation and offsets.';
+  }
+  return { textureSetId: setId, repeatSizeMillionths: repeat, rotationUrad: rotation, offsetUMm: offsetU, offsetVMm: offsetV };
 }
 
-function rangesOf(decoded: DecodedOwd, render: DecodedProjection): GeneratedTileRange[] {
+interface Plan {
+  readonly ranges: GeneratedTileRange[];
+  /** The placement of every textured range, by record. */
+  readonly references: Map<number, TileMaterialReference>;
+  readonly prepared: Map<string, PreparedTextureSet>;
+}
+
+async function plan(
+  decoded: DecodedOwd,
+  render: DecodedProjection,
+  sources: GeneratedTileSources,
+  digest: TextureSetDigest,
+): Promise<Plan> {
   const records = decoded.header.records;
+  const references = new Map<number, TileMaterialReference>();
+  const cited = new Map<number, string>();
+  for (const entry of render.header.entries) {
+    if (entry.state !== 'drawn') continue;
+    const material = entry.material;
+    if (material === undefined || material.state !== 'record') { cited.set(entry.record, MATERIAL_NOT_CITED); continue; }
+    const reference = materialReference(records[material.record]!);
+    if (typeof reference === 'string') cited.set(entry.record, reference);
+    else references.set(entry.record, reference);
+  }
+  const setIds = [...new Set([...references.values()].map((reference) => reference.textureSetId))].sort();
+  const prepared = new Map<string, PreparedTextureSet>();
+  for (const result of await Promise.all(
+    setIds.map((setId) => prepareTextureSet(sources.manifest, setId, sources.fetchSet, digest)),
+  )) prepared.set(result.setId, result);
+
   const ranges: GeneratedTileRange[] = [];
   for (const entry of render.header.entries) {
     const record = records[entry.record]!;
     const identity = record.identity === IDENTITY_NOT_STATED ? null : record.identity;
     switch (entry.state) {
       case 'drawn': {
-        const cited = entry.material.state === 'record' ? records[entry.material.record]! : null;
-        const setId = cited === null ? null : cited.fields['texture_set_id'];
+        const reference = references.get(entry.record);
+        const set = reference === undefined ? undefined : prepared.get(reference.textureSetId);
+        const refused = set?.state === 'refused' ? set.reason : null;
+        if (refused !== null) references.delete(entry.record);
         ranges.push({
           record: entry.record,
           kind: record.kind,
           identity,
           state: 'drawn',
-          // Version 1 carries no surface coordinates, so a cited set cannot be placed either.
-          surface: 'unavailable',
-          textureSetId: typeof setId === 'string' ? setId : null,
-          reason: cited === null ? MATERIAL_NOT_CITED : SURFACE_COORDINATES_NOT_CARRIED,
+          surface: reference !== undefined && refused === null ? 'textured' : 'unavailable',
+          orientation: entry.surface ?? null,
+          textureSetId: reference?.textureSetId ?? null,
+          reason: refused ?? cited.get(entry.record) ?? null,
           firstTriangle: entry.first_triangle,
           triangleCount: entry.triangle_count,
           extentMm: { min: entry.extent_mm.min, max: entry.extent_mm.max },
@@ -127,7 +198,10 @@ function rangesOf(decoded: DecodedOwd, render: DecodedProjection): GeneratedTile
         break;
       }
       case 'unavailable':
-        ranges.push({ record: entry.record, kind: record.kind, identity, state: 'unavailable', reason: describeNeeds(entry.needs), needs: entry.needs });
+        ranges.push({
+          record: entry.record, kind: record.kind, identity, state: 'unavailable', needs: entry.needs,
+          reason: `Not drawn: the record lacks ${entry.needs.join(', ')}.`,
+        });
         break;
       case 'not_admitted':
         ranges.push({
@@ -135,11 +209,11 @@ function rangesOf(decoded: DecodedOwd, render: DecodedProjection): GeneratedTile
           reason: 'Not drawn: its grammar does not admit render_batch.',
         });
         break;
-      case 'not_a_surface':
+      case 'not_in_projection':
         break;
     }
   }
-  return ranges;
+  return { ranges, references, prepared };
 }
 
 function renderExtent(ranges: readonly GeneratedTileRange[]): TileExtentMm {
@@ -156,8 +230,46 @@ function renderExtent(ranges: readonly GeneratedTileRange[]): TileExtentMm {
   return { min: [min[0]!, min[1]!, min[2]!], max: [max[0]!, max[1]!, max[2]!] };
 }
 
+/** Ray against an axis-aligned box, both in tile millimetres: the entry distance, or null. */
+function rayBox(origin: Vec3, direction: Vec3, box: TileExtentMm): number | null {
+  let near = 0;
+  let far = Infinity;
+  for (let axis = 0; axis < 3; axis += 1) {
+    const d = direction[axis]!;
+    const o = origin[axis]!;
+    if (d === 0) {
+      if (o < box.min[axis]! || o > box.max[axis]!) return null;
+      continue;
+    }
+    const a = (box.min[axis]! - o) / d;
+    const b = (box.max[axis]! - o) / d;
+    near = Math.max(near, Math.min(a, b));
+    far = Math.min(far, Math.max(a, b));
+    if (near > far) return null;
+  }
+  return near;
+}
+
+/** Ray against a triangle (Moller and Trumbore), both sides, in tile millimetres. */
+function rayTriangle(origin: Vec3, direction: Vec3, a: Vec3, b: Vec3, c: Vec3): number | null {
+  const e1 = [b[0] - a[0], b[1] - a[1], b[2] - a[2]];
+  const e2 = [c[0] - a[0], c[1] - a[1], c[2] - a[2]];
+  const p = [direction[1] * e2[2]! - direction[2] * e2[1]!, direction[2] * e2[0]! - direction[0] * e2[2]!, direction[0] * e2[1]! - direction[1] * e2[0]!];
+  const det = e1[0]! * p[0]! + e1[1]! * p[1]! + e1[2]! * p[2]!;
+  if (det === 0) return null;
+  const t = [origin[0] - a[0], origin[1] - a[1], origin[2] - a[2]];
+  const u = (t[0]! * p[0]! + t[1]! * p[1]! + t[2]! * p[2]!) / det;
+  if (u < 0 || u > 1) return null;
+  const q = [t[1]! * e1[2]! - t[2]! * e1[1]!, t[2]! * e1[0]! - t[0]! * e1[2]!, t[0]! * e1[1]! - t[1]! * e1[0]!];
+  const v = (direction[0] * q[0]! + direction[1] * q[1]! + direction[2] * q[2]!) / det;
+  if (v < 0 || u + v > 1) return null;
+  const distance = (e2[0]! * q[0]! + e2[1]! * q[1]! + e2[2]! * q[2]!) / det;
+  return distance >= 0 ? distance : null;
+}
+
 /**
- * Verify and read a baked tile. Refuses, with a reason, rather than drawing anything unchecked.
+ * Verify and read a baked tile, with every texture set it cites. Refuses, with a reason, rather
+ * than drawing anything unchecked.
  */
 export async function loadGeneratedTile(sources: GeneratedTileSources): Promise<LoadedGeneratedTile> {
   const digest = sources.digest === undefined ? ambientDigest() : sources.digest;
@@ -174,88 +286,109 @@ export async function loadGeneratedTile(sources: GeneratedTileSources): Promise<
   }
   const render = decoded.projections.find((projection) => projection.header.name === 'render_batch');
   if (render === undefined) throw new GeneratedTileRefusal(`Tile ${sources.name} carries no render_batch.`);
-  const ranges = rangesOf(decoded, render);
+  const surface = absoluteSurfaceCoordinates(render);
+  if (surface === undefined) throw new GeneratedTileRefusal(`Tile ${sources.name} carries no surface coordinates.`);
+  const { ranges, references, prepared } = await plan(decoded, render, sources, digest);
   const navigation = tileNavigation(
     decoded.projections.find((projection) => projection.header.name === 'nav_envelope'),
     renderExtent(ranges),
   );
-  const byTriangle = new Map<number, GeneratedTileRange>();
-  for (const range of ranges) if (range.state === 'drawn') byTriangle.set(range.firstTriangle, range);
-  const drawnStarts = [...byTriangle.keys()].sort((a, b) => a - b);
+  const drawn = ranges.filter((range): range is DrawnTileRange => range.state === 'drawn')
+    .sort((a, b) => a.firstTriangle - b.firstTriangle);
+  const vertices = absoluteVertices(render);
   const look = sources.look ?? TILE_LOOK_V1;
-  const name = sources.name;
+  let setBytes = 0;
+  for (const set of prepared.values()) if (set.state === 'decoded') setBytes += set.transferredBytes;
+
+  const rangeAtTriangle = (triangle: number): DrawnTileRange | null => {
+    let low = 0;
+    let high = drawn.length - 1;
+    while (low <= high) {
+      const middle = (low + high) >> 1;
+      const range = drawn[middle]!;
+      if (triangle < range.firstTriangle) high = middle - 1;
+      else if (triangle >= range.firstTriangle + range.triangleCount) low = middle + 1;
+      else return range;
+    }
+    return null;
+  };
 
   const tile: LoadedGeneratedTile = {
-    name,
+    name: sources.name,
     header: decoded.header,
     look,
     ranges,
     navigation,
     navigationWorld: navigation.world,
     start: navigation.start,
-    transferredBytes: sources.bytes.byteLength,
-    rangeAtTriangle(triangle: number): GeneratedTileRange | null {
-      let low = 0;
-      let high = drawnStarts.length - 1;
-      while (low <= high) {
-        const middle = (low + high) >> 1;
-        const start = drawnStarts[middle]!;
-        const range = byTriangle.get(start)!;
-        if (range.state !== 'drawn') return null;
-        if (triangle < start) high = middle - 1;
-        else if (triangle >= start + range.triangleCount) low = middle + 1;
-        else return range;
+    transferredBytes: sources.bytes.byteLength + setBytes,
+    rangeAtTriangle,
+    pick(origin: Vec3, direction: Vec3): TilePick | null {
+      const o = rendererToTile(origin[0], origin[1], origin[2]);
+      // A direction is rotated, not translated or scaled: millimetres per metre cancel in the distance.
+      const d = rendererToTile(direction[0], direction[1], direction[2]);
+      const at = (vertex: number): Vec3 => [vertices[vertex * 3]!, vertices[vertex * 3 + 1]!, vertices[vertex * 3 + 2]!];
+      let best: TilePick | null = null;
+      for (const range of drawn) {
+        const entry = rayBox(o, d, range.extentMm);
+        if (entry === null || (best !== null && entry > best.distance)) continue;
+        for (let triangle = range.firstTriangle; triangle < range.firstTriangle + range.triangleCount; triangle += 1) {
+          const hit = rayTriangle(o, d, at(render.index[triangle * 3]!), at(render.index[triangle * 3 + 1]!), at(render.index[triangle * 3 + 2]!));
+          if (hit !== null && (best === null || hit < best.distance)) best = { range, triangle, distance: hit };
+        }
       }
-      return null;
+      return best;
     },
     attach(host: GeneratedTileHost): GeneratedTileAttachment {
-      return attachTile(host, sources, look, render, ranges, tile);
+      return attachTile(host, tile, render, surface, references, prepared);
     },
   };
   return tile;
 }
 
-interface Batch {
-  readonly positions: number[];
-  readonly normals: number[];
-  readonly surfaceMm: number[];
-  readonly indices: number[];
-}
-
-/** Plan or wall coordinates for the unavailable pattern only; never a texture set's placement. */
-function patternCoordinates(position: Vec3, normal: Vec3): readonly [number, number] {
-  const [x, y, z] = rendererToTile(position[0], position[1], position[2]);
-  if (Math.abs(normal[1]) >= Math.SQRT1_2) return [x, -y];
-  const length = Math.hypot(normal[0], normal[2]);
-  // Along the wall, seen from its front, and downward.
-  const along = (position[0] * -normal[2] + position[2] * normal[0]) / (length === 0 ? 1 : length);
-  return [along * 1000, -z];
-}
-
 function attachTile(
   host: GeneratedTileHost,
-  sources: GeneratedTileSources,
-  look: TileLook,
-  render: DecodedProjection,
-  ranges: readonly GeneratedTileRange[],
   tile: LoadedGeneratedTile,
+  render: DecodedProjection,
+  surface: Float64Array,
+  references: ReadonlyMap<number, TileMaterialReference>,
+  prepared: ReadonlyMap<string, PreparedTextureSet>,
 ): GeneratedTileAttachment {
   const device = host.app.graphicsDevice;
+  const look = tile.look;
   const environment = applyTileEnvironment(host.app, host.camera, look);
-  const library = new TileTextureLibrary(device, look, sources.manifest, sources.fetchSet,
-    sources.digest === undefined ? ambientDigest() : sources.digest);
+  const uploads = new TileTextureUploads(device, look);
   const root = new pc.Entity(`generated-tile:${tile.name}`);
   const origin = render.header.origin_mm;
   if (origin.length === 3) root.setLocalPosition(...tileToRenderer(origin[0], origin[1], origin[2]));
   host.environmentRoot.addChild(root);
 
-  // Version 1: every drawn range is the unavailable surface, so there is one batch.
-  const unavailable: Batch = { positions: [], normals: [], surfaceMm: [], indices: [] };
-  const meshes: pc.Mesh[] = [];
+  // One batch per texture set, and one for every unavailable surface. Each vertex carries its final
+  // UV: a textured range is placed by the record it cites, an unavailable one by the pattern's size.
+  interface Batch { positions: number[]; normals: number[]; uvs: number[]; indices: number[]; material: pc.Material }
+  const batches = new Map<string, Batch>();
   let triangles = 0;
-  for (const range of ranges) {
+  for (const range of tile.ranges) {
     if (range.state !== 'drawn') continue;
-    const first = unavailable.positions.length / 3;
+    const key = range.surface === 'textured' ? range.textureSetId! : '';
+    let batch = batches.get(key);
+    if (batch === undefined) {
+      let material: pc.Material = uploads.unavailableMaterial;
+      if (key !== '') {
+        const resolution = uploads.adopt(prepared.get(key)!);
+        if (resolution.state !== 'available') throw new Error(`Texture set ${key} was prepared and then refused`);
+        material = resolution.material;
+      }
+      batch = { positions: [], normals: [], uvs: [], indices: [], material };
+      batches.set(key, batch);
+    }
+    const set = key === '' ? null : prepared.get(key)!;
+    const reference = references.get(range.record);
+    const place = (s: number, t: number): readonly [number, number] =>
+      set !== null && set.state === 'decoded' && reference !== undefined
+        ? surfaceUv(s, t, reference, set.set.entry)
+        : unavailableUv(s, t, look);
+    const first = batch.positions.length / 3;
     const remap = new Map<number, number>();
     const local: number[] = [];
     const rangeIndices: number[] = [];
@@ -265,45 +398,41 @@ function attachTile(
       if (mapped === undefined) {
         mapped = local.length / 3;
         remap.set(vertex, mapped);
-        const px = render.position[vertex * 3]!;
-        const py = render.position[vertex * 3 + 1]!;
-        const pz = render.position[vertex * 3 + 2]!;
-        local.push(px, pz, -py);
+        // Payload metres from the origin, rotated into the renderer frame: (x, z, -y).
+        local.push(render.position[vertex * 3]!, render.position[vertex * 3 + 2]!, -render.position[vertex * 3 + 1]!);
+        batch.uvs.push(...place(surface[vertex * 2]!, surface[vertex * 2 + 1]!));
       }
       rangeIndices.push(mapped);
     }
-    const normals = pc.calculateNormals(local, rangeIndices);
-    for (let vertex = 0; vertex < local.length / 3; vertex += 1) {
-      const position: Vec3 = [local[vertex * 3]!, local[vertex * 3 + 1]!, local[vertex * 3 + 2]!];
-      const normal: Vec3 = [normals[vertex * 3]!, normals[vertex * 3 + 1]!, normals[vertex * 3 + 2]!];
-      unavailable.positions.push(...position);
-      unavailable.normals.push(...normal);
-      unavailable.surfaceMm.push(...patternCoordinates(position, normal));
-    }
-    for (const index of rangeIndices) unavailable.indices.push(first + index);
+    batch.positions.push(...local);
+    batch.normals.push(...pc.calculateNormals(local, rangeIndices));
+    for (const index of rangeIndices) batch.indices.push(first + index);
     triangles += range.triangleCount;
   }
-  let drawBatches = 0;
-  if (unavailable.indices.length > 0) {
-    const mesh = buildSurfaceMesh(device, unavailable, (s, t) => unavailableUv(s, t, look));
+
+  const meshes: pc.Mesh[] = [];
+  const keys = [...batches.keys()].sort();
+  for (const key of keys) {
+    const batch = batches.get(key)!;
+    // The UV is already final, so the builder is handed it as the surface pair and passes it on.
+    const mesh = buildSurfaceMesh(device, { ...batch, surfaceMm: batch.uvs }, (u, v) => [u, v]);
     meshes.push(mesh);
-    const entity = new pc.Entity('generated-tile:unavailable-surfaces');
+    const entity = new pc.Entity(key === '' ? 'generated-tile:unavailable-surfaces' : `generated-tile:${key}`);
     entity.addComponent('render', {
-      meshInstances: [new pc.MeshInstance(mesh, library.unavailableMaterial, entity)],
+      meshInstances: [new pc.MeshInstance(mesh, batch.material, entity)],
       castShadows: true,
-      receiveShadows: false,
+      receiveShadows: key !== '',
     });
     root.addChild(entity);
-    drawBatches += 1;
   }
 
   const metrics: GeneratedTileMetrics = {
     tileName: tile.name,
     triangles,
-    drawBatches,
+    drawBatches: keys.length,
     transferredBytes: tile.transferredBytes,
-    decodedTextureBytes: library.decodedTextureBytes,
-    unavailableSurfaces: ranges.filter((range) => range.state === 'drawn' && range.surface === 'unavailable').length,
+    decodedTextureBytes: uploads.decodedTextureBytes,
+    unavailableSurfaces: tile.ranges.filter((range) => range.state === 'drawn' && range.surface === 'unavailable').length,
     lookId: look.id,
     lookVersion: look.version,
   };
@@ -315,7 +444,7 @@ function attachTile(
       disposed = true;
       root.destroy();
       for (const mesh of meshes) mesh.destroy();
-      library.destroy();
+      uploads.destroy();
       environment.dispose();
     },
   };

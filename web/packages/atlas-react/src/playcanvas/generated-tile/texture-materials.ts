@@ -133,19 +133,46 @@ interface Uploaded {
   readonly residentBytes: number;
 }
 
-export class TileTextureLibrary {
-  private readonly uploads = new Map<string, Promise<Uploaded | { readonly refused: string }>>();
+/** A set fetched and held to its pin, or the reason it was not. No device is needed for either. */
+export type PreparedTextureSet =
+  | { readonly state: 'decoded'; readonly setId: string; readonly set: DecodedTextureSet; readonly transferredBytes: number }
+  | { readonly state: 'refused'; readonly setId: string; readonly reason: string };
+
+/**
+ * Fetch one pinned set and verify it against the manifest. Separate from the upload so a tile can
+ * have every set it names checked before the renderer exists, and draw complete on its first frame.
+ */
+export async function prepareTextureSet(
+  manifest: TextureSetManifest,
+  setId: string,
+  /** Fetch a pinned set's bytes. The reader verifies them; the fetcher need not. */
+  fetchSet: (entry: TextureSetManifestEntry) => Promise<Uint8Array>,
+  digest?: TextureSetDigest | null,
+): Promise<PreparedTextureSet> {
+  const entry = manifest.byId.get(setId);
+  if (entry === undefined) {
+    return { state: 'refused', setId, reason: `Texture set ${setId} is not pinned by the texture manifest.` };
+  }
+  try {
+    const bytes = await fetchSet(entry);
+    const set = digest === undefined ? await decodeTextureSet(bytes, entry) : await decodeTextureSet(bytes, entry, digest);
+    return { state: 'decoded', setId, set, transferredBytes: bytes.byteLength };
+  } catch (error) {
+    if (error instanceof TextureSetRefusal) return { state: 'refused', setId, reason: `Texture set ${setId} refused: ${error.message}` };
+    return { state: 'refused', setId, reason: `Texture set ${setId} could not be read: ${error instanceof Error ? error.message : String(error)}` };
+  }
+}
+
+/** Uploads of prepared sets, and the unavailable surface. Synchronous: no fetch, no digest. */
+export class TileTextureUploads {
   private readonly settled = new Map<string, Uploaded>();
   private unavailable: ReturnType<typeof createUnavailableMaterial> | null = null;
-  private destroyed = false;
+  protected destroyed = false;
+  private transferred = 0;
 
   constructor(
     private readonly device: pc.GraphicsDevice,
     private readonly look: TileLook,
-    private readonly manifest: TextureSetManifest,
-    /** Fetch a pinned set's bytes. The library verifies them; the fetcher need not. */
-    private readonly fetchSet: (entry: TextureSetManifestEntry) => Promise<Uint8Array>,
-    private readonly digest?: TextureSetDigest | null,
   ) {}
 
   /** The unlit pattern every unresolved surface shares. */
@@ -161,41 +188,32 @@ export class TileTextureLibrary {
     return total;
   }
 
+  /** Container bytes of every set uploaded here. */
+  get transferredBytes(): number {
+    return this.transferred;
+  }
+
   get resolvedSetIds(): readonly string[] {
     return [...this.settled.keys()].sort();
   }
 
-  async resolve(setId: string): Promise<TileTextureResolution> {
+  /** Upload a set already prepared, synchronously, once per set. */
+  adopt(prepared: PreparedTextureSet): TileTextureResolution {
     if (this.destroyed) throw new Error('The texture library has been destroyed');
-    const entry = this.manifest.byId.get(setId);
-    if (entry === undefined) {
-      return { state: 'unavailable', setId, material: this.unavailableMaterial,
-        reason: `Texture set ${setId} is not pinned by the texture manifest.` };
+    if (prepared.state === 'refused') {
+      return { state: 'unavailable', setId: prepared.setId, material: this.unavailableMaterial, reason: prepared.reason };
     }
-    let pending = this.uploads.get(setId);
-    if (pending === undefined) {
-      pending = this.upload(entry);
-      this.uploads.set(setId, pending);
+    let uploaded = this.settled.get(prepared.setId);
+    if (uploaded === undefined) {
+      uploaded = this.upload(prepared.set);
+      this.settled.set(prepared.setId, uploaded);
+      this.transferred += prepared.transferredBytes;
     }
-    const result = await pending;
-    if ('refused' in result) {
-      return { state: 'unavailable', setId, material: this.unavailableMaterial, reason: result.refused };
-    }
-    return { state: 'available', setId, material: result.material, set: result.set };
+    return { state: 'available', setId: prepared.setId, material: uploaded.material, set: uploaded.set };
   }
 
-  private async upload(entry: TextureSetManifestEntry): Promise<Uploaded | { readonly refused: string }> {
-    let set: DecodedTextureSet;
-    try {
-      const bytes = await this.fetchSet(entry);
-      set = this.digest === undefined
-        ? await decodeTextureSet(bytes, entry)
-        : await decodeTextureSet(bytes, entry, this.digest);
-    } catch (error) {
-      if (error instanceof TextureSetRefusal) return { refused: `Texture set ${entry.setId} refused: ${error.message}` };
-      return { refused: `Texture set ${entry.setId} could not be read: ${error instanceof Error ? error.message : String(error)}` };
-    }
-    if (this.destroyed) return { refused: 'The texture library was destroyed while the set loaded.' };
+  private upload(set: DecodedTextureSet): Uploaded {
+    const entry = set.entry;
     const { width, height } = entry;
     const anisotropy = this.look.surface.anisotropy;
     const texture = (map: string, format: number, levels: Uint8Array): pc.Texture => new pc.Texture(this.device, {
@@ -245,9 +263,7 @@ export class TileTextureLibrary {
       material.heightMapFactor = this.look.surface.parallaxFactor;
     }
     material.update();
-    const uploaded = { set, material, textures, residentBytes };
-    this.settled.set(entry.setId, uploaded);
-    return uploaded;
+    return { set, material, textures, residentBytes };
   }
 
   destroy(): void {
@@ -257,11 +273,39 @@ export class TileTextureLibrary {
       for (const texture of upload.textures) texture.destroy();
     }
     this.settled.clear();
-    this.uploads.clear();
     if (this.unavailable !== null) {
       this.unavailable.material.destroy();
       this.unavailable.texture.destroy();
       this.unavailable = null;
     }
+  }
+}
+
+/** Uploads that fetch and verify their own sets from a manifest, once per set. */
+export class TileTextureLibrary extends TileTextureUploads {
+  private readonly pending = new Map<string, Promise<PreparedTextureSet>>();
+
+  constructor(
+    device: pc.GraphicsDevice,
+    look: TileLook,
+    private readonly manifest: TextureSetManifest,
+    /** Fetch a pinned set's bytes. The library verifies them; the fetcher need not. */
+    private readonly fetchSet: (entry: TextureSetManifestEntry) => Promise<Uint8Array>,
+    private readonly digest?: TextureSetDigest | null,
+  ) {
+    super(device, look);
+  }
+
+  /** Fetch, verify and upload, once per set. */
+  async resolve(setId: string): Promise<TileTextureResolution> {
+    if (this.destroyed) throw new Error('The texture library has been destroyed');
+    let prepared = this.pending.get(setId);
+    if (prepared === undefined) {
+      prepared = prepareTextureSet(this.manifest, setId, this.fetchSet, this.digest);
+      this.pending.set(setId, prepared);
+    }
+    const result = await prepared;
+    if (this.destroyed) throw new Error('The texture library was destroyed while the set loaded');
+    return this.adopt(result);
   }
 }

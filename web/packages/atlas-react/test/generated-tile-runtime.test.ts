@@ -4,7 +4,7 @@ import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
 import * as pc from 'playcanvas';
 import { atlasVec3, parseTextureSetManifest, resolveGroundMovement, type TextureSetDigest } from '@exulanica/atlas-core';
-import { bakeTile, decodeOwd, type DecodedProjection } from '@exulanica/loom-tess/core';
+import { PROJECTION_DEFINITIONS, bakeTile, decodeOwd, type DecodedProjection } from '@exulanica/loom-tess/core';
 import {
   GeneratedTileRefusal,
   MATERIAL_NOT_CITED,
@@ -44,7 +44,7 @@ describe('loading a baked tile through tess\'s decoder', () => {
     expect(terrain.state === 'drawn' && terrain.triangleCount).toBe(18);
     expect(terrain.identity).toBeNull();
     const header = decodeOwd(baked).projections.find((projection) => projection.header.name === 'render_batch')!.header;
-    const listed = header.entries.filter((entry) => entry.state !== 'not_a_surface').length;
+    const listed = header.entries.filter((entry) => entry.state !== 'not_in_projection').length;
     expect(tile.ranges).toHaveLength(listed);
     for (const range of tile.ranges) {
       if (range.state === 'drawn') continue;
@@ -86,32 +86,75 @@ describe('loading a baked tile through tess\'s decoder', () => {
   });
 });
 
-describe('standing on a tile with no nav_envelope', () => {
-  it('has no support anywhere, says so, and opens at a stated viewpoint outside the tile', () => {
+describe('standing on the tile\'s own nav_envelope', () => {
+  it('samples support from the envelope and opens standing on it, eye 1.62 m above it', () => {
     const navigation = tile.navigation;
-    expect(navigation.support).toEqual({ state: 'unavailable', reason: 'The tile carries no nav_envelope, so there is nothing to stand on.' });
+    expect(navigation.support).toEqual({ state: 'nav_envelope', triangles: 18 });
     expect(navigation.collisionState.state).toBe('unavailable');
-    expect(navigation.viewpointOnly).toBe(true);
+    expect(navigation.viewpointOnly).toBe(false);
     const world = navigation.world;
-    for (const [x, z] of [[0, 0], [2, -2], [navigation.start.x, navigation.start.z], [-3.9, 3.9]] as const) {
-      expect(world.surface.sample(x, z)).toBeNull();
-    }
     expect(world.eyeHeight).toBe(1.62);
     expect(world.cameraRadius).toBe(0.34);
     expect(world.surfaceSampleSpacing).toBe(SUPPORT_SAMPLE_SPACING_M);
-    // The terrain spans y from -4000 to 8000 mm; the viewpoint stands 6 m south of it, facing north.
+    // The terrain's first row holds -80 mm at x = 0 and 40 mm at x = 4000: -20 mm midway, on the
+    // envelope's southern edge, where the stance is.
+    const [x, , z] = tileToRenderer(2000, -4000, 0);
+    expect(navigation.start.x).toBeCloseTo(x, 12);
+    expect(navigation.start.z).toBeCloseTo(z, 12);
+    expect(navigation.start.y).toBeCloseTo(-0.02 + 1.62, 12);
+    expect(world.surface.sample(x, z)?.height).toBeCloseTo(-0.02, 12);
+    // Off the envelope there is nothing.
+    const [ox, , oz] = tileToRenderer(9000, 0, 0);
+    expect(world.surface.sample(ox, oz)).toBeNull();
+  });
+
+  it('walks across the terrain at its sampled height', () => {
+    const { world, start } = tile.navigation;
+    const [, , north] = tileToRenderer(2000, 2000, 0);
+    const resolution = resolveGroundMovement(world, {
+      current: atlasVec3(start.x, start.y, start.z), desired: atlasVec3(start.x, start.y, north), lastSafe: atlasVec3(start.x, start.y, start.z),
+    });
+    expect(resolution.recovered).toBe(false);
+    expect(resolution.position.y).toBeCloseTo(world.surface.sample(start.x, north)!.height + 1.62, 12);
+  });
+});
+
+describe('a tile with no nav_envelope', () => {
+  const extent = { min: [-4000, -4000, -200] as const, max: [8000, 8000, 640] as const };
+  const navigation = tileNavigation(undefined, extent);
+
+  it('has no support anywhere, says so, and opens at a stated viewpoint outside the tile', () => {
+    expect(navigation.support).toEqual({ state: 'unavailable', reason: 'The tile carries no nav_envelope, so there is nothing to stand on.' });
+    expect(navigation.viewpointOnly).toBe(true);
+    for (const [x, z] of [[0, 0], [2, -2], [navigation.start.x, navigation.start.z], [-3.9, 3.9]] as const) {
+      expect(navigation.world.surface.sample(x, z)).toBeNull();
+    }
+    // The extent spans y from -4000 to 8000 mm; the viewpoint stands 6 m south of it, facing north.
     expect(navigation.start).toMatchObject({ y: 1.62, yaw: 0 });
     expect(rendererToTile(navigation.start.x, 0, navigation.start.z)[1]).toBeCloseTo(-10000, 6);
     expect(navigation.start.pitch).toBeLessThan(0);
   });
 
   it('keeps a blocked walker exactly where the viewpoint is, with the no-surface reason', () => {
-    const { world, start } = tile.navigation;
+    const { world, start } = navigation;
     const current = atlasVec3(start.x, start.y, start.z);
     const resolution = resolveGroundMovement(world, { current, desired: atlasVec3(start.x, start.y, start.z - 1), lastSafe: null });
     expect(resolution.recovered).toBe(true);
     expect(resolution.recoveryReason).toBe('no-surface');
     expect([resolution.position.x, resolution.position.y, resolution.position.z]).toEqual([start.x, start.y, start.z]);
+  });
+});
+
+describe('picking a tile', () => {
+  it('finds the drawn triangle under a ray, its record and the distance along a unit ray', () => {
+    const [x, , z] = tileToRenderer(1000, 1000, 0);
+    const hit = tile.pick([x, 5, z], [0, -1, 0]);
+    expect(hit?.range.kind).toBe('city.terrain');
+    expect(tile.rangeAtTriangle(hit!.triangle)).toBe(hit!.range);
+    expect(hit!.distance).toBeCloseTo(5 - tile.navigation.world.surface.sample(x, z)!.height, 9);
+    expect(tile.pick([x, 5, z], [0, 1, 0])).toBeNull();
+    const [fx, , fz] = tileToRenderer(20000, 20000, 0);
+    expect(tile.pick([fx, 5, fz], [0, -1, 0])).toBeNull();
   });
 });
 
@@ -130,7 +173,8 @@ function envelope(step: number): DecodedProjection {
   const positionMm = new Int32Array(vertices.map((value, index) => value - origin[index % 3]!));
   return {
     header: {
-      name: 'nav_envelope', triangle_digest: '0'.repeat(64), origin_mm: origin,
+      name: 'nav_envelope', contract: PROJECTION_DEFINITIONS.find((definition) => definition.name === 'nav_envelope')!.contract,
+      triangle_digest: '0'.repeat(64), origin_mm: origin,
       vertex_count: vertices.length / 3, triangle_count: indices.length / 3, entries: [],
     },
     positionMm,

@@ -14,18 +14,25 @@ export type {
 } from './binding-contract.js';
 export type { Rgb, TileContactShadowMode, TileLook, TileShadowFilter, TileToneMapping } from './look.js';
 export { TILE_LOOK_ID, TILE_LOOK_V1, TileLookError, sunDirection, validateTileLook } from './look.js';
-export type { TileMaterialReference, TileTextureResolution } from './texture-materials.js';
-export { TileTextureLibrary, setTangents, surfaceUv, unavailableUv } from './texture-materials.js';
+export type { PreparedTextureSet, TileMaterialReference, TileTextureResolution } from './texture-materials.js';
+export {
+  TileTextureLibrary,
+  TileTextureUploads,
+  prepareTextureSet,
+  setTangents,
+  surfaceUv,
+  unavailableUv,
+} from './texture-materials.js';
 export type { SurfaceBatch } from './surface-mesh.js';
 export { buildSurfaceMesh, validateSurfaceBatch } from './surface-mesh.js';
 export type { TileEnvironment } from './environment.js';
 export { applyTileEnvironment, skyRadiance } from './environment.js';
 export { createUnavailableMaterial, unavailablePatternTexels } from './unavailable-surface.js';
-export type { GeneratedTileRange, GeneratedTileSources, LoadedGeneratedTile } from './tile-runtime.js';
+export type { DrawnTileRange, GeneratedTileRange, GeneratedTileSources, LoadedGeneratedTile, TilePick } from './tile-runtime.js';
 export {
   GeneratedTileRefusal,
   MATERIAL_NOT_CITED,
-  SURFACE_COORDINATES_NOT_CARRIED,
+  MATERIAL_PLACEMENT_UNSTATED,
   loadGeneratedTile,
 } from './tile-runtime.js';
 export type { TileCollisionState, TileExtentMm, TileNavigation, TileSupportState } from './tile-navigation.js';
