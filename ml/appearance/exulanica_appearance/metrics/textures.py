@@ -6,7 +6,8 @@
   pattern, so a smooth seamless tile reads about 1; a fine pattern crossing the wrap at its steepest
   can read up to about 2 (the eight published sets, seamless by construction, read 0.29 to 1.77 per
   map), and a tile painted with no wrap reads far above that. Compare against that range, never
-  against 1 alone.
+  against 1 alone. Where the neighbours are exactly flat, a flat wrap reads 1 and a wrap that steps
+  reads ``FLAT_STEP_SEAM_PPM``, so a step on a flat tile is a seam rather than nothing.
 - **Low-frequency share**: the share of luminance variance at 4 cycles per tile or fewer. Large
   blotches are what the eye recognises when a tile repeats across a wide shopfront, so a higher
   share predicts visible repetition. The operator still looks at the 4 by 4 composites.
@@ -35,6 +36,8 @@ __all__ = [
     "texel_pitch_um",
 ]
 
+#: What a seam reads where the neighbours beside the wrap are exactly flat and the wrap is not: 1000.
+FLAT_STEP_SEAM_PPM: Final = 1_000_000_000
 #: Features a quarter of a tile or larger: at a 2 m tile, 500 mm blotches, which read across a street.
 LOW_FREQUENCY_CYCLES: Final = 4
 
@@ -49,7 +52,11 @@ def seam_ratio_ppm(pixels: NDArray[np.uint8]) -> dict[str, int]:
         last = values.take(-1, axis=axis)
         beside = (np.abs(second - first).mean() + np.abs(last - before_last).mean()) / 2
         wrap = np.abs(first - last).mean()
-        out[name] = 0 if beside == 0 else int(np.rint(wrap / beside * 1_000_000))
+        if beside > 0:
+            out[name] = int(np.rint(wrap / beside * 1_000_000))
+        else:
+            # Flat beside the wrap: seamless if the wrap is flat too, and a stated 1000 if it steps.
+            out[name] = 1_000_000 if wrap == 0 else FLAT_STEP_SEAM_PPM
     return out
 
 

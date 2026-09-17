@@ -5,7 +5,9 @@
     {
       "repository": "nvidia/Cosmos3-Nano",
       "revision": "e59a53c25979a090fa8706c9acc0c254a6e89b92",
-      "candidates": ["B1"],
+      "candidates": [
+        "B1"
+      ],
       "include": [
         "chat_template.json",
         "checkpoint.json",
@@ -36,12 +38,18 @@
           "revision": "b8fff7315c768468a5333511427288870b2e9635",
           "evidence": "vae/config.json names Wan-AI/Wan2.2-TI2V-5B-Diffusers as its origin; the weights file is not byte-identical to that repository's, so these bytes are under this repository's own grant"
         }
-      ]
+      ],
+      "licence_text": {
+        "source": "https://openmdw.ai/license/1-1/",
+        "sha256": "78fd04b354c505564827cfe5603e4a331ef47c2e600736fab451c480ef44b59d"
+      }
     },
     {
       "repository": "alibaba-pai/Wan2.2-Fun-A14B-Control",
       "revision": "297be6d520f54908e124be0298e2317ee50ffdf4",
-      "candidates": ["B2"],
+      "candidates": [
+        "B2"
+      ],
       "include": [
         "Wan2.1_VAE.pth",
         "configuration.json",
@@ -82,7 +90,10 @@
     {
       "repository": "Qwen/Qwen-Image-2512",
       "revision": "25468b98e3276ca6700de15c6628e51b7de54a26",
-      "candidates": ["A1", "B3"],
+      "candidates": [
+        "A1",
+        "B3"
+      ],
       "include": [
         "model_index.json",
         "scheduler/*",
@@ -105,15 +116,22 @@
     {
       "repository": "alibaba-pai/Qwen-Image-2512-Fun-Controlnet-Union",
       "revision": "c21dcc372f9f52a55a6d4984cb56a0f0ac0807bc",
-      "candidates": ["A1", "B3"],
-      "include": ["Qwen-Image-2512-Fun-Controlnet-Union-2602.safetensors"],
+      "candidates": [
+        "A1",
+        "B3"
+      ],
+      "include": [
+        "Qwen-Image-2512-Fun-Controlnet-Union-2602.safetensors"
+      ],
       "reason": "The 2602 release: the card says it adds a gray control and trained longer than the first release, which is left out; it is trained for Qwen-Image-2512, which the InstantX union control (trained for the original Qwen-Image) is not.",
       "lineage": []
     },
     {
       "repository": "Tongyi-MAI/Z-Image-Turbo",
       "revision": "f332072aa78be7aecdf3ee76d5c247082da564a6",
-      "candidates": ["B4"],
+      "candidates": [
+        "B4"
+      ],
       "include": [
         "model_index.json",
         "scheduler/*",
@@ -146,7 +164,9 @@
     {
       "repository": "Tongyi-MAI/Z-Image",
       "revision": "04cc4abb7c5069926f75c9bfde9ef43d49423021",
-      "candidates": ["A2"],
+      "candidates": [
+        "A2"
+      ],
       "include": [
         "model_index.json",
         "scheduler/*",
@@ -179,15 +199,22 @@
     {
       "repository": "alibaba-pai/Z-Image-Fun-Controlnet-Union-2.1",
       "revision": "755999a934909bd5832e20718bb7c639d2a63eb9",
-      "candidates": ["A2", "B4"],
-      "include": ["Z-Image-Fun-Controlnet-Union-2.1.safetensors"],
+      "candidates": [
+        "A2",
+        "B4"
+      ],
+      "include": [
+        "Z-Image-Fun-Controlnet-Union-2.1.safetensors"
+      ],
       "reason": "The full union control (canny, depth, pose, MLSD, scribble, HED, gray); the lite version is weaker by design and the tile models are for upscaling, which no track uses.",
       "lineage": []
     },
     {
       "repository": "black-forest-labs/FLUX.2-klein-base-4B",
       "revision": "a3b4f4849157f664bdbc776fd7453c2783562f4d",
-      "candidates": ["A3"],
+      "candidates": [
+        "A3"
+      ],
       "include": [
         "LICENSE.md",
         "model_index.json",
@@ -219,8 +246,14 @@
     {
       "repository": "DiffSynth-Studio/Template-KleinBase4B-ControlNet",
       "revision": "14338668d53038eba59de16845c021415545a495",
-      "candidates": ["A3"],
-      "include": ["configuration.json", "model.py", "model.safetensors"],
+      "candidates": [
+        "A3"
+      ],
+      "include": [
+        "configuration.json",
+        "model.py",
+        "model.safetensors"
+      ],
       "reason": "The control template's weights, its model code and its configuration; its README loads the text encoder, VAE and tokenizer from FLUX.2-klein-4B, whose files are byte-identical to the klein base repository's, so those come from that manifest.",
       "lineage": [
         {
@@ -235,8 +268,12 @@
     {
       "repository": "Ruicheng/moge-2-vitl-normal",
       "revision": "cb0e8bbd6b1e243589717c78e750b1ba4c093acf",
-      "candidates": ["M"],
-      "include": ["model.pt"],
+      "candidates": [
+        "M"
+      ],
+      "include": [
+        "model.pt"
+      ],
       "reason": "The one checkpoint; measurement only, never a generator.",
       "lineage": [
         {

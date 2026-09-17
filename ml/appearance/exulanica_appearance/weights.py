@@ -1,9 +1,10 @@
 """``exulanica.appearance-weights/v1``: one model repository's weights, pinned file by file.
 
 A weights manifest names a Hugging Face repository at a 40-hex revision, the licence its card
-declares at that revision (held to ``docs/license-matrix.md`` section 6), where each component that
-came from elsewhere came from and under what licence, which files a generation loads, and every
-one of those files by size and digest:
+declares at that revision (held to ``docs/license-matrix.md`` section 6) and, where that licence is
+not a standard identifier, the sha256 of the licence text this lane read, where each component that
+came from elsewhere came from and under what licence, which files a generation loads, and every one
+of those files by size and digest:
 
 - a file stored through Git LFS (every weights file) by the sha256 the Hub reports for it;
 - a small file stored in git itself (configs, tokenizer text) by its git blob id, which is what the
@@ -61,6 +62,10 @@ _KEYS: Final = (
     "total_bytes",
 )
 _CARD_KEYS: Final = ("license", "license_name", "license_link")
+#: Licences whose identifier is a standard one, so the identifier is the whole reading. Anything
+#: else (OpenMDW-1.1 today) is this lane's reading of a text, and the manifest carries that text's
+#: digest so a reader can check the words the reading was taken from.
+_STANDARD: Final = frozenset({"Apache-2.0", "MIT", "CC-BY-4.0", "CC0-1.0"})
 _REPOSITORY: Final = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*")
 _DATE: Final = re.compile(r"20[0-9]{2}-[01][0-9]-[0-3][0-9]")
 _PATH: Final = re.compile(r"[A-Za-z0-9_.@+-]+(/[A-Za-z0-9_.@+-]+)*")
@@ -144,14 +149,20 @@ def build_weights(
     lineage = []
     for entry in spec["lineage"]:
         lineage.append(_lineage(own, entry, metadata))
+    licence: dict[str, Any] = {
+        "card": _declared(own.card),
+        "card_sha256": own.card_sha256,
+        "id": licence_id(own.card),
+        "rule": RULE,
+    }
+    if "licence_text" in spec:
+        licence["text"] = {
+            "sha256": spec["licence_text"]["sha256"],
+            "source": spec["licence_text"]["source"],
+        }
     document = {
         "files": [chosen[path] for path in sorted(chosen)],
-        "licence": {
-            "card": _declared(own.card),
-            "card_sha256": own.card_sha256,
-            "id": licence_id(own.card),
-            "rule": RULE,
-        },
+        "licence": licence,
         "lineage": sorted(lineage, key=lambda item: (item["component"], item["source"])),
         "profile": WEIGHTS_PROFILE,
         "read_on": read_on,
@@ -216,9 +227,11 @@ def read_weights(raw: bytes) -> dict[str, Any]:
         raise Refused(f"{where}: revision is 40 lowercase hex")
     if not isinstance(document["read_on"], str) or not _DATE.fullmatch(document["read_on"]):
         raise Refused(f"{where}: read_on is a date, YYYY-MM-DD")
-    licence = exact_keys(
-        document["licence"], ("card", "card_sha256", "id", "rule"), f"{where}: licence"
-    )
+    declared = document["licence"]
+    keys = ("card", "card_sha256", "id", "rule")
+    if isinstance(declared, dict) and "text" in declared:
+        keys = (*keys, "text")
+    licence = exact_keys(declared, keys, f"{where}: licence")
     card = licence["card"]
     if not isinstance(card, dict) or not set(card) <= set(_CARD_KEYS) or "license" not in card:
         raise Refused(
@@ -228,6 +241,19 @@ def read_weights(raw: bytes) -> dict[str, Any]:
         raise Refused(f"{where}: licence id is the one {RULE} allows for what the card declares")
     if licence["rule"] != RULE or not is_sha256(licence["card_sha256"]):
         raise Refused(f"{where}: licence names {RULE} and the card's sha256")
+    if licence["id"] in _STANDARD:
+        if "text" in licence:
+            raise Refused(
+                f"{where}: {licence['id']} is a standard identifier and carries no licence text"
+            )
+    else:
+        text = exact_keys(licence.get("text"), ("sha256", "source"), f"{where}: licence text")
+        if (
+            not is_sha256(text["sha256"])
+            or not isinstance(text["source"], str)
+            or not text["source"].startswith("https://")
+        ):
+            raise Refused(f"{where}: licence text names an https source and its sha256")
     _read_lineage(document["lineage"], where)
     selection = exact_keys(document["selection"], ("include", "reason"), f"{where}: selection")
     include = selection["include"]

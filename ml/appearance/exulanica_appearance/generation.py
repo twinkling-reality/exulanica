@@ -1,8 +1,8 @@
 """``exulanica.appearance-generation/v1``: how one model output was made, as a data object.
 
 A generation record names everything a person needs to know what an output is and where it came
-from: every weights component by role (each an ``exulanica.appearance-weights/v1`` digest, and the
-digest of the list, which is what a model-made maker names), the code by commit and source digest,
+from: every weights component by role (its model's id and revision, its ``exulanica.appearance-weights/v1``
+digest, and one digest over the list), the code by commit and source digest,
 the container by digest, every conditioning picture by the sha256 of its raw pixels and of the file
 the model read and the structure or recipe it was derived from, the prompt, the seed, the sampler
 and every setting, whether guardrails ran, the GPU and library versions, and every output by digest.
@@ -155,9 +155,15 @@ def read_generation(raw: bytes) -> dict[str, Any]:
         raise Refused(f"{where}: components lists at least one weights component")
     roles = []
     for item in components:
-        entry = exact_keys(item, ("role", "subfolder", "weights_sha256"), f"{where}: component")
+        entry = exact_keys(
+            item, ("id", "revision", "role", "subfolder", "weights_sha256"), f"{where}: component"
+        )
         if not isinstance(entry["role"], str) or not _ROLE.fullmatch(entry["role"]):
             raise Refused(f"{where}: a component role is lowercase")
+        if not is_text(entry["id"]) or not is_revision(entry["revision"]):
+            raise Refused(
+                f"{where}: a component names its model's repository id and 40-hex revision"
+            )
         if not isinstance(entry["subfolder"], str) or (
             entry["subfolder"] and not is_text(entry["subfolder"])
         ):

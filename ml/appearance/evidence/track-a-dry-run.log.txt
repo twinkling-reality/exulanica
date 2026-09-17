@@ -1,0 +1,122 @@
+Track A stub dry run, generated appearance lane, 2026-09-17T18:31:55Z
+Branch lane/generated-appearance at 3e6250cc1e31fb548ce32670ecc32dd581d39697, on the operator's Mac (arm64), no torch, no weights, no GPU.
+
+Command (from ml/appearance):
+  .venv/bin/python -m exulanica_appearance runner dry-run --repository ../.. --out $W/.exulanica/appearance/dry-run
+Wall clock: 0.63 s. It stages a job whose target is the published brick set, verifies the staged
+directory and every stub weights file, generates with the stub backend, measures, records, and checks.
+
+== what it refused, before running
+  an unlisted file in the staged directory:
+    the staged inputs: the directory does not hold exactly the listed files; extra ['conditioning/brick-weathered/not-listed.png'], missing []
+  a weights file changed after its manifest was written (same length, so the digest is what caught it):
+    config.json does not have the git blob id its manifest names
+
+== what it produced
+  staged manifest 4291a65087282ae402dfab270961e2c9ff1ad4ef0742cd7de1039266e5eca8c2
+  job            77bcbc62c2934a39cc6fdf781a26c3c1e2882e3d972d85d884fe6d405bd14b4b
+  results        dff83809726bbea2e8375016c929a7fdd066cd7c06838cb87c195e3d00262f4f
+  0 brick-weathered depth seed 1032392602: record 2b47debf3dcb5675bc4c86b0a09146ed0cd16e872e710fb0e4b733f93e571601
+      output 9da27a6c71213fddb5d7556622deb34ab0b129c9232d7519e9847e40fc54c18c seams {'u': 1029046, 'v': 990385} low frequency 757968 ppm
+  1 brick-weathered depth seed 1029734077: record 38a78fbcf7f2e76292bd1442e73af5583eef3e526f6e0263c71ea45039f7061f
+      output 0fc3b4902a5417d30682a7c669157ed179febd27e5480ca6e537483753e65f60 seams {'u': 1231928, 'v': 1186441} low frequency 757547 ppm
+  2 brick-weathered edge seed 2091523127: record fcb553fdf9b12e913c719c03d706cce1f8d6a27a0850ca8689a823c166a573dd
+      output 708a94314b0bcbe8fc16b5644e49453af4fd3751a62d538480f515ab02a0cf19 seams {'u': 1367909, 'v': 1901919} low frequency 288189 ppm
+  3 brick-weathered edge seed 3272943926: record e11034c81e63c3f1c0747000d5bb7c2132a6c965b22af2a5b7075a2d32bce16c
+      output 7408bdf65bbe39e7c0db15b1bad3916c5551366e817f054b175304946573f2ed seams {'u': 1617680, 'v': 1391557} low frequency 231146 ppm
+  verified weights: [{'bytes': 4138, 'seconds': 0, 'weights_sha256': 'f1d451c21024c274ad246d6319dc8c6d219b74fe332b97763aab2bf729eec3dd'}]
+  elapsed 0 s, stopped: no
+
+== one generation record in full, as the container writes them
+{
+ "code": {
+  "commit": "3e6250cc1e31fb548ce32670ecc32dd581d39697",
+  "source_sha256": "9eb1ad0d26f683cd7866f23ef3acd7939f55dd6b3049dfd15d56d57306073f81"
+ },
+ "components": [
+  {
+   "id": "exulanica/stub-appearance-model",
+   "revision": "0000000000000000000000000000000000000000",
+   "role": "base",
+   "subfolder": "",
+   "weights_sha256": "f1d451c21024c274ad246d6319dc8c6d219b74fe332b97763aab2bf729eec3dd"
+  }
+ ],
+ "components_sha256": "58d7252449e80142988f9de51b73a4968cbce9aed22a52934e061c1ebe8040ec",
+ "conditioning": [
+  {
+   "encoding": "relief-height-v1",
+   "file_sha256": "949da85358ce3b0f0d2a8122a98c50c2501b3dd4962e460ef033b2e9b946fc02",
+   "parameters": {},
+   "pixels_sha256": "de4f88ec0a387072268eafb9e36d71018a0aa2a9b93a15da1a7f6db94d950985",
+   "role": "depth",
+   "sources": [
+    "91791b17a705e45919e38aa42f2dacba961f01c51675efa443bf4a1934650499"
+   ]
+  }
+ ],
+ "container": {
+  "image": "stub@sha256:9eb1ad0d26f683cd7866f23ef3acd7939f55dd6b3049dfd15d56d57306073f81"
+ },
+ "finished_at": "2026-09-17T18:31:33Z",
+ "generated": true,
+ "guardrails": {
+  "enabled": false
+ },
+ "inputs": {
+  "prompt": "Seamless tileable texture. A stub picture, not a look: this run tests the pipeline, not a model."
+ },
+ "outputs": [
+  {
+   "byte_length": 196608,
+   "media_type": "application/vnd.exulanica.rgb8",
+   "role": "base-color",
+   "sha256": "9da27a6c71213fddb5d7556622deb34ab0b129c9232d7519e9847e40fc54c18c"
+  }
+ ],
+ "profile": "exulanica.appearance-generation/v1",
+ "reasons": {
+  "components.base": "the stub model, which stands in for a real one so the pipeline can run with no GPU",
+  "conditioning.depth": "the set's own height map: the recipe's exact relief; encoding: the recipe's exact height map as grey, raised relief white, which is the near-is-white convention depth controls were trained on",
+  "container": "the image this lane built from its committed recipe, pinned by digest",
+  "guardrails": "these models ship no guardrail, and their only inputs are a committed texture set's own relief and a prompt written from the catalog, with no people and nothing personal",
+  "inputs": "a stated stand-in, so nothing reads this picture as a candidate texture",
+  "sampler.control_context_scale_milli": "0.80, the value the real candidates use, carried so the record's shape matches",
+  "sampler.guidance_milli": "4.0, as the real candidates use",
+  "sampler.height": "256, small enough to run in a second on a laptop",
+  "sampler.name": "the stub's own loop, which is not a sampler any model ships",
+  "sampler.negative_prompt": "a single space, as the real candidates use",
+  "sampler.steps": "12 steps, enough for the tiling schedule to roll the grid many times",
+  "sampler.tiling": "the lane's tiling schedule, the thing this dry run exercises",
+  "sampler.width": "256, small enough to run in a second on a laptop",
+  "sampler.wrap_margin_px": "64 px, as the real candidates use",
+  "seed": "seed index 0 of 2 by the job's seed rule: the first four bytes, big-endian, of sha256 of 'exulanica.appearance-seed/v1:<job>:<target>:<candidate>:<role>:<index>'"
+ },
+ "regeneration": "GPU generation is not bit-exact across hardware, drivers or library versions. These output bytes are the artifact. Running this record again makes a new version with new digests; it is never a replay.",
+ "runtime": {
+  "cuda": "none: stub backend",
+  "driver": "none: stub backend",
+  "hardware": "stub backend on the operator's Mac, no GPU",
+  "libraries": [
+   {
+    "name": "numpy",
+    "version": "2.5.3"
+   }
+  ]
+ },
+ "sampler": {
+  "control_context_scale_milli": 800,
+  "guidance_milli": 4000,
+  "height": 256,
+  "name": "stub-loop",
+  "negative_prompt": " ",
+  "steps": 12,
+  "tiling": "exulanica.appearance-tiling/v1",
+  "width": 256,
+  "wrap_margin_px": 64
+ },
+ "seed": 1032392602,
+ "started_at": "2026-09-17T18:31:33Z",
+ "track": "texture",
+ "truth": "invented"
+}

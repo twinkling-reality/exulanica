@@ -15,6 +15,7 @@ from exulanica_appearance.gpu_run import (
     AUTHORITATIVE,
     build_gpu_run,
     cost_microdollars,
+    ledger_line,
     read_gpu_run,
 )
 
@@ -23,8 +24,20 @@ def _generation(**changes):
     document = {
         "code": {"commit": "c" * 40, "source_sha256": "d" * 64},
         "components": [
-            {"role": "transformer", "subfolder": "", "weights_sha256": "1" * 64},
-            {"role": "control", "subfolder": "", "weights_sha256": "2" * 64},
+            {
+                "id": "Qwen/Qwen-Image-2512",
+                "revision": "a" * 40,
+                "role": "transformer",
+                "subfolder": "",
+                "weights_sha256": "1" * 64,
+            },
+            {
+                "id": "alibaba-pai/Qwen-Image-2512-Fun-Controlnet-Union",
+                "revision": "b" * 40,
+                "role": "control",
+                "subfolder": "",
+                "weights_sha256": "2" * 64,
+            },
         ],
         "conditioning": [
             {
@@ -113,6 +126,8 @@ def _mutated(change):
         (lambda d: d.update(finished_at="2026-09-18T11:00:00Z"), "not before"),
         (lambda d: d["conditioning"][0].update(sources=[]), "came from"),
         (lambda d: d["code"].update(commit="HEAD"), "40-hex commit"),
+        (lambda d: d["components"][0].pop("id"), "has exactly"),
+        (lambda d: d["components"][0].update(revision="main"), "repository id and 40-hex revision"),
     ],
 )
 def test_the_generation_reader_refuses_a_record_out_of_shape(change, words):
@@ -127,6 +142,8 @@ def _run(**changes):
         "generations": ["b" * 64, "a" * 64],
         "gpu": "NVIDIA RTX PRO 6000 Blackwell 96 GB",
         "gpu_count": 1,
+        "hard_deadline_at": "2026-09-18T16:00:00Z",
+        "instance_name": "exulanica-appearance-a1",
         "instance_type": "massedcompute_RTXPRO6000",
         "over_estimate_reason": "",
         "profile": "exulanica.appearance-gpu-run/v1",
@@ -150,6 +167,19 @@ def test_a_run_record_computes_seconds_cost_and_stop():
     assert cost_microdollars(263, 1) == 731
 
 
+def test_the_ledger_line_names_the_instance_both_instants_and_the_cost():
+    line = ledger_line(build_gpu_run(_run()))
+    assert "exulanica-appearance-a1" in line
+    assert "2026-09-18T12:00:00Z" in line and "2026-09-18T14:30:00Z" in line
+    assert "deadline 2026-09-18T16:00:00Z" in line
+    assert "$6.58" in line and "263 cents/h" in line
+
+
+def test_a_deadline_before_the_start_is_refused():
+    with pytest.raises(Refused, match="hard_deadline_at is after started_at"):
+        build_gpu_run(_run(hard_deadline_at="2026-09-18T11:00:00Z"))
+
+
 def test_a_run_past_its_stop_must_say_why():
     with pytest.raises(Refused, match="passed its stop"):
         build_gpu_run(_run(estimate_seconds=3600))
@@ -168,6 +198,8 @@ def test_a_run_past_its_stop_must_say_why():
         (lambda d: d.update(billed_seconds=1), "interval"),
         (lambda d: d.update(stop_at_seconds=1), "150 per cent"),
         (lambda d: d.update(authoritative_total="our own sum"), "billing page"),
+        (lambda d: d.update(instance_name=""), "printable ASCII"),
+        (lambda d: d.update(hard_deadline_at="soon"), "UTC instant"),
     ],
 )
 def test_the_run_reader_refuses_edited_arithmetic(change, words):

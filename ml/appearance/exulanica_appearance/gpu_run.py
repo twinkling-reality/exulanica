@@ -26,7 +26,14 @@ from exulanica_appearance.canonical import (
     parse_canonical,
 )
 
-__all__ = ["AUTHORITATIVE", "GPU_RUN_PROFILE", "build_gpu_run", "cost_microdollars", "read_gpu_run"]
+__all__ = [
+    "AUTHORITATIVE",
+    "GPU_RUN_PROFILE",
+    "build_gpu_run",
+    "cost_microdollars",
+    "ledger_line",
+    "read_gpu_run",
+]
 
 GPU_RUN_PROFILE: Final = "exulanica.appearance-gpu-run/v1"
 AUTHORITATIVE: Final = "the provider's billing page, read by the operator"
@@ -34,6 +41,8 @@ _INSTANT: Final = "%Y-%m-%dT%H:%M:%SZ"
 _KEYS: Final = (
     "authoritative_total",
     "billed_seconds",
+    "hard_deadline_at",
+    "instance_name",
     "cost_microdollars",
     "deleted_at",
     "estimate_seconds",
@@ -79,7 +88,7 @@ def read_gpu_run(raw: bytes) -> dict[str, Any]:
     document = exact_keys(parse_canonical(raw, where), _KEYS, where)
     if document["profile"] != GPU_RUN_PROFILE:
         raise Refused(f"{where}: profile is {GPU_RUN_PROFILE}")
-    for key in ("provider", "instance_type", "gpu", "rate_source", "purpose"):
+    for key in ("provider", "instance_type", "instance_name", "gpu", "rate_source", "purpose"):
         if not is_text(document[key]):
             raise Refused(f"{where}: {key} is printable ASCII")
     if not is_count(document["gpu_count"], 1) or not is_count(document["rate_cents_per_hour"], 1):
@@ -91,6 +100,16 @@ def read_gpu_run(raw: bytes) -> dict[str, Any]:
         raise Refused(
             f"{where}: started_at and deleted_at are UTC instants, YYYY-MM-DDTHH:MM:SSZ"
         ) from error
+    try:
+        deadline = datetime.strptime(document["hard_deadline_at"], _INSTANT).replace(tzinfo=UTC)
+    except (TypeError, ValueError) as error:
+        raise Refused(
+            f"{where}: hard_deadline_at is a UTC instant, YYYY-MM-DDTHH:MM:SSZ"
+        ) from error
+    if deadline <= started:
+        raise Refused(
+            f"{where}: hard_deadline_at is after started_at; it is the time the machine is deleted whatever happens"
+        )
     seconds = int((deleted - started).total_seconds())
     if seconds <= 0 or document["billed_seconds"] != seconds:
         raise Refused(
@@ -121,3 +140,17 @@ def read_gpu_run(raw: bytes) -> dict[str, Any]:
     if document["authoritative_total"] != AUTHORITATIVE:
         raise Refused(f"{where}: authoritative_total names {AUTHORITATIVE}")
     return document
+
+
+def ledger_line(raw: bytes) -> str:
+    """One line for the committed ledger: what was rented, when it began and ended, and what it cost."""
+    run = read_gpu_run(raw)
+    # Cents by integer arithmetic, rounded half up: a float here prints 6.575 as 6.57.
+    cents = (run["cost_microdollars"] + 5_000) // 10_000
+    dollars = f"{cents // 100}.{cents % 100:02d}"
+    return (
+        f"{run['started_at']}  {run['deleted_at']}  deadline {run['hard_deadline_at']}  "
+        f"{run['instance_name']} ({run['instance_type']}, {run['gpu_count']}x {run['gpu']}, {run['provider']})  "
+        f"{run['billed_seconds']} s  ${dollars} at {run['rate_cents_per_hour']} cents/h  "
+        f"{len(run['generations'])} generations  {run['purpose']}"
+    )

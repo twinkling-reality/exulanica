@@ -127,5 +127,5 @@ def write_png(path: Path, pixels: NDArray[np.uint8]) -> tuple[str, str]:
     """Write ``pixels`` as a PNG; return the sha256 of the raw RGB bytes and of the file."""
     raw = np.ascontiguousarray(pixels, dtype=np.uint8).tobytes()
     path.parent.mkdir(parents=True, exist_ok=True)
-    Image.fromarray(pixels, mode="RGB").save(path, format="PNG")
+    Image.fromarray(pixels).save(path, format="PNG")
     return hashlib.sha256(raw).hexdigest(), hashlib.sha256(path.read_bytes()).hexdigest()

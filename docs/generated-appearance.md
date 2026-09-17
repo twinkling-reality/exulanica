@@ -133,10 +133,15 @@ document is refused.
 
 | Profile | Holds |
 | --- | --- |
-| `exulanica.appearance-weights/v1` | a repository at a 40-hex revision; the licence its card declares and the card's sha256; lineage of any component from elsewhere, with evidence and a pinned source; the selected files, each by LFS sha256 or git blob id |
+| `exulanica.appearance-weights/v1` | a repository at a 40-hex revision; the licence its card declares and the card's sha256, and where that licence is not a standard identifier the sha256 of the licence text this lane read; lineage of any component from elsewhere, with evidence and a pinned source; the selected files, each by LFS sha256 or git blob id |
 | `exulanica.appearance-structure/v1` | the geometry and pose sources by digest; the camera; the legend; each layer by name, encoding and sha256 of its raw bytes; the rasteriser's parameters and a reason for each; the capture code's digest |
 | `exulanica.appearance-generation/v1` | every weights component by role, and the digest of that listing (what a model-made maker names); code commit and source digest; container image by digest; every conditioning picture by pixel and file digest with the structure records it came from; prompt or parameters; seed; sampler settings; whether guardrails ran; GPU, driver, CUDA and library versions; every output by digest |
 | `exulanica.appearance-gpu-run/v1` | provider, instance, GPU, listed rate and where it was read; start and deletion instants; billed seconds; cost at the listed rate rounded up to a micro-dollar; the estimate and its stop at 150 per cent; the generation records produced |
+| `exulanica.appearance-texture-job/v1` | one session, fixed before it runs: the texture manifest it read, its candidates (backend, weights components, sampler, estimate per image), its targets (a pinned set, its recipe, the prompt, the conditioning roles), the seeds and their rule, the conditioning pictures by digest, and the stop |
+| `exulanica.appearance-staged-inputs/v1` | every file the rented machine receives, by size, digest, kind and source |
+| `exulanica.appearance-results/v1` | what one run produced: each record, output and measurement, what was verified, and whether and why it stopped |
+| `exulanica.appearance-texture-candidate/v1` | what the texture lane is handed: the maker's generation block (models, seed, sampler, map sources), the maps, the measurements, CC0-1.0 and its statements, and the look record |
+| `exulanica.appearance-third-party-look/v1` | every map cut into 1:1 crops covering every texel, what was looked at, what was found, and anything that might be third-party content |
 
 Rules the readers hold:
 
@@ -215,23 +220,80 @@ the numbers are copied into `ml/appearance/evidence/baseline-measurements.log.tx
   of each run's estimate. Every run is an `appearance-gpu-run` record and a line in the committed
   ledger.
 - **Consent:** each deploy carries a data-sharing consent with the named provider. The operator
-  clicks it; the lane messages the orchestrator before opening a deploy.
+  clicks it, and the lane messages the orchestrator before opening any deploy, every time, so that
+  click stays the only way a machine is created.
+- **The instance is announced twice:** its name, provider and hard deadline the moment it exists,
+  and again when it is deleted. Both instants and the name are in the run record and in the
+  committed ledger, because the orchestrator keeps a watchdog that outlives this session's.
+- **The smoke job stops the session:** after it, the lane reports whether the backends loaded, what
+  tiling and decoding did, seconds per image and spend, and waits. A broken setup costs one smoke
+  job rather than sixty-four generations.
+- **Local captures take the machine-wide GPU slot** (`.exulanica/bin/gpu-slot`), and a
+  timing-sensitive capture takes both slots in order (`quiet-slot gpu-slot <command>`), because two
+  lanes capturing at once blocked a page's main thread for ten minutes. Nothing about the rented
+  machine changes.
 - **Weights on the rented machine only**, downloaded at the pinned revisions and checked file by
   file against the manifests before a model loads. The Mac never installs torch: model libraries
   are in `ml/appearance`'s `gpu` extra, which only the container installs.
 - **Nothing personal reaches the machine.** It receives one staged directory whose manifest lists
   every file's digest and the capture that produced it.
 
-## 8. What the texture lane decides
+## 8. Track A: what runs, and what it hands over
 
-The orchestrator sent these to the texture lane on 2026-09-17, with its leanings, before any model-made set
-is published (the model-made maker's shape freezes at the first one):
+The runner is `ml/appearance/exulanica_appearance/runner/`. It runs the same code on the operator's
+Mac with a stub model (`runner dry-run`) and in the container on the rented machine, so the order
+below is exercised before any GPU is rented.
 
-- a model-made maker names one digest for all its weights: the `appearance-components` listing;
-- the generation record is named by digest in its own field, not as a conditioning input;
-- each map states its source, a recipe by digest or a model by generation digest, and the class
-  keeps its full layout, so a set with model colour on recipe relief keeps its normal;
-- the licence of a model-made set: CC0-1.0 with the model licences recorded, subject to its reading.
+1. **Staging, on the Mac.** `exulanica.appearance-staged-inputs/v1` is the only directory the
+   machine receives. Staging holds each target's container to the sha256 the committed texture
+   manifest pins, derives the conditioning pictures from that set's own relief, copies the weights
+   manifests the job names, writes the job, and lists every file with its size, digest, kind and
+   source. Three kinds exist: the job, a weights manifest, and a conditioning picture whose source
+   is a committed texture set. Nothing else has a kind, so no capture, photograph or workspace file
+   can be staged.
+2. **Weights, on the machine's host.** `scripts/fetch-weights.py` downloads exactly the files the
+   manifests name, from their pinned revisions, and checks each against its sha256 or git blob id
+   as it lands. It uses the standard library only: no client, no token, no repository listing.
+3. **Verification, in the container, before any model code is imported.** The staged directory must
+   hold exactly its listed files with their digests; then every weights file of every candidate is
+   checked, file by file. Only then is a backend built, and only then does torch load.
+4. **Generation.** One generation per target, candidate, conditioning role and seed, in that fixed
+   order. The seed is derived from the job's stated rule. Each output is stored as raw RGB bytes by
+   sha256 (a PNG beside it for people), measured for seams and low-frequency share, and recorded.
+5. **The stop.** Before each generation, if the time run so far plus that candidate's estimate per
+   image would pass the job's stop at 150 per cent of its estimate, the run stops and says so. The
+   container also runs under a hard `timeout`, and the instance is deleted from the Mac.
+6. **The handover.** `handoff.py` builds `exulanica.appearance-texture-candidate/v1` for the texture
+   lane, to its accepted answers (Q4, 2026-09-17):
+   - the maker's generation block carries **models**: one entry per role naming the model's id, its
+     revision and its weights manifest digest, so a reader sees which models ran without fetching;
+   - it carries **generation_sha256** and only the fields a reader checks (models, seed, sampler,
+     map sources); the code commit and the container digest live in the generation record alone, and
+     `check_projection` compares the two so they cannot drift;
+   - **map_sources** names, for every map of the class's procedural layout, either the recipe it
+     rebakes from or the generation that made it. A Track A set keeps the recipe's normal and
+     occlusion, so those stay rebakeable by anyone with the maker; only the painted colour is not;
+   - the set is **CC0-1.0**, with three statements: that Apache-2.0 and MIT place no condition on
+     outputs; that OpenMDW-1.1 is this lane's reading at a pinned revision, with the licence text's
+     sha256 in the weights manifest; and that every map was looked at at full resolution before the
+     set was pinned.
+7. **The look.** `look.py` cuts every map into 1:1 crops that cover every texel exactly once and
+   records what was looked at and what was found
+   (`exulanica.appearance-third-party-look/v1`). A record whose crops do not cover a map, or whose
+   finding is empty, is refused. Anything that might be a logo, lettering or a mark goes to the
+   orchestrator, and the operator decides.
+
+Seamless tiling is the lane's own, because no upstream method for these models is merged: before
+each denoising step the latent grid and the control latents are rolled by an offset derived from the
+seed and the step and rolled back after, so no position stays a grid edge; and the VAE encodes and
+decodes with the input wrap-padded by 64 px and the result cropped, so its convolutions see the
+tile's other edge instead of zeros. Every set is then held to the seam check; nothing is assumed.
+
+The first session's job is `ml/appearance/jobs/track-a-session-1.json`: weathered variants of brick,
+painted render, footway paving and carriageway asphalt, each conditioned on its own relief as depth
+and as edges, four seeds each, on both Qwen-Image-2512 and Z-Image with their Fun union controls.
+`track-a-smoke.json` is the cheap first run that asks only whether the backends load, tile and
+decode.
 
 ## 9. Not verified
 
@@ -245,3 +307,8 @@ is published (the model-made maker's shape freezes at the first one):
   bakes a street, at the gate route's own poses, as research references.
 - The structure layers' digests were produced on one Mac (arm64); a cross-machine comparison of the
   rasteriser's bytes has not been run.
+- The Qwen and Z-Image backends have never run: they are written against VideoX-Fun at a pinned
+  commit and exercised on the Mac only through the stub, which stands in for a model and proves
+  nothing about one. The smoke job is what finds out, in the first minutes of the first session.
+- Whether the tiling schedule leaves a seamless tile with a real model is unmeasured. The seam check
+  answers it on the first outputs, against the published sets' measured range.

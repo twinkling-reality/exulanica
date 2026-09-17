@@ -1,0 +1,7 @@
+# An allowlist: the build context is this directory, and only these paths enter the image.
+*
+!pyproject.toml
+!uv.lock
+!README.md
+!exulanica_appearance/
+!exulanica_appearance/**

@@ -35,6 +35,15 @@ node scripts/capture-bench-frames.mjs http://127.0.0.1:5311/ OUT FRAMES
 .venv/bin/python -m exulanica_appearance measure textures --repository ../.. --out textures.json
 .venv/bin/python -m exulanica_appearance sheet before --structure OUT --frames FRAMES --out SHEETS
 
+# the whole Track A pipeline with a stub model: staging, verification, tiling, records, measurements
+.venv/bin/python -m exulanica_appearance runner dry-run --repository ../.. --out DRY
+
+# a real session: stage on this machine, fetch and run on the rented one, check what came back
+.venv/bin/python -m exulanica_appearance runner stage --spec jobs/track-a-smoke.json --repository ../.. --weights weights/ --out STAGED
+python3 scripts/fetch-weights.py STAGED WEIGHTS          # on the rented machine's host
+container/run.sh IMAGE@sha256:... STAGED WEIGHTS OUT 5670   # no network, read-only, hard time limit
+.venv/bin/python -m exulanica_appearance runner check --out OUT
+
 # weights manifests from Hugging Face metadata only (no weights file is fetched)
 scripts/fetch-hf-metadata.sh <repo> <40-hex revision> METADATA/<repo>@<revision>
 .venv/bin/python -m exulanica_appearance weights build --spec weights/candidates.json --metadata METADATA --out weights/

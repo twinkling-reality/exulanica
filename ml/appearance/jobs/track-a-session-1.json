@@ -1,0 +1,169 @@
+{
+ "candidates": [
+  {
+   "backend": "videox-qwenimage-fun-control",
+   "components": [
+    {
+     "role": "base",
+     "subfolder": "",
+     "weights_sha256": "16ffd6e8850b6fb21a70bc0efbbcd09545f4b5e288618ffdee6959c7abc31d46"
+    },
+    {
+     "role": "control",
+     "subfolder": "",
+     "weights_sha256": "924913081f9be08910e36a35eef949c4e7c2c210c7912804c6aef4540d3ed0ce"
+    }
+   ],
+   "id": "a1",
+   "reasons": {
+    "components.base": "Qwen-Image-2512, Apache-2.0 at a pinned revision, accepted 2026-09-17 (licence matrix section 12)",
+    "components.control": "the Fun union control trained for Qwen-Image-2512 (the 2602 release), Apache-2.0; the InstantX union control was trained for the original Qwen-Image",
+    "sampler.control_context_scale_milli": "0.80, VideoX-Fun's example value, inside the 0.70 to 0.95 range the control's card recommends for stronger control and detail",
+    "sampler.guidance_milli": "4.0, the true classifier-free guidance VideoX-Fun's Qwen control example uses",
+    "sampler.height": "1024, the published sets' own height",
+    "sampler.name": "the flow-match Euler scheduler the base repository ships and VideoX-Fun's own example selects",
+    "sampler.negative_prompt": "a single space, which is what enables true classifier-free guidance in this pipeline without describing anything",
+    "sampler.steps": "50, the step count VideoX-Fun's Qwen control example uses",
+    "sampler.tiling": "the lane's tiling schedule: the latent grid and the control latents are rolled by a seeded offset each step and rolled back, because a transformer model has no convolution padding to make periodic",
+    "sampler.width": "1024, the published sets' own width, so the output needs no resampling to become a set",
+    "sampler.wrap_margin_px": "64 px, eight latent pixels of the neighbouring tile given to the VAE on each side and cropped after, so its convolutions see the tile's other edge instead of zeros",
+    "seconds_per_image": "60 s at 1024 by 1024 and 50 steps with true guidance, ESTIMATED: no timing for this card and this model is published"
+   },
+   "sampler": {
+    "control_context_scale_milli": 800,
+    "guidance_milli": 4000,
+    "height": 1024,
+    "name": "flow-match-euler",
+    "negative_prompt": " ",
+    "steps": 50,
+    "tiling": "exulanica.appearance-tiling/v1",
+    "width": 1024,
+    "wrap_margin_px": 64
+   },
+   "seconds_per_image": 60
+  },
+  {
+   "backend": "videox-zimage-fun-control",
+   "components": [
+    {
+     "role": "base",
+     "subfolder": "",
+     "weights_sha256": "77be4d029e07d7889ea3c6f1705bece002615bdaa1aaea3c612d559c4583b1e7"
+    },
+    {
+     "role": "control",
+     "subfolder": "",
+     "weights_sha256": "5d797918cdcbaa32fb7dd7b6f2f04af561905dccdf0633307a9b912bce374d9a"
+    }
+   ],
+   "id": "a2",
+   "reasons": {
+    "components.base": "Z-Image, Apache-2.0 at a pinned revision, whose VAE is byte-identical to FLUX.1-schnell's Apache release (licence matrix section 12)",
+    "components.control": "the Z-Image Fun union control 2.1, Apache-2.0, the full version rather than the deliberately weaker lite one",
+    "sampler.control_context_scale_milli": "0.90, VideoX-Fun's Z-Image control example value",
+    "sampler.guidance_milli": "4.0, the guidance VideoX-Fun's Z-Image control example uses",
+    "sampler.height": "1024, the published sets' own height",
+    "sampler.name": "the flow-match Euler scheduler the base repository ships and VideoX-Fun's own example selects",
+    "sampler.negative_prompt": "a single space, which is what enables true classifier-free guidance in this pipeline without describing anything",
+    "sampler.steps": "25, the step count VideoX-Fun's Z-Image control example uses",
+    "sampler.tiling": "the lane's tiling schedule: the latent grid and the control latents are rolled by a seeded offset each step and rolled back, because a transformer model has no convolution padding to make periodic",
+    "sampler.width": "1024, the published sets' own width, so the output needs no resampling to become a set",
+    "sampler.wrap_margin_px": "64 px, eight latent pixels of the neighbouring tile given to the VAE on each side and cropped after, so its convolutions see the tile's other edge instead of zeros",
+    "seconds_per_image": "30 s at 1024 by 1024 and 25 steps, ESTIMATED from the vendor's claim that this model is fast and from half Qwen's step count"
+   },
+   "sampler": {
+    "control_context_scale_milli": 900,
+    "guidance_milli": 4000,
+    "height": 1024,
+    "name": "flow-match-euler",
+    "negative_prompt": " ",
+    "steps": 25,
+    "tiling": "exulanica.appearance-tiling/v1",
+    "width": 1024,
+    "wrap_margin_px": 64
+   },
+   "seconds_per_image": 30
+  }
+ ],
+ "estimate_seconds": 3780,
+ "name": "track-a-session-1",
+ "reasons": {
+  "estimate_seconds": "32 images at 60 s (a1) and 32 at 30 s (a2) is 2880 s, plus 600 s to build both backends and 300 s to verify 88 GB of weights; ESTIMATED, since no timing for this card and these models is published",
+  "seeds_per_target": "four seeds a target and role: enough to see whether a look is the model's or the seed's, at 64 images in about an hour"
+ },
+ "seeds_per_target": 4,
+ "targets": [
+  {
+   "conditioning": [
+    "depth",
+    "edge"
+   ],
+   "id": "brick-weathered",
+   "prompt": "Seamless tileable texture. Orthographic photograph, taken straight on, of red to brown fired clay brick in running bond, 215 by 65 mm faces with 10 mm recessed joints, 1800 mm across, weathered by years of city street rain: soot and grime collected in the joints, faint vertical rain streaks below where sills would sit, a few patches of pale efflorescence. Flat even overcast light with no shadows, no highlights and no vignetting. The whole frame is the surface: no windows, no doors, no signs, no text, no people, no sky, no horizon.",
+   "reasons": {
+    "conditioning.depth": "the set's own height map: the recipe's exact relief, which the model must keep",
+    "conditioning.edge": "the recipe's joint and chip outlines from the same height map, a second control to compare against depth",
+    "prompt": "the set's own summary from its container header and its extent from the texture manifest, a weathering description in plain words, and the constraints that keep the picture a texture: flat light so no lighting is baked into a base colour, and nothing structural the recipe does not hold"
+   },
+   "set": {
+    "content_sha256": "91791b17a705e45919e38aa42f2dacba961f01c51675efa443bf4a1934650499",
+    "set_id": "cc0.brick-running-bond",
+    "version": 1
+   }
+  },
+  {
+   "conditioning": [
+    "depth",
+    "edge"
+   ],
+   "id": "painted-render-weathered",
+   "prompt": "Seamless tileable texture. Orthographic photograph, taken straight on, of warm off-white paint over a dashed render finish, flaking on a few raised dashes, 2000 mm across, weathered by years of city street rain: grey grime washed down in streaks, hairline cracks, paint lifting at the edges of the flakes, a faint tide mark near the bottom. Flat even overcast light with no shadows, no highlights and no vignetting. The whole frame is the surface: no windows, no doors, no signs, no text, no people, no sky, no horizon.",
+   "reasons": {
+    "conditioning.depth": "the set's own height map: the recipe's exact relief, which the model must keep",
+    "conditioning.edge": "the recipe's joint and chip outlines from the same height map, a second control to compare against depth",
+    "prompt": "the set's own summary from its container header and its extent from the texture manifest, a weathering description in plain words, and the constraints that keep the picture a texture: flat light so no lighting is baked into a base colour, and nothing structural the recipe does not hold"
+   },
+   "set": {
+    "content_sha256": "986e2119f33818d7cacf368a7a70fa22766bc9a1922eea35a46c3590ef43ac6d",
+    "set_id": "cc0.painted-render",
+    "version": 1
+   }
+  },
+  {
+   "conditioning": [
+    "depth",
+    "edge"
+   ],
+   "id": "footway-paving-weathered",
+   "prompt": "Seamless tileable texture. Orthographic photograph, taken straight on, of precast concrete flags, 600 by 600 mm, stack bond, 6 mm grit joints, 1800 mm across, weathered by years of city street rain: walked-in grey, dark gum spots trodden flat, dirt gathered in the joints, faint scuff marks. Flat even overcast light with no shadows, no highlights and no vignetting. The whole frame is the surface: no windows, no doors, no signs, no text, no people, no sky, no horizon.",
+   "reasons": {
+    "conditioning.depth": "the set's own height map: the recipe's exact relief, which the model must keep",
+    "conditioning.edge": "the recipe's joint and chip outlines from the same height map, a second control to compare against depth",
+    "prompt": "the set's own summary from its container header and its extent from the texture manifest, a weathering description in plain words, and the constraints that keep the picture a texture: flat light so no lighting is baked into a base colour, and nothing structural the recipe does not hold"
+   },
+   "set": {
+    "content_sha256": "3c0df2400f0eae3e7a7f6440217762f8eb51e7e7f2c4f8e4f2ebe2919e0707ef",
+    "set_id": "cc0.footway-paving",
+    "version": 1
+   }
+  },
+  {
+   "conditioning": [
+    "depth",
+    "edge"
+   ],
+   "id": "carriageway-asphalt-weathered",
+   "prompt": "Seamless tileable texture. Orthographic photograph, taken straight on, of worn asphalt with exposed coarse aggregate and sparse cracking, 2000 mm across, weathered by years of city street rain: oil staining darkened along the wheel path, grit washed into the cracks, tyre polish on the high aggregate. Flat even overcast light with no shadows, no highlights and no vignetting. The whole frame is the surface: no windows, no doors, no signs, no text, no people, no sky, no horizon.",
+   "reasons": {
+    "conditioning.depth": "the set's own height map: the recipe's exact relief, which the model must keep",
+    "conditioning.edge": "the recipe's joint and chip outlines from the same height map, a second control to compare against depth",
+    "prompt": "the set's own summary from its container header and its extent from the texture manifest, a weathering description in plain words, and the constraints that keep the picture a texture: flat light so no lighting is baked into a base colour, and nothing structural the recipe does not hold"
+   },
+   "set": {
+    "content_sha256": "3ed5d23aa14dac2f373cc834c6e98dacf6abcc9b2a484580db6e169b1e280a78",
+    "set_id": "cc0.carriageway-asphalt",
+    "version": 1
+   }
+  }
+ ]
+}

@@ -6,6 +6,10 @@
     measure frames   --structure DIR --frames DIR --out FILE
     measure textures --repository ROOT --out FILE
     sheet before     --structure DIR --frames DIR --out DIR
+    runner stage     --spec jobs/track-a-session-1.json --repository . --weights weights/ --out DIR
+    runner run       --staged DIR --weights DIR --out DIR
+    runner check     --out DIR
+    runner dry-run   --repository . --out DIR
 
 Every command reads and writes files only. None downloads a model, and none needs a GPU.
 """
@@ -84,6 +88,76 @@ def _sheet_before(args: argparse.Namespace) -> int:
     return 0
 
 
+def _runner_stage(args: argparse.Namespace) -> int:
+    from exulanica_appearance.canonical import sha256_hex
+    from exulanica_appearance.runner.staging import stage_texture_job
+
+    spec = json.loads(Path(args.spec).read_bytes())
+    manifests = {}
+    for path in sorted(Path(args.weights).glob("*.json")):
+        if path.name == "candidates.json":
+            continue
+        raw = path.read_bytes()
+        manifests[sha256_hex(raw)] = raw
+    manifest = stage_texture_job(
+        repository=Path(args.repository), job=spec, weights_manifests=manifests, out=Path(args.out)
+    )
+    print(f"staged {args.out}: manifest {sha256_hex(manifest)}")
+    return 0
+
+
+def _runner_run(args: argparse.Namespace) -> int:
+    import os
+
+    from exulanica_appearance.canonical import sha256_hex
+    from exulanica_appearance.runner.run import make_backend, run_job
+
+    commit = os.environ.get("EXULANICA_BUILD_REVISION", "")
+    image = os.environ.get("EXULANICA_CONTAINER_IMAGE", "")
+    if not commit or not image:
+        print(
+            "refused: EXULANICA_BUILD_REVISION and EXULANICA_CONTAINER_IMAGE name the code and the image",
+            file=sys.stderr,
+        )
+        return REFUSED
+    results = run_job(
+        staged=Path(args.staged),
+        weights_root=Path(args.weights),
+        out=Path(args.out),
+        backend_factory=make_backend,
+        code_commit=commit,
+        container_image=image,
+    )
+    print(f"results {sha256_hex(results)}")
+    return 0
+
+
+def _runner_check(args: argparse.Namespace) -> int:
+    from exulanica_appearance.runner.run import check_results
+
+    results = check_results(Path(args.out))
+    print(
+        f"{len(results['generations'])} generations checked; stopped: {results['stopped'] or 'no'}"
+    )
+    return 0
+
+
+def _runner_dry_run(args: argparse.Namespace) -> int:
+    from exulanica_appearance.runner.dry_run import dry_run
+
+    summary = dry_run(Path(args.repository), Path(args.out))
+    for words, refusal in summary["refusals"].items():
+        print(f"refused as it must: {words}\n    {refusal}")
+    print(f"staged manifest {summary['staged_sha256']}")
+    print(f"results {summary['results_sha256']}")
+    for item in summary["summary"]["generations"]:
+        print(
+            f"  {item['target']} {item['role']} seed {item['seed']}: record {item['record_sha256'][:16]} "
+            f"output {item['output_sha256'][:16]} seams {item['seams_ppm']} low frequency {item['low_frequency_share_ppm']}"
+        )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m exulanica_appearance")
     groups = parser.add_subparsers(dest="group", required=True)
@@ -122,6 +196,26 @@ def main(argv: list[str] | None = None) -> int:
     before.add_argument("--frames", required=True)
     before.add_argument("--out", required=True)
     before.set_defaults(run=_sheet_before)
+
+    runner = groups.add_parser("runner").add_subparsers(dest="command", required=True)
+    stage = runner.add_parser("stage")
+    stage.add_argument("--spec", required=True)
+    stage.add_argument("--repository", required=True)
+    stage.add_argument("--weights", required=True)
+    stage.add_argument("--out", required=True)
+    stage.set_defaults(run=_runner_stage)
+    run_parser = runner.add_parser("run")
+    run_parser.add_argument("--staged", required=True)
+    run_parser.add_argument("--weights", required=True)
+    run_parser.add_argument("--out", required=True)
+    run_parser.set_defaults(run=_runner_run)
+    check = runner.add_parser("check")
+    check.add_argument("--out", required=True)
+    check.set_defaults(run=_runner_check)
+    dry = runner.add_parser("dry-run")
+    dry.add_argument("--repository", required=True)
+    dry.add_argument("--out", required=True)
+    dry.set_defaults(run=_runner_dry_run)
 
     args = parser.parse_args(argv)
     try:

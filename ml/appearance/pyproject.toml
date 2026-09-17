@@ -15,11 +15,26 @@ dependencies = [
 [project.optional-dependencies]
 # Installed only inside the GPU container on a rented machine, never on the operator's Mac.
 gpu = [
+  # The models and their loaders.
   "torch>=2.8,<3",
+  "torchvision>=0.23,<1",
   "diffusers>=0.37,<0.38",
   "transformers>=4.57,<5",
   "accelerate>=1.10,<2",
   "safetensors>=0.6,<1",
+  # What VideoX-Fun (installed at a pinned commit by the container) imports when its model and
+  # pipeline packages load; measured over its source at that commit. func_timeout (LGPL-3.0), which
+  # only its dataset loaders use, is left out and stood in for (runner/backends/videox.py).
+  "einops>=0.8,<1",
+  "ftfy>=6,<7",
+  "imageio>=2.34,<3",
+  "librosa>=0.10,<1",
+  "opencv-python-headless>=4.10,<5",
+  "packaging>=24",
+  "requests>=2.32,<3",
+  "scipy>=1.13,<2",
+  "sentencepiece>=0.2,<1",
+  "tqdm>=4.66,<5",
 ]
 
 [dependency-groups]
