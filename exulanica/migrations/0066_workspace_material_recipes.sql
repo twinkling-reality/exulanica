@@ -66,9 +66,16 @@
 -- model right (migration 0073) exists. Two triggers, `tg_material_recipe_awaits_model_right`
 -- and `tg_material_recipe_source_awaits_model_right`, refuse every such row and do nothing
 -- else, and are named to fire before every other guard on their tables, so the refusal is always
--- theirs. The migration that follows 0073 replaces exactly those two and nothing more. Everything
--- a photo-derived recipe needs when it arrives is already here and already tested with those two
--- set aside: its sources, its person dependencies, its blocking and its erasure.
+-- theirs. Its sources, its person dependencies, its blocking and its erasure are already here and
+-- already tested with those two set aside. What is not here is what names the rights, because
+-- 0073 runs after this migration and nothing here can refer to it. So the migration that follows
+-- 0073 replaces those two triggers and adds:
+--   * `material_recipe_source.right_id`, a foreign key to
+--     `personal_model_right (workspace_id, right_id)`, with a check that the right names the same
+--     capture as the source row;
+--   * the model identity (provider, role, model id, revision) and the destination on
+--     `material_recipe`.
+-- `exulanica.materials.photo_derived` already has that shape.
 --
 -- A BAKE IS A COMPUTE AMPLIFIER. `material_bake_quota` bounds how many bakes one workspace may
 -- request in a day and how many may wait at once, and the request guard refuses past either.

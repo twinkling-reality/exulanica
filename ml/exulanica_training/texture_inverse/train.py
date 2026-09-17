@@ -8,9 +8,9 @@ deterministic kernels where torch offers them. Records are split by number, one 
 The receipt (``exulanica.texture-inverse-training-run/v1``) names the export by its manifest's
 digest, the code by the digest of this package's source, the torch version and device, every
 setting, the operator's approval reference, the held-out measurements as integers in parts per
-million, and the weights by the sha256 of the file written beside it. That digest is what a
-photo-derived recipe will name as its model, so the receipt is written last and only after the
-weights are on disk.
+million, and the weights by the sha256 of the file written beside it. That digest pins the model:
+a photo-derived recipe will name it as the revision ``sha256:<digest>`` once the personal model
+right accepts that form. So the receipt is written last, and only after the weights are on disk.
 """
 
 from __future__ import annotations

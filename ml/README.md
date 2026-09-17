@@ -46,10 +46,14 @@ A run writes the weights, named by their sha256, and a receipt,
 - the operator's approval reference;
 - the held-out measurements, as integers in parts per million.
 
-The weights digest is what a photo-derived recipe will name as its model
-(`exulanica.materials.photo_derived`). A proposal is only ever a recipe that the published maker's
-check accepts, and one read from a person's photographs also waits for the personal model right
-(migration 0073).
+The weights digest is what pins the trained model. A personal model right (migration 0073) pins a
+local checkpoint to a 40-character commit, and trained weights have none, so their revision will
+be spelled `sha256:` followed by the weights digest, with this receipt as their provenance. Neither
+the right nor `exulanica.materials.photo_derived` accepts that form yet: it is added when the first
+checkpoint exists (`docs/texture-package.md`, section 14).
+
+A proposal is only ever a recipe that the published maker's check accepts. One read from a
+person's photographs also needs a personal model right for every photograph it reads.
 
 ## Running it
 

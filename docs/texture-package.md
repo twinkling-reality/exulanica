@@ -479,7 +479,7 @@ manifest and the pinned rows disagree.
     the one purge machinery;
   - wiring the bake worker's image into `compose.yaml`, and building it;
   - the migration after 0073 that replaces the two inert triggers with the personal model right's
-    check;
+    check and adds the right and model columns a photo-derived recipe needs (section 14);
   - a lockfile for `ml/`, which has none yet;
   - the first training run, which waits for an operator's yes and for that lockfile.
 
@@ -581,18 +581,42 @@ reclaimed when the workspace is deleted. A sweep that reclaims them sooner is a 
 must run through the one purge machinery. When the edit lane lands, removal becomes one of its
 operations and can be undone.
 
-**Photo-derived recipes are inert until the personal model right (0073) exists.** Two triggers
-refuse every such row, and the repository refuses first. Everything these recipes need is already
-built, and tested with those two triggers set aside:
+**Photo-derived recipes are inert until the migration after 0073.** Two triggers refuse every such
+row, and the repository refuses first. This much is already built, and tested with those two
+triggers set aside:
 
 - their source photographs, one row each;
 - the people in them, recorded both when a photograph is read and when a person is confirmed later;
 - blocking;
 - erasure.
 
-`exulanica.materials.photo_derived.PhotoDerivedRecipe` is the object a model will emit. It cannot
-be built without a processing right reference, and whether that right is current is asked by the
-world service that writes the recipe, not by the object.
+What names the rights is not built, because 0073 runs after 0066 and 0066 cannot refer to it. The
+migration that follows 0073 replaces the two triggers and adds:
+
+- `material_recipe_source.right_id`, a foreign key to `personal_model_right (workspace_id,
+  right_id)`, with a check that the right names the same capture as the source row;
+- the model identity (provider, role, model id, revision) and the destination on
+  `material_recipe`.
+
+`exulanica.materials.photo_derived.PhotoDerivedRecipe` is the object a model will emit, and it
+already has that shape:
+
+- **One right per photograph.** A personal model right names one capture, one model and one
+  destination, so each source names its capture, its right and the digest of the right's
+  receipt. A photograph appears once, and no two photographs share a right.
+- **The model**, spelled as `ModelIdentity.as_record` spells it.
+- **The destination.** A local model reads in this process (`local-process`), and only a local
+  model does. The right itself refuses only the second half.
+
+The object cannot be built without a right for every photograph. Whether each right is current is
+asked by the world service that writes the recipe, through `require_model_right`, not by the
+object.
+
+**A checkpoint this project trains is pinned by content.** A right pins a local checkpoint to a
+full 40-character commit, and trained weights have none. Their revision will be spelled `sha256:`
+followed by the 64-character digest of the weights, with the training receipt as their
+provenance. Neither the right nor the object accepts that form yet. It is added when the first
+checkpoint exists, in a migration and in the personal model right's code together.
 
 **A bake is queued, never made in a request.**
 
