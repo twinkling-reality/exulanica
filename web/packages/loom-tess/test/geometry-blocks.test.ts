@@ -8,7 +8,7 @@ import { FACING_LIMIT_MM, turnByFacing } from '../src/core/facing.js';
 import { filletArc, filletCentre, filletSegmentsWithin } from '../src/core/fillet-arc.js';
 import { absolute, cross, floorDivide, floorSquareRoot, GeometryError, multiply } from '../src/core/integer-math.js';
 import type { Plan, Space } from '../src/core/integer-math.js';
-import { ringTwiceArea, requireSimpleRing, triangulateRing } from '../src/core/ring-triangulation.js';
+import { ringTwiceArea, requireSimpleRing, triangulateRing, triangulateRingWithHoles } from '../src/core/ring-triangulation.js';
 import { fixtureObject, recordsOf } from './support.js';
 
 /** A small deterministic generator, for property cases: never a source of shipped geometry. */
@@ -119,8 +119,25 @@ function holdsTheRingRule(ring: readonly Plan[]): void {
   ring.forEach((_point, start) => holdsTheRingRuleFrom([...ring.slice(start), ...ring.slice(0, start)]));
 }
 
+/** Whether two counter-clockwise triangles share no interior: some edge of one has the other wholly on its outside. */
+function interiorsDisjoint(first: readonly Plan[], second: readonly Plan[]): boolean {
+  const separates = (triangle: readonly Plan[], other: readonly Plan[]): boolean =>
+    [0, 1, 2].some((corner) => other.every((point) => twiceArea(triangle[corner]!, triangle[(corner + 1) % 3]!, point) <= 0));
+  return separates(first, second) || separates(second, first);
+}
+
+function expectNoOverlap(points: readonly Plan[], triangles: readonly number[]): void {
+  const corners = (at: number): Plan[] => [points[triangles[at]!]!, points[triangles[at + 1]!]!, points[triangles[at + 2]!]!];
+  for (let first = 0; first < triangles.length; first += 3) {
+    for (let second = first + 3; second < triangles.length; second += 3) {
+      expect(interiorsDisjoint(corners(first), corners(second)), `triangles ${first / 3} and ${second / 3}`).toBe(true);
+    }
+  }
+}
+
 function holdsTheRingRuleFrom(ring: readonly Plan[]): void {
   const triangles = triangulateRing(ring, 'case');
+  expectNoOverlap(ring, triangles);
   expect(triangles).toHaveLength((ring.length - 2) * 3);
   expect(new Set(triangles)).toEqual(new Set(ring.map((_point, index) => index)));
   let total = 0;
@@ -201,6 +218,79 @@ describe('the ring rule', () => {
     expect(() => requireSimpleRing([[0, 0], [0, 10], [10, 10], [10, 0]], 'case')).toThrow(/counter-clockwise/);
     expect(() => requireSimpleRing([[0, 0], [10, 10], [20, 0], [20, 10], [10, 0], [0, 10]], 'case')).toThrow(/intersect|counter-clockwise/);
     expect(() => triangulateRing([[0, 0], [10, 0], [10, 10], [5, 0], [0, 10]], 'case')).toThrow(GeometryError);
+  });
+});
+
+/** Every property the hole step states, on every rotation of the outer ring and of each hole. */
+function holdsTheHoleRule(outer: readonly Plan[], holes: readonly (readonly Plan[])[]): void {
+  const rotate = (ring: readonly Plan[], start: number): Plan[] => [...ring.slice(start), ...ring.slice(0, start)];
+  outer.forEach((_point, start) => holdsTheHoleRuleOnce(rotate(outer, start), holes));
+  holes.forEach((hole, which) => hole.forEach((_point, start) => {
+    holdsTheHoleRuleOnce(outer, holes.map((other, index) => (index === which ? rotate(other, start) : other)));
+  }));
+}
+
+function holdsTheHoleRuleOnce(outer: readonly Plan[], holes: readonly (readonly Plan[])[]): void {
+  const { vertices, triangles } = triangulateRingWithHoles(outer, holes, 'case');
+  expect(vertices).toEqual([...outer, ...holes.flat()]);
+  expect(triangles).toHaveLength((vertices.length + 2 * holes.length - 2) * 3);
+  expect(new Set(triangles)).toEqual(new Set(vertices.map((_point, index) => index)));
+  const tripled = (ring: readonly Plan[]): Plan[] => ring.map((point): Plan => [point[0] * 3, point[1] * 3]);
+  let total = 0;
+  for (let index = 0; index < triangles.length; index += 3) {
+    const [a, b, c] = [vertices[triangles[index]!]!, vertices[triangles[index + 1]!]!, vertices[triangles[index + 2]!]!];
+    const area = twiceArea(a, b, c);
+    expect(area, `triangle ${index / 3}`).toBeGreaterThan(0);
+    total += area;
+    const centroid: Plan = [a[0] + b[0] + c[0], a[1] + b[1] + c[1]];
+    expect(inside(centroid, tripled(outer)), `triangle ${index / 3} centroid in the outer ring`).toBe(true);
+    for (const hole of holes) expect(inside(centroid, tripled(hole)), `triangle ${index / 3} centroid in a hole`).toBe(false);
+  }
+  expect(total).toBe(ringTwiceArea(outer, 'case') - holes.reduce((sum, hole) => sum + ringTwiceArea(hole, 'case'), 0));
+  expectNoOverlap(vertices, triangles);
+}
+
+const square = (x: number, y: number, size: number): Plan[] => [[x, y], [x + size, y], [x + size, y + size], [x, y + size]];
+
+describe('the ring rule with holes', () => {
+  it('pins the triangles of a square with a square hole', () => {
+    // The well's greatest-x vertex (6000, 3000) bridges to the nearest corner, (9000, 0).
+    const { triangles } = triangulateRingWithHoles(square(0, 0, 9000), [square(3000, 3000, 3000)], 'case');
+    expect(triangles).toEqual([0, 1, 5, 0, 5, 4, 3, 0, 4, 3, 4, 7, 3, 7, 6, 6, 5, 1, 6, 1, 2, 6, 2, 3]);
+  });
+
+  it('holds its rule on a square with a hole and on every tier the fixture states', () => {
+    holdsTheHoleRule(square(0, 0, 9000), [square(3000, 3000, 3000)]);
+    const tiers = recordsOf(fixtureObject(), 'city.massing').flatMap((record: any) => record.fields.tiers);
+    expect(tiers.some((tier: any) => tier.light_wells_mm.length > 0)).toBe(true);
+    for (const tier of tiers) holdsTheHoleRule(tier.ring_mm, tier.light_wells_mm);
+  });
+
+  it('holds its rule with several holes, ties on greatest x, and a concave outer ring', () => {
+    // An L-shaped block with three wells; two share their greatest x.
+    const outer: Plan[] = [[0, 0], [20000, 0], [20000, 8000], [8000, 8000], [8000, 20000], [0, 20000]];
+    const holes = [square(2000, 2000, 2000), square(12000, 2000, 3000), square(2000, 12000, 2000), square(5000, 3000, 1000)];
+    holdsTheHoleRule(outer, holes);
+    // A comb whose teeth hide the nearest outer vertices from a well in the back.
+    const comb: Plan[] = [[0, 0], [12000, 0], [12000, 3000], [10000, 3000], [10000, 9000], [8000, 9000], [8000, 3000],
+      [6000, 3000], [6000, 9000], [4000, 9000], [4000, 3000], [2000, 3000], [2000, 9000], [0, 9000]];
+    holdsTheHoleRule(comb, [square(4500, 500, 1000), square(9000, 1000, 1500)]);
+  });
+
+  it('holds its rule on star-shaped rings with wells round their centre', () => {
+    const next = sequence(17);
+    for (let index = 0; index < 12; index += 1) {
+      holdsTheHoleRule(starRing(next, 6 + (index % 8)), [square(-600, -600, 500), square(200, 100, 600)]);
+    }
+  });
+
+  it('refuses a hole that is not strictly inside, and holes that meet', () => {
+    const outer = square(0, 0, 9000);
+    expect(() => triangulateRingWithHoles(outer, [square(0, 3000, 3000)], 'case')).toThrow(/not strictly inside/);
+    expect(() => triangulateRingWithHoles(outer, [square(10000, 0, 1000)], 'case')).toThrow(/not strictly inside/);
+    expect(() => triangulateRingWithHoles(outer, [square(1000, 1000, 3000), square(4000, 1000, 3000)], 'case')).toThrow(/meet/);
+    const clockwise: Plan[] = [[3000, 3000], [3000, 6000], [6000, 6000], [6000, 3000]];
+    expect(() => triangulateRingWithHoles(outer, [clockwise], 'case')).toThrow(/counter-clockwise/);
   });
 });
 
