@@ -344,7 +344,7 @@ export interface AuthenticatedAssetFetchOptions {
   readonly range?: readonly [start: number, end: number];
 }
 
-/** Authenticated fetch with observed—not assumed—Range behavior and optional integrity check. */
+/** Authenticated fetch with observed, not assumed, Range behavior and optional integrity check. */
 export async function fetchAuthenticatedAsset(
   descriptor: PhysicalAssetDescriptor,
   signal: AbortSignal,

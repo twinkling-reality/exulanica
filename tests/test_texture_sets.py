@@ -483,7 +483,7 @@ def test_the_document_names_every_pinned_set_and_the_evidence_it_cites(manifest)
         assert re.search(rf"\|\s*{entry['version']}\s*\|", row.group(0)), entry["set_id"]
     assert EVIDENCE.relative_to(ROOT).as_posix() in text
     assert OBJECT_EVIDENCE.relative_to(ROOT).as_posix() in text
-    assert "—" not in text
+    assert "\u2014" not in text
 
 
 def _run(record, run):

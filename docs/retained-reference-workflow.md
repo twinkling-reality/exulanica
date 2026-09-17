@@ -1,4 +1,4 @@
-# Retained photographic references — 2026-09-05
+# Retained photographic references, 2026-09-05
 
 **A real trained reconstruction is established for one collection and refused for the other.**
 EXECUTED 2026-09-05/06: both retained CC0 collections went through admission with a named human

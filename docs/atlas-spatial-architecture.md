@@ -11,10 +11,10 @@ The Atlas is a **grounded memory archipelago**.
 
 It is one logical semantic world, viewed at three scales:
 
-1. **Atlas** — the complete personal library and its stable semantic organization.
-2. **Neighborhood** — a bounded local memory field containing a comprehensible working set of
+1. **Atlas**: the complete personal library and its stable semantic organization.
+2. **Neighborhood**: a bounded local memory field containing a comprehensible working set of
    regions and routes to other neighborhoods.
-3. **Region** — a soft footprint whose interior presentation and movement model are determined by
+3. **Region**: a soft footprint whose interior presentation and movement model are determined by
    the reconstruction rung it actually earned.
 
 Ground view is walking on one continuous, low-frequency memory field. The field supplies contact,
@@ -65,10 +65,10 @@ distance and grazing angles, so a local terrain rise cannot draw a false platfor
 
 Every region footprint has four bands derived from one signed-distance definition:
 
-- **between** — outside the approach band;
-- **approach** — the region is becoming the likely destination;
-- **dissolve** — the outer fifth, where region and field are both partially present;
-- **interior** — the reconstruction-honest local presentation.
+- **between**: outside the approach band;
+- **approach**: the region is becoming the likely destination;
+- **dissolve**: the outer fifth, where region and field are both partially present;
+- **interior**: the reconstruction-honest local presentation.
 
 That same footprint drives visual dissolve, streaming priority, tier distance, entry state, and
 navigation constraints. A circle remains a valid broad-phase fallback for the foundational slice;
@@ -108,15 +108,15 @@ surface blocks sight or travel.
 
 ## 5. Reconstruction-rung traversal
 
-- **Rung 1 — free region.** Walking is free inside a trusted coarse navigation surface and honest
+- **Rung 1: free region.** Walking is free inside a trusted coarse navigation surface and honest
   coverage boundary. The photoreal asset does not define collision directly.
-- **Rung 2 — constrained corridor.** Position is projected into the recovered camera-trajectory
+- **Rung 2: constrained corridor.** Position is projected into the recovered camera-trajectory
   tube with an authored lateral envelope and look cone. Its endpoints and unseen sides dissolve;
   they do not become invisible walls pretending to be captured space.
-- **Rung 3 — photographic panels.** The common field connects panel viewpoints. Each panel allows
+- **Rung 3: photographic panels.** The common field connects panel viewpoints. Each panel allows
   only its measured micro-parallax; relief never becomes an invented walkable floor, and unseen
   backs are blocked by coarse panel proxies.
-- **Rung 4 — evidence-card grove.** Evidence surfaces and focus stops are arranged on the common
+- **Rung 4: evidence-card grove.** Evidence surfaces and focus stops are arranged on the common
   field. The cards are citations, not reconstructed geometry. Missing or preview-unavailable media
   is visibly an archive placeholder rather than a fabricated photograph.
 
@@ -247,7 +247,7 @@ behavior.
 
 ## 10. Phased roadmap and ownership
 
-### Phase A — spatial authority
+### Phase A: spatial authority
 
 **Frontend/core status: implemented; backend durability pending.**
 
@@ -257,7 +257,7 @@ the graph/backend owns durable storage and version conflicts; the app only adapt
 criterion: adding or confirming unrelated graph data cannot move an existing region without an
 explicit layout migration.
 
-### Phase B — neighborhoods and residency
+### Phase B: neighborhoods and residency
 
 **Core planner/index status: implemented; physical streaming and production full-library adapter
 pending.**
@@ -268,7 +268,7 @@ planner and state machine; PlayCanvas owns assets, origin rebasing, and disposal
 parallel world model. Exit criterion: a library much larger than five regions remains navigable
 without loading every detailed asset or changing logical coordinates.
 
-### Phase C — rung traversal
+### Phase C: rung traversal
 
 **Status: foundational policies only; measured pipeline artifacts pending.**
 
@@ -278,7 +278,7 @@ artifacts; `atlas-core` validates capability and resolves movement; PlayCanvas b
 coarse proxies and visuals the rung allows. Exit criterion: collision, focus occlusion, Locate, and
 visual coverage agree under every rung fixture.
 
-### Phase D — direct navigation and recovery
+### Phase D: direct navigation and recovery
 
 **Frontend/core status: region and citation travel, reduced motion, Map targets, and recovery
 feedback implemented; residency-aware asynchronous arrival and far-field action cues pending.**
@@ -289,7 +289,7 @@ and invariant state; the app owns commands and truthful captions; PlayCanvas rea
 transition. Exit criterion: Map cancel restores bit-for-bit ground state and every target either
 arrives at a validated pose or reports why it cannot.
 
-### Phase E — scale and comfort hardening
+### Phase E: scale and comfort hardening
 
 **Status: pending representative production assets and profiling.**
 

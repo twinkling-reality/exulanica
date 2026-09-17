@@ -238,7 +238,7 @@ def prepare_inputs(
     page = (
         '<!doctype html><html lang="en"><meta charset="utf-8">'
         '<meta name="viewport" content="width=device-width,initial-scale=1">'
-        f"<title>{title_html} — exact source review</title><style>"
+        f"<title>{title_html}: exact source review</title><style>"
         "body{font:16px system-ui;background:#eeeae2;color:#1e292d;margin:32px}"
         "main{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:20px}"
         "figure{margin:0;background:white;padding:12px}img{width:100%;height:300px;object-fit:contain}"

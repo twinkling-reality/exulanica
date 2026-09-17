@@ -120,7 +120,7 @@ export function mountPersonalIntake(deps: {
   function sourceOptions(): void {
     const prior = ui.source.value;
     replace(ui.source, (current.reviewSources ?? []).map((source, i) => el('option', {
-      value: source.captureId, text: `Photograph ${i + 1}${source.state === 'available' ? '' : ' — viewer unavailable'}`,
+      value: source.captureId, text: `Photograph ${i + 1}${source.state === 'available' ? '' : ' (viewer unavailable)'}`,
     })));
     if ([...ui.source.options].some(o => o.value === prior)) ui.source.value = prior;
     const subject = ui.linkedSubject.value;

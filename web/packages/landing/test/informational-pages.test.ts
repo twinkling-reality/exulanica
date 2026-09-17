@@ -33,6 +33,6 @@ describe('the signed-out reading surfaces', () => {
       expect(section.querySelectorAll('p')).toHaveLength(1);
     }
     expect(capabilities.textContent).toContain('World Memory Package');
-    expect(`${purpose.textContent} ${capabilities.textContent}`).not.toMatch(/[—–]/);
+    expect(`${purpose.textContent} ${capabilities.textContent}`).not.toMatch(/[\u2014\u2013]/);
   });
 });

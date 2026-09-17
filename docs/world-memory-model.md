@@ -310,7 +310,7 @@ A receiver that loads only supported planes must report the omitted planes. Sign
 does not imply complete world transfer, asset availability, simulation compatibility, or runtime
 behavior.
 
-## 9. What is distinct—and what is not
+## 9. What is distinct, and what is not
 
 The individual ingredients are not novel:
 

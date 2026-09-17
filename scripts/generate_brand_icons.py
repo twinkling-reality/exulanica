@@ -17,7 +17,7 @@ for i in range(256):
                    512 + 448 * math.copysign(abs(s)**0.5, s)))
 outline = 'M' + ' L'.join(f'{x:.3f},{y:.3f}' for x, y in points) + ' Z'
 symbol = master.replace('<circle cx="512" cy="512" r="448"', f'<path d="{outline}"')
-symbol = symbol.replace('Exulanica — single mass', 'Exulanica squircle icon')
+symbol = symbol.replace('Exulanica: single mass', 'Exulanica squircle icon')
 symbol = symbol.replace('A pale circular mass', 'A pale squircle').replace('Transparent outside the circle.', 'Transparent outside the squircle.')
 icon = BRAND / 'exulanica-icon.svg'
 icon.write_text(symbol)

@@ -21,7 +21,7 @@ browser code. Improving those loops can make a better image while making no bett
 the additions cannot necessarily be queried, edited, exported, corrected, trained on, or traced to
 an interpretation record.
 
-The obvious correction—“make everything data”—is also wrong. Renderer triangulation, batching,
+The obvious correction, “make everything data”, is also wrong. Renderer triangulation, batching,
 interpolation frames, mipmaps, and tone mapping have no independent world meaning. Persisting every
 vertex would confuse implementation identity with world identity and would make representation
 changes look like changes to the world.
@@ -59,7 +59,7 @@ Consequential state requires:
 
 Derived representations require a contract naming inputs, producer/version, frame, resolution,
 preserved and lost properties, admissible uses, quality, digest, and invalidation state. No
-representation—mesh, splat, point map, voxel grid, embedding, scene graph, or latent tensor—is
+representation (mesh, splat, point map, voxel grid, embedding, scene graph, or latent tensor) is
 privileged as the whole world.
 
 Procedural output may remain compact. A durable parametric grammar and materialization receipt can
