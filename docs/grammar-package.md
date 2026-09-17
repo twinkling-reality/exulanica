@@ -485,6 +485,9 @@ Each of these is known and deliberately not done here.
 - **Texture gaps.** No published texture set is glazing, a door, road paint, terrain, a tree pit,
   foliage, bark, timber, fabric or a sign panel, so those surfaces have no material record and
   draw as unavailable. They are queued with the texture lane.
+- **Tree roles.** A street tree's parts take surface roles 25 `canopy` and 26 `trunk`, appended
+  so foliage and bark are dressed apart; every other object's parts take object roles, and a
+  catalog part may take only an object role.
 - **`READ_ONLY_TABLES` registration.** Catalogs are meant to be registered in
   `exulanica/db/roles.py` so a runtime process may propose a registered value and never register
   one. They ship as data files and are not in any table.

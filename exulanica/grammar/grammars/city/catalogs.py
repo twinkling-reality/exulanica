@@ -49,6 +49,7 @@ from exulanica.grammar.errors import CatalogError, GrammarError
 from exulanica.grammar.grammars.city.common import (
     APPROACH_CONTROLS,
     FORM_PART_SHAPE,
+    OBJECT_ROLES,
     SURFACE_ROLES,
     FormPart,
 )
@@ -119,6 +120,8 @@ def form_parts_field(where: str, value: object) -> FieldValue:
             validate_record(FormPart(**item), FORM_PART_SHAPE)
         except GrammarError as error:
             raise CatalogError(f"{where}[{index}]: {error}") from error
+        if item["surface_role"] not in OBJECT_ROLES:
+            raise CatalogError(f"{where}[{index}] takes an object role, one of {OBJECT_ROLES}")
         parts.append(tuple((name, item[name]) for name in _FORM_PART_FIELDS))
     return tuple(parts)  # type: ignore[arg-type]
 

@@ -11,9 +11,10 @@ check refuses a position inside any building footprint (the target architecture'
 intersections gate), two exclusion circles that overlap, and an object inside a crossing's
 extent.
 
-A tree's pit is an explicit ring in the footway round its trunk. No published texture set is
-bark, foliage or soil yet, so a tree and its pit have no material records in this version and
-draw as unavailable.
+A tree's pit is an explicit ring in the footway round its trunk. A tree's parts take the roles
+``trunk`` and ``canopy``, never an object role, so bark and foliage are dressed apart; every other
+object's parts take object roles. No published texture set is bark, foliage or soil yet, so a
+tree and its pit have no material records in this version and draw as unavailable.
 """
 
 from __future__ import annotations
@@ -27,10 +28,13 @@ from exulanica.grammar.geometry import INSIDE, Extent, point_in_ring
 from exulanica.grammar.grammars.city._skeleton import skeleton
 from exulanica.grammar.grammars.city.common import (
     FORM_PART_SHAPE,
+    OBJECT_ROLES,
+    TREE_PART_ROLES,
     FormPart,
     direction_fields,
     extent_field,
     require_direction,
+    require_part_roles,
     require_point_in_extent,
 )
 
@@ -74,6 +78,7 @@ class StreetFurnitureRecord:
 
 def _furniture_rules(record: StreetFurnitureRecord) -> None:
     require_direction("facing", record.facing_dx_mm, record.facing_dy_mm)
+    require_part_roles("an item of furniture", record.parts, OBJECT_ROLES)
     require_point_in_extent("the item's base", record.extent, record.x_mm, record.y_mm, record.z_mm)
 
 
@@ -128,6 +133,7 @@ class StreetTreeRecord:
 def _tree_rules(record: StreetTreeRecord) -> None:
     if point_in_ring((record.x_mm, record.y_mm), record.pit_mm) != INSIDE:
         raise InvalidRecordError("a tree stands inside its pit")
+    require_part_roles("a street tree", record.parts, TREE_PART_ROLES)
     require_point_in_extent("the trunk base", record.extent, record.x_mm, record.y_mm, record.z_mm)
 
 

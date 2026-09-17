@@ -1518,8 +1518,8 @@ furniture = [
 assert [item.identity for item in furniture] == list(FURNITURE.values())
 
 TREE_PARTS = (
-    FormPart("prism", "object_primary", 0, 0, 0, 300, 300, 2_500, 1_000_000, 8, 1),
-    FormPart("ellipsoid", "object_secondary", 0, 0, 2_500, 6_000, 6_000, 5_000, 1_000_000, 16, 8),
+    FormPart("prism", "trunk", 0, 0, 0, 300, 300, 2_500, 1_000_000, 8, 1),
+    FormPart("ellipsoid", "canopy", 0, 0, 2_500, 6_000, 6_000, 5_000, 1_000_000, 16, 8),
 )
 trees = [
     StreetTreeRecord(

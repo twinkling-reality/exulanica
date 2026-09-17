@@ -69,16 +69,19 @@ __all__ = [
     "MOVEMENTS",
     "OBJECT_ROLES",
     "ORIENTATIONS",
+    "PART_ROLES",
     "POWER_OF_TWO_SEGMENTS",
     "SIDES",
     "SIDE_CODES",
     "SURFACE_ROLES",
     "SURFACE_ROLE_CODES",
     "TILE_SIZE_MM",
+    "TREE_PART_ROLES",
     "FormPart",
     "direction_fields",
     "extent_field",
     "require_direction",
+    "require_part_roles",
     "require_point_in_extent",
     "tile_ordinal",
 ]
@@ -123,9 +126,14 @@ SURFACE_ROLE_CODES: Final = {
     "object_secondary": 22,
     "object_tertiary": 23,
     "tree_pit": 24,
+    "canopy": 25,
+    "trunk": 26,
 }
 SURFACE_ROLES: Final = tuple(SURFACE_ROLE_CODES)
 OBJECT_ROLES: Final = ("object_primary", "object_secondary", "object_tertiary")
+#: The roles a street tree's parts take: its trunk, and its canopy, which a foliage set dresses.
+TREE_PART_ROLES: Final = ("trunk", "canopy")
+PART_ROLES: Final = (*OBJECT_ROLES, *TREE_PART_ROLES)
 
 FORM_SHAPES: Final = ("box", "prism", "ellipsoid")
 #: Segment and ring counts a reader builds by integer chord bisection, so no sine is needed.
@@ -143,6 +151,12 @@ def extent_field() -> shapes.FieldShape:
 def require_point_in_extent(name: str, extent: Extent, x: int, y: int, z: int) -> None:
     if not extent_contains_point(extent, x, y, z):
         raise InvalidRecordError(f"{name} ({x}, {y}, {z}) lies outside the record's extent")
+
+
+def require_part_roles(what: str, parts: tuple[FormPart, ...], roles: tuple[str, ...]) -> None:
+    for index, part in enumerate(parts):
+        if part.surface_role not in roles:
+            raise InvalidRecordError(f"{what}'s part {index} takes one of {roles} as its role")
 
 
 def require_direction(name: str, dx: int, dy: int) -> None:
@@ -173,7 +187,8 @@ class FormPart:
     first vertex on local ``+x``, extruded by ``size_z`` and scaled at its top by
     ``top_scale_millionths`` (0 makes a cone). An ``ellipsoid`` fills its sizes with
     ``segments`` meridians and ``rings`` bands. The surface role names the material record the
-    part takes from its owner.
+    part takes from its owner: an object role for furniture, rooftop objects and fitouts, and
+    ``trunk`` or ``canopy`` for a street tree.
     """
 
     shape: str
@@ -211,7 +226,7 @@ FORM_PART_SHAPE: Final = shapes.RecordShape(
     FormPart,
     (
         shapes.choice("shape", FORM_SHAPES),
-        shapes.choice("surface_role", OBJECT_ROLES),
+        shapes.choice("surface_role", PART_ROLES),
         shapes.integer("offset_x_mm"),
         shapes.integer("offset_y_mm"),
         shapes.integer("offset_z_mm"),

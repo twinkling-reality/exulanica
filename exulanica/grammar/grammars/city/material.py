@@ -8,7 +8,8 @@ stable id only; the set's version and digest are pinned where the catalog resolv
 **Which surface.** A record dresses one role (:data:`SURFACE_ROLE_OWNERS` says which record kinds
 may own each role) of the subject ``surface_identity`` names. Its identity derives from that
 subject and the role's fixed code. A role with no material record draws as unavailable: in this
-version no published set can dress glazing, doors, road paint, terrain, tree pits or foliage.
+version no published set can dress glazing, doors, road paint, terrain, tree pits, bark or
+foliage.
 
 **Texture coordinates, exactly.** The tessellator states each vertex's surface coordinates
 ``(s, t)`` in millimetres, in the frame ``common`` fixes for the owning record kind, the role and
@@ -84,7 +85,6 @@ _FACADE_ROLES: Final = (
 _OBJECTS: Final = (
     "city.rooftop_object",
     "city.street_furniture",
-    "city.street_tree",
     "city.vitrine",
 )
 
@@ -106,6 +106,8 @@ SURFACE_ROLE_OWNERS: Final = {
     "object_secondary": _OBJECTS,
     "object_tertiary": _OBJECTS,
     "tree_pit": ("city.street_tree",),
+    "canopy": ("city.street_tree",),
+    "trunk": ("city.street_tree",),
 }
 SURFACE_KINDS: Final = tuple(
     sorted({kind for kinds in SURFACE_ROLE_OWNERS.values() for kind in kinds})

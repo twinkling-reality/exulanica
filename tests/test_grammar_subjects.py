@@ -183,6 +183,8 @@ def test_the_codes_that_stand_in_for_an_ordinal_are_append_only_and_written_out(
         "object_secondary": 22,
         "object_tertiary": 23,
         "tree_pit": 24,
+        "canopy": 25,
+        "trunk": 26,
     }
     assert FACADE_TIER_STRIDE == 1_000_000
 

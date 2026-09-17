@@ -41,10 +41,12 @@ from exulanica.grammar.geometry import (
 from exulanica.grammar.grammars.city._skeleton import skeleton
 from exulanica.grammar.grammars.city.common import (
     FORM_PART_SHAPE,
+    OBJECT_ROLES,
     FormPart,
     direction_fields,
     extent_field,
     require_direction,
+    require_part_roles,
     require_point_in_extent,
 )
 
@@ -238,6 +240,7 @@ class RooftopObjectRecord:
 
 def _rooftop_rules(record: RooftopObjectRecord) -> None:
     require_direction("facing", record.facing_dx_mm, record.facing_dy_mm)
+    require_part_roles("a rooftop object", record.parts, OBJECT_ROLES)
     require_point_in_extent(
         "the object's base", record.extent, record.x_mm, record.y_mm, record.z_mm
     )

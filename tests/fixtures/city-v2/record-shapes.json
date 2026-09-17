@@ -140,7 +140,9 @@
           "values": [
             "object_primary",
             "object_secondary",
-            "object_tertiary"
+            "object_tertiary",
+            "trunk",
+            "canopy"
           ]
         },
         {
@@ -2406,7 +2408,9 @@
             "object_primary",
             "object_secondary",
             "object_tertiary",
-            "tree_pit"
+            "tree_pit",
+            "canopy",
+            "trunk"
           ]
         },
         {
@@ -2478,6 +2482,7 @@
         "ordinal": {
           "codes": {
             "awning": 12,
+            "canopy": 25,
             "carriageway": 13,
             "crossing": 17,
             "door": 7,
@@ -2500,6 +2505,7 @@
             "terrain": 20,
             "tree_pit": 24,
             "trim": 8,
+            "trunk": 26,
             "wall": 1
           },
           "field": "role"
