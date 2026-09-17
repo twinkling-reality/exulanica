@@ -12,10 +12,11 @@ What this file holds the generator system to.
     scan whose own detector is tested, not by reading the code.
 *   Canonical JSON **accepts the whole emitted record set and refuses every float** injected
     into it, at every position.
-*   Every city stage **emits nothing and says so**, and every record shape has a validator.
+*   Every city stage **emits nothing and says so**, and every record kind has a validator.
 
-The record instances below named ``_FIXTURES`` are validator inputs written for this test. They
-are not stage output, and no stage emits them.
+The record instances below named ``_FIXTURES`` are validator inputs: one record of every city
+record kind, taken from the hand-written city v2 fixture (``tests/fixtures/city-v2``). They are
+not stage output, and no stage emits them.
 """
 
 from __future__ import annotations
@@ -29,6 +30,7 @@ import os
 import subprocess
 import sys
 from pathlib import Path
+from typing import ClassVar
 
 import pytest
 from exulanica.canonical import canonical_json
@@ -53,22 +55,13 @@ from exulanica.grammar.errors import (
 from exulanica.grammar.grammars import builtin_registry
 from exulanica.grammar.grammars.city import CITY_STAGES
 from exulanica.grammar.grammars.city.facade import FACADE_RECORD_FIELDS, FacadeRecord
-from exulanica.grammar.grammars.city.massing import MassingRecord
-from exulanica.grammar.grammars.city.material import SurfaceMaterialRecord, require_texture_set
-from exulanica.grammar.grammars.city.parcels import ParcelRecord
-from exulanica.grammar.grammars.city.premises import PremisesRecord
-from exulanica.grammar.grammars.city.streetlife import StreetFurnitureRecord
-from exulanica.grammar.grammars.city.streets import (
-    CurbEdgeRecord,
-    StreetNodeRecord,
-    StreetSegmentRecord,
-)
-from exulanica.grammar.grammars.city.terrain import TerrainRecord
-from exulanica.grammar.grammars.city.tile import TileRecord, tile_inputs_digest
-from exulanica.grammar.grammars.city.vitrine import VitrineRecord
+from exulanica.grammar.grammars.city.material import require_texture_set
+from exulanica.grammar.grammars.city.tile import tile_inputs_digest
 from exulanica.grammar.records import MAX_SAFE_INTEGER, record_payload
 from exulanica.grammar.seed import require_seed
-from exulanica.grammar.textures import TextureSet
+from exulanica.grammar.textures import read_texture_manifest
+
+from city_v2_fixture import BUILDER_PATH, builder, records_by_kind, stage_of_kind
 
 ROOT = Path(__file__).resolve().parents[1]
 _PACKAGE = ROOT / "exulanica" / "grammar"
@@ -77,56 +70,26 @@ SEED = hashlib.sha256(b"exulanica grammar draw test").hexdigest()
 IDENTITY = "0e3b7f2a-5c1d-5a4b-8e6f-1a2b3c4d5e6f"
 
 _STAGES_BY_ID = {stage.stage_id: stage for stage in CITY_STAGES}
+_STAGE_OF_KIND = stage_of_kind()
 
+#: One record of every city record kind the stages validate, keyed by kind. The tile record is
+#: the fixture document's envelope, not one of its records.
 _FIXTURES = {
-    "terrain": TerrainRecord(0, 0, 1000, 2, 2, (0, 10, 20, 30), (0, 1, 2, 3)),
-    "streets": StreetNodeRecord(0, 0, 0),
-    "streets:segment": StreetSegmentRecord(
-        0, 0, 1, ((0, 0), (126_000, 0)), "test_hierarchy", 7000, 150, 300, 3000, 4000, (10, 60)
-    ),
-    "streets:curb": CurbEdgeRecord(0, 0, "left", 1),
-    "parcels": ParcelRecord(
-        0, 0, "memory_precinct", ((0, 0), (10_000, 0), (10_000, 20_000)), 0, 10_000, 1, 500
-    ),
-    "massing": MassingRecord(
-        IDENTITY,
-        0,
-        "test_typology",
-        "test_era",
-        4,
-        4500,
-        3200,
-        ((3, 2000),),
-        (0, 2),
-        1,
-        "test_roof",
-        900,
-        1,
-        1,
-    ),
-    "facade": FacadeRecord(
-        IDENTITY,
-        1,
-        (("test_integer", 3000), ("test_key", "test_value")),
-        SEED,
-        "0" * 64,
-        DeclaredSemantics("facade", ()),
-        0,
-    ),
-    "material": SurfaceMaterialRecord(
-        IDENTITY, 0, "test_material", "test-texture-set", 1_000_000, 0, 75, 10, 0, 0, 0
-    ),
-    "streetlife": StreetFurnitureRecord(0, "test_item", 0, "right", 5000, 600, 5000, -600),
-    "vitrine": VitrineRecord(IDENTITY, 0, 0, 900, "test_fitout"),
-    "premises": PremisesRecord(IDENTITY, 0, "test_use", "test_sign"),
-    "tile": TileRecord(
-        SEED, (("box", 1), ("city", 1)), "1" * 64, 0, 0, 0, 128_000, 64_000, "2" * 64
-    ),
+    **{kind: records[0] for kind, records in records_by_kind().items()},
+    "city.tile": builder().tile,
 }
+#: A city binding for the one parameter nothing may choose silently.
+_CITY_BINDINGS = (CascadeBinding.of("city", {"driving_side": "right"}),)
+#: What generating each registered grammar needs besides a seed and a subject.
+_BINDINGS = {"box": (), "city": _CITY_BINDINGS}
 
 
-def _stage_for(fixture_name: str):
-    return _STAGES_BY_ID[fixture_name.split(":")[0]]
+def _stage_for(kind: str):
+    return _STAGES_BY_ID[_STAGE_OF_KIND[kind]]
+
+
+def _fixture(kind: str, **changes):
+    return dataclasses.replace(_FIXTURES[kind], **changes)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -165,6 +128,17 @@ def test_a_domain_sequence_is_unchanged_when_another_domain_draws_in_between():
     assert not set(newcomer_values) & set(expected), "two domains produced the same stream"
 
 
+@dataclasses.dataclass(frozen=True, slots=True)
+class _DrawRecord:
+    """A probe record: which draw it is, and the value the stage's cursor gave it."""
+
+    RECORD_KIND: ClassVar[str] = "probe.draw"
+    RECORD_VERSION: ClassVar[int] = 1
+
+    ordinal: int
+    value: int
+
+
 def _probe_grammar(tmp_path: Path, stage_ids: tuple[str, ...]) -> Grammar:
     descriptor = tmp_path / "probe.v1.json"
     if not descriptor.exists():
@@ -182,18 +156,7 @@ def _probe_grammar(tmp_path: Path, stage_ids: tuple[str, ...]) -> Grammar:
 
         def emit(self, context: StageContext) -> StageEmission:
             cursor = context.cursor("value")
-            records = tuple(
-                FacadeRecord(
-                    IDENTITY,
-                    1,
-                    (("draw", cursor.integer(0, 1 << 30)),),
-                    SEED,
-                    "0" * 64,
-                    DeclaredSemantics("probe", ()),
-                    index,
-                )
-                for index in range(8)
-            )
+            records = tuple(_DrawRecord(index, cursor.integer(0, 1 << 30)) for index in range(8))
             return StageEmission(self.stage_id, 1, "emitted", "", records)
 
         def validate(self, record: object) -> None:
@@ -290,28 +253,37 @@ def test_a_seed_is_never_defaulted():
 # Byte stability across processes
 
 _EMIT = r"""
+import hashlib
+import importlib.util
 import sys
 import exulanica.grammar
 from exulanica.canonical import sha256_of_canonical
-from exulanica.grammar import generate
+from exulanica.grammar import CascadeBinding, generate
 from exulanica.grammar.catalogs import catalog_digest
 from exulanica.grammar.draw import _number
 from exulanica.grammar.grammars import builtin_registry
 from exulanica.grammar.grammars.city.catalogs import load_city_catalogs
+from exulanica.grammar.grammars.city.document import document_bytes
 
-seed, identity = sys.argv[1], sys.argv[2]
+seed, identity, builder_path = sys.argv[1], sys.argv[2], sys.argv[3]
+bindings = {"box": (), "city": (CascadeBinding.of("city", {"driving_side": "right"}),)}
+spec = importlib.util.spec_from_file_location("city_v2_fixture_builder", builder_path)
+fixture = importlib.util.module_from_spec(spec)
+sys.modules[spec.name] = fixture
+spec.loader.exec_module(fixture)
 registry = builtin_registry()
 emitted = {
     "generations": [
         generate(registry.get(key.grammar_id, key.grammar_version), seed=seed,
-                 subject_identity=identity).payload()
+                 subject_identity=identity, bindings=bindings[key.grammar_id]).payload()
         for key in registry.registered_keys()
     ],
     "draws": {
         domain: [str(_number(seed, domain, ordinal)) for ordinal in range(64)]
         for domain in {"streets.hierarchy", "box.parameters.width_mm", "vitrine.fitout"}
     },
-    "catalog_digest": catalog_digest(load_city_catalogs(texture_sets={})),
+    "catalog_digest": catalog_digest(load_city_catalogs()),
+    "fixture_document": hashlib.sha256(document_bytes(fixture.build_document())).hexdigest(),
 }
 print(exulanica.grammar.__file__)
 print(sha256_of_canonical(emitted).hex())
@@ -320,7 +292,7 @@ print(sha256_of_canonical(emitted).hex())
 
 def _emit_in_a_new_process(hash_seed: str) -> str:
     result = subprocess.run(
-        [sys.executable, "-c", _EMIT, SEED, IDENTITY],
+        [sys.executable, "-c", _EMIT, SEED, IDENTITY, str(BUILDER_PATH)],
         cwd=ROOT,
         capture_output=True,
         text=True,
@@ -465,17 +437,22 @@ def test_the_grammar_package_has_no_clock_no_random_no_secrets_and_no_float():
 # Canonical JSON over the emitted set, and every float refused
 
 
-def _emitted_set() -> dict[str, object]:
+def _generations() -> list[dict[str, object]]:
     registry = builtin_registry()
+    return [
+        generate(
+            registry.get(key.grammar_id, key.grammar_version),
+            seed=SEED,
+            subject_identity=IDENTITY,
+            bindings=_BINDINGS[key.grammar_id],
+        ).payload()
+        for key in registry.registered_keys()
+    ]
+
+
+def _emitted_set() -> dict[str, object]:
     return {
-        "generations": [
-            generate(
-                registry.get(key.grammar_id, key.grammar_version),
-                seed=SEED,
-                subject_identity=IDENTITY,
-            ).payload()
-            for key in registry.registered_keys()
-        ],
+        "generations": _generations(),
         "validator_fixtures": {name: record_payload(record) for name, record in _FIXTURES.items()},
     }
 
@@ -521,12 +498,19 @@ def test_canonical_json_accepts_the_whole_emitted_record_set():
 
 @pytest.mark.parametrize("poison", [0.5, 0.0, -0.0, 1e300, float("nan"), float("inf")])
 def test_every_float_injected_anywhere_in_the_emitted_set_is_refused(poison):
+    """Part by part: the generations, then each fixture record's payload on its own.
+
+    Canonical JSON walks the whole value, so a float found inside one part is found inside the
+    whole; injecting per part keeps every position covered without copying the whole set once
+    per leaf.
+    """
     emitted = _emitted_set()
-    paths = _leaf_paths(emitted)
-    assert len(paths) > 200, len(paths)
-    for path in paths:
+    parts = [emitted["generations"], *emitted["validator_fixtures"].values()]
+    paths = [(index, path) for index, part in enumerate(parts) for path in _leaf_paths(part)]
+    assert len(paths) > 2_000, len(paths)
+    for index, path in paths:
         with pytest.raises(CanonicalisationError):
-            canonical_json(_inject(emitted, path, poison))
+            canonical_json(_inject(parts[index], path, poison))
 
 
 def _float_variants(record: object):
@@ -555,17 +539,24 @@ def test_every_record_validator_refuses_a_float_in_any_field_by_canonical_json(n
             stage.validate(variant)
 
 
+def _node_at(x_mm: int):
+    node = _FIXTURES["city.street_node"]
+    extent = dataclasses.replace(node.extent, min_x_mm=x_mm, max_x_mm=x_mm)
+    return dataclasses.replace(node, x_mm=x_mm, extent=extent)
+
+
 def test_a_record_integer_a_javascript_reader_would_change_is_refused():
-    node = StreetNodeRecord(0, MAX_SAFE_INTEGER, -MAX_SAFE_INTEGER)
-    _stage_for("streets").validate(node)
+    stage = _stage_for("city.street_node")
+    stage.validate(_node_at(MAX_SAFE_INTEGER))
+    stage.validate(_node_at(-MAX_SAFE_INTEGER))
     with pytest.raises(InvalidRecordError):
-        _stage_for("streets").validate(StreetNodeRecord(0, MAX_SAFE_INTEGER + 1, 0))
+        stage.validate(_node_at(MAX_SAFE_INTEGER + 1))
 
 
 @pytest.mark.parametrize("value", [True, None, [1], {"a": 1}])
 def test_a_record_value_that_is_not_an_int_str_tuple_or_record_is_refused(value):
     with pytest.raises(InvalidRecordError):
-        record_payload(StreetNodeRecord(0, value, 0))  # type: ignore[arg-type]
+        record_payload(_fixture("city.street_node", x_mm=value))
 
 
 # ---------------------------------------------------------------------------------------------
@@ -573,6 +564,7 @@ def test_a_record_value_that_is_not_an_int_str_tuple_or_record_is_refused(value)
 
 _CITY_STAGE_IDS = (
     "terrain",
+    "districts",
     "streets",
     "parcels",
     "massing",
@@ -585,37 +577,56 @@ _CITY_STAGE_IDS = (
 )
 
 
-def test_the_city_declares_the_ten_stages_in_order_each_versioned():
+def test_the_city_declares_the_eleven_stages_in_order_each_versioned():
     assert tuple(stage.stage_id for stage in CITY_STAGES) == _CITY_STAGE_IDS
     assert all(
         type(stage.stage_version) is int and stage.stage_version >= 1 for stage in CITY_STAGES
     )
 
 
+def test_only_city_version_2_is_registered():
+    keys = [(key.grammar_id, key.grammar_version) for key in builtin_registry().registered_keys()]
+    assert keys == [("box", 1), ("city", 2)]
+
+
 def test_every_city_stage_emits_nothing_and_says_so():
-    city = builtin_registry().get("city", 1)
-    generation = generate(city, seed=SEED, subject_identity=IDENTITY)
+    city = builtin_registry().get("city", 2)
+    generation = generate(city, seed=SEED, subject_identity=IDENTITY, bindings=_CITY_BINDINGS)
     assert [emission.stage_id for emission in generation.emissions] == list(_CITY_STAGE_IDS)
     for emission in generation.emissions:
         assert emission.status == "not_implemented"
         assert emission.records == ()
         assert "no generator" in emission.reason
-    assert generation.receipt.declared_semantics == DeclaredSemantics("city", ())
-    assert generation.receipt.parameters.values == ()
+    assert generation.receipt.declared_semantics == DeclaredSemantics(
+        "city", ("render_batch", "collision_proxy", "nav_envelope", "pick_geometry")
+    )
+    parameters = generation.receipt.parameters
+    assert parameters.values == (("driving_side", "right"),)
+    sources = dict(parameters.sources)
+    assert sources.pop("driving_side") == "city"
+    assert len(sources) == 68
+    assert set(sources.values()) == {"derive"}
+
+
+def test_a_city_is_refused_when_nothing_states_the_side_of_the_road():
+    with pytest.raises(InvalidParameterError):
+        generate(builtin_registry().get("city", 2), seed=SEED, subject_identity=IDENTITY)
 
 
 def test_every_city_stage_has_a_validator_for_a_fixture():
     covered = {_stage_for(name).stage_id for name in _FIXTURES}
     assert covered == set(_CITY_STAGE_IDS)
+    assert set(_FIXTURES) == set(_STAGE_OF_KIND)
 
 
 def test_an_unimplemented_stage_cannot_emit_records_and_cannot_stay_silent():
+    node = _FIXTURES["city.street_node"]
     with pytest.raises(InvalidRecordError):
-        StageEmission("streets", 1, "not_implemented", "none yet", (_FIXTURES["streets"],))
+        StageEmission("streets", 2, "not_implemented", "none yet", (node,))
     with pytest.raises(InvalidRecordError):
-        StageEmission("streets", 1, "not_implemented", "", ())
+        StageEmission("streets", 2, "not_implemented", "", ())
     with pytest.raises(InvalidRecordError):
-        StageEmission("streets", 1, "emitted", "a reason for an emitted stage", ())
+        StageEmission("streets", 2, "emitted", "a reason for an emitted stage", ())
 
 
 def test_the_facade_record_carries_the_six_section_5_1_fields():
@@ -629,7 +640,7 @@ def test_the_facade_record_carries_the_six_section_5_1_fields():
         "declared_semantics",
     )
     assert names[:6] == list(FACADE_RECORD_FIELDS)
-    fields = record_payload(_FIXTURES["facade"])["fields"]
+    fields = record_payload(_FIXTURES["city.facade"])["fields"]
     assert set(FACADE_RECORD_FIELDS) <= set(fields)
     assert fields["declared_semantics"]["plane"] == "invented"
 
@@ -652,58 +663,63 @@ def test_the_generic_receipt_carries_the_same_six_facts():
 @pytest.mark.parametrize(
     "name,change",
     [
-        ("streets:segment", {"kerb_height_mm": 99}),
-        ("streets:segment", {"kerb_height_mm": 181}),
-        ("streets:segment", {"end_node": 0}),
-        ("streets:segment", {"crossing_offsets_mm": (60, 10)}),
-        ("streets:segment", {"centreline_mm": ((0, 0),)}),
-        ("streets:segment", {"hierarchy": "Primary"}),
-        ("streets:curb", {"side": "middle"}),
-        ("parcels", {"frontage_mm": 0}),
-        ("parcels", {"lot_class": "hole"}),
-        ("parcels", {"boundary_mm": ((0, 0), (1, 0), (0, 0))}),
-        ("massing", {"setbacks": ((4, 2000),)}),
-        ("massing", {"storeys": 0}),
-        ("massing", {"building_identity": "not-a-uuid"}),
-        ("facade", {"seed": "0" * 63}),
-        ("facade", {"parameters": (("b", 1), ("a", 2))}),
-        ("facade", {"output_digest": "A" * 64}),
-        ("material", {"texture_set_id": ""}),
-        ("material", {"texture_set_id": "Test_Set"}),
-        ("material", {"texture_set_id": "a" * 64 + "@1"}),
-        ("material", {"uv_rotation_urad": 6_283_186}),
-        ("material", {"soiling_gradient_millionths": 1_000_001}),
-        ("vitrine", {"depth_mm": 599}),
-        ("vitrine", {"depth_mm": 1501}),
-        ("terrain", {"height_mm": (0, 10, 20)}),
-        ("tile", {"tile_size_mm": 127_999}),
-        ("tile", {"halo_radius_mm": 0}),
-        ("tile", {"grammar_versions": (("city", 1), ("box", 1))}),
-        ("premises", {"sign": "Sign Text"}),
+        ("city.curb_edge", {"kerb_height_mm": 99}),
+        ("city.curb_edge", {"kerb_height_mm": 181}),
+        ("city.curb_edge", {"side": "middle"}),
+        ("city.street_segment", {"end_node_identity": None}),
+        ("city.street_segment", {"centreline_mm": ((20_000, 40_000, 0),)}),
+        ("city.street_segment", {"hierarchy": "Primary"}),
+        ("city.street_segment", {"length_mm": 39_999}),
+        ("city.parcel", {"frontage_mm": 0}),
+        ("city.parcel", {"lot_class": "hole"}),
+        ("city.parcel", {"boundary_mm": ((0, 0), (1, 0), (0, 0))}),
+        ("city.massing", {"storeys": 0}),
+        ("city.massing", {"parcel_identity": "not-a-uuid"}),
+        ("city.massing", {"ground_storey_height_mm": 3_999}),
+        ("city.facade", {"seed": "0" * 63}),
+        ("city.facade", {"parameters": ()}),
+        ("city.facade", {"output_digest": "A" * 64}),
+        ("city.surface_material", {"texture_set_id": ""}),
+        ("city.surface_material", {"texture_set_id": "Test_Set"}),
+        ("city.surface_material", {"texture_set_id": "a" * 64 + "@1"}),
+        ("city.surface_material", {"uv_rotation_urad": 6_283_186}),
+        ("city.surface_material", {"soiling_gradient_millionths": 1_000_001}),
+        ("city.vitrine", {"depth_mm": 599}),
+        ("city.vitrine", {"depth_mm": 1501}),
+        ("city.terrain", {"height_mm": (0, 10, 20)}),
+        ("city.tile", {"tile_size_mm": 127_999}),
+        ("city.tile", {"halo_radius_mm": 0}),
+        ("city.tile", {"ownership_rule": "nearest_centre"}),
+        ("city.premises", {"sign": "Sign Text"}),
     ],
 )
 def test_a_record_outside_its_declared_shape_is_refused(name, change):
-    with pytest.raises((InvalidRecordError, InvalidSeedError)):
-        _stage_for(name).validate(dataclasses.replace(_FIXTURES[name], **change))
+    with pytest.raises((InvalidRecordError, InvalidParameterError, InvalidSeedError)):
+        _stage_for(name).validate(_fixture(name, **change))
 
 
 def test_a_stage_refuses_a_record_type_it_does_not_declare():
     with pytest.raises(InvalidRecordError):
-        _stage_for("vitrine").validate(_FIXTURES["premises"])
+        _stage_for("city.vitrine").validate(_FIXTURES["city.premises"])
 
 
 def test_a_material_whose_texture_set_is_not_published_is_refused():
-    material = _FIXTURES["material"]
+    material = _FIXTURES["city.surface_material"]
     with pytest.raises(UnresolvedReferenceError):
         require_texture_set(material, {})
-    require_texture_set(material, {"test-texture-set": TextureSet("test-texture-set", 1, "a" * 64)})
+    require_texture_set(material, read_texture_manifest())
 
 
-def test_the_tile_digest_moves_with_the_edit_subsequence():
-    tile = _FIXTURES["tile"]
+def test_the_tile_digest_moves_with_the_edit_subsequence_and_the_descriptor_pin():
+    tile = _FIXTURES["city.tile"]
     moved = dataclasses.replace(tile, edit_delta_digest="3" * 64)
     assert tile_inputs_digest(tile) != tile_inputs_digest(moved)
     assert tile_inputs_digest(tile) == tile_inputs_digest(dataclasses.replace(tile))
+    [pin] = tile.grammar_versions
+    repinned = dataclasses.replace(
+        tile, grammar_versions=(dataclasses.replace(pin, descriptor_sha256="4" * 64),)
+    )
+    assert tile_inputs_digest(tile) != tile_inputs_digest(repinned)
 
 
 # ---------------------------------------------------------------------------------------------
