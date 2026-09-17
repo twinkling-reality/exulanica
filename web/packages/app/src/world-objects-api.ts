@@ -43,8 +43,6 @@ import { ApiError, Transport, type TransportOptions } from '@exulanica/graph-cli
 /** `origin.role`, chosen by the person and never inferred. */
 export type ObjectRole = 'fictional' | 'personal';
 
-export const OBJECT_ROLES: readonly ObjectRole[] = Object.freeze(['fictional', 'personal']);
-
 /**
  * The words a surface shows for a role.
  *
@@ -56,6 +54,11 @@ export const OBJECT_ROLE_LABELS: Readonly<Record<ObjectRole, string>> = Object.f
   fictional: 'Invented for this world',
   personal: 'Connected to something I experienced',
 });
+
+/** Whether a value is one of the roles above. The label table is the one list of roles. */
+export function isObjectRole(value: unknown): value is ObjectRole {
+  return typeof value === 'string' && Object.hasOwn(OBJECT_ROLE_LABELS, value);
+}
 
 /** The three-state honesty the contract borrows from `GET /world/source-media`. */
 export type AssetAvailability = 'available' | 'unavailable_asset' | string;
@@ -517,7 +520,7 @@ export function parseObject(value: unknown): AuthoredObject {
   const row = record(value, 'authored object');
   const origin = record(row['origin'], 'authored object origin');
   const role = text(origin['role'], 'authored object role');
-  if (!OBJECT_ROLES.includes(role as ObjectRole)) throw invalid('authored object role');
+  if (!isObjectRole(role)) throw invalid('authored object role');
   return Object.freeze({
     objectId: text(row['object_id'], 'authored object id'),
     asset: parseAsset(row['asset']),
@@ -525,7 +528,7 @@ export function parseObject(value: unknown): AuthoredObject {
     transform: parseTransform(row['transform']),
     origin: Object.freeze({
       kind: text(origin['kind'], 'authored object origin kind'),
-      role: role as ObjectRole,
+      role,
     }),
     behaviour: parseBehaviour(row['behaviour']),
     removed: flag(row['removed'], 'authored object removal'),
@@ -565,7 +568,7 @@ function parseEnvironmentInstance(value: unknown): EnvironmentInstance {
   const row = record(value, 'environment instance');
   const origin = record(row['origin'], 'environment instance origin');
   const role = text(origin['role'], 'environment instance role');
-  if (!OBJECT_ROLES.includes(role as ObjectRole)) throw invalid('environment instance role');
+  if (!isObjectRole(role)) throw invalid('environment instance role');
   return Object.freeze({
     instanceId: text(row['instance_id'], 'environment instance id'),
     source: Object.freeze({ ...record(row['source'], 'environment instance source') }),
@@ -573,7 +576,7 @@ function parseEnvironmentInstance(value: unknown): EnvironmentInstance {
     transform: parseTransform(row['transform']),
     origin: Object.freeze({
       kind: text(origin['kind'], 'environment instance origin kind'),
-      role: role as ObjectRole,
+      role,
     }),
     removed: flag(row['removed'], 'environment instance removal'),
     availability: text(row['availability'], 'environment instance availability'),

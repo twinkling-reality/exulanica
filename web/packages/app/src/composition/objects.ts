@@ -56,7 +56,6 @@ import {
 import { tierPolicy } from '@exulanica/companion-runtime';
 import type { ConfirmationBand, ConfirmationSummary } from '@exulanica/companion-runtime';
 import {
-  AUTHORED_OBJECT_MEDIA_TYPE,
   DEFAULT_PLACEMENT_DISTANCE_MM,
   MM_PER_METRE,
   fetchVerifiedObjectAsset,
@@ -78,9 +77,9 @@ import {
   type PlacedObjectRow,
 } from '../ui/object-placement.js';
 import {
-  OBJECT_ROLES,
   OBJECT_ROLE_LABELS,
   WorldObjectsClient,
+  isObjectRole,
   objectWriteFailure,
   type AlternateVersion,
   type AuthoredObject,
@@ -141,6 +140,9 @@ interface Pending {
   run(): Promise<void>;
 }
 
+/** Said when a write is confirmed with no saved version to write to. */
+const NO_AUTHORITY = 'No saved world version is connected, so nothing was changed.';
+
 export function mountObjects(deps: ObjectsDependencies): MountedObjects {
   const { env, state } = deps;
   const listeners = new AbortController();
@@ -159,7 +161,6 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
   /** Refusals and clamps the runtime reported, by object, so a row can keep showing them. */
   const notices = new Map<string, string>();
   /** Objects the preview drew for this session only. Never sent anywhere. */
-  const drawnInPreview: AuthoredObject[] = [];
 
   const confirm = buildConfirm({
     onConfirm: () => void commit(),
@@ -210,12 +211,14 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
   async function begin(versionId?: string): Promise<void> {
     if (disposed) return;
     if (client === null) {
-      assets = PREVIEW_ASSETS;
-      version = PREVIEW_VERSION;
+      // The preview has no reviewed object registry and no saved version. It offers nothing
+      // rather than a stand-in whose digests no bytes were ever hashed to.
+      assets = Object.freeze([]);
+      version = null;
       refresh();
       panel.report(
-        'This is the development preview. Objects placed here are drawn for this session and are '
-        + 'not saved.',
+        'This is the development preview. It has no reviewed objects and no saved world, so there '
+        + 'is nothing to place here, and nothing is sent.',
       );
       return;
     }
@@ -260,7 +263,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     const runtime = state.atlas?.binding.objects;
     if (disposed || runtime === undefined) return 'The world is not drawn yet.';
     // The contract embeds the whole registry row on the object, so availability is already here.
-    if (record.asset.availability !== 'available' && !env.preview) {
+    if (record.asset.availability !== 'available') {
       return `The reviewed bytes for “${record.asset.title}” are not in storage `
         + `(${record.asset.availability}), so it cannot be drawn.`;
     }
@@ -307,7 +310,6 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
 
   function loadBytes(asset: ReviewedAsset, islandId: IslandId): Promise<ArrayBuffer> {
     if (deps.loadBytes !== undefined) return deps.loadBytes(asset, islandId);
-    if (env.preview) return Promise.resolve(previewContainer());
     return fetchVerifiedObjectAsset(
       islandId,
       {
@@ -502,12 +504,18 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
   }
 
   function proposePlacement(draft: ObjectPlacementDraft): void {
+    // A role is the person's answer about their own material. Nothing here answers for them.
+    if (!isObjectRole(draft.role)) {
+      panel.report('Choose what this object is to you before placing it.', 'failure');
+      return;
+    }
+    const role: ObjectRole = draft.role;
     const asset = assets.find((candidate) => candidate.assetKey === draft.assetKey);
     if (asset === undefined) {
       panel.report('That object is not in the reviewed registry.', 'failure');
       return;
     }
-    if (asset.availability !== 'available' && !env.preview) {
+    if (asset.availability !== 'available') {
       panel.report(
         `The reviewed bytes for “${asset.title}” are not in storage, so it cannot be placed.`,
         'failure',
@@ -549,9 +557,6 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       return;
     }
     const districtKey = JSON.stringify(districtAtPlacement);
-    const role: ObjectRole = OBJECT_ROLES.includes(draft.role as ObjectRole)
-      ? (draft.role as ObjectRole)
-      : 'fictional';
     const behaviour = draft.motion
       ? {
           behaviourKey: BOUNDED_PATH_KEY,
@@ -582,13 +587,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       reversible: true,
       run: async () => {
         if (client === null || version === null) {
-          drawnInPreview.push(previewObject(objectId, asset, region.island, pose, behaviour, role));
-          const failure = await draw(drawnInPreview.at(-1)!);
-          refresh();
-          panel.report(
-            failure ?? 'Placed for this session only. The preview is read-only and nothing was saved.',
-            failure === null ? 'settled' : 'failure',
-          );
+          panel.report(NO_AUTHORITY, 'failure');
           return;
         }
         if (districtAtPlacement !== null && JSON.stringify(currentDistrict()) !== districtKey) {
@@ -617,9 +616,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       reversible: true,
       run: async () => {
         if (client === null || version === null) {
-          nudged = null;
-          panel.setPendingMove(null);
-          panel.report('The preview is read-only, so this position was not saved.', 'failure');
+          panel.report(NO_AUTHORITY, 'failure');
           return;
         }
         const result = await client.move(version, object.objectId, target);
@@ -643,12 +640,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       reversible: true,
       run: async () => {
         if (client === null || version === null) {
-          const at = drawnInPreview.findIndex((row) => row.objectId === objectId);
-          if (at !== -1) drawnInPreview.splice(at, 1);
-          state.atlas?.binding.objects.remove(objectId);
-          if (selectedId === objectId) select(null);
-          refresh();
-          panel.report('Taken out of this session. The preview is read-only.', 'failure');
+          panel.report(NO_AUTHORITY, 'failure');
           return;
         }
         const result = await client.remove(version, objectId);
@@ -680,7 +672,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       reversible: false,
       run: async () => {
         if (client === null || version === null) {
-          panel.report('The preview is read-only, so there is nothing recorded to take back.', 'failure');
+          panel.report(NO_AUTHORITY, 'failure');
           return;
         }
         await settle(await client.undo(version), 'Taken back.');
@@ -703,12 +695,6 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     const running = pending;
     if (running === null) return;
     pending = null;
-    if (env.preview) {
-      confirm.hide();
-      panel.setBusy(true);
-      try { await running.run(); } finally { panel.setBusy(false); }
-      return;
-    }
     panel.setBusy(true);
     try {
       await running.run();
@@ -820,7 +806,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
   }
 
   function everyRecord(): readonly AuthoredObject[] {
-    return client === null ? drawnInPreview : version?.objects ?? [];
+    return version?.objects ?? [];
   }
 
   function recordOf(objectId: string): AuthoredObject | null {
@@ -865,11 +851,11 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       assets.map((asset) => ({
         assetKey: asset.assetKey,
         label: asset.title,
-        available: asset.availability === 'available' || env.preview,
+        available: asset.availability === 'available',
         unavailableReason: asset.availability === 'available' ? null : asset.availability,
         licenceId: asset.licenceId,
       })),
-      OBJECT_ROLES.map((key) => ({ key, label: OBJECT_ROLE_LABELS[key] })),
+      Object.entries(OBJECT_ROLE_LABELS).map(([key, label]) => ({ key, label })),
     );
     panel.showObjects(
       visibleObjects().map((record) => ({
@@ -1008,138 +994,4 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       pending = null;
     },
   };
-}
-
-// -- the preview catalogue ---------------------------------------------------------------------------
-
-/**
- * What `?preview=1` offers, and the container it draws.
- *
- * Built here rather than read from `graph-client/test/fixtures/world-objects.json`, which is a
- * real `GET /world/versions/{id}` body the CLIENT's tests parse and which carries no bytes. A
- * preview needs something to draw. This is a box, it is obviously a box, and the surface says
- * every time that nothing placed in the preview was saved.
- */
-const PREVIEW_ASSETS: readonly ReviewedAsset[] = Object.freeze([
-  Object.freeze({
-    assetKey: 'preview.marker',
-    title: 'Preview marker',
-    summary: 'A half-metre box, drawn by the development preview only.',
-    mediaType: AUTHORED_OBJECT_MEDIA_TYPE,
-    contentSha256: '0'.repeat(64),
-    byteSize: 0,
-    licenceId: 'CC0-1.0',
-    licenceSha256: '0'.repeat(64),
-    availability: 'available',
-  }),
-]);
-
-const PREVIEW_VERSION: AlternateVersion = Object.freeze({
-  schemaVersion: 1,
-  versionId: 'preview',
-  worldId: 'preview',
-  sourceSnapshotId: 'preview',
-  parentVersionId: null,
-  title: 'Development preview',
-  origin: 'authored',
-  styleVersionId: null,
-  stateSha256: '0'.repeat(64),
-  editSeq: 0,
-  sourceInvalidated: false,
-  createdBy: 'preview',
-  createdAt: '1970-01-01T00:00:00+00:00',
-  objects: Object.freeze([]),
-  elementOverrides: Object.freeze([]),
-  edits: Object.freeze([]),
-});
-
-function previewObject(
-  objectId: string,
-  asset: ReviewedAsset,
-  island: Island,
-  pose: RegionPose,
-  behaviour: {
-    readonly behaviourKey: string;
-    readonly behaviourVersion: number;
-    readonly parameters: Readonly<Record<string, unknown>>;
-  } | null,
-  role: ObjectRole,
-): AuthoredObject {
-  return Object.freeze({
-    objectId,
-    asset,
-    regionId: String(island.islandId),
-    transform: Object.freeze({
-      coordinateSpace: 'region_local',
-      coordinateUnit: 'millimetre',
-      ...pose,
-    }),
-    origin: Object.freeze({ kind: 'authored', role }),
-    behaviour,
-    removed: false,
-  });
-}
-
-/** A self-contained GLB holding one half-metre box, built rather than shipped. */
-function previewContainer(): ArrayBuffer {
-  const h = 0.25;
-  const positions = new Float32Array([
-    -h, 0, -h, h, 0, -h, h, 2 * h, -h, -h, 2 * h, -h,
-    -h, 0, h, h, 0, h, h, 2 * h, h, -h, 2 * h, h,
-  ]);
-  const indices = new Uint16Array([
-    0, 2, 1, 0, 3, 2, 4, 5, 6, 4, 6, 7, 0, 1, 5, 0, 5, 4,
-    3, 7, 6, 3, 6, 2, 0, 4, 7, 0, 7, 3, 1, 2, 6, 1, 6, 5,
-  ]);
-  const indexBytes = new Uint8Array(indices.buffer);
-  const positionBytes = new Uint8Array(positions.buffer);
-  const indexPadding = (4 - (indexBytes.length % 4)) % 4;
-  const binary = new Uint8Array(positionBytes.length + indexBytes.length + indexPadding);
-  binary.set(positionBytes, 0);
-  binary.set(indexBytes, positionBytes.length);
-
-  const gltf = {
-    asset: { version: '2.0', generator: 'exulanica-preview' },
-    scene: 0,
-    scenes: [{ nodes: [0] }],
-    nodes: [{ mesh: 0, name: 'preview-marker' }],
-    meshes: [{ primitives: [{ attributes: { POSITION: 0 }, indices: 1, material: 0 }] }],
-    materials: [{
-      name: 'preview',
-      pbrMetallicRoughness: {
-        baseColorFactor: [0.82, 0.55, 0.28, 1], metallicFactor: 0, roughnessFactor: 0.7,
-      },
-    }],
-    accessors: [
-      {
-        bufferView: 0, componentType: 5126, count: 8, type: 'VEC3',
-        min: [-h, 0, -h], max: [h, 2 * h, h],
-      },
-      { bufferView: 1, componentType: 5123, count: indices.length, type: 'SCALAR' },
-    ],
-    bufferViews: [
-      { buffer: 0, byteOffset: 0, byteLength: positionBytes.length, target: 34962 },
-      {
-        buffer: 0, byteOffset: positionBytes.length, byteLength: indexBytes.length, target: 34963,
-      },
-    ],
-    buffers: [{ byteLength: binary.length }],
-  };
-
-  const json = new TextEncoder().encode(JSON.stringify(gltf));
-  const jsonChunk = new Uint8Array(Math.ceil(json.length / 4) * 4).fill(0x20);
-  jsonChunk.set(json);
-  const total = 12 + 8 + jsonChunk.length + 8 + binary.length;
-  const bytes = new Uint8Array(total);
-  const view = new DataView(bytes.buffer);
-  view.setUint32(0, 0x46546c67, true);
-  view.setUint32(4, 2, true);
-  view.setUint32(8, total, true);
-  view.setUint32(12, jsonChunk.length, true);
-  view.setUint32(16, 0x4e4f534a, true);
-  bytes.set(jsonChunk, 20);
-  view.setUint32(20 + jsonChunk.length, binary.length, true);
-  view.setUint32(24 + jsonChunk.length, 0x004e4942, true);
-  bytes.set(binary, 28 + jsonChunk.length);
-  return bytes.buffer;
 }

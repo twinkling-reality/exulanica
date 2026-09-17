@@ -316,8 +316,15 @@ export function buildObjectPlacement(
       }
       const first = assets.findIndex((asset) => asset.available);
       assetSelect.selectedIndex = first === -1 ? 0 : first;
-      replace(roleSelect, roles.map((role) =>
-        el('option', { value: role.key, text: role.label })));
+      // No role starts chosen, and a refresh keeps the one the person picked: a preselected
+      // option would send an answer nobody gave.
+      const chosenRole = roleSelect.value;
+      const unchosen = el('option', { value: '', text: 'Choose one' });
+      unchosen.disabled = true;
+      replace(roleSelect, [unchosen, ...roles.map((role) =>
+        el('option', { value: role.key, text: role.label }))]);
+      const kept = roles.findIndex((role) => role.key === chosenRole);
+      roleSelect.selectedIndex = kept === -1 ? 0 : kept + 1;
       reflectAsset();
     },
 

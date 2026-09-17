@@ -248,7 +248,16 @@ const arrow = (code: string) => {
   window.dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true, cancelable: true }));
 };
 
-async function place(h: ReturnType<typeof harness>, motion = false): Promise<void> {
+async function place(
+  h: ReturnType<typeof harness>,
+  motion = false,
+  role: string | null = 'fictional',
+): Promise<void> {
+  if (role !== null) {
+    const select = h.mounted.panel.root.querySelector<HTMLSelectElement>('#object-placement-role')!;
+    select.value = role;
+    select.dispatchEvent(new Event('change'));
+  }
   if (motion) {
     const toggle = h.mounted.panel.root.querySelector<HTMLInputElement>('#object-placement-motion')!;
     toggle.checked = true;
@@ -434,7 +443,7 @@ describe('nothing reaches the authority without a confirmation', () => {
     const h = harness({ initial: version({ sourceInvalidated: true }) });
     await h.mounted.begin();
     h.mounted.panel.setVisible(true);
-    button(h.mounted.panel.root, 'Place before me').click();
+    await place(h);
     expect(h.mounted.confirm.root.hidden).toBe(true);
     expect(writes(h.authority.calls)).toEqual([]);
     expect(h.mounted.panel.root.textContent).toContain('was deleted');
@@ -460,7 +469,7 @@ describe('a placement that cannot land honestly is refused, not faked', () => {
     const h = harness({ footprint: 2, awayBy: 500 });
     await h.mounted.begin();
     h.mounted.panel.setVisible(true);
-    button(h.mounted.panel.root, 'Place before me').click();
+    await place(h);
     expect(h.mounted.confirm.root.hidden).toBe(true);
     expect(writes(h.authority.calls)).toEqual([]);
     expect(h.mounted.panel.root.textContent).toContain('not standing in a region with reconstructed ground');
@@ -471,7 +480,7 @@ describe('a placement that cannot land honestly is refused, not faked', () => {
     (h.state as unknown as { placedPointMaps: unknown }).placedPointMaps = [];
     await h.mounted.begin();
     h.mounted.panel.setVisible(true);
-    button(h.mounted.panel.root, 'Place before me').click();
+    await place(h);
     expect(h.mounted.panel.root.textContent).toContain('No authorized district or reconstructed ground is available');
     expect(writes(h.authority.calls)).toEqual([]);
   });
@@ -480,7 +489,7 @@ describe('a placement that cannot land honestly is refused, not faked', () => {
     const h = harness();
     await h.mounted.begin();
     h.mounted.panel.setVisible(true);
-    button(h.mounted.panel.root, 'Place before me').click();
+    await place(h);
     expect(h.mounted.confirm.root.textContent).toContain('standing at your feet');
     expect(h.mounted.confirm.root.textContent).toContain('no recovered cameras');
     button(h.mounted.confirm.root, 'Confirm').click();
@@ -504,7 +513,7 @@ describe('a placement that cannot land honestly is refused, not faked', () => {
     ]);
     await h.mounted.begin();
     h.mounted.panel.setVisible(true);
-    button(h.mounted.panel.root, 'Place before me').click();
+    await place(h);
     expect(h.mounted.confirm.root.textContent).toContain('standing on the ground its cameras recovered');
     expect(h.mounted.confirm.root.textContent).not.toContain('at your feet');
   });
@@ -708,17 +717,47 @@ describe('running a motion writes nothing, and a refusal is visible', () => {
   });
 });
 
-describe('the development preview draws and never sends', () => {
-  it('places for the session only and says the change was not saved', async () => {
+describe('the development preview offers nothing and never sends', () => {
+  /*
+   * The preview used to offer a marker whose content, licence and version digests were sixty-four
+   * zeros. No bytes were ever hashed to them. Having nothing to place, and saying so, is the honest
+   * preview.
+   */
+  it('lists no object, says why, and sends nothing', async () => {
     const h = harness({ noClient: true }, true);
     await h.mounted.begin();
-    expect(h.mounted.panel.root.textContent).toContain('not saved');
+    const text = h.mounted.panel.root.textContent ?? '';
+    expect(text).toContain('no reviewed objects and no saved world');
+    expect(text).toContain('No reviewed objects are available');
 
     await place(h);
-    button(h.mounted.confirm.root, 'Confirm').click();
-    await vi.waitFor(() => expect(h.objects.place).toHaveBeenCalled());
+    expect(h.mounted.confirm.root.hidden).toBe(true);
+    expect(h.objects.place).not.toHaveBeenCalled();
     expect(writes(h.authority.calls)).toEqual([]);
-    expect(h.mounted.panel.root.textContent).toContain('for this session only');
+  });
+});
+
+describe('the role is the person’s answer', () => {
+  it('starts with no role chosen, refuses to place, and sends nothing', async () => {
+    const h = harness();
+    await h.mounted.begin();
+    const role = h.mounted.panel.root.querySelector<HTMLSelectElement>('#object-placement-role')!;
+    expect(role.value).toBe('');
+
+    await place(h, false, null);
+    expect(h.mounted.panel.root.textContent).toContain('Choose what this object is to you');
+    expect(h.mounted.confirm.root.hidden).toBe(true);
+    expect(h.objects.place).not.toHaveBeenCalled();
+    expect(writes(h.authority.calls)).toEqual([]);
+  });
+
+  it('keeps the chosen role when the panel is refreshed', async () => {
+    const h = harness();
+    await h.mounted.begin();
+    const role = h.mounted.panel.root.querySelector<HTMLSelectElement>('#object-placement-role')!;
+    role.value = 'personal';
+    await h.mounted.begin();
+    expect(role.value).toBe('personal');
   });
 });
 
