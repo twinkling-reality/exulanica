@@ -12,11 +12,12 @@ lot line: ``party_wall`` when a building stands across it, with ``neighbour_top_
 above this building's base the neighbour's wall top reaches, up to this face's own top; ``flank``
 for a side edge and ``rear`` for the back edge when no building stands across.
 
-**Bays, by the pitch rule.** A face longer than 1200 mm that is not a party wall has
-``count = max(round(run / target), ceil(run / 3500))`` bays of ``pitch = run // count``, the
-remainder split into its two margins, smaller first; ``target`` is ``bay_pitch_mm``. The second
-term keeps every pitch within the target architecture's 3.5 m maximum, so a door that fills a bay
-stays within an entrance record's width.
+**Bays, by the pitch rule.** A face longer than 1200 mm that is not a party wall has ``count`` bays
+of ``pitch = run // count``, the remainder split into its two margins, smaller first. ``count`` is
+``round(run / target)``, ``target`` being ``bay_pitch_mm``, moved to the nearest count whose pitch
+lies in the target architecture's 2.4 to 3.5 m band when some count does. When none does (a run of
+3.5 to 4.8 m, or under 2.4 m), it is the fewest bays a door can fill, since a door fills its bay and
+an entrance record holds a door at most 4 m wide.
 
 **Upper storeys.** One opening grid covers every bay of every upper storey of a face. Its head
 follows its treatment: ``plain`` has no band, projection or rise; ``lintel`` and ``hood`` have a
@@ -87,10 +88,10 @@ from exulanica.grammar.grammars.city.generation.stage import (
 )
 from exulanica.grammar.parameters import ParameterBinding
 
-__all__ = ["MAXIMUM_PITCH_MM", "STAGE", "building_shop_units", "is_shop_bay", "shop_units"]
+__all__ = ["PITCH_BAND_MM", "STAGE", "building_shop_units", "is_shop_bay", "shop_units"]
 
-#: The target architecture's widest bay: no pitch this generator lays out exceeds it.
-MAXIMUM_PITCH_MM: Final = 3_500
+#: The target architecture's bay pitch band.
+PITCH_BAND_MM: Final = (2_400, 3_500)
 _LOTS_PER_BLOCK: Final = 10_000
 _SEMANTICS: Final = DeclaredSemantics(facade.STAGE_ID, CITY_ADMISSIBLE_USES)
 _FACADE_PARAMETERS: Final = tuple(
@@ -175,9 +176,14 @@ def _field(shape: object, name: str) -> Any:
 
 
 def _count(run: int, target: int) -> int:
-    nearest = (2 * run + target) // (2 * target)
-    widest = -(-run // MAXIMUM_PITCH_MM)
-    return max(1, nearest, widest)
+    """The bay count: the one nearest ``run / target`` among those whose pitch lies in the band,
+    or, when no count does, the fewest whose pitch a door record can fill."""
+    nearest = max(1, (2 * run + target) // (2 * target))
+    fewest = -(-run // PITCH_BAND_MM[1])
+    most = run // PITCH_BAND_MM[0]
+    if fewest <= most:
+        return min(max(nearest, fewest), most)
+    return max(1, -(-run // _field(facade.ENTRANCE_SHAPE, "width_mm").maximum))
 
 
 def _layout(run: int, exposure: str, target: int) -> facade.BayLayout:

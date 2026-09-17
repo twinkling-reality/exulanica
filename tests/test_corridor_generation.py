@@ -10,12 +10,10 @@ longer than 1 km.
 from __future__ import annotations
 
 from collections import Counter
-from functools import cache
 
 import pytest
 from exulanica.canonical import sha256_of_canonical
 from exulanica.grammar.errors import InvalidRecordError
-from exulanica.grammar.grammars.city.catalogs import load_city_catalogs
 from exulanica.grammar.grammars.city.document import (
     TileDocument,
     document_bytes,
@@ -24,7 +22,6 @@ from exulanica.grammar.grammars.city.document import (
 from exulanica.grammar.grammars.city.generation.corridor import (
     CORRIDOR_BINDINGS,
     CORRIDOR_CITY_IDENTITY,
-    CORRIDOR_LOD,
     CORRIDOR_SEED,
     CORRIDOR_TILE,
     CORRIDOR_TILES,
@@ -34,7 +31,6 @@ from exulanica.grammar.grammars.city.generation.tiles import (
     check_piece_lengths,
     city_records,
     generate_city,
-    tile_document,
 )
 from exulanica.grammar.grammars.city.streets import (
     BlockRecord,
@@ -44,34 +40,19 @@ from exulanica.grammar.grammars.city.streets import (
 )
 from exulanica.grammar.records import record_payload
 
+from corridor_city import catalogs, documents, records
 
-@cache
+
 def _catalogs():
-    return load_city_catalogs()
+    return catalogs()
 
 
-@cache
 def _records() -> tuple[object, ...]:
-    generation = generate_city(
-        seed=CORRIDOR_SEED, subject_identity=CORRIDOR_CITY_IDENTITY, bindings=CORRIDOR_BINDINGS
-    )
-    return city_records(generation)
+    return records()
 
 
-@cache
 def _documents() -> dict[tuple[int, int], TileDocument]:
-    return {
-        (tile_x, tile_y): tile_document(
-            _records(),
-            seed=CORRIDOR_SEED,
-            subject_identity=CORRIDOR_CITY_IDENTITY,
-            catalogs=_catalogs(),
-            tile_x=tile_x,
-            tile_y=tile_y,
-            lod=CORRIDOR_LOD,
-        )
-        for tile_x, tile_y in CORRIDOR_TILES
-    }
+    return documents()
 
 
 def test_generating_the_corridor_twice_gives_the_same_records():
