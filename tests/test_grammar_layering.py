@@ -129,7 +129,11 @@ def test_the_layers_contract_is_still_exhaustive_and_places_both_new_slots():
         "reconstruction | capture",
         "evidence | migrations",
         "grammar",
-        "materials",
+        # Lettering shares the slot under `grammar` with material objects: a glyph catalog is
+        # authored data and the layout rule that places a sign's letters is integer arithmetic on
+        # it, so the city grammar's validator may import it while neither it nor materials can
+        # reach the other. See docs/lettering.md and the contract's own comment.
+        "materials | lettering",
         "canonical",
     ], order
     [grammar] = [contract for contract in contracts if contract["name"] == GRAMMAR_CONTRACT]

@@ -5,8 +5,8 @@ layout rule in both languages, and their shared cases. NOTHING DRAWS A LETTER YE
 carries a sign's typeface or cap height, no tess expander turns a placed sign into triangles, and no
 tile has been baked with lettering, so the appearance of raised letters on a fascia is UNVERIFIED.
 The kerning rule is UNVERIFIED against a shaper (section 4). The lettering fields the city grammar
-needs and the expander tess needs are specified in
-`.orimera/briefs/lanes/requirements/lettering-design-note.md`, for those lanes to build.
+needs and the expander tess needs are specified in the lettering design note, which is kept with
+the lane briefs outside this repository and was handed to those two lanes to build.
 
 ## What a person gets
 
@@ -57,12 +57,14 @@ so a catalog cannot be taken for the font.
 best-licensed candidate, touches its neighbour in 99 adjacent letter pairs across the 18 lexicon
 texts at a 300 mm cap height with no tracking. Two letters that share a point have coplanar front
 faces at the same depth, which z-fight, so the layout rule refuses them (section 4); a joined script
-would be refused almost always. Other candidates were rejected for a Reserved Font Name (Abril
-Fatface, Alfa Slab One, Limelight, Pathway Gothic One, Arvo, Rye and eleven more), for shipping only
-a variable font at that commit (Work Sans, Archivo, Oswald, Playfair Display, IBM Plex Sans and
-others), for mixed winding (Libre Caslon Display: 22 of 67 glyphs fill counter-clockwise, and i and
-j wind both ways), for small capitals only (Holtwood One SC), or for a smallest safe cap height
-above the promise (Gloock 142 mm, Coustard Regular 129 mm).
+would be refused almost always. Other candidates were rejected for a Reserved Font Name (eighteen
+of them, among them Abril Fatface, Alfa Slab One, Limelight, Pathway Gothic One, Arvo and Rye), for
+shipping only a variable font at that commit (Work Sans, Archivo, Oswald, Playfair Display, IBM Plex
+Sans and others), for mixed winding (Libre Caslon Display: 22 of 67 glyphs fill counter-clockwise,
+and i and j wind both ways), for small capitals only (Holtwood One SC), or for a smallest safe cap
+height above the promise: Gloock 142 mm (edges of `K` meet at 141) and Coustard Regular 129 mm (a
+spike in `M` at 128), both measured with this minimum edge and a coarser tolerance than the one
+settled on, `cap / 667`.
 
 ## 3. The catalog, and how a font becomes one
 
