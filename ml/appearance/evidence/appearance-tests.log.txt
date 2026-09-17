@@ -1,0 +1,16 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.12.9, pytest-9.1.1, pluggy-1.6.0
+rootdir: /Users/glendonchin/dev/Technology/exulanica-generated-appearance/ml/appearance
+configfile: pyproject.toml
+testpaths: tests
+collected 76 items
+
+tests/test_bench_capture.py ...                                          [  3%]
+tests/test_canonical_and_licences.py ................                    [ 25%]
+tests/test_encode.py ...                                                 [ 28%]
+tests/test_generation_and_runs.py .....................                  [ 56%]
+tests/test_metrics.py .....                                              [ 63%]
+tests/test_raster_and_structure.py ..............                        [ 81%]
+tests/test_weights.py ..............                                     [100%]
+
+============================== 76 passed in 0.44s ==============================

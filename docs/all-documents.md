@@ -6,13 +6,13 @@ and fails if this file disagrees with the catalog rules, which is what keeps it 
 This catalog lists living contracts, capability guides, and decision records.
 Start from [README.md](README.md).
 
-**89 documents** in the public catalog.
+**90 documents** in the public catalog.
 
 ## Living contracts and reference
 
 How the system works now. Edited as the system changes.
 
-61 documents.
+62 documents.
 
 - [architecture-overview](architecture-overview.md) : Current direction, 2026-09-12: read product-direction.md
 - [asset-read-currency](asset-read-currency.md) : Final acceptance at source head 03501cea376cf530c185e3b12a5fb0d8d8d7acdf passed 2118 backend
@@ -35,6 +35,7 @@ How the system works now. Edited as the system changes.
 - [evaluation-harness](evaluation-harness.md) : REPLAY MECHANICS AND ARCHIVES IMPLEMENTED; REAL OGC-1 BASELINE AND THE PHASE 2 GATE
 - [evaluation-methodology](evaluation-methodology.md) : Status of this document: mixed. Every claim below carries exactly one label
 - [frontier-roadmap](frontier-roadmap.md) : engineering archive. product-direction.md owns product
+- [generated-appearance](generated-appearance.md) : PLAN ACCEPTED 2026-09-17. Structure capture, the four records and the model-free
 - [generated-corridor-street](generated-corridor-street.md) : GENERATED, VALIDATED AND GATED; NOT YET BAKED INTO THE STORE OR SCORED. Updated
 - [generated-tile-runtime](generated-tile-runtime.md) : IMPLEMENTED as a development evaluation only: the browser reads baked texture sets and
 - [grammar-package](grammar-package.md) : CITY VOCABULARY VERSION 2 BUILT; EVERY CITY STAGE GENERATES. Phase 1 of the target

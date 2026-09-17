@@ -1,0 +1,55 @@
+Baseline measurements of the procedural look, generated appearance lane, 2026-09-17
+Measured on the operator's Mac (arm64) with ml/appearance's base environment; no model, no GPU.
+
+Commands (from ml/appearance, W = the worktree):
+  (cd ../../web && ./node_modules/.bin/tsx ../ml/appearance/capture/export-bench.ts) > $W/.exulanica/appearance/capture/bench-geometry.json
+  .venv/bin/python -m exulanica_appearance capture bench --geometry $W/.exulanica/appearance/capture/bench-geometry.json --out $W/.exulanica/appearance/capture/bench
+  node scripts/capture-bench-frames.mjs http://127.0.0.1:5311/ $W/.exulanica/appearance/capture/bench $W/.exulanica/appearance/before/procedural-look-v1
+  .venv/bin/python -m exulanica_appearance measure frames --structure $W/.exulanica/appearance/capture/bench --frames $W/.exulanica/appearance/before/procedural-look-v1 --out $W/.exulanica/appearance/baseline/procedural-frames.json
+  .venv/bin/python -m exulanica_appearance measure textures --repository $W --out $W/.exulanica/appearance/baseline/published-textures.json
+The bench server was this worktree's generated-tile-bench Vite config on port 5311 (launch entry appearance-bench).
+
+Bench geometry sha256: af4ddaccdf825153e867c22ea6c1c89ddb30add5a7e5aa32ae310e0df6174171
+Capture code sha256: fc44fb81785043901948c8141e517551ed1b3c84203527d5b7629a5ba086f833
+test-street.ts sha256: 1d39fac6f32c9acbffccd4a5e440d63366cb237d8a0bb27d95e5a6ff2645da38
+bench.ts sha256: 8ddf5be060c5116710f32ca6e3ad13f9977c426f5a3f7b57bf02c325e0dd158d
+Frame report sha256: 42a6f3ad7976201d3a13c09ab8e5894fcf998f2df7568ef12ceba8fdeee1f188
+Texture report sha256: 7bb5826245e37c244c5229ce82a449512cf0e8b93cc9fd59605330dcc329386e
+
+Structure records, by camera:
+  wall     ebf20dc3ada77b2cb84b57be2c592edc8494c1a52dfb70385d1c79dac2e324c7
+  kerb     3e50d15f8be5e77b20873c0b2627545e3a2627c3b1a34ec56ccfc76fa56c31e8
+  door     4202cf4a50ed6642ed0d79be7082b6f8c02132b415260eb2f6755d1c920310c7
+  cornice  b194fa374fa362f7447cb2d703a9f2d1ea0f132e1df66037d0b1206552b895be
+  street   b66dd6fa9c72e34dd64bf05df6c294a6ad6750cf8efd82ae743f0c407cd295ae
+  footway  271963a69bf52592cd1db740945cd5e2e618412df7d545dc17a57ab3c7a1e2b9
+  walk: 121 records, first b27c4387f7d8e91fa786f8d30cde153a10091e5fe8c99fd9eb9b3640d4287a56, last 085226d2205d47c26c945a5a9033c720bb80bfc6cdc60829e9df380171205f03
+
+Edge agreement at the six poses (tolerance 2 px, step 16 levels):
+  cornice  exact   2310  picture  138374  recall_ppm  763636  precision_ppm  22165  frame 34d6398d35e8a108
+  door     exact   5781  picture  112355  recall_ppm  923024  precision_ppm  48694  frame 2a251c308c430016
+  footway  exact   6316  picture  120058  recall_ppm  869221  precision_ppm  50742  frame 2d87f13c58baca4e
+  kerb     exact   8966  picture  292288  recall_ppm  659491  precision_ppm  21585  frame 8ee84ac3dbddef73
+  street   exact   4490  picture   53728  recall_ppm  845880  precision_ppm  84797  frame f4c1b4b0c3857446
+  wall     exact   5042  picture  152160  recall_ppm  836176  precision_ppm  30369  frame 2a12801f92f8f234
+
+Per-surface luminance spread (milli-levels) and interior edge density (ppm):
+  cornice: wall 41430/215261, cornice 69692/1403
+  door: footway 14799/37483, plinth 15763/24175, wall 40649/152668, reveal 25631/16621, threshold 43834/18271, door 45231/7077
+  footway: carriageway 15804/250433, kerb-top 11447/144756, footway 12700/31474, plinth 15994/23316, wall 40145/180423, reveal 23901/18625, threshold 44193/17467, door 39597/7109
+  kerb: carriageway 21552/337479, kerb-face 22964/179346, kerb-top 6200/21131, footway 7940/21799, plinth 8080/6296, wall 34283/264450, reveal 22736/5610, threshold 39623/47059, door 21375/1814
+  street: carriageway 12061/191794, kerb-top 6786/46780, footway 7284/35817, plinth 3394/0, wall 35127/319401, reveal 18684/0, threshold 3545/0, cornice 61021/550
+  wall: carriageway 9241/120888, kerb-top 3686/1596, footway 6850/29743, plinth 5562/21999, wall 39698/192857, reveal 20854/14273, threshold 45221/19209, door 38578/13662, cornice 69994/847
+
+Walk flicker, 120 consecutive pairs: {"mean_of_means_milli_levels": 2672, "median_p95_milli_levels": 11945, "worst_p95_milli_levels": 14952}
+  covisible pixels per pair: min 541673 max 608759
+
+Published texture sets (manifest sha256 7a33503c03efca8fe01d63d402f68aa4458fa9038144ac1d6909177b074cd7a7):
+  cc0.brick-running-bond     pitch_um 1758  seams_ppm  781360..1067294  low_frequency_ppm  22998  cycles {'u': 16, 'v': 24}  height_cycles {'u': 16, 'v': 24}  modules {'courses': 24, 'units_per_course': 8}  decoded 16777212
+  cc0.carriageway-asphalt    pitch_um 1953  seams_ppm  824884..1010437  low_frequency_ppm  35716  cycles {'u': 5, 'v': 6}  height_cycles {'u': 3, 'v': 3}  modules {}  decoded 16777212
+  cc0.cast-concrete          pitch_um 2344  seams_ppm  778938..1032399  low_frequency_ppm  63371  cycles {'u': 12, 'v': 1}  height_cycles {'u': 1, 'v': 8}  modules {'rows': 4}  decoded 16777212
+  cc0.footway-paving         pitch_um 1758  seams_ppm  939564..1194092  low_frequency_ppm 211011  cycles {'u': 1, 'v': 1}  height_cycles {'u': 3, 'v': 3}  modules {'rows': 3}  decoded 16777212
+  cc0.kerb-stone             pitch_um 1758  seams_ppm  986507..1438275  low_frequency_ppm   5870  cycles {'u': 2, 'v': 2}  height_cycles {'u': 2, 'v': 106}  modules {'units_per_tile': 2}  decoded 4194324
+  cc0.limestone-ashlar       pitch_um 2344  seams_ppm  294901..1532586  low_frequency_ppm 396344  cycles {'u': 1, 'v': 4}  height_cycles {'u': 8, 'v': 16}  modules {'courses': 8, 'units_per_course': 4}  decoded 16777212
+  cc0.painted-render         pitch_um 1953  seams_ppm  898573..1020619  low_frequency_ppm 215799  cycles {'u': 3, 'v': 1}  height_cycles {'u': 12, 'v': 3}  modules {}  decoded 16777212
+  cc0.storefront-metal       pitch_um  977  seams_ppm  327447..1766902  low_frequency_ppm 227349  cycles {'u': 2, 'v': 1}  height_cycles {'u': 1, 'v': 1}  modules {}  decoded 16777212

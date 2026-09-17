@@ -1,0 +1,46 @@
+[project]
+name = "exulanica-appearance"
+version = "0.1.0"
+description = "Generated appearance on exact structure: structure capture, generation records and evaluation, outside the product."
+readme = "README.md"
+license = "Apache-2.0"
+requires-python = ">=3.11,<3.13"
+# The base environment captures structure, reads and writes the records and measures pictures. It
+# runs on the operator's Mac and needs no GPU.
+dependencies = [
+  "numpy>=2.1,<3",
+  "pillow>=11,<12",
+]
+
+[project.optional-dependencies]
+# Installed only inside the GPU container on a rented machine, never on the operator's Mac.
+gpu = [
+  "torch>=2.8,<3",
+  "diffusers>=0.37,<0.38",
+  "transformers>=4.57,<5",
+  "accelerate>=1.10,<2",
+  "safetensors>=0.6,<1",
+]
+
+[dependency-groups]
+dev = ["pytest>=8"]
+
+[build-system]
+requires = ["hatchling>=1.25"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["exulanica_appearance"]
+
+[tool.uv]
+package = true
+
+[tool.pytest.ini_options]
+minversion = "8.0"
+testpaths = ["tests"]
+pythonpath = ["."]
+addopts = "-q --strict-markers --strict-config"
+
+[tool.ruff]
+line-length = 100
+target-version = "py311"

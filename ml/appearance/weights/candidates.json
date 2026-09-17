@@ -1,0 +1,252 @@
+{
+  "read_on": "2026-09-17",
+  "note": "Every repository, revision, pattern and lineage claim below was read from Hugging Face metadata at the pinned revision on read_on. Lineage lists only a source that a file names or that is byte-identical, plus one publisher statement; a component that names no source is covered by its own repository's card.",
+  "repositories": [
+    {
+      "repository": "nvidia/Cosmos3-Nano",
+      "revision": "e59a53c25979a090fa8706c9acc0c254a6e89b92",
+      "candidates": ["B1"],
+      "include": [
+        "chat_template.json",
+        "checkpoint.json",
+        "config.json",
+        "generation_config.json",
+        "merges.txt",
+        "model.safetensors.index.json",
+        "model_index.json",
+        "modular_model_index.json",
+        "preprocessor_config.json",
+        "scheduler/*",
+        "sound_tokenizer/*",
+        "text_tokenizer/*",
+        "tokenizer.json",
+        "tokenizer_config.json",
+        "transformer/*",
+        "vae/*",
+        "video_preprocessor_config.json",
+        "vision_encoder/*",
+        "vocab.json"
+      ],
+      "reason": "Every component model_index.json and modular_model_index.json load (scheduler, text tokenizer, transformer, VAE, vision encoder, sound tokenizer) and the root configs the vLLM-Omni path reads; the example media under assets/ and images/ and the card documents are not loaded.",
+      "lineage": [
+        {
+          "component": "vae/",
+          "kind": "card",
+          "repository": "Wan-AI/Wan2.2-TI2V-5B-Diffusers",
+          "revision": "b8fff7315c768468a5333511427288870b2e9635",
+          "evidence": "vae/config.json names Wan-AI/Wan2.2-TI2V-5B-Diffusers as its origin; the weights file is not byte-identical to that repository's, so these bytes are under this repository's own grant"
+        }
+      ]
+    },
+    {
+      "repository": "alibaba-pai/Wan2.2-Fun-A14B-Control",
+      "revision": "297be6d520f54908e124be0298e2317ee50ffdf4",
+      "candidates": ["B2"],
+      "include": [
+        "Wan2.1_VAE.pth",
+        "configuration.json",
+        "google/umt5-xxl/*",
+        "high_noise_model/*",
+        "low_noise_model/*",
+        "models_t5_umt5-xxl-enc-bf16.pth"
+      ],
+      "reason": "Both experts, the bundled VAE, the umT5 text encoder and its tokenizer, as VideoX-Fun loads them; the READMEs are not loaded.",
+      "lineage": [
+        {
+          "component": "Wan2.1_VAE.pth",
+          "kind": "identical-bytes",
+          "repository": "Wan-AI/Wan2.2-I2V-A14B",
+          "revision": "206a9ee1b7bfaaf8f7e4d81335650533490646a3",
+          "path": "Wan2.1_VAE.pth",
+          "own_path": "Wan2.1_VAE.pth",
+          "evidence": "byte-identical (same LFS sha256) to Wan-AI's own release, which the card also names as base_model"
+        },
+        {
+          "component": "high_noise_model/ low_noise_model/",
+          "kind": "card",
+          "repository": "Wan-AI/Wan2.2-I2V-A14B",
+          "revision": "206a9ee1b7bfaaf8f7e4d81335650533490646a3",
+          "evidence": "the card's base_model names Wan-AI/Wan2.2-I2V-A14B, which these control experts were trained from"
+        },
+        {
+          "component": "models_t5_umt5-xxl-enc-bf16.pth",
+          "kind": "identical-bytes",
+          "repository": "Wan-AI/Wan2.2-I2V-A14B",
+          "revision": "206a9ee1b7bfaaf8f7e4d81335650533490646a3",
+          "path": "models_t5_umt5-xxl-enc-bf16.pth",
+          "own_path": "models_t5_umt5-xxl-enc-bf16.pth",
+          "evidence": "byte-identical (same LFS sha256) to Wan-AI's own release"
+        }
+      ]
+    },
+    {
+      "repository": "Qwen/Qwen-Image-2512",
+      "revision": "25468b98e3276ca6700de15c6628e51b7de54a26",
+      "candidates": ["A1", "B3"],
+      "include": [
+        "model_index.json",
+        "scheduler/*",
+        "text_encoder/*",
+        "tokenizer/*",
+        "transformer/*",
+        "vae/*"
+      ],
+      "reason": "Every component model_index.json loads; nothing at the root but the index is loaded.",
+      "lineage": [
+        {
+          "component": "text_encoder/",
+          "kind": "card",
+          "repository": "Qwen/Qwen2.5-VL-7B-Instruct",
+          "revision": "cc594898137f460bfe9f0759e9844b3ce807cfb5",
+          "evidence": "text_encoder/config.json is Qwen2_5_VLForConditionalGeneration from the same publisher; the shards are split differently, so they are not byte-identical"
+        }
+      ]
+    },
+    {
+      "repository": "alibaba-pai/Qwen-Image-2512-Fun-Controlnet-Union",
+      "revision": "c21dcc372f9f52a55a6d4984cb56a0f0ac0807bc",
+      "candidates": ["A1", "B3"],
+      "include": ["Qwen-Image-2512-Fun-Controlnet-Union-2602.safetensors"],
+      "reason": "The 2602 release: the card says it adds a gray control and trained longer than the first release, which is left out; it is trained for Qwen-Image-2512, which the InstantX union control (trained for the original Qwen-Image) is not.",
+      "lineage": []
+    },
+    {
+      "repository": "Tongyi-MAI/Z-Image-Turbo",
+      "revision": "f332072aa78be7aecdf3ee76d5c247082da564a6",
+      "candidates": ["B4"],
+      "include": [
+        "model_index.json",
+        "scheduler/*",
+        "text_encoder/*",
+        "tokenizer/*",
+        "transformer/*",
+        "vae/*"
+      ],
+      "reason": "Every component model_index.json loads; the example pictures under assets/ are not loaded.",
+      "lineage": [
+        {
+          "component": "text_encoder/",
+          "kind": "identical-bytes",
+          "repository": "Qwen/Qwen3-4B",
+          "revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+          "path": "model-00001-of-00003.safetensors",
+          "own_path": "text_encoder/model-00001-of-00003.safetensors",
+          "evidence": "shards 1 and 2 are byte-identical to Qwen3-4B's (the third differs in size), so the encoder is Qwen's release"
+        },
+        {
+          "component": "vae/",
+          "kind": "publisher-statement",
+          "source": "https://huggingface.co/api/models/black-forest-labs/FLUX.1-schnell/revision/741f7c3ce8b383c54771c7003378a50191e9efe9?blobs=true",
+          "source_sha256": "12a1765a4801935191c0a3265daf52fcaa991af8a279d3e7cec4a55f45fad648",
+          "licence_id": "Apache-2.0",
+          "evidence": "vae/diffusion_pytorch_model.safetensors has sha256 f5b59a26851551b67ae1fe58d32e76486e1e812def4696a4bea97f16604d40a3, the same file FLUX.1-schnell carries, whose card declares apache-2.0 at that revision; the repository is gated, so its card text was not read"
+        }
+      ]
+    },
+    {
+      "repository": "Tongyi-MAI/Z-Image",
+      "revision": "04cc4abb7c5069926f75c9bfde9ef43d49423021",
+      "candidates": ["A2"],
+      "include": [
+        "model_index.json",
+        "scheduler/*",
+        "text_encoder/*",
+        "tokenizer/*",
+        "transformer/*",
+        "vae/*"
+      ],
+      "reason": "Every component model_index.json loads.",
+      "lineage": [
+        {
+          "component": "text_encoder/",
+          "kind": "identical-bytes",
+          "repository": "Qwen/Qwen3-4B",
+          "revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+          "path": "model-00001-of-00003.safetensors",
+          "own_path": "text_encoder/model-00001-of-00003.safetensors",
+          "evidence": "shards 1 and 2 are byte-identical to Qwen3-4B's (the third differs in size), so the encoder is Qwen's release"
+        },
+        {
+          "component": "vae/",
+          "kind": "publisher-statement",
+          "source": "https://huggingface.co/api/models/black-forest-labs/FLUX.1-schnell/revision/741f7c3ce8b383c54771c7003378a50191e9efe9?blobs=true",
+          "source_sha256": "12a1765a4801935191c0a3265daf52fcaa991af8a279d3e7cec4a55f45fad648",
+          "licence_id": "Apache-2.0",
+          "evidence": "vae/diffusion_pytorch_model.safetensors has sha256 f5b59a26851551b67ae1fe58d32e76486e1e812def4696a4bea97f16604d40a3, the same file FLUX.1-schnell carries, whose card declares apache-2.0 at that revision; vae/config.json names ../checkpoints/flux-dev as a local path, and the bytes are the Apache release"
+        }
+      ]
+    },
+    {
+      "repository": "alibaba-pai/Z-Image-Fun-Controlnet-Union-2.1",
+      "revision": "755999a934909bd5832e20718bb7c639d2a63eb9",
+      "candidates": ["A2", "B4"],
+      "include": ["Z-Image-Fun-Controlnet-Union-2.1.safetensors"],
+      "reason": "The full union control (canny, depth, pose, MLSD, scribble, HED, gray); the lite version is weaker by design and the tile models are for upscaling, which no track uses.",
+      "lineage": []
+    },
+    {
+      "repository": "black-forest-labs/FLUX.2-klein-base-4B",
+      "revision": "a3b4f4849157f664bdbc776fd7453c2783562f4d",
+      "candidates": ["A3"],
+      "include": [
+        "LICENSE.md",
+        "model_index.json",
+        "scheduler/*",
+        "text_encoder/*",
+        "tokenizer/*",
+        "transformer/*",
+        "vae/*"
+      ],
+      "reason": "Every component model_index.json loads, and the licence file; the root single-file copy of the transformer duplicates transformer/ and the example pictures are not loaded.",
+      "lineage": [
+        {
+          "component": "text_encoder/",
+          "kind": "card",
+          "repository": "Qwen/Qwen3-4B",
+          "revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+          "evidence": "text_encoder/config.json is Qwen3ForCausalLM at Qwen3-4B's size (hidden 2560, 36 layers); its shards are split differently from Qwen's, so they are not byte-identical"
+        },
+        {
+          "component": "vae/",
+          "kind": "publisher-statement",
+          "source": "https://raw.githubusercontent.com/black-forest-labs/flux2/50fe5162777813d869182b139e83b10743caef15/README.md",
+          "source_sha256": "435753749320bbb395c15983e63e3dc73936c03f0f1870c628e7bf922c55eef7",
+          "licence_id": "Apache-2.0",
+          "evidence": "the publisher's README, section FLUX.2 autoencoder, states the autoencoder is released under Apache 2.0; vae/config.json names black-forest-labs/FLUX.2-dev, whose transformer is non-commercial, as its origin"
+        }
+      ]
+    },
+    {
+      "repository": "DiffSynth-Studio/Template-KleinBase4B-ControlNet",
+      "revision": "14338668d53038eba59de16845c021415545a495",
+      "candidates": ["A3"],
+      "include": ["configuration.json", "model.py", "model.safetensors"],
+      "reason": "The control template's weights, its model code and its configuration; its README loads the text encoder, VAE and tokenizer from FLUX.2-klein-4B, whose files are byte-identical to the klein base repository's, so those come from that manifest.",
+      "lineage": [
+        {
+          "component": "model.safetensors",
+          "kind": "card",
+          "repository": "black-forest-labs/FLUX.2-klein-base-4B",
+          "revision": "a3b4f4849157f664bdbc776fd7453c2783562f4d",
+          "evidence": "the README loads it on FLUX.2-klein-base-4B's transformer"
+        }
+      ]
+    },
+    {
+      "repository": "Ruicheng/moge-2-vitl-normal",
+      "revision": "cb0e8bbd6b1e243589717c78e750b1ba4c093acf",
+      "candidates": ["M"],
+      "include": ["model.pt"],
+      "reason": "The one checkpoint; measurement only, never a generator.",
+      "lineage": [
+        {
+          "component": "model.pt",
+          "kind": "card",
+          "repository": "facebook/dinov2-large",
+          "revision": "47b73eefe95e8d44ec3623f8890bd894b6ea2d6c",
+          "evidence": "the card's base_model names facebook/dinov2-large"
+        }
+      ]
+    }
+  ]
+}
