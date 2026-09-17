@@ -2,6 +2,8 @@ import { describe,it,expect,vi } from 'vitest';
 import type * as pc from 'playcanvas';
 import { NativeCharacterRuntime,type NativeCharacterFrame } from '../src/playcanvas/native-character-runtime.js';
 import type { NativeCharacterDescriptor } from '../src/playcanvas/native-character.js';
+import { CharacterHost } from '../src/playcanvas/character/host.js';
+import { CHARACTER_CATALOG } from '../src/playcanvas/character/catalog-data.js';
 const state=vi.hoisted(()=>({releases:0,destroys:0}));
 vi.mock('../src/playcanvas/native-character-pool.js',()=>({NativeCharacterPool:class{async acquire(){return{release:()=>state.releases++};}destroy(){}}}));
 vi.mock('../src/playcanvas/native-character-actor.js',()=>({
@@ -9,12 +11,13 @@ vi.mock('../src/playcanvas/native-character-actor.js',()=>({
  NativeCharacterActor:class{status='ready';currentGait='idle';resolvedSpeed=0;mutableResidentBytes=0;constructor(readonly subject:unknown,readonly descriptor:unknown,private lease:{release():void}){}update(){}setAppearance(){}destroy(){state.destroys++;this.lease.release();}}
 }));
 const descriptor={} as NativeCharacterDescriptor;
+const app=()=>({once:vi.fn()}) as unknown as pc.AppBase;
 function frame(id:string,branch='main'):NativeCharacterFrame{
  const render={enabled:true};return{subject:{kind:'synthetic-inhabitant',societyId:'society',branchId:branch,inhabitantId:id},parent:{} as pc.Entity,fallback:{findComponents:()=>[render],tags:{add:vi.fn(),remove:vi.fn(),has:()=>false}} as unknown as pc.Entity,visible:true,position:[0,0,0],yaw:0,deltaSeconds:1/60};
 }
 describe('native residency and current permission',()=>{
  it('uses capped subjects, rejects overflow, and releases an old branch even for matching inhabitant IDs',async()=>{
-  const runtime=new NativeCharacterRuntime({} as pc.AppBase,vi.fn());const frames=Array.from({length:24},(_,i)=>frame(String(i)));runtime.syncFrames(frames);
+  const runtime=new NativeCharacterRuntime(app(),vi.fn());const frames=Array.from({length:24},(_,i)=>frame(String(i)));runtime.syncFrames(frames);
   await runtime.install(frames[0]!.subject,descriptor,{},()=>({presence:'allowed',source:'available'}));
   expect(runtime.inspect(frames[0]!.subject)?.status).toBe('ready');
   expect(()=>runtime.syncFrames([...frames,frame('25')])).toThrow('resident');
@@ -23,7 +26,7 @@ describe('native residency and current permission',()=>{
   expect(state.destroys).toBeGreaterThan(0);runtime.destroy();
  });
  it('restores fallback on withdrawal and hides both representations on denied or failed presence checks',async()=>{
-  const runtime=new NativeCharacterRuntime({} as pc.AppBase,vi.fn()),f=frame('one');runtime.syncFrames([f]);
+  const runtime=new NativeCharacterRuntime(app(),vi.fn()),f=frame('one');runtime.syncFrames([f]);
   let authority:{presence:'allowed'|'denied';source:'available'|'withdrawn'}={presence:'allowed',source:'available'};
   await runtime.install(f.subject,descriptor,{},()=>authority);
   const render=(f.fallback.findComponents('render') as pc.RenderComponent[])[0]!;
@@ -34,7 +37,7 @@ describe('native residency and current permission',()=>{
   runtime.destroy();
  });
  it('does not restore a native instance automatically when a withdrawn source becomes available again',async()=>{
-  const runtime=new NativeCharacterRuntime({} as pc.AppBase,vi.fn()),f=frame('one');runtime.syncFrames([f]);let available=true;
+  const runtime=new NativeCharacterRuntime(app(),vi.fn()),f=frame('one');runtime.syncFrames([f]);let available=true;
   await runtime.install(f.subject,descriptor,{},()=>({presence:'allowed',source:available?'available':'withdrawn'}));
   available=false;runtime.syncFrames([f]);available=true;runtime.syncFrames([f]);expect(runtime.inspect(f.subject)?.status).toBe('fallback');
   runtime.clear(f.subject);expect(runtime.inspect(f.subject)?.status).toBe('abstract');runtime.destroy();
@@ -43,7 +46,7 @@ describe('native residency and current permission',()=>{
 
 describe('native resident subscriptions',()=>{
  it('starts with an immutable current snapshot and ignores pose, visibility and order changes',()=>{
-  const runtime=new NativeCharacterRuntime({} as pc.AppBase,vi.fn());
+  const runtime=new NativeCharacterRuntime(app(),vi.fn());
   const a=frame('a'),b=frame('b');runtime.syncFrames([a,b]);
   const listener=vi.fn();const unsubscribe=runtime.subscribeResidents(listener);
   expect(listener).toHaveBeenCalledTimes(1);
@@ -61,7 +64,7 @@ describe('native resident subscriptions',()=>{
   expect(listener).toHaveBeenCalledTimes(2);runtime.destroy();
  });
  it('notifies after the entire mutation and permits immediate installation, including replacement at the same identity',async()=>{
-  const runtime=new NativeCharacterRuntime({} as pc.AppBase,vi.fn());
+  const runtime=new NativeCharacterRuntime(app(),vi.fn());
   const a=frame('a'),b=frame('b');const pending:Promise<void>[]=[];
   const statuses:(string|undefined)[][]=[];
   const withAsset={asset:{assetKey:'test',mediaType:'model/gltf-binary',contentSha256:'a'.repeat(64),byteSize:1}} as NativeCharacterDescriptor;
@@ -87,19 +90,26 @@ describe('native resident subscriptions',()=>{
   runtime.destroy();
  });
  it('unsubscribes repeated callbacks independently',()=>{
-  const runtime=new NativeCharacterRuntime({} as pc.AppBase,vi.fn()),listener=vi.fn();
+  const runtime=new NativeCharacterRuntime(app(),vi.fn()),listener=vi.fn();
   const first=runtime.subscribeResidents(listener),second=runtime.subscribeResidents(listener);
   expect(listener).toHaveBeenCalledTimes(2);first();runtime.syncFrames([frame('one')]);
   expect(listener).toHaveBeenCalledTimes(3);second();runtime.syncFrames([]);
   expect(listener).toHaveBeenCalledTimes(3);runtime.destroy();
  });
  it('stops dispatch when a listener destroys the runtime and stays quiet afterward',()=>{
-  const runtime=new NativeCharacterRuntime({} as pc.AppBase,vi.fn());
+  const runtime=new NativeCharacterRuntime(app(),vi.fn());
   const first=vi.fn((subjects:readonly NativeCharacterFrame['subject'][])=>{if(subjects.length)runtime.destroy();});
   const second=vi.fn();runtime.subscribeResidents(first);runtime.subscribeResidents(second);
   runtime.syncFrames([frame('one')]);expect(first).toHaveBeenCalledTimes(2);expect(second).toHaveBeenCalledTimes(1);
   runtime.syncFrames([frame('two')]);const late=vi.fn();runtime.subscribeResidents(late)();runtime.destroy();
   expect(late).not.toHaveBeenCalled();expect(first).toHaveBeenCalledTimes(2);expect(second).toHaveBeenCalledTimes(1);
   expect(runtime.inspect(frame('two').subject)).toBeNull();
+ });
+ it('hands its byte authority to the catalog people of the same application',()=>{
+  const application=app(),loader=vi.fn();
+  expect(CharacterHost.forApp(application,CHARACTER_CATALOG).hasLoader).toBe(false);
+  new NativeCharacterRuntime(application,loader);
+  expect(CharacterHost.forApp(application,CHARACTER_CATALOG).hasLoader).toBe(true);
+  expect(CharacterHost.forApp(app(),CHARACTER_CATALOG).hasLoader).toBe(false);
  });
 });

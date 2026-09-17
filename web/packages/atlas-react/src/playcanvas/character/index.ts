@@ -34,3 +34,4 @@ export {
 export { CHARACTER_CATALOG } from './catalog-data.js';
 export { CharacterHost, type CharacterAssetLoader } from './host.js';
 export { canonicalJson, canonicalSha256, sha256Hex } from './digest.js';
+export { CharacterCrowdEvaluation, EVALUATION_SPEEDS, type CrowdEvaluationHost, type CrowdEvaluationOptions } from './evaluation.js';

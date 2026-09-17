@@ -4,6 +4,8 @@ import { NativeCharacterActor, currentNativeAuthorityStatus } from './native-cha
 import { NativeCharacterPool, type CharacterByteLoader } from './native-character-pool.js';
 import type { NativeCharacterAppearance, NativeCharacterAuthority, NativeCharacterDescriptor, NativeCharacterMotion } from './native-character.js';
 import { CHARACTER_RENDERABLE_TAG } from './character/renderable.js';
+import { CharacterHost } from './character/host.js';
+import { CHARACTER_CATALOG } from './character/catalog-data.js';
 
 export interface NativeCharacterFrame extends NativeCharacterMotion {
   readonly subject:CharacterSubject;
@@ -18,7 +20,11 @@ export class NativeCharacterRuntime {
   private readonly residents=new Map<string,Resident>();
   private readonly residentListeners=new Set<(subjects:readonly CharacterSubject[])=>void>();
   private destroyed=false;
-  constructor(app:pc.AppBase,loadBytes:CharacterByteLoader){this.pool=new NativeCharacterPool(app,loadBytes);}
+  constructor(app:pc.AppBase,loadBytes:CharacterByteLoader){
+    this.pool=new NativeCharacterPool(app,loadBytes);
+    // Catalog people fetch through the same authority; renderables waiting for it upgrade now.
+    CharacterHost.forApp(app,CHARACTER_CATALOG).setLoader(loadBytes);
+  }
   /** Initial snapshot, then residency changes only. Pose/visibility updates do not notify. */
   subscribeResidents(listener:(subjects:readonly CharacterSubject[])=>void):()=>void{
     if(this.destroyed)return ()=>{};
