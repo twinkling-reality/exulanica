@@ -669,3 +669,14 @@ name = "The product never imports the training code"
 type = "forbidden"
 source_modules = ["exulanica"]
 forbidden_modules = ["exulanica_training"]
+
+[[tool.importlinter.contracts]]
+# The generated appearance code in `ml/appearance/` is outside the product in the same way: its own
+# environment, model libraries in a GPU extra only its container installs, and weights named by
+# digest. What crosses back is data: a candidate texture set with its generation record, handed to
+# the texture lane to publish or not. `tests/test_training_boundary.py` holds the same rule by
+# reading the source.
+name = "The product never imports the generated appearance code"
+type = "forbidden"
+source_modules = ["exulanica"]
+forbidden_modules = ["exulanica_appearance"]

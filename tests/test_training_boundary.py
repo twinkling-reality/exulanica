@@ -79,3 +79,49 @@ def test_the_training_code_has_its_own_environment_and_the_product_s_does_not_ca
         "EXULANICA_TRAINING_APPROVAL",
     ):
         assert flag in run, flag
+
+
+APPEARANCE = ROOT / "ml" / "appearance"
+
+
+def test_nothing_in_the_product_imports_the_generated_appearance_code():
+    offenders = sorted(
+        str(path.relative_to(ROOT))
+        for path in (ROOT / "exulanica").rglob("*.py")
+        if any(name.split(".")[0] == "exulanica_appearance" for name in _imports(path))
+    )
+    assert offenders == []
+
+
+def test_the_import_contract_names_the_generated_appearance_package():
+    config = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    contracts = config["tool"]["importlinter"]["contracts"]
+    name = "The product never imports the generated appearance code"
+    (contract,) = [c for c in contracts if c["name"] == name]
+    assert contract["type"] == "forbidden"
+    assert contract["source_modules"] == ["exulanica"]
+    assert contract["forbidden_modules"] == ["exulanica_appearance"]
+
+
+def test_the_generated_appearance_code_reaches_nothing_of_the_product():
+    for path in (APPEARANCE / "exulanica_appearance").rglob("*.py"):
+        for name in _imports(path):
+            top = name.split(".")[0]
+            assert top not in {"exulanica", "exulanica_training"}, (
+                f"{path.relative_to(ROOT)} imports {name}"
+            )
+            assert top not in {"psycopg", "fastapi", "requests", "httpx", "urllib3"}, (
+                f"{path.relative_to(ROOT)} imports {name}; appearance code reads files only"
+            )
+
+
+def test_the_generated_appearance_code_keeps_model_libraries_out_of_its_base_environment():
+    appearance = tomllib.loads((APPEARANCE / "pyproject.toml").read_text(encoding="utf-8"))
+    assert appearance["project"]["name"] == "exulanica-appearance"
+    base = " ".join(appearance["project"]["dependencies"])
+    for library in ("torch", "diffusers", "transformers", "accelerate"):
+        assert library not in base, f"{library} is in the base environment, which runs on the Mac"
+    assert any(d.startswith("torch") for d in appearance["project"]["optional-dependencies"]["gpu"])
+    assert (APPEARANCE / "uv.lock").is_file()
+    product = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
+    assert product["tool"]["hatch"]["build"]["targets"]["wheel"]["packages"] == ["exulanica"]
