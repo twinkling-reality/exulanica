@@ -6,8 +6,10 @@ The default `exulanica-society/v1` retains seeded synthetic motion. Opt-in
 `exulanica-society/v2` adds reachable goals, routes, reviewed visit/rest actions and reactions to
 versioned authored inputs. Opt-in `exulanica-society/v3` adds a bounded synthetic cast with
 local observations, communicated beliefs and explicitly requested, validated model proposals.
-All profiles are fictional simulation, separate from personal evidence. They do not model real
-residents, infer demographic facts or demonstrate general social intelligence.
+`exulanica-society/v4`, the living society, adds catalogued routines, occupancy and a
+population sized to its place; the browser creates new live societies with it. All profiles are
+fictional simulation, separate from personal evidence. They do not model real residents, infer
+demographic facts or demonstrate general social intelligence.
 
 ## Connection to the personal world
 
@@ -26,7 +28,13 @@ playing v2/v3 society under the bounded lease policy below; persistence alone st
 
 Implementation:
 
-- legacy state and transitions: `exulanica/world/society.py`;
+- shared identity, draws, events and digests: `exulanica/world/society.py`;
+- the frozen v1 engine and the fixed tables stored v1 to v3 histories depend on:
+  `exulanica/world/society_legacy.py`;
+- the v4 living society: `exulanica/world/society_living.py`, its routine catalogs
+  `exulanica/world/society_catalogs.py` over `assets/catalogs/society/`, the place contract
+  `exulanica/world/society_place.py`, the generated-city place `exulanica/world/society_city_place.py`
+  and run measurements `exulanica/world/society_metrics.py`;
 - purposeful policy and input validation: `exulanica/world/society_planner.py`;
 - bounded observations and communication: `exulanica/world/society_social.py`;
 - persistence and compare-and-swap: `exulanica/world/society_repository.py`;
@@ -41,8 +49,9 @@ Implementation:
 
 ## Identity, branches and compatibility
 
-The default population is 128; the pure initializer accepts 100–512. The population is canonical
-state, independent of the 24-avatar display budget. Inhabitant UUIDv5 identities derive from
+The v1 to v3 population is 128; their pure initializer accepts 100–512. V4 sizes its
+population to its place (below). The population is canonical state, independent of how many
+people a renderer draws. Inhabitant UUIDv5 identities derive from
 society identity and ordinal. The same society ID/seed/population preserves those identities across
 profiles, but a stored society's profile and seed cannot change. The society UUID derives from its
 authored version UUID with the existing `exulanica-society/v1` identity domain, including for v2 and v3.
@@ -90,7 +99,7 @@ are distributed deterministically among declared nodes in components containing 
 ## Goals, routes and actions
 
 Each tick is one simulated minute. Travel budget is 60,000 mm per tick, at most one metre per
-simulated second. Shortest routes minimize integer edge length with lexicographic node-path ties.
+simulated second. Shortest routes minimize integer edge length with lexicographic node-path ties (in every profile).
 A scalar need of at least 750 prefers rest; otherwise visit is preferred. Among reachable candidates,
 the policy prefers a different target from the last completed one, then lower route cost and target
 ID. This is a small deterministic utility policy, not learned preference or biography.
@@ -348,6 +357,14 @@ The database cases use real migrations and a synthetic authorized-input adapter,
 sources or personal material. Live connected acceptance and renderer performance require the
 integrated experience and explicit user evaluation.
 
+V4 pure fixtures cover catalog refusal, place projection and sizing on the committed Flatiron
+input, a 500-minute Flatiron run with no stationary collisions or over-capacity minutes, the same
+properties over twelve seeds on a synthetic grid, graph-bound motion within each walking speed,
+pinned state and event digests, edits without teleporting, source withdrawal, a simulated day in
+a hand-written city block built from grammar records, and a real-engine preview recording that
+replays frame for frame. PostgreSQL cases cover v4 creation, advance, reload, replay, withdrawal,
+playback through the worker on admitted Flatiron inputs, and selection labels without names.
+
 V3 pure fixtures cover local information boundaries, transmission delay, remembered choices,
 vacated locations, stale hearsay, wait, proposal rejection and replay. Authenticated PostgreSQL
 cases exercise committed reservations, pending/completed retries, stale input/state admission,
@@ -482,6 +499,88 @@ only the next eligible goal and ordinary navigation/action checks remain authori
 teleport, cross unsupported space, undo completed actions or simulation history, or replace a
 withdrawn target. The current browser can inspect inhabitants and destinations but does not issue
 this API, so directed-action interaction and manual acceptance remain open.
+
+## V4 living society: routines, places and occupancy
+
+V4 is a successor profile. It never changes v1, v2 or v3 bytes: their pinned digest vectors and
+replay tests are unchanged, and the names, roles, `home:{n}`/`work:{n}` labels, fixed weather and
+resources blocks and the 300 m wander bound those profiles hash now live only in
+`society_legacy.py`, labelled as a frozen encoding that exists so stored histories replay.
+
+**Routine as data.** Needs, activities, capacity rules, the premises use-class mapping and policy
+values live in versioned catalogs under `assets/catalogs/society/`, in the city grammar's
+catalog envelope, each entry with a licence and a stated reason. A society records the catalog
+versions and their digest, and refuses to advance under a different digest, so a routine change
+is a new catalog version. Five needs (rest, leisure, a meal, shopping, sleep) grow each simulated
+minute at their catalogued rate. Activities relieve one need each, have a duration range and an
+opening window, and take place at a destination, at home, at work (a shift, which outranks every
+need while due) or at any open standing spot (walking and pausing, which needs only the graph).
+
+**The place contract.** A place hands the society `exulanica.society-place/v1`
+(`validate_place`): an integer-millimetre navigation graph with ceil-Euclidean edge lengths,
+standing spots (one person each, at distinct positions), carriageway crossings, destinations with
+affordances, reviewed durations, indoor or outdoor presence, visitor, staff and resident
+capacities, role, shift, address and frontage street segment, unavailable destinations, and a
+sorted list of what the place cannot supply. Two producers exist:
+
+- `place_from_society_input` projects a persisted society input exactly as it is, so v4 replay
+  needs nothing beyond the stored inputs. Every graph node is one standing spot when the
+  published clearance fits the catalogued standing radius, and each district or authored target
+  holds one person at its access node. The input has no homes, premises, roles, street names,
+  street segments or crossings, and the place says so. The Flatiron interpretation's walkable
+  graph spans 32 m by 80 m of the district (93 nodes, 4 targets), so a Flatiron society holds 46
+  people: half of its 93 places.
+- `place_from_city_records` derives a place from the city grammar's street, parcel, massing,
+  premises and street-furniture records only. Footways follow each segment at an integer offset,
+  join only within the same junction corner, and cross a carriageway only at a recorded crossing
+  offset. A premises unit's use class maps to its capacities, role and shift; an unknown use class
+  is listed as unsupported, never guessed. A unit's access node is the projection of its parcel's
+  centroid onto the frontage footway until the records carry an entrance.
+
+**Population.** A place with homes is populated by one inhabitant per catalogued home place. A
+place without homes holds the catalogued share (half) of its standing spots and indoor visitor
+places, and a requested population above nine tenths of that capacity is refused. Workplace
+positions go to inhabitants in seeded order. A role exists only where premises supply it; an
+inhabitant without one records the reason. No state field names a person: presentation is a role
+in a place, and names, if ever shown, belong to world style.
+
+**Choice and occupancy.** Each minute every need grows. An inhabitant with nothing in progress
+takes the most pressing reachable activity that has room: weighted need above its threshold, or
+a due shift, with a seeded per-inhabitant weight spread of a tenth. When nothing is pressing it
+takes the best available activity anyway, and walking to another open spot is always available.
+Reservations are taken in inhabitant order within the minute: a standing spot holds one person,
+an indoor destination holds its visitor capacity, and homes and workplace positions belong to
+their inhabitants. An inhabitant never chooses the spot or destination it is already at, a
+finished activity lowers its need by the catalogued relief, and a population never exceeds its
+place's capacity. Together these rule out the absorbing state v2 reached on Flatiron, where
+every inhabitant preferred the one visit target forever: no two stationary people share a
+position, and an outdoor inhabitant moves again within a bounded number of minutes.
+
+**Motion.** Each inhabitant walks at its own seeded speed of 66 to 84 m per simulated minute
+along shortest graph routes, from spot to access node, along edges and onto its target spot. An
+indoor activity places the person at the premises' access node with `indoors: true`. Positions
+are always on the graph or on a spot, so v4 needs no position bound. `motion_path_mm` records
+every point passed in the minute. Weather and resources are recorded as unavailable with a reason.
+
+**Events.** V4 emits `goal_selected`, `route_progressed`, `action_completed`, `replanned` and
+`blocked` with the v2 envelope, plus the minute of day, the place digest, the inhabitant's needs
+and, for each carriageway crossing entered, `{crossing_id, arrival_second, duration_seconds}`
+from its recorded motion and speed. Summaries are templates naming the role or "a person".
+
+**Persistence.** Migration 0075 admits v4 in the engine-version check, allows v4 populations of
+1 to 65,536 while keeping 100 to 512 for earlier profiles, and extends the versioned event order
+index and the input and event binding triggers. V4 uses the existing input, event and transition
+tables, playback controls and replay. Typed user actions and model decisions remain v2/v3 and v3
+features; v4 refuses them.
+
+**Rendering.** The app draws the whole population by distance: up to 24 nearest outdoor
+inhabitants as full characters (the native character runtime's resident limit) and every other
+outdoor inhabitant within 700 m as a simple instanced figure of the same identity, one draw call
+per palette. Indoor inhabitants are counted, not drawn. People at the same position are all drawn
+there. A v4 inhabitant walks its recorded path from the start of the interval at its recorded
+speed and stops where the path ends; nothing is interpolated off the path. The development
+preview plays a recording made by the real engine over the committed Flatiron input
+(`scripts/record_living_society.py`), with every frame bound to its state digest.
 
 ## Traffic boundary
 
