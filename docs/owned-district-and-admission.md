@@ -72,11 +72,15 @@ Version 1 contains no explicit:
 - photogrammetric appearance.
 
 The browser does not complete any of those. It draws each building as its recorded footprint and
-roof height, outlined and hatched with no surface material, and draws the ground as a grid marking
-the authored flat walking datum. That drawing represents the recorded footprints and heights; it is
-not new data. No facade, roof, tree, lamp or street-furniture geometry is generated, the material
-class and material catalog above are not drawn, and the interpretation's facade grids and parapets
-are not drawn either.
+roof height, and each sidewalk as its recorded footprint, outlined and hatched with no surface
+material, the sidewalks lighter so they read as ground. It draws the ground as a grid marking the
+authored flat walking datum. That drawing represents the recorded footprints and heights; it is not
+new data. No facade, roof, tree, lamp or street-furniture geometry is generated, the material class
+and material catalog above are not drawn, and the interpretation's facade grids and parapets are
+not drawn either. Two tints are declared and name recorded facts rather than materials: an
+authored instance, drawn with the same outline and hatching, takes one tint per recorded role, and
+the interpretation's generated entrance and rest markers take one tint that marks them as
+generated.
 
 ## Interpretation boundary
 
