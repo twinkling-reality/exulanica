@@ -23,6 +23,10 @@
  * draw under the owned district that is not a data view point draw (its surfaces and its extent and
  * datum lines), to tell the district's own drawing cost from the data view's. Each run records what
  * it hid and whether each draw was already visible, and puts every one back afterwards.
+ * `--hide-points` hides the data view's own point draws instead, with every point still prepared.
+ * `--style '<json>'` merges look values into the style the measured runtime is built with (for
+ * example `{"points":{"minPixels":1,"maxPixels":1}}`), validated like any style; the product's
+ * style is not touched.
  */
 import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
@@ -42,6 +46,8 @@ const budgets = argument('budgets', '65536,262144,524288,1048576,2097152,4194304
 const seconds = Number(argument('seconds', '8'));
 const views = argument('views', 'street,overview').split(',');
 const hideDistrict = process.argv.includes('--hide-district');
+const hidePoints = process.argv.includes('--hide-points');
+const styleOverride = JSON.parse(argument('style', '{}'));
 const port = Number(argument('port', String(9400 + Math.floor(Math.random() * 400))));
 
 class Session {
@@ -117,7 +123,10 @@ const MEASURE = (budget, view) => `(async () => {
   b.representationController?.destroy();
   b.representationOverlay?.destroy();
   b.representationDefaults.clear(); b.representationOverrides.clear(); b.representationFrames.clear();
-  b.representationController = new RepresentationRuntime(${budget}, perSubject);
+  const merge = (base, over) => Object.fromEntries(Object.entries(base).map(([k, v]) =>
+    [k, over && Object.hasOwn(over, k) ? (typeof v === 'object' && v !== null && !Array.isArray(v) ? merge(v, over[k]) : over[k]) : v]));
+  const style = core.dataViewStyle(merge(JSON.parse(JSON.stringify(core.DATA_VIEW_STYLE)), ${JSON.stringify(styleOverride)}));
+  b.representationController = new RepresentationRuntime(${budget}, perSubject, { style });
   b.initializeRepresentation([]);
   const prepareStart = performance.now();
   let report = b.setRepresentationIntent({ ...b.representationReport.intent, pointMix: 1 });
@@ -131,6 +140,16 @@ const MEASURE = (budget, view) => `(async () => {
     district.forEach(e => {
       for (const mi of e.render?.meshInstances ?? []) {
         if (e.name.startsWith('data-view-points:')) continue;
+        hidden.push({ name: e.name, primitive: mi.mesh.primitive[0].type, wasVisible: mi.visible, mi });
+        mi.visible = false;
+      }
+    });
+  }
+  if (${hidePoints}) {
+    const district = b.app.root;
+    district.forEach(e => {
+      if (!e.name.startsWith('data-view-points:')) return;
+      for (const mi of e.render?.meshInstances ?? []) {
         hidden.push({ name: e.name, primitive: mi.mesh.primitive[0].type, wasVisible: mi.visible, mi });
         mi.visible = false;
       }
@@ -245,7 +264,8 @@ async function main() {
     socket.close();
     process.stdout.write(`${JSON.stringify({
       measuredAt: new Date().toISOString(), url, viewport: VIEWPORT, seconds, browser: version.Browser,
-      renderer: attached.renderer, canvas: attached.canvas, subjects: attached.subjects, hideDistrict, runs,
+      renderer: attached.renderer, canvas: attached.canvas, subjects: attached.subjects, hideDistrict, hidePoints,
+      styleOverride, runs,
     }, null, 2)}\n`);
   } finally {
     chrome.kill('SIGKILL');
