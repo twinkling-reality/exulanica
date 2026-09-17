@@ -200,9 +200,11 @@ seven, `condensed` has five pairs that touch in the font's own units (`XX`, `Xx`
 and two more that only the rounding brings together, `slab` has `fY` and two more, and
 `modern_serif` has `fb` and four more. `grotesque` has none at any size. Rounding-driven touching
 flickers with size: `Qj` in `modern_serif` touches from 101 to 110 mm, is apart at 111 to 116, and
-touches again from 117 to 122. No text in the signage lexicon touches in any of the four catalogs at
-any of the sizes tested, so a refusal here means the grammar picked an unusual pairing, and its
-answer is another cap height, some tracking, or another typeface.
+touches again from 117 to 122. No text in the signage lexicon touches, in any of the four catalogs, at any
+cap height in the promise: measured exhaustively, 79,272 layouts (18 texts, 4 catalogs, every
+integer cap height from 100 to 1200 mm), no refusal of any kind, 23 s in one process. So a refusal
+here means the grammar picked an unusual pairing, and its answer is another cap height, some
+tracking, or another typeface.
 
 ## 6. What a sign costs
 
