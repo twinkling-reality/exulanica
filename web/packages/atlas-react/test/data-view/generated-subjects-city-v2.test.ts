@@ -98,10 +98,16 @@ function expectContract(outcomes: readonly Outcome[]): void {
 function expectToday(outcomes: readonly Outcome[]): void {
   const count = (test: (outcome: Outcome) => boolean) => outcomes.filter(test).length;
   expect(outcomes).toHaveLength(174);
+  const street = ['carriageway:record', 'gutter:record'];
   expect(outcomes.filter(outcome => outcome.state === 'drawn').map(outcome => [outcome.kind, outcome.bounded, outcome.surfaces]))
-    .toEqual([['city.terrain', true, ['terrain:none-exists']]]);
+    .toEqual([
+      ['city.street_segment', true, street],
+      ['city.street_segment', true, street],
+      ['city.street_segment', true, street],
+      ['city.terrain', true, ['terrain:none-exists']],
+    ]);
   expect(count(outcome => outcome.membership === 'halo' && outcome.subjectId === null)).toBe(3);
-  expect(count(outcome => outcome.state === 'unavailable' && outcome.subjectId !== null && !outcome.bounded)).toBe(61);
+  expect(count(outcome => outcome.state === 'unavailable' && outcome.subjectId !== null && !outcome.bounded)).toBe(58);
   expect(count(outcome => outcome.state === 'not_in_projection' && outcome.hasExtent && !outcome.bounded)).toBe(24);
   expect(count(outcome => outcome.membership === 'owned' && !outcome.hasExtent && outcome.subjectId === null)).toBe(85);
 }
