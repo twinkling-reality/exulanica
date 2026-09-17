@@ -327,6 +327,18 @@
       "maximum": 5000
     },
     {
+      "name": "dropped_kerb_upstand_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "district",
+      "stage": "streets",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: the kerb a dropped crossing leaves standing. Nominally flush, and what is left is what a cane finds; a district builds its crossings one way.",
+      "minimum": 0,
+      "maximum": 25
+    },
+    {
       "name": "speed_limit_mm_s",
       "kind": "integer",
       "unit": "mm_per_s",

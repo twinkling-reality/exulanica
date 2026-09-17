@@ -56,7 +56,7 @@ def test_the_city_migration_is_total_and_introduces_every_parameter():
     assert sorted(entry.target for entry in migration.introduced) == sorted(
         CITY_SURFACE.parameters.names()
     )
-    assert len(migration.introduced) == 76
+    assert len(migration.introduced) == 77
     assert migration.identity_policy == "introduced"
     assert "derived no subject identities" in migration.identity_reason
     assert migration.levels == tuple((level, level) for level in CITY_V1_SURFACE.cascade.levels)

@@ -76,6 +76,10 @@
       "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
     },
     {
+      "target": "dropped_kerb_upstand_mm",
+      "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
+    },
+    {
       "target": "speed_limit_mm_s",
       "reason": "City version 1 declared no parameters, so this one has no predecessor to carry."
     },
