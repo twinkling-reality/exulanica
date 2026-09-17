@@ -26,6 +26,7 @@
  */
 
 import type { AtlasScene, DistrictInterpretation, IslandId, OwnedDistrict } from '@exulanica/atlas-core';
+import type { GeneratedTileMount } from '@exulanica/atlas-react/generated-tile';
 import type {
   PresentationTheme,
   WorldArtProfile,
@@ -75,6 +76,8 @@ export async function mountAtlas(
       readonly residentBytes: number;
       readonly interpretation?: DistrictInterpretation;
     };
+    /** Development evaluation only; see `composition/generated-tile.ts`. */
+    readonly generatedTile?: GeneratedTileMount;
   },
   beforeStart?: (binding: AtlasBinding) => void,
 ): Promise<MountedAtlas> {
@@ -92,6 +95,9 @@ export async function mountAtlas(
     ...(presentation?.ownedDistrict === undefined
       ? {}
       : { ownedDistrict: presentation.ownedDistrict }),
+    ...(presentation?.generatedTile === undefined
+      ? {}
+      : { generatedTile: presentation.generatedTile }),
     ...(presentation === undefined
       ? {}
       : {
