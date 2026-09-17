@@ -2,7 +2,7 @@
   "set_id": "cc0.float-glazing",
   "version": 1,
   "title": "Float glazing",
-  "summary": "Clear soda-lime float glass with a light film of dust, rain streaks and faint handling marks.",
+  "summary": "Clear soda-lime float glass, mostly clean, with patches of fine dust, occasional rain streaks and rare handling marks.",
   "licence_id": "CC0-1.0",
   "recipe": {
     "profile": "exulanica.texture-recipe/v1",
@@ -12,25 +12,26 @@
     },
     "seed": 2026091701,
     "resolution": {
-      "width": 512,
-      "height": 512
+      "width": 1024,
+      "height": 1024
     },
     "extent_mm": {
-      "u": 1000,
-      "v": 1000
+      "u": 2000,
+      "v": 2000
     },
     "parameters": {
       "glass_tint": [246, 250, 247],
       "glass_roughness_permille": 20,
       "film_colour": [150, 144, 132],
       "film_roughness_permille": 650,
-      "dust_percent": 16,
-      "dust_cells": 160,
-      "streak_percent": 10,
-      "streak_cells_across": 40,
-      "streak_cells_along": 2,
+      "dust_percent": 12,
+      "dust_patch_cells": 8,
+      "dust_cells": 320,
+      "streak_percent": 8,
+      "streak_cells_across": 80,
+      "streak_cells_along": 4,
       "smudge_percent": 4,
-      "smudge_cells": 6
+      "smudge_cells": 12
     }
   }
 }
