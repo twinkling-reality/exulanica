@@ -20,9 +20,16 @@ const TILES: Readonly<Record<string, () => Promise<string>>> = import.meta.glob<
   { query: '?url', import: 'default' },
 );
 
-const TEXTURE_SETS: Readonly<Record<string, () => Promise<string>>> = import.meta.glob<string>(
+/**
+ * The committed sets' URLs, imported eagerly. The blobs sit outside the app's workspace, and Vite's
+ * development server resolves a `?url` import of such a file only when a module imports it statically
+ * (as the manifest above is); a lazy import of one is answered with its raw bytes instead of a URL
+ * module, so the page could not load it. Eager imports are static, and they carry URLs, not bytes.
+ * `test/generated-tile-sources.test.ts` resolves every pinned set through a real development server.
+ */
+const TEXTURE_SETS: Readonly<Record<string, string>> = import.meta.glob<string>(
   '../../../../../assets/textures/blobs/*.ltex',
-  { query: '?url', import: 'default' },
+  { query: '?url', import: 'default', eager: true },
 );
 
 export interface GeneratedTileSourceBytes {
@@ -68,7 +75,7 @@ export async function generatedTileSource(name: string): Promise<GeneratedTileSo
     async textureSet(contentSha256: string): Promise<Uint8Array> {
       const entry = Object.entries(TEXTURE_SETS).find(([candidate]) => baseName(candidate, '.ltex') === contentSha256);
       if (entry === undefined) throw new Error(`No committed texture set has digest ${contentSha256}`);
-      return bytesAt(await entry[1](), `Texture set ${contentSha256}`);
+      return bytesAt(entry[1], `Texture set ${contentSha256}`);
     },
   };
 }
