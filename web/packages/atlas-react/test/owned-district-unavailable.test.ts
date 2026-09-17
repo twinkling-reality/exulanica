@@ -3,9 +3,12 @@ import { describe, expect, it } from 'vitest';
 import * as pc from 'playcanvas';
 import type { DistrictInterpretation, OwnedDistrict } from '@exulanica/atlas-core';
 import {
+  GENERATED_MARKER_TINT,
   OWNED_DISTRICT_GROUND_UNAVAILABLE,
   OWNED_DISTRICT_SURFACE_UNAVAILABLE,
   OwnedDistrictRuntime,
+  ROLE_TINT,
+  type OwnedAuthoredEnvironmentInstance,
 } from '../src/playcanvas/owned-district-runtime.js';
 
 /*
@@ -15,8 +18,9 @@ import {
  * with windows, band it with cornices, add rooftop boxes to even-numbered tall buildings, plant a
  * tree and a lamp at every sidewalk centroid, lay an asphalt quad under all of it, and float a cone
  * over anything marked fictional. None of that is in any source record. These tests hold the
- * replacement: one unavailable treatment for every building, a datum grid for the ground, and
- * nothing else.
+ * replacement: one unavailable treatment for every building and sidewalk, a datum grid for the
+ * ground, a declared tint for what a record does say (an authored instance's role, a generated
+ * marker), and nothing else.
  */
 
 const square = (x: number, z: number, half: number) =>
@@ -68,6 +72,7 @@ function setup(interpretation?: DistrictInterpretation) {
 const drawn = (root: pc.Entity) => root.children.map((child) => child.name);
 
 const REMOVED = [
+  'owned-sidewalks',
   'owned-district-visible-support',
   'owned-building-roofs',
   'owned-building-memory-windows',
@@ -83,14 +88,15 @@ describe('owned district unavailable surfaces', () => {
     const { runtime, app } = setup();
     const names = drawn(runtime.root);
     expect(names).toEqual([
-      'owned-sidewalks',
+      'owned-sidewalk-surface-unavailable',
+      'owned-sidewalk-recorded-extent',
       'owned-district-ground-datum-unavailable',
       'owned-building-surface-unavailable',
       'owned-building-recorded-extent',
     ]);
     for (const name of REMOVED) expect(names).not.toContain(name);
     expect(names.some((name) => name.startsWith('owned-buildings-'))).toBe(false);
-    expect(runtime.metrics.drawCalls).toBe(4);
+    expect(runtime.metrics.drawCalls).toBe(5);
     runtime.destroy();
     app.destroy();
   });
@@ -114,6 +120,28 @@ describe('owned district unavailable surfaces', () => {
     app.destroy();
   });
 
+  it('draws recorded sidewalks hatched and outlined, not as a paving material', () => {
+    const { runtime, app } = setup();
+    const buildings = (runtime.root.findByName('owned-building-surface-unavailable') as pc.Entity)
+      .render!.meshInstances[0]!.material as pc.StandardMaterial;
+    const surface = runtime.root.findByName('owned-sidewalk-surface-unavailable') as pc.Entity;
+    const material = surface.render!.meshInstances[0]!.material as pc.StandardMaterial;
+    expect(material.useLighting).toBe(false);
+    expect(material.opacityMap).toBe(buildings.opacityMap);
+    expect(material.emissive.equals(buildings.emissive)).toBe(true);
+    expect(material.diffuse.equals(new pc.Color(0, 0, 0))).toBe(true);
+    // Lighter than the buildings, so it still reads as ground.
+    expect(material.opacity).toBeLessThan(buildings.opacity);
+    // The footprint at kerb height, and nowhere else.
+    const positions: number[] = [];
+    surface.render!.meshInstances[0]!.mesh.getPositions(positions);
+    expect(new Set(positions.filter((_, index) => index % 3 === 1).map((y) => Math.round(y * 1000)))).toEqual(new Set([25]));
+    const outline = runtime.root.findByName('owned-sidewalk-recorded-extent') as pc.Entity;
+    expect(outline.render!.meshInstances[0]!.mesh.primitive[0]!.type).toBe(pc.PRIMITIVE_LINES);
+    runtime.destroy();
+    app.destroy();
+  });
+
   it('draws the ground as lines, not as a surface', () => {
     const { runtime, app } = setup();
     const datum = runtime.root.findByName('owned-district-ground-datum-unavailable') as pc.Entity;
@@ -129,10 +157,12 @@ describe('owned district unavailable surfaces', () => {
     const { runtime, app } = setup();
     expect(runtime.unavailable).toEqual({
       buildingSurfaces: 2,
+      sidewalkSurfaces: 1,
       surfaceReason: OWNED_DISTRICT_SURFACE_UNAVAILABLE,
       groundReason: OWNED_DISTRICT_GROUND_UNAVAILABLE,
     });
     expect(OWNED_DISTRICT_SURFACE_UNAVAILABLE).toMatch(/no source record/);
+    expect(OWNED_DISTRICT_SURFACE_UNAVAILABLE).toMatch(/sidewalk/);
     runtime.destroy();
     app.destroy();
   });
@@ -169,21 +199,85 @@ describe('owned district unavailable surfaces', () => {
     }
   });
 
+  const instance = (id: string, role: string): OwnedAuthoredEnvironmentInstance => ({
+    instanceId: id,
+    providerFeatureId: 'doitt_id:1',
+    coordinateFrame: 'flatiron-local-mm',
+    transform: { xMm: 0, yMm: 0, zMm: 0, yawMicroradians: 0, scaleMilli: 1000 },
+    origin: { role },
+    removed: false,
+    availability: 'available',
+  });
+
   it('places a fictional authored instance without a sky lantern', () => {
     const { runtime, app } = setup();
-    runtime.setAuthoredInstances([{
-      instanceId: 'probe',
-      providerFeatureId: 'doitt_id:1',
-      coordinateFrame: 'flatiron-local-mm',
-      transform: { xMm: 0, yMm: 0, zMm: 0, yawMicroradians: 0, scaleMilli: 1000 },
-      origin: { role: 'fictional' },
-      removed: false,
-      availability: 'available',
-    }]);
+    runtime.setAuthoredInstances([instance('probe', 'fictional')]);
     const placed = runtime.authoredRoot.findByName('authored-probe') as pc.Entity;
     expect(placed).not.toBeNull();
     expect(placed.children).toHaveLength(0);
     expect(runtime.authoredRoot.findByName('authored-fantasy-sky-lantern')).toBeNull();
+    runtime.destroy();
+    app.destroy();
+  });
+
+  it('tells authored instances apart only by their recorded role, with no material of their own', () => {
+    const { runtime, app } = setup();
+    runtime.setAuthoredInstances([
+      instance('invented', 'fictional'),
+      instance('lived', 'personal'),
+      instance('unlisted', 'something-else'),
+    ]);
+    const buildings = (runtime.root.findByName('owned-building-surface-unavailable') as pc.Entity)
+      .render!.meshInstances[0]!.material as pc.StandardMaterial;
+    const plain = new pc.StandardMaterial();
+    const drawn = (id: string) => {
+      const entity = runtime.authoredRoot.findByName(`authored-${id}`) as pc.Entity;
+      const [surface, edges] = entity.render!.meshInstances;
+      expect(edges!.mesh.primitive[0]!.type).toBe(pc.PRIMITIVE_LINES);
+      const material = surface!.material as pc.StandardMaterial;
+      expect(material.useLighting).toBe(false);
+      expect(material.useMetalness).toBe(plain.useMetalness);
+      expect(material.gloss).toBe(plain.gloss);
+      expect(material.opacityMap).toBe(buildings.opacityMap);
+      expect(material.diffuse.equals(new pc.Color(0, 0, 0))).toBe(true);
+      expect((edges!.material as pc.StandardMaterial).emissive.equals(material.emissive)).toBe(true);
+      return material.emissive;
+    };
+    expect(drawn('invented').equals(ROLE_TINT['fictional']!)).toBe(true);
+    expect(drawn('lived').equals(ROLE_TINT['personal']!)).toBe(true);
+    expect(drawn('invented').equals(drawn('lived'))).toBe(false);
+    // A role the legend does not know borrows no other role's tint.
+    expect(drawn('unlisted').equals(buildings.emissive)).toBe(true);
+    runtime.destroy();
+    app.destroy();
+  });
+
+  it('draws the interpretation’s generated markers in the generated-marker tint and nothing else', () => {
+    const markers = {
+      district_id: 'test',
+      subjects: [
+        {
+          subject_id: 'test/entrance', kind: 'entrance', permitted_uses: ['render', 'select', 'simulate'],
+          recipe: {
+            kind: 'entrance-marker', building_subject_id: 'doitt_id:1', position_mm: [-1000, -900],
+            polygon_index: 0, facade_edge_index: 0, width_mm: 1200, height_mm: 2200,
+          },
+        },
+        {
+          subject_id: 'test/rest', kind: 'civic-object', permitted_uses: ['render', 'select', 'simulate'],
+          recipe: { kind: 'rest-pad', position_mm: [0, 0], radius_mm: 600, height_mm: 0 },
+        },
+      ],
+    } as unknown as DistrictInterpretation;
+    const { runtime, app } = setup(markers);
+    const entity = runtime.root.findByName('interpreted-civic-markers') as pc.Entity;
+    const material = entity.render!.meshInstances[0]!.material as pc.StandardMaterial;
+    const plain = new pc.StandardMaterial();
+    expect(material.useLighting).toBe(false);
+    expect(material.emissive.equals(GENERATED_MARKER_TINT)).toBe(true);
+    expect(material.diffuse.equals(new pc.Color(0, 0, 0))).toBe(true);
+    expect(material.gloss).toBe(plain.gloss);
+    expect(material.useMetalness).toBe(plain.useMetalness);
     runtime.destroy();
     app.destroy();
   });

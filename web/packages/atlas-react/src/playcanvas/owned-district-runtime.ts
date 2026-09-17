@@ -6,7 +6,7 @@ import type {
   OwnedDistrictBuilding,
 } from '@exulanica/atlas-core';
 import * as pc from 'playcanvas';
-import { buildingRayDistance, pointInRing, ringArea, surfaceTriangles } from './district-surfaces.js';
+import { buildingRayDistance, pointInRing, surfaceTriangles } from './district-surfaces.js';
 import { sampleMotionPath } from './society-presentation.js';
 import { PlayerAvatar } from './player-avatar.js';
 import { abstractCharacter, syntheticCharacterStyle } from './character-shape.js';
@@ -29,12 +29,13 @@ export interface OwnedDistrictMetrics {
  */
 export interface OwnedDistrictUnavailableState {
   readonly buildingSurfaces: number;
+  readonly sidewalkSurfaces: number;
   readonly surfaceReason: string;
   readonly groundReason: string;
 }
 
 export const OWNED_DISTRICT_SURFACE_UNAVAILABLE =
-  'Surface material unavailable: no source record describes it. The outline and hatching show the recorded footprint and roof height only.';
+  'Surface material unavailable: no source record describes it. The outline and hatching show each recorded building footprint and roof height, and each recorded sidewalk footprint, only.';
 export const OWNED_DISTRICT_GROUND_UNAVAILABLE =
   'Ground surface unavailable: the grid marks the authored flat walking datum, not a surveyed street.';
 
@@ -114,6 +115,29 @@ const HATCH_PERIOD_M = 2.4;
 const UNAVAILABLE_TONE = new pc.Color(0.34, 0.4, 0.43);
 /** Metres between datum grid lines. */
 const DATUM_SPACING_M = 10;
+/** Sidewalks share the unavailable tone at a lower strength, so they read as ground under the buildings. */
+const SIDEWALK_OPACITY = 0.55;
+
+/**
+ * The legend for authored instances: one tint per recorded role.
+ *
+ * The tint encodes the role the person chose for the instance, and nothing else. It is not a
+ * material: the instance's surface is as unrecorded as every other surface here, so it draws with
+ * the same outline and hatching. A role missing from this legend draws in the unavailable tone
+ * rather than borrowing another role's tint.
+ */
+export const ROLE_TINT: Readonly<Record<string, pc.Color>> = Object.freeze({
+  fictional: new pc.Color(0.1, 0.5, 0.6),
+  personal: new pc.Color(0.66, 0.56, 0.4),
+});
+
+/**
+ * The legend for the interpretation's generated civic markers (entrance and rest markers).
+ *
+ * The tint says "a generated recipe put this here", the same meaning the proof lens gives its
+ * generated tier. It is not a material, and nothing about it was observed.
+ */
+export const GENERATED_MARKER_TINT = new pc.Color(0.85, 0.45, 0.1);
 
 function hatchTexture(device: pc.GraphicsDevice): pc.Texture {
   const size = 32;
@@ -139,12 +163,14 @@ function hatchTexture(device: pc.GraphicsDevice): pc.Texture {
   return texture;
 }
 
-function unavailableSurfaceMaterial(hatch: pc.Texture): pc.StandardMaterial {
+/** Hatched, unlit, and one tint: the whole of what an unrecorded surface may look like. */
+function hatchedMaterial(hatch: pc.Texture, tint: pc.Color = UNAVAILABLE_TONE, opacity = 1): pc.StandardMaterial {
   const result = new pc.StandardMaterial();
   result.useLighting = false;
   result.useSkybox = false;
   result.diffuse = new pc.Color(0, 0, 0);
-  result.emissive = UNAVAILABLE_TONE.clone();
+  result.emissive = tint.clone();
+  result.opacity = opacity;
   result.emissiveMap = hatch;
   result.opacityMap = hatch;
   result.opacityMapChannel = 'a';
@@ -155,12 +181,14 @@ function unavailableSurfaceMaterial(hatch: pc.Texture): pc.StandardMaterial {
   return result;
 }
 
-function unavailableLineMaterial(opacity: number): pc.StandardMaterial {
+/** Unlit and one tint, for outlines, the datum grid and generated markers. */
+function flatMaterial(opacity: number, tint: pc.Color = UNAVAILABLE_TONE): pc.StandardMaterial {
   const result = new pc.StandardMaterial();
   result.useLighting = false;
   result.useSkybox = false;
   result.diffuse = new pc.Color(0, 0, 0);
-  result.emissive = UNAVAILABLE_TONE.clone();
+  result.emissive = tint.clone();
+  result.cull = pc.CULLFACE_NONE;
   result.opacity = opacity;
   result.blendType = opacity < 1 ? pc.BLEND_NORMAL : pc.BLEND_NONE;
   result.update();
@@ -212,9 +240,27 @@ function addUnavailableBuilding(
           [[ax, 0, az], [bx, 0, bz], [bx, height, bz], [ax, height, az]],
           [[u0, 0], [u1, 0], [u1, v1], [u0, v1]]);
         line(outlines, [ax, 0.03, az], [bx, 0.03, bz]);
-        line(outlines, [ax, height, az], [bx, height, bz]);
         line(outlines, [ax, 0.03, az], [ax, height, az]);
         along += length;
+      }
+    }
+  }
+  addUnavailableFlat(surfaces, outlines, building.polygons, height);
+}
+
+/** A recorded footprint at one height: hatched between its rings, and every ring outlined. */
+function addUnavailableFlat(
+  surfaces: HatchBatch,
+  outlines: LineBatch,
+  polygons: OwnedDistrictBuilding['polygons'],
+  height: number,
+): void {
+  for (const polygon of polygons) {
+    for (const ring of polygon) {
+      for (let index = 1; index < ring.length; index += 1) {
+        const [ax, az] = ring[index - 1]!;
+        const [bx, bz] = ring[index]!;
+        line(outlines, [ax / 100, height, az / 100], [bx / 100, height, bz / 100]);
       }
     }
     for (const triangle of surfaceTriangles(polygon)) {
@@ -227,6 +273,26 @@ function addUnavailableBuilding(
       surfaces.indices.push(first, first + 1, first + 2);
     }
   }
+}
+
+function hatchedMesh(device: pc.GraphicsDevice, source: HatchBatch): pc.Mesh | null {
+  if (source.indices.length === 0) return null;
+  const result = new pc.Mesh(device);
+  result.setPositions(source.positions);
+  result.setNormals(source.normals);
+  result.setUvs(0, source.uvs);
+  result.setIndices(source.indices);
+  result.update(pc.PRIMITIVE_TRIANGLES);
+  return result;
+}
+
+function lineMesh(device: pc.GraphicsDevice, source: LineBatch): pc.Mesh | null {
+  if (source.indices.length === 0) return null;
+  const result = new pc.Mesh(device);
+  result.setPositions(source.positions);
+  result.setIndices(source.indices);
+  result.update(pc.PRIMITIVE_LINES);
+  return result;
 }
 
 /** The authored flat datum the district's navigation stands on, drawn as a grid, not a surface. */
@@ -281,44 +347,6 @@ function addBox(
   quad(target, [l, b, n], [r, b, n], [r, b, f], [l, b, f], [0, -1, 0]);
 }
 
-function addBuilding(target: Batch, building: OwnedDistrictBuilding): void {
-  const height = building.height_cm / 100;
-  for (const polygon of building.polygons) {
-    polygon.forEach((sourceRing, ringIndex) => {
-      // Consistent outward faces regardless of provider winding, including holes.
-      const wantPositive = ringIndex === 0;
-      const ring = (ringArea(sourceRing) > 0) === wantPositive ? sourceRing : [...sourceRing].reverse();
-      for (let index = 1; index < ring.length; index++) {
-        const [ax, az] = ring[index - 1]!, [bx, bz] = ring[index]!;
-        const dx = (bx - ax) / 100, dz = (bz - az) / 100;
-        const length = Math.hypot(dx, dz);
-        if (length < 1e-8) continue;
-        quad(target, [bx / 100, 0, bz / 100], [ax / 100, 0, az / 100],
-          [ax / 100, height, az / 100], [bx / 100, height, bz / 100],
-          [dz / length, 0, -dx / length]);
-      }
-    });
-  }
-  addFlatPolygon(target, building.polygons, height);
-}
-
-function addFlatPolygon(
-  target: Batch,
-  polygons: OwnedDistrictBuilding['polygons'],
-  height: number,
-): void {
-  for (const polygon of polygons) {
-    for (const triangle of surfaceTriangles(polygon)) {
-      const first = target.positions.length / 3;
-      for (const [x, z] of triangle) {
-        target.positions.push(x / 100, height, z / 100);
-        target.normals.push(0, 1, 0);
-      }
-      target.indices.push(first, first + 1, first + 2);
-    }
-  }
-}
-
 function mesh(device: pc.GraphicsDevice, source: Batch): pc.Mesh | null {
   if (source.indices.length === 0) return null;
   const result = new pc.Mesh(device);
@@ -361,6 +389,7 @@ export class OwnedDistrictRuntime {
   private readonly meshes: pc.Mesh[] = [];
   private readonly materials: pc.Material[] = [];
   private readonly textures: pc.Texture[] = [];
+  private readonly hatch: pc.Texture;
   private authoredMeshes: pc.Mesh[] = [];
   private authoredMaterials: pc.Material[] = [];
   private societyMeshes: pc.Mesh[] = [];
@@ -389,30 +418,18 @@ export class OwnedDistrictRuntime {
     parent.addChild(this.root);
     parent.addChild(this.authoredRoot);
     parent.addChild(this.societyRoot);
-    const sidewalkBatch = batch();
-    for (const sidewalk of district.sidewalks) {
-      addFlatPolygon(sidewalkBatch, sidewalk.polygons, 0.025);
-    }
-    const sidewalkMesh = mesh(device, sidewalkBatch);
-    if (sidewalkMesh !== null) {
-      const sidewalkMaterial = new pc.StandardMaterial();
-      sidewalkMaterial.diffuse = new pc.Color(0.76, 0.76, 0.71);
-      sidewalkMaterial.emissive = new pc.Color(0.025, 0.023, 0.019);
-      sidewalkMaterial.emissiveIntensity = 0.15;
-      sidewalkMaterial.gloss = 0.1;
-      sidewalkMaterial.update();
-      const sidewalks = new pc.Entity('owned-sidewalks');
-      sidewalks.addComponent('render', {
-        meshInstances: [new pc.MeshInstance(sidewalkMesh, sidewalkMaterial, sidewalks)],
-        castShadows: false,
-        receiveShadows: true,
-      });
-      this.meshes.push(sidewalkMesh);
-      this.materials.push(sidewalkMaterial);
-      this.root.addChild(sidewalks);
-    }
+    this.hatch = hatchTexture(device);
+    this.textures.push(this.hatch);
 
-    let drawCalls = sidewalkMesh === null ? 0 : 1;
+    // Sidewalk footprints are recorded; what they are paved with is not. They draw like the
+    // buildings, hatched and outlined, at a lower strength so they still read as ground.
+    const sidewalkSurfaces = hatchBatch();
+    const sidewalkOutlines = lineBatch();
+    for (const sidewalk of district.sidewalks) {
+      addUnavailableFlat(sidewalkSurfaces, sidewalkOutlines, sidewalk.polygons, 0.025);
+    }
+    let drawCalls = this.addHatched(sidewalkSurfaces, 'owned-sidewalk-surface-unavailable', SIDEWALK_OPACITY);
+    drawCalls += this.addLines(sidewalkOutlines, 'owned-sidewalk-recorded-extent', SIDEWALK_OPACITY);
 
     // No record gives the ground a surface. The grid is the authored walking datum and says so.
     const datum = lineBatch();
@@ -423,33 +440,14 @@ export class OwnedDistrictRuntime {
     // footprint and roof height as an outline, hatched between the edges. The interpretation's
     // facade grids and parapets are generated recipes with nothing observed behind them, so they
     // are not drawn either.
-    const hatch = hatchTexture(device);
-    this.textures.push(hatch);
     const surfaces = hatchBatch();
     const outlines = lineBatch();
     for (const building of district.buildings) addUnavailableBuilding(surfaces, outlines, building);
-    if (surfaces.indices.length > 0) {
-      const geometry = new pc.Mesh(device);
-      geometry.setPositions(surfaces.positions);
-      geometry.setNormals(surfaces.normals);
-      geometry.setUvs(0, surfaces.uvs);
-      geometry.setIndices(surfaces.indices);
-      geometry.update(pc.PRIMITIVE_TRIANGLES);
-      const surface = unavailableSurfaceMaterial(hatch);
-      const entity = new pc.Entity('owned-building-surface-unavailable');
-      entity.addComponent('render', {
-        meshInstances: [new pc.MeshInstance(geometry, surface, entity)],
-        castShadows: false,
-        receiveShadows: false,
-      });
-      this.meshes.push(geometry);
-      this.materials.push(surface);
-      this.root.addChild(entity);
-      drawCalls += 1;
-    }
+    drawCalls += this.addHatched(surfaces, 'owned-building-surface-unavailable', 1);
     drawCalls += this.addLines(outlines, 'owned-building-recorded-extent', 1);
     this.unavailable = Object.freeze({
       buildingSurfaces: district.buildings.length,
+      sidewalkSurfaces: district.sidewalks.length,
       surfaceReason: OWNED_DISTRICT_SURFACE_UNAVAILABLE,
       groundReason: OWNED_DISTRICT_GROUND_UNAVAILABLE,
     });
@@ -476,7 +474,8 @@ export class OwnedDistrictRuntime {
       }
       const civicMesh = mesh(device, civic);
       if (civicMesh) {
-        const mat = new pc.StandardMaterial(); mat.diffuse = new pc.Color(.22, .54, .58); mat.emissive = new pc.Color(.07, .16, .17); mat.cull = pc.CULLFACE_NONE; mat.update();
+        // Generated recipes, drawn in the generated-marker tint rather than a surface of their own.
+        const mat = flatMaterial(1, GENERATED_MARKER_TINT);
         const entity = new pc.Entity('interpreted-civic-markers');
         entity.addComponent('render', {meshInstances:[new pc.MeshInstance(civicMesh, mat, entity)],castShadows:false,receiveShadows:true});
         this.root.addChild(entity); this.meshes.push(civicMesh); this.materials.push(mat); drawCalls++;
@@ -491,13 +490,26 @@ export class OwnedDistrictRuntime {
     });
   }
 
+  private addHatched(source: HatchBatch, name: string, opacity: number): number {
+    const geometry = hatchedMesh(this.device, source);
+    if (geometry === null) return 0;
+    const surface = hatchedMaterial(this.hatch, UNAVAILABLE_TONE, opacity);
+    const entity = new pc.Entity(name);
+    entity.addComponent('render', {
+      meshInstances: [new pc.MeshInstance(geometry, surface, entity)],
+      castShadows: false,
+      receiveShadows: false,
+    });
+    this.meshes.push(geometry);
+    this.materials.push(surface);
+    this.root.addChild(entity);
+    return 1;
+  }
+
   private addLines(source: LineBatch, name: string, opacity: number): number {
-    if (source.indices.length === 0) return 0;
-    const geometry = new pc.Mesh(this.device);
-    geometry.setPositions(source.positions);
-    geometry.setIndices(source.indices);
-    geometry.update(pc.PRIMITIVE_LINES);
-    const surface = unavailableLineMaterial(opacity);
+    const geometry = lineMesh(this.device, source);
+    if (geometry === null) return 0;
+    const surface = flatMaterial(opacity);
     const entity = new pc.Entity(name);
     entity.addComponent('render', {
       meshInstances: [new pc.MeshInstance(geometry, surface, entity)],
@@ -532,27 +544,26 @@ export class OwnedDistrictRuntime {
           ([x, z]) => [x - cx, z - cz] as const,
         ))),
       };
-      const source = batch();
-      addBuilding(source, local);
-      const geometry = mesh(this.device, source);
-      if (geometry === null) continue;
-      const surface = new pc.StandardMaterial();
-      surface.diffuse = instance.origin.role === 'fictional'
-        ? new pc.Color(0.12, 0.34, 0.4)
-        : new pc.Color(0.74, 0.66, 0.55);
-      surface.emissive = instance.origin.role === 'fictional'
-        ? new pc.Color(0.05, 0.58, 0.68)
-        : new pc.Color(0.08, 0.04, 0.02);
-      surface.emissiveIntensity = instance.origin.role === 'fictional' ? 0.55 : 0.12;
-      surface.metalness = 0.22;
-      surface.gloss = 0.72;
-      surface.useMetalness = true;
-      surface.update();
+      const surfaces = hatchBatch();
+      const outlines = lineBatch();
+      addUnavailableBuilding(surfaces, outlines, local);
+      const geometry = hatchedMesh(this.device, surfaces);
+      const edges = lineMesh(this.device, outlines);
+      if (geometry === null || edges === null) continue;
+      // The recorded role is the only thing that tells two instances apart.
+      const tint = Object.hasOwn(ROLE_TINT, instance.origin.role)
+        ? ROLE_TINT[instance.origin.role]!
+        : UNAVAILABLE_TONE;
+      const surface = hatchedMaterial(this.hatch, tint);
+      const edge = flatMaterial(1, tint);
       const entity = new pc.Entity(`authored-${instance.instanceId}`);
       entity.addComponent('render', {
-        meshInstances: [new pc.MeshInstance(geometry, surface, entity)],
-        castShadows: true,
-        receiveShadows: true,
+        meshInstances: [
+          new pc.MeshInstance(geometry, surface, entity),
+          new pc.MeshInstance(edges, edge, entity),
+        ],
+        castShadows: false,
+        receiveShadows: false,
       });
       entity.setLocalPosition(
         instance.transform.xMm / 1000,
@@ -565,8 +576,8 @@ export class OwnedDistrictRuntime {
         instance.transform.scaleMilli / 1000,
         instance.transform.scaleMilli / 1000,
       );
-      this.authoredMeshes.push(geometry);
-      this.authoredMaterials.push(surface);
+      this.authoredMeshes.push(geometry, edges);
+      this.authoredMaterials.push(surface, edge);
       this.authoredRoot.addChild(entity);
     }
   }
