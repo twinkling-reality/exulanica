@@ -1,5 +1,7 @@
-# The conformance fixtures and cases are compared byte for byte with what conformance.ts generates,
-# so no checkout may convert a line ending, expand a keyword or run a filter over one.
+# The conformance fixtures, the cases and the draft maker manifests are compared byte for byte with
+# what conformance.ts and draft-makers.ts generate, so no checkout may convert a line ending, expand
+# a keyword or run a filter over one.
 texture-set-cases.json -text -ident -filter -working-tree-encoding
 conformance/** -text -ident -filter -working-tree-encoding
 conformance/**/*.ltex binary
+draft-makers/** -text -ident -filter -working-tree-encoding

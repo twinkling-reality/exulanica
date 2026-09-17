@@ -966,6 +966,11 @@ published library against `MAKERS` alone, so no published recipe and no workspac
 draft maker: `makerFor` refuses its id. A maker joins `MAKERS`, and its entry moves to `library/`, in
 the commit that publishes its first set and pins it in a migration.
 
+The backend checks the drafts too, before publication rather than inside the commit that pins them.
+The package writes each draft maker's manifest as canonical JSON under `test/draft-makers/`, holding
+those files to its makers byte for byte, and `tests/test_texture_drafts.py` runs the backend's
+manifest and recipe checks over them and over every entry in `library-drafts/`.
+
 The drafts today are `loom.glazing` (`cc0.float-glazing`), `loom.foliage`
 (`cc0.broadleaf-foliage`) and `loom.bark` (`cc0.tree-bark`).
 
