@@ -543,11 +543,22 @@ sorted list of what the place cannot supply. Two producers exist:
   `premises_access` edge from the footway to the threshold. A door onto a lot is stated, and a
   unit with no door onto a footway in the place is listed as unsupported, never given one. A use
   class maps to capacities, role and shift; an unknown use class is listed as unsupported, never
-  guessed. A bench seats its catalogued visitors side by side across its facing, and standing
-  spots keep two standing radii apart. Every node except a corner names its street by the street
-  record's identity. A street's name is presentation: `city_street_names` reads it from the
-  city's own street records for a label ("a baker on Market Street"), and no name is copied into
-  the place, so restyling a street never changes a society's input.
+  guessed. A bench seats its catalogued visitors side by side along its own direction vector,
+  which runs along its seat. Every node except a corner names its street by the street record's
+  identity. A street's name is presentation: `city_street_names` reads it from the city's own
+  street records for a label ("a baker on Market Street"), and no name is copied into the place,
+  so restyling a street never changes a society's input.
+- **What a person may stand on is the city descriptor's navigation table, read as data**
+  (`city_navigation`), never a list of kinds in this lane's code. A footway exists because
+  `city.curb_edge` is support, and a place whose curbs are not is refused; a crossing or a door is
+  walked only while its own kind is support, and a place that drops either says so. Standing spots
+  keep two standing radii apart and keep the nav envelope's capsule radius (340 mm) clear of
+  everything the table says obstructs: a building's base ring, and each furniture or tree part
+  whose bottom is below the capsule height (1900 mm), as a box in its object's turned frame. A
+  seat is clear of every obstruction but its own bench. An obstruction of a kind this producer
+  does not read is stated rather than ignored. Walking lines are not yet routed round
+  obstructions: the place counts every footway or door piece that passes within a capsule radius
+  of a low part and states that count.
 
 **Population.** A place with homes is populated by one inhabitant per catalogued home place. A
 place without homes holds the catalogued share (half) of its standing spots and indoor visitor
