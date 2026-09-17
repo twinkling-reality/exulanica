@@ -67,3 +67,12 @@ export {
   tileToRenderer,
   unsupportedFrame,
 } from './tile-navigation.js';
+export type { BakedTileSummary, FetchedTile, HeldTile, TileBytesOrigin, TileRouteAccess } from './tile-route.js';
+export {
+  BAKED_TILE_MEDIA_TYPE,
+  BAKED_TILE_SERVED_STATE,
+  TileRouteRefusal,
+  fetchBakedTile,
+  listBakedTiles,
+  tileAt,
+} from './tile-route.js';
