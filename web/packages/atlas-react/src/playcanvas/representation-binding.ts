@@ -1,12 +1,19 @@
 import * as pc from 'playcanvas';
 import {
+  DATA_VIEW_STYLE,
+  REPRESENTATION_POINTS_PER_SUBJECT,
   representationSampleIndices,
+  type DataViewStyle,
   type RepresentationBounds,
   type RepresentationSubject,
 } from '@exulanica/atlas-core';
+import { createDataViewPoints } from './data-view/points.js';
 import type { RepresentationDraw, RepresentationPointAllocation } from './representation-runtime.js';
 
+/** Triangle sampling reads the whole mesh on the CPU, so it stays bounded by source size. */
 const MAX_SOURCE_VERTICES = 250_000;
+/** Address sampling only selects existing points, so a retained buffer may be much larger. */
+export const MAX_RETAINED_POINTS = 16_777_216;
 
 /** Hierarchy visibility is borrowed authority, never replaced by the representation preference. */
 export function representationParentVisible(node: pc.GraphNode): boolean {
@@ -16,12 +23,18 @@ export function representationParentVisible(node: pc.GraphNode): boolean {
   return true;
 }
 
+/** The layers a borrowed node draws in, for a presentation draw parented beneath it. */
+function layersOf(node: pc.GraphNode): readonly number[] | undefined {
+  return node instanceof pc.Entity ? node.render?.layers ?? node.gsplat?.layers : undefined;
+}
+
 /** Static triangle draws only. Generated surface samples are presentation, not measurements. */
 export function staticMeshRepresentation(
   device: pc.GraphicsDevice,
   instance: pc.MeshInstance,
   currentSubject: () => RepresentationSubject,
   parentVisible: () => boolean = () => representationParentVisible(instance.node),
+  style: DataViewStyle = DATA_VIEW_STYLE,
 ): RepresentationDraw | null {
   if (!(instance.material instanceof pc.StandardMaterial) || instance.skinInstance != null
     || instance.morphInstance != null || !instance.visible
@@ -32,6 +45,17 @@ export function staticMeshRepresentation(
   let clone: pc.StandardMaterial | null = null;
   let lastWeight: number | null = null;
   let refresh = true;
+  let surface: { positions: number[]; indices: number[]; area: number } | null | undefined;
+  const readSurface = () => {
+    if (surface !== undefined) return surface;
+    const positions: number[] = [];
+    instance.mesh.getPositions(positions);
+    const indices: number[] = [];
+    instance.mesh.getIndices(indices);
+    const area = positions.length >= 9 ? meshSurfaceArea(positions, indices) : 0;
+    surface = Number.isFinite(area) && area > 0 ? { positions, indices, area } : null;
+    return surface;
+  };
   return {
     currentSubject,
     parentVisible,
@@ -44,35 +68,70 @@ export function staticMeshRepresentation(
         clone ??= original.clone();
         // Retain an alpha-zero original draw for its stable pick subject at the point endpoint.
         // Theme/material changes affect the borrowed original; copy them before presentation alpha.
+        // The fade is a dither, not a blend: the surface stays an opaque, depth-writing draw that
+        // loses pixels as it fades, so overlapping batches never sort against each other, and the
+        // pixels it gives up show the data view's dark ground and the points behind.
         clone.copy(original); clone.opacity = original.opacity * weight;
-        clone.blendType = pc.BLEND_NORMAL; clone.depthWrite = false; clone.update();
+        clone.opacityDither = pc.DITHER_IGNNOISE; clone.opacityShadowDither = pc.DITHER_IGNNOISE;
+        clone.update();
         instance.material = clone;
       } else instance.material = original;
     },
     refresh() { refresh = true; },
+    pointDemand() {
+      const read = readSurface();
+      return read === null ? 0 : read.area * style.points.densityPerSquareMetre;
+    },
     createPoints(limit): RepresentationPointAllocation | null {
-      const positions: number[] = [];
-      instance.mesh.getPositions(positions);
-      const count = positions.length / 3;
+      const read = readSurface();
+      if (read === null) return null;
+      const count = read.positions.length / 3;
       if (!Number.isSafeInteger(count) || count < 1 || count > MAX_SOURCE_VERTICES) return null;
-      const indices: number[] = [];
-      instance.mesh.getIndices(indices);
-      const samples = sampledMeshSurfacePositions(positions, indices, limit);
+      const samples = sampledMeshSurfacePositions(read.positions, read.indices, limit);
       if (samples === null) return null;
-      return sampledPointAllocation(
-        device,
-        instance.node,
-        samples,
-        samples.length / 3,
-        original.diffuse,
-        currentSubject().subjectId,
-      );
+      const layers = layersOf(instance.node);
+      return createDataViewPoints({
+        device, node: instance.node, positions: samples, style,
+        subjectId: currentSubject().subjectId, ...(layers ? { layers } : {}),
+      });
     },
     restore() {
       instance.material = original; instance.visible = originalVisible;
       clone?.destroy(); clone = null;
     },
   };
+}
+
+/** The summed area of a triangle list, in the mesh's own squared units. */
+export function meshSurfaceArea(positions: ArrayLike<number>, suppliedIndices: ArrayLike<number>): number {
+  const vertexCount = positions.length / 3;
+  const indexCount = suppliedIndices.length === 0 ? vertexCount : suppliedIndices.length;
+  let area = 0;
+  for (let offset = 0; offset + 2 < indexCount; offset += 3) {
+    const a = suppliedIndices.length === 0 ? offset : suppliedIndices[offset]!;
+    const b = suppliedIndices.length === 0 ? offset + 1 : suppliedIndices[offset + 1]!;
+    const c = suppliedIndices.length === 0 ? offset + 2 : suppliedIndices[offset + 2]!;
+    if (!(a >= 0 && b >= 0 && c >= 0 && a < vertexCount && b < vertexCount && c < vertexCount)) return Number.NaN;
+    const abx = positions[b * 3]! - positions[a * 3]!;
+    const aby = positions[b * 3 + 1]! - positions[a * 3 + 1]!;
+    const abz = positions[b * 3 + 2]! - positions[a * 3 + 2]!;
+    const acx = positions[c * 3]! - positions[a * 3]!;
+    const acy = positions[c * 3 + 1]! - positions[a * 3 + 1]!;
+    const acz = positions[c * 3 + 2]! - positions[a * 3 + 2]!;
+    area += Math.hypot(aby * acz - abz * acy, abz * acx - abx * acz, abx * acy - aby * acx) / 2;
+  }
+  return area;
+}
+
+/** The mesh's own local extent, for a generated batch's `generated-extent` bounds. */
+export function meshLocalExtent(mesh: pc.Mesh): {
+  readonly min: readonly [number, number, number];
+  readonly max: readonly [number, number, number];
+} | null {
+  const { center, halfExtents } = mesh.aabb;
+  const min = [center.x - halfExtents.x, center.y - halfExtents.y, center.z - halfExtents.z] as const;
+  const max = [center.x + halfExtents.x, center.y + halfExtents.y, center.z + halfExtents.z] as const;
+  return [...min, ...max].every(Number.isFinite) ? { min, max } : null;
 }
 
 function radicalInverse(index: number, base: number): number {
@@ -93,17 +152,22 @@ export function sampledMeshSurfacePositions(
 ): Float32Array | null {
   const vertexCount = positions.length / 3;
   if (!Number.isSafeInteger(vertexCount) || vertexCount < 3 || vertexCount > MAX_SOURCE_VERTICES
-    || !Number.isSafeInteger(limit) || limit < 1 || limit > 65_536
-    || Array.from(positions).some(value => !Number.isFinite(value))) return null;
-  const indices = suppliedIndices.length === 0
-    ? Array.from({ length: vertexCount }, (_, index) => index)
-    : Array.from(suppliedIndices);
-  if (indices.length < 3 || indices.some(index => !Number.isSafeInteger(index)
-    || index < 0 || index >= vertexCount)) return null;
-  const triangles: { readonly indices: readonly [number, number, number]; readonly end: number }[] = [];
+    || !Number.isSafeInteger(limit) || limit < 1 || limit > REPRESENTATION_POINTS_PER_SUBJECT) return null;
+  for (let i = 0; i < positions.length; i += 1) if (!Number.isFinite(positions[i]!)) return null;
+  const indexCount = suppliedIndices.length === 0 ? vertexCount : suppliedIndices.length;
+  if (indexCount < 3) return null;
+  const index = (offset: number): number => (suppliedIndices.length === 0 ? offset : suppliedIndices[offset]!);
+  for (let offset = 0; offset < indexCount; offset += 1) {
+    const value = index(offset);
+    if (!Number.isSafeInteger(value) || value < 0 || value >= vertexCount) return null;
+  }
+  const triangleCount = Math.floor(indexCount / 3);
+  const corners = new Uint32Array(triangleCount * 3);
+  const ends = new Float64Array(triangleCount);
+  let kept = 0;
   let area = 0;
-  for (let offset = 0; offset + 2 < indices.length; offset += 3) {
-    const a = indices[offset]!; const b = indices[offset + 1]!; const c = indices[offset + 2]!;
+  for (let offset = 0; offset + 2 < indexCount; offset += 3) {
+    const a = index(offset); const b = index(offset + 1); const c = index(offset + 2);
     const abx = positions[b * 3]! - positions[a * 3]!;
     const aby = positions[b * 3 + 1]! - positions[a * 3 + 1]!;
     const abz = positions[b * 3 + 2]! - positions[a * 3 + 2]!;
@@ -116,79 +180,43 @@ export function sampledMeshSurfacePositions(
     const triangleArea = Math.hypot(x, y, z) / 2;
     if (!(triangleArea > 0)) continue;
     area += triangleArea;
-    triangles.push({ indices: [a, b, c], end: area });
+    corners[kept * 3] = a; corners[kept * 3 + 1] = b; corners[kept * 3 + 2] = c;
+    ends[kept] = area;
+    kept += 1;
   }
-  if (triangles.length === 0 || !Number.isFinite(area)) return null;
+  if (kept === 0 || !Number.isFinite(area)) return null;
   const samples = new Float32Array(limit * 3);
-  let triangleIndex = 0;
+  let triangle = 0;
   for (let sample = 0; sample < limit; sample += 1) {
     const target = (sample + 0.5) * area / limit;
-    while (triangles[triangleIndex]!.end < target) triangleIndex += 1;
-    const [a, b, c] = triangles[triangleIndex]!.indices;
+    while (triangle < kept - 1 && ends[triangle]! < target) triangle += 1;
+    const a = corners[triangle * 3]!; const b = corners[triangle * 3 + 1]!; const c = corners[triangle * 3 + 2]!;
     const root = Math.sqrt(radicalInverse(sample + 1, 2));
-    const barycentric = [1 - root, root * (1 - radicalInverse(sample + 1, 3)),
-      root * radicalInverse(sample + 1, 3)];
+    const v = radicalInverse(sample + 1, 3);
+    const wa = 1 - root; const wb = root * (1 - v); const wc = root * v;
     for (let axis = 0; axis < 3; axis += 1) {
-      samples[sample * 3 + axis] = positions[a * 3 + axis]! * barycentric[0]!
-        + positions[b * 3 + axis]! * barycentric[1]!
-        + positions[c * 3 + axis]! * barycentric[2]!;
+      samples[sample * 3 + axis] = positions[a * 3 + axis]! * wa
+        + positions[b * 3 + axis]! * wb
+        + positions[c * 3 + axis]! * wc;
     }
   }
   return samples;
 }
 
-export function sampledPointAllocation(
+/**
+ * A retained buffer's own points, drawn by the data view: even addresses into the existing
+ * positions, never interpolated. Point maps and trained Gaussian centres use this.
+ */
+export function retainedPointAllocation(
   device: pc.GraphicsDevice, node: pc.GraphNode, positions: ArrayLike<number>, limit: number,
-  color: pc.Color, subjectId: string,
+  subjectId: string, style: DataViewStyle = DATA_VIEW_STYLE,
 ): RepresentationPointAllocation | null {
   const selected = sampledMeshPositions(positions, limit);
   if (selected === null) return null;
-  const pointCount = selected.length / 3;
-  const mesh = new pc.Mesh(device);
-  // Recompute bounds: these allocations are created after the source entity and otherwise keep
-  // an empty origin AABB, which lets the renderer cull a valid point display off-camera.
-  mesh.setPositions(selected); mesh.update(pc.PRIMITIVE_POINTS);
-  const material = new pc.StandardMaterial();
-  material.useLighting = false;
-  material.useFog = false;
-  // The district sky is deliberately pale, so preserve source hue while enforcing enough
-  // contrast for one-pixel WebGL/WebGPU points to remain legible at the endpoint.
-  const displayColor = new pc.Color(
-    0.08 + color.r * 0.18,
-    0.12 + color.g * 0.2,
-    0.28 + color.b * 0.24,
-  );
-  material.emissive.copy(displayColor); material.diffuse.copy(displayColor); material.update();
-  const entity = new pc.Entity(`representation-points:${subjectId}`);
-  node.addChild(entity);
-  const points = new pc.MeshInstance(mesh, material, entity);
-  points.pick = false; points.castShadow = false; points.receiveShadow = false;
-  const layers = node instanceof pc.Entity ? node.render?.layers : undefined;
-  entity.addComponent('render', {
-    meshInstances: [points],
-    ...(layers ? { layers: [...layers] } : {}),
+  const layers = layersOf(node);
+  return createDataViewPoints({
+    device, node, positions: selected, style, subjectId, ...(layers ? { layers } : {}),
   });
-  let destroyed = false;
-  let lastWeight: number | null = null;
-  return {
-    pointCount,
-    // CPU vertex storage plus GPU position payload; engine/material overhead is separately bounded
-    // by registry size, and no retained source buffer ownership is included in this allocation.
-    byteLength: selected.byteLength * 2,
-    setWeight(weight) {
-      if (destroyed || weight === lastWeight) return;
-      lastWeight = weight;
-      points.visible = weight > 0;
-      material.opacity = weight;
-      material.blendType = weight < 1 ? pc.BLEND_NORMAL : pc.BLEND_NONE;
-      material.depthWrite = weight === 1; material.update();
-    },
-    destroy() {
-      if (destroyed) return;
-      destroyed = true;
-      entity.destroy(); mesh.destroy(); material.destroy();
-    },
-  };
 }
 
 /** Coordinates remain in their borrowed mesh frame; only source vertex addresses are selected. */
@@ -197,7 +225,7 @@ export function sampledMeshPositions(
   limit: number,
 ): Float32Array | null {
   const count = positions.length / 3;
-  if (!Number.isSafeInteger(count) || count < 1 || count > MAX_SOURCE_VERTICES) return null;
+  if (!Number.isSafeInteger(count) || count < 1 || count > MAX_RETAINED_POINTS) return null;
   const indices = representationSampleIndices(count, limit);
   if (indices.length === 0) return null;
   const selected = new Float32Array(indices.length * 3);

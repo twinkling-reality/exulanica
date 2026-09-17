@@ -142,11 +142,14 @@ import {
   type RepresentationReport,
 } from './representation-runtime.js';
 import {
+  meshLocalExtent,
   representationParentVisible,
   representationWorldBounds,
-  sampledPointAllocation,
+  retainedPointAllocation,
   staticMeshRepresentation,
 } from './representation-binding.js';
+import { DataViewOverlay } from './data-view/overlay.js';
+import type { DataViewOverlayPlan } from './data-view/overlay-plan.js';
 
 /**
  * The PlayCanvas binding for the Atlas.
@@ -487,6 +490,8 @@ export class AtlasBinding {
   get representation(): RepresentationRuntime {
     return this.representationController ??= new RepresentationRuntime();
   }
+  /** Boxes, tags, links and the dark ground. Created with the registry; draws only when asked. */
+  private representationOverlay: DataViewOverlay | null = null;
   private readonly representationDefaults = new Map<string, RepresentationSubject>();
   private readonly representationOverrides = new Map<string, RepresentationSubject>();
   private readonly representationFrames = new Map<string, pc.GraphNode>();
@@ -1109,6 +1114,9 @@ export class AtlasBinding {
       const { min, max } = visual.pointMap.map.header.bounds;
       const source = visual.pointMap.artifactId;
       const surface = visual.cloud.surface;
+      // The map's own look (points or a surface) is its rendered form; the data view draws the
+      // same retained samples in its own look. Neither can fade the other, so the data look
+      // grows over the map's own look and replaces it only at the points end.
       const current = remember({
         subjectId: source,
         subjectKind: 'scene',
@@ -1117,9 +1125,10 @@ export class AtlasBinding {
         origin: 'inferred',
         sourceRefs: Object.freeze([source]),
         availability: 'available',
-        rendered: surface,
+        rendered: true,
         points: 'retained-points',
-        compatibleBlend: false,
+        compatibleBlend: true,
+        blend: 'overlay',
         bounds: Object.freeze({
           frameId: `artifact:${source}:opm-local`,
           units: 'metres',
@@ -1131,40 +1140,29 @@ export class AtlasBinding {
         label: null,
         dataAvailable: visual.pointMap.captureId !== undefined,
         unavailableReason: surface
-          ? 'Point-map surfaces support endpoint switching, not continuous blending.'
-          : null,
+          ? 'The point-map surface keeps its own look until the points end; its retained samples fade in over it.'
+          : 'The point map keeps its own look until the points end; the same retained samples fade in over it.',
       });
       this.representationFrames.set(source, visual.entity);
       const render = visual.entity.render;
       if (render === undefined || render === null) continue;
       const originallyEnabled = render.enabled;
-      if (surface) {
-        this.representation.register({
-          currentSubject: current,
-          parentVisible: () => visual.entity.parent !== null
-            && representationParentVisible(visual.entity.parent),
-          setRenderedWeight: weight => { render.enabled = originallyEnabled && weight > 0; },
-          createPoints: limit => sampledPointAllocation(
-            this.device,
-            visual.entity,
-            visual.pointMap.map.position,
-            limit,
-            new pc.Color(0.62, 0.9, 1),
-            source,
-          ),
-          restore: () => { render.enabled = originallyEnabled; },
-        });
-      } else {
-        this.representation.register({
-          currentSubject: current,
-          parentVisible: () => visual.entity.parent !== null
-            && representationParentVisible(visual.entity.parent),
-          setRenderedWeight: () => {},
-          createPoints: () => null,
-          setExistingPointWeight: weight => { render.enabled = originallyEnabled && weight > 0; },
-          restore: () => { render.enabled = originallyEnabled; },
-        });
-      }
+      this.representation.register({
+        currentSubject: current,
+        parentVisible: () => visual.entity.parent !== null
+          && representationParentVisible(visual.entity.parent),
+        setRenderedWeight: weight => { render.enabled = originallyEnabled && weight > 0; },
+        pointDemand: () => visual.pointMap.map.header.pointCount,
+        createPoints: limit => retainedPointAllocation(
+          this.device,
+          visual.entity,
+          visual.pointMap.map.position,
+          limit,
+          source,
+          this.representation.style,
+        ),
+        restore: () => { render.enabled = originallyEnabled; },
+      });
     }
 
     for (const visual of this.trainedScenes) {
@@ -1180,7 +1178,10 @@ export class AtlasBinding {
         availability: 'available',
         rendered: true,
         points: centres === null ? null : 'gaussian-centres',
-        compatibleBlend: false,
+        // The splat renderer exposes no fade this view owns, so the splat stays whole while its
+        // own centres fade in over it, and leaves at the points end.
+        compatibleBlend: centres !== null,
+        ...(centres === null ? {} : { blend: 'overlay' as const }),
         bounds: Object.freeze({
           frameId: `artifact:${source}:asset-local`,
           units: 'scene-units',
@@ -1193,7 +1194,7 @@ export class AtlasBinding {
         dataAvailable: false,
         unavailableReason: centres === null
           ? 'The engine retained no CPU Gaussian-centre buffer.'
-          : 'Gaussian-centre display supports endpoint switching, not continuous blending.',
+          : 'The trained splat cannot fade here, so its Gaussian centres fade in over it and it leaves at the points end.',
       });
       this.representationFrames.set(source, visual.entity);
       const component = visual.entity.gsplat;
@@ -1204,13 +1205,14 @@ export class AtlasBinding {
         parentVisible: () => visual.entity.parent !== null
           && representationParentVisible(visual.entity.parent),
         setRenderedWeight: weight => { component.enabled = originallyEnabled && weight > 0; },
-        createPoints: limit => centres === null ? null : sampledPointAllocation(
+        pointDemand: () => (centres === null ? 0 : centres.length / 3),
+        createPoints: limit => centres === null ? null : retainedPointAllocation(
           this.device,
           visual.entity,
           centres,
           limit,
-          new pc.Color(0.9, 0.72, 1),
           source,
+          this.representation.style,
         ),
         restore: () => { component.enabled = originallyEnabled; },
       });
@@ -1222,15 +1224,22 @@ export class AtlasBinding {
       const sourceDisplayAllowed = district.source_records.length > 0
         && district.source_records.every(source => source.operation_rights.display === true);
       let ordinal = 0;
+      const districtFrame = `${district.frame?.name ?? district.district_id}:render-metres`;
+      const rootWorld = this.ownedDistrict.root.getWorldTransform().data;
       for (const render of this.ownedDistrict.root.findComponents('render') as pc.RenderComponent[]) {
         for (const instance of render.meshInstances) {
           const subjectId = `${district.district_id}:render-group:${render.entity.name}:${ordinal}`;
           ordinal += 1;
+          // A batch's extent is its own mesh's, and it is stated in the district frame only when
+          // the batch draws in that frame. It is the extent of a group, never of one building.
+          const nodeWorld = instance.node.getWorldTransform().data;
+          const extent = nodeWorld.every((value, index) => value === rootWorld[index])
+            ? meshLocalExtent(instance.mesh) : null;
           const current = remember({
             subjectId,
             subjectKind: 'geometry-group',
             sceneId: null,
-            frameId: `${district.frame?.name ?? district.district_id}:render-metres`,
+            frameId: districtFrame,
             // This is renderer tessellation derived from retained source and interpretation
             // records. Sampling its vertices must never relabel them as observed measurements.
             origin: 'generated',
@@ -1239,7 +1248,14 @@ export class AtlasBinding {
             rendered: true,
             points: 'mesh-surface-samples',
             compatibleBlend: true,
-            bounds: null,
+            bounds: extent === null ? null : Object.freeze({
+              frameId: districtFrame,
+              units: 'metres' as const,
+              origin: 'generated' as const,
+              basis: 'generated-extent' as const,
+              min: Object.freeze([...extent.min]) as readonly [number, number, number],
+              max: Object.freeze([...extent.max]) as readonly [number, number, number],
+            }),
             label: render.entity.name,
             dataAvailable: sourceDisplayAllowed,
             unavailableReason: sourceDisplayAllowed
@@ -1247,11 +1263,28 @@ export class AtlasBinding {
               : 'A retained district source is unavailable for display.',
           });
           this.representationFrames.set(subjectId, instance.node);
-          const draw = staticMeshRepresentation(this.device, instance, current);
+          const draw = staticMeshRepresentation(
+            this.device, instance, current, undefined, this.representation.style);
           if (draw !== null) this.representation.register(draw);
         }
       }
     }
+    this.representationOverlay = new DataViewOverlay({
+      device: this.device,
+      app: this.app,
+      camera: this.camera,
+      report: () => this.representation.report,
+      worldBounds: subject => this.representationBounds(subject),
+      reducedMotion: () => this.reducedMotion,
+      invalidate: () => this.invalidate(),
+    }, this.representation.style);
+    // Points are prepared a bounded amount per update; keep publishing until every request is met.
+    this.app.on('update', () => {
+      if (this.representationController !== null && this.representation.report.pendingSubjects > 0) {
+        this.publishRepresentation();
+        this.invalidate();
+      }
+    });
     this.setRepresentationSubjects(subjects);
   }
 
@@ -1265,11 +1298,14 @@ export class AtlasBinding {
       const fixed = this.representationDefaults.get(subject.subjectId);
       if (fixed === undefined) throw new TypeError(`Unknown representation subject ${subject.subjectId}`);
       for (const key of [
-        'subjectKind', 'sceneId', 'frameId', 'origin', 'rendered', 'points', 'compatibleBlend',
+        'subjectKind', 'sceneId', 'frameId', 'origin', 'rendered', 'points', 'compatibleBlend', 'blend',
       ] as const) {
         if (subject[key] !== fixed[key]) {
           throw new TypeError(`Representation subject ${subject.subjectId} changed ${key}`);
         }
+      }
+      if (JSON.stringify(subject.record ?? null) !== JSON.stringify(fixed.record ?? null)) {
+        throw new TypeError(`Representation subject ${subject.subjectId} changed record`);
       }
     }
     // Commit only after every record passes. Copy caller-owned arrays so later mutation cannot
@@ -1300,6 +1336,19 @@ export class AtlasBinding {
   }
 
   get representationReport(): RepresentationReport { return this.representation.report; }
+
+  /** Highlight one subject in the data view, or none. The world selection and camera stay put. */
+  setRepresentationSelection(subjectId: string | null): RepresentationReport {
+    const report = this.representation.setSelection(subjectId);
+    this.onRepresentationChange?.(report);
+    this.invalidate();
+    return report;
+  }
+
+  /** What the overlay drew on the last drawn frame, with every refusal it made. */
+  get representationOverlayPlan(): DataViewOverlayPlan | null {
+    return this.representationOverlay?.plan ?? null;
+  }
 
   /** Display-world corners for UI projection. This creates no draw or pick target. */
   representationBounds(subject: RepresentationSubject): readonly (readonly [number, number, number])[] | null {

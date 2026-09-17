@@ -46,6 +46,17 @@
  *                       from behind the print, w unused
  *   uPhotograph   sampler2D  the viewer's image of the photograph (PHOTOGRAPH surfaces only)
  *
+ * DATA_VIEW, a define only the data view material sets (see `data-view/points.ts`), adds:
+ *
+ *   uDataView       vec4  x sprite width metres, y min px, z max px, w dash half width (0 is round)
+ *   uDataViewGlow   vec4  x core radius squared, y halo falloff, z halo strength, w pull metres
+ *   uDataViewLook   vec4  x display gain, y cross-fade weight, z band depth, w bands per metre
+ *   uDataViewTime   float band phase in bands, written once per drawn frame by the data view
+ *
+ * and reads the engine's own `matrix_projection` and `uScreenSize`, so a sprite keeps its world
+ * width through whatever camera draws it. Without the define none of this is compiled, and the
+ * point-map program is the text it always was.
+ *
  * These describe ONE photograph's own camera and are enabled only for a map drawn in an unmeasured
  * arrangement (`arrangement: 'unmeasured-fan'`). Such a map knows only the front of what one
  * camera saw, so it is shown as that photograph and never as a place to walk round:
@@ -108,6 +119,15 @@ varying float vPresence;
 #endif
 #ifdef PHOTOGRAPH
 varying vec3 vLocal;
+#endif
+#ifdef DATA_VIEW
+uniform mat4 matrix_projection;
+uniform vec4 uScreenSize;
+uniform vec4 uDataView;
+uniform vec4 uDataViewGlow;
+uniform vec4 uDataViewLook;
+uniform float uDataViewTime;
+varying float vDataBand;
 #endif
 
 // One hash, used for the particulate dissolve. Deterministic per point, so the boundary does not
@@ -201,6 +221,18 @@ void main(void) {
     float spread = uPoint.x / max(aColor.a, uSupportFloor);
     gl_PointSize = clamp(spread * uPoint.z / max(viewDist, 0.001), 1.0, uPoint.y);
 #endif
+#ifdef DATA_VIEW
+    // A data view sprite is a world width seen through the drawing camera's own projection:
+    // matrix_projection[1][1] is 1 / tan(half the vertical field of view).
+    float dataScale = 0.5 * uScreenSize.y * matrix_projection[1][1];
+    gl_PointSize = clamp(uDataView.x * dataScale / max(viewDist, 0.001), uDataView.y, uDataView.z);
+    // The visualization treatment's falling band, in bands: presentation, never a measurement.
+    vDataBand = worldPos.y * uDataViewLook.w + uDataViewTime;
+    // Drawn a few centimetres towards the viewer, so a sample on a surface is not hidden by the
+    // very surface it samples while that surface dissolves. The sample's position is unchanged.
+    gl_Position = matrix_viewProjection
+        * vec4(worldPos.xyz + normalize(view_position - worldPos.xyz) * uDataViewGlow.w, 1.0);
+#endif
 
     float fogAmount = 0.0;
     if (uFog.w > 0.5) {
@@ -252,6 +284,12 @@ varying float vFogAmount;
 varying float vSurvive;
 varying float vPresence;
 #endif
+#ifdef DATA_VIEW
+uniform vec4 uDataView;
+uniform vec4 uDataViewGlow;
+uniform vec4 uDataViewLook;
+varying float vDataBand;
+#endif
 #ifdef PHOTOGRAPH
 /**
  * The viewer's image of the photograph, and the camera it was taken through. Each pixel of the
@@ -281,6 +319,16 @@ void main(void) {
     float r2 = dot(d, d);
     if (r2 > 1.0) discard;
     float soft = smoothstep(1.0, 0.25, r2);
+#ifdef DATA_VIEW
+    // Glow: a solid core and an exponential halo, or a short vertical dash for the visualization
+    // treatment. Both are presentation of one real sample; neither adds a sample.
+    if (uDataView.w > 0.0) {
+        if (abs(d.x) > uDataView.w) discard;
+        soft = 1.0 - d.y * d.y;
+    } else {
+        soft = min(1.0, smoothstep(uDataViewGlow.x, 0.0, r2) + uDataViewGlow.z * exp(-r2 * uDataViewGlow.y));
+    }
+#endif
 #endif
 
     int slot = int(vSemantic.y + 0.5);
@@ -358,6 +406,12 @@ void main(void) {
         if (coverage < 0.2) discard;
         gl_FragColor = vec4(rgb, 1.0);
     #endif
+#ifdef DATA_VIEW
+    // Additive: the gain lives in colour and the cross-fade weight in alpha, which the blend
+    // multiplies in. The band dims a dash between its crests and is off (depth 0) for points.
+    float band = 1.0 - uDataViewLook.z * (0.5 - 0.5 * cos(6.2831853 * fract(vDataBand)));
+    gl_FragColor = vec4(rgb * uDataViewLook.x * band, clamp(soft * uDataViewLook.y, 0.0, 1.0));
+#endif
 }
 `;
 
@@ -492,6 +546,9 @@ uniform uPoint : vec4f;
 uniform uLens : vec4f;
 uniform uExposure : f32;
 uniform uRelief : vec4f;
+#ifdef DATA_VIEW
+uniform uDataViewLook : vec4f;
+#endif
 
 varying vColor : vec4f;
 varying vSemantic : vec4f;
@@ -539,6 +596,11 @@ fn fragmentMain(input : FragmentInput) -> FragmentOutput {
     }
 
     output.color = vec4f(rgb, 1.0);
+#ifdef DATA_VIEW
+    // One pixel per point on this path (see the file header), so there is no sprite to shape; the
+    // gain and the cross-fade weight still apply, exactly as in the GLSL path.
+    output.color = vec4f(rgb * uniform.uDataViewLook.x, clamp(uniform.uDataViewLook.y, 0.0, 1.0));
+#endif
     return output;
 }
 `;

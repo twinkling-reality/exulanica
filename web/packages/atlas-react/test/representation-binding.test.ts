@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import * as pc from 'playcanvas';
 import {
+  MAX_RETAINED_POINTS,
+  meshLocalExtent,
+  meshSurfaceArea,
   representationParentVisible,
   representationWorldBounds,
   sampledMeshPositions,
@@ -9,7 +12,7 @@ import {
 } from '../src/playcanvas/representation-binding.js';
 import { AtlasBinding } from '../src/playcanvas/atlas-binding.js';
 import { RepresentationRuntime } from '../src/playcanvas/representation-runtime.js';
-import type { RepresentationSubject } from '@exulanica/atlas-core';
+import { DATA_VIEW_STYLE, REPRESENTATION_POINTS_PER_SUBJECT, type RepresentationSubject } from '@exulanica/atlas-core';
 
 const subject: RepresentationSubject = {
   subjectId: 'authored:batch', subjectKind: 'geometry-group', sceneId: null,
@@ -48,6 +51,26 @@ describe('PlayCanvas representation binding', () => {
       expect(first[offset + 2]).toBe(0);
     }
     expect(sampledMeshSurfacePositions(positions, [0, 1, 9], 4)).toBeNull();
+    expect(sampledMeshSurfacePositions(positions, [], REPRESENTATION_POINTS_PER_SUBJECT))
+      .toHaveLength(REPRESENTATION_POINTS_PER_SUBJECT * 3);
+    expect(sampledMeshSurfacePositions(positions, [], REPRESENTATION_POINTS_PER_SUBJECT + 1)).toBeNull();
+    expect(sampledMeshSurfacePositions([0, 0, 0, 1, 0, 0, 2, 0, 0], [], 4)).toBeNull();
+  });
+
+  it('measures the surface a sampled draw would cover, and the mesh\'s own extent', () => {
+    expect(meshSurfaceArea([0, 0, 0, 2, 0, 0, 0, 2, 0, 2, 2, 0], [0, 1, 2, 1, 3, 2])).toBeCloseTo(4);
+    expect(meshSurfaceArea([0, 0, 0, 2, 0, 0, 0, 2, 0], [])).toBeCloseTo(2);
+    expect(meshSurfaceArea([0, 0, 0, 2, 0, 0, 0, 2, 0], [0, 1, 7])).toBeNaN();
+    const aabb = new pc.BoundingBox(new pc.Vec3(1, 2, 3), new pc.Vec3(4, 5, 6));
+    expect(meshLocalExtent({ aabb } as pc.Mesh)).toEqual({ min: [-3, -3, -3], max: [5, 7, 9] });
+    const broken = new pc.BoundingBox(new pc.Vec3(Number.NaN, 0, 0), new pc.Vec3(1, 1, 1));
+    expect(meshLocalExtent({ aabb: broken } as pc.Mesh)).toBeNull();
+  });
+
+  it('bounds retained address sampling by the retained buffer, not by triangle sampling', () => {
+    expect(sampledMeshPositions({ length: (MAX_RETAINED_POINTS + 1) * 3 } as ArrayLike<number>, 1)).toBeNull();
+    const large = new Float32Array(300_000 * 3).map((_, index) => index % 7);
+    expect(sampledMeshPositions(large, 4)).toHaveLength(12);
   });
 
   it('projects explicit-frame bounds through the existing node transform', () => {
@@ -79,7 +102,12 @@ describe('PlayCanvas representation binding', () => {
     draw!.setRenderedWeight(0.5);
     expect(instance.material).not.toBe(original);
     expect((instance.material as pc.StandardMaterial).opacity).toBeCloseTo(0.4);
+    // A dissolve, not a blend: the surface stays opaque and depth-writing while it loses pixels.
+    expect((instance.material as pc.StandardMaterial).opacityDither).toBe(pc.DITHER_IGNNOISE);
+    expect((instance.material as pc.StandardMaterial).blendType).toBe(pc.BLEND_NONE);
+    expect((instance.material as pc.StandardMaterial).depthWrite).toBe(true);
     expect(original.opacity).toBe(0.8);
+    expect(original.opacityDither).toBe(pc.DITHER_NONE);
     expect(original.blendType).toBe(pc.BLEND_NONE);
     expect(original.depthWrite).toBe(true);
     const clone = instance.material as pc.StandardMaterial;
@@ -97,6 +125,18 @@ describe('PlayCanvas representation binding', () => {
     draw!.restore();
     expect(instance.material).toBe(original);
     expect(instance.visible).toBe(true);
+  });
+
+  it('asks for points in proportion to the surface it samples', () => {
+    const node = { enabled: true, parent: null } as unknown as pc.GraphNode;
+    const positions = [0, 0, 0, 4, 0, 0, 0, 5, 0];
+    const instance = {
+      material: new pc.StandardMaterial(), skinInstance: null, morphInstance: null, visible: true, node,
+      mesh: { vertexBuffer: { numVertices: 3 }, primitive: [{ type: pc.PRIMITIVE_TRIANGLES }],
+        getPositions: (out: number[]) => { out.push(...positions); }, getIndices: () => undefined },
+    } as unknown as pc.MeshInstance;
+    const draw = staticMeshRepresentation({} as pc.GraphicsDevice, instance, () => subject)!;
+    expect(draw.pointDemand!()).toBeCloseTo(10 * DATA_VIEW_STYLE.points.densityPerSquareMetre);
   });
 
   it('refuses skinned, morphing, non-standard and oversized draws', () => {
@@ -134,6 +174,16 @@ describe('PlayCanvas representation binding', () => {
       { ...subject, label: 'Accepted only if the batch is valid' },
       { ...second, sourceRefs: [''] },
     ])).toThrow('Unsupported representation subject');
+    expect(overrides.size).toBe(0);
+    expect(() => binding.setRepresentationSubjects([{ ...subject, blend: 'overlay' }])).toThrow('changed blend');
+    const record = { kind: 'city.massing' as const, version: 1, identity: '5f0c7a2e-1b3d-4c5e-8f60-718293a4b5c6', key: 'parcel_ordinal.3' };
+    const generated: RepresentationSubject = {
+      ...subject, subjectId: 'generated:record', origin: 'generated', subjectKind: 'object', record,
+    };
+    (binding as unknown as { representationDefaults: Map<string, RepresentationSubject> })
+      .representationDefaults.set(generated.subjectId, generated);
+    expect(() => binding.setRepresentationSubjects([{ ...generated, record: { ...record, key: 'parcel_ordinal.4' } }]))
+      .toThrow('changed record');
     expect(overrides.size).toBe(0);
 
     const sources = ['current:one'];

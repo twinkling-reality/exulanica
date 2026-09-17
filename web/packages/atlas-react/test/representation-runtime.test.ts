@@ -1,9 +1,16 @@
 import { describe, expect, it } from 'vitest';
-import { DEFAULT_REPRESENTATION_INTENT, type RepresentationSubject } from '@exulanica/atlas-core';
+import {
+  DATA_VIEW_STYLE,
+  DEFAULT_REPRESENTATION_INTENT,
+  REPRESENTATION_POINT_BUDGET,
+  REPRESENTATION_POINTS_PER_SUBJECT,
+  type RepresentationSubject,
+} from '@exulanica/atlas-core';
 import {
   RepresentationRuntime,
   type RepresentationDraw,
   type RepresentationPointAllocation,
+  type RepresentationPointLook,
 } from '../src/playcanvas/representation-runtime.js';
 
 const available = (id: string): RepresentationSubject => ({
@@ -16,8 +23,10 @@ const available = (id: string): RepresentationSubject => ({
 class Allocation implements RepresentationPointAllocation {
   destroyed = 0;
   weights: number[] = [];
+  looks: RepresentationPointLook[] = [];
   constructor(readonly pointCount: number, readonly byteLength = pointCount * 24) {}
   setWeight(weight: number): void { this.weights.push(weight); }
+  setLook(look: RepresentationPointLook): void { this.looks.push(look); }
   destroy(): void { this.destroyed += 1; }
 }
 
@@ -28,13 +37,15 @@ class Draw implements RepresentationDraw {
   limits: number[] = [];
   allocations: Allocation[] = [];
   restores = 0;
-  constructor(id: string) { this.subject = available(id); }
+  demand: number | undefined;
+  constructor(id: string, demand?: number) { this.subject = available(id); this.demand = demand; }
+  pointDemand(): number { return this.demand ?? 4; }
   currentSubject(): RepresentationSubject { return this.subject; }
   parentVisible(): boolean { return this.visible; }
   setRenderedWeight(weight: number): void { this.rendered.push(weight); }
   createPoints(limit: number): RepresentationPointAllocation | null {
     this.limits.push(limit);
-    const allocation = new Allocation(Math.min(4, limit));
+    const allocation = new Allocation(limit);
     this.allocations.push(allocation);
     return allocation;
   }
@@ -67,16 +78,86 @@ describe('bounded representation runtime', () => {
     const two = new Draw('two');
     runtime.register(one); runtime.register(two);
     let report = runtime.setIntent({ ...DEFAULT_REPRESENTATION_INTENT, pointMix: 1 });
-    expect(one.limits).toEqual([4]);
-    expect(two.limits).toEqual([2]);
+    // Both want 4 of a budget of 6: one factor scales both, so the second is not starved.
+    expect(one.limits).toEqual([3]);
+    expect(two.limits).toEqual([3]);
     expect(report.allocatedPoints).toBe(6);
+    expect(report.subjects.map(entry => entry.plannedPoints)).toEqual([3, 3]);
     runtime.unregister('one');
     const replacement = new Draw('one');
     runtime.register(replacement);
     report = runtime.update();
-    expect(replacement.limits).toEqual([4]);
+    expect(replacement.limits).toEqual([3]);
     expect(report.allocatedPoints).toBe(6);
     expect(one.allocations[0]!.destroyed).toBe(1);
+  });
+
+  it('scales every demand by one factor and never beyond a subject\'s cap', () => {
+    const runtime = new RepresentationRuntime(100, 60);
+    const draws = [new Draw('large', 300), new Draw('small', 100), new Draw('empty', 0)];
+    for (const draw of draws) runtime.register(draw);
+    const report = runtime.setIntent({ ...DEFAULT_REPRESENTATION_INTENT, pointMix: 1 });
+    expect(draws.map(draw => draw.limits)).toEqual([[60], [25], []]);
+    expect(report.allocatedPoints).toBe(85);
+    expect(report.subjects[2]).toMatchObject({ allocatedPoints: 0, plannedPoints: 0,
+      subject: { points: null, unavailableReason: 'This draw has nothing to sample.' },
+      resolved: { renderedWeight: 1, pointWeight: 0 } });
+  });
+
+  it('prepares a bounded number of points per update and keeps the surface until they arrive', () => {
+    const runtime = new RepresentationRuntime(40, 20, { pointsPerUpdate: 25 });
+    const draws = [new Draw('a', 20), new Draw('b', 20), new Draw('c', 20)];
+    for (const draw of draws) runtime.register(draw);
+    let report = runtime.setIntent({ ...DEFAULT_REPRESENTATION_INTENT, pointMix: 0.5 });
+    expect(report.pendingSubjects).toBe(2);
+    expect(draws.map(draw => draw.limits.length)).toEqual([1, 0, 0]);
+    expect(report.subjects[1]).toMatchObject({
+      subject: { unavailableReason: 'Points for this subject are still being prepared.' },
+      resolved: { renderedWeight: 1, pointWeight: 0 },
+    });
+    report = runtime.update();
+    report = runtime.update();
+    expect(report.pendingSubjects).toBe(0);
+    expect(report.allocatedPoints).toBe(39);
+    expect(report.subjects.map(entry => entry.resolved.pointWeight)).toEqual([0.5, 0.5, 0.5]);
+  });
+
+  it('tells each allocation its palette colour, treatment and selection emphasis', () => {
+    const runtime = new RepresentationRuntime(8, 4);
+    const one = new Draw('one');
+    const two = new Draw('two');
+    two.subject = { ...two.subject, origin: 'inferred', subjectKind: 'scene', sceneId: 'scene:1' };
+    runtime.register(one); runtime.register(two);
+    runtime.setIntent({ ...DEFAULT_REPRESENTATION_INTENT, pointMix: 1 });
+    const palette = DATA_VIEW_STYLE.palette;
+    expect(one.allocations[0]!.looks.at(-1)).toEqual({ colour: palette.origin.authored, treatment: 'points', gain: 1 });
+    expect(two.allocations[0]!.looks.at(-1)).toEqual({ colour: palette.origin.inferred, treatment: 'points', gain: 1 });
+    runtime.setIntent({ ...DEFAULT_REPRESENTATION_INTENT, pointMix: 1, colour: 'kind', binary: 'visualization' });
+    expect(one.allocations[0]!.looks.at(-1)).toEqual({ colour: palette.kind['geometry-group'], treatment: 'dashes', gain: 1 });
+    expect(two.allocations[0]!.looks.at(-1)!.colour).toBe(palette.kind.scene);
+    const looks = one.allocations[0]!.looks.length;
+    runtime.update();
+    expect(one.allocations[0]!.looks).toHaveLength(looks);
+    const report = runtime.setSelection('two');
+    expect(report.selection).toBe('two');
+    expect(two.allocations[0]!.looks.at(-1)!.gain).toBe(DATA_VIEW_STYLE.points.selectedGain);
+    expect(one.allocations[0]!.looks.at(-1)!.gain).toBe(DATA_VIEW_STYLE.points.unselectedGain);
+    expect(() => runtime.setSelection('missing')).toThrow('Unknown representation subject');
+    runtime.unregister('two');
+    expect(runtime.update().selection).toBeNull();
+    expect(runtime.report.style).toEqual({ id: 'exulanica.data-view', version: DATA_VIEW_STYLE.version });
+  });
+
+  it('holds its budgets to the measured limits', () => {
+    expect(new RepresentationRuntime().report).toMatchObject({
+      pointBudget: REPRESENTATION_POINT_BUDGET, perSubjectLimit: REPRESENTATION_POINTS_PER_SUBJECT,
+    });
+    expect(() => new RepresentationRuntime(REPRESENTATION_POINT_BUDGET + 1)).toThrow('budget');
+    expect(() => new RepresentationRuntime(REPRESENTATION_POINT_BUDGET, REPRESENTATION_POINTS_PER_SUBJECT + 1))
+      .toThrow('budget');
+    expect(() => new RepresentationRuntime(8, 9)).toThrow('budget');
+    expect(() => new RepresentationRuntime(0)).toThrow('budget');
+    expect(() => new RepresentationRuntime(8, 4, { pointsPerUpdate: 0 })).toThrow('allowance');
   });
 
   it('lets withdrawal and existing parent visibility defeat requested point fallback', () => {
