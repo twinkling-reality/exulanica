@@ -3,8 +3,11 @@ import { describe, expect, it } from 'vitest';
 import { CHARACTER_CATALOG, CHARACTER_CATALOG_JSON } from '../src/playcanvas/character/catalog-data.js';
 import { validateCharacterCatalog, type CharacterCatalog } from '../src/playcanvas/character/catalog.js';
 import { canonicalJson } from '../src/playcanvas/character/digest.js';
+import { designedLook, validateDesignedLooks, type DesignedLooks } from '../src/playcanvas/character/look.js';
+import { DESIGNED_LOOKS, DESIGNED_LOOKS_JSON } from '../src/playcanvas/character/looks-data.js';
 
 const committed = readFileSync(new URL('../../../../assets/characters/catalog.json', import.meta.url), 'utf8');
+const committedLooks = readFileSync(new URL('../../../../assets/characters/looks.json', import.meta.url), 'utf8');
 // A fresh, freely editable copy for each refusal; the refusals reach into arbitrary depth.
 const copy = (): any => JSON.parse(CHARACTER_CATALOG_JSON);
 
@@ -101,5 +104,36 @@ describe('catalog validation refuses', () => {
 
   it('a height distribution beyond the base', () => {
     refuses((c) => { c.population[0].parameters.feminine.heightMillimetres.max = 1990; }, /outside its range/);
+  });
+});
+
+describe('designed looks', () => {
+  const looks = (): any => JSON.parse(DESIGNED_LOOKS_JSON);
+  const refuses = (mutate: (value: any) => void, message: RegExp) => {
+    const value = looks();
+    mutate(value);
+    expect(() => validateDesignedLooks(CHARACTER_CATALOG, value as DesignedLooks)).toThrow(message);
+  };
+
+  it('are the same document as assets/characters/looks.json', () => {
+    expect(canonicalJson(JSON.parse(committedLooks))).toBe(DESIGNED_LOOKS_JSON);
+  });
+
+  it('give every body a default over itself and the player a designed default', () => {
+    for (const base of CHARACTER_CATALOG.families[0]!.bases) {
+      expect(designedLook(DESIGNED_LOOKS, DESIGNED_LOOKS.defaults.bases[base.baseId]!).baseId).toBe(base.baseId);
+    }
+    expect(designedLook(DESIGNED_LOOKS, DESIGNED_LOOKS.defaults.player).profile).toBe('exulanica.character-look/v1');
+    expect(new Set(DESIGNED_LOOKS.looks.map((entry) => entry.look.parts['outfit'])).size).toBe(DESIGNED_LOOKS.looks.length);
+  });
+
+  it('refuse a look outside the catalog, a missing body default and a default over the wrong body', () => {
+    refuses((v) => { v.looks[0].look.parts.outfit = 'feminine/outfit/cape'; }, /is not a outfit/);
+    refuses((v) => { v.looks.push({ ...v.looks[0] }); }, /designed twice/);
+    refuses((v) => { v.looks[0].note = 'extra'; }, /must be exactly/);
+    refuses((v) => { delete v.defaults.bases.masculine; }, /designed base defaults/);
+    refuses((v) => { v.defaults.player = 'nobody'; }, /not a designed look/);
+    refuses((v) => { v.defaults.bases.feminine = v.defaults.bases.masculine; }, /over another base/);
+    refuses((v) => { v.catalogId = 'another-catalog'; }, /another catalog/);
   });
 });

@@ -3,16 +3,21 @@ export type { CharacterRenderable, CharacterPose, CharacterRenderableStatus } fr
 export { LayeredCharacterRenderable, CHARACTER_RENDERABLE_TAG } from './renderable.js';
 export {
   CHARACTER_LOOK_PROFILE,
+  DESIGNED_LOOKS_PROFILE,
   describeLook,
   describeLookBytes,
+  designedLook,
   drawLook,
   heightParameter,
   lookSha256,
+  validateDesignedLooks,
   validateLook,
   type CharacterDetail,
   type CharacterLook,
   type CharacterRenderableDescription,
+  type DesignedLooks,
 } from './look.js';
+export { DESIGNED_LOOKS } from './looks-data.js';
 export {
   catalogBase,
   catalogFamily,

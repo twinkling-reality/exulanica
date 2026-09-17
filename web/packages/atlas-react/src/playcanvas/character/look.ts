@@ -84,6 +84,44 @@ export function lookSha256(look: CharacterLook): string {
   return canonicalSha256(look);
 }
 
+export const DESIGNED_LOOKS_PROFILE = 'exulanica.character-looks/v1';
+
+/** Looks someone designed: starting points to choose from, and each body's default. */
+export interface DesignedLooks {
+  readonly profile: typeof DESIGNED_LOOKS_PROFILE;
+  readonly catalogId: string;
+  readonly defaults: { readonly player: string; readonly bases: Readonly<Record<string, string>> };
+  readonly looks: readonly { readonly lookId: string; readonly label: string; readonly look: CharacterLook }[];
+}
+
+/** The same rules as `exulanica.world.character_appearance.designed_looks`. */
+export function validateDesignedLooks(catalog: CharacterCatalog, looks: DesignedLooks): DesignedLooks {
+  if (looks.profile !== DESIGNED_LOOKS_PROFILE || looks.catalogId !== catalog.catalogId) fail('designed looks name another catalog or profile');
+  const ids = new Set<string>();
+  for (const entry of looks.looks) {
+    exactKeys(entry, ['lookId', 'label', 'look'], 'a designed look');
+    if (ids.has(entry.lookId)) fail(`${entry.lookId} is designed twice`);
+    ids.add(entry.lookId);
+    validateLook(catalog, entry.look);
+  }
+  exactKeys(looks.defaults, ['player', 'bases'], 'designed defaults');
+  for (const id of [looks.defaults.player, ...Object.values(looks.defaults.bases)]) {
+    if (!ids.has(id)) fail(`designed default ${id} is not a designed look`);
+  }
+  const bases = catalog.families.flatMap((family) => family.bases.map((base) => base.baseId));
+  exactKeys(looks.defaults.bases, bases, 'designed base defaults');
+  for (const [baseId, id] of Object.entries(looks.defaults.bases)) {
+    if (looks.looks.find((entry) => entry.lookId === id)!.look.baseId !== baseId) fail(`${baseId} default look is over another base`);
+  }
+  return looks;
+}
+
+export function designedLook(looks: DesignedLooks, lookId: string): CharacterLook {
+  const entry = looks.looks.find((candidate) => candidate.lookId === lookId);
+  if (!entry) throw new TypeError(`Unknown designed look ${lookId}`);
+  return entry.look;
+}
+
 /** A reproducible stream of 32-bit integers from SHA-256 in counter mode. */
 export class DrawStream {
   private readonly seed: Uint8Array;
