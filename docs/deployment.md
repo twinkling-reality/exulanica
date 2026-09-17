@@ -399,8 +399,7 @@ Training, conversion and authenticated visual acceptance are separate gates.
 | `EXULANICA_SCENE_JOB_IDS` | Comma-separated scene job UUIDs the scene worker may claim | Optional. Without it (or `--job`) the scene worker drains every eligible job in its workspaces oldest first |
 | `EXULANICA_COMPRESSOR_GPU` | `cpu` or a WebGPU adapter index for the SOG compressor's k-means | Optional, default `cpu`. On a GPU host give the scene worker container the GPU with graphics capability and set `0`; recorded in each compression attempt |
 | `EXULANICA_DEPTH_MODEL` | Selects the production depth implementation | Compose sets `moge` on the derivative worker. Other processes leave it unavailable |
-| `EXULANICA_DEPTH_MODEL_ID` | Reviewed MoGe repository identifier | Defaults to `Ruicheng/moge-2-vitl`; changing it changes the point-map artifact binding |
-| `EXULANICA_DEPTH_MODEL_REVISION` | Full Git commit for the MoGe checkpoint | Defaults to the measured `39c4d5e957afe587e04eec59dc2bcc3be5ecd968`; mutable branches and tags are refused |
+| `EXULANICA_DEPTH_MODEL_ID`, `EXULANICA_DEPTH_MODEL_REVISION` | Retired | No longer read: the MoGe checkpoint is the one `models.manifest.json` pins as `local_roles.depth`, and the derivative worker refuses to start while either is set |
 | `EXULANICA_DEPTH_DEVICE` | Optional torch device such as `cuda`, `mps`, or `cpu` | The derivative worker; when absent it selects MPS, then CUDA, then CPU |
 | `EXULANICA_SEGMENTATION_MODEL` | `local` or `unavailable`: whether the derivative worker runs the object segmentation stage | Defaults to `unavailable` everywhere, Compose included. `local` needs the `segmentation` extra and loads the checkpoints the manifest's `local_roles` pin; startup fails if either is wrong |
 | `EXULANICA_SEGMENTATION_DEVICE` | Optional torch device such as `cuda`, `mps`, or `cpu` for the segmenter | The derivative worker; when absent it selects MPS, then CPU |

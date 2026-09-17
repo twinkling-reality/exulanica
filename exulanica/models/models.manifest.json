@@ -137,7 +137,7 @@
     }
   },
 
-  "local_models_note": "Checkpoints this codebase runs on its own hardware, pinned by HuggingFace revision SHA. Nothing here is a Token Factory identifier, so the preflight neither reads nor checks this section, and parse_manifest ignores it. license is read from the raw README.md YAML frontmatter at the pinned revision, never from the catalog, a model card's prose or the family name, and exulanica/ingest/stages/segmentation.py re-reads that frontmatter before it loads any weights and refuses on drift. readme_sha256 is the digest of those README bytes as retrieved on retrieved_at. pipeline_version moved from 2 to 3 when these entries were added.",
+  "local_models_note": "Checkpoints this codebase runs on its own hardware, pinned by HuggingFace revision SHA. Nothing here is a Token Factory identifier, so the preflight neither reads nor checks this section, and parse_manifest ignores it. license is read from the raw README.md YAML frontmatter at the pinned revision, never from the catalog, a model card's prose or the family name, and exulanica/ingest/stages/segmentation.py re-reads that frontmatter before it loads the segmentation weights and refuses on drift. readme_sha256 is the digest of those README bytes as retrieved on retrieved_at. pipeline_version moved from 2 to 3 when the segmentation entries were added; the depth entry, added later, named the checkpoint the worker already ran and moved nothing.",
   "local_models": {
     "facebook/sam2.1-hiera-tiny": {
       "revision": "de431c4043854a71d8101e17995dfe596bf101a5",
@@ -166,6 +166,15 @@
       "library": "transformers",
       "task": "zero-shot-object-detection",
       "note": "The card's research-output framing is a norm, not a licence term (docs/license-matrix.md section 3.4)."
+    },
+    "Ruicheng/moge-2-vitl": {
+      "revision": "39c4d5e957afe587e04eec59dc2bcc3be5ecd968",
+      "license": "mit",
+      "readme_sha256": "d8d7a46d41a1a37fe4f0a5f637bf55c649310185329127d8a2204632e480be17",
+      "retrieved_at": "2026-09-16",
+      "library": "moge",
+      "task": "depth-estimation",
+      "note": "MoGe-2 ViT-L, the checkpoint every existing point map names. The README at this revision is its frontmatter and nothing else. Loaded by the moge package, which does not re-read this frontmatter before loading. The depth stage binds repo@revision, so moving this pin re-keys every point map and is a decision of its own; it does not move pipeline_version, which keys hosted responses and caption vectors."
     }
   },
 
@@ -179,6 +188,11 @@
       "primary": "IDEA-Research/grounding-dino-tiny",
       "fallback": "google/owlv2-base-patch16-ensemble",
       "rationale": "Boxes for SAM when the hosted vision pass supplied none. The fallback is tried when the primary cannot be loaded or raises, and the artifact records which one ran."
+    },
+    "depth": {
+      "primary": "Ruicheng/moge-2-vitl",
+      "fallback": null,
+      "rationale": "Metric point maps, locally, for the depth stage. Moved here on 2026-09-16 from worker environment defaults, with the same checkpoint, so the depth model is stated where every other model is and a personal model right can name it by role. No fallback: a worker that cannot load this checkpoint reports depth unavailable rather than substituting another."
     }
   },
 

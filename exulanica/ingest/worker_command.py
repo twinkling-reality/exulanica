@@ -49,8 +49,9 @@ DATA_DIR_ENV: Final = env_name("DATA_DIR")
 MODEL_KEY_ENV: Final = "NEBIUS_API_KEY"
 DEPTH_MODEL_ENV: Final = env_name("DEPTH_MODEL")
 PERSON_DETECTOR_ENV: Final = env_name("PERSON_DETECTOR")
-DEPTH_MODEL_ID_ENV: Final = env_name("DEPTH_MODEL_ID")
-DEPTH_MODEL_REVISION_ENV: Final = env_name("DEPTH_MODEL_REVISION")
+#: Read before 2026-09-16 to choose the depth checkpoint, which the manifest now pins. Refused when
+#: set, so a deployment that pinned something else stops rather than quietly running the manifest's.
+RETIRED_DEPTH_ENVS: Final = (env_name("DEPTH_MODEL_ID"), env_name("DEPTH_MODEL_REVISION"))
 DEPTH_DEVICE_ENV: Final = env_name("DEPTH_DEVICE")
 SEGMENTATION_MODEL_ENV: Final = env_name("SEGMENTATION_MODEL")
 SEGMENTATION_DEVICE_ENV: Final = env_name("SEGMENTATION_DEVICE")
@@ -139,20 +140,20 @@ def _build_depth(environ: Mapping[str, str]) -> Any:
         return None
     if mode != "moge":
         raise ValueError(f"{DEPTH_MODEL_ENV} must be 'moge' or 'unavailable', not {mode!r}")
+    for retired in RETIRED_DEPTH_ENVS:
+        if environ.get(retired):
+            raise ValueError(
+                f"{retired} is no longer read: the depth checkpoint is the one "
+                "models.manifest.json pins as local_roles.depth; unset it"
+            )
     from exulanica.ingest.stages import stage
-    from exulanica.reconstruction.moge import (
-        DEFAULT_MOGE_MODEL,
-        DEFAULT_MOGE_REVISION,
-        MoGeDepthModel,
-    )
+    from exulanica.ingest.stages.segmentation import DEPTH_ROLE, local_model_role
+    from exulanica.reconstruction.moge import MoGeDepthModel
 
-    revision = env_get("DEPTH_MODEL_REVISION", environ) or DEFAULT_MOGE_REVISION
-    if len(revision) != 40 or any(character not in "0123456789abcdef" for character in revision):
-        raise ValueError(f"{DEPTH_MODEL_REVISION_ENV} must be a full lowercase Git commit")
-
+    pin = local_model_role(DEPTH_ROLE).primary
     return MoGeDepthModel(
-        model_id=env_get("DEPTH_MODEL_ID", environ) or DEFAULT_MOGE_MODEL,
-        revision=revision,
+        model_id=pin.repo_id,
+        revision=pin.revision,
         max_edge_px=int(stage("depth").params["max_edge_px"]),
         device=env_get("DEPTH_DEVICE", environ) or None,
     )

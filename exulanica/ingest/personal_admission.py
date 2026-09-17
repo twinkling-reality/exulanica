@@ -27,7 +27,12 @@ from exulanica.ingest.privacy import (
     require_privacy_screening,
 )
 from exulanica.ingest.repository import IngestRepository
-from exulanica.ingest.stages.segmentation import local_model_roles
+from exulanica.ingest.stages.segmentation import (
+    DEPTH_ROLE,
+    DETECTION_ROLE,
+    SEGMENTATION_ROLE,
+    local_model_role,
+)
 from exulanica.models import manifest as models_manifest
 
 
@@ -367,17 +372,15 @@ class PersonalBatch(StrictInput):
 def role_handoff(role: str, manifest: models_manifest.Manifest | None = None) -> ModelHandoff:
     """Every model a manifest role can reach, and where its bytes go.
 
-    A hosted role resolves to its whole chain at the manifest's endpoint; a local role to its
-    pinned checkpoint and fallback in this process. A role the manifest does not state is
-    refused. Depth is one of those: its checkpoint is chosen by the worker's configuration rather
-    than stated in the manifest, so a depth right names its checkpoint explicitly through
-    :func:`~exulanica.ingest.model_rights.grant_model_right`.
+    A hosted role resolves to its whole chain at the manifest's endpoint; a local role, depth
+    included, to its pinned checkpoint and fallback in this process. A role the manifest does not
+    state is refused.
     """
     if role in {member.value for member in models_manifest.Role}:
         return ModelHandoff.hosted(manifest or models_manifest.load_manifest(), role)
-    local = local_model_roles().get(role)
-    if local is None:
+    if role not in (SEGMENTATION_ROLE, DETECTION_ROLE, DEPTH_ROLE):
         raise ValueError(f"the manifest states no model role {role!r}")
+    local = local_model_role(role)
     return ModelHandoff.local(
         *(
             ModelIdentity(

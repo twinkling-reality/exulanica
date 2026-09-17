@@ -373,14 +373,17 @@ def test_each_stage_states_the_hand_over_its_model_makes(manifest, transport):
     )
 
 
-def test_a_manifest_role_resolves_to_its_models_and_depth_is_not_one():
+def test_a_manifest_role_resolves_to_its_models_and_an_unstated_one_is_refused():
     assert role_handoff("vision") == HOSTED
     local = role_handoff("open_vocabulary_detection")
     assert local.destination == LOCAL_PROCESS
     assert len(local.identities) == 2
     assert all(identity.revision for identity in local.identities)
-    with pytest.raises(ValueError, match="states no model role"):
-        role_handoff("depth")
+    (depth,) = role_handoff("depth").identities
+    assert depth.revision is not None
+    for unstated in ("clairvoyance", "local_models", ""):
+        with pytest.raises(ValueError, match="states no model role"):
+            role_handoff(unstated)
 
 
 def test_the_migration_grants_nobody_anything():
@@ -1264,7 +1267,7 @@ def test_an_admission_that_names_the_vision_role_grants_each_model_it_can_reach(
 def test_an_admission_refuses_a_right_it_cannot_name_before_writing_anything(upload):
     body = batch(upload)
     for requested in (
-        [{"role": "depth", "valid_until": body["authority"]["valid_until"]}],
+        [{"role": "clairvoyance", "valid_until": body["authority"]["valid_until"]}],
         [{"role": "vision", "valid_until": "2099-01-01T00:00:00+00:00"}],
         _vision_rights(body) * 2,
     ):

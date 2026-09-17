@@ -102,8 +102,6 @@ refusal leaves the capture succeeded, sends nothing, and is recorded as the `mes
 
 **Not covered yet.**
 
-- The manifest states no depth role, so depth cannot be granted by role name through the batch
-  path; a depth right names its checkpoint through `grant_model_right`.
 - Scene pose (COLMAP, classic feature matching with no learned weights) runs under the scene
   privacy admission only. Gaussian-splat training runs a learned perceptual metric (LPIPS) in its
   container on whichever host runs the scene worker, and asks for no model right. Until both
@@ -157,12 +155,12 @@ model client and spending guard; admission does not create a spending authorizat
 The optional `model_rights` list (at most eight entries, default empty) is how the account holder
 lets models receive the admitted photographs. Each entry is `{"role": ..., "valid_until": ...}`
 naming a role the manifest states: a hosted role such as `vision` or `embedding`, or a local role
-(`object_segmentation`, `open_vocabulary_detection`). The server records one right per member for
-every model the role can reach, under that member's new personal authority, granted by the session
-actor at `recorded_at`. Each role appears once, and each term must end in the future and no later
-than the authority. `depth` is refused: its checkpoint is chosen by the worker's configuration, not
-stated in the manifest, so a depth right names its checkpoint through `grant_model_right`. The
-whole list is validated before any receipt is written. Each response receipt carries
+(`object_segmentation`, `open_vocabulary_detection`, `depth`). The server records one right per
+member for every model the role can reach, under that member's new personal authority, granted by
+the session actor at `recorded_at`. Each role appears once, and each term must end in the future
+and no later than the authority. `depth` names the MoGe checkpoint the manifest pins as
+`local_roles.depth`, the one the derivative worker loads. The whole list is validated before any
+receipt is written. Each response receipt carries
 `model_right_ids` and `model_rights` (identity, destination, term and receipt digest, never the
 purpose). A batch that names no role records no right, and the worker then sends its photographs to
 no model. A replay with the same `request_id` reports each granted right as `current` or `ended`,

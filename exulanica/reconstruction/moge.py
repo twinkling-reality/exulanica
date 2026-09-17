@@ -1,8 +1,8 @@
 """MoGe-2 behind the depth protocol.
 
-``docs/model-and-service-selection.md`` selects ``Ruicheng/moge-2-vitl``, MIT, run locally, with
-MoGe-3 on a Linux GPU as the fallback because MoGe-3 has no macOS path. That note turned out to be
-exactly right and worth restating with what was found: MoGe 3.0.0 requires ``torchvision>=0.19``,
+``docs/model-and-service-selection.md`` selects MoGe-2 ViT-L, MIT, run locally, with MoGe-3 on a
+Linux GPU as the fallback because MoGe-3 has no macOS path. That note turned out to be exactly
+right and worth restating with what was found: MoGe 3.0.0 requires ``torchvision>=0.19``,
 and no torchvision wheel matching this platform exists for the current torch, so the package
 installs only without its transitive dependencies. What it actually needs at run time is torch,
 numpy, opencv and ``utils3d_moge``, and the last of those is a different package from the
@@ -13,6 +13,9 @@ numpy, opencv and ``utils3d_moge``, and the last of those is a different package
 instance with no depth model still ingests a corpus and reports the stage as not run, which is the
 same arrangement the vision stage has and for the same reason: a pipeline that could not run
 without a 1.3 GB checkpoint is one that does not run.
+
+**The caller states the checkpoint.** The repository and its full revision are read from the
+manifest's ``local_roles.depth`` by whoever builds this, and nothing here defaults either.
 
 **Three things measured here rather than assumed:**
 
@@ -39,14 +42,10 @@ from PIL import Image
 from exulanica.reconstruction.depth import DepthPrediction
 
 __all__ = [
-    "DEFAULT_MOGE_MODEL",
-    "DEFAULT_MOGE_REVISION",
     "MoGeDepthModel",
+    "checkpoint_ref",
     "to_opm_frame",
 ]
-
-DEFAULT_MOGE_MODEL: Final = "Ruicheng/moge-2-vitl"
-DEFAULT_MOGE_REVISION: Final = "39c4d5e957afe587e04eec59dc2bcc3be5ecd968"
 
 #: Passed to `infer`. Trades tokens for detail; 6 is the level the timing above was measured at.
 _RESOLUTION_LEVEL: Final = 6
@@ -54,6 +53,11 @@ _RESOLUTION_LEVEL: Final = 6
 
 class DepthModelUnavailable(RuntimeError):
     """Torch or MoGe is not installed. Raised with what to install rather than an ImportError."""
+
+
+def checkpoint_ref(model_id: str, revision: str) -> str:
+    """``repo@revision``: the identity every point map records and the depth stage binds."""
+    return f"{model_id}@{revision}"
 
 
 def to_opm_frame(points: list[float]) -> list[float]:
@@ -88,13 +92,16 @@ class MoGeDepthModel:
     def __init__(
         self,
         *,
-        model_id: str = DEFAULT_MOGE_MODEL,
-        revision: str | None = DEFAULT_MOGE_REVISION,
+        model_id: str,
+        revision: str,
         max_edge_px: int = 512,
         device: str | None = None,
     ) -> None:
-        if revision is not None and (
-            len(revision) != 40
+        if not isinstance(model_id, str) or not model_id:
+            raise ValueError("a MoGe checkpoint is named by its repository identifier")
+        if (
+            not isinstance(revision, str)
+            or len(revision) != 40
             or any(character not in "0123456789abcdef" for character in revision)
         ):
             raise ValueError("a MoGe checkpoint revision must be a full lowercase Git commit")
@@ -109,7 +116,7 @@ class MoGeDepthModel:
             ) from exc
 
         self._torch = torch
-        self._model_id = f"{model_id}@{revision}" if revision else model_id
+        self._model_id = checkpoint_ref(model_id, revision)
         self._max_edge_px = max_edge_px
         resolved = device or (
             "mps"
@@ -119,11 +126,7 @@ class MoGeDepthModel:
             else "cpu"
         )
         self._device = torch.device(resolved)
-        pretrained = (
-            MoGeModel.from_pretrained(model_id, revision=revision)
-            if revision
-            else MoGeModel.from_pretrained(model_id)
-        )
+        pretrained = MoGeModel.from_pretrained(model_id, revision=revision)
         self._model = pretrained.to(self._device).eval()
         # Read from the loaded checkpoint, not from its name. `infer` multiplies the points by a
         # recovered `metric_scale` only when the model carries a scale head, so this is the same

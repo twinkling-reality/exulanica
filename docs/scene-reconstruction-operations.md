@@ -235,8 +235,6 @@ explicitly:
 
 ```bash
 export EXULANICA_DEPTH_MODEL=moge
-export EXULANICA_DEPTH_MODEL_ID=Ruicheng/moge-2-vitl
-export EXULANICA_DEPTH_MODEL_REVISION=39c4d5e957afe587e04eec59dc2bcc3be5ecd968
 export EXULANICA_DEPTH_DEVICE=cpu
 uv run --extra reconstruction exulanica-derivative-worker
 ```

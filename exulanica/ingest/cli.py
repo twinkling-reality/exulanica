@@ -143,10 +143,16 @@ def _build_depth(args: argparse.Namespace, stream: Any) -> Any:
     """
     if not args.reconstruct:
         return None
+    from exulanica.ingest.stages.segmentation import DEPTH_ROLE, local_model_role
     from exulanica.reconstruction.moge import DepthModelUnavailable, MoGeDepthModel
 
+    pin = local_model_role(DEPTH_ROLE).primary
     try:
-        model = MoGeDepthModel(max_edge_px=int(stage("depth").params["max_edge_px"]))
+        model = MoGeDepthModel(
+            model_id=pin.repo_id,
+            revision=pin.revision,
+            max_edge_px=int(stage("depth").params["max_edge_px"]),
+        )
     except DepthModelUnavailable as exc:
         raise SystemExit(f"reconstruction: {exc}") from exc
     print(

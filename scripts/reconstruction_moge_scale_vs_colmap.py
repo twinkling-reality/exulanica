@@ -114,10 +114,12 @@ def main():
     out_path = args.out or spike / ("moge_scale_vs_colmap_knownfov.json" if args.known_fov else "moge_scale_vs_colmap.json")
 
     sys.path.insert(0, str(REPO))
+    from exulanica.ingest.stages.segmentation import DEPTH_ROLE, local_model_role
     from exulanica.reconstruction.moge import MoGeDepthModel
 
+    pin = local_model_role(DEPTH_ROLE).primary
     t0 = time.monotonic()
-    model = MoGeDepthModel(max_edge_px=args.max_edge)
+    model = MoGeDepthModel(model_id=pin.repo_id, revision=pin.revision, max_edge_px=args.max_edge)
     load_s = time.monotonic() - t0
 
     images = read_images(model_dir / "images.txt")

@@ -15,8 +15,6 @@ export EXULANICA_DATABASE_URL=postgresql://exulanica_app:<password>@postgres:543
 export EXULANICA_DATA_DIR=/var/lib/exulanica
 export EXULANICA_WORKSPACE_IDS=<uuid>[,<uuid>...]
 export EXULANICA_DEPTH_MODEL=moge
-export EXULANICA_DEPTH_MODEL_ID=Ruicheng/moge-2-vitl
-export EXULANICA_DEPTH_MODEL_REVISION=39c4d5e957afe587e04eec59dc2bcc3be5ecd968
 uv run --extra reconstruction exulanica-derivative-worker
 ```
 
@@ -30,8 +28,10 @@ BYPASSRLS. Both inspect the active database role at startup and refuse an unsafe
 owner URL belongs only to `exulanica-db`; `compose.yaml` enforces that split.
 
 `EXULANICA_DEPTH_MODEL` accepts only `moge` or `unavailable` and defaults to the latter outside
-Compose. `EXULANICA_DEPTH_MODEL_REVISION` is a full Git commit, not a mutable branch or tag, and is
-included in the model identity stored with each point map. `EXULANICA_DEPTH_DEVICE` may pin `cuda`,
+Compose. The checkpoint is the one `exulanica/models/models.manifest.json` pins as
+`local_roles.depth`, at a full Git commit that is part of the model identity stored with each point
+map. `EXULANICA_DEPTH_MODEL_ID` and `EXULANICA_DEPTH_MODEL_REVISION` are no longer read, and the
+worker refuses to start while either is set. `EXULANICA_DEPTH_DEVICE` may pin `cuda`,
 `mps`, or `cpu`; when absent, the model selects MPS, then CUDA, then CPU according to measured
 runtime availability. Compose persists `HF_HOME` under the media volume so a restart does not
 download the reviewed checkpoint again.

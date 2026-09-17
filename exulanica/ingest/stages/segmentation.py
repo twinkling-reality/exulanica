@@ -89,6 +89,7 @@ if TYPE_CHECKING:
     import numpy as np
 
 __all__ = [
+    "DEPTH_ROLE",
     "DETECTION_ROLE",
     "OBJECT_MASK_KIND",
     "OBJECT_MASK_PROFILE",
@@ -104,6 +105,7 @@ __all__ = [
     "OutlinePolicy",
     "SegmentedMask",
     "SegmenterUnavailable",
+    "local_model_role",
     "local_model_roles",
     "model_handoff",
     "outline_from_mask",
@@ -123,6 +125,10 @@ SEGMENTER_CONTRACT: Final = "exulanica.object-segmenter/v1"
 #: The two local roles in ``models.manifest.json``. Code names a role and never an identifier.
 SEGMENTATION_ROLE: Final = "object_segmentation"
 DETECTION_ROLE: Final = "open_vocabulary_detection"
+#: The local role that pins the depth stage's checkpoint. Not a segmentation role and not in
+#: :func:`local_model_roles`; the processes that load MoGe read it through
+#: :func:`local_model_role`.
+DEPTH_ROLE: Final = "depth"
 
 
 class SegmenterUnavailable(RuntimeError):
@@ -174,12 +180,12 @@ def _pin(models: Mapping[str, Any], repo_id: object, role: str) -> LocalModelPin
     return LocalModelPin(repo_id=repo_id, revision=revision, license=licence)
 
 
-def local_model_roles(document: Mapping[str, Any] | None = None) -> dict[str, LocalRole]:
-    """The manifest's ``local_roles``, resolved to pinned checkpoints and validated.
+def local_model_role(name: str, document: Mapping[str, Any] | None = None) -> LocalRole:
+    """One of the manifest's ``local_roles``, resolved to pinned checkpoints and validated.
 
     Read from the manifest file rather than restated here, which is invariant 7 applied to the
     checkpoints this codebase runs itself: no identifier appears in Python source, and a test
-    greps this module and its sibling to keep it so.
+    greps the package to keep it so.
     """
     if document is None:
         document = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
@@ -187,17 +193,21 @@ def local_model_roles(document: Mapping[str, Any] | None = None) -> dict[str, Lo
     roles = document.get("local_roles")
     if not isinstance(models, Mapping) or not isinstance(roles, Mapping):
         raise ValueError("the manifest has no local_models and local_roles sections")
-    resolved: dict[str, LocalRole] = {}
-    for name in (SEGMENTATION_ROLE, DETECTION_ROLE):
-        raw = roles.get(name)
-        if not isinstance(raw, Mapping):
-            raise ValueError(f"the manifest does not bind the local role {name!r}")
-        primary = _pin(models, raw.get("primary"), name)
-        fallback = None if raw.get("fallback") is None else _pin(models, raw.get("fallback"), name)
-        if fallback is not None and fallback.repo_id == primary.repo_id:
-            raise ValueError(f"local role {name!r} names its primary as its own fallback")
-        resolved[name] = LocalRole(primary=primary, fallback=fallback)
-    return resolved
+    raw = roles.get(name)
+    if not isinstance(raw, Mapping):
+        raise ValueError(f"the manifest does not bind the local role {name!r}")
+    primary = _pin(models, raw.get("primary"), name)
+    fallback = None if raw.get("fallback") is None else _pin(models, raw.get("fallback"), name)
+    if fallback is not None and fallback.repo_id == primary.repo_id:
+        raise ValueError(f"local role {name!r} names its primary as its own fallback")
+    return LocalRole(primary=primary, fallback=fallback)
+
+
+def local_model_roles(document: Mapping[str, Any] | None = None) -> dict[str, LocalRole]:
+    """The two segmentation roles in the manifest's ``local_roles``, resolved and validated."""
+    if document is None:
+        document = json.loads(MANIFEST_PATH.read_text(encoding="utf-8"))
+    return {name: local_model_role(name, document) for name in (SEGMENTATION_ROLE, DETECTION_ROLE)}
 
 
 def _frontmatter_licence(readme: str) -> str | None:

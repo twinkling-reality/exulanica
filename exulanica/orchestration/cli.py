@@ -180,9 +180,15 @@ def _depth_model(mode: str) -> DepthModel | None:
     if mode == "unavailable":
         return None
     try:
+        from exulanica.ingest.stages.segmentation import DEPTH_ROLE, local_model_role
         from exulanica.reconstruction.moge import MoGeDepthModel
 
-        return MoGeDepthModel(max_edge_px=int(stage("depth").params["max_edge_px"]))
+        pin = local_model_role(DEPTH_ROLE).primary
+        return MoGeDepthModel(
+            model_id=pin.repo_id,
+            revision=pin.revision,
+            max_edge_px=int(stage("depth").params["max_edge_px"]),
+        )
     except Exception as exc:
         raise FrontierDemonstrationError(
             "depth_configuration", f"configured MoGe could not load: {exc}"

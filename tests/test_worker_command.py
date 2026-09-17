@@ -44,6 +44,7 @@ def test_startup_failure_is_machine_readable_and_returns_failure():
 
 
 def test_depth_configuration_is_explicit_and_passes_the_pinned_model_binding(monkeypatch):
+    from exulanica.ingest.stages.segmentation import DEPTH_ROLE, local_model_role
     from exulanica.reconstruction import moge
 
     captured = {}
@@ -58,28 +59,23 @@ def test_depth_configuration_is_explicit_and_passes_the_pinned_model_binding(mon
     depth = worker_command._build_depth(
         {
             worker_command.DEPTH_MODEL_ENV: "moge",
-            worker_command.DEPTH_MODEL_ID_ENV: "example/moge-checkpoint",
-            worker_command.DEPTH_MODEL_REVISION_ENV: "a" * 40,
             worker_command.DEPTH_DEVICE_ENV: "cuda",
         }
     )
 
+    pin = local_model_role(DEPTH_ROLE).primary
     assert isinstance(depth, FakeDepth)
     assert captured == {
-        "model_id": "example/moge-checkpoint",
-        "revision": "a" * 40,
+        "model_id": pin.repo_id,
+        "revision": pin.revision,
         "max_edge_px": 512,
         "device": "cuda",
     }
     with pytest.raises(ValueError, match="must be 'moge' or 'unavailable'"):
         worker_command._build_depth({worker_command.DEPTH_MODEL_ENV: "automatic"})
-    with pytest.raises(ValueError, match="full lowercase Git commit"):
-        worker_command._build_depth(
-            {
-                worker_command.DEPTH_MODEL_ENV: "moge",
-                worker_command.DEPTH_MODEL_REVISION_ENV: "main",
-            }
-        )
+    for retired in worker_command.RETIRED_DEPTH_ENVS:
+        with pytest.raises(ValueError, match="no longer read"):
+            worker_command._build_depth({worker_command.DEPTH_MODEL_ENV: "moge", retired: "a" * 40})
 
 
 class _RecordingSegmenter:
