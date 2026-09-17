@@ -248,7 +248,12 @@ A tile can be named only on the synthetic development preview route:
   drops the branch and the modules it imports; `composition/generated-tile.ts` refuses to run
   outside development preview as a second guard.
 - `dev/generated-tile-sources.ts` resolves a name only among `dev/tiles/*.owd`, pinned development
-  goldens described in that folder's README, and texture sets only among the committed blobs.
+  goldens described in that folder's README, and texture sets only among the committed blobs. It
+  imports the blobs' URLs eagerly: they sit outside the app's workspace, and Vite's development
+  server resolves a `?url` import of such a file only when a module imports it statically (a lazy
+  import is answered with the raw bytes, so no cited set could load).
+  `web/packages/app/test/generated-tile-sources.test.ts` starts a development server from the app's
+  configuration and resolves every pinned set to its URL and its pinned bytes.
   Baked corridor streets are not repository files; they go to the baked tile store and a permission
   gated route, and nothing here reaches them.
 - The preview title is left alone: the visual gate harness holds the shell to its title, and
