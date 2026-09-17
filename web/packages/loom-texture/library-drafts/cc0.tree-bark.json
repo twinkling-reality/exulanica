@@ -1,0 +1,53 @@
+{
+  "set_id": "cc0.tree-bark",
+  "version": 1,
+  "title": "Tree bark",
+  "summary": "The furrowed bark of a mature broadleaf street tree, with interlacing furrows, cracked plates and patches of lichen.",
+  "licence_id": "CC0-1.0",
+  "recipe": {
+    "profile": "exulanica.texture-recipe/v1",
+    "maker": {
+      "id": "loom.bark",
+      "version": 1
+    },
+    "seed": 2026091703,
+    "resolution": {
+      "width": 512,
+      "height": 512
+    },
+    "extent_mm": {
+      "u": 1000,
+      "v": 1000
+    },
+    "parameters": {
+      "plate_colours": [
+        [116, 108, 98],
+        [102, 94, 86],
+        [128, 120, 110],
+        [94, 88, 82]
+      ],
+      "furrow_colour": [54, 46, 40],
+      "lichen_colour": [132, 138, 108],
+      "plate_cells_across": 14,
+      "plate_cells_down": 4,
+      "furrow_width_mm": 34,
+      "furrow_depth_mm": 12,
+      "sway_mm": 30,
+      "sway_cells": 3,
+      "crack_cells_across": 6,
+      "crack_cells_down": 14,
+      "crack_width_mm": 8,
+      "crack_depth_percent": 20,
+      "plate_relief_mm_1024ths": 2560,
+      "plate_texture_cells": 120,
+      "plate_variation_q16": 4000,
+      "lichen_percent": 25,
+      "lichen_cells": 7,
+      "bark_roughness_permille": 900,
+      "height_range_mm": 20,
+      "occlusion_radius_mm": 10,
+      "occlusion_depth_mm": 6,
+      "occlusion_strength_permille": 650
+    }
+  }
+}
