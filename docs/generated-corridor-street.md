@@ -107,3 +107,36 @@ it was generated at, from git, and nothing else that varies between runs. The ta
 Baking the tiles through the tessellator and recording them through migration 0072 is a separate,
 offline step: `scripts/bake_corridor_tiles.py`, which bakes every tile twice under one key and
 requires the second bake to be byte-identical. Nothing bakes inside a request.
+
+## 6. How the street is served
+
+Two routes, and neither of them bakes. Both require the `tiles.materialise` permission, which
+nothing holds by default: a generated world reaches no person's world until the governance
+decision is accepted in writing, so only a token whose grant names the permission is served a
+generated tile.
+
+- `GET /tiles?city_seed=<64 hex>[&lod=<int>]` lists what is stored for one city: each tile's key,
+  coordinate, level of detail, container digest and size, its two triangle digests and its state.
+  Metadata only, and no tile quota is spent on it.
+- `GET /tiles/{baked_tile_id}/bytes` serves one container, as
+  `application/vnd.exulanica.owd`, with the container digest as its `ETag`. A caller that already
+  holds the bytes sends `If-None-Match` and is answered 304 with no body. **The caller hashes what
+  it received and refuses to draw anything whose digest is not the one the listing states**: the
+  route checks its own bytes before sending them, and that check is not a substitute for the
+  caller's.
+
+What a tile costs: the first delivery of a tile to a workspace spends one of its migration 0062
+tile quota, and delivering the same tile to that workspace again is free, because the ceiling
+limits how many distinct tiles a workspace materialises and not how often a walk reloads one. A
+revalidation costs nothing, and neither does a delivery that fails: the quota is charged after the
+bytes are in hand and held to their digest, never before.
+
+Refusals, each meaning one thing: 404 `unknown_reference` for a key nothing stored, which is also
+what a credential without the permission is told, so neither answer says whether the other was the
+reason; 409 `nondeterminism_detected` for a key that once baked into two different containers,
+which is never served; 409 `bytes_missing` for a row whose bytes are not in the store, which is an
+operator's problem rather than a client's; 429 `tile_quota_exceeded` for a workspace past its
+ceiling or with none declared, which is never retried.
+
+A loader is better off listing first and fetching only the digests it does not already hold: one
+small request for a whole city, rather than a revalidation per tile.
