@@ -49,9 +49,25 @@ class Tiles:
     workspaces: dict[str, uuid.UUID]
     keys: dict[str, uuid.UUID]
     digests: dict[str, str]
+    dsn: str
 
-    def get(self, who: str, path: str):
-        return self.client.get(path, headers={"Authorization": f"Bearer {self.tokens[who]}"})
+    def get(self, who: str, path: str, **headers: str):
+        return self.client.get(
+            path, headers={"Authorization": f"Bearer {self.tokens[who]}", **headers}
+        )
+
+    def used(self, who: str) -> int:
+        """How many tiles of its ceiling this workspace has spent."""
+        with psycopg.connect(self.dsn, autocommit=True, row_factory=dict_row) as connection:
+            connection.execute(
+                "select set_config('exulanica.workspace_id', %s, false)",
+                (str(self.workspaces[who]),),
+            )
+            row = connection.execute(
+                "select tiles_used from workspace_tile_quota where workspace_id = %s",
+                (self.workspaces[who],),
+            ).fetchone()
+            return int(row["tiles_used"]) if row else 0
 
 
 def _record(repository: BakedTileRepository, key: uuid.UUID, tile_x: int, container: bytes) -> str:
@@ -137,6 +153,7 @@ def tiles(tmp_path_factory) -> Iterator[Tiles]:
         with TestClient(app) as client:
             yield Tiles(
                 client=client,
+                dsn=dsn,
                 tokens=tokens,
                 workspaces=workspaces,
                 keys=keys,
@@ -186,6 +203,33 @@ def test_a_walk_that_reloads_one_tile_spends_one_of_the_ceiling(tiles):
     refused = tiles.get("cramped", f"/tiles/{tiles.keys['first']}/bytes")
     assert refused.status_code == 429
     assert refused.json()["code"] == "tile_quota_exceeded"
+
+
+def test_a_revalidation_is_answered_304_and_costs_no_tile(tiles):
+    """What the ETag is for. A loader that already holds the bytes gets no body and pays nothing."""
+    key = tiles.keys["first"]
+    etag = f'"{tiles.digests["first"]}"'
+    before = tiles.used("walker")
+    answer = tiles.get("walker", f"/tiles/{key}/bytes", **{"If-None-Match": etag})
+    assert answer.status_code == 304
+    assert answer.content == b""
+    assert answer.headers["ETag"] == etag
+    assert tiles.used("walker") == before
+    # The weak form and the wildcard name the same representation; a digest that is not this
+    # tile's does not.
+    assert (
+        tiles.get("walker", f"/tiles/{key}/bytes", **{"If-None-Match": f"W/{etag}"}).status_code
+        == 304
+    )
+    assert tiles.get("walker", f"/tiles/{key}/bytes", **{"If-None-Match": "*"}).status_code == 304
+    stale = tiles.get("walker", f"/tiles/{key}/bytes", **{"If-None-Match": '"' + "0" * 64 + '"'})
+    assert stale.status_code == 200 and stale.content == b"the corridor tile"
+
+
+def test_a_faulted_tile_is_never_revalidated_either(tiles):
+    """A faulted tile answers 409 whatever the caller holds: it is never current."""
+    answer = tiles.get("walker", f"/tiles/{tiles.keys['faulted']}/bytes", **{"If-None-Match": "*"})
+    assert answer.status_code == 409 and answer.json()["code"] == "nondeterminism_detected"
 
 
 def test_a_faulted_tile_is_never_served(tiles):

@@ -25,7 +25,14 @@ ceiling declared, is 429 and never retried.
 **The caller checks the bytes too.** The response carries the container digest as its ``ETag``; a
 runtime must hash what it received and refuse to draw anything whose digest is not that one.
 Caching is ``private, no-cache``: the bytes hold nothing personal and are named by their own
-digest, so a browser may keep them and revalidate, and a 304 costs nothing.
+digest, so a browser may keep them and revalidate.
+
+**A revalidation is answered here, not by the framework.** ``If-None-Match`` naming the tile's
+digest (or ``*``) is answered 304 with the same ``ETag`` and no body, and spends no tile of the
+quota, because nothing was delivered. Starlette's plain ``Response`` does no conditional handling
+of its own, so a route that did not say this would answer 200 with the whole container to every
+revalidation; the lane building the loader read this file rather than trusting the header, and
+found exactly that.
 """
 
 from __future__ import annotations
@@ -104,6 +111,21 @@ def list_tiles(
     )
 
 
+def _revalidates(header: str | None, digest: str) -> bool:
+    """Whether ``If-None-Match`` names what this tile's bytes are, by RFC 9110's weak comparison."""
+    if header is None:
+        return False
+    for candidate in header.split(","):
+        tag = candidate.strip()
+        if tag == "*":
+            return True
+        if tag.startswith("W/"):
+            tag = tag[2:]
+        if tag.strip('"') == digest:
+            return True
+    return False
+
+
 @router.get("/{baked_tile_id}/bytes")
 def read_tile_bytes(
     baked_tile_id: uuid.UUID,
@@ -112,7 +134,19 @@ def read_tile_bytes(
     session: CurrentSession,
 ) -> Response:
     try:
-        served = _repository(request, connection).serve(session.workspace_id, baked_tile_id)
+        repository = _repository(request, connection)
+        tile = repository.servable(baked_tile_id)
+        if _revalidates(request.headers.get("if-none-match"), tile.container_sha256):
+            # Nothing is delivered, so nothing is charged.
+            return Response(
+                status_code=304,
+                headers={
+                    **_HEADERS,
+                    "ETag": f'"{tile.container_sha256}"',
+                    "X-Exulanica-Tile-Inputs-Digest": tile.tile_inputs_digest,
+                },
+            )
+        served = repository.serve(session.workspace_id, baked_tile_id)
     except (BakedTileError, _Unavailable) as error:
         return _refused(error)
     return Response(

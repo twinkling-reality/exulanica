@@ -7,12 +7,15 @@ Migration 0072 holds the shape and every rule; this is the path that reaches it.
   row exactly as it is and mark it ``nondeterminism_detected``. The bytes are put in the ``tiles``
   store before the row is written, so a row never names bytes that were never stored.
 * :meth:`BakedTileRepository.tiles_of_city` lists what is stored for one city seed, as metadata.
-* :meth:`BakedTileRepository.serve` delivers one tile's bytes to a workspace. The first delivery
-  of a tile to a workspace inserts the ledger row migration 0072 keys ``(workspace, tile)``, whose
-  trigger spends one of the workspace's 0062 tile quota in the same statement; later deliveries of
-  that tile to that workspace are free. The bytes are read from the store and held to the row's
-  digest, and the row is read again under the 0041 asset read lock, so a tile that stopped being
-  servable between the read and the delivery is refused rather than served.
+* :meth:`BakedTileRepository.serve` delivers one tile's bytes to a workspace. The bytes are read
+  from the store, held to the row's digest, and the row is read again under the 0041 asset read
+  lock, so a tile that stopped being servable between the read and the delivery is refused rather
+  than served. Only then is the delivery recorded: the first delivery of a tile to a workspace
+  inserts the ledger row migration 0072 keys ``(workspace, tile)``, whose trigger spends one of the
+  workspace's 0062 tile quota in the same statement, and later deliveries of that tile to that
+  workspace are free. A delivery that fails costs nothing.
+* :meth:`BakedTileRepository.servable` answers what a tile's bytes would be without fetching or
+  charging, which is what a conditional request needs.
 
 Nothing here bakes, and nothing here reads ``assets/``. A faulted tile is never served.
 """
@@ -204,15 +207,27 @@ class BakedTileRepository:
         ).fetchall()
         return [_row(row) for row in rows]
 
-    def serve(self, workspace_id: uuid.UUID, baked_tile_id: uuid.UUID) -> ServedTile:
-        """One tile's bytes for one workspace, charged once and checked twice."""
+    def servable(self, baked_tile_id: uuid.UUID) -> BakedTile:
+        """The tile, if it is one this deployment serves. Reads nothing from the store and charges
+        nothing: a caller that only needs to know what the bytes would be, to answer a conditional
+        request or to skip a fetch, must not spend a workspace's ceiling to find out."""
         tile = self.read(baked_tile_id)
         if tile.state != "baked":
             raise BakedTileFaulted(
                 f"baked tile {baked_tile_id} baked twice into different containers and is not "
                 "served; rebake it after the bake is made deterministic again"
             )
-        charged = self._charge(workspace_id, baked_tile_id)
+        return tile
+
+    def serve(self, workspace_id: uuid.UUID, baked_tile_id: uuid.UUID) -> ServedTile:
+        """One tile's bytes for one workspace, charged once and checked twice.
+
+        The bytes are fetched and held to their digest **before** the quota is charged. A delivery
+        that cannot happen costs nothing: a row whose bytes are missing from the store is an
+        operator's fault, and charging a workspace a tile of its ceiling for it would make our
+        problem theirs.
+        """
+        tile = self.servable(baked_tile_id)
         try:
             data = self.store.get(BlobId(bytes.fromhex(tile.container_sha256)))
         except BlobNotFoundError as error:
@@ -224,6 +239,7 @@ class BakedTileRepository:
         ):
             raise TileBytesMissing(f"baked tile {baked_tile_id}'s bytes are not what it records")
         self._final_check(tile)
+        charged = self._charge(workspace_id, baked_tile_id)
         return ServedTile(data=data, tile=tile, charged=charged)
 
     def _charge(self, workspace_id: uuid.UUID, baked_tile_id: uuid.UUID) -> bool:
