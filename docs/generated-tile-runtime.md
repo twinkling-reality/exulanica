@@ -100,10 +100,10 @@ depends on the offline package.
 ## 3. Materials and the UV rule
 
 A set is drawn by its material class and by nothing else, never by its id or title. This runtime
-draws `opaque`, `cutout` and `glazing` sets, of either container profile and either maker; `decal`
-draws the stated unavailable surface with the reason "material class decal is not drawn by this
-runtime" (`undrawnClassReason`), and nothing of it is uploaded. Drawing decal follows section 3 of
-the texture proposal and comes next.
+draws all four classes, `opaque`, `cutout`, `decal` and `glazing`, of either container profile and
+either maker. A class this runtime has not been taught draws the stated unavailable surface with the
+reason "material class X is not drawn by this runtime" (`undrawnClassReason`), and nothing of it is
+uploaded.
 
 A `cutout` set is glTF's `alphaMode: MASK` with `doubleSided: true`. Its `base_color_coverage` map is
 uploaded as sRGB colour with linear coverage, and every mip level is built by
@@ -119,6 +119,32 @@ field at 70.5 per cent coverage and within 1.1 per cent at 38.9 per cent, where 
 drift by 10.1 and 5.7 per cent; the cutout's shadow has holes (49.4 per cent of the ground under it
 shadowed, against 100 per cent for the same square drawn opaque); and its back face is lit (91.2
 against 49.7 without two-sided lighting).
+
+A `decal` set is glTF's `alphaMode: BLEND` over the surface it lies on: road paint, a stain, a patch
+of grime, geometry that is part of the surface under it rather than a thing of its own. Its
+`base_color_coverage` map is uploaded as sRGB colour with linear coverage, level 0 only, so the device
+builds the chain by averaging: a decal is blended by its coverage rather than tested against a cutoff,
+so an average is exactly what a partly covered texel means, and the coverage-preserving chain a cutout
+needs would be wrong here. Each sample is source over the surface by its coverage; depth
+is tested and not written, so decals never hide one another by depth; the surface is lit by its own
+normal, roughness and metalness maps and receives shadows; it casts none (`castsShadow`), since a
+film of paint lying on a road shadows nothing.
+
+Two things the class needs that opaque and cutout do not. A decal is coplanar with the surface it
+dresses, so the depth buffer cannot separate them and the surface shows through in bands that crawl
+as the camera moves; the material is pulled toward the camera by a constant bias and one that grows
+with the surface's slope to the view (`DECAL_DEPTH_BIAS` -1, `DECAL_SLOPE_DEPTH_BIAS` -2), the slope
+term being what a road needs at eye level, where the ground runs away almost edge on. And a blended
+surface is drawn in the engine's back-to-front pass, which sorts by draw bucket before distance:
+decal takes bucket 160 and glazing 96, above and below the default 127, so every decal is drawn after
+the opaque and cutout scene and before any glass, and a lane line behind a shop window is drawn
+before the window.
+
+**Decal acceptance is not measured yet.** The walk that measures it is committed as the bench's
+`measureDecalWalk`: a test-only worn lane line lying on asphalt in the same plane, walked 30 m at eye
+level beside it, comparing the decal as bound and the same decal with no depth bias against a
+reference drawn with no depth test, pose by pose. Its numbers are owed in
+`evidence/decal-acceptance.log.txt`, and the bias constants stand on argument until they exist.
 
 A `glazing` set is glTF metallic-roughness with metalness 0 plus `KHR_materials_transmission` and
 `KHR_materials_ior`. Its `transmission_roughness` map is uploaded with transmission in red and

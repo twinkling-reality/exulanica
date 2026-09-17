@@ -177,7 +177,8 @@ export function drawBucket(set: Pick<DecodedTextureSet, 'materialClass'>): numbe
 /**
  * How far a decal is pulled toward the camera so it stays in front of the coplanar surface it lies on,
  * in the depth buffer's own units: a constant offset and one that grows with the surface's slope to the
- * view, which is what holds at eye level along a road. Measured on the bench (evidence/decal-acceptance).
+ * view, which is what holds at eye level along a road. The bench's `measureDecalWalk` is the walk that
+ * proves it; its numbers are owed in evidence/decal-acceptance.log.txt and are not measured yet.
  */
 export const DECAL_DEPTH_BIAS = -1;
 export const DECAL_SLOPE_DEPTH_BIAS = -2;
