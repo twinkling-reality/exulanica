@@ -41,6 +41,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from exulanica.errors import ExulanicaError
 from exulanica.models.client import ModelClient
+from exulanica.models.handoff import ModelHandoff
 from exulanica.models.manifest import Role
 from exulanica.models.messages import image_part
 from exulanica.models.results import ChatResult
@@ -556,6 +557,17 @@ class NebiusVisionModel:
         behaviour the invariant asks for.
         """
         return self._client.manifest[Role.VISION].primary.model_id
+
+    @property
+    def model_handoff(self) -> ModelHandoff:
+        """Every model a call can reach, and where the photograph goes.
+
+        The role's whole chain rather than the primary alone, because the client falls back on a
+        withdrawn identifier and either model can receive the same request, and the endpoint of the
+        manifest this client was built with, which is where every request it sends is addressed.
+        A personal photograph is sent only when a right names each of these.
+        """
+        return ModelHandoff.hosted(self._client.manifest, Role.VISION)
 
     def observe(self, *, image_bytes: bytes, media_type: str) -> VisionResult:
         call: ChatResult = self._client.chat(

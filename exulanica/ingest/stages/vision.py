@@ -32,12 +32,10 @@ from exulanica.ingest.vision import (
     OBSERVATION_SCHEMA_NAME,
     PROMPT_VERSION,
     SCHEMA_VERSION,
-    NebiusVisionModel,
     VisionModel,
     VisionObservation,
     prompt_digest,
 )
-from exulanica.models.manifest import Role
 
 __all__ = ["model_handoff", "run"]
 
@@ -49,17 +47,12 @@ DETECTOR_VERSION: Final = "vision:1"
 def model_handoff(model: VisionModel) -> ModelHandoff | None:
     """Every model a call to ``model`` can reach, and where the photograph goes, or None.
 
-    A model states this with a ``model_handoff`` attribute. The hosted client predates the
-    attribute, so its chain and endpoint are read from the manifest that client was built with,
-    which is where every request it sends is addressed. Anything else is unstated, and a personal
-    photograph is not sent to a model that cannot say which model it is or where the bytes go.
+    A model states this with a ``model_handoff`` attribute, as the hosted client does. Anything
+    else is unstated, and a personal photograph is not sent to a model that cannot say which model
+    it is or where the bytes go.
     """
     declared = getattr(model, "model_handoff", None)
-    if declared is not None:
-        return declared if isinstance(declared, ModelHandoff) else None
-    if isinstance(model, NebiusVisionModel):
-        return ModelHandoff.hosted(model._client.manifest, Role.VISION)
-    return None
+    return declared if isinstance(declared, ModelHandoff) else None
 
 
 def run(
