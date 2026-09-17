@@ -838,13 +838,11 @@ def compile_network(
         footprint = tuple(space.footprint_mm)
         if _polygon_area2(footprint) <= 0:
             raise _refuse(f"space {space.space_ordinal} footprint is not counter-clockwise")
-        edges = sorted(
-            {
-                (footprint[i][0] - footprint[(i + 1) % 4][0]) ** 2
-                + (footprint[i][1] - footprint[(i + 1) % 4][1]) ** 2
-                for i in range(4)
-            }
-        )
+        sides = [
+            (following[0] - corner[0], following[1] - corner[1])
+            for corner, following in zip(footprint, footprint[1:] + footprint[:1], strict=True)
+        ]
+        edges = sorted({dot(side, side) for side in sides})
         stall_width_squared, stall_length_squared = edges[0], edges[-1]
         access = space.access_end_mm - space.access_start_mm
         fitting = []
@@ -858,8 +856,8 @@ def compile_network(
                 )
                 continue
             if (
-                vehicle.width_mm**2 > stall_width_squared
-                or vehicle.length_mm**2 > stall_length_squared
+                vehicle.width_mm * vehicle.width_mm > stall_width_squared
+                or vehicle.length_mm * vehicle.length_mm > stall_length_squared
                 or vehicle.length_mm > access
             ):
                 restrictions.append((space.identity, key, "the stall is too small"))
