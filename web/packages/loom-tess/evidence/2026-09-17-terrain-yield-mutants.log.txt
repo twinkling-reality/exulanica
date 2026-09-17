@@ -1,0 +1,15 @@
+# terrain yield mutation run, 2026-09-17, against test/terrain-yield.test.ts and test/triangle-digest-conformance.test.ts
+# baseline a978580f; the first run showed the watertight check never ran (a crossing lies on its covering's
+# closed outline), fixed in 4de8a812 by probing beside each crossing, and the survivors rerun on 4de8a812.
+corners floor only                 killed   7 failed | 13 passed
+corners outside the piece kept     killed   3 failed | 17 passed
+no rows                            killed   7 failed | 13 passed
+no convexity refusal               survived (equivalent: faces cut at covering vertex rows are convex by construction; the refusal is a guard)
+hull drops collinear points        survived on a978580f; killed on 4de8a812, 5 failed | 15 passed
+heights toward zero                killed   2 failed | 18 passed
+touching cells not met             survived (equivalent: a covering that only touches a cell's side leaves the grid cell exactly right)
+every cell coplanar                killed   3 failed | 17 passed
+clockwise coverings kept as given  killed   2 failed | 18 passed
+covered faces kept                 killed   8 failed | 12 passed
+no nesting of groups               killed   1 failed | 19 passed
+bounding boxes treated as apart    killed   6 failed | 14 passed
