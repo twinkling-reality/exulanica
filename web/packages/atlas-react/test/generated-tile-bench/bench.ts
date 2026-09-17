@@ -11,7 +11,7 @@
 import * as pc from 'playcanvas';
 import { parseTextureSetManifest, textureSetBlobPath, type TextureSetManifest } from '@exulanica/atlas-core';
 import { TILE_LOOK_V1, validateTileLook, type TileLook } from '../../src/playcanvas/generated-tile/look.js';
-import { TileTextureLibrary, castsShadow, surfaceUv, type TileMaterialReference } from '../../src/playcanvas/generated-tile/texture-materials.js';
+import { TileTextureLibrary, castsShadow, drawBucket, surfaceUv, type TileMaterialReference } from '../../src/playcanvas/generated-tile/texture-materials.js';
 import { buildSurfaceMesh } from '../../src/playcanvas/generated-tile/surface-mesh.js';
 import { applyTileEnvironment, type TileEnvironment } from '../../src/playcanvas/generated-tile/environment.js';
 import {
@@ -20,6 +20,7 @@ import {
 } from './test-street.js';
 import { testCutoutSet } from './test-cutout.js';
 import { TEST_BACKING_DEPTH_M, backingTexels, testGlazingSet } from './test-glazing.js';
+import { testDecalSet } from './test-decal.js';
 import type { DecodedTextureSet } from '@exulanica/atlas-core';
 
 declare const __TEXTURE_ROOT__: string;
@@ -808,6 +809,91 @@ export class Bench {
     sun.setRotation(rotation);
     this.clear();
     return { openMean: Math.round(meanOpen * 10) / 10, underPaneMean: Math.round(meanUnder * 10) / 10, darkenedBy: Math.round(((meanOpen - meanUnder) / meanOpen) * 1000) / 1000 };
+  }
+
+  /** A horizontal rectangle at height `y`, s along +X and t along -Z (left of s), one repeat per extent. */
+  private groundRect(material: pc.Material, x0: number, x1: number, z0: number, z1: number, y: number, extentUMm: number, extentVMm: number, castShadows: boolean, bucket: number | null = null): pc.Entity {
+    const mesh = buildSurfaceMesh(this.app.graphicsDevice, {
+      positions: [x0, y, z1, x1, y, z1, x1, y, z0, x0, y, z0], normals: [0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0],
+      surfaceMm: [0, 0, (x1 - x0) * 1000, 0, (x1 - x0) * 1000, (z1 - z0) * 1000, 0, (z1 - z0) * 1000],
+      // Counter-clockwise seen from +Y.
+      indices: [0, 1, 2, 0, 2, 3],
+    }, (s, t) => [s / extentUMm, t / extentVMm]);
+    const entity = new pc.Entity('bench:ground-rect');
+    const instance = new pc.MeshInstance(mesh, material, entity);
+    if (bucket !== null) instance.drawBucket = bucket;
+    entity.addComponent('render', { meshInstances: [instance], castShadows, receiveShadows: true });
+    this.root.addChild(entity);
+    this.surfaces.push(entity);
+    this.meshes.push(mesh);
+    return entity;
+  }
+
+  /**
+   * Decal acceptance: a test-only worn lane line lying on asphalt in the same plane, 250 mm wide and 75 m
+   * long, walked for 30 m at eye level beside it. At each step, the line's pixels are where a reference
+   * frame (the decal drawn with no depth test, so nothing can hide it) differs from the road alone; the
+   * share of them where the decal as bound, and the same decal with no depth bias, match the reference.
+   */
+  async measureDecalWalk(steps: number, walkM: number): Promise<Record<string, unknown>> {
+    this.clear();
+    const set = testDecalSet();
+    const resolution = this.library.adopt({ state: 'decoded', setId: set.entry.setId, set, transferredBytes: 0 });
+    if (resolution.state !== 'available') throw new Error(`the test decal does not draw: ${resolution.reason}`);
+    const decal = resolution.material;
+    const unbiased = decal.clone() as pc.StandardMaterial;
+    unbiased.depthBias = 0; unbiased.slopeDepthBias = 0; unbiased.update();
+    const reference = decal.clone() as pc.StandardMaterial;
+    reference.depthTest = false; reference.update();
+    const road = await this.library.resolve('cc0.carriageway-asphalt');
+    this.groundRect(road.material, -5, 70, -4, 4, 0, 2000, 2000, true);
+    const line = this.groundRect(decal, -5, 70, -0.125, 0.125, 0, set.entry.extentUMm, set.entry.extentVMm, castsShadow(set), drawBucket(set));
+    const render = line.render!;
+    const eye = 1.62;
+    const rows: { x: number; linePixels: number; bound: number; unbiased: number }[] = [];
+    for (let step = 0; step <= steps; step += 1) {
+      const x = (walkM * step) / steps;
+      this.pose({ position: [x, eye, 1.2], target: [x + 12, 0, 0] });
+      line.enabled = false; this.pump(2);
+      const none = this.pixels();
+      line.enabled = true; render.meshInstances[0]!.material = reference; this.pump(2);
+      const ref = this.pixels();
+      render.meshInstances[0]!.material = decal; this.pump(2);
+      const bound = this.pixels();
+      render.meshInstances[0]!.material = unbiased; this.pump(2);
+      const plain = this.pixels();
+      let pixels = 0; let boundOk = 0; let plainOk = 0;
+      const close = (a: Uint8Array, b: Uint8Array, at: number): boolean =>
+        Math.abs(a[at]! - b[at]!) + Math.abs(a[at + 1]! - b[at + 1]!) + Math.abs(a[at + 2]! - b[at + 2]!) <= 12;
+      for (let at = 0; at < none.data.length; at += 4) {
+        if (!Bench.differs(ref.data, none.data, at)) continue;
+        pixels += 1;
+        if (close(bound.data, ref.data, at)) boundOk += 1;
+        if (close(plain.data, ref.data, at)) plainOk += 1;
+      }
+      rows.push({ x: Math.round(x * 100) / 100, linePixels: pixels, bound: Math.round((boundOk / pixels) * 10000) / 10000, unbiased: Math.round((plainOk / pixels) * 10000) / 10000 });
+    }
+    render.meshInstances[0]!.material = decal;
+    this.clear();
+    unbiased.destroy(); reference.destroy();
+    const summary = (key: 'bound' | 'unbiased') => {
+      const values = rows.map((row) => row[key]);
+      return { min: Math.min(...values), mean: Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10000) / 10000, max: Math.max(...values), stepsBelow099: values.filter((value) => value < 0.99).length };
+    };
+    return { depthBias: decal.depthBias, slopeDepthBias: decal.slopeDepthBias, steps: rows.length, bound: summary('bound'), unbiased: summary('unbiased'), rows };
+  }
+
+  /** For screenshots: the test lane line on asphalt from eye level beside it, left drawn. */
+  async showDecal(): Promise<void> {
+    this.clear();
+    const set = testDecalSet();
+    const resolution = this.library.adopt({ state: 'decoded', setId: set.entry.setId, set, transferredBytes: 0 });
+    if (resolution.state !== 'available') throw new Error(`the test decal does not draw: ${resolution.reason}`);
+    const road = await this.library.resolve('cc0.carriageway-asphalt');
+    this.groundRect(road.material, -5, 70, -4, 4, 0, 2000, 2000, true);
+    this.groundRect(resolution.material, -5, 70, -0.125, 0.125, 0, set.entry.extentUMm, set.entry.extentVMm, castsShadow(set), drawBucket(set));
+    this.pose({ position: [0, 1.62, 1.2], target: [12, 0, 0] });
+    this.pump(6);
   }
 
   /** For screenshots: the pane and its test backing from 4 m at `angle` degrees off the pane's normal, left drawn. */
