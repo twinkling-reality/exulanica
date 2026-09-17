@@ -100,10 +100,25 @@ depends on the offline package.
 ## 3. Materials and the UV rule
 
 A set is drawn by its material class and by nothing else, never by its id or title. This runtime
-draws `opaque` sets, of either container profile and either maker; `cutout`, `decal` and `glazing`
+draws `opaque` and `cutout` sets, of either container profile and either maker; `decal` and `glazing`
 draw the stated unavailable surface with the reason "material class X is not drawn by this runtime"
 (`undrawnClassReason`), and nothing of theirs is uploaded, so glazing is never drawn as opaque.
-Drawing those three classes follows section 3 of the texture proposal and comes next.
+Drawing those two classes follows section 3 of the texture proposal and comes next.
+
+A `cutout` set is glTF's `alphaMode: MASK` with `doubleSided: true`. Its `base_color_coverage` map is
+uploaded as sRGB colour with linear coverage, and every mip level is built by
+`coveragePreservingMips` (`cutout-coverage.ts`): each level is averaged from the one above, colour in
+linear light weighted by coverage, and its coverage is then scaled by the one factor that keeps the
+share of texels at or above the cutoff equal to the set's `coverage_permille` (texels tied with the
+last one wanted are covered together). Each sample is tested against `alpha_cutoff / 255` and nothing
+is blended; depth is written; the shadow pass applies the same test; both faces are drawn and lit, a
+back face with its normal reversed; a set is still one draw. Measured on the bench with a test-only
+leaf coverage field, not yet on published foliage
+(`evidence/cutout-acceptance.log.txt`): silhouette coverage at 30 m is within 4.2 per cent of 5 m for a
+field at 70.5 per cent coverage and within 1.1 per cent at 38.9 per cent, where plain averaged levels
+drift by 10.1 and 5.7 per cent; the cutout's shadow has holes (49.4 per cent of the ground under it
+shadowed, against 100 per cent for the same square drawn opaque); and its back face is lit (91.2
+against 49.7 without two-sided lighting).
 
 One `pc.StandardMaterial` per opaque set, shared by every surface that names it
 (`texture-materials.ts`): `base_color` uploaded as sRGB, `normal` as linear bytes, and `orm` driving
