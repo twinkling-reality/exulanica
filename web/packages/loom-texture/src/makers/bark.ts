@@ -12,7 +12,7 @@ import {
 import { bits16, pick, stream } from '../hash.js';
 import { FULL, ONE, clamp, floorDiv, smoothstep } from '../integer.js';
 import type { Maker } from '../maker.js';
-import { type CellSample, band, cells, fbm } from '../noise.js';
+import { type CellSample, band, cells, fbm, valueNoise } from '../noise.js';
 import { MAKER_PROFILE_V2, type ProceduralMakerManifest, type Recipe, read } from '../recipe.js';
 import { type Pattern, heightOfLength, jitter, mixColour, permille, setColour, shade } from '../sample.js';
 import { decode } from '../srgb.js';
@@ -32,17 +32,20 @@ import { MM, TILE } from '../tile.js';
  *
  * What the version fixes, each with its reason:
  *
- *   - A furrow's profile: a flat floor as wide as its two walls together, and walls that rise
- *     smoothly to a plate's flat top, so a plate reads as a flat-topped block between channels,
- *     the way bark splits, rather than a dome. A crack is a groove over its own width.
+ *   - A furrow's profile: a floor as wide as its two walls together, and walls that rise smoothly
+ *     to a plate's top, so a furrow is a narrow channel with steep sides and a plate is not a
+ *     dome. A crack is a groove over its own width.
+ *   - Where a furrow's depth varies, it varies along the trunk: the depth field has the plates' own
+ *     cells, so a furrow is shallower beside one plate and deeper beside the next. Plate tops stay
+ *     level and only the floor moves, and a shallow furrow is less dark than a deep one.
  *   - A furrow's width is measured across the trunk and a crack's down it. The cellular field
  *     measures distance in cells, so a furrow running straight along the trunk, or a crack straight
  *     around it, has the stated width, and one at a slant is wider.
  *   - A crack cuts into a plate by a share of the furrow depth, so it is never deeper than a
  *     furrow, and bark darkens toward the furrow colour by how deep it lies below a plate face.
- *   - A plate face carries fine relief, two octaves of fractal noise, only on the face. Its cells
- *     are stretched down the trunk as the plates are, because both come from the trunk splitting
- *     as it widens, so the texture runs in fibres along the trunk.
+ *   - A plate's top carries fibrous relief, two octaves of fractal noise, only on the plate. Its
+ *     cells are stretched down the trunk as the plates are, because both come from the trunk
+ *     splitting as it widens, so the texture runs in fibres along the trunk.
  *   - Lichen keeps the top of broad fractal noise (40000 to 52000, about its upper fifth, measured)
  *     and grows only on plate faces, never in a furrow.
  *
@@ -67,29 +70,31 @@ export const barkManifest: ProceduralMakerManifest = {
     ], [1, 16], 'Plate colours', 'Each plate of bark takes one of these tones.'),
     colour('furrow_colour', [54, 46, 40], 'Furrow colour', 'The darker bark deep in a furrow.'),
     colour('lichen_colour', [132, 138, 108], 'Lichen colour', 'The pale green-grey of lichen on the plates.'),
-    integer('plate_cells_across', 'module', 'cells_per_tile', [2, 128], 14, 'Plates across',
+    integer('plate_cells_across', 'module', 'cells_per_tile', [2, 128], 16, 'Plates across',
       'How many plates fit across one tile, around the trunk.'),
-    integer('plate_cells_down', 'module', 'cells_per_tile', [1, 64], 4, 'Plates down',
+    integer('plate_cells_down', 'module', 'cells_per_tile', [1, 64], 2, 'Plates down',
       'How many plate lengths fit down one tile, along the trunk.'),
-    integer('furrow_width_mm', 'module', 'mm', [1, 60], 16, 'Furrow width',
+    integer('furrow_width_mm', 'module', 'mm', [1, 60], 8, 'Furrow width',
       'How wide a furrow is, measured across the trunk.'),
     integer('furrow_depth_mm', 'relief', 'mm', [0, 48], 12, 'Furrow depth',
-      'How far a furrow sinks below the plates beside it.'),
+      'How far the deepest furrow sinks below the plates beside it.'),
+    integer('furrow_depth_variation_percent', 'relief', 'percent', [0, 100], 60, 'Furrow depth variation',
+      'How much shallower a furrow can be in places than the deepest, as a share of the furrow depth.'),
     integer('sway_mm', 'module', 'mm', [0, 200], 30, 'Furrow sway',
       'How far a furrow wanders sideways as it runs down the trunk.'),
     integer('sway_cells', 'detail', 'cells_per_tile', [1, 32], 3, 'Sway length',
       'How many sideways wanders fit down one tile; more means tighter wanders.'),
     integer('crack_cells_across', 'detail', 'cells_per_tile', [1, 64], 6, 'Crack length',
       'How many crack lengths fit across one tile; more means shorter cracks.'),
-    integer('crack_cells_down', 'detail', 'cells_per_tile', [1, 128], 14, 'Cracks down',
+    integer('crack_cells_down', 'detail', 'cells_per_tile', [1, 128], 8, 'Cracks down',
       'How many cracks fit down one tile.'),
     integer('crack_width_mm', 'module', 'mm', [1, 60], 8, 'Crack width',
       'How wide a crack is, measured down the trunk.'),
     integer('crack_depth_percent', 'relief', 'percent', [0, 100], 20, 'Crack depth',
       'How deep a crack cuts into a plate, as a share of the furrow depth.'),
-    integer('plate_relief_mm_1024ths', 'relief', 'mm_1024ths', [0, 4096], 2560, 'Plate texture',
+    integer('plate_relief_mm_1024ths', 'relief', 'mm_1024ths', [0, 4096], 3072, 'Plate texture',
       'How far the fine texture on a plate face rises and falls.'),
-    integer('plate_texture_cells', 'detail', 'cells_per_tile', [4, 512], 120, 'Plate texture size',
+    integer('plate_texture_cells', 'detail', 'cells_per_tile', [4, 512], 160, 'Plate texture size',
       'How many bumps of the fine texture fit across one tile; more means finer texture.'),
     integer('plate_variation_q16', 'colour', 'q16', [0, 32768], 4000, 'Plate variation',
       'How much one plate differs in brightness from the next.'),
@@ -128,6 +133,7 @@ function pattern(recipe: Recipe): Pattern {
   const platesDown = read.integer(recipe, 'plate_cells_down');
   const furrowWidth = read.integer(recipe, 'furrow_width_mm');
   const furrowDepth = read.integer(recipe, 'furrow_depth_mm') * MM;
+  const depthVariation = read.integer(recipe, 'furrow_depth_variation_percent');
   const swayMm = read.integer(recipe, 'sway_mm');
   const swayCells = read.integer(recipe, 'sway_cells');
   const cracksAcross = read.integer(recipe, 'crack_cells_across');
@@ -150,6 +156,7 @@ function pattern(recipe: Recipe): Pattern {
   const crackSeed = stream(seed, 3);
   const reliefSeed = stream(seed, 4);
   const lichenSeed = stream(seed, 5);
+  const depthSeed = stream(seed, 6);
 
   // Widths in cells across (Q16), and the sway in tile micro-units along u.
   const furrowCells = Math.max(1, floorDiv(furrowWidth * platesAcross * ONE, extentU));
@@ -167,9 +174,15 @@ function pattern(recipe: Recipe): Pattern {
     cells(x + shift, y, cracksAcross, cracksDown, crackSeed, ONE, cracks);
     const crack = ONE - smoothstep(0, crackCells, cracks.second - cracks.nearest);
 
+    // How deep the furrow is here: the full depth, less up to the stated variation.
+    const deep = furrowDepth - floorDiv(
+      floorDiv(valueNoise(x + shift, y, platesAcross, platesDown, depthSeed) * depthVariation, 100) * furrowDepth,
+      FULL,
+    );
+    const groove = floorDiv((ONE - face) * deep, ONE);
     const relief = fbm(x, y, textureAcross, textureDown, reliefSeed, 2);
     const cracked = floorDiv(crack * face, ONE);
-    const length = floorDiv(face * furrowDepth, ONE)
+    const length = furrowDepth - groove
       - floorDiv(cracked * crackDepth, ONE)
       + floorDiv(floorDiv(relief * face, ONE) * plateRelief, FULL);
     out.height = heightOfLength(clamp(length, 0, rangeMm * MM), rangeMm);
@@ -182,8 +195,13 @@ function pattern(recipe: Recipe): Pattern {
       100,
     );
     mixColour(out, lichenColour, lichen);
-    // Darker the deeper below a plate face: all the way in a furrow, a crack's share in a crack.
-    mixColour(out, furrowColour, clamp(ONE - face + floorDiv(cracked * crackPercent, 100), 0, ONE));
+    // Darker the deeper below a plate's top: all the way at the floor of the deepest furrow, a
+    // shallower furrow's share of that, and a crack's share in a crack.
+    mixColour(
+      out,
+      furrowColour,
+      clamp(floorDiv(groove * ONE, Math.max(1, furrowDepth)) + floorDiv(cracked * crackPercent, 100), 0, ONE),
+    );
 
     out.roughness = roughness;
     out.metalness = 0;
