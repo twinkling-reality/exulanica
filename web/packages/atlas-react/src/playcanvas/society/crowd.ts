@@ -62,9 +62,10 @@ const NEAR_LIMIT = 24;
 const REFRESH_METRES = 4;
 const DEFAULT_INTERVAL_MS = 1_850;
 /**
- * The nearest 4 are posed every frame, the next 8 every second frame and the rest every third.
- * Measured in the preview at 1440x900: posing all 24 abstract characters every frame took most of
- * the frame on the main thread.
+ * The nearest 4 are posed every frame, the next 8 every second frame and the rest every third:
+ * 12 poses a frame instead of 24. Measured in the preview at 1440x900, one abstract character's
+ * pose costs about 0.53 ms of main-thread time, almost all of it CPU skinning, so posing all 24
+ * every frame left the main thread busy for nearly the whole 16.7 ms frame.
  */
 const POSE_INTERVAL: PoseInterval = (rank) => (rank < 4 ? 1 : rank < 12 ? 2 : 3);
 
