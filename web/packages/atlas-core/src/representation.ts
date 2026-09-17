@@ -176,7 +176,7 @@ export function districtRepresentationSubjects(
     availability,
     rendered: true,
     points: null,
-    // District draws are material batches, so per-building point switching is not supported.
+    // Every district building shares one aggregate draw, so per-building point switching is not supported.
     compatibleBlend: false,
     bounds: Object.freeze({
       frameId,
