@@ -7,9 +7,10 @@
  *    The baseline scenes are also run on a checkout of main and compared digest for digest.
  * 2. Does the personal point-map look at its existing settings still draw what main draws?
  *    Same comparison, on the committed `python-writer.opm` fixture.
- * 3. Does a withdrawn subject draw nothing at any slider position, with every overlay on? A scene
- *    holding a withdrawn box is compared with the same scene without that box, at 0, 0.5 and 1,
- *    for the world canvas and for the tag canvas, and its overlay plan must hold no mark for it.
+ * 3. Does a withdrawn or unavailable subject draw nothing at any slider position, with every
+ *    overlay on? A scene holding such a box is compared with the same scene without that box, at
+ *    0, 0.5 and 1, for the world canvas and for the tag canvas, and its overlay plan must hold no
+ *    mark for it.
  */
 import {
   DATA_VIEW_STYLE,
@@ -41,15 +42,15 @@ export interface OverlayDigest extends PixelDigest {
 }
 
 async function overlayScene(
-  scene: string, box: 'available' | 'withdrawn' | 'absent', intent: RepresentationIntent,
+  scene: string, box: 'available' | 'withdrawn' | 'unavailable' | 'absent', intent: RepresentationIntent,
 ): Promise<OverlayDigest> {
   const stage = await createStage();
   const specs = box === 'absent' ? BOXES.filter(spec => spec.id !== WITHDRAWN) : BOXES;
   const instances = addBoxes(stage, specs);
   const runtime = new RepresentationRuntime();
   const subjects = new Map(specs.map(spec => [spec.id, (): RepresentationSubject => boxSubject(spec,
-    spec.id === WITHDRAWN && box === 'withdrawn'
-      ? { availability: 'withdrawn', unavailableReason: 'Withdrawn for this check.' } : {},
+    spec.id === WITHDRAWN && (box === 'withdrawn' || box === 'unavailable')
+      ? { availability: box, unavailableReason: `Made ${box} for this check.` } : {},
   )] as const));
   registerBoxes(stage, runtime, instances, subjects);
   const overlay = new DataViewOverlay({
@@ -93,6 +94,7 @@ export interface DataViewPixelResult {
   readonly baseline: readonly PixelDigest[];
   readonly renderedEndWithOverlay: OverlayDigest;
   readonly withdrawn: readonly {
+    readonly availability: 'withdrawn' | 'unavailable';
     readonly pointMix: number;
     readonly withWithdrawn: OverlayDigest;
     readonly without: OverlayDigest;
@@ -106,15 +108,15 @@ export async function runDataViewPixelChecks(opmUrl: string): Promise<DataViewPi
   // The rendered end with the overlay attached: must equal the registered scene without one.
   const renderedEndWithOverlay = await overlayScene('rendered-end-with-overlay', 'available', DEFAULT_REPRESENTATION_INTENT);
   const withdrawn = [];
-  for (const pointMix of [0, 0.5, 1]) {
+  for (const availability of ['withdrawn', 'unavailable'] as const) for (const pointMix of [0, 0.5, 1]) {
     const intent: RepresentationIntent = {
       ...DEFAULT_REPRESENTATION_INTENT, pointMix, boxes: true, ids: true, labels: true,
       binary: 'visualization', colour: 'kind',
     };
-    const withWithdrawn = await overlayScene(`withdrawn-present-${pointMix}`, 'withdrawn', intent);
-    const without = await overlayScene(`withdrawn-absent-${pointMix}`, 'absent', intent);
+    const withWithdrawn = await overlayScene(`${availability}-present-${pointMix}`, availability, intent);
+    const without = await overlayScene(`${availability}-absent-${pointMix}`, 'absent', intent);
     withdrawn.push({
-      pointMix, withWithdrawn, without,
+      availability, pointMix, withWithdrawn, without,
       worldIdentical: withWithdrawn.sha256 === without.sha256,
       tagsIdentical: withWithdrawn.tagsSha256 === without.tagsSha256,
     });
