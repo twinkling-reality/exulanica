@@ -585,3 +585,79 @@ def test_the_stage_spec_refuses_a_float_parameter_at_construction():
             deterministic=True,
             params={"lod": 0.0},
         )
+
+
+# -- building blocks not yet wired into the bake ---------------------------------------------------
+
+
+def test_the_fillet_centre_is_the_grammars_corner_rule(tmp_path):
+    """Tess's `cornerCentre` gives exactly what `document._corner_centre` gives, which the
+    `[corner_radius]` check holds every corner to, so the check and the geometry are one rule.
+
+    The cases are both tangent points of every carried fixture corner with a radius, walked round
+    the face as the grammar walks it (a right curb last to first), and generated corners whose
+    products outgrow a double.
+    """
+    import random
+
+    from exulanica.grammar.grammars.city.document import _corner_centre, _walk_round_face
+    from exulanica.grammar.grammars.city.streets import CurbEdgeRecord
+
+    if not TSX.exists():
+        pytest.skip(
+            f"the web toolchain is not installed ({TSX} is missing); run pnpm install in web/"
+        )
+    records = {record.identity: record for record in fixture_records()}  # type: ignore[attr-defined]
+    cases = []
+    for curb in records.values():
+        if not isinstance(curb, CurbEdgeRecord) or curb.corner_radius_mm == 0:
+            continue
+        for identity in curb.next_curb_identity:
+            follower = records.get(identity)
+            if follower is None:
+                continue
+            before, after = _walk_round_face(curb), _walk_round_face(follower)
+            p, q = before[-1], after[0]
+            leaving = (p[0] - before[-2][0], p[1] - before[-2][1])
+            joining = (after[1][0] - q[0], after[1][1] - q[1])
+            cross = leaving[0] * joining[1] - leaving[1] * joining[0]
+            turn = 1 if cross > 0 else -1
+            cases += [
+                (p, leaving, curb.corner_radius_mm, turn),
+                (q, joining, curb.corner_radius_mm, turn),
+            ]
+    assert len(cases) >= 4, "the fixture carries no corner with a radius to compare"
+    assert {record.side for record in records.values() if isinstance(record, CurbEdgeRecord)} == {
+        "left",
+        "right",
+    }
+    generator = random.Random(20260917)
+    for _ in range(200):
+        direction = (
+            generator.randint(-2_000_000, 2_000_000),
+            generator.randint(-2_000_000, 2_000_000),
+        )
+        if direction == (0, 0):
+            continue
+        point = (generator.randint(-(10**9), 10**9), generator.randint(-(10**9), 10**9))
+        cases.append((point, direction, generator.randint(1, 50_000), generator.choice((1, -1))))
+    expected = [
+        list(_corner_centre(point, direction, radius, turn))
+        for point, direction, radius, turn in cases
+    ]
+
+    inputs = tmp_path.joinpath("corners.json")
+    inputs.write_text(json.dumps([[list(p), list(d), r, t] for p, d, r, t in cases]))
+    script = tmp_path.joinpath("corners.ts")
+    module = PACKAGE.joinpath("src", "core", "fillet-arc.ts")
+    script.write_text(
+        f"import {{ readFileSync }} from 'node:fs';\n"
+        f"import {{ cornerCentre }} from {json.dumps(str(module))};\n"
+        f"const cases = JSON.parse(readFileSync({json.dumps(str(inputs))}, 'utf8'));\n"
+        "const centres = cases.map(([p, d, r, t]) => cornerCentre(p, d, r, t, 'parity'));\n"
+        "process.stdout.write(JSON.stringify(centres));\n"
+    )
+    result = subprocess.run(
+        [str(TSX), str(script)], cwd=WEB, capture_output=True, text=True, check=True, timeout=300
+    )
+    assert json.loads(result.stdout) == expected
