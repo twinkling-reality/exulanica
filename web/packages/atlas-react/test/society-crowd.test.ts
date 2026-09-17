@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest';
 import * as pc from 'playcanvas';
-import { SocietyCrowd } from '../src/playcanvas/society/crowd.js';
+import { SocietyCrowd, type PoseInterval } from '../src/playcanvas/society/crowd.js';
 import type {
   CrowdPose,
   CrowdRenderable,
@@ -9,7 +9,7 @@ import type {
   OwnedSocietyState,
 } from '../src/playcanvas/society/types.js';
 
-function setup(factory?: CrowdRenderableFactory, nearLimit?: number) {
+function setup(factory?: CrowdRenderableFactory, nearLimit?: number, poseInterval?: PoseInterval) {
   const canvas = document.createElement('canvas');
   const device = new pc.NullGraphicsDevice(canvas);
   const app = new pc.AppBase(canvas);
@@ -22,6 +22,7 @@ function setup(factory?: CrowdRenderableFactory, nearLimit?: number) {
   const crowd = new SocietyCrowd(device, root, {
     ...(factory ? { factory } : {}),
     ...(nearLimit !== undefined ? { nearLimit } : {}),
+    ...(poseInterval ? { poseInterval } : {}),
   });
   return { crowd, app, root };
 }
@@ -58,6 +59,72 @@ const v4 = (tick: number, inhabitants: OwnedSocietyState['inhabitants']): OwnedS
   tick,
   inhabitants,
 });
+
+/** Thirty people a metre apart walking north, with renderables that can be carried between poses. */
+function cadenceScenario(poseInterval?: PoseInterval) {
+  const poses = new Map<string, CrowdPose[]>();
+  const follows = new Map<string, number>();
+  const factory: CrowdRenderableFactory = (_device, parent, identity) => {
+    const id = identity.inhabitantId;
+    poses.set(id, poses.get(id) ?? []);
+    follows.set(id, follows.get(id) ?? 0);
+    const root = new pc.Entity(`fake:${id}`);
+    parent.addChild(root);
+    return {
+      root,
+      subject: { kind: 'synthetic-inhabitant', ...identity },
+      representation: null as never,
+      standingHeight: 1.8,
+      facing: 0,
+      residentBytes: 10,
+      textureResidentBytes: 1,
+      pose: (pose) => {
+        poses.get(id)!.push(pose);
+        root.setLocalPosition(pose.position[0], pose.position[1], pose.position[2]);
+      },
+      follow: (position) => {
+        follows.set(id, follows.get(id)! + 1);
+        root.setLocalPosition(position[0], position[1], position[2]);
+      },
+      setVisible: (visible) => { root.enabled = visible; },
+      destroy: () => root.destroy(),
+    };
+  };
+  const { crowd, app } = setup(factory, undefined, poseInterval);
+  const people = (tick: number) => Array.from({ length: 30 }, (_, i) => ({
+    id: `p${String(i).padStart(3, '0')}`,
+    synthetic: true as const,
+    position_mm: [i * 1000, tick ? 10_000 : 0] as const,
+    motion_path_mm: tick ? [[i * 1000, 0], [i * 1000, 10_000]] as const : [[i * 1000, 0]] as const,
+    walk_speed_mm_per_tick: 60_000,
+  }));
+  crowd.set(v4(0, people(0)), [0, 0], { nowMs: 0, intervalMs: 60_000 });
+  crowd.set(v4(1, people(1)), [0, 0], { nowMs: 0, intervalMs: 60_000 });
+  const near = Array.from({ length: 24 }, (_, i) => `p${String(i).padStart(3, '0')}`);
+  expect(crowd.drawnIds.slice(0, crowd.counts.near)).toEqual(near);
+  const total = () => near.reduce((sum, id) => sum + poses.get(id)!.length, 0);
+  const run = (from: number, frames: number) => {
+    const posesBefore = new Map(near.map((id) => [id, poses.get(id)!.length]));
+    const followsBefore = new Map(near.map((id) => [id, follows.get(id)!]));
+    const perFrame: number[] = [];
+    for (let frame = 1; frame <= frames; frame += 1) {
+      const held = total();
+      crowd.update(((from + frame) * 1000) / 60);
+      perFrame.push(total() - held);
+      for (const id of crowd.drawnIds.slice(0, crowd.counts.near)) {
+        const at = crowd.positionOf(id)!;
+        const root = app.root.findByName(`fake:${id}`)!.getLocalPosition();
+        expect([root.x, root.z], id).toEqual([at[0], at[1]]);
+      }
+    }
+    return {
+      perFrame,
+      poses: new Map(near.map((id) => [id, poses.get(id)!.slice(posesBefore.get(id)!)])),
+      follows: new Map(near.map((id) => [id, follows.get(id)! - followsBefore.get(id)!])),
+    };
+  };
+  return { crowd, app, poses, follows, near, people, run };
+}
 
 describe('society crowd', () => {
   it('walks each inhabitant at its recorded speed and stops where the recorded path ends', () => {
@@ -142,62 +209,8 @@ describe('society crowd', () => {
   });
 
   it('places every full character every frame and poses the farther ones on fewer frames', () => {
-    const poses = new Map<string, CrowdPose[]>();
-    const follows = new Map<string, number>();
-    const factory: CrowdRenderableFactory = (_device, parent, identity) => {
-      const id = identity.inhabitantId;
-      poses.set(id, []);
-      follows.set(id, 0);
-      const root = new pc.Entity(`fake:${id}`);
-      parent.addChild(root);
-      return {
-        root,
-        subject: { kind: 'synthetic-inhabitant', ...identity },
-        representation: null as never,
-        standingHeight: 1.8,
-        facing: 0,
-        residentBytes: 10,
-        textureResidentBytes: 1,
-        pose: (pose) => {
-          poses.get(id)!.push(pose);
-          root.setLocalPosition(pose.position[0], pose.position[1], pose.position[2]);
-        },
-        follow: (position) => {
-          follows.set(id, follows.get(id)! + 1);
-          root.setLocalPosition(position[0], position[1], position[2]);
-        },
-        setVisible: (visible) => { root.enabled = visible; },
-        destroy: () => root.destroy(),
-      };
-    };
-    const { crowd, app } = setup(factory);
-    const people = (tick: number) => Array.from({ length: 30 }, (_, i) => ({
-      id: `p${String(i).padStart(3, '0')}`,
-      synthetic: true as const,
-      position_mm: [i * 1000, tick ? 10_000 : 0] as const,
-      motion_path_mm: tick ? [[i * 1000, 0], [i * 1000, 10_000]] as const : [[i * 1000, 0]] as const,
-      walk_speed_mm_per_tick: 60_000,
-    }));
-    crowd.set(v4(0, people(0)), [0, 0], { nowMs: 0, intervalMs: 60_000 });
-    crowd.set(v4(1, people(1)), [0, 0], { nowMs: 0, intervalMs: 60_000 });
-    const near = Array.from({ length: 24 }, (_, i) => `p${String(i).padStart(3, '0')}`);
-    expect(crowd.drawnIds.slice(0, crowd.counts.near)).toEqual(near);
-    const run = (from: number, frames: number) => {
-      const posesBefore = new Map(near.map((id) => [id, poses.get(id)!.length]));
-      const followsBefore = new Map(near.map((id) => [id, follows.get(id)!]));
-      for (let frame = 1; frame <= frames; frame += 1) {
-        crowd.update(((from + frame) * 1000) / 60);
-        for (const id of crowd.drawnIds.slice(0, crowd.counts.near)) {
-          const at = crowd.positionOf(id)!;
-          const root = app.root.findByName(`fake:${id}`)!.getLocalPosition();
-          expect([root.x, root.z], id).toEqual([at[0], at[1]]);
-        }
-      }
-      return {
-        poses: new Map(near.map((id) => [id, poses.get(id)!.slice(posesBefore.get(id)!)])),
-        follows: new Map(near.map((id) => [id, follows.get(id)! - followsBefore.get(id)!])),
-      };
-    };
+    const scene = cadenceScenario();
+    const { crowd, app, poses, near, run } = scene;
     const window = run(0, 60);
     expect(crowd.positionOf('p000')![1]).toBeGreaterThan(0);
     near.forEach((id, rank) => {
@@ -207,14 +220,23 @@ describe('society crowd', () => {
       // Each pose after the first carries the whole time since the one before it.
       for (const pose of window.poses.get(id)!.slice(1)) expect(pose.deltaSeconds).toBeCloseTo(1 / expected, 9);
     });
-    // Someone the person selected is posed every frame, whatever their distance.
-    crowd.select('p020');
-    expect(run(60, 60).poses.get('p020')!.length).toBe(60);
+    // Staggered, so no frame carries more than its share: 4 + 8 / 2 + 12 / 3.
+    expect(new Set(window.perFrame)).toEqual(new Set([12]));
     // A jump is never carried: every full character is posed from scratch.
-    crowd.set(v4(5, people(1)), [0, 0], { nowMs: 0, intervalMs: 60_000 });
+    crowd.set(v4(5, scene.people(1)), [0, 0], { nowMs: 0, intervalMs: 60_000 });
     for (const id of crowd.drawnIds.slice(0, crowd.counts.near)) {
       expect(poses.get(id)!.at(-1)!.discontinuity, id).toBe(true);
     }
+    crowd.destroy();
+    app.destroy();
+  });
+
+  it('poses a selected inhabitant every frame whatever the cadence for its rank', () => {
+    const { crowd, app, run } = cadenceScenario(() => 3);
+    crowd.select('p020');
+    const window = run(0, 60);
+    expect(window.poses.get('p020')!.length).toBe(60);
+    expect(window.poses.get('p001')!.length).toBe(20);
     crowd.destroy();
     app.destroy();
   });
