@@ -9,6 +9,12 @@ describe('actual character representation details', () => {
     expect(details.flat()).toContain('a'.repeat(64));
     expect(details.flat()).not.toContain('abstract-1');
   });
+  it('says a person beyond the full-detail budget is drawn in far form', () => {
+    const details = characterDisplayDetails({ subject: { kind: 'synthetic-inhabitant', societyId: 's', branchId: 'b', inhabitantId: 'i' }, status: 'far',
+      error: null, rigId: null, asset: null, gait: null, speed: 0, mutableBytes: 0 }, 'abstract-1');
+    expect(details.flat()).toContain('abstract-1');
+    expect(details.flat().some((text) => text.startsWith('Far form: only the nearest'))).toBe(true);
+  });
   it('keeps the abstract version for unavailable imported content', () => {
     expect(characterDisplayDetails(null, 'abstract-1').flat()).toContain('abstract-1');
   });

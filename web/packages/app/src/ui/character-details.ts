@@ -1,4 +1,4 @@
-import type { NativeCharacterRuntime } from '@exulanica/atlas-react/playcanvas';
+import { NEAR_CHARACTER_BUDGET, type NativeCharacterRuntime } from '@exulanica/atlas-react/playcanvas';
 
 /** Report the representation actually drawn, not the fallback retained for stable selection. */
 export function characterDisplayDetails(
@@ -22,5 +22,6 @@ export function characterDisplayDetails(
       : 'Abstract authored appearance. Not measured traits or a real person’s likeness.'],
     ['Character version', fallbackId ?? 'Outside the nearby rendering cap'],
     ...(native?.status === 'fallback' ? [['Character source status', native.error ?? 'Imported source unavailable; abstract fallback shown.'] as const] : []),
+    ...(native?.status === 'far' ? [['Character detail', `Far form: only the nearest ${NEAR_CHARACTER_BUDGET} people are drawn in full at once.`] as const] : []),
   ];
 }

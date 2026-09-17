@@ -200,6 +200,7 @@ export {
   DESIGNED_LOOKS,
   INHABITANT_DRAW_DOMAIN,
   LayeredCharacterRenderable,
+  NEAR_CHARACTER_BUDGET,
   describeLook,
   designedLook,
   drawLook,

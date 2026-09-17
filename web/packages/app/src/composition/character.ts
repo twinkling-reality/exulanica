@@ -7,6 +7,7 @@ import {
   CharacterPreview,
   DESIGNED_LOOKS,
   FirstPersonGesture,
+  NEAR_CHARACTER_BUDGET,
   designedLook,
   type AtlasBinding,
   type CharacterByteLoader,
@@ -406,7 +407,7 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
         if (disposed) return;
         native = atlas.enableNativeCharacters(loadCharacterBytes);
         const crowdSize = previewCrowdSize(window.location.search, env.preview);
-        if (crowdSize > 0) crowd = CharacterCrowdEvaluation.mount(atlas, { count: crowdSize, nearBudget: 24 });
+        if (crowdSize > 0) crowd = CharacterCrowdEvaluation.mount(atlas, { count: crowdSize, nearBudget: NEAR_CHARACTER_BUDGET });
         // Ensure the existing player presentation exists without changing the active camera. It
         // wears the catalog's designed default until the person chooses otherwise.
         atlas.setCameraMode(atlas.cameraMode);

@@ -36,3 +36,4 @@ export { CharacterHost, type CharacterAssetLoader } from './host.js';
 export { canonicalJson, canonicalSha256, sha256Hex } from './digest.js';
 export { CharacterCrowdEvaluation, EVALUATION_SPEEDS, type CrowdEvaluationHost, type CrowdEvaluationOptions } from './evaluation.js';
 export { CharacterChoices, type CharacterChoice } from './choices.js';
+export { NEAR_CHARACTER_BUDGET } from './budget.js';

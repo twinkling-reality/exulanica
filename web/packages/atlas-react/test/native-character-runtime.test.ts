@@ -4,26 +4,55 @@ import { NativeCharacterRuntime,type NativeCharacterFrame } from '../src/playcan
 import type { NativeCharacterDescriptor } from '../src/playcanvas/native-character.js';
 import { CharacterHost } from '../src/playcanvas/character/host.js';
 import { CHARACTER_CATALOG } from '../src/playcanvas/character/catalog-data.js';
-const state=vi.hoisted(()=>({releases:0,destroys:0}));
+import { NEAR_CHARACTER_BUDGET } from '../src/playcanvas/character/budget.js';
+const state=vi.hoisted(()=>({releases:0,destroys:0,appearances:[] as unknown[]}));
 vi.mock('../src/playcanvas/native-character-pool.js',()=>({NativeCharacterPool:class{async acquire(){return{release:()=>state.releases++};}destroy(){}}}));
 vi.mock('../src/playcanvas/native-character-actor.js',()=>({
  currentNativeAuthorityStatus:(fn:()=>{presence:string;source:string})=>{try{const a=fn();return a.presence!=='allowed'?'hidden':a.source==='available'?'ready':'fallback';}catch{return'hidden';}},
- NativeCharacterActor:class{status='ready';currentGait='idle';resolvedSpeed=0;mutableResidentBytes=0;constructor(readonly subject:unknown,readonly descriptor:unknown,private lease:{release():void}){}update(){}setAppearance(){}destroy(){state.destroys++;this.lease.release();}}
+ NativeCharacterActor:class{status='ready';currentGait='idle';resolvedSpeed=0;mutableResidentBytes=0;constructor(readonly subject:unknown,readonly descriptor:unknown,private lease:{release():void},_parent?:unknown,_authority?:unknown,appearance?:unknown){state.appearances.push(appearance);}update(){}setAppearance(){}destroy(){state.destroys++;this.lease.release();}}
 }));
 const descriptor={} as NativeCharacterDescriptor;
 const app=()=>({once:vi.fn()}) as unknown as pc.AppBase;
-function frame(id:string,branch='main'):NativeCharacterFrame{
- const render={enabled:true};return{subject:{kind:'synthetic-inhabitant',societyId:'society',branchId:branch,inhabitantId:id},parent:{} as pc.Entity,fallback:{findComponents:()=>[render],tags:{add:vi.fn(),remove:vi.fn(),has:()=>false}} as unknown as pc.Entity,visible:true,position:[0,0,0],yaw:0,deltaSeconds:1/60};
+function frame(id:string,branch='main',position:readonly [number,number,number]=[0,0,0]):NativeCharacterFrame{
+ const render={enabled:true};return{subject:{kind:'synthetic-inhabitant',societyId:'society',branchId:branch,inhabitantId:id},parent:{} as pc.Entity,fallback:{findComponents:()=>[render],tags:{add:vi.fn(),remove:vi.fn(),has:()=>false}} as unknown as pc.Entity,visible:true,position,yaw:0,deltaSeconds:1/60};
 }
+const player=():NativeCharacterFrame=>({...frame('viewer'),subject:{kind:'player',playerId:'viewer'}});
+const drawn=(f:NativeCharacterFrame)=>(f.fallback.findComponents('render') as unknown as {enabled:boolean}[])[0]!.enabled;
+const allowed=()=>({presence:'allowed' as const,source:'available' as const});
 describe('native residency and current permission',()=>{
- it('uses capped subjects, rejects overflow, and releases an old branch even for matching inhabitant IDs',async()=>{
-  const runtime=new NativeCharacterRuntime(app(),vi.fn());const frames=Array.from({length:24},(_,i)=>frame(String(i)));runtime.syncFrames(frames);
-  await runtime.install(frames[0]!.subject,descriptor,{},()=>({presence:'allowed',source:'available'}));
-  expect(runtime.inspect(frames[0]!.subject)?.status).toBe('ready');
-  expect(()=>runtime.syncFrames([...frames,frame('25')])).toThrow('resident');
-  expect(runtime.inspect(frames[0]!.subject)?.status).toBe('ready');
-  runtime.syncFrames([frame('0','branch-two')]);expect(runtime.inspect(frames[0]!.subject)).toBeNull();
+ it('draws the nearest people in full up to the measured budget, the rest in far form, and releases an old branch',async()=>{
+  const runtime=new NativeCharacterRuntime(app(),vi.fn()),viewer=player();
+  // One metre apart outwards from the player, who takes one full place of the budget.
+  const people=Array.from({length:NEAR_CHARACTER_BUDGET+3},(_,i)=>frame(String(i),'main',[i+1,0,0]));
+  runtime.syncFrames([viewer,...people]);
+  await Promise.all(people.map(f=>runtime.install(f.subject,descriptor,{},allowed)));
+  const statuses=people.map(f=>runtime.inspect(f.subject)?.status);
+  expect(statuses.slice(0,NEAR_CHARACTER_BUDGET-1).every(s=>s==='ready')).toBe(true);
+  expect(statuses.slice(NEAR_CHARACTER_BUDGET-1)).toEqual(['far','far','far','far']);
+  expect(people.map(drawn)).toEqual(statuses.map(s=>s!=='ready'));
+  expect(()=>runtime.syncFrames([viewer,people[0]!,people[0]!])).toThrow('resident');
+  runtime.syncFrames([frame('0','branch-two')]);expect(runtime.inspect(people[0]!.subject)).toBeNull();
   expect(state.destroys).toBeGreaterThan(0);runtime.destroy();
+ });
+ it('hands a full place to someone nearer only for a clear gain, wearing their latest appearance',async()=>{
+  const runtime=new NativeCharacterRuntime(app(),vi.fn()),viewer=player();
+  const people=Array.from({length:NEAR_CHARACTER_BUDGET},(_,i)=>frame(String(i),'main',[i+1,0,0]));
+  const sync=(moved:NativeCharacterFrame)=>runtime.syncFrames([viewer,...people.slice(0,-1),moved]);
+  const edge=people.at(-2)!,waiting=people.at(-1)!;
+  runtime.syncFrames([viewer,...people]);
+  await Promise.all(people.map(f=>runtime.install(f.subject,descriptor,{},allowed)));
+  expect(runtime.inspect(waiting.subject)?.status).toBe('far');
+  runtime.setAppearance(waiting.subject,{colors:{cloth:'#334455'}});
+  // A metre nearer than the farthest full body is not enough to trade places.
+  sync({...waiting,position:[edge.position[0]-1,0,0]});
+  expect(runtime.inspect(waiting.subject)?.status).toBe('far');
+  expect(runtime.inspect(edge.subject)?.status).toBe('ready');
+  sync({...waiting,position:[edge.position[0]-3,0,0]});
+  expect(runtime.inspect(edge.subject)?.status).toBe('far');
+  expect(drawn(edge)).toBe(true);
+  await vi.waitFor(()=>expect(runtime.inspect(waiting.subject)?.status).toBe('ready'));
+  expect(state.appearances.at(-1)).toEqual({colors:{cloth:'#334455'}});
+  runtime.destroy();
  });
  it('restores fallback on withdrawal and hides both representations on denied or failed presence checks',async()=>{
   const runtime=new NativeCharacterRuntime(app(),vi.fn()),f=frame('one');runtime.syncFrames([f]);
