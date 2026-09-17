@@ -35,6 +35,7 @@ from exulanica.epistemics.assertions import AssertionWriter
 from exulanica.evidence.blob import BlobId
 from exulanica.identity import IdentityRepository, name_occurrence
 from exulanica.ingest.pipeline import PhotoIngestPipeline
+from exulanica.ingest.repository import IngestRepository
 from exulanica.materials import canonical_bytes, sha256_hex, thaw
 from exulanica.materials.workspace import (
     WORKSPACE_LICENCE_ID,
@@ -1436,3 +1437,76 @@ def test_a_read_only_deployment_refuses_material_writes_by_name(materials):
             with pytest.raises(MaterialReadOnly):
                 write()
     assert materials.rows("select count(*) as n from material_recipe")[0]["n"] == 1
+
+
+def test_the_runtime_role_makes_every_material_write_the_product_makes(materials):
+    """Recipes, bake requests, claims, records, failures and withdrawals, as the provisioned writer.
+
+    Every other material test writes as the database owner, who holds every privilege, so none of
+    them would notice provisioning take away one the product needs. The writer may only append
+    recipes, their sources and withdrawals, and bake requests. This takes every path the product
+    takes on those tables and on bakes, as that writer, ending with a deletion whose trigger reads
+    recipes and the photographs they name to find the bakes it reaches.
+    """
+    capture = _capture(materials)
+    worker = materials.worker()
+    app = materials.purged.database(role=_APP_ROLE, password=_APP_PASSWORD)
+    with app.session(materials.workspace_id) as runtime:
+        assert runtime.execute("select current_user as role").fetchone()["role"] == _APP_ROLE
+        for table in (
+            "material_recipe",
+            "material_recipe_source",
+            "material_recipe_withdrawal",
+            "material_bake_request",
+        ):
+            held = runtime.execute(
+                "select has_table_privilege(%s, 'INSERT') as appends, "
+                "  has_table_privilege(%s, 'UPDATE') as updates",
+                (table, table),
+            ).fetchone()
+            assert (held["appends"], held["updates"]) == (True, False), table
+        repository = materials.repository(runtime)
+
+        kept = repository.create_recipe(_small())
+        assert repository.request_bake(kept.recipe_id).state == "requested"
+        claim = worker._claim(runtime, materials.workspace_id)
+        assert claim is not None and claim.recipe_id == kept.recipe_id
+        assert worker._finish_failed(
+            runtime, materials.workspace_id, claim, _Failed("bake_failed", "test")
+        )
+        assert repository.request_bake(kept.recipe_id).state == "requested"
+        claim = worker._claim(runtime, materials.workspace_id)
+        assert claim is not None
+        container = b"synthetic container for " + kept.recipe_id.bytes
+        assert worker._record_and_write(
+            runtime,
+            materials.workspace_id,
+            claim,
+            container,
+            materials.receipt(kept.recipe_id, container),
+        )
+        assert repository.read_bake(kept.recipe_id).data == container
+
+        waiting = repository.create_recipe(_small(seed=5))
+        repository.request_bake(waiting.recipe_id)
+        repository.withdraw_recipe(waiting.recipe_id)
+        repository.withdraw_recipe(kept.recipe_id)
+        assert repository.recipes() == []
+
+        IngestRepository(runtime, materials.workspace_id).insert_tombstone(
+            scope="capture",
+            capture_id=capture,
+            requested_by=materials.actor,
+            reason="the person deleted this photograph",
+        )
+
+    bakes = {
+        row["recipe_id"]: row["state"]
+        for row in materials.rows("select recipe_id, state from material_bake")
+    }
+    assert bakes == {kept.recipe_id: "baked", waiting.recipe_id: "cancelled"}
+    assert materials.rows("select count(*) as n from material_bake_request")[0]["n"] == 3
+    assert materials.rows("select count(*) as n from material_recipe_withdrawal")[0]["n"] == 2
+    assert (
+        materials.rows("select purge_id from purge_job where target_kind = 'material_bake'") == []
+    ), "both recipes were authored, so a photograph's deletion reaches neither bake"
