@@ -1,0 +1,100 @@
+corridor tiles and gates
+commit 015e662fb9f45f5b089a9f0048de6b8d3940cd71
+city seed 75832ac54dcfd499219752e6385149c73624b8c674f9ebb0c1fa0af2bb70b3d1
+city identity 0594ec43-fbf9-5377-86d3-b1b733714b4a
+generation output digest 0b1db332f5aa8518b5071515dbd1cbd88444f72d59228563138f64f284224759
+records 4806
+
+tile (0, 0): valid; owned 292, halo 733, external 17; document 866145 bytes sha256 6a43fd1a35dff8b94036ecc1e8e3743537f36c89951a670d0df33b353a303624; tile_inputs_digest ded374f902ecb3378dfaf253239600ab7684034fb5987b0f9f2c94eb8eb11984; baked_tile_id ad424140-27ae-5d63-b740-89581c04296c
+tile (1, 0): valid; owned 1349, halo 1130, external 18; document 2107833 bytes sha256 42b6fb12d7985a8e58a989a5c25f1e36e9eb4c431a4c59991e22b46c6f98277d; tile_inputs_digest 3ef5fb8db9ccf4c017821e8787488ea4595c1575df21b117cdb392c33a1a0a51; baked_tile_id 976a729b-c2a6-5172-9ed5-00f27cb309ad
+tile (2, 0) corridor: valid; owned 1544, halo 1484, external 47; document 2564535 bytes sha256 991a0e79feaec23537d927bb7c7f2b6d54df6bc8d9f9f236aa434ad8c9efb62c; tile_inputs_digest 5f4b3df87ecdf16a505f6572eee20bca5585c5391954b8acb87a4d5bc0ad7fd4; baked_tile_id 33a71a6a-f141-5868-a0c3-5d61d79cd30f
+tile (3, 0): valid; owned 1325, halo 1134, external 31; document 2044300 bytes sha256 36e30bbdec0b02ed9e7513892018fb99a5070182b255044c65f1bc7d71f21a8e; tile_inputs_digest 9773b324e1cc6ef036d6519b11d051e3c94fff88446c6b75bbed83bc8701620d; baked_tile_id e28f5863-712c-576c-803c-c433bf9a95c0
+tile (4, 0): valid; owned 285, halo 724, external 25; document 813969 bytes sha256 c41b85410133c159931ade4784ad95370c3a7772de781859db256309e3ddd0ca; tile_inputs_digest 3731b228359259aaba16c81aac5429639b0cccd143a26bb8a1ef533cabe6e81d; baked_tile_id 88493f7c-e166-50c2-8b17-6516ea0bdefe
+
+city reference closure: closed
+pieces no longer than 1 km: yes
+
+gates, every record of the city:
+{
+  "bayable_edges": 171,
+  "bayable_edges_without_bays": 0,
+  "buildings": 99,
+  "buildings_with_every_facade": 99,
+  "curbs": 46,
+  "facade_coverage_percent": 100,
+  "facades": 524,
+  "facades_with_section_5_1_fields": 524,
+  "frontage_faces_in_pitch_band": 166,
+  "frontage_faces_with_bays": 167,
+  "ground_faces": 396,
+  "ground_faces_in_band": 396,
+  "kerb_height_range_mm": [
+    126,
+    150
+  ],
+  "materials": 2166,
+  "materials_with_texture_set": 2166,
+  "objects": 58,
+  "objects_inside_footprints": 0,
+  "passes": {
+    "bay_pitch": true,
+    "facade_coverage": true,
+    "furniture_outside_footprints": true,
+    "ground_band": true,
+    "kerb_height": true,
+    "materials_name_texture_sets": true,
+    "section_5_1": true
+  },
+  "pitch_mm_minimum_median_maximum": [
+    2425,
+    2927,
+    3564
+  ],
+  "unavailable_roles": {
+    "door": 231,
+    "glazing": 223,
+    "transom": 454
+  }
+}
+gates, the corridor tile's owned records:
+{
+  "bayable_edges": 60,
+  "bayable_edges_without_bays": 0,
+  "buildings": 32,
+  "buildings_with_every_facade": 32,
+  "curbs": 6,
+  "facade_coverage_percent": 100,
+  "facades": 176,
+  "facades_with_section_5_1_fields": 176,
+  "frontage_faces_in_pitch_band": 56,
+  "frontage_faces_with_bays": 56,
+  "ground_faces": 128,
+  "ground_faces_in_band": 128,
+  "kerb_height_range_mm": [
+    126,
+    145
+  ],
+  "materials": 706,
+  "materials_with_texture_set": 706,
+  "objects": 12,
+  "objects_inside_footprints": 0,
+  "passes": {
+    "bay_pitch": true,
+    "facade_coverage": true,
+    "furniture_outside_footprints": true,
+    "ground_band": true,
+    "kerb_height": true,
+    "materials_name_texture_sets": true,
+    "section_5_1": true
+  },
+  "pitch_mm_minimum_median_maximum": [
+    2455,
+    2907,
+    3343
+  ],
+  "unavailable_roles": {
+    "door": 75,
+    "glazing": 78,
+    "transom": 153
+  }
+}

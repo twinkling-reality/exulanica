@@ -1,0 +1,100 @@
+"""Writes docs/artifacts/corridor/corridor-tiles.log.txt: the corridor city's tiles and gates.
+
+Run from the repository root:
+
+    uv run python docs/artifacts/corridor/corridor-tiles.py.txt
+
+It generates the corridor city from its specification, cuts it into its tiles, validates each,
+checks the whole city's reference closure and piece lengths, and records per tile the record
+counts, the tile document's SHA-256 and byte count, its tile_inputs_digest and its baked_tile_id,
+then the mechanical gates measured from every record and from the corridor tile's owned records.
+It reads no clock: the log carries the commit it was generated at, from git, and nothing else
+that varies between runs.
+"""
+
+import hashlib
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+from exulanica.grammar.grammars.city.catalogs import load_city_catalogs
+from exulanica.grammar.grammars.city.document import document_bytes, validate_city_document
+from exulanica.grammar.grammars.city.generation.corridor import (
+    CORRIDOR_BINDINGS,
+    CORRIDOR_CITY_IDENTITY,
+    CORRIDOR_LOD,
+    CORRIDOR_SEED,
+    CORRIDOR_TILE,
+    CORRIDOR_TILES,
+)
+from exulanica.grammar.grammars.city.generation.gates import measure_gates
+from exulanica.grammar.grammars.city.generation.tiles import (
+    check_city_reference_closure,
+    check_piece_lengths,
+    city_records,
+    generate_city,
+    tile_document,
+)
+from exulanica.grammar.grammars.city.tile import tile_inputs_digest
+from exulanica.ingest.stages import STAGES, baked_tile_id
+
+OUTPUT = Path("docs/artifacts/corridor/corridor-tiles.log.txt")
+
+
+def main() -> int:
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+    ).stdout.strip()
+    catalogs = load_city_catalogs()
+    generation = generate_city(
+        seed=CORRIDOR_SEED, subject_identity=CORRIDOR_CITY_IDENTITY, bindings=CORRIDOR_BINDINGS
+    )
+    records = city_records(generation)
+    check_piece_lengths(records)
+    lines = [
+        "corridor tiles and gates",
+        f"commit {head}",
+        f"city seed {CORRIDOR_SEED}",
+        f"city identity {CORRIDOR_CITY_IDENTITY}",
+        f"generation output digest {generation.receipt.output_digest}",
+        f"records {len(records)}",
+        "",
+    ]
+    documents = []
+    for tile_x, tile_y in CORRIDOR_TILES:
+        document = tile_document(
+            records,
+            seed=CORRIDOR_SEED,
+            subject_identity=CORRIDOR_CITY_IDENTITY,
+            catalogs=catalogs,
+            tile_x=tile_x,
+            tile_y=tile_y,
+            lod=CORRIDOR_LOD,
+        )
+        validate_city_document(document, catalogs=catalogs)
+        documents.append(document)
+        data = document_bytes(document)
+        grammar = document.grammars[0]
+        lines.append(
+            f"tile ({tile_x}, {tile_y}){' corridor' if (tile_x, tile_y) == CORRIDOR_TILE else ''}: "
+            f"valid; owned {len(grammar.owned)}, halo {len(grammar.halo)}, "
+            f"external {len(grammar.external)}; document {len(data)} bytes sha256 "
+            f"{hashlib.sha256(data).hexdigest()}; tile_inputs_digest "
+            f"{tile_inputs_digest(document.tile)}; baked_tile_id "
+            f"{baked_tile_id(STAGES['baked_tile'], document.tile)}"
+        )
+    check_city_reference_closure(documents)
+    lines += ["", "city reference closure: closed", "pieces no longer than 1 km: yes", ""]
+    lines.append("gates, every record of the city:")
+    lines.append(json.dumps(measure_gates(records).as_dict(), indent=2, sort_keys=True))
+    owned = documents[CORRIDOR_TILES.index(CORRIDOR_TILE)].grammars[0].owned
+    lines.append("gates, the corridor tile's owned records:")
+    lines.append(json.dumps(measure_gates(owned).as_dict(), indent=2, sort_keys=True))
+    OUTPUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(OUTPUT, len(OUTPUT.read_bytes()), "bytes")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())
