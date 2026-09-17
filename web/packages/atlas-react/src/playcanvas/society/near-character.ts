@@ -34,6 +34,10 @@ class AbstractInhabitant implements CrowdRenderable {
   get residentBytes(): number { return this.avatar.residentBytes; }
   get textureResidentBytes(): number { return this.avatar.textureResidentBytes; }
 
+  /**
+   * Solve and skin a new pose. The step is measured from the last posed point, so a pose that
+   * follows several `follow` frames advances the gait by the whole distance walked since.
+   */
   pose(pose: CrowdPose): void {
     const [x, , z] = pose.position;
     const previous = pose.discontinuity || this.last === null ? [x, z] : this.last;
@@ -47,6 +51,12 @@ class AbstractInhabitant implements CrowdRenderable {
       pose.reducedMotion ?? false,
       pose.position[1],
     );
+  }
+
+  /** Move the last skinned pose to the new ground contact; posing is where the CPU cost is. */
+  follow(position: readonly [number, number, number]): void {
+    if (!this.visible) return;
+    this.avatar.root.setLocalPosition(position[0], position[1], position[2]);
   }
 
   setVisible(visible: boolean): void {

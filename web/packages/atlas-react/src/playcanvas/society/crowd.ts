@@ -17,6 +17,11 @@ import type { CrowdRenderable, CrowdRenderableFactory, OwnedSocietyState } from 
  * Motion follows the recorded path only. A v4 inhabitant walks from the start of the tick at its
  * own recorded speed and stops where the path ends; an older snapshot without a speed is eased
  * along its path over the whole interval. No position is invented between path points.
+ *
+ * Detail by distance applies to time as well as shape. Every drawn inhabitant is placed at its
+ * recorded point every frame, but a full character's limbs are solved and skinned on the CPU, so
+ * only the nearest few are posed every frame; the rest are posed every second or third frame and
+ * carried to their recorded point in between. A selected inhabitant is posed every frame.
  */
 export interface CrowdOptions {
   /** Full characters at most; the native character runtime admits 24 synthetic residents. */
@@ -26,7 +31,11 @@ export interface CrowdOptions {
   /** Far figures only within this many metres of the observer. */
   readonly farRadius?: number;
   readonly factory?: CrowdRenderableFactory;
+  /** Frames between poses for the full character at this nearness rank (0 is nearest). */
+  readonly poseInterval?: PoseInterval;
 }
+
+export type PoseInterval = (rank: number) => number;
 
 export interface CrowdCounts {
   readonly population: number;
@@ -52,6 +61,17 @@ interface Walker {
 const NEAR_LIMIT = 24;
 const REFRESH_METRES = 4;
 const DEFAULT_INTERVAL_MS = 1_850;
+/**
+ * The nearest 4 are posed every frame, the next 8 every second frame and the rest every third.
+ * Measured in the preview at 1440x900: posing all 24 abstract characters every frame took most of
+ * the frame on the main thread.
+ */
+const POSE_INTERVAL: PoseInterval = (rank) => (rank < 4 ? 1 : rank < 12 ? 2 : 3);
+
+interface PoseSlot {
+  rank: number;
+  pendingSeconds: number;
+}
 
 function polyline(path: readonly (readonly [number, number])[]): { lengths: number[]; total: number } {
   const lengths = path.slice(1).map((p, i) => Math.hypot(p[0] - path[i]![0], p[1] - path[i]![1]));
@@ -85,6 +105,10 @@ export class SocietyCrowd {
   /** Renderables whose next pose must not be read as motion from wherever they were. */
   private readonly fresh = new Set<string>();
   private farIds: string[] = [];
+  private readonly poseInterval: PoseInterval;
+  /** Nearness rank and unposed time of each full character. */
+  private readonly slots = new Map<string, PoseSlot>();
+  private frame = 0;
 
   constructor(
     private readonly device: pc.GraphicsDevice,
@@ -95,6 +119,7 @@ export class SocietyCrowd {
     this.nearLimit = Math.max(0, Math.min(NEAR_LIMIT, options.nearLimit ?? NEAR_LIMIT));
     this.nearRadius = options.nearRadius ?? 60;
     this.farRadius = options.farRadius ?? 700;
+    this.poseInterval = options.poseInterval ?? POSE_INTERVAL;
     this.far = new FarFigures(device, root);
   }
 
@@ -305,6 +330,7 @@ export class SocietyCrowd {
   private releaseNear(): void {
     for (const renderable of this.near.values()) renderable.destroy();
     this.near.clear();
+    this.slots.clear();
     this.fresh.clear();
   }
 
@@ -327,11 +353,17 @@ export class SocietyCrowd {
       if (!nearIds.has(id)) {
         renderable.destroy();
         this.near.delete(id);
+        this.slots.delete(id);
         this.fresh.delete(id);
       }
     }
     const identity = { societyId: this.state?.society_id ?? 'preview', branchId: this.state?.branch_id ?? 'preview' };
+    let rank = 0;
     for (const id of nearIds) {
+      const slot = this.slots.get(id);
+      if (slot) slot.rank = rank;
+      else this.slots.set(id, { rank, pendingSeconds: 0 });
+      rank += 1;
       if (this.near.has(id)) continue;
       const renderable = this.factory(this.device, this.root, { ...identity, inhabitantId: id }, 'near');
       const walker = this.walkers.get(id)!;
@@ -361,15 +393,24 @@ export class SocietyCrowd {
       walker.facing = heading(walker.position, position, walker.facing);
       walker.position = position;
     }
+    this.frame += 1;
     for (const [id, renderable] of this.near) {
       const walker = this.walkers.get(id)!;
+      const slot = this.slots.get(id)!;
+      const position = [walker.position[0], 0, walker.position[1]] as const;
+      const discontinuity = this.fresh.delete(id);
       renderable.setVisible(!walker.indoors);
-      renderable.pose({
-        position: [walker.position[0], 0, walker.position[1]],
-        deltaSeconds: dt,
-        reducedMotion: reduced,
-        discontinuity: this.fresh.delete(id),
-      });
+      slot.pendingSeconds += dt;
+      // Frames, not seconds: a slow frame must not make more posing due. The gait advances by
+      // the distance walked since the last pose, so a longer gap costs update rate, not stride.
+      const interval = id === this.selectedId ? 1 : Math.max(1, Math.floor(this.poseInterval(slot.rank)));
+      const due = discontinuity || !renderable.follow || interval === 1 || (this.frame + slot.rank) % interval === 0;
+      if (due) {
+        renderable.pose({ position, deltaSeconds: slot.pendingSeconds, reducedMotion: reduced, discontinuity });
+        slot.pendingSeconds = 0;
+      } else {
+        renderable.follow!(position);
+      }
     }
     this.far.update(
       this.farIds.map((id) => {

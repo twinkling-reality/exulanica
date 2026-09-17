@@ -93,6 +93,12 @@ export interface CrowdRenderable {
   readonly residentBytes: number;
   readonly textureResidentBytes: number;
   pose(pose: CrowdPose): void;
+  /**
+   * Optional: carry the last pose to a new ground contact without solving a new one. A renderable
+   * that offers it may be posed on fewer frames than it is drawn; one without it is posed every
+   * frame.
+   */
+  follow?(position: readonly [number, number, number]): void;
   setVisible(visible: boolean): void;
   destroy(): void;
 }

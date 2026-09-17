@@ -141,6 +141,84 @@ describe('society crowd', () => {
     app.destroy();
   });
 
+  it('places every full character every frame and poses the farther ones on fewer frames', () => {
+    const poses = new Map<string, CrowdPose[]>();
+    const follows = new Map<string, number>();
+    const factory: CrowdRenderableFactory = (_device, parent, identity) => {
+      const id = identity.inhabitantId;
+      poses.set(id, []);
+      follows.set(id, 0);
+      const root = new pc.Entity(`fake:${id}`);
+      parent.addChild(root);
+      return {
+        root,
+        subject: { kind: 'synthetic-inhabitant', ...identity },
+        representation: null as never,
+        standingHeight: 1.8,
+        facing: 0,
+        residentBytes: 10,
+        textureResidentBytes: 1,
+        pose: (pose) => {
+          poses.get(id)!.push(pose);
+          root.setLocalPosition(pose.position[0], pose.position[1], pose.position[2]);
+        },
+        follow: (position) => {
+          follows.set(id, follows.get(id)! + 1);
+          root.setLocalPosition(position[0], position[1], position[2]);
+        },
+        setVisible: (visible) => { root.enabled = visible; },
+        destroy: () => root.destroy(),
+      };
+    };
+    const { crowd, app } = setup(factory);
+    const people = (tick: number) => Array.from({ length: 30 }, (_, i) => ({
+      id: `p${String(i).padStart(3, '0')}`,
+      synthetic: true as const,
+      position_mm: [i * 1000, tick ? 10_000 : 0] as const,
+      motion_path_mm: tick ? [[i * 1000, 0], [i * 1000, 10_000]] as const : [[i * 1000, 0]] as const,
+      walk_speed_mm_per_tick: 60_000,
+    }));
+    crowd.set(v4(0, people(0)), [0, 0], { nowMs: 0, intervalMs: 60_000 });
+    crowd.set(v4(1, people(1)), [0, 0], { nowMs: 0, intervalMs: 60_000 });
+    const near = Array.from({ length: 24 }, (_, i) => `p${String(i).padStart(3, '0')}`);
+    expect(crowd.drawnIds.slice(0, crowd.counts.near)).toEqual(near);
+    const run = (from: number, frames: number) => {
+      const posesBefore = new Map(near.map((id) => [id, poses.get(id)!.length]));
+      const followsBefore = new Map(near.map((id) => [id, follows.get(id)!]));
+      for (let frame = 1; frame <= frames; frame += 1) {
+        crowd.update(((from + frame) * 1000) / 60);
+        for (const id of crowd.drawnIds.slice(0, crowd.counts.near)) {
+          const at = crowd.positionOf(id)!;
+          const root = app.root.findByName(`fake:${id}`)!.getLocalPosition();
+          expect([root.x, root.z], id).toEqual([at[0], at[1]]);
+        }
+      }
+      return {
+        poses: new Map(near.map((id) => [id, poses.get(id)!.slice(posesBefore.get(id)!)])),
+        follows: new Map(near.map((id) => [id, follows.get(id)! - followsBefore.get(id)!])),
+      };
+    };
+    const window = run(0, 60);
+    expect(crowd.positionOf('p000')![1]).toBeGreaterThan(0);
+    near.forEach((id, rank) => {
+      const expected = rank < 4 ? 60 : rank < 12 ? 30 : 20;
+      expect(window.poses.get(id)!.length, `${id} at rank ${rank}`).toBe(expected);
+      expect(window.follows.get(id), `${id} at rank ${rank}`).toBe(60 - expected);
+      // Each pose after the first carries the whole time since the one before it.
+      for (const pose of window.poses.get(id)!.slice(1)) expect(pose.deltaSeconds).toBeCloseTo(1 / expected, 9);
+    });
+    // Someone the person selected is posed every frame, whatever their distance.
+    crowd.select('p020');
+    expect(run(60, 60).poses.get('p020')!.length).toBe(60);
+    // A jump is never carried: every full character is posed from scratch.
+    crowd.set(v4(5, people(1)), [0, 0], { nowMs: 0, intervalMs: 60_000 });
+    for (const id of crowd.drawnIds.slice(0, crowd.counts.near)) {
+      expect(poses.get(id)!.at(-1)!.discontinuity, id).toBe(true);
+    }
+    crowd.destroy();
+    app.destroy();
+  });
+
   it('draws far figures with one instanced draw per palette', () => {
     const { crowd, app, root } = setup(undefined, 0);
     const people = Array.from({ length: 64 }, (_, i) => ({
