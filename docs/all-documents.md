@@ -40,6 +40,7 @@ How the system works now. Edited as the system changes.
 - [gsplat-scene-jobs](gsplat-scene-jobs.md) : Status 2026-09-05, evening: the runner image has been built from this recipe and executed on a
 - [interaction-model](interaction-model.md) : mixed. Every claim carries exactly one label, per the convention in
 - [interaction-policy-backend](interaction-policy-backend.md) : IMPLEMENTED for the capability registry, immutable policy history, Settings and
+- [lettering](lettering.md) : IMPLEMENTED for the four glyph catalogs, the conversion tool, the catalog reader and the
 - [license-matrix](license-matrix.md) : VERIFIED where a primary source was read on 2026-08-27, with the exceptions marked
 - [model-and-service-selection](model-and-service-selection.md) : current implementation reviewed 2026-09-14; model upgrades require task-specific evidence
 - [owned-district-and-admission](owned-district-and-admission.md) : IMPLEMENTED DATA PATH; VISUAL AND WORLD-MEMORY VALIDATION IN PROGRESS

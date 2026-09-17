@@ -475,3 +475,54 @@ purpose.
 | `assets/catalogs/sources/nyc-2015-street-tree-census-species.json`, 10,853 bytes, SHA-256 `68865bbbfdbcff42ce2492eadb218313e20c5f54845e7a4cac93885873b3ae15` | 2015 Street Tree Census (`uvpi-gqnh`), tree records aggregated by species | Provider revision Thu, 13 Sep 2018 14:58:58 GMT; retrieved 2026-09-17T01:41:14Z by one approved GET | Retained unchanged. `assets/catalogs/tree-species.v2.json` derives 19 entries from it: every named species with at least one percent of the 652,169 named trees, leaving out rows that name a genus alone and the row with no species. The query and response headers are in the `.provenance.json` file beside it |
 | `assets/owned-world/flatiron/source/buildings.geojson`, 286,944 bytes, SHA-256 `67942a1838465d35e85b83a973ac09aeaf2d9c08f463ed7d1684b9b8f3ba22db` | NYC BUILDING (`5zhs-2jue`), the footprints inside the Flatiron district box | Provider revision Sun, 13 Sep 2026 15:49:22 GMT | Retained unchanged. In `assets/owned-world/flatiron/flatiron-owned-district.json` coordinates are quantized and transformed to a local metric frame; building massing, facade completion, materials, roads, lighting, fantasy additions and synthetic inhabitants are generated and are not observations. The query is in `assets/owned-world/flatiron/manifest.json` |
 | `assets/owned-world/flatiron/source/sidewalks.geojson`, 258,925 bytes, SHA-256 `e833dd97a5f8360c2d205c003b66a7fddc6a88f34e3d3f21f594d06658ecd5d8` | NYC Planimetric Database SIDEWALK (`52n9-sdep`), the sidewalk polygons inside the same box | Provider revision Wed, 24 Apr 2024 20:18:07 GMT | As for the buildings above; ground is authored flat and claims no surveyed elevation |
+
+## Shipped typefaces and the lettering tool (2026-09-17)
+
+Four typeface families are retained under `assets/fonts/`, byte for byte as downloaded from the
+`google/fonts` repository at commit `a54f7446f84a1125ef6bf08baa46f3639e8905e0`, each with its own
+`OFL.txt` and a `SOURCE.json` recording every file's URL at that commit, its SHA-256 and its size.
+`tests/test_lettering_catalog.py` fails if a file under `assets/fonts/` is not named in this section,
+if its digest no longer matches, or if a family's `OFL.txt` acquires a Reserved Font Name.
+
+**Licence: SIL Open Font License, Version 1.1** for all four, and for the glyph catalogs derived
+from them. Each family's full licence text is the `OFL.txt` beside it. **None of the four declares a
+Reserved Font Name**, which is why they were chosen: converting outlines is plausibly a Modified
+Version, and a Reserved Font Name would forbid the result from carrying the family's name.
+
+The required copyright notices, verbatim from the four `OFL.txt` files:
+
+- Copyright 2017 The Barlow Project Authors (https://github.com/jpt/barlow)
+- Copyright 2011 The Francois One Project Authors (contact@sansoxygen.com)
+- Copyright 2016 The Bevan Project Authors (https://github.com/googlefonts/BevanFont)
+- Copyright 2011 The Old Standard Project Authors (amkryukov@gmail.com)
+
+| Retained file | Bytes | SHA-256 |
+| --- | --- | --- |
+| `assets/fonts/barlow/Barlow-SemiBold.ttf` | 108,348 | `86577cb32f8abe3673db53ca0f4221e6856751a4f6730c867e00f720f8bb1fc5` |
+| `assets/fonts/barlow/OFL.txt` | 4,377 | `186d750eb496a4c17a76385f82be6aea2ac1cf2de074a811d63786cf374ea73f` |
+| `assets/fonts/barlow/SOURCE.json` | 661 | `d55aeef6cebd8525d66c674a1d30132b48324256bd6607062e6c6c195bae52d3` |
+| `assets/fonts/bevan/Bevan-Regular.ttf` | 118,004 | `8d16c0920330f1def84e342ce70626c27fbf179b4294e6391b19301ff5873469` |
+| `assets/fonts/bevan/OFL.txt` | 4,480 | `578f12281f17e7dd88c9e553240243b29f4240043eef22093d32c043c4ab6dc0` |
+| `assets/fonts/bevan/SOURCE.json` | 651 | `8bcccd8bfc7d37f6d46c8b67ce2f3b3447c65cb91339adae9e25ed74569fd826` |
+| `assets/fonts/francoisone/FrancoisOne-Regular.ttf` | 79,356 | `700fb5e4a5b6edb14dde2dcd481e5a9cac14281579cf42500170bae7cddd3609` |
+| `assets/fonts/francoisone/OFL.txt` | 4,376 | `09685e225ba9b697b2ccd2d4098cac5ecbed0679960605258a271af60749887b` |
+| `assets/fonts/francoisone/SOURCE.json` | 692 | `4fcab25323e4de727acd8886fe169a195edd76d4f24f8356546e9e3e46365084` |
+| `assets/fonts/oldstandardtt/OFL.txt` | 4,373 | `4faa2d9e2ce0a4b5b37e62ee6fafe474a539b31578f7214ed97cc3503aeb8ebd` |
+| `assets/fonts/oldstandardtt/OldStandard-Bold.ttf` | 267,128 | `7d831e9d799ad23ee98e889381a9db2a283b2dac7f228dd5c06071decb9c54db` |
+| `assets/fonts/oldstandardtt/SOURCE.json` | 692 | `19884b2d6bd3171118f8d9bac639b8a803f2d2f7da82eac567de3c18a6f9307d` |
+
+**Derived, and distributed under the OFL as Modified Versions of the font software:** the glyph
+catalogs `assets/catalogs/lettering/condensed.v1.json` (from Francois One),
+`assets/catalogs/lettering/grotesque.v1.json` (Barlow SemiBold),
+`assets/catalogs/lettering/modern_serif.v1.json` (Old Standard Bold) and
+`assets/catalogs/lettering/slab.v1.json` (Bevan). Each holds the outlines of 67 glyphs as integer
+rings, flattened and simplified by the stated rules in `docs/lettering.md` section 3, with the
+family, the style, the copyright notice, the licence file and the source digest recorded inside it.
+A tile baked with letters on it is a document created using the font software, which OFL condition 4
+leaves outside the licence.
+
+**The conversion tool** is `fontTools` 4.65.0 (MIT), used once, offline, to read the four fonts. It
+is NOT a product dependency: it lives in `tools/lettering` with its own `pyproject.toml` and
+`uv.lock`, it never enters the root `uv.lock`, and `tests/test_lettering_boundary.py` plus the
+import contract `The product never imports the lettering tool` in `pyproject.toml` hold both halves
+of that. The product reads the catalogs and parses no font.
