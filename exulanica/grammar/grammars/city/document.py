@@ -79,6 +79,14 @@ from exulanica.grammar.geometry import (
 from exulanica.grammar.grammars.city import CITY_GRAMMAR, CITY_SHAPES
 from exulanica.grammar.grammars.city.catalogs import city_vocabularies, entry_fields, form_parts
 from exulanica.grammar.grammars.city.common import SIDE_CODES, FormPart
+from exulanica.grammar.grammars.city.corners import (
+    corner_box,
+    frontage_corner,
+    junction_fill_box,
+    strip_box,
+)
+from exulanica.grammar.grammars.city.corners import corner_centre as _corner_centre
+from exulanica.grammar.grammars.city.corners import walk_round_face as _walk_round_face
 from exulanica.grammar.grammars.city.descriptor import (
     CITY_DESCRIPTOR_PATH,
     CITY_GRAMMAR_ID,
@@ -204,8 +212,6 @@ OWN_ANCHOR_KINDS: Final = (
 )
 #: Record kinds with no single anchor, which no tile owns.
 ANCHORLESS_KINDS: Final = (DistrictRecord, StreetRecord)
-#: The scale at which a corner check measures a kerb piece's length: millionths of a millimetre.
-_CORNER_LENGTH_SCALE: Final = 1_000_000
 #: How close, in millimetres, a point derived with one floored integer normal must land.
 _NORMAL_ROUNDING_MM: Final = 2
 
@@ -481,22 +487,12 @@ def _extent_ring(extent: Extent) -> tuple[tuple[int, int], ...]:
     )
 
 
-def _walk_round_face(curb: CurbEdgeRecord) -> tuple[tuple[int, int], ...]:
-    """A kerb line in plan, in the order a counter-clockwise walk round the curb's face takes it."""
-    line = tuple((x, y) for x, y, _z in curb.kerb_line_mm)
-    return line if curb.side == "left" else line[::-1]
-
-
-def _corner_centre(
-    point: tuple[int, int], direction: tuple[int, int], radius: int, turn: int
-) -> tuple[int, int]:
-    """``point`` plus ``radius`` along the unit normal toward the turn, floored as stated."""
-    dx, dy = direction
-    scale = _CORNER_LENGTH_SCALE
-    length = integer_sqrt((dx * dx + dy * dy) * scale * scale)
+def _holds(outer: Extent, inner: Extent) -> bool:
+    """Whether ``outer`` contains ``inner`` on every axis, height included."""
     return (
-        point[0] + (-turn * dy * radius * scale) // length,
-        point[1] + (turn * dx * radius * scale) // length,
+        _within_plan(inner, outer)
+        and outer.min_z_mm <= inner.min_z_mm
+        and inner.max_z_mm <= outer.max_z_mm
     )
 
 
@@ -728,6 +724,14 @@ class _Checker:
             for point in curb.kerb_line_mm:
                 if not _in_extent_plan(segment.extent, point[0], point[1]):
                     raise _fail("kerb_line", f"curb {curb.identity} leaves its segment's extent")
+            if not _holds(curb.extent, strip_box(curb)):
+                raise _fail(
+                    "curb_extent", f"curb {curb.identity}'s extent does not hold its straight part"
+                )
+            for block_identity in curb.block_identity:
+                block = self.carried(block_identity)
+                if block is not None:
+                    self._check_frontage_line(curb, block)
             for next_identity in curb.next_curb_identity:
                 followers[next_identity] += 1
                 follower = self.carried(next_identity)
@@ -738,10 +742,7 @@ class _Checker:
                 if not ends & {other.start_node_identity, other.end_node_identity}:
                     raise _fail("curb_graph", f"curb {curb.identity} is followed across no node")
                 self._check_corner(curb, follower)
-            for block_identity in curb.block_identity:
-                block = self.carried(block_identity)
-                if block is not None:
-                    self._check_frontage_line(curb, block)
+                self._check_corner_extent(curb, follower)
         branching = [identity for identity, count in followers.items() if count > 1]
         if branching:
             raise _fail("curb_graph", f"curbs followed by more than one curb: {branching}")
@@ -772,6 +773,43 @@ class _Checker:
                 "corner_radius",
                 f"{where}: tangent points {p} and {q} find centres {from_p} and {from_q}, "
                 f"not one arc of radius {radius}",
+            )
+
+    def _check_corner_extent(self, curb: CurbEdgeRecord, follower: CurbEdgeRecord) -> None:
+        """The curb stating a radius owns its corner, and its extent holds the corner's box."""
+        try:
+            box = corner_box(curb, follower)
+        except InvalidRecordError as error:
+            raise _fail("corner_extent", str(error)) from error
+        if box is None:
+            return
+        if not _holds(curb.extent, box):
+            raise _fail(
+                "corner_extent",
+                f"curb {curb.identity}'s extent does not hold its corner to {follower.identity}, "
+                f"{box}",
+            )
+        for block_identity in curb.block_identity:
+            block = self.carried(block_identity)
+            if block is not None and frontage_corner(curb, follower) not in block.boundary_mm:
+                raise _fail(
+                    "corner_extent",
+                    f"curb {curb.identity}'s frontage corner is not a corner of block "
+                    f"{block.identity}",
+                )
+
+    def _check_junction_extent(self, junction: JunctionRecord) -> None:
+        """A junction owns the carriageway fill inside its kerb arcs, and its extent holds it."""
+        node = self.carried(junction.node_identity)
+        legs = [self.carried(identity) for identity in junction.segment_identities]
+        if node is None or None in legs:
+            return
+        box = junction_fill_box(node, legs, self._segment_curbs, self.carried)
+        if box is not None and not _holds(junction.extent, box):
+            raise _fail(
+                "junction_extent",
+                f"junction {junction.identity}'s extent does not hold its fill inside the kerb "
+                f"arcs, {box}",
             )
 
     def _check_frontage_line(self, curb: CurbEdgeRecord, block: BlockRecord) -> None:
@@ -891,6 +929,7 @@ class _Checker:
     def _check_junctions(self) -> None:
         segments = self.of(StreetSegmentRecord)
         for junction in self.of(JunctionRecord):
+            self._check_junction_extent(junction)
             node = self.carried(junction.node_identity)
             touching = {
                 segment.identity

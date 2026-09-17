@@ -2,9 +2,10 @@
 
 Every value below was chosen by hand for this fixture. The builder computes only what a written
 rule derives from those values: identities (``exulanica.grammar.subjects``), facade output
-digests, part extents, owners' extents covering what they anchor, the descriptor and catalog pins,
-and the canonical bytes. The tile carries everything it names, so its external list is empty. It
-is a test input, never stage output: no generator exists, and nothing here is one.
+digests, part extents, owners' extents covering what they anchor, a curb's extent covering the
+corner its radius owns, the descriptor and catalog pins, and the canonical bytes. The tile carries
+everything it names, so its external list is empty. It is a test input, never stage output, and
+nothing here is a generator.
 
 The tile is one T-junction at (60 m, 40 m). Market Street, a high street, runs west to east
 through it on two segments; Mill Lane, a local street, runs north from it. The junction is
@@ -36,6 +37,7 @@ from exulanica.grammar.geometry import Extent, edge_run_length, ring_centroid
 from exulanica.grammar.grammars.city import CITY_GRAMMAR, CITY_SHAPES
 from exulanica.grammar.grammars.city.catalogs import entry_fields, form_parts, load_city_catalogs
 from exulanica.grammar.grammars.city.common import SIDE_CODES, SURFACE_ROLE_CODES, FormPart
+from exulanica.grammar.grammars.city.corners import corner_box
 from exulanica.grammar.grammars.city.descriptor import CITY_DESCRIPTOR_PATH, CITY_SURFACE
 from exulanica.grammar.grammars.city.districts import DistrictRecord
 from exulanica.grammar.grammars.city.document import (
@@ -374,6 +376,17 @@ curbs = [
         Extent(63_250, 50_750, -95, 66_950, 80_000, 135),
     ),
 ]
+
+
+def corner_covered(record: CurbEdgeRecord) -> CurbEdgeRecord:
+    """A curb stating a radius owns its corner, so its extent grows to the corner's box."""
+    for next_identity in record.next_curb_identity:
+        follower = next(item for item in curbs if item.identity == next_identity)
+        box = corner_box(record, follower)
+        if box is not None:
+            record = dataclasses.replace(record, extent=covering(record.extent, box))
+    return record
+
 
 JUNCTION = identity("junction", NODES["junction"], 0)
 SIGNAL = identity("signal", JUNCTION, 0)
@@ -1653,6 +1666,7 @@ def covering(*extents: Extent) -> Extent:
     )
 
 
+curbs = [corner_covered(record) for record in curbs]
 segments = [
     dataclasses.replace(
         segment,

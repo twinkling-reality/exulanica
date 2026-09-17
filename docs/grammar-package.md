@@ -302,6 +302,20 @@ along its piece's unit normal toward the turn, every component floored, the piec
 `isqrt((dx * dx + dy * dy) * 10**12)` millionths of a millimetre so the floor of that length costs
 less than a millimetre at any radius; a reader without big integers uses a big-integer type for it.
 
+**Corner ownership** (`[curb_extent]`, `[corner_extent]`, `[junction_extent]`, in `corners.py`).
+The curb that states `corner_radius_mm` owns its corner: the kerb face along the arc, the kerb top
+and the footway wedge, up to its follower's tangent point. The ground is partitioned at the
+tangent points' normals, which meet at the arc's centre: each straight piece's strip ends at its
+normal, and the corner owns what lies between the normals, beyond the kerb face on the face side
+and outside the building side beyond the frontage corner, where the two frontage lines meet. When a
+footway reaches the radius, the wedge runs to the centre and the two straight strips meet on the
+mitre line from the centre to the frontage corner. A curb's extent must hold its straight strips
+and its corner's box, a block's ring corner must be exactly the frontage corner, and a convex
+radius no wider than the kerb is refused. The junction owns only the carriageway fill inside the
+kerb arcs, and its extent must hold the kerb line ends nearest its node and every corner arc
+between its legs. `tests/test_grammar_city_corners.py` samples every integer point a corner owns,
+for convex, mitred, concave and slanted corners, and requires it inside the box.
+
 **Membership.** A tile owns a subject whose anchor lies in its 128 m square. A subject it does not
 own is in its halo when the subject's extent meets the square grown by 64 m on every side
 (`extent_meets_grown_square`), so a long segment or a large parcel anchored far away that still

@@ -25,6 +25,7 @@ from exulanica.grammar.errors import InvalidRecordError, UnresolvedReferenceErro
 from exulanica.grammar.geometry import Extent, ring_centroid
 from exulanica.grammar.grammars.city import CITY_SHAPES
 from exulanica.grammar.grammars.city.catalogs import entry_fields, load_city_catalogs
+from exulanica.grammar.grammars.city.corners import corner_box, strip_box
 from exulanica.grammar.grammars.city.descriptor import CITY_V1_DESCRIPTOR_PATH
 from exulanica.grammar.grammars.city.document import (
     ANCHOR_OWNER_FIELDS,
@@ -59,7 +60,7 @@ from exulanica.grammar.textures import read_texture_manifest
 from city_v2_fixture import builder
 
 FIXTURE = builder()
-DOCUMENT_SHA256 = "c4366a3fd7f909c428534a34b5544370cd556f7f72e20a2d9aa8b388122ea4fa"
+DOCUMENT_SHA256 = "266c3041ca318c1dd2621f231fdb50edebd46305748ce049b71782863ceb7ca6"
 DOCUMENT_BYTES = 124_747
 SHAPES_SHA256 = "14d981dba098f6fcbf11cc21da44340674f61a009f81a937ba425564d37ec7e9"
 SHAPES_BYTES = 59_825
@@ -452,11 +453,55 @@ def _corner_radius(curb_index: int, radius: int) -> TileDocument:
 
 def _corner_tangent_point_moved(offset_mm: int) -> TileDocument:
     """Mill Lane's west kerb starts ``offset_mm`` north of where the corner arc from Market Street
-    ends."""
-    curb = FIXTURE.curbs[4]
+    ends. Market Street's north kerb owns that corner, so its extent, and its segment's, grow to
+    the corner's new box."""
+    owner, curb = FIXTURE.curbs[0], FIXTURE.curbs[4]
     (x, y, z), *rest = curb.kerb_line_mm
     moved = dataclasses.replace(curb, kerb_line_mm=((x, y + offset_mm, z), *rest))
-    return _document(replace={curb.identity: moved})
+    grown = _grown_to_corner(owner, moved)
+    segment = next(item for item in FIXTURE.segments if item.identity == owner.segment_identity)
+    segment = dataclasses.replace(segment, extent=FIXTURE.covering(segment.extent, grown.extent))
+    return _document(
+        replace={curb.identity: moved, owner.identity: grown, segment.identity: segment}
+    )
+
+
+def _grown_to_corner(owner: Any, follower: Any) -> Any:
+    try:
+        box = corner_box(owner, follower)
+    except InvalidRecordError:
+        return owner
+    if box is None:
+        return owner
+    return dataclasses.replace(owner, extent=FIXTURE.covering(owner.extent, box))
+
+
+def _corner_left_outside_its_owner() -> TileDocument:
+    """Market Street's north kerb keeps only its straight part's extent, not its corner's."""
+    curb = FIXTURE.curbs[0]
+    return _document(replace={curb.identity: dataclasses.replace(curb, extent=strip_box(curb))})
+
+
+def _straight_part_outside_its_curb() -> TileDocument:
+    """Market Street's south kerb's extent stops 1 mm short of its footway's back edge."""
+    curb = FIXTURE.curbs[1]
+    shrunk = dataclasses.replace(curb.extent, min_y_mm=curb.extent.min_y_mm + 1)
+    return _document(replace={curb.identity: dataclasses.replace(curb, extent=shrunk)})
+
+
+def _frontage_corner_off_the_block() -> TileDocument:
+    """Mill Lane's west footway narrows by 100 mm, so the corner Market Street's north kerb owns
+    meets the frontage 100 mm east of the block's corner."""
+    curb = FIXTURE.curbs[4]
+    narrowed = dataclasses.replace(curb, footway_width_mm=curb.footway_width_mm - 100)
+    return _document(replace={curb.identity: narrowed})
+
+
+def _junction_fill_below_its_extent() -> TileDocument:
+    """The junction's extent stops 1 mm above the kerb lines its fill reaches down to."""
+    junction = FIXTURE.junction
+    raised = dataclasses.replace(junction.extent, min_z_mm=junction.extent.min_z_mm + 1)
+    return _document(replace={junction.identity: dataclasses.replace(junction, extent=raised)})
 
 
 def _camber_steepened() -> TileDocument:
@@ -560,6 +605,26 @@ _MUTATIONS: list[tuple[str, Callable[[], TileDocument], str]] = [
         "a tangent point 3 mm off its arc",
         lambda: _corner_tangent_point_moved(3),
         r"\[corner_radius\]",
+    ),
+    (
+        "a corner outside the extent of the curb that owns it",
+        _corner_left_outside_its_owner,
+        r"\[corner_extent\]",
+    ),
+    (
+        "a frontage corner that is not the block's corner",
+        _frontage_corner_off_the_block,
+        r"\[corner_extent\]",
+    ),
+    (
+        "a straight footway outside its curb's extent",
+        _straight_part_outside_its_curb,
+        r"\[curb_extent\]",
+    ),
+    (
+        "a junction fill outside the junction's extent",
+        _junction_fill_below_its_extent,
+        r"\[junction_extent\]",
     ),
     ("a crossing wider than its type", _crossing_too_wide, r"\[crossing_width\]"),
     ("a kerb below the 100 mm gate", _kerb_below_the_gate, "below its minimum 100"),

@@ -12,9 +12,15 @@ declared in :mod:`~exulanica.grammar.grammars.city.roads`.
 * A curb edge's ``kerb_line_mm`` is the foot of the kerb face, at gutter level, digitised in the
   segment's direction, from the tangent point where one corner arc ends to the tangent point where
   the next begins. The carriageway surface runs between the two kerb lines of its segment; a
-  junction fills the rest with fillet arcs of each curb's ``corner_radius_mm`` (the tessellator's
-  own arc rule). The kerb face rises ``kerb_height_mm`` from the kerb line, the kerb top is
-  ``kerb_width_mm`` wide, and the footway then runs ``footway_width_mm`` to the frontage line.
+  junction fills the rest inside the fillet arcs of each curb's ``corner_radius_mm`` (the
+  tessellator's own arc rule). The kerb face rises ``kerb_height_mm`` from the kerb line, the kerb
+  top is ``kerb_width_mm`` wide, and the footway then runs ``footway_width_mm`` to the frontage
+  line.
+* **Who owns a corner.** The curb that states ``corner_radius_mm`` owns the corner to the curb
+  that follows it: the kerb face along the arc, the kerb top and the footway wedge, up to the
+  follower's tangent point, and its extent holds them. The junction owns only the carriageway
+  fill inside the kerb arcs. :mod:`~exulanica.grammar.grammars.city.corners` states the partition
+  and the boxes exactly.
 * **Footway width is the source; the frontage line is derived and checked.** A block's ring is
   the frontage line, and the document check holds each straight kerb piece to lie
   ``kerb_width_mm + footway_width_mm`` from it, to within the rounding of one integer normal.
