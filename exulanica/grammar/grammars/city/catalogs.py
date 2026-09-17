@@ -231,6 +231,10 @@ def city_catalog_schemas(*, texture_sets: Mapping[str, TextureSet]) -> tuple[Cat
                 ("traffic", choice_field(("carries", "none"))),
                 ("width_minimum_mm", _MILLIMETRES),
                 ("width_maximum_mm", _MILLIMETRES),
+                # The tightest turn a junction must admit out of this lane: the widest turning
+                # circle among the vehicle classes traffic's access catalog maps to this use. Each
+                # entry's reason names that catalog by digest; nothing here reads it.
+                ("turning_radius_mm", _MILLIMETRES),
                 REASON,
             ),
             entry_check=_ordered(("width_minimum_mm", "width_maximum_mm")),

@@ -82,7 +82,7 @@
         },
         {
           "kind": "city.junction_approach",
-          "version": 1
+          "version": 2
         },
         {
           "kind": "city.lane_connection",

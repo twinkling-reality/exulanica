@@ -180,10 +180,17 @@ JUNCTION_SHAPE: Final = shapes.RecordShape(
 
 @dataclass(frozen=True, slots=True)
 class JunctionApproachRecord:
-    """How one segment enters a junction: its control and its rank (0 is the major road)."""
+    """How one segment enters a junction: its control, its rank (0 is the major road) and the turn
+    it must admit.
+
+    ``turning_radius_mm`` is the tightest turn a vehicle leaving this approach may need: the widest
+    of the turning radii the lane-use catalog states for this segment's lane uses. The catalog takes
+    those from traffic's vehicle classes and names that catalog by digest in each entry's reason;
+    the city grammar never reads it. 0 means nothing drives out of this approach.
+    """
 
     RECORD_KIND: ClassVar[str] = "city.junction_approach"
-    RECORD_VERSION: ClassVar[int] = 1
+    RECORD_VERSION: ClassVar[int] = 2
 
     identity: str
     junction_identity: str
@@ -192,6 +199,7 @@ class JunctionApproachRecord:
     approach_ordinal: int
     control: str
     priority_rank: int
+    turning_radius_mm: int
 
 
 APPROACH_SHAPE: Final = shapes.RecordShape(
@@ -203,6 +211,7 @@ APPROACH_SHAPE: Final = shapes.RecordShape(
         shapes.integer("approach_ordinal", 0, 64),
         shapes.choice("control", APPROACH_CONTROLS),
         shapes.integer("priority_rank", 0, 16),
+        shapes.integer("turning_radius_mm", 0, 30_000),
     ),
     identity=shapes.IdentityRule(
         "junction_approach", owner_field="junction_identity", ordinal_field="approach_ordinal"

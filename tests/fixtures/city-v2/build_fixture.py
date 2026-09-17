@@ -650,6 +650,9 @@ approaches = [
         ordinal,
         "signal",
         rank,
+        # Every lane of this fixture's segments is general, and the lane-use catalog states the
+        # city bus's turning circle for a general lane.
+        entry("lane-use", "general")["turning_radius_mm"],
     )
     for ordinal, (segment, rank) in enumerate((("s1", 0), ("s2", 1), ("s0", 0)))
 ]

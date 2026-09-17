@@ -47,7 +47,11 @@ plan in traffic's catalog, which the city grammar does not read.
 dresses; signals, whose plan catalog the city does not read; lane connections and parking. Lane
 markings are ``none``, since no paint is generated.
 
-**Junctions.** A node where three or four segments meet is a junction. A junction on the high
+**Junctions.** Every approach states the tightest turn it must admit: the widest turning radius the
+lane-use catalog states for the uses of that segment's lanes. The catalog takes those from traffic's
+vehicle classes and names that catalog by digest; this stage reads the city's catalog only.
+
+A node where three or four segments meet is a junction. A junction on the high
 street gives its high street legs priority and its other legs a stop; any other junction gives the
 street that continues through it priority and the street that ends there a stop. Its extent is the
 fill the corner rule states (:func:`~exulanica.grammar.grammars.city.corners.junction_fill_box`).
@@ -624,7 +628,14 @@ def _generate(context: StageContext) -> Iterator[object]:
         )
 
     junctions, approaches = _junctions(
-        context, node_records, list(segment_records.values()), curbs, along, every_street, segments
+        context,
+        node_records,
+        list(segment_records.values()),
+        curbs,
+        along,
+        every_street,
+        segments,
+        lane_records,
     )
     crossings = _crossings(
         context,
@@ -788,6 +799,7 @@ def _junctions(
     along: list[_Street],
     every_street: list[_Street],
     segments: dict[tuple[int, int], _Segment],
+    lanes: list[roads.LaneRecord],
 ) -> tuple[list[roads.JunctionRecord], list[roads.JunctionApproachRecord]]:
     street_of = {item.identity: item.street for item in segments.values()}
     curbs_by_segment: dict[str, dict[str, streets.CurbEdgeRecord]] = {}
@@ -838,6 +850,16 @@ def _junctions(
                     approach_ordinal=ordinal,
                     control="priority" if major else "stop",
                     priority_rank=0 if major else 1,
+                    turning_radius_mm=max(
+                        entry("lane-use", use)["turning_radius_mm"]
+                        for use in sorted(
+                            {
+                                lane.lane_use
+                                for lane in lanes
+                                if lane.segment_identity == record.identity
+                            }
+                        )
+                    ),
                 )
             )
     return junctions, approaches

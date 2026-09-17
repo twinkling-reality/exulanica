@@ -1277,6 +1277,12 @@
           "maximum": 16,
           "minimum": 0,
           "name": "priority_rank"
+        },
+        {
+          "kind": "integer",
+          "maximum": 30000,
+          "minimum": 0,
+          "name": "turning_radius_mm"
         }
       ],
       "identity": {
@@ -1288,7 +1294,7 @@
       "kind": "city.junction_approach",
       "rules": [],
       "shape": "city.junction_approach",
-      "version": 1
+      "version": 2
     },
     {
       "extent_field": "extent",

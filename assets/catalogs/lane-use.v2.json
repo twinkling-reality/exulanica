@@ -9,7 +9,8 @@
       "traffic": "none",
       "width_minimum_mm": 500,
       "width_maximum_mm": 1500,
-      "reason": "Authored lane use: a painted buffer that carries no traffic.",
+      "turning_radius_mm": 0,
+      "reason": "Authored lane use: a painted buffer that carries no traffic. Its turning radius is no class drives in a painted buffer, so no vehicle turns out of one: the minimum_turning_radius_mm of assets/catalogs/traffic/vehicle-class.v1.json, sha256 1da3a44f919228a97719e54821bed2c9a1218cd6c1699ec2ee5d54d4591c35f8, whose classes lane-use-access maps to this use. The city grammar names that catalog and never reads it.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
@@ -24,7 +25,8 @@
       "traffic": "carries",
       "width_minimum_mm": 3000,
       "width_maximum_mm": 4250,
-      "reason": "Authored lane use; the traffic lane maps it to vehicle classes. Transit lanes are discussed in NACTO Urban Street Design Guide (Island Press, 2013), which was not re-read in this build and is not quoted.",
+      "turning_radius_mm": 11520,
+      "reason": "Authored lane use; the traffic lane maps it to vehicle classes. Transit lanes are discussed in NACTO Urban Street Design Guide (Island Press, 2013), which was not re-read in this build and is not quoted. Its turning radius is the city bus, the only class this lane admits: the minimum_turning_radius_mm of assets/catalogs/traffic/vehicle-class.v1.json, sha256 1da3a44f919228a97719e54821bed2c9a1218cd6c1699ec2ee5d54d4591c35f8, whose classes lane-use-access maps to this use. The city grammar names that catalog and never reads it.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
@@ -39,7 +41,8 @@
       "traffic": "none",
       "width_minimum_mm": 3000,
       "width_maximum_mm": 4250,
-      "reason": "Authored lane use. A bus waiting between runs stands in a layover, which parking-kind has named since version 1 while lane-use could not say it: a layover carries no through traffic, so its traffic is none, and it is as wide as the bus lane it comes off.",
+      "turning_radius_mm": 0,
+      "reason": "Authored lane use. A bus waiting between runs stands in a layover, which parking-kind has named since version 1 while lane-use could not say it: a layover carries no through traffic, so its traffic is none, and it is as wide as the bus lane it comes off. Its turning radius is a layover carries no through traffic, so no vehicle turns out of one: the minimum_turning_radius_mm of assets/catalogs/traffic/vehicle-class.v1.json, sha256 1da3a44f919228a97719e54821bed2c9a1218cd6c1699ec2ee5d54d4591c35f8, whose classes lane-use-access maps to this use. The city grammar names that catalog and never reads it.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
@@ -54,7 +57,8 @@
       "traffic": "carries",
       "width_minimum_mm": 1500,
       "width_maximum_mm": 2500,
-      "reason": "Authored lane use; the traffic lane maps it to vehicle classes.",
+      "turning_radius_mm": 1000,
+      "reason": "Authored lane use; the traffic lane maps it to vehicle classes. Its turning radius is the bicycle, the only class this lane admits: the minimum_turning_radius_mm of assets/catalogs/traffic/vehicle-class.v1.json, sha256 1da3a44f919228a97719e54821bed2c9a1218cd6c1699ec2ee5d54d4591c35f8, whose classes lane-use-access maps to this use. The city grammar names that catalog and never reads it.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
@@ -69,7 +73,8 @@
       "traffic": "carries",
       "width_minimum_mm": 2750,
       "width_maximum_mm": 3650,
-      "reason": "Authored lane use; the traffic lane maps it to vehicle classes. Lane width is discussed in NACTO Urban Street Design Guide (Island Press, 2013), Street Design Elements, Lane Width, which was not re-read in this build and is not quoted.",
+      "turning_radius_mm": 11520,
+      "reason": "Authored lane use; the traffic lane maps it to vehicle classes. Lane width is discussed in NACTO Urban Street Design Guide (Island Press, 2013), Street Design Elements, Lane Width, which was not re-read in this build and is not quoted. Its turning radius is the city bus, the widest turn among the classes this lane admits: the minimum_turning_radius_mm of assets/catalogs/traffic/vehicle-class.v1.json, sha256 1da3a44f919228a97719e54821bed2c9a1218cd6c1699ec2ee5d54d4591c35f8, whose classes lane-use-access maps to this use. The city grammar names that catalog and never reads it.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
@@ -84,7 +89,8 @@
       "traffic": "none",
       "width_minimum_mm": 2000,
       "width_maximum_mm": 2700,
-      "reason": "Authored lane use: bays along the kerb that carry no through traffic.",
+      "turning_radius_mm": 0,
+      "reason": "Authored lane use: bays along the kerb that carry no through traffic. Its turning radius is a parked vehicle turns out of its bay into the lane beside it, not out of this one: the minimum_turning_radius_mm of assets/catalogs/traffic/vehicle-class.v1.json, sha256 1da3a44f919228a97719e54821bed2c9a1218cd6c1699ec2ee5d54d4591c35f8, whose classes lane-use-access maps to this use. The city grammar names that catalog and never reads it.",
       "licence": {
         "spdx": "Apache-2.0",
         "verdict": "SHIP",
