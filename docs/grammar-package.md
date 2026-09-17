@@ -1,6 +1,6 @@
 # The generator system: `exulanica.grammar`
 
-Status: **CITY VOCABULARY VERSION 2 BUILT; NO STAGE GENERATES ANYTHING YET**. Phase 1 of the target
+Status: **CITY VOCABULARY VERSION 2 BUILT; EVERY CITY STAGE GENERATES**. Phase 1 of the target
 architecture. Updated 2026-09-17.
 
 `exulanica.grammar` is a generator system, not a city generator. It holds a generic contract
@@ -9,12 +9,13 @@ and declared semantics) and the grammars that implement it. The city is the firs
 grammar. A second grammar, `box`, ships beside it to prove that the contract carries something
 that is not architecture with no change to the contract.
 
-This phase is structural. The package produces **no mesh and no vertices**; the only generated
-values are the box grammar's three integer extents. City version 2 declares the whole vocabulary a
-generator will write: 28 record kinds with integer geometry, 91 declared parameters, four
-projection contracts, 18 licensed catalogs, one identity rule and a hand-written fixture tile that
-exercises all of it. No city stage has a generator: a city generated today is a receipt and eleven
-emissions that each say `not_implemented` and why.
+The package produces **no mesh and no vertices**: every generated value is an integer record, and
+turning records into triangles is the tessellator's. City version 2 declares the whole vocabulary:
+28 record kinds with integer geometry, 91 declared parameters, four projection contracts, 18
+licensed catalogs, one identity rule and a hand-written fixture tile that exercises all of it.
+Every one of the eleven city stages now has a generator: see
+[generated-corridor-street](generated-corridor-street.md) for the street they make together and
+what it measures.
 
 ## 1. Where it sits, and why below `evidence`
 
@@ -493,8 +494,9 @@ means an origin the map does not know. `tests/test_selection_packet_invented.py`
 
 Each of these is known and deliberately not done here.
 
-- **No stage has a generator.** The corridor lane writes them against these record shapes,
-  parameters and catalogs.
+- **No published texture set dresses glazing, doors, transoms, road paint or a tree.** Those
+  surfaces are drawn unavailable rather than painted with something else, and the counts are in
+  [generated-corridor-street](generated-corridor-street.md).
 - **The city v1 consumers have not been ported.** The tessellator's bake stage and its fixture and
   the traffic lane's provisional records read city v1 record classes, while the living society's
   city place adapter now reads v2 tile documents. The tessellator lane ports on a branch stacked on
