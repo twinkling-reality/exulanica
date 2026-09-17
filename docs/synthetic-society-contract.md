@@ -605,6 +605,17 @@ speed and stops where the path ends; nothing is interpolated off the path. The d
 preview plays a recording made by the real engine over the committed Flatiron input
 (`scripts/record_living_society.py`), with every frame bound to its state digest.
 
+**Detail by distance applies to time too.** Solving and skinning one full character costs about
+0.53 ms of main-thread time, so the crowd poses the 4 nearest every frame, the next 8 every second
+frame and the rest every third, 12 poses a frame instead of 24, and carries each character to its
+recorded point on every frame in between. A selected inhabitant, and anyone whose snapshot jumped,
+is posed at once. Measured in the preview at 1440x900 in headless Chrome on an M3 Pro, over the
+debug PlayCanvas build a development server serves: main-thread work per frame is 9.4 ms at p50
+and 9.9 ms at p95 with the cadence, against 15.9 ms and 16.6 ms posing every character every
+frame, and at most 2 frames in 1,199 passed 16.7 ms. A steady 16.7 ms frame interval is not proof
+of a met budget: the browser stamps each frame on schedule while its callbacks run late, so the
+figures above are main-thread work, not intervals.
+
 ## Traffic boundary
 
 Cars likewise remain outside the pedestrian implementation. A future traffic producer must supply
