@@ -1,0 +1,76 @@
+// The data view's GPU pixel checks, headless, so they can queue behind the machine-wide GPU slot.
+// Usage: node run_pixel_checks.mjs <main|lane> <port> <worktree>
+//   main: renderBaselineScenes from pixel-scenes.ts (the shared scenes, on a checkout of main)
+//   lane: runDataViewPixelChecks from data-view-pixels.ts (those scenes plus the lane's own checks)
+import { spawn } from 'node:child_process';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { setTimeout as sleep } from 'node:timers/promises';
+
+const [mode, port, worktree] = process.argv.slice(2);
+if (!['main', 'lane'].includes(mode) || !port || !worktree) {
+  throw new Error('usage: run_pixel_checks.mjs <main|lane> <port> <worktree>');
+}
+const debugPort = 9800 + Math.floor(Math.random() * 180);
+const profile = mkdtempSync(join(tmpdir(), 'data-view-pixels-'));
+const chrome = spawn('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', [
+  '--headless=new', `--remote-debugging-port=${debugPort}`, `--user-data-dir=${profile}`,
+  '--window-size=1280,800', '--no-first-run', '--no-default-browser-check',
+  '--disable-background-timer-throttling', '--disable-renderer-backgrounding', 'about:blank',
+], { stdio: 'ignore' });
+
+let socket; let nextId = 1; const pending = new Map();
+const send = (method, params = {}) => {
+  const id = nextId++;
+  socket.send(JSON.stringify({ id, method, params }));
+  return new Promise((resolve, reject) => pending.set(id, { resolve, reject }));
+};
+async function evaluate(expression, timeout = 600000) {
+  const result = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true, timeout });
+  if (result.exceptionDetails) throw new Error(JSON.stringify(result.exceptionDetails).slice(0, 2000));
+  return result.result.value;
+}
+
+const RUN = `(async () => {
+  const base = '/@fs${worktree}/web/packages/atlas-react/test';
+  const opm = base + '/fixtures/python-writer.opm';
+  const module = await import(base + '/gpu/${mode === 'lane' ? 'data-view-pixels' : 'pixel-scenes'}.ts?run=' + Date.now());
+  const gl = document.createElement('canvas').getContext('webgl2');
+  const info = gl.getExtension('WEBGL_debug_renderer_info');
+  const renderer = gl.getParameter(info.UNMASKED_RENDERER_WEBGL);
+  const result = await module.${mode === 'lane' ? 'runDataViewPixelChecks' : 'renderBaselineScenes'}(opm);
+  return { renderer, result };
+})()`;
+
+try {
+  let page;
+  for (let attempt = 0; attempt < 80 && page === undefined; attempt += 1) {
+    try {
+      const targets = await (await fetch(`http://127.0.0.1:${debugPort}/json/list`)).json();
+      page = targets.find((target) => target.type === 'page');
+    } catch { /* not listening yet */ }
+    if (page === undefined) await sleep(250);
+  }
+  if (page === undefined) throw new Error('Chrome exposed no page');
+  const version = await (await fetch(`http://127.0.0.1:${debugPort}/json/version`)).json();
+  socket = new WebSocket(page.webSocketDebuggerUrl);
+  await new Promise((resolve) => socket.addEventListener('open', resolve, { once: true }));
+  socket.addEventListener('message', (event) => {
+    const message = JSON.parse(event.data);
+    if (!message.id || !pending.has(message.id)) return;
+    const { resolve, reject } = pending.get(message.id); pending.delete(message.id);
+    if (message.error) reject(new Error(JSON.stringify(message.error))); else resolve(message.result);
+  });
+  await send('Page.enable');
+  await send('Page.navigate', { url: `http://127.0.0.1:${port}/?preview=1` });
+  await sleep(6000);
+  const value = await evaluate(RUN);
+  process.stdout.write(`${JSON.stringify({ mode, port, worktree, browser: version.Browser, ...value }, null, 2)}\n`);
+} finally {
+  try { socket?.close(); } catch { /* already closed */ }
+  chrome.kill('SIGKILL');
+  await sleep(500);
+  rmSync(profile, { recursive: true, force: true });
+  process.exit(0);
+}
