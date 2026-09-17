@@ -206,6 +206,17 @@ export type {
   RepresentationResolution,
   RepresentationSubject,
 } from './representation.js';
+export type {
+  GeneratedAnonymousRecordKind,
+  GeneratedIdentityRecordKind,
+  GeneratedRecordPayload,
+  GeneratedRecordRegistration,
+  GeneratedRecordSubjectResult,
+  GeneratedTileReference,
+  RepresentationBlend,
+  RepresentationBoundsBasis,
+  RepresentationRecordReference,
+} from './representation.js';
 export {
   DEFAULT_REPRESENTATION_INTENT,
   artifactByteWindow,
@@ -216,6 +227,23 @@ export {
   resolveRepresentation,
   validateRepresentationSubject,
 } from './representation.js';
+export {
+  GENERATED_ANONYMOUS_RECORD_KINDS,
+  GENERATED_IDENTITY_RECORD_KINDS,
+  REPRESENTATION_POINT_BUDGET,
+  REPRESENTATION_POINTS_PER_SUBJECT,
+  generatedRecordSubject,
+  representationColourKey,
+} from './representation.js';
+export type { DataViewHex, DataViewKindKey, DataViewOriginKey, DataViewStyle } from './data-view-style.js';
+export {
+  DATA_VIEW_STYLE,
+  DATA_VIEW_STYLE_V1,
+  dataViewRgb,
+  dataViewStyle,
+  dataViewStyleName,
+  isDataViewKindKey,
+} from './data-view-style.js';
 export {
   DEFAULT_CAMERA_RADIUS_AU,
   DEFAULT_EYE_HEIGHT_AU,
