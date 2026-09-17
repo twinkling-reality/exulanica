@@ -12,14 +12,25 @@
           "declared_semantics": {"subject_kind", "admissible_uses", "plane"},
           "subject_identity": <the admitted city identity every record identity derives from>,
           "owned": [<record payload>, ...],
-          "halo": [<record payload>, ...]
+          "halo": [<record payload>, ...],
+          "external": [{"identity": <uuid>, "kind": <record kind>}, ...]
         }
       ]
     }
 
 A record payload is exactly ``record_payload``'s. ``grammars`` is sorted by id and states exactly
 the pins the tile record's ``grammar_versions`` states, in order. ``owned`` and ``halo`` are each
-sorted by kind, then version, then identity, and no identity is in both. A bake draws owned records
+sorted by kind, then version, then identity, and no identity is in both.
+
+**External references.** A carried record may name a subject the tile does not carry: a segment
+crossing the tile names a node far away, and a street names every segment along it. Each such
+identity is listed once in ``external``, sorted by identity, with the kind of the record it names,
+so a tile stays a bounded unit of work and every reference still resolves: to a carried record, or
+to an external entry whose kind the naming field admits. Every external entry is named by a carried
+record, and no identity is both carried and external. A check across records that needs both ends
+runs only when both are carried; ``docs/grammar-package.md`` lists which. That every external
+identity is carried by some tile of the same city is a rule for a whole generated city, and is not
+checked here. A bake draws owned records
 only and reads halo records for context. Membership follows the tile record's rules (see
 :mod:`~exulanica.grammar.grammars.city.tile`): an owned record's anchor lies in the tile, a halo
 record is not owned and its extent meets the tile grown by the halo radius, and a record with no
@@ -73,6 +84,7 @@ from exulanica.grammar.grammars.city.descriptor import (
     CITY_GRAMMAR_ID,
     CITY_GRAMMAR_VERSION,
 )
+from exulanica.grammar.grammars.city.districts import DistrictRecord
 from exulanica.grammar.grammars.city.facade import (
     EntranceRecord,
     FacadeRecord,
@@ -120,7 +132,10 @@ from exulanica.grammar.grammars.city.vitrine import VitrineRecord
 from exulanica.grammar.records import record_payload, require_identity
 
 __all__ = [
+    "ANCHORLESS_KINDS",
+    "ANCHOR_OWNER_FIELDS",
     "BAY_PITCH_TARGET_MM",
+    "OWN_ANCHOR_KINDS",
     "RELATION_FIELDS",
     "TILE_DOCUMENT_PROFILE",
     "CityDocumentReport",
@@ -130,6 +145,7 @@ __all__ = [
     "document_bytes",
     "read_tile_document",
     "record_sort_key",
+    "select_tile",
     "validate_city_document",
 ]
 
@@ -148,6 +164,7 @@ _GRAMMAR_KEYS: Final = frozenset(
         "subject_identity",
         "owned",
         "halo",
+        "external",
     }
 )
 #: For each record kind with no extent, the field naming the record whose membership it shares.
@@ -156,6 +173,37 @@ RELATION_FIELDS: Final[Mapping[type, str]] = {
     SignalRecord: "controls_identity",
     SurfaceMaterialRecord: "surface_identity",
 }
+#: For each record kind anchored by its owner, the field naming the owner. The owner is carried
+#: wherever the record is, and the record's extent lies inside the owner's in plan, so a tile that
+#: carries the record by its extent always carries its owner too.
+ANCHOR_OWNER_FIELDS: Final[Mapping[type, str]] = {
+    CurbEdgeRecord: "segment_identity",
+    LaneRecord: "segment_identity",
+    CrossingRecord: "segment_identity",
+    ParkingSpaceRecord: "segment_identity",
+    StreetFurnitureRecord: "segment_identity",
+    StreetTreeRecord: "segment_identity",
+    RoadMarkingRecord: "marks_identity",
+    LaneConnectionRecord: "junction_identity",
+    MassingRecord: "parcel_identity",
+    RooftopObjectRecord: "building_identity",
+    FacadeRecord: "building_identity",
+    PremisesRecord: "building_identity",
+    GroundBayRecord: "facade_identity",
+    EntranceRecord: "facade_identity",
+    VitrineRecord: "building_identity",
+}
+#: Record kinds anchored by their own fields, which no absent owner can leave unanchored.
+OWN_ANCHOR_KINDS: Final = (
+    TerrainRecord,
+    StreetNodeRecord,
+    StreetSegmentRecord,
+    BlockRecord,
+    ParcelRecord,
+    JunctionRecord,
+)
+#: Record kinds with no single anchor, which no tile owns.
+ANCHORLESS_KINDS: Final = (DistrictRecord, StreetRecord)
 #: How close, in millimetres, a point derived with one floored integer normal must land.
 _NORMAL_ROUNDING_MM: Final = 2
 
@@ -179,6 +227,8 @@ class GrammarRecords:
     subject_identity: str
     owned: tuple[object, ...]
     halo: tuple[object, ...]
+    #: ``(identity, kind)`` of each subject a carried record names and the tile does not carry.
+    external: tuple[tuple[str, str], ...]
 
     def records(self) -> tuple[object, ...]:
         return self.owned + self.halo
@@ -202,6 +252,9 @@ class TileDocument:
                     "subject_identity": entry.subject_identity,
                     "owned": [record_payload(item) for item in entry.owned],
                     "halo": [record_payload(item) for item in entry.halo],
+                    "external": [
+                        {"identity": identity, "kind": kind} for identity, kind in entry.external
+                    ],
                 }
                 for entry in self.grammars
             ],
@@ -261,6 +314,41 @@ def _check_envelope(document: TileDocument) -> None:
         }
         if overlap:
             raise InvalidRecordError(f"identities both owned and halo: {sorted(overlap)}")
+        _check_external(where, entry)
+
+
+def _check_external(where: str, entry: GrammarRecords) -> None:
+    if not isinstance(entry.external, tuple):
+        raise _fail("external_order", f"{where}.external is a tuple of (identity, kind)")
+    identities = []
+    for position, pair in enumerate(entry.external):
+        if not isinstance(pair, tuple) or len(pair) != 2:
+            raise _fail("external_order", f"{where}.external[{position}] is (identity, kind)")
+        identity, kind = pair
+        require_identity(f"{where}.external[{position}].identity", identity)
+        shape = _SHAPES_BY_KIND.get(kind)  # type: ignore[arg-type]
+        if shape is None or shape.identity is None:
+            raise _fail(
+                "external_kind",
+                f"{where}.external[{position}] names {kind!r}, which is no city subject kind",
+            )
+        identities.append(identity)
+    if identities != sorted(set(identities)):
+        raise _fail("external_order", f"{where}.external is sorted by identity, each once")
+    carried = {item.identity for item in entry.records()}  # type: ignore[attr-defined]
+    both = sorted(carried & set(identities))
+    if both:
+        raise _fail("external_carried", f"{where}: identities both carried and external: {both}")
+
+
+def _external(where: str, raw: object) -> tuple[tuple[str, str], ...]:
+    if not isinstance(raw, list):
+        raise InvalidRecordError(f"{where} is a list")
+    pairs = []
+    for position, item in enumerate(raw):
+        entry = _object(f"{where}[{position}]", item, frozenset({"identity", "kind"}))
+        pairs.append((entry["identity"], entry["kind"]))
+    return tuple(pairs)
 
 
 def read_tile_document(data: bytes) -> TileDocument:
@@ -301,6 +389,7 @@ def read_tile_document(data: bytes) -> TileDocument:
                 subject_identity=item["subject_identity"],
                 owned=_records(f"{where}.owned", item["owned"]),
                 halo=_records(f"{where}.halo", item["halo"]),
+                external=_external(f"{where}.external", item["external"]),
             )
         )
     document = TileDocument(tile, tuple(grammars))
@@ -390,6 +479,15 @@ def _extent_ring(extent: Extent) -> tuple[tuple[int, int], ...]:
     )
 
 
+def _within_plan(inner: Extent, outer: Extent) -> bool:
+    return (
+        outer.min_x_mm <= inner.min_x_mm
+        and inner.max_x_mm <= outer.max_x_mm
+        and outer.min_y_mm <= inner.min_y_mm
+        and inner.max_y_mm <= outer.max_y_mm
+    )
+
+
 def _in_extent_plan(extent: Extent, x: int, y: int) -> bool:
     return extent.min_x_mm <= x <= extent.max_x_mm and extent.min_y_mm <= y <= extent.max_y_mm
 
@@ -429,6 +527,7 @@ class _Checker:
             )
         )
         self._anchors: dict[str, tuple[int, int] | None] = {}
+        self.owned_identities = frozenset(record.identity for record in grammar.owned)
         self._footprints: list[tuple[tuple[int, int], ...]] = []
 
     def of(self, record_type: type) -> list[Any]:
@@ -436,6 +535,48 @@ class _Checker:
 
     def get(self, identity: str) -> Any:
         return self.index[identity]
+
+    def carried(self, identity: str) -> Any | None:
+        """The carried record ``identity`` names, or ``None`` when the tile lists it as external."""
+        return self.index.get(identity)
+
+    def complete(self, owner_identity: str) -> bool:
+        """Whether every record anchored by this owner is carried: the tile owns the owner.
+
+        A halo owner's parts are carried only where their own extents reach the grown square, so a
+        rule that counts an owner's parts runs on an owned owner alone.
+        """
+        return owner_identity in self.owned_identities
+
+    def check_references(self) -> None:
+        external = dict(self.grammar.external)
+        named: set[str] = set()
+        for record in self.records:
+            shape = _SHAPES_BY_TYPE[type(record)]
+            for field_shape, target in shapes.named_identities(record, shape):
+                referent = self.index.get(target)
+                if referent is not None:
+                    kind = _SHAPES_BY_TYPE[type(referent)].kind
+                elif target in external:
+                    kind = external[target]
+                    named.add(target)
+                else:
+                    raise _fail(
+                        "references",
+                        f"{shape.name}.{field_shape.name} names {target}, which is neither "
+                        "carried nor external",
+                    )
+                if field_shape.refers_to and kind not in field_shape.refers_to:
+                    raise _fail(
+                        "reference_kind",
+                        f"{shape.name}.{field_shape.name} names a {kind}, not one of "
+                        f"{field_shape.refers_to}",
+                    )
+        unnamed = sorted(set(external) - named)
+        if unnamed:
+            raise _fail(
+                "external_unnamed", f"external identities no carried record names: {unnamed}"
+            )
 
     def entry(self, catalog: str, key: str) -> dict[str, Any]:
         return entry_fields(self.catalogs[catalog], key)
@@ -450,40 +591,42 @@ class _Checker:
 
     def _compute_anchor(self, record: Any) -> tuple[int, int] | None:
         kind = type(record)
-        if kind in (TerrainRecord,):
+        through = RELATION_FIELDS.get(kind) or ANCHOR_OWNER_FIELDS.get(kind)
+        if through is not None:
+            return self.anchor(self.get(getattr(record, through)))
+        if kind is TerrainRecord:
             return record.tile_x * self.tile.tile_size_mm, record.tile_y * self.tile.tile_size_mm
-        if kind in (StreetNodeRecord,):
+        if kind is StreetNodeRecord:
             return record.x_mm, record.y_mm
         if kind in (BlockRecord, ParcelRecord):
             return record.centroid_x_mm, record.centroid_y_mm
-        if kind in (StreetSegmentRecord,):
-            start = self.get(record.start_node_identity)
-            end = self.get(record.end_node_identity)
-            return (start.x_mm + end.x_mm) // 2, (start.y_mm + end.y_mm) // 2
-        owner = {
-            JunctionRecord: "node_identity",
-            JunctionApproachRecord: "junction_identity",
-            LaneConnectionRecord: "junction_identity",
-            SignalRecord: "controls_identity",
-            CurbEdgeRecord: "segment_identity",
-            LaneRecord: "segment_identity",
-            CrossingRecord: "segment_identity",
-            ParkingSpaceRecord: "curb_identity",
-            StreetFurnitureRecord: "curb_identity",
-            StreetTreeRecord: "curb_identity",
-            RoadMarkingRecord: "marks_identity",
-            MassingRecord: "parcel_identity",
-            RooftopObjectRecord: "building_identity",
-            FacadeRecord: "building_identity",
-            PremisesRecord: "building_identity",
-            GroundBayRecord: "facade_identity",
-            EntranceRecord: "facade_identity",
-            VitrineRecord: "bay_identity",
-            SurfaceMaterialRecord: "surface_identity",
-        }.get(kind)
-        if owner is None:
-            return None
-        return self.anchor(self.get(getattr(record, owner)))
+        if kind is StreetSegmentRecord:
+            start, end = record.centreline_mm[0], record.centreline_mm[-1]
+            return (start[0] + end[0]) // 2, (start[1] + end[1]) // 2
+        if kind is JunctionRecord:
+            extent = record.extent
+            return (extent.min_x_mm + extent.max_x_mm) // 2, (
+                extent.min_y_mm + extent.max_y_mm
+            ) // 2
+        return None
+
+    def check_owners(self) -> None:
+        """A record anchored by another names a carried one, inside whose extent it lies."""
+        for record in self.records:
+            kind = type(record)
+            field_name = RELATION_FIELDS.get(kind) or ANCHOR_OWNER_FIELDS.get(kind)
+            if field_name is None:
+                continue
+            where = f"{_SHAPES_BY_TYPE[kind].kind} {record.identity}"
+            owner = self.carried(getattr(record, field_name))
+            if owner is None:
+                raise _fail(
+                    "anchor_owner",
+                    f"{where} belongs with its {field_name} {getattr(record, field_name)}, "
+                    "which the tile does not carry",
+                )
+            if kind in ANCHOR_OWNER_FIELDS and not _within_plan(record.extent, owner.extent):
+                raise _fail("owner_extent", f"{where} reaches outside its owner's extent")
 
     def expected_membership(self, record: Any) -> str:
         """Where the tile's rules put ``record``: by its anchor and extent, or its relation's."""
@@ -520,13 +663,19 @@ class _Checker:
 
     def check_streets(self) -> None:
         for segment in self.of(StreetSegmentRecord):
-            start = self.get(segment.start_node_identity)
-            end = self.get(segment.end_node_identity)
-            if segment.centreline_mm[0] != (start.x_mm, start.y_mm, start.z_mm):
+            start = self.carried(segment.start_node_identity)
+            end = self.carried(segment.end_node_identity)
+            if start is not None and segment.centreline_mm[0] != (
+                start.x_mm,
+                start.y_mm,
+                start.z_mm,
+            ):
                 raise _fail("segment_ends", f"segment {segment.identity} starts off its node")
-            if segment.centreline_mm[-1] != (end.x_mm, end.y_mm, end.z_mm):
+            if end is not None and segment.centreline_mm[-1] != (end.x_mm, end.y_mm, end.z_mm):
                 raise _fail("segment_ends", f"segment {segment.identity} ends off its node")
-            street = self.get(segment.street_identity)
+            street = self.carried(segment.street_identity)
+            if street is None:
+                continue
             if segment.identity not in street.segment_identities:
                 raise _fail("street_segments", f"street {street.identity} omits a segment")
             name = self.entry("street-name", street.name)
@@ -536,7 +685,8 @@ class _Checker:
             if street.name_text != self.entry("street-name", street.name)["text"]:
                 raise _fail("street_name", f"street {street.identity} states another name text")
             for identity in street.segment_identities:
-                if self.get(identity).street_identity != street.identity:
+                segment = self.carried(identity)
+                if segment is not None and segment.street_identity != street.identity:
                     raise _fail("street_segments", f"a segment of {street.identity} names another")
         self._check_curbs()
         self._check_camber()
@@ -559,13 +709,17 @@ class _Checker:
                     raise _fail("kerb_line", f"curb {curb.identity} leaves its segment's extent")
             for next_identity in curb.next_curb_identity:
                 followers[next_identity] += 1
-                follower = self.get(next_identity)
+                follower = self.carried(next_identity)
+                if follower is None:
+                    continue
                 ends = {segment.start_node_identity, segment.end_node_identity}
                 other = self.get(follower.segment_identity)
                 if not ends & {other.start_node_identity, other.end_node_identity}:
                     raise _fail("curb_graph", f"curb {curb.identity} is followed across no node")
             for block_identity in curb.block_identity:
-                self._check_frontage_line(curb, self.get(block_identity))
+                block = self.carried(block_identity)
+                if block is not None:
+                    self._check_frontage_line(curb, block)
         branching = [identity for identity, count in followers.items() if count > 1]
         if branching:
             raise _fail("curb_graph", f"curbs followed by more than one curb: {branching}")
@@ -659,6 +813,8 @@ class _Checker:
             if max(lane.start_offset_mm, lane.end_offset_mm) > segment.length_mm:
                 raise _fail("lane_offsets", f"lane {lane.identity} runs past its segment")
         for segment_identity, lanes in lanes_by_segment.items():
+            if not self.complete(segment_identity):
+                continue
             segment = self.get(segment_identity)
             indices = sorted(lane.lane_index for lane in lanes)
             if indices != list(range(len(indices))):
@@ -685,36 +841,41 @@ class _Checker:
     def _check_junctions(self) -> None:
         segments = self.of(StreetSegmentRecord)
         for junction in self.of(JunctionRecord):
-            node = self.get(junction.node_identity)
+            node = self.carried(junction.node_identity)
             touching = {
                 segment.identity
                 for segment in segments
                 if junction.node_identity
                 in (segment.start_node_identity, segment.end_node_identity)
             }
-            if set(junction.segment_identities) != touching:
+            listed = [self.carried(identity) for identity in junction.segment_identities]
+            carried_listed = {segment.identity for segment in listed if segment is not None}
+            if carried_listed != touching:
                 raise _fail(
                     "junction_segments", f"junction {junction.identity} lists other segments"
                 )
-            directions = []
-            for identity in junction.segment_identities:
-                segment = self.get(identity)
-                line = segment.centreline_mm
-                away = (
-                    line[1] if segment.start_node_identity == junction.node_identity else line[-2]
-                )
-                directions.append((away[0] - node.x_mm, away[1] - node.y_mm))
-            if not _counter_clockwise(directions):
-                raise _fail(
-                    "junction_order", f"junction {junction.identity} is not counter-clockwise"
-                )
+            if node is not None and None not in listed:
+                directions = []
+                for segment in listed:
+                    line = segment.centreline_mm
+                    away = (
+                        line[1]
+                        if segment.start_node_identity == junction.node_identity
+                        else line[-2]
+                    )
+                    directions.append((away[0] - node.x_mm, away[1] - node.y_mm))
+                if not _counter_clockwise(directions):
+                    raise _fail(
+                        "junction_order", f"junction {junction.identity} is not counter-clockwise"
+                    )
             control = self.entry("junction-control", junction.control)
             if (control["signal"] == "required") != bool(junction.signal_identity):
                 raise _fail(
                     "junction_signal", f"junction {junction.identity} and its control disagree"
                 )
             for signal_identity in junction.signal_identity:
-                if self.get(signal_identity).controls_identity != junction.identity:
+                signal = self.carried(signal_identity)
+                if signal is not None and signal.controls_identity != junction.identity:
                     raise _fail(
                         "junction_signal", f"junction {junction.identity}'s signal is elsewhere"
                     )
@@ -728,7 +889,8 @@ class _Checker:
                 for approach in self.of(JunctionApproachRecord)
                 if approach.junction_identity == junction.identity
             }
-            if set(approaches) != inbound:
+            lane_complete = {identity for identity in approaches if self.complete(identity)}
+            if not inbound <= set(approaches) or not lane_complete <= inbound:
                 raise _fail(
                     "approaches",
                     f"junction {junction.identity} needs one approach per inbound segment",
@@ -748,32 +910,33 @@ class _Checker:
     def _check_connections(self) -> None:
         for connection in self.of(LaneConnectionRecord):
             junction = self.get(connection.junction_identity)
-            source = self.get(connection.from_lane_identity)
-            target = self.get(connection.to_lane_identity)
-            if "none" in (source.direction, target.direction):
-                raise _fail(
-                    "connection_lanes",
-                    f"connection {connection.identity} joins a lane without traffic",
-                )
-            if self._lane_end_node(source) != junction.node_identity:
+            source = self.carried(connection.from_lane_identity)
+            target = self.carried(connection.to_lane_identity)
+            for lane in (source, target):
+                if lane is not None and lane.direction == "none":
+                    raise _fail(
+                        "connection_lanes",
+                        f"connection {connection.identity} joins a lane without traffic",
+                    )
+            if source is not None and self._lane_end_node(source) != junction.node_identity:
                 raise _fail(
                     "connection_lanes",
                     f"connection {connection.identity}'s lane does not reach the node",
                 )
-            if self._lane_start_node(target) != junction.node_identity:
+            if target is not None and self._lane_start_node(target) != junction.node_identity:
                 raise _fail(
                     "connection_lanes",
                     f"connection {connection.identity}'s lane does not leave the node",
                 )
-            if connection.path_mm[0] != source.centreline_mm[-1]:
+            if source is not None and connection.path_mm[0] != source.centreline_mm[-1]:
                 raise _fail(
                     "connection_path", f"connection {connection.identity} starts off its stop line"
                 )
-            if connection.path_mm[-1] != target.centreline_mm[0]:
+            if target is not None and connection.path_mm[-1] != target.centreline_mm[0]:
                 raise _fail(
                     "connection_path", f"connection {connection.identity} ends off its lane"
                 )
-            if connection.movement not in source.turns:
+            if source is not None and connection.movement not in source.turns:
                 raise _fail(
                     "connection_turn",
                     f"connection {connection.identity} makes a turn its lane forbids",
@@ -796,14 +959,18 @@ class _Checker:
                 grouped = {
                     identity for group in signal.groups for identity in group.connection_identities
                 }
-                if grouped != junction_connections:
+                complete = self.complete(controlled.identity)
+                if not junction_connections <= grouped or (
+                    complete and grouped != junction_connections
+                ):
                     raise _fail(
                         "signal_groups", f"signal {signal.identity} groups another set of movements"
                     )
                 touching = set(controlled.segment_identities)
                 for group in signal.groups:
                     for identity in group.crossing_identities:
-                        if self.get(identity).segment_identity not in touching:
+                        crossing = self.carried(identity)
+                        if crossing is not None and crossing.segment_identity not in touching:
                             raise _fail(
                                 "signal_groups", f"signal {signal.identity} releases a far crossing"
                             )
@@ -820,9 +987,10 @@ class _Checker:
                         "signal_groups", f"signal {signal.identity} leaves its crossing out"
                     )
             for head in signal.heads:
-                furniture = self.get(head.furniture_identity)
+                furniture = self.carried(head.furniture_identity)
                 if (
-                    self.entry("street-furniture", furniture.furniture_class)["category"]
+                    furniture is not None
+                    and self.entry("street-furniture", furniture.furniture_class)["category"]
                     != "signal"
                 ):
                     raise _fail("signal_heads", f"signal {signal.identity}'s head is not a signal")
@@ -836,17 +1004,18 @@ class _Checker:
                 raise _fail(
                     "parking_placement", f"space {space.identity} is not where its kind goes"
                 )
-            curb = self.get(space.curb_identity)
-            if curb.segment_identity != space.segment_identity:
+            curb = self.carried(space.curb_identity)
+            if curb is not None and curb.segment_identity != space.segment_identity:
                 raise _fail("parking_curb", f"space {space.identity}'s curb is on another segment")
-            access = self.get(space.access_lane_identity)
-            if access.segment_identity != space.segment_identity or access.direction == "none":
-                raise _fail("parking_access", f"space {space.identity}'s access lane is wrong")
-            low, high = sorted((access.start_offset_mm, access.end_offset_mm))
-            if not low <= space.access_start_mm < space.access_end_mm <= high:
-                raise _fail(
-                    "parking_access", f"space {space.identity}'s access stretch leaves its lane"
-                )
+            access = self.carried(space.access_lane_identity)
+            if access is not None:
+                if access.segment_identity != space.segment_identity or access.direction == "none":
+                    raise _fail("parking_access", f"space {space.identity}'s access lane is wrong")
+                low, high = sorted((access.start_offset_mm, access.end_offset_mm))
+                if not low <= space.access_start_mm < space.access_end_mm <= high:
+                    raise _fail(
+                        "parking_access", f"space {space.identity}'s access stretch leaves its lane"
+                    )
             sides = sorted(edge_run_length(space.footprint_mm, index) for index in range(4))
             if not (
                 kind["width_minimum_mm"] <= sides[0] <= kind["width_maximum_mm"]
@@ -854,28 +1023,30 @@ class _Checker:
             ):
                 raise _fail("parking_size", f"space {space.identity} is not its kind's size")
             if space.placement == "carriageway":
-                parking_lane = self.get(space.lane_identity[0])
-                if (
+                parking_lane = self.carried(space.lane_identity[0])
+                if parking_lane is not None and (
                     parking_lane.segment_identity != space.segment_identity
                     or parking_lane.lane_use != "parking"
                 ):
                     raise _fail("parking_lane", f"space {space.identity} is not in a parking lane")
             else:
-                self._check_footway_parking(space, curb)
+                self._check_footway_parking(space)
 
-    def _check_footway_parking(self, space: ParkingSpaceRecord, curb: CurbEdgeRecord) -> None:
+    def _check_footway_parking(self, space: ParkingSpaceRecord) -> None:
         capacity = 0
-        for identity in space.furniture_identities:
-            stand = self.get(identity)
+        stands = [self.carried(identity) for identity in space.furniture_identities]
+        for stand in stands:
+            if stand is None:
+                continue
             entry = self.entry("street-furniture", stand.furniture_class)
-            if entry["category"] != "cycle_parking" or stand.curb_identity != curb.identity:
+            if entry["category"] != "cycle_parking" or stand.curb_identity != space.curb_identity:
                 raise _fail(
                     "cycle_parking", f"space {space.identity} lists a stand that is not its own"
                 )
             if point_in_ring((stand.x_mm, stand.y_mm), space.footprint_mm) != INSIDE:
                 raise _fail("cycle_parking", f"space {space.identity}'s stand stands outside it")
             capacity += entry["bicycles_per_stand"]
-        if space.capacity > capacity:
+        if None not in stands and space.capacity > capacity:
             raise _fail(
                 "cycle_parking", f"space {space.identity} holds more bicycles than its stands"
             )
@@ -901,7 +1072,9 @@ class _Checker:
             low = crossing.offset_mm - crossing.width_mm // 2
             high = low + crossing.width_mm
             released_by = {
-                self.get(signal).controls_identity for signal in crossing.signal_identity
+                signal.controls_identity
+                for signal in map(self.carried, crossing.signal_identity)
+                if signal is not None
             }
             for lane in self.of(LaneRecord):
                 if lane.segment_identity != crossing.segment_identity or lane.direction == "none":
@@ -926,12 +1099,12 @@ class _Checker:
 
     def check_buildings(self) -> None:
         for parcel in self.of(ParcelRecord):
-            block = self.get(parcel.block_identity)
-            if not ring_within_ring(parcel.boundary_mm, block.boundary_mm):
+            block = self.carried(parcel.block_identity)
+            if block is not None and not ring_within_ring(parcel.boundary_mm, block.boundary_mm):
                 raise _fail("parcel_in_block", f"parcel {parcel.identity} leaves its block")
             for frontage in parcel.frontages:
-                curb = self.get(frontage.curb_identity)
-                if curb.block_identity != (block.identity,):
+                curb = self.carried(frontage.curb_identity)
+                if curb is not None and curb.block_identity != (parcel.block_identity,):
                     raise _fail(
                         "frontage_curb", f"parcel {parcel.identity} fronts another block's curb"
                     )
@@ -942,7 +1115,6 @@ class _Checker:
             ] = facade
         footprints = []
         for building in self.of(MassingRecord):
-            self.report.buildings += 1
             parcel = self.get(building.parcel_identity)
             if parcel.lot_class != "building":
                 raise _fail("building_lot", f"building {building.identity} stands on a precinct")
@@ -959,9 +1131,10 @@ class _Checker:
                 for edge in range(len(tier.ring_mm))
             }
             present = facades_by_building.get(building.identity, {})
-            if set(present) == edges:
-                self.report.buildings_with_every_facade += 1
-            elif set(present) - edges:
+            if self.complete(building.identity):
+                self.report.buildings += 1
+                self.report.buildings_with_every_facade += set(present) == edges
+            if set(present) - edges:
                 raise _fail("facade_edges", f"building {building.identity} has a facade on no edge")
         self._footprints = footprints
         for obj in self.of(RooftopObjectRecord):
@@ -1049,8 +1222,8 @@ class _Checker:
         if facade.first_storey == 0 and facade.band_top_mm != building.ground_storey_height_mm:
             raise _fail("ground_band", f"{where}'s ground band is not its ground storey")
         if facade.exposure == "frontage":
-            curb = self.get(facade.faces_curb_identity[0])
-            if curb.segment_identity != facade.faces_segment_identity[0]:
+            curb = self.carried(facade.faces_curb_identity[0])
+            if curb is not None and curb.segment_identity != facade.faces_segment_identity[0]:
                 raise _fail("facade_frontage", f"{where} faces a curb of another segment")
             self.report.frontage_faces_with_bays += facade.bays.count > 0
             low, high = BAY_PITCH_TARGET_MM
@@ -1077,7 +1250,11 @@ class _Checker:
             bay for bay in self.of(GroundBayRecord) if bay.facade_identity == facade.identity
         )
         expected_bays = list(range(facade.bays.count)) if facade.first_storey == 0 else []
-        if sorted(bay.bay_ordinal for bay in bays) != expected_bays:
+        present_bays = sorted(bay.bay_ordinal for bay in bays)
+        complete = self.complete(facade.identity)
+        if not set(present_bays) <= set(expected_bays) or (
+            complete and present_bays != expected_bays
+        ):
             raise _fail("ground_bays", f"{where} has one ground bay record per bay, and no other")
         bound = {binding.name: binding.value for binding in facade.parameters}
         for grid in facade.openings:
@@ -1100,7 +1277,7 @@ class _Checker:
             for entrance in self.of(EntranceRecord)
             if entrance.facade_identity == facade.identity
         )
-        if facade.output_digest != facade_output_digest(facade, bays, entrances):
+        if complete and facade.output_digest != facade_output_digest(facade, bays, entrances):
             raise _fail("output_digest", f"{where}'s output digest is not its layout's")
 
     def _check_bay(self, bay: GroundBayRecord) -> None:
@@ -1121,20 +1298,21 @@ class _Checker:
 
     def _check_entrance(self, entrance: EntranceRecord) -> None:
         facade = self.get(entrance.facade_identity)
-        bay = self.get(entrance.bay_identity)
+        bay = self.carried(entrance.bay_identity)
         building = self.get(facade.building_identity)
         where = f"entrance {entrance.identity}"
-        if bay.facade_identity != facade.identity:
-            raise _fail("entrance", f"{where}'s bay is on another face")
         left = entrance.u_centre_mm - entrance.width_mm // 2
         right = left + entrance.width_mm
-        if left < bay.u_start_mm or right > bay.u_start_mm + bay.width_mm:
-            raise _fail("entrance", f"{where} leaves its bay")
-        if not any(
-            panel.role == "door" and panel.u_start_mm <= left and right <= panel.u_end_mm
-            for panel in bay.panels
-        ):
-            raise _fail("entrance", f"{where} has no door panel")
+        if bay is not None:
+            if bay.facade_identity != facade.identity:
+                raise _fail("entrance", f"{where}'s bay is on another face")
+            if left < bay.u_start_mm or right > bay.u_start_mm + bay.width_mm:
+                raise _fail("entrance", f"{where} leaves its bay")
+            if not any(
+                panel.role == "door" and panel.u_start_mm <= left and right <= panel.u_end_mm
+                for panel in bay.panels
+            ):
+                raise _fail("entrance", f"{where} has no door panel")
         tier = building.tiers[facade.tier_ordinal]
         ring = tier.ring_mm
         start, end = ring[facade.edge_ordinal], ring[(facade.edge_ordinal + 1) % len(ring)]
@@ -1215,9 +1393,9 @@ class _Checker:
     # -- streetlife, vitrines, premises ----------------------------------------------------
 
     def _check_placed(self, record: Any, parts: tuple[FormPart, ...], exclusion: int) -> None:
-        curb = self.get(record.curb_identity)
+        curb = self.carried(record.curb_identity)
         where = f"{_SHAPES_BY_TYPE[type(record)].kind} {record.identity}"
-        if curb.segment_identity != record.segment_identity:
+        if curb is not None and curb.segment_identity != record.segment_identity:
             raise _fail("placement", f"{where}'s curb is on another segment")
         if record.parts != parts:
             raise _fail("placement", f"{where}'s parts are not its class's parts")
@@ -1259,25 +1437,24 @@ class _Checker:
 
     def check_vitrines(self) -> None:
         for vitrine in self.of(VitrineRecord):
-            bay = self.get(vitrine.bay_identity)
-            facade = self.get(vitrine.facade_identity)
+            bay = self.carried(vitrine.bay_identity)
+            facade = self.carried(vitrine.facade_identity)
             where = f"vitrine {vitrine.identity}"
             if (
-                bay.facade_identity != facade.identity
-                or facade.building_identity != vitrine.building_identity
-            ):
+                bay is not None and facade is not None and bay.facade_identity != facade.identity
+            ) or (facade is not None and facade.building_identity != vitrine.building_identity):
                 raise _fail("vitrine", f"{where} names a bay, face and building that disagree")
             left, right = vitrine.u_start_mm, vitrine.u_start_mm + vitrine.width_mm
             bottom, top = vitrine.sill_mm, vitrine.sill_mm + vitrine.height_mm
             covered = 0
-            for panel in bay.panels:
+            for panel in bay.panels if bay is not None else ():
                 if panel.role != "glazing":
                     continue
                 width = min(right, panel.u_end_mm) - max(left, panel.u_start_mm)
                 height = min(top, panel.z_top_mm) - max(bottom, panel.z_bottom_mm)
                 if width > 0 and height > 0:
                     covered += width * height
-            if covered != vitrine.width_mm * vitrine.height_mm:
+            if bay is not None and covered != vitrine.width_mm * vitrine.height_mm:
                 raise _fail("vitrine", f"{where} is not wholly behind glazing")
             unit = form_parts(self.entry("fitout", vitrine.fitout)["parts"])
             for part in vitrine.parts:
@@ -1312,10 +1489,12 @@ class _Checker:
                 if facade.building_identity == building.identity
             }
             for identity in premises.bay_identities:
-                if self.get(identity).facade_identity not in faces:
+                bay = self.carried(identity)
+                if bay is not None and bay.facade_identity not in faces:
                     raise _fail("premises", f"{where} occupies another building's bay")
             for identity in premises.entrance_identities:
-                if self.get(identity).facade_identity not in faces:
+                entrance = self.carried(identity)
+                if entrance is not None and entrance.facade_identity not in faces:
                     raise _fail("premises", f"{where} is reached through another building")
             use = self.entry("use-class", premises.use_class)
             if (use["signage"] == "required") != bool(premises.sign):
@@ -1352,6 +1531,7 @@ class _Checker:
 
 
 _CHECKS: Final[tuple[Callable[[_Checker], None], ...]] = (
+    _Checker.check_owners,
     _Checker.check_membership,
     _Checker.check_streets,
     _Checker.check_roads,
@@ -1362,6 +1542,51 @@ _CHECKS: Final[tuple[Callable[[_Checker], None], ...]] = (
     _Checker.check_premises,
     _Checker.check_terrain,
 )
+
+
+def select_tile(
+    tile: TileRecord, records: Sequence[object], *, subject_identity: str
+) -> TileDocument:
+    """The tile document one tile carries out of a whole city's records, by the tile's rules.
+
+    ``records`` must name only one another. Each is owned, halo or left out by its anchor and
+    extent; every identity a carried record names that is left out is listed as external. This
+    selects and generates nothing: every record is one the caller already has.
+    """
+    everything = GrammarRecords(
+        grammar_id=CITY_GRAMMAR_ID,
+        grammar_version=CITY_GRAMMAR_VERSION,
+        descriptor_sha256=descriptor_sha256(),
+        declared_semantics=CITY_GRAMMAR.semantics,
+        subject_identity=subject_identity,
+        owned=tuple(sorted(records, key=record_sort_key)),
+        halo=(),
+        external=(),
+    )
+    checker = _Checker(TileDocument(tile, (everything,)), everything, ())
+    checker.check_references()
+    places: dict[str, list[object]] = {OWNED: [], HALO: []}
+    for record in everything.owned:
+        place = checker.expected_membership(record)
+        if place in places:
+            places[place].append(record)
+    carried = {record.identity for record in (*places[OWNED], *places[HALO])}  # type: ignore[attr-defined]
+    external: dict[str, str] = {}
+    for record in (*places[OWNED], *places[HALO]):
+        for _field, target in shapes.named_identities(record, _SHAPES_BY_TYPE[type(record)]):
+            if target not in carried:
+                external[target] = _SHAPES_BY_TYPE[type(checker.get(target))].kind
+    return TileDocument(
+        tile,
+        (
+            dataclasses.replace(
+                everything,
+                owned=tuple(places[OWNED]),
+                halo=tuple(places[HALO]),
+                external=tuple(sorted(external.items())),
+            ),
+        ),
+    )
 
 
 def validate_city_document(
@@ -1389,7 +1614,7 @@ def validate_city_document(
     for grammar in document.grammars:
         checker = _Checker(document, grammar, catalogs)
         try:
-            shapes.check_references(checker.records, _SHAPES_BY_TYPE, checker.index)
+            checker.check_references()
             shapes.check_identities(
                 checker.records,
                 _SHAPES_BY_TYPE,

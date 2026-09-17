@@ -282,7 +282,8 @@ version 1 to 3, and every refusal).
 
 **The tile document** (`exulanica.tile-document/v2`, `document.py`) is one tile's records as a bake
 reads them: canonical JSON of the tile record, and per grammar its descriptor digest, declared
-semantics, the admitted city identity, and the owned and halo records, each list sorted. A tile
+semantics, the admitted city identity, the owned and halo records, each list sorted, and the
+external references. A tile
 pins each grammar by the SHA-256 of its descriptor file, and a test pins every shipped
 descriptor's digest per version. `validate_city_document` runs every record's own validator and
 the envelope checks, then everything that spans records: references resolve to admitted kinds,
@@ -292,12 +293,56 @@ in blocks, footprints in parcels, facade runs, bays, entrances, vitrines behind 
 matches the tile's rules, and the pins match what was loaded. Each refusal names its check in
 brackets.
 
-**Membership.** A tile owns a subject whose anchor (a parcel's centroid, a node's point, a
-segment's node midpoint, shared down to everything the subject owns) lies in its 128 m square. A
-subject it does not own is in its halo when the subject's extent meets the square grown by 64 m on
-every side (`extent_meets_grown_square`), so a long segment or a large parcel anchored far away
-that still crosses the tile is carried. A record with no extent (a surface material, a junction
-approach, a signal) goes with the record it relates to. Owned and halo never overlap.
+**Membership.** A tile owns a subject whose anchor lies in its 128 m square. A subject it does not
+own is in its halo when the subject's extent meets the square grown by 64 m on every side
+(`extent_meets_grown_square`), so a long segment or a large parcel anchored far away that still
+crosses the tile is carried. Owned and halo never overlap.
+
+**Anchors** (`ANCHOR_OWNER_FIELDS`, `OWN_ANCHOR_KINDS`, `RELATION_FIELDS` and `ANCHORLESS_KINDS` in
+`document.py`, which a test holds to cover every kind exactly once):
+
+| Anchor | Kinds |
+| --- | --- |
+| Its own fields | street node (its point), segment (floored midpoint of its centreline's end points), block and parcel (centroid), junction (floored centre of its extent), terrain (its tile's south-west corner) |
+| Its owner's, and its extent lies inside the owner's in plan (`[owner_extent]`) | curb, lane, crossing, parking space, furniture and tree (the segment); marking (what it marks); lane connection (the junction); building (the parcel); rooftop object, facade, premises and vitrine (the building); ground bay and entrance (the facade) |
+| The record it relates to (it has no extent) | surface material (its surface), junction approach (its junction), signal (what it controls) |
+| None, never owned | district, street |
+
+A record anchored through another names a carried one (`[anchor_owner]`). With the containment, a
+tile that carries a record by its extent always carries its owner, and a building and all it owns
+belong to one tile.
+
+**External references.** A carried record may name a subject the tile does not carry: a segment
+crossing the tile names a node 400 m away, a street names every segment along it. The document
+lists each such identity once in `external`, with its kind, so a tile stays a bounded unit of work
+and every reference still resolves. Each violation has its own check: `[external_order]` (sorted
+by identity, each once), `[external_kind]` (a city subject kind), `[external_carried]` (never both
+carried and external), `[references]` (every name is carried or external), `[reference_kind]`
+(the named kind is one the field admits) and `[external_unnamed]` (every external entry is named).
+`select_tile` builds the document one tile carries out of a whole city's records by these rules,
+and a test validates the fixture city seen from each of the nine tiles around it.
+
+**Rules that need both ends run only when both are carried:** `segment_ends` (each end node),
+`street_segments` and `street_name` (a segment's street, a street's segments), `curb_graph` (the
+following curb), `frontage_line` (a curb's block), `junction_segments` (compared over carried
+segments), `junction_order` (the node and every listed segment), `junction_signal` (the signal's
+controlled junction), `connection_lanes`, `connection_path` and `connection_turn` (each lane),
+`signal_groups` for a far crossing and `signal_heads` for a head's category (the crossing, the
+furniture), `parking_curb`, `parking_access` and `parking_lane`, `cycle_parking` per stand (and the
+capacity sum when every stand is carried), `stop_line` (the releasing signal), `parcel_in_block` and
+`frontage_curb`, `facade_frontage`, `entrance` against its bay, `placement` against the curb,
+`vitrine` against its bay and facade, and `premises` against its bays and entrances.
+
+**Rules that count an owner's parts run only when the tile owns the owner,** because a halo owner's
+parts are carried only where their own extents reach: `lane_indices` and `carriageway_width` (every
+lane of a segment), `approaches` in the direction that every approach's segment has an inbound lane,
+`signal_groups` for grouping exactly the junction's movements (a halo junction must still group
+every carried one), `ground_bays` for one bay record per bay (a halo facade may carry fewer, never
+more), `output_digest`, and the report's building figures, which count owned buildings.
+
+**Not enforced yet: `city_reference_closure`.** Every external identity of every tile is carried by
+some tile of the same city. That is a rule over a whole generated city, not over one document, and
+it belongs to the first real generator's output check, in the corridor lane.
 
 **The fixture**, `tests/fixtures/city-v2/tile-document.json`, is written by hand in
 `build_fixture.py`: one signalised T-junction, a memory precinct lot and a four-storey shophouse
@@ -428,6 +473,12 @@ Each of these is known and deliberately not done here.
   subsequence has its one encoding, but how a non-empty subsequence is digested belongs to the
   edit log, which does not exist yet. What a pinned subject keeps across a reseed is the edit
   log's decision too.
+- **`city_reference_closure` is not enforced.** No check yet holds that every external identity
+  of every tile is carried by some tile of the same city; the corridor lane's first generator
+  output check does.
+- **A junction's anchor is the centre of its extent**, because its node is a point no junction
+  extent can lie inside. An edit that grows a junction's extent across a tile boundary moves the
+  junction, its approaches, its signal and its lane connections to the next tile.
 - **Root identity minting.** Every generated identity derives from the admitted city identity.
   Nothing here mints that root.
 - **Signal durations.** A signal record carries the traffic lane's plan key and the SHA-256 of

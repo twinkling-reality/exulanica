@@ -2,7 +2,8 @@
 
 Every value below was chosen by hand for this fixture. The builder computes only what a written
 rule derives from those values: identities (``exulanica.grammar.subjects``), facade output
-digests, part extents, the descriptor and catalog pins, and the canonical bytes. It is a test
+digests, part extents, owners' extents covering what they anchor, the descriptor and catalog pins,
+and the canonical bytes. The tile carries everything it names, so its external list is empty. It is a test
 input, never stage output: no generator exists, and nothing here is one.
 
 The tile is one T-junction at (60 m, 40 m). Market Street, a high street, runs west to east
@@ -1637,6 +1638,62 @@ for item in vitrines:
         materials.append(material(item.identity, "city.vitrine", role, key))
 
 # -------------------------------------------------------------------------------------------
+# Owners' extents cover what they anchor
+
+
+def covering(*extents: Extent) -> Extent:
+    """The smallest extent containing every one given: how an owner's extent covers its parts."""
+    return Extent(
+        min(extent.min_x_mm for extent in extents),
+        min(extent.min_y_mm for extent in extents),
+        min(extent.min_z_mm for extent in extents),
+        max(extent.max_x_mm for extent in extents),
+        max(extent.max_y_mm for extent in extents),
+        max(extent.max_z_mm for extent in extents),
+    )
+
+
+segments = [
+    dataclasses.replace(
+        segment,
+        extent=covering(
+            segment.extent,
+            *(
+                item.extent
+                for item in (*curbs, *lanes, *crossings, *parking, *furniture, *trees)
+                if item.segment_identity == segment.identity
+            ),
+        ),
+    )
+    for segment in segments
+]
+streets = [
+    dataclasses.replace(
+        street,
+        extent=covering(
+            *(segment.extent for segment in segments if segment.street_identity == street.identity)
+        ),
+    )
+    for street in streets
+]
+junction = dataclasses.replace(
+    junction, extent=covering(junction.extent, *(item.extent for item in connections))
+)
+building = dataclasses.replace(
+    building,
+    extent=covering(
+        building.extent,
+        *(item.extent for item in (*rooftops, *facades, *premises, *vitrines)),
+    ),
+)
+parcels = [
+    dataclasses.replace(parcel, extent=covering(parcel.extent, building.extent))
+    if parcel.identity == building.parcel_identity
+    else parcel
+    for parcel in parcels
+]
+
+# -------------------------------------------------------------------------------------------
 # Terrain, the tile and the document
 
 SAMPLES = 17
@@ -1708,6 +1765,7 @@ def build_document() -> TileDocument:
                 subject_identity=CITY,
                 owned=tuple(sorted(OWNED, key=record_sort_key)),
                 halo=tuple(sorted(HALO, key=record_sort_key)),
+                external=(),
             ),
         ),
     )

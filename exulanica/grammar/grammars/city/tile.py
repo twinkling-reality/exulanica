@@ -6,13 +6,18 @@ either is a new version. Tile ``(tile_x, tile_y)`` covers ``[tile_x * 128000,
 and east edges to its neighbours.
 
 **Ownership** (``anchor_floor_division``). Every subject has one anchor point, and it belongs to
-the tile that contains it, found by floor division. A parcel's anchor is its centroid, and a
-building and everything the building owns share its parcel's anchor. A block's is its centroid.
-A street node's is its point, and its junction, the junction's approaches and connections and a
-signal controlling it share it. A segment's is the floored midpoint of its two nodes, and its
-street, lanes, curbs, crossings, parking, furniture, trees and markings share it (a signal on a
-crossing shares the crossing's). A terrain patch's is its tile's south-west corner. A material
-record shares its surface's. A district and a street have no single anchor, so no tile owns one.
+the tile that contains it, found by floor division. An anchor comes from the record's own fields
+wherever the record's owner could be absent from a tile: a street node's is its point, a segment's
+the floored midpoint of its centreline's end points, a block's and a parcel's their centroid, a
+junction's the floored centre of its extent, and a terrain patch's its tile's south-west corner.
+Every other subject shares its owner's anchor, and its extent lies inside its owner's in plan: a
+segment's curbs, lanes, crossings, parking, furniture and trees; the record a marking marks; a
+junction's lane connections; a parcel's building; and a building's facades, rooftop objects,
+premises and vitrines, and a facade's ground bays and entrances. So a tile that carries a subject
+by its extent always carries its owner, and a building and everything it owns belong to one tile.
+A surface material, a junction approach and a signal have no extent and share the anchor of the
+record they relate to. A district and a street have no single anchor, so no tile owns one.
+``exulanica.grammar.grammars.city.document`` holds these rules as tables and checks them.
 
 **The halo** (``extent_meets_grown_square``). A subject the tile does not own is in its halo when
 the subject's stated extent, in plan, meets the tile grown by the halo radius on every side:

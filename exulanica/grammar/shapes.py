@@ -71,6 +71,7 @@ __all__ = [
     "integers",
     "key",
     "keys",
+    "named_identities",
     "optional_identity",
     "optional_record",
     "optional_text",
@@ -693,6 +694,21 @@ def _walk(value: object, shape: RecordShape) -> Iterable[tuple[FieldShape, objec
             assert field_shape.shape is not None
             for item in field_value:  # type: ignore[attr-defined]
                 yield from _walk(item, field_shape.shape)
+
+
+def named_identities(record: object, shape: RecordShape) -> Iterable[tuple[FieldShape, str]]:
+    """Every identity ``record`` names in another subject, at any depth, with the field naming it.
+
+    The record's own identity is not included.
+    """
+    own_field = shape.identity.field if shape.identity is not None else ""
+    for field_shape, value, holder in _walk(record, shape):
+        if field_shape.kind not in ("identity", "identities"):
+            continue
+        if holder is record and field_shape.name == own_field:
+            continue
+        for target in (value,) if field_shape.kind == "identity" else value:  # type: ignore[union-attr]
+            yield field_shape, target
 
 
 def index_records(

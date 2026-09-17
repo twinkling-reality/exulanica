@@ -27,15 +27,19 @@ from exulanica.grammar.grammars.city import CITY_SHAPES
 from exulanica.grammar.grammars.city.catalogs import entry_fields, load_city_catalogs
 from exulanica.grammar.grammars.city.descriptor import CITY_V1_DESCRIPTOR_PATH
 from exulanica.grammar.grammars.city.document import (
+    ANCHOR_OWNER_FIELDS,
+    ANCHORLESS_KINDS,
+    OWN_ANCHOR_KINDS,
     RELATION_FIELDS,
     TILE_DOCUMENT_PROFILE,
     TileDocument,
     document_bytes,
     read_tile_document,
     record_sort_key,
+    select_tile,
     validate_city_document,
 )
-from exulanica.grammar.grammars.city.streets import BlockRecord
+from exulanica.grammar.grammars.city.streets import BlockRecord, StreetSegmentRecord
 from exulanica.grammar.grammars.city.tile import (
     HALO,
     HALO_RULES,
@@ -50,8 +54,8 @@ from exulanica.grammar.textures import read_texture_manifest
 from city_v2_fixture import builder
 
 FIXTURE = builder()
-DOCUMENT_SHA256 = "9da6beb4bda8f9314baaaf9edd4d8385c5f05521a337ff9be805ddc59ecf9a31"
-DOCUMENT_BYTES = 124_717
+DOCUMENT_SHA256 = "c4366a3fd7f909c428534a34b5544370cd556f7f72e20a2d9aa8b388122ea4fa"
+DOCUMENT_BYTES = 124_747
 SHAPES_SHA256 = "14d981dba098f6fcbf11cc21da44340674f61a009f81a937ba425564d37ec7e9"
 SHAPES_BYTES = 59_825
 
@@ -259,9 +263,16 @@ def _facade_removed_alone() -> TileDocument:
     return _document(remove=frozenset({FIXTURE.facades[-1].identity}))
 
 
-def _bench_in_building() -> TileDocument:
+def _bench_outside_its_segment() -> TileDocument:
     bench = FIXTURE.furniture[0]
     return _document(replace={bench.identity: _placed_at(bench, 45_000, 55_000)})
+
+
+def _bench_in_building() -> TileDocument:
+    bench = _placed_at(FIXTURE.furniture[0], 45_000, 55_000)
+    segment = FIXTURE.segments[0]
+    widened = dataclasses.replace(segment, extent=FIXTURE.covering(segment.extent, bench.extent))
+    return _document(replace={bench.identity: bench, segment.identity: widened})
 
 
 def _stand_outside_its_space() -> TileDocument:
@@ -309,6 +320,94 @@ def _district_far_away() -> TileDocument:
 
 def _material_listed_apart_from_its_surface() -> TileDocument:
     return _document(to_halo=frozenset({FIXTURE.materials[0].identity}))
+
+
+def _junction_centred_beyond_the_tile() -> TileDocument:
+    junction = FIXTURE.junction
+    stretched = dataclasses.replace(junction.extent, max_x_mm=400_000)
+    return _document(replace={junction.identity: dataclasses.replace(junction, extent=stretched)})
+
+
+def _building_external() -> TileDocument:
+    return _document(
+        remove=frozenset({FIXTURE.BUILDING}),
+        grammar={"external": ((FIXTURE.BUILDING, "city.massing"),)},
+    )
+
+
+def _facade_external_under_its_materials() -> TileDocument:
+    face = FIXTURE.facades[-1]
+    return _document(
+        remove=frozenset({face.identity}), grammar={"external": ((face.identity, "city.facade"),)}
+    )
+
+
+# A segment crossing the tile northward from the north node to a node 400 m out, on a street the
+# tile does not carry: the case external references exist for.
+FAR_NODE = FIXTURE.identity("street_node", FIXTURE.CITY, 4)
+NORTH_STREET = FIXTURE.identity("street", FIXTURE.CITY, 2)
+OTHER_IDENTITY = "00000000-0000-5000-8000-000000000000"
+
+
+def _crossing_segment() -> StreetSegmentRecord:
+    return StreetSegmentRecord(
+        identity=FIXTURE.identity("street_segment", FIXTURE.CITY, 3),
+        segment_ordinal=3,
+        street_identity=NORTH_STREET,
+        district_identity=FIXTURE.DISTRICT,
+        start_node_identity=FIXTURE.NODES["north"],
+        end_node_identity=FAR_NODE,
+        centreline_mm=(FIXTURE.NODE_POINTS["north"], (60_000, 400_000, 0)),
+        length_mm=320_000,
+        hierarchy="local_street",
+        carriageway_width_mm=6_500,
+        camber_millionths=29_231,
+        speed_limit_mm_s=8_333,
+        extent=Extent(56_750, 80_000, -95, 63_250, 400_000, 0),
+    )
+
+
+def _crossing_external() -> list[tuple[str, str]]:
+    return sorted([(FAR_NODE, "city.street_node"), (NORTH_STREET, "city.street")])
+
+
+def _crossing_document(external: list[tuple[str, str]] | None = None) -> TileDocument:
+    listed = _crossing_external() if external is None else external
+    return _document(add_halo=(_crossing_segment(),), grammar={"external": tuple(listed)})
+
+
+def _far_node_not_listed() -> TileDocument:
+    return _crossing_document([(NORTH_STREET, "city.street")])
+
+
+def _far_node_listed_as_a_block() -> TileDocument:
+    return _crossing_document(sorted([(FAR_NODE, "city.block"), (NORTH_STREET, "city.street")]))
+
+
+def _external_nobody_names() -> TileDocument:
+    return _crossing_document(sorted([*_crossing_external(), (OTHER_IDENTITY, "city.street_node")]))
+
+
+def _external_also_carried() -> TileDocument:
+    carried = (FIXTURE.NODES["north"], "city.street_node")
+    return _crossing_document(sorted([*_crossing_external(), carried]))
+
+
+def _external_out_of_order() -> TileDocument:
+    return _crossing_document(list(reversed(_crossing_external())))
+
+
+def _external_twice() -> TileDocument:
+    first, second = _crossing_external()
+    return _crossing_document([first, first, second])
+
+
+def _external_tile_kind() -> TileDocument:
+    return _crossing_document(sorted([(FAR_NODE, "city.tile"), (NORTH_STREET, "city.street")]))
+
+
+def _external_unknown_kind() -> TileDocument:
+    return _crossing_document(sorted([(FAR_NODE, "city.hedge"), (NORTH_STREET, "city.street")]))
 
 
 def _descriptor_pinned_elsewhere() -> TileDocument:
@@ -381,7 +480,8 @@ _MUTATIONS: list[tuple[str, Callable[[], TileDocument], str]] = [
     ("a catalog key that does not exist", _key_unknown, "'castle' is not a key of typology"),
     ("an era its typology does not have", _era_foreign_to_typology, r"\[typology\]"),
     ("a material naming another set", _texture_set_other, r"\[material_texture\]"),
-    ("a facade removed from under its materials", _facade_removed_alone, "which no record states"),
+    ("a facade removed from under its materials", _facade_removed_alone, r"\[references\]"),
+    ("a bench moved outside its segment's extent", _bench_outside_its_segment, r"\[owner_extent\]"),
     ("a bench inside the building", _bench_in_building, r"\[footprint_intersection\]"),
     ("a cycle stand outside its space", _stand_outside_its_space, r"\[cycle_parking\]"),
     ("an owned building listed as halo", _building_listed_as_halo, r"\[membership\]"),
@@ -397,6 +497,25 @@ _MUTATIONS: list[tuple[str, Callable[[], TileDocument], str]] = [
         _material_listed_apart_from_its_surface,
         r"\[membership\]",
     ),
+    (
+        "a junction whose extent centre leaves the tile",
+        _junction_centred_beyond_the_tile,
+        r"\[membership\]",
+    ),
+    ("a building external under its facades", _building_external, r"\[anchor_owner\]"),
+    (
+        "a facade external under its materials",
+        _facade_external_under_its_materials,
+        r"\[anchor_owner\]",
+    ),
+    ("a far node neither carried nor external", _far_node_not_listed, r"\[references\]"),
+    ("a far node listed as a block", _far_node_listed_as_a_block, r"\[reference_kind\]"),
+    ("an external entry nothing names", _external_nobody_names, r"\[external_unnamed\]"),
+    ("an identity both carried and external", _external_also_carried, r"\[external_carried\]"),
+    ("external entries out of order", _external_out_of_order, r"\[external_order\]"),
+    ("an external entry listed twice", _external_twice, r"\[external_order\]"),
+    ("an external tile record", _external_tile_kind, r"\[external_kind\]"),
+    ("an external entry of no kind", _external_unknown_kind, r"\[external_kind\]"),
     ("both descriptor pins moved", _descriptor_pinned_elsewhere, r"\[descriptor_pin\]"),
     ("the tile's descriptor pin alone moved", _tile_pin_alone_moved, "exactly the tile's grammar"),
     ("a catalog digest pinned elsewhere", _catalog_pinned_elsewhere, r"\[catalog_pin\]"),
@@ -513,3 +632,81 @@ def test_every_record_kind_without_an_extent_names_the_record_it_relates_to():
     for record_type, field in RELATION_FIELDS.items():
         shape = next(item for item in CITY_SHAPES if item.record_type is record_type)
         assert shape.field(field).kind == "identity"
+
+
+# -------------------------------------------------------------------------------------------
+# External references
+
+
+def test_a_segment_crossing_the_tile_with_a_far_node_and_an_external_street_validates():
+    document = _crossing_document()
+    report = _validate(document)
+    assert report.record_counts["city.street_segment"] == 4
+    [entry] = document.grammars
+    assert _crossing_segment().identity in {record.identity for record in entry.halo}
+    assert dict(entry.external) == {FAR_NODE: "city.street_node", NORTH_STREET: "city.street"}
+    again = read_tile_document(document_bytes(document))
+    assert again == document
+    _validate(again)
+
+
+def test_the_committed_fixture_carries_everything_it_names():
+    [entry] = FIXTURE.build_document().grammars
+    assert entry.external == ()
+    assert document_bytes(FIXTURE.build_document()).count(b'"external":[]') == 1
+
+
+def test_every_record_kind_has_exactly_one_anchor_rule():
+    kinds = {shape.record_type for shape in CITY_SHAPES if shape.kind != "city.tile"}
+    rules = [
+        set(OWN_ANCHOR_KINDS),
+        set(ANCHOR_OWNER_FIELDS),
+        set(RELATION_FIELDS),
+        set(ANCHORLESS_KINDS),
+    ]
+    assert set().union(*rules) == kinds
+    assert sum(len(rule) for rule in rules) == len(kinds)
+    for record_type, field in ANCHOR_OWNER_FIELDS.items():
+        shape = next(item for item in CITY_SHAPES if item.record_type is record_type)
+        assert shape.field(field).kind == "identity"
+        assert shape.extent_field == "extent"
+
+
+_NEIGHBOURHOOD = [(tile_x, tile_y) for tile_y in (-1, 0, 1) for tile_x in (-1, 0, 1)]
+
+
+def _city_records() -> tuple[object, ...]:
+    return FIXTURE.build_document().grammars[0].records()
+
+
+def test_selecting_the_fixture_tile_from_its_records_gives_the_committed_document():
+    assert select_tile(FIXTURE.tile, _city_records(), subject_identity=FIXTURE.CITY) == (
+        FIXTURE.build_document()
+    )
+
+
+@pytest.mark.parametrize("tile_x,tile_y", _NEIGHBOURHOOD)
+def test_the_same_city_seen_from_each_neighbouring_tile_validates(tile_x, tile_y):
+    """Halo owners with partial parts, far references and external streets, all by the rules."""
+    tile = dataclasses.replace(FIXTURE.tile, tile_x=tile_x, tile_y=tile_y)
+    document = select_tile(tile, _city_records(), subject_identity=FIXTURE.CITY)
+    _validate(document)
+    _validate(read_tile_document(document_bytes(document)))
+
+
+def test_every_anchored_record_is_owned_by_exactly_one_tile_of_the_neighbourhood():
+    owners: dict[str, list[tuple[int, int]]] = {}
+    carried: set[str] = set()
+    for tile_x, tile_y in _NEIGHBOURHOOD:
+        tile = dataclasses.replace(FIXTURE.tile, tile_x=tile_x, tile_y=tile_y)
+        [entry] = select_tile(tile, _city_records(), subject_identity=FIXTURE.CITY).grammars
+        for record in entry.owned:
+            owners.setdefault(record.identity, []).append((tile_x, tile_y))
+        carried |= {record.identity for record in entry.records()}
+        if (tile_x, tile_y) == (0, 1):
+            assert entry.halo and entry.external
+    anchorless = {FIXTURE.district.identity, *(street.identity for street in FIXTURE.streets)}
+    everything = {record.identity for record in _city_records()}
+    assert set(owners) == everything - anchorless
+    assert all(places == [(0, 0)] for places in owners.values())
+    assert carried == everything
