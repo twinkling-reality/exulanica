@@ -131,9 +131,11 @@ limits how many distinct tiles a workspace materialises and not how often a walk
 revalidation costs nothing, and neither does a delivery that fails: the quota is charged after the
 bytes are in hand and held to their digest, never before.
 
-Refusals, each meaning one thing: 404 `unknown_reference` for a key nothing stored, which is also
-what a credential without the permission is told, so neither answer says whether the other was the
-reason; 409 `nondeterminism_detected` for a key that once baked into two different containers,
+Refusals, each meaning one thing: 404 `unknown_reference` for a key nothing stored, and the same
+status and code for every key when the caller's grant does not hold the permission, so a credential
+that is short cannot learn which keys exist (the two bodies are not identical: the floor refuses
+before the route runs, with its own detail and none of the route's headers, which tells a caller
+only what its own grant is); 409 `nondeterminism_detected` for a key that once baked into two different containers,
 which is never served; 409 `bytes_missing` for a row whose bytes are not in the store, which is an
 operator's problem rather than a client's; 429 `tile_quota_exceeded` for a workspace past its
 ceiling or with none declared, which is never retried.
