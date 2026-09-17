@@ -337,6 +337,60 @@ module.exports = {
       to: { path: notPkgRef('loom-texture', 'atlas-core') },
     },
 
+    // ---- the tessellator: one core, two hosts ----------------------------------------------
+    {
+      name: 'loom-tess-is-reached-through-its-core-entry-only',
+      severity: 'error',
+      comment:
+        'A package outside loom-tess may import @exulanica/loom-tess/core, the pure .owd decoder, ' +
+        'and nothing else from it. The node entry is the bake and writes with node:fs; the browser ' +
+        'entry is an edit-time preview whose output is never served; the tests and fixtures are ' +
+        'neither. A runtime that read a tile any other way would be a second reader of the format.',
+      from: { path: String.raw`^packages/(?!loom-tess/)` },
+      to: {
+        path: String.raw`^packages/loom-tess/(?!src/core/index\.ts$)|^(?:node_modules/)?@exulanica/loom-tess(?:$|/(?!core$))`,
+      },
+    },
+    {
+      name: 'loom-tess-imports-no-workspace-package',
+      severity: 'error',
+      comment:
+        'The tessellator expands grammar records whose shapes it transcribes itself, held to the ' +
+        'grammar by a parity test, so it has no reason to reach any other workspace package, and a ' +
+        'vocabulary it could import is a vocabulary it could use.',
+      from: { path: pkg('loom-tess') },
+      to: { path: notPkgRef('loom-tess') },
+    },
+    {
+      name: 'loom-tess-core-reaches-only-core',
+      severity: 'error',
+      comment:
+        'src/core is the one source the Node bake and the browser preview both compile. It may ' +
+        'import other src/core modules and nothing else: no node: builtin, no host entry, no test. ' +
+        'tsconfig.core.json already makes a host global a type error; this makes a host module an ' +
+        'error too, even where a type for it would resolve.',
+      from: { path: String.raw`^packages/loom-tess/src/core/` },
+      to: { pathNot: String.raw`^packages/loom-tess/src/core/` },
+    },
+    {
+      name: 'loom-tess-preview-is-unreachable-from-the-bake',
+      severity: 'error',
+      comment:
+        'The browser entry is preview only. Nothing on the offline bake path may reach it, so a ' +
+        'preview can never become the bytes a stage digests.',
+      from: { path: String.raw`^packages/loom-tess/src/node/` },
+      to: { path: String.raw`^packages/loom-tess/src/browser/` },
+    },
+    {
+      name: 'loom-tess-bake-is-unreachable-from-the-preview',
+      severity: 'error',
+      comment:
+        'The browser entry shares core with the bake and nothing else. tsconfig.browser.json keeps ' +
+        'Node types out; this keeps Node modules out.',
+      from: { path: String.raw`^packages/loom-tess/src/browser/` },
+      to: { path: String.raw`^packages/loom-tess/src/node/` },
+    },
+
     // ---- general hygiene -------------------------------------------------------------------
     { name: 'no-circular', severity: 'error', from: {}, to: { circular: true } },
     {
