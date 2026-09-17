@@ -6,13 +6,13 @@
  * container's last, is this one code path, which is what makes "the Node bake and the browser
  * preview agree" a statement about hashing alone.
  */
-import { canonicalBytes } from './canonical-json.js';
+import { canonicalBytes, compareCodeUnits } from './canonical-json.js';
 import type { CanonicalValue } from './canonical-json.js';
 import { readTileDocument, TILE_DOCUMENT_PROFILE, TileDocumentError } from './document.js';
 import { MATERIALISED_LOD, MATERIALISED_PROJECTIONS, TESSELLATOR_SOURCE_VERSION } from './expand.js';
 import { COORDINATE_UNIT, decodeOwd, encodeOwd, OWD_CONTAINER, OwdError } from './owd.js';
-import type { DecodedOwd, OwdHeader } from './owd.js';
-import { RECORD_SHAPES, TILE_SHAPE } from './record-shapes.js';
+import type { DecodedOwd, OwdHeader, OwdRecord } from './owd.js';
+import { GRAMMAR_TABLES, TILE_SHAPE } from './record-shapes.js';
 import type { ProjectionName } from './record-shapes.js';
 import { digestEntries, documentRecords, recordBytes, tessellate } from './tessellate.js';
 import type { TessellatedTile } from './tessellate.js';
@@ -30,13 +30,26 @@ export interface Bake {
   readonly tessellation: TessellatedTile;
 }
 
-function boundOf(field: string): number {
-  const shape = TILE_SHAPE.fields[field];
-  if (shape === undefined) throw new RangeError(`the tile record has no ${field}`);
-  if (shape.type !== 'int') throw new RangeError(`the tile record's ${field} is not an integer`);
-  if (shape.min === undefined) throw new RangeError(`the tile record's ${field} is not fixed`);
-  if (shape.min !== shape.max) throw new RangeError(`the tile record's ${field} is not fixed`);
-  return shape.min;
+function boundOf(name: string): number {
+  const field = TILE_SHAPE.fields.find((candidate) => candidate.name === name);
+  if (field === undefined) throw new RangeError(`the tile record has no ${name}`);
+  if (field.kind !== 'integer') throw new RangeError(`the tile record's ${name} is not an integer`);
+  if (field.minimum === undefined) throw new RangeError(`the tile record's ${name} is not fixed`);
+  if (field.minimum !== field.maximum) throw new RangeError(`the tile record's ${name} is not fixed`);
+  return field.minimum;
+}
+
+/** Every record kind of every grammar version this tessellator reads, with its version. */
+function recordShapeVersions(): { [kind: string]: number } {
+  const versions: { [kind: string]: number } = {};
+  for (const table of GRAMMAR_TABLES) {
+    for (const shape of table.shapes.records) {
+      if (shape.kind === undefined) throw new RangeError(`${shape.shape} is a record with no kind`);
+      if (shape.version === undefined) throw new RangeError(`${shape.shape} is a record with no version`);
+      versions[shape.kind] = shape.version;
+    }
+  }
+  return versions;
 }
 
 /**
@@ -54,9 +67,7 @@ export const BAKE_PARAMETERS = {
   lod: MATERIALISED_LOD,
   tile_size_mm: boundOf('tile_size_mm'),
   halo_radius_mm: boundOf('halo_radius_mm'),
-  record_shapes: Object.fromEntries(
-    [TILE_SHAPE, ...RECORD_SHAPES].map((shape) => [shape.kind, shape.version]),
-  ),
+  record_shapes: recordShapeVersions(),
 } as const;
 
 /** Bake one tile document. Same bytes in, same bytes out, on any host that hashes correctly. */
@@ -69,7 +80,7 @@ export async function bakeTile(documentBytes: Uint8Array, sha256: Sha256Hex): Pr
     );
   }
   const recordDigests: string[] = [];
-  for (const record of documentRecords(document)) recordDigests.push(await sha256(recordBytes(record)));
+  for (const record of documentRecords(document)) recordDigests.push(await sha256(recordBytes(record.payload)));
   const tessellation = tessellate(document, recordDigests);
   const tileInputsDigest = await sha256(canonicalBytes(document.tile as unknown as CanonicalValue));
   const triangleDigests = new Map<ProjectionName, string>();
@@ -81,16 +92,32 @@ export async function bakeTile(documentBytes: Uint8Array, sha256: Sha256Hex): Pr
   return { container, tileInputsDigest, triangleDigests, tessellation };
 }
 
-/** The tile document a container's header describes, in canonical record order. */
+/** The document's order within a membership list: kind, then version, then identity. */
+function documentOrder(a: OwdRecord, b: OwdRecord): number {
+  const byKind = compareCodeUnits(a.kind, b.kind);
+  if (byKind !== 0) return byKind;
+  if (a.version !== b.version) return a.version - b.version;
+  return compareCodeUnits(a.identity, b.identity);
+}
+
+/** The tile document a container's header describes, with each membership list in document order. */
 export function documentOf(header: OwdHeader): Uint8Array {
+  const listed = (grammar: number, membership: OwdRecord['membership']): unknown[] =>
+    header.records
+      .filter((record) => record.grammar === grammar && record.membership === membership)
+      .sort(documentOrder)
+      .map((record) => ({ fields: record.fields, kind: record.kind, version: record.version }));
   return canonicalBytes({
     profile: TILE_DOCUMENT_PROFILE,
     tile: header.tile,
     grammars: header.grammars.map((grammar, index) => ({
-      ...grammar,
-      records: header.records
-        .filter((record) => record.grammar === index)
-        .map((record) => ({ fields: record.fields, kind: record.kind, version: record.version })),
+      declared_semantics: grammar.declared_semantics,
+      descriptor_sha256: grammar.descriptor_sha256,
+      grammar_id: grammar.grammar_id,
+      grammar_version: grammar.grammar_version,
+      halo: listed(index, 'halo'),
+      owned: listed(index, 'owned'),
+      subject_identity: grammar.subject_identity,
     })),
   } as unknown as CanonicalValue);
 }

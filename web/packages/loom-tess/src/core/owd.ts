@@ -2,7 +2,7 @@
  * THE .owd CONTAINER, AND WHY IT IS THIS ONE. This is the only writer of the format, and the
  * decoder below is the only reader any runtime should use.
  *
- * `.owd` (Exulanica World Data, one baked tile): the four magic bytes `OWD1`, a little-endian
+ * `.owd` (Exulanica World Data, one baked tile): the four magic bytes `OWD2`, a little-endian
  * uint32 header length, the header as canonical JSON, space padding to a 16-byte boundary, then
  * planar typed-array sections packed one after another with no gaps. It is the shape
  * `scene-synth/src/format/opm.ts` proved out and `loom-texture` repeated: one file, one fetch, and
@@ -35,13 +35,19 @@
  * nothing in the payload comes from a transcendental function, a clock or a random source.
  *
  * WHAT THE HEADER CARRIES, so a runtime needs nothing else: the tile record and its inputs
- * digest; each grammar's identity, descriptor digest and declared semantics; every record, in the
- * canonical record order, with its digest, the identity it states (or `not-stated`) and its
- * fields; and per projection, its representation contract, the triangle digest, the origins, the
- * counts, and one entry per record. A drawn entry is a contiguous vertex and triangle range with
- * its integer extent (and, where the projection carries surfaces, its material reference and
- * orientation), which answers "which record does this triangle belong to" and "what is that
- * record's extent". Any other entry states why nothing is drawn.
+ * digest; each grammar's identity, descriptor digest, declared semantics, the frame its
+ * coordinates are in and the subject identity its records are owned under; every record, in the
+ * canonical record order, with its digest, the identity it states (or `not-stated`), whether the
+ * tile owns it or carries it as halo, and its fields; and per projection, its representation
+ * contract, the triangle digest, the origins, the counts, and one entry per record. A drawn entry
+ * is a contiguous vertex and triangle range with its integer extent (and, where the projection
+ * carries surfaces, the material record that dresses it and its orientation), which answers
+ * "which record does this triangle belong to" and "what is that record's extent". Any other entry
+ * states why nothing is drawn.
+ *
+ * VERSION 2 is the container for city grammar version 2: grammars carry their frame and subject
+ * identity, records their membership, entries a `halo` state, and a drawn range is always dressed
+ * by a material record. A version 1 file is refused at its magic; there is no upgrade on read.
  *
  * REJECTED, with reasons:
  *
@@ -71,25 +77,38 @@
 import { AsciiError, ASCII_SPACE, asciiBytes, asciiText } from './ascii.js';
 import { CanonicalJsonError, canonicalBytes, canonicalJson, compareCodeUnits, parseCanonical } from './canonical-json.js';
 import type { CanonicalValue } from './canonical-json.js';
-import { shapeOf, TileDocumentError, validateRecord, validateSemantics } from './document.js';
-import type { DeclaredSemantics, RecordPayload } from './document.js';
+import {
+  MEMBERSHIPS,
+  statedIdentity,
+  tableOf,
+  TileDocumentError,
+  validateRecord,
+  validateSemantics,
+} from './document.js';
+import type { DeclaredSemantics, Membership, RecordPayload } from './document.js';
 import { NEEDS, PROJECTION_DEFINITIONS, TESSELLATOR_SOURCE_VERSION } from './expand.js';
 import type { Need, ProjectionDefinition } from './expand.js';
-import { HEX64_PATTERN, IDENTITY_PATTERN, MATERIAL_RECORD_KIND, TILE_SHAPE } from './record-shapes.js';
-import type { ProjectionName } from './record-shapes.js';
+import {
+  GRAMMAR_TABLES,
+  HEX64_PATTERN,
+  IDENTITY_PATTERN,
+  MATERIAL_RECORD_KIND,
+  tableFor,
+  TILE_SHAPE,
+} from './record-shapes.js';
+import type { GrammarFrame, ProjectionName } from './record-shapes.js';
 import type { Entry, MaterialRef, ProjectionMesh, TessellatedTile, Triple } from './tessellate.js';
 import {
   ENTRY_STATES,
   IDENTITY_NOT_STATED,
-  MATERIAL_NOT_CARRIED,
   SURFACE_ORIENTATIONS,
   TRIANGLE_DIGEST_PROFILE,
 } from './triangle-digest.js';
 
-export const OWD_MAGIC = 'OWD1';
-export const OWD_PROFILE = 'exulanica.owd/v1';
+export const OWD_MAGIC = 'OWD2';
+export const OWD_PROFILE = 'exulanica.owd/v2';
 /** The string the bake stage's parameters name the container by. */
-export const OWD_CONTAINER = 'owd/1';
+export const OWD_CONTAINER = 'owd/2';
 export const OWD_MEDIA_TYPE = 'application/vnd.exulanica.owd';
 export const OWD_GENERATOR = 'exulanica loom-tess';
 /** Generated content, never observed, and saying so in the bytes. */
@@ -109,13 +128,13 @@ const UINT32_LIMIT = 0x100000000;
 
 export const COORDINATES = {
   unit: COORDINATE_UNIT,
-  plan: 'x and y are the plan axes the records state their millimetres in',
+  plan: 'x and y are the plan axes of the frame each grammar entry names, in the records millimetres',
   up: 'z is the height the records state, increasing upward',
   winding: 'counter-clockwise seen from +z, with x to the right and y up',
   payload: 'position is float32 metres from origin_mm: fround((mm - origin_mm) / 1000)',
-  surface: 'surface_mm plus surface_origin_mm is s, t in millimetres in the frame of the '
-    + 'surface orientation; horizontal: t left of s, terrain s = x and t = y; '
-    + 'vertical: s along the run from its start, t = base - z',
+  surface: 'surface_mm plus surface_origin_mm is s, t in millimetres in the surface frame the '
+    + 'grammar fixes for the record kind, role and orientation; horizontal: t left of s, terrain '
+    + 's = x and t = y; vertical: s along the run from its start, t = base - z',
 } as const;
 
 export type SectionName = 'position_mm' | 'position' | 'surface_mm' | 'index';
@@ -152,6 +171,8 @@ export interface OwdRecord extends RecordPayload {
   readonly identity: string;
   /** Index into `grammars`: the grammar whose document entry listed the record. */
   readonly grammar: number;
+  /** Which of that entry's lists held it. A halo record is context, never drawn. */
+  readonly membership: Membership;
 }
 
 export interface OwdGrammar {
@@ -159,6 +180,10 @@ export interface OwdGrammar {
   readonly grammar_version: number;
   readonly descriptor_sha256: string;
   readonly declared_semantics: DeclaredSemantics;
+  /** The admitted identity every record identity of this grammar entry derives from. */
+  readonly subject_identity: string;
+  /** The frame the grammar version states its coordinates in. */
+  readonly frame: GrammarFrame;
 }
 
 export interface OwdProjection {
@@ -327,6 +352,8 @@ function headerFor(
       grammar_version: grammar.grammar_version,
       descriptor_sha256: grammar.descriptor_sha256,
       declared_semantics: grammar.declared_semantics,
+      subject_identity: grammar.subject_identity,
+      frame: tableOf(grammar).frame,
     })),
     records: tile.records.map((record) => ({
       kind: record.payload.kind,
@@ -335,6 +362,7 @@ function headerFor(
       sha256: record.sha256,
       identity: record.identity,
       grammar: record.grammar,
+      membership: record.membership,
     })),
     projections,
     sections,
@@ -454,11 +482,7 @@ function withRefusal<T>(run: () => T): T {
 
 function checkMaterial(value: unknown, where: string, records: readonly OwdRecord[]): MaterialRef {
   const material = objectAt(value, where);
-  if (material.state === MATERIAL_NOT_CARRIED) {
-    keysAre(material, ['state'], where);
-    return { state: MATERIAL_NOT_CARRIED };
-  }
-  if (material.state !== 'record') fail(`${where}.state is neither ${MATERIAL_NOT_CARRIED} nor record`);
+  if (material.state !== 'record') fail(`${where}.state is not record`);
   keysAre(material, ['record', 'state'], where);
   const record = countAt(material.record, `${where}.record`, records.length);
   if (records[record]!.kind !== MATERIAL_RECORD_KIND) fail(`${where} cites a record that is not a material`);
@@ -487,6 +511,9 @@ function checkEntries(
     const entry = objectAt(value, at);
     if (entry.record !== index) fail(`${at}.record is not ${index}`);
     if (!ENTRY_STATES.some((state) => state === entry.state)) fail(`${at}.state is not an entry state`);
+    if ((entry.state === 'halo') !== (records[index]!.membership === 'halo')) {
+      fail(`${at}.state is halo exactly when its record is halo, and it is ${String(entry.state)}`);
+    }
     switch (entry.state) {
       case 'drawn': {
         if (definition.surfaces) {
@@ -525,6 +552,7 @@ function checkEntries(
       }
       case 'not_admitted':
       case 'not_in_projection':
+      case 'halo':
         keysAre(entry, ['record', 'state'], at);
         return;
     }
@@ -578,40 +606,56 @@ function checkHeader(value: unknown): OwdHeader {
   if (canonicalJson(header.coordinates as CanonicalValue) !== canonicalJson(COORDINATES)) {
     fail('coordinates is not the statement this version writes');
   }
-  withRefusal(() => validateRecord(header.tile, 'tile', TILE_SHAPE));
+  withRefusal(() => validateRecord(GRAMMAR_TABLES[0]!, header.tile, 'tile', TILE_SHAPE));
   hexAt(header.tile_inputs_digest, 'tile_inputs_digest');
 
-  const declared = (header.tile as RecordPayload).fields.grammar_versions as readonly (readonly [string, number])[];
-  const grammars = arrayAt(header.grammars, 'grammars');
-  if (grammars.length !== declared.length) fail('grammars does not match tile.grammar_versions');
-  grammars.forEach((entry, index) => {
+  const pins = (header.tile as RecordPayload).fields.grammar_versions as readonly JsonObject[];
+  const grammars = arrayAt(header.grammars, 'grammars').map((entry, index) => {
     const at = `grammars[${index}]`;
     const grammar = objectAt(entry, at);
-    keysAre(grammar, ['declared_semantics', 'descriptor_sha256', 'grammar_id', 'grammar_version'], at);
-    if (grammar.grammar_id !== declared[index]![0]) fail(`${at}.grammar_id does not match the tile`);
-    if (grammar.grammar_version !== declared[index]![1]) fail(`${at}.grammar_version does not match the tile`);
-    hexAt(grammar.descriptor_sha256, `${at}.descriptor_sha256`);
-    withRefusal(() => validateSemantics(grammar.declared_semantics, `${at}.declared_semantics`));
+    keysAre(
+      grammar,
+      ['declared_semantics', 'descriptor_sha256', 'frame', 'grammar_id', 'grammar_version', 'subject_identity'],
+      at,
+    );
+    const pin = pins[index];
+    if (pin === undefined) fail(`${at} is not a pin of the tile`);
+    for (const key of ['grammar_id', 'grammar_version', 'descriptor_sha256']) {
+      if (grammar[key] !== pin[key]) fail(`${at}.${key} does not match the tile`);
+    }
+    const table = tableFor(grammar.grammar_id, grammar.grammar_version);
+    if (table === undefined) fail(`${at} names a grammar version this tessellator does not read`);
+    if (canonicalJson(grammar.frame as CanonicalValue) !== canonicalJson(table.frame as unknown as CanonicalValue)) {
+      fail(`${at}.frame is not the frame its grammar version states`);
+    }
+    if (typeof grammar.subject_identity !== 'string') fail(`${at}.subject_identity is not a UUID`);
+    if (!IDENTITY_PATTERN.test(grammar.subject_identity)) fail(`${at}.subject_identity is not a UUID`);
+    withRefusal(() => validateSemantics(table, grammar.declared_semantics, `${at}.declared_semantics`));
+    return table;
   });
+  if (grammars.length !== pins.length) fail('grammars does not match tile.grammar_versions');
 
   const records = arrayAt(header.records, 'records').map((entry, index): OwdRecord => {
     const at = `records[${index}]`;
     const record = objectAt(entry, at);
-    keysAre(record, ['fields', 'grammar', 'identity', 'kind', 'sha256', 'version'], at);
+    keysAre(record, ['fields', 'grammar', 'identity', 'kind', 'membership', 'sha256', 'version'], at);
     const grammar = countAt(record.grammar, `${at}.grammar`, grammars.length);
+    const table = grammars[grammar]!;
     const payload = withRefusal(() =>
-      validateRecord({ fields: record.fields, kind: record.kind, version: record.version }, at),
+      validateRecord(table, { fields: record.fields, kind: record.kind, version: record.version }, at),
     );
     const sha256 = hexAt(record.sha256, `${at}.sha256`);
+    const membership = MEMBERSHIPS.find((candidate) => candidate === record.membership);
+    if (membership === undefined) fail(`${at}.membership is not one of ${canonicalJson([...MEMBERSHIPS])}`);
     if (typeof record.identity !== 'string') fail(`${at}.identity is not text`);
-    const field = shapeOf(payload.kind).identity_field;
-    if (field === undefined) {
+    const stated = withRefusal(() => statedIdentity(table, payload));
+    if (stated === undefined) {
       if (record.identity !== IDENTITY_NOT_STATED) fail(`${at}.identity is not ${IDENTITY_NOT_STATED}`);
     } else {
-      if (record.identity !== payload.fields[field]) fail(`${at}.identity is not the identity the record states`);
+      if (record.identity !== stated) fail(`${at}.identity is not the identity the record states`);
       if (!IDENTITY_PATTERN.test(record.identity)) fail(`${at}.identity is not a UUID`);
     }
-    return { ...payload, sha256, identity: record.identity, grammar };
+    return { ...payload, sha256, identity: record.identity, grammar, membership };
   });
   records.forEach((record, index) => {
     if (index > 0) {

@@ -808,7 +808,9 @@ STAGES: Final[dict[str, StageSpec]] = {
     ),
     "baked_tile": StageSpec(
         key="baked_tile",
-        version=1,
+        # 2: the container is `owd/2`, read from city grammar version 2 tile documents, which carry
+        # membership, a frame and a subject identity that version 1 had no field for.
+        version=2,
         output_kind="owd_tile",
         # Deterministic in the sense the flag carries: integer records in, integer geometry and a
         # correctly rounded float payload out, no model, no clock and no random source, so two runs
@@ -825,14 +827,15 @@ STAGES: Final[dict[str, StageSpec]] = {
         # mapping equal to what the tessellator itself states (`exulanica-tess params`).
         params={
             # The container format. A new version is a rebake, never an upgrade on read.
-            "container": "owd/1",
+            "container": "owd/2",
             # The tessellator's source version: its expanders, its statements of what a record
-            # kind lacks, and its fixed tessellation choices, such as a terrain cell's diagonal.
-            "tessellator": 1,
+            # kind waits on, and its fixed tessellation choices, such as a terrain cell's diagonal
+            # and which terrain cells a covering record's extent leaves out.
+            "tessellator": 2,
             # How a projection's triangles are digested; the golden fixture digest depends on it.
-            "triangle_digest": "exulanica.owd-triangle-digest/v1",
-            # The document the bake reads.
-            "tile_document": "exulanica.tile-document/v1",
+            "triangle_digest": "exulanica.owd-triangle-digest/v2",
+            # The document the bake reads, whose envelope the city grammar owns.
+            "tile_document": "exulanica.tile-document/v2",
             # The records' unit, and the unit of every digested coordinate.
             "coordinate_unit": "millimetre",
             # The projections materialised, each from the records by its own rules and with its
@@ -841,12 +844,13 @@ STAGES: Final[dict[str, StageSpec]] = {
             "projections": ["render_batch", "nav_envelope"],
             # The only level of detail drawn; a tile at another level is refused.
             "lod": 0,
-            # Declared by version 1 of the grammar's tile stage, imported rather than restated.
+            # Declared by version 2 of the grammar's tile stage, imported rather than restated.
             "tile_size_mm": TILE_SIZE_MM,
             "halo_radius_mm": HALO_RADIUS_MM,
             # The grammar reference: the record kinds and versions the documents are written in.
-            # Grammar ids and versions of a particular tile, and its catalog digest, are not
-            # here: they are inputs of that tile and reach the key through `tile_inputs_digest`.
+            # A particular tile's grammar pins (id, version and descriptor digest), its catalog
+            # digest and its ownership and halo rules are not here: they are inputs of that tile
+            # and reach the key through `tile_inputs_digest`.
             "record_shapes": baked_tile_record_shapes(),
         },
     ),

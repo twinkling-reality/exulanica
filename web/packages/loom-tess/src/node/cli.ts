@@ -5,7 +5,7 @@
  *   pnpm tess bake <tile-document.json> <out.owd>   bake, write, print the digests
  *   pnpm tess verify <file.owd>                     decode and rebake; print the digests again
  *   pnpm tess params                                the bake stage parameters this build states
- *   pnpm tess shapes                                the record shapes this build reads
+ *   pnpm tess shapes                                the grammar tables this build reads
  *
  * Output is deterministic: the same document gives the same container bytes, on any machine and
  * any Node version, the promise `scene-synth`'s CLI makes for its fixtures. Every line printed is
@@ -15,15 +15,15 @@ import { BAKE_PARAMETERS } from '../core/bake.js';
 import { canonicalJson } from '../core/canonical-json.js';
 import type { CanonicalValue } from '../core/canonical-json.js';
 import {
+  GRAMMAR_TABLES,
   HEX64_PATTERN,
   IDENTITY_PATTERN,
   KEY_PATTERN,
   MATERIAL_RECORD_KIND,
   PLANE,
   PROJECTIONS,
-  RECORD_SHAPES,
   TEXTURE_SET_ID_PATTERN,
-  TILE_SHAPE,
+  TILE_RECORD_KIND,
 } from '../core/record-shapes.js';
 import { bakeDocumentFile, verifyFile } from './index.js';
 
@@ -70,8 +70,8 @@ async function main(argv: readonly string[]): Promise<void> {
       plane: PLANE,
       projections: [...PROJECTIONS],
       material_record_kind: MATERIAL_RECORD_KIND,
-      tile: TILE_SHAPE,
-      records: RECORD_SHAPES,
+      tile_record_kind: TILE_RECORD_KIND,
+      grammars: GRAMMAR_TABLES,
     });
     return;
   }

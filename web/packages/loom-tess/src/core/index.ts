@@ -8,8 +8,8 @@
 export { BAKE_PARAMETERS, bakeTile, documentOf, verifyOwd } from './bake.js';
 export type { Bake, Sha256Hex } from './bake.js';
 export { CanonicalJsonError, canonicalBytes, canonicalJson } from './canonical-json.js';
-export { readTileDocument, TILE_DOCUMENT_PROFILE, TileDocumentError } from './document.js';
-export type { DeclaredSemantics, GrammarEntry, RecordPayload, TileDocument } from './document.js';
+export { MEMBERSHIPS, readTileDocument, TILE_DOCUMENT_PROFILE, TileDocumentError } from './document.js';
+export type { DeclaredSemantics, GrammarEntry, Membership, RecordPayload, TileDocument } from './document.js';
 export {
   MATERIALISED_LOD,
   MATERIALISED_PROJECTIONS,
@@ -42,13 +42,26 @@ export type {
   OwdSection,
   SectionName,
 } from './owd.js';
-export { PROJECTIONS, RECORD_SHAPES, TILE_SHAPE } from './record-shapes.js';
-export type { FieldShape, ProjectionName, RecordShape } from './record-shapes.js';
+export {
+  GRAMMAR_TABLES,
+  MATERIAL_RECORD_KIND,
+  PROJECTIONS,
+  ShapeTableError,
+  TILE_RECORD_KIND,
+  TILE_SHAPE,
+} from './record-shapes.js';
+export type {
+  FieldShape,
+  GrammarFrame,
+  GrammarTable,
+  IdentityRule,
+  ProjectionName,
+  RecordShape,
+} from './record-shapes.js';
 export type { DrawnEntry, Entry, MaterialRef, Triple } from './tessellate.js';
 export {
   ENTRY_STATES,
   IDENTITY_NOT_STATED,
-  MATERIAL_NOT_CARRIED,
   SURFACE_ORIENTATIONS,
   TRIANGLE_DIGEST_DOMAIN,
   TRIANGLE_DIGEST_PROFILE,

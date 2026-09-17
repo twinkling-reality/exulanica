@@ -4,8 +4,8 @@
  * Both triangle digests must equal the CHECKED-IN LITERAL below, not merely each other: two
  * builds that agree on a wrong answer agree. The literal is the fixture. It moves only when the
  * fixture, the tessellator version or the digest definition moves, and each of those is a
- * deliberate commit that updates it (see `tests/test_bake_determinism.py` for regenerating the
- * fixture).
+ * deliberate commit that updates it. The fixture is the city vocabulary lane's version 2 tile,
+ * copied byte for byte; `tests/test_bake_determinism.py` holds the copy to its source.
  */
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
@@ -13,19 +13,35 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { PreviewUnavailable, previewTile } from '../src/browser/index.js';
 import { bakeDocumentFile, nodeSha256 } from '../src/node/index.js';
 import { bakeTile } from '../src/core/bake.js';
-import { absoluteSurfaceCoordinates, absoluteVertices } from '../src/core/owd.js';
-import { documentBytes, FIXTURE_PATH, fixtureBytes, fixtureObject, recordsOf, scratch } from './support.js';
+import { absoluteSurfaceCoordinates, absoluteVertices, decodeOwd } from '../src/core/owd.js';
+import type { DecodedOwd } from '../src/core/owd.js';
+import {
+  coveringBoxes,
+  documentBytes,
+  dressedTerrainObject,
+  FIXTURE_PATH,
+  fixtureBytes,
+  fixtureObject,
+  recordsOf,
+  scratch,
+  sortList,
+} from './support.js';
 
-/** Over `test/fixtures/tile-conformance.json`, tessellator 1, digest profile v1. */
+/** Over `test/fixtures/tile-conformance.json`, tessellator 2, digest profile v2. */
 const GOLDEN = {
-  render_batch: '9daf8516ee7595b2d6ff01db81c3224c6907ebe411d7cdcb422c5faee9b093a4',
-  nav_envelope: '4b9616b60beab2094b9673c0773118d89fd8c1754373edef4c87738d44a97d9e',
+  render_batch: 'c7d8aa7a2315ede90991e2153c85bebc561d6a569ee0ecb0de6b846937a7db89',
+  nav_envelope: 'e6670a327a191dc71e69dc732484fecde04e4f34146674b1585f2f0c13cc6928',
 } as const;
-const GOLDEN_RENDER_BATCH = GOLDEN.render_batch;
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
+
+const count = (states: string[], state: string): number => states.filter((s) => s === state).length;
+
+async function decodedFixture(bytes: Uint8Array = fixtureBytes()): Promise<DecodedOwd> {
+  return decodeOwd((await bakeTile(bytes, nodeSha256)).container);
+}
 
 describe('the triangle digest of the conformance fixture', () => {
   it('is the golden literal through the Node bake and through the browser preview', async () => {
@@ -41,55 +57,105 @@ describe('the triangle digest of the conformance fixture', () => {
     expect(browser.tileInputsDigest).toBe(node.tile_inputs_digest);
   });
 
-  it('draws the terrain and states why every other record is not drawn', async () => {
-    const preview = await previewTile(fixtureBytes());
-    const [renderBatch, navEnvelope] = preview.projections;
+  it('draws exposed terrain as support, and states why every other record is not drawn', async () => {
+    const { header, projections } = await decodedFixture();
+    const [renderBatch, navEnvelope] = projections;
     expect(renderBatch!.header.name).toBe('render_batch');
     expect(navEnvelope!.header.name).toBe('nav_envelope');
-    for (const projection of [renderBatch!, navEnvelope!]) {
-      expect(projection.header.vertex_count).toBe(16);
-      expect(projection.header.triangle_count).toBe(18);
-    }
-    const count = (states: string[], state: string): number => states.filter((s) => s === state).length;
+    const grammar = fixtureObject().grammars[0];
+    expect(header.records).toHaveLength(grammar.owned.length + grammar.halo.length);
+    expect(header.grammars[0]).toMatchObject({
+      subject_identity: grammar.subject_identity,
+      frame: { name: 'city_local', units: 'mm', axes: 'x_east_y_north_z_up', metric_class: 'metric_authored' },
+    });
+    const terrain = header.records.findIndex((record) => record.kind === 'city.terrain');
+
+    // Nothing is drawn: the grammar dresses no terrain, and every other surface waits on a rule.
     const render = renderBatch!.header.entries.map((entry) => entry.state);
-    expect([count(render, 'drawn'), count(render, 'not_in_projection'), count(render, 'unavailable')])
-      .toEqual([1, 1, render.length - 2]);
+    expect(renderBatch!.header.vertex_count).toBe(0);
+    expect(count(render, 'drawn')).toBe(0);
+    expect(count(render, 'halo')).toBe(grammar.halo.length);
+    expect(renderBatch!.header.entries[terrain]).toEqual({ record: terrain, state: 'unavailable', needs: ['surface_material'] });
+    expect(renderBatch!.surfaceMm).toHaveLength(0);
+
     const nav = navEnvelope!.header.entries.map((entry) => entry.state);
-    // Terrain supports; facades, the material, the vitrine, the premises and the tree do not.
-    expect([count(nav, 'drawn'), count(nav, 'not_in_projection'), count(nav, 'unavailable')])
-      .toEqual([1, 8, nav.length - 9]);
+    expect(count(nav, 'drawn')).toBe(1);
+    expect(count(nav, 'halo')).toBe(grammar.halo.length);
+    expect(navEnvelope!.header.entries[terrain]).toMatchObject({ state: 'drawn', vertex_count: 235, triangle_count: 368 });
     expect(navEnvelope!.surfaceMm).toBeUndefined();
-    expect(renderBatch!.surfaceMm).toHaveLength(32);
+
+    // Halo is exactly what the document lists as halo.
+    header.records.forEach((record, index) => {
+      expect(renderBatch!.header.entries[index]!.state === 'halo').toBe(record.membership === 'halo');
+    });
   });
 
-  it('gives drawn terrain plan surface coordinates, s = x and t = y, in millimetres', async () => {
-    const preview = await previewTile(fixtureBytes());
-    const renderBatch = preview.projections[0]!;
+  it('leaves out exactly the terrain cells a covering record meets', async () => {
+    const nav = (await decodedFixture()).projections[1]!;
+    const vertices = absoluteVertices(nav);
+    const cover = coveringBoxes(fixtureObject());
+    const terrain = recordsOf(fixtureObject(), 'city.terrain')[0].fields;
+    const cell = terrain.cell_mm as number;
+    const meets = (west: number, south: number): boolean =>
+      cover.some((box) => west <= box.max_x && box.min_x <= west + cell && south <= box.max_y && box.min_y <= south + cell);
+
+    const drawn = new Set<string>();
+    for (let triangle = 0; triangle < nav.header.triangle_count; triangle += 1) {
+      const corners = [0, 1, 2].map((corner) => nav.index[triangle * 3 + corner]!);
+      const west = Math.min(...corners.map((vertex) => vertices[vertex * 3]!));
+      const south = Math.min(...corners.map((vertex) => vertices[vertex * 3 + 1]!));
+      expect(meets(west, south), `cell at ${west}, ${south}`).toBe(false);
+      drawn.add(`${west} ${south}`);
+    }
+    let expected = 0;
+    for (let row = 0; row + 1 < terrain.samples_per_side; row += 1) {
+      for (let column = 0; column + 1 < terrain.samples_per_side; column += 1) {
+        if (!meets(column * cell, row * cell)) expected += 1;
+      }
+    }
+    expect(expected).toBeGreaterThan(0);
+    expect(expected).toBeLessThan((terrain.samples_per_side - 1) ** 2);
+    expect(drawn.size).toBe(expected);
+    expect(nav.header.triangle_count).toBe(expected * 2);
+  });
+
+  it('samples support height exactly at the terrain samples', async () => {
+    const nav = (await decodedFixture()).projections[1]!;
+    const vertices = absoluteVertices(nav);
+    const terrain = recordsOf(fixtureObject(), 'city.terrain')[0].fields;
+    for (let vertex = 0; vertex < nav.header.vertex_count; vertex += 1) {
+      const [x, y, z] = [vertices[vertex * 3]!, vertices[vertex * 3 + 1]!, vertices[vertex * 3 + 2]!];
+      const sample = (y / terrain.cell_mm) * terrain.samples_per_side + x / terrain.cell_mm;
+      expect(z).toBe(terrain.height_mm[sample]);
+    }
+    expect(nav.header.contract.admissible_uses).toEqual(['sampling support height']);
+  });
+
+  it('draws dressed terrain with its material and plan surface coordinates, s = x and t = y', async () => {
+    const decoded = await decodedFixture(documentBytes(dressedTerrainObject()));
+    const renderBatch = decoded.projections[0]!;
+    const drawn = renderBatch.header.entries.filter((entry) => entry.state === 'drawn');
+    expect(drawn).toHaveLength(1);
+    const entry = drawn[0]!;
+    if (entry.state !== 'drawn') throw new Error('unreachable');
+    expect(entry.surface).toBe('horizontal');
+    const material = decoded.header.records[entry.material!.record]!;
+    expect(material.kind).toBe('city.surface_material');
+    expect(material.fields.surface_identity).toBe(decoded.header.records[entry.record]!.identity);
     const vertices = absoluteVertices(renderBatch);
     const surface = absoluteSurfaceCoordinates(renderBatch)!;
     for (let vertex = 0; vertex < renderBatch.header.vertex_count; vertex += 1) {
       expect(surface[vertex * 2]).toBe(vertices[vertex * 3]);
       expect(surface[vertex * 2 + 1]).toBe(vertices[vertex * 3 + 1]);
     }
-    const drawn = renderBatch.header.entries.find((entry) => entry.state === 'drawn');
-    expect(drawn).toMatchObject({ surface: 'horizontal', material: { state: 'not-carried' } });
-  });
-
-  it('samples support height exactly on the terrain plane', async () => {
-    const preview = await previewTile(fixtureBytes());
-    const nav = preview.projections[1]!;
-    const vertices = absoluteVertices(nav);
-    // The fixture's plane: z = -200 + 120 per 4 m in x and 160 per 4 m in y, from (-4000, -4000).
-    for (let vertex = 0; vertex < nav.header.vertex_count; vertex += 1) {
-      const [x, y, z] = [vertices[vertex * 3]!, vertices[vertex * 3 + 1]!, vertices[vertex * 3 + 2]!];
-      expect(z).toBe(-200 + ((x + 4000) / 4000) * 120 + ((y + 4000) / 4000) * 160);
-    }
-    expect(nav.header.contract.admissible_uses).toEqual(['sampling support height']);
+    expect(renderBatch.header.vertex_count).toBe(decoded.projections[1]!.header.vertex_count);
   });
 
   it('moves when one integer of the fixture moves, in both builds alike', async () => {
     const document = fixtureObject();
-    recordsOf(document, 'city.terrain')[0].fields.height_mm[5] += 1;
+    const terrain = recordsOf(document, 'city.terrain')[0].fields;
+    terrain.height_mm[0] = 10;
+    terrain.extent.max_z_mm = 10;
     const perturbed = documentBytes(document);
     const node = await bakeTile(perturbed, nodeSha256);
     const browser = await previewTile(perturbed);
@@ -102,14 +168,19 @@ describe('the triangle digest of the conformance fixture', () => {
     const document = fixtureObject();
     recordsOf(document, 'city.parcel')[0].fields.address_number += 1;
     const node = await bakeTile(documentBytes(document), nodeSha256);
-    expect(node.triangleDigests.get('render_batch')).not.toBe(GOLDEN_RENDER_BATCH);
+    expect(node.triangleDigests.get('render_batch')).not.toBe(GOLDEN.render_batch);
+    expect(node.triangleDigests.get('nav_envelope')).not.toBe(GOLDEN.nav_envelope);
   });
 
-  it('does not move when the document lists its records in another order', async () => {
+  it('moves when an owned record becomes halo, because halo is never drawn', async () => {
     const document = fixtureObject();
-    document.grammars[0].records.reverse();
+    const grammar = document.grammars[0];
+    const index = grammar.owned.findIndex((record: any) => record.kind === 'city.premises');
+    grammar.halo.push(...grammar.owned.splice(index, 1));
+    sortList(grammar.halo);
     const node = await bakeTile(documentBytes(document), nodeSha256);
-    expect(Object.fromEntries(node.triangleDigests)).toEqual(GOLDEN);
+    expect(node.triangleDigests.get('render_batch')).not.toBe(GOLDEN.render_batch);
+    expect(node.triangleDigests.get('nav_envelope')).not.toBe(GOLDEN.nav_envelope);
   });
 });
 

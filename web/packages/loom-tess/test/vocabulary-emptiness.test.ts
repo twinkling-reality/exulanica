@@ -4,9 +4,12 @@
  * The precedent is the backend's model-manifest test, which fails when a model identifier leaks
  * into a `.py` file. This walks every file in `src/core` with the TypeScript parser and fails on:
  *
- *   - a word from the repository's own vocabulary sources: the city catalogs, the pinned texture
- *     sets, the owned district's seven material names, the society's roles and names, and a
- *     short list of typology, era, material, use and element words written below;
+ *   - a word from the repository's own vocabulary sources: every entry key of the city catalogs,
+ *     as the run of words it spells, the pinned texture sets, the owned district's seven material
+ *     names, the society's roles and names, and a short list of typology, era, material, use and
+ *     element words written below. A record field's closed values are the grammar's schema, not
+ *     vocabulary: an expander names the enum its record carries (a part's shape, the role it
+ *     draws), which is what the grammar was asked to carry so that no expander reads a key;
  *   - a numeric literal outside a short list whose every member has a stated structural reason;
  *   - a `||` or `??` (the shape of a fallback that supplies a value a record does not carry), a
  *     `default:` branch, and a default parameter or destructuring default;
@@ -16,21 +19,23 @@
  *     float32 payload, which no digest reads);
  *   - an import that is not a relative `./*.js` module inside `src/core`.
  *
- * `src/core/record-shapes.ts` is exempt from the word and number rules, and only from those. Its
- * numbers and closed values are the grammar's own, and `tests/test_bake_determinism.py` holds them
- * to the grammar field by field. The detector itself is tested against planted violations first,
- * so a scan that stopped finding things would fail rather than pass.
+ * `src/core/city-v2.ts` is exempt from the word and number rules, and only from those. It is the
+ * grammar's own table, generated from the grammar's files, and `test/grammar-table.test.ts` and
+ * `tests/test_bake_determinism.py` hold it to them. Schema words (record kinds, shape and field
+ * names, projections, states and needs) are not vocabulary. The detector itself is tested against
+ * planted violations first, so a scan that stopped finding things would fail rather than pass.
  */
 import { readdirSync, readFileSync } from 'node:fs';
 import { join, relative } from 'node:path';
 import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
-import { NEEDS, PROJECTIONS, RECORD_SHAPES, TILE_SHAPE } from '../src/core/index.js';
+import { GRAMMAR_TABLES, MEMBERSHIPS, NEEDS, PROJECTIONS } from '../src/core/index.js';
+import { FIELD_KINDS } from '../src/core/record-shapes.js';
 import { ENTRY_STATES } from '../src/core/triangle-digest.js';
 import { PACKAGE_ROOT, REPOSITORY_ROOT } from './support.js';
 
 const CORE = join(PACKAGE_ROOT, 'src', 'core');
-const EXEMPT_FROM_WORDS_AND_NUMBERS = new Set(['record-shapes.ts']);
+const EXEMPT_FROM_WORDS_AND_NUMBERS = new Set(['city-v2.ts']);
 
 /**
  * Numbers core may write anywhere: 0 and 1 (counting), 2 (a pair, two surface coordinates, two
@@ -61,6 +66,9 @@ const WRITTEN_WORDS = [
   'oak', 'maple', 'linden', 'unresolved',
 ];
 
+/** Words the language itself spells, which a catalog key happens to share. */
+const HOST_NAMES = ['buffer'];
+
 const words = (text: string): string[] =>
   text
     .replace(/([a-z0-9])([A-Z])/g, '$1 $2')
@@ -72,25 +80,17 @@ function readJson(path: string): unknown {
   return JSON.parse(readFileSync(path, 'utf8'));
 }
 
-function stringsIn(value: unknown, skip: ReadonlySet<string>): string[] {
-  if (typeof value === 'string') return [value];
-  if (Array.isArray(value)) return value.flatMap((item) => stringsIn(item, skip));
-  if (typeof value === 'object' && value !== null) {
-    return Object.keys(value)
-      .sort()
-      .filter((key) => !skip.has(key))
-      .flatMap((key) => stringsIn((value as Record<string, unknown>)[key], skip));
-  }
-  return [];
-}
+const tableShapes = () => GRAMMAR_TABLES.flatMap((table) => [...table.shapes.records, ...table.shapes.nested]);
 
-/** Every schema word core legitimately spells: record kinds, field names, projections, needs. */
+/** Every schema word core legitimately spells: record kinds, shape and field names, projections, needs. */
 function schemaWords(): Set<string> {
   const tokens = [
-    ...[TILE_SHAPE, ...RECORD_SHAPES].flatMap((shape) => [shape.kind, ...Object.keys(shape.fields)]),
+    ...tableShapes().flatMap((shape) => [shape.shape, ...shape.fields.map((field) => field.name)]),
     ...PROJECTIONS,
     ...Object.keys(NEEDS),
     ...ENTRY_STATES,
+    ...MEMBERSHIPS,
+    ...FIELD_KINDS,
   ];
   return new Set(tokens.flatMap(words));
 }
@@ -100,8 +100,11 @@ function vocabulary(): Set<string> {
   const found = new Set<string>(WRITTEN_WORDS);
   const catalogs = join(REPOSITORY_ROOT, 'assets', 'catalogs');
   for (const name of readdirSync(catalogs).filter((file) => file.endsWith('.json')).sort()) {
-    const catalog = readJson(join(catalogs, name)) as { entries: unknown[] };
-    for (const text of stringsIn(catalog.entries, new Set(['licence']))) words(text).forEach((w) => found.add(w));
+    const catalog = readJson(join(catalogs, name)) as { entries: { key: string }[] };
+    // A key is forbidden whole, as the run of words it spells, so `raised_table` is "raised table"
+    // and not every table. Every list an entry holds names keys of another catalog or closed
+    // values of a record field, so the keys cover the catalogs.
+    for (const entry of catalog.entries) found.add(words(entry.key).join(' '));
   }
   const manifest = readJson(join(REPOSITORY_ROOT, 'assets', 'textures', 'manifest.json')) as {
     sets: { set_id: string }[];
@@ -117,7 +120,13 @@ function vocabulary(): Set<string> {
     if (match === null) throw new Error(`society.py no longer declares ${tuple} where this test reads it`);
     for (const literal of match[1]!.matchAll(/"([^"]+)"/g)) words(literal[1]!).forEach((w) => found.add(w));
   }
-  for (const word of schemaWords()) found.delete(word);
+  // JavaScript's own name for a typed array's bytes, which the lane-use catalog also uses as a key.
+  for (const hostName of HOST_NAMES) found.delete(hostName);
+  const schema = schemaWords();
+  for (const entry of [...found]) {
+    if (entry.split(' ').every((word) => schema.has(word))) found.delete(entry);
+  }
+  found.delete('');
   return found;
 }
 
@@ -149,8 +158,12 @@ export function findings(label: string, text: string, forbiddenWords: ReadonlySe
   };
   const checkWords = (node: ts.Node, value: string): void => {
     if (exempt) return;
-    for (const word of words(value)) {
-      if (forbiddenWords.has(word)) flag(node, `vocabulary word "${word}"`);
+    const spelled = words(value);
+    for (let start = 0; start < spelled.length; start += 1) {
+      for (let end = start + 1; end <= spelled.length; end += 1) {
+        const run = spelled.slice(start, end).join(' ');
+        if (forbiddenWords.has(run)) flag(node, `vocabulary word "${run}"`);
+      }
     }
   };
   const visit = (node: ts.Node): void => {
@@ -198,7 +211,7 @@ export function findings(label: string, text: string, forbiddenWords: ReadonlySe
     } else if (ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) {
       const specifier = node.moduleSpecifier;
       if (specifier !== undefined && ts.isStringLiteral(specifier)) {
-        if (!/^\.\/[a-z-]+\.js$/.test(specifier.text)) flag(node, `import of ${specifier.text}`);
+        if (!/^\.\/[a-z0-9-]+\.js$/.test(specifier.text)) flag(node, `import of ${specifier.text}`);
       }
       // A module specifier is a path, not vocabulary, so its words are not checked.
       return;
@@ -218,12 +231,14 @@ function coreFiles(): string[] {
 }
 
 describe('the vocabulary-emptiness scan', () => {
-  const planted = new Set(['brick', 'baker']);
+  const planted = new Set(['brick', 'baker', 'running bond']);
   const plant = (text: string): string[] => findings('planted.ts', text, planted);
 
   it('finds every kind of violation it claims to find', () => {
     expect(plant("export const role = 'baker';")).toHaveLength(1);
     expect(plant('export const brickCourse = 1;')).toHaveLength(1);
+    expect(plant("export const course = 'running_bond';")).toHaveLength(1);
+    expect(plant('export const running = 1;')).toEqual([]);
     expect(plant('export const bay = (value: number): number => value * 3000;')).toHaveLength(1);
     expect(plant('function f(): number { const pitch = 16; return pitch; }')).toHaveLength(1);
     expect(plant('export const f = (a?: number): number => a ?? 1;')).toHaveLength(1);

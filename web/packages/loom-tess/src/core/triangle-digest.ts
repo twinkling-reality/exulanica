@@ -1,6 +1,8 @@
 /**
- * THE TRIANGLE DIGEST. Written before either build existed, so it describes a definition and not
- * whichever implementation came second. `README.md` states the same thing in prose.
+ * THE TRIANGLE DIGEST. Version 1 was written before either build existed, so it describes a
+ * definition and not whichever implementation came second; version 2 changes it for the city
+ * grammar's second version, and only where that version changed what a record is. `README.md`
+ * states the same thing in prose.
  *
  * ONE DIGEST PER PROJECTION. A projection (`render_batch`, `nav_envelope`, and later
  * `collision_proxy` and `pick_geometry`) is a separate declared output, so each gets its own
@@ -10,62 +12,66 @@
  *
  *   1. the domain `exulanica/owd-triangle-digest`, distinct from `exulanica/idempotency-key` so
  *      this digest can never be mistaken for a key;
- *   2. the digest format version, the decimal text `1`;
+ *   2. the digest format version, the decimal text `2`;
  *   3. the projection name;
  *   4. the number of entries, as a signed 64-bit integer. There is exactly one entry per record
- *      the tile document carries, drawn or not;
+ *      the tile document carries, owned or halo, drawn or not;
  *   5. for each entry, in the canonical record order below, exactly eight fields:
  *        a. the record kind, for example `city.terrain`;
  *        b. the record digest: lowercase hex SHA-256 of the record's canonical JSON payload
  *           `{"fields", "kind", "version"}`, which is `exulanica.grammar.records.canonical_record`;
- *        c. the identity the record states, as its canonical UUID text, or `not-stated` when the
- *           record kind carries no identity field. An identity is never minted here;
- *        d. the entry state: `drawn`, `unavailable`, `not_admitted` or `not_in_projection`;
+ *        c. the identity the record states in the field its shape names, as its canonical UUID
+ *           text, or `not-stated` when the record kind's shape declares no identity. Every city
+ *           version 2 record kind in a document states one. An identity is never minted here;
+ *        d. the entry state: `drawn`, `unavailable`, `not_admitted`, `not_in_projection`, or
+ *           `halo` for a record the document lists as halo, which is context and never drawn;
  *        e. for a drawn entry in a projection that carries surfaces (`render_batch`), the
- *           material reference: the record digest of the `city.surface_material` record the
- *           range is bound to, or `not-carried` when the record kind has no material record shape
- *           at all. Empty otherwise;
+ *           material reference: the record digest of the `city.surface_material` record that
+ *           dresses the range. A surface nothing dresses is not drawn. Empty otherwise;
  *        f. for a drawn entry in a projection that carries surfaces, the surface orientation,
  *           `horizontal` or `vertical`. Empty otherwise;
  *        g. for a drawn entry, the triangles: nine signed 64-bit big-endian integers per triangle,
  *           vertex a, b, c, each x, y, z, in the declared unit, in the order the expander emitted
- *           them. For an unavailable entry, the canonical JSON array of what the record kind
- *           lacks. Empty for `not_admitted` and `not_in_projection`;
+ *           them. For an unavailable entry, the canonical JSON array of what it needs. Empty for
+ *           every other state;
  *        h. for a drawn entry in a projection that carries surfaces, the surface coordinates: six
  *           signed 64-bit big-endian integers per triangle, vertex a, b, c, each s, t, in
  *           millimetres. Empty otherwise.
  *
- * SURFACE COORDINATES are millimetres on the surface, in the frames the city vocabulary lane
- * fixed with this lane and the tile runtime on 2026-09-16, so a texture's physical extent scales
- * them with no guessed constant:
+ * SURFACE COORDINATES are millimetres on the surface, in the frames the city grammar fixes
+ * (`exulanica.grammar.grammars.city.common`), so a texture's physical extent scales them with no
+ * guessed constant:
  *
- *   horizontal  t is always to the left of s. Terrain, lot and roof: s = x, t = y, in plan, a
- *               pitched plane included. Carriageway, gutter, kerb top, footway and crossing: s
- *               along the owning segment's centreline from its start node; a junction uses +x.
- *               An awning: s along its facade run. A part top: s is the part's local +x.
+ *   horizontal  t is always to the left of s. A segment's carriageway and gutter, a curb's kerb
+ *               top and footway, a crossing and a marking on a segment: s along the owning
+ *               segment's centreline. Everything else horizontal (a junction's carriageway,
+ *               terrain, a lot, a roof including a pitched plane, an awning, a tree pit, a part
+ *               top): s = x and t = y in plan.
  *   vertical    s along the run from its start (a facade's edge run from its start vertex, the
- *               kerb face's along-centreline coordinate, a part's local +x); t = base - z,
- *               pointing down, from the building's base elevation, the gutter level, or the
- *               part's base.
+ *               kerb face's along-centreline coordinate, round a part from its local +x);
+ *               t = base - z, pointing down, from the building's base elevation, the kerb line's
+ *               z, or the object's base.
  *
- * Only terrain draws today, so only the plan frame is exercised; the others are stated here so a
- * reader can rely on them before a record draws in them.
+ * Only terrain draws today, in the plan frame; the others are stated so a reader can rely on them
+ * before a record draws in them.
  *
  * WHAT DOES NOT ENTER: the float32 payload, the index buffer (triangles are digested
  * de-indexed, so how vertices are shared cannot move the digest), texture bytes, the container
  * header's layout and padding, section offsets, each projection's representation contract text
- * (the tessellator version covers it), the tile inputs digest (the bake key covers it), and any
- * time. Digesting the float32 bytes would make the digest a statement about a lossy rounding
- * rather than about the geometry, which is why they are payload and nothing more.
+ * (the tessellator version covers it), the tile inputs digest (the bake key covers it), the
+ * grammar frame and subject identity (the records' identities and the descriptor pin cover them),
+ * and any time. Digesting the float32 bytes would make the digest a statement about a lossy
+ * rounding rather than about the geometry, which is why they are payload and nothing more.
  *
  * THE UNIT is the records' own: millimetres, integers. Every coordinate is quantised before it
  * is a vertex, by the expander, in integer arithmetic; nothing is quantised after the fact.
  *
  * THE ORDER is total and comes from the records alone. Entries sort by record kind, then by
- * record digest, both compared as ASCII text. A tile document never carries one record twice (the
- * reader refuses it), so no two entries tie. Within a range the order is the expander's, which
- * is a loop over the record's own fields (a terrain grid is row-major over its cells). There is no
- * spatial sort anywhere, so no tie between two positions can flip an order.
+ * record digest, both compared as ASCII text. A tile document never carries one identity twice
+ * (the reader refuses it), so it never carries one record twice, and no two entries tie. Within a
+ * range the order is the expander's, which is a loop over the record's own fields (a terrain grid
+ * is row-major over its cells). There is no spatial sort anywhere, so no tie between two positions
+ * can flip an order.
  *
  * THE ENCODING. Every field, fixed width or not, is framed by its length as an unsigned 64-bit
  * big-endian integer, exactly as `exulanica.ingest.stages.idempotency_key` frames its fields and
@@ -79,15 +85,13 @@ import { asciiBytes } from './ascii.js';
 import { canonicalJson } from './canonical-json.js';
 
 export const TRIANGLE_DIGEST_DOMAIN = 'exulanica/owd-triangle-digest';
-export const TRIANGLE_DIGEST_VERSION = 1;
-export const TRIANGLE_DIGEST_PROFILE = 'exulanica.owd-triangle-digest/v1';
+export const TRIANGLE_DIGEST_VERSION = 2;
+export const TRIANGLE_DIGEST_PROFILE = 'exulanica.owd-triangle-digest/v2';
 
-/** The identity text of a record whose kind carries no identity field. */
+/** The identity text of a record whose kind's shape declares no identity. */
 export const IDENTITY_NOT_STATED = 'not-stated';
-/** The material text of a range whose record kind has no material record shape. */
-export const MATERIAL_NOT_CARRIED = 'not-carried';
 
-export const ENTRY_STATES = ['drawn', 'unavailable', 'not_admitted', 'not_in_projection'] as const;
+export const ENTRY_STATES = ['drawn', 'unavailable', 'not_admitted', 'not_in_projection', 'halo'] as const;
 export const SURFACE_ORIENTATIONS = ['horizontal', 'vertical'] as const;
 export type SurfaceOrientation = (typeof SURFACE_ORIENTATIONS)[number];
 export type EntryState = (typeof ENTRY_STATES)[number];
@@ -117,7 +121,7 @@ export type DigestEntry =
       };
     })
   | (EntryHead & { readonly state: 'unavailable'; readonly needs: readonly string[] })
-  | (EntryHead & { readonly state: 'not_admitted' | 'not_in_projection' });
+  | (EntryHead & { readonly state: 'not_admitted' | 'not_in_projection' | 'halo' });
 
 class Framer {
   private readonly parts: Uint8Array[] = [];
@@ -207,6 +211,7 @@ export function trianglePreimage(projection: string, entries: readonly DigestEnt
         return;
       case 'not_admitted':
       case 'not_in_projection':
+      case 'halo':
         framer.text('', where);
         framer.text('', where);
         framer.text('', where);

@@ -1,9 +1,0 @@
-{
-  "schema_version": 1,
-  "grammar_id": "cityrenderfixture",
-  "grammar_version": 1,
-  "subject_kind": "city",
-  "admissible_uses": ["render_batch", "nav_envelope"],
-  "cascade_levels": ["city", "district", "block", "lot", "building", "face"],
-  "parameters": []
-}
