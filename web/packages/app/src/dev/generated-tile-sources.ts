@@ -11,6 +11,11 @@
  * bakes this entry carries for development (see `./tiles/README.md`). Baked corridor streets are not
  * files in the repository; they live in the baked tile store and a permission-gated route serves
  * them, so they are not reachable from here.
+ *
+ * The texture library is separate from the tiles on purpose. A tile fetched from the route cites the
+ * same committed, published sets a golden does, and nothing serves those sets over HTTP yet, so
+ * `committedTextureLibrary()` hands them to either path. Where the container comes from is the part
+ * that differs, and it is the part that must never be committed.
  */
 
 import textureManifestUrl from '../../../../../assets/textures/manifest.json?url';
@@ -32,12 +37,16 @@ const TEXTURE_SETS: Readonly<Record<string, string>> = import.meta.glob<string>(
   { query: '?url', import: 'default', eager: true },
 );
 
-export interface GeneratedTileSourceBytes {
-  readonly name: string;
-  readonly tile: Uint8Array;
+/** The committed texture library, which a tile from either source draws with. */
+export interface CommittedTextureLibrary {
   readonly textureManifest: Uint8Array;
   /** Bytes of a pinned set by its content digest, or a refusal if the repository has none. */
   readonly textureSet: (contentSha256: string) => Promise<Uint8Array>;
+}
+
+export interface GeneratedTileSourceBytes extends CommittedTextureLibrary {
+  readonly name: string;
+  readonly tile: Uint8Array;
 }
 
 async function bytesAt(url: string, what: string): Promise<Uint8Array> {
@@ -56,6 +65,22 @@ export function generatedTileNames(): readonly string[] {
   return Object.keys(TILES).map((path) => baseName(path, '.owd')).sort();
 }
 
+/**
+ * The committed manifest and the sets it pins, for a tile from any source. A tile fetched from the
+ * product route needs exactly this and nothing else from the repository.
+ */
+export async function committedTextureLibrary(): Promise<CommittedTextureLibrary> {
+  const textureManifest = await bytesAt(textureManifestUrl, 'The texture manifest');
+  return {
+    textureManifest,
+    async textureSet(contentSha256: string): Promise<Uint8Array> {
+      const entry = Object.entries(TEXTURE_SETS).find(([candidate]) => baseName(candidate, '.ltex') === contentSha256);
+      if (entry === undefined) throw new Error(`No committed texture set has digest ${contentSha256}`);
+      return bytesAt(entry[1], `Texture set ${contentSha256}`);
+    },
+  };
+}
+
 export async function generatedTileSource(name: string): Promise<GeneratedTileSourceBytes> {
   const matches = Object.entries(TILES).filter(([path]) => baseName(path, '.owd') === name);
   if (matches.length === 0) {
@@ -64,18 +89,9 @@ export async function generatedTileSource(name: string): Promise<GeneratedTileSo
   }
   if (matches.length > 1) throw new Error(`More than one baked tile is named ${name}: ${matches.map(([path]) => path).join(', ')}`);
   const [, resolve] = matches[0]!;
-  const [tile, textureManifest] = await Promise.all([
+  const [tile, library] = await Promise.all([
     resolve().then((url) => bytesAt(url, `Tile ${name}`)),
-    bytesAt(textureManifestUrl, 'The texture manifest'),
+    committedTextureLibrary(),
   ]);
-  return {
-    name,
-    tile,
-    textureManifest,
-    async textureSet(contentSha256: string): Promise<Uint8Array> {
-      const entry = Object.entries(TEXTURE_SETS).find(([candidate]) => baseName(candidate, '.ltex') === contentSha256);
-      if (entry === undefined) throw new Error(`No committed texture set has digest ${contentSha256}`);
-      return bytesAt(entry[1], `Texture set ${contentSha256}`);
-    },
-  };
+  return { name, tile, ...library };
 }

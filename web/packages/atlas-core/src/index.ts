@@ -639,6 +639,7 @@ export {
   TEXTURE_SET_TRUTH,
   TextureSetRefusal,
   decodeTextureSet,
+  ambientTextureSetDigest,
   parseTextureSetManifest,
   textureSetBlobPath,
 } from './texture-set.js';

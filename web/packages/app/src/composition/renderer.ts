@@ -18,6 +18,7 @@ import { worldArtProfile } from '@exulanica/presentation';
 
 import { mountAtlas } from '../atlas.js';
 import {
+  bakedTileRequest,
   generatedTileEvaluationName,
   ownedDistrict,
 } from '../config.js';
@@ -91,9 +92,14 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
     // Development only: `import.meta.env.DEV` is false in a production build, so the bundler drops
     // this branch and the module it imports. The preview route is the only caller.
     const tileName = import.meta.env.DEV ? generatedTileEvaluationName(window.location.search, env.preview) : null;
+    // A name is a golden committed here; a city seed and coordinate, or a key, is a container
+    // fetched from /tiles with this session's credential, because a baked street is never committed.
+    const bakedTile = import.meta.env.DEV && tileName === null ? bakedTileRequest(window.location.search, env.preview) : null;
     const generatedTile = import.meta.env.DEV && tileName !== null
       ? await (await import('./generated-tile.js')).prepareGeneratedTileEvaluation(env, tileName)
-      : undefined;
+      : import.meta.env.DEV && bakedTile !== null
+        ? await (await import('./generated-tile.js')).prepareBakedTileWalk(env, bakedTile)
+        : undefined;
     const district = generatedTile === undefined ? await ownedDistrict({ preview: env.preview }) : undefined;
     state.atlas = await mountAtlas(env.canvas, deps.stage, deps.scene, (report) => {
       resolveFirstFrame?.();

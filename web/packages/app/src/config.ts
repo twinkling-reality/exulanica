@@ -98,6 +98,50 @@ export function generatedTileEvaluationName(search: string, preview: boolean): s
     : null;
 }
 
+/** A city seed is a digest; a baked tile's key is a UUID. Neither is ever a path. */
+const CITY_SEED = /^[0-9a-f]{64}$/;
+const BAKED_TILE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+const TILE_COORDINATE_LIMIT = 1_000_000;
+const LOD_LIMIT = 64;
+
+/** Which baked tile a walk asked the product route for: a key, or a coordinate in a city. */
+export type BakedTileRequest =
+  | { readonly kind: 'key'; readonly bakedTileId: string }
+  | { readonly kind: 'coordinate'; readonly citySeed: string; readonly tileX: number; readonly tileY: number; readonly lod: number };
+
+function whole(value: string | null, limit: number): number | null {
+  if (value === null || !/^-?\d+$/.test(value)) return null;
+  const parsed = Number.parseInt(value, 10);
+  return Number.isSafeInteger(parsed) && Math.abs(parsed) <= limit ? parsed : null;
+}
+
+/**
+ * The baked tile a development preview asked the product route for, or null.
+ *
+ * DEVELOPMENT ONLY, and for the same reason {@link generatedTileEvaluationName} is: a generated
+ * tile may not appear in any person's world until a superseding governance ADR is accepted in
+ * writing. The difference between the two is where the container comes from. A `tile` name is a
+ * golden committed to this repository; a `city` and coordinate, or a `baked_tile` key, is a
+ * container fetched from `/tiles` with this session's credential, because a baked corridor street
+ * is never committed. The texture sets are the committed library either way, since no route serves
+ * the published texture library yet.
+ *
+ * A key wins over a coordinate when a search carries both, so one reading is never ambiguous.
+ */
+export function bakedTileRequest(search: string, preview: boolean): BakedTileRequest | null {
+  if (!preview) return null;
+  const parameters = new URLSearchParams(search);
+  const key = parameters.get('baked_tile');
+  if (key !== null) return BAKED_TILE_ID.test(key) ? { kind: 'key', bakedTileId: key } : null;
+  const citySeed = parameters.get('city');
+  if (citySeed === null || !CITY_SEED.test(citySeed)) return null;
+  const tileX = whole(parameters.get('tile_x'), TILE_COORDINATE_LIMIT);
+  const tileY = whole(parameters.get('tile_y'), TILE_COORDINATE_LIMIT);
+  const lod = parameters.get('lod') === null ? 0 : whole(parameters.get('lod'), LOD_LIMIT);
+  if (tileX === null || tileY === null || lod === null || lod < 0) return null;
+  return { kind: 'coordinate', citySeed, tileX, tileY, lod };
+}
+
 /** Keep preview provenance visible in browser chrome without adding permanent world chrome. */
 export function applicationTitle(preview: boolean): string {
   return preview ? PREVIEW_TITLE : PRODUCT_TITLE;

@@ -403,9 +403,21 @@ export function textureSetBlobPath(entry: TextureSetManifestEntry): string {
   return `blobs/${entry.contentSha256}.ltex`;
 }
 
-function ambientDigest(): TextureSetDigest | null {
+/**
+ * This page's own `crypto.subtle` as the one digest a reader needs, or null where there is none.
+ *
+ * The narrowing is the point: `SubtleCrypto.digest` accepts any `BufferSource` and any algorithm,
+ * and every caller here hands it SHA-256 over a `Uint8Array`, so the whole surface a caller may use
+ * is the one line of {@link TextureSetDigest}. A page with no `crypto.subtle` gets null and refuses
+ * rather than reading anything it cannot check.
+ */
+export function ambientTextureSetDigest(): TextureSetDigest | null {
   const scope = globalThis as unknown as { readonly crypto?: { readonly subtle?: TextureSetDigest } };
   return scope.crypto?.subtle ?? null;
+}
+
+function ambientDigest(): TextureSetDigest | null {
+  return ambientTextureSetDigest();
 }
 
 function hex(buffer: ArrayBuffer): string {
