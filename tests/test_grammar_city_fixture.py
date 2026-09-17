@@ -543,6 +543,29 @@ def _camber_steepened() -> TileDocument:
     )
 
 
+def _both_walks_on_one_street() -> TileDocument:
+    """One walk group releases both crossings, so the street it crosses is never stopped."""
+    signal = FIXTURE.signal
+    walks = [group for group in signal.groups if group.crossing_identities]
+    first, second = walks[0], walks[1]
+    groups = tuple(
+        dataclasses.replace(
+            group,
+            crossing_identities=(
+                (*first.crossing_identities, *second.crossing_identities) if group is first else ()
+            ),
+        )
+        if group in (first, second)
+        else group
+        for group in signal.groups
+    )
+    # A group that releases nothing is refused by the record itself, so the emptied one goes.
+    groups = tuple(
+        group for group in groups if group.connection_identities or group.crossing_identities
+    )
+    return _document(replace={signal.identity: dataclasses.replace(signal, groups=groups)})
+
+
 def _crossing_too_wide() -> TileDocument:
     crossing = FIXTURE.crossings[0]
     signalised = entry_fields(
@@ -666,6 +689,7 @@ _MUTATIONS: list[tuple[str, Callable[[], TileDocument], str]] = [
     ),
     ("a tree canopy at head height", _canopy_at_head_height, r"\[canopy_clearance\]"),
     ("a crossing wider than its type", _crossing_too_wide, r"\[crossing_width\]"),
+    ("both walks releasing one street's crossings", _both_walks_on_one_street, r"\[walk_group\]"),
     ("a kerb below the 100 mm gate", _kerb_below_the_gate, "below its minimum 100"),
     ("a vitrine partly behind a stall riser", _vitrine_not_behind_glass, r"\[vitrine\]"),
     ("a sign of another use class", _sign_of_another_use, r"\[premises_sign\]"),

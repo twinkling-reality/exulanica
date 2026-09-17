@@ -1678,6 +1678,62 @@ class _Checker:
                 ):
                     raise _fail("vitrine", f"{where}'s fitout leaves its box")
 
+    def check_walk_groups(self) -> None:
+        """Which walk a crossing belongs to: the one that walks while its own street is stopped.
+
+        A person crossing the north leg of a junction walks while the east to west phase is green,
+        so the crossings of one street belong to one pedestrian group and the crossings of the
+        street that meets it belong to another. Two groups that released the crossings of one
+        street would walk people into the same stopped traffic twice and leave the other street
+        uncrossable.
+
+        A crossing a signal releases must also lie on a leg of the junction that signal controls: a
+        crossing no phase of that junction stops traffic for is refused here rather than paired by
+        ordinal with whatever group happens to be next. In a document that passes ``[approaches]``
+        that branch is unreachable, since every inbound segment of a junction has an approach; it
+        is kept because the two checks are independent and a later junction rule may part them.
+
+        The plan's intervals say which groups run together, and they live in traffic's signal-plan
+        catalog, which this grammar names by digest and never reads. What is checkable here is the
+        pairing, and the pairing is what a generator gets wrong.
+        """
+        legs: dict[str, set[str]] = {}
+        for approach in self.of(JunctionApproachRecord):
+            legs.setdefault(approach.junction_identity, set()).add(approach.segment_identity)
+        for signal in self.of(SignalRecord):
+            junction_legs = legs.get(signal.controls_identity)
+            by_street: dict[str, str] = {}
+            for group in signal.groups:
+                if group.connection_identities or not group.crossing_identities:
+                    continue
+                streets = set()
+                for identity in group.crossing_identities:
+                    crossing = self.carried(identity)
+                    if crossing is None:
+                        continue
+                    if junction_legs is not None and crossing.segment_identity not in junction_legs:
+                        raise _fail(
+                            "walk_group",
+                            f"crossing {identity} is released by {signal.identity}'s group "
+                            f"{group.group} and crosses no leg of the junction it controls",
+                        )
+                    segment = self.carried(crossing.segment_identity)
+                    if segment is not None:
+                        streets.add(segment.street_identity)
+                if len(streets) > 1:
+                    raise _fail(
+                        "walk_group",
+                        f"{signal.identity}'s group {group.group} releases crossings of "
+                        f"{len(streets)} streets; a walk crosses one street",
+                    )
+                for street in streets:
+                    if by_street.setdefault(street, group.group) != group.group:
+                        raise _fail(
+                            "walk_group",
+                            f"{signal.identity} releases crossings of street {street} in both "
+                            f"{by_street[street]} and {group.group}",
+                        )
+
     def check_backings(self) -> None:
         """What lies behind a face's glass: one plane per glazed face, covering every opening.
 
@@ -1794,6 +1850,7 @@ _CHECKS: Final[tuple[Callable[[_Checker], None], ...]] = (
     _Checker.check_streetlife,
     _Checker.check_vitrines,
     _Checker.check_backings,
+    _Checker.check_walk_groups,
     _Checker.check_premises,
     _Checker.check_terrain,
 )
