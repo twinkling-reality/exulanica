@@ -105,6 +105,10 @@ read above 16.7 ms, missed presentations, preparation time, bytes, draw calls.
    per-subject cap of 2,097,152 is what binds here (one district batch asks for more), so the
    4,194,304 budget draws 2,187,735 points and its headroom is unmeasured.
    DECISION: both constants stay as they are, now measured on the district main draws today.
+   NOTE ON THE BASE: these six runs were measured with the lane based on main f07cedb6. The branch was
+   then rebased onto 71e5219d (the texture and living society lanes among 36 commits). The pixel
+   checks were rerun on that base and are byte-identical to it, but these frame times were NOT
+   re-measured there.
 
 Not measured here: WebGPU (the look is WebGL2-only; see the header of data-view/points.ts), a weak machine,
 a ten-minute leak run, and the first slide's preparation hitch per frame (the totals above are
