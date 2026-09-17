@@ -13,6 +13,7 @@ read by the operator, is the only authoritative total, and the record says so.
 
 from __future__ import annotations
 
+from collections.abc import Sequence
 from datetime import UTC, datetime
 from typing import Any, Final
 
@@ -30,7 +31,9 @@ __all__ = [
     "AUTHORITATIVE",
     "GPU_RUN_PROFILE",
     "build_gpu_run",
+    "ceiling_seconds",
     "cost_microdollars",
+    "document_section",
     "ledger_line",
     "read_gpu_run",
 ]
@@ -65,6 +68,13 @@ def cost_microdollars(rate_cents_per_hour: int, seconds: int) -> int:
     """Rate times seconds, in millionths of a dollar, rounded up."""
     numerator = rate_cents_per_hour * 10_000 * seconds
     return -(-numerator // 3600)
+
+
+def ceiling_seconds(ceiling_cents: int, rate_cents_per_hour: int) -> int:
+    """The most seconds a ceiling buys at a rate, rounded down, so a run cannot pass it by a second."""
+    if ceiling_cents < 0 or rate_cents_per_hour < 1:
+        raise Refused("a ceiling is not negative and a rate is positive")
+    return ceiling_cents * 3600 // rate_cents_per_hour
 
 
 def build_gpu_run(document: dict[str, Any]) -> bytes:
@@ -154,3 +164,68 @@ def ledger_line(raw: bytes) -> str:
         f"{run['billed_seconds']} s  ${dollars} at {run['rate_cents_per_hour']} cents/h  "
         f"{len(run['generations'])} generations  {run['purpose']}"
     )
+
+
+def document_section(
+    raw: bytes,
+    *,
+    balance_before_cents: int,
+    balance_after_cents: int,
+    consent: str,
+    produced: Sequence[str],
+    taught: Sequence[str],
+) -> str:
+    """The dated section this run adds to ``docs/reference-gpu-compute.md``, for a person to read.
+
+    The operator asked that every instance this lane creates is written into the repository, not only
+    into the ignored evidence directory: what was rented, at what rate read that day, when it began
+    and ended, what it cost, what it produced by digest, what it taught including the false starts,
+    that the operator accepted the provider's data-sharing consent, and the balance before and after.
+    The machine-readable record stays beside it; this is the part a person reads later.
+    """
+    run = read_gpu_run(raw)
+    if balance_before_cents < 0 or balance_after_cents < 0:
+        raise Refused("a balance is not negative")
+    if not produced or not taught:
+        raise Refused(
+            "a section says what the run produced and what it taught, even if it taught that it failed"
+        )
+    hours = run["billed_seconds"] / 3600
+    cents = (run["cost_microdollars"] + 5_000) // 10_000
+    lines = [
+        f"## {run['started_at'][:10]} {run['purpose']}",
+        "",
+        "| Field | Value |",
+        "| --- | --- |",
+        f"| Provider | {run['provider']} |",
+        f"| Instance type | `{run['instance_type']}` |",
+        f"| Instance name | `{run['instance_name']}` |",
+        f"| GPU | {run['gpu_count']} x {run['gpu']} |",
+        f"| Rate read that day | ${run['rate_cents_per_hour'] // 100}.{run['rate_cents_per_hour'] % 100:02d} per hour ({run['rate_source']}) |",
+        f"| Created | {run['started_at']} |",
+        f"| Hard deadline | {run['hard_deadline_at']} |",
+        f"| Deleted | {run['deleted_at']} |",
+        f"| Billed | {run['billed_seconds']} s ({hours:.2f} h) |",
+        f"| Cost at the listed rate | ${cents // 100}.{cents % 100:02d} |",
+        f"| Prepaid balance before | ${balance_before_cents // 100}.{balance_before_cents % 100:02d} |",
+        f"| Prepaid balance after | ${balance_after_cents // 100}.{balance_after_cents % 100:02d} |",
+        f"| Data-sharing consent | {consent} |",
+        f"| Authoritative total | {run['authoritative_total']} |",
+        "",
+        "What it produced:",
+        "",
+    ]
+    lines += [f"- {item}" for item in produced]
+    lines += ["", "What it taught:", ""]
+    lines += [f"- {item}" for item in taught]
+    lines += [
+        "",
+        (
+            "The machine-readable record of this run is `exulanica.appearance-gpu-run/v1` with "
+            f"{len(run['generations'])} generation records; the cost above is the listed rate times "
+            "the billed seconds, and the provider's billing page, read by the operator, is the only "
+            "authoritative total."
+        ),
+        "",
+    ]
+    return "\n".join(lines)

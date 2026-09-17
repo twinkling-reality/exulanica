@@ -216,9 +216,23 @@ the numbers are copied into `ml/appearance/evidence/baseline-measurements.log.tx
   Shadeform on Brev, listed at $2.63 an hour on 2026-09-17 (no stop; deleted after every run). Every
   candidate fits at bf16 except Wan A14B, which runs in fp8. Fallback: an H200 141 GB on Nebius at
   $5.40 an hour.
-- **Approved spend:** about 30 hours, a $150 ceiling including the fallback, a stop at 150 per cent
-  of each run's estimate. Every run is an `appearance-gpu-run` record and a line in the committed
-  ledger.
+- **Approved spend, corrected by the operator on 2026-09-17:** the prepaid balance is $40.31, not
+  the $150 first approved. Track A's smoke and session 1 go ahead (about $7.60 at the estimates)
+  under a hard ceiling of **$25 for all of this lane's Track A work**, retries and idle included. A
+  projected spend that would pass the ceiling stops the work: delete the machine and report instead.
+  `gpu_run.ceiling_seconds` turns a ceiling into whole billed seconds at the day's rate, floored, so
+  a run cannot pass it by a second: $25 at $2.63 an hour is 34,220 s.
+- **Track B is not approved at this balance.** Its video work (about 13 hours, roughly $34) needs a
+  fresh decision and probably a top-up, which the orchestrator puts to the operator with Track A's
+  results in hand. Nothing in Track B runs before then.
+- **Every run is documented in the repository**, not only in the ignored evidence directory:
+  `gpu_run.document_section` writes the dated section that is appended to
+  [reference-gpu-compute.md](reference-gpu-compute.md) and committed. It names the provider and
+  instance type, the rate read that day, the instance name, the creation, deadline and deletion
+  instants, the hours billed, the cost at the listed rate, what the run produced by digest, what it
+  taught including the false starts, that the operator accepted the provider's data-sharing consent,
+  and the prepaid balance before and after. The `appearance-gpu-run` record stays beside it as the
+  machine-readable evidence; the section is what a person reads later.
 - **Consent:** each deploy carries a data-sharing consent with the named provider. The operator
   clicks it, and the lane messages the orchestrator before opening any deploy, every time, so that
   click stays the only way a machine is created.

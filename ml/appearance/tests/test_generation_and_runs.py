@@ -207,3 +207,47 @@ def test_the_run_reader_refuses_edited_arithmetic(change, words):
     change(document)
     with pytest.raises(Refused, match=words):
         read_gpu_run(canonical_bytes(document))
+
+
+def test_a_ceiling_buys_whole_seconds_and_never_one_more():
+    from exulanica_appearance.gpu_run import ceiling_seconds
+
+    # $25 at $2.63 an hour, floored so a run cannot pass the ceiling by a second.
+    assert ceiling_seconds(2500, 263) == 34_220
+    assert cost_microdollars(263, ceiling_seconds(2500, 263)) <= 25_000_000
+    assert cost_microdollars(263, ceiling_seconds(2500, 263) + 1) > 25_000_000
+    assert ceiling_seconds(0, 263) == 0
+    with pytest.raises(Refused, match="a ceiling is not negative"):
+        ceiling_seconds(-1, 263)
+
+
+def test_the_documented_section_says_what_a_person_needs_later():
+    from exulanica_appearance.gpu_run import document_section
+
+    section = document_section(
+        build_gpu_run(_run()),
+        balance_before_cents=4031,
+        balance_after_cents=3373,
+        consent="accepted by the operator in the Brev console, MassedCompute named on the Deploy dialog",
+        produced=["2 generation records, outputs 9da27a6c and 0fc3b490"],
+        taught=["the first build failed on a missing apt package, which cost 4 minutes"],
+    )
+    assert "| Instance name | `exulanica-appearance-a1` |" in section
+    assert "| Rate read that day | $2.63 per hour" in section
+    assert "| Created | 2026-09-18T12:00:00Z |" in section
+    assert "| Deleted | 2026-09-18T14:30:00Z |" in section
+    assert "| Billed | 9000 s (2.50 h) |" in section
+    assert "| Cost at the listed rate | $6.58 |" in section
+    assert "| Prepaid balance before | $40.31 |" in section
+    assert "| Prepaid balance after | $33.73 |" in section
+    assert "accepted by the operator" in section
+    assert "the first build failed" in section
+    with pytest.raises(Refused, match="what it taught"):
+        document_section(
+            build_gpu_run(_run()),
+            balance_before_cents=4031,
+            balance_after_cents=3373,
+            consent="accepted",
+            produced=["nothing"],
+            taught=[],
+        )
