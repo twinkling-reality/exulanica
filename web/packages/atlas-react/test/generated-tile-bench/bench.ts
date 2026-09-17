@@ -18,6 +18,8 @@ import {
   CORNICE, DOOR, KERB_FACE_Z, KERB_HEIGHT_M, WALL, WALL_Z,
   calibrationWall, testStreet, type TestStreetSets, type TestSurface,
 } from './test-street.js';
+import { testCutoutSet } from './test-cutout.js';
+import type { DecodedTextureSet } from '@exulanica/atlas-core';
 
 declare const __TEXTURE_ROOT__: string;
 
@@ -486,6 +488,218 @@ export class Bench {
     }
     await this.showStreet();
     return results;
+  }
+
+  /** The test-only leaf field as a cutout material, bound by the runtime's own class binding. */
+  private cutoutMaterial(discs?: number): { readonly material: pc.StandardMaterial; readonly set: DecodedTextureSet } {
+    const set = testCutoutSet(512, 2000, discs);
+    const resolution = this.library.adopt({ state: 'decoded', setId: set.entry.setId, set, transferredBytes: 0 });
+    if (resolution.state !== 'available') throw new Error(`the test cutout does not draw: ${resolution.reason}`);
+    return { material: resolution.material, set };
+  }
+
+  /** For comparison only: the same material with the device's own averaged mip chain. */
+  private plainMipMaterial(material: pc.StandardMaterial, set: DecodedTextureSet): { readonly material: pc.StandardMaterial; readonly texture: pc.Texture } {
+    const texture = new pc.Texture(this.app.graphicsDevice, {
+      name: 'bench:plain-mip-cutout', width: set.entry.width, height: set.entry.height, format: pc.PIXELFORMAT_SRGBA8,
+      mipmaps: true, anisotropy: this.look.surface.anisotropy, addressU: pc.ADDRESS_REPEAT, addressV: pc.ADDRESS_REPEAT,
+      minFilter: pc.FILTER_LINEAR_MIPMAP_LINEAR, magFilter: pc.FILTER_LINEAR, levels: [set.maps.base_color_coverage!],
+    });
+    const plain = material.clone() as pc.StandardMaterial;
+    plain.diffuseMap = texture;
+    plain.opacityMap = texture;
+    plain.update();
+    return { material: plain, texture };
+  }
+
+  /** A square of the test field, `size` metres, facing -Z (vertical) or +Y (horizontal), one repeat per extent. */
+  private cutoutPlane(material: pc.Material, centre: readonly [number, number, number], size: number, facing: 'front' | 'up', extentMm: number): pc.Entity {
+    const h = size / 2;
+    const [x, y, z] = centre;
+    const corners = facing === 'front'
+      ? [[x - h, y + h, z], [x + h, y + h, z], [x + h, y - h, z], [x - h, y - h, z]]
+      : [[x - h, y, z - h], [x + h, y, z - h], [x + h, y, z + h], [x - h, y, z + h]];
+    const normal = facing === 'front' ? [0, 0, -1] : [0, 1, 0];
+    const mm = size * 1000;
+    const mesh = buildSurfaceMesh(this.app.graphicsDevice, {
+      positions: corners.flat(), normals: [...normal, ...normal, ...normal, ...normal],
+      // Counter-clockwise seen from the side the normal points to, so the geometric front is that side.
+      surfaceMm: [0, 0, mm, 0, mm, mm, 0, mm], indices: facing === 'front' ? [0, 1, 2, 0, 2, 3] : [0, 2, 1, 0, 3, 2],
+    }, (s, t) => [s / extentMm, t / extentMm]);
+    const entity = new pc.Entity('bench:cutout-plane');
+    entity.addComponent('render', { meshInstances: [new pc.MeshInstance(mesh, material, entity)], castShadows: true, receiveShadows: true });
+    this.root.addChild(entity);
+    this.surfaces.push(entity);
+    this.meshes.push(mesh);
+    return entity;
+  }
+
+  private unlitMask(): pc.StandardMaterial {
+    const mask = new pc.StandardMaterial();
+    mask.useLighting = false; mask.useSkybox = false; mask.diffuse = new pc.Color(0, 0, 0); mask.emissive = new pc.Color(1, 0, 1);
+    mask.cull = pc.CULLFACE_NONE; mask.update();
+    return mask;
+  }
+
+  private static differs(a: Uint8Array, b: Uint8Array, at: number): boolean {
+    return Math.abs(a[at]! - b[at]!) + Math.abs(a[at + 1]! - b[at + 1]!) + Math.abs(a[at + 2]! - b[at + 2]!) > 30;
+  }
+
+  /**
+   * Cutout acceptance: silhouette coverage of a 4 m square of the test field seen face on at each
+   * distance, as the share of its footprint's pixels the leaves cover. The footprint is the same square
+   * drawn as an opaque mask; a pixel is covered where the cutout frame differs from the empty frame.
+   * Measured with the runtime's coverage-keeping levels and, for comparison, with plain averaged levels.
+   */
+  async measureCutoutCoverage(distances: readonly number[], discs?: number): Promise<Record<string, unknown>> {
+    this.clear();
+    const { material, set } = this.cutoutMaterial(discs);
+    const plain = this.plainMipMaterial(material, set);
+    const mask = this.unlitMask();
+    const centre = [0, 40, 0] as const;
+    const plane = this.cutoutPlane(material, centre, 4, 'front', set.entry.extentUMm);
+    const render = plane.render!;
+    const out: Record<string, unknown> = { coveragePermille: (set.classParameters as { coveragePermille: number }).coveragePermille };
+    for (const [label, drawn] of [['kept', material], ['plain', plain.material]] as const) {
+      const rows: Record<string, unknown>[] = [];
+      for (const distance of distances) {
+        this.pose({ position: [0, 40, -distance], target: centre });
+        plane.enabled = false; this.pump(4);
+        const empty = this.pixels();
+        plane.enabled = true; render.meshInstances[0]!.material = mask; this.pump(4);
+        const footprintFrame = this.pixels();
+        render.meshInstances[0]!.material = drawn; this.pump(4);
+        const drawnFrame = this.pixels();
+        let footprint = 0; let covered = 0;
+        for (let at = 0; at < empty.data.length; at += 4) {
+          if (!Bench.differs(footprintFrame.data, empty.data, at)) continue;
+          footprint += 1;
+          if (Bench.differs(drawnFrame.data, empty.data, at)) covered += 1;
+        }
+        rows.push({ distance, footprintPixels: footprint, coveredPixels: covered, coverage: Math.round((covered / footprint) * 10000) / 10000 });
+      }
+      out[label] = rows;
+    }
+    this.clear();
+    mask.destroy(); plain.material.destroy(); plain.texture.destroy();
+    return out;
+  }
+
+  /**
+   * The shadow pass applies the same test: a horizontal 4 m square of the test field 2.5 m above lit
+   * ground, the sun straight down, the ground under it seen obliquely from beside it. The share of
+   * ground samples shadowed (closer to the opaque square's shadow than to open light), for the cutout
+   * and for the same square drawn opaque.
+   */
+  async measureCutoutShadow(): Promise<Record<string, unknown>> {
+    this.clear();
+    const { material, set } = this.cutoutMaterial();
+    const ground = await this.library.resolve('cc0.footway-paving');
+    const sun = this.environment!.sun;
+    const rotation = sun.getRotation().clone();
+    sun.setRotation(new pc.Quat().setFromEulerAngles(0, 0, 0));
+    const opaque = material.clone() as pc.StandardMaterial;
+    opaque.opacityMap = null; opaque.alphaTest = 0; opaque.update();
+    const groundPlane = this.cutoutPlane(ground.material, [0, 0, 0], 16, 'up', 1800);
+    groundPlane.name = 'bench:ground';
+    const canopy = this.cutoutPlane(material, [0, 2.5, 0], 4, 'up', set.entry.extentUMm);
+    this.pose({ position: [0, 1.3, -7], target: [0, 0, 0] });
+    const samples: (readonly [number, number])[] = [];
+    for (let i = 0; i < 40; i += 1) {
+      for (let j = 0; j < 40; j += 1) {
+        const [sx, sy] = this.screen([-1.6 + (3.2 * (i + 0.5)) / 40, 0.001, -1.6 + (3.2 * (j + 0.5)) / 40]);
+        samples.push([Math.round(sx), Math.round(sy)]);
+      }
+    }
+    const luma = (frame: ReturnType<Bench['pixels']>): number[] => samples.map(([x, y]) => {
+      const at = (y * frame.width + x) * 4;
+      return luminance(frame.data[at]!, frame.data[at + 1]!, frame.data[at + 2]!);
+    });
+    const render = canopy.render!;
+    canopy.enabled = false; this.pump(6);
+    const lit = luma(this.pixels());
+    canopy.enabled = true; render.meshInstances[0]!.material = opaque; this.pump(6);
+    const dark = luma(this.pixels());
+    render.meshInstances[0]!.material = material; this.pump(6);
+    const holed = luma(this.pixels());
+    const share = (values: number[]): number => {
+      let shadowed = 0;
+      values.forEach((value, index) => { if (lit[index]! - value > (lit[index]! - dark[index]!) / 2) shadowed += 1; });
+      return Math.round((shadowed / values.length) * 1000) / 1000;
+    };
+    const result = {
+      coveragePermille: (set.classParameters as { coveragePermille: number }).coveragePermille,
+      litMean: Math.round(lit.reduce((a, b) => a + b, 0) / lit.length),
+      opaqueShadowMean: Math.round(dark.reduce((a, b) => a + b, 0) / dark.length),
+      cutoutShadowedShare: share(holed),
+      opaqueShadowedShare: share(dark),
+    };
+    sun.setRotation(rotation);
+    this.clear();
+    opaque.destroy();
+    return result;
+  }
+
+  /**
+   * Both faces are lit: the test field square seen from its back with the sun behind the viewer, so
+   * light reaches the back face. Mean luminance of the covered pixels with two-sided lighting (the
+   * binding) and, for comparison, without it, and of the front face with the sun on the far side.
+   */
+  async measureCutoutBackFace(): Promise<Record<string, unknown>> {
+    this.clear();
+    const { material, set } = this.cutoutMaterial();
+    const oneSided = material.clone() as pc.StandardMaterial;
+    oneSided.twoSidedLighting = false; oneSided.update();
+    const sun = this.environment!.sun;
+    const rotation = sun.getRotation().clone();
+    // Light travelling toward -Z and down: it reaches the +Z (back) face of a square facing -Z.
+    sun.setRotation(new pc.Quat().setFromDirections(new pc.Vec3(0, -1, 0), new pc.Vec3(0, -0.5, -1).normalize()));
+    const centre = [0, 40, 0] as const;
+    const plane = this.cutoutPlane(material, centre, 4, 'front', set.entry.extentUMm);
+    const render = plane.render!;
+    const coveredMean = (position: readonly [number, number, number], drawn: pc.Material): number => {
+      this.pose({ position, target: centre });
+      plane.enabled = false; this.pump(4);
+      const empty = this.pixels();
+      plane.enabled = true; render.meshInstances[0]!.material = drawn; this.pump(4);
+      const frame = this.pixels();
+      let sum = 0; let count = 0;
+      for (let at = 0; at < frame.data.length; at += 4) {
+        if (!Bench.differs(frame.data, empty.data, at)) continue;
+        sum += luminance(frame.data[at]!, frame.data[at + 1]!, frame.data[at + 2]!); count += 1;
+      }
+      return count === 0 ? -1 : Math.round((sum / count) * 10) / 10;
+    };
+    const result = {
+      backLitTwoSided: coveredMean([0, 40, 6], material),
+      backLitOneSided: coveredMean([0, 40, 6], oneSided),
+      frontUnlitTwoSided: coveredMean([0, 40, -6], material),
+    };
+    sun.setRotation(rotation);
+    this.clear();
+    oneSided.destroy();
+    return result;
+  }
+
+  /** For screenshots: a 4 m square of the test field face on at `distance`, left drawn. */
+  showCutoutFaceOn(distance: number, discs?: number): void {
+    this.clear();
+    const { material, set } = this.cutoutMaterial(discs);
+    this.cutoutPlane(material, [0, 40, 0], 4, 'front', set.entry.extentUMm);
+    this.pose({ position: [0, 40, -distance], target: [0, 40, 0] });
+    this.pump(4);
+  }
+
+  /** For screenshots: the shadow scene of `measureCutoutShadow`, left drawn with the sun straight down. */
+  async showCutoutShadow(): Promise<void> {
+    this.clear();
+    const { material, set } = this.cutoutMaterial();
+    const ground = await this.library.resolve('cc0.footway-paving');
+    this.environment!.sun.setRotation(new pc.Quat().setFromEulerAngles(0, 0, 0));
+    this.cutoutPlane(ground.material, [0, 0, 0], 16, 'up', 1800);
+    this.cutoutPlane(material, [0, 2.5, 0], 4, 'up', set.entry.extentUMm);
+    this.pose({ position: [0, 1.3, -7], target: [0, 0, 0] });
+    this.pump(6);
   }
 
   /**

@@ -7,44 +7,10 @@ import { parseTextureSetManifest, type TextureSetDigest } from '@exulanica/atlas
 import { TILE_LOOK_V1 } from '../src/playcanvas/generated-tile/look.js';
 import { coveragePreservingMips, coverageShare } from '../src/playcanvas/generated-tile/cutout-coverage.js';
 import { TileTextureLibrary } from '../src/playcanvas/generated-tile/texture-materials.js';
+import { leafCoverageField } from './generated-tile-bench/test-cutout.js';
 
 const subtle = webcrypto.subtle as unknown as TextureSetDigest;
 const CUTOFF = 128;
-
-/**
- * A test-only leaf field: overlapping soft discs of coverage, deterministic, tiling. It stands in
- * for foliage only in this test and never ships.
- */
-function leafField(size: number, discs: number, seed: number): Uint8Array {
-  let state = seed >>> 0;
-  const random = (): number => {
-    state = (state * 1664525 + 1013904223) >>> 0;
-    return state / 2 ** 32;
-  };
-  const alpha = new Float64Array(size * size);
-  for (let disc = 0; disc < discs; disc += 1) {
-    const cx = random() * size;
-    const cy = random() * size;
-    const radius = size * (0.01 + random() * 0.03);
-    for (let dy = -Math.ceil(radius); dy <= Math.ceil(radius); dy += 1) {
-      for (let dx = -Math.ceil(radius); dx <= Math.ceil(radius); dx += 1) {
-        const falloff = 1 - Math.hypot(dx, dy) / radius;
-        if (falloff <= 0) continue;
-        const x = (((Math.floor(cx) + dx) % size) + size) % size;
-        const y = (((Math.floor(cy) + dy) % size) + size) % size;
-        alpha[y * size + x] = Math.max(alpha[y * size + x]!, Math.min(1, falloff * 2.2));
-      }
-    }
-  }
-  const rgba = new Uint8Array(size * size * 4);
-  for (let texel = 0; texel < size * size; texel += 1) {
-    rgba[texel * 4] = 60;
-    rgba[texel * 4 + 1] = 110;
-    rgba[texel * 4 + 2] = 40;
-    rgba[texel * 4 + 3] = Math.round(alpha[texel]! * 255);
-  }
-  return rgba;
-}
 
 /** Ordinary mip levels: every byte averaged, coverage included. What the class contract forbids. */
 function boxMips(rgba: Uint8Array, size: number): Uint8Array[] {
@@ -70,7 +36,7 @@ function boxMips(rgba: Uint8Array, size: number): Uint8Array[] {
 
 describe('cutout mip levels keep their coverage', () => {
   const size = 256;
-  const field = leafField(size, 900, 20260917);
+  const field = leafCoverageField(size, 900, 20260917);
   const permille = Math.floor(coverageShare(field, CUTOFF) * 1000);
 
   it('keeps the share of covered texels at coverage_permille on every level, to the nearest texel, where plain averaging thins out', () => {

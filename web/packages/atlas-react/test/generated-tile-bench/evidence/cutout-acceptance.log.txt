@@ -1,0 +1,42 @@
+CUTOUT ACCEPTANCE, texture proposal section 3, 2026-09-17, lane/tile-runtime-cutout on main c4ca74a8
+Driver: headless Chrome 152 at 1440x900 against the bench (tile-runtime-bench, 5191), ANGLE Metal on Apple M3 Pro,
+look exulanica.generated-tile-look@1 (camera frame with 4 samples, contact shadowing, 3 shadow cascades at 2048, PCF3).
+Frames pumped synchronously through window.bench; pixels read back from the default framebuffer.
+
+SET: the TEST-ONLY leaf coverage field (test/generated-tile-bench/test-cutout.ts), never shipped and not foliage:
+overlapping soft discs of coverage, 512 x 512 texels over 2000 x 2000 mm (the proposal's foliage sizing), flat normals,
+roughness 190, bound through the runtime's own class binding (TileTextureUploads.adopt). Two densities:
+  dense: 904 discs, coverage_permille 705.  sparse: 380 discs, coverage_permille 389.
+Real foliage (cc0.broadleaf-foliage) is NOT measured: it is not published on main yet.
+
+1. SILHOUETTE COVERAGE AT 5 m AND 30 m (bench.measureCutoutCoverage). A 4 m square of the field, face on, at each
+   distance; the footprint is the same square drawn as an opaque unlit mask; a footprint pixel is covered where the
+   cutout frame differs from the empty frame by more than 30 in summed RGB. "kept" is the runtime's binding
+   (coveragePreservingMips); "plain" is the same material with the device's averaged mip chain, for comparison only.
+                     footprint px   kept coverage          plain coverage
+   dense   5 m        264,196       0.7071                 0.7078
+   dense  30 m          7,396       0.7370 (+4.2 %)        0.7795 (+10.1 %)
+   sparse  5 m        264,196       0.3876                 0.3880
+   sparse 30 m          7,396       0.3832 (-1.1 %)        0.3657 (-5.7 %)
+   Acceptance (30 m within 10 per cent of 5 m): met for both densities with the kept levels. Plain averaging leaves
+   the dense field 10.1 per cent thicker and thins the sparse one by 5.7 per cent. Partly covered pixels at leaf edges
+   count as covered, which favours coverage at distance slightly for both.
+
+2. THE SHADOW PASS APPLIES THE SAME TEST (bench.measureCutoutShadow). A horizontal 4 m square of the dense field 2.5 m
+   above lit paving, the sun straight down, 1,600 ground samples under it seen obliquely from 7 m (not through the
+   square). A sample is shadowed when it is darker than open light by more than half of the opaque square's shadow.
+   lit mean 227, opaque shadow mean 92; shadowed share: opaque square 1.000, cutout square 0.494 (coverage 0.705).
+   The cutout's shadow has holes, so coverage is tested in the shadow pass. Its share is below the coverage because
+   the shadow map's filtering and resolution soften leaf edges; it is not a claim that shadow share equals coverage.
+
+3. BOTH FACES ARE LIT (bench.measureCutoutBackFace). A vertical square of the dense field, light travelling toward -Z
+   and down, so it reaches the back (+Z) face; mean luminance of the covered pixels.
+   back face, two-sided lighting (the binding):   91.2
+   back face, one-sided (comparison only):        49.7
+   front face (away from the light), two-sided:   49.8
+   The back face is lit only with its normal reversed.
+
+UNIT TESTS: test/generated-tile-cutout.test.ts (every level of a 256 x 256 leaf field keeps coverage_permille to 1 per
+cent of its texels while plain averaging drifts by more than 5 per cent; colour averaged by coverage; the conformance
+cutout fixture binds with alphaTest 128/255, opacity from the colour map's alpha, no blending, depth written, cull
+none, two-sided lighting and a five-level chain).
