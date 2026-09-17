@@ -1,0 +1,273 @@
+{
+  "schema_version": 1,
+  "catalog_id": "tree-species",
+  "catalog_version": 2,
+  "entries": [
+    {
+      "key": "acer_platanoides",
+      "scientific_name": "Acer platanoides",
+      "common_name": "Norway maple",
+      "census_count": 34189,
+      "reason": "Derived: a species of at least one percent of the 652169 named trees in the NYC 2015 Street Tree Census species counts retained beside this catalog; rows naming a genus alone and the row with no species are left out.",
+      "licence": {
+        "spdx": "LicenseRef-NYC-Open-Data",
+        "verdict": "SHIP-ATTRIB",
+        "origin": "derived",
+        "licence_source": "https://cityofnewyork.github.io/opendatatsm/publicpolicies.html",
+        "content_source": "assets/catalogs/sources/nyc-2015-street-tree-census-species.json"
+      }
+    },
+    {
+      "key": "acer_rubrum",
+      "scientific_name": "Acer rubrum",
+      "common_name": "red maple",
+      "census_count": 17246,
+      "reason": "Derived: a species of at least one percent of the 652169 named trees in the NYC 2015 Street Tree Census species counts retained beside this catalog; rows naming a genus alone and the row with no species are left out.",
+      "licence": {
+        "spdx": "LicenseRef-NYC-Open-Data",
+        "verdict": "SHIP-ATTRIB",
+        "origin": "derived",
+        "licence_source": "https://cityofnewyork.github.io/opendatatsm/publicpolicies.html",
+        "content_source": "assets/catalogs/sources/nyc-2015-street-tree-census-species.json"
+      }
+    },
+    {
+      "key": "acer_saccharinum",
+      "scientific_name": "Acer saccharinum",
+      "common_name": "silver maple",
+      "census_count": 12277,
+      "reason": "Derived: a species of at least one percent of the 652169 named trees in the NYC 2015 Street Tree Census species counts retained beside this catalog; rows naming a genus alone and the row with no species are left out.",
+      "licence": {
+        "spdx": "LicenseRef-NYC-Open-Data",
+        "verdict": "SHIP-ATTRIB",
+        "origin": "derived",
+        "licence_source": "https://cityofnewyork.github.io/opendatatsm/publicpolicies.html",
+        "content_source": "assets/catalogs/sources/nyc-2015-street-tree-census-species.json"
+      }
+    },
+    {
+      "key": "fraxinus_pennsylvanica",
+      "scientific_name": "Fraxinus pennsylvanica",
+      "common_name": "green ash",
+      "census_count": 16251,
+      "reason": "Derived: a species of at least one percent of the 652169 named trees in the NYC 2015 Street Tree Census species counts retained beside this catalog; rows naming a genus alone and the row with no species are left out.",
+      "licence": {
+        "spdx": "LicenseRef-NYC-Open-Data",
+        "verdict": "SHIP-ATTRIB",
+        "origin": "derived",
+        "licence_source": "https://cityofnewyork.github.io/opendatatsm/publicpolicies.html",
+        "content_source": "assets/catalogs/sources/nyc-2015-street-tree-census-species.json"
+      }
+    },
+    {
+      "key": "ginkgo_biloba",
+      "scientific_name": "Ginkgo biloba",
+      "common_name": "ginkgo",
+      "census_count": 21024,
+      "reason": "Derived: a species of at least one percent of the 652169 named trees in the NYC 2015 Street Tree Census species counts retained beside this catalog; rows naming a genus alone and the row with no species are left out.",
+      "licence": {
+        "spdx": "LicenseRef-NYC-Open-Data",
+        "verdict": "SHIP-ATTRIB",
+        "origin": "derived",
+        "licence_source": "https://cityofnewyork.github.io/opendatatsm/publicpolicies.html",
+        "content_source": "assets/catalogs/sources/nyc-2015-street-tree-census-species.json"
+      }
+    },
+    {
+      "key": "gleditsia_triacanthos_var_inermis",
+      "scientific_name": "Gleditsia triacanthos var. inermis",
+      "common_name": "honeylocust",
+      "census_count": 64264,
+      "reason": "Derived: a species of at least one percent of the 652169 named trees in the NYC 2015 Street Tree Census species counts retained beside this catalog; rows naming a genus alone and the row with no species are left out.",
+      "licence": {
+        "spdx": "LicenseRef-NYC-Open-Data",
+        "verdict": "SHIP-ATTRIB",
+        "origin": "derived",
+        "licence_source": "https://cityofnewyork.github.io/opendatatsm/publicpolicies.html",
+        "content_source": "assets/catalogs/sources/nyc-2015-street-tree-census-species.json"
+      }
+    },
+    {
+      "key": "liquidambar_styraciflua",
+      "scientific_name": "Liquidambar styraciflua",
+      "common_name": "sweetgum",
+      "census_count": 10657,
+      "reason": "Derived: a species of at least one percent of the 652169 named trees in the NYC 2015 Street Tree Census species counts retained beside this catalog; rows naming a genus alone and the row with no species are left out.",
+      "licence": {
+        "spdx": "LicenseRef-NYC-Open-Data",
+        "verdict": "SHIP-ATTRIB",
+        "origin": "derived",
+        "licence_source": "https://cityofnewyork.github.io/opendatatsm/publicpolicies.html",
+        "content_source": "assets/catalogs/sources/nyc-2015-street-tree-census-species.json"
+      }
+    },
+    {
+      "key": "platanus_x_acerifolia",
+      "scientific_name": "Platanus x acerifolia",
+      "common_name": "London planetree",
+      "census_count": 87014,
+      "reason": "Derived: a species of at least one percent of the 652169 named trees in the NYC 2015 Street Tree Census species counts retained beside this catalog; rows naming a genus alone and the row with no species are left out.",
+      "licence": {
+        "spdx": "LicenseRef-NYC-Open-Data",
+        "verdict": "SHIP-ATTRIB",
+        "origin": "derived",
+        "licence_source": "https://cityofnewyork.github.io/opendatatsm/publicpolicies.html",
+        "content_source": "assets/catalogs/sources/nyc-2015-street-tree-census-species.json"
+      }
+    },
+    {
+      "key": "prunus_cerasifera",
+      "scientific_name": "Prunus cerasifera",
+      "common_name": "purple-leaf plum",
+      "census_count": 6879,
+      "reason": "Derived: a species of at least one percent of the 652169 named trees in the NYC 2015 Street Tree Census species counts retained beside this catalog; rows naming a genus alone and the row with no species are left out.",
+      "licence": {
+        "spdx": "LicenseRef-NYC-Open-Data",
+        "verdict": "SHIP-ATTRIB",
+        "origin": "derived",
+        "licence_source": "https://cityofnewyork.github.io/opendatatsm/publicpolicies.html",
+        "content_source": "assets/catalogs/sources/nyc-2015-street-tree-census-species.json"
+      }
+    },
+    {
+      "key": "pyrus_calleryana",
+      "scientific_name": "Pyrus calleryana",
+      "common_name": "Callery pear",
+      "census_count": 58931,
+      "reason": "Derived: a species of at least one percent of the 652169 named trees in the NYC 2015 Street Tree Census species counts retained beside this catalog; rows naming a genus alone and the row with no species are left out.",
+      "licence": {
+        "spdx": "LicenseRef-NYC-Open-Data",
+        "verdict": "SHIP-ATTRIB",
+        "origin": "derived",
+        "licence_source": "https://cityofnewyork.github.io/opendatatsm/publicpolicies.html",
+        "content_source": "assets/catalogs/sources/nyc-2015-street-tree-census-species.json"
+      }
+    },
+    {
+      "key": "quercus_bicolor",
+      "scientific_name": "Quercus bicolor",
+      "common_name": "swamp white oak",
+      "census_count": 6598,
+      "reason": "Derived: a species of at least one percent of the 652169 named trees in the NYC 2015 Street Tree Census species counts retained beside this catalog; rows naming a genus alone and the row with no species are left out.",
+      "licence": {
+        "spdx": "LicenseRef-NYC-Open-Data",
+        "verdict": "SHIP-ATTRIB",
+        "origin": "derived",
+        "licence_source": "https://cityofnewyork.github.io/opendatatsm/publicpolicies.html",
+        "content_source": "assets/catalogs/sources/nyc-2015-street-tree-census-species.json"
+      }
+    },
+    {
+      "key": "quercus_palustris",
+      "scientific_name": "Quercus palustris",
+      "common_name": "pin oak",
+      "census_count": 53185,
+      "reason": "Derived: a species of at least one percent of the 652169 named trees in the NYC 2015 Street Tree Census species counts retained beside this catalog; rows naming a genus alone and the row with no species are left out.",
+      "licence": {
+        "spdx": "LicenseRef-NYC-Open-Data",
+        "verdict": "SHIP-ATTRIB",
+        "origin": "derived",
+        "licence_source": "https://cityofnewyork.github.io/opendatatsm/publicpolicies.html",
+        "content_source": "assets/catalogs/sources/nyc-2015-street-tree-census-species.json"
+      }
+    },
+    {
+      "key": "quercus_rubra",
+      "scientific_name": "Quercus rubra",
+      "common_name": "northern red oak",
+      "census_count": 8400,
+      "reason": "Derived: a species of at least one percent of the 652169 named trees in the NYC 2015 Street Tree Census species counts retained beside this catalog; rows naming a genus alone and the row with no species are left out.",
+      "licence": {
+        "spdx": "LicenseRef-NYC-Open-Data",
+        "verdict": "SHIP-ATTRIB",
+        "origin": "derived",
+        "licence_source": "https://cityofnewyork.github.io/opendatatsm/publicpolicies.html",
+        "content_source": "assets/catalogs/sources/nyc-2015-street-tree-census-species.json"
+      }
+    },
+    {
+      "key": "styphnolobium_japonicum",
+      "scientific_name": "Styphnolobium japonicum",
+      "common_name": "Sophora",
+      "census_count": 19338,
+      "reason": "Derived: a species of at least one percent of the 652169 named trees in the NYC 2015 Street Tree Census species counts retained beside this catalog; rows naming a genus alone and the row with no species are left out.",
+      "licence": {
+        "spdx": "LicenseRef-NYC-Open-Data",
+        "verdict": "SHIP-ATTRIB",
+        "origin": "derived",
+        "licence_source": "https://cityofnewyork.github.io/opendatatsm/publicpolicies.html",
+        "content_source": "assets/catalogs/sources/nyc-2015-street-tree-census-species.json"
+      }
+    },
+    {
+      "key": "tilia_americana",
+      "scientific_name": "Tilia americana",
+      "common_name": "American linden",
+      "census_count": 13530,
+      "reason": "Derived: a species of at least one percent of the 652169 named trees in the NYC 2015 Street Tree Census species counts retained beside this catalog; rows naming a genus alone and the row with no species are left out.",
+      "licence": {
+        "spdx": "LicenseRef-NYC-Open-Data",
+        "verdict": "SHIP-ATTRIB",
+        "origin": "derived",
+        "licence_source": "https://cityofnewyork.github.io/opendatatsm/publicpolicies.html",
+        "content_source": "assets/catalogs/sources/nyc-2015-street-tree-census-species.json"
+      }
+    },
+    {
+      "key": "tilia_cordata",
+      "scientific_name": "Tilia cordata",
+      "common_name": "littleleaf linden",
+      "census_count": 29742,
+      "reason": "Derived: a species of at least one percent of the 652169 named trees in the NYC 2015 Street Tree Census species counts retained beside this catalog; rows naming a genus alone and the row with no species are left out.",
+      "licence": {
+        "spdx": "LicenseRef-NYC-Open-Data",
+        "verdict": "SHIP-ATTRIB",
+        "origin": "derived",
+        "licence_source": "https://cityofnewyork.github.io/opendatatsm/publicpolicies.html",
+        "content_source": "assets/catalogs/sources/nyc-2015-street-tree-census-species.json"
+      }
+    },
+    {
+      "key": "tilia_tomentosa",
+      "scientific_name": "Tilia tomentosa",
+      "common_name": "silver linden",
+      "census_count": 7995,
+      "reason": "Derived: a species of at least one percent of the 652169 named trees in the NYC 2015 Street Tree Census species counts retained beside this catalog; rows naming a genus alone and the row with no species are left out.",
+      "licence": {
+        "spdx": "LicenseRef-NYC-Open-Data",
+        "verdict": "SHIP-ATTRIB",
+        "origin": "derived",
+        "licence_source": "https://cityofnewyork.github.io/opendatatsm/publicpolicies.html",
+        "content_source": "assets/catalogs/sources/nyc-2015-street-tree-census-species.json"
+      }
+    },
+    {
+      "key": "ulmus_americana",
+      "scientific_name": "Ulmus americana",
+      "common_name": "American elm",
+      "census_count": 7975,
+      "reason": "Derived: a species of at least one percent of the 652169 named trees in the NYC 2015 Street Tree Census species counts retained beside this catalog; rows naming a genus alone and the row with no species are left out.",
+      "licence": {
+        "spdx": "LicenseRef-NYC-Open-Data",
+        "verdict": "SHIP-ATTRIB",
+        "origin": "derived",
+        "licence_source": "https://cityofnewyork.github.io/opendatatsm/publicpolicies.html",
+        "content_source": "assets/catalogs/sources/nyc-2015-street-tree-census-species.json"
+      }
+    },
+    {
+      "key": "zelkova_serrata",
+      "scientific_name": "Zelkova serrata",
+      "common_name": "Japanese zelkova",
+      "census_count": 29258,
+      "reason": "Derived: a species of at least one percent of the 652169 named trees in the NYC 2015 Street Tree Census species counts retained beside this catalog; rows naming a genus alone and the row with no species are left out.",
+      "licence": {
+        "spdx": "LicenseRef-NYC-Open-Data",
+        "verdict": "SHIP-ATTRIB",
+        "origin": "derived",
+        "licence_source": "https://cityofnewyork.github.io/opendatatsm/publicpolicies.html",
+        "content_source": "assets/catalogs/sources/nyc-2015-street-tree-census-species.json"
+      }
+    }
+  ]
+}

@@ -1,0 +1,246 @@
+{
+  "schema_version": 1,
+  "catalog_id": "typology",
+  "catalog_version": 2,
+  "entries": [
+    {
+      "key": "apartment_block",
+      "label": "Apartment block",
+      "storeys_minimum": 3,
+      "storeys_maximum": 12,
+      "frontage_minimum_mm": 12000,
+      "frontage_maximum_mm": 30000,
+      "attachment": "terraced",
+      "ground_floor_uses": [
+        "cafe",
+        "grocery",
+        "residential"
+      ],
+      "upper_floor_uses": [
+        "residential"
+      ],
+      "eras": [
+        "contemporary",
+        "postwar"
+      ],
+      "roof_families": [
+        "flat_eaves",
+        "flat_parapet"
+      ],
+      "reason": "Authored typology: a later block of flats with plain elevations.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "civic_building",
+      "label": "Civic building",
+      "storeys_minimum": 2,
+      "storeys_maximum": 4,
+      "frontage_minimum_mm": 15000,
+      "frontage_maximum_mm": 30000,
+      "attachment": "detached",
+      "ground_floor_uses": [
+        "library",
+        "school"
+      ],
+      "upper_floor_uses": [
+        "library",
+        "office",
+        "school"
+      ],
+      "eras": [
+        "interwar",
+        "postwar",
+        "prewar_masonry"
+      ],
+      "roof_families": [
+        "flat_parapet",
+        "gable"
+      ],
+      "reason": "Authored typology: a library or school standing on its own lot.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "loft_building",
+      "label": "Loft building",
+      "storeys_minimum": 4,
+      "storeys_maximum": 10,
+      "frontage_minimum_mm": 9000,
+      "frontage_maximum_mm": 30000,
+      "attachment": "terraced",
+      "ground_floor_uses": [
+        "cafe",
+        "office",
+        "restaurant",
+        "workshop"
+      ],
+      "upper_floor_uses": [
+        "office",
+        "residential",
+        "workshop"
+      ],
+      "eras": [
+        "prewar_masonry"
+      ],
+      "roof_families": [
+        "flat_parapet"
+      ],
+      "reason": "Authored typology: a former workshop building with wide bays and tall storeys.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "mansion_block",
+      "label": "Mansion block",
+      "storeys_minimum": 4,
+      "storeys_maximum": 8,
+      "frontage_minimum_mm": 12000,
+      "frontage_maximum_mm": 30000,
+      "attachment": "terraced",
+      "ground_floor_uses": [
+        "cafe",
+        "grocery",
+        "pharmacy",
+        "residential",
+        "restaurant"
+      ],
+      "upper_floor_uses": [
+        "residential"
+      ],
+      "eras": [
+        "interwar",
+        "prewar_masonry"
+      ],
+      "roof_families": [
+        "flat_parapet"
+      ],
+      "reason": "Authored typology: a broad masonry block of flats, often with shops on the ground floor.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "office_block",
+      "label": "Office block",
+      "storeys_minimum": 5,
+      "storeys_maximum": 20,
+      "frontage_minimum_mm": 15000,
+      "frontage_maximum_mm": 30000,
+      "attachment": "detached",
+      "ground_floor_uses": [
+        "bookshop",
+        "cafe",
+        "office",
+        "pharmacy"
+      ],
+      "upper_floor_uses": [
+        "office"
+      ],
+      "eras": [
+        "contemporary",
+        "postwar"
+      ],
+      "roof_families": [
+        "flat_eaves",
+        "flat_parapet"
+      ],
+      "reason": "Authored typology: a free-standing office building with a public ground floor.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "rowhouse",
+      "label": "Rowhouse",
+      "storeys_minimum": 2,
+      "storeys_maximum": 4,
+      "frontage_minimum_mm": 4500,
+      "frontage_maximum_mm": 7500,
+      "attachment": "terraced",
+      "ground_floor_uses": [
+        "residential"
+      ],
+      "upper_floor_uses": [
+        "residential"
+      ],
+      "eras": [
+        "interwar",
+        "prewar_masonry"
+      ],
+      "roof_families": [
+        "flat_parapet",
+        "gable"
+      ],
+      "reason": "Authored typology: a terraced house, a street of dwellings with doors onto the footway.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "shophouse",
+      "label": "Shophouse",
+      "storeys_minimum": 2,
+      "storeys_maximum": 4,
+      "frontage_minimum_mm": 4500,
+      "frontage_maximum_mm": 9000,
+      "attachment": "terraced",
+      "ground_floor_uses": [
+        "bakery",
+        "bookshop",
+        "cafe",
+        "grocery",
+        "pharmacy",
+        "restaurant",
+        "workshop"
+      ],
+      "upper_floor_uses": [
+        "office",
+        "residential"
+      ],
+      "eras": [
+        "interwar",
+        "prewar_masonry"
+      ],
+      "roof_families": [
+        "flat_parapet",
+        "gable"
+      ],
+      "reason": "Authored typology: a narrow terraced building with a shop below and rooms above, the unit of a high street.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    }
+  ]
+}

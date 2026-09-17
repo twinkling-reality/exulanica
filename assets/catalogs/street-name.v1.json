@@ -1,0 +1,193 @@
+{
+  "schema_version": 1,
+  "catalog_id": "street-name",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "bridge_street",
+      "text": "Bridge Street",
+      "hierarchies": [
+        "high_street",
+        "local_street"
+      ],
+      "reason": "Authored generic street name, a common landscape or trade word and a street type. It names no real street and comes from no city's street list.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "church_walk",
+      "text": "Church Walk",
+      "hierarchies": [
+        "narrow_street"
+      ],
+      "reason": "Authored generic street name, a common landscape or trade word and a street type. It names no real street and comes from no city's street list.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "foundry_street",
+      "text": "Foundry Street",
+      "hierarchies": [
+        "high_street",
+        "local_street"
+      ],
+      "reason": "Authored generic street name, a common landscape or trade word and a street type. It names no real street and comes from no city's street list.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "harbour_way",
+      "text": "Harbour Way",
+      "hierarchies": [
+        "avenue",
+        "high_street"
+      ],
+      "reason": "Authored generic street name, a common landscape or trade word and a street type. It names no real street and comes from no city's street list.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "linden_terrace",
+      "text": "Linden Terrace",
+      "hierarchies": [
+        "local_street"
+      ],
+      "reason": "Authored generic street name, a common landscape or trade word and a street type. It names no real street and comes from no city's street list.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "maple_row",
+      "text": "Maple Row",
+      "hierarchies": [
+        "local_street",
+        "narrow_street"
+      ],
+      "reason": "Authored generic street name, a common landscape or trade word and a street type. It names no real street and comes from no city's street list.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "market_street",
+      "text": "Market Street",
+      "hierarchies": [
+        "high_street"
+      ],
+      "reason": "Authored generic street name, a common landscape or trade word and a street type. It names no real street and comes from no city's street list.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "mill_lane",
+      "text": "Mill Lane",
+      "hierarchies": [
+        "local_street",
+        "narrow_street"
+      ],
+      "reason": "Authored generic street name, a common landscape or trade word and a street type. It names no real street and comes from no city's street list.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "orchard_place",
+      "text": "Orchard Place",
+      "hierarchies": [
+        "local_street"
+      ],
+      "reason": "Authored generic street name, a common landscape or trade word and a street type. It names no real street and comes from no city's street list.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "quarry_lane",
+      "text": "Quarry Lane",
+      "hierarchies": [
+        "narrow_street"
+      ],
+      "reason": "Authored generic street name, a common landscape or trade word and a street type. It names no real street and comes from no city's street list.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "river_avenue",
+      "text": "River Avenue",
+      "hierarchies": [
+        "avenue"
+      ],
+      "reason": "Authored generic street name, a common landscape or trade word and a street type. It names no real street and comes from no city's street list.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "station_road",
+      "text": "Station Road",
+      "hierarchies": [
+        "avenue",
+        "high_street"
+      ],
+      "reason": "Authored generic street name, a common landscape or trade word and a street type. It names no real street and comes from no city's street list.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    }
+  ]
+}

@@ -1,0 +1,133 @@
+[{"spc_latin":"Acer","spc_common":"maple","tree_count":"7080"}
+,{"spc_latin":"Acer buergerianum","spc_common":"trident maple","tree_count":"110"}
+,{"spc_latin":"Acer campestre","spc_common":"hedge maple","tree_count":"2550"}
+,{"spc_latin":"Acer ginnala","spc_common":"Amur maple","tree_count":"2049"}
+,{"spc_latin":"Acer griseum","spc_common":"paperbark maple","tree_count":"220"}
+,{"spc_latin":"Acer negundo","spc_common":"boxelder","tree_count":"64"}
+,{"spc_latin":"Acer nigrum","spc_common":"black maple","tree_count":"114"}
+,{"spc_latin":"Acer palmatum","spc_common":"Japanese maple","tree_count":"1130"}
+,{"spc_latin":"Acer platanoides","spc_common":"Norway maple","tree_count":"34189"}
+,{"spc_latin":"Acer platanoides 'Crimson King'","spc_common":"crimson king maple","tree_count":"5923"}
+,{"spc_latin":"Acer pseudoplatanus","spc_common":"sycamore maple","tree_count":"2731"}
+,{"spc_latin":"Acer rubrum","spc_common":"red maple","tree_count":"17246"}
+,{"spc_latin":"Acer saccharinum","spc_common":"silver maple","tree_count":"12277"}
+,{"spc_latin":"Acer saccharum","spc_common":"sugar maple","tree_count":"2844"}
+,{"spc_latin":"Acer tataricum","spc_common":"tartar maple","tree_count":"153"}
+,{"spc_latin":"Acer truncatum","spc_common":"Shantung maple","tree_count":"59"}
+,{"spc_latin":"Aesculus glabra","spc_common":"Ohio buckeye","tree_count":"75"}
+,{"spc_latin":"Aesculus hippocastanum","spc_common":"horse chestnut","tree_count":"1096"}
+,{"spc_latin":"Aesculus x carnea","spc_common":"red horse chestnut","tree_count":"116"}
+,{"spc_latin":"Ailanthus altissima","spc_common":"tree of heaven","tree_count":"756"}
+,{"spc_latin":"Albizia julibrissin","spc_common":"mimosa","tree_count":"163"}
+,{"spc_latin":"Alnus glutinosa","spc_common":"European alder","tree_count":"47"}
+,{"spc_latin":"Amelanchier","spc_common":"serviceberry","tree_count":"2032"}
+,{"spc_latin":"Betula nigra","spc_common":"river birch","tree_count":"565"}
+,{"spc_latin":"Betula papyrifera","spc_common":"paper birch","tree_count":"535"}
+,{"spc_latin":"Betula pendula","spc_common":"silver birch","tree_count":"300"}
+,{"spc_latin":"Carpinus betulus","spc_common":"European hornbeam","tree_count":"2099"}
+,{"spc_latin":"Carpinus caroliniana","spc_common":"American hornbeam","tree_count":"1517"}
+,{"spc_latin":"Carpinus japonica","spc_common":"Japanese hornbeam","tree_count":"426"}
+,{"spc_latin":"Carya glabra","spc_common":"pignut hickory","tree_count":"99"}
+,{"spc_latin":"Castanea mollissima","spc_common":"Chinese chestnut","tree_count":"173"}
+,{"spc_latin":"Catalpa","spc_common":"catalpa","tree_count":"551"}
+,{"spc_latin":"Cedrus atlantica","spc_common":"Atlas cedar","tree_count":"87"}
+,{"spc_latin":"Cedrus deodara","spc_common":"Himalayan cedar","tree_count":"72"}
+,{"spc_latin":"Celtis occidentalis","spc_common":"common hackberry","tree_count":"2382"}
+,{"spc_latin":"Cercidiphyllum japonicum","spc_common":"katsura tree","tree_count":"911"}
+,{"spc_latin":"Cercis canadensis","spc_common":"eastern redbud","tree_count":"3801"}
+,{"spc_latin":"Cercis reniformis","spc_common":"Oklahoma redbud","tree_count":"219"}
+,{"spc_latin":"Chamaecyparis pisifera","spc_common":"false cypress","tree_count":"108"}
+,{"spc_latin":"Chamaecyparis thyoides","spc_common":"Atlantic white cedar","tree_count":"355"}
+,{"spc_latin":"Chionanthus retusus","spc_common":"Chinese fringetree","tree_count":"234"}
+,{"spc_latin":"Cladrastis kentukea","spc_common":"Kentucky yellowwood","tree_count":"479"}
+,{"spc_latin":"Cornus alternifolia","spc_common":"pagoda dogwood","tree_count":"280"}
+,{"spc_latin":"Cornus florida","spc_common":"flowering dogwood","tree_count":"1552"}
+,{"spc_latin":"Cornus kousa","spc_common":"kousa dogwood","tree_count":"302"}
+,{"spc_latin":"Cornus mas","spc_common":"Cornelian cherry","tree_count":"1066"}
+,{"spc_latin":"Corylus colurna","spc_common":"Turkish hazelnut","tree_count":"317"}
+,{"spc_latin":"Cotinus coggygria","spc_common":"smoketree","tree_count":"58"}
+,{"spc_latin":"Crataegus","spc_common":"hawthorn","tree_count":"2988"}
+,{"spc_latin":"Crataegus crusgalli var. inermis","spc_common":"cockspur hawthorn","tree_count":"341"}
+,{"spc_latin":"Eucommia ulmoides","spc_common":"hardy rubber tree","tree_count":"915"}
+,{"spc_latin":"Fagus grandifolia","spc_common":"American beech","tree_count":"273"}
+,{"spc_latin":"Fagus sylvatica","spc_common":"European beech","tree_count":"125"}
+,{"spc_latin":"Fraxinus","spc_common":"ash","tree_count":"2609"}
+,{"spc_latin":"Fraxinus americana","spc_common":"white ash","tree_count":"1121"}
+,{"spc_latin":"Fraxinus pennsylvanica","spc_common":"green ash","tree_count":"16251"}
+,{"spc_latin":"Ginkgo biloba","spc_common":"ginkgo","tree_count":"21024"}
+,{"spc_latin":"Gleditsia triacanthos var. inermis","spc_common":"honeylocust","tree_count":"64264"}
+,{"spc_latin":"Gymnocladus dioicus","spc_common":"Kentucky coffeetree","tree_count":"3364"}
+,{"spc_latin":"Halesia diptera","spc_common":"two-winged silverbell","tree_count":"221"}
+,{"spc_latin":"Ilex","spc_common":"holly","tree_count":"138"}
+,{"spc_latin":"Juglans nigra","spc_common":"black walnut","tree_count":"295"}
+,{"spc_latin":"Juniperus virginiana","spc_common":"eastern redcedar","tree_count":"1101"}
+,{"spc_latin":"Koelreuteria paniculata","spc_common":"golden raintree","tree_count":"3719"}
+,{"spc_latin":"Lagerstroemia","spc_common":"crepe myrtle","tree_count":"442"}
+,{"spc_latin":"Larix laricina","spc_common":"American larch","tree_count":"46"}
+,{"spc_latin":"Liquidambar styraciflua","spc_common":"sweetgum","tree_count":"10657"}
+,{"spc_latin":"Liriodendron tulipifera","spc_common":"tulip-poplar","tree_count":"1076"}
+,{"spc_latin":"Maackia amurensis","spc_common":"Amur maackia","tree_count":"2197"}
+,{"spc_latin":"Maclura pomifera","spc_common":"Osage-orange","tree_count":"29"}
+,{"spc_latin":"Magnolia","spc_common":"magnolia","tree_count":"699"}
+,{"spc_latin":"Magnolia acuminata","spc_common":"cucumber magnolia","tree_count":"169"}
+,{"spc_latin":"Magnolia grandiflora","spc_common":"southern magnolia","tree_count":"132"}
+,{"spc_latin":"Malus","spc_common":"crab apple","tree_count":"3527"}
+,{"spc_latin":"Metasequoia glyptostroboides","spc_common":"dawn redwood","tree_count":"3020"}
+,{"spc_latin":"Morus","spc_common":"mulberry","tree_count":"1157"}
+,{"spc_latin":"Nyssa sylvatica","spc_common":"blackgum","tree_count":"288"}
+,{"spc_latin":"Ostrya virginiana","spc_common":"American hophornbeam","tree_count":"1081"}
+,{"spc_latin":"Parrotia persica","spc_common":"Persian ironwood","tree_count":"277"}
+,{"spc_latin":"Paulownia tomentosa","spc_common":"empress tree","tree_count":"245"}
+,{"spc_latin":"Phellodendron amurense","spc_common":"Amur cork tree","tree_count":"183"}
+,{"spc_latin":"Picea","spc_common":"spruce","tree_count":"202"}
+,{"spc_latin":"Picea abies","spc_common":"Norway spruce","tree_count":"355"}
+,{"spc_latin":"Picea pungens","spc_common":"blue spruce","tree_count":"126"}
+,{"spc_latin":"Pinus","spc_common":"pine","tree_count":"289"}
+,{"spc_latin":"Pinus nigra","spc_common":"black pine","tree_count":"37"}
+,{"spc_latin":"Pinus resinosa","spc_common":"red pine","tree_count":"106"}
+,{"spc_latin":"Pinus rigida","spc_common":"pitch pine","tree_count":"33"}
+,{"spc_latin":"Pinus strobus","spc_common":"white pine","tree_count":"202"}
+,{"spc_latin":"Pinus sylvestris","spc_common":"Scots pine","tree_count":"25"}
+,{"spc_latin":"Pinus virginiana","spc_common":"Virginia pine","tree_count":"10"}
+,{"spc_latin":"Platanus x acerifolia","spc_common":"London planetree","tree_count":"87014"}
+,{"spc_latin":"Populus deltoides","spc_common":"eastern cottonwood","tree_count":"276"}
+,{"spc_latin":"Populus grandidentata","spc_common":"bigtooth aspen","tree_count":"94"}
+,{"spc_latin":"Populus tremuloides","spc_common":"quaking aspen","tree_count":"83"}
+,{"spc_latin":"Prunus","spc_common":"cherry","tree_count":"29279"}
+,{"spc_latin":"Prunus cerasifera","spc_common":"purple-leaf plum","tree_count":"6879"}
+,{"spc_latin":"Prunus serotina","spc_common":"black cherry","tree_count":"607"}
+,{"spc_latin":"Prunus virginiana","spc_common":"'Schubert' chokecherry","tree_count":"4888"}
+,{"spc_latin":"Pseudotsuga menziesii","spc_common":"Douglas-fir","tree_count":"85"}
+,{"spc_latin":"Pyrus calleryana","spc_common":"Callery pear","tree_count":"58931"}
+,{"spc_latin":"Quercus acutissima","spc_common":"sawtooth oak","tree_count":"2244"}
+,{"spc_latin":"Quercus alba","spc_common":"white oak","tree_count":"1686"}
+,{"spc_latin":"Quercus bicolor","spc_common":"swamp white oak","tree_count":"6598"}
+,{"spc_latin":"Quercus coccinea","spc_common":"scarlet oak","tree_count":"1465"}
+,{"spc_latin":"Quercus falcata","spc_common":"southern red oak","tree_count":"83"}
+,{"spc_latin":"Quercus imbricaria","spc_common":"shingle oak","tree_count":"1049"}
+,{"spc_latin":"Quercus macrocarpa","spc_common":"bur oak","tree_count":"515"}
+,{"spc_latin":"Quercus palustris","spc_common":"pin oak","tree_count":"53185"}
+,{"spc_latin":"Quercus phellos","spc_common":"willow oak","tree_count":"3184"}
+,{"spc_latin":"Quercus robur","spc_common":"English oak","tree_count":"1644"}
+,{"spc_latin":"Quercus rubra","spc_common":"northern red oak","tree_count":"8400"}
+,{"spc_latin":"Quercus shumardii","spc_common":"Schumard's oak","tree_count":"1487"}
+,{"spc_latin":"Quercus velutina","spc_common":"black oak","tree_count":"1327"}
+,{"spc_latin":"Robinia pseudoacacia","spc_common":"black locust","tree_count":"1784"}
+,{"spc_latin":"Salix babylonica","spc_common":"weeping willow","tree_count":"282"}
+,{"spc_latin":"Sassafras albidum","spc_common":"sassafras","tree_count":"171"}
+,{"spc_latin":"Styphnolobium japonicum","spc_common":"Sophora","tree_count":"19338"}
+,{"spc_latin":"Styrax japonicus","spc_common":"Japanese snowbell","tree_count":"392"}
+,{"spc_latin":"Syringa pekinensis","spc_common":"Chinese tree lilac","tree_count":"462"}
+,{"spc_latin":"Syringa reticulata","spc_common":"Japanese tree lilac","tree_count":"4568"}
+,{"spc_latin":"Taxodium ascendens","spc_common":"pond cypress","tree_count":"181"}
+,{"spc_latin":"Taxodium distichum","spc_common":"bald cypress","tree_count":"1261"}
+,{"spc_latin":"Thuja occidentalis","spc_common":"arborvitae","tree_count":"328"}
+,{"spc_latin":"Tilia americana","spc_common":"American linden","tree_count":"13530"}
+,{"spc_latin":"Tilia cordata","spc_common":"littleleaf linden","tree_count":"29742"}
+,{"spc_latin":"Tilia tomentosa","spc_common":"silver linden","tree_count":"7995"}
+,{"spc_latin":"Tsuga canadensis","spc_common":"eastern hemlock","tree_count":"88"}
+,{"spc_latin":"Ulmus americana","spc_common":"American elm","tree_count":"7975"}
+,{"spc_latin":"Ulmus parvifolia","spc_common":"Chinese elm","tree_count":"5345"}
+,{"spc_latin":"Ulmus pumila","spc_common":"Siberian elm","tree_count":"1595"}
+,{"spc_latin":"Zelkova serrata","spc_common":"Japanese zelkova","tree_count":"29258"}
+,{"tree_count":"31619"}]

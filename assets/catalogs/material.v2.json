@@ -1,0 +1,212 @@
+{
+  "schema_version": 1,
+  "catalog_id": "material",
+  "catalog_version": 2,
+  "entries": [
+    {
+      "key": "brick_running_bond",
+      "label": "Brick, running bond",
+      "category": "masonry",
+      "texture_set_id": "cc0.brick-running-bond",
+      "surfaces": [
+        "wall",
+        "ground_band",
+        "stall_riser",
+        "party_wall_scar",
+        "parapet"
+      ],
+      "course_module_mm": 75,
+      "mortar_module_mm": 10,
+      "unit_length_mm": 225,
+      "bond": "running",
+      "reason": "The material the cc0.brick-running-bond texture set depicts. Its modules are read from the set's recipe object: 24 courses and 8 units a course over the set's 1800 mm, with 10 mm joints.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "assets/textures/objects/c9a76029897fd5264859f633ce0242abf4852c2b8010eed2db073eafc593fea1.json"
+      }
+    },
+    {
+      "key": "carriageway_asphalt",
+      "label": "Carriageway asphalt",
+      "category": "asphalt",
+      "texture_set_id": "cc0.carriageway-asphalt",
+      "surfaces": [
+        "carriageway",
+        "gutter",
+        "crossing",
+        "lot"
+      ],
+      "course_module_mm": 0,
+      "mortar_module_mm": 0,
+      "unit_length_mm": 0,
+      "bond": "none",
+      "reason": "The material the cc0.carriageway-asphalt texture set depicts. Its modules are read from the set's recipe object: a continuous worn asphalt with no courses or joints.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "assets/textures/objects/2ccf108178b97c5041aec011504e9865bf9a602de43bd3f38885b30bb958a24d.json"
+      }
+    },
+    {
+      "key": "cast_concrete",
+      "label": "Cast concrete",
+      "category": "concrete",
+      "texture_set_id": "cc0.cast-concrete",
+      "surfaces": [
+        "wall",
+        "ground_band",
+        "stall_riser",
+        "trim",
+        "roof",
+        "parapet",
+        "lot",
+        "object_primary",
+        "object_secondary",
+        "object_tertiary"
+      ],
+      "course_module_mm": 600,
+      "mortar_module_mm": 2,
+      "unit_length_mm": 1200,
+      "bond": "stack",
+      "reason": "The material the cc0.cast-concrete texture set depicts. Its modules are read from the set's recipe object: 1200 by 600 mm formwork panels in stack bond, with 2 mm seams.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "assets/textures/objects/01f704249a1fb892b9a87392cb5e9bc523bb2996173e90eeeeb6e12ea38c1a9c.json"
+      }
+    },
+    {
+      "key": "footway_paving",
+      "label": "Footway paving",
+      "category": "paving",
+      "texture_set_id": "cc0.footway-paving",
+      "surfaces": [
+        "footway",
+        "crossing",
+        "lot"
+      ],
+      "course_module_mm": 600,
+      "mortar_module_mm": 6,
+      "unit_length_mm": 600,
+      "bond": "stack",
+      "reason": "The material the cc0.footway-paving texture set depicts. Its modules are read from the set's recipe object: 600 mm flags in stack bond, with 6 mm joints.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "assets/textures/objects/35d518bde81913e5d42318a222d4d9a6a8652e868d71b6a0e441f1a11299df65.json"
+      }
+    },
+    {
+      "key": "kerb_stone",
+      "label": "Kerb stone",
+      "category": "stone",
+      "texture_set_id": "cc0.kerb-stone",
+      "surfaces": [
+        "gutter",
+        "kerb"
+      ],
+      "course_module_mm": 0,
+      "mortar_module_mm": 6,
+      "unit_length_mm": 900,
+      "bond": "stack",
+      "reason": "The material the cc0.kerb-stone texture set depicts. Its modules are read from the set's recipe object: 900 mm granite kerb units in one row, with 6 mm joints.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "assets/textures/objects/e11aaa6d28764084cd32aaec73738a4347d36adbb708ed8c3526e4d2853d0c07.json"
+      }
+    },
+    {
+      "key": "limestone_ashlar",
+      "label": "Limestone ashlar",
+      "category": "stone",
+      "texture_set_id": "cc0.limestone-ashlar",
+      "surfaces": [
+        "wall",
+        "ground_band",
+        "stall_riser",
+        "fascia",
+        "trim",
+        "parapet",
+        "object_primary",
+        "object_secondary"
+      ],
+      "course_module_mm": 300,
+      "mortar_module_mm": 5,
+      "unit_length_mm": 600,
+      "bond": "half",
+      "reason": "The material the cc0.limestone-ashlar texture set depicts. Its modules are read from the set's recipe object: 300 mm courses of 600 mm blocks in half bond, with 5 mm joints.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "assets/textures/objects/98f6e569b5ae14b69fc8588356ef3e90b58a978dcd4a5095a1b05edf23537d34.json"
+      }
+    },
+    {
+      "key": "painted_render",
+      "label": "Painted render",
+      "category": "render",
+      "texture_set_id": "cc0.painted-render",
+      "surfaces": [
+        "wall",
+        "ground_band",
+        "fascia",
+        "trim",
+        "party_wall_scar",
+        "parapet"
+      ],
+      "course_module_mm": 0,
+      "mortar_module_mm": 0,
+      "unit_length_mm": 0,
+      "bond": "none",
+      "reason": "The material the cc0.painted-render texture set depicts. Its modules are read from the set's recipe object: a continuous dashed render with no courses or joints.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "assets/textures/objects/a24359e42ed866c507936cf623a47d209ff1e73f4b2337ae9d1770200d15ad6f.json"
+      }
+    },
+    {
+      "key": "storefront_metal",
+      "label": "Storefront metal",
+      "category": "metal",
+      "texture_set_id": "cc0.storefront-metal",
+      "surfaces": [
+        "fascia",
+        "shopfront_frame",
+        "roof",
+        "awning",
+        "object_primary",
+        "object_secondary",
+        "object_tertiary"
+      ],
+      "course_module_mm": 0,
+      "mortar_module_mm": 0,
+      "unit_length_mm": 0,
+      "bond": "none",
+      "reason": "The material the cc0.storefront-metal texture set depicts. Its modules are read from the set's recipe object: a brushed anodised sheet with no courses or joints.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "assets/textures/objects/26410fe9588398f5656ee1bc14a00c87ac2c8cca2fb666a462771007975ce806.json"
+      }
+    }
+  ]
+}

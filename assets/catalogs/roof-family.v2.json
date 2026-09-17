@@ -1,0 +1,58 @@
+{
+  "schema_version": 1,
+  "catalog_id": "roof-family",
+  "catalog_version": 2,
+  "entries": [
+    {
+      "key": "flat_eaves",
+      "label": "Flat roof with no parapet",
+      "form": "flat",
+      "rise_minimum_mm": 0,
+      "rise_maximum_mm": 0,
+      "parapet": "none",
+      "rooftop_objects": "allowed",
+      "reason": "Authored roof family: a flat deck that ends at the wall top, common on later blocks.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "flat_parapet",
+      "label": "Flat roof behind a parapet",
+      "form": "flat",
+      "rise_minimum_mm": 0,
+      "rise_maximum_mm": 0,
+      "parapet": "required",
+      "rooftop_objects": "allowed",
+      "reason": "Authored roof family: a flat deck with a parapet, the commonest roof of dense masonry streets.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "gable",
+      "label": "Gable roof",
+      "form": "ridge",
+      "rise_minimum_mm": 1500,
+      "rise_maximum_mm": 6000,
+      "parapet": "none",
+      "rooftop_objects": "none",
+      "reason": "Authored roof family: one ridge between two gable ends. This version draws only flat and ridge forms, so hipped and mansard families wait for a later version.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    }
+  ]
+}

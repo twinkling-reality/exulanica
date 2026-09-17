@@ -1,0 +1,109 @@
+{
+  "schema_version": 1,
+  "catalog_id": "era",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "contemporary",
+      "label": "Contemporary",
+      "start_year": 1980,
+      "end_year": 2026,
+      "wall_materials": [
+        "brick_running_bond",
+        "cast_concrete",
+        "painted_render"
+      ],
+      "roof_families": [
+        "flat_eaves",
+        "flat_parapet"
+      ],
+      "upper_storey_minimum_mm": 2800,
+      "upper_storey_maximum_mm": 3600,
+      "cornice": "none",
+      "reason": "Authored era: concrete and render with plain tops.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "interwar",
+      "label": "Interwar",
+      "start_year": 1918,
+      "end_year": 1939,
+      "wall_materials": [
+        "brick_running_bond",
+        "limestone_ashlar",
+        "painted_render"
+      ],
+      "roof_families": [
+        "flat_parapet"
+      ],
+      "upper_storey_minimum_mm": 2900,
+      "upper_storey_maximum_mm": 3600,
+      "cornice": "optional",
+      "reason": "Authored era: brick and render with plainer tops and slightly lower storeys.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "postwar",
+      "label": "Post-war",
+      "start_year": 1945,
+      "end_year": 1979,
+      "wall_materials": [
+        "brick_running_bond",
+        "cast_concrete",
+        "painted_render"
+      ],
+      "roof_families": [
+        "flat_eaves",
+        "flat_parapet"
+      ],
+      "upper_storey_minimum_mm": 2700,
+      "upper_storey_maximum_mm": 3200,
+      "cornice": "none",
+      "reason": "Authored era: concrete and brick with low storeys and no cornice.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "prewar_masonry",
+      "label": "Pre-war masonry",
+      "start_year": 1850,
+      "end_year": 1914,
+      "wall_materials": [
+        "brick_running_bond",
+        "limestone_ashlar"
+      ],
+      "roof_families": [
+        "flat_parapet",
+        "gable"
+      ],
+      "upper_storey_minimum_mm": 3000,
+      "upper_storey_maximum_mm": 4200,
+      "cornice": "required",
+      "reason": "Authored era: load-bearing brick and stone with tall storeys and a cornice, so material, storey height and cornice vary together.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    }
+  ]
+}

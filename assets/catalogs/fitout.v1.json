@@ -1,0 +1,293 @@
+{
+  "schema_version": 1,
+  "catalog_id": "fitout",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "bakery_counter",
+      "label": "Bakery counter",
+      "use_classes": [
+        "bakery",
+        "cafe"
+      ],
+      "light": "warm",
+      "parts": [
+        {
+          "shape": "box",
+          "surface_role": "object_primary",
+          "offset_x_mm": 450,
+          "offset_y_mm": 250,
+          "offset_z_mm": 0,
+          "size_x_mm": 900,
+          "size_y_mm": 400,
+          "size_z_mm": 900,
+          "top_scale_millionths": 1000000,
+          "segments": 4,
+          "rings": 1
+        },
+        {
+          "shape": "box",
+          "surface_role": "object_secondary",
+          "offset_x_mm": 450,
+          "offset_y_mm": 250,
+          "offset_z_mm": 900,
+          "size_x_mm": 900,
+          "size_y_mm": 300,
+          "size_z_mm": 40,
+          "top_scale_millionths": 1000000,
+          "segments": 4,
+          "rings": 1
+        }
+      ],
+      "reason": "Authored fitout unit: a counter with a display shelf, repeated along the window.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "book_shelves",
+      "label": "Book shelves",
+      "use_classes": [
+        "bookshop",
+        "library"
+      ],
+      "light": "warm",
+      "parts": [
+        {
+          "shape": "box",
+          "surface_role": "object_primary",
+          "offset_x_mm": 450,
+          "offset_y_mm": 200,
+          "offset_z_mm": 0,
+          "size_x_mm": 900,
+          "size_y_mm": 300,
+          "size_z_mm": 1800,
+          "top_scale_millionths": 1000000,
+          "segments": 4,
+          "rings": 1
+        }
+      ],
+      "reason": "Authored fitout unit: a full-height shelf facing the window.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "cafe_tables",
+      "label": "Cafe tables",
+      "use_classes": [
+        "cafe",
+        "restaurant"
+      ],
+      "light": "warm",
+      "parts": [
+        {
+          "shape": "prism",
+          "surface_role": "object_secondary",
+          "offset_x_mm": 400,
+          "offset_y_mm": 300,
+          "offset_z_mm": 0,
+          "size_x_mm": 80,
+          "size_y_mm": 80,
+          "size_z_mm": 700,
+          "top_scale_millionths": 1000000,
+          "segments": 8,
+          "rings": 1
+        },
+        {
+          "shape": "prism",
+          "surface_role": "object_primary",
+          "offset_x_mm": 400,
+          "offset_y_mm": 300,
+          "offset_z_mm": 700,
+          "size_x_mm": 500,
+          "size_y_mm": 500,
+          "size_z_mm": 40,
+          "top_scale_millionths": 1000000,
+          "segments": 16,
+          "rings": 1
+        }
+      ],
+      "reason": "Authored fitout unit: a round table on a stem, seen through the window.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "display_boards",
+      "label": "Display boards",
+      "use_classes": [
+        "school"
+      ],
+      "light": "bright",
+      "parts": [
+        {
+          "shape": "box",
+          "surface_role": "object_primary",
+          "offset_x_mm": 450,
+          "offset_y_mm": 100,
+          "offset_z_mm": 300,
+          "size_x_mm": 900,
+          "size_y_mm": 40,
+          "size_z_mm": 1200,
+          "top_scale_millionths": 1000000,
+          "segments": 4,
+          "rings": 1
+        }
+      ],
+      "reason": "Authored fitout unit: a board of work shown to the street.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "grocery_racks",
+      "label": "Grocery racks",
+      "use_classes": [
+        "grocery",
+        "pharmacy"
+      ],
+      "light": "bright",
+      "parts": [
+        {
+          "shape": "box",
+          "surface_role": "object_primary",
+          "offset_x_mm": 450,
+          "offset_y_mm": 250,
+          "offset_z_mm": 0,
+          "size_x_mm": 900,
+          "size_y_mm": 400,
+          "size_z_mm": 1500,
+          "top_scale_millionths": 1000000,
+          "segments": 4,
+          "rings": 1
+        },
+        {
+          "shape": "box",
+          "surface_role": "object_secondary",
+          "offset_x_mm": 450,
+          "offset_y_mm": 250,
+          "offset_z_mm": 1500,
+          "size_x_mm": 900,
+          "size_y_mm": 400,
+          "size_z_mm": 60,
+          "top_scale_millionths": 1000000,
+          "segments": 4,
+          "rings": 1
+        }
+      ],
+      "reason": "Authored fitout unit: a rack of goods with a top shelf.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "office_desks",
+      "label": "Office desks",
+      "use_classes": [
+        "office"
+      ],
+      "light": "bright",
+      "parts": [
+        {
+          "shape": "box",
+          "surface_role": "object_secondary",
+          "offset_x_mm": 600,
+          "offset_y_mm": 300,
+          "offset_z_mm": 0,
+          "size_x_mm": 1100,
+          "size_y_mm": 450,
+          "size_z_mm": 700,
+          "top_scale_millionths": 1000000,
+          "segments": 4,
+          "rings": 1
+        },
+        {
+          "shape": "box",
+          "surface_role": "object_primary",
+          "offset_x_mm": 600,
+          "offset_y_mm": 300,
+          "offset_z_mm": 700,
+          "size_x_mm": 1200,
+          "size_y_mm": 500,
+          "size_z_mm": 40,
+          "top_scale_millionths": 1000000,
+          "segments": 4,
+          "rings": 1
+        }
+      ],
+      "reason": "Authored fitout unit: a desk on a pedestal.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "work_bench",
+      "label": "Work bench",
+      "use_classes": [
+        "workshop"
+      ],
+      "light": "bright",
+      "parts": [
+        {
+          "shape": "box",
+          "surface_role": "object_secondary",
+          "offset_x_mm": 600,
+          "offset_y_mm": 300,
+          "offset_z_mm": 0,
+          "size_x_mm": 1100,
+          "size_y_mm": 450,
+          "size_z_mm": 850,
+          "top_scale_millionths": 1000000,
+          "segments": 4,
+          "rings": 1
+        },
+        {
+          "shape": "box",
+          "surface_role": "object_primary",
+          "offset_x_mm": 600,
+          "offset_y_mm": 300,
+          "offset_z_mm": 850,
+          "size_x_mm": 1200,
+          "size_y_mm": 500,
+          "size_z_mm": 60,
+          "top_scale_millionths": 1000000,
+          "segments": 4,
+          "rings": 1
+        }
+      ],
+      "reason": "Authored fitout unit: a heavy bench on a base.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    }
+  ]
+}

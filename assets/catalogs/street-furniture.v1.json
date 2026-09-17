@@ -1,0 +1,464 @@
+{
+  "schema_version": 1,
+  "catalog_id": "street-furniture",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "bench",
+      "label": "Bench",
+      "category": "seating",
+      "bicycles_per_stand": 0,
+      "exclusion_radius_mm": 900,
+      "kerb_offset_minimum_mm": 600,
+      "kerb_offset_maximum_mm": 2000,
+      "parts": [
+        {
+          "shape": "box",
+          "surface_role": "object_primary",
+          "offset_x_mm": 0,
+          "offset_y_mm": 0,
+          "offset_z_mm": 420,
+          "size_x_mm": 1800,
+          "size_y_mm": 450,
+          "size_z_mm": 60,
+          "top_scale_millionths": 1000000,
+          "segments": 4,
+          "rings": 1
+        },
+        {
+          "shape": "box",
+          "surface_role": "object_primary",
+          "offset_x_mm": 0,
+          "offset_y_mm": -200,
+          "offset_z_mm": 480,
+          "size_x_mm": 1800,
+          "size_y_mm": 60,
+          "size_z_mm": 420,
+          "top_scale_millionths": 1000000,
+          "segments": 4,
+          "rings": 1
+        },
+        {
+          "shape": "box",
+          "surface_role": "object_secondary",
+          "offset_x_mm": -700,
+          "offset_y_mm": 0,
+          "offset_z_mm": 0,
+          "size_x_mm": 80,
+          "size_y_mm": 450,
+          "size_z_mm": 420,
+          "top_scale_millionths": 1000000,
+          "segments": 4,
+          "rings": 1
+        },
+        {
+          "shape": "box",
+          "surface_role": "object_secondary",
+          "offset_x_mm": 700,
+          "offset_y_mm": 0,
+          "offset_z_mm": 0,
+          "size_x_mm": 80,
+          "size_y_mm": 450,
+          "size_z_mm": 420,
+          "top_scale_millionths": 1000000,
+          "segments": 4,
+          "rings": 1
+        }
+      ],
+      "reason": "Authored bench. Its key matches the living society lane's furniture key for a place to rest.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "bollard",
+      "label": "Bollard",
+      "category": "bollard",
+      "bicycles_per_stand": 0,
+      "exclusion_radius_mm": 300,
+      "kerb_offset_minimum_mm": 300,
+      "kerb_offset_maximum_mm": 900,
+      "parts": [
+        {
+          "shape": "prism",
+          "surface_role": "object_primary",
+          "offset_x_mm": 0,
+          "offset_y_mm": 0,
+          "offset_z_mm": 0,
+          "size_x_mm": 160,
+          "size_y_mm": 160,
+          "size_z_mm": 900,
+          "top_scale_millionths": 1000000,
+          "segments": 16,
+          "rings": 1
+        },
+        {
+          "shape": "ellipsoid",
+          "surface_role": "object_secondary",
+          "offset_x_mm": 0,
+          "offset_y_mm": 0,
+          "offset_z_mm": 860,
+          "size_x_mm": 160,
+          "size_y_mm": 160,
+          "size_z_mm": 80,
+          "top_scale_millionths": 1000000,
+          "segments": 16,
+          "rings": 4
+        }
+      ],
+      "reason": "Authored bollard: a post with a domed cap.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "cycle_stand",
+      "label": "Cycle stand",
+      "category": "cycle_parking",
+      "bicycles_per_stand": 2,
+      "exclusion_radius_mm": 400,
+      "kerb_offset_minimum_mm": 600,
+      "kerb_offset_maximum_mm": 2500,
+      "parts": [
+        {
+          "shape": "box",
+          "surface_role": "object_primary",
+          "offset_x_mm": -350,
+          "offset_y_mm": 0,
+          "offset_z_mm": 0,
+          "size_x_mm": 50,
+          "size_y_mm": 50,
+          "size_z_mm": 750,
+          "top_scale_millionths": 1000000,
+          "segments": 4,
+          "rings": 1
+        },
+        {
+          "shape": "box",
+          "surface_role": "object_primary",
+          "offset_x_mm": 350,
+          "offset_y_mm": 0,
+          "offset_z_mm": 0,
+          "size_x_mm": 50,
+          "size_y_mm": 50,
+          "size_z_mm": 750,
+          "top_scale_millionths": 1000000,
+          "segments": 4,
+          "rings": 1
+        },
+        {
+          "shape": "box",
+          "surface_role": "object_primary",
+          "offset_x_mm": 0,
+          "offset_y_mm": 0,
+          "offset_z_mm": 700,
+          "size_x_mm": 750,
+          "size_y_mm": 50,
+          "size_z_mm": 50,
+          "top_scale_millionths": 1000000,
+          "segments": 4,
+          "rings": 1
+        }
+      ],
+      "reason": "Authored hoop stand. It holds two bicycles, one against each side: a declared figure. Cycle parking is discussed in London Cycling Design Standards (Transport for London, 2016), chapter 8, which was not re-read in this build and is not quoted.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "hydrant",
+      "label": "Hydrant",
+      "category": "utility",
+      "bicycles_per_stand": 0,
+      "exclusion_radius_mm": 450,
+      "kerb_offset_minimum_mm": 450,
+      "kerb_offset_maximum_mm": 900,
+      "parts": [
+        {
+          "shape": "prism",
+          "surface_role": "object_primary",
+          "offset_x_mm": 0,
+          "offset_y_mm": 0,
+          "offset_z_mm": 0,
+          "size_x_mm": 250,
+          "size_y_mm": 250,
+          "size_z_mm": 600,
+          "top_scale_millionths": 1000000,
+          "segments": 8,
+          "rings": 1
+        },
+        {
+          "shape": "ellipsoid",
+          "surface_role": "object_primary",
+          "offset_x_mm": 0,
+          "offset_y_mm": 0,
+          "offset_z_mm": 550,
+          "size_x_mm": 250,
+          "size_y_mm": 250,
+          "size_z_mm": 150,
+          "top_scale_millionths": 1000000,
+          "segments": 8,
+          "rings": 4
+        }
+      ],
+      "reason": "Authored hydrant: a short post with a domed top.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "litter_bin",
+      "label": "Litter bin",
+      "category": "waste",
+      "bicycles_per_stand": 0,
+      "exclusion_radius_mm": 500,
+      "kerb_offset_minimum_mm": 450,
+      "kerb_offset_maximum_mm": 1200,
+      "parts": [
+        {
+          "shape": "prism",
+          "surface_role": "object_primary",
+          "offset_x_mm": 0,
+          "offset_y_mm": 0,
+          "offset_z_mm": 0,
+          "size_x_mm": 520,
+          "size_y_mm": 520,
+          "size_z_mm": 1000,
+          "top_scale_millionths": 1000000,
+          "segments": 16,
+          "rings": 1
+        },
+        {
+          "shape": "prism",
+          "surface_role": "object_secondary",
+          "offset_x_mm": 0,
+          "offset_y_mm": 0,
+          "offset_z_mm": 1000,
+          "size_x_mm": 540,
+          "size_y_mm": 540,
+          "size_z_mm": 60,
+          "top_scale_millionths": 1000000,
+          "segments": 16,
+          "rings": 1
+        }
+      ],
+      "reason": "Authored litter bin: a round bin with a lid.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "pedestrian_signal",
+      "label": "Pedestrian signal",
+      "category": "signal",
+      "bicycles_per_stand": 0,
+      "exclusion_radius_mm": 450,
+      "kerb_offset_minimum_mm": 450,
+      "kerb_offset_maximum_mm": 1000,
+      "parts": [
+        {
+          "shape": "prism",
+          "surface_role": "object_primary",
+          "offset_x_mm": 0,
+          "offset_y_mm": 0,
+          "offset_z_mm": 0,
+          "size_x_mm": 120,
+          "size_y_mm": 120,
+          "size_z_mm": 2800,
+          "top_scale_millionths": 1000000,
+          "segments": 8,
+          "rings": 1
+        },
+        {
+          "shape": "box",
+          "surface_role": "object_secondary",
+          "offset_x_mm": 0,
+          "offset_y_mm": -130,
+          "offset_z_mm": 2100,
+          "size_x_mm": 300,
+          "size_y_mm": 220,
+          "size_z_mm": 600,
+          "top_scale_millionths": 1000000,
+          "segments": 4,
+          "rings": 1
+        }
+      ],
+      "reason": "Authored signal pole with one pedestrian head, named by a signal record.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "sign_post",
+      "label": "Street name sign",
+      "category": "signage",
+      "bicycles_per_stand": 0,
+      "exclusion_radius_mm": 300,
+      "kerb_offset_minimum_mm": 450,
+      "kerb_offset_maximum_mm": 1000,
+      "parts": [
+        {
+          "shape": "prism",
+          "surface_role": "object_primary",
+          "offset_x_mm": 0,
+          "offset_y_mm": 0,
+          "offset_z_mm": 0,
+          "size_x_mm": 60,
+          "size_y_mm": 60,
+          "size_z_mm": 2800,
+          "top_scale_millionths": 1000000,
+          "segments": 8,
+          "rings": 1
+        },
+        {
+          "shape": "box",
+          "surface_role": "object_secondary",
+          "offset_x_mm": 0,
+          "offset_y_mm": 0,
+          "offset_z_mm": 2200,
+          "size_x_mm": 600,
+          "size_y_mm": 20,
+          "size_z_mm": 400,
+          "top_scale_millionths": 1000000,
+          "segments": 4,
+          "rings": 1
+        }
+      ],
+      "reason": "Authored sign post carrying a street's name plate.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "street_lamp",
+      "label": "Street lamp",
+      "category": "lighting",
+      "bicycles_per_stand": 0,
+      "exclusion_radius_mm": 600,
+      "kerb_offset_minimum_mm": 450,
+      "kerb_offset_maximum_mm": 900,
+      "parts": [
+        {
+          "shape": "prism",
+          "surface_role": "object_primary",
+          "offset_x_mm": 0,
+          "offset_y_mm": 0,
+          "offset_z_mm": 0,
+          "size_x_mm": 150,
+          "size_y_mm": 150,
+          "size_z_mm": 6000,
+          "top_scale_millionths": 1000000,
+          "segments": 8,
+          "rings": 1
+        },
+        {
+          "shape": "box",
+          "surface_role": "object_primary",
+          "offset_x_mm": 600,
+          "offset_y_mm": 0,
+          "offset_z_mm": 5800,
+          "size_x_mm": 1200,
+          "size_y_mm": 80,
+          "size_z_mm": 80,
+          "top_scale_millionths": 1000000,
+          "segments": 4,
+          "rings": 1
+        },
+        {
+          "shape": "box",
+          "surface_role": "object_secondary",
+          "offset_x_mm": 1100,
+          "offset_y_mm": 0,
+          "offset_z_mm": 5650,
+          "size_x_mm": 500,
+          "size_y_mm": 250,
+          "size_z_mm": 150,
+          "top_scale_millionths": 1000000,
+          "segments": 4,
+          "rings": 1
+        }
+      ],
+      "reason": "Authored street lamp: a pole with an arm reaching over the carriageway.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "traffic_signal",
+      "label": "Traffic signal",
+      "category": "signal",
+      "bicycles_per_stand": 0,
+      "exclusion_radius_mm": 450,
+      "kerb_offset_minimum_mm": 450,
+      "kerb_offset_maximum_mm": 1000,
+      "parts": [
+        {
+          "shape": "prism",
+          "surface_role": "object_primary",
+          "offset_x_mm": 0,
+          "offset_y_mm": 0,
+          "offset_z_mm": 0,
+          "size_x_mm": 140,
+          "size_y_mm": 140,
+          "size_z_mm": 3600,
+          "top_scale_millionths": 1000000,
+          "segments": 8,
+          "rings": 1
+        },
+        {
+          "shape": "box",
+          "surface_role": "object_secondary",
+          "offset_x_mm": 0,
+          "offset_y_mm": -150,
+          "offset_z_mm": 2400,
+          "size_x_mm": 300,
+          "size_y_mm": 250,
+          "size_z_mm": 1000,
+          "top_scale_millionths": 1000000,
+          "segments": 4,
+          "rings": 1
+        }
+      ],
+      "reason": "Authored signal pole with one vehicle head, named by a signal record.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    }
+  ]
+}

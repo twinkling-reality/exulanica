@@ -1,0 +1,161 @@
+{
+  "schema_version": 1,
+  "catalog_id": "use-class",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "bakery",
+      "label": "Bakery",
+      "category": "retail",
+      "signage": "required",
+      "reason": "Authored use class. Its key equals a key of the living society lane's society-use-class catalog, which maps it to a role; a new class needs that lane's mapping first.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "bookshop",
+      "label": "Bookshop",
+      "category": "retail",
+      "signage": "required",
+      "reason": "Authored use class. Its key equals a key of the living society lane's society-use-class catalog, which maps it to a role; a new class needs that lane's mapping first.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "cafe",
+      "label": "Cafe",
+      "category": "food_service",
+      "signage": "required",
+      "reason": "Authored use class. Its key equals a key of the living society lane's society-use-class catalog, which maps it to a role; a new class needs that lane's mapping first.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "grocery",
+      "label": "Grocery",
+      "category": "retail",
+      "signage": "required",
+      "reason": "Authored use class. Its key equals a key of the living society lane's society-use-class catalog, which maps it to a role; a new class needs that lane's mapping first.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "library",
+      "label": "Library",
+      "category": "civic",
+      "signage": "required",
+      "reason": "Authored use class. Its key equals a key of the living society lane's society-use-class catalog, which maps it to a role; a new class needs that lane's mapping first.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "office",
+      "label": "Office",
+      "category": "office",
+      "signage": "required",
+      "reason": "Authored use class. Its key equals a key of the living society lane's society-use-class catalog, which maps it to a role; a new class needs that lane's mapping first.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "pharmacy",
+      "label": "Pharmacy",
+      "category": "retail",
+      "signage": "required",
+      "reason": "Authored use class. Its key equals a key of the living society lane's society-use-class catalog, which maps it to a role; a new class needs that lane's mapping first.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "residential",
+      "label": "Dwelling",
+      "category": "residential",
+      "signage": "none",
+      "reason": "Authored use class. Its key equals a key of the living society lane's society-use-class catalog, which maps it to a role; a new class needs that lane's mapping first.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "restaurant",
+      "label": "Restaurant",
+      "category": "food_service",
+      "signage": "required",
+      "reason": "Authored use class. Its key equals a key of the living society lane's society-use-class catalog, which maps it to a role; a new class needs that lane's mapping first.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "school",
+      "label": "School",
+      "category": "civic",
+      "signage": "required",
+      "reason": "Authored use class. Its key equals a key of the living society lane's society-use-class catalog, which maps it to a role; a new class needs that lane's mapping first.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "workshop",
+      "label": "Workshop",
+      "category": "workshop",
+      "signage": "required",
+      "reason": "Authored use class. Its key equals a key of the living society lane's society-use-class catalog, which maps it to a role; a new class needs that lane's mapping first.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    }
+  ]
+}

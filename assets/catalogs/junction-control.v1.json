@@ -1,0 +1,73 @@
+{
+  "schema_version": 1,
+  "catalog_id": "junction-control",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "all_way_stop",
+      "label": "All-way stop",
+      "signal": "none",
+      "approach_controls": [
+        "stop"
+      ],
+      "reason": "Authored control class; its key equals the traffic lane's right-of-way policy key.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "priority_two_way_stop",
+      "label": "Major road priority",
+      "signal": "none",
+      "approach_controls": [
+        "stop",
+        "yield",
+        "priority"
+      ],
+      "reason": "Authored control class; its key equals the traffic lane's right-of-way policy key.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "signalised",
+      "label": "Signal controlled",
+      "signal": "required",
+      "approach_controls": [
+        "signal"
+      ],
+      "reason": "Authored control class; its key equals the traffic lane's right-of-way policy key.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "uncontrolled_continuation",
+      "label": "Uncontrolled bend or continuation",
+      "signal": "none",
+      "approach_controls": [
+        "priority"
+      ],
+      "reason": "Authored control class; its key equals the traffic lane's right-of-way policy key.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    }
+  ]
+}

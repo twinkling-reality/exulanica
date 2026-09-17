@@ -19,7 +19,7 @@ from typing import Any, Final
 
 from exulanica.grammar.errors import CatalogError
 
-__all__ = ["read_json", "split_versioned_name"]
+__all__ = ["parse_json", "read_json", "split_versioned_name"]
 
 _NAME: Final = re.compile(r"([a-z][a-z0-9-]*)\.v([1-9][0-9]*)\.json")
 
@@ -37,6 +37,11 @@ def read_json(path: Path) -> Any:
         text = path.read_text(encoding="utf-8")
     except OSError as error:
         raise CatalogError(f"cannot read {path}: {error}") from error
+    return parse_json(text, path.name)
+
+
+def parse_json(text: str, where: str) -> Any:
+    """``text`` parsed by the same three refusals as a data file, errors naming ``where``."""
     try:
         return json.loads(
             text,
@@ -45,9 +50,9 @@ def read_json(path: Path) -> Any:
             object_pairs_hook=_refuse_duplicates,
         )
     except json.JSONDecodeError as error:
-        raise CatalogError(f"{path.name} is not valid JSON: {error}") from error
+        raise CatalogError(f"{where} is not valid JSON: {error}") from error
     except CatalogError as error:
-        raise CatalogError(f"{path.name}: {error}") from error
+        raise CatalogError(f"{where}: {error}") from error
 
 
 def _refuse_float(literal: str) -> Any:

@@ -1,0 +1,241 @@
+{
+  "schema_version": 1,
+  "catalog_id": "signage-lexicon",
+  "catalog_version": 2,
+  "entries": [
+    {
+      "key": "bakery",
+      "text": "Bakery",
+      "use_class": "bakery",
+      "reason": "Authored generic descriptor for the use class it names; never a brand or a business name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "books",
+      "text": "Books",
+      "use_class": "bookshop",
+      "reason": "Authored generic descriptor for the use class it names; never a brand or a business name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "bookshop",
+      "text": "Bookshop",
+      "use_class": "bookshop",
+      "reason": "Authored generic descriptor for the use class it names; never a brand or a business name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "bread",
+      "text": "Bread",
+      "use_class": "bakery",
+      "reason": "Authored generic descriptor for the use class it names; never a brand or a business name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "cafe",
+      "text": "Cafe",
+      "use_class": "cafe",
+      "reason": "Authored generic descriptor for the use class it names; never a brand or a business name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "chemist",
+      "text": "Chemist",
+      "use_class": "pharmacy",
+      "reason": "Authored generic descriptor for the use class it names; never a brand or a business name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "coffee",
+      "text": "Coffee",
+      "use_class": "cafe",
+      "reason": "Authored generic descriptor for the use class it names; never a brand or a business name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "grocery",
+      "text": "Grocery",
+      "use_class": "grocery",
+      "reason": "Authored generic descriptor for the use class it names; never a brand or a business name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "kitchen",
+      "text": "Kitchen",
+      "use_class": "restaurant",
+      "reason": "Authored generic descriptor for the use class it names; never a brand or a business name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "library",
+      "text": "Library",
+      "use_class": "library",
+      "reason": "Authored generic descriptor for the use class it names; never a brand or a business name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "market",
+      "text": "Market",
+      "use_class": "grocery",
+      "reason": "Authored generic descriptor for the use class it names; never a brand or a business name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "offices",
+      "text": "Offices",
+      "use_class": "office",
+      "reason": "Authored generic descriptor for the use class it names; never a brand or a business name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "pharmacy",
+      "text": "Pharmacy",
+      "use_class": "pharmacy",
+      "reason": "Authored generic descriptor for the use class it names; never a brand or a business name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "public_library",
+      "text": "Public Library",
+      "use_class": "library",
+      "reason": "Authored generic descriptor for the use class it names; never a brand or a business name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "repairs",
+      "text": "Repairs",
+      "use_class": "workshop",
+      "reason": "Authored generic descriptor for the use class it names; never a brand or a business name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "restaurant",
+      "text": "Restaurant",
+      "use_class": "restaurant",
+      "reason": "Authored generic descriptor for the use class it names; never a brand or a business name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "school",
+      "text": "School",
+      "use_class": "school",
+      "reason": "Authored generic descriptor for the use class it names; never a brand or a business name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "workshop",
+      "text": "Workshop",
+      "use_class": "workshop",
+      "reason": "Authored generic descriptor for the use class it names; never a brand or a business name.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    }
+  ]
+}

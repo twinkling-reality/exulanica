@@ -1,0 +1,197 @@
+{
+  "schema_version": 1,
+  "catalog_id": "rooftop-object",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "hvac_unit",
+      "label": "Rooftop plant unit",
+      "clearance_minimum_mm": 1000,
+      "parts": [
+        {
+          "shape": "box",
+          "surface_role": "object_primary",
+          "offset_x_mm": 0,
+          "offset_y_mm": 0,
+          "offset_z_mm": 0,
+          "size_x_mm": 1800,
+          "size_y_mm": 1200,
+          "size_z_mm": 1400,
+          "top_scale_millionths": 1000000,
+          "segments": 4,
+          "rings": 1
+        },
+        {
+          "shape": "prism",
+          "surface_role": "object_secondary",
+          "offset_x_mm": 0,
+          "offset_y_mm": 0,
+          "offset_z_mm": 1400,
+          "size_x_mm": 900,
+          "size_y_mm": 900,
+          "size_z_mm": 200,
+          "top_scale_millionths": 1000000,
+          "segments": 16,
+          "rings": 1
+        }
+      ],
+      "reason": "Authored rooftop plant: a packaged unit with a fan housing, kept a metre from the roof edge.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "lift_overrun",
+      "label": "Lift overrun",
+      "clearance_minimum_mm": 600,
+      "parts": [
+        {
+          "shape": "box",
+          "surface_role": "object_primary",
+          "offset_x_mm": 0,
+          "offset_y_mm": 0,
+          "offset_z_mm": 0,
+          "size_x_mm": 2400,
+          "size_y_mm": 2600,
+          "size_z_mm": 2400,
+          "top_scale_millionths": 1000000,
+          "segments": 4,
+          "rings": 1
+        }
+      ],
+      "reason": "Authored rooftop object: the box above a lift shaft.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "stair_bulkhead",
+      "label": "Stair bulkhead",
+      "clearance_minimum_mm": 600,
+      "parts": [
+        {
+          "shape": "box",
+          "surface_role": "object_primary",
+          "offset_x_mm": 0,
+          "offset_y_mm": 0,
+          "offset_z_mm": 0,
+          "size_x_mm": 2800,
+          "size_y_mm": 3200,
+          "size_z_mm": 3000,
+          "top_scale_millionths": 1000000,
+          "segments": 4,
+          "rings": 1
+        }
+      ],
+      "reason": "Authored rooftop object: the box a stair rises into.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "water_tank",
+      "label": "Water tank on legs",
+      "clearance_minimum_mm": 1500,
+      "parts": [
+        {
+          "shape": "box",
+          "surface_role": "object_secondary",
+          "offset_x_mm": -1500,
+          "offset_y_mm": -1500,
+          "offset_z_mm": 0,
+          "size_x_mm": 150,
+          "size_y_mm": 150,
+          "size_z_mm": 3000,
+          "top_scale_millionths": 1000000,
+          "segments": 4,
+          "rings": 1
+        },
+        {
+          "shape": "box",
+          "surface_role": "object_secondary",
+          "offset_x_mm": 1500,
+          "offset_y_mm": -1500,
+          "offset_z_mm": 0,
+          "size_x_mm": 150,
+          "size_y_mm": 150,
+          "size_z_mm": 3000,
+          "top_scale_millionths": 1000000,
+          "segments": 4,
+          "rings": 1
+        },
+        {
+          "shape": "box",
+          "surface_role": "object_secondary",
+          "offset_x_mm": -1500,
+          "offset_y_mm": 1500,
+          "offset_z_mm": 0,
+          "size_x_mm": 150,
+          "size_y_mm": 150,
+          "size_z_mm": 3000,
+          "top_scale_millionths": 1000000,
+          "segments": 4,
+          "rings": 1
+        },
+        {
+          "shape": "box",
+          "surface_role": "object_secondary",
+          "offset_x_mm": 1500,
+          "offset_y_mm": 1500,
+          "offset_z_mm": 0,
+          "size_x_mm": 150,
+          "size_y_mm": 150,
+          "size_z_mm": 3000,
+          "top_scale_millionths": 1000000,
+          "segments": 4,
+          "rings": 1
+        },
+        {
+          "shape": "prism",
+          "surface_role": "object_primary",
+          "offset_x_mm": 0,
+          "offset_y_mm": 0,
+          "offset_z_mm": 3000,
+          "size_x_mm": 3600,
+          "size_y_mm": 3600,
+          "size_z_mm": 4000,
+          "top_scale_millionths": 1000000,
+          "segments": 16,
+          "rings": 1
+        },
+        {
+          "shape": "prism",
+          "surface_role": "object_primary",
+          "offset_x_mm": 0,
+          "offset_y_mm": 0,
+          "offset_z_mm": 7000,
+          "size_x_mm": 3700,
+          "size_y_mm": 3700,
+          "size_z_mm": 1200,
+          "top_scale_millionths": 0,
+          "segments": 16,
+          "rings": 1
+        }
+      ],
+      "reason": "Authored rooftop tank: a round tank on four legs under a conical cap.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "approval": "One GET, approved by the operator on 2026-09-16 for the city vocabulary lane. Nothing else was downloaded.",
+  "attribution": "NYC Open Data, Office of Technology and Innovation (OTI)",
+  "byte_size": 10853,
+  "dataset": "NYC Open Data, 2015 Street Tree Census (tree records aggregated by species)",
+  "dataset_id": "uvpi-gqnh",
+  "method": "GET",
+  "modifications": "The response bytes are retained unchanged. assets/catalogs/tree-species.v2.json derives its entries from them by the selection rule each entry states.",
+  "profile": "exulanica.catalog-source/v1",
+  "provider": "NYC Open Data, Office of Technology and Innovation (OTI)",
+  "provider_revision": "Thu, 13 Sep 2018 14:58:58 GMT",
+  "query": {
+    "group": "spc_latin,spc_common",
+    "limit": 1000,
+    "order": "spc_latin",
+    "select": "spc_latin,spc_common,count(tree_id) AS tree_count"
+  },
+  "response_headers": {
+    "Content-Type": "application/json;charset=utf-8",
+    "Last-Modified": "Thu, 13 Sep 2018 14:58:58 GMT",
+    "X-SODA2-Fields": "[\"spc_latin\",\"spc_common\",\"tree_count\"]",
+    "X-SODA2-Truth-Last-Modified": "Thu, 13 Sep 2018 14:58:58 GMT",
+    "X-SODA2-Types": "[\"text\",\"text\",\"number\"]"
+  },
+  "retrieved_at": "2026-09-17T01:41:14Z",
+  "sha256": "68865bbbfdbcff42ce2492eadb218313e20c5f54845e7a4cac93885873b3ae15",
+  "source_file": "nyc-2015-street-tree-census-species.json",
+  "terms_basis": "docs/evaluation/2026-09-13-owned-world-source-decision.json records the reviewed claim that NYC Open Data public datasets are available without registration requirements, license requirements, or restrictions on use, and that a republication may be required to identify source, version, and modifications.",
+  "terms_url": "https://cityofnewyork.github.io/opendatatsm/publicpolicies.html",
+  "url": "https://data.cityofnewyork.us/resource/uvpi-gqnh.json?%24select=spc_latin%2Cspc_common%2Ccount%28tree_id%29%20AS%20tree_count&%24group=spc_latin%2Cspc_common&%24order=spc_latin&%24limit=1000"
+}

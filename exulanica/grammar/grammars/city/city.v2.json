@@ -1,0 +1,1422 @@
+{
+  "schema_version": 2,
+  "grammar_id": "city",
+  "grammar_version": 2,
+  "subject_kind": "city",
+  "frame": {
+    "name": "city_local",
+    "units": "mm",
+    "axes": "x_east_y_north_z_up",
+    "metric_class": "metric_authored"
+  },
+  "admissible_uses": [
+    "render_batch",
+    "collision_proxy",
+    "nav_envelope",
+    "pick_geometry"
+  ],
+  "cascade_levels": [
+    "city",
+    "district",
+    "block",
+    "lot",
+    "building",
+    "face"
+  ],
+  "stages": [
+    {
+      "stage_id": "terrain",
+      "stage_version": 2,
+      "records": [
+        {
+          "kind": "city.terrain",
+          "version": 2
+        }
+      ]
+    },
+    {
+      "stage_id": "districts",
+      "stage_version": 1,
+      "records": [
+        {
+          "kind": "city.district",
+          "version": 1
+        }
+      ]
+    },
+    {
+      "stage_id": "streets",
+      "stage_version": 2,
+      "records": [
+        {
+          "kind": "city.street_node",
+          "version": 2
+        },
+        {
+          "kind": "city.street",
+          "version": 1
+        },
+        {
+          "kind": "city.street_segment",
+          "version": 2
+        },
+        {
+          "kind": "city.block",
+          "version": 1
+        },
+        {
+          "kind": "city.curb_edge",
+          "version": 2
+        },
+        {
+          "kind": "city.crossing",
+          "version": 1
+        },
+        {
+          "kind": "city.lane",
+          "version": 1
+        },
+        {
+          "kind": "city.junction",
+          "version": 1
+        },
+        {
+          "kind": "city.junction_approach",
+          "version": 1
+        },
+        {
+          "kind": "city.lane_connection",
+          "version": 1
+        },
+        {
+          "kind": "city.signal",
+          "version": 1
+        },
+        {
+          "kind": "city.parking_space",
+          "version": 1
+        },
+        {
+          "kind": "city.road_marking",
+          "version": 1
+        }
+      ]
+    },
+    {
+      "stage_id": "parcels",
+      "stage_version": 2,
+      "records": [
+        {
+          "kind": "city.parcel",
+          "version": 2
+        }
+      ]
+    },
+    {
+      "stage_id": "massing",
+      "stage_version": 2,
+      "records": [
+        {
+          "kind": "city.massing",
+          "version": 2
+        },
+        {
+          "kind": "city.rooftop_object",
+          "version": 1
+        }
+      ]
+    },
+    {
+      "stage_id": "facade",
+      "stage_version": 2,
+      "records": [
+        {
+          "kind": "city.facade",
+          "version": 2
+        },
+        {
+          "kind": "city.ground_bay",
+          "version": 1
+        },
+        {
+          "kind": "city.entrance",
+          "version": 1
+        }
+      ]
+    },
+    {
+      "stage_id": "material",
+      "stage_version": 2,
+      "records": [
+        {
+          "kind": "city.surface_material",
+          "version": 2
+        }
+      ]
+    },
+    {
+      "stage_id": "streetlife",
+      "stage_version": 2,
+      "records": [
+        {
+          "kind": "city.street_furniture",
+          "version": 2
+        },
+        {
+          "kind": "city.street_tree",
+          "version": 1
+        }
+      ]
+    },
+    {
+      "stage_id": "vitrine",
+      "stage_version": 2,
+      "records": [
+        {
+          "kind": "city.vitrine",
+          "version": 2
+        }
+      ]
+    },
+    {
+      "stage_id": "premises",
+      "stage_version": 2,
+      "records": [
+        {
+          "kind": "city.premises",
+          "version": 2
+        }
+      ]
+    },
+    {
+      "stage_id": "tile",
+      "stage_version": 2,
+      "records": [
+        {
+          "kind": "city.tile",
+          "version": 2
+        }
+      ]
+    }
+  ],
+  "parameters": [
+    {
+      "name": "terrain_cell_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "city",
+      "stage": "terrain",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: the heightfield sample spacing; the terrain record refuses a cell that does not divide the 128 m tile.",
+      "minimum": 1000,
+      "maximum": 8000
+    },
+    {
+      "name": "terrain_relief_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "city",
+      "stage": "terrain",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: the largest elevation range a tile's terrain may span; a bound on grading, not a landform.",
+      "minimum": 0,
+      "maximum": 50000
+    },
+    {
+      "name": "driving_side",
+      "kind": "choice",
+      "unit": "key",
+      "level": "district",
+      "stage": "districts",
+      "when_unset": "required",
+      "vocabulary": "closed",
+      "basis": "authored: the side of the carriageway traffic keeps to is a convention a world states, so nothing chooses it: it is required.",
+      "options": [
+        "right",
+        "left"
+      ]
+    },
+    {
+      "name": "block_length_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "district",
+      "stage": "streets",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: the spacing of cross streets along a street; a planning choice, not a quoted standard.",
+      "minimum": 60000,
+      "maximum": 250000
+    },
+    {
+      "name": "lane_width_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "district",
+      "stage": "streets",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: about 9 to 12 feet; lane width is discussed in NACTO Urban Street Design Guide (Island Press, 2013), Street Design Elements, Lane Width, which was not re-read in this build and is not quoted.",
+      "minimum": 2750,
+      "maximum": 3650
+    },
+    {
+      "name": "camber_millionths",
+      "kind": "integer",
+      "unit": "millionths",
+      "level": "district",
+      "stage": "streets",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: a carriageway cross-fall of 1 to 4 percent from crown to kerb line, for drainage; not quoted from a standard.",
+      "minimum": 10000,
+      "maximum": 40000
+    },
+    {
+      "name": "crossing_width_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "district",
+      "stage": "streets",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: the band a crossing marks along the street; crosswalks are discussed in NACTO Urban Street Design Guide (Island Press, 2013), Street Design Elements, Crosswalks and Crossings, which was not re-read in this build and is not quoted.",
+      "minimum": 2400,
+      "maximum": 5000
+    },
+    {
+      "name": "speed_limit_mm_s",
+      "kind": "integer",
+      "unit": "mm_per_s",
+      "level": "district",
+      "stage": "streets",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: 15 to 50 km/h, floored to millimetres per second, a range for inhabited streets; the traffic lane owns the rules that read it.",
+      "minimum": 4166,
+      "maximum": 13888
+    },
+    {
+      "name": "kerb_height_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "block",
+      "stage": "streets",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': 'Kerb 100 to 180 mm'.",
+      "minimum": 100,
+      "maximum": 180
+    },
+    {
+      "name": "kerb_width_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "block",
+      "stage": "streets",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: the width of the kerb top; kerb units of this order are what the kerb-stone texture set depicts.",
+      "minimum": 150,
+      "maximum": 350
+    },
+    {
+      "name": "gutter_width_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "block",
+      "stage": "streets",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': names a gutter; its width is authored, and 0 is a street with no separate gutter strip.",
+      "minimum": 0,
+      "maximum": 600
+    },
+    {
+      "name": "footway_width_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "block",
+      "stage": "streets",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: kerb to frontage line; sidewalk zones are discussed in NACTO Urban Street Design Guide (Island Press, 2013), Street Design Elements, Sidewalks, which was not re-read in this build and is not quoted.",
+      "minimum": 1800,
+      "maximum": 8000
+    },
+    {
+      "name": "footway_crossfall_millionths",
+      "kind": "integer",
+      "unit": "millionths",
+      "level": "block",
+      "stage": "streets",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: a 1 to 2.5 percent rise from kerb to frontage, so a footway drains to the gutter.",
+      "minimum": 10000,
+      "maximum": 25000
+    },
+    {
+      "name": "corner_radius_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "block",
+      "stage": "streets",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': names corner radii; the range is authored, with small radii for slow urban turns as discussed in NACTO Urban Street Design Guide (Island Press, 2013), Street Design Elements, Corner Radii, not re-read in this build.",
+      "minimum": 1500,
+      "maximum": 15000
+    },
+    {
+      "name": "lot_frontage_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "block",
+      "stage": "parcels",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: the frontage a subdivision aims for, from a narrow shopfront lot to a wide one.",
+      "minimum": 4000,
+      "maximum": 30000
+    },
+    {
+      "name": "lot_depth_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "block",
+      "stage": "parcels",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: the depth a subdivision aims for behind the frontage line.",
+      "minimum": 12000,
+      "maximum": 60000
+    },
+    {
+      "name": "memory_precinct_lots",
+      "kind": "integer",
+      "unit": "count",
+      "level": "district",
+      "stage": "parcels",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: how many lots a district reserves as memory precincts, so nothing is ever cut out of a block later (graft 7).",
+      "minimum": 0,
+      "maximum": 8
+    },
+    {
+      "name": "front_setback_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "lot",
+      "stage": "parcels",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: the distance a building stands back from the frontage line; 0 builds to the line.",
+      "minimum": 0,
+      "maximum": 6000
+    },
+    {
+      "name": "typology",
+      "kind": "choice",
+      "unit": "key",
+      "level": "building",
+      "stage": "massing",
+      "when_unset": "derive",
+      "vocabulary": "typology",
+      "basis": "authored: the typology catalog's keys, exactly.",
+      "options": [
+        "apartment_block",
+        "civic_building",
+        "loft_building",
+        "mansion_block",
+        "office_block",
+        "rowhouse",
+        "shophouse"
+      ]
+    },
+    {
+      "name": "era",
+      "kind": "choice",
+      "unit": "key",
+      "level": "building",
+      "stage": "massing",
+      "when_unset": "derive",
+      "vocabulary": "era",
+      "basis": "authored: the era catalog's keys, exactly.",
+      "options": [
+        "contemporary",
+        "interwar",
+        "postwar",
+        "prewar_masonry"
+      ]
+    },
+    {
+      "name": "storeys",
+      "kind": "integer",
+      "unit": "count",
+      "level": "building",
+      "stage": "massing",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: storeys above grade, ground storey included; a typology narrows it.",
+      "minimum": 1,
+      "maximum": 40
+    },
+    {
+      "name": "ground_storey_height_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "building",
+      "stage": "massing",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': 'Ground band 0 to 4.0-6.0 m'.",
+      "minimum": 4000,
+      "maximum": 6000
+    },
+    {
+      "name": "upper_storey_height_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "building",
+      "stage": "massing",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: floor to floor above the ground storey; an era narrows it.",
+      "minimum": 2700,
+      "maximum": 4500
+    },
+    {
+      "name": "setback_depth_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "building",
+      "stage": "massing",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': names setbacks; the depth range is authored.",
+      "minimum": 0,
+      "maximum": 6000
+    },
+    {
+      "name": "setback_top_storeys",
+      "kind": "integer",
+      "unit": "count",
+      "level": "building",
+      "stage": "massing",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: how many top storeys step back; 0 is no setback.",
+      "minimum": 0,
+      "maximum": 4
+    },
+    {
+      "name": "roof_family",
+      "kind": "choice",
+      "unit": "key",
+      "level": "building",
+      "stage": "massing",
+      "when_unset": "derive",
+      "vocabulary": "roof-family",
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': 'Roof families'; the roof-family catalog's keys, exactly.",
+      "options": [
+        "flat_eaves",
+        "flat_parapet",
+        "gable"
+      ]
+    },
+    {
+      "name": "roof_rise_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "building",
+      "stage": "massing",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: a ridge's height above the wall top; 0 for a flat roof.",
+      "minimum": 0,
+      "maximum": 8000
+    },
+    {
+      "name": "parapet_height_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "building",
+      "stage": "massing",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': names parapets; the height range is authored.",
+      "minimum": 0,
+      "maximum": 1500
+    },
+    {
+      "name": "light_well_count",
+      "kind": "integer",
+      "unit": "count",
+      "level": "building",
+      "stage": "massing",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: light wells per tier.",
+      "minimum": 0,
+      "maximum": 4
+    },
+    {
+      "name": "rooftop_plant_count",
+      "kind": "integer",
+      "unit": "count",
+      "level": "building",
+      "stage": "massing",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': names rooftop plant; the count range is authored.",
+      "minimum": 0,
+      "maximum": 8
+    },
+    {
+      "name": "rooftop_tank_count",
+      "kind": "integer",
+      "unit": "count",
+      "level": "building",
+      "stage": "massing",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': names tanks; the count range is authored.",
+      "minimum": 0,
+      "maximum": 4
+    },
+    {
+      "name": "bay_pitch_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "face",
+      "stage": "facade",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': '2.4 to 3.5 m on centre as frontage / round(frontage / target)'.",
+      "minimum": 2400,
+      "maximum": 3500
+    },
+    {
+      "name": "opening_width_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "face",
+      "stage": "facade",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: a window's width; the record refuses one wider than its bay.",
+      "minimum": 600,
+      "maximum": 2400
+    },
+    {
+      "name": "opening_height_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "face",
+      "stage": "facade",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: a window's height; an era narrows it.",
+      "minimum": 900,
+      "maximum": 3000
+    },
+    {
+      "name": "sill_height_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "face",
+      "stage": "facade",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: a window's sill above its storey's floor.",
+      "minimum": 0,
+      "maximum": 1200
+    },
+    {
+      "name": "reveal_depth_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "face",
+      "stage": "facade",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': 'Recessed openings, 120 to 250 mm reveal'.",
+      "minimum": 120,
+      "maximum": 250
+    },
+    {
+      "name": "sill_projection_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "face",
+      "stage": "facade",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': names a sill projection; its range is authored.",
+      "minimum": 0,
+      "maximum": 150
+    },
+    {
+      "name": "sill_thickness_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "face",
+      "stage": "facade",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: the projecting sill's own height; 0 is no projecting sill.",
+      "minimum": 0,
+      "maximum": 200
+    },
+    {
+      "name": "head_treatment",
+      "kind": "choice",
+      "unit": "key",
+      "level": "face",
+      "stage": "facade",
+      "when_unset": "derive",
+      "vocabulary": "closed",
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': names a head treatment; the four labels are authored, and the geometry is always the explicit rise, band and projection.",
+      "options": [
+        "plain",
+        "lintel",
+        "arch",
+        "hood"
+      ]
+    },
+    {
+      "name": "head_rise_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "face",
+      "stage": "facade",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: a segmental arch's rise over the opening; 0 is a flat head.",
+      "minimum": 0,
+      "maximum": 900
+    },
+    {
+      "name": "head_band_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "face",
+      "stage": "facade",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: the height of a lintel or hood above the opening.",
+      "minimum": 0,
+      "maximum": 600
+    },
+    {
+      "name": "head_projection_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "face",
+      "stage": "facade",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: how far a lintel or hood stands proud of the face.",
+      "minimum": 0,
+      "maximum": 150
+    },
+    {
+      "name": "string_course_height_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "face",
+      "stage": "facade",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': 'string courses 60 to 200 mm'.",
+      "minimum": 60,
+      "maximum": 200
+    },
+    {
+      "name": "string_course_projection_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "face",
+      "stage": "facade",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: how far a string course stands proud; 0 is no string course.",
+      "minimum": 0,
+      "maximum": 100
+    },
+    {
+      "name": "cornice_height_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "face",
+      "stage": "facade",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': 'cornice 400 to 900 mm'.",
+      "minimum": 400,
+      "maximum": 900
+    },
+    {
+      "name": "cornice_projection_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "face",
+      "stage": "facade",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: how far a cornice oversails; 0 is no cornice.",
+      "minimum": 0,
+      "maximum": 900
+    },
+    {
+      "name": "stall_riser_height_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "face",
+      "stage": "facade",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': names the stall riser; its height range is authored.",
+      "minimum": 300,
+      "maximum": 900
+    },
+    {
+      "name": "transom_height_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "face",
+      "stage": "facade",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': names the transom; its height range is authored, and 0 is none.",
+      "minimum": 0,
+      "maximum": 900
+    },
+    {
+      "name": "fascia_height_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "face",
+      "stage": "facade",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': names the fascia; its height range is authored.",
+      "minimum": 300,
+      "maximum": 1200
+    },
+    {
+      "name": "awning_projection_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "face",
+      "stage": "facade",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': names the awning; its reach is authored, and 0 is none.",
+      "minimum": 0,
+      "maximum": 2500
+    },
+    {
+      "name": "awning_valance_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "face",
+      "stage": "facade",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: the depth of an awning's front drop.",
+      "minimum": 0,
+      "maximum": 450
+    },
+    {
+      "name": "entrance_recess_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "face",
+      "stage": "facade",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': names a recessed entrance; its depth is authored.",
+      "minimum": 0,
+      "maximum": 1800
+    },
+    {
+      "name": "threshold_height_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "face",
+      "stage": "facade",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': names the threshold; its step above the footway is authored.",
+      "minimum": 0,
+      "maximum": 180
+    },
+    {
+      "name": "wall_material",
+      "kind": "choice",
+      "unit": "key",
+      "level": "building",
+      "stage": "material",
+      "when_unset": "derive",
+      "vocabulary": "material",
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': surface_material; the options are the material catalog's keys that dress a wall, exactly.",
+      "options": [
+        "brick_running_bond",
+        "cast_concrete",
+        "limestone_ashlar",
+        "painted_render"
+      ]
+    },
+    {
+      "name": "repeat_size_millionths",
+      "kind": "integer",
+      "unit": "millionths",
+      "level": "face",
+      "stage": "material",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': 'per-instance UV scale'; within a quarter of a set's baked size, so a brick stays brick-sized.",
+      "minimum": 800000,
+      "maximum": 1250000
+    },
+    {
+      "name": "soiling_gradient_millionths",
+      "kind": "integer",
+      "unit": "millionths",
+      "level": "building",
+      "stage": "material",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': 'soiling gradient'.",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    {
+      "name": "base_weathering_millionths",
+      "kind": "integer",
+      "unit": "millionths",
+      "level": "building",
+      "stage": "material",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': 'base weathering'.",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    {
+      "name": "reveal_darkening_millionths",
+      "kind": "integer",
+      "unit": "millionths",
+      "level": "building",
+      "stage": "material",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': 'reveal darkening'.",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    {
+      "name": "tree_species",
+      "kind": "choice",
+      "unit": "key",
+      "level": "block",
+      "stage": "streetlife",
+      "when_unset": "derive",
+      "vocabulary": "tree-species",
+      "basis": "derived: the tree-species catalog's keys, exactly, which come from the NYC 2015 Street Tree Census retained under assets/catalogs/sources.",
+      "options": [
+        "acer_platanoides",
+        "acer_rubrum",
+        "acer_saccharinum",
+        "fraxinus_pennsylvanica",
+        "ginkgo_biloba",
+        "gleditsia_triacanthos_var_inermis",
+        "liquidambar_styraciflua",
+        "platanus_x_acerifolia",
+        "prunus_cerasifera",
+        "pyrus_calleryana",
+        "quercus_bicolor",
+        "quercus_palustris",
+        "quercus_rubra",
+        "styphnolobium_japonicum",
+        "tilia_americana",
+        "tilia_cordata",
+        "tilia_tomentosa",
+        "ulmus_americana",
+        "zelkova_serrata"
+      ]
+    },
+    {
+      "name": "tree_spacing_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "block",
+      "stage": "streetlife",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: the spacing of street trees along a kerb.",
+      "minimum": 5000,
+      "maximum": 15000
+    },
+    {
+      "name": "lamp_spacing_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "block",
+      "stage": "streetlife",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: the spacing of street lamps along a kerb; not a lighting calculation.",
+      "minimum": 15000,
+      "maximum": 40000
+    },
+    {
+      "name": "furniture_kerb_offset_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "block",
+      "stage": "streetlife",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': 'street furniture at kerb offsets'; the range is authored.",
+      "minimum": 450,
+      "maximum": 1200
+    },
+    {
+      "name": "exclusion_clearance_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "block",
+      "stage": "streetlife",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': 'exclusion zones'; the clearance range is authored.",
+      "minimum": 300,
+      "maximum": 1500
+    },
+    {
+      "name": "vitrine_depth_mm",
+      "kind": "integer",
+      "unit": "mm",
+      "level": "face",
+      "stage": "vitrine",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': 'a lit vitrine behind the glass', 0.6 to 1.5 m deep.",
+      "minimum": 600,
+      "maximum": 1500
+    },
+    {
+      "name": "fitout",
+      "kind": "choice",
+      "unit": "key",
+      "level": "face",
+      "stage": "vitrine",
+      "when_unset": "derive",
+      "vocabulary": "fitout",
+      "basis": "authored: the fitout catalog's keys, exactly.",
+      "options": [
+        "bakery_counter",
+        "book_shelves",
+        "cafe_tables",
+        "display_boards",
+        "grocery_racks",
+        "office_desks",
+        "work_bench"
+      ]
+    },
+    {
+      "name": "vitrine_light_level_millionths",
+      "kind": "integer",
+      "unit": "millionths",
+      "level": "face",
+      "stage": "vitrine",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "target architecture 2026-09-15, table 'Why it clears the bar': the vitrine is lit; the level is relative to the brightest the renderer shows.",
+      "minimum": 0,
+      "maximum": 1000000
+    },
+    {
+      "name": "ground_floor_use",
+      "kind": "choice",
+      "unit": "key",
+      "level": "building",
+      "stage": "premises",
+      "when_unset": "derive",
+      "vocabulary": "use-class",
+      "basis": "authored: the use-class catalog's keys, exactly, which the living society lane maps to roles.",
+      "options": [
+        "bakery",
+        "bookshop",
+        "cafe",
+        "grocery",
+        "library",
+        "office",
+        "pharmacy",
+        "residential",
+        "restaurant",
+        "school",
+        "workshop"
+      ]
+    },
+    {
+      "name": "upper_floor_use",
+      "kind": "choice",
+      "unit": "key",
+      "level": "building",
+      "stage": "premises",
+      "when_unset": "derive",
+      "vocabulary": "use-class",
+      "basis": "authored: the use-class catalog's keys, exactly.",
+      "options": [
+        "bakery",
+        "bookshop",
+        "cafe",
+        "grocery",
+        "library",
+        "office",
+        "pharmacy",
+        "residential",
+        "restaurant",
+        "school",
+        "workshop"
+      ]
+    },
+    {
+      "name": "units_per_storey",
+      "kind": "integer",
+      "unit": "count",
+      "level": "building",
+      "stage": "premises",
+      "when_unset": "derive",
+      "vocabulary": "",
+      "basis": "authored: how many premises share one storey.",
+      "minimum": 1,
+      "maximum": 8
+    }
+  ],
+  "projections": [
+    {
+      "projection": "render_batch",
+      "representation_version": 1,
+      "time_scope": "atemporal",
+      "resolution_mm": 1,
+      "preserved": [
+        {
+          "property": "visible_surface_shape",
+          "statement": "The surfaces a viewer sees, expanded from the records' integer millimetres."
+        },
+        {
+          "property": "surface_material_reference",
+          "statement": "Every triangle range names the surface material record that dresses it, or states that none exists."
+        },
+        {
+          "property": "subject_identity",
+          "statement": "Every triangle range carries the identity its source record states."
+        },
+        {
+          "property": "surface_coordinates",
+          "statement": "Every vertex carries its s and t in the surface frame the grammar fixes."
+        }
+      ],
+      "unsupported": [
+        {
+          "property": "solid_occupancy",
+          "statement": "A render batch is a set of surfaces, not solids; it says nothing about what is inside them."
+        },
+        {
+          "property": "walkable_support",
+          "statement": "It does not state where a person may stand."
+        },
+        {
+          "property": "capsule_clearance",
+          "statement": "It does not state where a person fits."
+        }
+      ],
+      "uses": [
+        {
+          "use": "display",
+          "verdict": "admitted",
+          "reason": "drawn for a viewer, with its materials"
+        },
+        {
+          "use": "collision",
+          "verdict": "refused",
+          "reason": "a render batch preserves visible shape, not solid occupancy; collision reads collision_proxy"
+        },
+        {
+          "use": "navigation",
+          "verdict": "refused",
+          "reason": "support is read from nav_envelope, which is declared separately, never derived from a render mesh"
+        },
+        {
+          "use": "picking",
+          "verdict": "refused",
+          "reason": "picking reads pick_geometry, which carries a coarse outline per subject"
+        },
+        {
+          "use": "interchange_export",
+          "verdict": "refused",
+          "reason": "export_gltf is not admitted by this version"
+        },
+        {
+          "use": "evaluation",
+          "verdict": "admitted",
+          "reason": "a baked tile may be measured and scored in an evaluation record, which admits it to no workspace"
+        },
+        {
+          "use": "personal_world",
+          "verdict": "refused",
+          "reason": "a generated world is reachable from no person's world until the superseding governance decision is accepted in writing"
+        },
+        {
+          "use": "citation",
+          "verdict": "refused",
+          "reason": "generated content is never evidence (ADR-0008)"
+        }
+      ],
+      "dependencies": []
+    },
+    {
+      "projection": "collision_proxy",
+      "representation_version": 1,
+      "time_scope": "atemporal",
+      "resolution_mm": 1,
+      "preserved": [
+        {
+          "property": "solid_occupancy",
+          "statement": "Coarse solids that bound what a moving body may not enter."
+        },
+        {
+          "property": "subject_identity",
+          "statement": "Every solid carries the identity its source record states."
+        },
+        {
+          "property": "subject_extent",
+          "statement": "No solid leaves the extent its record states."
+        }
+      ],
+      "unsupported": [
+        {
+          "property": "visible_surface_shape",
+          "statement": "Solids are coarse and are not an appearance."
+        },
+        {
+          "property": "surface_material_reference",
+          "statement": "Solids carry no material."
+        },
+        {
+          "property": "walkable_support",
+          "statement": "A solid's top is not a statement that a person may stand there."
+        }
+      ],
+      "uses": [
+        {
+          "use": "display",
+          "verdict": "refused",
+          "reason": "coarse solids are not an appearance"
+        },
+        {
+          "use": "collision",
+          "verdict": "admitted",
+          "reason": "stops a moving body entering occupied space"
+        },
+        {
+          "use": "navigation",
+          "verdict": "refused",
+          "reason": "clearance and support are nav_envelope's; reusing collision solids for them is the failure that projection exists to prevent"
+        },
+        {
+          "use": "picking",
+          "verdict": "refused",
+          "reason": "picking reads pick_geometry"
+        },
+        {
+          "use": "interchange_export",
+          "verdict": "refused",
+          "reason": "export_gltf is not admitted by this version"
+        },
+        {
+          "use": "evaluation",
+          "verdict": "admitted",
+          "reason": "a baked tile may be measured and scored in an evaluation record, which admits it to no workspace"
+        },
+        {
+          "use": "personal_world",
+          "verdict": "refused",
+          "reason": "a generated world is reachable from no person's world until the superseding governance decision is accepted in writing"
+        },
+        {
+          "use": "citation",
+          "verdict": "refused",
+          "reason": "generated content is never evidence (ADR-0008)"
+        }
+      ],
+      "dependencies": []
+    },
+    {
+      "projection": "nav_envelope",
+      "representation_version": 1,
+      "time_scope": "atemporal",
+      "resolution_mm": 1,
+      "preserved": [
+        {
+          "property": "walkable_support",
+          "statement": "The surfaces a person may stand on, sampled to within 50 mm."
+        },
+        {
+          "property": "capsule_clearance",
+          "statement": "Clear space for a capsule of 340 mm radius and 1900 mm height, eye at 1620 mm, which is what the visual gate measures."
+        },
+        {
+          "property": "subject_identity",
+          "statement": "Every support surface names the record it came from."
+        }
+      ],
+      "unsupported": [
+        {
+          "property": "visible_surface_shape",
+          "statement": "Support is not an appearance."
+        },
+        {
+          "property": "solid_occupancy",
+          "statement": "Clearance is not a solid; collision reads collision_proxy."
+        },
+        {
+          "property": "surface_material_reference",
+          "statement": "Support carries no material."
+        }
+      ],
+      "uses": [
+        {
+          "use": "display",
+          "verdict": "refused",
+          "reason": "support is not an appearance"
+        },
+        {
+          "use": "collision",
+          "verdict": "refused",
+          "reason": "clearance is not a solid; collision reads collision_proxy"
+        },
+        {
+          "use": "navigation",
+          "verdict": "admitted",
+          "reason": "stands a person on generated ground and keeps them clear of what they cannot pass"
+        },
+        {
+          "use": "picking",
+          "verdict": "refused",
+          "reason": "picking reads pick_geometry"
+        },
+        {
+          "use": "interchange_export",
+          "verdict": "refused",
+          "reason": "export_gltf is not admitted by this version"
+        },
+        {
+          "use": "evaluation",
+          "verdict": "admitted",
+          "reason": "a baked tile may be measured and scored in an evaluation record, which admits it to no workspace"
+        },
+        {
+          "use": "personal_world",
+          "verdict": "refused",
+          "reason": "a generated world is reachable from no person's world until the superseding governance decision is accepted in writing"
+        },
+        {
+          "use": "citation",
+          "verdict": "refused",
+          "reason": "generated content is never evidence (ADR-0008)"
+        }
+      ],
+      "dependencies": []
+    },
+    {
+      "projection": "pick_geometry",
+      "representation_version": 1,
+      "time_scope": "atemporal",
+      "resolution_mm": 1,
+      "preserved": [
+        {
+          "property": "subject_identity",
+          "statement": "Every pickable region is the identity its record states."
+        },
+        {
+          "property": "subject_extent",
+          "statement": "Every pickable region lies inside its record's extent."
+        },
+        {
+          "property": "pick_outline",
+          "statement": "A coarse outline of each subject a pointer can hit."
+        }
+      ],
+      "unsupported": [
+        {
+          "property": "visible_surface_shape",
+          "statement": "An outline is not an appearance."
+        },
+        {
+          "property": "surface_material_reference",
+          "statement": "An outline carries no material."
+        },
+        {
+          "property": "walkable_support",
+          "statement": "An outline is not support."
+        },
+        {
+          "property": "solid_occupancy",
+          "statement": "An outline is not a solid."
+        }
+      ],
+      "uses": [
+        {
+          "use": "display",
+          "verdict": "refused",
+          "reason": "an outline is not an appearance"
+        },
+        {
+          "use": "collision",
+          "verdict": "refused",
+          "reason": "an outline is not a solid; collision reads collision_proxy"
+        },
+        {
+          "use": "navigation",
+          "verdict": "refused",
+          "reason": "an outline is not support; navigation reads nav_envelope"
+        },
+        {
+          "use": "picking",
+          "verdict": "admitted",
+          "reason": "answers which subject a pointer is over"
+        },
+        {
+          "use": "interchange_export",
+          "verdict": "refused",
+          "reason": "export_gltf is not admitted by this version"
+        },
+        {
+          "use": "evaluation",
+          "verdict": "admitted",
+          "reason": "a baked tile may be measured and scored in an evaluation record, which admits it to no workspace"
+        },
+        {
+          "use": "personal_world",
+          "verdict": "refused",
+          "reason": "a generated world is reachable from no person's world until the superseding governance decision is accepted in writing"
+        },
+        {
+          "use": "citation",
+          "verdict": "refused",
+          "reason": "generated content is never evidence (ADR-0008)"
+        }
+      ],
+      "dependencies": []
+    }
+  ]
+}

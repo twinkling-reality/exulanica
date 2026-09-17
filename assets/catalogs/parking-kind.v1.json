@@ -1,0 +1,92 @@
+{
+  "schema_version": 1,
+  "catalog_id": "parking-kind",
+  "catalog_version": 1,
+  "entries": [
+    {
+      "key": "accessible",
+      "label": "Accessible bay",
+      "placement": "carriageway",
+      "length_minimum_mm": 6000,
+      "length_maximum_mm": 7000,
+      "width_minimum_mm": 2400,
+      "width_maximum_mm": 3600,
+      "reason": "Authored parking kind: a wider bay kept for people who need room beside the vehicle.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "bus_layover",
+      "label": "Bus layover",
+      "placement": "carriageway",
+      "length_minimum_mm": 12000,
+      "length_maximum_mm": 30000,
+      "width_minimum_mm": 3000,
+      "width_maximum_mm": 3650,
+      "reason": "Authored parking kind: where a bus waits at the end of a trip, always in the carriageway.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "cycle_stand",
+      "label": "Cycle parking",
+      "placement": "footway",
+      "length_minimum_mm": 1800,
+      "length_maximum_mm": 12000,
+      "width_minimum_mm": 600,
+      "width_maximum_mm": 2500,
+      "reason": "Authored parking kind: stands on the footway where a cycle trip ends, drawn once as street furniture.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "general",
+      "label": "General bay",
+      "placement": "carriageway",
+      "length_minimum_mm": 5000,
+      "length_maximum_mm": 6700,
+      "width_minimum_mm": 2000,
+      "width_maximum_mm": 2700,
+      "reason": "Authored parking kind: a kerbside bay for one car.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    },
+    {
+      "key": "loading",
+      "label": "Loading bay",
+      "placement": "carriageway",
+      "length_minimum_mm": 6000,
+      "length_maximum_mm": 12000,
+      "width_minimum_mm": 2400,
+      "width_maximum_mm": 3000,
+      "reason": "Authored parking kind: a bay for deliveries.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "docs/grammar-package.md"
+      }
+    }
+  ]
+}
