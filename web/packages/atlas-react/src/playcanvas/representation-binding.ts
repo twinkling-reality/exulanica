@@ -10,6 +10,15 @@ import {
 import { createDataViewPoints } from './data-view/points.js';
 import type { RepresentationDraw, RepresentationPointAllocation } from './representation-runtime.js';
 
+/** One subject a caller registers with `AtlasBinding.registerRepresentationSubjects`. */
+export interface ExternalRepresentationEntry {
+  readonly subject: RepresentationSubject;
+  /** The static triangle draw the subject stands for, borrowed exactly like a district batch. */
+  readonly instance?: pc.MeshInstance;
+  /** Or a draw of the caller's own. Exactly one of the two. */
+  readonly draw?: RepresentationDraw;
+}
+
 /** Triangle sampling reads the whole mesh on the CPU, so it stays bounded by source size. */
 const MAX_SOURCE_VERTICES = 250_000;
 /** Address sampling only selects existing points, so a retained buffer may be much larger. */

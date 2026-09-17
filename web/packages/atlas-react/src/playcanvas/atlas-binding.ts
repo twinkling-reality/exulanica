@@ -139,10 +139,12 @@ import {
 } from './scene-point-maps.js';
 import {
   RepresentationRuntime,
+  type RepresentationDraw,
   type RepresentationReport,
 } from './representation-runtime.js';
 import {
   meshLocalExtent,
+  type ExternalRepresentationEntry,
   representationParentVisible,
   representationWorldBounds,
   retainedPointAllocation,
@@ -1286,6 +1288,96 @@ export class AtlasBinding {
       }
     });
     this.setRepresentationSubjects(subjects);
+  }
+
+  /**
+   * Register subjects whose geometry the caller draws (a baked tile, for example) against the node
+   * their frame and bounds are stated in. Each one passes the same validation, budget, blend and
+   * overlay rules as the binding's own subjects, and later rights changes arrive through
+   * `setRepresentationSubjects` as usual. Give each subject either the static triangle draw it
+   * stands for, which the data view borrows exactly as it borrows a district batch, or a draw of
+   * the caller's own. Nothing is registered unless every entry is accepted.
+   *
+   * Returns the handle that unregisters all of them and restores every borrowed draw. Call it when
+   * the geometry unloads; it also runs by itself if the node is destroyed first. Idempotent.
+   */
+  registerRepresentationSubjects(
+    node: pc.GraphNode,
+    entries: readonly ExternalRepresentationEntry[],
+  ): () => void {
+    const seen = new Set<string>();
+    for (const entry of entries) {
+      validateRepresentationSubject(entry.subject);
+      const id = entry.subject.subjectId;
+      if (seen.has(id) || this.representationDefaults.has(id)) {
+        throw new TypeError(`Duplicate representation subject ${id}`);
+      }
+      if ((entry.instance === undefined) === (entry.draw === undefined)) {
+        throw new TypeError(`Representation subject ${id} needs exactly one of a mesh instance or a draw`);
+      }
+      seen.add(id);
+    }
+    const registered: string[] = [];
+    const release = (): void => {
+      for (const id of registered.splice(0)) {
+        this.representation.unregister(id);
+        this.representationDefaults.delete(id);
+        this.representationOverrides.delete(id);
+        this.representationFrames.delete(id);
+      }
+    };
+    try {
+      for (const entry of entries) {
+        const fixed = Object.freeze({
+          ...entry.subject,
+          sourceRefs: Object.freeze([...entry.subject.sourceRefs]),
+          bounds: entry.subject.bounds === null ? null : Object.freeze({
+            ...entry.subject.bounds,
+            min: Object.freeze([...entry.subject.bounds.min]) as readonly [number, number, number],
+            max: Object.freeze([...entry.subject.bounds.max]) as readonly [number, number, number],
+          }),
+        });
+        const id = fixed.subjectId;
+        const current = () => this.representationSubject(fixed);
+        const own = entry.draw;
+        const draw: RepresentationDraw | null = own === undefined
+          ? staticMeshRepresentation(this.device, entry.instance!, current, undefined, this.representation.style)
+          : {
+            currentSubject: current,
+            parentVisible: () => own.parentVisible(),
+            setRenderedWeight: weight => own.setRenderedWeight(weight),
+            createPoints: limit => own.createPoints(limit),
+            restore: () => own.restore(),
+            ...(own.pointDemand === undefined ? {} : { pointDemand: () => own.pointDemand!() }),
+            ...(own.setExistingPointWeight === undefined
+              ? {} : { setExistingPointWeight: (weight: number) => own.setExistingPointWeight!(weight) }),
+            ...(own.refresh === undefined ? {} : { refresh: () => own.refresh!() }),
+          };
+        if (draw === null) {
+          throw new TypeError(`Representation subject ${id} is not a static triangle draw the data view can borrow`);
+        }
+        this.representationDefaults.set(id, fixed);
+        this.representationFrames.set(id, node);
+        this.representation.register(draw);
+        registered.push(id);
+      }
+    } catch (error) {
+      release();
+      throw error;
+    }
+    let active = true;
+    const handle = (): void => {
+      if (!active) return;
+      active = false;
+      node.off('destroy', handle);
+      release();
+      if (this.representationController !== null) this.publishRepresentation();
+      this.invalidate();
+    };
+    node.once('destroy', handle);
+    this.publishRepresentation();
+    this.invalidate();
+    return handle;
   }
 
   /** Update current rights and records for known geometry without replacing world identity. */
