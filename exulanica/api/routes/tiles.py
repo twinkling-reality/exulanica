@@ -15,9 +15,14 @@ Both routes require ``tiles.materialise``. Nothing is granted that permission by
 generated world reaches no person's world until the governance decision is accepted in writing, so
 only a token whose grant names the permission is served a generated tile.
 
-A key nothing stored is 404 ``unknown_reference``, the same answer the permission floor gives a
-credential that does not hold ``tiles.materialise``, so neither answer says whether the other one
-was the reason. A key whose tile baked twice into different containers is 409 and never bytes. A
+A key nothing stored is 404 ``unknown_reference``, and so is every key when the caller's grant does
+not hold ``tiles.materialise``: the permission floor refuses an id-addressed route as a missing id.
+The two are the same status and the same code and not the same bytes, since the floor's refusal is
+raised before this route runs and carries its own detail and none of these headers. What the rule
+is for still holds: a credential without the permission is told the same thing about every id, so
+it cannot learn which ids exist. It can tell that its own grant is short, which it knows already.
+
+A key whose tile baked twice into different containers is 409 and never bytes. A
 row whose bytes are not in the store is 409, because a row is written after its bytes and a
 missing file is an operator's problem, not a client's. A workspace past its ceiling, or with no
 ceiling declared, is 429 and never retried.

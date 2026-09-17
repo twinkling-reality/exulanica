@@ -240,12 +240,33 @@ def test_a_faulted_tile_is_never_served(tiles):
 
 
 def test_an_unknown_key_and_a_missing_permission_are_refused_alike(tiles):
-    """The floor's rule: on a route addressed by an id, a refusal answers as a missing id does."""
+    """The floor's rule, and exactly how far it goes.
+
+    On a route addressed by an id, a credential without the permission is refused as a missing id
+    is: same status, same code. They are **not** byte for byte the same, and this pins the
+    difference rather than claiming it away: the floor's refusal comes from the permission
+    dependency before this route runs, with its own detail and without this route's headers, while
+    an unknown key is refused by the route itself.
+
+    That difference is not an existence oracle, which is what the rule is for. A credential without
+    the permission is told the same thing about every id, existing or not, so it learns nothing
+    about which ids exist. What it can tell is whether its own grant holds ``tiles.materialise``,
+    which it already knows and which the listing route states outright.
+    """
     missing = tiles.get("walker", f"/tiles/{uuid.uuid4()}/bytes")
-    assert missing.status_code == 404 and missing.json()["code"] == "unknown_reference"
     refused = tiles.get("viewer", f"/tiles/{tiles.keys['first']}/bytes")
-    assert refused.status_code == 404 and refused.json()["code"] == "unknown_reference"
+    assert (missing.status_code, missing.json()["code"]) == (404, "unknown_reference")
+    assert (refused.status_code, refused.json()["code"]) == (404, "unknown_reference")
     assert refused.content != b"the corridor tile"
+    # A credential without the permission is told one thing about every id, which is the part that
+    # matters: a stored key and an unknown one are indistinguishable to it.
+    unknown_to_viewer = tiles.get("viewer", f"/tiles/{uuid.uuid4()}/bytes")
+    assert unknown_to_viewer.content == refused.content
+    assert unknown_to_viewer.headers.get("etag") is None
+    # And what differs between the two refusals, stated rather than assumed.
+    assert missing.json()["detail"] != refused.json()["detail"]
+    assert missing.headers["Cache-Control"] == "private, no-cache"
+    assert "Cache-Control" not in refused.headers
     # The listing route names no id, so it says plainly that the credential is not the reason.
     listing = tiles.get("viewer", f"/tiles?city_seed={CITY_SEED}")
     assert listing.status_code == 403 and listing.json()["code"] == "not_authorised"
