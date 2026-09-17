@@ -11,13 +11,20 @@
  *   2. FACES. The piece less the union of the obstructions, divided along its rows, found exactly by
  *      the plan arrangement rule (`plan-arrangement.ts`). A face that is not convex is refused.
  *   3. HULLS. Each face becomes the convex hull of the integer points `(floor or ceil x, floor or
- *      ceil y)` round each of its vertices that lie in the closed piece, keeping the points along
- *      the hull's edges so neighbours meet vertex to vertex.
+ *      ceil y)` round each of its vertices, keeping the points along the hull's edges so neighbours
+ *      meet vertex to vertex.
  *
  * A hull HOLDS its face, so nothing uncovered is lost, and lies within its face grown by a
  * millimetre on each axis, so it enters an obstruction by no more than that. A rule that must not
  * enter its obstructions at all grows them by a millimetre before carving, and then the hulls stay
  * outside the obstructions themselves.
+ *
+ * HOLDING TO THE PIECE. A caller may keep only the points inside the closed piece. Terrain does,
+ * because its pieces are cells whose sides cross every row at an integer point, so it loses nothing
+ * by it and no cell's terrain reaches into the next. A surface with a sloping edge must not: a row
+ * crosses such an edge between integer points, and holding to the piece would shave a sliver off
+ * the edge itself. Where two triangles of one surface share that edge both would shave it, and the
+ * crack between them is one a person would fall through.
  */
 import { bigFloorQuotient, exact, GeometryError, multiply, subtract } from './integer-math.js';
 import type { Plan, Space } from './integer-math.js';
@@ -97,8 +104,8 @@ export function hullKeepingEdges(points: readonly Plan[], where: string): Plan[]
   return [...lower.slice(0, -1), ...upper.slice(0, -1)];
 }
 
-/** A face's hull corners, step 5. */
-function faceHull(face: readonly RationalPoint[], piece: readonly Plan[], where: string): Plan[] {
+/** A face's hull corners, step 3, holding to the piece or not as the caller's rule needs. */
+function faceHull(face: readonly RationalPoint[], piece: readonly Plan[], holdToPiece: boolean, where: string): Plan[] {
   const corners: Plan[] = [];
   for (const vertex of face) {
     const lowX = bigFloorQuotient(vertex.x, vertex.w);
@@ -108,7 +115,8 @@ function faceHull(face: readonly RationalPoint[], piece: readonly Plan[], where:
     for (const x of xs) {
       for (const y of ys) {
         const point: Plan = [exact(Number(x), where), exact(Number(y), where)];
-        if (inPiece(piece, point, where)) corners.push(point);
+        if (holdToPiece && !inPiece(piece, point, where)) continue;
+        corners.push(point);
       }
     }
   }
@@ -131,13 +139,14 @@ function convex(face: readonly RationalPoint[]): boolean {
 export function carvedPiece(
   piece: readonly Plan[],
   obstructions: readonly ObstructionTriangle[],
+  holdToPiece: boolean,
   where: string,
 ): Plan[][] {
   const walks: Plan[][] = [];
   for (const region of uncoveredRegions(piece, obstructions, rowsOf(piece, obstructions, where), where)) {
     if (region.holes.length > 0) throw new GeometryError(`${where}: a face cut along its rows still holds a hole`);
     if (!convex(region.outer)) throw new GeometryError(`${where}: a face cut along its rows is not convex`);
-    const hull = faceHull(region.outer, piece, where);
+    const hull = faceHull(region.outer, piece, holdToPiece, where);
     if (hull.length >= 3) walks.push(hull);
   }
   return walks;

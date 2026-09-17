@@ -142,7 +142,7 @@ export function yieldedCell(
   const triangles: number[] = [];
   for (const piece of pieces) {
     const ring: Plan[] = piece.map((corner) => [corner[0], corner[1]]);
-    for (const hull of carvedPiece(ring, coverings, where)) {
+    for (const hull of carvedPiece(ring, coverings, true, where)) {
       const first = vertices.length;
       for (const point of hull) vertices.push([point[0], point[1], heightOnPlane(piece, point, where)]);
       for (const index of triangulateRing(hull, where)) triangles.push(first + index);
