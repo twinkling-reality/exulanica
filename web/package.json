@@ -13,6 +13,7 @@
     "check": "pnpm run typecheck && pnpm run boundaries && pnpm run test",
     "synth": "tsx packages/scene-synth/src/cli.ts",
     "texture": "tsx packages/loom-texture/src/cli.ts",
+    "tess": "tsx packages/loom-tess/src/node/cli.ts",
     "world-style:sync": "tsx scripts/sync-world-style-registry.ts",
     "app": "pnpm --filter @exulanica/app dev",
     "app:build": "pnpm --filter @exulanica/app build",
