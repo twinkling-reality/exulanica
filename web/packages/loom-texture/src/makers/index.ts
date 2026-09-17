@@ -4,6 +4,7 @@ import { ashlarMaker } from './ashlar.js';
 import { asphaltMaker } from './asphalt.js';
 import { barkMaker } from './bark.js';
 import { brickMaker } from './brick.js';
+import { canvasMaker } from './canvas.js';
 import { concreteMaker } from './concrete.js';
 import { foliageMaker } from './foliage.js';
 import { glazingMaker } from './glazing.js';
@@ -41,7 +42,7 @@ export const MAKERS: readonly Maker[] = Object.freeze(
  * the drafts.
  */
 export const DRAFT_MAKERS: readonly Maker[] = Object.freeze(
-  [timberMaker].sort((a, b) => (a.manifest.maker_id < b.manifest.maker_id ? -1 : 1)),
+  [canvasMaker, timberMaker].sort((a, b) => (a.manifest.maker_id < b.manifest.maker_id ? -1 : 1)),
 );
 
 for (const maker of [...MAKERS, ...DRAFT_MAKERS]) {

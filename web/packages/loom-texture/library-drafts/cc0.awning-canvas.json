@@ -1,0 +1,48 @@
+{
+  "set_id": "cc0.awning-canvas",
+  "version": 1,
+  "title": "Awning canvas",
+  "summary": "Striped woven canvas for a shop awning, sagging between its rafters, faded by the sun and streaked where rain runs down the slope.",
+  "licence_id": "CC0-1.0",
+  "recipe": {
+    "profile": "exulanica.texture-recipe/v1",
+    "maker": {
+      "id": "loom.canvas",
+      "version": 1
+    },
+    "seed": 2026091705,
+    "resolution": {
+      "width": 512,
+      "height": 512
+    },
+    "extent_mm": {
+      "u": 1000,
+      "v": 1000
+    },
+    "parameters": {
+      "stripe_colours": [
+        [58, 74, 96],
+        [214, 208, 194]
+      ],
+      "bleached_colour": [226, 220, 206],
+      "dirt_colour": [104, 98, 88],
+      "stripes_across": 8,
+      "thread_cells_across": 240,
+      "thread_relief_mm_1024ths": 1100,
+      "thread_tone_q16": 3000,
+      "ripples_across": 3,
+      "ripple_mm_1024ths": 2400,
+      "fade_percent": 10,
+      "fade_cells": 2,
+      "streak_percent": 14,
+      "streak_cells_across": 60,
+      "streak_cells_along": 3,
+      "canvas_roughness_permille": 860,
+      "dirt_roughness_percent": 6,
+      "height_range_mm": 6,
+      "occlusion_radius_mm": 6,
+      "occlusion_depth_mm": 2,
+      "occlusion_strength_permille": 350
+    }
+  }
+}
