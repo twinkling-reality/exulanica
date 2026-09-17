@@ -130,10 +130,10 @@ the NVIDIA Open Model License must not be vendored, and per section 6 must not b
 
 | Instrument | Models |
 | --- | --- |
-| **OpenMDW-1.1** (permissive) | `nvidia/Nemotron-3_5-Lightning` / `NVIDIA-Nemotron-3.5-Lightning-30B-A3B-*`, `nvidia/nemotron-3.5-asr-streaming-0.6b`, `nvidia/Nemotron-3-Embed-1B-BF16`, `nvidia/Nemotron-3-Embed-8B-BF16`. All four VERIFIED in raw HF frontmatter (F39). `nvidia/Nemotron-3-Ultra-550b-a55b` is **catalog-only**, see section 5 |
+| **OpenMDW-1.1** (permissive) | `nvidia/Nemotron-3_5-Lightning` / `NVIDIA-Nemotron-3.5-Lightning-30B-A3B-*`, `nvidia/nemotron-3.5-asr-streaming-0.6b`, `nvidia/Nemotron-3-Embed-1B-BF16`, `nvidia/Nemotron-3-Embed-8B-BF16`. All four VERIFIED in raw HF frontmatter (F39). `nvidia/Nemotron-3-Ultra-550b-a55b` is **catalog-only**, see section 5. Added 2026-09-17: `nvidia/Cosmos3-Nano`, `nvidia/Cosmos3-Super` and `nvidia/Cosmos3-Edge`, VERIFIED in raw HF card data at pinned revisions, see section 12 |
 | **NVIDIA Nemotron Open Model License** (permissive) | `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B-*`, `nvidia/nemotron-3-super-120b-a12b`. Both per HF card; the Nebius catalog disagrees, see section 5 |
 | **NVIDIA Open Model Agreement** (permissive) | `nvidia/Nemotron-3-Nano-Omni-30B-A3B-Reasoning-*`. Per HF card; the Nebius catalog disagrees. Removed from Token Factory Serverless 2026-08-31 (F4), so it has no role in the plan |
-| **NVIDIA Open Model License** (restrictive) | Cosmos family (`Cosmos3-Super-Reasoner`, `Cosmos-Reason1-7B`, `Cosmos-Reason2-*`, `Cosmos-Embed1-*`, `C-RADIOv4-H`), `nvidia/parakeet-unified-en-0.6b`, `nvidia/multitalker-parakeet-streaming-0.6b-v1`, `nvidia/diar_streaming_sortformer_4spk-v2.1`, `nvidia/NVIDIA-Nemotron-Parse-v1.2`, `nvidia/NV-DINOv2`, `nvidia/nv-grounding-dino`, `nvidia/Llama-3_1-Nemotron-Ultra-253B-v1` |
+| **NVIDIA Open Model License** (restrictive) | Cosmos family before Cosmos 3's public weights (`Cosmos3-Super-Reasoner`, not a public Hugging Face repository on 2026-09-17, see section 12; `Cosmos-Transfer1-*`, `Cosmos-Transfer2.5-*`, the Cosmos DiffusionRenderer and the Cosmos guardrail models, added 2026-09-17; `Cosmos-Reason1-7B`, `Cosmos-Reason2-*`, `Cosmos-Embed1-*`, `C-RADIOv4-H`), `nvidia/parakeet-unified-en-0.6b`, `nvidia/multitalker-parakeet-streaming-0.6b-v1`, `nvidia/diar_streaming_sortformer_4spk-v2.1`, `nvidia/NVIDIA-Nemotron-Parse-v1.2`, `nvidia/NV-DINOv2`, `nvidia/nv-grounding-dino`, `nvidia/Llama-3_1-Nemotron-Ultra-253B-v1` |
 | **NVIDIA Community Model License** (unusable) | No model Exulanica needs is only available here |
 | **"NVIDIA License", per repo, non-commercial** | `nvidia/LocateAnything-3B` |
 
@@ -173,7 +173,7 @@ bases.
 | `nvidia/diar_sortformer_4spk-v1` | Apache-2.0 | **cc-by-nc-4.0** | **No** | <https://huggingface.co/nvidia/diar_sortformer_4spk-v1> | **BLOCKED** |
 | `nvidia/parakeet-unified-en-0.6b` | Apache-2.0 | nvidia-open-model-license | **No** | <https://huggingface.co/nvidia/parakeet-unified-en-0.6b> | **Excluded** per section 6. Also does not claim timestamp support |
 | `nvidia/multitalker-parakeet-streaming-0.6b-v1` | Apache-2.0 | nvidia-open-model-license | **No** | <https://huggingface.co/nvidia/multitalker-parakeet-streaming-0.6b-v1> | **SEGREGATE.** Architecturally attractive, excluded per section 6 |
-| Cosmos family: `Cosmos3-Super-Reasoner`, `Cosmos-Reason1-7B`, `Cosmos-Reason2-*`, `Cosmos-Embed1-*`, `C-RADIOv4-H` | `nvidia-cosmos/cosmos-reason1` Apache-2.0; `NVIDIA/Cosmos` NOASSERTION | nvidia-open-model-license; Reason2 additionally **gated** | **No** | <https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/> | **BLOCKED.** Tuned for physical AI, gated, restrictive, and removed from Token Factory Serverless 2026-08-31 |
+| Cosmos family: `Cosmos3-Super-Reasoner`, `Cosmos-Reason1-7B`, `Cosmos-Reason2-*`, `Cosmos-Embed1-*`, `C-RADIOv4-H` | `nvidia-cosmos/cosmos-reason1` Apache-2.0; `NVIDIA/Cosmos` NOASSERTION | nvidia-open-model-license; Reason2 additionally **gated** | **No** | <https://www.nvidia.com/en-us/agreements/enterprise-software/nvidia-open-model-license/> | **BLOCKED.** Tuned for physical AI, gated, restrictive, and removed from Token Factory Serverless 2026-08-31. Cosmos 3's public weights (`nvidia/Cosmos3-Nano`, `-Super`, `-Edge`) are OpenMDW-1.1, not this licence: section 12 |
 | `nvidia/NVIDIA-Nemotron-Parse-v1.2` | Apache-2.0 | nvidia-open-model-license | **No** | <https://huggingface.co/nvidia/NVIDIA-Nemotron-Parse-v1.2> | SEGREGATE. No role in Exulanica |
 | `nvidia/LocateAnything-3B` | per repo | **NVIDIA License**, "academic and non-profit research purposes only", plus a stacked Qwen Research License | **No** | <https://huggingface.co/nvidia/LocateAnything-3B/raw/main/README.md> | **BLOCKED.** A use-time block, not only a shipping block: a publicly released project of this kind is arguably not academic non-profit research |
 | `nvidia/NV-DINOv2`, `nvidia/nv-grounding-dino` | n/a | gated / nvidia-open-model-license | **No** | NGC / HF | **BLOCKED** |
@@ -607,3 +607,51 @@ no encoder package was installed. It contains no personal photographs. See the
 [decoder inspection](evaluation/artifacts/2026-09-11-heic-source-lineage/decoder-inspection.json).
 Conversion lineage is separate from privacy masking. Migration 0045 requires a current
 normalized predecessor and, when consent requires it, a current mask of that predecessor.
+
+
+## 12. Generated appearance models, 2026-09-17
+
+Status: VERIFIED from raw Hugging Face card data (`/api/models/<id>/revision/<revision>`) and the
+recursive file tree at the revisions below, read 2026-09-17 by the generated appearance lane. Every
+weights file of an accepted row is pinned by its LFS sha256, and every small file by its git blob
+id, in `ml/appearance/weights/`, which also holds each component's lineage evidence.
+`ml/appearance/exulanica_appearance/licences.py` holds section 6's decision over what a card
+declares, and refuses everything else. These weights are run self-hosted on a rented GPU and never
+vendored into this repository; the outputs they generate are labelled invented.
+
+**Correction to sections 2 and 3.1.** Cosmos 3's public weights are OpenMDW-1.1, not the NVIDIA Open
+Model License: `nvidia/Cosmos3-Nano` at `e59a53c25979a090fa8706c9acc0c254a6e89b92`,
+`nvidia/Cosmos3-Super` at `f543c56225b2e04d0ad141e29655be3a45d9c455` and `nvidia/Cosmos3-Edge` at
+`344d602b128d1bbdacb43b08d0a3626f46343e29` each declare `license: other`,
+`license_name: openmdw1.1-license`, `license_link: https://openmdw.ai/license/1-1/`, and none is
+gated. `nvidia/Cosmos3-Super-Reasoner`, which section 2 lists under the restrictive licence, could
+not be re-read: the Hub answers 401 for that id, as it does for a repository that is not public, and
+no public repository by that name appears among NVIDIA's Cosmos 3 models. Its row is left as it was
+read on 2026-08-27, since it may name a catalog identifier rather than a Hugging Face repository.
+
+### 12.1 Accepted: run self-hosted, never vendored
+
+| Repository | Revision | Weights licence, as the card declares | Components and lineage | Verdict |
+| --- | --- | --- | --- | --- |
+| `nvidia/Cosmos3-Nano` | `e59a53c25979a090fa8706c9acc0c254a6e89b92` | other, `openmdw1.1-license` | Transformer, VAE, vision encoder, sound and text tokenizers in one repository. `vae/config.json` names `Wan-AI/Wan2.2-TI2V-5B-Diffusers` (apache-2.0 at `b8fff7315c768468a5333511427288870b2e9635`) as its origin; the file is not byte-identical, so NVIDIA's grant covers it. The vision encoder is a `Qwen3VLVisionModel` and names no source | **SHIP**, guardrails off: OpenMDW-1.1 has no guardrail clause, and the inputs are synthetic structure with no people |
+| `alibaba-pai/Wan2.2-Fun-A14B-Control` | `297be6d520f54908e124be0298e2317ee50ffdf4` | apache-2.0 | Base model `Wan-AI/Wan2.2-I2V-A14B` (apache-2.0 at `206a9ee1b7bfaaf8f7e4d81335650533490646a3`); the bundled VAE and umT5 encoder are byte-identical to that release | **SHIP** |
+| `Qwen/Qwen-Image-2512` | `25468b98e3276ca6700de15c6628e51b7de54a26` | apache-2.0 | Text encoder is `Qwen2_5_VLForConditionalGeneration` from the same publisher (`Qwen/Qwen2.5-VL-7B-Instruct`, apache-2.0 at `cc594898137f460bfe9f0759e9844b3ce807cfb5`), sharded differently | **SHIP** |
+| `alibaba-pai/Qwen-Image-2512-Fun-Controlnet-Union` | `c21dcc372f9f52a55a6d4984cb56a0f0ac0807bc` | apache-2.0 | Control weights only; the 2602 release | **SHIP** |
+| `Tongyi-MAI/Z-Image-Turbo` | `f332072aa78be7aecdf3ee76d5c247082da564a6` | apache-2.0 | Text encoder shards 1 and 2 byte-identical to `Qwen/Qwen3-4B` (apache-2.0 at `1cfa9a7208912126459214e8b04321603b3df60c`). The VAE is byte-identical (sha256 `f5b59a26851551b67ae1fe58d32e76486e1e812def4696a4bea97f16604d40a3`) to the one `black-forest-labs/FLUX.1-schnell` carries, whose card declares apache-2.0 at `741f7c3ce8b383c54771c7003378a50191e9efe9`; that repository is gated, so its card text was not read | **SHIP** |
+| `Tongyi-MAI/Z-Image` | `04cc4abb7c5069926f75c9bfde9ef43d49423021` | apache-2.0 | As Z-Image-Turbo. `vae/config.json` names a local path `../checkpoints/flux-dev`; the bytes are the Apache release above, not FLUX.1-dev's | **SHIP** |
+| `alibaba-pai/Z-Image-Fun-Controlnet-Union-2.1` | `755999a934909bd5832e20718bb7c639d2a63eb9` | apache-2.0 | Control weights only | **SHIP** |
+| `black-forest-labs/FLUX.2-klein-base-4B` | `a3b4f4849157f664bdbc776fd7453c2783562f4d` | apache-2.0, with an Apache 2.0 `LICENSE.md` | Only the 4B klein models are Apache; every 9B klein model and FLUX.2 [dev] are non-commercial. `vae/config.json` names `FLUX.2-dev`; the publisher's README at `black-forest-labs/flux2` commit `50fe5162777813d869182b139e83b10743caef15` (sha256 `435753749320bbb395c15983e63e3dc73936c03f0f1870c628e7bf922c55eef7`) states the FLUX.2 autoencoder is released under Apache 2.0. Text encoder is Qwen3ForCausalLM at Qwen3-4B's size | **SHIP** |
+| `DiffSynth-Studio/Template-KleinBase4B-ControlNet` | `14338668d53038eba59de16845c021415545a495` | apache-2.0 | Control weights on klein base 4B; its README loads the encoder and VAE from `FLUX.2-klein-4B` (apache-2.0 at `e7b7dc27f91deacad38e78976d1f2b499d76a294`), whose files are byte-identical to klein base's | **SHIP** |
+| `Ruicheng/moge-2-vitl-normal` | `cb0e8bbd6b1e243589717c78e750b1ba4c093acf` | mit | Base model `facebook/dinov2-large` (apache-2.0 at `47b73eefe95e8d44ec3623f8890bd894b6ea2d6c`). Measurement only, never a generator | **SHIP** |
+
+### 12.2 Refused, read the same day
+
+| Repository | Revision | Weights licence, as the card declares | Verdict |
+| --- | --- | --- | --- |
+| `nvidia/Cosmos-Transfer2.5-2B` | `ce8440327c632d8313c3bde69db13b627ba5cae1` | other, `nvidia-open-model-license`, gated | **BLOCKED** by section 6 |
+| `nvidia/Diffusion_Renderer_Inverse_Cosmos_7B` | `41f63abccfb764b2516ff85b98af529c2662e2df` | other, `nvidia-open-model-license` | **BLOCKED** by section 6 |
+| `nvidia/Cosmos-Guardrail1` | `d6d4bfa899a71454a700907664f3e88f503950cf` | other, `nvidia-open-model-license`, gated | **BLOCKED** by section 6; not needed, since Cosmos 3 runs with guardrails off |
+| `black-forest-labs/FLUX.2-dev` | `26afe3a78bb242c0a8bb181dcc8937bb16e5c66c` | other, `flux-non-commercial-license`, gated | **BLOCKED** |
+| `black-forest-labs/FLUX.1-dev` | `3de623fc3c33e44ffbe2bad470d0f45bccf2eb21` | other, `flux-1-dev-non-commercial-license`, gated | **BLOCKED** |
+| `gvecchio/StableMaterials` | `4d452731535bd5c74261d6645623a573326f6f36` | openrail | **BLOCKED** by section 6: OpenRAIL carries use restrictions |
+| `InstantX/Qwen-Image-ControlNet-Union` | `b13036f066d6dee7c20513e263d3d673055e9de8` | apache-2.0 | Allowed, not used: trained for the original Qwen-Image, where the Fun union control above is trained for 2512 |
