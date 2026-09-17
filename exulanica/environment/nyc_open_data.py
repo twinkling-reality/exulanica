@@ -43,7 +43,18 @@ QUERY_FIELDS = (
     "last_status_type",
 )
 QUERY_BOUNDS = (-739_930_000, 407_200_000, -739_840_000, 407_240_000)
-QUERY_WHERE = "within_box(the_geom,40.724,-73.993,40.720,-73.984)"
+
+
+def _degree_text(value: int) -> str:
+    """One pinned bound as the thousandth-of-a-degree text the request has always carried."""
+    if value % 10_000:
+        raise ValueError("query bounds are pinned to thousandths of a degree")
+    return str((Decimal(value) / COORDINATE_SCALE).quantize(Decimal("0.001")))
+
+
+# One extent, written once: the request text is derived from the integer bounds it must agree with.
+_WEST, _SOUTH, _EAST, _NORTH = (_degree_text(value) for value in QUERY_BOUNDS)
+QUERY_WHERE = f"within_box(the_geom,{_NORTH},{_WEST},{_SOUTH},{_EAST})"
 QUERY_PARAMETERS = (
     ("$select", ",".join(QUERY_FIELDS)),
     ("$where", QUERY_WHERE),
