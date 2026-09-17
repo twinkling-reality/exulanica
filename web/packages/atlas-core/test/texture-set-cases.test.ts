@@ -85,7 +85,7 @@ describe('texture-set-cases.json against the browser reader', () => {
   const fixture = JSON.parse(readFileSync(join(HERE, cases.manifest), 'utf8')) as unknown;
 
   it('reads the fixture manifest from its committed bytes', () => {
-    expect(parseTextureSetManifest(new Uint8Array(readFileSync(join(HERE, cases.manifest)))).sets).toHaveLength(6);
+    expect(parseTextureSetManifest(new Uint8Array(readFileSync(join(HERE, cases.manifest)))).sets).toHaveLength(7);
   });
 
   for (const testCase of cases.manifests) {

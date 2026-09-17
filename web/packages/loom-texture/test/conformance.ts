@@ -34,10 +34,16 @@ import { MANIFEST_PROFILE_V2 } from '../src/manifest-reader.js';
  * Every file this writes is a function of this module alone. `test/texture-set-cases.test.ts` holds
  * the committed files to it byte for byte and runs every case against this package's reader;
  * `tests/test_texture_set_cases.py` runs them against the backend's; `atlas-core` runs them against
- * the browser's. The fixtures are not published sets. They are small (16 x 16 texels) containers
- * with synthetic texels, one for each kind of container a reader must accept, and then single
- * mutations of those, each with exactly one defect, so which check a reader happens to run first
- * cannot change the reason it gives.
+ * the browser's. The fixtures are not published sets. They are small containers with synthetic
+ * texels, 16 by 16 over a square metre but for one that is 16 by 4 over 1000 by 250 mm, one for each
+ * kind of container a reader must accept, and then single mutations of those, each with exactly one
+ * defect, so which check a reader happens to run first cannot change the reason it gives.
+ *
+ * The non-square fixture is a decal, the shape `cc0.road-paint-white` publishes. A tile need not be
+ * square (`cc0.kerb-stone` has been 4 to 1 since migration 0065) and a reader that holds one number
+ * for both axes, or compares only their product, passes every square case and then reads such a set
+ * transposed. The last case below is that defect exactly: an entry whose width and height are
+ * swapped, which leaves the byte size right and can only be caught per axis.
  *
  * Run `node_modules/.bin/tsx packages/loom-texture/test/write-conformance.ts` from `web/` to write
  * them.
@@ -46,7 +52,9 @@ export const CASES_FILE = 'texture-set-cases.json';
 export const FIXTURE_DIRECTORY = 'conformance';
 
 const SIZE = 16;
-const TEXELS = SIZE * SIZE;
+/** The one fixture whose tile is not square: the road paint's 4 to 1, at a square texel. */
+const WIDE = { width: 16, height: 4 } as const;
+const WIDE_EXTENT = { u: 1000, v: 250 } as const;
 
 type Header = Record<string, unknown>;
 
@@ -56,40 +64,57 @@ interface Fixture {
   readonly maps: readonly FramedMap[];
 }
 
-function texels(components: number, value: (i: number, j: number, c: number) => number): Uint8Array {
-  const out = new Uint8Array(TEXELS * components);
-  for (let j = 0; j < SIZE; j += 1) {
-    for (let i = 0; i < SIZE; i += 1) {
-      for (let c = 0; c < components; c += 1) out[(j * SIZE + i) * components + c] = value(i, j, c) & 0xff;
+interface Shape {
+  readonly width: number;
+  readonly height: number;
+}
+
+const SQUARE: Shape = { width: SIZE, height: SIZE };
+
+function texels(
+  components: number,
+  value: (i: number, j: number, c: number) => number,
+  shape: Shape = SQUARE,
+): Uint8Array {
+  const out = new Uint8Array(shape.width * shape.height * components);
+  for (let j = 0; j < shape.height; j += 1) {
+    for (let i = 0; i < shape.width; i += 1) {
+      for (let c = 0; c < components; c += 1) {
+        out[(j * shape.width + i) * components + c] = value(i, j, c) & 0xff;
+      }
     }
   }
   return out;
 }
 
-/** Synthetic texels per map name, so each map's bytes differ and none is constant. */
-function mapBytes(descriptor: MapDescriptor): Uint8Array {
+/**
+ * Synthetic texels per map name, so each map's bytes differ and none is constant. Every value
+ * depends on both i and j, and differently on each, so a reader that transposes a non-square map
+ * cannot produce the same bytes.
+ */
+function mapBytes(descriptor: MapDescriptor, shape: Shape = SQUARE): Uint8Array {
   switch (descriptor.name) {
     case 'base_color':
-      return texels(3, (i, j, c) => [i * 17, j * 17, (i + j) * 8][c]!);
+      return texels(3, (i, j, c) => [i * 17, j * 17, (i + j) * 8][c]!, shape);
     case 'base_color_coverage':
-      return texels(4, (i, j, c) => [i * 17, j * 13, (i + j) * 8, (i + j) % 3 === 0 ? 64 : 200][c]!);
+      return texels(4, (i, j, c) => [i * 17, j * 13, (i + j) * 8, (i + j) % 3 === 0 ? 64 : 200][c]!, shape);
     case 'normal':
       return descriptor.components === 2
-        ? texels(2, (i, j, c) => [120 + i, 120 + j][c]!)
-        : texels(3, (i, j, c) => [120 + i, 120 + j, 250][c]!);
+        ? texels(2, (i, j, c) => [120 + i, 120 + j][c]!, shape)
+        : texels(3, (i, j, c) => [120 + i, 120 + j, 250][c]!, shape);
     case 'orm':
-      return texels(3, (i, j, c) => [255 - i, 128 + j, (i * j) % 7][c]!);
+      return texels(3, (i, j, c) => [255 - i, 128 + j, (i * j) % 7][c]!, shape);
     case 'transmission_roughness':
-      return texels(2, (i, j, c) => [240 - i, 20 + j][c]!);
+      return texels(2, (i, j, c) => [240 - i, 20 + j][c]!, shape);
     case 'height':
-      return texels(1, (i, j) => (i * j) % 256);
+      return texels(1, (i, j) => (i * j) % 256, shape);
     default:
       throw new Error(`no synthetic texels for ${descriptor.name}`);
   }
 }
 
-const framed = (layout: readonly MapDescriptor[]): FramedMap[] =>
-  layout.map((descriptor) => ({ descriptor, bytes: mapBytes(descriptor) }));
+const framed = (layout: readonly MapDescriptor[], shape: Shape = SQUARE): FramedMap[] =>
+  layout.map((descriptor) => ({ descriptor, bytes: mapBytes(descriptor, shape) }));
 
 const LICENCE_SHA256 = sha256Hex(licenceBytes());
 
@@ -122,9 +147,10 @@ function v2Fixture(
   materialClass: MaterialClass,
   makerKind: MakerKind,
   produced = { normal: false, height: false },
+  shape: Shape = SQUARE,
 ): Fixture {
   const layout = classLayout(materialClass, makerKind, produced);
-  const maps = framed(layout);
+  const maps = framed(layout, shape);
   const colour = maps.find((map) => map.descriptor.name === 'base_color_coverage');
   const relief = makerKind === 'procedural'
     ? (materialClass === 'glazing' ? {} : RELIEF)
@@ -142,12 +168,14 @@ function v2Fixture(
         materialClass === 'glazing' ? FILM : null,
       ),
       ...relief,
+      resolution: { width: shape.width, height: shape.height },
+      ...(shape === SQUARE ? {} : { extent_mm: WIDE_EXTENT }),
     },
     maps,
   };
 }
 
-/** The six containers every reader must accept, by set id. */
+/** The seven containers every reader must accept, by set id. */
 export function baseFixtures(): Fixture[] {
   const legacy: Fixture = {
     setId: 'fixture.legacy-opaque',
@@ -165,6 +193,7 @@ export function baseFixtures(): Fixture[] {
     v2Fixture('fixture.decal', 'decal', 'procedural'),
     v2Fixture('fixture.glazing', 'glazing', 'procedural'),
     v2Fixture('fixture.model-opaque', 'opaque', 'model', { normal: true, height: true }),
+    v2Fixture('fixture.decal-wide', 'decal', 'procedural', { normal: false, height: false }, WIDE),
   ];
 }
 
@@ -528,6 +557,17 @@ const CONTAINER_CASES: readonly ContainerCase[] = [
     name: 'a cutout set declares a film colour',
     base: 'fixture.cutout',
     bytes: reframed([{ path: ['class', 'film_srgb'], value: [150, 144, 132] }]),
+    reason: 'header',
+  },
+  // A tile that is not square. Appended last so the cases before it keep their file numbers. The
+  // bytes are the fixture's own: only the entry is wrong, and it is wrong in the one way a reader
+  // that holds a single number for both axes, or compares only their product, cannot see, since
+  // swapping 16 by 4 for 4 by 16 leaves the byte size and the digest exactly right.
+  {
+    name: 'the entry swaps the width and height of a set whose tile is not square',
+    base: 'fixture.decal-wide',
+    bytes: (_fixture, good) => good,
+    entryChanges: [{ path: ['resolution'], value: { width: WIDE.height, height: WIDE.width } }],
     reason: 'header',
   },
 ];

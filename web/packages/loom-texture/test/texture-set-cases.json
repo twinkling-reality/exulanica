@@ -88,7 +88,7 @@
         {
           "path": [
             "sets",
-            2,
+            3,
             "channels"
           ],
           "value": [
@@ -208,7 +208,7 @@
         {
           "path": [
             "sets",
-            3,
+            4,
             "material_class"
           ],
           "value": "cutout"
@@ -266,7 +266,7 @@
         {
           "path": [
             "sets",
-            2,
+            3,
             "channels",
             0,
             "srgb"
@@ -474,7 +474,7 @@
         {
           "path": [
             "sets",
-            2,
+            3,
             "licence_id"
           ],
           "value": "CC-BY-4.0"
@@ -827,6 +827,61 @@
         "licence_sha256": "d51d213f1f5d94acb27403d616b29007802618979c106b075fdbd399fa86310f",
         "container_profile": "exulanica.texture-set/v2",
         "material_class": "opaque"
+      },
+      "reason": null
+    },
+    {
+      "name": "fixture.decal-wide is accepted",
+      "container": "conformance/fixture.decal-wide.ltex",
+      "entry": {
+        "set_id": "fixture.decal-wide",
+        "version": 1,
+        "content_sha256": "1189d1b20dfca846354e9666cb7e7e3e61cc9a094bfcb873a0db9c42958aca0a",
+        "byte_size": 2448,
+        "resolution": {
+          "width": 16,
+          "height": 4
+        },
+        "channels": [
+          {
+            "map": "base_color_coverage",
+            "components": 4,
+            "holds": [
+              "red",
+              "green",
+              "blue",
+              "coverage"
+            ],
+            "srgb": true
+          },
+          {
+            "map": "normal",
+            "components": 2,
+            "holds": [
+              "normal_x",
+              "normal_y"
+            ],
+            "srgb": false
+          },
+          {
+            "map": "orm",
+            "components": 3,
+            "holds": [
+              "occlusion",
+              "roughness",
+              "metalness"
+            ],
+            "srgb": false
+          }
+        ],
+        "extent_mm": {
+          "u": 1000,
+          "v": 250
+        },
+        "licence_id": "CC0-1.0",
+        "licence_sha256": "d51d213f1f5d94acb27403d616b29007802618979c106b075fdbd399fa86310f",
+        "container_profile": "exulanica.texture-set/v2",
+        "material_class": "decal"
       },
       "reason": null
     },
@@ -2880,6 +2935,61 @@
         "licence_sha256": "d51d213f1f5d94acb27403d616b29007802618979c106b075fdbd399fa86310f",
         "container_profile": "exulanica.texture-set/v2",
         "material_class": "cutout"
+      },
+      "reason": "header"
+    },
+    {
+      "name": "the entry swaps the width and height of a set whose tile is not square",
+      "container": "conformance/fixture.decal-wide.ltex",
+      "entry": {
+        "set_id": "fixture.decal-wide",
+        "version": 1,
+        "content_sha256": "1189d1b20dfca846354e9666cb7e7e3e61cc9a094bfcb873a0db9c42958aca0a",
+        "byte_size": 2448,
+        "resolution": {
+          "width": 4,
+          "height": 16
+        },
+        "channels": [
+          {
+            "map": "base_color_coverage",
+            "components": 4,
+            "holds": [
+              "red",
+              "green",
+              "blue",
+              "coverage"
+            ],
+            "srgb": true
+          },
+          {
+            "map": "normal",
+            "components": 2,
+            "holds": [
+              "normal_x",
+              "normal_y"
+            ],
+            "srgb": false
+          },
+          {
+            "map": "orm",
+            "components": 3,
+            "holds": [
+              "occlusion",
+              "roughness",
+              "metalness"
+            ],
+            "srgb": false
+          }
+        ],
+        "extent_mm": {
+          "u": 1000,
+          "v": 250
+        },
+        "licence_id": "CC0-1.0",
+        "licence_sha256": "d51d213f1f5d94acb27403d616b29007802618979c106b075fdbd399fa86310f",
+        "container_profile": "exulanica.texture-set/v2",
+        "material_class": "decal"
       },
       "reason": "header"
     }
