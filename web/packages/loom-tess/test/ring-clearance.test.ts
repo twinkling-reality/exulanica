@@ -1,8 +1,9 @@
 /**
  * The ring clearance rule, held to its two claims by arithmetic of this test's own:
  *
- *   - NOTHING LEFT OUT: every point within the radius of the ring, on the half-millimetre lattice of
- *     a small ring and at seeded points round a large one, lies in one of the pieces;
+ *   - NOTHING LEFT OUT: every point within the radius of the ring lies in one of the pieces: on the
+ *     half-millimetre lattice of a small ring, at seeded points round a large one, and every
+ *     sixteenth of a millimetre round each band's far corners, where the thinnest gap would be;
  *   - LITTLE TAKEN BEYOND: every corner of every piece is within five millimetres past the radius of
  *     the ring, whatever the radius, so a carve by them loses almost nothing a capsule could stand
  *     on: at the capsule's own radius that is under two parts in a hundred.
@@ -118,6 +119,32 @@ function everyHalfMillimetre(ring: readonly Plan[], radius: number): [bigint, bi
   return out;
 }
 
+/**
+ * Every sixteenth of a millimetre in a four millimetre box round each corner of each band: where a
+ * band's outward step leans along its edge it leaves a lens there, no wider than that lean and no
+ * taller than about one over the radius, which coarser sampling walks straight past.
+ */
+function roundBandCorners(ring: readonly Plan[], radius: number): [bigint, bigint, bigint][] {
+  const out: [bigint, bigint, bigint][] = [];
+  const scale = 16n;
+  const reach = 2n * scale;
+  ring.forEach((from, index) => {
+    const to = ring[(index + 1) % ring.length]!;
+    // The true outward step, at the radius across the edge, as sixteenths: the band's far corners
+    // lie within a millimetre of these, whichever integer step the rule takes.
+    const [dx, dy] = [to[0] - from[0], to[1] - from[1]];
+    const length = Math.hypot(dx, dy);
+    const [nx, ny] = [(dy / length) * radius, (-dx / length) * radius];
+    for (const corner of [from, to]) {
+      const [cx, cy] = [BigInt(Math.round((corner[0] + nx) * 16)), BigInt(Math.round((corner[1] + ny) * 16))];
+      for (let y = -reach; y <= reach; y += 1n) {
+        for (let x = -reach; x <= reach; x += 1n) out.push([cx + x, cy + y, scale]);
+      }
+    }
+  });
+  return out;
+}
+
 /** Seeded points round a ring: at its corners, along its edges, and out to a little past the radius. */
 function seededRound(ring: readonly Plan[], radius: number, seed: number, count: number): [bigint, bigint, bigint][] {
   const next = sequence(seed);
@@ -139,25 +166,25 @@ function seededRound(ring: readonly Plan[], radius: number, seed: number, count:
 describe('the ring clearance rule', () => {
   it('holds every point within the radius of a square, to the half millimetre', () => {
     const square: Plan[] = [[0, 0], [12, 0], [12, 9], [0, 9]];
-    holdsTheRule(square, 5, everyHalfMillimetre(square, 5));
+    holdsTheRule(square, 5, [...everyHalfMillimetre(square, 5), ...roundBandCorners(square, 5)]);
   });
 
   it('holds every point within the radius of a ring with a reflex corner and a slanted edge', () => {
     const shape: Plan[] = [[0, 0], [14, 0], [14, 6], [7, 6], [9, 13], [0, 11]];
-    holdsTheRule(shape, 4, everyHalfMillimetre(shape, 4));
-    holdsTheRule(shape, 7, everyHalfMillimetre(shape, 7));
+    holdsTheRule(shape, 4, [...everyHalfMillimetre(shape, 4), ...roundBandCorners(shape, 4)]);
+    holdsTheRule(shape, 7, [...everyHalfMillimetre(shape, 7), ...roundBandCorners(shape, 7)]);
   });
 
   it('holds every point within a radius of one, where a corner hull is only a few millimetres across', () => {
     const shape: Plan[] = [[0, 0], [9, 2], [5, 8]];
-    holdsTheRule(shape, 1, everyHalfMillimetre(shape, 1));
-    holdsTheRule(shape, 2, everyHalfMillimetre(shape, 2));
+    holdsTheRule(shape, 1, [...everyHalfMillimetre(shape, 1), ...roundBandCorners(shape, 1)]);
+    holdsTheRule(shape, 2, [...everyHalfMillimetre(shape, 2), ...roundBandCorners(shape, 2)]);
   });
 
   it('holds seeded points round the conformance tile\'s building at the capsule radius', () => {
     const building = recordsOf(fixtureObject(), 'city.massing')[0].fields;
     const ring = building.tiers[0].ring_mm as Plan[];
-    const pieces = holdsTheRule(ring, 340, seededRound(ring, 340, 20260917, 4000));
+    const pieces = holdsTheRule(ring, 340, [...seededRound(ring, 340, 20260917, 4000), ...roundBandCorners(ring, 340)]);
     // The building's base ring is chamfered, which is what a plan box would have closed a footway for.
     expect(ring.length).toBeGreaterThan(4);
     expect(pieces.length).toBeGreaterThan(ring.length);
@@ -174,7 +201,7 @@ describe('the ring clearance rule', () => {
           [size + (next() % 30), size],
           [next() % 15, size + (next() % 10)],
         ];
-        holdsTheRule(ring, radius, seededRound(ring, radius, 7 + trial, 1500));
+        holdsTheRule(ring, radius, [...seededRound(ring, radius, 7 + trial, 1500), ...roundBandCorners(ring, radius)]);
       }
     }
   });
