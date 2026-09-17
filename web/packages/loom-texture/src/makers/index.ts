@@ -14,6 +14,7 @@ import { paintMaker } from './paint.js';
 import { panelMaker } from './panel.js';
 import { pavingMaker } from './paving.js';
 import { renderMaker } from './render.js';
+import { soilMaker } from './soil.js';
 import { timberMaker } from './timber.js';
 
 /**
@@ -44,7 +45,7 @@ export const MAKERS: readonly Maker[] = Object.freeze(
  * the drafts.
  */
 export const DRAFT_MAKERS: readonly Maker[] = Object.freeze(
-  [canvasMaker, paintMaker, panelMaker, timberMaker].sort((a, b) => (a.manifest.maker_id < b.manifest.maker_id ? -1 : 1)),
+  [canvasMaker, paintMaker, panelMaker, soilMaker, timberMaker].sort((a, b) => (a.manifest.maker_id < b.manifest.maker_id ? -1 : 1)),
 );
 
 for (const maker of [...MAKERS, ...DRAFT_MAKERS]) {

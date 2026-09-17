@@ -1,0 +1,50 @@
+{
+  "set_id": "cc0.tree-pit-soil",
+  "version": 1,
+  "title": "Tree pit soil",
+  "summary": "The dug bed of a street tree pit: clods of damp earth with the stones the digging left, darker in the hollows where water sits.",
+  "licence_id": "CC0-1.0",
+  "recipe": {
+    "profile": "exulanica.texture-recipe/v1",
+    "maker": {
+      "id": "loom.soil",
+      "version": 1
+    },
+    "seed": 2026091709,
+    "resolution": {
+      "width": 512,
+      "height": 512
+    },
+    "extent_mm": {
+      "u": 900,
+      "v": 900
+    },
+    "parameters": {
+      "soil_colour": [92, 74, 58],
+      "damp_colour": [52, 40, 31],
+      "stone_colours": [
+        [104, 100, 94],
+        [86, 82, 78],
+        [118, 110, 100],
+        [98, 78, 68]
+      ],
+      "clod_cells": 12,
+      "clod_relief_mm_1024ths": 5200,
+      "clod_tone_q16": 14000,
+      "crumb_cells": 220,
+      "crumb_relief_mm_1024ths": 520,
+      "crumb_tone_q16": 10000,
+      "stone_cells": 14,
+      "stone_fraction_percent": 10,
+      "stone_relief_mm_1024ths": 2200,
+      "stone_drift_cells": 4,
+      "damp_percent": 45,
+      "soil_roughness_permille": 900,
+      "stone_roughness_permille": 620,
+      "height_range_mm": 10,
+      "occlusion_radius_mm": 8,
+      "occlusion_depth_mm": 2,
+      "occlusion_strength_permille": 500
+    }
+  }
+}
