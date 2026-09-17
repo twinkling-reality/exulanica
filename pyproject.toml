@@ -409,7 +409,14 @@ layers = [
   # spine, for the reason the forbidden contract on it gives: a recipe is invented, including one
   # a person or a model derives from a photograph, and a module that cannot import an evidence
   # address cannot make a recipe pass for an observation. Everything above may read it.
-  "materials",
+  #
+  # Lettering is its sibling, for the same reason and one more. A glyph catalog is authored data
+  # made once from an open-licence font by `tools/lettering`, and the layout rule that places a
+  # shop sign's letters is integer arithmetic on it; neither needs to know what a photograph, a
+  # database or a generated world is. It sits BELOW `grammar` because the city grammar's validator
+  # imports it to check that a sign fits its fascia, and the two are siblings rather than one
+  # layer so a recipe can never reach a letter nor a letter a recipe.
+  "materials | lettering",
   "canonical",
   # The corpus generator sits at the bottom and depends on nothing in this package at all: it
   # draws pictures with Pillow and knows nothing about evidence, storage or the database. Listed
@@ -611,6 +618,43 @@ source_modules = [
   "exulanica.store",
 ]
 forbidden_modules = ["psycopg"]
+
+[[tool.importlinter.contracts]]
+# Letters are data, placed by integer arithmetic, and that is all this package may know.
+#
+# A glyph catalog is authored content: outlines converted once from a font, never an observation of
+# one, so `exulanica.lettering` cannot import the module that defines an evidence address, cannot
+# write a blob a span could point at, cannot open the database, cannot reach the pipeline that
+# admits a photograph, and cannot name a person. `exulanica.canonical` stays importable, because a
+# digest is not a citation, and the reader needs the canonical form to check a catalog's bytes.
+#
+# psycopg is named for the reason the capture contract gives: the layout rule must stay runnable in
+# a process with no server and no credentials, since the grammar's validator runs it for every
+# sign a generated street draws.
+name = "Lettering cannot name a citation or open a database"
+type = "forbidden"
+source_modules = ["exulanica.lettering"]
+forbidden_modules = [
+  "psycopg",
+  "exulanica.db",
+  "exulanica.store",
+  "exulanica.evidence",
+  "exulanica.ingest",
+  "exulanica.migrations",
+  "exulanica.identity",
+  "exulanica.selection",
+]
+
+[[tool.importlinter.contracts]]
+# The conversion tool in `tools/lettering` is not part of the product: its own environment, its own
+# lock, and fontTools at a version the product never installs. What crosses back is data, a glyph
+# catalog in canonical JSON. `tests/test_lettering_boundary.py` holds the same rule by reading the
+# source, for a tree where the tool is not installed and so not in this graph at all, and holds
+# fontTools out of the root lock, where a stray dependency would break every lane's offline sync.
+name = "The product never imports the lettering tool"
+type = "forbidden"
+source_modules = ["exulanica"]
+forbidden_modules = ["exulanica_lettering_tool"]
 
 [[tool.importlinter.contracts]]
 # The training code in `ml/` is not part of the product: its own environment, its own container,
