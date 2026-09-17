@@ -17,39 +17,51 @@ shape. Everything is integer geometry in the grammar's ``city_local`` frame:
   it; where the footway is wider than the corner is round, the two footway lines meet at a point.
 - **Crossings.** A carriageway is crossed only on a crossing record, between the footway points
   beside the two ends of its line. The place's crossing keeps the record's identity and signal.
+- **What supports a person.** The city descriptor's navigation table, read as data
+  (:func:`city_navigation`), is the only source of what a person may stand on: footways need
+  curbs to be support, a crossing or a door is walked only when its kind is support, and a place
+  whose curbs are not support is refused.
 - **Entrances.** A premises unit is an indoor destination reached through the first of its
   entrances that opens onto a footway in the place: a premises-access edge runs from the footway
   point nearest the threshold to the threshold. A door onto a lot reaches no footway; a unit with
   no door onto a footway in the place is stated as unsupported and is never given one.
 - **Furniture.** Street furniture whose furniture class has a use-class entry (a bench) is an
-  outdoor destination with one standing spot per seat, side by side across its facing.
+  outdoor destination with one seat per catalogued visitor, side by side along the record's
+  direction vector, which is its local ``+x`` and runs along its seat.
 - **Streets.** A footway, entrance or furniture node names its segment's street by the street's
   identity, and a corner node names none. A street's name is presentation, never identity:
   :func:`city_street_names` reads names from the city's own street records for a label, and no
   name is copied into the place, so restyling a street never changes a society's input.
 
-Standing spots keep two standing radii apart: a footway station that close to a seat or to another
-spot is walked through, not stood on. A premises unit whose use class the routine does not know is
-listed as unsupported, never guessed.
+Standing spots keep two standing radii apart, and keep the nav envelope's capsule radius clear of
+everything the navigation table says obstructs: a building's base ring, and each furniture or tree
+part whose bottom is below the capsule height, as a box in its object's frame. A seat is clear of
+every obstruction but its own bench. A footway station that fails either is walked through, not
+stood on. Walking lines are not yet routed round obstructions: the place counts every footway or
+door piece that passes within a capsule radius of a low part, and says so. A premises unit whose
+use class the routine does not know is listed as unsupported, never guessed.
 """
 
 from __future__ import annotations
 
 import math
-from collections.abc import Iterable, Sequence
+from collections.abc import Iterable, Mapping, Sequence
+from dataclasses import dataclass
 from itertools import pairwise
 from typing import Any, Final
 
 from exulanica.canonical import sha256_of_canonical
 from exulanica.grammar import shapes
 from exulanica.grammar.catalogs import Catalog
-from exulanica.grammar.grammars.city import CITY_SHAPES_BY_TYPE
+from exulanica.grammar.geometry import OUTSIDE, point_in_ring
+from exulanica.grammar.grammars.city import CITY_GRAMMAR, CITY_SHAPES_BY_TYPE
+from exulanica.grammar.grammars.city.common import FormPart
 from exulanica.grammar.grammars.city.document import TileDocument, validate_city_document
 from exulanica.grammar.grammars.city.facade import EntranceRecord
 from exulanica.grammar.grammars.city.massing import MassingRecord
 from exulanica.grammar.grammars.city.parcels import ParcelRecord
 from exulanica.grammar.grammars.city.premises import PremisesRecord
-from exulanica.grammar.grammars.city.streetlife import StreetFurnitureRecord
+from exulanica.grammar.grammars.city.streetlife import StreetFurnitureRecord, StreetTreeRecord
 from exulanica.grammar.grammars.city.streets import (
     CrossingRecord,
     CurbEdgeRecord,
@@ -64,6 +76,8 @@ __all__ = [
     "CITY_RECORDS_PROFILE",
     "CORNER_TOLERANCE_MM",
     "READ_KINDS",
+    "CityNavigation",
+    "city_navigation",
     "city_street_names",
     "place_from_city_documents",
     "place_from_city_records",
@@ -80,10 +94,15 @@ READ_KINDS: Final = (
     PremisesRecord,
     EntranceRecord,
     StreetFurnitureRecord,
+    StreetTreeRecord,
 )
 #: How far, in millimetres, a straight piece of a corner's footway may cut inside its arc.
 CORNER_TOLERANCE_MM: Final = 250
 _CORNER_DEPTH: Final = 8
+#: Plan coordinates in an object's frame are kept in millionths of a millimetre.
+_E6: Final = 10**6
+#: The side of a cell in the obstruction index, in millimetres.
+_CELL_MM: Final = 4_000
 
 Point = tuple[int, int]
 
@@ -245,6 +264,165 @@ def _corner(kerb: _Kerb, follower: _Kerb) -> list[Point]:
     return _arc(centre, footway_radius, _sub(p, centre), _sub(q, centre), 0)
 
 
+@dataclass(frozen=True, slots=True)
+class CityNavigation:
+    """What the city grammar says a walking person stands on and keeps clear of, read as data.
+
+    ``ground`` and ``obstruction`` map each record kind to its navigation row's words, and the
+    capsule is the nav envelope's ``capsule_clearance`` measures.
+    """
+
+    ground: Mapping[str, str]
+    obstruction: Mapping[str, str]
+    capsule_radius_mm: int
+    capsule_height_mm: int
+
+
+def city_navigation() -> CityNavigation:
+    """The city descriptor's navigation table and its nav envelope's capsule measures."""
+    measures = next(
+        dict(row.measures)
+        for row in CITY_GRAMMAR.projection("nav_envelope").preserved
+        if row.property == "capsule_clearance"
+    )
+    return CityNavigation(
+        ground={row.kind: row.ground for row in CITY_GRAMMAR.navigation},
+        obstruction={row.kind: row.obstruction for row in CITY_GRAMMAR.navigation},
+        capsule_radius_mm=measures["radius_mm"],
+        capsule_height_mm=measures["height_mm"],
+    )
+
+
+def _segment_gap_squared_below(c: Point, a: Point, b: Point, limit: int) -> bool:
+    """Whether ``c`` lies closer than ``limit`` to the segment from ``a`` to ``b``, exactly."""
+    s = _sub(b, a)
+    w = _sub(c, a)
+    length = s[0] * s[0] + s[1] * s[1]
+    along = w[0] * s[0] + w[1] * s[1]
+    if length == 0 or along <= 0:
+        return w[0] * w[0] + w[1] * w[1] < limit * limit
+    if along >= length:
+        e = _sub(c, b)
+        return e[0] * e[0] + e[1] * e[1] < limit * limit
+    return (w[0] * w[0] + w[1] * w[1]) * length - along * along < limit * limit * length
+
+
+def _crosses(a: Point, b: Point, c: Point, d: Point) -> bool:
+    """Whether the closed segments ``ab`` and ``cd`` meet, by exact orientation tests."""
+
+    def side(p: Point, q: Point, r: Point) -> int:
+        value = (q[0] - p[0]) * (r[1] - p[1]) - (q[1] - p[1]) * (r[0] - p[0])
+        return (value > 0) - (value < 0)
+
+    def within(p: Point, q: Point, r: Point) -> bool:
+        return min(p[0], q[0]) <= r[0] <= max(p[0], q[0]) and min(p[1], q[1]) <= r[1] <= max(
+            p[1], q[1]
+        )
+
+    d1, d2, d3, d4 = side(c, d, a), side(c, d, b), side(a, b, c), side(a, b, d)
+    if d1 * d2 < 0 and d3 * d4 < 0:
+        return True
+    return (
+        (d1 == 0 and within(c, d, a))
+        or (d2 == 0 and within(c, d, b))
+        or (d3 == 0 and within(a, b, c))
+        or (d4 == 0 and within(a, b, d))
+    )
+
+
+class _LowPart:
+    """One form part below the capsule height, as a box in its object's turned frame."""
+
+    def __init__(self, owner: str, origin: Point, direction: Point, part: FormPart) -> None:
+        self.owner = owner
+        self.origin = origin
+        self.unit = _scaled(direction, _E6)
+        half_x, half_y = (part.size_x_mm + 1) // 2, (part.size_y_mm + 1) // 2
+        self.low = ((part.offset_x_mm - half_x) * _E6, (part.offset_y_mm - half_y) * _E6)
+        self.high = ((part.offset_x_mm + half_x) * _E6, (part.offset_y_mm + half_y) * _E6)
+        # Every point of the box lies within this many millimetres of the origin on each axis.
+        self.reach = abs(part.offset_x_mm) + abs(part.offset_y_mm) + half_x + half_y
+
+    def _local(self, point: Point) -> Point:
+        dx, dy = point[0] - self.origin[0], point[1] - self.origin[1]
+        return (dx * self.unit[0] + dy * self.unit[1], -dx * self.unit[1] + dy * self.unit[0])
+
+    def near_point(self, point: Point, radius: int) -> bool:
+        u, v = self._local(point)
+        du = max(self.low[0] - u, 0, u - self.high[0])
+        dv = max(self.low[1] - v, 0, v - self.high[1])
+        return du * du + dv * dv < (radius * _E6) ** 2
+
+    def near_segment(self, a: Point, b: Point, radius: int) -> bool:
+        la, lb = self._local(a), self._local(b)
+        corners = (
+            self.low,
+            (self.high[0], self.low[1]),
+            self.high,
+            (self.low[0], self.high[1]),
+        )
+        limit = radius * _E6
+        if self.near_point(a, radius) or self.near_point(b, radius):
+            return True
+        if any(
+            _crosses(la, lb, p, q) for p, q in zip(corners, corners[1:] + corners[:1], strict=True)
+        ):
+            return True
+        return any(_segment_gap_squared_below(corner, la, lb, limit) for corner in corners)
+
+
+class _Obstructions:
+    """Everything a standing capsule keeps its radius clear of, indexed by plan cell."""
+
+    def __init__(self, radius: int) -> None:
+        self.radius = radius
+        self.parts: dict[tuple[int, int], list[_LowPart]] = {}
+        self.rings: dict[tuple[int, int], list[tuple[tuple[int, int], ...]]] = {}
+
+    def _cells(self, low: Point, high: Point) -> Iterable[tuple[int, int]]:
+        for cx in range(low[0] // _CELL_MM, high[0] // _CELL_MM + 1):
+            for cy in range(low[1] // _CELL_MM, high[1] // _CELL_MM + 1):
+                yield (cx, cy)
+
+    def add_part(self, part: _LowPart) -> None:
+        reach = part.reach + self.radius
+        low = (part.origin[0] - reach, part.origin[1] - reach)
+        high = (part.origin[0] + reach, part.origin[1] + reach)
+        for cell in self._cells(low, high):
+            self.parts.setdefault(cell, []).append(part)
+
+    def add_ring(self, ring: tuple[tuple[int, int], ...]) -> None:
+        low = (min(p[0] for p in ring) - self.radius, min(p[1] for p in ring) - self.radius)
+        high = (max(p[0] for p in ring) + self.radius, max(p[1] for p in ring) + self.radius)
+        for cell in self._cells(low, high):
+            self.rings.setdefault(cell, []).append(ring)
+
+    def blocks_standing(self, point: Point, exempt: str | None = None) -> bool:
+        cell = (point[0] // _CELL_MM, point[1] // _CELL_MM)
+        for part in self.parts.get(cell, ()):
+            if part.owner != exempt and part.near_point(point, self.radius):
+                return True
+        for ring in self.rings.get(cell, ()):
+            if point_in_ring(point, ring) != OUTSIDE or any(
+                _segment_gap_squared_below(point, p, q, self.radius)
+                for p, q in zip(ring, ring[1:] + ring[:1], strict=True)
+            ):
+                return True
+        return False
+
+    def blocks_walking(self, a: Point, b: Point) -> bool:
+        low = (min(a[0], b[0]), min(a[1], b[1]))
+        high = (max(a[0], b[0]), max(a[1], b[1]))
+        seen: set[int] = set()
+        for cell in self._cells(low, high):
+            for part in self.parts.get(cell, ()):
+                if id(part) not in seen:
+                    seen.add(id(part))
+                    if part.near_segment(a, b, self.radius):
+                        return True
+        return False
+
+
 def _validated(records: Iterable[object]) -> list[Any]:
     held = []
     for record in records:
@@ -272,6 +450,7 @@ def place_from_city_documents(
     routine: RoutineModel,
     catalogs: Sequence[Catalog],
     input_seq: int = 1,
+    navigation: CityNavigation | None = None,
 ) -> dict[str, Any]:
     """Derive the place a set of one city's tile documents supports, each document checked first.
 
@@ -293,7 +472,11 @@ def place_from_city_documents(
     if len(cities) != 1:
         raise ValueError("a city place's tile documents all belong to one city")
     return place_from_city_records(
-        place_id=place_id, records=list(owned.values()), routine=routine, input_seq=input_seq
+        place_id=place_id,
+        records=list(owned.values()),
+        routine=routine,
+        input_seq=input_seq,
+        navigation=navigation,
     )
 
 
@@ -303,8 +486,13 @@ def place_from_city_records(
     records: Sequence[object],
     routine: RoutineModel,
     input_seq: int = 1,
+    navigation: CityNavigation | None = None,
 ) -> dict[str, Any]:
-    """Derive the place these city records support. Each record is held to its own shape first."""
+    """Derive the place these city records support. Each record is held to its own shape first.
+
+    ``navigation`` defaults to the city descriptor's table and capsule, :func:`city_navigation`.
+    """
+    navigation = navigation if navigation is not None else city_navigation()
     by_type: dict[type, list[Any]] = {kind: [] for kind in READ_KINDS}
     for record in _validated(records):
         if type(record) in by_type:
@@ -312,6 +500,9 @@ def place_from_city_records(
     segments = {r.identity: r for r in by_type[StreetSegmentRecord]}
     if not segments:
         raise ValueError("a city place needs street segments")
+    supports = {kind for kind, ground in navigation.ground.items() if ground == "support"}
+    if CurbEdgeRecord.RECORD_KIND not in supports:
+        raise ValueError("the city's navigation table lets nobody stand on a curb's footway")
     kerbs: dict[str, _Kerb] = {}
     for curb in sorted(by_type[CurbEdgeRecord], key=lambda r: r.identity):
         segment = segments.get(curb.segment_identity)
@@ -368,7 +559,10 @@ def place_from_city_records(
 
     crossing_stops = []
     outside = 0
-    for crossing in sorted(by_type[CrossingRecord], key=lambda r: r.identity):
+    walked_crossings = by_type[CrossingRecord] if CrossingRecord.RECORD_KIND in supports else []
+    if by_type[CrossingRecord] and not walked_crossings:
+        unsupported.add("crossings (the city's navigation table lets nobody stand on one)")
+    for crossing in sorted(walked_crossings, key=lambda r: r.identity):
         ends = []
         for x, y, _ in crossing.line_mm:
             nearest = sorted(
@@ -389,6 +583,9 @@ def place_from_city_records(
         unsupported.add(f"crossings that do not join two footways in the place ({outside})")
 
     entrances = {r.identity: r for r in by_type[EntranceRecord]}
+    if entrances and EntranceRecord.RECORD_KIND not in supports:
+        unsupported.add("entrances (the city's navigation table lets nobody stand on one)")
+        entrances = {}
     lot_doors = sum(1 for r in entrances.values() if not r.approach_curb_identity)
     if lot_doors:
         unsupported.add(f"entrances onto a lot, not a footway ({lot_doors})")
@@ -484,6 +681,43 @@ def place_from_city_records(
             }
         )
 
+    obstructions = _Obstructions(navigation.capsule_radius_mm)
+    for kind in (StreetFurnitureRecord, StreetTreeRecord):
+        if navigation.obstruction.get(kind.RECORD_KIND) != "low_parts":
+            continue
+        for record in by_type[kind]:
+            direction = (
+                (record.facing_dx_mm, record.facing_dy_mm)
+                if kind is StreetFurnitureRecord
+                else (1, 0)
+            )
+            for part in record.parts:
+                if part.offset_z_mm < navigation.capsule_height_mm:
+                    obstructions.add_part(
+                        _LowPart(record.identity, (record.x_mm, record.y_mm), direction, part)
+                    )
+    if navigation.obstruction.get(MassingRecord.RECORD_KIND) == "base_ring":
+        for building in by_type[MassingRecord]:
+            obstructions.add_ring(building.tiers[0].ring_mm)
+    read = {
+        StreetFurnitureRecord.RECORD_KIND: "low_parts",
+        StreetTreeRecord.RECORD_KIND: "low_parts",
+        MassingRecord.RECORD_KIND: "base_ring",
+    }
+    for kind, region in sorted(navigation.obstruction.items()):
+        if region != "none" and read.get(kind) != region:
+            unsupported.add(f"obstructions of {kind} by {region}, which this place does not read")
+    crowded = sum(
+        1
+        for edge in edges.values()
+        if edge["kind"] in ("footway", "premises_access")
+        and obstructions.blocks_walking(nodes[edge["from_node_id"]], nodes[edge["to_node_id"]])
+    )
+    if crowded:
+        unsupported.add(
+            f"walking pieces that pass within a capsule radius of an obstruction ({crowded})"
+        )
+
     radius = policy["standing_radius_mm"]
     spots: dict[str, dict[str, Any]] = {}
     standing: dict[Point, list[Point]] = {}
@@ -506,12 +740,12 @@ def place_from_city_records(
         if alias[name] != name:
             unsupported.add(f"street furniture {item.identity} stands on a footway station")
             continue
-        across = _left((item.facing_dx_mm, item.facing_dy_mm))
+        along = (item.facing_dx_mm, item.facing_dy_mm)
         seats = []
         for seat in range(use.visitor_capacity):
             step = (2 * seat - (use.visitor_capacity - 1)) * policy["standing_spacing_mm"]
-            point = _add((item.x_mm, item.y_mm), _scaled(across, _round_div(step, 2)))
-            if not keeps_apart(point, 1):
+            point = _add((item.x_mm, item.y_mm), _scaled(along, _round_div(step, 2)))
+            if not keeps_apart(point, 1) or obstructions.blocks_standing(point, item.identity):
                 continue
             spot_id = f"{name}:seat:{seat}"
             spots[spot_id] = {
@@ -549,7 +783,11 @@ def place_from_city_records(
     if clearance >= radius:
         for name in sorted(nodes):
             point = nodes[name]
-            if name.startswith("footway:") and keeps_apart(point, 2 * radius):
+            if (
+                name.startswith("footway:")
+                and keeps_apart(point, 2 * radius)
+                and not obstructions.blocks_standing(point)
+            ):
                 spots[name] = {
                     "spot_id": name,
                     "node_id": name,

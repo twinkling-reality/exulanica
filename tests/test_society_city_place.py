@@ -11,11 +11,13 @@ from itertools import pairwise
 
 import pytest
 from exulanica.grammar.errors import InvalidRecordError
-from exulanica.grammar.geometry import OUTSIDE, point_in_ring
+from exulanica.grammar.geometry import OUTSIDE, Extent, point_in_ring
 from exulanica.grammar.grammars.city.document import TileDocument
 from exulanica.grammar.grammars.city.facade import EntranceRecord
+from exulanica.grammar.grammars.city.massing import MassingRecord
 from exulanica.grammar.grammars.city.premises import PremisesRecord
-from exulanica.grammar.grammars.city.streetlife import StreetFurnitureRecord, StreetTreeRecord
+from exulanica.grammar.grammars.city.roads import RoadMarkingRecord
+from exulanica.grammar.grammars.city.streetlife import StreetFurnitureRecord
 from exulanica.grammar.grammars.city.streets import (
     BlockRecord,
     CrossingRecord,
@@ -25,6 +27,7 @@ from exulanica.grammar.grammars.city.streets import (
 )
 from exulanica.world.society_city_place import (
     CORNER_TOLERANCE_MM,
+    city_navigation,
     city_street_names,
     place_from_city_documents,
     place_from_city_records,
@@ -59,8 +62,32 @@ def document_place(document: TileDocument | None = None) -> dict:
     )
 
 
-def records_place(records: list) -> dict:
-    return place_from_city_records(place_id="fixture-tile", records=records, routine=routine())
+def records_place(records: list, **options: object) -> dict:
+    return place_from_city_records(
+        place_id="fixture-tile",
+        records=records,
+        routine=routine(),
+        **options,  # type: ignore[arg-type]
+    )
+
+
+def shifted(extent: Extent, dx: int, dy: int) -> Extent:
+    return dataclasses.replace(
+        extent,
+        min_x_mm=extent.min_x_mm + dx,
+        max_x_mm=extent.max_x_mm + dx,
+        min_y_mm=extent.min_y_mm + dy,
+        max_y_mm=extent.max_y_mm + dy,
+    )
+
+
+def navigation_with(**rows: tuple[str, str]) -> object:
+    """The city's own navigation table with some kinds' ground or obstruction words replaced."""
+    held = city_navigation()
+    ground, obstruction = dict(held.ground), dict(held.obstruction)
+    for kind, (field, word) in rows.items():
+        (ground if field == "ground" else obstruction)[f"city.{kind}"] = word
+    return dataclasses.replace(held, ground=ground, obstruction=obstruction)
 
 
 def components(document: dict, *, without: frozenset[str] = frozenset()) -> list[set[str]]:
@@ -209,10 +236,10 @@ def test_documents_and_their_owned_records_give_one_place_whatever_the_order():
     document = document_place()
     assert records_place(shuffled) == document
     assert records_place([*records, *fixture_document().grammars[0].halo]) == document
-    # The input digest covers only the records a place is read from.
-    [tree] = of_kind(records, StreetTreeRecord)
-    replanted = dataclasses.replace(tree, species="tilia_cordata")
-    assert records_place([replanted if r is tree else r for r in records]) == document
+    # The input digest covers only the records a place is read from: paint is not one of them.
+    [line] = [r for r in of_kind(records, RoadMarkingRecord) if r.marking == "lane_line"]
+    repainted = dataclasses.replace(line, marking="edge_line")
+    assert records_place([repainted if r is line else r for r in records]) == document
     [bench] = [r for r in of_kind(records, StreetFurnitureRecord) if r.furniture_class == "bench"]
     moved = dataclasses.replace(bench, x_mm=bench.x_mm - 100, along_mm=bench.along_mm - 100)
     other = records_place([moved if r is bench else r for r in records])
@@ -312,6 +339,86 @@ def test_documents_are_checked_and_malformed_record_sets_refused_before_a_place_
         records_place([r for r in records if not isinstance(r, CurbEdgeRecord)])
     with pytest.raises(ValueError, match="not a city grammar record"):
         records_place([*records, object()])
+
+
+def test_standing_spots_keep_clear_of_what_the_navigation_table_says_obstructs():
+    records = owned_records()
+    plain = records_place(records)
+    spots = {spot["spot_id"]: spot["position_mm"] for spot in plain["spots"]}
+    [bench] = [r for r in of_kind(records, StreetFurnitureRecord) if r.furniture_class == "bench"]
+    # A seat is inside its own bench and clear of everything else, side by side along the bench.
+    seats = sorted(p for k, p in spots.items() if k.startswith(f"furniture:{bench.identity}:seat"))
+    assert seats == [[bench.x_mm - 350, bench.y_mm], [bench.x_mm + 350, bench.y_mm]]
+    station = "footway:0:left:26357"
+    assert station in spots and not any("obstruction" in line for line in plain["unsupported"])
+
+    # A lamp moved onto the footway takes that station's standing spot and blocks the walk past it.
+    [lamp] = [
+        r for r in of_kind(records, StreetFurnitureRecord) if r.furniture_class == "street_lamp"
+    ]
+    x, y = spots[station]
+    moved = dataclasses.replace(
+        lamp, x_mm=x, y_mm=y, extent=shifted(lamp.extent, x - lamp.x_mm, y - lamp.y_mm)
+    )
+    with_lamp = [moved if r is lamp else r for r in records]
+    blocked = records_place(with_lamp)
+    validate_place(blocked, routine())
+    assert station not in {spot["spot_id"] for spot in blocked["spots"]}
+    [walking] = [line for line in blocked["unsupported"] if "obstruction" in line]
+    assert walking.startswith("walking pieces that pass within a capsule radius of an obstruction")
+    assert int(walking.rsplit("(", 1)[1].rstrip(")")) >= 2
+    # The table, not a list of kinds in code, says furniture obstructs.
+    unblocked = records_place(
+        with_lamp, navigation=navigation_with(street_furniture=("obstruction", "none"))
+    )
+    assert station in {spot["spot_id"] for spot in unblocked["spots"]}
+    assert not any("obstruction" in line for line in unblocked["unsupported"])
+
+    # A building grown to within 100 mm of Mill Lane's footway line takes the spots beside it.
+    [building] = of_kind(records, MassingRecord)
+    ring = tuple((54_700, py) if px == 53_050 else (px, py) for px, py in building.tiers[0].ring_mm)
+    wider = dataclasses.replace(
+        building,
+        tiers=(dataclasses.replace(building.tiers[0], ring_mm=ring), *building.tiers[1:]),
+        extent=dataclasses.replace(building.extent, max_x_mm=54_700),
+    )
+    beside = records_place([wider if r is building else r for r in records])
+    kept = {spot["spot_id"] for spot in beside["spots"]}
+    for along in (0, 4178):
+        assert f"footway:2:left:{along}" in spots and f"footway:2:left:{along}" not in kept
+    assert "footway:2:left:12535" in kept
+    assert "footway:2:left:0" in {
+        spot["spot_id"]
+        for spot in records_place(
+            [wider if r is building else r for r in records],
+            navigation=navigation_with(massing=("obstruction", "none")),
+        )["spots"]
+    }
+
+
+def test_the_navigation_table_decides_what_a_person_may_stand_on():
+    records = owned_records()
+    with pytest.raises(ValueError, match="lets nobody stand on a curb"):
+        records_place(records, navigation=navigation_with(curb_edge=("ground", "none")))
+    no_crossings = records_place(records, navigation=navigation_with(crossing=("ground", "none")))
+    assert no_crossings["crossings"] == [] and len(components(no_crossings)) == 3
+    assert (
+        "crossings (the city's navigation table lets nobody stand on one)"
+        in no_crossings["unsupported"]
+    )
+    no_doors = records_place(records, navigation=navigation_with(entrance=("ground", "none")))
+    assert not any(d["origin"] == "premises" for d in no_doors["destinations"])
+    assert (
+        "entrances (the city's navigation table lets nobody stand on one)"
+        in no_doors["unsupported"]
+    )
+    rooftops = records_place(
+        records, navigation=navigation_with(rooftop_object=("obstruction", "low_parts"))
+    )
+    assert (
+        "obstructions of city.rooftop_object by low_parts, which this place does not read"
+        in rooftops["unsupported"]
+    )
 
 
 def test_a_busier_fixture_tile_lives_a_day_of_homes_shifts_meals_and_sleep():
