@@ -360,9 +360,10 @@ integrated experience and explicit user evaluation.
 V4 pure fixtures cover catalog refusal, place projection and sizing on the committed Flatiron
 input, a 500-minute Flatiron run with no stationary collisions or over-capacity minutes, the same
 properties over twelve seeds on a synthetic grid, graph-bound motion within each walking speed,
-pinned state and event digests, edits without teleporting, source withdrawal, a simulated day in
-a hand-written city block built from grammar records, and a real-engine preview recording that
-replays frame for frame. PostgreSQL cases cover v4 creation, advance, reload, replay, withdrawal,
+pinned state and event digests, edits without teleporting, source withdrawal, the city grammar's
+hand-written v2 fixture tile as a place (doors, corners, crossings, street identities, spot
+spacing and every refusal), a simulated day on that tile with five more flats behind the same
+front door, and a real-engine preview recording that replays frame for frame. PostgreSQL cases cover v4 creation, advance, reload, replay, withdrawal,
 playback through the worker on admitted Flatiron inputs, and selection labels without names.
 
 V3 pure fixtures cover local information boundaries, transmission delay, remembered choices,
@@ -530,12 +531,23 @@ sorted list of what the place cannot supply. Two producers exist:
   street segments or crossings, and the place says so. The Flatiron interpretation's walkable
   graph spans 32 m by 80 m of the district (93 nodes, 4 targets), so a Flatiron society holds 46
   people: half of its 93 places.
-- `place_from_city_records` derives a place from the city grammar's street, parcel, massing,
-  premises and street-furniture records only. Footways follow each segment at an integer offset,
-  join only within the same junction corner, and cross a carriageway only at a recorded crossing
-  offset. A premises unit's use class maps to its capacities, role and shift; an unknown use class
-  is listed as unsupported, never guessed. A unit's access node is the projection of its parcel's
-  centroid onto the frontage footway until the records carry an entrance.
+- `place_from_city_documents` holds each city grammar v2 tile document to every check the
+  grammar defines, then derives a place from the records the tiles own; `place_from_city_records`
+  is the same derivation over records that each pass their own shape, and the input digest covers
+  only the record kinds a place is read from. A curb's footway runs beside its kerb line, the kerb
+  top's width and half the footway's width away. Footways join round a block's corner only toward
+  the curb a curb record names as next, following the offset corner arc to within 250 mm, so no
+  path crosses a carriageway at a junction; a carriageway is crossed only on a crossing record,
+  and the place's crossing keeps that record's identity and its signal. A premises unit is reached
+  through the first of its entrances that opens onto a footway in the place, by a
+  `premises_access` edge from the footway to the threshold. A door onto a lot is stated, and a
+  unit with no door onto a footway in the place is listed as unsupported, never given one. A use
+  class maps to capacities, role and shift; an unknown use class is listed as unsupported, never
+  guessed. A bench seats its catalogued visitors side by side across its facing, and standing
+  spots keep two standing radii apart. Every node except a corner names its street by the street
+  record's identity. A street's name is presentation: `city_street_names` reads it from the
+  city's own street records for a label ("a baker on Market Street"), and no name is copied into
+  the place, so restyling a street never changes a society's input.
 
 **Population.** A place with homes is populated by one inhabitant per catalogued home place. A
 place without homes holds the catalogued share (half) of its standing spots and indoor visitor
