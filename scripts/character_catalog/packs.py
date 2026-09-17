@@ -9,7 +9,7 @@ import io
 import json
 from pathlib import Path
 
-from PIL import Image, ImageChops
+from PIL import Image, ImageChops, ImageFilter, ImageMath
 
 if __package__:
     from .glb import BinaryBuilder, write_glb
@@ -68,16 +68,38 @@ def bake_occlusion(colour, occlusion):
     return out
 
 
-def normalise_hair(colour):
-    """A light neutral strand texture for multiplicative tinting, keeping relative contrast."""
+def normalise_hair(colour, target=205, radius_fraction=1 / 64, strength=0.7, max_gain=3.0):
+    """A light neutral strand texture for multiplicative tinting.
+
+    Each texel is divided by the coverage-weighted mean luminance of the strands around it, so the
+    broad shading an authored texture carries (light roots, dark tips, a dark crown) flattens to
+    one level while the strand detail stays. A single global scale kept that shading, and every
+    tint then showed it: grey hair drew white at the roots and black at the ends. The gain is
+    capped so thin, dark strands are not amplified into noise, and the detail is softened.
+    """
     rgba = colour.convert("RGBA")
     luminance = rgba.convert("L")
     alpha = rgba.getchannel("A")
-    values = [v for v, a in zip(luminance.getdata(), alpha.getdata(), strict=True) if a > 128]
-    mean = sum(values) / len(values) if values else 128
-    scale = 205 / max(mean, 1)
-    lifted = luminance.point(lambda v: min(255, round(v * scale)))
-    return Image.merge("RGB", [lifted, lifted, lifted])
+    radius = max(2, round(colour.size[0] * radius_fraction))
+    weighted = ImageChops.multiply(luminance, alpha).filter(ImageFilter.GaussianBlur(radius))
+    coverage = alpha.filter(ImageFilter.GaussianBlur(radius))
+
+    def flatten(a):
+        local = a["max"](a["weighted"] * 255.0 / a["max"](a["coverage"], 1.0), 16.0)
+        gain = a["min"](a["target"] / local, a["max_gain"])
+        value = a["target"] + (a["luminance"] * gain - a["target"]) * a["strength"]
+        return a["min"](a["max"](value, 0.0), 255.0)
+
+    flat = ImageMath.lambda_eval(
+        flatten,
+        luminance=luminance.convert("F"),
+        weighted=weighted.convert("F"),
+        coverage=coverage.convert("F"),
+        target=float(target),
+        max_gain=float(max_gain),
+        strength=float(strength),
+    ).convert("L")
+    return Image.merge("RGB", [flat, flat, flat])
 
 
 def encode(image, fmt, quality=86):
@@ -145,12 +167,16 @@ def build_pack(name, kind, mhmat, settings, repairs=None, image_path=None, retur
     size = settings["size"]
     alpha_mode = settings.get("alphaMode", "OPAQUE")
     tint = settings.get("tint")
-    average = average_colour(colour, colour.getchannel("A") if colour.mode == "RGBA" and alpha_mode != "OPAQUE" else None)
+    average = average_colour(
+        colour, colour.getchannel("A") if colour.mode == "RGBA" and alpha_mode != "OPAQUE" else None
+    )
     if kind == "hair":
         base = normalise_hair(colour).resize((size, size), Image.Resampling.LANCZOS)
         images.append(encode(base, settings["format"], settings.get("quality", 86)))
-        alpha = colour.convert("RGBA").getchannel("A").resize(
-            (settings["alphaSize"], settings["alphaSize"]), Image.Resampling.LANCZOS
+        alpha = (
+            colour.convert("RGBA")
+            .getchannel("A")
+            .resize((settings["alphaSize"], settings["alphaSize"]), Image.Resampling.LANCZOS)
         )
         images.append(encode(alpha, "png"))
         roles["opacity"] = 1
@@ -163,7 +189,9 @@ def build_pack(name, kind, mhmat, settings, repairs=None, image_path=None, retur
             images.append(encode(resized.convert("RGBA"), "png"))
         if "normalSize" in settings and "normal" in info:
             normal = Image.open(folder / info["normal"]).convert("RGB")
-            normal = normal.resize((settings["normalSize"], settings["normalSize"]), Image.Resampling.LANCZOS)
+            normal = normal.resize(
+                (settings["normalSize"], settings["normalSize"]), Image.Resampling.LANCZOS
+            )
             images.append(encode(normal, "jpeg", 92))
             roles["normal"] = len(images) - 1
     material = {

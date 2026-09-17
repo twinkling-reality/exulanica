@@ -177,8 +177,8 @@
         "mediaType": "model/gltf-binary"
        },
        "farColours": {
-        "lower": "#ababab",
-        "upper": "#ababab"
+        "lower": "#828282",
+        "upper": "#828282"
        },
        "label": "Side-swept bob",
        "material": "hair/bob01",
@@ -206,8 +206,8 @@
         "mediaType": "model/gltf-binary"
        },
        "farColours": {
-        "lower": "#bcbcbc",
-        "upper": "#bcbcbc"
+        "lower": "#c6c6c6",
+        "upper": "#c6c6c6"
        },
        "label": "Rounded bob",
        "material": "hair/bob02",
@@ -236,8 +236,8 @@
         "mediaType": "model/gltf-binary"
        },
        "farColours": {
-        "lower": "#b4b4b4",
-        "upper": "#b4b4b4"
+        "lower": "#767676",
+        "upper": "#767676"
        },
        "label": "Braid",
        "material": "hair/braid01",
@@ -268,8 +268,8 @@
         "mediaType": "model/gltf-binary"
        },
        "farColours": {
-        "lower": "#4b4b4b",
-        "upper": "#c1c1c1"
+        "lower": "#606060",
+        "upper": "#909090"
        },
        "label": "Long straight",
        "material": "hair/long01",
@@ -300,8 +300,8 @@
         "mediaType": "model/gltf-binary"
        },
        "farColours": {
-        "lower": "#bcbcbc",
-        "upper": "#bcbcbc"
+        "lower": "#b5b5b5",
+        "upper": "#b5b5b5"
        },
        "label": "Ponytail",
        "material": "hair/ponytail01",
@@ -331,8 +331,8 @@
         "mediaType": "model/gltf-binary"
        },
        "farColours": {
-        "lower": "#cdcdcd",
-        "upper": "#cdcdcd"
+        "lower": "#c1c1c1",
+        "upper": "#c1c1c1"
        },
        "label": "Short textured",
        "material": "hair/short02",
@@ -361,8 +361,8 @@
         "mediaType": "model/gltf-binary"
        },
        "farColours": {
-        "lower": "#777777",
-        "upper": "#777777"
+        "lower": "#4c4c4c",
+        "upper": "#4c4c4c"
        },
        "label": "Rounded curls",
        "material": "hair/afro01",
@@ -1020,8 +1020,8 @@
         "mediaType": "model/gltf-binary"
        },
        "farColours": {
-        "lower": "#b5b5b5",
-        "upper": "#b5b5b5"
+        "lower": "#727272",
+        "upper": "#727272"
        },
        "label": "Cropped",
        "material": "hair/short01",
@@ -1051,8 +1051,8 @@
         "mediaType": "model/gltf-binary"
        },
        "farColours": {
-        "lower": "#cdcdcd",
-        "upper": "#cdcdcd"
+        "lower": "#c1c1c1",
+        "upper": "#c1c1c1"
        },
        "label": "Short textured",
        "material": "hair/short02",
@@ -1082,8 +1082,8 @@
         "mediaType": "model/gltf-binary"
        },
        "farColours": {
-        "lower": "#bdbdbd",
-        "upper": "#bdbdbd"
+        "lower": "#aeaeae",
+        "upper": "#aeaeae"
        },
        "label": "Short parted",
        "material": "hair/short03",
@@ -1113,8 +1113,8 @@
         "mediaType": "model/gltf-binary"
        },
        "farColours": {
-        "lower": "#a6a6a6",
-        "upper": "#a6a6a6"
+        "lower": "#7e7e7e",
+        "upper": "#7e7e7e"
        },
        "label": "Short swept",
        "material": "hair/short04",
@@ -1144,8 +1144,8 @@
         "mediaType": "model/gltf-binary"
        },
        "farColours": {
-        "lower": "#777777",
-        "upper": "#777777"
+        "lower": "#4c4c4c",
+        "upper": "#4c4c4c"
        },
        "label": "Rounded curls",
        "material": "hair/afro01",
@@ -2006,8 +2006,8 @@
      "alphaMode": "MASK",
      "asset": {
       "assetKey": "makehuman.people.material.hair.afro01.v1",
-      "byteSize": 501064,
-      "contentSha256": "477fca470ef6afde7074636016b16922cf680a8c3965833610cce60a0711d792",
+      "byteSize": 439532,
+      "contentSha256": "cd531415bcd9d78ca84bddb2d4762aec0ca248ecdf929ca5c7ffff1fbf6b24f0",
       "file": "makehuman-people-v1/materials/hair.afro01.glb",
       "mediaType": "model/gltf-binary"
      },
@@ -2034,8 +2034,8 @@
      "alphaMode": "MASK",
      "asset": {
       "assetKey": "makehuman.people.material.hair.bob01.v1",
-      "byteSize": 138852,
-      "contentSha256": "5f3ce01fa1f7ccb88595dcffb7d59a505adf061e23db1c7cbfe094d83398c3a1",
+      "byteSize": 124488,
+      "contentSha256": "8b69e3d643ddc0639e0c996ab7f5e244d9aca5edd738fb9f1d2d8518d780b17c",
       "file": "makehuman-people-v1/materials/hair.bob01.glb",
       "mediaType": "model/gltf-binary"
      },
@@ -2062,8 +2062,8 @@
      "alphaMode": "MASK",
      "asset": {
       "assetKey": "makehuman.people.material.hair.bob02.v1",
-      "byteSize": 127308,
-      "contentSha256": "6c48ca4aa0a5049addf349df6b707aacbc3b7f852bd4f9b968adc584f4067ae5",
+      "byteSize": 125544,
+      "contentSha256": "04641ab3eead270016cee46523f4df90b4028bcc23dc12feded41e737b7eec97",
       "file": "makehuman-people-v1/materials/hair.bob02.glb",
       "mediaType": "model/gltf-binary"
      },
@@ -2090,8 +2090,8 @@
      "alphaMode": "MASK",
      "asset": {
       "assetKey": "makehuman.people.material.hair.braid01.v1",
-      "byteSize": 55144,
-      "contentSha256": "c1987f2d38b2fd4105eac5819d41e353d1f0e5edc148eb55b07f84b9ec423b20",
+      "byteSize": 41404,
+      "contentSha256": "d0f02a81c4e7a5c8af60094feadd0ea504604a93ecc3d2530e31cee0daa191fc",
       "file": "makehuman-people-v1/materials/hair.braid01.glb",
       "mediaType": "model/gltf-binary"
      },
@@ -2118,8 +2118,8 @@
      "alphaMode": "MASK",
      "asset": {
       "assetKey": "makehuman.people.material.hair.long01.v1",
-      "byteSize": 106428,
-      "contentSha256": "2e6dfe48cb438b7f4e7aa1930cd4613e1a9fc95ce9d702dcc42d8c4bff7eb9b3",
+      "byteSize": 105008,
+      "contentSha256": "093665a51cbf184dae0fb0788c610bd9b936bffed2b6acf2dde5b0899a684d90",
       "file": "makehuman-people-v1/materials/hair.long01.glb",
       "mediaType": "model/gltf-binary"
      },
@@ -2146,8 +2146,8 @@
      "alphaMode": "MASK",
      "asset": {
       "assetKey": "makehuman.people.material.hair.ponytail01.v1",
-      "byteSize": 230960,
-      "contentSha256": "6ef83930abf946e40edf863878cf05d776b5b5f9c416ac7eb131bf826302f4dd",
+      "byteSize": 226088,
+      "contentSha256": "ec344dd37f0e1c66d86d41d850dc98f7c4e7b082779f11c49ba3bb5c6e87bf87",
       "file": "makehuman-people-v1/materials/hair.ponytail01.glb",
       "mediaType": "model/gltf-binary"
      },
@@ -2174,8 +2174,8 @@
      "alphaMode": "MASK",
      "asset": {
       "assetKey": "makehuman.people.material.hair.short01.v1",
-      "byteSize": 381680,
-      "contentSha256": "eae0c9dcdf9b88de70c73f65425bd4d84f8ed4fa8d71dd34cfea706a441d34a5",
+      "byteSize": 341152,
+      "contentSha256": "66c5e805dc3c5eb7097617396e6caa9a9f3e31c4dbee93905436ce9c2784e59b",
       "file": "makehuman-people-v1/materials/hair.short01.glb",
       "mediaType": "model/gltf-binary"
      },
@@ -2202,8 +2202,8 @@
      "alphaMode": "MASK",
      "asset": {
       "assetKey": "makehuman.people.material.hair.short02.v1",
-      "byteSize": 99136,
-      "contentSha256": "4938654273050f0f5157e8e9a2ccc8f2582877356b2c4adc4c6cb4ca5e7ef1c7",
+      "byteSize": 97416,
+      "contentSha256": "c2cfc00d6478f27ccc987b8bd13c318251601abf756657fa514ce75ee8961111",
       "file": "makehuman-people-v1/materials/hair.short02.glb",
       "mediaType": "model/gltf-binary"
      },
@@ -2230,8 +2230,8 @@
      "alphaMode": "MASK",
      "asset": {
       "assetKey": "makehuman.people.material.hair.short03.v1",
-      "byteSize": 101968,
-      "contentSha256": "92eac7eb21e209de508405846b4de0e617b276b17d7a1cf42120fcd84b6469c9",
+      "byteSize": 98260,
+      "contentSha256": "403477c95ad2439ae9924b74caedbdf2dc0320b78d30bb467c5cf383f63a6e41",
       "file": "makehuman-people-v1/materials/hair.short03.glb",
       "mediaType": "model/gltf-binary"
      },
@@ -2258,8 +2258,8 @@
      "alphaMode": "MASK",
      "asset": {
       "assetKey": "makehuman.people.material.hair.short04.v1",
-      "byteSize": 198576,
-      "contentSha256": "7599ff6fd8e250b038e944536e5a0c1b7f4f52c19a1e33e9dc0dccc8793b5329",
+      "byteSize": 177896,
+      "contentSha256": "61cd4dfd7a3d4ca10ddd9ca260e6d6778a4e29b1f6d6dcd17f622a22ce1ed8d4",
       "file": "makehuman-people-v1/materials/hair.short04.glb",
       "mediaType": "model/gltf-binary"
      },
@@ -3197,14 +3197,14 @@
       "feminine/lashes/eyelashes01": 10
      },
      "outfit": {
-      "feminine/outfit/female_casualsuit01": 12,
-      "feminine/outfit/female_casualsuit02": 6,
-      "feminine/outfit/female_elegantsuit01": 8,
-      "feminine/outfit/female_sportsuit01": 6,
-      "feminine/outfit/male_casualsuit01": 5,
-      "feminine/outfit/male_casualsuit03": 5,
-      "feminine/outfit/male_casualsuit05": 8,
-      "feminine/outfit/male_casualsuit06": 6
+      "feminine/outfit/female_casualsuit01": 5,
+      "feminine/outfit/female_casualsuit02": 5,
+      "feminine/outfit/female_elegantsuit01": 10,
+      "feminine/outfit/female_sportsuit01": 5,
+      "feminine/outfit/male_casualsuit01": 4,
+      "feminine/outfit/male_casualsuit03": 9,
+      "feminine/outfit/male_casualsuit05": 10,
+      "feminine/outfit/male_casualsuit06": 10
      },
      "shoes": {
       "feminine/shoes/shoes01": 8,
@@ -3251,14 +3251,14 @@
       "masculine/lashes/eyelashes01": 10
      },
      "outfit": {
-      "masculine/outfit/male_casualsuit01": 10,
-      "masculine/outfit/male_casualsuit02": 8,
+      "masculine/outfit/male_casualsuit01": 6,
+      "masculine/outfit/male_casualsuit02": 7,
       "masculine/outfit/male_casualsuit03": 10,
-      "masculine/outfit/male_casualsuit04": 8,
+      "masculine/outfit/male_casualsuit04": 6,
       "masculine/outfit/male_casualsuit05": 10,
       "masculine/outfit/male_casualsuit06": 10,
-      "masculine/outfit/male_elegantsuit01": 6,
-      "masculine/outfit/male_worksuit01": 4
+      "masculine/outfit/male_elegantsuit01": 9,
+      "masculine/outfit/male_worksuit01": 5
      },
      "shoes": {
       "masculine/shoes/shoes01": 10,

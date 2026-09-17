@@ -3,7 +3,7 @@
   "catalog": {
     "catalogId": "exulanica-characters",
     "revision": 1,
-    "canonicalSha256": "316412e3f78519247701a3ee6cac51d9b21ab49a5b39b24fd0cb64de2274ebf6"
+    "canonicalSha256": "0b691b241f170bac55f450818ff83f88765fbda11c37af2d614ce46d7b7d1c7e"
   },
   "domain": "street-population/v1",
   "vectors": [
@@ -73,7 +73,7 @@
         "familyId": "makehuman-people/v1",
         "baseId": "masculine",
         "parts": {
-          "outfit": "masculine/outfit/male_casualsuit04",
+          "outfit": "masculine/outfit/male_casualsuit05",
           "shoes": "masculine/shoes/shoes02",
           "hair": "masculine/hair/afro01",
           "brows": "masculine/brows/eyebrow003",
@@ -93,7 +93,7 @@
           "muscle": 342
         }
       },
-      "lookSha256": "94b2d5bbc170d470c5e778690a320f27f5266e927d4b8ba90e0e6cf0a1645d3e"
+      "lookSha256": "17293bbe9912a885579052b2a09910fea3eb96324a7b8bc8307efba7716bf65a"
     },
     {
       "subject": "3ec62805-2d6b-5a2b-b5fd-cfb2b7ae8702",
@@ -161,7 +161,7 @@
         "familyId": "makehuman-people/v1",
         "baseId": "masculine",
         "parts": {
-          "outfit": "masculine/outfit/male_casualsuit06",
+          "outfit": "masculine/outfit/male_elegantsuit01",
           "shoes": "masculine/shoes/shoes04",
           "hair": "masculine/hair/short01",
           "brows": "masculine/brows/eyebrow001",
@@ -181,7 +181,7 @@
           "muscle": -46
         }
       },
-      "lookSha256": "3d1dd5f5a769327d0ae9c27a3774cf85279cf358a0cf66cdab5727631da63e9f"
+      "lookSha256": "46f6c925035193f37d39c00083a237bd57b045318ae80ede3785a634e734043c"
     },
     {
       "subject": "4ecd7919-b71b-56e4-b013-7131e4f13a79",
@@ -205,7 +205,7 @@
         "familyId": "makehuman-people/v1",
         "baseId": "masculine",
         "parts": {
-          "outfit": "masculine/outfit/male_casualsuit05",
+          "outfit": "masculine/outfit/male_casualsuit06",
           "shoes": "masculine/shoes/shoes01",
           "hair": "masculine/hair/short02",
           "brows": "masculine/brows/eyebrow001",
@@ -225,7 +225,7 @@
           "muscle": -228
         }
       },
-      "lookSha256": "0729caeb158e7f68a0f29c89b4b9abd220252f047b3e854583d53b48e35ec9da"
+      "lookSha256": "a201deb27aeb2e15e76d36529e02c451f8f83fe5604a26f5b7c25dd6def58296"
     },
     {
       "subject": "f96894cf-a8d9-5b9f-a375-0d28152ae738",
@@ -293,7 +293,7 @@
         "familyId": "makehuman-people/v1",
         "baseId": "feminine",
         "parts": {
-          "outfit": "feminine/outfit/male_casualsuit05",
+          "outfit": "feminine/outfit/male_casualsuit06",
           "shoes": "feminine/shoes/shoes05",
           "hair": "feminine/hair/bob02",
           "brows": "feminine/brows/eyebrow010",
@@ -313,7 +313,7 @@
           "muscle": 272
         }
       },
-      "lookSha256": "4c66109af655d2f5087963469e7a231f2ec408552839daaf324a7179968de7a0"
+      "lookSha256": "7d3908bc1fe753b401daac5fc5aa7f9b0a1dc2a6497a1cb05fcf11f959089c07"
     },
     {
       "subject": "743a82b3-be89-53f4-a261-492c6cd3dfd1",
@@ -381,7 +381,7 @@
         "familyId": "makehuman-people/v1",
         "baseId": "feminine",
         "parts": {
-          "outfit": "feminine/outfit/male_casualsuit05",
+          "outfit": "feminine/outfit/male_casualsuit06",
           "shoes": "feminine/shoes/shoes04",
           "hair": "feminine/hair/ponytail01",
           "brows": "feminine/brows/eyebrow010",
@@ -401,7 +401,7 @@
           "muscle": -65
         }
       },
-      "lookSha256": "7a7adbab9b9c212f9bb4bdefa2d1a2dd69ad1a04ca0d633a47395328c63cd4c4"
+      "lookSha256": "b13173d5f59e71f8e41a5237d39f31945a6c31ae52e823b2bf0c58b3077a5f73"
     },
     {
       "subject": "a \"quoted\" \\ subject",
@@ -425,7 +425,7 @@
         "familyId": "makehuman-people/v1",
         "baseId": "masculine",
         "parts": {
-          "outfit": "masculine/outfit/male_casualsuit04",
+          "outfit": "masculine/outfit/male_casualsuit05",
           "shoes": "masculine/shoes/shoes02",
           "hair": null,
           "brows": "masculine/brows/eyebrow009",
@@ -445,7 +445,7 @@
           "muscle": 30
         }
       },
-      "lookSha256": "c84317f7a071262e6396ef03d3a2fa2091f5a30e6c6c7a006536ca785a7e8cc3"
+      "lookSha256": "9e5caa4f23f224396d29bf089d11da857ff45b8197d1dce30348c674b9b18286"
     }
   ]
 }
