@@ -301,6 +301,17 @@ class MaterialRepository:
     (``material_bake_lifecycle_lock``) first, before any row lock, because a tombstone takes that
     lock and then updates bake rows. Taking a row lock first and the lifecycle lock second, which
     is what the bake guard alone would do, can deadlock against a deletion.
+
+    **No recipe row is locked.** A recipe never changes, and what can change whether it is readable
+    (a withdrawal, a deletion) is written under the lifecycle lock. A bake request and a withdrawal
+    read the recipe only once they hold that lock, so the read sees whatever committed first, and
+    nothing that would change the answer commits until they do. That is why the runtime role holds
+    no UPDATE on ``material_recipe``, which ``SELECT ... FOR UPDATE`` would need.
+
+    **A read-only deployment is refused before anything is read.** A bake request and a withdrawal
+    first ask whether this role may append the row they would write. The judge deployment's may
+    not, so it is refused by name whatever recipe it names, one this workspace holds or not; the
+    recipe row lock used to give that answer only as a side effect of needing UPDATE.
     """
 
     def __init__(
@@ -409,12 +420,11 @@ class MaterialRepository:
         assert row is not None
         return row
 
-    def _recipe_row(self, recipe_id: uuid.UUID, *, lock: bool = False) -> Mapping[str, Any]:
+    def _recipe_row(self, recipe_id: uuid.UUID) -> Mapping[str, Any]:
         row = self.connection.execute(
             f"select {_RECIPE_COLUMNS}, "
             "  tombstone_blocks_material_recipe(r.workspace_id, r.recipe_id) as blocked "
-            "from material_recipe r where r.workspace_id = %s and r.recipe_id = %s"
-            + (" for update" if lock else ""),
+            "from material_recipe r where r.workspace_id = %s and r.recipe_id = %s",
             (self.workspace_id, recipe_id),
         ).fetchone()
         if row is None:
@@ -443,7 +453,7 @@ class MaterialRepository:
         def withdraw() -> None:
             with self.connection.transaction():
                 self._lifecycle_lock()
-                self._recipe_row(recipe_id, lock=True)
+                self._recipe_row(recipe_id)
                 self.connection.execute(
                     "insert into material_recipe_withdrawal (workspace_id, recipe_id, "
                     "  withdrawn_by) values (%s, %s, %s) "
@@ -452,10 +462,18 @@ class MaterialRepository:
                 )
 
         with _refusals():
+            self._may_append("material_recipe_withdrawal")
             _retrying(withdraw)
 
     def _lifecycle_lock(self) -> None:
         self.connection.execute("select material_bake_lifecycle_lock(%s)", (self.workspace_id,))
+
+    def _may_append(self, table: str) -> None:
+        row = self.connection.execute(
+            "select has_table_privilege(%s, 'INSERT') as allowed", (table,)
+        ).fetchone()
+        if row is None or not row["allowed"]:
+            raise MaterialReadOnly("this deployment keeps material recipes read-only")
 
     # -- bakes --------------------------------------------------------------------------
 
@@ -482,12 +500,13 @@ class MaterialRepository:
     def request_bake(self, recipe_id: uuid.UUID) -> BakeRecord:
         """Queue the recipe's bake, unless it is already queued, running, or baked and present."""
         with _refusals():
+            self._may_append("material_bake_request")
             return _retrying(lambda: self._request_bake(recipe_id))
 
     def _request_bake(self, recipe_id: uuid.UUID) -> BakeRecord:
         with self.connection.transaction():
             self._lifecycle_lock()
-            self._recipe_row(recipe_id, lock=True)
+            self._recipe_row(recipe_id)
             row = self._bake_row(recipe_id, lock=True)
             if row is None:
                 created = self.connection.execute(

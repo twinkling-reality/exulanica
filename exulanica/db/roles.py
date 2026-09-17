@@ -33,11 +33,13 @@ So this module creates the role and grants it exactly what it needs:
     derivatives, rewrite what it names, or mark a purge complete over bytes still on disk.
     Migration 0074 refuses the same rewrites for any role, and lets only the purge role's column
     grant or an administrator record a purge completion.
-*   **INSERT and SELECT, never UPDATE, on the append-only material tables.** A bake request, a
-    photo-derived recipe's source photograph and a recipe's withdrawal (migration 0066) are each
-    written once. With UPDATE the runtime could move a request out of the day its workspace's
-    quota counts, or rewrite which photograph a recipe was read from, which is what deletion
-    follows. 0066's triggers refuse the same updates for any role.
+*   **INSERT and SELECT, never UPDATE, on the append-only material tables.** A recipe, a bake
+    request, a photo-derived recipe's source photograph and a recipe's withdrawal (migration 0066)
+    are each written once. With UPDATE the runtime could change a recipe after its published maker
+    checked it, move a request out of the day its workspace's quota counts, or rewrite which
+    photograph a recipe was read from, which is what deletion follows. 0066's triggers refuse the
+    same updates for any role. Nothing locks a recipe row either, which would need UPDATE: the
+    writers that decide on a recipe hold the workspace's material lifecycle lock instead.
 *   **No ownership and no BYPASSRLS**, which is the whole point.
 
 Every statement here is built with :mod:`psycopg.sql` rather than an f-string. Role names,
@@ -105,6 +107,7 @@ READ_ONLY_TABLES: Final = (
 INSERT_ONLY_TABLES: Final = (
     "tombstone",
     "material_bake_request",
+    "material_recipe",
     "material_recipe_source",
     "material_recipe_withdrawal",
 )

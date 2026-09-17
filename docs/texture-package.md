@@ -723,9 +723,13 @@ The rest of the machinery:
   checkpoint that names bakes is refused when no namespace is given.
 - **Serialisation.** A tombstone and a bake serialise on a per-workspace lock, in the shape of
   0044, so a tombstone either sees a finished bake or the bake is refused.
-  - **Order.** Every writer takes that lock before it locks any bake row, because a tombstone takes
-    the lock first and then updates bake rows; the other order deadlocks.
-    `tests/test_material_recipes.py` holds both orders.
+  - **Order.** Every writer takes that lock before it locks any bake row or reads the recipe it
+    decides on, because a tombstone takes the lock first and then updates bake rows. The other
+    order deadlocks, or decides on a recipe that a withdrawal is about to hide. Every writer also
+    retries past a deadlock, so an outcome alone does not show the order.
+    `tests/test_material_recipes.py` checks it directly: while a bake request, a claim or a
+    withdrawal waits for the lock, the test locks every recipe and bake row of the workspace
+    without waiting, and a withdrawal that waited behind another finds the recipe withdrawn.
   - **Reads during a write.** A read that finds a recorded bake's bytes missing first waits for the
     bake's object lock, so a bake still being written is read a moment later instead of being
     re-requested.
@@ -733,15 +737,21 @@ The rest of the machinery:
 **What the runtime role may write.** `tests/test_runtime_update_grants.py` names every table the
 runtime role may update and why, and every material table is there:
 
-- `material_bake_request`, `material_recipe_source` and `material_recipe_withdrawal` are in
-  `INSERT_ONLY_TABLES` in `exulanica/db/roles.py`, so provisioning takes UPDATE on them away.
-  0066's append-only triggers still refuse an update from any role that holds it.
+- `material_recipe`, `material_bake_request`, `material_recipe_source` and
+  `material_recipe_withdrawal` are in `INSERT_ONLY_TABLES` in `exulanica/db/roles.py`, so
+  provisioning takes UPDATE on them away. 0066's recipe guard and append-only triggers still refuse
+  an update from any role that holds it.
 - `material_bake` keeps UPDATE. The worker claims, records and fails bakes and retakes an expired
   lease, a request re-queues a bake, and a withdrawal or a tombstone cancels one.
-- `material_recipe` keeps UPDATE, because a request and a withdrawal lock the recipe row and
-  `SELECT ... FOR UPDATE` needs that privilege. Its guard refuses every change.
 - `material_bake_quota` keeps the blanket grant and has no runtime writer. It is a ceiling an
   operator declares; making it operator-only, with 0062's `tiles_limit`, is the security lane's.
+
+No path locks a recipe row, which would need UPDATE (`SELECT ... FOR UPDATE` does). A bake request
+and a withdrawal read the recipe only once they hold the lifecycle lock, and a withdrawal and a
+tombstone both take that lock, so the read sees any that committed first and no other commits until
+the reader does. Both also ask first whether the role may append the row they would write, so the
+judge deployment's 403 comes before any read, whatever recipe a write names. The recipe row lock
+used to give that answer only because it needed UPDATE.
 
 **Routes.** `/materials/makers`, `/materials/library`, `/materials/recipes`, one recipe, its
 withdrawal, its bake request, its bake and the bake's bytes. Reads need `world.read` and writes
