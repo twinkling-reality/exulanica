@@ -1,8 +1,9 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CATALOG, LIBRARY, definitionOf } from '../src/catalog.js';
-import { encodeContainer } from '../src/container.js';
+import { SET_PROFILE_V1 } from '../src/classes.js';
+import { encodeContainer, encodeContainerV2 } from '../src/container.js';
 import type { TextureSetDefinition } from '../src/definition.js';
-import { bakeMaps, sampleFields } from '../src/maps.js';
+import { bakeClassMaps, bakeMaps, sampleFields } from '../src/maps.js';
 import { sha256Hex } from '../src/publish.js';
 import { FIELD_NAMES } from './support.js';
 
@@ -19,6 +20,13 @@ const small = (def: TextureSetDefinition, size = 32): TextureSetDefinition => ({
   height: def.height === def.width ? size : size / 4,
 });
 
+/** Every map a set stores, in stored order, whichever container it is baked into. */
+function storedMaps(def: TextureSetDefinition, size?: { width: number; height: number }): Uint8Array[] {
+  if (def.containerProfile !== SET_PROFILE_V1) return bakeClassMaps(def, size).map((map) => map.bytes);
+  const maps = bakeMaps(def, size);
+  return [maps.baseColor, maps.normal, maps.orm, maps.relief];
+}
+
 afterEach(() => {
   vi.restoreAllMocks();
 });
@@ -26,12 +34,13 @@ afterEach(() => {
 describe('a bake is a function of its stated inputs', () => {
   it('produces identical maps twice over, for every set', () => {
     for (const def of CATALOG) {
-      const a = bakeMaps(def, { width: 64, height: def.height / 16 });
-      const b = bakeMaps(def, { width: 64, height: def.height / 16 });
-      expect(Buffer.from(a.baseColor).equals(Buffer.from(b.baseColor)), def.setId).toBe(true);
-      expect(Buffer.from(a.normal).equals(Buffer.from(b.normal)), def.setId).toBe(true);
-      expect(Buffer.from(a.orm).equals(Buffer.from(b.orm)), def.setId).toBe(true);
-      expect(Buffer.from(a.relief).equals(Buffer.from(b.relief)), def.setId).toBe(true);
+      const size = { width: 64, height: def.height / (def.width / 64) };
+      const a = storedMaps(def, size);
+      const b = storedMaps(def, size);
+      expect(a.length, def.setId).toBe(b.length);
+      a.forEach((map, index) => {
+        expect(Buffer.from(map).equals(Buffer.from(b[index]!)), `${def.setId} map ${index}`).toBe(true);
+      });
     }
   });
 
@@ -44,7 +53,10 @@ describe('a bake is a function of its stated inputs', () => {
     vi.spyOn(performance, 'now').mockImplementation(refuse('performance.now'));
     vi.spyOn(process, 'hrtime').mockImplementation(refuse('process.hrtime') as never);
     for (const def of CATALOG) {
-      expect(() => encodeContainer(small(def), bakeMaps(small(def)), '0'.repeat(64))).not.toThrow();
+      const tiny = small(def);
+      expect(() => (tiny.containerProfile === SET_PROFILE_V1
+        ? encodeContainer(tiny, bakeMaps(tiny), '0'.repeat(64))
+        : encodeContainerV2(tiny, bakeClassMaps(tiny), '0'.repeat(64)))).not.toThrow();
     }
   });
 
@@ -70,9 +82,9 @@ describe('a different seed is a different surface', () => {
         });
       const a = reseeded(1);
       const b = reseeded(2);
-      const size = { width: 64, height: a.height / 16 };
+      const size = { width: 64, height: a.height / (a.width / 64) };
       expect(
-        Buffer.from(bakeMaps(a, size).baseColor).equals(Buffer.from(bakeMaps(b, size).baseColor)),
+        Buffer.from(storedMaps(a, size)[0]!).equals(Buffer.from(storedMaps(b, size)[0]!)),
         a.setId,
       ).toBe(false);
     }

@@ -2,7 +2,7 @@ import { canonicalBytes } from '../canonical-json.js';
 import { sha256Hex } from '../digest.js';
 import type { Maker } from '../maker.js';
 import { MAKERS } from '../makers/index.js';
-import { MAXIMUM_RESOLUTION, type Recipe, recipeProblems } from '../recipe.js';
+import { MAKER_PROFILE, MAXIMUM_RESOLUTION, type Recipe, materialClassOf, recipeProblems } from '../recipe.js';
 import { WORKSPACE_LICENCE_ID } from './licence.js';
 
 /**
@@ -107,6 +107,13 @@ export function bakeRequestProblems(candidate: unknown, licenceSha256: string): 
   const maker = requestedMaker(candidate);
   if (maker === undefined) {
     problems.push('recipe names a maker id and version this package has');
+    return problems;
+  }
+  if (maker.manifest.profile !== MAKER_PROFILE) {
+    problems.push(
+      `${maker.manifest.maker_id} makes ${materialClassOf(maker.manifest)} sets in the v2 container, and a `
+        + 'workspace bake makes only v1 opaque sets in this version',
+    );
     return problems;
   }
   if (sha256Hex(canonicalBytes(maker.manifest)) !== candidate.maker_sha256) {

@@ -33,7 +33,7 @@ interface PythonSet {
   readonly height: number;
   readonly extent_u_mm: number;
   readonly extent_v_mm: number;
-  readonly height_range_mm: number;
+  readonly height_range_mm: number | null;
   readonly maps: readonly PythonMap[];
 }
 /** Written by `texture-set-python-decode.py.txt` from the backend's strict reader. */
@@ -135,6 +135,9 @@ describe('texture set reader, conformance with the backend reader', () => {
       'cc0.limestone-ashlar': 'vertical',
       'cc0.painted-render': 'vertical',
       'cc0.storefront-metal': 'vertical',
+      'cc0.float-glazing': 'vertical',
+      'cc0.broadleaf-foliage': 'vertical',
+      'cc0.tree-bark': 'vertical',
     });
   });
 });
@@ -255,7 +258,7 @@ describe('texture manifest reader, refusals', () => {
   };
 
   it('accepts the committed bytes exactly, and refuses them re-serialised with whitespace', () => {
-    expect(manifest.sets).toHaveLength(8);
+    expect(manifest.sets).toHaveLength(11);
     expect(manifestRefusal(JSON.stringify(document, null, 1))).toBe('manifest');
     expect(manifestRefusal(`${new TextDecoder().decode(manifestBytes)}\n`)).toBe('manifest');
   });
@@ -265,7 +268,7 @@ describe('texture manifest reader, refusals', () => {
     expect(manifestRefusal(withFirstSet((set) => { set['fallback'] = 'none'; }))).toBe('manifest');
     expect(manifestRefusal(withFirstSet((set) => { delete set['extent_mm']; }))).toBe('manifest');
     expect(manifestRefusal({ ...document, sets: [...document.sets, document.sets[0]] })).toBe('manifest');
-    expect(manifestRefusal({ ...document, profile: 'exulanica.texture-manifest/v2' })).toBe('manifest');
+    expect(manifestRefusal({ ...document, profile: 'exulanica.texture-manifest/v3' })).toBe('manifest');
     expect(manifestRefusal({ ...document, sets: [] })).toBe('manifest');
   });
 

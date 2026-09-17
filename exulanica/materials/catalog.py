@@ -27,10 +27,12 @@ from typing import Any, Final
 
 from exulanica.materials.objects import (
     BAKE_PIPELINE,
+    BAKE_PIPELINE_V2,
     BAKE_RECEIPT_PROFILE,
     CATALOG_PROFILE,
     LIBRARY_ENTRY_PROFILE,
     MAKER_PROFILE,
+    MAKER_PROFILE_V2,
     RECIPE_PROFILE,
     SAFE_INTEGER,
     MaterialObjectError,
@@ -167,15 +169,18 @@ def _manifest_sets(manifest_raw: bytes) -> tuple[Mapping[str, Any], ...]:
     return tuple(sets)
 
 
-def _object(read: ObjectReader, digest: Any, profile: str, keys: frozenset[str]) -> Any:
+def _object(
+    read: ObjectReader, digest: Any, profile: str | tuple[str, ...], keys: frozenset[str]
+) -> Any:
+    profiles = (profile,) if isinstance(profile, str) else profile
     if not is_sha256(digest):
         raise MaterialObjectError(f"{digest!r} is not a sha256 object name")
     raw = read(digest)
     if sha256_hex(raw) != digest:
         raise MaterialObjectError(f"object {digest} does not hash to its name")
     document = read_object(raw, f"object {digest}")
-    if not isinstance(document, Mapping) or document.get("profile") != profile:
-        raise MaterialObjectError(f"object {digest} is not a {profile} object")
+    if not isinstance(document, Mapping) or document.get("profile") not in profiles:
+        raise MaterialObjectError(f"object {digest} is not a {' or '.join(profiles)} object")
     if keys and set(document) != keys:
         raise MaterialObjectError(f"object {digest} has fields other than exactly {sorted(keys)}")
     return document
@@ -199,7 +204,9 @@ def _makers(read: ObjectReader, document: Mapping[str, Any]) -> dict[str, MakerR
         if not _is_identity(identity) or (previous is not None and identity <= previous):
             raise MaterialObjectError("catalog makers are sorted by id and version, each once")
         previous = identity
-        manifest = _object(read, row["object_sha256"], MAKER_PROFILE, frozenset())
+        manifest = _object(
+            read, row["object_sha256"], (MAKER_PROFILE, MAKER_PROFILE_V2), frozenset()
+        )
         problems = manifest_problems(manifest)
         if problems:
             raise MaterialObjectError(
@@ -250,7 +257,7 @@ def verify_material_catalog(
     for row, entry in zip(rows, listed, strict=True):
         set_id = row["set_id"]
         receipt = _object(read, row["receipt_sha256"], BAKE_RECEIPT_PROFILE, _RECEIPT_KEYS)
-        if receipt["pipeline"] != BAKE_PIPELINE:
+        if receipt["pipeline"] not in (BAKE_PIPELINE, BAKE_PIPELINE_V2):
             raise MaterialObjectError(f"{set_id} was baked by {receipt['pipeline']!r}")
         _require(
             _positive_integer(receipt["byte_size"])
@@ -266,6 +273,13 @@ def verify_material_catalog(
         maker = makers.get(receipt["maker_sha256"])
         if maker is None:
             raise MaterialObjectError(f"{set_id}: the receipt names a maker the catalog lacks")
+        # A v1 maker's sets are baked by the v1 pipeline, and a maker that states its class bakes
+        # its sets into that class's container by the v2 pipeline; no other pairing exists.
+        pipeline = BAKE_PIPELINE if maker.manifest["profile"] == MAKER_PROFILE else BAKE_PIPELINE_V2
+        if receipt["pipeline"] != pipeline:
+            raise MaterialObjectError(
+                f"{set_id}: a {maker.manifest['profile']} maker's set is baked by {pipeline}"
+            )
         library_entry = _object(read, receipt["entry_sha256"], LIBRARY_ENTRY_PROFILE, _ENTRY_KEYS)
         _require(
             _positive_integer(library_entry["version"])

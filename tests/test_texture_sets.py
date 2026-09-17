@@ -23,6 +23,7 @@ from pathlib import Path
 import pytest
 from exulanica.canonical import canonical_json
 from exulanica.errors import CanonicalisationError
+from exulanica.materials.classes import RELIEF_CLASSES, TEXTURE_SET_PROFILE_V1, class_layout
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.world import texture_assets
 from exulanica.world.texture_assets import (
@@ -85,11 +86,11 @@ def _payloads(manifest):
 def test_the_manifest_is_canonical_json_in_the_agreed_shape(manifest):
     assert MANIFEST.read_bytes() == canonical_json(manifest)
     assert set(manifest) == {"profile", "sets"}
-    assert manifest["profile"] == "exulanica.texture-manifest/v1"
+    assert manifest["profile"] == "exulanica.texture-manifest/v2"
     ids = [entry["set_id"] for entry in manifest["sets"]]
     assert ids == sorted(ids)
     assert len(set(ids)) == len(ids)
-    assert 6 <= len(ids) <= 10
+    assert len(ids) >= 6
     for entry in manifest["sets"]:
         assert set(entry) == {
             "set_id",
@@ -101,6 +102,8 @@ def test_the_manifest_is_canonical_json_in_the_agreed_shape(manifest):
             "extent_mm",
             "licence_id",
             "licence_sha256",
+            "container_profile",
+            "material_class",
         }
         assert re.fullmatch(texture_assets.TEXTURE_SET_ID_PATTERN, entry["set_id"])
         # A stable name: never a version, never a digest.
@@ -159,13 +162,25 @@ def test_every_header_states_extent_seed_packing_and_plane(manifest):
         assert header["truth"] == "invented", where
         assert header["media_type"] == "application/vnd.exulanica.texture-set", where
         packing = [(m["name"], m["components"], m["holds"], m["srgb"]) for m in header["maps"]]
-        assert packing == [
-            ("base_color", 3, ["red", "green", "blue"], True),
-            ("normal", 3, ["normal_x", "normal_y", "normal_z"], False),
-            ("orm", 3, ["occlusion", "roughness", "metalness"], False),
-            ("height", 1, ["height"], False),
-        ], where
-        assert type(header["height_range_mm"]) is int and header["height_range_mm"] > 0
+        if entry["container_profile"] == TEXTURE_SET_PROFILE_V1:
+            assert packing == [
+                ("base_color", 3, ["red", "green", "blue"], True),
+                ("normal", 3, ["normal_x", "normal_y", "normal_z"], False),
+                ("orm", 3, ["occlusion", "roughness", "metalness"], False),
+                ("height", 1, ["height"], False),
+            ], where
+        else:
+            # A published set of a class is procedural, so it packs its class's smaller layout.
+            assert packing == [
+                (m.name, m.components, list(m.holds), m.srgb)
+                for m in class_layout(
+                    entry["material_class"], "procedural", normal=False, height=False
+                )
+            ], where
+        if entry["material_class"] in RELIEF_CLASSES:
+            assert type(header["height_range_mm"]) is int and header["height_range_mm"] > 0
+        else:
+            assert "height_range_mm" not in header, where
 
 
 def test_sets_are_named_by_surface_not_by_era_or_typology(manifest):
@@ -190,7 +205,7 @@ def _planes(payload):
     height = decoded.header["resolution"]["height"]
     for layout in decoded.header["maps"]:
         raw = bytes(decoded.maps[layout["name"]])
-        mode = "RGB" if layout["components"] == 3 else "L"
+        mode = {1: "L", 2: "LA", 3: "RGB", 4: "RGBA"}[layout["components"]]
         image = Image.frombytes(mode, (width, height), raw)
         for channel, plane in enumerate(image.split()):
             yield f"{layout['name']}[{channel}]", plane
@@ -239,8 +254,12 @@ def test_every_channel_of_every_set_is_continuous_across_both_wrap_edges(manifes
                 if not result.continuous:
                     failures.append(f"{entry['set_id']} {name} {axis}: {result}")
     assert failures == []
-    # Ten channels (3 + 3 + 3 + 1), two edges each, for every set.
-    assert checked == 20 * len(manifest["sets"])
+    # Every channel of every map, two edges each: ten channels (3 + 3 + 3 + 1) for a v1 set, and
+    # its class layout's channels for any other.
+    channels = sum(
+        channel["components"] for entry in manifest["sets"] for channel in entry["channels"]
+    )
+    assert checked == 2 * channels
 
 
 def test_the_continuity_check_flags_a_plane_that_does_not_tile(manifest):
@@ -377,7 +396,7 @@ def test_the_catalog_refuses_bytes_that_do_not_match_their_pin(tmp_path, manifes
         (lambda doc: doc["sets"][0].update(extent_mm={"u": 1800}), "extent"),
         (lambda doc: doc["sets"][0].update(note=1), "keys"),
         (lambda doc: doc["sets"][0].update(content_sha256="0" * 64), "not in"),
-        (lambda doc: doc.update(profile="exulanica.texture-manifest/v2"), "profile"),
+        (lambda doc: doc.update(profile="exulanica.texture-manifest/v3"), "profile"),
     ],
 )
 def test_the_catalog_refuses_a_manifest_that_breaks_the_contract(
@@ -551,7 +570,12 @@ def test_the_workspace_bake_record_is_every_published_recipe_baked_alike(manifes
     assert "$HERE/requests.mts" in record.split("\n== requests.mts", 1)[0]
     assert re.search(r"^commit [0-9a-f]{40}$", record, re.MULTILINE)
     assert "working tree changes under web/packages/loom-texture and exulanica: 0" in record
-    stems = [f"{index:02d}-{entry['set_id']}" for index, entry in enumerate(manifest["sets"])]
+    # A workspace bakes only v1 opaque sets in this version, so the record is of those, and the
+    # sets published later with a class are not in it.
+    v1_sets = [
+        entry for entry in manifest["sets"] if entry["container_profile"] == TEXTURE_SET_PROFILE_V1
+    ]
+    stems = [f"{index:02d}-{entry['set_id']}" for index, entry in enumerate(v1_sets)]
     runs = {}
     for run in WORKSPACE_RUNS:
         section = record.split(f"== run {run}\n", 1)[1].split("\n== ", 1)[0]

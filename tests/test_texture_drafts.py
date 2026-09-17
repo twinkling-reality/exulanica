@@ -23,10 +23,20 @@ MANIFESTS = sorted(MANIFEST_DIRECTORY.glob("*.json"))
 ENTRIES = sorted((PACKAGE / "library-drafts").glob("*.json"))
 
 
-def test_there_are_drafts_to_check():
-    """An empty glob would pass every parametrised test by running none of them."""
-    assert MANIFESTS
-    assert ENTRIES
+def test_the_drafts_and_their_manifests_are_where_this_test_looks():
+    """Between batches there may be no drafts, so the paths themselves are anchored instead.
+
+    A mistyped path would glob nothing and pass every parametrised test by running none of them.
+    The published library beside the drafts must be found, and every draft entry must have its
+    maker's manifest and every manifest a draft entry.
+    """
+    assert (PACKAGE / "library" / "cc0.brick-running-bond.json").is_file()
+    makers = {path.name for path in MANIFESTS}
+    named = set()
+    for path in ENTRIES:
+        maker = parse_strict(path.read_bytes())["recipe"]["maker"]
+        named.add(f"{maker['id']}.v{maker['version']}.json")
+    assert named == makers
 
 
 @pytest.mark.parametrize("path", MANIFESTS, ids=lambda path: path.name)

@@ -33,10 +33,12 @@ from exulanica.materials.manifest import (
 )
 from exulanica.materials.objects import (
     BAKE_PIPELINE,
+    BAKE_PIPELINE_V2,
     BAKE_RECEIPT_PROFILE,
     CATALOG_PROFILE,
     LIBRARY_ENTRY_PROFILE,
     MAKER_PROFILE,
+    MAKER_PROFILE_V2,
     RECIPE_PROFILE,
     STRICT_JSON_PROBLEMS,
     MaterialObjectError,
@@ -59,12 +61,14 @@ from exulanica.materials.recipes import (
 
 __all__ = [
     "BAKE_PIPELINE",
+    "BAKE_PIPELINE_V2",
     "BAKE_RECEIPT_PROFILE",
     "CATALOG_PROFILE",
     "COMMON_CONTROLS",
     "CONTAINER_LAYOUT",
     "LIBRARY_ENTRY_PROFILE",
     "MAKER_PROFILE",
+    "MAKER_PROFILE_V2",
     "MANIFEST_PROFILE",
     "PUBLISHED_LICENCE_ID",
     "RECIPE_PROFILE",

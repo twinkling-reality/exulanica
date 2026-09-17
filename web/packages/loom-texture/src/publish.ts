@@ -1,6 +1,15 @@
 import { canonicalBytes } from './canonical-json.js';
 import { LIBRARY, definitionOf } from './catalog.js';
-import { MAP_LAYOUT, encodeContainer } from './container.js';
+import {
+  type Channel,
+  type MaterialClass,
+  SET_PROFILE_V1,
+  type SetProfile,
+  V1_LAYOUT,
+  channelsOf,
+  classLayout,
+} from './classes.js';
+import { encodeContainer, encodeContainerV2 } from './container.js';
 import type { TextureSetDefinition } from './definition.js';
 import { sha256Hex } from './digest.js';
 import {
@@ -11,8 +20,11 @@ import {
 } from './library.js';
 import { LICENCE_ID, licenceBytes } from './licence.js';
 import { MAKERS } from './makers/index.js';
-import { bakeMaps } from './maps.js';
+import { MANIFEST_PROFILE_V2 } from './manifest-reader.js';
+import { bakeClassMaps, bakeMaps } from './maps.js';
 import {
+  BAKE_PIPELINE,
+  BAKE_PIPELINE_V2,
   CATALOG_FILE,
   ObjectStore,
   OBJECT_DIRECTORY,
@@ -31,21 +43,22 @@ export { SET_ID_PATTERN } from './library.js';
  * The directory is content-addressed: each set is `blobs/<sha256>.ltex`, the licence text is
  * `blobs/<sha256>.txt`, every maker manifest, recipe, library entry and bake receipt is
  * `objects/<sha256>.json` (see `objects.ts`), and two indexes sit at the top. `catalog.json`
- * accounts for every set with a receipt. `manifest.json` is the index both
- * `exulanica/world/texture_assets.py` and the grammar's catalog loader read, and its shape was
- * fixed with the grammar lane before either side was written:
+ * accounts for every set with a receipt. `manifest.json` is the index the backend, the grammar's
+ * catalog loader and the browser all read:
  *
- *   {"profile": "exulanica.texture-manifest/v1", "sets": [entry, ...]}
+ *   {"profile": "exulanica.texture-manifest/v2", "sets": [entry, ...]}
  *
  * with `sets` sorted by `set_id`, each id once, and each entry holding exactly `set_id`,
- * `version`, `content_sha256`, `byte_size`, `resolution`, `channels`, `extent_mm`, `licence_id`
- * and `licence_sha256`. The file is canonical JSON with no trailing newline, so its bytes are a
+ * `version`, `content_sha256`, `byte_size`, `resolution`, `channels`, `extent_mm`, `licence_id`,
+ * `licence_sha256`, `container_profile` and `material_class`. A set baked before material classes
+ * is `exulanica.texture-set/v1` and `opaque`, and its `channels` are the v1 layout; any other set's
+ * are its class's layout. The file is canonical JSON with no trailing newline, so its bytes are a
  * function of its content and nothing else.
  *
  * `version` and `content_sha256` are replay inputs: the grammar pins both into its catalog
  * digest. A rebake that changes a set's bytes without bumping its version is a replay bug.
  */
-export const MANIFEST_PROFILE = 'exulanica.texture-manifest/v1';
+export const MANIFEST_PROFILE = MANIFEST_PROFILE_V2;
 export const MANIFEST_FILE = 'manifest.json';
 /**
  * Every file here is pinned by digest, so no checkout may convert a line ending, expand a keyword
@@ -70,15 +83,12 @@ export interface ManifestEntry {
   readonly content_sha256: string;
   readonly byte_size: number;
   readonly resolution: { readonly width: number; readonly height: number };
-  readonly channels: readonly {
-    readonly map: string;
-    readonly components: number;
-    readonly holds: readonly string[];
-    readonly srgb: boolean;
-  }[];
+  readonly channels: readonly Channel[];
   readonly extent_mm: { readonly u: number; readonly v: number };
   readonly licence_id: string;
   readonly licence_sha256: string;
+  readonly container_profile: SetProfile;
+  readonly material_class: MaterialClass;
 }
 
 export interface PublishedSet {
@@ -155,15 +165,14 @@ export function manifestEntry(
     content_sha256: sha256Hex(container),
     byte_size: container.length,
     resolution: { width: def.width, height: def.height },
-    channels: MAP_LAYOUT.map((layout) => ({
-      map: layout.name,
-      components: layout.components,
-      holds: layout.holds,
-      srgb: layout.srgb,
-    })),
+    channels: channelsOf(
+      def.containerProfile === SET_PROFILE_V1 ? V1_LAYOUT : classLayout(def.materialClass, 'procedural'),
+    ),
     extent_mm: { u: def.extentU, v: def.extentV },
     licence_id: def.licenceId,
     licence_sha256: licenceSha256,
+    container_profile: def.containerProfile,
+    material_class: def.materialClass,
   };
 }
 
@@ -179,7 +188,9 @@ export function manifestBytes(entries: readonly ManifestEntry[]): Uint8Array {
 
 export function publishSet(def: TextureSetDefinition, licenceSha256: string): PublishedSet {
   checkDefinition(def);
-  const container = encodeContainer(def, bakeMaps(def), licenceSha256);
+  const container = def.containerProfile === SET_PROFILE_V1
+    ? encodeContainer(def, bakeMaps(def), licenceSha256)
+    : encodeContainerV2(def, bakeClassMaps(def), licenceSha256);
   const entry = manifestEntry(def, container, licenceSha256);
   return {
     definition: def,
@@ -214,6 +225,7 @@ export function publish(library: readonly LibrarySet[] = LIBRARY): Publication {
     const entrySha256 = store.put(libraryEntryObject(source.entry, recipeSha256));
     const receiptSha256 = store.put(
       bakeReceipt({
+        pipeline: published.definition.containerProfile === SET_PROFILE_V1 ? BAKE_PIPELINE : BAKE_PIPELINE_V2,
         makerSha256: maker.row.object_sha256,
         entrySha256,
         recipeSha256,

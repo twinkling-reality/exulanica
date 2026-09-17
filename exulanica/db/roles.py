@@ -26,8 +26,9 @@ So this module creates the role and grants it exactly what it needs:
     registration is a reviewed migration/code change. A runtime process may propose registered
     values; it cannot register its own renderer or interaction vocabulary.
 *   **SELECT only on the pinned asset catalogs.** ``world_reviewed_asset`` (migration 0042) and
-    ``world_texture_set`` (migration 0065) each pin reviewed bytes by digest, and a new pin is a
-    new migration. A runtime process resolves a pinned asset; it never pins one.
+    ``world_texture_set`` (migration 0065) each pin reviewed bytes by digest, and
+    ``world_texture_set_class`` (migration 0076) states what kind of surface each pinned set is. A
+    new pin is a new migration. A runtime process resolves a pinned asset; it never pins one.
 *   **INSERT and SELECT, never UPDATE, on ``tombstone``.** A deletion request is written once. With
     UPDATE the runtime could push ``effective_at`` out, which stops a tombstone blocking
     derivatives, rewrite what it names, or mark a purge complete over bytes still on disk.
@@ -101,6 +102,7 @@ READ_ONLY_TABLES: Final = (
     "world_object_behaviour_registry",
     "world_reviewed_asset",
     "world_texture_set",
+    "world_texture_set_class",
 )
 
 #: Tables the runtime may read and append to and may not update. See the module docstring.

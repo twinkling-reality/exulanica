@@ -161,6 +161,5 @@ describe('the decoded texture budget', () => {
       expect(decodedBytes(def, true)).toBeLessThanOrEqual(4 * 1_398_101 * 4);
     }
     expect(CATALOG.length).toBeGreaterThanOrEqual(6);
-    expect(CATALOG.length).toBeLessThanOrEqual(10);
   });
 });

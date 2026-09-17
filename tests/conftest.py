@@ -322,6 +322,7 @@ _PRESERVED_TABLES = frozenset(
         "world_style_module_capability",
         "world_art_profile_module",
         "world_texture_set",
+        "world_texture_set_class",
     }
 )
 

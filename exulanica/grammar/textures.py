@@ -12,15 +12,18 @@ digest as a pin on the entry, and ``catalog_digest`` covers the pins. A rebaked 
 moves the catalog digest, and every tile digest that covers the catalog digest, while no record
 and no catalog file changes.
 
-**The manifest's shape**, as fixed with the texture lane before it wrote one:
-``{"profile": "exulanica.texture-manifest/v1", "sets": [...]}``, where ``sets`` lists at least one
-set, sorted by ``set_id`` with each id once, and each entry has exactly ``set_id``, ``version``,
-``content_sha256``, ``byte_size``, ``resolution``, ``channels``, ``extent_mm``, ``licence_id``
-and ``licence_sha256``. The file is canonical JSON with integers only, and each field has the
-form :mod:`exulanica.materials.manifest` states. A different profile, a bare array, unsorted sets,
-a repeated id, a malformed field and bytes in any other form are all refused, as
+**The manifest's shape**: ``{"profile": "exulanica.texture-manifest/v2", "sets": [...]}``, where
+``sets`` lists at least one set, sorted by ``set_id`` with each id once, and each entry has exactly
+``set_id``, ``version``, ``content_sha256``, ``byte_size``, ``resolution``, ``channels``,
+``extent_mm``, ``licence_id``, ``licence_sha256``, ``container_profile`` and ``material_class``.
+The first manifest, ``exulanica.texture-manifest/v1``, had the first nine keys and is still read.
+The file is canonical JSON with integers only, and each field has the form
+:mod:`exulanica.materials.manifest` states. A different profile, a bare array, unsorted sets, a
+repeated id, a malformed field and bytes in any other form are all refused, as
 :class:`~exulanica.grammar.errors.CatalogError`. The manifest is published, and callers still pass
-the published sets explicitly; nothing here reads it by default.
+the published sets explicitly; nothing here reads it by default. A set's pin is
+``{set_id, version, content_sha256}`` whatever the profile, so publishing the manifest as v2 moved
+no pin.
 """
 
 from __future__ import annotations

@@ -56,9 +56,12 @@ def _compact(document: object) -> bytes:
 def test_the_published_manifest_reads_back_to_its_own_bytes():
     raw = MANIFEST.read_bytes()
     entries = read_texture_manifest(raw)
-    assert len(entries) == 8
-    rebuilt = {"profile": "exulanica.texture-manifest/v1", "sets": []}
-    rebuilt["sets"] = [entry.as_entry() for entry in entries.values()]
+    # The eight sets 0065 pins and batch 1's three, which 0076 pins.
+    assert len(entries) == 11
+    rebuilt = {"profile": "exulanica.texture-manifest/v2", "sets": []}
+    rebuilt["sets"] = [
+        entry.as_entry(profile="exulanica.texture-manifest/v2") for entry in entries.values()
+    ]
     assert canonical_json(rebuilt) == raw
 
 
@@ -82,8 +85,8 @@ CASES = [
     (lambda doc: doc.update(sets={}), "non-empty list"),
     (lambda doc: doc.update(note=1), "exactly profile and sets"),
     (lambda doc: doc.update(profile="exulanica.texture-manifest/v3"), "profile is"),
-    # A v2 manifest states each entry's container profile and class; a v1 entry does not.
-    (lambda doc: doc.update(profile="exulanica.texture-manifest/v2"), "keys other than exactly"),
+    # A v2 entry states its container profile and class, and a v1 manifest's entries do not.
+    (lambda doc: doc.update(profile="exulanica.texture-manifest/v1"), "keys other than exactly"),
     (lambda doc: _entry(doc).update(note=1), "keys other than exactly"),
     (lambda doc: _entry(doc).update(set_id="Cc0.Brick"), "is not a texture set id"),
     (lambda doc: _entry(doc).update(set_id="cc0.brick\n"), "a string the baker cannot write"),

@@ -58,6 +58,7 @@ from exulanica.materials import (
 from exulanica.materials.classes import (
     MAKER_KINDS,
     MATERIAL_CLASSES,
+    RELIEF_CLASSES,
     TEXTURE_SET_PROFILE_V1,
     TEXTURE_SET_PROFILE_V2,
     TEXTURE_SET_PROFILES,
@@ -71,7 +72,7 @@ from exulanica.materials.classes import (
 )
 from exulanica.materials.manifest import (
     MANIFEST_NAME,
-    MANIFEST_PROFILE,
+    MANIFEST_PROFILE_V2,
     PUBLISHED_LICENCE_ID,
     SET_ID_PATTERN,
     ManifestEntry,
@@ -111,7 +112,8 @@ __all__ = [
 ]
 
 TEXTURE_DIRECTORY: Final = Path(__file__).resolve().parents[2] / "assets" / "textures"
-TEXTURE_MANIFEST_PROFILE: Final = MANIFEST_PROFILE
+#: The profile ``assets/textures/manifest.json`` is published in. Both profiles are read.
+TEXTURE_MANIFEST_PROFILE: Final = MANIFEST_PROFILE_V2
 #: The profile of every set published before material classes.
 TEXTURE_SET_PROFILE: Final = TEXTURE_SET_PROFILE_V1
 TEXTURE_SET_MEDIA_TYPE: Final = "application/vnd.exulanica.texture-set"
@@ -125,7 +127,7 @@ CC0_LICENCE_ID: Final = PUBLISHED_LICENCE_ID
 #: recipe, so this one digest pins every object in the directory. A rebake that changes any object
 #: changes it, and updates it here in the same commit; the package's
 #: ``test/published.test.ts`` compares it with the committed catalog so the web suite says so first.
-TEXTURE_CATALOG_SHA256: Final = "c6343f4cd3a1794e95bdbf9f4ef9843e26cf212002d9e119980bce85c24e8c9e"
+TEXTURE_CATALOG_SHA256: Final = "58b12c0a52b6680dd7be0e1cf7292a4a34e05b7c900465ffef265e231aea5887"
 #: Every published maker manifest, by maker id and version. Rows are appended, never edited or
 #: removed: a recipe names a maker by id and version, so a published version names one manifest
 #: forever, and a change to a maker's controls, rules or wording is a new version and a new row.
@@ -133,8 +135,11 @@ PUBLISHED_MAKER_MANIFESTS: Final[Mapping[tuple[str, int], str]] = MappingProxyTy
     {
         ("loom.ashlar", 1): "f689a79667f18cccc577b007fb74e9c6c831482a4afac29222153d3cb6ad2cff",
         ("loom.asphalt", 1): "a1b1a9435744a6cb5bd9c046109a63a0b41b41bcd8e162562a1d91109ad67a88",
+        ("loom.bark", 1): "ad6c1442cfb89de44c9b954e2247959df0385cb37c7cdf51e622fa11452b61ef",
         ("loom.brick", 1): "50ae89003097a3b3a68f78490c1344278477a3351ef63b6dde59e06d1435f5c6",
         ("loom.concrete", 1): "4215979b6d8dc40bc86605ca020070583892c2094042aebd1c02bb692d803fae",
+        ("loom.foliage", 1): "8423c6af158f1978aa08463cb5be5ad28de5780024d424dffd377b7fdef781ed",
+        ("loom.glazing", 1): "2bfadbbad2ad34399c4c90ba316b206b43e93e358f68233338d7ae4b396252c1",
         ("loom.kerb", 1): "838d4404a523e2080005f75bb673baa23d4c15e333f415741f13943f80b408f7",
         ("loom.metal", 1): "63c5080a4a150d5da0199cbf81e354512cae9ee27004209e8025826935d62635",
         ("loom.paving", 1): "e1d8bf41461217f50d3880e75298056c22dc869cc86aa652afb3d99c565fbbb0",
@@ -204,7 +209,8 @@ class PinnedTextureSet:
     title: str
     summary: str
     seed: int
-    height_range_mm: int
+    #: None for a class whose bake has no height field, which is glazing.
+    height_range_mm: int | None
     path: Path
     #: The maker and recipe the bytes were baked from, and the receipt that says so.
     maker_id: str
@@ -234,7 +240,7 @@ class PinnedTextureSet:
             container_profile=self.container_profile,
             material_class=self.material_class,
             maps=self.maps,
-        ).as_entry()
+        ).as_entry(profile=TEXTURE_MANIFEST_PROFILE)
 
     def read_bytes(self) -> bytes:
         """The container, re-verified: a file changed since the catalog loaded is refused."""
@@ -493,25 +499,46 @@ def _check_provenance(
 ) -> None:
     """The header says what the identity, the recipe and the maker say, field for field."""
     parameters = recipe["parameters"]
-    expected = {
+    # A v1 maker makes opaque sets; a maker that states its class makes sets of that class.
+    material_class = manifest.get("material_class", "opaque")
+    if header.get("material_class", "opaque") != material_class:
+        raise TextureCatalogError(
+            f"{where}: header material_class is {header.get('material_class')!r}, but its maker "
+            f"makes {material_class} sets"
+        )
+    expected: dict[str, Any] = {
         "title": title,
         "summary": summary,
         "seed": recipe["seed"],
         "resolution": thaw(recipe["resolution"]),
         "extent_mm": thaw(recipe["extent_mm"]),
         "family": manifest["family"],
-        "height_range_mm": parameters["height_range_mm"],
-        "cavity": {
+    }
+    if material_class in RELIEF_CLASSES:
+        expected["height_range_mm"] = parameters["height_range_mm"]
+        expected["cavity"] = {
             "radius_mm": parameters["occlusion_radius_mm"],
             "depth_mm": parameters["occlusion_depth_mm"],
             "strength_permille": parameters["occlusion_strength_permille"],
-        },
-    }
+        }
     for key, value in expected.items():
         if not identical(header.get(key), value):
             raise TextureCatalogError(
                 f"{where}: header {key} is {header.get(key)!r}, but its recipe says {value!r}"
             )
+    if material_class == "glazing":
+        # The film is declared, not measured, so what binds it to the recipe is this comparison.
+        stated_class = header.get("class")
+        film = {
+            "film_srgb": thaw(parameters["film_colour"]),
+            "film_roughness_permille": parameters["film_roughness_permille"],
+        }
+        for key, value in film.items():
+            stated = stated_class.get(key) if isinstance(stated_class, Mapping) else None
+            if not identical(stated, value):
+                raise TextureCatalogError(
+                    f"{where}: header class {key} is {stated!r}, but its recipe says {value!r}"
+                )
     placement = header.get("placement")
     if not isinstance(placement, Mapping) or placement.get("surface") != manifest["surface"]:
         raise TextureCatalogError(f"{where}: header placement is not its maker's surface")
@@ -711,7 +738,7 @@ def load_texture_catalog(
             title=header["title"],
             summary=header["summary"],
             seed=header["seed"],
-            height_range_mm=header["height_range_mm"],
+            height_range_mm=header.get("height_range_mm"),
             path=path,
             maker_id=record.maker.maker_id,
             maker_version=record.maker.version,

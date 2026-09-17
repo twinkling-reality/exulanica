@@ -67,8 +67,11 @@ const WRITTEN_WORDS = [
   'oak', 'maple', 'linden', 'unresolved',
 ];
 
-/** Words the language itself spells, which a catalog key happens to share. */
-const HOST_NAMES = ['buffer'];
+/**
+ * Words the language itself spells, which a catalog key happens to share. `float` is the encoding's
+ * own name (float32), which the float glazing set id shares.
+ */
+const HOST_NAMES = ['buffer', 'float'];
 
 const words = (text: string): string[] =>
   text

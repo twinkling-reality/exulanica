@@ -401,6 +401,20 @@ def test_a_recipe_the_published_maker_refuses_is_never_stored(materials, change,
     assert materials.rows("select recipe_id from material_recipe") == []
 
 
+def test_a_recipe_for_a_maker_of_a_material_class_is_refused_by_name(materials):
+    """A workspace bakes v1 opaque sets only, so a published maker that states its class is
+    refused when a recipe names it, before any bake could fail on it."""
+    for set_id, material_class in (
+        ("cc0.float-glazing", "glazing"),
+        ("cc0.broadleaf-foliage", "cutout"),
+        ("cc0.tree-bark", "opaque"),
+    ):
+        record = CATALOG.sets[set_id]
+        with pytest.raises(InvalidRecipe, match=f"{record.maker.maker_id} makes {material_class}"):
+            materials.repository().create_recipe(thaw(record.recipe))
+    assert materials.rows("select recipe_id from material_recipe") == []
+
+
 def test_a_variant_names_a_pinned_set_and_that_set_s_maker(materials):
     repository = materials.repository()
     with pytest.raises(InvalidRecipe, match="pinned version"):

@@ -1,4 +1,5 @@
 import { LIBRARY } from '../catalog.js';
+import { MAKER_PROFILE } from '../recipe.js';
 
 /**
  * A dataset plan: the whole specification of a synthetic training set, as data.
@@ -120,11 +121,15 @@ export function planProblems(candidate: unknown): string[] {
     problems.push('name is lowercase letters, digits, dots and hyphens, starting with a letter');
   }
   if (!isInteger(candidate.seed, 0, 0xffffffff)) problems.push('seed is an unsigned 32-bit integer');
-  const published = new Set(LIBRARY.map((source) => source.entry.set_id));
+  // The pairs a plan exports are renders of opaque v1 sets; what a training pair is for a set of
+  // another class is a training design's decision, which none has made yet.
+  const published = new Set(
+    LIBRARY.filter((source) => source.maker.manifest.profile === MAKER_PROFILE).map((source) => source.entry.set_id),
+  );
   const sets = candidate.sets;
   if (!Array.isArray(sets) || sets.length === 0 || new Set(sets).size !== sets.length
     || !sets.every((setId) => typeof setId === 'string' && published.has(setId))) {
-    problems.push('sets are distinct published set ids, at least one');
+    problems.push('sets are distinct published v1 set ids, at least one');
   }
   if (!isInteger(candidate.records_per_set, 1, 100_000)) {
     problems.push('records_per_set is from 1 to 100000');

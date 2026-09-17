@@ -32,6 +32,11 @@ export const CATALOG_PROFILE = 'exulanica.texture-catalog/v1';
  * every set.
  */
 export const BAKE_PIPELINE = 'exulanica.texture-bake/v1';
+/**
+ * The bake of a set that states its material class: the class's maps into the v2 container. A v1
+ * maker's sets stay on the pipeline above, which this one does not change a byte of.
+ */
+export const BAKE_PIPELINE_V2 = 'exulanica.texture-bake/v2';
 export const OBJECT_DIRECTORY = 'objects';
 export const OBJECT_EXTENSION = '.json';
 export const CATALOG_FILE = 'catalog.json';
@@ -48,7 +53,7 @@ export interface LibraryEntryObject {
 
 export interface BakeReceipt {
   readonly profile: typeof BAKE_RECEIPT_PROFILE;
-  readonly pipeline: typeof BAKE_PIPELINE;
+  readonly pipeline: typeof BAKE_PIPELINE | typeof BAKE_PIPELINE_V2;
   readonly maker_sha256: string;
   readonly entry_sha256: string;
   readonly recipe_sha256: string;
@@ -90,6 +95,7 @@ export function libraryEntryObject(entry: LibraryEntry, recipeSha256: string): L
 }
 
 export function bakeReceipt(inputs: {
+  readonly pipeline: typeof BAKE_PIPELINE | typeof BAKE_PIPELINE_V2;
   readonly makerSha256: string;
   readonly entrySha256: string;
   readonly recipeSha256: string;
@@ -99,7 +105,7 @@ export function bakeReceipt(inputs: {
 }): BakeReceipt {
   return {
     profile: BAKE_RECEIPT_PROFILE,
-    pipeline: BAKE_PIPELINE,
+    pipeline: inputs.pipeline,
     maker_sha256: inputs.makerSha256,
     entry_sha256: inputs.entrySha256,
     recipe_sha256: inputs.recipeSha256,

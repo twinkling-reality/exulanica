@@ -1,4 +1,4 @@
-import { MAP_LAYOUT } from './container.js';
+import { SET_PROFILE_V1, V1_LAYOUT, classLayout } from './classes.js';
 import type { TextureSetDefinition } from './definition.js';
 
 /**
@@ -36,9 +36,15 @@ export function mipChainTexels(width: number, height: number): number {
   }
 }
 
+/**
+ * A set's decoded cost: each map it stores, as RGBA8. A v1 set stores its four maps, height
+ * included, and is charged for all four as it always was; a set of a material class stores its
+ * class's maps and no height map, and is charged for those.
+ */
 export function decodedBytes(def: TextureSetDefinition, withMips: boolean): number {
   const texels = withMips ? mipChainTexels(def.width, def.height) : def.width * def.height;
-  return MAP_LAYOUT.length * texels * DECODED_BYTES_PER_TEXEL;
+  const maps = def.containerProfile === SET_PROFILE_V1 ? V1_LAYOUT : classLayout(def.materialClass, 'procedural');
+  return maps.length * texels * DECODED_BYTES_PER_TEXEL;
 }
 
 /**

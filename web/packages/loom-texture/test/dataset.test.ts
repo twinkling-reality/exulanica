@@ -68,10 +68,14 @@ describe('a dataset plan', () => {
 
   it('names only published sets, and a picture no larger than its bake', () => {
     expect(planProblems({ ...COMMITTED, sets: ['cc0.unknown'] })).toEqual([
-      'sets are distinct published set ids, at least one',
+      'sets are distinct published v1 set ids, at least one',
     ]);
     expect(planProblems({ ...COMMITTED, sets: [...COMMITTED.sets, COMMITTED.sets[0]] })).toEqual([
-      'sets are distinct published set ids, at least one',
+      'sets are distinct published v1 set ids, at least one',
+    ]);
+    // A published set of a material class is not a pair this plan can export yet.
+    expect(planProblems({ ...COMMITTED, sets: ['cc0.float-glazing'] })).toEqual([
+      'sets are distinct published v1 set ids, at least one',
     ]);
     expect(planProblems({ ...COMMITTED, image_size: 512 })).toEqual([
       'image_size is a power of two from 8, no larger than bake_size',

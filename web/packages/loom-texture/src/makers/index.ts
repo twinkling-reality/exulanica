@@ -20,8 +20,11 @@ export const MAKERS: readonly Maker[] = Object.freeze(
   [
     ashlarMaker,
     asphaltMaker,
+    barkMaker,
     brickMaker,
     concreteMaker,
+    foliageMaker,
+    glazingMaker,
     kerbMaker,
     metalMaker,
     pavingMaker,
@@ -37,7 +40,7 @@ export const MAKERS: readonly Maker[] = Object.freeze(
  * the drafts.
  */
 export const DRAFT_MAKERS: readonly Maker[] = Object.freeze(
-  [barkMaker, foliageMaker, glazingMaker].sort((a, b) => (a.manifest.maker_id < b.manifest.maker_id ? -1 : 1)),
+  ([] as Maker[]).sort((a, b) => (a.manifest.maker_id < b.manifest.maker_id ? -1 : 1)),
 );
 
 for (const maker of [...MAKERS, ...DRAFT_MAKERS]) {

@@ -1,5 +1,9 @@
 """Migration 0065: the texture set catalog, its pins, and who may touch it.
 
+Migration 0076 states each pinned set's container profile and material class in a table of its own;
+``tests/test_texture_set_class_migration.py`` checks that table, and the rows here are compared with
+the manifest through the join a reader makes.
+
 Two schemas, for two reasons that were measured rather than guessed.
 
 The session's ``spine_schema`` is checked for structure. Its rows and grants are not trusted
@@ -50,6 +54,8 @@ def _runtime_roles(path: Path) -> tuple[str, ...]:
 #: the roles `exulanica.db.roles` provisions.
 RUNTIME_ROLES = _runtime_roles(MIGRATION)
 TABLE = "world_texture_set"
+#: How many sets the migrations pin: every set the published manifest lists.
+PINNED = len(json.loads(MANIFEST.read_bytes())["sets"])
 
 
 def _code(text: str) -> str:
@@ -60,9 +66,9 @@ def _code(text: str) -> str:
 # -- the file ----------------------------------------------------------------------------------
 
 
-def test_0065_is_the_one_texture_migration_and_is_shaped_like_its_neighbours():
+def test_0065_is_the_first_texture_migration_and_is_shaped_like_its_neighbours():
     texture = [m.path.name for m in migrations() if "texture" in m.path.name]
-    assert texture == ["0065_texture_set_digests.sql"]
+    assert texture == ["0065_texture_set_digests.sql", "0076_texture_set_classes.sql"]
     assert re.fullmatch(r"(\d{4})_[a-z0-9_]+\.sql", MIGRATION.name)
     statements = [line for line in _code(MIGRATION.read_text()).splitlines() if line.strip()]
     assert statements[0] == "begin;"
@@ -142,7 +148,11 @@ def test_the_spine_schema_carries_the_catalog_with_its_checks_and_guard(spine_sc
                 (TABLE,),
             ).fetchall()
         }
-        assert triggers == {"tg_world_texture_set_is_migration_data"}
+        # 0065's wall, and 0076's check that no set is pinned without its class.
+        assert triggers == {
+            "tg_world_texture_set_is_migration_data",
+            "tg_world_texture_set_states_its_class",
+        }
     finally:
         connection.close()
 
@@ -171,9 +181,11 @@ def connection(own_schema):
 
 def test_the_pinned_rows_are_the_manifest_exactly(connection):
     rows = connection.execute(
-        "select set_id, version, content_sha256, byte_size, width, height, extent_u_mm, "
-        "extent_v_mm, channels, licence_id, licence_sha256, title, summary, media_type, truth "
-        f"from {TABLE} order by set_id, version"
+        "select s.set_id, s.version, s.content_sha256, s.byte_size, s.width, s.height, "
+        "s.extent_u_mm, s.extent_v_mm, s.channels, s.licence_id, s.licence_sha256, s.title, "
+        "s.summary, s.media_type, s.truth, c.container_profile, c.material_class "
+        f"from {TABLE} s left join world_texture_set_class c using (set_id, version) "
+        "order by s.set_id, s.version"
     ).fetchall()
     manifest = json.loads(MANIFEST.read_bytes())
     as_entries = [
@@ -187,6 +199,8 @@ def test_the_pinned_rows_are_the_manifest_exactly(connection):
             "extent_mm": {"u": row["extent_u_mm"], "v": row["extent_v_mm"]},
             "licence_id": row["licence_id"],
             "licence_sha256": row["licence_sha256"],
+            "container_profile": row["container_profile"],
+            "material_class": row["material_class"],
         }
         for row in rows
     ]
@@ -312,7 +326,9 @@ def test_provisioning_leaves_the_catalog_read_only_and_the_trigger_is_the_second
         }
         connection.execute(sql.SQL("set role {}").format(sql.Identifier(role)))
         try:
-            assert connection.execute(f"select count(*) as n from {TABLE}").fetchone()["n"] == 8
+            assert (
+                connection.execute(f"select count(*) as n from {TABLE}").fetchone()["n"] == PINNED
+            )
             with pytest.raises(psycopg.errors.InsufficientPrivilege, match="permission denied"):
                 _insert(connection)
             with pytest.raises(psycopg.errors.InsufficientPrivilege, match="permission denied"):
@@ -336,7 +352,7 @@ def test_provisioning_leaves_the_catalog_read_only_and_the_trigger_is_the_second
                 connection.execute(f"update {TABLE} set title = 'renamed'")
         finally:
             connection.execute("reset role")
-        assert connection.execute(f"select count(*) as n from {TABLE}").fetchone()["n"] == 8
+        assert connection.execute(f"select count(*) as n from {TABLE}").fetchone()["n"] == PINNED
     finally:
         connection.execute(sql.SQL("drop owned by {}").format(sql.Identifier(role)))
         connection.execute(sql.SQL("drop role if exists {}").format(sql.Identifier(role)))
@@ -347,7 +363,7 @@ def test_a_pinned_row_never_changes_or_disappears_even_for_the_owner(connection)
         connection.execute(f"update {TABLE} set content_sha256 = %s", ("f" * 64,))
     with pytest.raises(psycopg.errors.IntegrityConstraintViolation, match="pinned"):
         connection.execute(f"delete from {TABLE} where set_id = 'cc0.kerb-stone'")
-    assert connection.execute(f"select count(*) as n from {TABLE}").fetchone()["n"] == 8
+    assert connection.execute(f"select count(*) as n from {TABLE}").fetchone()["n"] == PINNED
 
 
 def test_the_owner_can_pin_a_new_version_as_a_later_migration_would(connection):
@@ -357,7 +373,7 @@ def test_the_owner_can_pin_a_new_version_as_a_later_migration_would(connection):
             f"select version from {TABLE} where set_id = 'cc0.brick-running-bond' order by version"
         ).fetchall()
         assert [row["version"] for row in versions] == [1, 99]
-    assert connection.execute(f"select count(*) as n from {TABLE}").fetchone()["n"] == 8
+    assert connection.execute(f"select count(*) as n from {TABLE}").fetchone()["n"] == PINNED
 
 
 def test_provisioning_before_0065_leaves_the_catalog_read_only_once_it_exists(monkeypatch):

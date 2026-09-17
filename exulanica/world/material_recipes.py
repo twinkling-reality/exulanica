@@ -51,6 +51,7 @@ from exulanica.errors import (
 )
 from exulanica.evidence.blob import BlobId
 from exulanica.materials import (
+    MAKER_PROFILE,
     MaterialCatalog,
     MaterialObjectError,
     canonical_bytes,
@@ -369,6 +370,16 @@ class MaterialRepository:
         published = None if identity is None else self.catalog.makers.get(identity)
         if pinned is None or published is None or published.sha256 != pinned:
             raise InvalidRecipe(["recipe names a published maker id and version"])
+        if published.manifest["profile"] != MAKER_PROFILE:
+            # The bake worker checks and stores v1 containers only, so a maker that states its
+            # material class is refused by name here rather than failing inside a bake.
+            raise InvalidRecipe(
+                [
+                    f"{published.maker_id} makes {published.manifest['material_class']} sets in "
+                    "the v2 container, and a workspace bake makes only v1 opaque sets in this "
+                    "version"
+                ]
+            )
         problems = list(recipe_problems(recipe, published.manifest))
         if based_on is not None:
             source = self.catalog.sets.get(based_on[0])

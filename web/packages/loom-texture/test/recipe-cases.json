@@ -14,6 +14,36 @@
       "problems": []
     },
     {
+      "name": "every published recipe is valid: glazing, a maker of class glazing",
+      "set": "cc0.float-glazing",
+      "changes": [],
+      "problems": []
+    },
+    {
+      "name": "every published recipe is valid: foliage, a maker of class cutout",
+      "set": "cc0.broadleaf-foliage",
+      "changes": [],
+      "problems": []
+    },
+    {
+      "name": "every published recipe is valid: bark, a v2 maker of class opaque",
+      "set": "cc0.tree-bark",
+      "changes": [],
+      "problems": []
+    },
+    {
+      "name": "a glazing recipe without its film roughness",
+      "set": "cc0.float-glazing",
+      "changes": [{"path": ["parameters", "film_roughness_permille"], "remove": true}],
+      "problems": ["parameters: film_roughness_permille is missing; a recipe states every control"]
+    },
+    {
+      "name": "a foliage leaf longer than four leaf positions",
+      "set": "cc0.broadleaf-foliage",
+      "changes": [{"path": ["parameters", "leaf_length_mm"], "value": 400}],
+      "problems": ["a leaf is at most four leaf positions long across the tile, so a texel need look at no farther leaves", "a leaf is at most four leaf positions long down the tile, so a texel need look at no farther leaves"]
+    },
+    {
       "name": "a recipe is an object",
       "set": "cc0.brick-running-bond",
       "changes": [{"path": [], "value": [1, 2, 3]}],

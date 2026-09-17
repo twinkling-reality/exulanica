@@ -1,14 +1,14 @@
 # Texture package
 
-Status: IMPLEMENTED for eight baked texture sets, their container, the manifest, migration 0065, the
-backend resolver, and the recipes, makers and object store the sets are baked from; and, in
-migration 0066, for a workspace's own recipes and bakes, their erasure, their routes and the bake
-worker (section 14). Material classes, the v2 container and the v2 manifest are IMPLEMENTED in the
-readers and the bake (section 16), and nothing is published in them yet: the three makers written
-for glass, foliage and bark are drafts, and no migration pins a v2 set. The appearance of these sets
-in the rendered product is UNVERIFIED: no renderer draws them yet, and that check belongs to the
-corridor lane, against the gate lane's Flatiron baseline. No bake worker runs in any deployment, and
-no model has been trained.
+Status: IMPLEMENTED for eleven baked texture sets, their containers, the manifest, migrations 0065
+and 0076, the backend resolver, and the recipes, makers and object store the sets are baked from;
+and, in migration 0066, for a workspace's own recipes and bakes, their erasure, their routes and the
+bake worker (section 14). Eight sets are the first, opaque v1 containers; glazing, foliage and bark
+are the first sets that state a material class (section 16), pinned with every set's class by 0076.
+The appearance of these sets in the rendered product is UNVERIFIED: no renderer draws the glazing or
+cutout class yet, and the eye-level checks belong to the tile runtime's bench and to the corridor
+lane, against the gate lane's Flatiron baseline. Publishing a set is not a verdict on its look. No
+bake worker runs in any deployment, and no model has been trained.
 
 The plan names what shipped and what this package replaces, and both sentences are quoted
 verbatim:
@@ -27,19 +27,23 @@ The implementation is `web/packages/loom-texture` (the makers and the offline ba
 
 ## 1. The sets
 
-Eight sets, named by the surface a street draws. Deciding which building gets which surface is the
-grammar's material stage, so no set is named after an era, a typology or a height class.
+Eleven sets, named by the surface a street draws. Deciding which building gets which surface is the
+grammar's material stage, so no set is named after an era, a typology or a height class. The eight
+first sets are v1 containers, which are opaque; the last three state their class (section 16).
 
-| Set | Version | Surface | Texels | Extent (mm) | Height range (mm) | Seed | content_sha256 |
-| --- | --- | --- | --- | --- | --- | --- | --- |
-| `cc0.brick-running-bond` | 1 | vertical | 1024 x 1024 | 1800 x 1800 | 12 | 2026091601 | `91791b17a705e45919e38aa42f2dacba961f01c51675efa443bf4a1934650499` |
-| `cc0.carriageway-asphalt` | 1 | horizontal | 1024 x 1024 | 2000 x 2000 | 6 | 2026091606 | `3ed5d23aa14dac2f373cc834c6e98dacf6abcc9b2a484580db6e169b1e280a78` |
-| `cc0.cast-concrete` | 1 | vertical | 1024 x 1024 | 2400 x 2400 | 12 | 2026091604 | `e2903a77e5841cd5b97d788fb503e8d2faf3fdd09b5eb62ab062e1ded6223c43` |
-| `cc0.footway-paving` | 1 | horizontal | 1024 x 1024 | 1800 x 1800 | 8 | 2026091607 | `3c0df2400f0eae3e7a7f6440217762f8eb51e7e7f2c4f8e4f2ebe2919e0707ef` |
-| `cc0.kerb-stone` | 1 | horizontal | 1024 x 256 | 1800 x 450 | 6 | 2026091608 | `495906d226fb50f827afa0f9b55e386be65adb53e4c2e1fac8a92188f9355bb3` |
-| `cc0.limestone-ashlar` | 1 | vertical | 1024 x 1024 | 2400 x 2400 | 8 | 2026091602 | `4d7b009dcf2280b1ecff7febc97da6ee584211983d85e5399fe7dfb78d73b60b` |
-| `cc0.painted-render` | 1 | vertical | 1024 x 1024 | 2000 x 2000 | 4 | 2026091603 | `986e2119f33818d7cacf368a7a70fa22766bc9a1922eea35a46c3590ef43ac6d` |
-| `cc0.storefront-metal` | 1 | vertical | 1024 x 1024 | 1000 x 1000 | 1 | 2026091605 | `7178431b117baaef8b2b6de2416631539237bda296a00bb3305071397fb9b41a` |
+| Set | Version | Class | Surface | Texels | Extent (mm) | Height range (mm) | Seed | content_sha256 |
+| --- | --- | --- | --- | --- | --- | --- | --- | --- |
+| `cc0.brick-running-bond` | 1 | opaque, v1 | vertical | 1024 x 1024 | 1800 x 1800 | 12 | 2026091601 | `91791b17a705e45919e38aa42f2dacba961f01c51675efa443bf4a1934650499` |
+| `cc0.carriageway-asphalt` | 1 | opaque, v1 | horizontal | 1024 x 1024 | 2000 x 2000 | 6 | 2026091606 | `3ed5d23aa14dac2f373cc834c6e98dacf6abcc9b2a484580db6e169b1e280a78` |
+| `cc0.cast-concrete` | 1 | opaque, v1 | vertical | 1024 x 1024 | 2400 x 2400 | 12 | 2026091604 | `e2903a77e5841cd5b97d788fb503e8d2faf3fdd09b5eb62ab062e1ded6223c43` |
+| `cc0.footway-paving` | 1 | opaque, v1 | horizontal | 1024 x 1024 | 1800 x 1800 | 8 | 2026091607 | `3c0df2400f0eae3e7a7f6440217762f8eb51e7e7f2c4f8e4f2ebe2919e0707ef` |
+| `cc0.kerb-stone` | 1 | opaque, v1 | horizontal | 1024 x 256 | 1800 x 450 | 6 | 2026091608 | `495906d226fb50f827afa0f9b55e386be65adb53e4c2e1fac8a92188f9355bb3` |
+| `cc0.limestone-ashlar` | 1 | opaque, v1 | vertical | 1024 x 1024 | 2400 x 2400 | 8 | 2026091602 | `4d7b009dcf2280b1ecff7febc97da6ee584211983d85e5399fe7dfb78d73b60b` |
+| `cc0.painted-render` | 1 | opaque, v1 | vertical | 1024 x 1024 | 2000 x 2000 | 4 | 2026091603 | `986e2119f33818d7cacf368a7a70fa22766bc9a1922eea35a46c3590ef43ac6d` |
+| `cc0.storefront-metal` | 1 | opaque, v1 | vertical | 1024 x 1024 | 1000 x 1000 | 1 | 2026091605 | `7178431b117baaef8b2b6de2416631539237bda296a00bb3305071397fb9b41a` |
+| `cc0.float-glazing` | 1 | glazing, v2 | vertical | 1024 x 1024 | 2000 x 2000 | none | 2026091701 | `8f8f6663e238e2e40d9f61a98d434ef4aa8323e33c65447c4201b8ee571a6708` |
+| `cc0.broadleaf-foliage` | 1 | cutout, v2 | vertical | 512 x 512 | 2000 x 2000 | 40 | 2026091702 | `62c58628a7059ea546565a29c1fde6f9b393de3be3fa3ddaaa28d60e7dd4ace2` |
+| `cc0.tree-bark` | 1 | opaque, v2 | vertical | 512 x 512 | 1000 x 1000 | 20 | 2026091703 | `97fe363dbb2bc398b9be7956deb1b272698363f723d91028b04f56f91e9e0c62` |
 
 Every set is CC0-1.0. The dedication is its own blob, referenced by digest
 `d51d213f1f5d94acb27403d616b29007802618979c106b075fdbd399fa86310f`, the way
@@ -72,6 +76,19 @@ mm where a half-module offset is not a whole millimetre):
   and sparse trodden-in gum.
 - **Kerb stone.** Flame-textured grey granite units 900 mm long with 6 mm head joints and no bed
   joint. 1024 x 256 texels over 1800 x 450 mm keeps texels square at 1.76 mm.
+- **Float glazing.** Clear soda-lime float glass, faintly green, mostly clean: about 69 per cent of
+  texels pass all the light their reflection does not. Fine dust gathers in 250 mm patches, rain
+  streaks are narrow and broken, and handling marks are rare. It declares its film (the colour and
+  roughness of the dirt where it covers the glass completely), so a renderer can lay more of the
+  same film by position in a pane, which a tiling set cannot know. 2000 mm keeps a shop pane to
+  about one repeat.
+- **Broadleaf foliage.** The outer leaves of a street tree's canopy: ovate leaves about 110 mm long
+  on a 56 mm jittered lattice, stacked by depth and darkened with it, thinned into 200 mm clumps.
+  Coverage is leaf or gap at each texel, and about 56 per cent of texels are leaf. Large openings in
+  a canopy are left to its geometry.
+- **Tree bark.** Furrowed broadleaf bark: plates about 62 mm across and 500 mm long between narrow
+  furrows up to 12 mm deep that wander and interlace, shallow cracks across the plates, fibrous
+  relief along the trunk and patches of lichen on the plates.
 
 The corridor needs six. Which six is the grammar's decision, so everything below that depends on
 the choice charges the six most expensive sets, which bounds any six the grammar picks.
@@ -432,6 +449,25 @@ INSERT by a role that is not a member of the owner, so a pinned version never na
 new version arrives only in a new migration, and a role handed a write here by mistake is still
 refused. `tests/test_texture_set_migration.py` measures both walls on a provisioned role.
 
+**Migration 0076** states what kind of surface each pinned set is. It creates
+`world_texture_set_class`, keyed by the same `(set_id, version)` with a foreign key to the pin, holding
+`container_profile` and `material_class`, each checked against its closed list, with a check that a
+v1 container is opaque. It does not add columns to `world_texture_set`: filling a new column on the
+eight 0065 rows would mean updating pinned rows, and a pinned row's wall is never lowered, not even
+in a migration. A reader joins the two tables.
+
+- `texture_set_layouts(container_profile, material_class)` is an immutable function returning every
+  channel layout a pinned set of that profile and class may have. `tests/test_texture_set_class_migration.py`
+  holds it to the readers' own table for every pair.
+- The class table's trigger refuses every UPDATE and DELETE, every INSERT by a role that is not a
+  member of the owner, and a class whose layouts do not include the set's pinned channels.
+- A deferred constraint trigger on `world_texture_set` refuses, at commit, a set pinned without its
+  class, so every later migration that pins a set states the set's class in the same transaction.
+  It adds a wall and lowers none.
+- It pins batch 1's three sets as 0065 pinned the eight, inserts the class of all eleven, and makes
+  the class table read-only for the runtime roles. `READ_ONLY_TABLES`, `GLOBAL_TABLES` in
+  `exulanica/orchestration/judge_seed.py` and `_PRESERVED_TABLES` in `tests/conftest.py` name it.
+
 The catalog has no `workspace_id`, no `ws_isolation` policy and no forced row-level security,
 because, like `world_reviewed_asset`, it is a global reviewed registry every workspace reads
 identically and no workspace may own, hide or alter. It therefore does not change the count of
@@ -572,7 +608,9 @@ recipe row holds:
 The repository refuses the recipe unless:
 
 - it is canonical, portable JSON;
-- it names a maker version `PUBLISHED_MAKER_MANIFESTS` pins;
+- it names a maker version `PUBLISHED_MAKER_MANIFESTS` pins, and one that makes v1 opaque sets. A
+  maker that states its material class is refused by name, because the bake worker checks and
+  stores v1 containers only;
 - `recipe_problems` finds nothing wrong with it against that manifest. This is the check the
   baker makes and the published library passes.
 
@@ -971,8 +1009,24 @@ The package writes each draft maker's manifest as canonical JSON under `test/dra
 those files to its makers byte for byte, and `tests/test_texture_drafts.py` runs the backend's
 manifest and recipe checks over them and over every entry in `library-drafts/`.
 
-The drafts today are `loom.glazing` (`cc0.float-glazing`), `loom.foliage`
-(`cc0.broadleaf-foliage`) and `loom.bark` (`cc0.tree-bark`).
+`loom.glazing`, `loom.foliage` and `loom.bark` were drafts until batch 1 published them with
+migration 0076. Between batches there may be no draft at all.
+
+### Publishing a set of a class
+
+A set of a class is published as the eight were (section 11), with three differences:
+
+- its container is baked by the class's maps into `exulanica.texture-set/v2`, and its bake receipt
+  names the pipeline `exulanica.texture-bake/v2`. A v1 maker's sets keep `exulanica.texture-bake/v1`,
+  and the catalog loader refuses any other pairing;
+- its manifest entry states `container_profile` and `material_class`, and its pin states both in
+  `world_texture_set_class`, in the same migration;
+- the loader holds its header to its maker's class as well as its recipe: a relief class states its
+  height range and cavity, glazing states neither, and a glazing header's declared film must be its
+  recipe's `film_colour` and `film_roughness_permille`.
+
+A decoded budget charges a set for the maps it stores, as RGBA8 with mips: four for a v1 set, height
+included, and its class's maps for any other.
 
 ### Known looks risks, and the levers for them
 

@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import { CATALOG } from '../src/catalog.js';
-import { decodeContainer } from '../src/container.js';
+import { SET_PROFILE_V1 } from '../src/classes.js';
+import { readContainer } from '../src/container.js';
 import type { TextureSetDefinition } from '../src/definition.js';
 import { floorMod } from '../src/integer.js';
-import { type Fields, bakeMaps, sampleFields } from '../src/maps.js';
+import { type Fields, bakeClassMaps, bakeMaps, sampleFields } from '../src/maps.js';
 import {
   FIELD_NAMES,
   continuous,
@@ -44,6 +45,24 @@ function checkConstruction(def: TextureSetDefinition): void {
   const width = def.width / SCALE;
   const height = def.height / SCALE;
   const base = sampleFields(def, { width, height });
+  if (def.containerProfile !== SET_PROFILE_V1) {
+    // A set of a material class: its class's maps, each rolled with the window.
+    const maps = bakeClassMaps(def, { width, height });
+    for (const [du, dv] of SHIFTS) {
+      const shifted = sampleFields(def, { width, height, offsetU: du, offsetV: dv });
+      expect(rollMismatches(width, height, fieldPlanes(base, shifted), du, dv)).toEqual(
+        Object.fromEntries(FIELD_NAMES.map((name) => [name, 0])),
+      );
+      const moved = bakeClassMaps(def, { width, height, offsetU: du, offsetV: dv });
+      const planes = Object.fromEntries(maps.map((map, index) => [
+        map.descriptor.name,
+        [map.bytes, moved[index]!.bytes, map.descriptor.components] as const,
+      ]));
+      expect(rollMismatches(width, height, planes, du, dv), `${def.setId} maps shifted by (${du}, ${dv})`)
+        .toEqual(Object.fromEntries(maps.map((map) => [map.descriptor.name, 0])));
+    }
+    return;
+  }
   const maps = bakeMaps(def, { width, height });
   for (const [du, dv] of SHIFTS) {
     const shifted = sampleFields(def, { width, height, offsetU: du, offsetV: dv });
@@ -108,10 +127,17 @@ describe('the pinned bytes are continuous across both wrap edges', () => {
     expect(manifest.sets.length).toBeGreaterThanOrEqual(6);
     const failures: string[] = [];
     for (const entry of manifest.sets) {
-      const { header, maps } = decodeContainer(readPublished(`blobs/${entry.content_sha256}.ltex`));
-      const reports = seamReports(header.resolution.width, header.resolution.height, maps);
-      // Four maps: 3 + 3 + 3 + 1 channels, each across two edges.
-      expect(reports).toHaveLength(20);
+      const read = readContainer(readPublished(`blobs/${entry.content_sha256}.ltex`));
+      const resolution = read.header.resolution as { width: number; height: number };
+      const reports = seamReports(
+        resolution.width,
+        resolution.height,
+        Object.fromEntries(read.maps),
+        read.layout,
+      );
+      // Every channel of every map the set stores, each across two edges: 3 + 3 + 3 + 1 for a v1
+      // set, and its class's channels for any other.
+      expect(reports).toHaveLength(2 * read.layout.reduce((sum, map) => sum + map.components, 0));
       for (const report of reports.filter((r) => !continuous(r))) {
         failures.push(`${entry.set_id} ${report.map}[${report.channel}] ${report.axis}: ${report.seam}`);
       }

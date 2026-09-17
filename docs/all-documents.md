@@ -63,7 +63,7 @@ How the system works now. Edited as the system changes.
 - [security-floor](security-floor.md) : - Status: mixed, labelled per claim. See README.md(README.md) for the status convention
 - [spatial-world-authority](spatial-world-authority.md) : IMPLEMENTED for canonical structural snapshots, reviewed preview/apply, protected-base
 - [synthetic-society-contract](synthetic-society-contract.md) : BOUNDED DETERMINISTIC SIMULATION; NOT A LEARNED SOCIETY MODEL
-- [texture-package](texture-package.md) : IMPLEMENTED for eight baked texture sets, their container, the manifest, migration 0065, the
+- [texture-package](texture-package.md) : IMPLEMENTED for eleven baked texture sets, their containers, the manifest, migrations 0065
 - [traffic-contract](traffic-contract.md) : V1 IMPLEMENTED ON CITY V2 ROAD RECORDS; NOT YET RUN BY ANY RUNTIME, STORED OR DRAWN
 - [visual-gate-rubric](visual-gate-rubric.md) : version 5, fixed before any street geometry is generated and before any corridor is scored. Changing it needs a new reconciliation record...
 - [world-composition-contract](world-composition-contract.md) : DECISION for product and architecture direction; PARTIAL implementation

@@ -94,6 +94,8 @@ describe('a bake request', () => {
     ['another text', (c) => { c.licence = { id: WORKSPACE_LICENCE_ID, sha256: '0'.repeat(64) }; }, 'licence'],
     ['another manifest', (c) => { c.maker_sha256 = '0'.repeat(64); }, 'not the manifest'],
     ['an unknown maker', (c) => { (c.recipe as { maker: object }).maker = { id: 'loom.none', version: 1 }; }, 'maker id and version'],
+    // A published maker that states its class bakes a v2 container, which no workspace bake makes yet.
+    ['a maker of a material class', (c) => { (c.recipe as { maker: object }).maker = { id: 'loom.glazing', version: 1 }; }, 'loom.glazing makes glazing sets in the v2 container'],
     ['a recipe the maker refuses', (c) => { (c.recipe as Recipe as { parameters: Record<string, unknown> }).parameters.courses = 25; }, 'recipe: '],
   ];
   for (const [name, change, message] of broken) {
@@ -132,7 +134,7 @@ describe('the publishing paths', () => {
     ) as Record<string, unknown>;
     expect(planProblems(plan)).toEqual([]);
     expect(planProblems({ ...plan, sets: [SET_ID] })).toContain(
-      'sets are distinct published set ids, at least one',
+      'sets are distinct published v1 set ids, at least one',
     );
   });
 });

@@ -31,6 +31,7 @@ from exulanica.errors import CanonicalisationError, ExulanicaError
 
 __all__ = [
     "BAKE_PIPELINE",
+    "BAKE_PIPELINE_V2",
     "BAKE_RECEIPT_PROFILE",
     "CATALOG_PROFILE",
     "LIBRARY_ENTRY_PROFILE",
@@ -63,6 +64,9 @@ BAKE_RECEIPT_PROFILE: Final = "exulanica.texture-bake-receipt/v1"
 CATALOG_PROFILE: Final = "exulanica.texture-catalog/v1"
 #: The bake itself: sampling, the normal and cavity derivations, quantisation and the container.
 BAKE_PIPELINE: Final = "exulanica.texture-bake/v1"
+#: The bake of a set that states its material class, into its class's maps and the v2 container.
+#: A v1 maker's sets stay on :data:`BAKE_PIPELINE`, whose bytes this one does not change.
+BAKE_PIPELINE_V2: Final = "exulanica.texture-bake/v2"
 #: The largest integer an IEEE double holds exactly, which is the largest the baker can write.
 SAFE_INTEGER: Final = 9_007_199_254_740_991
 

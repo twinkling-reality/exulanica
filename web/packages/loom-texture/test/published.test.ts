@@ -3,12 +3,13 @@ import { join, relative } from 'node:path';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { canonicalJson } from '../src/canonical-json.js';
 import { LIBRARY } from '../src/catalog.js';
-import { decodeContainer } from '../src/container.js';
+import { readContainer } from '../src/container.js';
 import { LIBRARY_FOLDER, formatLibrarySource, packageRoot } from '../src/library.js';
 import { LICENCE_TEXT } from '../src/licence.js';
 import { MAKERS } from '../src/makers/index.js';
 import {
   BAKE_PIPELINE,
+  BAKE_PIPELINE_V2,
   BAKE_RECEIPT_PROFILE,
   type BakeReceipt,
   CATALOG_FILE,
@@ -44,6 +45,21 @@ import { PUBLISHED, REPOSITORY, readPublished } from './support.js';
  * here; a rebake that changed bytes without bumping a version fails in
  * `tests/test_texture_set_migration.py`, against the pins.
  */
+/** The header fields these checks read, which every profile shares. */
+interface DecodedHeader {
+  set_id: string;
+  version: number;
+  title: string;
+  summary: string;
+  seed: number;
+  family: string;
+  resolution: unknown;
+  extent_mm: unknown;
+  licence: unknown;
+  height_range_mm?: number;
+  maps: { name: string; components: number; holds: string[]; srgb: boolean }[];
+}
+
 let publication: Publication;
 let manifest: { profile: string; sets: ManifestEntry[] };
 
@@ -84,15 +100,16 @@ describe('the published directory', () => {
     expect(ids).toEqual([...ids].sort());
     expect(new Set(ids).size).toBe(ids.length);
     expect(ids.length).toBeGreaterThanOrEqual(6);
-    expect(ids.length).toBeLessThanOrEqual(10);
     for (const entry of manifest.sets) {
       expect(Object.keys(entry).sort()).toEqual([
         'byte_size',
         'channels',
+        'container_profile',
         'content_sha256',
         'extent_mm',
         'licence_id',
         'licence_sha256',
+        'material_class',
         'resolution',
         'set_id',
         'version',
@@ -110,7 +127,10 @@ describe('the published directory', () => {
       const bytes = readPublished(`${BLOB_DIRECTORY}/${entry.content_sha256}.ltex`);
       expect(sha256Hex(bytes), entry.set_id).toBe(entry.content_sha256);
       expect(bytes.length).toBe(entry.byte_size);
-      const { header } = decodeContainer(bytes);
+      const read = readContainer(bytes);
+      const header = read.header as unknown as DecodedHeader;
+      expect(read.profile).toBe(entry.container_profile);
+      expect(read.materialClass).toBe(entry.material_class);
       expect(header.set_id).toBe(entry.set_id);
       expect(header.version).toBe(entry.version);
       expect(header.resolution).toEqual(entry.resolution);
@@ -171,7 +191,8 @@ describe('the catalog accounts for every set', () => {
       const receipt = readObject<BakeReceipt>(row.receipt_sha256);
       expect(receipt).toEqual({
         profile: BAKE_RECEIPT_PROFILE,
-        pipeline: BAKE_PIPELINE,
+        // A v1 container is baked by the v1 pipeline, and a set of a material class by the v2 one.
+        pipeline: listed.container_profile === 'exulanica.texture-set/v1' ? BAKE_PIPELINE : BAKE_PIPELINE_V2,
         maker_sha256: receipt.maker_sha256,
         entry_sha256: receipt.entry_sha256,
         recipe_sha256: receipt.recipe_sha256,
@@ -192,7 +213,8 @@ describe('the catalog accounts for every set', () => {
       ]);
       expect(recipeProblems(recipe, maker), row.set_id).toEqual([]);
       // And the container says what its entry and recipe say.
-      const { header } = decodeContainer(readPublished(`${BLOB_DIRECTORY}/${row.content_sha256}.ltex`));
+      const header = readContainer(readPublished(`${BLOB_DIRECTORY}/${row.content_sha256}.ltex`))
+        .header as unknown as DecodedHeader;
       expect(header.title).toBe(entry.title);
       expect(header.summary).toBe(entry.summary);
       expect(header.seed).toBe(recipe.seed);

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { canonicalBytes, canonicalJson } from '../src/canonical-json.js';
 import { CATALOG } from '../src/catalog.js';
+import { SET_PROFILE_V1, SET_PROFILE_V2, classLayout } from '../src/classes.js';
 import {
   CONTAINER_MAGIC,
   MAP_LAYOUT,
@@ -8,10 +9,12 @@ import {
   TRUTH,
   decodeContainer,
   encodeContainer,
+  encodeContainerV2,
+  readContainer,
 } from '../src/container.js';
 import type { TextureSetDefinition } from '../src/definition.js';
 import { LICENCE_ID } from '../src/licence.js';
-import { bakeMaps } from '../src/maps.js';
+import { bakeClassMaps, bakeMaps } from '../src/maps.js';
 
 const LICENCE = 'b'.repeat(64);
 const tiny = (def: TextureSetDefinition): TextureSetDefinition => ({
@@ -30,8 +33,36 @@ function everyNumber(value: unknown, path: string, out: string[]): void {
   }
 }
 
+describe('a published set of material class', () => {
+  for (const def of CATALOG.filter((candidate) => candidate.containerProfile === SET_PROFILE_V2)) {
+    it(`${def.setId} round-trips as its class's container and states everything it holds`, () => {
+      const small = tiny(def);
+      const bytes = encodeContainerV2(small, bakeClassMaps(small), LICENCE);
+      expect(new TextDecoder().decode(bytes.subarray(0, 4))).toBe(CONTAINER_MAGIC);
+      const read = readContainer(bytes);
+      expect(read.profile).toBe(SET_PROFILE_V2);
+      expect(read.materialClass).toBe(def.materialClass);
+      expect(read.makerKind).toBe('procedural');
+      expect(read.header.set_id).toBe(def.setId);
+      expect(read.header.version).toBe(def.version);
+      expect(read.header.seed).toBe(def.seed);
+      expect(read.header.truth).toBe(TRUTH);
+      expect(read.header.licence).toEqual({ id: LICENCE_ID, sha256: LICENCE });
+      expect(read.header.extent_mm).toEqual({ u: def.extentU, v: def.extentV });
+      // A class whose bake has a height field states its range; glazing states none.
+      expect(read.header.height_range_mm).toBe(def.heightRangeMm ?? undefined);
+      const floats: string[] = [];
+      everyNumber(read.header, '$', floats);
+      expect(floats).toEqual([]);
+      expect(read.layout.map((map) => map.name)).toEqual(
+        classLayout(def.materialClass, 'procedural').map((map) => map.name),
+      );
+    });
+  }
+});
+
 describe('the container', () => {
-  for (const def of CATALOG) {
+  for (const def of CATALOG.filter((candidate) => candidate.containerProfile === SET_PROFILE_V1)) {
     it(`${def.setId} round-trips and states everything it holds`, () => {
       const small = tiny(def);
       const maps = bakeMaps(small);
