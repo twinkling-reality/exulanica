@@ -90,6 +90,8 @@ _CITY_VALUES = {
     "block_length_mm": 60_000,
     "block_depth_mm": 40_000,
     "gutter_width_mm": 300,
+    "front_setback_mm": 0,
+    "memory_precinct_lots": 1,
 }
 _CITY_BINDINGS = (CascadeBinding.of("city", _CITY_VALUES),)
 #: What generating each registered grammar needs besides a seed and a subject.
@@ -281,7 +283,7 @@ seed, identity, builder_path = sys.argv[1], sys.argv[2], sys.argv[3]
 bindings = {"box": (), "city": (CascadeBinding.of("city", {
     "driving_side": "right", "city_extent_x_mm": 256000, "city_extent_y_mm": 128000,
     "terrain_relief_mm": 0, "block_length_mm": 60000, "block_depth_mm": 40000,
-    "gutter_width_mm": 300,
+    "gutter_width_mm": 300, "front_setback_mm": 0, "memory_precinct_lots": 1,
 }),)}
 spec = importlib.util.spec_from_file_location("city_v2_fixture_builder", builder_path)
 fixture = importlib.util.module_from_spec(spec)

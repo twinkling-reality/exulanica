@@ -42,6 +42,8 @@ from exulanica.grammar.grammars.city import (
 )
 from exulanica.grammar.grammars.city.descriptor import CITY_DESCRIPTOR_PATH
 from exulanica.grammar.grammars.city.generation import districts as districts_generator
+from exulanica.grammar.grammars.city.generation import massing as massing_generator
+from exulanica.grammar.grammars.city.generation import parcels as parcels_generator
 from exulanica.grammar.grammars.city.generation import streets as streets_generator
 from exulanica.grammar.grammars.city.generation import terrain as terrain_generator
 from exulanica.grammar.shapes import RecordShape
@@ -52,8 +54,8 @@ CITY_STAGES: Final = (
     terrain_generator.STAGE,
     districts_generator.STAGE,
     streets_generator.STAGE,
-    parcels.STAGE,
-    massing.STAGE,
+    parcels_generator.STAGE,
+    massing_generator.STAGE,
     facade.STAGE,
     material.STAGE,
     streetlife.STAGE,
