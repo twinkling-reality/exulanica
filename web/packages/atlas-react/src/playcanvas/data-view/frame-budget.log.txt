@@ -1,0 +1,740 @@
+DATA VIEW FRAME BUDGET, measured 2026-09-16 (local time; records below carry UTC).
+
+What: the owned district in the app's no-token preview (?preview=1), slider at the points end,
+every subject's points prepared, over two views: street (the arrival, walking height) and
+overview (camera held 520 m back and 330 m up with the whole district in view; the binding's
+per-frame update was replaced by a no-op for that view only, to hold the camera).
+How: web/packages/atlas-react/test/gpu/measure-frame-budget.mjs, headless Chrome over CDP,
+viewport 1440x900 at device scale 1. For each budget the page's representation registry is
+rebuilt with that budget. 'interval' is the gap between requestAnimationFrame callbacks with
+every frame drawn (the Melbourne envelope metric), after a 2 s warm-up. A 60 Hz display
+presents every 16.67 ms, which the page clock reads as 16.7 or 16.8; a missed presentation
+reads as 33 ms or more. 'bytes' is CPU plus GPU vertex storage of the data view draws.
+Machine: Apple M3 Pro, 12 cores, 18 GB, AC power. Browser: Chrome/152.0.7977.84. Renderer: ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version).
+The machine was shared with other lanes throughout: load averages 24 to 118 during these runs.
+Columns: view, budget, per-subject cap, points drawn, interval percentiles in ms, frames, frames
+read above 16.7 ms, missed presentations, preparation time, bytes, draw calls.
+
+1. Before distance thinning (density 1 per m2, demand 2,341,998 points), UTC 2026-09-17T02:00:09.881Z:
+  street       65,536    65,536    60,600  p50  16.7  p95  16.7  p99  16.8  max  16.8  frames 301  >16.7  94              prepared   30 ms      2.3 MiB  draws 52
+  street    1,048,576 1,048,576   969,667  p50  16.7  p95  16.7  p99  16.8  max  16.8  frames 301  >16.7 134              prepared  120 ms     37.0 MiB  draws 52
+  street    4,194,304 4,194,304 2,341,998  p50  16.7  p95  16.8  p99  16.8  max  16.8  frames 301  >16.7 155              prepared  205 ms     89.3 MiB  draws 52
+  street    8,388,608 4,194,304 2,341,998  p50  16.7  p95  16.7  p99  16.8  max  16.8  frames 301  >16.7 146              prepared  327 ms     89.3 MiB  draws 52
+  overview     65,536    65,536    60,600  p50  16.7  p95  16.7  p99  16.8  max  83.4  frames 293  >16.7  90              prepared   12 ms      2.3 MiB  draws 84
+  overview  1,048,576 1,048,576   969,667  p50  16.7  p95  33.4  p99  33.4  max  66.6  frames 262  >16.7  98              prepared   95 ms     37.0 MiB  draws 84
+  overview  4,194,304 4,194,304 2,341,998  p50    50  p95  66.7  p99   100  max 116.6  frames  96  >16.7  96              prepared 3310 ms     89.3 MiB  draws 84
+  overview  8,388,608 4,194,304 2,341,998  p50    50  p95  66.6  p99  66.7  max  66.7  frames 101  >16.7 101              prepared 7149 ms     89.3 MiB  draws 84
+   The overview fell to 33.4 ms p95 at 969,667 points and 66.7 ms at 2,341,998. Every far point was a
+   1.5 px additive sprite, so the whole district's points overdrew. This decided the thinning: beyond
+   160 m a stable subset is drawn, falling with the square of distance (style points.thinning).
+
+2. The sweep, with thinning, density 4 per m2 (demand 9.4 million), constants raised temporarily to
+   8,388,608 and 4,194,304 so the larger budgets could be tried, UTC 2026-09-17T02:16:21.792Z:
+  street      262,144   262,144   256,912  p50  16.7  p95  16.7  p99  16.8  max  33.4  frames 480  >16.7 170              prepared   65 ms      9.8 MiB  draws 52
+  street    1,048,576 1,048,576 1,027,664  p50  16.7  p95  16.8  p99  16.8  max  16.8  frames 481  >16.7 241              prepared   90 ms     39.2 MiB  draws 52
+  street    2,097,152 2,097,152 2,055,334  p50  16.7  p95  16.8  p99  16.8  max  16.8  frames 481  >16.7 199              prepared  153 ms     78.4 MiB  draws 52
+  street    4,194,304 4,194,304 4,110,676  p50  16.7  p95  16.8  p99  16.8  max  16.8  frames 481  >16.7 138              prepared  330 ms    156.8 MiB  draws 52
+  street    8,388,608 4,194,304 8,221,358  p50  16.7  p95  16.7  p99  16.8  max  16.8  frames 481  >16.7 136              prepared  841 ms    313.6 MiB  draws 52
+  overview    262,144   262,144   256,912  p50  16.7  p95  16.7  p99  16.8  max  16.8  frames 481  >16.7 118              prepared   24 ms      9.8 MiB  draws 84
+  overview  1,048,576 1,048,576 1,027,664  p50  16.7  p95  16.8  p99  16.8  max  16.8  frames 481  >16.7  81              prepared   80 ms     39.2 MiB  draws 84
+  overview  2,097,152 2,097,152 2,055,334  p50  16.7  p95  16.7  p99  16.8  max  16.8  frames 481  >16.7  84              prepared  143 ms     78.4 MiB  draws 84
+  overview  4,194,304 4,194,304 4,110,676  p50  16.7  p95  16.7  p99  16.8  max  16.8  frames 481  >16.7  73              prepared  319 ms    156.8 MiB  draws 84
+  overview  8,388,608 4,194,304 8,221,358  p50    50  p95  66.7  p99  66.7  max  83.4  frames 154  >16.7 154              prepared  975 ms    313.6 MiB  draws 84
+   4,110,676 points held a p95 of 16.7 to 16.8 ms in both views, with no interval above 16.8 ms, that
+   is, no missed presentation. 8,221,358 held that at street level and fell to 66.7 ms p95 in the
+   overview, every frame late.
+
+3. Decision: REPRESENTATION_POINT_BUDGET = 4,194,304, REPRESENTATION_POINTS_PER_SUBJECT = 2,097,152,
+   density 4 per m2. Confirmed at those constants, with the old 65,536 budget beside it, UTC 2026-09-17T02:18:38.272Z:
+  street       65,536    65,536    64,225  p50  16.7  p95  16.7  p99  16.8  max  16.8  frames 601  >16.7 205  missed 0    prepared   45 ms      2.4 MiB  draws 52
+  street    4,194,304 2,097,152 4,110,676  p50  16.7  p95  16.7  p99  16.8  max  16.8  frames 601  >16.7 286  missed 0    prepared  335 ms    156.8 MiB  draws 52
+  overview     65,536    65,536    64,225  p50  16.7  p95  16.7  p99  16.8  max  16.8  frames 601  >16.7 191  missed 0    prepared   14 ms      2.4 MiB  draws 84
+  overview  4,194,304 2,097,152 4,110,676  p50  16.7  p95  16.8  p99  16.8  max  16.8  frames 601  >16.7 175  missed 0    prepared  351 ms    156.8 MiB  draws 84
+   No missed presentation in 601 frames at either budget, in either view.
+
+Not measured here: WebGPU (the look is WebGL2-only; see data-view/README.md), a weak machine,
+a ten-minute leak run, and the first slide's preparation hitch per frame (the totals above are
+synchronous; in the product the preparation is spread at 262,144 points per update).
+
+Raw records:
+--- pass 1
+{
+ "browser": "Chrome/152.0.7977.84",
+ "canvas": [
+  1440,
+  900
+ ],
+ "measuredAt": "2026-09-17T02:00:09.881Z",
+ "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)",
+ "runs": [
+  {
+   "allocatedBytes": 2424000,
+   "allocatedPoints": 60600,
+   "budget": 65536,
+   "cost": {
+    "frames": 120,
+    "max": 3.4,
+    "over16_7": 0,
+    "p50": 1.2,
+    "p95": 2.2,
+    "p99": 3.3
+   },
+   "drawCalls": 52,
+   "heapMB": 143,
+   "heldCamera": false,
+   "interval": {
+    "frames": 301,
+    "max": 16.8,
+    "over16_7": 94,
+    "p50": 16.7,
+    "p95": 16.7,
+    "p99": 16.8
+   },
+   "perSubject": 65536,
+   "prepareMs": 30,
+   "subjectsWithPoints": 13,
+   "view": "street"
+  },
+  {
+   "allocatedBytes": 38786680,
+   "allocatedPoints": 969667,
+   "budget": 1048576,
+   "cost": {
+    "frames": 120,
+    "max": 2.5,
+    "over16_7": 0,
+    "p50": 1,
+    "p95": 1.8,
+    "p99": 2.4
+   },
+   "drawCalls": 52,
+   "heapMB": 102,
+   "heldCamera": false,
+   "interval": {
+    "frames": 301,
+    "max": 16.8,
+    "over16_7": 134,
+    "p50": 16.7,
+    "p95": 16.7,
+    "p99": 16.8
+   },
+   "perSubject": 1048576,
+   "prepareMs": 120,
+   "subjectsWithPoints": 13,
+   "view": "street"
+  },
+  {
+   "allocatedBytes": 93679920,
+   "allocatedPoints": 2341998,
+   "budget": 4194304,
+   "cost": {
+    "frames": 120,
+    "max": 2.4,
+    "over16_7": 0,
+    "p50": 1,
+    "p95": 2.2,
+    "p99": 2.4
+   },
+   "drawCalls": 52,
+   "heapMB": 181,
+   "heldCamera": false,
+   "interval": {
+    "frames": 301,
+    "max": 16.8,
+    "over16_7": 155,
+    "p50": 16.7,
+    "p95": 16.8,
+    "p99": 16.8
+   },
+   "perSubject": 4194304,
+   "prepareMs": 205,
+   "subjectsWithPoints": 13,
+   "view": "street"
+  },
+  {
+   "allocatedBytes": 93679920,
+   "allocatedPoints": 2341998,
+   "budget": 8388608,
+   "cost": {
+    "frames": 120,
+    "max": 3.6,
+    "over16_7": 0,
+    "p50": 1.4,
+    "p95": 3,
+    "p99": 3.6
+   },
+   "drawCalls": 52,
+   "heapMB": 157,
+   "heldCamera": false,
+   "interval": {
+    "frames": 301,
+    "max": 16.8,
+    "over16_7": 146,
+    "p50": 16.7,
+    "p95": 16.7,
+    "p99": 16.8
+   },
+   "perSubject": 4194304,
+   "prepareMs": 327,
+   "subjectsWithPoints": 13,
+   "view": "street"
+  },
+  {
+   "allocatedBytes": 2424000,
+   "allocatedPoints": 60600,
+   "budget": 65536,
+   "cost": {
+    "frames": 120,
+    "max": 11,
+    "over16_7": 0,
+    "p50": 1.5,
+    "p95": 3,
+    "p99": 6
+   },
+   "drawCalls": 84,
+   "heapMB": 165,
+   "heldCamera": true,
+   "interval": {
+    "frames": 293,
+    "max": 83.4,
+    "over16_7": 90,
+    "p50": 16.7,
+    "p95": 16.7,
+    "p99": 16.8
+   },
+   "perSubject": 65536,
+   "prepareMs": 12,
+   "subjectsWithPoints": 13,
+   "view": "overview"
+  },
+  {
+   "allocatedBytes": 38786680,
+   "allocatedPoints": 969667,
+   "budget": 1048576,
+   "cost": {
+    "frames": 120,
+    "max": 3.6,
+    "over16_7": 0,
+    "p50": 1,
+    "p95": 2.2,
+    "p99": 3.1
+   },
+   "drawCalls": 84,
+   "heapMB": 115,
+   "heldCamera": true,
+   "interval": {
+    "frames": 262,
+    "max": 66.6,
+    "over16_7": 98,
+    "p50": 16.7,
+    "p95": 33.4,
+    "p99": 33.4
+   },
+   "perSubject": 1048576,
+   "prepareMs": 95,
+   "subjectsWithPoints": 13,
+   "view": "overview"
+  },
+  {
+   "allocatedBytes": 93679920,
+   "allocatedPoints": 2341998,
+   "budget": 4194304,
+   "cost": {
+    "frames": 120,
+    "max": 1.6,
+    "over16_7": 0,
+    "p50": 0.5,
+    "p95": 0.8,
+    "p99": 1
+   },
+   "drawCalls": 84,
+   "heapMB": 163,
+   "heldCamera": true,
+   "interval": {
+    "frames": 96,
+    "max": 116.6,
+    "over16_7": 96,
+    "p50": 50,
+    "p95": 66.7,
+    "p99": 100
+   },
+   "perSubject": 4194304,
+   "prepareMs": 3310,
+   "subjectsWithPoints": 13,
+   "view": "overview"
+  },
+  {
+   "allocatedBytes": 93679920,
+   "allocatedPoints": 2341998,
+   "budget": 8388608,
+   "cost": {
+    "frames": 120,
+    "max": 1.3,
+    "over16_7": 0,
+    "p50": 0.6,
+    "p95": 0.8,
+    "p99": 1.1
+   },
+   "drawCalls": 84,
+   "heapMB": 169,
+   "heldCamera": true,
+   "interval": {
+    "frames": 101,
+    "max": 66.7,
+    "over16_7": 101,
+    "p50": 50,
+    "p95": 66.6,
+    "p99": 66.7
+   },
+   "perSubject": 4194304,
+   "prepareMs": 7149,
+   "subjectsWithPoints": 13,
+   "view": "overview"
+  }
+ ],
+ "seconds": 5,
+ "subjects": 14,
+ "url": "http://127.0.0.1:5261/?preview=1",
+ "viewport": {
+  "height": 900,
+  "width": 1440
+ }
+}
+--- sweep
+{
+ "browser": "Chrome/152.0.7977.84",
+ "canvas": [
+  1440,
+  900
+ ],
+ "measuredAt": "2026-09-17T02:16:21.792Z",
+ "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)",
+ "runs": [
+  {
+   "allocatedBytes": 10276480,
+   "allocatedPoints": 256912,
+   "budget": 262144,
+   "cost": {
+    "frames": 120,
+    "max": 6.3,
+    "over16_7": 0,
+    "p50": 1.3,
+    "p95": 2.9,
+    "p99": 3.9
+   },
+   "drawCalls": 52,
+   "heapMB": 143,
+   "heldCamera": false,
+   "interval": {
+    "frames": 480,
+    "max": 33.4,
+    "over16_7": 170,
+    "p50": 16.7,
+    "p95": 16.7,
+    "p99": 16.8
+   },
+   "perSubject": 262144,
+   "prepareMs": 65,
+   "subjectsWithPoints": 13,
+   "view": "street"
+  },
+  {
+   "allocatedBytes": 41106560,
+   "allocatedPoints": 1027664,
+   "budget": 1048576,
+   "cost": {
+    "frames": 120,
+    "max": 5,
+    "over16_7": 0,
+    "p50": 1.3,
+    "p95": 2.4,
+    "p99": 3.3
+   },
+   "drawCalls": 52,
+   "heapMB": 113,
+   "heldCamera": false,
+   "interval": {
+    "frames": 481,
+    "max": 16.8,
+    "over16_7": 241,
+    "p50": 16.7,
+    "p95": 16.8,
+    "p99": 16.8
+   },
+   "perSubject": 1048576,
+   "prepareMs": 90,
+   "subjectsWithPoints": 13,
+   "view": "street"
+  },
+  {
+   "allocatedBytes": 82213360,
+   "allocatedPoints": 2055334,
+   "budget": 2097152,
+   "cost": {
+    "frames": 120,
+    "max": 10,
+    "over16_7": 0,
+    "p50": 2.1,
+    "p95": 3.1,
+    "p99": 5.3
+   },
+   "drawCalls": 52,
+   "heapMB": 181,
+   "heldCamera": false,
+   "interval": {
+    "frames": 481,
+    "max": 16.8,
+    "over16_7": 199,
+    "p50": 16.7,
+    "p95": 16.8,
+    "p99": 16.8
+   },
+   "perSubject": 2097152,
+   "prepareMs": 153,
+   "subjectsWithPoints": 13,
+   "view": "street"
+  },
+  {
+   "allocatedBytes": 164427040,
+   "allocatedPoints": 4110676,
+   "budget": 4194304,
+   "cost": {
+    "frames": 120,
+    "max": 9.6,
+    "over16_7": 0,
+    "p50": 1.5,
+    "p95": 3.1,
+    "p99": 3.4
+   },
+   "drawCalls": 52,
+   "heapMB": 183,
+   "heldCamera": false,
+   "interval": {
+    "frames": 481,
+    "max": 16.8,
+    "over16_7": 138,
+    "p50": 16.7,
+    "p95": 16.8,
+    "p99": 16.8
+   },
+   "perSubject": 4194304,
+   "prepareMs": 330,
+   "subjectsWithPoints": 13,
+   "view": "street"
+  },
+  {
+   "allocatedBytes": 328854320,
+   "allocatedPoints": 8221358,
+   "budget": 8388608,
+   "cost": {
+    "frames": 120,
+    "max": 2.8,
+    "over16_7": 0,
+    "p50": 1.1,
+    "p95": 1.7,
+    "p99": 2.4
+   },
+   "drawCalls": 52,
+   "heapMB": 271,
+   "heldCamera": false,
+   "interval": {
+    "frames": 481,
+    "max": 16.8,
+    "over16_7": 136,
+    "p50": 16.7,
+    "p95": 16.7,
+    "p99": 16.8
+   },
+   "perSubject": 4194304,
+   "prepareMs": 841,
+   "subjectsWithPoints": 13,
+   "view": "street"
+  },
+  {
+   "allocatedBytes": 10276480,
+   "allocatedPoints": 256912,
+   "budget": 262144,
+   "cost": {
+    "frames": 120,
+    "max": 2,
+    "over16_7": 0,
+    "p50": 0.9,
+    "p95": 1.4,
+    "p99": 1.7
+   },
+   "drawCalls": 84,
+   "heapMB": 310,
+   "heldCamera": true,
+   "interval": {
+    "frames": 481,
+    "max": 16.8,
+    "over16_7": 118,
+    "p50": 16.7,
+    "p95": 16.7,
+    "p99": 16.8
+   },
+   "perSubject": 262144,
+   "prepareMs": 24,
+   "subjectsWithPoints": 13,
+   "view": "overview"
+  },
+  {
+   "allocatedBytes": 41106560,
+   "allocatedPoints": 1027664,
+   "budget": 1048576,
+   "cost": {
+    "frames": 120,
+    "max": 4,
+    "over16_7": 0,
+    "p50": 1.2,
+    "p95": 2.5,
+    "p99": 3.7
+   },
+   "drawCalls": 84,
+   "heapMB": 349,
+   "heldCamera": true,
+   "interval": {
+    "frames": 481,
+    "max": 16.8,
+    "over16_7": 81,
+    "p50": 16.7,
+    "p95": 16.8,
+    "p99": 16.8
+   },
+   "perSubject": 1048576,
+   "prepareMs": 80,
+   "subjectsWithPoints": 13,
+   "view": "overview"
+  },
+  {
+   "allocatedBytes": 82213360,
+   "allocatedPoints": 2055334,
+   "budget": 2097152,
+   "cost": {
+    "frames": 120,
+    "max": 2.3,
+    "over16_7": 0,
+    "p50": 1.3,
+    "p95": 2,
+    "p99": 2.3
+   },
+   "drawCalls": 84,
+   "heapMB": 120,
+   "heldCamera": true,
+   "interval": {
+    "frames": 481,
+    "max": 16.8,
+    "over16_7": 84,
+    "p50": 16.7,
+    "p95": 16.7,
+    "p99": 16.8
+   },
+   "perSubject": 2097152,
+   "prepareMs": 143,
+   "subjectsWithPoints": 13,
+   "view": "overview"
+  },
+  {
+   "allocatedBytes": 164427040,
+   "allocatedPoints": 4110676,
+   "budget": 4194304,
+   "cost": {
+    "frames": 120,
+    "max": 3.6,
+    "over16_7": 0,
+    "p50": 1.4,
+    "p95": 2.6,
+    "p99": 3.4
+   },
+   "drawCalls": 84,
+   "heapMB": 203,
+   "heldCamera": true,
+   "interval": {
+    "frames": 481,
+    "max": 16.8,
+    "over16_7": 73,
+    "p50": 16.7,
+    "p95": 16.7,
+    "p99": 16.8
+   },
+   "perSubject": 4194304,
+   "prepareMs": 319,
+   "subjectsWithPoints": 13,
+   "view": "overview"
+  },
+  {
+   "allocatedBytes": 328854320,
+   "allocatedPoints": 8221358,
+   "budget": 8388608,
+   "cost": {
+    "frames": 120,
+    "max": 1.9,
+    "over16_7": 0,
+    "p50": 0.7,
+    "p95": 1.3,
+    "p99": 1.6
+   },
+   "drawCalls": 84,
+   "heapMB": 296,
+   "heldCamera": true,
+   "interval": {
+    "frames": 154,
+    "max": 83.4,
+    "over16_7": 154,
+    "p50": 50,
+    "p95": 66.7,
+    "p99": 66.7
+   },
+   "perSubject": 4194304,
+   "prepareMs": 975,
+   "subjectsWithPoints": 13,
+   "view": "overview"
+  }
+ ],
+ "seconds": 8,
+ "subjects": 14,
+ "url": "http://127.0.0.1:5261/?preview=1",
+ "viewport": {
+  "height": 900,
+  "width": 1440
+ }
+}
+--- confirmation
+{
+ "browser": "Chrome/152.0.7977.84",
+ "canvas": [
+  1440,
+  900
+ ],
+ "measuredAt": "2026-09-17T02:18:38.272Z",
+ "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)",
+ "runs": [
+  {
+   "allocatedBytes": 2569000,
+   "allocatedPoints": 64225,
+   "budget": 65536,
+   "cost": {
+    "frames": 120,
+    "max": 10.3,
+    "missed": 0,
+    "over16_7": 0,
+    "p50": 1,
+    "p95": 2.2,
+    "p99": 2.6
+   },
+   "drawCalls": 52,
+   "heapMB": 146,
+   "heldCamera": false,
+   "interval": {
+    "frames": 601,
+    "max": 16.8,
+    "missed": 0,
+    "over16_7": 205,
+    "p50": 16.7,
+    "p95": 16.7,
+    "p99": 16.8
+   },
+   "perSubject": 65536,
+   "prepareMs": 45,
+   "subjectsWithPoints": 13,
+   "view": "street"
+  },
+  {
+   "allocatedBytes": 164427040,
+   "allocatedPoints": 4110676,
+   "budget": 4194304,
+   "cost": {
+    "frames": 120,
+    "max": 2.9,
+    "missed": 0,
+    "over16_7": 0,
+    "p50": 1.1,
+    "p95": 2.3,
+    "p99": 2.8
+   },
+   "drawCalls": 52,
+   "heapMB": 170,
+   "heldCamera": false,
+   "interval": {
+    "frames": 601,
+    "max": 16.8,
+    "missed": 0,
+    "over16_7": 286,
+    "p50": 16.7,
+    "p95": 16.7,
+    "p99": 16.8
+   },
+   "perSubject": 2097152,
+   "prepareMs": 335,
+   "subjectsWithPoints": 13,
+   "view": "street"
+  },
+  {
+   "allocatedBytes": 2569000,
+   "allocatedPoints": 64225,
+   "budget": 65536,
+   "cost": {
+    "frames": 120,
+    "max": 3.2,
+    "missed": 0,
+    "over16_7": 0,
+    "p50": 1.3,
+    "p95": 2.2,
+    "p99": 2.5
+   },
+   "drawCalls": 84,
+   "heapMB": 115,
+   "heldCamera": true,
+   "interval": {
+    "frames": 601,
+    "max": 16.8,
+    "missed": 0,
+    "over16_7": 191,
+    "p50": 16.7,
+    "p95": 16.7,
+    "p99": 16.8
+   },
+   "perSubject": 65536,
+   "prepareMs": 14,
+   "subjectsWithPoints": 13,
+   "view": "overview"
+  },
+  {
+   "allocatedBytes": 164427040,
+   "allocatedPoints": 4110676,
+   "budget": 4194304,
+   "cost": {
+    "frames": 120,
+    "max": 3.2,
+    "missed": 0,
+    "over16_7": 0,
+    "p50": 1.5,
+    "p95": 2.7,
+    "p99": 3
+   },
+   "drawCalls": 84,
+   "heapMB": 192,
+   "heldCamera": true,
+   "interval": {
+    "frames": 601,
+    "max": 16.8,
+    "missed": 0,
+    "over16_7": 175,
+    "p50": 16.7,
+    "p95": 16.8,
+    "p99": 16.8
+   },
+   "perSubject": 2097152,
+   "prepareMs": 351,
+   "subjectsWithPoints": 13,
+   "view": "overview"
+  }
+ ],
+ "seconds": 10,
+ "subjects": 14,
+ "url": "http://127.0.0.1:5261/?preview=1",
+ "viewport": {
+  "height": 900,
+  "width": 1440
+ }
+}

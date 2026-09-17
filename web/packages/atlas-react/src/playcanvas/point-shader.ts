@@ -52,6 +52,8 @@
  *   uDataViewGlow   vec4  x core radius squared, y halo falloff, z halo strength, w pull metres
  *   uDataViewLook   vec4  x display gain, y cross-fade weight, z band depth, w bands per metre
  *   uDataViewTime   float band phase in bands, written once per drawn frame by the data view
+ *   uDataViewThin   vec4  x distance within which every sample is drawn, y most gain a thinned
+ *                         sample may take, zw unused
  *
  * and reads the engine's own `matrix_projection` and `uScreenSize`, so a sprite keeps its world
  * width through whatever camera draws it. Without the define none of this is compiled, and the
@@ -126,8 +128,10 @@ uniform vec4 uScreenSize;
 uniform vec4 uDataView;
 uniform vec4 uDataViewGlow;
 uniform vec4 uDataViewLook;
+uniform vec4 uDataViewThin;
 uniform float uDataViewTime;
 varying float vDataBand;
+varying float vDataGain;
 #endif
 
 // One hash, used for the particulate dissolve. Deterministic per point, so the boundary does not
@@ -232,6 +236,18 @@ void main(void) {
     // very surface it samples while that surface dissolves. The sample's position is unchanged.
     gl_Position = matrix_viewProjection
         * vec4(worldPos.xyz + normalize(view_position - worldPos.xyz) * uDataViewGlow.w, 1.0);
+    // Far away, a stable subset: a sample is drawn with probability (near / distance) squared, by a
+    // hash of its own index so nothing flickers, and the survivors carry the brightness of the
+    // ones left out. Every drawn point is still a real sample; far points only overlap less.
+    float keep = min(1.0, uDataViewThin.x / max(viewDist, 0.001));
+    keep *= keep;
+    if (hash1(float(gl_VertexID) * 0.7548776662) > keep) {
+        gl_Position = vec4(0.0, 0.0, 2.0, 1.0);
+        gl_PointSize = 0.0;
+        vDataGain = 0.0;
+        return;
+    }
+    vDataGain = min(uDataViewThin.y, inversesqrt(max(keep, 0.0001)));
 #endif
 
     float fogAmount = 0.0;
@@ -289,6 +305,7 @@ uniform vec4 uDataView;
 uniform vec4 uDataViewGlow;
 uniform vec4 uDataViewLook;
 varying float vDataBand;
+varying float vDataGain;
 #endif
 #ifdef PHOTOGRAPH
 /**
@@ -410,7 +427,10 @@ void main(void) {
     // Additive: the gain lives in colour and the cross-fade weight in alpha, which the blend
     // multiplies in. The band dims a dash between its crests and is off (depth 0) for points.
     float band = 1.0 - uDataViewLook.z * (0.5 - 0.5 * cos(6.2831853 * fract(vDataBand)));
-    gl_FragColor = vec4(rgb * uDataViewLook.x * band, clamp(soft * uDataViewLook.y, 0.0, 1.0));
+    vec3 lit = rgb * uDataViewLook.x * band * vDataGain;
+    // Brighter, never another hue: scale the whole colour back when any channel would clip.
+    lit /= max(1.0, max(lit.r, max(lit.g, lit.b)));
+    gl_FragColor = vec4(lit, clamp(soft * uDataViewLook.y, 0.0, 1.0));
 #endif
 }
 `;

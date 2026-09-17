@@ -138,6 +138,7 @@ export function createDataViewPoints(options: DataViewPointsOptions): Representa
   material.setParameter('uViewpoint', [0, 0, 0, 0]);
   material.setParameter('uCapture', [0, 0, 0, 0]);
   material.setParameter('uRelief', [1, 0, 0, 0]);
+  material.setParameter('uDataViewThin', [style.points.thinning.keepAllWithinMetres, style.points.thinning.maxGain, 0, 0]);
   material.setParameter('uDataViewGlow', [
     style.points.glow.core, style.points.glow.falloff, style.points.glow.halo, style.points.pullMetres,
   ]);

@@ -19,7 +19,7 @@ describe('data view style descriptor', () => {
   });
 
   it('refuses unknown keys at every level', () => {
-    for (const path of [[], ['points'], ['points', 'glow'], ['palette', 'origin'], ['palette', 'kind'], ['tags']]) {
+    for (const path of [[], ['points'], ['points', 'glow'], ['points', 'thinning'], ['palette', 'origin'], ['palette', 'kind'], ['tags']]) {
       const value = copy();
       let target = value;
       for (const key of path) target = target[key];
@@ -36,6 +36,8 @@ describe('data view style descriptor', () => {
       [value => { delete value['points']['sizeMetres']; }, /sizeMetres is missing/],
       [value => { delete value['palette']['origin']['external']; }, /external is missing/],
       [value => { value['points']['intensity'] = 1.5; }, /intensity is not a number from 0 to 1/],
+      [value => { value['points']['thinning']['maxGain'] = 0.5; }, /thinning.maxGain/],
+      [value => { value['ground']['rise'] = 0; }, /ground.rise/],
       [value => { value['points']['maxPixels'] = 0.5; }, /maxPixels/],
       [value => { value['points']['minPixels'] = 9; value['points']['maxPixels'] = 8; }, /maxPixels is below minPixels/],
       [value => { value['points']['depthFade']['endMetres'] = 10; }, /endMetres is not beyond startMetres/],

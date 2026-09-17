@@ -72,6 +72,14 @@ export interface DataViewStyle {
       readonly endMetres: number;
       readonly density: number;
     };
+    /**
+     * Beyond `keepAllWithinMetres` a stable subset of samples is drawn, falling with the square of
+     * distance, and each survivor is brightened by up to `maxGain` for the ones left out.
+     */
+    readonly thinning: {
+      readonly keepAllWithinMetres: number;
+      readonly maxGain: number;
+    };
   };
   /** The visualization treatment: short vertical dashes with a slow falling band. */
   readonly dashes: {
@@ -122,7 +130,7 @@ export const DATA_VIEW_STYLE_V1 = {
     sizeMetres: 0.3,
     minPixels: 1.5,
     maxPixels: 6,
-    densityPerSquareMetre: 1,
+    densityPerSquareMetre: 4,
     intensity: 0.85,
     rise: 2,
     pullMetres: 0.2,
@@ -130,6 +138,7 @@ export const DATA_VIEW_STYLE_V1 = {
     unselectedGain: 0.55,
     glow: { core: 0.16, falloff: 4, halo: 0.45 },
     depthFade: { startMetres: 150, endMetres: 1800, density: 0.9 },
+    thinning: { keepAllWithinMetres: 160, maxGain: 3 },
   },
   dashes: {
     halfWidth: 0.2,
@@ -221,10 +230,11 @@ export function dataViewStyle(value: unknown): DataViewStyle {
   const ground = record(root['ground'], 'style.ground', ['colour', 'strength', 'rise']);
   const points = record(root['points'], 'style.points', [
     'sizeMetres', 'minPixels', 'maxPixels', 'densityPerSquareMetre', 'intensity', 'rise', 'pullMetres',
-    'selectedGain', 'unselectedGain', 'glow', 'depthFade',
+    'selectedGain', 'unselectedGain', 'glow', 'depthFade', 'thinning',
   ]);
   const glow = record(points['glow'], 'style.points.glow', ['core', 'falloff', 'halo']);
   const fade = record(points['depthFade'], 'style.points.depthFade', ['startMetres', 'endMetres', 'density']);
+  const thinning = record(points['thinning'], 'style.points.thinning', ['keepAllWithinMetres', 'maxGain']);
   const dashes = record(root['dashes'], 'style.dashes', ['halfWidth', 'sizeScale', 'bandsPerMetre', 'bandsPerSecond', 'bandDepth']);
   const palette = record(root['palette'], 'style.palette', ['origin', 'kind']);
   const origin = record(palette['origin'], 'style.palette.origin', ORIGINS);
@@ -267,6 +277,10 @@ export function dataViewStyle(value: unknown): DataViewStyle {
         startMetres,
         endMetres,
         density: number(fade['density'], 'style.points.depthFade.density', 0, 16),
+      },
+      thinning: {
+        keepAllWithinMetres: number(thinning['keepAllWithinMetres'], 'style.points.thinning.keepAllWithinMetres', 1, 100_000),
+        maxGain: number(thinning['maxGain'], 'style.points.thinning.maxGain', 1, 16),
       },
     },
     dashes: {

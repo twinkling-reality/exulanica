@@ -24,13 +24,17 @@ export const DEFAULT_REPRESENTATION_INTENT: RepresentationIntent = Object.freeze
 });
 
 /**
- * The point budget of the data view, MEASURED rather than chosen. See
- * `web/packages/atlas-react/src/playcanvas/data-view/frame-budget.log.txt`: the owned district
- * with every point on, at 1440x900 on the development machine (Apple M3 Pro, Chrome, WebGL2).
+ * The point budget of the data view, MEASURED rather than chosen, in
+ * `web/packages/atlas-react/src/playcanvas/data-view/frame-budget.log.txt`: the owned district with
+ * every point on, at 1440x900 in Chrome 152 on an Apple M3 Pro (ANGLE Metal, WebGL2), at street
+ * level and from above with the whole district in view. 4,110,676 points kept every frame on the
+ * 60 Hz presentation in both views (p95 16.7 to 16.8 ms, no interval above 16.8 ms); 8,221,358 kept
+ * it at street level and fell to a 66.7 ms p95 from above. The budget is the largest power of two
+ * that held both views.
  */
-export const REPRESENTATION_POINT_BUDGET = 1_048_576;
+export const REPRESENTATION_POINT_BUDGET = 4_194_304;
 /** One subject may hold at most this many; a larger demand is scaled, never truncated by order. */
-export const REPRESENTATION_POINTS_PER_SUBJECT = 262_144;
+export const REPRESENTATION_POINTS_PER_SUBJECT = 2_097_152;
 
 /**
  * `generated-extent` is the extent of triangles the world generated from its own records: an
