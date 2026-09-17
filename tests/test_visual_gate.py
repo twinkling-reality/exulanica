@@ -73,7 +73,7 @@ _RUBRIC = _ROOT / "docs/visual-gate-rubric.md"
 _BASELINE_PATH = "docs/evaluation/2026-09-15-flatiron-owned-district-baseline.json"
 _BASELINE = _ROOT / _BASELINE_PATH
 _COMPANION = _ROOT / ".exulanica/judge-words/2026-09-15-flatiron-owned-district-baseline.json"
-_RECORD_PATH = "docs/evaluation/2026-09-16-visual-gate-test.json"
+_RECORD_PATH = "records/2026-09-16-visual-gate-test.json"
 _GIVEN_AT = "2026-09-16T12:00:00Z"
 _SHA = "0" * 63 + "1"
 _RUBRIC_SHA = "0" * 63 + "2"
@@ -1112,7 +1112,7 @@ def test_a_retained_record_is_decided_again_from_its_private_companion():
     with pytest.raises(GateEvidenceError, match="not in the private companion"):
         judged_answers_from_record(judged, {})
     with pytest.raises(GateEvidenceError, match="not the private companion"):
-        words_from_companion(json.loads(companion), "docs/evaluation/another-record.json")
+        words_from_companion(json.loads(companion), "records/another-record.json")
     forged = json.loads(companion)
     forged["replies"][0]["words"] = "Something else entirely."
     with pytest.raises(GateEvidenceError, match="does not match its own digest"):
@@ -1542,7 +1542,7 @@ def test_the_writer_keeps_the_judges_words_in_the_private_companion(monkeypatch,
     with pytest.raises(SystemExit, match="other words"):
         writer._write_private(path, companion + b" ", replace=False)
     assert writer._private_words(companion) == (["Blocks, not a street."], [])
-    leak = root / "docs/evaluation/leak.json"
+    leak = root / "leak.json"
     with pytest.raises(SystemExit, match="judge's words"):
         writer._write(
             leak,
