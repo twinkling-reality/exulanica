@@ -6,14 +6,18 @@
     and it moves when an entry does.
 *   A material whose **texture set does not resolve raises**; it is never defaulted.
 *   An **unknown key is rejected** rather than ignored, at every level.
-*   Which catalogs are **empty is pinned**, and the package document names every one of them, so
-    an entry cannot land without the document that says what is missing being revisited.
+*   **What ships is pinned**: every catalog's file version and entry count, and the package
+    document names every file with its count, so an entry cannot land without the document that
+    describes the catalogs being revisited.
 
 *   A texture manifest outside its agreed shape is refused, and a **rebaked texture set moves the
     catalog digest** while the catalog file stays byte-identical; a set no entry uses does not.
 
 Catalog files and manifests written under ``tmp_path`` below are test inputs. Their texture set
-ids, such as ``test-texture-set``, name nothing real and never appear in a shipped file.
+ids, such as ``test-texture-set``, name nothing real and never appear in a shipped file. The
+entries written for a catalog start from a shipped entry of that catalog, so an entry refused below
+is refused for the one change the case makes. ``tests/test_grammar_city_catalogs.py`` holds what the
+city's catalogs say.
 """
 
 from __future__ import annotations
@@ -53,17 +57,27 @@ from exulanica.materials.manifest import CONTAINER_LAYOUT
 ROOT = Path(__file__).resolve().parents[1]
 DOCUMENT = ROOT / "docs" / "grammar-package.md"
 
-#: What ships today. A change here is a change to what the city can say, and the package
-#: document has to say it too.
-EXPECTED_ENTRY_COUNTS = {
-    "action-vocabulary": 0,
-    "band": 1,
-    "material": 0,
-    "roof-family": 0,
-    "signage-lexicon": 0,
-    "street-hierarchy": 0,
-    "tree-species": 0,
-    "typology": 0,
+#: What ships today: each catalog's file version and entry count. A change here is a change to
+#: what the city can say, and the package document has to say it too.
+EXPECTED_CATALOGS = {
+    "action-vocabulary": (1, 0),
+    "band": (1, 1),
+    "crossing-type": (1, 3),
+    "era": (1, 4),
+    "fitout": (1, 7),
+    "junction-control": (1, 4),
+    "lane-use": (1, 5),
+    "material": (2, 8),
+    "parking-kind": (1, 5),
+    "roof-family": (2, 3),
+    "rooftop-object": (1, 4),
+    "signage-lexicon": (2, 18),
+    "street-furniture": (1, 9),
+    "street-hierarchy": (2, 4),
+    "street-name": (1, 12),
+    "tree-species": (2, 19),
+    "typology": (2, 7),
+    "use-class": (1, 11),
 }
 
 _ORIGINAL = {
@@ -77,24 +91,39 @@ _ORIGINAL = {
 _NO_SETS: Mapping[str, TextureSet] = MappingProxyType({})
 _TEST_SETS = {"test-texture-set": TextureSet("test-texture-set", 1, "a" * 64)}
 
-_MATERIAL_ENTRY = {
-    "key": "test_material",
-    "label": "Test material",
-    "texture_set_id": "test-texture-set",
-    "licence": _ORIGINAL,
-}
+
+def _version(catalog_id: str) -> int:
+    return EXPECTED_CATALOGS[catalog_id][0]
 
 
-def _write(directory: Path, stem: str, entries: list, **envelope: object) -> Path:
-    """``<stem>.v1.json``, whose envelope says the same unless ``envelope`` overrides it."""
+def _shipped_entry(catalog_id: str, **changes: object) -> dict:
+    """A copy of the first shipped entry of a catalog, with ``changes``, as an input to write."""
+    path = CATALOG_DIRECTORY / f"{catalog_id}.v{_version(catalog_id)}.json"
+    entry = json.loads(path.read_text(encoding="utf-8"))["entries"][0]
+    return {**entry, "licence": _ORIGINAL, **changes}
+
+
+_MATERIAL_ENTRY = _shipped_entry(
+    "material", key="test_material", label="Test material", texture_set_id="test-texture-set"
+)
+
+
+def _write(
+    directory: Path, stem: str, entries: list, *, version: int | None = None, **envelope: object
+) -> Path:
+    """``<stem>.v<version>.json``, whose envelope says the same unless ``envelope`` overrides it.
+
+    The version is the shipped catalog's unless given.
+    """
+    version = _version(stem) if version is None else version
     document = {
         "schema_version": 1,
         "catalog_id": stem,
-        "catalog_version": 1,
+        "catalog_version": version,
         "entries": entries,
         **envelope,
     }
-    path = directory / f"{stem}.v1.json"
+    path = directory / f"{stem}.v{version}.json"
     path.write_text(json.dumps(document), encoding="utf-8")
     return path
 
@@ -109,15 +138,19 @@ def _schema(catalog_id: str, *, texture_sets: Mapping[str, TextureSet] = _NO_SET
 
 
 def test_the_shipped_catalogs_load_and_hold_what_is_pinned():
-    catalogs = load_city_catalogs(texture_sets={})
-    assert {catalog.catalog_id: len(catalog.entries) for catalog in catalogs} == (
-        EXPECTED_ENTRY_COUNTS
-    )
+    catalogs = load_city_catalogs()
+    assert {
+        catalog.catalog_id: (catalog.catalog_version, len(catalog.entries)) for catalog in catalogs
+    } == EXPECTED_CATALOGS
+    assert sum(count for _version, count in EXPECTED_CATALOGS.values()) == 124
 
 
 def test_every_shipped_entry_carries_a_licence():
     files = sorted(CATALOG_DIRECTORY.glob("*.json"))
-    assert len(files) == len(EXPECTED_ENTRY_COUNTS)
+    assert [path.name for path in files] == sorted(
+        f"{catalog_id}.v{version}.json"
+        for catalog_id, (version, _count) in EXPECTED_CATALOGS.items()
+    )
     entries = 0
     for path in files:
         for entry in json.loads(path.read_text(encoding="utf-8"))["entries"]:
@@ -125,12 +158,15 @@ def test_every_shipped_entry_carries_a_licence():
             licence = entry.get("licence")
             assert isinstance(licence, dict), f"{path.name} {entry.get('key')} has no licence"
             assert licence["verdict"] in LICENCE_VERDICTS
-            assert (ROOT / licence["content_source"]).exists(), licence["content_source"]
+            assert (ROOT / licence["content_source"]).is_file(), licence["content_source"]
             if licence["origin"] == "original":
                 assert licence["spdx"] == "Apache-2.0"
                 assert (ROOT / licence["licence_source"]).is_file()
-    assert entries == sum(EXPECTED_ENTRY_COUNTS.values())
-    for catalog in load_city_catalogs(texture_sets={}):
+            else:
+                assert licence["licence_source"] != "LICENSE"
+                assert licence["content_source"].startswith("assets/catalogs/sources/")
+    assert entries == sum(count for _version, count in EXPECTED_CATALOGS.values())
+    for catalog in load_city_catalogs():
         for entry in catalog.entries:
             assert entry.licence.verdict in LICENCE_VERDICTS
 
@@ -143,37 +179,42 @@ def test_every_file_version_matches_its_name():
 
 
 def test_a_file_whose_contents_disagree_with_its_name_is_refused(tmp_path):
-    path = _write(tmp_path, "typology", [], catalog_version=2)
+    version = _version("typology")
+    path = _write(tmp_path, "typology", [], catalog_version=version + 1)
     with pytest.raises(CatalogError):
         load_catalog(path, _schema("typology"))
-    renamed = tmp_path / "typology.v2.json"
+    renamed = tmp_path / f"typology.v{version + 1}.json"
     _write(tmp_path, "typology", []).rename(renamed)
     with pytest.raises(CatalogError):
         load_catalog(renamed, _schema("typology"))
     other = _write(tmp_path, "band", [], catalog_id="typology")
     with pytest.raises(CatalogError):
         load_catalog(other, _schema("band"))
+    load_catalog(_write(tmp_path, "typology", []), _schema("typology"))
 
 
-def test_the_package_document_names_every_catalog_and_the_empty_ones_as_empty():
+def test_the_package_document_names_every_catalog_file_with_its_entry_count():
     text = DOCUMENT.read_text(encoding="utf-8")
-    for catalog_id, count in EXPECTED_ENTRY_COUNTS.items():
-        assert f"`{catalog_id}.v1.json`" in text, catalog_id
-        if count == 0:
-            assert f"| `{catalog_id}.v1.json` | 0 |" in text, catalog_id
+    for catalog_id, (version, count) in EXPECTED_CATALOGS.items():
+        assert f"| `{catalog_id}.v{version}.json` | {count} |" in text, catalog_id
 
 
-def test_a_directory_with_a_stray_or_a_missing_file_is_refused(tmp_path):
+def test_a_directory_with_a_stray_a_stale_or_a_missing_file_is_refused(tmp_path):
     shutil.copytree(CATALOG_DIRECTORY, tmp_path / "catalogs")
     directory = tmp_path / "catalogs"
-    load_city_catalogs(directory, texture_sets={})
-    _write(directory, "lamp-post", [])
+    load_city_catalogs(directory)
+    _write(directory, "lamp-post", [], version=1)
     with pytest.raises(CatalogError):
-        load_city_catalogs(directory, texture_sets={})
+        load_city_catalogs(directory)
     (directory / "lamp-post.v1.json").unlink()
-    (directory / "typology.v1.json").unlink()
+    _write(directory, "typology", [], version=1)
     with pytest.raises(CatalogError):
-        load_city_catalogs(directory, texture_sets={})
+        load_city_catalogs(directory)
+    (directory / "typology.v1.json").unlink()
+    load_city_catalogs(directory)
+    (directory / f"typology.v{_version('typology')}.json").unlink()
+    with pytest.raises(CatalogError):
+        load_city_catalogs(directory)
 
 
 # ---------------------------------------------------------------------------------------------
@@ -186,7 +227,7 @@ from exulanica.grammar.catalogs import catalog_digest
 from exulanica.grammar.grammars.city.catalogs import load_city_catalogs
 
 print(exulanica.grammar.__file__)
-print(catalog_digest(load_city_catalogs(texture_sets={})))
+print(catalog_digest(load_city_catalogs()))
 """
 
 
@@ -210,22 +251,22 @@ def test_the_catalog_digest_is_stable_across_two_processes():
     first = _digest_in_a_new_process("7")
     second = _digest_in_a_new_process("2718281828")
     assert first == second
-    assert first == catalog_digest(load_city_catalogs(texture_sets={}))
+    assert first == catalog_digest(load_city_catalogs())
 
 
 def test_the_catalog_digest_moves_when_an_entry_does(tmp_path):
     shutil.copytree(CATALOG_DIRECTORY, tmp_path / "catalogs")
     directory = tmp_path / "catalogs"
-    before = catalog_digest(load_city_catalogs(directory, texture_sets={}))
+    before = catalog_digest(load_city_catalogs(directory))
     band = json.loads((directory / "band.v1.json").read_text(encoding="utf-8"))
     band["entries"][0]["top_maximum_mm"] += 1
     (directory / "band.v1.json").write_text(json.dumps(band), encoding="utf-8")
-    after = catalog_digest(load_city_catalogs(directory, texture_sets={}))
+    after = catalog_digest(load_city_catalogs(directory))
     assert before != after
 
 
 def test_the_catalog_digest_does_not_depend_on_the_order_catalogs_are_passed_in():
-    catalogs = load_city_catalogs(texture_sets={})
+    catalogs = load_city_catalogs()
     assert catalog_digest(catalogs) == catalog_digest(tuple(reversed(catalogs)))
 
 
@@ -272,7 +313,7 @@ def test_a_material_entry_with_no_texture_set_field_is_refused(tmp_path):
 # Strictness
 
 
-_TYPOLOGY_ENTRY = {"key": "test_typology", "label": "Test typology", "licence": _ORIGINAL}
+_TYPOLOGY_ENTRY = _shipped_entry("typology", key="test_typology", label="Test typology")
 
 
 @pytest.mark.parametrize(
@@ -324,26 +365,34 @@ def test_a_repeated_entry_key_is_rejected(tmp_path):
         load_catalog(path, _schema("typology"))
 
 
+_ENVELOPE = '"schema_version": 1, "catalog_id": "typology", "catalog_version": 2'
+
+
+def test_the_envelope_the_refusals_below_start_from_loads(tmp_path):
+    path = tmp_path / "typology.v2.json"
+    path.write_text("{" + _ENVELOPE + ', "entries": []}', encoding="utf-8")
+    assert load_catalog(path, _schema("typology")).entries == ()
+
+
 @pytest.mark.parametrize(
     "text",
     [
-        '{"schema_version": 1, "catalog_id": "typology", "catalog_version": 1, "entries": [],'
-        ' "comment": "x"}',
-        '{"schema_version": 1, "catalog_id": "typology", "catalog_version": 1}',
-        '{"schema_version": 2, "catalog_id": "typology", "catalog_version": 1, "entries": []}',
-        '{"schema_version": 1, "catalog_id": "typology", "catalog_id": "typology",'
-        ' "catalog_version": 1, "entries": []}',
-        '{"schema_version": 1.0, "catalog_id": "typology", "catalog_version": 1, "entries": []}',
-        '{"schema_version": 1, "catalog_id": "typology", "catalog_version": 1, "entries": NaN}',
-        '{"schema_version": true, "catalog_id": "typology", "catalog_version": 1, "entries": []}',
+        "{" + _ENVELOPE + ', "entries": [], "comment": "x"}',
+        "{" + _ENVELOPE + "}",
+        '{"schema_version": 2, "catalog_id": "typology", "catalog_version": 2, "entries": []}',
+        "{" + _ENVELOPE + ', "catalog_id": "typology", "entries": []}',
+        '{"schema_version": 1.0, "catalog_id": "typology", "catalog_version": 2, "entries": []}',
+        "{" + _ENVELOPE + ', "entries": NaN}',
+        '{"schema_version": true, "catalog_id": "typology", "catalog_version": 2, "entries": []}',
         '{"schema_version": 1, "catalog_id": "typology", "catalog_version": true, "entries": []}',
-        '{"schema_version": 1, "catalog_id": "typology", "catalog_version": 1, "entries": {}}',
+        "{" + _ENVELOPE + ', "entries": {}}',
         "[]",
         "not json",
     ],
 )
 def test_an_envelope_outside_its_schema_is_rejected(tmp_path, text):
-    path = tmp_path / "typology.v1.json"
+    assert _version("typology") == 2
+    path = tmp_path / "typology.v2.json"
     path.write_text(text, encoding="utf-8")
     with pytest.raises(CatalogError):
         load_catalog(path, _schema("typology"))
@@ -483,7 +532,8 @@ def test_a_rebaked_texture_set_moves_the_catalog_digest_with_the_file_unchanged(
     assert path.read_bytes() == before_bytes
     assert before != after
     [entry] = load_catalog(path, _schema("material", texture_sets=rebaked)).entries
-    assert dict(entry.values) == {"label": "Test material", "texture_set_id": "test-texture-set"}
+    assert dict(entry.values)["texture_set_id"] == "test-texture-set"
+    assert dict(entry.values)["label"] == "Test material"
 
 
 def test_a_set_no_entry_uses_does_not_move_the_catalog_digest(tmp_path):
