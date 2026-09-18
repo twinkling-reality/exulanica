@@ -25,6 +25,7 @@ from exulanica.lettering import (
     layout_sign,
     read_glyph_catalog,
 )
+from exulanica.lettering.catalog import CATALOG_DIRECTORY
 
 ROOT = Path(__file__).resolve().parents[1]
 CASE_DIRECTORY = ROOT / "web" / "packages" / "loom-lettering" / "test"
@@ -97,6 +98,23 @@ def test_a_glyph_case(case: dict[str, Any]):
         for outer, holes in parts
     ]
     assert flat == case["parts"]
+
+
+def test_the_cases_cover_every_committed_catalog_in_both_directions():
+    """A fifth catalog with no cases is an absence, not an error, so something has to notice it.
+
+    The generated file names the catalogs it runs. Compared against the directory both ways: a
+    catalog with no entry fails here, which is the new one nobody generated cases for, and an entry
+    with no catalog fails here too, which is the id left behind when a catalog is withdrawn.
+    ``boxes`` is the rectangles fixture beside the cases and is not a committed catalog.
+    """
+    committed = {path.name.split(".v")[0] for path in CATALOG_DIRECTORY.glob("*.json")}
+    named = set(CASES["catalogs"]) - {"boxes"}
+    assert named == committed
+    accepted = {case["catalog"] for case in CASES["catalog_cases"] if case["reason"] is None}
+    assert committed <= accepted, "a committed catalog with no accepted case"
+    laid_out = {case["catalog"] for case in CASES["layout_cases"]}
+    assert committed <= laid_out, "a committed catalog no layout case uses"
 
 
 def test_the_cases_reach_every_refusal_reason_and_accept_something():

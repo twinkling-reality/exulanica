@@ -45,7 +45,14 @@ CASES = CASE_DIRECTORY / "lettering-cases.json"
 BOXES = CASE_DIRECTORY / "cases" / "boxes.v1.json"
 #: Where the committed catalogs sit, relative to the case file.
 COMMITTED = "../../../../assets/catalogs/lettering"
-CATALOG_IDS = ("condensed", "grotesque", "modern_serif", "slab")
+#: The committed catalogs, read from the directory rather than listed here. A list would be a second
+#: statement of what `assets/catalogs/lettering` holds, and the two would part company silently: a
+#: fifth catalog would simply get no cases, which is not an error or a skip but an absence.
+#: `tests/test_lettering_cases.py` holds the generated file to this directory in both directions.
+def committed_catalogs() -> dict[str, str]:
+    """Catalog id to file name, for every catalog in the committed directory."""
+    directory = ROOT / "assets" / "catalogs" / "lettering"
+    return {path.name.split(".v")[0]: path.name for path in sorted(directory.glob("*.json"))}
 
 BOX_CAP_HEIGHT = 1000
 BOX_MINIMUM_MM = 100
@@ -187,7 +194,7 @@ def _scan(catalog: GlyphCatalog) -> tuple[int, str | None]:
 
 
 def _catalogs() -> dict[str, str]:
-    paths = {name: f"{COMMITTED}/{name}.v1.json" for name in CATALOG_IDS}
+    paths = {name: f"{COMMITTED}/{file}" for name, file in committed_catalogs().items()}
     paths["boxes"] = "cases/boxes.v1.json"
     return paths
 
@@ -227,7 +234,7 @@ def _catalog_cases() -> list[dict[str, Any]]:
     """Every catalog refusal reason, and every committed catalog accepted."""
     cases: list[dict[str, Any]] = [
         {"name": f"the committed {name} catalog is accepted", "catalog": name, "reason": None}
-        for name in (*CATALOG_IDS, "boxes")
+        for name in (*committed_catalogs(), "boxes")
     ]
     index = {character: position for position, character in enumerate(CHARACTER_SET)}
 
@@ -499,7 +506,7 @@ def _lexicon() -> list[str]:
 def _layout_cases() -> list[dict[str, Any]]:
     cases: list[dict[str, Any]] = []
     for text in _lexicon():
-        for name in CATALOG_IDS:
+        for name in committed_catalogs():
             cases.append(
                 _layout_case(
                     f"{text!r} centred in {name}",
