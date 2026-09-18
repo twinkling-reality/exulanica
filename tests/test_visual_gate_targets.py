@@ -433,3 +433,41 @@ def test_a_number_the_rule_does_not_record_is_refused_if_it_appears(tmp_path):
     built = _route_record(tmp_path, "record.yaw = plan.yaw;")
     assert "refused" in built, built
     assert "yaw" in built["refused"], built
+
+
+# -- the harness itself, type-checked, because nothing else in this repository checks it -----------
+
+HARNESS_TSCONFIG = ROOT / "web/tsconfig.scripts.json"
+
+
+def test_the_harness_type_checks_and_the_checker_looked_at_it():
+    """Nothing else checks this file, and a checker that looked at nothing also exits 0.
+
+    MEASURED 2026-09-18: no tsconfig in this repository reaches outside ``web/``, so the gate harness
+    was type-checked by nothing; ``node --check`` accepts a duplicate object key because it is legal
+    JavaScript; and there is no JavaScript linter here. A duplicated key in the record builder
+    therefore replaced a measured count with a derived one in silence, and a hand-run ``tsc`` over a
+    copy was what found it.
+
+    The configuration is deliberately lenient: strict typing of untyped JavaScript reports 158
+    findings across these three files, none of them a defect, while this reports the syntactic class
+    that actually bit. Both were measured, and both catch the duplicate.
+
+    THE SECOND ASSERTION IS THE LOAD BEARING ONE. An empty ``include`` exits 0 exactly as a clean
+    file does, so this asserts the compiler listed the harness among the files it read before
+    reading its silence as a pass.
+    """
+    tsc = WEB / "node_modules/.bin/tsc"
+    if not tsc.exists():
+        pytest.skip(f"the web toolchain is not installed ({tsc} is missing); run pnpm install in web/")
+    result = subprocess.run(
+        [str(tsc), "-p", str(HARNESS_TSCONFIG), "--listFiles"],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+        timeout=600,
+    )
+    read = [line.strip() for line in result.stdout.splitlines() if line.strip().endswith(".mjs")]
+    assert str(HARNESS) in read, f"the checker did not read {HARNESS}; it read {read}"
+    findings = [line for line in result.stdout.splitlines() if "error TS" in line]
+    assert result.returncode == 0, "\n".join(findings) or result.stderr
