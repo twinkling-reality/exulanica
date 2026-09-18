@@ -1,0 +1,14 @@
+plan-clip.json.txt is the plan the clip capture ran with, retained verbatim except for one field.
+
+REDACTED: "outDir" held the absolute path of the capturing session's scratch directory. Two reasons
+it is not here. It names a session-scoped directory that no longer exists, so it tells a later reader
+nothing they can act on. And it contained the withdrawn product name, because the checkout it ran
+from is under a directory still carrying that name, which tripped the rename guard
+(tests/test_orimera_rename_guard.py) the moment this file was committed.
+
+The guard was right to fire and the file was the wrong place to make an exception: its allowlist is
+per path, so exempting this file would exempt everything ever added to it. The redaction removes an
+incidental string and loses no evidence; the frames it names are retained separately.
+
+Nothing else in the plan is altered. The url, size, frame count, turn key, settle time, readiness
+expression, timeout and hidden text are exactly as the capture ran them.
