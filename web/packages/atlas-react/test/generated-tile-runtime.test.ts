@@ -221,14 +221,39 @@ describe('the route obstruction rings a tile states', () => {
   // MEASURED 2026-09-18: the mapper sat on main for hours with nothing calling it, so a tile that
   // states rings served a page that carried none and a route rule had nothing to decide with. This
   // holds the wiring rather than the mapping: the rings a container states must reach the world.
-  it('carries the container\'s own rings into the navigation world, named by record', () => {
-    const carried = tile.navigation.world.polygonObstacles ?? [];
-    expect(carried.length).toBe(tile.routeObstructions.obstacles.length);
-    for (const obstacle of carried) {
+  it('states them on the tile, named by record, for a route rule to read', () => {
+    for (const obstacle of tile.routeObstructions.obstacles) {
       // `kind:identity`, so a run record can bind what a walk passed to the record that put it there.
       expect(obstacle.id).toMatch(/^[a-z_.]+:.+/);
       expect(obstacle.rings[0]!.length).toBeGreaterThanOrEqual(3);
     }
+  });
+
+  it('KEEPS THEM OUT OF THE NAVIGATION WORLD, because that field stops bodies', () => {
+    // MEASURED 2026-09-18: carrying route rings in `polygonObstacles` made a bench stop a walker
+    // 344 mm from its edge against a stated capsule radius of 340. The resolver collides against that
+    // field by construction, with no flag and no opt-out, so the only way for a ring to stop nothing
+    // is for it not to be there. This asserts the property the panel claims rather than the plumbing.
+    expect(tile.navigation.world.polygonObstacles ?? []).toEqual([]);
+  });
+
+  it('proves that field really does block, so the emptiness above is load bearing', () => {
+    // A ring square around a point half a metre north of the stance, in the renderer's frame.
+    const from = tile.navigation.start;
+    const corners = [[-1, -1], [1, -1], [1, 1], [-1, 1]] as const;
+    const blocked = {
+      ...tile.navigation.world,
+      polygonObstacles: [{
+        id: 'test:ring',
+        rings: [corners.map(([dx, dz]) => atlasVec3(from.x + dx, 0, from.z - 0.5 + dz))],
+      }],
+    };
+    const through = resolveGroundMovement(blocked, {
+      current: atlasVec3(from.x, from.y, from.z),
+      desired: atlasVec3(from.x, from.y, from.z - 0.5),
+      lastSafe: null,
+    });
+    expect(through.collided || through.recovered).toBe(true);
   });
 
   it('states what it refused, so a smaller set is never silent', () => {

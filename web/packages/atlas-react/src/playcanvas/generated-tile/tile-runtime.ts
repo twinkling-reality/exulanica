@@ -453,17 +453,17 @@ export async function loadGeneratedTile(sources: GeneratedTileSources): Promise<
   if (surface === undefined) throw new GeneratedTileRefusal(`Tile ${sources.name} carries no surface coordinates.`);
   const { ranges, placements, prepared } = await plan(decoded, render, sources, digest);
   // ROUTE obstruction rings, built from the container's own records with tess's own reader, so the
-  // rings a walk is routed around are the rings the bake made. They choose which way a walk faces and
-  // stop no body: nothing here blocks the capsule, which waits on a collision proxy no tile yet
-  // materialises. A region that bounds nothing or names no record is refused rather than repaired,
-  // and the refusals are carried so a caller can say what was dropped instead of serving a quietly
-  // smaller set.
+  // rings a walk is routed around are the rings the bake made. They are stated ON THE TILE and NOT in
+  // the navigation world: `resolveGroundMovement` collides against `polygonObstacles` by
+  // construction, so carrying them there made a bench stop a walker, measured 2026-09-18. They choose
+  // which way a walk faces and stop no body; a route rule reads them from here. A region that bounds
+  // nothing or names no record is refused rather than repaired, and the refusals are carried so a
+  // caller can say what was dropped instead of serving a quietly smaller set.
   const rings = obstructionRings(routeObstructionRings(decoded.header));
   const navigation = tileNavigation(
     decoded.projections.find((projection) => projection.header.name === 'nav_envelope'),
     renderExtent(ranges),
     capsule,
-    rings.obstacles,
   );
   const drawn = ranges.filter((range): range is DrawnTileRange => range.state === 'drawn')
     .sort((a, b) => a.firstTriangle - b.firstTriangle);

@@ -4,7 +4,6 @@ import {
   atlasVec3,
   type NavigationSurface,
   type NavigationWorld,
-  type PolygonObstacle,
   type SurfaceSample,
 } from '@exulanica/atlas-core';
 import {
@@ -231,13 +230,7 @@ export interface TileNavigation {
   readonly capsule: TileCapsule;
 }
 
-function world(
-  surface: NavigationSurface,
-  centre: readonly [number, number],
-  radius: number,
-  capsule: TileCapsule,
-  polygonObstacles: readonly PolygonObstacle[],
-): NavigationWorld {
+function world(surface: NavigationSurface, centre: readonly [number, number], radius: number, capsule: TileCapsule): NavigationWorld {
   return Object.freeze({
     surface,
     eyeHeight: capsule.eyeHeightM,
@@ -250,10 +243,15 @@ function world(
     surfaceSampleSpacing: SUPPORT_SAMPLE_SPACING_M,
     regions: Object.freeze([]),
     obstacles: Object.freeze([]),
-    // ROUTE obstruction rings, which choose which way a walk faces and stop no body: they have no
-    // height and nothing in them blocks the capsule. Horizontal blocking waits on a collision proxy
-    // that no tile materialises, and carrying these does not change that.
-    polygonObstacles,
+    // EMPTY, AND IT MUST STAY EMPTY UNTIL SOMETHING IN THIS TILE REALLY BLOCKS A BODY. MEASURED
+    // 2026-09-18: route obstruction rings were carried here, and `resolveGroundMovement` collides
+    // against this field by construction, with no flag and no opt-out, so a bench stopped a walker
+    // 344 mm from its edge against a stated capsule radius of 340. Route rings choose which way a
+    // walk faces and stop nothing; they are stated on the loaded tile instead, where a route rule
+    // reads them and the movement resolver never sees them. A field named `polygonObstacles` means
+    // one thing to everything that reads it, and putting something else in it does not change what
+    // the readers do.
+    polygonObstacles: Object.freeze([]),
     traces: Object.freeze([]),
   });
 }
@@ -275,7 +273,6 @@ export function tileNavigation(
   navEnvelope: DecodedProjection | undefined,
   renderExtent: TileExtentMm,
   capsule: TileCapsule,
-  polygonObstacles: readonly PolygonObstacle[] = [],
 ): TileNavigation {
   if (navEnvelope === undefined || navEnvelope.header.triangle_count === 0) {
     // A viewpoint south of the tile, looking north at its middle, at eye height above the city datum.
@@ -288,7 +285,7 @@ export function tileNavigation(
     const [tx, ty, tz] = tileToRenderer(cx, cy, cz);
     const pitch = Math.atan2(ty - capsule.eyeHeightM, Math.hypot(tx - vx, tz - vz));
     return {
-      world: world(NO_SURFACE, [vx, vz], halfDiagonalM(renderExtent) + VIEWPOINT_STANDOFF_MM / MILLIMETRES, capsule, polygonObstacles),
+      world: world(NO_SURFACE, [vx, vz], halfDiagonalM(renderExtent) + VIEWPOINT_STANDOFF_MM / MILLIMETRES, capsule),
       start: { x: vx, y: capsule.eyeHeightM, z: vz, yaw: 0, pitch },
       support: { state: 'unavailable', reason: navEnvelope === undefined
         ? 'The tile carries no nav_envelope projection, so there is nothing to stand on.'
@@ -311,7 +308,7 @@ export function tileNavigation(
   }
   if (stance === null) throw new Error('The nav_envelope has no support on its own north-south midline');
   return {
-    world: world(support.surface, [cx, cz], halfDiagonalM(extent), capsule, polygonObstacles),
+    world: world(support.surface, [cx, cz], halfDiagonalM(extent), capsule),
     start: stance,
     support: { state: 'nav_envelope', triangles: support.triangles },
     collisionState: COLLISION_PENDING,

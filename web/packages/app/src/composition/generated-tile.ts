@@ -72,7 +72,8 @@ function ringLine(tile: LoadedGeneratedTile): string {
   const { obstacles, refused } = tile.routeObstructions;
   const records = new Set(obstacles.map((obstacle) => obstacle.id.slice(obstacle.id.indexOf(':') + 1))).size;
   const dropped = refused.length === 0 ? '' : `, ${refused.length} refused`;
-  return `${obstacles.length} route obstruction rings from ${records} records${dropped}: they choose which way a walk faces and stop no body.`;
+  return `${obstacles.length} route obstruction rings from ${records} records${dropped}: stated for a route rule to read, `
+    + 'not carried into movement, so they stop no body.';
 }
 
 /** Where the walk began and whether anybody stated it, which is what makes a frame reproducible. */
