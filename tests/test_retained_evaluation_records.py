@@ -8,6 +8,7 @@ import warnings
 from pathlib import Path
 
 from exulanica.canonical import canonical_json
+from exulanica.evaluation import visual_gate
 
 _ROOT = Path(__file__).resolve().parents[1]
 
@@ -29,11 +30,17 @@ def test_every_retained_evaluation_record_reproduces_its_canonical_digest():
 
 
 def test_retained_evaluation_records_contain_no_personal_path_or_credential_material():
+    """The forbidden strings come from the gate that refuses them, not from a copy here.
+
+    Both lists said the same three, with nothing holding them in step, so the gate could gain a
+    fourth and the retained records would never be asked about it.
+    """
+    forbidden = visual_gate._FORBIDDEN_TEXT
+    assert len(forbidden) >= 3, forbidden
     for path in _records():
         text = path.read_text(encoding="utf-8")
-        assert "/Users/" not in text, path
-        assert "Bearer " not in text, path
-        assert "api-token" not in text, path
+        for phrase in forbidden:
+            assert phrase not in text, (path, phrase)
 
 
 def test_depth_image_forward_record_does_not_claim_normal_worker_or_host_performance():
