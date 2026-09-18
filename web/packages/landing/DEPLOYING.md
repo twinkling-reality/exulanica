@@ -101,3 +101,6 @@ Two things about that deployment are worth carrying, because neither is recovera
   `packages/landing` changing at all, which is exactly what happened between the deployed state and
   `main`. `npx vite build --sourcemap` in the package, read against the coverage of a cold load,
   is how to measure how much; do that rather than trust a figure written here, which would rot.
+  The page now imports `@exulanica/presentation/companion` rather than the barrel, so the next
+  deploy will carry about half the JavaScript this one does. That is a bundle change and not a
+  visible one, and `landing:verify` will report it as a difference, correctly.

@@ -227,6 +227,25 @@ module.exports = {
       from: { path: pkg('landing') },
       to: { path: notPkgRef('landing', 'presentation') },
     },
+    {
+      name: 'landing-takes-the-companion-entry-not-the-barrel',
+      severity: 'error',
+      comment:
+        'The signed-out page may import @exulanica/presentation/companion and not the package ' +
+        'barrel. The barrel re-exports world-profiles.js, which constructs the world style ' +
+        'registry at module scope, and a module-scope constructor call cannot be dropped as ' +
+        'unused: one named import from the barrel shipped that registry and the modules behind it ' +
+        'into the public bundle and ran them on every cold load, measured at 25,600 of 55,898 ' +
+        'attributed bytes to draw one avatar in the corner. Moving to the narrow entry halved the ' +
+        'bundle, from 62,637 bytes to 31,276. Nothing about that is self-enforcing, because the ' +
+        'barrel import looks identical to the one it replaced, which is what this rule is for. ' +
+        'landing/test/bundle-boundary.test.ts asserts the same property against the built ' +
+        'sourcemap, for a module that arrives some way this path pattern does not describe.',
+      from: { path: pkg('landing') },
+      to: {
+        path: String.raw`^packages/presentation/src/index\.ts$|^(?:node_modules/)?@exulanica/presentation$`,
+      },
+    },
 
     // ---- app: the composition root ---------------------------------------------------------
     {

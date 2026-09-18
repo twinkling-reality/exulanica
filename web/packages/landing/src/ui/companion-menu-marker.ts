@@ -7,7 +7,7 @@ import {
   type CompanionBodyVariant,
   type CompanionEyeShape,
   type CompanionFaceVariant,
-} from '@exulanica/presentation';
+} from '@exulanica/presentation/companion';
 
 const SVG_NS = 'http://www.w3.org/2000/svg';
 

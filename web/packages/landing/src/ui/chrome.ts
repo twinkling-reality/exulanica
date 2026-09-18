@@ -10,7 +10,7 @@ import {
   DEFAULT_COMPANION,
   type CompanionBodyVariant,
   type CompanionColorVariant,
-} from '@exulanica/presentation';
+} from '@exulanica/presentation/companion';
 
 import { el } from './dom.js';
 import { createCompanionMenuMarker, MENU_FACE } from './companion-menu-marker.js';

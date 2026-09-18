@@ -72,10 +72,23 @@ silently drops an address.
 
 ## Boundaries
 
-The landing package depends only on `@exulanica/presentation` for shared semantic visual tokens.
-`web/.dependency-cruiser.cjs` enforces that boundary and separately prevents renderer imports.
-This keeps the public first paint lightweight while leaving world-owned visual identity, Atlas
-navigation, the geometric Companion, evidence, Map, and Index inside the canonical application.
+The landing package's only workspace dependency is `@exulanica/presentation`, and it takes that
+package's `/companion` entry rather than its barrel. `web/.dependency-cruiser.cjs` enforces the
+dependency, the choice of entry, and separately prevents renderer imports;
+`test/bundle-boundary.test.ts` asserts the same property against the build's own sourcemap. What
+this keeps inside the canonical application is world-owned visual identity, Atlas navigation, the
+geometric Companion, evidence, Map, and Index.
+
+**The sentence that stood here also said the arrangement "keeps the public first paint lightweight",
+and that was measured and found false.** A package boundary is not a bundle boundary. The barrel
+re-exports `world-profiles.js`, which constructs the world style registry at module scope, and a
+module-scope constructor call cannot be dropped as unused, so one named Companion import shipped
+that registry and the modules behind it and ran them on every cold load, to draw one small avatar in
+the corner of a signed-out screen. When it was measured, 25,600 of 55,898 attributed bundle bytes
+were world style, `world-style-model.ts` was larger than any module this package had written, and
+taking the narrow entry halved the JavaScript from 62,637 bytes to 31,276. `pnpm run boundaries` was
+green throughout: the edge it forbids is a cross-package import and this was not one. The figures
+are history rather than a property, which is why the test and the rule are what hold it now.
 
 ## Surfaces
 
