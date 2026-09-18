@@ -66,9 +66,18 @@ def before_sheets(structure_dir: Path, frames_dir: Path, out: Path) -> Iterator[
         identity = encode.identity_colours(layers["identity"], len(record["legend"]))
         tiles = [
             _labelled(render, f"{name}: procedural look (before)"),
-            _labelled(Image.fromarray(depth), "exact depth (inverse, this pose's range)"),
-            _labelled(Image.fromarray(identity), "surface identity"),
-            _labelled(Image.fromarray(overlay), "exact edges over the render"),
+            _labelled(
+                Image.fromarray(depth),
+                f"exact depth, {encode.ENCODINGS['depth']['name']}, this pose's range",
+            ),
+            _labelled(
+                Image.fromarray(identity),
+                f"surface identity, {encode.ENCODINGS['segmentation']['name']}",
+            ),
+            _labelled(
+                Image.fromarray(overlay),
+                f"exact edges over the render, {encode.ENCODINGS['edge']['name']}",
+            ),
             _labelled(_unavailable(_TILE, "AFTER: UNAVAILABLE"), "after (generated look)"),
         ]
         row = Image.new("RGB", (_TILE[0] * len(tiles), _TILE[1] + _LABEL))

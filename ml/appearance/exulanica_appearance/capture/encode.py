@@ -21,6 +21,7 @@ from PIL import Image
 from exulanica_appearance.capture.raster import NORMAL_SCALE, Camera
 
 __all__ = [
+    "ENCODERS",
     "ENCODINGS",
     "depth_range",
     "edge_lines",
@@ -30,6 +31,13 @@ __all__ = [
     "write_png",
 ]
 
+#: Every encoding this module states, with the reason its constants are what they are. The set is
+#: closed by the code below and not by this statement: ``ENCODERS`` binds each entry to the function
+#: that produces that picture, and ``tests/test_encode.py`` compares the two with the module's own
+#: source both ways, so a fifth picture encoder, a renamed one, or an entry with nothing behind it
+#: fails rather than leaving this dictionary quietly wrong. Anything that writes a conditioning
+#: picture names its encoding from here, so the name in a record, a sheet's label and the reason a
+#: reviewer reads are one string and not three.
 ENCODINGS: Final = {
     "depth": {
         "name": "inverse-depth-v2",
@@ -129,3 +137,14 @@ def write_png(path: Path, pixels: NDArray[np.uint8]) -> tuple[str, str]:
     path.parent.mkdir(parents=True, exist_ok=True)
     Image.fromarray(pixels).save(path, format="PNG")
     return hashlib.sha256(raw).hexdigest(), hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+#: Which function produces each stated encoding. Kept beside them so the pairing is executable: the
+#: tests hold that these keys are exactly ``ENCODINGS``' keys and exactly the module's own functions
+#: that return a picture.
+ENCODERS: Final = {
+    "depth": inverse_depth,
+    "segmentation": identity_colours,
+    "edge": edge_lines,
+    "normal": normal_camera,
+}

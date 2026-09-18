@@ -38,3 +38,48 @@ def test_edges_and_normals_encode_the_structure():
     # The wall faces the camera, so its camera-space normal is +Z: (128, 128, 255).
     assert tuple(normal[24, 32]) == (128, 128, 255)
     assert tuple(normal[0, 0]) == (0, 0, 0)
+
+
+def test_the_stated_encodings_are_exactly_the_pictures_this_module_produces():
+    """The vocabulary is held to the code both ways, so it cannot be quietly wrong.
+
+    A published set of names that nothing loads is documentation with a type annotation. These are
+    real: each is one function of a structure record's layers, each is named in a generation record
+    and on a sheet's label, and the set is closed. So the test reads the module's own source for the
+    functions that return a picture and compares that set with what is stated, in both directions.
+    """
+    import ast
+    import inspect
+
+    source = inspect.getsource(encode)
+    tree = ast.parse(source)
+    produces_a_picture = set()
+    for node in tree.body:
+        if not isinstance(node, ast.FunctionDef) or node.name.startswith("_"):
+            continue
+        returns = ast.unparse(node.returns) if node.returns is not None else ""
+        if returns.replace(" ", "") == "NDArray[np.uint8]":
+            produces_a_picture.add(node.name)
+    # A parse that finds nothing must fail here rather than agree with an empty set.
+    assert len(produces_a_picture) >= 4, produces_a_picture
+
+    named = {role: function.__name__ for role, function in encode.ENCODERS.items()}
+    assert set(named.values()) == produces_a_picture, (named, produces_a_picture)
+    assert set(encode.ENCODERS) == set(encode.ENCODINGS)
+    for role, entry in encode.ENCODINGS.items():
+        assert set(entry) == {"name", "reason"}, role
+        assert entry["name"] and entry["reason"].strip(), role
+        assert encode.ENCODERS[role].__module__ == encode.__name__
+    # Distinct names, or two records could claim the same encoding for different pictures.
+    assert len({entry["name"] for entry in encode.ENCODINGS.values()}) == len(encode.ENCODINGS)
+
+
+def test_the_before_sheet_labels_come_from_the_stated_encodings(tmp_path):
+    """The one runtime that draws these pictures names them from the vocabulary, not its own prose."""
+    import inspect
+
+    from exulanica_appearance import sheets
+
+    drawn = inspect.getsource(sheets.before_sheets)
+    for role in ("depth", "segmentation", "edge"):
+        assert f"encode.ENCODINGS['{role}']['name']" in drawn, role
