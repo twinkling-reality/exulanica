@@ -450,6 +450,35 @@ corridor lane's open question and it is open here too: stopping, dropping to the
 and stepping over are all honest answers. Recording the question in advance is what stops whichever
 happens from being described afterwards as the expected behaviour.
 
+**What the eye height is, read rather than remembered, and what it makes decidable.** The capsule comes
+from the tile's own grammar table: city version 2 states `eye_height_mm` 1620 (`loom-tess/src/core/
+city-v2.ts`), `tileCapsule` reads it and refuses a tile whose grammar states none, and the movement
+rule puts the eye exactly that above the sampled support (`navigation.ts`: the target is
+`sample.height + world.eyeHeight`, and the resolved position is `finalSample.height + world.eyeHeight`).
+So a standing eye is support plus 1620 mm and nothing else, which is what lets this lane's trace and the
+corridor lane's support heights SUBTRACT. On tessellator 13, whose footway support measures 147 to 170
+mm, a standing eye reads 1767 to 1790 mm, and the behaviours separate:
+
+| behaviour | signature in the pair |
+| --- | --- |
+| stops | x stops advancing, eye height holds near 1790 |
+| passes over nothing | x advances across a gap the container calls unsupported while the eye holds near 1790 |
+| drops to terrain | eye falls about 170 mm to near 1620 while x advances |
+
+**A fourth signature this lane can predict from its own code**, which neither half would have guessed
+from the street: a tile's navigation world states no regions (`tile-navigation.ts` passes an empty
+list), so if movement ever recovers with no last safe position to return to, `nearestRegionEntry`
+answers the world CENTRE at `world.eyeHeight` above the datum rather than above any support. That
+reads as an eye at exactly 1620 mm, not 1767 to 1790, and an x that jumps to the middle of the tile.
+If a trace shows that, it is not a walk at all and must not be reported as one.
+
+**The mirror of this lane's eye caveat, from the corridor lane, recorded before the run:** its support
+heights are the CONTAINER's, not the runtime's. If the runtime applied a step height, a ground offset,
+or held the last known support where it found none, its idea of the floor would differ from the
+container's by a constant or by a history, and neither half would see that alone. A clean difference
+that is not 1620 is therefore the first thing to suspect, and a fact about the runtime worth having
+rather than an error in either measurement.
+
 **One candidate excluded by measurement, 2026-09-18, before either half ran.** The pre-registration
 above is left as written; this is what has since been measured against it. The corridor lane sharpened
 its sampler after finding that a point supported at 170 mm and a point supported at 0 mm both counted
