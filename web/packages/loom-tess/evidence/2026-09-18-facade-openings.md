@@ -192,3 +192,33 @@ The four no longer make the claim. `facing.ts` keeps it, because it is still tru
 `test/core-headers.test.ts` now reads the import graph and fails if a module claiming to be unwired
 is imported by anything in core. That test was broken on purpose before being trusted: planting the
 sentence in `streets.ts` failed it naming streets.ts and expand.ts.
+
+## The development golden's pinned counts, and one field whose name was checked rather than assumed
+
+Moving the golden moved seven pinned values in `packages/atlas-react/test/generated-tile-runtime.test.ts`,
+which belongs to a lane that is closed. The orchestrator asked for the edit to be made here and in
+its own commit. Every value is derived from the rebaked golden, container `3a2fd58d`:
+
+    city.facade's triangle range     368 to 482      becomes  368 to 2316
+    every range after it             shifts by 1,834, no kind or order changes
+    terrain firstVertex              3419            becomes  6961
+    terrain firstTriangle            1401            becomes  3235
+    terrain vertexCount 478 and triangleCount 495 do NOT move: only its offset in a shared buffer did
+    render triangles                 2,208           becomes  4,042
+    render vertices                  4,833           becomes  8,375
+    unavailableSurfaces              118             becomes  124
+
+THE LAST OF THOSE WAS FLAGGED RATHER THAN WRITTEN, because 124 is also the number of DRAWN surfaces
+and a metric that equals the drawn count may be a metric that is not measuring what its name says.
+Measured through the runtime's own loader, on the fixture, with the same stub the test uses:
+
+    drawn surfaces   124
+    textured           0
+    unavailable      124, of which 20 say no surface_material record dresses them and 104 say a
+                     texture set could not be read
+
+So the field is correctly named and 124 is right. The equality with the drawn count is an artefact
+of THE TEST rather than of the fixture: it passes a `fetchSet` that throws, so no set is ever
+prepared and every surface carrying a material reference is unavailable for that reason. The
+fixture's sets are real published ones. A run that fetched them would report a smaller number, and
+anybody reading 124 as "how much of this tile has no material" would be wrong by a factor of six.
