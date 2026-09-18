@@ -1,5 +1,9 @@
 """Read a baked container's entries through the tessellator's own decoder.
 
+Used by ``scripts/bake_corridor_tiles.py``, by the corridor's drawn-surface evidence script and by
+``tests/test_drawn_surfaces_are_dressed.py``. One reader, three callers: a second implementation
+that disagreed with this one would disagree silently.
+
 Python has no reader for the ``owd`` container and should not grow one: two readers that disagreed
 would be worse than none, and the disagreement would be silent. So this hands a small TypeScript
 program to the tessellator's own decoder and document reader and takes back what they say.

@@ -146,43 +146,44 @@ small request for a whole city, rather than a revalidation per tile.
 
 ## 7. What draws today, and what does not
 
-Measured from the container the route served for tile (2, 0), baked by tessellator 5 at main
-dee8567d, not from what any lane expects to be true. The counts below are
-`docs/artifacts/corridor/corridor-drawn.log.txt`, written by the script beside it from a container
-and the document it was baked from; it maps each entry to its record through the tessellator's own
-document reader, because the container states one entry per record in its own sorted order and
-reading that order by eye gets it wrong. The tessellator lane has
-massing and facades built on its branch, unmerged, so most of this table is queued rather than
-unwritten.
+Measured from the container the route served for tile (2, 0), baked by tessellator 11 at main
+7c0280f2. The counts are `docs/artifacts/corridor/corridor-drawn.log.txt`, written by the script
+beside it from a container and the document it was baked from, and every bake writes the same
+measurement into its own row's receipt, so the number exists whether or not anybody goes to look.
+Both map each entry to its record through the tessellator's own document reader, because the
+container states one entry per record in its own sorted order and reading that order by eye gets it
+wrong.
 
-`render_batch` holds **596 triangles** across **4 drawn entries** of the tile's 4 149: three street
-segments, each drawing its carriageway and its gutter dressed by their material records, 8
-triangles apiece, and the tile's terrain, 572 triangles drawn as the unavailable state because no
-material dresses it. **850 entries state unavailable**, and each one names the expander it waits
-for:
+`render_batch` holds **32 834 triangles** across **476 drawn entries** of the tile's 4 149: 168
+facades, 89 rooftop objects, 78 vitrines, 36 pieces of street furniture, 33 parcels, 32 massings,
+30 street trees, 6 curb edges, 3 street segments and the terrain. Of **1 531 drawn surfaces, 1 445
+are dressed** by a material record and 86 are not: 85 facade ground bands and the terrain.
 
-| Waiting on | Entries | The records, and what a person would see when it lands |
+**134 entries state unavailable**, and each names the expander it waits for:
+
+| Waiting on | Entries | The records |
 | --- | --- | --- |
-| `facade_layout` | 538 | 244 ground bays, 168 facades, 75 entrances, 51 interior backings: the frontages, their bays, stall risers, glazing and doors, and the room behind the glass. |
-| `form_parts` | 233 | 89 rooftop objects, 78 vitrines, 36 pieces of street furniture, 30 street trees: the lamps, benches, bins, shopfronts and trees. |
-| `ring_triangulation` | 65 | 33 parcels, 30 street trees (their pits), 2 blocks: the ground people walk on between the kerb and the frontage. |
-| `massing_faces` | 32 | 32 massings: the building volumes behind the frontages. |
-| `crossing_band` | 6 | 6 crossings: the zebras. |
-| `kerb_offset` | 6 | 6 curb edges: the kerb line and the footways beside it. |
+| `facade_layout` | 126 | 75 entrances and 51 interior backings: the recessed doorways, and the plane that closes a shop window. |
+| `crossing_band` | 6 | The zebras. |
+| `ground_coverage` | 2 | The two blocks' own ground, where no lot covers it. |
 
-The column sums to 880 and there are 850 entries, because thirty of them name two. They are the
-street trees: a tree waits on `form_parts` for its trunk and canopy and on `ring_triangulation`
-for its pit, and it says both rather than picking one.
+`nav_envelope` holds **39 863 triangles**, and this is where the street is still not a street: see
+section 8.
 
-`nav_envelope` holds **37 052 triangles** over **31 517 vertices**, so the street is already
-walkable: a capsule can stand on it and walk the 126 m along a carriageway with bare ground either
-side of it. That asymmetry is the honest state of this lane. The records are complete and gated;
-the tessellator draws four of the tile's 4 149 entries; and the question this lane exists to
-answer, whether the street reads as inhabited, cannot be asked of a picture until `facade_layout`
-lands, because it alone holds 538 of the 850 entries that are waiting.
+**The 85 undressed ground bands are not on the street.** At the two frontage planes what draws is
+wall, fascia, shopfront frame and stall riser, every one dressed, and no ground band at all,
+because the corridor's frontages are covered by bays end to end and the band role is only the part
+no bay covers. All 85 are interior: 54 on party walls between neighbours, 31 on rear walls. The
+north terrace is eight buildings from x 258 900 to 381 100 with no gap between any of them, so
+none of those faces can be seen from the footway.
 
-Nothing here is a defect of the records. Every unavailable entry names a reason, and a reader can
-tell a surface nobody has dressed from a surface nobody has yet triangulated.
+They are visible anyway, and that is worth understanding before looking at a picture of this
+street. The 51 interior backings are not drawn, so a shop window has nothing behind it: looking
+into a shopfront you are looking through the building at the inside of the terrace, where a 5.2 m
+undressed band glows. **The caption is "you are seeing through the building", not "the frontage is
+undressed"**, and every picture taken before `facade_layout` finishes its interior backings needs
+that sentence to be read correctly. A picture that needs that sentence is not a picture of the
+street: it is a picture of a stage.
 
 ## 8. The walk, and the pose it starts from
 
@@ -210,18 +211,28 @@ The walk starts on the wider footway, in the middle of it, at the western end of
 Read into the development evaluation route, that is
 `?preview=1&city=<seed>&tile_x=2&tile_y=0&pose_x_mm=262000&pose_y_mm=70300&facing_dx=1&facing_dy=0`.
 
-**What the pictures must not imply.** Until `kerb_offset` lands, the footway this pose stands on
-does not draw at all: a curb edge carries the kerb and the footway together, and it is waiting.
-When `ring_triangulation` lands, the pale ground at the base of the frontages will be the
-**parcels' lot ground**, which is the private ground behind the frontage line, and not the footway.
-A caption that calls it a pavement is wrong.
+**What the walk found, and what it costs.** The footway now draws, and the navigation envelope
+carries it: at the stated pose the surface under the walker is the footway at 170 mm, not the
+terrain below it. But **56 m of the 116 m has no walkable surface at all**. Sampling the envelope
+every 500 mm along three lines across the footway's width gives seven unsupported runs of about
+8 m: x 264 000 to 272 000, 277 000 to 285 000, 289 500 to 297 500, 315 000 to 323 500, 328 000 to
+336 000, 353 500 to 361 500 and 366 000 to 374 500.
 
-And the walker is not standing on the footway in any sense yet, which is worth stating exactly
-rather than loosely. The curb edge is unavailable in the **navigation** projection too, not only in
-the drawn one: `docs/artifacts/corridor/corridor-drawn.log.txt` shows `nav_envelope` waiting on
-`kerb_offset` for the same six curb edges. What holds the walker up at this pose is the terrain
-grid, which is level at **0 mm** across the whole tile because the corridor states no relief. The
-footway will stand a kerb above that, **167 mm** on the north side. So the walk happens 167 mm
-below the pavement it will one day be on, and the kerb a person would step up is not there to step
-on. The picture will not show any of that, which is the point: a person can stand where nothing is
-drawn, and a screenshot of it looks like a person standing on something.
+Seven runs, seven street trees, at x 268 089, 280 868, 293 647, 319 205, 331 984, 357 542 and
+370 321, each stating a plan extent of 7 972 mm, which is its CANOPY. The tessellator carves
+support clear of what the navigation table says obstructs a capsule, and for a street tree it reads
+the record's whole stated plan extent rather than its parts, so each tree removes eight metres of
+pavement. The grammar says the opposite in as many words: a tree's pit is drawn ground a person may
+stand on, its trunk obstructs as a low part, and its canopy stands a capsule height above every
+support it overhangs. The records and the tessellator disagree about what a tree is, and half the
+pavement is the difference. It is tess's to resolve, by reading the parts.
+
+The carriageway is continuous: every sample along y 64 000 is supported. A walk down the middle of
+the road is not the walk this gate scores and should not be presented as one, but it is 116 m of
+street with both frontages in view and nothing under the feet that is a lie.
+
+**What the pictures must not imply.** The pale ground at the base of the frontages is the
+**parcels' lot ground**, the private ground behind the frontage line, and not the footway. And the
+magenta seen through every shop window is the inside of the terrace, not an undressed frontage: see
+section 7. A frame that would need either sentence to be read correctly is evidence of a stage, not
+a picture of a street, and should not be used where the sentence cannot travel with it.

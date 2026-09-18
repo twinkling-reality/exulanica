@@ -17,6 +17,14 @@ still generated and the city's reference closure still checked; only the bake an
 narrowed. That is for the case where the tessellator refuses one tile and the others are wanted in
 the store meanwhile, which is a state to say out loud rather than a reason to record nothing.
 
+EVERY BAKE MEASURES WHAT IT DREW, and keeps the measurement in the row's receipt: how many
+surfaces were drawn, how many a material record dresses, which ones none dresses by kind and role,
+and what each record that did not draw is waiting for. That is derived from the container itself
+rather than from a list of the kinds worth asking about, so it cannot go quiet about a kind nobody
+anticipated. Twice in one day a surface was drawn with nothing dressing it and no gate said so,
+because each gate was asking about the kinds somebody had thought of. A bake that carries its own
+count means nobody has to remember to go and ask.
+
 It never bakes inside a request, never writes to ``assets/``, and connects as whatever role the
 URL names; recording a tile needs the owner, because a baked tile is published by this offline
 bake and never by a runtime process.
@@ -30,9 +38,11 @@ import os
 import subprocess
 import sys
 import tempfile
+from collections import Counter
 from pathlib import Path
 
 import psycopg
+from owd_entries import projections, undressed
 from exulanica.grammar.grammars.city.catalogs import load_city_catalogs
 from exulanica.grammar.grammars.city.document import document_bytes, validate_city_document
 from exulanica.grammar.grammars.city.generation.corridor import (
@@ -59,6 +69,29 @@ from psycopg.rows import dict_row
 ROOT = Path(__file__).resolve().parents[1]
 CLI = ROOT / "web" / "packages" / "loom-tess" / "src" / "node" / "cli.ts"
 TSX = ROOT / "web" / "node_modules" / ".bin" / "tsx"
+
+
+def measure(container: Path, document: Path) -> dict[str, object]:
+    """What the container drew, and what it left undressed or undrawn, from the container itself.
+
+    Derived rather than listed: every surface the bake states it drew is asked whether a material
+    record dresses it, so a kind nobody anticipated appears here the first time something draws it.
+    """
+    render_batch = next(p for p in projections(container, document) if p["name"] == "render_batch")
+    surfaces = [surface for entry in render_batch["entries"] for surface in entry["surfaces"]]
+    bare = Counter(f"{surface.kind} {surface.role}" for surface in undressed(render_batch))
+    waiting: Counter[str] = Counter()
+    for entry in render_batch["entries"]:
+        if entry["state"] == "unavailable":
+            waiting.update(entry["needs"] or ["(states no need)"])
+    return {
+        "entries": len(render_batch["entries"]),
+        "surfaces": len(surfaces),
+        "dressed": len(surfaces) - sum(bare.values()),
+        "undressed": dict(sorted(bare.items())),
+        "waiting": dict(sorted(waiting.items())),
+        "triangles": render_batch["triangles"],
+    }
 
 
 def bake(document: Path, container: Path) -> dict[str, object]:
@@ -158,6 +191,7 @@ def main() -> int:
                 document_path.write_bytes(data)
                 statement = bake(document_path, container_path)
                 container = container_path.read_bytes()
+                drawn = measure(container_path, document_path)
                 if hashlib.sha256(container).hexdigest() != statement["container_sha256"]:
                     raise SystemExit("the bake's statement and its bytes disagree")
                 outcome = repository.record(
@@ -179,6 +213,7 @@ def main() -> int:
                         statement["triangle_digests"]["nav_envelope"]
                     ),
                     receipt={
+                        "drawn": drawn,
                         "stage": spec.key,
                         "stage_version": spec.version,
                         "container": spec.params["container"],
@@ -197,7 +232,17 @@ def main() -> int:
                         outcome,
                     )
                 )
-                print(pass_name, tile.tile_x, tile.tile_y, key, len(container), outcome)
+                print(
+                    pass_name,
+                    tile.tile_x,
+                    tile.tile_y,
+                    key,
+                    len(container),
+                    outcome,
+                    f"drawn {drawn['surfaces']} surfaces, {drawn['dressed']} dressed,",
+                    f"undressed {drawn['undressed'] or 'none'},",
+                    f"waiting {drawn['waiting'] or 'nothing'}",
+                )
     second = [outcome for pass_name, _t, _k, _b, outcome in outcomes if pass_name == "second"]
     if set(second) != {"identical"}:
         print(f"a second bake answered {sorted(set(second))}, not identical", file=sys.stderr)

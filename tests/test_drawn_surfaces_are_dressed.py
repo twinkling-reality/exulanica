@@ -20,22 +20,37 @@ dresses, and a disappearing one because the fixture was dressed.
 
 from __future__ import annotations
 
+import importlib.util
 import subprocess
+import sys
 from collections import Counter
 from pathlib import Path
 
 import pytest
 
-from owd_entries import projections, undressed
-
 ROOT = Path(__file__).resolve().parents[1]
+
+# The reader lives with the offline tools that bake and measure, and is loaded the way this
+# suite loads any script: by path, so there is one implementation rather than a test's copy.
+_spec = importlib.util.spec_from_file_location("owd_entries", ROOT / "scripts" / "owd_entries.py")
+assert _spec is not None and _spec.loader is not None
+owd_entries = importlib.util.module_from_spec(_spec)
+# Registered before execution because a slots dataclass resolves its own module through
+# sys.modules while the class is being rebuilt, and finds None if the module is not there yet.
+sys.modules[_spec.name] = owd_entries
+_spec.loader.exec_module(owd_entries)
+projections, undressed = owd_entries.projections, owd_entries.undressed
 TSX = ROOT / "web" / "node_modules" / ".bin" / "tsx"
 CLI = ROOT / "web" / "packages" / "loom-tess" / "src" / "node" / "cli.ts"
 DOCUMENT = ROOT / "tests" / "fixtures" / "city-v2" / "tile-document.json"
 
-#: What the fixture draws with no material record, by record kind and surface role. Each is a
-#: material the fixture's own hand-written records never state, not a gap in the city grammar: the
-#: generated city dresses all of these from the published sets.
+#: What the fixture draws with no material record, by record kind and surface role.
+#:
+#: EVERY LINE HERE IS A MATERIAL THE HAND-WRITTEN FIXTURE NEVER STATES, not a gap in the city
+#: grammar. The generated city dresses doors, glazing and every part of a street tree from the
+#: published sets; this tile was written before those sets existed and was never redressed. The
+#: distinction matters because a pin that looked like a list of known grammar gaps would invite
+#: the next reader to treat it as a backlog rather than as a fixture's age.
 UNDRESSED: dict[tuple[str, str], int] = {
     ("city.facade", "door"): 3,
     ("city.facade", "glazing"): 2,

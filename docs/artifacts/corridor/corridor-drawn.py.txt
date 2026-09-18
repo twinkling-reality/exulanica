@@ -11,69 +11,22 @@ container states its entries in ONE MERGED LIST SORTED BY KIND, while the docume
 records and then halo records. Reading the order by eye gives a confident wrong answer. On
 2026-09-17 it said a surface material record was drawing a carriageway, which is nonsense on its
 face and is how the mistake was caught. So this reads both through the tessellator's own decoder
-and document reader, by handing a small TypeScript program to the tessellator's own runtime, rather
-than reimplementing either in Python. Python has no reader for the owd container and should not
-grow a second one: two readers that disagree would be worse than none.
+and document reader, by way of ``scripts/owd_entries.py``, the one bridge the bake and the suite
+also use. Python has no reader for the owd container and should not grow one: two readers that
+disagreed would be worse than none, and they would disagree quietly.
 
 It reads no clock and no network, so two runs over one container agree.
 """
 
-import json
-import subprocess
 import sys
-import tempfile
+from collections import Counter
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[3]
-TSX = ROOT / "web" / "node_modules" / ".bin" / "tsx"
 OUTPUT = ROOT / "docs" / "artifacts" / "corridor" / "corridor-drawn.log.txt"
 
-#: Run inside the tessellator's own runtime: decode the container, read the document, and answer
-#: with the entries mapped to their records. It states no numbers of its own; the counting is below.
-READER = """
-import { readFileSync } from 'node:fs';
-import { decodeOwd } from '<ROOT>/web/packages/loom-tess/src/core/owd.js';
-import { readTileDocument } from '<ROOT>/web/packages/loom-tess/src/core/document.js';
-
-const owd = decodeOwd(new Uint8Array(readFileSync(process.argv[2]))) as any;
-const document = readTileDocument(new Uint8Array(readFileSync(process.argv[3]))) as any;
-const records = document.grammars
-  .flatMap((grammar: any) => [...grammar.owned, ...grammar.halo])
-  .sort((a: any, b: any) => (a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : a.version - b.version));
-
-process.stdout.write(JSON.stringify({
-  records: records.length,
-  projections: Object.values<any>(owd.projections).map((projection: any) => ({
-    name: projection.header.name,
-    triangles: projection.header.triangle_count,
-    vertices: projection.header.vertex_count,
-    entries: projection.header.entries.map((entry: any) => ({
-      kind: records[entry.record]?.kind ?? 'unknown record index',
-      state: entry.state,
-      needs: entry.needs ?? [],
-      surfaces: (entry.surfaces ?? []).map((surface: any) => ({
-        role: surface.role,
-        orientation: surface.orientation,
-        material: surface.material.state,
-        triangles: surface.triangle_count,
-      })),
-    })),
-  })),
-}));
-"""
-
-
-def read(container: Path, document: Path) -> dict:
-    if not TSX.exists():
-        raise SystemExit("web/node_modules is not installed: pnpm install --frozen-lockfile --offline in web/")
-    with tempfile.TemporaryDirectory() as work:
-        program = Path(work) / "read-entries.ts"
-        program.write_text(READER.replace("<ROOT>", str(ROOT)), encoding="utf-8")
-        result = subprocess.run(
-            [str(TSX), str(program), str(container), str(document)],
-            capture_output=True, text=True, check=True,
-        )
-    return json.loads(result.stdout)
+sys.path.insert(0, str(ROOT / "scripts"))
+from owd_entries import projections, undressed  # noqa: E402
 
 
 def counted(pairs) -> list[tuple[str, int]]:
@@ -88,20 +41,19 @@ def main() -> int:
         print(__doc__)
         return 2
     container, document = Path(sys.argv[1]), Path(sys.argv[2])
-    read_back = read(container, document)
+    read_back = projections(container, document)
     lines = [
         "what the tessellator draws of the corridor tile",
         "",
         f"container   {container.name}, {container.stat().st_size} bytes",
         f"document    {document.name}, {document.stat().st_size} bytes",
-        f"records     {read_back['records']}",
+        f"records     {len(read_back[0]['entries'])}",
         "",
     ]
-    for projection in read_back["projections"]:
+    for projection in read_back:
         entries = projection["entries"]
         lines.append(
-            f"== {projection['name']}: {projection['triangles']} triangles, "
-            f"{projection['vertices']} vertices, {len(entries)} entries"
+            f"== {projection['name']}: {projection['triangles']} triangles, {len(entries)} entries"
         )
         for state, count in counted(entry["state"] for entry in entries):
             lines.append(f"   {count:>6}  {state}")
@@ -115,9 +67,7 @@ def main() -> int:
                 for entry in drawn
                 for surface in entry["surfaces"]
             ]
-            dressed = sum(
-                1 for entry in drawn for surface in entry["surfaces"] if surface["material"] == "record"
-            )
+            dressed = len(surfaces) - len(undressed(projection))
             lines.append(
                 f"   drawn surfaces: {len(surfaces)}, of which {dressed} dressed by a material "
                 f"record and {len(surfaces) - dressed} with none"

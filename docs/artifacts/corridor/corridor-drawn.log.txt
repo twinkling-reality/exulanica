@@ -1,49 +1,78 @@
 what the tessellator draws of the corridor tile
 
-container   served-2-0.owd, 5607448 bytes
+container   tile-2-0-t11.owd, 9483132 bytes
 document    corridor-tile-2-0.json, 3381852 bytes
 records     4149
 
-== render_batch: 596 triangles, 744 vertices, 4149 entries
+== render_batch: 32834 triangles, 4149 entries
      2076  halo
-     1219  not_in_projection
-      850  unavailable
-        4  drawn
+     1463  not_in_projection
+      476  drawn
+      134  unavailable
    drawn, by record kind:
+      168  city.facade
+       89  city.rooftop_object
+       78  city.vitrine
+       36  city.street_furniture
+       33  city.parcel
+       32  city.massing
+       30  city.street_tree
+        6  city.curb_edge
         3  city.street_segment
         1  city.terrain
-   drawn surfaces: 7, of which 6 dressed by a material record and 1 with none
+   drawn surfaces: 1531, of which 1445 dressed by a material record and 86 with none
+      151  city.facade wall (record, vertical)
+       89  city.rooftop_object object_primary (record, horizontal)
+       89  city.rooftop_object object_primary (record, vertical)
+       89  city.rooftop_object object_secondary (record, horizontal)
+       89  city.rooftop_object object_secondary (record, vertical)
+       85  city.facade ground_band (none-exists, vertical)
+       78  city.vitrine object_primary (record, horizontal)
+       78  city.vitrine object_primary (record, vertical)
+       78  city.vitrine object_secondary (record, horizontal)
+       78  city.vitrine object_secondary (record, vertical)
+       45  city.facade party_wall_scar (record, vertical)
+       40  city.facade ground_band (record, vertical)
+       37  city.facade glazing (record, vertical)
+       36  city.street_furniture object_primary (record, horizontal)
+       36  city.street_furniture object_primary (record, vertical)
+       33  city.parcel lot (record, horizontal)
+       32  city.facade door (record, vertical)
+       32  city.massing roof (record, horizontal)
+       32  city.street_furniture object_secondary (record, horizontal)
+       32  city.street_furniture object_secondary (record, vertical)
+       30  city.street_tree canopy (record, horizontal)
+       30  city.street_tree canopy (record, vertical)
+       30  city.street_tree tree_pit (record, horizontal)
+       30  city.street_tree trunk (record, horizontal)
+       30  city.street_tree trunk (record, vertical)
+       26  city.facade fascia (record, vertical)
+       24  city.facade stall_riser (record, vertical)
+       24  city.massing parapet (record, vertical)
+       21  city.facade shopfront_frame (record, vertical)
+        6  city.curb_edge footway (record, horizontal)
+        6  city.curb_edge kerb (record, horizontal)
+        6  city.curb_edge kerb (record, vertical)
         3  city.street_segment carriageway (record, horizontal)
         3  city.street_segment gutter (record, horizontal)
+        2  city.massing wall (record, vertical)
         1  city.terrain terrain (none-exists, horizontal)
    unavailable, by what each entry waits for:
-      538  facade_layout
-              244  city.ground_bay
-              168  city.facade
+      126  facade_layout
                75  city.entrance
                51  city.interior_backing
-      233  form_parts
-               89  city.rooftop_object
-               78  city.vitrine
-               36  city.street_furniture
-               30  city.street_tree
-       65  ring_triangulation
-               33  city.parcel
-               30  city.street_tree
-                2  city.block
-       32  massing_faces
-               32  city.massing
         6  crossing_band
                 6  city.crossing
-        6  kerb_offset
-                6  city.curb_edge
+        2  ground_coverage
+                2  city.block
 
-== nav_envelope: 37052 triangles, 31517 vertices, 4149 entries
+== nav_envelope: 39863 triangles, 4149 entries
      2076  halo
-     1885  not_in_projection
-      184  unavailable
-        4  drawn
+     1917  not_in_projection
+      146  unavailable
+       10  drawn
    drawn, by record kind:
+        6  city.curb_edge
         3  city.street_segment
         1  city.terrain
    drawn surfaces: 0, of which 0 dressed by a material record and 0 with none
@@ -54,10 +83,6 @@ records     4149
                33  city.parcel
                30  city.street_tree
                 2  city.block
-       32  massing_faces
-               32  city.massing
         6  crossing_band
                 6  city.crossing
-        6  kerb_offset
-                6  city.curb_edge
 
