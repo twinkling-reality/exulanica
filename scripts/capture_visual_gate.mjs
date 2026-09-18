@@ -618,6 +618,11 @@ const READ_TILE = `function () {
   return attached === null || attached === undefined ? null : { ...attached.metrics };
 }`;
 
+const READ_FIELD = `function () {
+  const world = this.navigationWorld;
+  return { centreX: world.centre.x, centreZ: world.centre.z, fieldRadius: world.fieldRadius };
+}`;
+
 const READ_OBSTACLES = `function () {
   return (this.navigationWorld.polygonObstacles ?? []).map((obstacle) => ({
     id: obstacle.id,
@@ -1007,7 +1012,24 @@ async function main() {
         'collision solids and nothing in them stops a body.',
       );
     }
-    const plan = planRoute([arrival.x, arrival.z], routeRings, [west, north, east, south]);
+    // THE FIELD THE WALK IS BOUNDED BY. The owned district states a rectangle in its artifact. A
+    // generated tile states no artifact, and the product bounds a walk on one by a CIRCLE: the
+    // navigation world's centre and fieldRadius. The rule takes a rectangle, so this passes the
+    // square INSCRIBED in that circle, every point of which is inside the field the product
+    // bounds. The conservative direction is the right one here: a rectangle drawn around the
+    // circle would let the rule qualify a heading whose clear run leaves the world, and a route
+    // chosen out there would be scored as if the product allowed it.
+    let field = [west, north, east, south];
+    if (!scoresOwnedDistrict) {
+      const bound = await session.call(bindingId, READ_FIELD);
+      const half = bound.fieldRadius / Math.SQRT2;
+      field = [bound.centreX - half, bound.centreZ - half, bound.centreX + half, bound.centreZ + half];
+      observed.field = { ...bound, inscribedHalfSideM: half, bounds: field };
+      if (!(bound.fieldRadius > 0)) {
+        await halt(`the page bounds its walkable field by a radius of ${bound.fieldRadius}, which bounds nothing`);
+      }
+    }
+    const plan = planRoute([arrival.x, arrival.z], routeRings, field);
     phase(`the route was planned at ${plan.headingMillidegrees} millidegrees`);
 
     const interactions = [];
@@ -1457,6 +1479,8 @@ async function main() {
       opening: observed.opening ?? null,
       route: {
         rule: plan.rule,
+        // What bounded the walk, and how it was derived from what the product states.
+        field: observed.field ?? { bounds: [west, north, east, south], from: options.artifact },
         startMm: [Math.round(plan.start[0] * 1000), Math.round(plan.start[1] * 1000)],
         headingMillidegrees: plan.headingMillidegrees,
         clearRunMm: plan.clearRunMm,

@@ -92,6 +92,41 @@ opening at a stated pose, for two reasons in the product rather than in the gate
 Both are asked of the lanes that own those files. Until they are answered the gate binds the walk it
 read and the pose the page reported, and does not claim to have checked that the page honoured it.
 
+## The run with the rings carried, predicted before it was run
+
+Written and committed before the server was restarted, so these can be checked rather than fitted.
+The first prediction of sixteen was right and the zero beside it was informative only because it was
+committed first.
+
+**Predicted:**
+
+- the ringless halt does NOT fire;
+- `routeObstacleRings` is **16**, the same sixteen `routeObstructionRings` reads from the container,
+  because the runtime states `obstacles.length + refused.length === rings.length` and its refusals
+  are empty on this tile. A different number is a finding and the difference is the refused list;
+- `frontageBothSidesSamples` on the winner is **above zero, and I expect it high rather than low**.
+  I revised this upward on reading the rule's own numbers rather than guessing from the tile: the
+  frontage search is 40 m to each side, not a street's width, and the sixteen rings sit in a patch
+  about 19 m by 28 m. A ray passing anywhere near that patch has something within 40 m on both
+  sides for many of its 126 samples. If it comes back zero, the rings are further from every
+  qualifying heading than they look in plan;
+- the route length is 125 m plus a 6 m stopping margin, so a heading has to clear 131 m inside a
+  tile 128 m across. **I expect no heading to clear it**, and the rule to refuse with "no heading
+  from the arrival pose clears the route length". That refusal is the rule working: the tile is
+  smaller than the walk the gate measures;
+- the eight mechanical keys are therefore expected NOT to be reached. If the route is refused, the
+  brief's expectation that they FAIL on this tile stays untested, and that is a fact about the tile
+  being 128 m rather than about the keys.
+
+**The field a generated walk is bounded by** is read from the page for the first time in this run.
+The owned district states a rectangle in its artifact; a tile states none, and the product bounds a
+walk on one by a circle, the navigation world's centre and `fieldRadius`. The gate passes the square
+INSCRIBED in that circle, every point of which is inside the field the product bounds. Before this
+change the generated target was passing `[0, 0, 0, 0]`, which bounds nothing: every heading pointing
+away from the origin had an unbounded clear run. No generated run had reached the rule, so nothing
+had ever used those bounds, but a record made with them would have described a walk in a field the
+product never allowed.
+
 ## The run with rings, predicted before it was run
 
 Written before the run, and before the server was started, so the numbers below can be checked
