@@ -532,6 +532,37 @@ inside tile (2, 0)'s western edge at 256,000, so a heading due east has 122,000 
 street is 116,600 mm frontage to frontage and the committed walk is 116,000 mm; the gate's route is
 longer than the street it was built to score.
 
+**THE WINDOW, COMPUTED RATHER THAN INFERRED, because shortening the route does not rescue it.** A
+fourth number decides this and it is a KEY THRESHOLD rather than harness configuration:
+`minimumWalkedMm` is 120,000 and `usefulEyeLevelMovement` requires at least that much walked.
+
+    due east from the committed pose
+      room                        122,000
+      so a route must fit         <= 116,000   (122,000 less the 6,000 margin)
+      and the key demands         >= 120,000
+      WINDOW                      [120,000 .. 116,000]   EMPTY, the two cross by 4,000 mm
+
+    due east from the tile's western edge instead
+      room                        128,000
+      WINDOW                      [120,000 .. 122,000]   OPEN, 2,000 mm wide
+      and such a walk runs        3,400 to 5,400 mm past the 116,600 mm frontage
+
+So there is NO route length that both fits east from the committed pose and satisfies the key's
+minimum walk. **The binding constraint is the pose's 6,000 mm inset from the tile edge, not the
+street's length.** And at the western edge the window that opens is 2,000 mm wide and every walk in
+it ends past the frontage, which is where a walker steps off the pavement onto a junction.
+
+**Four numbers, and only some are free.** The route length is harness configuration that the rubric
+calls "roughly 125 m" and never names as a constant, so changing it needs no rubric change; it is
+nonetheless written twice, in `keys.ts` and again in `gate_keys.py`, which is two sources for one
+number. The stopping margin is harness configuration. THE MINIMUM WALK IS A KEY THRESHOLD and
+changing it needs a reconciliation record. The pose is the corridor lane's committed walk, chosen
+before any of this was known and deliberately left alone by that lane once it learned something
+interesting sat past its end.
+
+This is arithmetic and not a recommendation. Nothing here proposes moving any of the four, and this
+lane will not: three of them are somebody else's and the fourth is a key.
+
 **So the single most likely outcome is a refusal**, and it is the rule's own: "no heading from the
 arrival pose clears the route length; the route cannot be walked". Rays to the far corners are 140.8
 and 135.0 m, so the field alone admits some diagonals, but a diagonal from a footway crosses the
