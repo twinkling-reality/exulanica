@@ -38,9 +38,21 @@ product's own source, and the harness reads the title from there. If the symbol 
 halts, because a derivation that quietly yields nothing would compare an empty expectation against
 an empty title and pass.
 
-**It will not accept a pose a run chose.** A walk pose in the URL is refused. A stated pose belongs
-in a committed file, read by the gate and bound in the record by its digest. The lane a scored run
-judges must never choose where the camera starts.
+**It will not accept a pose a run chose.** A pose is admitted only when a committed file states it,
+the run asks the page for that same pose, and the record binds the file by digest. The URL and the
+file have to agree, and either alone is a refusal: a pose in the URL with no file is a pose this run
+chose, and a file with no pose in the URL is a walk the page was never asked to take. The lane a
+scored run judges must never choose where the camera starts.
+
+The file is named by `--walk` and read strictly, because it is prose. A file that states no walk is
+refused, and so is a file that states two different ones: a reader that took the first match would
+score whichever paragraph came first, and a superseded example would quietly become the opening
+frame. The same walk written twice is one walk.
+
+The comparison is made in the frame the file states, integer millimetres of the city frame and an
+integer facing, against the same four integers in the URL. Converting to the renderer's metres to
+compare would put a frame change inside the gate's own verdict; the renderer pose is a consequence
+of the stated one and the record carries it as measured, not as derived.
 
 **It will not walk a route that nothing chose.** The route rule keeps the headings a capsule can
 walk and then prefers the one with frontage on both sides. Given no collision rings it does not
@@ -54,6 +66,25 @@ have. Those rings are the plan regions a walking capsule is kept clear of: they 
 they drop anything above head height, and they are not collision solids. Nothing in them stops a
 body, so a walk that goes around a bench and a walk that passes through one look the same in a still
 frame.
+
+## What the stated walk cannot yet prove
+
+Written down because a check nobody can exercise is a check nobody has seen refuse anything.
+
+The reader and the agreement rule are exercised by tests that run the harness itself, and each was
+falsified by removing the check and watching the test fail. What is NOT exercised is a real page
+opening at a stated pose, for two reasons in the product rather than in the gate:
+
+- the committed golden route passes a literal `pose: null`, so the one target that needs no
+  credential cannot take a stated pose at all. A stated pose is reachable only on the routes that
+  fetch a container with a credential;
+- the page states which of the two it did only as a sentence on screen, "Opened at a stated pose"
+  against "Opened at this runtime's default pose". Reading that by parsing the sentence would make a
+  scored verdict depend on wording, and the failure direction is the wrong one: a reworded default
+  line would read as a stated pose and the gate would pass a frame nobody stated.
+
+Both are asked of the lanes that own those files. Until they are answered the gate binds the walk it
+read and the pose the page reported, and does not claim to have checked that the page honoured it.
 
 ## The first run of the generated target, predicted before it was run
 

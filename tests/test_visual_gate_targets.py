@@ -11,6 +11,8 @@ from __future__ import annotations
 import copy
 import json
 import re
+import shutil
+import subprocess
 from pathlib import Path
 
 import pytest
@@ -198,3 +200,150 @@ def test_every_declared_title_is_one_the_product_states():
         assert stated.group(1).strip(), (
             f"{target.title_symbol} is empty, which equals an empty title"
         )
+
+
+# -- the walk a committed file states, through the harness itself ---------------------------------
+
+WEB = ROOT / "web"
+TSX = WEB / "node_modules/.bin/tsx"
+CORRIDOR_WALK = ROOT / "docs/generated-corridor-street.md"
+WALK_PARAMETERS = ("pose_x_mm", "pose_y_mm", "facing_dx", "facing_dy")
+
+
+def _node(*arguments: str) -> subprocess.CompletedProcess[str]:
+    """Run something under the web toolchain's tsx, because the harness imports TypeScript."""
+    if not TSX.exists():
+        pytest.skip(f"the web toolchain is not installed ({TSX} is missing); run pnpm install in web/")
+    if shutil.which("node") is None:
+        pytest.skip("node is not on PATH")
+    return subprocess.run(
+        [str(TSX), *arguments], cwd=WEB, capture_output=True, text=True, timeout=300
+    )
+
+
+def _read_walk(tmp_path: Path, text: str) -> dict[str, object]:
+    """What the harness's own reader makes of `text`: the walk, or the refusal it raised."""
+    source = tmp_path / "walk.md"
+    source.write_text(text)
+    driver = tmp_path / "read-walk.mjs"
+    driver.write_text(
+        "import { readFileSync } from 'node:fs';\n"
+        f"const harness = await import({str(HARNESS)!r});\n"
+        f"const text = readFileSync({str(source)!r}, 'utf8');\n"
+        "try { console.log(JSON.stringify({ walk: harness.statedWalkOf(text) })); }\n"
+        "catch (error) { console.log(JSON.stringify({ refused: error.message })); }\n"
+    )
+    result = _node(str(driver))
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout.strip().splitlines()[-1])
+
+
+def test_the_committed_corridor_walk_reads_as_exactly_one_walk(tmp_path):
+    """The file the gate will bind states one walk, and the harness reads it as one.
+
+    The values are not pinned here. The corridor owns where its walk begins and may move it; what
+    this holds is that the file states a walk at all, states only one, and states it in whole
+    millimetres, which is what makes a bound pose reproducible.
+    """
+    read = _read_walk(tmp_path, CORRIDOR_WALK.read_text())
+    assert "refused" not in read, read
+    walk = read["walk"]
+    assert set(walk) == {"xMm", "yMm", "facingDx", "facingDy"}
+    assert all(isinstance(value, int) for value in walk.values()), walk
+    assert (walk["facingDx"], walk["facingDy"]) != (0, 0), "a facing of no direction states nothing"
+
+
+def test_a_file_stating_no_walk_is_refused_by_name(tmp_path):
+    read = _read_walk(tmp_path, "This paragraph mentions a walk and states no pose.")
+    assert "walk" not in read, read
+    for name in WALK_PARAMETERS:
+        assert name in read["refused"], read
+
+
+def test_a_file_stating_two_different_walks_is_refused_rather_than_chosen_between(tmp_path):
+    """Two walks in one file is the failure a lenient reader would hide.
+
+    A reader that took the first match would score whichever paragraph came first, and a superseded
+    example would silently become the opening frame of a scored run.
+    """
+    read = _read_walk(
+        tmp_path,
+        "one `?pose_x_mm=262000&pose_y_mm=70300&facing_dx=1&facing_dy=0`\n"
+        "two `?pose_x_mm=320000&pose_y_mm=70300&facing_dx=1&facing_dy=0`\n",
+    )
+    assert "walk" not in read, read
+    assert "262000" in read["refused"] and "320000" in read["refused"], read
+
+
+def test_one_walk_written_twice_is_one_walk(tmp_path):
+    """Repetition is not disagreement: a file may state its walk in prose and again in a table."""
+    stated = "`?preview=1&tile_x=2&pose_x_mm=262000&pose_y_mm=70300&facing_dx=1&facing_dy=0`"
+    read = _read_walk(tmp_path, f"{stated}\nand again later: {stated}\n")
+    assert read == {"walk": {"xMm": 262000, "yMm": 70300, "facingDx": 1, "facingDy": 0}}
+
+
+@pytest.mark.parametrize(
+    "written",
+    ["pose_x_mm=262000.5&pose_y_mm=70300&facing_dx=1&facing_dy=0", "pose_x_mm=262000&pose_y_mm=70300&facing_dx=1"],
+)
+def test_a_walk_stated_incompletely_or_in_fractions_is_not_a_walk(tmp_path, written):
+    read = _read_walk(tmp_path, f"`?{written}`")
+    assert "walk" not in read, read
+
+
+def _harness_halt(tmp_path: Path, search: str, walk: str | None) -> str:
+    """The reason the harness stopped, from the halt it writes, for a run that never opens a browser.
+
+    The walk rule is checked before Chrome is launched, so these runs cost no browser and no server:
+    a halt here is the refusal itself and not a failure to reach a page.
+    """
+    out = tmp_path / "out"
+    arguments = [
+        str(HARNESS), "--target", "generated-tile-evaluation",
+        "--app", f"http://127.0.0.1:1/{search}", "--out", str(out), "--label", "walk-rule",
+    ]
+    if walk is not None:
+        arguments += ["--walk", walk]
+    result = _node(*arguments)
+    assert result.returncode == 3, (result.returncode, result.stdout, result.stderr)
+    halted = json.loads((out / "walk-rule-halt.json").read_text())
+    assert halted["halted"] is True
+    return halted["reason"]
+
+
+def test_a_pose_the_run_chose_is_refused_when_no_committed_file_states_it(tmp_path):
+    reason = _harness_halt(
+        tmp_path,
+        "?preview=1&tile=tile-conformance&pose_x_mm=1&pose_y_mm=2&facing_dx=1&facing_dy=0",
+        walk=None,
+    )
+    assert "chosen per run" in reason and "--walk" in reason, reason
+
+
+def test_a_committed_walk_the_page_was_never_asked_to_take_is_refused(tmp_path):
+    """A file naming a walk, and a URL that opens somewhere else, is not a stated walk.
+
+    The record would name a pose nobody walked from. Both halves have to agree or the binding says
+    nothing about the frame that was captured.
+    """
+    reason = _harness_halt(tmp_path, "?preview=1&tile=tile-conformance", walk=str(CORRIDOR_WALK))
+    assert all(name in reason for name in WALK_PARAMETERS), reason
+    assert "unset" in reason, reason
+
+
+def test_a_run_asking_for_a_different_walk_than_the_file_states_is_refused(tmp_path):
+    reason = _harness_halt(
+        tmp_path,
+        "?preview=1&tile=tile-conformance&pose_x_mm=262000&pose_y_mm=70300&facing_dx=0&facing_dy=1",
+        walk=str(CORRIDOR_WALK),
+    )
+    assert "facing_dx" in reason and "facing_dy" in reason, reason
+    # The parameters that agree are not named as differences.
+    assert "pose_x_mm" not in reason and "pose_y_mm" not in reason, reason
+
+
+def test_a_walk_outside_the_repository_is_refused(tmp_path):
+    outside = tmp_path / "somebody-elses-walk.md"
+    outside.write_text("`?pose_x_mm=1&pose_y_mm=2&facing_dx=1&facing_dy=0`")
+    reason = _harness_halt(tmp_path, "?preview=1&tile=tile-conformance", walk=str(outside))
+    assert "outside the repository" in reason, reason

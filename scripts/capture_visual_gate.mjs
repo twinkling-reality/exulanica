@@ -29,7 +29,8 @@
  * WHICH PAGE IT SCORED is stated by --target, and the page is checked against that target's own
  * rule: its path, the parameters it is reached with, and the exact title the PRODUCT states for it
  * (read from the product's source, never written here). A page that matches no target, a title that
- * cannot be derived, a pose chosen in the URL, or a route rule with no rings to choose between all
+ * cannot be derived, a pose the run chose rather than one a committed file states, or a route
+ * rule with no rings to choose between all
  * halt rather than scoring something easier. The targets are declared in TARGETS below and in
  * exulanica/evaluation/gate_keys.py, and a test holds the two lists to each other.
  *
@@ -42,7 +43,7 @@ import { createHash } from 'node:crypto';
 import { mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute, join, relative, resolve } from 'node:path';
 import { setTimeout as sleep } from 'node:timers/promises';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import {
   CAPTURE_LABELS,
   GATE_KEY_SET_VERSION,
@@ -116,6 +117,43 @@ class Halt extends Error {}
  */
 const observed = {};
 
+/** The four values a stated walk is made of, in the frame the file states them in. */
+const WALK_PARAMETERS = Object.freeze(['pose_x_mm', 'pose_y_mm', 'facing_dx', 'facing_dy']);
+
+/**
+ * The walk a committed file states: integer millimetres of the city frame and an integer facing,
+ * read out of the preview route the file writes.
+ *
+ * Strict because the file is prose. A reader that took the first thing it recognised would take a
+ * pose from an example, from a superseded paragraph or from a second walk, and nothing downstream
+ * could tell. Zero refuses, more than one distinct pose refuses, and both refusals say what was
+ * found. It does not re-state the product's own rules about what a pose may be: the product refuses
+ * a malformed one, and a gate that repeats those rules here would be a second source for them.
+ */
+export function statedWalkOf(text) {
+  const found = new Map();
+  for (const run of text.matchAll(/[^\s`'"]*pose_x_mm=[^\s`'"]*/g)) {
+    const query = run[0].includes('?') ? run[0].slice(run[0].indexOf('?') + 1) : run[0];
+    const parameters = new URLSearchParams(query);
+    const values = WALK_PARAMETERS.map((name) => parameters.get(name));
+    if (values.some((value) => value === null || !/^-?\d+$/.test(value))) continue;
+    found.set(values.join(','), values.map(Number));
+  }
+  if (found.size === 0) {
+    throw new Halt(
+      `no walk is stated there: nothing in the file states all of ${WALK_PARAMETERS.join(', ')} as whole numbers`,
+    );
+  }
+  if (found.size > 1) {
+    throw new Halt(
+      `${found.size} different walks are stated there (${[...found.keys()].join(' and ')}); a scored ` +
+      'run will not choose between them',
+    );
+  }
+  const [xMm, yMm, facingDx, facingDy] = [...found.values()][0];
+  return { xMm, yMm, facingDx, facingDy };
+}
+
 function argument(name, fallback) {
   const index = process.argv.indexOf(`--${name}`);
   if (index >= 0 && process.argv[index + 1] !== undefined) return process.argv[index + 1];
@@ -128,7 +166,13 @@ const options = {
   target: argument('target', 'owned-district'),
   artifact: argument('artifact', 'assets/owned-world/flatiron/flatiron-owned-district.json'),
   renderer: argument('renderer', 'web/packages/atlas-react/src/playcanvas/owned-district-runtime.ts'),
-  out: argument('out'),
+  // The committed file that states where this walk begins. The gate reads the pose from it and
+  // binds its digest, so a scored frame is one somebody stated in advance rather than one this run
+  // chose. Empty means no walk was stated, which is only allowed when the URL states no pose either.
+  walk: argument('walk', ''),
+  // Required to run, checked where the run begins rather than where the module loads, so the
+  // readers above can be imported without a directory to write into.
+  out: argument('out', ''),
   label: argument('label', 'run'),
   port: Number(argument('cdp-port', '9351')),
   // The product caps its own measuring window at 60 seconds.
@@ -584,6 +628,7 @@ const READ_OBSTACLES = `function () {
 // ---- the run ---------------------------------------------------------------------------------
 
 async function main() {
+  if (options.out === '') throw new Halt('--out is required');
   const out = resolve(options.out);
   mkdirSync(out, { recursive: true });
   const profile = join(out, `.chrome-profile-${options.label}`);
@@ -618,14 +663,40 @@ async function main() {
       `${selectors.length === 0 ? 'none' : selectors.join(' and ')}`,
     );
   }
-  // A pose in a URL is a choice the run makes, and the lane a scored run judges must never choose
-  // where the camera starts. A stated pose belongs in a committed file the record binds by digest.
-  const posed = ['pose_x_mm', 'pose_y_mm', 'facing_dx', 'facing_dy'].filter((name) => search.get(name) !== null);
-  if (posed.length > 0) {
+  // Where the camera starts is not this run's to choose: the lane a scored run judges must never
+  // pick a flattering opening. A pose is admitted only when a committed file states it, the run
+  // asks the page for that same pose, and the record binds the file by digest. So the URL and the
+  // file must agree, and either one alone is a refusal: a URL pose with no file is a pose this run
+  // chose, and a file with no URL pose is a walk the page was never asked to take.
+  const posed = WALK_PARAMETERS.filter((name) => search.get(name) !== null);
+  if (options.walk === '' && posed.length > 0) {
     throw new Halt(
       `a scored run refuses a pose chosen per run (${posed.join(', ')}); a stated pose is read from a ` +
-      'committed file and bound by its digest',
+      'committed file named by --walk and bound by its digest',
     );
+  }
+  if (options.walk !== '') {
+    const walkPath = relative(ROOT, resolve(options.walk));
+    if (walkPath.startsWith('..') || isAbsolute(walkPath)) {
+      throw new Halt(`--walk ${options.walk} is outside the repository, so no committed file states it`);
+    }
+    const bytes = readFileSync(join(ROOT, walkPath));
+    const stated = statedWalkOf(bytes.toString('utf8'));
+    observed.statedWalk = {
+      path: walkPath, byteSize: bytes.byteLength, sha256: sha256(bytes), ...stated,
+    };
+    // Compared as the integers both sides state, in the frame the file states them in. Converting
+    // to the renderer's metres to compare would put a frame change inside the gate's own verdict,
+    // and the renderer pose is a consequence of this one, recorded as measured rather than derived.
+    const asked = Object.fromEntries(WALK_PARAMETERS.map((name) => [name, search.get(name)]));
+    const wanted = { pose_x_mm: stated.xMm, pose_y_mm: stated.yMm, facing_dx: stated.facingDx, facing_dy: stated.facingDy };
+    const differ = WALK_PARAMETERS.filter((name) => asked[name] === null || Number(asked[name]) !== wanted[name]);
+    if (differ.length > 0) {
+      throw new Halt(
+        `the run asks for a different walk than ${walkPath} states: ` +
+        differ.map((name) => `${name} ${asked[name] === null ? 'unset' : asked[name]} against ${wanted[name]}`).join(', '),
+      );
+    }
   }
 
   Object.assign(observed, {
@@ -1346,6 +1417,10 @@ async function main() {
         previewApiRequests: previewApi,
       },
       arrival,
+      // The walk somebody stated in advance, with the file it was read from, or null when this
+      // run opened wherever the page opens. A record that says neither is a record that cannot
+      // say whether its opening frame was reproducible.
+      statedWalk: observed.statedWalk ?? null,
       route: {
         rule: plan.rule,
         startMm: [Math.round(plan.start[0] * 1000), Math.round(plan.start[1] * 1000)],
@@ -1449,7 +1524,13 @@ async function main() {
   }
 }
 
-main().catch((error) => {
+// Run only when this file is the program. Imported, it is the pure readers above: the stated walk
+// and the target table can then be exercised without a browser, and a check nobody can exercise is
+// a check nobody has seen refuse anything.
+const invokedDirectly = process.argv[1] !== undefined
+  && import.meta.url === pathToFileURL(resolve(process.argv[1])).href;
+
+if (invokedDirectly) main().catch((error) => {
   const out = process.argv.includes('--out') ? resolve(argument('out')) : null;
   if (error instanceof Halt) {
     if (out !== null) {
