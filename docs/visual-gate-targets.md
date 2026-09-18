@@ -328,6 +328,34 @@ passed, and nothing was adjusted to reach them. The fourth prediction's other ha
 not all hold, stays untested, and so does everything the paragraph above it says about which of them
 a generated target decides on partial inputs.
 
+## A hint about the frontage tie-break, with its n beside it
+
+**A direction, not evidence.** Over all 36 headings the rule qualifies on this tile, each sampled
+every 5 mm for the whole 131 m:
+
+| | no ground | walkable |
+| --- | --- | --- |
+| frontage on both sides | 1 | 1 |
+| no frontage | 0 | 34 |
+
+So the only unwalkable heading is one of the two with any both-sides frontage, and none of the
+thirty-four without frontage lacks ground.
+
+**The mechanism it is consistent with.** The tie-break prefers a line with rings close on both sides;
+the clearance carve removes support within the capsule radius plus its own integer overshoot of every
+ring; so the most enclosed line is by construction the likeliest to run through the band where a ring
+is cleared by the rule and the ground is taken away. If that holds, the ranked walk is load bearing
+rather than a safety net, and the gate will descend the rule's order routinely.
+
+**Why this cannot establish it.** Two headings have frontage at all. One of them is walkable, which is
+a counter-example to any strong reading, and a fixture with one massing record cannot exercise the
+case. The test is a corridor street, which is far more enclosed, and there the same measurement can
+fail. Recorded now so that the prediction exists before the data that could refute it.
+
+One number worth keeping for the ranked walk: the two frontage headings are the first two in the
+rule's order, and the third is already a heading with no frontage at all. On this tile the order runs
+out of frontage immediately; on a street it should not.
+
 ## A key that passes on a surface declaring it has no material
 
 **The block fails today, so nothing is wrongly passed. The risk is what happens when it stops
