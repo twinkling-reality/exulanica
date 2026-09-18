@@ -165,7 +165,15 @@ def test_a_busy_run_keeps_every_rule_and_every_trip_ends_arrived_or_blocked(labe
     assert set(statuses) <= {"arrived", "blocked"}, statuses
     assert all(trip["reason"] for trip in trips if trip["status"] == "blocked")
     # The run must have exercised what it claims to check.
-    network, _ = fixture()
+    network, catalogs = fixture()
+    # Every vehicle class the catalogs hold drove in this run. The coverage is read from the
+    # catalogs, not from the fleet in traffic_scenarios.py, so a class added there later cannot
+    # ride along unexercised while these runs still pass.
+    of_vehicle = {vehicle["id"]: vehicle["vehicle_class"] for vehicle in result.state["vehicles"]}
+    drove = {
+        of_vehicle[event["vehicle_id"]] for event in _documents(result.events, "trip_departed")
+    }
+    assert drove == {entry.key for entry in catalogs.vehicle_classes}, sorted(drove)
     entered = Counter(event["junction"] for event in _documents(result.events, "junction_entered"))
     assert set(entered) == set(network.junctions), entered
     assert _documents(result.events, "crossing_entered")

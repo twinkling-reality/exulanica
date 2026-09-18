@@ -10,10 +10,13 @@ that kind, while the unplanted transition stays clean for that kind.
 
 from __future__ import annotations
 
+import ast
 import copy
 import uuid
 from functools import cache
+from pathlib import Path
 
+from exulanica.traffic import checks as checks_module
 from exulanica.traffic.checks import CHECK_KINDS, TransitionChecker
 from exulanica.traffic.inputs import CrossingEntry, CrossingFeed, TrafficInputs
 from exulanica.traffic.network import JunctionSpec
@@ -115,6 +118,33 @@ def _without_lane(state: dict, lane: str) -> dict:
 
 def test_every_check_kind_has_a_negative_control_here():
     assert PLANTED_KINDS == CHECK_KINDS
+
+
+def test_check_kinds_is_every_kind_the_checker_can_report():
+    """The kinds come out of the checker's source, so a new check cannot go unlisted.
+
+    ``PLANTED_KINDS`` above is this file's claim about the checker and ``CHECK_KINDS`` is the
+    module's own; neither is the checker. A check added without listing it would leave both
+    agreeing and the new kind uncontrolled, so the set is read from every ``Violation`` the
+    module constructs. This proves each kind is named, not that each check is right: the
+    negative controls below are what show them firing.
+    """
+    tree = ast.parse(Path(checks_module.__file__).read_text(encoding="utf-8"))
+    kinds = set()
+    for node in ast.walk(tree):
+        if not (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)):
+            continue
+        if node.func.id != "Violation":
+            continue
+        stated = [*node.args[:1], *(word.value for word in node.keywords if word.arg == "kind")]
+        assert stated, ast.unparse(node)
+        for value in stated:
+            assert isinstance(value, ast.Constant) and isinstance(value.value, str), (
+                f"line {node.lineno}: a violation kind that is not a literal cannot be read here"
+            )
+            kinds.add(value.value)
+    assert len(kinds) >= 5, "the parse found no violation kinds, so it compared nothing"
+    assert kinds == set(CHECK_KINDS)
 
 
 # ---------------------------------------------------------------------------------------------
