@@ -499,8 +499,21 @@ rather than an error in either measurement.
 step at dt 1/30, with the walked line's y constant at `70300` for all 3,000 steps. So this lane's
 claim of the night before, that the walk barely advances, was about the tessellator 13 tree-canopy
 holes and not about the capture or the movement rule. At x `378334` the eye fell 146 mm and the walker
-came to rest at x `383999`, the tile's eastern edge, for the remaining 779 steps: the end of the world
-rather than a hole in it, and a third case neither half had pre-registered.
+came to rest at x `383999` for the remaining 779 steps.
+
+That last stretch was first reported here as "the end of the world" and that was wrong. A third lane
+read the records along the walked line and found the fall is 34 mm past where the Harbour Way 7 left
+kerb ends, with the tile continuing 5.7 m further: it is the end of the PAVEMENT, not of the world,
+and the 146 mm is exactly the footway's own height, so the walker stepped off the footway onto terrain
+at the datum. Reading the trace for x `383000` to `383999` alone confirms it from this side: 797 steps,
+the eye at 1620 for every one of them with no variation, y constant at `70300` throughout. So the
+walked line held and the KERB turned away from it, not the other way about.
+
+**Report a walk as segments by surface, not as one distance.** "121,982 mm continuous" is true and
+hides that the surface changed 5.7 m before the end. A continuity claim is about the walker and says
+nothing about what they were walking on, and neither of this lane's numbers, advance and eye height,
+distinguishes a footway from terrain: only the eye height's VALUE does, and only against a support
+height measured by somebody else.
 
 Two instrument faults came out of it, and only the pair could have found the second.
 
