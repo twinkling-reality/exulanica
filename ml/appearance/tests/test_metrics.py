@@ -2,8 +2,6 @@
 
 from __future__ import annotations
 
-import json
-
 import numpy as np
 import pytest
 from conftest import quad_scene
@@ -164,15 +162,18 @@ def test_decoded_bytes_match_lane_16s_binding_and_pitch_rounds():
     assert texel_pitch_um(1800, 1024) == 1758
 
 
-def test_a_published_container_reads_and_a_changed_byte_is_refused(repository):
-    manifest = json.loads((repository / "assets" / "textures" / "manifest.json").read_bytes())
-    entry = manifest["sets"][0]
+def test_a_published_container_reads_and_a_changed_byte_is_refused(repository, brick_set):
+    entry = brick_set
     raw = (
         repository / "assets" / "textures" / "blobs" / f"{entry['content_sha256']}.ltex"
     ).read_bytes()
     header, maps = read_container(raw, entry)
     assert header["set_id"] == entry["set_id"]
-    assert maps["base_color"].shape == (1024, 1024, 3)
+    # The decoded map is the size the container declares, whatever that size is: the catalog now
+    # publishes 512 px sets beside 1024 px ones, and a hard-coded size tested the catalog's fashion.
+    size = header["resolution"]
+    assert size == entry["resolution"]
+    assert maps["base_color"].shape == (size["height"], size["width"], 3)
     changed = bytearray(raw)
     changed[-1] ^= 1
     with pytest.raises(Refused, match="size and sha256"):

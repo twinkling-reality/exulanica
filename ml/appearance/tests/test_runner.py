@@ -107,7 +107,7 @@ def test_the_seed_rule_and_the_generation_order_are_the_job_s(tmp_path, reposito
     assert listed[0].seed == seed_for("track-a-dry-run", "brick-weathered", "stub", "depth", 0)
 
 
-def test_a_record_names_its_model_by_id_revision_and_digest(tmp_path, repository):
+def test_a_record_names_its_model_by_id_revision_and_digest(tmp_path, repository, brick_set):
     summary = _dry(tmp_path, repository)
     record_path = (
         tmp_path
@@ -123,11 +123,8 @@ def test_a_record_names_its_model_by_id_revision_and_digest(tmp_path, repository
     assert record["guardrails"] == {"enabled": False}
     assert "no people" in record["reasons"]["guardrails"]
     assert record["track"] == "texture"
-    assert record["conditioning"][0]["sources"] == [
-        json.loads((repository / "assets" / "textures" / "manifest.json").read_bytes())["sets"][0][
-            "content_sha256"
-        ]
-    ]
+    # The set the dry run names, not whichever one sorts first in a catalog that keeps growing.
+    assert record["conditioning"][0]["sources"] == [brick_set["content_sha256"]]
 
 
 def test_a_changed_output_is_refused_when_the_results_are_checked(tmp_path, repository):
