@@ -6,7 +6,7 @@ and fails if this file disagrees with the catalog rules.
 This catalog lists living contracts, capability guides, and decision records.
 Start from [README.md](README.md).
 
-**95 documents** in the public catalog.
+**96 documents** in the public catalog.
 
 ## Living contracts and reference
 
@@ -97,7 +97,7 @@ Written for somebody choosing to use the product.
 
 Numbered, and the number is the identifier. Never renumbered.
 
-24 documents.
+25 documents.
 
 - [0002-model-routing](adr/0002-model-routing.md) : - Status: Accepted
 - [0003-renderer-selection](adr/0003-renderer-selection.md) : - Status: ACCEPTED, PlayCanvas Engine 2.21.4. Resolved 2026-08-28 by matched-resolution
@@ -122,4 +122,5 @@ Numbered, and the number is the identifier. Never renumbered.
 - [0022-withdrawal-at-evidence-serving](adr/0022-withdrawal-at-evidence-serving.md) : - Status: Accepted
 - [0023-epistemically-typed-world-memory](adr/0023-epistemically-typed-world-memory.md) : ACCEPTED AS ARCHITECTURE; RESEARCH CLAIMS OPEN
 - [0024-declared-coordinate-quantum](adr/0024-declared-coordinate-quantum.md) : - Status: Accepted
+- [0025-a-doorway-is-a-notch-in-the-building](adr/0025-a-doorway-is-a-notch-in-the-building.md) : - Status: Accepted
 - [gsplat-training-and-recorded-rung](adr/gsplat-training-and-recorded-rung.md) : Date: 2026-09-05. Status: accepted for implementation; CUDA execution remains unverified

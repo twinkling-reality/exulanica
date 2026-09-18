@@ -155,6 +155,7 @@ record is missing from this table.
 | [adr/0022-withdrawal-at-evidence-serving.md](adr/0022-withdrawal-at-evidence-serving.md) | Every evidence entrypoint checks withdrawal before reading stored bytes | ACCEPTED |
 | [adr/0023-epistemically-typed-world-memory.md](adr/0023-epistemically-typed-world-memory.md) | World memory is epistemically typed state; no mesh, graph, field, or latent representation is the whole world | ACCEPTED as architecture; research claims open |
 | [adr/0024-declared-coordinate-quantum.md](adr/0024-declared-coordinate-quantum.md) | Coordinates are exact integers at a quantum a document declares and a reader refuses on mismatch | ACCEPTED |
+| [adr/0025-a-doorway-is-a-notch-in-the-building.md](adr/0025-a-doorway-is-a-notch-in-the-building.md) | A recessed doorway is a notch in the building's footprint, so a person standing in one stands outside it | ACCEPTED |
 | [adr/gsplat-training-and-recorded-rung.md](adr/gsplat-training-and-recorded-rung.md) | Gaussian optimization and the recorded scene rung are separate decisions, so a nonmetric scene can be trained honestly | ACCEPTED for implementation; unnumbered, deliberately |
 
 ## Runtime authority
