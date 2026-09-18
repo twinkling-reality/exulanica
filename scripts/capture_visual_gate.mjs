@@ -1227,6 +1227,91 @@ async function main() {
     };
     phase(`the route was planned at ${plan.headingMillidegrees} millidegrees`);
 
+    // IS THERE GROUND ALONG IT, asked of the product's own surface before a single frame is
+    // captured, because the rule cannot ask.
+    //
+    // MEASURED 2026-09-18, and this is the whole reason it exists. `planRoute` qualifies a heading a
+    // 0.34 m capsule can travel without touching a ring or leaving the field, and it never consults
+    // support: `firstContact` takes ring edges and four field lines and nothing else. The carve that
+    // makes the walkable surface removes support within the capsule radius PLUS its own integer
+    // overshoot, which `ring-clearance.ts` states as under five millimetres. So any line whose
+    // closest approach to a ring falls between the radius and the radius plus that overshoot
+    // QUALIFIES UNDER THE RULE AND HAS NO GROUND UNDER IT. Run four's line passes a bench at
+    // 343.470 mm against a 340 mm radius, which is inside that band, and it walked 52.795 m before
+    // the product refused to move and kept refusing.
+    //
+    // This does not choose a heading and cannot: it refuses the one the rule chose, before the
+    // captures, naming where the ground stops. A run that walks into it instead reports a stalled
+    // walk, which took three runs and two wrong causes to read.
+    //
+    // Sampled at 5 mm rather than at the product's own 0.05 m path spacing: the unsupported run
+    // here is 32 mm and the walker advances about 28 mm a frame, so a probe at the product's
+    // spacing can step over the thing that stops the walk. One batch, about 26,000 points.
+    //
+    // THE GENERATED TARGET ONLY, and that is a limit rather than a judgement. The disagreement was
+    // measured on a tile's carve; whether this check is inert on the owned district has NOT been
+    // measured, because running that target needs the API and a credential this lane does not hold.
+    // A check that has never been run against the one page every retained record scored must not be
+    // able to refuse it. Extending it there needs the product target run before and after, with
+    // every plan field pinned, which is the measurement the orchestrator has asked for.
+    const GROUND_PROBE_SPACING_M = 0.005;
+    const walked = (plan.rule.lengthMm + plan.rule.stopMarginMm) / 1000;
+    const groundProbes = Math.round(walked / GROUND_PROBE_SPACING_M) + 1;
+    const groundPoints = new Float64Array(groundProbes * 2);
+    for (let step = 0; step < groundProbes; step += 1) {
+      groundPoints[step * 2] = plan.start[0] + plan.forward[0] * (step * GROUND_PROBE_SPACING_M);
+      groundPoints[step * 2 + 1] = plan.start[1] + plan.forward[1] * (step * GROUND_PROBE_SPACING_M);
+    }
+    const groundHeights = scoresOwnedDistrict ? new Float64Array(0)
+      : float64FromBase64(await session.call(bindingId, SAMPLE_SUPPORT, [toBase64(groundPoints)]));
+    let firstUnsupported = null;
+    let unsupportedProbes = 0;
+    for (let step = 0; step < groundHeights.length; step += 1) {
+      if (!Number.isNaN(groundHeights[step])) continue;
+      unsupportedProbes += 1;
+      if (firstUnsupported === null) firstUnsupported = step * GROUND_PROBE_SPACING_M;
+    }
+    observed.routeGround = {
+      asked: !scoresOwnedDistrict,
+      probeSpacingM: GROUND_PROBE_SPACING_M,
+      probes: groundHeights.length,
+      lengthM: walked,
+      unsupportedProbes,
+      firstUnsupportedAtM: firstUnsupported,
+    };
+    if (firstUnsupported !== null) {
+      const x = plan.start[0] + plan.forward[0] * firstUnsupported;
+      const z = plan.start[1] + plan.forward[1] * firstUnsupported;
+      let nearest = null;
+      for (const { id, ring } of routeRings) {
+        for (let k = 0; k < ring.length; k += 1) {
+          const a = ring[k];
+          const b = ring[(k + 1) % ring.length];
+          const ex = b[0] - a[0];
+          const ez = b[1] - a[1];
+          const length2 = ex * ex + ez * ez;
+          const t = length2 === 0 ? 0 : Math.max(0, Math.min(1, ((x - a[0]) * ex + (z - a[1]) * ez) / length2));
+          const metres = Math.hypot(x - (a[0] + ex * t), z - (a[1] + ez * t));
+          if (nearest === null || metres < nearest.metres) nearest = { id, metres };
+        }
+      }
+      observed.routeGround.nearestRouteRingAtFirstGap = nearest === null ? null
+        : { id: nearest.id, metres: Number(nearest.metres.toFixed(4)) };
+      await halt(
+        `the route rule chose a heading the product cannot walk: its own navigation surface states ` +
+        `no support ${firstUnsupported.toFixed(3)} m along the ${walked} m line, and ` +
+        `${unsupportedProbes} of ${groundHeights.length} probes at ${GROUND_PROBE_SPACING_M * 1000} mm find ` +
+        `none` +
+        (nearest === null ? '' : `. The nearest route obstruction ring there is ${nearest.metres.toFixed(3)} m away, ` +
+          `against the ${THRESHOLDS.capsuleRadiusMm} mm radius the rule qualifies by`) +
+        '. The rule reads rings and the field and never asks what holds a body up, so a line that ' +
+        'clears every ring by the radius can still cross ground the carve took away. This refuses ' +
+        'the heading rather than walking into it and reporting a stalled walk.',
+      );
+    }
+    phase(scoresOwnedDistrict ? 'the route ground was not asked about on this target'
+      : `the route has support at all ${groundHeights.length} probes`);
+
     const interactions = [];
     const harnessWrites = [];
     const key = async (type, code, keyName, virtual, autoRepeat = false) => {
