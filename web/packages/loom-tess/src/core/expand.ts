@@ -43,6 +43,7 @@ import type { ProjectionName } from './record-shapes.js';
 import { ringClearance } from './ring-clearance.js';
 import { curbSurfaces, junctionSurface, segmentSurfaces } from './streets.js';
 import type { StreetFields, StreetLookup, StreetResult, StripNeed } from './streets.js';
+import { hullKeepingEdges } from './piece-carve.js';
 import { carveSupport } from './support-carve.js';
 import type { ClearanceWalk, SupportTriangle } from './support-carve.js';
 import { coveringsWithArea, metCells, yieldedCell } from './terrain-yield.js';
@@ -52,7 +53,7 @@ import type { CoveringTriangle, TerrainPatch } from './terrain-yield.js';
  * Bumped whenever an expander, a statement, a contract or the materialised projection set
  * changes, because each changes the bytes a bake writes. The bake stage's parameters carry it.
  */
-export const TESSELLATOR_SOURCE_VERSION = 13;
+export const TESSELLATOR_SOURCE_VERSION = 14;
 
 /**
  * What each materialised projection preserves and what it may be used for, as separate rows, the
@@ -101,6 +102,9 @@ export const PROJECTION_DEFINITIONS: readonly ProjectionDefinition[] = [
         'capsule clearance in plan: no support triangle enters the region within the capsule radius its '
           + 'grammar measures of what its navigation table says obstructs, at any height, so a capsule of '
           + 'that radius stood anywhere on support meets none of them',
+        'what obstructs by height: a record whose parts obstruct is read part by part, and only the parts '
+          + 'standing below the capsule height its grammar measures take ground, so what stands over a '
+          + 'person\'s head leaves the ground under it walkable',
       ],
       admissible_uses: ['sampling support height'],
       inadmissible_uses: [
@@ -108,9 +112,9 @@ export const PROJECTION_DEFINITIONS: readonly ProjectionDefinition[] = [
         'collision: clearance is not a solid',
         'deciding walkability: no record states a slope limit, so no slope is refused and the capsule is '
           + 'not checked against rising ground',
-        'deciding that a plan point has no support: a record whose low parts obstruct takes the whole of '
-          + 'its stated plan extent until this tessellator reads those parts, and a record whose rule is '
-          + 'not built draws no support at all',
+        'deciding that a plan point has no support: a record whose rule is not built draws no support at '
+          + 'all, so unsupported ground here is as often a rule this version has yet to write as it is '
+          + 'ground a person cannot stand on',
       ],
     },
   },
@@ -174,6 +178,15 @@ export interface PlanBox {
   readonly max_y: number;
 }
 
+/**
+ * What a grammar's nav_envelope contract measures for a walking capsule: the radius it keeps clear
+ * and the height below which a part of a record is in its way.
+ */
+export interface CapsuleClearance {
+  readonly radiusMm: number;
+  readonly heightMm: number;
+}
+
 /** A region a standing capsule keeps its radius clear of, in plan, with what it was read from. */
 export interface ObstructionRegion {
   /** The record kind that obstructs, for the message when a ring is refused. */
@@ -188,8 +201,8 @@ export interface ExpandContext {
   readonly tileSizeMm: number;
   /**
    * Every region the navigation table says obstructs a walking capsule, from every record in the
-   * document, owned or halo: a `base_ring` record's base ring, and a `low_parts` record's stated
-   * plan extent, which holds every part it has until this tessellator reads them one by one.
+   * document, owned or halo: a `base_ring` record's base ring, and one region for each part of a
+   * `low_parts` record that stands below the capsule height.
    */
   readonly obstructions: readonly ObstructionRegion[];
   /**
@@ -204,8 +217,8 @@ export interface ExpandContext {
   readonly resolutionMm: number;
   /**
    * The capsule radius the record's grammar measures for `nav_envelope`'s `capsule_clearance`, or
-   * undefined when it measures none, which an expander claiming clearance refuses. The height and
-   * the eye are not read: the carve is in plan and ignores height, which only ever leaves out more.
+   * undefined when it measures none, which an expander claiming clearance refuses. Only the radius:
+   * the carve is in plan, and the height has already chosen which of a record's parts obstruct.
    */
   readonly capsuleRadiusMm: number | undefined;
   /**
@@ -219,7 +232,18 @@ export interface ExpandContext {
 }
 
 export type Expansion =
-  | { readonly state: 'drawn'; readonly pieces: readonly Piece[] }
+  | {
+      readonly state: 'drawn';
+      readonly pieces: readonly Piece[];
+      /**
+       * The ground the record takes from terrain, when that is not the ground it draws. A support
+       * surface is carved clear of what obstructs a capsule, and the holes that leaves are still
+       * the record's ground: a footway with a tree standing in it is the footway's, and terrain
+       * that drew under the tree would put a patch of hillside in the middle of a pavement. So a
+       * carve reports what it covered as well as what it kept, and terrain yields to the first.
+       */
+      readonly covers?: readonly Piece[];
+    }
   | { readonly state: 'unavailable'; readonly needs: readonly Need[] };
 
 export type Rule =
@@ -426,7 +450,7 @@ function pieceOf(kept: readonly SupportTriangle[]): Piece {
 function carvedSupport(surfaces: readonly SupportTriangle[], context: ExpandContext, where: string): Expansion {
   const kept = carveSupport(surfaces, clearancesOf(context, where), statedWalk(context, where), where);
   if (kept.length === 0) return { state: 'unavailable', needs: [NEEDS.ground_coverage] };
-  return { state: 'drawn', pieces: [pieceOf(kept)] };
+  return { state: 'drawn', pieces: [pieceOf(kept)], covers: [pieceOf(surfaces)] };
 }
 
 /**
@@ -551,6 +575,21 @@ function renderMassing(fields: Fields, context: ExpandContext): Expansion {
   return { state: 'drawn', pieces };
 }
 
+/**
+ * Where an object stands and which way it faces. A street tree states no facing vector, so its
+ * local frame faces east, which is how `exulanica.world.society_city_place` reads the same parts.
+ */
+function objectFrame(fields: Fields): Omit<FormObject, 'parts'> {
+  const stated = fields.facing_dx_mm;
+  return {
+    xMm: fields.x_mm as number,
+    yMm: fields.y_mm as number,
+    zMm: fields.z_mm as number,
+    facingDxMm: stated === undefined ? 1 : stated as number,
+    facingDyMm: stated === undefined ? 0 : fields.facing_dy_mm as number,
+  };
+}
+
 /** An object's parts as the form parts rule takes them, field for field. */
 function formParts(fields: Fields): FormPart[] {
   return (fields.parts as readonly Fields[]).map((part) => ({
@@ -568,15 +607,19 @@ function formParts(fields: Fields): FormPart[] {
   }));
 }
 
-/** The triangles of an object's parts, gathered into one surface per role and orientation. */
-function objectPieces(object: FormObject, where: string): Piece[] {
-  let triangles: readonly FormTriangle[];
+/** An object's triangles by the form parts rule, with its refusal said in this tessellator's terms. */
+function formTriangles(object: FormObject, where: string): readonly FormTriangle[] {
   try {
-    triangles = expandFormParts(object);
+    return expandFormParts(object);
   } catch (refusal) {
     if (refusal instanceof FormPartsRefusal) throw new TessellationError(`${where}: ${refusal.message}`);
     throw refusal;
   }
+}
+
+/** The triangles of an object's parts, gathered into one surface per role and orientation. */
+function objectPieces(object: FormObject, where: string): Piece[] {
+  const triangles = formTriangles(object, where);
   const surfaces = new Map<string, Surface>();
   for (const triangle of triangles) {
     const key = `${triangle.surfaceRole} ${triangle.orientation}`;
@@ -594,14 +637,7 @@ function objectPieces(object: FormObject, where: string): Piece[] {
 /** An object that states where it stands and which way it faces: furniture, a rooftop object. */
 function renderObject(fields: Fields, kind: string): Expansion {
   const where = `${kind} ${fields.identity as string}`;
-  const pieces = objectPieces({
-    xMm: fields.x_mm as number,
-    yMm: fields.y_mm as number,
-    zMm: fields.z_mm as number,
-    facingDxMm: fields.facing_dx_mm as number,
-    facingDyMm: fields.facing_dy_mm as number,
-    parts: formParts(fields),
-  }, where);
+  const pieces = objectPieces({ ...objectFrame(fields), parts: formParts(fields) }, where);
   if (pieces.length === 0) return { state: 'unavailable', needs: [NEEDS.form_parts] };
   return { state: 'drawn', pieces };
 }
@@ -668,14 +704,7 @@ function renderBlock(fields: Fields, context: ExpandContext): Expansion {
 function renderTree(fields: Fields): Expansion {
   const where = `city.street_tree ${fields.identity as string}`;
   const pit = groundPieces(fields.pit_mm as readonly Plan[], fields.z_mm as number, TREE_PIT, [], where);
-  const parts = objectPieces({
-    xMm: fields.x_mm as number,
-    yMm: fields.y_mm as number,
-    zMm: fields.z_mm as number,
-    facingDxMm: 1,
-    facingDyMm: 0,
-    parts: formParts(fields),
-  }, where);
+  const parts = objectPieces({ ...objectFrame(fields), parts: formParts(fields) }, where);
   const pieces = [...pit, ...parts];
   if (pieces.length === 0) return { state: 'unavailable', needs: [NEEDS.ring_triangulation, NEEDS.form_parts] };
   return { state: 'drawn', pieces };
@@ -846,31 +875,44 @@ export function baseRingOf(kind: string, fields: Fields): readonly Plan[] {
 }
 
 /**
- * The region one record obstructs a walking capsule with, by the navigation table's obstruction
- * axis, or undefined when it obstructs nothing. A base ring is the ring itself. Low parts are each
- * part of the record below the capsule height, which this tessellator does not read one by one yet,
- * so it takes the stated plan extent, which holds every part the record has: it keeps a capsule
- * clear of more ground than the parts themselves would, never less.
+ * The regions one record obstructs a walking capsule with, by the navigation table's obstruction
+ * axis, and none when it obstructs nothing. A base ring is the ring itself, one region. Low parts
+ * are one region each: every part of the record whose bottom stands below the capsule height, in
+ * its own place, so what a person walks round is the part and not the record.
  */
-export function obstructionOf(
+export function obstructionsOf(
   kind: string,
   region: string,
   fields: Fields,
-  extent: PlanBox | undefined,
-): ObstructionRegion | undefined {
-  if (region === 'none') return undefined;
-  if (region === 'base_ring') return { kind, ring: baseRingOf(kind, fields) };
+  capsule: CapsuleClearance | undefined,
+  where: string,
+): ObstructionRegion[] {
+  if (region === 'none') return [];
+  if (region === 'base_ring') return [{ kind, ring: baseRingOf(kind, fields) }];
   if (region === 'low_parts') {
-    if (extent === undefined) throw new TessellationError(`${kind} obstructs with its low parts and states no extent that holds them`);
-    return {
-      kind,
-      ring: [
-        [extent.min_x, extent.min_y],
-        [extent.max_x, extent.min_y],
-        [extent.max_x, extent.max_y],
-        [extent.min_x, extent.max_y],
-      ],
-    };
+    if (capsule === undefined) {
+      throw new TessellationError(`${kind} obstructs with its low parts and its grammar measures no capsule to call them low by`);
+    }
+    // A LOW PART, not the record's extent. The grammar says which: each part whose bottom lies
+    // below the capsule height above the record's base point. A street tree's trunk is one; its
+    // canopy is not, since the grammar holds a canopy a capsule height above what it overhangs, and
+    // taking the extent instead took the canopy's whole width of footway away from the person
+    // underneath it. Each part's own plan region is the hull of the triangles the form parts rule
+    // makes of it, so the frame that turns a part is derived once and drawn and carved from alike.
+    const regions: ObstructionRegion[] = [];
+    formParts(fields).forEach((part, ordinal) => {
+      if (part.offsetZMm >= capsule.heightMm) return;
+      const points: Plan[] = [];
+      for (const triangle of formTriangles({ ...objectFrame(fields), parts: [part] }, where)) {
+        for (const vertex of triangle.vertices) points.push([vertex.xMm, vertex.yMm]);
+      }
+      const ring = hullKeepingEdges(points, where);
+      // A part standing in a person's way whose plan region has no area would be walked through,
+      // so it is refused rather than passed over: every part this rule reads takes ground.
+      if (ring.length < 3) throw new TessellationError(`${where}: part ${ordinal} stands below head height and covers no ground in plan`);
+      regions.push({ kind, ring });
+    });
+    return regions;
   }
   throw new TessellationError(`${kind} obstructs with ${region}, a region this tessellator does not read`);
 }
@@ -905,8 +947,8 @@ for (const table of GRAMMAR_TABLES) {
     if (row.obstruction === 'base_ring' && !BASE_RINGS.has(row.kind)) {
       throw new TessellationError(`${row.kind} obstructs with its base ring, and this tessellator reads no base ring for it`);
     }
-    if (row.obstruction === 'low_parts' && recordShapeOf(table, row.kind)!.extent_field === undefined) {
-      throw new TessellationError(`${row.kind} obstructs with its low parts and states no extent that holds them`);
+    if (row.obstruction === 'low_parts' && !recordShapeOf(table, row.kind)!.fields.some((field) => field.name === 'parts')) {
+      throw new TessellationError(`${row.kind} obstructs with its low parts and states no parts to read them from`);
     }
     if (row.obstruction !== 'base_ring' && row.obstruction !== 'low_parts') {
       throw new TessellationError(`${row.kind} obstructs with ${row.obstruction}, a region this tessellator does not read`);

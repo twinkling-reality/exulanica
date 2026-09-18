@@ -23,8 +23,8 @@
 import { canonicalBytes, compareCodeUnits } from './canonical-json.js';
 import type { Membership, RecordPayload, TileDocument } from './document.js';
 import { statedIdentity, tableOf } from './document.js';
-import { baseRingOf, obstructionOf, PROJECTION_DEFINITIONS, ruleFor, TessellationError } from './expand.js';
-import type { CarriedRecord, ExpandContext, Expansion, Need, ObstructionRegion, PlanBox } from './expand.js';
+import { baseRingOf, obstructionsOf, PROJECTION_DEFINITIONS, ruleFor, TessellationError } from './expand.js';
+import type { CapsuleClearance, CarriedRecord, ExpandContext, Expansion, Need, ObstructionRegion, PlanBox } from './expand.js';
 import type { Piece } from './pieces.js';
 import type { CoveringTriangle } from './terrain-yield.js';
 import { MATERIAL_RECORD_KIND, navigationRowOf, recordShapeOf } from './record-shapes.js';
@@ -166,8 +166,9 @@ function obstructions(document: TileDocument, records: readonly PlacedRecord[]):
   for (const record of records) {
     const table = tableOf(document.grammars[record.grammar]!);
     const row = navigationRowOf(table, record.payload.kind);
-    const region = obstructionOf(record.payload.kind, row.obstruction, record.payload.fields, planBox(document, record));
-    if (region !== undefined) regions.push(region);
+    for (const region of obstructionsOf(record.payload.kind, row.obstruction, record.payload.fields, capsuleOf(table), `${record.payload.kind} ${record.payload.fields.identity as string}`)) {
+      regions.push(region);
+    }
   }
   return regions;
 }
@@ -180,14 +181,18 @@ function resolutionOf(table: GrammarTable, projection: ProjectionName): number {
 }
 
 /**
- * The capsule radius the record's grammar measures for nav_envelope, from its descriptor's
- * contract, or undefined when it measures none.
+ * What a grammar measures for the walking capsule of `nav_envelope`'s `capsule_clearance`: the
+ * radius a support surface is carved clear by, and the height below which a record's part stands
+ * in a person's way rather than over their head. Undefined when the grammar measures neither.
  */
-function capsuleRadius(document: TileDocument, record: PlacedRecord): number | undefined {
-  const measures = tableOf(document.grammars[record.grammar]!).measures;
-  const clearance = measures.nav_envelope?.capsule_clearance;
+function capsuleOf(table: GrammarTable): CapsuleClearance | undefined {
+  const clearance = table.measures.nav_envelope?.capsule_clearance;
   if (clearance === undefined) return undefined;
-  return clearance.radius_mm;
+  const radiusMm = clearance.radius_mm;
+  const heightMm = clearance.height_mm;
+  if (radiusMm === undefined) throw new TessellationError(`${table.grammar_id} measures a capsule clearance with no radius`);
+  if (heightMm === undefined) throw new TessellationError(`${table.grammar_id} measures a capsule clearance with no height`);
+  return { radiusMm, heightMm };
 }
 
 /** Every surface material record, by the surface it names and the role it dresses. */
@@ -277,7 +282,7 @@ export function tessellate(document: TileDocument, digests: readonly string[]): 
     resolutionMm: resolutionOf(tableOf(document.grammars[record.grammar]!), projection),
     obstructions: obstructing,
     extent: planBox(document, record),
-    capsuleRadiusMm: capsuleRadius(document, record),
+    capsuleRadiusMm: capsuleOf(tableOf(document.grammars[record.grammar]!))?.radiusMm,
     coverings,
     carried,
   });
@@ -323,7 +328,10 @@ export function tessellate(document: TileDocument, digests: readonly string[]): 
         }
       }
       if (row.ground !== 'support') return;
-      for (const piece of expansion.pieces) {
+      // What it covers where that is not what it kept: the carve reports the ground it stood on
+      // before it was cleared of what obstructs, and that whole ground is the record's.
+      const covered = expansion.covers === undefined ? expansion.pieces : expansion.covers;
+      for (const piece of covered) {
         // A projection that carries surfaces states which of a record's surfaces are ground. One
         // that carries none draws only what a person is supported by, so every piece of it is.
         if (definition.surfaces && piece.surface?.orientation !== 'horizontal') continue;

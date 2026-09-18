@@ -165,7 +165,7 @@ describe('loading a baked tile through tess\'s decoder', () => {
 describe('standing on the tile\'s own nav_envelope', () => {
   it('samples support from the envelope and opens standing on it, eye 1.62 m above it', () => {
     const navigation = tile.navigation;
-    expect(navigation.support).toEqual({ state: 'nav_envelope', triangles: 4850 });
+    expect(navigation.support).toEqual({ state: 'nav_envelope', triangles: 5728 });
     expect(navigation.collisionState.state).toBe('unavailable');
     expect(navigation.viewpointOnly).toBe(false);
     const world = navigation.world;

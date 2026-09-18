@@ -170,21 +170,28 @@ solids an object states as its parts, and the ground a lot states.
   render draws, and the segments' own carriageways and gutters, each CARVED clear of every region
   that table's obstruction axis names, by the support carve rule below. A `base_ring` obstruction is
   the ring the record stands on, covered by the ring clearance rule; a `low_parts` obstruction is
-  the record's whole stated plan extent, which holds every part it has, until this tessellator reads
-  those parts one by one. So a capsule stood anywhere on support meets none of them in plan, at any
-  height, which is the city descriptor's capsule clearance claim. The radius is the `radius_mm`
-  measure the descriptor's nav_envelope contract states for `capsule_clearance` (340 mm for city
-  version 2), carried into the generated table; core restates no number. A stated extent takes no
-  ground from anybody else: a record that obstructs nothing removes no support, and none removes
-  anything from what is drawn.
+  ONE REGION PER PART, every part of the record whose bottom stands below the capsule height its
+  grammar measures, each placed at the record's point and turned by its facing and taken as the plan
+  hull of the triangles the form parts rule makes of it. So a capsule stood anywhere on support
+  meets none of them in plan, at any height, which is the city descriptor's capsule clearance claim.
+  The radius and the height are the `radius_mm` and `height_mm` measures the descriptor's
+  nav_envelope contract states for `capsule_clearance` (340 mm and 1,900 mm for city version 2),
+  carried into the generated table; core restates no number. A stated extent takes no ground from
+  anybody else: a record that obstructs nothing removes no support, and none removes anything from
+  what is drawn.
 
-  WHAT THE LOW PART READING COSTS, measured on the corridor lane's generated street, tile (2, 0),
-  on 2026-09-17: of that tile's 16,384 m2, buildings take 9,542 m2, the capsule radius round their
-  base rings 252 m2, trees and furniture 1,408 m2 as their stated extents and 258 m2 as the radius
-  round those, leaving 4,893 m2 of support. The 1,408 is the conservatism: a street tree's stated
-  extent is its six metre canopy while its trunk is 0.3 m across, so each tree takes about 45 m2 of
-  footway it does not occupy. Reading an object's parts gives most of that back, and none of the
-  258. It is never room claimed that is not there, which is the direction to be wrong in.
+  A CARVE COVERS WHAT IT CLEARED. The ground a support surface gives up to a clearance is still that
+  record's ground, so a carve reports it and terrain yields to the whole of it. Terrain that drew
+  under a tree would put a patch of hillside in the middle of a pavement, and would then be carved
+  away again by the same clearance, which is work for nothing.
+
+  WHAT READING THE PARTS GAVE BACK, measured on the corridor lane's generated street, tile (2, 0),
+  on 2026-09-18, by sampling the nav envelope every 500 mm along the 116.5 m north footway: reading
+  each object's whole stated extent left 47 m of it unsupported beside the kerb, 49 m across the
+  middle and 53 m along the line of the trees, in runs of about 6 m, one per tree. Reading the parts
+  leaves 0 m, 2 m and 13.5 m, the last in fourteen gaps of a metre, which is a 151 mm trunk and the
+  340 mm a capsule keeps clear of it. The tile bakes in 31 s against 22 s for the extent reading,
+  which drew far less footway to carve.
 
 Every other record kind states the rule it waits on (`NEEDS` in `src/core/expand.ts`):
 `ring_triangulation`, `massing_faces`, `facade_layout`, `bent_street`, `street_curbs`,

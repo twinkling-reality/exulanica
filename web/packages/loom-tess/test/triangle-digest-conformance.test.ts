@@ -28,10 +28,10 @@ import {
   sortList,
 } from './support.js';
 
-/** Over `test/fixtures/tile-conformance.json`, tessellator 13, digest profile v3. */
+/** Over `test/fixtures/tile-conformance.json`, tessellator 14, digest profile v3. */
 const GOLDEN = {
   render_batch: '70ca86e97e4221fbe691c6732af7ca372b68ec1d4edb5c32118c8bbb0c22efdc',
-  nav_envelope: 'b7baf414ab9a2df06439efea94a997cc327e6bc55a7ccdd4a51d69b86150d154',
+  nav_envelope: 'adec1833518f6a785a90211eb6f0f2d4513a776b366a3946588203aa9eed9e9e',
 } as const;
 
 afterEach(() => {
@@ -43,35 +43,49 @@ const count = (states: string[], state: string): number => states.filter((s) => 
 type PlanPoint = readonly [number, number];
 
 /**
- * Every region the grammar's navigation table says obstructs a walking capsule, read from the
- * fixture by this test's own reading of that table: a building's base ring, and the stated plan
- * extent of whatever obstructs with its low parts. Sorted by kind, so the building comes first and
- * the seven pieces of furniture before the tree.
+ * Every region the grammar's navigation table says obstructs a walking capsule, by this test's own
+ * reading of that table and of the DRAWN geometry, each as a convex walk in plan.
+ *
+ * A base ring is the ring the record states. A record whose LOW PARTS obstruct is read out of what
+ * it draws: every triangle of its render batch whose three corners all stand below the capsule
+ * height its grammar measures above where the record stands. Such a triangle lies inside a low part
+ * by construction, so the region it stands for is one this tessellator must keep a capsule out of,
+ * and every low part contributes at least the cap it stands on, which is that part's whole
+ * footprint. Nothing here reads the carve, or the rule that chose which parts are low: the claim is
+ * that what a person is held clear of is what they can see standing in their way.
  */
-function obstructionRings(document: any): PlanPoint[][] {
-  const rings: { kind: string; ring: PlanPoint[] }[] = [];
-  for (const grammar of document.grammars) {
-    for (const record of [...grammar.owned, ...grammar.halo]) {
-      const row = CITY_V2.navigation.find((candidate) => candidate.kind === record.kind)!;
-      if (row.obstruction === 'none') continue;
-      if (row.obstruction === 'base_ring') {
-        rings.push({ kind: record.kind, ring: record.fields.tiers[0].ring_mm as PlanPoint[] });
-        continue;
-      }
-      const extent = record.fields.extent;
-      rings.push({
-        kind: record.kind,
-        ring: [
-          [extent.min_x_mm, extent.min_y_mm],
-          [extent.max_x_mm, extent.min_y_mm],
-          [extent.max_x_mm, extent.max_y_mm],
-          [extent.min_x_mm, extent.max_y_mm],
-        ],
-      });
+function obstructionWalks(decoded: DecodedOwd): { kind: string; walk: PlanPoint[] }[] {
+  const render = decoded.projections[0]!;
+  const vertices = absoluteVertices(render);
+  const height = CITY_V2.measures.nav_envelope!.capsule_clearance!.height_mm!;
+  const walks: { kind: string; walk: PlanPoint[] }[] = [];
+  decoded.header.records.forEach((record, index) => {
+    const row = CITY_V2.navigation.find((candidate) => candidate.kind === record.kind)!;
+    if (row.obstruction === 'none') return;
+    if (row.obstruction === 'base_ring') {
+      walks.push({ kind: record.kind, walk: (record.fields as any).tiers[0].ring_mm as PlanPoint[] });
+      return;
     }
-  }
-  rings.sort((a, b) => (a.kind === b.kind ? a.ring[0]![0] - b.ring[0]![0] : a.kind < b.kind ? -1 : 1));
-  return rings.map((row) => row.ring);
+    const entry = render.header.entries[index]!;
+    if (entry.state !== 'drawn') throw new Error(`${record.kind} obstructs with its low parts and draws nothing`);
+    const ceiling = (record.fields as any).z_mm + height;
+    const partRoles = new Set(((record.fields as any).parts as any[]).map((part) => part.surface_role as string));
+    const before = walks.length;
+    for (const surface of entry.surfaces!) {
+      if (!partRoles.has(surface.role)) continue;
+      for (let triangle = surface.first_triangle; triangle < surface.first_triangle + surface.triangle_count; triangle += 1) {
+        const corners = [0, 1, 2].map((corner) => render.index[triangle * 3 + corner]!);
+        if (corners.some((vertex) => vertices[vertex * 3 + 2]! >= ceiling)) continue;
+        const walk = corners.map((vertex) => [vertices[vertex * 3]!, vertices[vertex * 3 + 1]!] as PlanPoint);
+        const turning = twice(walk[0]!, walk[1]!, walk[2]!);
+        // An underside is drawn counter-clockwise seen from below, so it turns the other way in plan.
+        if (turning === 0) continue;
+        walks.push({ kind: record.kind, walk: turning > 0 ? walk : [...walk].reverse() });
+      }
+    }
+    if (walks.length === before) throw new Error(`${record.kind} obstructs with its low parts and draws none of them low`);
+  });
+  return walks;
 }
 
 const twice = (a: PlanPoint, b: PlanPoint, c: PlanPoint): number =>
@@ -96,11 +110,33 @@ function interiorsMeet(first: readonly PlanPoint[], second: readonly PlanPoint[]
 }
 
 /** The squared distance from a plan point to a closed box given as its four corners, exactly. */
-function boxGapSquared(box: readonly PlanPoint[], x: number, y: number): number {
-  const beyond = (low: number, high: number, value: number): number => Math.max(low - value, 0, value - high);
-  const across = beyond(box[0]![0], box[2]![0], x);
-  const along = beyond(box[0]![1], box[2]![1], y);
-  return across * across + along * along;
+function walkGapSquared(walk: readonly PlanPoint[], x: number, y: number): number {
+  let inside = true;
+  let nearest = Infinity;
+  const turned = walk.reduce((total, here, index) => {
+    const next = walk[(index + 1) % walk.length]!;
+    return total + (here[0] * next[1] - here[1] * next[0]);
+  }, 0) >= 0 ? walk : [...walk].reverse();
+  turned.forEach((from, index) => {
+    const to = turned[(index + 1) % turned.length]!;
+    if (twice(from, to, [x, y]) < 0) inside = false;
+    const [dx, dy] = [to[0] - from[0], to[1] - from[1]];
+    const span = dx * dx + dy * dy;
+    const along = span === 0 ? 0 : Math.min(Math.max(((x - from[0]) * dx + (y - from[1]) * dy) / span, 0), 1);
+    const [gx, gy] = [x - (from[0] + along * dx), y - (from[1] + along * dy)];
+    nearest = Math.min(nearest, gx * gx + gy * gy);
+  });
+  return inside ? 0 : nearest;
+}
+
+/** The bounding box of plan points. */
+function boundsOf(points: readonly PlanPoint[]): { min_x: number; min_y: number; max_x: number; max_y: number } {
+  return {
+    min_x: Math.min(...points.map((point) => point[0])),
+    min_y: Math.min(...points.map((point) => point[1])),
+    max_x: Math.max(...points.map((point) => point[0])),
+    max_y: Math.max(...points.map((point) => point[1])),
+  };
 }
 
 /** Whether any triangle of a projection holds a plan point, its edges included. */
@@ -214,7 +250,9 @@ describe('the triangle digest of the conformance fixture', () => {
     const nav = navEnvelope!.header.entries.map((entry) => entry.state);
     expect(count(nav, 'drawn')).toBe(11);
     expect(count(nav, 'halo')).toBe(grammar.halo.length);
-    expect(navEnvelope!.header.entries[terrain]).toMatchObject({ state: 'drawn', vertex_count: 1446, triangle_count: 1781 });
+    // Fewer triangles than render's terrain, and far fewer than when terrain drew under the ground
+    // a carve had cleared: the segments cover what they stand on whether or not a capsule fits.
+    expect(navEnvelope!.header.entries[terrain]).toMatchObject({ state: 'drawn', vertex_count: 622, triangle_count: 842 });
     expect(navEnvelope!.surfaceMm).toBeUndefined();
 
     // Halo is exactly what the document lists as halo.
@@ -224,16 +262,20 @@ describe('the triangle digest of the conformance fixture', () => {
   });
 
   it('supports nothing a capsule could not stand on, over what the navigation table says obstructs', async () => {
-    const nav = (await decodedFixture()).projections[1]!;
+    const decoded = await decodedFixture();
+    const nav = decoded.projections[1]!;
     const vertices = absoluteVertices(nav);
     const radius = CITY_V2.measures.nav_envelope!.capsule_clearance!.radius_mm!;
-    const rings = obstructionRings(fixtureObject());
-    // One building by its base ring, seven pieces of furniture and one tree by their plan extents.
-    expect(rings).toHaveLength(9);
+    const walks = obstructionWalks(decoded);
+    // One building by its base ring, and the low drawn geometry of seven pieces of furniture and a
+    // tree: the posts they stand on and what hangs off them below head height, never their canopies.
+    expect(new Set(walks.map((row) => row.kind))).toEqual(new Set(['city.massing', 'city.street_furniture', 'city.street_tree']));
+    expect(walks.filter((row) => row.kind === 'city.massing')).toHaveLength(1);
+    expect(walks.filter((row) => row.kind !== 'city.massing').length).toBeGreaterThan(0);
 
     // No support meets a clearance piece. Those pieces cover everywhere within the radius of the
-    // ring, which `ring-clearance.test.ts` holds them to, so no support is within the radius of it.
-    const pieces = rings.flatMap((ring) => ringClearance(ring, radius, 'the conformance tile'));
+    // walk, which `ring-clearance.test.ts` holds them to, so no support is within the radius of it.
+    const pieces = walks.flatMap((row) => ringClearance(row.walk, radius, 'the conformance tile'));
     for (let triangle = 0; triangle < nav.header.triangle_count; triangle += 1) {
       const walk = [0, 1, 2].map((corner) => {
         const vertex = nav.index[triangle * 3 + corner]!;
@@ -244,20 +286,23 @@ describe('the triangle digest of the conformance fixture', () => {
       }
     }
 
-    // And measured against the radius itself, not against those pieces: over a lattice round one
-    // lamp, no point within the radius of its extent is supported, and points past it are.
-    const lamp = rings[1]!;
-    const [west, south] = [lamp[0]![0], lamp[0]![1]];
-    const [east, north] = [lamp[2]![0], lamp[2]![1]];
+    // And measured against the radius itself, not against those pieces: over a lattice round the
+    // street tree, no point within the radius of its TRUNK is supported, and points past it are,
+    // which is the whole of the change: the tree's canopy is 6 m across and its pit is walkable.
+    const trunk = walks.filter((row) => row.kind === 'city.street_tree').map((row) => row.walk);
+    const box = boundsOf(trunk.flat());
+    // 300 mm of trunk, where the canopy the record states is 6,000 mm across and the pit 1,200.
+    expect(box.max_x - box.min_x).toBe(300);
+    expect(box.max_y - box.min_y).toBe(300);
     let within = 0;
     let beyond = 0;
-    for (let y = south - radius - 200; y <= north + radius + 200; y += 20) {
-      for (let x = west - radius - 200; x <= east + radius + 200; x += 20) {
-        const gap = boxGapSquared(lamp, x, y);
+    for (let y = box.min_y - radius - 200; y <= box.max_y + radius + 200; y += 20) {
+      for (let x = box.min_x - radius - 200; x <= box.max_x + radius + 200; x += 20) {
+        const gap = Math.min(...trunk.map((walk) => walkGapSquared(walk, x, y)));
         const held = supports(nav, vertices, x, y);
         if (gap < radius * radius) {
           within += 1;
-          expect(held, `(${x}, ${y}) is within the radius of a lamp and supported`).toBe(false);
+          expect(held, `(${x}, ${y}) is within the radius of the trunk and supported`).toBe(false);
         }
         if (gap > (radius + 10) * (radius + 10) && held) beyond += 1;
       }

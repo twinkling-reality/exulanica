@@ -187,9 +187,10 @@ describe('the bake', () => {
   });
 
   it('keeps support a capsule radius clear of a record that obstructs just outside the tile', async () => {
-    // A lamp's stated extent 200 mm, then 400 mm, east of the tile's edge, which it never meets.
-    // Its low parts obstruct, so within the grammar's 340 mm capsule radius the ground beside it is
-    // carved away and beyond that radius it is kept, whole cells either way now.
+    // A lamp standing east of the tile's edge, which its extent never meets. Its low parts obstruct,
+    // so within the grammar's 340 mm capsule radius of THE POST the ground beside it is carved away
+    // and beyond that radius it is kept, whole cells either way now. The post is a 120 mm prism at
+    // the lamp's point; the 300 mm extent holds it and the sign above it, and takes no ground.
     const nearEast = (gap: number) => broken((d) => {
       const lamp = first(d, 'city.street_furniture');
       // Its parts are drawn round its point, so the point moves with the extent that holds them,
@@ -217,6 +218,10 @@ describe('the bake', () => {
     expect(await supportsEdge(fixtureBytes())).toBe(true);
     expect(await supportsEdge(nearEast(200))).toBe(false);
     expect(await supportsEdge(nearEast(400))).toBe(true);
+    // And the part is what is measured from, not the extent that holds it: at a 300 mm gap the
+    // extent's near edge is inside the radius of the sample and the post's is 90 mm outside it, so
+    // the ground is kept. Reading the extent instead carved it, which is what took the footway.
+    expect(await supportsEdge(nearEast(300))).toBe(true);
     // Render is untouched either way: a stated extent takes no ground from it, only drawn surfaces do.
     const renderTriangles = async (bytes: Uint8Array): Promise<number> => {
       const render = (await bake(bytes)).tessellation.projections[0]!;

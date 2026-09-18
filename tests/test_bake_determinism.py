@@ -33,6 +33,7 @@ from __future__ import annotations
 import dataclasses
 import hashlib
 import json
+import math
 import shutil
 import struct
 import subprocess
@@ -85,12 +86,51 @@ SHAPE_TABLE = ROOT.joinpath("tests", "fixtures", "city-v2", "record-shapes.json"
 CLI = PACKAGE.joinpath("src", "node", "cli.ts")
 TSX = WEB.joinpath("node_modules", ".bin", "tsx")
 
-#: The record kinds the city's navigation table says obstruct a capsule with their low parts, which
-#: this tessellator reads as their whole stated plan extent until it reads the parts themselves.
+#: The record kinds the city's navigation table says obstruct a capsule with their low parts.
 LOW_PART_KINDS = frozenset({"city.street_furniture", "city.street_tree"})
 
 
-def _ring_gap_squared(ring: list[tuple[int, int]], x: int, y: int) -> float:
+def _low_part_rings(record: Any, height_mm: int) -> list[list[tuple[float, float]]]:
+    """Each part of a record that stands below the capsule height, as a plan ring inside it.
+
+    A millimetre inside what the record states, and read from the record rather than from the
+    tessellator. A ``box`` spans its sizes, so its ring is that rectangle; a ``prism`` and an
+    ``ellipsoid`` are inscribed in the size ellipse, and every count the grammar allows holds at
+    least the rectangle of half those sizes, since at the smallest, four segments, that rectangle's
+    corners lie on the diamond itself. So the ring is inside the part either way, and a point within
+    the capsule radius of the ring is within it of the part.
+    """
+    facing_x = getattr(record, "facing_dx_mm", None)
+    facing_y = getattr(record, "facing_dy_mm", None)
+    if facing_x is None:
+        facing_x, facing_y = 1, 0
+    length = math.hypot(facing_x, facing_y)
+    along = (facing_x / length, facing_y / length)
+    left = (-along[1], along[0])
+    rings = []
+    for part in record.parts:
+        if part.offset_z_mm >= height_mm:
+            continue
+        span = 2 if part.shape == "box" else 4
+        half_x = max(part.size_x_mm / span - 1, 0)
+        half_y = max(part.size_y_mm / span - 1, 0)
+        rings.append(
+            [
+                (
+                    record.x_mm
+                    + (part.offset_x_mm + sx * half_x) * along[0]
+                    + (part.offset_y_mm + sy * half_y) * left[0],
+                    record.y_mm
+                    + (part.offset_x_mm + sx * half_x) * along[1]
+                    + (part.offset_y_mm + sy * half_y) * left[1],
+                )
+                for sx, sy in ((-1, -1), (1, -1), (1, 1), (-1, 1))
+            ]
+        )
+    return rings
+
+
+def _ring_gap_squared(ring: list[tuple[float, float]], x: int, y: int) -> float:
     """The squared distance from a plan point to a closed ring, zero inside it."""
     inside = False
     for (ax, ay), (bx, by) in zip(ring, ring[1:] + ring[:1], strict=True):
@@ -620,12 +660,18 @@ def capsule_radius_mm() -> int:
     return descriptor_measures()["nav_envelope"]["capsule_clearance"]["radius_mm"]
 
 
+def capsule_height_mm() -> int:
+    return descriptor_measures()["nav_envelope"]["capsule_clearance"]["height_mm"]
+
+
 def test_the_tessellator_carves_support_clear_of_everything_that_obstructs(tmp_path):
     """A second reading of the support rule this version carves, from the records themselves."""
     _, container = _bake(tmp_path, "fixture.owd")
     header = _header(container)
     radius = capsule_radius_mm()
+    height = capsule_height_mm()
     assert radius > 0
+    assert height > 0
     obstructions = []
     for record in fixture_records():
         kind = CITY_SHAPES_BY_TYPE[type(record)].kind
@@ -634,16 +680,12 @@ def test_the_tessellator_carves_support_clear_of_everything_that_obstructs(tmp_p
             continue
         if kind not in LOW_PART_KINDS:
             continue
-        extent = record.extent
-        obstructions.append(
-            [
-                (extent.min_x_mm, extent.min_y_mm),
-                (extent.max_x_mm, extent.min_y_mm),
-                (extent.max_x_mm, extent.max_y_mm),
-                (extent.min_x_mm, extent.max_y_mm),
-            ]
-        )
-    assert len(obstructions) == 9
+        obstructions.extend(_low_part_rings(record, height))
+    # One building and the fifteen parts of eight objects that stand below head height. What stands
+    # above it takes no ground: the tree's six metre canopy is not here, and nothing is wider than
+    # the two metre bench, which is the whole of the difference from reading a stated extent.
+    assert len(obstructions) == 16
+    assert max(max(p[0] for p in ring) - min(p[0] for p in ring) for ring in obstructions[1:]) < 2000
 
     terrain = fixture_terrain()
     cell = terrain.cell_mm
