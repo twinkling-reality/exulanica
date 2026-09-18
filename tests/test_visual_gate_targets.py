@@ -112,7 +112,9 @@ def test_a_comparison_states_both_targets():
         _evidence(),
         target=GENERATED_TILE_TARGET,
         baseline=baseline,
-        baseline_path="docs/evaluation/test-baseline.json",
+        # Not a docs/ path: a record path this test invents would read as a retained record that
+        # does not exist, and the documentation link test is right to refuse one.
+        baseline_path="tests/fixtures/visual-gate/a-baseline-this-test-invented.json",
     )
     comparison = document["record"]["baselineComparison"]
     assert comparison["candidateTarget"] == GENERATED_TILE_TARGET
