@@ -401,5 +401,9 @@ Nothing has been handed to the texture lane. Track B has not run and is not appr
 - Whether the appearance a model invents suits the world's other materials is unknown: four targets
   ran, and the catalog holds eight makers.
 - Which stage of the latent pipeline leaves the dark 8 px-pitch band in painted render a1. It is
-  traced to the latent grid and cleared of being third-party content (section 9); the stage needs
-  per-latent-row statistics recorded during a run, and nothing from that set goes onward until then.
+  traced to the latent grid and cleared of being third-party content (section 9). The runner now
+  measures the latent the decoder is about to read and writes where its rows and columns stand out
+  beside each output (`exulanica.appearance-latent-lines/v1`, in `diagnostics/`), so the next
+  session's outputs answer it: a line whose latent row stands 8 or more robust sigma out is the
+  latent's, and a line over a level latent is the decoder's or the crop's. Nothing from that set goes
+  onward until it is answered.

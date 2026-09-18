@@ -17,6 +17,7 @@ from typing import Any
 import numpy as np
 from numpy.typing import NDArray
 
+from exulanica_appearance.metrics.latents import latent_lines
 from exulanica_appearance.runner.tiling import roll_grid, shift_for_step, unroll_grid, wrap_crop
 
 __all__ = ["StubBackend"]
@@ -71,6 +72,10 @@ class StubBackend:
             "libraries": [{"name": "numpy", "version": np.__version__}],
         }
 
+    def lines(self) -> dict[str, Any]:
+        """Where the last generation's own grid stood out, row by row and column by column."""
+        return dict(self._lines)
+
     def generate(
         self, *, prompt: str, conditioning: NDArray[np.uint8], seed: int, sampler: Mapping[str, Any]
     ) -> NDArray[np.uint8]:
@@ -93,6 +98,9 @@ class StubBackend:
             rolled, rolled_control = roll_grid(grid, shift), roll_grid(control, shift)
             prediction = _smooth_zero_padded(rolled) * 0.9 + rolled_control * 0.1
             grid = unroll_grid(prediction, shift)
+        # Its own grid, not a model's latent, and the record says so: this exercises the wiring the
+        # real backends use, and is never read as a measurement of a model.
+        self._lines = latent_lines(np.moveaxis(grid, 2, 0), source="stub-grid")
         upsampled = np.repeat(np.repeat(grid, TOKEN_PX, axis=0), TOKEN_PX, axis=1)
         margin = sampler["wrap_margin_px"]
         padded = np.pad(upsampled, [(margin, margin), (margin, margin), (0, 0)], mode="wrap")

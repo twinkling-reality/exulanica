@@ -62,6 +62,8 @@ class Backend(Protocol):
 
     def runtime(self) -> dict[str, Any]: ...
 
+    def lines(self) -> dict[str, Any]: ...
+
     def generate(
         self, *, prompt: str, conditioning: NDArray[np.uint8], seed: int, sampler: Mapping[str, Any]
     ) -> NDArray[np.uint8]: ...
@@ -143,7 +145,7 @@ def run_job(
 
     package = Path(__file__).resolve().parents[1]
     code = {"commit": code_commit, "source_sha256": source_sha256(package)}
-    for directory in ("outputs", "previews", "records"):
+    for directory in ("diagnostics", "outputs", "previews", "records"):
         (out / directory).mkdir()
     backends: dict[str, Backend] = {}
     produced = []
@@ -193,6 +195,13 @@ def run_job(
         output_sha256 = sha256_hex(raw_output)
         (out / "outputs" / f"{output_sha256}.rgb").write_bytes(raw_output)
         Image.fromarray(rgb).save(out / "previews" / f"{output_sha256}.png")
+        # Beside the picture, not inside its record: the record pins what the product may rely on,
+        # and this is the lane's own diagnostic of the latent the decoder read.
+        lines = getattr(backend, "lines", dict)()
+        if lines:
+            (out / "diagnostics" / f"{output_sha256}.json").write_bytes(
+                canonical_bytes({"output_sha256": output_sha256} | dict(lines))
+            )
 
         reasons = {
             f"components.{c['role']}": candidate["reasons"][f"components.{c['role']}"]

@@ -256,6 +256,36 @@ def test_a_candidate_carries_cc0_with_its_three_statements(tmp_path, repository)
         )
 
 
+def test_a_run_writes_where_the_latent_stood_out_beside_each_output(tmp_path, repository):
+    from exulanica_appearance.metrics.latents import LINE_SIGMA_MILLI, latent_lines
+
+    summary = _dry(tmp_path, repository)
+    written = sorted((tmp_path / "dry" / "run" / "diagnostics").glob("*.json"))
+    assert len(written) == len(summary["summary"]["generations"])
+    document = parse_canonical(written[0].read_bytes(), "the latent lines")
+    assert document["profile"] == "exulanica.appearance-latent-lines/v1"
+    # The stub's grid is its own and says so, so no reader mistakes it for a model's latent.
+    assert document["source"] == "stub-grid"
+    assert document["output_sha256"] == written[0].stem
+    assert set(document["row"]) == {"beyond_threshold", "index", "sigma_milli", "spread_milli"}
+
+    # A planted line is found at its own index, and a level latent reports nothing beyond it.
+    rng = np.random.default_rng(11)
+    values = rng.standard_normal((4, 64, 64))
+    level = latent_lines(values, source="test")
+    assert level["row"]["beyond_threshold"] == 0
+    values[:, 37, :] -= 40
+    found = latent_lines(values, source="test")
+    assert found["row"]["index"] == 37
+    assert abs(found["row"]["sigma_milli"]) >= LINE_SIGMA_MILLI
+    assert found["row"]["beyond_threshold"] == 1
+    assert found["column"]["beyond_threshold"] == 0
+    with pytest.raises(Refused, match="channels by rows by columns"):
+        latent_lines(values[0], source="test")
+    with pytest.raises(Refused, match="says what it was taken from"):
+        latent_lines(values, source="")
+
+
 def test_the_look_covers_every_texel_or_it_is_not_a_look(tmp_path):
     rng = np.random.default_rng(2)
     maps = {

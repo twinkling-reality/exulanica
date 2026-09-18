@@ -32,6 +32,7 @@ from typing import Any, Final
 import numpy as np
 from numpy.typing import NDArray
 
+from exulanica_appearance.metrics.latents import latent_lines
 from exulanica_appearance.runner.tiling import shift_for_step
 
 __all__ = ["VIDEOX_FUN_ROOT", "QwenImageFunControl", "ZImageFunControl"]
@@ -199,6 +200,10 @@ class _Base:
         self.rows = 0
         self.columns = 0
 
+    def lines(self) -> dict[str, Any]:
+        """Where the last generation's final latent stood out, row by row and column by column."""
+        return dict(getattr(self, "_lines", {}))
+
     def runtime(self) -> dict[str, Any]:
         return _runtime({"videox-fun": self.videox_commit})
 
@@ -333,6 +338,9 @@ class QwenImageFunControl(_Base):
                 .to(latents.device, latents.dtype)
             )
             latents = latents * std + mean
+            self._lines = latent_lines(
+                latents[0].float().cpu().numpy(), source="final-latent-before-decode"
+            )
             decoded = self.vae.decode(
                 _circular_pad(latents, margin // LATENT_PX), return_dict=False
             )[0]
@@ -436,6 +444,9 @@ class ZImageFunControl(_Base):
             latents = (
                 latents.to(self.vae.dtype) / self.vae.config.scaling_factor
                 + self.vae.config.shift_factor
+            )
+            self._lines = latent_lines(
+                latents[0].float().cpu().numpy(), source="final-latent-before-decode"
             )
             decoded = self.vae.decode(
                 _circular_pad(latents, margin // LATENT_PX), return_dict=False
