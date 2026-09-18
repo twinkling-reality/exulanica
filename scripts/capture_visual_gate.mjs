@@ -1333,15 +1333,25 @@ async function main() {
             // report three causes ruled out while the product's own status line named one.
             const productSaid = await session.call(recorderId, 'function () { return this.failures.slice(-5); }');
             // How far the walk was actually moving each frame, from the product's own trace rather
-            // than from any constant here: the middle of the non-zero planar steps over the last
-            // forty recorded frames. It is the step the movement resolver asks its surface about,
-            // so a hole narrower than it can still stop the walk and a reader needs both numbers.
-            const lately = await session.call(recorderId, 'function () { return this.poses.slice(-40).map((pose) => [pose[0], pose[2]]); }');
-            const steps = lately.slice(1)
-              .map((point, index) => Math.hypot(point[0] - lately[index][0], point[1] - lately[index][1]))
-              .filter((step) => step > 0)
-              .sort((a, b) => a - b);
-            const perFrameMm = steps.length === 0 ? null : Math.round(steps[Math.floor(steps.length / 2)] * 1000);
+            // than from any constant here: the middle of the non-zero planar steps over EVERY frame
+            // recorded since the walk opened. It is the step the movement resolver asks its surface
+            // about, so a hole narrower than it can still stop the walk and a reader needs both.
+            //
+            // Every frame, not the last few: a stall is detected after five seconds of no progress,
+            // so the most recent hundreds of frames are all stationary and a window over them
+            // reports that the walk was not moving, which is the thing being explained rather than
+            // an explanation of it. Computed on the page, because the trace is thousands of poses.
+            const perFrameMm = await session.call(recorderId, `function () {
+              const steps = [];
+              for (let index = 1; index < this.poses.length; index += 1) {
+                const step = Math.hypot(this.poses[index][0] - this.poses[index - 1][0],
+                  this.poses[index][2] - this.poses[index - 1][2]);
+                if (step > 0) steps.push(step);
+              }
+              if (steps.length === 0) return null;
+              steps.sort((a, b) => a - b);
+              return Math.round(steps[Math.floor(steps.length / 2)] * 1000);
+            }`);
             const field = observed.field ?? {};
             observed.stall = {
               atX: p.x, atZ: p.z,
