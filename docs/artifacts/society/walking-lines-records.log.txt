@@ -1,0 +1,40 @@
+the heights the corridor's records state on tile (2, 0)'s north-south midline
+
+6566 records, 46 curbs, 23 street segments
+tile (2, 0) spans x 256000 to 384000, y 0 to 128000; its midline is x 320000
+
+== the walking lines of the whole street: 11 distinct values
+   {96: 5, 123: 5, 125: 3, 137: 4, 146: 8, 151: 3, 155: 3, 158: 4, 159: 4, 163: 4, 167: 3}
+   lowest 96 mm, highest 167 mm
+   curbs whose walking line is not constant along their own length: []
+
+== the 6 curbs the midline meets, south to north
+   their shared x span is 261950 to 378050, whose midpoint is 320000
+
+   street          curb         kerb y  strip y0  strip y1  kerb top   WALK y  WALK z  back z
+   Linden Terrace  2:right        4450      1000      4450        87     2575     123     159
+   Linden Terrace  2:left        11550     11550     15300       119    13500     163     207
+   Harbour Way     7:right       60450     56700     60450       119    58500     163     207
+   Harbour Way     7:left        67550     67550     72900       118    70300     146     174
+   Foundry Street  12:right     116450    111100    116450       118   113700     146     174
+   Foundry Street  12:left      123550    123550    125750        77   124800      96     115
+
+   walking-line heights south to north: [123, 163, 163, 146, 146, 96]
+   distinct: [96, 123, 146, 163]
+   differences between neighbours: [40, 0, -17, 0, -50]
+   walking lines of the street this line does not reach: [125, 137, 151, 155, 158, 159, 167]
+
+== the 6 street trees whose trunk is within 6,000 mm of the midline
+   trunk (315217, 12734)  -4783 mm from the midline, exclusion radius 2180, pit reaches x 316189
+      on Linden Terrace 2:left, whose walking-line point on the midline is 4844 mm away
+   trunk (323412, 12734)  +3412 mm from the midline, exclusion radius 2180, pit reaches x 324384
+      on Linden Terrace 2:left, whose walking-line point on the midline is 3497 mm away
+   trunk (324783, 59266)  +4783 mm from the midline, exclusion radius 2180, pit reaches x 325755
+      on Harbour Way 7:right, whose walking-line point on the midline is 4844 mm away
+   trunk (316588, 59266)  -3412 mm from the midline, exclusion radius 2180, pit reaches x 317560
+      on Harbour Way 7:right, whose walking-line point on the midline is 3497 mm away
+   trunk (319205, 68549)   -795 mm from the midline, exclusion radius 1153, pit reaches x 319982
+      on Harbour Way 7:left, whose walking-line point on the midline is 1923 mm away
+   trunk (320795, 115451)   +795 mm from the midline, exclusion radius 1153, pit reaches x 321572
+      on Foundry Street 12:right, whose walking-line point on the midline is 1923 mm away
+

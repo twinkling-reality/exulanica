@@ -1,0 +1,165 @@
+"""Writes docs/artifacts/society/walking-lines-records.log.txt: the heights the corridor's records
+state along tile (2, 0)'s north-south midline, and the eleven walking lines of the whole street.
+
+Run from the repository root:
+
+    uv run python docs/artifacts/society/walking-lines-records.py.txt
+
+It reads the city's own records and nothing else: no container, no bake, no sampler. That is the
+point of it. The heights it prints are the prediction the runtime's support sampler is then held
+to, so they have to come from a reading that shares no code with the sampler, and they have to be
+written down before the sampler is run.
+
+Heights come from ``_Kerb.surface_z``, the society place's own reading of a curb record, so the
+number printed here is the number ``exulanica.society-place/v2`` states beside a footway node and
+not a second opinion about it.
+
+It reads no clock, no network and no database, so two runs agree.
+"""
+
+from __future__ import annotations
+
+import sys
+from collections import Counter
+from pathlib import Path
+
+from exulanica.grammar.grammars.city.generation.corridor import (
+    CORRIDOR_BINDINGS,
+    CORRIDOR_CITY_IDENTITY,
+    CORRIDOR_SEED,
+    CORRIDOR_TILE,
+)
+from exulanica.grammar.grammars.city.generation.tiles import city_records, generate_city
+from exulanica.grammar.grammars.city.streetlife import StreetTreeRecord
+from exulanica.grammar.grammars.city.streets import (
+    CurbEdgeRecord,
+    StreetRecord,
+    StreetSegmentRecord,
+)
+from exulanica.grammar.grammars.city.tile import TILE_SIZE_MM
+from exulanica.world.society_city_place import _Kerb
+
+OUTPUT = Path(__file__).resolve().parent / "walking-lines-records.log.txt"
+
+
+def main() -> int:
+    tile_x, tile_y = CORRIDOR_TILE
+    x0, x1 = tile_x * TILE_SIZE_MM, (tile_x + 1) * TILE_SIZE_MM
+    y0, y1 = tile_y * TILE_SIZE_MM, (tile_y + 1) * TILE_SIZE_MM
+    midline = (x0 + x1) // 2
+
+    records = city_records(
+        generate_city(
+            seed=CORRIDOR_SEED, subject_identity=CORRIDOR_CITY_IDENTITY, bindings=CORRIDOR_BINDINGS
+        )
+    )
+    segments = {r.identity: r for r in records if isinstance(r, StreetSegmentRecord)}
+    street_of = {
+        identity: street.name_text or street.name
+        for street in records
+        if isinstance(street, StreetRecord)
+        for identity in street.segment_identities
+    }
+    kerbs = [_Kerb(r, segments[r.segment_identity]) for r in records if isinstance(r, CurbEdgeRecord)]
+
+    lines = [
+        "the heights the corridor's records state on tile "
+        f"({tile_x}, {tile_y})'s north-south midline",
+        "",
+        f"{len(records)} records, {len(kerbs)} curbs, {len(segments)} street segments",
+        f"tile ({tile_x}, {tile_y}) spans x {x0} to {x1}, y {y0} to {y1}; its midline is x {midline}",
+        "",
+    ]
+
+    walking = Counter(kerb.footway_z(0) for kerb in kerbs)
+    lines.append(f"== the walking lines of the whole street: {len(walking)} distinct values")
+    lines.append(f"   {dict(sorted(walking.items()))}")
+    lines.append(f"   lowest {min(walking)} mm, highest {max(walking)} mm")
+    varying = [k.key for k in kerbs if len({k.footway_z(a) for a in range(0, k.length + 1, 500)}) > 1]
+    lines.append(f"   curbs whose walking line is not constant along their own length: {varying}")
+    lines.append("")
+
+    # The curbs the midline meets: an east-west kerb line, inside the tile's y span, whose x span
+    # covers the midline. Asked of every curb rather than of a list of the ones expected.
+    met = []
+    for kerb in kerbs:
+        xs = [p[0] for p in kerb.points]
+        ys = [p[1] for p in kerb.points]
+        if min(ys) != max(ys) or not (y0 <= ys[0] <= y1) or not (min(xs) <= midline <= max(xs)):
+            continue
+        along = kerb.project((midline, ys[0]))[1]
+        foot = kerb.footway(along)
+        away = 1 if foot[1] > ys[0] else -1
+        reach = kerb.curb.kerb_width_mm + kerb.curb.footway_width_mm
+        met.append(
+            (
+                foot[1],
+                street_of[kerb.curb.segment_identity],
+                kerb.key,
+                ys[0],
+                min(ys[0], ys[0] + away * reach),
+                max(ys[0], ys[0] + away * reach),
+                foot[1],
+                kerb.surface_z(along, kerb.offset),
+                kerb.kerb_top_z(along),
+                kerb.surface_z(along, reach),
+            )
+        )
+    met.sort()
+    shared = (
+        max(min(p[0] for p in k.points) for k in kerbs if k.key in {m[2] for m in met}),
+        min(max(p[0] for p in k.points) for k in kerbs if k.key in {m[2] for m in met}),
+    )
+    lines.append(f"== the {len(met)} curbs the midline meets, south to north")
+    lines.append(
+        f"   their shared x span is {shared[0]} to {shared[1]}, whose midpoint is"
+        f" {(shared[0] + shared[1]) // 2}"
+    )
+    lines.append("")
+    lines.append(
+        f"   {'street':16}{'curb':10}{'kerb y':>9}{'strip y0':>10}{'strip y1':>10}"
+        f"{'kerb top':>10}{'WALK y':>9}{'WALK z':>8}{'back z':>8}"
+    )
+    for _, street, key, kerb_y, sy0, sy1, walk_y, walk_z, top, back in met:
+        lines.append(
+            f"   {street:16}{key:10}{kerb_y:9}{sy0:10}{sy1:10}{top:10}{walk_y:9}{walk_z:8}{back:8}"
+        )
+    heights = [m[7] for m in met]
+    lines.append("")
+    lines.append(f"   walking-line heights south to north: {heights}")
+    lines.append(f"   distinct: {sorted(set(heights))}")
+    lines.append(f"   differences between neighbours: {[b - a for a, b in zip(heights, heights[1:])]}")
+    lines.append(
+        "   walking lines of the street this line does not reach: "
+        f"{sorted(set(walking) - set(heights))}"
+    )
+    lines.append("")
+
+    trees = [
+        t
+        for t in records
+        if isinstance(t, StreetTreeRecord) and y0 <= t.y_mm <= y1 and abs(t.x_mm - midline) <= 6_000
+    ]
+    lines.append(f"== the {len(trees)} street trees whose trunk is within 6,000 mm of the midline")
+    for tree in sorted(trees, key=lambda t: t.y_mm):
+        pit_x = [p[0] for p in tree.pit_mm]
+        lines.append(
+            f"   trunk ({tree.x_mm}, {tree.y_mm}) {tree.x_mm - midline:+6} mm from the midline,"
+            f" exclusion radius {tree.exclusion_radius_mm}, pit reaches x {max(pit_x)}"
+        )
+        for _, street, key, _kerb_y, sy0, sy1, walk_y, _z, _t, _b in met:
+            if sy0 <= tree.y_mm <= sy1:
+                gap = round(((tree.x_mm - midline) ** 2 + (tree.y_mm - walk_y) ** 2) ** 0.5)
+                lines.append(
+                    f"      on {street} {key}, whose walking-line point on the midline is"
+                    f" {gap} mm away"
+                )
+    lines.append("")
+
+    OUTPUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(OUTPUT, len(OUTPUT.read_bytes()), "bytes")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

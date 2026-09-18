@@ -647,6 +647,95 @@ frame, and at most 2 frames in 1,199 passed 16.7 ms. A steady 16.7 ms frame inte
 of a met budget: the browser stamps each frame on schedule while its callbacks run late, so the
 figures above are main-thread work, not intervals.
 
+## The surface under a walker where the records state several heights
+
+`exulanica.society-place/v2` states beside each node the height of the surface a person stands on,
+taken from the records. The corridor's records state many heights: eleven distinct footway walking
+lines from 96 to 167 mm across its 46 curbs, and the two curbs of one street segment can differ by
+50 mm. Every walk taken on this city has run ALONG one curb's footway, where the walking line is
+constant along its whole length, so no measurement yet separates a runtime whose surface carries
+the heights the records state from one that stands a walker at a single height the records do not
+state anywhere.
+
+The parameters, the expected heights and the response to each outcome below are committed before
+the container is baked and before anything is sampled, so that what is reported afterwards has
+something to be checked against rather than something to be chosen to fit.
+
+**The line.** Tile (2, 0)'s own north-south midline: x `320000`, the midpoint of the tile's x span
+256,000 to 384,000, from y `0` to y `128000`. It is the same x the east-west walk already captures
+a frame at, so the two lines cross at that frame. Six curbs state a footway across it: the tile
+carries six east-west kerb lines whose x span covers the tile's midline, their shared x span is
+261,950 to 378,050, and the midpoint of that span is also 320,000, so the line meets no curb near
+its end.
+
+| | |
+| --- | --- |
+| line | x `320000`, y `0` to `128000`, in the records' own `city_local` frame, integer millimetres |
+| step | 50 mm, which is `SUPPORT_SAMPLE_SPACING_M`, the spacing the runtime resamples support at |
+| samples | 2,561 along the line, plus the six walking-line points exactly |
+| what is asked | `navEnvelopeSupport(nav_envelope).surface.sample(...)`, the runtime's own support sampler, over the tile's own container |
+| frame of the ask | renderer metres, `tileToRenderer(x, y, 0)`, and the height it returns in metres multiplied by 1,000 to compare with the records' millimetres |
+| what it is compared with | `_Kerb.surface_z`, the society place's own reading of the curb record, in millimetres |
+| container | baked from the tile (2, 0) document by `pnpm tess bake`; both triangle digests recorded beside the result |
+
+**What the records state on that line**, south to north, read from the curb records of this tree
+by [walking-lines-records.py.txt](artifacts/society/walking-lines-records.py.txt), which reads the
+city's records and no container, and whose
+[log](artifacts/society/walking-lines-records.log.txt) is the table below:
+
+| curb | kerb line y | footway strip | walking line y | walking line z |
+| --- | --- | --- | --- | --- |
+| Linden Terrace 2 right | 4,450 | 1,000 to 4,450 | 2,575 | **123** |
+| Linden Terrace 2 left | 11,550 | 11,550 to 15,300 | 13,500 | **163** |
+| Harbour Way 7 right | 60,450 | 56,700 to 60,450 | 58,500 | **163** |
+| Harbour Way 7 left | 67,550 | 67,550 to 72,900 | 70,300 | **146** |
+| Foundry Street 12 right | 116,450 | 111,100 to 116,450 | 113,700 | **146** |
+| Foundry Street 12 left | 123,550 | 123,550 to 125,750 | 124,800 | **96** |
+
+Four of the eleven heights the street states, and the differences between neighbours along the line
+are +40, 0, -17, 0, -50 millimetres. The seven the line does not reach are 125, 137, 151, 155, 158,
+159 and 167.
+
+**The two-part signature, decided here so a partial match reads as a partial match.**
+
+| outcome | signature |
+| --- | --- |
+| steps with the records | the six heights are 123, 163, 163, 146, 146 and 96, each within 1 mm, AND their differences are +40, 0, -17, 0, -50, each within 1 mm |
+| stays flat | the six heights are equal to one another within 1 mm |
+| neither | anything else, reported as the six numbers it is |
+| no surface | the sampler returns null at a walking-line point |
+
+The millimetre is not a judgement about what is acceptable; it is what the carve can lose. Support
+triangles are cut with their heights taken from the source triangle's own plane and floored, so a
+sample between two carved vertices can read up to a millimetre below the plane the records state.
+Where the two agree exactly, that is reported as exact rather than as within tolerance.
+
+**What each outcome is answered with, fixed before the run.**
+
+- *Steps.* Report the distribution of differences over every footway station the place states inside
+  the tile, not only the six, so one lucky line cannot decide it. Then state what is still untested:
+  whether a walker can WALK a 40 mm and a 50 mm step, which is the controller's rule and not the
+  surface's, and the seven walking lines this line does not reach.
+- *Flat.* Report the constant, and then ask the container which triangle covers each of the six
+  points and print its three vertices. A constant is a circumstance; the triangle is the cause, and
+  this project has paid for the difference more than once.
+- *Neither.* Report the six numbers and the covering triangles, and name no mechanism that is not
+  read out of the container.
+- *No surface.* Report which points, and what record covers that plan point by extent. An absence
+  has at least two explanations and the records can say which.
+
+**What is not predicted.** What the line reads over the two carriageways and the two blocks of
+buildings between the streets. The nav envelope is carved to keep a capsule clear of what obstructs
+it and the records' footway strips stop at the frontage, so the two are not measuring the same
+surface there; that stretch is reported as a profile and not as an agreement or a disagreement.
+
+**What this line cannot answer.** Whether a person could walk it. It crosses two carriageways and
+two blocks, so it is a line through a surface, not a route. It also passes 795 mm east of one tree
+trunk at y 68,549 and 795 mm west of another at y 115,451, and 18 mm east of the first one's pit, so
+a gap in support near those two y values is the tree carve and is expected. Both walking-line points
+on those two curbs are 1,923 mm from the nearer trunk, which is clear of the 1,153 mm the record
+states as that tree's exclusion radius even before a capsule radius is added to it.
+
 ## Traffic boundary
 
 Cars likewise remain outside the pedestrian implementation. A future traffic producer must supply
