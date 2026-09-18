@@ -507,7 +507,10 @@ kerb ends, with the tile continuing 5.7 m further: it is the end of the PAVEMENT
 and the 146 mm is exactly the footway's own height, so the walker stepped off the footway onto terrain
 at the datum. Reading the trace for x `383000` to `383999` alone confirms it from this side: 797 steps,
 the eye at 1620 for every one of them with no variation, y constant at `70300` throughout. So the
-walked line held and the KERB turned away from it, not the other way about.
+walked line held and the KERB turned away from it, not the other way about. A third lane's sampling of
+the walked points against the records puts numbers on that drift: from x `379017` the point's distance
+from the kerb line grows from 2,750 to 5,460 mm as the records' surface climbs 146 to 174 mm across the
+crossfall, and by x `383767` it is 679 mm beyond the nearest footway's back edge.
 
 **Report a walk as segments by surface, not as one distance.** "121,982 mm continuous" is true and
 hides that the surface changed 5.7 m before the end. A continuity claim is about the walker and says
