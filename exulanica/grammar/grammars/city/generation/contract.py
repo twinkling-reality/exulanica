@@ -101,8 +101,8 @@ of detail, the 128 m tile, the 64 m halo, the ownership and halo rules, and ``ed
 sorted) into that field; the empty subsequence is ``EMPTY_EDIT_DELTA_DIGEST``. ``baked_tile_id``
 is ``uuid5(ARTIFACT_NAMESPACE, "baked_tile:<version>:<params digest>:<tile_inputs_digest>")``.
 
-2. THE TESSELLATOR (``web/packages/loom-tess``, stage ``baked_tile`` version 3)
-==============================================================================
+2. THE TESSELLATOR (``web/packages/loom-tess``, stage ``baked_tile`` version 3, tessellator 13)
+===============================================================================
 
 **Container** ``owd/3``, magic ``OWD3``: canonical JSON header (tile record and inputs digest,
 grammars with pins, frame, subject identity and externals, every record with digest, identity and
@@ -120,18 +120,36 @@ bake; the browser build is a preview held to the same triangle digest. Two bakes
 ``baked_tile_id`` that differ are a fault; the table that records that fault is migration 0072,
 this lane's.
 
-**What draws on main:** terrain only (whole patch in ``render_batch`` as ``none-exists``;
-``nav_envelope`` keeps each cell whose square meets no carried record's extent grown by the
-capsule radius). Every other kind states the rule it waits on (``NEEDS`` in ``expand.ts``).
+**What draws, measured from the corridor's own container on 2026-09-18, tessellator 13 at main
+f3868dee.** Of tile (2, 0)'s 4,149 entries, 476 draw: 168 facades, 89 rooftop objects, 78 vitrines,
+36 pieces of street furniture, 33 parcels, 32 massings, 30 street trees, 6 curb edges, 3 street
+segments and the terrain. That is 1,531 surfaces, 1,445 of them dressed by a material record. The
+counts come from the container rather than from tess's statements about itself: every bake writes
+them into its own receipt, and ``docs/artifacts/corridor/corridor-drawn.log.txt`` carries the same
+reading for one tile.
 
-**Built and not wired** (``lane/tess-expanders`` at d3196a15): straight street rules only (a
-centreline or kerb line of more than one piece draws nothing and needs ``bent_street``); a
-junction's carriageway fill over each leg's strip mouth, kerb lines back to the node and corner
-arcs, needing every leg's segment, curbs and node carried; the support clearance rule, carving
-support triangles away from obstruction boxes grown by the capsule radius. Expander order, the
-corridor's: terrain; street surfaces with kerbs and crossings; massing and facades with bays and
-openings; furniture, trees, vitrines and rooftop objects. Tess waits on two grammar rules from
-this lane: corner ownership, and navigation classification per record kind as data.
+**What does not draw, by the rule each entry names** (``NEEDS`` in ``expand.ts``), for that tile:
+``facade_layout`` 126, which is 75 entrances and 51 interior backings; ``crossing_band`` 6;
+``ground_coverage`` 2, the blocks' own ground where lots cover all of it. The other declared needs
+are satisfied for this street and remain for others: ``ring_triangulation``, ``form_parts``,
+``street_curbs``, ``junction_legs``, ``bent_street`` (every corridor street is straight, so nothing
+here has met it) and ``marking_stripes`` (no stage emits a road marking record yet).
+
+**Two things a reader of this section must not assume.** An entry that draws is not an entry that
+draws WELL: 85 facade ground bands draw with no material, and they are visible today only because
+the 51 interior backings are not drawn, so a shop window has nothing behind it and shows the inside
+of the terrace. And an entry that draws is not ground a person can stand on: the ``nav_envelope``
+carves support clear of what the navigation table says obstructs, and tess reads a street tree's
+whole stated plan extent rather than its parts, so each tree removes about 8 m of footway. On the
+corridor that is seven trees and 56 m of the 116 m walked. Both are tess's, both are stated here
+because this document is what other lanes read to know what they can rely on, and neither is
+visible in a triangle count.
+
+**Taken on trust, stated by tess and not measured here:** that the browser build is held to the
+same triangle digest as the Node bake; that ``collision_proxy`` and ``pick_geometry`` will follow
+their own contracts when they exist; and the expander order tess is working to, which is trees,
+then interior backings, then the corner wedge. Expander order for this street was this lane's ask
+and tess's to schedule.
 
 3. THE TILE RUNTIME (``atlas-react`` generated-tile, ``docs/generated-tile-runtime.md``)
 =======================================================================================
