@@ -2,12 +2,19 @@
 
 from __future__ import annotations
 
+import json
+
 import numpy as np
 import pytest
 from conftest import quad_scene
 from PIL import Image
 
-from exulanica_appearance.canonical import Refused, parse_canonical
+from exulanica_appearance.canonical import (
+    Refused,
+    canonical_bytes,
+    parse_canonical,
+    sha256_hex,
+)
 from exulanica_appearance.capture.raster import rasterize
 from exulanica_appearance.containers import read_container
 from exulanica_appearance.metrics.edges import edge_agreement, image_edges
@@ -130,6 +137,49 @@ def test_a_session_is_measured_against_the_recipe_and_the_conditioning(tmp_path,
     Image.fromarray(pixels).save(picture)
     with pytest.raises(Refused, match="not the pixels the record pins"):
         measure_session(repository=repository, results=results, staged=staged)
+
+
+def test_two_runs_of_one_job_are_compared_by_digest(tmp_path, repository):
+    from exulanica_appearance.metrics.session import compare_runs
+    from exulanica_appearance.runner.dry_run import dry_run
+
+    dry_run(repository, tmp_path / "first")
+    dry_run(repository, tmp_path / "second")
+    first, second = tmp_path / "first" / "run", tmp_path / "second" / "run"
+    document = parse_canonical(compare_runs(first=first, second=second), "the comparison")
+    # The stub is a fixed function of its seed, so two runs of one spec agree byte for byte. That is
+    # what the comparison is for: on a real model it is the question, here it is a control.
+    assert document["compared"] == 4
+    assert document["identical"] == 4
+    assert document["verdict"] == "every output identical"
+    assert all(row["seed"] for row in document["generations"])
+
+    # A changed output is caught, and named by what the job fixes rather than by position.
+    row = document["generations"][0]
+    stem = row["first_output_sha256"]
+    records = sorted((first / "records").glob("*.json"))
+    changed = next(path for path in records if stem in path.read_text())
+    edited = json.loads(changed.read_bytes())
+    edited["outputs"][0]["sha256"] = "f" * 64
+    changed.write_bytes(canonical_bytes(edited))
+    (first / "records" / f"{sha256_hex(changed.read_bytes())}.json").write_bytes(
+        changed.read_bytes()
+    )
+    document = parse_canonical(compare_runs(first=first, second=second), "the comparison")
+    assert document["identical"] == 3
+    assert "1 of 4 outputs differ" == document["verdict"]
+
+    # Comparing runs that did not generate the same set measures the difference between the jobs
+    # rather than between the machines, so it is refused.
+    import shutil
+
+    short = tmp_path / "short"
+    shutil.copytree(second, short)
+    summary = parse_canonical((short / "results.json").read_bytes(), "the results")
+    summary["generations"] = summary["generations"][:-1]
+    (short / "results.json").write_bytes(canonical_bytes(summary))
+    with pytest.raises(Refused, match="did not generate the same set"):
+        compare_runs(first=first, second=short)
 
 
 def test_the_module_amplitude_is_read_at_a_stated_period_not_the_strongest():

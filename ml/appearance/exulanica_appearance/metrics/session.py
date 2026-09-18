@@ -30,7 +30,7 @@ from exulanica_appearance.metrics.textures import (
     seam_ratio_ppm,
 )
 
-__all__ = ["MODULES", "measure_session"]
+__all__ = ["MODULES", "compare_runs", "measure_session"]
 
 #: Which recipe parameter states the module count along each axis, by maker. A maker not named here
 #: paints scattered cells and not a repeating module (asphalt stones, render relief cells), so it has
@@ -270,3 +270,77 @@ def _summary(rows: list[dict[str, Any]]) -> dict[str, Any]:
             by_target[target][candidate] = entry
     out["by_target"] = by_target
     return out
+
+
+def compare_runs(*, first: Path, second: Path) -> bytes:
+    """Compare two runs of the same job, generation by generation, by the digests they wrote.
+
+    A second run of one job spec on a second machine is the only thing that says whether this
+    pipeline is deterministic, and the answer is worth having either way: identical digests mean a
+    record's output can be reproduced from the record, and differing digests mean a once-in-many
+    artefact could be the machine rather than the seed. The comparison is by digest, so it cannot be
+    argued with, and it is keyed by what the job itself fixes (target, candidate, role, seed index)
+    rather than by the order the generations happen to be written in.
+    """
+
+    def by_key(results: Path) -> dict[tuple[str, str, str, int], dict[str, Any]]:
+        summary = parse_canonical((results / "results.json").read_bytes(), "the results")
+        out = {}
+        for item in summary["generations"]:
+            key = (item["target"], item["candidate"], item["role"], item["index"])
+            record = read_generation(
+                (results / "records" / f"{item['record_sha256']}.json").read_bytes()
+            )
+            out[key] = {
+                "output_sha256": record["outputs"][0]["sha256"],
+                "record_sha256": item["record_sha256"],
+                "seconds": item["seconds"],
+                "seed": item["seed"],
+            }
+        return out
+
+    left, right = by_key(first), by_key(second)
+    if set(left) != set(right):
+        raise Refused(
+            "these two runs did not generate the same set: "
+            f"{len(set(left) - set(right))} only in the first, "
+            f"{len(set(right) - set(left))} only in the second. A comparison of different jobs "
+            "would measure the difference between the jobs"
+        )
+    rows = []
+    for key in sorted(left):
+        a, b = left[key], right[key]
+        if a["seed"] != b["seed"]:
+            raise Refused(
+                f"{key} ran at seed {a['seed']} and {b['seed']}: the seed rule did not hold across "
+                "the two runs, so nothing else here is comparable"
+            )
+        rows.append(
+            {
+                "candidate": key[1],
+                "first_output_sha256": a["output_sha256"],
+                "identical": int(a["output_sha256"] == b["output_sha256"]),
+                "index": key[3],
+                "role": key[2],
+                "second_output_sha256": b["output_sha256"],
+                "seconds_first": a["seconds"],
+                "seconds_second": b["seconds"],
+                "seed": a["seed"],
+                "target": key[0],
+            }
+        )
+    same = [row for row in rows if row["identical"]]
+    document = {
+        "compared": len(rows),
+        "first_results_sha256": sha256_hex((first / "results.json").read_bytes()),
+        "generations": rows,
+        "identical": len(same),
+        "profile": "exulanica.appearance-run-comparison/v1",
+        "second_results_sha256": sha256_hex((second / "results.json").read_bytes()),
+        "verdict": (
+            "every output identical"
+            if len(same) == len(rows)
+            else f"{len(rows) - len(same)} of {len(rows)} outputs differ"
+        ),
+    }
+    return canonical_bytes(document)

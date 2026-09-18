@@ -6,6 +6,7 @@
     measure frames   --structure DIR --frames DIR --out FILE
     measure textures --repository ROOT --out FILE
     measure session  --repository ROOT --results DIR --staged DIR --out FILE
+    measure compare  --first DIR --second DIR --out FILE
     look record      --results DIR --findings FILE --crops DIR --records DIR
     sheet before     --structure DIR --frames DIR --out DIR
     sheet pairs      --repository . --results DIR --out DIR
@@ -240,6 +241,26 @@ def _measure_session(args: argparse.Namespace) -> int:
     return 0
 
 
+def _measure_compare(args: argparse.Namespace) -> int:
+    """Compare two runs of one job spec by the digests they wrote."""
+    from exulanica_appearance.canonical import parse_canonical
+    from exulanica_appearance.metrics.session import compare_runs
+
+    raw = compare_runs(first=Path(args.first), second=Path(args.second))
+    Path(args.out).write_bytes(raw)
+    document = parse_canonical(raw, "the comparison")
+    print(
+        f"{document['identical']} of {document['compared']} outputs identical: {document['verdict']}"
+    )
+    for row in document["generations"]:
+        if not row["identical"]:
+            print(
+                f"  differs: {row['target']} {row['candidate']} {row['role']} seed {row['seed']}: "
+                f"{row['first_output_sha256'][:16]} then {row['second_output_sha256'][:16]}"
+            )
+    return 0
+
+
 def _look_record(args: argparse.Namespace) -> int:
     """Cut every picked output into 1:1 crops, sheet them, and write the look record."""
     from exulanica_appearance.look import look_at_results
@@ -297,6 +318,11 @@ def main(argv: list[str] | None = None) -> int:
     session.add_argument("--staged")
     session.add_argument("--out", required=True)
     session.set_defaults(run=_measure_session)
+    compare = measure.add_parser("compare")
+    compare.add_argument("--first", required=True)
+    compare.add_argument("--second", required=True)
+    compare.add_argument("--out", required=True)
+    compare.set_defaults(run=_measure_compare)
 
     look = groups.add_parser("look").add_subparsers(dest="command", required=True)
     look_record = look.add_parser("record")
