@@ -117,3 +117,14 @@ AND THE NUMBER THAT MATTERS MOST: undressed held at 86, still 85 facade ground b
 terrain. No new magenta anywhere, which is what separated this piece from the entrance half.
 
 Five parts, five matches, three of them exact to the unit.
+
+### Four new trim surfaces for 525 returns
+
+Worth its own line because it says what the remaining stages will cost. The 525 returns landed on 32
+faces, and 28 of those already drew a trim surface for their openings, so the whole second half of
+this piece added FOUR dressed surfaces where the first half added 51. The geometry roughly doubled
+the openings half's triangle count on the affected faces; the DRESSING cost a twentieth of it.
+
+That is the shape to expect from sills, heads, string courses and cornices too, since all of them
+take the same `trim` role on faces that already carry it. The number worth watching as this piece
+continues is triangles, not materials.
