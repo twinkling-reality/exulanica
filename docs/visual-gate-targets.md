@@ -112,3 +112,41 @@ JavaScript module whose path still ends `.owd`. Read by suffix, that module deco
 container and stops the run. The scan now uses the URL only to narrow what it reads and the
 container's own magic to decide, and a response that carries the magic and still fails to decode is
 a broken container, which is a different fact and still stops the run.
+
+## A definition with two readings, known and deliberately left
+
+`completeCapsuleClearanceVerification` defines itself, in `exulanica/evaluation/gate_keys.py`, as
+true only when a capsule "keeps at least 0.34 m from every drawn triangle that rises more than
+0.18 m above that surface and lies outside every building exterior ring with at least 0.34 m to its
+nearest edge".
+
+That sentence has two readings:
+
+**A.** Rings EXCLUDE triangles from the test: measure clearance only from triangles that lie outside
+every building exterior ring.
+
+**B.** Two conditions: clear of every qualifying drawn triangle, AND outside every building exterior
+ring by at least 0.34 m.
+
+**The implementation is B, and has always been B.** That can be established without reading the
+implementation at all, from the key's own declared structure: its `decided_by` lists
+`capsuleRingContactSamples` as one of the four values that decide it, and a pure exclusion reading
+needs no ring counter whatsoever. Reading the code agrees: `measureCapsule` counts triangle contacts
+against the drawn triangle table with no ring filter, and separately counts ring contacts against
+the prisms, skipping any prism outside the capsule's height band.
+
+**No retained score is affected and none moves.** The measurement has not changed, the key set
+version has not changed, and the rubric digest is over `docs/visual-gate-rubric.md`, which states
+nothing about capsules or clearance. Every retained record was scored by reading B, because reading
+B is what the code has always done.
+
+The sentence is left exactly as it is, on purpose. Its text is quoted verbatim by five retained,
+digest-bound reconciliation records, and the gate re-checks the current text against them: changing
+one word of it fails five record checks, which is those checks doing their job rather than an
+obstacle. Editing it therefore needs a new reconciliation record, and a reconciliation record binds
+a named human judge's calibration reply, which is a person's answer and not a thing to be
+manufactured for a wording change.
+
+This was found by building the generated-tile target, not by reviewing the product one, which is
+also how the static-title hazard and the shared route-and-key ring input were found. Whoever meets
+these two readings next: this was known, it was left deliberately, and the records are not suspect.
