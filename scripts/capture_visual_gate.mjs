@@ -296,6 +296,15 @@ const options = {
   // readers above can be imported without a directory to write into.
   out: argument('out', ''),
   label: argument('label', 'run'),
+  // WHICH PAGE SERVED THIS RUN, as a STATEMENT and not a binding. A record binds the containers, the
+  // artifact, the renderer path and this harness by digest, and says NOTHING about the tree the
+  // application itself was built from. MEASURED 2026-09-18: a corridor run was served from a lane
+  // worktree two merges behind main and only a container version refusal revealed it; a page from
+  // any tree can serve a scored target and no field would say which. These two are what the runner
+  // was told, so a reader can at least see what was claimed. Binding it needs the page to state its
+  // own commit, which is an app change and a follow-up.
+  servedBy: argument('served-by', ''),
+  servedFrom: argument('served-from', ''),
   port: Number(argument('cdp-port', '9351')),
   // The product caps its own measuring window at 60 seconds.
   validationSeconds: Number(argument('validation-seconds', '60')),
@@ -871,6 +880,7 @@ async function main() {
   Object.assign(observed, {
     target: options.target,
     app: { origin: appOrigin, path: appUrl.pathname, search: appUrl.search },
+    servedBy: { entry: options.servedBy, worktree: options.servedFrom, stated: true, bound: false },
     pageCheck: { path: gateTarget.path, title: expectedTitle, titleFrom: `${TITLE_SOURCE} ${gateTarget.titleSymbol}` },
   });
   const scoresOwnedDistrict = gateTarget.binds === 'owned-district-artifact';
@@ -1918,6 +1928,9 @@ async function main() {
       app: { origin: appOrigin, path: appUrl.pathname, search: appUrl.search, validationSeconds: options.validationSeconds },
       target: options.target,
       pageCheck: { path: gateTarget.path, title: expectedTitle, titleFrom: `${TITLE_SOURCE} ${gateTarget.titleSymbol}` },
+      // What served the page, STATED by the runner and not bound by anything. See the option's
+      // comment: a record binds what the page drew and not the tree the page was built from.
+      servedBy: { entry: options.servedBy, worktree: options.servedFrom, stated: true, bound: false },
       scored: {
         ...(scoresOwnedDistrict
           ? { artifact: { path: options.artifact, byteSize: artifactBytes.byteLength, sha256: sha256(artifactBytes), profile: artifact.profile, districtId: artifact.district_id } }
