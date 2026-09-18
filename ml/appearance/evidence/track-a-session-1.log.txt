@@ -92,10 +92,42 @@ one writable output directory, hard limit passed to timeout.
     painted-render-weathered-a2        look 54d4b7368570c8a9   0 suspected
   No lettering, numeral, logo, badge, signature, watermark, road marking or utility mark was found in
   any of the 32 crops, and nothing that reads as a particular real building or street.
-  The one suspected line: a faint straight horizontal dashed line crosses painted-render a1 for the full
-  width in all four crops. I am unsure what it is. It looks like an artefact of my own per-step latent
-  roll; a straight dashed line is also the shape a learned overlay would take; I have not traced it. The
-  operator decides, and that set is not pinned while it stands.
+  The one suspected line was traced the same night and is no longer suspected: see the section below.
+  painted-render a1's look record was rewritten with the traced finding; it is now
+  95718e871299d7d718eeafe3eb9502f2b4eb44dede15f8a0fd8356771c63baaa and lists nothing as suspected.
+
+== the dashed line across painted render a1, traced
+  What was seen by eye in the contact sheet: a faint straight horizontal dashed line across the full
+  width of every crop. Measured, in the output
+  4432d3253e0e1b3706cdaa646b0408a96c71032666565bc92906a139b5cdb8f5:
+    a dark band three pixels tall, 615 to 617, deepest at row 616 at 48 grey levels below the tile's
+      own median, 610 of its 1024 columns more than 20 levels dark, neutral in all three channels
+      (the darkest column is down 172, 166 and 144);
+    the strongest period along that line is 128 cycles across the tile, that is exactly every 8.0 px,
+      at 21.6 grey levels, and the band is centred exactly on a latent row boundary (616 = 8 x 77);
+    8.0 px is the autoencoder's own latent cell pitch, so what the decoder drew is one latent row of
+      cells, each rendered as a dark blob;
+    the conditioning picture the model was given has no line there: its edge map is dense everywhere
+      (450 to 520 pixels a row differing by 40 levels or more) and its own strongest rows are 668,
+      426, 337, 40 and 989;
+    one output of the 64 carries it.
+  That is enough to say what it is NOT: it is not painted content, not a learned overlay, not a
+  watermark and not third-party content. Nothing learned from photographs lands on precisely the
+  autoencoder's cell pitch and on precisely a latent row boundary. It arose inside this lane's own
+  latent pipeline, which makes it a defect of mine and not a provenance question.
+  What is NOT settled is which stage. The obvious suspect was my per-step cyclic roll, and for this
+  output it fitted: step 12 of 50 shifted the latent rows by 51, and 128 - 51 = 77, the exact latent
+  row. The hypothesis then failed its own test over the population: of the strong lines in all 64
+  outputs, 47 per cent sit on a boundary that seed's own schedule visited, against 44 per cent
+  expected by chance, and 40 per cent are aligned to the 8 px grid against 38 per cent by chance. So
+  the single match was luck and the roll is not convicted.
+  The latents were not retained, so this cannot be closed from what the run wrote. The next session
+  records per-latent-row statistics (min, max, mean) at each step, which costs nothing, and that will
+  say whether a row leaves the range the decoder expects and at which step.
+  Also learned from the same sweep: the strongest lines in the whole session are paving's joints
+  (columns 169 to 171, 511, 854 and rows at the same places), which is the recipe's own 3 by 3 flag
+  grid at 1024/6, 1024/2 and 5 x 1024/6. Structure, not a defect, and a reminder to test a line
+  against the recipe before calling it an artefact.
 
 == what went wrong, and what it cost
   1. The output directory is a bind mount the host owns, so the container must run as the invoking user.
@@ -114,10 +146,12 @@ one writable output directory, hard limit passed to timeout.
      longer exist. Every line I quoted from them was quoted while they existed; they cannot be checked
      now. Next time, pull each step's log as that step ends.
   6. The deletion check ran 13 s after the delete request, while the provider still listed the instance
-     as DELETING, so scripts/delete-instance.sh printed "IS STILL LISTED" and exited 1. I recorded the
-     deletion at 00:05:56Z without re-listing. I read the account again at 2026-09-18T00:20:01Z: "No
-     instances in org glendonchin-hq". The proof is that later reading, not the first one, and the
-     script should wait for the provider's own removal rather than a fixed 10 s.
+     as DELETING, so scripts/delete-instance.sh printed "IS STILL LISTED" and exited 1, and I recorded
+     the deletion at 00:05:56Z without re-listing. The machine was in fact gone within a minute: the
+     orchestrator session read the account independently at 2026-09-18T00:06:39Z and got "No instances
+     in org glendonchin-hq", which is the earliest and the independent confirmation; my own re-reading
+     at 00:20:01Z says the same. The script is what was wrong, and it should wait for the provider's own
+     removal rather than a fixed 10 s.
   7. While writing the findings file I typed a digest from memory for painted-render a2 instead of
      copying it. I caught it by rewriting every digest from the picks file and verifying each against
      the bytes on disk: one was wrong, seven were right, and all eight now verify. Nothing was

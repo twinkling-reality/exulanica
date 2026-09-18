@@ -368,10 +368,18 @@ texel of every pick was looked at at 1:1 before anything was offered onward: fin
 [`session-1-findings.json`](../ml/appearance/look/session-1-findings.json), records in
 `ml/appearance/look/records/`. No lettering, numeral, logo, badge, signature, watermark, road marking
 or utility mark was found in any of the 32 crops, and nothing that reads as a particular real place.
-One line is unresolved and stated as unresolved: a faint straight horizontal dashed line crosses
-painted render a1 for the full width of all four crops. It looks like an artefact of the lane's own
-latent roll, a straight dashed line is also the shape a learned overlay would take, and the cause is
-untraced. That set is not pinned while it stands.
+One defect was found by eye and then traced. A dark band three pixels tall crosses painted render a1
+at row 616, 48 grey levels below the tile's own median, dashed. The dash period along it is exactly
+8.0 px, which is the autoencoder's own latent cell pitch, at 21.6 grey levels and the strongest
+period in that line; the band is centred exactly on a latent row boundary (616 = 8 x 77); it is
+neutral in all three channels; the conditioning picture has no line there; and 1 of the 64 outputs
+carries it. Nothing learned from photographs lands on precisely the autoencoder's cell pitch, so this
+is a defect of the lane's own latent pipeline and not third-party content. Which stage is not
+settled: the per-step roll fitted this one output (step 12 shifted the rows by 51, and 128 - 51 = 77)
+and then failed over the population, where 47 per cent of strong lines sit on a boundary the seed's
+schedule visited against 44 per cent expected by chance. The latents were not retained, so the next
+session records per-latent-row statistics at each step. That set is not offered while the defect
+stands.
 
 Nothing has been handed to the texture lane. Track B has not run and is not approved.
 
@@ -392,5 +400,6 @@ Nothing has been handed to the texture lane. Track B has not run and is not appr
   second machine: every number in section 9 comes from one instance, one driver and one image.
 - Whether the appearance a model invents suits the world's other materials is unknown: four targets
   ran, and the catalog holds eight makers.
-- The cause of painted render a1's straight dashed line. Until it is traced, nothing from that set
-  goes onward.
+- Which stage of the latent pipeline leaves the dark 8 px-pitch band in painted render a1. It is
+  traced to the latent grid and cleared of being third-party content (section 9); the stage needs
+  per-latent-row statistics recorded during a run, and nothing from that set goes onward until then.
