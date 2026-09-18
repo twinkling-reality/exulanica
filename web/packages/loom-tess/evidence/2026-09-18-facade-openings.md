@@ -282,3 +282,31 @@ WHAT THIS FRAME IS NOT. It is the conformance fixture and not the corridor stree
 the holes are drawn; it says nothing about whether they look right, which is a judgement and not
 this lane's to make. The magenta is the runtime saying a surface has no material record, not a
 colour anybody chose.
+
+### Two observers of one quantity, neither measuring it for that
+
+The gate lane's fifth run, on the same development page at tessellator 17, recorded the panel saying
+"46 of 55 records drawn; 18 surfaces drawn as unavailable". This lane's capture, on the same page at
+tessellator 18, recorded "46 of 55 records drawn; 20 surfaces drawn as unavailable". And this
+package's own suite failure, in a Python test on a different code path, named the new undressed class
+as `("city.facade", "trim"): 2`.
+
+Summed from the pinned set in `tests/test_drawn_surfaces_are_dressed.py` rather than by eye: it
+totals 20, of which trim is 2, so 18 without it. The records count is identical at 46 of 55 in both.
+
+So a running browser page and a Python pin agree about what changed and by how much, having been
+produced by two lanes on two branches for two unrelated reasons. Neither was measured to check the
+other, which is what makes the agreement worth anything.
+
+### What the openings cost, on the street rather than the fixture
+
+    corridor tile (2, 0)   render_batch   17: 34,954 triangles   18: 55,338   plus 20,384
+                           nav_envelope   17: 96,745 triangles   18: 96,745   identical, and its
+                                          70,206 vertices are identical too
+
+20,384 triangles for the 916 openings that tile states, which is 22.3 a piece. The brief's estimate
+was about 53,000 triangles for the whole piece, openings and arches and string courses and cornices
+and entrances together, over the city's 2,652 openings, which is about 20 each. Stage 1 alone is
+already 22.3 each. So the estimate was low, and the later stages will cost more than the figure
+somebody will remember. Said here because the number is cheap to measure now and expensive to argue
+about later.
