@@ -116,8 +116,14 @@ decision is accepted in writing, so only a token whose grant names the permissio
 generated tile.
 
 - `GET /tiles?city_seed=<64 hex>[&lod=<int>]` lists what is stored for one city: each tile's key,
-  coordinate, level of detail, container digest and size, its two triangle digests and its state.
-  Metadata only, and no tile quota is spent on it.
+  coordinate, level of detail, **the stage version and stage params digest its key was derived
+  from**, container digest and size, its two triangle digests and its state. Metadata only, and no
+  tile quota is spent on it. The stage fields are what tell two rows for one tile apart: a tile
+  document may be baked by more than one tessellator, so a listing can carry rows agreeing on
+  coordinate, level of detail and `tile_inputs_digest` and differing only in the program that baked
+  them. A caller reading by coordinate alone takes whichever came first, which on 2026-09-18 made a
+  loader draw a container its runtime then refused, and the failure read as a missing tile rather
+  than as an ambiguous listing.
 - `GET /tiles/{baked_tile_id}/bytes` serves one container, as
   `application/vnd.exulanica.owd`, with the container digest as its `ETag`. A caller that already
   holds the bytes sends `If-None-Match` and is answered 304 with no body. **The caller hashes what

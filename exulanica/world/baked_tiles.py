@@ -72,12 +72,22 @@ class TileQuotaRefused(BakedTileError):
 
 @dataclass(frozen=True, slots=True)
 class BakedTile:
-    """One stored tile, as a caller may see it. The container's bytes are fetched separately."""
+    """One stored tile, as a caller may see it. The container's bytes are fetched separately.
+
+    ``stage_version`` and ``stage_params_sha256`` are what tell two rows for ONE tile apart. A tile
+    document may be baked by more than one tessellator (migration 0077), so a listing can carry two
+    rows with the same coordinate, the same level of detail and the same ``tile_inputs_digest``,
+    differing only in the program that baked them. Without these a caller reading the listing by
+    coordinate has no way to choose and will take whichever came first; on 2026-09-18 a loader did
+    exactly that and drew a container its runtime then refused.
+    """
 
     baked_tile_id: uuid.UUID
     tile_x: int
     tile_y: int
     lod: int
+    stage_version: int
+    stage_params_sha256: str
     tile_inputs_digest: str
     container_sha256: str
     container_bytes: int
@@ -91,6 +101,8 @@ class BakedTile:
             "tile_x": self.tile_x,
             "tile_y": self.tile_y,
             "lod": self.lod,
+            "stage_version": self.stage_version,
+            "stage_params_sha256": self.stage_params_sha256,
             "tile_inputs_digest": self.tile_inputs_digest,
             "container_sha256": self.container_sha256,
             "container_bytes": self.container_bytes,
@@ -117,6 +129,8 @@ def _row(row: Mapping[str, Any]) -> BakedTile:
         tile_x=row["tile_x"],
         tile_y=row["tile_y"],
         lod=row["lod"],
+        stage_version=int(row["stage_version"]),
+        stage_params_sha256=_hex(row["stage_params_sha256"]),
         tile_inputs_digest=_hex(row["tile_inputs_digest"]),
         container_sha256=_hex(row["container_sha256"]),
         container_bytes=int(row["container_bytes"]),
@@ -127,8 +141,8 @@ def _row(row: Mapping[str, Any]) -> BakedTile:
 
 
 _COLUMNS: Final = (
-    "baked_tile_id, tile_x, tile_y, lod, tile_inputs_digest, container_sha256, container_bytes, "
-    "render_batch_sha256, nav_envelope_sha256, state"
+    "baked_tile_id, tile_x, tile_y, lod, stage_version, stage_params_sha256, tile_inputs_digest, "
+    "container_sha256, container_bytes, render_batch_sha256, nav_envelope_sha256, state"
 )
 
 

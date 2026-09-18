@@ -143,6 +143,22 @@ def test_one_tile_document_baked_by_two_tessellators_makes_two_rows(stored):
     assert repository.read(newer).state == "baked"
     assert repository.read(older).container_bytes == len(b"as the old tessellator wrote it")
 
+    # AND A CALLER CAN TELL THEM APART. The two rows agree on coordinate, level of detail and
+    # tile_inputs_digest, because those are the tile's and the tile did not move. What a listing
+    # must carry is what differs: the stage version and the params digest the key was derived
+    # from. Without them a loader reading by coordinate takes whichever row came first, which is
+    # what happened on 2026-09-18: a page drew a container its runtime then refused, and the
+    # failure looked like a missing tile rather than an ambiguous listing.
+    listed = repository.tiles_of_city(str(_tile()["city_seed"]))
+    rows = {tile.baked_tile_id: tile for tile in listed}
+    assert set(rows) == {older, newer}
+    assert rows[older].tile_x == rows[newer].tile_x and rows[older].tile_y == rows[newer].tile_y
+    assert rows[older].tile_inputs_digest == rows[newer].tile_inputs_digest
+    assert rows[older].stage_params_sha256 != rows[newer].stage_params_sha256
+    for tile in rows.values():
+        assert tile.document()["stage_params_sha256"] == tile.stage_params_sha256
+        assert tile.document()["stage_version"] == tile.stage_version
+
 
 def test_two_keys_may_not_claim_one_bake(stored):
     """The other half of 0077: the key is a uuid5 the caller computes, so the database checks that
