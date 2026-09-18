@@ -90,7 +90,10 @@ export interface RepresentationRecordReference {
   readonly surfaces?: readonly RepresentationRecordSurface[];
 }
 
-/** One surface role of a generated record's drawn range, and the material that dresses it, if any. */
+/**
+ * One surface of a generated record's drawn range: its role, the orientation that fixes its surface
+ * frame, and the material that dresses it, if any. A role repeats only on another orientation.
+ */
 export interface RepresentationRecordSurface {
   readonly role: string;
   readonly orientation: string;
@@ -189,7 +192,7 @@ export function validateRepresentationSubject(subject: RepresentationSubject): v
       || record.surfaces.some(surface => !SURFACE_WORD.test(surface.role) || !SURFACE_WORD.test(surface.orientation)
         || (surface.material === 'record') !== (typeof surface.dressingIdentity === 'string' && CANONICAL_UUID.test(surface.dressingIdentity))
         || !['record', 'none-exists'].includes(surface.material))
-      || new Set(record.surfaces.map(surface => surface.role)).size !== record.surfaces.length))
+      || new Set(record.surfaces.map(surface => `${surface.role}/${surface.orientation}`)).size !== record.surfaces.length))
     || subject.origin !== 'generated' || subject.subjectKind !== 'object')) {
     throw new TypeError('A record subject names a generated identity record exactly as it states itself');
   }
@@ -712,8 +715,14 @@ export function generatedRecordSubjectV2(
       }
       return Object.freeze({ role: surface.role, orientation: surface.orientation, ...dressedBy(surface.material, surface.role) });
     }));
-    if (new Set(surfaces.map(surface => surface.role)).size !== surfaces.length) {
-      throw new TypeError(`${kind} ${identity}: a drawn range states each surface role once`);
+    // Role AND orientation, because a role legitimately repeats on the other orientation: a litter
+    // bin's sides and its top are both object_primary, and the orientation is what fixes the surface
+    // frame (s round the part with t = base - z on a side, s = x with t = y in plan on a top), so
+    // collapsing them would make half the texture coordinates a lie about their frame. One material
+    // record may dress both, since a material is keyed by (surface identity, role), not orientation.
+    // The container contract states the same rule (loom-tess pieces.ts, owd.ts, tessellate.ts).
+    if (new Set(surfaces.map(surface => `${surface.role}/${surface.orientation}`)).size !== surfaces.length) {
+      throw new TypeError(`${kind} ${identity}: a drawn range states each surface role and orientation once`);
     }
     bounds = Object.freeze({
       frameId, units: 'metres' as const, origin: 'generated' as const, basis: 'generated-extent' as const,

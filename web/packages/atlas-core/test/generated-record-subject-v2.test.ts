@@ -181,10 +181,46 @@ describe('generated street subject contract v2', () => {
     expect(() => register(facade, withSurfaces([
       { role: 'wall', orientation: 'vertical', material: { state: 'none-exists' } },
       { role: 'wall', orientation: 'vertical', material: { state: 'none-exists' } },
-    ]))).toThrow('each surface role once');
+    ]))).toThrow('each surface role and orientation once');
     expect(() => register(facade, withSurfaces([]))).toThrow('at least one surface');
     expect(() => register(facade, withSurfaces([{ role: 'Wall', orientation: 'vertical', material: { state: 'none-exists' } }])))
       .toThrow('names its role and orientation');
+  });
+
+  it('takes one role on two orientations, dressed by one material, as a litter bin states it', () => {
+    // A form part states one surface role; its sides are vertical and its top horizontal, and the
+    // orientation is what fixes the surface frame, so the two cannot be collapsed into one surface.
+    // The material is keyed by (surface identity, role), so one record dresses both.
+    const bin: GeneratedRecordPayload = {
+      kind: 'city.street_furniture', version: 2,
+      fields: {
+        identity: 'b1c2d3e4-5f60-5a7b-8c9d-0e1f2a3b4c5d', item_ordinal: 0,
+        curb_identity: '3afeee23-e3b3-5cbb-8654-ed114473327c', segment_identity: '3afeee23-e3b3-5cbb-8654-ed114473327c',
+        extent: extent([12_000, 8_000, 0], [12_600, 8_600, 900]),
+      },
+    };
+    const paint: GeneratedRecordPayload = {
+      kind: 'city.surface_material', version: 2,
+      fields: {
+        identity: 'a7c9e1f3-2b4d-5e6f-8a9b-0c1d2e3f4a5b', surface_identity: bin.fields['identity'],
+        surface_kind: 'city.street_furniture', role: 'object_primary', material: 'painted_metal',
+      },
+    };
+    const { subject } = generatedRecordSubjectV2(tile, {
+      record: bin, membership: 'owned', drawnSeparately: false, availability: 'available',
+      entry: {
+        state: 'drawn', extentMm: { min: [12_000, 8_000, 0], max: [12_600, 8_600, 900] },
+        surfaces: [
+          { role: 'object_primary', orientation: 'vertical', material: { state: 'record', record: paint } },
+          { role: 'object_primary', orientation: 'horizontal', material: { state: 'record', record: paint } },
+        ],
+      },
+    });
+    expect(subject!.record!.surfaces).toEqual([
+      { role: 'object_primary', orientation: 'vertical', material: 'record', dressingIdentity: paint.fields['identity'] },
+      { role: 'object_primary', orientation: 'horizontal', material: 'record', dressingIdentity: paint.fields['identity'] },
+    ]);
+    expect(() => validateRepresentationSubject(subject!)).not.toThrow();
   });
 
   it('gives a halo record no subject, and refuses a halo entry for an owned record or the reverse', () => {
