@@ -78,13 +78,18 @@ def replacement_refusal(
 ) -> str | None:
     """The reason this run must not drop ``name``, or None when it may.
 
-    Guard added 2026-09-17, after exulanica_corridor_0917_test was dropped on the shared 5433
-    server by something that left no trace (this server does not log successful DDL), costing the
-    corridor lane a rebuild, a re-migration, a workspace and quota redeclaration and a rebake. This
-    script held the only unguarded drop path in the repository: --force dropped whatever its target
-    named, with no check on the name.
+    Guard added 2026-09-17. This script held the only unguarded drop path in the repository:
+    --force dropped whatever its target named, with no check on the name, while
+    tests/test_evaluation_replay.py refuses any name outside its own prefix. That asymmetry is the
+    reason for this guard and it stands on its own.
 
-    A name pattern is not the guard, because the database that was lost matched every plausible
+    IT WAS FOUND WHILE INVESTIGATING A LOSS THAT DID NOT HAPPEN. A lane reported that its scratch
+    database had been dropped from the shared 5433 server; the database had in fact never been
+    created there, because the lane read its own runbook, which was a PLAN, as a description of
+    state. That is corrected here so nobody re-litigates this guard on a false origin: nothing was
+    destroyed, and this path is still a loaded gun.
+
+    A name pattern is not the guard, because a scratch database's name matches every plausible
     scratch pattern, and so does this script's own default target. What a run cannot do by accident is
     name the database twice: once in the target URL and once in --replace. Two named databases that
     are also protected outright, because nothing here may replace them at any confirmation.
