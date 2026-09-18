@@ -450,6 +450,20 @@ corridor lane's open question and it is open here too: stopping, dropping to the
 and stepping over are all honest answers. Recording the question in advance is what stops whichever
 happens from being described afterwards as the expected behaviour.
 
+**One candidate excluded by measurement, 2026-09-18, before either half ran.** The pre-registration
+above is left as written; this is what has since been measured against it. The corridor lane sharpened
+its sampler after finding that a point supported at 170 mm and a point supported at 0 mm both counted
+as "supported", so a walker dropping off the kerb would have read as a continuous walk: the tool meant
+to catch that behaviour could not see it. Reporting the support HEIGHT at 100 mm along the walked line
+of the tessellator 13 container gives 1,161 samples, every supported one of them footway at 147 to 170
+mm, no terrain level anywhere, and seven runs of NO SUPPORT AT ANY HEIGHT totalling 60.7 m of the 116,
+which is more than the 53 to 56 m a 500 mm sampling had reported. So on that bake the candidate "drops
+170 mm to the terrain" is excluded by the ground truth rather than by argument: where the footway is
+carved away the envelope holds no triangle at any height, because the terrain had already yielded to
+the footway's own record and the carve removes both. Two candidates remain there, stopping or passing
+over nothing, and a trace can tell those apart. Whether the third returns on tessellator 14 is a
+question for that container's own sampling, not for this paragraph.
+
 ## 9. After this runtime
 
 - The corridor lane bakes the street and iterates on its look, at most three times, by editing
