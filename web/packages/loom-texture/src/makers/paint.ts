@@ -46,9 +46,11 @@ import { MM, TILE, tileToLength } from '../tile.js';
  *     border rather than as the edge of paint. So the edge is straight where the paint was laid.
  *   - What is left of that idea is the bites: where something has caught the edge, a chunk of paint
  *     is missing, tens of millimetres across and several texels deep, which does read at this
- *     pitch. A bite is a function of the position along the line alone, so the two edges are bitten
- *     independently, and it eats from whichever edge is nearer. The field is measured (below), and
- *     the band keeps its top fifth, so most of a marking's edge is whole.
+ *     pitch. A bite is a function of the position along the line alone and both edges share it, so
+ *     a bite at one edge has its twin opposite. That is not how one marking wears, but the tile has
+ *     to join itself across v, where its last row and its first row are its two edges: a bite that
+ *     belonged to one edge only put a step between them. The field is measured (below) and the band
+ *     keeps its top fifth, so most of a marking's edge is whole.
  *   - Coverage at a bite rises over 6 mm, about one and a half texels: a decal is blended, not
  *     thresholded, so an edge that crosses more than one texel reads as an edge and not a stair.
  *   - Wear is holes gathered in patches, not an even thinning, because tyres scrub the same tracks
@@ -183,8 +185,7 @@ function pattern(recipe: Recipe): Pattern {
   const roughness = permille(read.integer(recipe, 'paint_roughness_permille'));
   const grimeRoughness = read.integer(recipe, 'grime_roughness_percent');
   const rangeMm = read.integer(recipe, 'height_range_mm');
-  const nearSeed = stream(seed, 1);
-  const farSeed = stream(seed, 2);
+  const biteSeed = stream(seed, 1);
   const holeSeed = stream(seed, 3);
   const patchSeed = stream(seed, 4);
   const beadSeed = stream(seed, 5);
@@ -215,10 +216,12 @@ function pattern(recipe: Recipe): Pattern {
     // rather than through a noise field, which folds its own. Unfolded, the band would not repeat.
     const across = tileToLength(floorMod(y, TILE), recipe.extent_mm.v);
     const fromEdge = Math.min(across, acrossLength - across);
-    // The bite in the edge this texel is nearer to. Beyond the bite's depth the paint is whole,
-    // which is why a marking with no bites has no border: its coverage runs to the tile's edge.
-    const seedHere = across * 2 <= acrossLength ? nearSeed : farSeed;
-    const depth = floorDiv(band(valueNoise(x, 0, edgeCells, 1, seedHere), BITE_LOW, BITE_HIGH) * bite, ONE);
+    // The bite in the edge, from one field of the position ALONG the line, so both edges are bitten
+    // alike at a given point. That is what lets the tile join itself across v: the last row and the
+    // first are the two edges of the marking, and a bite belonging to one edge alone put a step
+    // between them, which the backend's seam check refused. Beyond the bite's depth the paint is
+    // whole, which is why a marking with no bites has no border: its coverage runs to the edge.
+    const depth = floorDiv(band(valueNoise(x, 0, edgeCells, 1, biteSeed), BITE_LOW, BITE_HIGH) * bite, ONE);
     const edge = smoothstep(depth - soft, depth, fromEdge);
 
     const patch = band(fbm(x, y, patchCells, down(patchCells), patchSeed, 3), PATCH_LOW, PATCH_HIGH);

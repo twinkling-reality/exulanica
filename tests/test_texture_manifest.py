@@ -56,8 +56,8 @@ def _compact(document: object) -> bytes:
 def test_the_published_manifest_reads_back_to_its_own_bytes():
     raw = MANIFEST.read_bytes()
     entries = read_texture_manifest(raw)
-    # The eight sets 0065 pins and batch 1's three, which 0076 pins.
-    assert len(entries) == 11
+    # The eight sets 0065 pins, batch 1's three from 0076, and batch 3's six from 0077.
+    assert len(entries) == 17
     rebuilt = {"profile": "exulanica.texture-manifest/v2", "sets": []}
     rebuilt["sets"] = [
         entry.as_entry(profile="exulanica.texture-manifest/v2") for entry in entries.values()
@@ -75,7 +75,21 @@ def test_grammar_and_the_resolver_pin_the_same_sets():
 
 
 def _entry(document: dict) -> dict:
-    return document["sets"][0]
+    """The entry the cases below mutate: the first set in the v1 container, by profile not position.
+
+    These cases are about the v1 layout, four maps with a height among them. The manifest is sorted
+    by set id, so the first entry happened to be a v1 set until batch 3 published cc0.awning-canvas
+    ahead of cc0.brick-running-bond, and the cases that reach for the fourth channel began reading a
+    v2 set that has three. What they mean is "a set in the v1 container", so that is what they ask
+    for. The v2 layouts have their own cases in the shared conformance file.
+    """
+    v1 = [
+        entry
+        for entry in document["sets"]
+        if entry["container_profile"] == "exulanica.texture-set/v1"
+    ]
+    assert v1, "no v1 set is pinned any more; these cases need rewriting, not repointing"
+    return v1[0]
 
 
 CASES = [
@@ -255,6 +269,7 @@ def test_a_container_may_describe_its_maps_beyond_their_packing():
     def describe(header: dict) -> None:
         header["maps"][3]["decode"] = "linear height, 0 is the lowest point"
 
+    # A v1 container, because the fourth map is its height: a v2 procedural set has three.
     decode_texture_set(_reencode(_published_container(), describe))
 
 

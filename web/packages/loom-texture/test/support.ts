@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
-import type { MapDescriptor } from '../src/classes.js';
+import { CATALOG } from '../src/catalog.js';
+import { SET_PROFILE_V1, type MapDescriptor } from '../src/classes.js';
 import { MAP_LAYOUT } from '../src/container.js';
+import type { TextureSetDefinition } from '../src/definition.js';
 import type { Fields } from '../src/maps.js';
 
 /** The repository root: web/packages/loom-texture/test -> root. */
@@ -9,6 +11,22 @@ export const REPOSITORY = fileURLToPath(new URL('../../../../', import.meta.url)
 
 /** The published directory, at the repository root. */
 export const PUBLISHED = fileURLToPath(new URL('../../../../assets/textures/', import.meta.url));
+
+/**
+ * A published set in the v1 container, for the tests that are about v1: its four maps, its height
+ * among them, and the writer that refuses a set of a class.
+ *
+ * Asked for by profile and not as `CATALOG[0]`, which is what these tests used to say. The catalog
+ * is sorted by set id, so the first entry was a v1 set until batch 3 published cc0.awning-canvas
+ * ahead of cc0.brick-running-bond, and four tests then began handing a v2 set to a v1 writer.
+ */
+export const V1_SET: TextureSetDefinition = (() => {
+  const found = CATALOG.find((def) => def.containerProfile === SET_PROFILE_V1);
+  if (found === undefined) {
+    throw new Error('no v1 set is published any more; the tests that use this need rewriting');
+  }
+  return found;
+})();
 
 export function readPublished(path: string): Uint8Array {
   return new Uint8Array(readFileSync(`${PUBLISHED}${path}`));

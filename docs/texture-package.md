@@ -1,13 +1,15 @@
 # Texture package
 
-Status: IMPLEMENTED for eleven baked texture sets, their containers, the manifest, migrations 0065
-and 0076, the backend resolver, and the recipes, makers and object store the sets are baked from;
-and, in migration 0066, for a workspace's own recipes and bakes, their erasure, their routes and the
-bake worker (section 14). Eight sets are the first, opaque v1 containers; glazing, foliage and bark
-are the first sets that state a material class (section 16), pinned with every set's class by 0076.
-The appearance of these sets in the rendered product is UNVERIFIED: no renderer draws the glazing or
-cutout class yet, and the eye-level checks belong to the tile runtime's bench and to the corridor
-lane, against the gate lane's Flatiron baseline. Publishing a set is not a verdict on its look. No
+Status: IMPLEMENTED for seventeen baked texture sets, their containers, the manifest, migrations
+0065, 0076 and 0078, the backend resolver, and the recipes, makers and object store the sets are
+baked from; and, in migration 0066, for a workspace's own recipes and bakes, their erasure, their
+routes and the bake worker (section 14). Eight sets are the first, opaque v1 containers; glazing,
+foliage and bark are the first sets that state a material class (section 16), pinned with every
+set's class by 0076, and 0078 pins six more: painted timber, awning canvas and a sign panel for a
+shopfront, white and yellow road paint, which are the first sets of the decal class, and the soil of
+a tree pit. The appearance of these sets in the rendered product is UNVERIFIED: the eye-level checks
+belong to the tile runtime's bench and to the corridor lane, against the gate lane's Flatiron
+baseline, and no bench check has accepted a decal. Publishing a set is not a verdict on its look. No
 bake worker runs in any deployment, and no model has been trained.
 
 The plan names what shipped and what this package replaces, and both sentences are quoted
@@ -27,9 +29,10 @@ The implementation is `web/packages/loom-texture` (the makers and the offline ba
 
 ## 1. The sets
 
-Eleven sets, named by the surface a street draws. Deciding which building gets which surface is the
-grammar's material stage, so no set is named after an era, a typology or a height class. The eight
-first sets are v1 containers, which are opaque; the last three state their class (section 16).
+Seventeen sets, named by the surface a street draws. Deciding which building gets which surface is
+the grammar's material stage, so no set is named after an era, a typology or a height class. The
+eight first sets are v1 containers, which are opaque; the nine after them state their class
+(section 16), and two of those nine are the first decals.
 
 | Set | Version | Class | Surface | Texels | Extent (mm) | Height range (mm) | Seed | content_sha256 |
 | --- | --- | --- | --- | --- | --- | --- | --- | --- |
@@ -44,6 +47,12 @@ first sets are v1 containers, which are opaque; the last three state their class
 | `cc0.float-glazing` | 1 | glazing, v2 | vertical | 1024 x 1024 | 2000 x 2000 | none | 2026091701 | `8f8f6663e238e2e40d9f61a98d434ef4aa8323e33c65447c4201b8ee571a6708` |
 | `cc0.broadleaf-foliage` | 1 | cutout, v2 | vertical | 512 x 512 | 2000 x 2000 | 40 | 2026091702 | `62c58628a7059ea546565a29c1fde6f9b393de3be3fa3ddaaa28d60e7dd4ace2` |
 | `cc0.tree-bark` | 1 | opaque, v2 | vertical | 512 x 512 | 1000 x 1000 | 20 | 2026091703 | `97fe363dbb2bc398b9be7956deb1b272698363f723d91028b04f56f91e9e0c62` |
+| `cc0.painted-timber` | 1 | opaque, v2 | vertical | 512 x 512 | 1000 x 1000 | 4 | 2026091704 | `2554cb0f6da638364776806faaaf46dc1e021a02905ecd85083776c474304157` |
+| `cc0.awning-canvas` | 1 | opaque, v2 | horizontal | 512 x 512 | 1000 x 1000 | 6 | 2026091705 | `b94be437c837a7afc8529995f99271b8a5f17287a04b04bcc30ce0122d703c32` |
+| `cc0.sign-panel` | 1 | opaque, v2 | vertical | 512 x 512 | 1000 x 1000 | 4 | 2026091706 | `e2733280fa6813f7fbd66358d16a325f514cd4684621f16bc18c9e8088fac23e` |
+| `cc0.road-paint-white` | 1 | decal, v2 | horizontal | 256 x 64 | 1000 x 250 | 4 | 2026091707 | `43678e7000744cf366957c82371078cfa77f9897f920b94f86d2d77a6d2e2035` |
+| `cc0.road-paint-yellow` | 1 | decal, v2 | horizontal | 256 x 64 | 1000 x 250 | 4 | 2026091708 | `e97e4abe1ed7ea48af15c53dbccb01a1925eb12ecd66e7f887bda12789a3d01e` |
+| `cc0.tree-pit-soil` | 1 | opaque, v2 | horizontal | 512 x 512 | 900 x 900 | 10 | 2026091709 | `e721fbad53136668c61af04bc717f5f904559ea5a17593b505a897090cec517b` |
 
 Every set is CC0-1.0. The dedication is its own blob, referenced by digest
 `d51d213f1f5d94acb27403d616b29007802618979c106b075fdbd399fa86310f`, the way
@@ -89,6 +98,31 @@ mm where a half-module offset is not a whole millimetre):
 - **Tree bark.** Furrowed broadleaf bark: plates about 62 mm across and 500 mm long between narrow
   furrows up to 12 mm deep that wander and interlace, shallow cracks across the plates, fibrous
   relief along the trunk and patches of lichen on the plates.
+- **Painted timber.** Painted softwood for a shopfront's doors, frames and stall boards: ten boards
+  across the tile with V grooves between them, grain and brush marks showing through the paint, and
+  chips of paint gathered in patches rather than spread evenly, because a door wears where it is
+  handled. Bare wood and primer show in the deepest chips.
+- **Awning canvas.** A plain weave of 240 threads across the tile, striped along the shopfront in
+  two colours, sagging between three rafters. The sun bleaches it in broad patches and rain leaves
+  narrow streaks down the slope. The stripes are laid half a stripe off the tile's edge so a colour
+  change does not sit on the seam.
+- **Sign panel.** A sprayed sheet panel for a fascia, and no lettering: lettering is a record of
+  what a shop is called, so whatever draws a fascia draws it over this. Sheets butt along the
+  fascia with a shadow-line joint, the finish is the fine even orange peel of sprayed paint, and the
+  weathering is deliberately low, because a panel interesting on its own is too dirty to letter. The
+  joint is laid half a sheet off the tile's edge, so its groove is not cut in half by the seam.
+- **Road paint, white** and **road paint, yellow.** The library's first decals: one maker, two
+  colours, because New York paints lane lines and crossings white and centre lines yellow. A
+  marking is drawn over the carriageway and blended by its coverage, so the set holds the paint
+  alone and the road shows through where the paint has gone. The film thins before it breaks, holes
+  come from a warped cellular field with a size per hole, and both edges carry the same bites, so
+  the tile joins itself across its width. 256 x 64 texels over 1000 x 250 mm keeps the texel square
+  at 3.91 mm.
+- **Tree pit soil.** The dug bed a street tree stands in: clods at the scale of a spadeful, crumbs
+  finer than that, and stones from a warped cellular field that lie in drifts rather than spread
+  evenly. Each stone takes its size from its own cell, and the bed darkens in its hollows where the
+  water sits. 900 mm is the narrowest pit on the walked street, so one tile covers a pit with no
+  repeat inside it.
 
 The corridor needs six. Which six is the grammar's decision, so everything below that depends on
 the choice charges the six most expensive sets, which bounds any six the grammar picks.
@@ -457,6 +491,13 @@ A trigger is the second wall: it refuses every UPDATE and DELETE, even by the ow
 INSERT by a role that is not a member of the owner, so a pinned version never names other bytes, a
 new version arrives only in a new migration, and a role handed a write here by mistake is still
 refused. `tests/test_texture_set_migration.py` measures both walls on a provisioned role.
+
+**Migration 0078** pins batch 3's six sets, in the shape 0065 pins and beside their class rows in
+the table 0076 created, in one transaction: the class table's deferred trigger refuses a pinned set
+that arrives without its class, so the two inserts cannot be separated. Two of the six are the first
+pinned decals, and the first pinned sets whose tile is not square in the v2 container; every column
+here has carried a tile longer than it is wide since 0065, where `cc0.kerb-stone` is 1024 by 256
+texels over 1800 by 450 mm. Migration 0077 is the corridor lane's, not this lane's.
 
 **Migration 0076** states what kind of surface each pinned set is. It creates
 `world_texture_set_class`, keyed by the same `(set_id, version)` with a foreign key to the pin, holding
@@ -998,11 +1039,16 @@ resolution follows from the extent and that distance.
 | Timber, bark, canvas, sign panel | 1.5 m or more, beside the footway | 512 over 1000 mm | 1.95 mm |
 | Foliage, bare ground | 3 m or more, or ground 2.57 m away | 512 over 2000 mm | 3.91 mm |
 | Road paint | the ground 2.57 m or more away | 256 x 64 over 1000 x 250 mm | 3.91 mm |
-| Tree pit soil | the ground 2.57 m or more away | 256 over 1000 mm | 3.91 mm |
+| Tree pit soil | the ground 2.57 m or more away | 512 over 900 mm | 1.76 mm |
 
 Glazing is twice the extent of the other vertical sets at the same pitch for one reason: a shop pane
 is 1.5 to 3 m wide, so a 1000 mm tile repeats two or three times inside one pane, and a repeat inside
 a single pane reads as wallpaper.
+
+Tree pit soil is finer than this rule alone asks for, at 512 over 900 mm rather than 256 over 1000.
+The corridor measured 14 to 46 pits on the walked street, 900 to 2000 mm across, one to three metres
+from the walker, and 900 mm is the narrowest: at that extent one tile covers a pit, so no repeat
+appears inside the one surface a person looks straight down at.
 
 ### Draft makers, which nothing publishes
 

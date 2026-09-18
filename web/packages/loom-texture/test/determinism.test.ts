@@ -5,7 +5,7 @@ import { encodeContainer, encodeContainerV2 } from '../src/container.js';
 import type { TextureSetDefinition } from '../src/definition.js';
 import { bakeClassMaps, bakeMaps, sampleFields } from '../src/maps.js';
 import { sha256Hex } from '../src/publish.js';
-import { FIELD_NAMES } from './support.js';
+import { FIELD_NAMES, V1_SET } from './support.js';
 
 /**
  * Same inputs, same bytes; and nothing but the stated inputs reaches them.
@@ -61,7 +61,7 @@ describe('a bake is a function of its stated inputs', () => {
   });
 
   it('changes the digest, and only the header, when only the version changes', () => {
-    const def = small(CATALOG[0]!);
+    const def = small(V1_SET);
     const maps = bakeMaps(def);
     const first = encodeContainer(def, maps, 'a'.repeat(64));
     const second = encodeContainer({ ...def, version: def.version + 1 }, maps, 'a'.repeat(64));

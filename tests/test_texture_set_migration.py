@@ -68,7 +68,11 @@ def _code(text: str) -> str:
 
 def test_0065_is_the_first_texture_migration_and_is_shaped_like_its_neighbours():
     texture = [m.path.name for m in migrations() if "texture" in m.path.name]
-    assert texture == ["0065_texture_set_digests.sql", "0076_texture_set_classes.sql"]
+    assert texture == [
+        "0065_texture_set_digests.sql",
+        "0076_texture_set_classes.sql",
+        "0078_texture_set_batch_three.sql",
+    ]
     assert re.fullmatch(r"(\d{4})_[a-z0-9_]+\.sql", MIGRATION.name)
     statements = [line for line in _code(MIGRATION.read_text()).splitlines() if line.strip()]
     assert statements[0] == "begin;"

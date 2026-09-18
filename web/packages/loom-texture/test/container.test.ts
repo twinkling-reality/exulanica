@@ -15,6 +15,7 @@ import {
 import type { TextureSetDefinition } from '../src/definition.js';
 import { LICENCE_ID } from '../src/licence.js';
 import { bakeClassMaps, bakeMaps } from '../src/maps.js';
+import { V1_SET } from './support.js';
 
 const LICENCE = 'b'.repeat(64);
 const tiny = (def: TextureSetDefinition): TextureSetDefinition => ({
@@ -117,12 +118,12 @@ describe('the container', () => {
   }
 
   it('refuses a preview-sized bake as the set itself', () => {
-    const def = CATALOG[0]!;
+    const def = V1_SET;
     expect(() => encodeContainer(def, bakeMaps(tiny(def)), LICENCE)).toThrow(/preview/);
   });
 
   describe('the reader refuses what the writer would not have written', () => {
-    const def = tiny(CATALOG[0]!);
+    const def = tiny(V1_SET);
     const good = encodeContainer(def, bakeMaps(def), LICENCE);
     const headerLength = new DataView(good.buffer).getUint32(4, true);
 

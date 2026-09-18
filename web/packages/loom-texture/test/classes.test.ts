@@ -14,7 +14,7 @@ import type { TextureSetDefinition } from '../src/definition.js';
 import { FULL } from '../src/integer.js';
 import { bakeClassMaps, bakeMaps, classMaps, sampleFields } from '../src/maps.js';
 import { valueNoise } from '../src/noise.js';
-import { rollMismatches } from './support.js';
+import { V1_SET, rollMismatches } from './support.js';
 
 /**
  * The v2 bake of a procedural set, class by class.
@@ -143,7 +143,7 @@ describe('a v2 procedural set', () => {
   it('is never written as v1, and a v1 set is never written as v2', () => {
     const def = definition('cutout');
     expect(() => encodeContainer(def, bakeMaps(v1Twin(def)), LICENCE)).toThrow(/not a v1 set/);
-    const v1 = { ...CATALOG[0]!, width: SIZE, height: SIZE };
+    const v1 = { ...V1_SET, width: SIZE, height: SIZE };
     expect(() => encodeContainerV2(v1, [], LICENCE)).toThrow(/is a v1 set/);
     expect(() => classMaps(sampleFields(v1), v1)).toThrow(/is a v1 set/);
   });

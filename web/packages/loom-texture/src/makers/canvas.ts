@@ -159,6 +159,7 @@ function pattern(recipe: Recipe): Pattern {
   const stripeSeed = stream(seed, 4);
   // The threads run in both directions on the same pitch, so the cloth is square-woven.
   const threadsDown = Math.max(2, floorDiv(threads * recipe.extent_mm.v, recipe.extent_mm.u));
+  const halfStripe = floorDiv(TILE, 2 * stripesAcross);
 
   return (x, y, out) => {
     // The weave: at each crossing the warp or the weft is on top, alternating like a chessboard.
@@ -170,7 +171,10 @@ function pattern(recipe: Recipe): Pattern {
       rangeMm,
     );
 
-    const stripe = cellOf(x, stripesAcross) % stripes.length;
+    // Half a stripe along, so a stripe boundary never lands on the tile's own edge: with an even
+    // count of stripes and two colours the boundary at x = 0 was a colour change on the seam,
+    // which tiles correctly and still reads as a drawn line down the awning.
+    const stripe = cellOf(x + halfStripe, stripesAcross) % stripes.length;
     setColour(out, stripes[stripe] as Linear);
     // A thread on top catches more light than the one it crosses over.
     shade(out, jitter(warpOnTop ? thread : ONE - thread, threadTone));

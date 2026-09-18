@@ -137,10 +137,14 @@ function pattern(recipe: Recipe): Pattern {
   const halfJoint = Math.max(1, floorDiv(jointWidth * MM, 2));
   // The finish's cells are square: as many down the tile as its extent allows.
   const finishDown = Math.max(1, floorDiv(finishCells * recipe.extent_mm.v, recipe.extent_mm.u));
+  const halfSheet = floorDiv(TILE, 2 * sheets);
 
   return (x, y, out) => {
     // Where this texel sits across its sheet, and how far into the joint beside it.
-    const scaled = x * sheets;
+    // Half a sheet along, so the joint's groove sits inside the tile instead of astride its edge.
+    // A V groove centred on the seam has its kink there, and the normal's x flips sign across
+    // it: the joints still repeat every sheet width once tiled, just not on the cut.
+    const scaled = (x + halfSheet) * sheets;
     const cell = floorDiv(scaled, TILE);
     const sheet = floorMod(cell, sheets);
     const within = floorDiv((scaled - cell * TILE) * sheetWidth, TILE);

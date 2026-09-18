@@ -11,6 +11,7 @@ import type { TextureSetDefinition } from '../src/definition.js';
 import { FULL, floorDiv, isqrt } from '../src/integer.js';
 import { type Fields, normalMap } from '../src/maps.js';
 import { SRGB_TO_LINEAR, encodeChannel } from '../src/srgb.js';
+import { V1_SET } from './support.js';
 
 describe('the sRGB table', () => {
   it('is the IEC 61966-2-1 curve at sixteen bits', () => {
@@ -63,7 +64,7 @@ describe('the normal map follows the glTF convention', () => {
   // One millimetre per texel, so a bump of a few millimetres is a slope the bytes can show.
   const size = 32;
   const def: TextureSetDefinition = {
-    ...CATALOG[0]!,
+    ...V1_SET,
     width: size,
     height: size,
     extentU: size,

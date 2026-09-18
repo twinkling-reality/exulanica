@@ -127,7 +127,7 @@ CC0_LICENCE_ID: Final = PUBLISHED_LICENCE_ID
 #: recipe, so this one digest pins every object in the directory. A rebake that changes any object
 #: changes it, and updates it here in the same commit; the package's
 #: ``test/published.test.ts`` compares it with the committed catalog so the web suite says so first.
-TEXTURE_CATALOG_SHA256: Final = "58b12c0a52b6680dd7be0e1cf7292a4a34e05b7c900465ffef265e231aea5887"
+TEXTURE_CATALOG_SHA256: Final = "11bf546f287fdb66a3cac70564d7c5cf40a9e07b8ea09131347ecc2cbe5da61a"
 #: Every published maker manifest, by maker id and version. Rows are appended, never edited or
 #: removed: a recipe names a maker by id and version, so a published version names one manifest
 #: forever, and a change to a maker's controls, rules or wording is a new version and a new row.
@@ -137,13 +137,18 @@ PUBLISHED_MAKER_MANIFESTS: Final[Mapping[tuple[str, int], str]] = MappingProxyTy
         ("loom.asphalt", 1): "a1b1a9435744a6cb5bd9c046109a63a0b41b41bcd8e162562a1d91109ad67a88",
         ("loom.bark", 1): "ad6c1442cfb89de44c9b954e2247959df0385cb37c7cdf51e622fa11452b61ef",
         ("loom.brick", 1): "50ae89003097a3b3a68f78490c1344278477a3351ef63b6dde59e06d1435f5c6",
+        ("loom.canvas", 1): "a6a451d9de95b822f5db1e902408c6ad49e706e6fb51fd04e4e83e7342f52ef4",
         ("loom.concrete", 1): "4215979b6d8dc40bc86605ca020070583892c2094042aebd1c02bb692d803fae",
         ("loom.foliage", 1): "8423c6af158f1978aa08463cb5be5ad28de5780024d424dffd377b7fdef781ed",
         ("loom.glazing", 1): "2bfadbbad2ad34399c4c90ba316b206b43e93e358f68233338d7ae4b396252c1",
         ("loom.kerb", 1): "838d4404a523e2080005f75bb673baa23d4c15e333f415741f13943f80b408f7",
         ("loom.metal", 1): "63c5080a4a150d5da0199cbf81e354512cae9ee27004209e8025826935d62635",
+        ("loom.paint", 1): "43825ffc6095dc1f817d3108aa739bdffa333f9afe5a8a6693d871f1dcf9f704",
+        ("loom.panel", 1): "30f0ca34c24d23b3e16d2360cc320166882214a3299dab130ed52c76a294999a",
         ("loom.paving", 1): "e1d8bf41461217f50d3880e75298056c22dc869cc86aa652afb3d99c565fbbb0",
         ("loom.render", 1): "ebe23d3b8dc98ac86531788499137d7196a81c96717b80e1d80752add8118245",
+        ("loom.soil", 1): "61b780c54341920dae0215b381698b76f5dee3ce33dd0117360e7dade547ac44",
+        ("loom.timber", 1): "f8c36948012d458adeec1d424d91c8701f3591cdf2862e7530647de3ca30613f",
     }
 )
 

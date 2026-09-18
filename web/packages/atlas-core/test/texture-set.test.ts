@@ -127,17 +127,23 @@ describe('texture set reader, conformance with the backend reader', () => {
     const surfaces = await Promise.all(manifest.sets.map(async (set) =>
       [set.setId, (await decodeTextureSet(blob(set), set, subtle)).surface] as const));
     expect(Object.fromEntries(surfaces)).toEqual({
+      'cc0.awning-canvas': 'horizontal',
       'cc0.brick-running-bond': 'vertical',
+      'cc0.broadleaf-foliage': 'vertical',
       'cc0.carriageway-asphalt': 'horizontal',
       'cc0.cast-concrete': 'vertical',
+      'cc0.float-glazing': 'vertical',
       'cc0.footway-paving': 'horizontal',
       'cc0.kerb-stone': 'horizontal',
       'cc0.limestone-ashlar': 'vertical',
       'cc0.painted-render': 'vertical',
+      'cc0.painted-timber': 'vertical',
+      'cc0.road-paint-white': 'horizontal',
+      'cc0.road-paint-yellow': 'horizontal',
+      'cc0.sign-panel': 'vertical',
       'cc0.storefront-metal': 'vertical',
-      'cc0.float-glazing': 'vertical',
-      'cc0.broadleaf-foliage': 'vertical',
       'cc0.tree-bark': 'vertical',
+      'cc0.tree-pit-soil': 'horizontal',
     });
   });
 });
@@ -258,7 +264,7 @@ describe('texture manifest reader, refusals', () => {
   };
 
   it('accepts the committed bytes exactly, and refuses them re-serialised with whitespace', () => {
-    expect(manifest.sets).toHaveLength(11);
+    expect(manifest.sets).toHaveLength(17);
     expect(manifestRefusal(JSON.stringify(document, null, 1))).toBe('manifest');
     expect(manifestRefusal(`${new TextDecoder().decode(manifestBytes)}\n`)).toBe('manifest');
   });
