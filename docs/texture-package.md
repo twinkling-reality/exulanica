@@ -332,6 +332,17 @@ the exact guarantee is the construction test above.
 show every set as a 2 x 2 tiling and at full scale around the corner where four tiles meet. They
 were inspected during the bake. They are inspection pictures lit by a fixed light, not the product.
 
+`pnpm texture-look --textures assets/textures --out DIR [--set ID]` draws the same kinds of picture
+from the COMMITTED bytes instead, reading each container out of `blobs/` by the digest the manifest
+pins, so what it draws is what a reader reads. The bake's own `--inspect` can only picture the bake
+it just did, which is no use for looking at a set whose maker has moved since it was published, and
+a look tool written against `library-drafts/` stops working the moment a draft is published: that is
+what happened to this lane's scripts when batch 3 published six drafts at once. Each set gets its
+stored maps at one texel to one pixel, the channel its class leaves over as grey, and one lit
+composite per light over a stated number of tiles. `test/published-look.test.ts` holds every
+published profile and class pair to being pictured. These pictures depend on the zlib build that
+wrote them, so like every PNG here they are never part of a published directory.
+
 ## 6. Physical extent and UV scale
 
 `extent_mm` is the physical size one tile covers, and it is the direct answer to "no UV channel, no

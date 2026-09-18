@@ -64,7 +64,7 @@ function toByte(linear: number): number {
  * so it has no channel left over. Until this existed the sheet read v1 alone and threw on every
  * set of a class, which by batch 3 was nine of seventeen.
  */
-interface Planes {
+export interface Planes {
   readonly width: number;
   readonly height: number;
   readonly baseColor: Uint8Array;
@@ -74,7 +74,7 @@ interface Planes {
   readonly extra: { readonly name: string; readonly bytes: Uint8Array } | null;
 }
 
-function planes(container: Uint8Array): Planes {
+export function planes(container: Uint8Array): Planes {
   const read = readContainer(container);
   const resolution = read.header.resolution as { width: number; height: number };
   const { width, height } = resolution;
