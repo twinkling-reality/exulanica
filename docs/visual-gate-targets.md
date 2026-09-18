@@ -328,6 +328,33 @@ passed, and nothing was adjusted to reach them. The fourth prediction's other ha
 not all hold, stays untested, and so does everything the paragraph above it says about which of them
 a generated target decides on partial inputs.
 
+## A key that passes on a surface declaring it has no material
+
+**The block fails today, so nothing is wrongly passed. The risk is what happens when it stops
+failing.** `continuousTexturedStreetAndFacades` held on run five over an endpoint frame that is an
+empty field of magenta diagonal hatching reading UNAVAILABLE, under an empty sky, with no street, no
+building and no furniture in it. If the other three keys are ever satisfied while this one still
+measures what it measured here, THE WHOLE MECHANICAL BLOCK WOULD PASS ON A MAGENTA FIELD.
+
+Two mechanisms, both measured on that run rather than argued:
+
+**The half named for facades measured nothing.** `facadeTriangles` is zero by construction on a
+generated target: `classify` marks a near-vertical triangle as facade only within a band of a PRISM
+ring edge, prisms are building exteriors with a stated height, and a tile states none, so the keys
+receive an empty list. The 819 triangles the key counted are walking triangles alone. A rule given no
+inputs does not fail; here it returned the answer that flatters.
+
+**The unavailable hatch is a texture.** `untexturedStreetAndFacadeTriangles` is zero while the page
+states 18 surfaces drawn as unavailable, because the pattern that says a surface has no material is
+itself drawn with a texture. The key cannot tell a surface a material record dresses from a surface
+wearing the mark that says none exists.
+
+**Not this lane's to fix, and the reason matters more than the rule.** A key's definition and
+threshold are forbidden here because a gate that tuned the rule judging its own runs would be worth
+nothing, and changing a key's definition needs a reconciliation record, which binds a named human's
+calibration reply. This is written down so that whoever owns it can see exactly what it passed, with
+the numbers that decided it and the frame it decided over.
+
 ## Run five: the eight mechanical keys, measured on a generated page
 
 The first run to reach them. The walk completed 125 m, all three captures were taken, and the block
