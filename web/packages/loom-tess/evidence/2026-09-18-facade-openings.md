@@ -310,3 +310,37 @@ and entrances together, over the city's 2,652 openings, which is about 20 each. 
 already 22.3 each. So the estimate was low, and the later stages will cost more than the figure
 somebody will remember. Said here because the number is cheap to measure now and expensive to argue
 about later.
+
+### The control was in the frame and nobody put it there
+
+A second reader looking at the same frame found what this lane had not: the dark brick block carries
+openings with ROUNDED tops and the tan rendered block beside it carries openings with FLAT tops, in
+one picture. The fixture states four gridded faces with `head_treatment` arch and two with a flat
+head, so the frame holds its own control: a rule that drew every head flat, or every head curved,
+would be contradicted by the same image rather than by a second capture.
+
+### CUTTING THE HOLES TURNED AN INVISIBLE GAP INTO A VISIBLE ONE
+
+Every opening in that frame reads as bright magenta. A viewer sees a brick building with glowing
+pink windows, and the honest reading of it is "unfinished".
+
+That is the runtime telling the truth. Of the 20 surfaces the page states as unavailable, 6 are the
+interior backings, 2 the glazing and 3 the doors, and those are exactly what a person now looks
+through a hole and sees. Nothing dresses them.
+
+IT IS A FINDING AND NOT A CAVEAT. Until today those backings stood inside a rectangle their own
+facade drew as solid, so their being undressed cost nothing anybody could notice. The openings did
+not create the gap; they made it visible. Whoever sees this frame without this paragraph will read
+progress as regression, and whoever sees it with the paragraph has the next piece of work named:
+dress what is behind the glass.
+
+### What the openings cost, carried one step further
+
+    corridor tile, 20,384 triangles for 916 openings      22.25 each
+    the city's 2,652 openings at that rate                59,007 for STAGE 1 ALONE
+    the brief's estimate for the WHOLE piece              about 53,000, openings and arches and
+                                                          string courses and cornices and entrances
+
+So stage 1 by itself already exceeds the estimate for everything, before one cornice box or string
+course exists. The estimate is not slightly low. Both numbers are here, with the brief's beside them,
+so the next person inherits a measurement rather than an estimate.
