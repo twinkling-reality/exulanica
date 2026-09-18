@@ -37,6 +37,16 @@ esac
 mkdir -p "${out}"
 if [ -n "$(ls -A "${out}")" ]; then echo "run.sh: ${out} is not empty" >&2; exit 2; fi
 
+# Docker refuses a relative bind path, and this script is called from a driver that works in
+# relative ones. MEASURED on the first driver-run of session 2: "invalid mount config for type
+# bind: invalid mount path: 'appearance/staged-smoke' mount path must be absolute", after the image
+# was built and 88.5 GB of weights were already in place. Session 1 never hit it because those
+# steps were typed by hand from a directory that made them absolute. Resolve here, in the script
+# that does the mounting, so no caller has to know.
+staged=$(cd "${staged}" && pwd) || { echo "run.sh: ${staged} is not a directory" >&2; exit 2; }
+weights=$(cd "${weights}" && pwd) || { echo "run.sh: ${weights} is not a directory" >&2; exit 2; }
+out=$(cd "${out}" && pwd) || { echo "run.sh: ${out} is not a directory" >&2; exit 2; }
+
 # As the invoking host user, not the image's own user and never root: the output directory is a bind
 # mount the host owns, and a container user of its own cannot create anything inside it. MEASURED on
 # the first real run, which refused with "PermissionError: [Errno 13] Permission denied: /out/outputs".
