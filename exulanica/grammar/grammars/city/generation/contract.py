@@ -120,13 +120,17 @@ bake; the browser build is a preview held to the same triangle digest. Two bakes
 ``baked_tile_id`` that differ are a fault; the table that records that fault is migration 0072,
 this lane's.
 
-**What draws, measured from the corridor's own container on 2026-09-18, tessellator 17.** Of tile
-(2, 0)'s 4,149 entries, 527 draw: 168 facades, 89 rooftop objects, 78 vitrines, 51 interior
+**What draws, measured from the corridor's own container ``93df0715f5...``, tessellator 17.** Of
+tile (2, 0)'s 4,149 entries, 527 draw: 168 facades, 89 rooftop objects, 78 vitrines, 51 interior
 backings, 36 pieces of street furniture, 33 parcels, 32 massings, 30 street trees, 6 curb edges, 3
-street segments and the terrain. That is 1,531 surfaces, 1,445 of them dressed by a material
-record. The counts come from the container rather than from tess's statements about itself: every
-bake writes them into its own receipt, and ``docs/artifacts/corridor/corridor-drawn.log.txt``
-carries the same reading for one tile.
+street segments and the terrain. That is 1,582 surfaces, 1,496 of them dressed by a material
+record. The container is named by DIGEST here for the same reason the log beside it is: these
+counts move whenever the tessellator does, and a number carrying the digest it came from says so
+itself. The pair that stood here before, 1,531 and 1,445, came from the container two versions back
+and survived an hour beside entry counts already brought forward. The counts come from the
+container rather than from tess's statements about itself: every bake writes them into its own
+receipt, and ``docs/artifacts/corridor/corridor-drawn.log.txt`` carries the same reading for one
+tile.
 
 **What does not draw, by the rule each entry names** (``NEEDS`` in ``expand.ts``), for that tile:
 ``facade_layout`` 75, the entrances; ``crossing_band`` 6; ``ground_coverage`` 2, the blocks' own

@@ -1,15 +1,15 @@
 corridor tiles and gates
-commit 27c6310a87e8071580edc5c09e189ae61449dd3e
+commit de0ccbd43f892f6724c84d7c73949c3ec859ac9d
 city seed 75832ac54dcfd499219752e6385149c73624b8c674f9ebb0c1fa0af2bb70b3d1
 city identity 0594ec43-fbf9-5377-86d3-b1b733714b4a
 generation output digest d51c4b15f88e4c0bfd387ffec84bae64fbe72a767979e35e2860ec2e20176693
 records 6566
 
-tile (0, 0): valid; owned 346, halo 1058, external 17; document 1146778 bytes sha256 35165c4b423601422c7d5db78e7e71dce2acfb8f81fcdcb98153dddda02a1b22; tile_inputs_digest 1cc153c7e86071c861f345daacafdf51e083d8ae5b192d8386a2fa6fdce8fe02; baked_tile_id adbac061-04cb-5c34-aa5b-f9fd3f0f2459
-tile (1, 0): valid; owned 1953, halo 1475, external 18; document 2804246 bytes sha256 f72d6de47392ea1064c86f4e0b9c4b877f55a2160ae6a22e9451dba2bf913258; tile_inputs_digest 7721f92b21902619fa16f3381ed24d45aa7caea41ac6c6d8c0c10458445ced26; baked_tile_id 2f9c602c-99fd-5055-959d-1627e5553338
-tile (2, 0) corridor: valid; owned 2073, halo 2076, external 47; document 3381852 bytes sha256 4cb6e0572dcfa98a161cbba2410e31a0bddfb34e1ae64dc92184d085962bbe69; tile_inputs_digest bb6c0f6a140a3b8d94e510efc08fae9500ee1b1e34042f5fa64032305c4f7fe1; baked_tile_id 3d88d6ff-8b1e-5339-a777-1b805763996e
-tile (3, 0): valid; owned 1854, halo 1447, external 31; document 2658931 bytes sha256 8851da4fa10a66bcd8b797abf819d19950c213c505f5313ea8415ddfd30b047c; tile_inputs_digest 9874b478aca802dbe0233512f417e381cbdb2082343de77f0c2c6460d0e2d787; baked_tile_id d466cf70-f238-5148-b90f-17095f2235f9
-tile (4, 0): valid; owned 329, halo 1005, external 25; document 1050123 bytes sha256 4061847cf42754a897d683a663f1bdd17300c8eb4679d90b3954d0021ed9394a; tile_inputs_digest 618d9bdc8cee56cb9371ca5b543ed2ac83f8a8967804709ec8a10e08a4842ac2; baked_tile_id be06b57a-6fa4-5afa-bb77-9aa94a97285f
+tile (0, 0): valid; owned 346, halo 1058, external 17; document 1146778 bytes sha256 97105ea88bb52ff2a6dbaa60f9d16b51c59903dde9d83a20fbea08bdad4cbe67; tile_inputs_digest 0ceea9ea664f1db40830a0bd3d47ef44868d260a2655df81c0307c7d6e6d481a; baked_tile_id 5f6d859f-2282-56ef-af1f-1898e6bc0b5b
+tile (1, 0): valid; owned 1953, halo 1475, external 18; document 2804246 bytes sha256 93763edd67a0b03b8f82315b02c6110ec5db3461b2a77661b4ad4d0b8924e76f; tile_inputs_digest 41c18dde690b67654653f9d2a05cca619a60d2c94a42376eb0edec04f94397ec; baked_tile_id 4f172f6c-dd54-522f-b075-d58bd94d7c5a
+tile (2, 0) corridor: valid; owned 2073, halo 2076, external 47; document 3381852 bytes sha256 4c3bea16620c69fcd781fb780836d68a8c4459a7e6ddb8a64a7f12f59e756c9f; tile_inputs_digest 2ab27821090c68920842fa60803cf19afa27a2bccccd23c49687a66e604232ee; baked_tile_id 6af3c98b-7bed-50ba-b656-6564babd7c29
+tile (3, 0): valid; owned 1854, halo 1447, external 31; document 2658931 bytes sha256 cd2e198ba2e96c11d0f4fb5277d2ed744b3151bd4d2969a2634008aecfc53505; tile_inputs_digest 737eaa6a6f0635157a0317e52fbb84199fb3f453e03be28f3a7d1655384284b0; baked_tile_id a097c2dd-3d15-5886-b3ed-3773ab0ad030
+tile (4, 0): valid; owned 329, halo 1005, external 25; document 1050123 bytes sha256 05edfe639578a32da681468b6e235392349f802263f6a059182fd572d371c7db; tile_inputs_digest fd6a37a82bd789116e956a57a682d6555be5d41bf94a2ff04a3fd119c5fee795; baked_tile_id af882cc7-73ac-5c08-85e5-d2cd079244ec
 
 city reference closure: closed
 pieces no longer than 1 km: yes

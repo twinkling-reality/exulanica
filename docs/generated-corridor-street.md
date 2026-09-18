@@ -152,47 +152,41 @@ small request for a whole city, rather than a revalidation per tile.
 
 ## 7. What draws today, and what does not
 
-Measured from the container the route serves for tile (2, 0), baked by tessellator 13 at main
-f81621cc. The counts are `docs/artifacts/corridor/corridor-drawn.log.txt`, written by the script
-beside it from a container and the document it was baked from, and every bake writes the same
-measurement into its own row's receipt and onto
-[docs/artifacts/corridor/corridor-bake.log.txt](artifacts/corridor/corridor-bake.log.txt), so the
-number exists whether or not anybody goes to look. Tessellator 11 and 13 draw this tile
-identically: both triangle digests are unchanged between them, and the container moved only
-because its header states which tessellator made it. The two containers are even the same size,
-9 483 132 bytes, which is why the digests are what you compare and not the sizes.
-Both map each entry to its record through the tessellator's own document reader, because the
-container states one entry per record in its own sorted order and reading that order by eye gets it
-wrong.
+Measured from the container the route serves for tile (2, 0), baked by tessellator 17 at main
+de0ccbd4, container sha256 `93df0715f5...`. The counts are
+`docs/artifacts/corridor/corridor-drawn.log.txt`, which names the container it read by DIGEST
+rather than by file name, so it cannot be read against a different container without the mismatch
+showing. Every bake writes the same measurement into its own row's receipt and onto
+[corridor-bake.log.txt](artifacts/corridor/corridor-bake.log.txt).
 
-`render_batch` holds **32 834 triangles** across **476 drawn entries** of the tile's 4 149: 168
-facades, 89 rooftop objects, 78 vitrines, 36 pieces of street furniture, 33 parcels, 32 massings,
-30 street trees, 6 curb edges, 3 street segments and the terrain. Of **1 531 drawn surfaces, 1 445
-are dressed** by a material record and 86 are not: 85 facade ground bands and the terrain.
+`render_batch` holds **34 954 triangles** across **527 drawn entries** of the tile's 4 149: 168
+facades, 89 rooftop objects, 78 vitrines, 51 interior backings, 36 pieces of street furniture, 33
+parcels, 32 massings, 30 street trees, 6 curb edges, 3 street segments and the terrain. Of **1 582
+drawn surfaces, 1 496 are dressed** by a material record and 86 are not: 85 facade ground bands and
+the terrain.
 
-**134 entries state unavailable**, and each names the expander it waits for:
+**83 entries state unavailable**, and each names the expander it waits for:
 
 | Waiting on | Entries | The records |
 | --- | --- | --- |
-| `facade_layout` | 126 | 75 entrances and 51 interior backings. The backings are what a shop window is meant to close; the tessellator lane has since measured that all 51 sit entirely inside a face the facade draws as solid wall, because openings are not cut yet, so drawing them would change nothing a viewer sees. |
+| `facade_layout` | 75 | 75 entrances: the recessed doorways, which wait on openings being cut. |
 | `crossing_band` | 6 | The zebras. |
-| `ground_coverage` | 2 | The two blocks' own ground, where no lot covers it. |
+| `ground_coverage` | 2 | The two blocks' own ground, where lots cover all of it. |
 
-`nav_envelope` holds **39 863 triangles**, and this is where the street is still not a street: see
-section 8.
+`nav_envelope` holds **96 745 triangles**.
 
-**Where the 85 undressed ground bands are, and what is not known about them.** Measured: all 85
-are interior faces, 54 on party walls between neighbours and 31 on rear walls, and the north
-terrace is eight buildings from x 258 900 to 381 100 with no gap between any of them.
+**Where the 85 undressed ground bands are, and what is not known about them.** Measured: all 85 are
+interior faces, 54 on party walls between neighbours and 31 on rear walls, and the north terrace is
+eight buildings from x 258 900 to 381 100 with no gap between any of them.
 
 Not known: whether those bands are what appears as the magenta unavailable state in a picture of
 this street. This document said until 2026-09-18 that they were, and that a viewer was looking
 through the buildings at them because the upper glazing had nothing behind it. That was wrong twice
 over and is retracted. There is no upper glazing at all: the glazing on this frontage spans z 556
-to 3404, which is the shopfront band. And the claim rested on a reading of my own that was an
-artefact of the query rather than a fact about the street. Asking which surfaces lie ON a frontage
-plane, by selecting those whose y is constant, silently drops every RECESSED surface, and a
-shopfront's ground band, glazing and door are recessed: they span y 56 700 to 55 253. The filter
+to 3404, which is the shopfront band. And the claim rested on a reading of this lane's own that was
+an artefact of its query rather than a fact about the street: asking which surfaces lie ON a
+frontage plane, by selecting those whose y is constant, silently drops every RECESSED surface, and
+a shopfront's ground band, glazing and door are recessed, spanning y 56 700 to 55 253. The filter
 removed the six dressed surfaces in front of the viewer and left the interior bands as the only
 candidate. An artefact that removes the evidence for the alternative is the worst kind, because
 everything that survives it agrees.
@@ -201,13 +195,10 @@ Read without that filter, the south frontage in the column in front of the walke
 ground band, fascia, glazing, shopfront frame and stall riser, and every one is dressed by a
 material record. In that ten metre column there is no undressed surface at all except the terrain.
 
-So the question is open and is being measured by the tessellator lane from the exact pose the
-picture was taken at, `pose_x_mm=320000 pose_y_mm=70300 facing_dx=0 facing_dy=-1` on container
-8194a31e. Two candidates are on the table, ground level glass with only a vitrine's boxes behind
-it, and a wall seen from inside a building, which draws nothing because a back face is not drawn
-and no collision proxy stops a walker entering one. This lane is not choosing between them, and a
-caption for any picture of this street should say the magenta is an unavailable surface and stop
-there until the measurement says more.
+The interior backings now draw, as of tessellator 16, which makes the question testable: the
+experiment is written down, unrun, in
+[magenta-comparison.md](artifacts/corridor/magenta-comparison.md). Until it is run, a caption for
+any picture of this street should say the magenta is an unavailable surface and stop there.
 
 ## 8. The walk, and the pose it starts from
 
@@ -258,28 +249,80 @@ question of this walk, and the honest answers include stopping, dropping to the 
 below, and stepping over it. I do not know which, and I would rather record the question in advance
 than discover the answer and call it the expected behaviour.
 
-**What the walk found, and what it costs.** The footway now draws, and the navigation envelope
-carries it: at the stated pose the surface under the walker is the footway at 170 mm, not the
-terrain below it. But **56 m of the 116 m has no walkable surface at all**. Sampling the envelope
-every 500 mm along three lines across the footway's width gives seven unsupported runs of about
-8 m: x 264 000 to 272 000, 277 000 to 285 000, 289 500 to 297 500, 315 000 to 323 500, 328 000 to
-336 000, 353 500 to 361 500 and 366 000 to 374 500.
+**What the walk found, measured on the served container at 100 mm along the walked line.** The
+footway is continuous: 1 161 samples from x 262 000 to 378 000, every one supported, at a constant
+**146 mm**. On the tessellator 13 bake the same line had seven unsupported runs totalling 60.7 m,
+one under each street tree, because the carve then read a tree's whole stated plan extent, which is
+its canopy at 7 972 mm across, rather than its parts. Tessellator 14 moved the carve onto the
+parts, and the runtime says the same thing from the other side: the pose at x 320 000 used to print
+"where the tile states no walkable surface" and no longer does.
 
-Seven runs, seven street trees, at x 268 089, 280 868, 293 647, 319 205, 331 984, 357 542 and
-370 321, each stating a plan extent of 7 972 mm, which is its CANOPY. The tessellator carves
-support clear of what the navigation table says obstructs a capsule, and for a street tree it reads
-the record's whole stated plan extent rather than its parts, so each tree removes eight metres of
-pavement. The grammar says the opposite in as many words: a tree's pit is drawn ground a person may
-stand on, its trunk obstructs as a low part, and its canopy stands a capsule height above every
-support it overhangs. The records and the tessellator disagree about what a tree is, and half the
-pavement is the difference. It is tess's to resolve, by reading the parts.
+The gaps did not vanish, they moved to where a tree actually is. Sampling across the footway's
+width on the served container:
 
-The carriageway is continuous: every sample along y 64 000 is supported. A walk down the middle of
-the road is not the walk this gate scores and should not be presented as one, but it is 116 m of
-street with both frontages in view and nothing under the feet that is a lie.
+| line | support | runs that are not footway |
+| --- | --- | --- |
+| y 68 549, the tree row | 127 mm | 14, about a metre each |
+| y 70 300, the walked line | 146 mm | none |
+| y 72 000, nearer the frontage | 164 mm | none |
+
+The support height differs by line because the footway drains to the gutter at 10 864 millionths,
+56 mm of fall across its 5 200 mm. That matters for anyone comparing a runtime's eye height against
+this: a standing eye is support plus the capsule's stated 1 620, so 1 766 mm on the walked line and
+between about 1 747 and 1 784 elsewhere on the footway. The tile runtime lane measured 1 766 while
+walking, which is 146 + 1 620 exactly.
+
+**What is past the end of the line.** The walk stops at x 378 000 and the curb it is on ends at
+378 300. Beyond that is a junction, and a walker who keeps going steps off the pavement onto
+terrain at z 0, which is a 146 mm fall. That was measured by the tile runtime lane at x 378 334 and
+is a different question from a hole in the footway; it has no parameters written for it yet, and
+the walk was deliberately NOT extended to cover it, because a line chosen to include a known event
+is not a walk, it is an illustration of that event.
 
 **What the pictures must not imply.** The pale ground at the base of the frontages is the
 **parcels' lot ground**, the private ground behind the frontage line, and not the footway. And the
-magenta seen through every shop window is the inside of the terrace, not an undressed frontage: see
-section 7. A frame that would need either sentence to be read correctly is evidence of a stage, not
-a picture of a street, and should not be used where the sentence cannot travel with it.
+magenta seen through every shop window is an unavailable surface whose visibility is not yet
+explained: see section 7, and the experiment written down in
+[magenta-comparison.md](artifacts/corridor/magenta-comparison.md). A frame that would need either
+sentence to be read correctly is evidence of a stage, not a picture of a street, and should not be
+used where the sentence cannot travel with it.
+
+## 9. Six bakes of one street, and what each digest said
+
+One tile document, baked by six tessellators in one night, every bake stored beside the others
+under migration 0077 and each keyed by `uuid5(stage version, stage params digest, tile inputs
+digest)`. Nothing here was decided by anybody: each digest is a function of the bytes, and the
+table is what they came out as.
+
+| params digest | bytes | container | render_batch | nav_envelope | what moved |
+| --- | --- | --- | --- | --- | --- |
+| `fc70ae79` | 5 607 448 | `ab6023d8c7` | `297d744723` | `09ec20f943` | tessellator 5 |
+| `dc305256` | 9 483 132 | `8194a31e44` | `adef2300b7` | `550f0d4b75` | 11: the expanders |
+| `c252f533` | 9 483 132 | `dfd922bfee` | `adef2300b7` | `550f0d4b75` | 13: neither projection |
+| `e90cfd76` | 11 014 812 | `2adf282b94` | `adef2300b7` | `9d59577a5d` | 14: navigation only, the tree carve |
+| `00353a17` | 11 235 848 | `b323810ae9` | `749e317efe` | `3a3dc8abe9` | 16: both, the interior backings |
+| `33d663f8` | 11 153 540 | `93df0715f5` | `91350a9045` | `35388d7849` | 17: both, the mitre and the corner carve |
+
+**What the table is evidence of.** Two versions changed nothing that draws and their render_batch
+digests are identical; one changed only what a person can walk on and only `nav_envelope` moved;
+one drew something new and both moved. The digests said which each time, and nobody decided what
+they should say.
+
+**Two of those rows are the same size and not the same bytes.** 11 and 13 are both 9 483 132, with
+different container digests and identical triangle digests: the geometry was untouched and only the
+header moved, because it states which tessellator made it. A reader comparing byte counts would
+have concluded nothing changed between them, and a reader comparing container digests alone would
+have concluded something had. Only the pair of triangle digests says which it was.
+
+**Five of the six keys are predictions, not records.** The tessellator 11, 13, 14, 16 and 17 keys
+were each computed from the stage parameters BEFORE the bake ran, with the bake to be refused if it
+disagreed, and each matched. The tessellator 5 key was computed after its bake, which makes it a
+record of what happened rather than a test of whether the key derivation is what it claims to be.
+Five predictions, five matches.
+
+**The last row shrank.** Tessellator 17 writes 82 308 fewer bytes than 16 while both its triangle
+digests move, because its corner rule stops a footway short of a frontage that no carried block
+marks: at a tile edge, where the block belongs to the neighbouring tile, the old rule drew the
+whole slice and the footway ran through where a building stands. Less geometry and more correct,
+which is a combination a byte count alone would report as a loss.
+
