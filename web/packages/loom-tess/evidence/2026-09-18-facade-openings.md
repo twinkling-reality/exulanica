@@ -257,3 +257,28 @@ WHAT A PICTURE OF THIS CANNOT SHOW, decided now rather than after looking: it is
 FIXTURE and not the corridor street. It can prove the holes are drawn. It cannot say whether they
 look right, which is a judgement, and it says nothing about the corridor beyond the fact that the
 two tiles are cut by one rule.
+
+### What the frame showed, looked at rather than inferred
+
+Captured from the development preview at `?preview=1&tile=tile-conformance`, container `3a2fd58d`,
+which the page names on screen. Five of five predictions hold.
+
+1. HOLES ARE CUT. The dark brick face shows three rows of openings through the wall, above the
+   ground band and not in it.
+2. THE ARCHED HEADS ARE ARCHES. Every opening on that face has a visibly rounded top. A flat head
+   would have been indistinguishable from a rectangle and was the failure this predicted.
+3. THE REVEALS ARE VISIBLE. Each opening carries a pale return at its head and side, catching light
+   differently from the face, so a hole reads as cut through a wall with thickness.
+4. THE BACKING CLOSES THE VIEW. What shows through each opening is the interior backing, and it is
+   MAGENTA because nothing dresses it, which the fixture states and this package's pinned undressed
+   set records as `("city.interior_backing", "wall"): 6`. Not the sky, and not the far side of the
+   building, which is what a face without openings and without backings would have shown.
+5. THE SURFACES DRAW TEXTURED. The page reports 20 surfaces drawn as unavailable, not 124. So the
+   development page does fetch its sets, the 104 I measured were the test stub's, and the brick,
+   the roof and the parapets draw with their published materials. The 20 are exactly the pinned
+   undressed set of this fixture.
+
+WHAT THIS FRAME IS NOT. It is the conformance fixture and not the corridor street. It shows that
+the holes are drawn; it says nothing about whether they look right, which is a judgement and not
+this lane's to make. The magenta is the runtime saying a surface has no material record, not a
+colour anybody chose.
