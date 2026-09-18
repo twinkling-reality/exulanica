@@ -21,12 +21,18 @@ export const GENERATED_TILE_EVALUATION_ATTRIBUTE = 'data-generated-tile-evaluati
 
 /** Where a tile's container came from, said on screen so no picture of a walk can hide it. */
 export type TileProvenance =
-  | { readonly kind: 'committed'; readonly name: string }
+  | { readonly kind: 'development'; readonly name: string; readonly containerSha256: string }
   | { readonly kind: 'route'; readonly bakedTileId: string; readonly containerSha256: string; readonly origin: string };
 
 function provenanceLine(provenance: TileProvenance): string {
-  if (provenance.kind === 'committed') {
-    return `Container: the golden ${provenance.name} committed to this repository. Texture sets: the committed library.`;
+  if (provenance.kind === 'development') {
+    // NOT "the committed golden": this development server serves whatever `dev/tiles/` holds in the
+    // working tree, and a lane baking its own tile there is the normal case rather than the odd one.
+    // The page cannot know what is committed, so it says what it does know, which is the digest, and
+    // leaves the comparison to a reader who can make it.
+    return `Container: ${provenance.name}.owd, served from this development server's working tree, `
+      + `sha256 ${provenance.containerSha256}. This page cannot tell whether those bytes are the committed golden. `
+      + 'Texture sets: the committed library.';
   }
   return `Container: fetched from /tiles as ${provenance.bakedTileId} (${provenance.origin}), sha256 ${provenance.containerSha256}. `
     + 'Texture sets: the committed library, because no route serves the published library yet.';
@@ -99,12 +105,17 @@ export async function prepareGeneratedTileEvaluation(env: AppEnvironment, name: 
   if (!import.meta.env.DEV || !env.preview) {
     throw new Error('A generated tile can be evaluated only on the development preview route.');
   }
-  const [{ loadGeneratedTile }, { parseTextureSetManifest }, sources] = await Promise.all([
+  const [{ loadGeneratedTile }, { ambientTextureSetDigest, parseTextureSetManifest }, sources] = await Promise.all([
     import('@exulanica/atlas-react/generated-tile'),
     import('@exulanica/atlas-core'),
     import('../dev/generated-tile-sources.js'),
   ]);
   const source = await sources.generatedTileSource(name);
+  const digest = ambientTextureSetDigest();
+  if (digest === null) {
+    throw new Error('This page has no crypto.subtle, so no tile can be checked against its own records.');
+  }
+  const containerSha256 = hex(await digest.digest('SHA-256', source.tile));
   const manifest = parseTextureSetManifest(source.textureManifest);
   const tile = await loadGeneratedTile({
     name,
@@ -115,8 +126,12 @@ export async function prepareGeneratedTileEvaluation(env: AppEnvironment, name: 
   // The title stays the preview's own: the visual gate harness holds the shell to it.
   env.shell.setAttribute(GENERATED_TILE_EVALUATION_ATTRIBUTE, name);
   env.shell.querySelector('.generated-tile-evaluation')?.remove();
-  env.shell.append(statement(tile, { kind: 'committed', name }, { pose: null, supported: true, start: tile.start }));
+  env.shell.append(statement(tile, { kind: 'development', name, containerSha256 }, { pose: null, supported: true, start: tile.start }));
   return tile;
+}
+
+function hex(buffer: ArrayBuffer): string {
+  return [...new Uint8Array(buffer)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 /** Containers this page already fetched, by key, so a reload inside one page asks for no bytes. */

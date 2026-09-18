@@ -15,7 +15,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { bakedTileRequest } from '../src/config.js';
-import { prepareBakedTileWalk } from '../src/composition/generated-tile.js';
+import { prepareBakedTileWalk, prepareGeneratedTileEvaluation } from '../src/composition/generated-tile.js';
 import type { AppEnvironment } from '../src/composition/session-state.js';
 
 // Relative to web/, where the suite runs.
@@ -32,6 +32,9 @@ function fileFor(url: string): Uint8Array | null {
   const path = url.split('?')[0]!.replace(/^https?:\/\/[^/]+/, '');
   const onDisk = path.startsWith('/@fs') ? path.slice('/@fs'.length) : null;
   if (onDisk !== null) return new Uint8Array(readFileSync(onDisk));
+  if (path.includes('/dev/tiles/')) {
+    return new Uint8Array(readFileSync(resolve('packages/app/src/dev/tiles', path.slice(path.lastIndexOf('/') + 1))));
+  }
   if (path.includes('/assets/textures/')) {
     return new Uint8Array(readFileSync(resolve(TEXTURES, path.slice(path.indexOf('/assets/textures/') + '/assets/textures/'.length))));
   }
@@ -130,6 +133,18 @@ describe('walking a tile fetched from the product route', { timeout: 30_000 }, (
     );
     expect(element.querySelector('.generated-tile-evaluation')?.textContent)
       .toContain("Opened at this runtime's default pose");
+  });
+
+  it('does not claim a development tile is the committed golden, and gives the digest instead', async () => {
+    // A lane baking its own tile into dev/tiles is the normal case, not the odd one: the page cannot
+    // know what is committed, so it must not say "committed to this repository" about bytes it read
+    // from a working tree.
+    const element = shell();
+    await prepareGeneratedTileEvaluation({ shell: element, preview: true } as unknown as AppEnvironment, 'tile-conformance');
+    const said = element.querySelector('.generated-tile-evaluation')?.textContent ?? '';
+    expect(said).toContain("served from this development server's working tree");
+    expect(said).toContain(goldenSha256);
+    expect(said).not.toContain('committed to this repository');
   });
 
   it('refuses a container whose bytes are not the digest its row records, and draws nothing', async () => {
