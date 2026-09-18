@@ -29,7 +29,7 @@ import {
 } from './support.js';
 
 /**
- * Over `test/fixtures/tile-conformance.json`, tessellator 18, digest profile v3.
+ * Over `test/fixtures/tile-conformance.json`, tessellator 19, digest profile v3.
  *
  * THE PAIR IS THE POINT. Cutting the fixture's openings out of its faces moved `render_batch` and
  * left `nav_envelope` byte for byte where it was, which is what the grammar's navigation table says
@@ -38,7 +38,7 @@ import {
  * moved the second of these two lines would be a carve that had escaped the face's own plane.
  */
 const GOLDEN = {
-  render_batch: '15129ce53e574e684c0faee2fd2c695cfb81696a5d03f3acf874e72c1ced9822',
+  render_batch: '3aee7162da258e98e1de96ba73a551d0b578a97263eda013d9a7608fb0b1cd7e',
   nav_envelope: 'dcd548bde8d8ca988c1e3b433c9515fe6531c95d7a5f4085d627e1b54e7eb811',
 } as const;
 
@@ -213,7 +213,7 @@ describe('the triangle digest of the conformance fixture', () => {
     const drawnTerrain = renderBatch!.header.entries[terrain]!;
     expect(drawnTerrain).toMatchObject({
       state: 'drawn',
-      first_vertex: 6961,
+      first_vertex: 7021,
       vertex_count: 478,
       triangle_count: 495,
       surfaces: [{ role: 'terrain', orientation: 'horizontal', material: { state: 'none-exists' }, triangle_count: 495 }],

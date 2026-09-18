@@ -95,3 +95,25 @@ as a rectangle floating up to 1.79 m behind a wall: not a missing door, a missin
 4. Every return faces INTO the recess, so a person in the street sees the jamb rather than its back.
 5. The trim surface count rises by one per affected FACE rather than per return, since a facade
    draws one trim surface and adds to it.
+
+### The result, against every part of that prediction
+
+Baked on the corridor tile, container `e01ffe0e` at 18 to `e59f6cf0` at 19.
+
+    1  render_batch moved            b5a1af14 -> fd4b6ebe                       HOLDS
+       nav_envelope did not          35388d78 -> 35388d78                       HOLDS
+       and not in count either       96,745 triangles and 70,206 vertices, both identical
+    2  525 returns, 1,050 triangles  55,338 -> 56,388, which is +1,050 exactly  HOLDS
+       and 525 times four vertices   136,610 -> 138,710, which is +2,100        HOLDS
+    3  on the 75 bays with a door    the triangle count is the check: 525 pairs at two each
+    4  each facing into its recess   held by test, on a shopfront's two steps, where the lower
+                                     faces up and the upper faces down and neither has any other
+                                     component
+    5  trim rises per FACE           surfaces 1,633 -> 1,637, dressed 1,547 -> 1,551, so FOUR new
+                                     trim surfaces for 525 returns: 28 of the 32 stepped faces
+                                     already drew trim for their openings
+
+AND THE NUMBER THAT MATTERS MOST: undressed held at 86, still 85 facade ground bands and the
+terrain. No new magenta anywhere, which is what separated this piece from the entrance half.
+
+Five parts, five matches, three of them exact to the unit.

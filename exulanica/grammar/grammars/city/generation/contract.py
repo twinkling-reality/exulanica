@@ -101,7 +101,7 @@ of detail, the 128 m tile, the 64 m halo, the ownership and halo rules, and ``ed
 sorted) into that field; the empty subsequence is ``EMPTY_EDIT_DELTA_DIGEST``. ``baked_tile_id``
 is ``uuid5(ARTIFACT_NAMESPACE, "baked_tile:<version>:<params digest>:<tile_inputs_digest>")``.
 
-2. THE TESSELLATOR (``web/packages/loom-tess``, stage ``baked_tile`` version 3, tessellator 18)
+2. THE TESSELLATOR (``web/packages/loom-tess``, stage ``baked_tile`` version 3, tessellator 19)
 ===============================================================================
 
 **Container** ``owd/3``, magic ``OWD3``: canonical JSON header (tile record and inputs digest,
@@ -120,13 +120,14 @@ bake; the browser build is a preview held to the same triangle digest. Two bakes
 ``baked_tile_id`` that differ are a fault; the table that records that fault is migration 0072,
 this lane's.
 
-**What draws, measured from the corridor's own container ``e01ffe0e51...``, tessellator 18.** Of
+**What draws, measured from the corridor's own container ``e59f6cf05d...``, tessellator 19.** Of
 tile (2, 0)'s 4,149 entries, 527 draw: 168 facades, 89 rooftop objects, 78 vitrines, 51 interior
 backings, 36 pieces of street furniture, 33 parcels, 32 massings, 30 street trees, 6 curb edges, 3
-street segments and the terrain. That is 1,633 surfaces, 1,547 of them dressed by a material
-record. The 51 surfaces that pair gained over the version before it are the returns into the
-openings cut in every face that states a grid, and every one of them is dressed: what is undressed
-is the same 86 it was, 85 facade ground bands and the terrain. The container is named by DIGEST
+street segments and the terrain. That is 1,637 surfaces, 1,551 of them dressed by a material
+record. The 55 surfaces that pair has gained over two versions are the returns: 51 into the openings
+cut in every face that states a grid, and 4 more on faces whose ground bays step in depth and had no
+opening. Every one is dressed, so what is undressed is the same 86 it was, 85 facade ground bands
+and the terrain. The container is named by DIGEST
 here for the same reason the log beside it is: these counts move whenever the tessellator does, and
 a number carrying the digest it came from says so itself. The pair that stood here before, 1,531
 and 1,445, came from the container two versions back and survived an hour beside entry counts

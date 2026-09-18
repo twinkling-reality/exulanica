@@ -193,14 +193,41 @@ export function revealOn(
 ): void {
   if (depth < 1) return;
   const inward = subtract(0, depth, where);
-  const corner = (point: Plan, back: number): number => into.corner(
-    facePoint(edge, point[0], back, where),
+  outline.forEach((here, index) => {
+    const next = outline[(index + 1) % outline.length]!;
+    stepOn(into, edge, here, next, 0, inward, datum, where);
+  });
+}
+
+/**
+ * ONE RETURN, from a line in the face's `(u, z)` plane at one depth to the same line at another.
+ *
+ * This is the quad a reveal is made of and the quad a ground bay's depth step needs, which is the
+ * same shape twice: a strip perpendicular to the face, closing the gap between two surfaces that
+ * share a line and stand at different depths. Its two ends take the `(u, z)` of the line they were
+ * set back from, for the reason `revealOn` gives: the frame the grammar fixes for a facade role has
+ * no axis across the face, so a return has no extent there and a material on it is stretched over
+ * its depth.
+ *
+ * WHICH WAY IT FACES follows from the order of `from` and `to` and nothing else, so a caller turns
+ * a return by naming its line the right way round rather than by passing a side.
+ */
+export function stepOn(
+  into: Surface,
+  edge: FaceEdge,
+  from: Plan,
+  to: Plan,
+  front: number,
+  back: number,
+  datum: number,
+  where: string,
+): void {
+  if (front === back) return;
+  const corner = (point: Plan, depth: number): number => into.corner(
+    facePoint(edge, point[0], depth, where),
     point[1],
     point[0],
     subtract(datum, point[1], where),
   );
-  outline.forEach((here, index) => {
-    const next = outline[(index + 1) % outline.length]!;
-    into.face(corner(here, 0), corner(next, 0), corner(next, inward), corner(here, inward));
-  });
+  into.face(corner(from, front), corner(to, front), corner(to, back), corner(from, back));
 }

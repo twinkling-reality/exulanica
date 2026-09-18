@@ -43,12 +43,12 @@
  */
 import { add, exact, GeometryError, subtract } from './integer-math.js';
 import type { Plan } from './integer-math.js';
-import { faceOn, piecesOf, revealOn, Surface, VERTICAL, walkOn } from './faces.js';
+import { faceOn, piecesOf, revealOn, stepOn, Surface, VERTICAL, walkOn } from './faces.js';
 import type { FaceCover, FaceEdge } from './faces.js';
 import type { Piece } from './pieces.js';
 import { storeyFloorMm } from './massing.js';
 import type { MassingFields } from './massing.js';
-import { gridOpenings } from './openings.js';
+import { gridOpenings, panelSteps } from './openings.js';
 import type { BayLayoutFields, Opening, OpeningGridFields, WallRegion } from './openings.js';
 import { openRegions } from './piece-carve.js';
 
@@ -286,6 +286,20 @@ export function facadePieces(
       faceOn(band, edge, low, high, frame.base, bandTop, 0, frame.datum, where);
     }
     for (const bay of bays) {
+      // Where the bay's own panels step in depth, the wall between them: without it a door set back
+      // as much as a metre and a half reads as a rectangle floating behind the face.
+      for (const step of panelSteps(bay.panels, where)) {
+        stepOn(
+          trim,
+          edge,
+          [step.from[0], add(frame.base, step.from[1], where)],
+          [step.to[0], add(frame.base, step.to[1], where)],
+          subtract(0, step.shallow, where),
+          subtract(0, step.deep, where),
+          frame.datum,
+          where,
+        );
+      }
       for (const panel of bay.panels) {
         const role = panelSurfaceRole(panel.role, where);
         let surface = panels.get(role);

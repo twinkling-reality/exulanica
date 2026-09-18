@@ -14,8 +14,8 @@ that no production build emits these bytes or the code that reads them.
   pnpm tess bake packages/loom-tess/test/fixtures/tile-conformance.json packages/app/src/dev/tiles/tile-conformance.owd
   ```
 
-- sha256: `3a2fd58d76f4d40f84aff7e3ec5fcc736ce43d0615647595f9892f62c9e24964` (701,276 bytes).
-- render_batch triangle digest: `15129ce53e574e684c0faee2fd2c695cfb81696a5d03f3acf874e72c1ced9822`,
+- sha256: `bd07246dbeb9b1116498a233ede7790da2cbcf8eeef1024b4e33682460f351c1` (703,556 bytes).
+- render_batch triangle digest: `3aee7162da258e98e1de96ba73a551d0b578a97263eda013d9a7608fb0b1cd7e`,
   the value tess's own conformance test pins.
 
 `test/generated-tile-golden.test.ts` rebakes the source through tess's bake command and requires
@@ -36,3 +36,10 @@ the useful half of this story: `city.facade` carries navigation ground `none`, s
 changes what is drawn and cannot change what a person stands on. `tile_inputs_digest` held at
 `5dd2dcb5de5b684fc485e4c2ad3b25bdc89c0f9ce3a73e4af043e13ec4b75b22` as well, because a tile's inputs
 are its document's and not its tessellator's.
+
+And again at tessellator 19, from 701,276 bytes to 703,556, when a ground bay's own panels gained
+the returns across the steps in depth between them: a door set back as much as 1.79 m had nothing
+drawn between it and the face, which is why it read as a rectangle floating behind a wall.
+render_batch moved, nav_envelope held at
+`dcd548bde8d8ca988c1e3b433c9515fe6531c95d7a5f4085d627e1b54e7eb811` for the third version running,
+and `tile_inputs_digest` held at `5dd2dcb5de5b684fc485e4c2ad3b25bdc89c0f9ce3a73e4af043e13ec4b75b22`.

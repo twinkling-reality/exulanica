@@ -24,7 +24,8 @@
 import { describe, expect, it } from 'vitest';
 import { backingPieces, facadePieces, faceCover, panelSurfaceRole } from '../src/core/facades.js';
 import type { BackingFields, FacadeFields, FaceFrame, GroundBayFields } from '../src/core/facades.js';
-import type { OpeningGridFields } from '../src/core/openings.js';
+import { panelSteps } from '../src/core/openings.js';
+import type { OpeningGridFields, PanelStepFields } from '../src/core/openings.js';
 import { massingPieces } from '../src/core/massing.js';
 import type { MassingFields } from '../src/core/massing.js';
 import type { Plan } from '../src/core/integer-math.js';
@@ -246,9 +247,80 @@ describe('the facade rule', () => {
     expect(depth.get('stall_riser')).toBeCloseTo(20, 6);
     expect(depth.get('glazing')).toBeCloseTo(140, 6);
     expect(depth.get('fascia')).toBeCloseTo(0, 6);
-    // Still exactly the run by its storeys, counting every surface once.
+    // Where the panels step in depth the wall between them is drawn, in the trim role: the riser to
+    // the glazing is 120 mm over the bay's 6 m, and the transom to the fascia is 140 mm over it.
+    // Without these a shopfront's glass floats behind its own frame.
+    expect(area.get('trim')).toBeCloseTo(6000 * 120 + 6000 * 140, 6);
+    // Still exactly the run by its storeys, counting every surface once. The returns are drawn
+    // ACROSS the face rather than on it, so they are not part of that rectangle.
     const height = frame.top - frame.base;
-    expect([...area.values()].reduce((total, value) => total + value, 0)).toBeCloseTo(12000 * height, 6);
+    const drawn = [...area.values()].reduce((total, value) => total + value, 0);
+    expect(drawn - area.get('trim')!).toBeCloseTo(12000 * height, 6);
+  });
+
+  it('finds a step where a bay\'s panels share an edge at different depths, and nowhere else', () => {
+    const panel = (u: [number, number], z: [number, number], recess: number): PanelStepFields =>
+      ({ u_start_mm: u[0], u_end_mm: u[1], z_bottom_mm: z[0], z_top_mm: z[1], recess_mm: recess });
+    // Side by side, the deep panel on the right: the step runs DOWN the shared line.
+    expect(panelSteps([panel([0, 100], [0, 100], 0), panel([100, 200], [0, 100], 500)], 'case'))
+      .toEqual([{ from: [100, 100], to: [100, 0], shallow: 0, deep: 500 }]);
+    // Side by side, the deep panel on the left: the same line, run the other way.
+    expect(panelSteps([panel([0, 100], [0, 100], 500), panel([100, 200], [0, 100], 0)], 'case'))
+      .toEqual([{ from: [100, 0], to: [100, 100], shallow: 0, deep: 500 }]);
+    // Stacked, the deep panel above: the line runs right, so the return faces up into the recess.
+    expect(panelSteps([panel([0, 100], [0, 100], 0), panel([0, 100], [100, 200], 500)], 'case'))
+      .toEqual([{ from: [0, 100], to: [100, 100], shallow: 0, deep: 500 }]);
+    // Stacked, the deep panel below: the line runs left, so the return faces down into it.
+    expect(panelSteps([panel([0, 100], [0, 100], 500), panel([0, 100], [100, 200], 0)], 'case'))
+      .toEqual([{ from: [100, 100], to: [0, 100], shallow: 0, deep: 500 }]);
+    // No step at all: the same recess, and panels meeting at a corner rather than along an edge.
+    expect(panelSteps([panel([0, 100], [0, 100], 7), panel([100, 200], [0, 100], 7)], 'case')).toEqual([]);
+    expect(panelSteps([panel([0, 100], [0, 100], 0), panel([100, 200], [100, 200], 500)], 'case')).toEqual([]);
+    // And a step is found only over the part of the line the two panels share.
+    expect(panelSteps([panel([0, 100], [0, 100], 0), panel([100, 200], [40, 60], 500)], 'case'))
+      .toEqual([{ from: [100, 60], to: [100, 40], shallow: 0, deep: 500 }]);
+  });
+
+  it('returns the face across a bay\'s depth steps, facing into the recess', () => {
+    const massing = block();
+    const facade = face();
+    const frame = frameOf(massing, facade);
+    // A shopfront: a flush riser and fascia with the glass and its transom set back 140 mm.
+    const bay: GroundBayFields = {
+      facade_identity: 'face',
+      u_start_mm: 1000,
+      width_mm: 6000,
+      panels: [
+        { role: 'stall_riser', u_start_mm: 1000, u_end_mm: 7000, z_bottom_mm: 0, z_top_mm: 600, recess_mm: 0 },
+        { role: 'glazing', u_start_mm: 1000, u_end_mm: 7000, z_bottom_mm: 600, z_top_mm: 3400, recess_mm: 140 },
+        { role: 'fascia', u_start_mm: 1000, u_end_mm: 7000, z_bottom_mm: 3400, z_top_mm: 4200, recess_mm: 0 },
+      ],
+    };
+    const pieces = facadePieces(facade, massing, frame, [bay], RESOLUTION_MM, 'case');
+    const reveal = pieces.find((piece) => piece.surface!.role === 'trim')!;
+    // Two steps, the riser to the glass and the glass to the fascia, each 6 m by 140 mm.
+    expect(measure([reveal]).area.get('trim')).toBeCloseTo(2 * 6000 * 140, 6);
+    // The lower step faces UP into the recess above it and the upper one faces DOWN into it. The
+    // face runs along +x, so the two normals must have opposite z and no other component.
+    const normals: number[][] = [];
+    for (let triangle = 0; triangle + 2 < reveal.triangles.length; triangle += 3) {
+      const corner = (at: number): number[] => {
+        const vertex = reveal.triangles[triangle + at]!;
+        return [reveal.vertices[vertex * 3]!, reveal.vertices[vertex * 3 + 1]!, reveal.vertices[vertex * 3 + 2]!];
+      };
+      const [a, b, c] = [corner(0), corner(1), corner(2)];
+      const edge = (from: number[], to: number[]): number[] => [to[0]! - from[0]!, to[1]! - from[1]!, to[2]! - from[2]!];
+      const [u, v] = [edge(a, b), edge(a, c)];
+      normals.push([u[1]! * v[2]! - u[2]! * v[1]!, u[2]! * v[0]! - u[0]! * v[2]!, u[0]! * v[1]! - u[1]! * v[0]!]);
+    }
+    expect(normals).toHaveLength(4);
+    for (const normal of normals) {
+      expect(normal[0]).toBe(0);
+      expect(normal[1]).toBe(0);
+    }
+    // Two up and two down, since each step is a quad of two triangles.
+    expect(normals.filter((normal) => normal[2]! > 0)).toHaveLength(2);
+    expect(normals.filter((normal) => normal[2]! < 0)).toHaveLength(2);
   });
 
   it('scars a party wall above the neighbour and walls it below', () => {

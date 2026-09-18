@@ -91,6 +91,83 @@ export function openingOutline(
   return [...sill, ...archHead(uLeft, uRight, headZ, rise, resolutionMm, where)];
 }
 
+/** A rectangular panel of a ground bay, as the step rule reads it. */
+export interface PanelStepFields {
+  readonly u_start_mm: number;
+  readonly u_end_mm: number;
+  readonly z_bottom_mm: number;
+  readonly z_top_mm: number;
+  readonly recess_mm: number;
+}
+
+/** A step in depth between two panels that share an edge: the line, and the depths either side. */
+export interface PanelStep {
+  /** The shared edge in the face's `(u, z)` plane, from the shallow panel's side. */
+  readonly from: Plan;
+  readonly to: Plan;
+  readonly shallow: number;
+  readonly deep: number;
+}
+
+const overlap = (lowOne: number, highOne: number, lowTwo: number, highTwo: number): [number, number] =>
+  [lowOne > lowTwo ? lowOne : lowTwo, highOne < highTwo ? highOne : highTwo];
+
+/**
+ * WHERE A GROUND BAY STEPS IN DEPTH, which is where a return is missing.
+ *
+ * A bay's panels tile it exactly, which the grammar holds them to, and each sits at its own recess.
+ * So two panels that share an edge and differ in recess leave a step with nothing drawn across it,
+ * and a door set back a metre and a half from the face reads as a rectangle floating behind a wall
+ * rather than as a doorway. This finds those steps; `facades.ts` draws the return across each.
+ *
+ * ORDERED SO THE RETURN CAN FACE THE RIGHT WAY. Each step runs along the shared edge with the
+ * SHALLOW panel's side named first, so a caller can turn the quad toward the recess without
+ * deciding which panel is which a second time.
+ *
+ * Panels that merely touch at a corner share no edge and make no step: the overlap must have
+ * length, which the comparisons below require rather than assume.
+ */
+export function panelSteps(panels: readonly PanelStepFields[], where: string): PanelStep[] {
+  const steps: PanelStep[] = [];
+  panels.forEach((one, index) => {
+    for (const two of panels.slice(index + 1)) {
+      if (one.recess_mm === two.recess_mm) continue;
+      const [shallow, deep] = one.recess_mm < two.recess_mm ? [one, two] : [two, one];
+      const depths = { shallow: shallow.recess_mm, deep: deep.recess_mm };
+      // Side by side: they share a line of constant u and overlap in z. The line runs down when the
+      // deep panel is to the right and up when it is to the left, which is what turns the return
+      // toward the recess.
+      const [low, high] = overlap(one.z_bottom_mm, one.z_top_mm, two.z_bottom_mm, two.z_top_mm);
+      if (high > low) {
+        if (shallow.u_end_mm === deep.u_start_mm) {
+          const at = exact(shallow.u_end_mm, where);
+          steps.push({ from: [at, high], to: [at, low], ...depths });
+          continue;
+        }
+        if (deep.u_end_mm === shallow.u_start_mm) {
+          const at = exact(shallow.u_start_mm, where);
+          steps.push({ from: [at, low], to: [at, high], ...depths });
+          continue;
+        }
+      }
+      // Stacked: a line of constant z, running right when the deep panel is above and left when it
+      // is below, so the return faces up into the recess above or down into the one below.
+      const [left, right] = overlap(one.u_start_mm, one.u_end_mm, two.u_start_mm, two.u_end_mm);
+      if (right <= left) continue;
+      if (shallow.z_top_mm === deep.z_bottom_mm) {
+        const at = exact(shallow.z_top_mm, where);
+        steps.push({ from: [left, at], to: [right, at], ...depths });
+        continue;
+      }
+      if (deep.z_top_mm === shallow.z_bottom_mm) {
+        const at = exact(shallow.z_bottom_mm, where);
+        steps.push({ from: [right, at], to: [left, at], ...depths });
+      }
+    }
+  });
+  return steps;
+}
+
 /**
  * Every opening one grid states on one face, in the face's `(u, z)` plane: one per bay per storey,
  * by the rule above. `region` is the wall they are cut from, and an opening outside it is refused.
