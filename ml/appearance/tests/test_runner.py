@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from typing import Final
 
 import numpy as np
 import pytest
@@ -381,6 +382,48 @@ def test_the_session_findings_file_names_every_pick_in_words(repository):
         assert "lettering" in pick["found"], pick["name"]
     names = [pick["name"] for pick in findings["picks"]]
     assert len(set(names)) == len(names)
+
+
+#: The two specs that ran before this rule existed. They are NOT corrected: they are what produced
+#: the outputs in ml/appearance/evidence, and editing them would make the evidence cite a spec that
+#: never ran. They are named here with their risk instead, and any new spec must carry no numerals.
+PROMPTS_WITH_NUMERALS: Final = {
+    "track-a-session-1": "ran 2026-09-17; its brick prompt says 1800 mm across and one output "
+    "painted 1800 m on a brick face",
+    "track-a-session-2": "ran 2026-09-18; its ashlar prompt says 2400 mm across and one output "
+    "painted 2400 and 0.00m on a block face",
+    "track-a-smoke": "ran with both; the smoke prompt states a stand-in and carries the same shape",
+}
+
+
+def test_no_new_job_spec_puts_a_numeral_in_a_prompt():
+    """MEASURED twice: a model paints the numbers it is told.
+
+    Session 1's brick prompt said "1800 mm across" and one of its outputs carries "1800 m" incised
+    on a brick. Session 2's ashlar prompt said "2400 mm across" and one of its outputs carries
+    "2400" and "0.00m" on a block. Both prompts also said, in words, no text. The number in the
+    prompt is where the text comes from, so the rule is that a prompt carries no numerals at all:
+    the conditioning picture already gives the model the structure and its scale, and the recipe
+    holds the true dimensions for anyone who needs them.
+    """
+    specs = sorted((Path(__file__).resolve().parents[1] / "jobs").glob("*.json"))
+    assert len(specs) >= 3, specs
+    for path in specs:
+        spec = json.loads(path.read_bytes())
+        digits = {
+            target["id"]: "".join(c for c in target["prompt"] if c.isdigit())
+            for target in spec["targets"]
+            if any(c.isdigit() for c in target["prompt"])
+        }
+        if path.stem in PROMPTS_WITH_NUMERALS:
+            # Grandfathered, and held to still carrying them: if someone corrects one of these
+            # quietly, the evidence that cites it stops matching and this test says so.
+            assert digits, f"{path.stem} is listed as carrying numerals and no longer does"
+            continue
+        assert not digits, (
+            f"{path.stem} puts numerals in a prompt: {digits}. A model paints the numbers it is "
+            "told; state sizes nowhere in the prompt and let the conditioning carry the scale."
+        )
 
 
 def test_a_conditioning_picture_with_no_structure_in_it_is_refused(tmp_path, repository):

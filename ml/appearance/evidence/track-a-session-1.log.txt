@@ -192,6 +192,38 @@ one writable output directory, hard limit passed to timeout.
   same code on a different machine", because one side of the comparison cannot be reconstructed.
   gpu-session.sh now refuses to run from a dirty tree, which is what stops the next one.
 
+== THE FREE TEST, RUN 2026-09-18 ON THIS SESSION'S OWN DATA, AND WHAT IT FOUND
+  Session 2 raised a hypothesis: that the edge conditioning role carries the faults, because all four
+  faults found there came from it. Rather than propose a machine, the test was run on data already in
+  hand: all SIXTEEN brick outputs of this session, looked at at 1:1, four crops each, every texel,
+  eight from each role. Records in ml/appearance/look/records-session-1-brick/.
+  A SECOND CASE OF LETTERING, in an output nobody had looked at in September: a2 edge seed
+  2099328355, output 1e9b5b9e9f13e5c0 by its own record, carries light characters reading "1800 m" on
+  a stretcher face. It is refused and cannot be published.
+  AND WITH IT THE MECHANISM, which matters more than the role. This session's brick prompt says
+  "1800 mm across". Session 2's ashlar prompt says "2400 mm across" and its lettering case painted
+  "2400" and "0.00m". THE NUMERALS COME FROM THE PROMPT. Both prompts also said, in words, no text,
+  and were obeyed on that and not on this. A model paints the numbers it is told.
+  The rule now: a job spec carries NO numerals in a prompt at all. The conditioning picture already
+  gives the model the structure and its scale, and the recipe holds the true dimensions for anyone
+  who needs them. tests/test_runner.py holds it, and names track-a-session-1, track-a-session-2 and
+  track-a-smoke as grandfathered WITH their risk, because correcting them would make this evidence
+  cite specs that never ran; the test also fails if someone quietly corrects one.
+  THE ROLE TALLY, over the 32 module-material outputs now looked at at 1:1 (brick here, ashlar in
+  session 2):
+    edge, 16 outputs: 2 definite lettering cases, 1 ambiguous, 2 inventions of block geometry
+    depth, 16 outputs: no lettering, no invented geometry; the a2 depth outputs carry an
+      over-saturated green along the joints, which is a fault of another kind
+  So the edge role carries every case of learned text and every invented geometry across two targets
+  and both models. That is a consistent pattern on 32 outputs, not a proof, and the mechanism above
+  explains the CONTENT of the text without explaining why the role matters. A signal strong enough to
+  reproduce a structure may be strong enough to invite elaboration on it; that part is still a
+  hypothesis.
+  WHAT IS STILL UNLOOKED AT: this session's other 48 outputs (footway paving 16, painted render 16,
+  carriageway asphalt 16) and session 2's other 24. Nothing from them may be published. The eight
+  picks looked at in September are the only other outputs of this session anyone has seen at full
+  resolution, and the sentence "no lettering in 32 crops" covers those crops and nothing wider.
+
 == what this does not show
   - Nothing here is evidence about any real place. Every output is invented appearance on synthetic
     structure, labelled "invented" in its own record.

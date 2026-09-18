@@ -1,0 +1,170 @@
+{
+  "looked_by": "the generated appearance lane",
+  "looked_on": "2026-09-18",
+  "note": "All sixteen brick outputs of SESSION 1, looked at at 1:1 on 2026-09-18, four crops each covering every texel. This was run as a free test of a hypothesis from session 2, that the edge conditioning role carries the faults, using data already in hand rather than a new machine. It found a second case of lettering that nobody had looked at in September, and with it the mechanism: the numerals come from the prompt. Session 1's other 48 outputs, painted render and carriageway asphalt and the sixteen footway paving, are still NOT looked at at full resolution, and nothing from them may be published.",
+  "session": "track-a-session-1",
+  "picks": [
+    {
+      "candidate": "a1",
+      "found": "Red stretcher bond brick on the recipe's own courses, brick to brick colour varied, mortar recessed and dark. Almost no weathering: even red faces with faint grain. No lettering, numeral, logo, badge, signature, watermark or maker's mark anywhere in the four crops, and nothing that reads as a particular real building.",
+      "name": "brick-weathered-a1-depth-1651293075",
+      "output_sha256": "aad2bb5a9d12f117736395e90621b56da7cdf539ef8216f2a35161d28dcaa8a6",
+      "role": "depth",
+      "seed": 1651293075,
+      "suspected": [],
+      "target": "brick-weathered"
+    },
+    {
+      "candidate": "a1",
+      "found": "Red stretcher bond brick on the recipe's own courses, brick to brick colour varied, mortar recessed and dark. Thin grey soot streaks on a few bricks and one pale efflorescence patch near the top left. No lettering, numeral, logo, badge, signature, watermark or maker's mark anywhere in the four crops, and nothing that reads as a particular real building.",
+      "name": "brick-weathered-a1-depth-1848595245",
+      "output_sha256": "eca75e125090784d332e8ea64a3b10fda41ea25e50de66d40e7dfd30f9821ec0",
+      "role": "depth",
+      "seed": 1848595245,
+      "suspected": [],
+      "target": "brick-weathered"
+    },
+    {
+      "candidate": "a1",
+      "found": "Red stretcher bond brick on the recipe's own courses, brick to brick colour varied, mortar recessed and dark. Light soot flecks and a few pale efflorescence patches, otherwise even. No lettering, numeral, logo, badge, signature, watermark or maker's mark anywhere in the four crops, and nothing that reads as a particular real building.",
+      "name": "brick-weathered-a1-depth-448216047",
+      "output_sha256": "14a11e5279fef598718b32c0951f62e1b3ce38efa58daf950bfb1640204e3c9a",
+      "role": "depth",
+      "seed": 448216047,
+      "suspected": [],
+      "target": "brick-weathered"
+    },
+    {
+      "candidate": "a1",
+      "found": "Red stretcher bond brick on the recipe's own courses, brick to brick colour varied, mortar recessed and dark. Even faces with pale grey bloom on scattered bricks. No lettering, numeral, logo, badge, signature, watermark or maker's mark anywhere in the four crops, and nothing that reads as a particular real building.",
+      "name": "brick-weathered-a1-depth-594117353",
+      "output_sha256": "91e4daad6caf59523c1d2671a99d949cbbc5924cbc4879d197566df9bb49a330",
+      "role": "depth",
+      "seed": 594117353,
+      "suspected": [],
+      "target": "brick-weathered"
+    },
+    {
+      "candidate": "a1",
+      "found": "Red stretcher bond brick on the recipe's own courses, brick to brick colour varied, mortar recessed and dark. Efflorescence in white patches, soot spots and rain streaking down the joints; the most weathered of the a1 brick outputs. No lettering, numeral, logo, badge, signature, watermark or maker's mark anywhere in the four crops, and nothing that reads as a particular real building.",
+      "name": "brick-weathered-a1-edge-1329606148",
+      "output_sha256": "74a0b9c6a10e8974564bf3674f260d0c53bc3c6d578170cbc7bac47b326a6bf9",
+      "role": "edge",
+      "seed": 1329606148,
+      "suspected": [],
+      "target": "brick-weathered"
+    },
+    {
+      "candidate": "a1",
+      "found": "Red stretcher bond brick on the recipe's own courses, brick to brick colour varied, mortar recessed and dark. Darker mixed reds with soot spotting and fine rain streaks. No lettering, numeral, logo, badge, signature, watermark or maker's mark anywhere in the four crops, and nothing that reads as a particular real building.",
+      "name": "brick-weathered-a1-edge-2162731945",
+      "output_sha256": "0f7901f8f4972ff252eac83ace03c284817e81941440c862f0b807021bbfae5f",
+      "role": "edge",
+      "seed": 2162731945,
+      "suspected": [],
+      "target": "brick-weathered"
+    },
+    {
+      "candidate": "a1",
+      "found": "Red stretcher bond brick on the recipe's own courses, brick to brick colour varied, mortar recessed and dark. Mixed reds, black soot patches gathered at some perpends, thin white rain streaks. No lettering, numeral, logo, badge, signature, watermark or maker's mark anywhere in the four crops, and nothing that reads as a particular real building.",
+      "name": "brick-weathered-a1-edge-2363143237",
+      "output_sha256": "cb8f8b0c2011577baf5f2ecbd142c40cd27b244119e069e870e774ca4a30e056",
+      "role": "edge",
+      "seed": 2363143237,
+      "suspected": [],
+      "target": "brick-weathered"
+    },
+    {
+      "candidate": "a1",
+      "found": "Red stretcher bond brick on the recipe's own courses, brick to brick colour varied, mortar recessed and dark. Deeper brown reds with fine vertical rain streaking across every course and small efflorescence flecks. No lettering, numeral, logo, badge, signature, watermark or maker's mark anywhere in the four crops, and nothing that reads as a particular real building.",
+      "name": "brick-weathered-a1-edge-3232475219",
+      "output_sha256": "6469c0616ab7623a0dce8386e9d5aeb01e14fe98e7e4d5e31208da21a5af7a99",
+      "role": "edge",
+      "seed": 3232475219,
+      "suspected": [],
+      "target": "brick-weathered"
+    },
+    {
+      "candidate": "a2",
+      "found": "Pale orange brick on the recipe's own courses, nearly even brick to brick, much cleaner than a1 and close to the flat recipe colour. Faint grey streaking over a few headers and no efflorescence. No lettering, numeral, logo, badge, signature, watermark or maker's mark anywhere in the four crops, and nothing that reads as a particular real building.",
+      "name": "brick-weathered-a2-depth-113773412",
+      "output_sha256": "d5499912c01c0855edcebd00d8ae1b3968cac244ce358cc267555cc6cc4f34cf",
+      "role": "depth",
+      "seed": 113773412,
+      "suspected": [],
+      "target": "brick-weathered"
+    },
+    {
+      "candidate": "a2",
+      "found": "Pale orange brick on the recipe's own courses, nearly even brick to brick, much cleaner than a1 and close to the flat recipe colour. Even orange faces, a single pale patch, no soot. No lettering, numeral, logo, badge, signature, watermark or maker's mark anywhere in the four crops, and nothing that reads as a particular real building.",
+      "name": "brick-weathered-a2-depth-2625323486",
+      "output_sha256": "d7e084e3152abc58bbdf34d676483aeec3fd22487a76f1805f87fdc746a3fecf",
+      "role": "depth",
+      "seed": 2625323486,
+      "suspected": [],
+      "target": "brick-weathered"
+    },
+    {
+      "candidate": "a2",
+      "found": "Pale orange brick on the recipe's own courses, nearly even brick to brick, much cleaner than a1 and close to the flat recipe colour. The cleanest of the sixteen: even orange with almost no incident. No lettering, numeral, logo, badge, signature, watermark or maker's mark anywhere in the four crops, and nothing that reads as a particular real building.",
+      "name": "brick-weathered-a2-depth-4010987834",
+      "output_sha256": "ecd52b18789a703d95835c78a6e5515a7611bbdae748cf443ef59dd43b7cbf25",
+      "role": "depth",
+      "seed": 4010987834,
+      "suspected": [],
+      "target": "brick-weathered"
+    },
+    {
+      "candidate": "a2",
+      "found": "Pale orange brick on the recipe's own courses, nearly even brick to brick, much cleaner than a1 and close to the flat recipe colour. Even faces with a faint grey wash in places. No lettering, numeral, logo, badge, signature, watermark or maker's mark anywhere in the four crops, and nothing that reads as a particular real building.",
+      "name": "brick-weathered-a2-depth-442545475",
+      "output_sha256": "62593ed8d824c438da825ee349e2ae1f4c6f482507c502fb4527ce83e983e333",
+      "role": "depth",
+      "seed": 442545475,
+      "suspected": [],
+      "target": "brick-weathered"
+    },
+    {
+      "candidate": "a2",
+      "found": "Pale orange brick on the recipe's own courses, nearly even brick to brick, much cleaner than a1 and close to the flat recipe colour. Smooth new looking brick with pale grey mortar and a slight sheen, as if recently laid and unweathered. No lettering, numeral, logo, badge, signature, watermark or maker's mark anywhere in the four crops, and nothing that reads as a particular real building.",
+      "name": "brick-weathered-a2-edge-1033353428",
+      "output_sha256": "1fc209448791bfe63397e7ec6833cf1e23bf15e9e436f7b3240a8be18b2b935b",
+      "role": "edge",
+      "seed": 1033353428,
+      "suspected": [],
+      "target": "brick-weathered"
+    },
+    {
+      "candidate": "a2",
+      "found": "Pale orange brick on the recipe's own courses, nearly even brick to brick, much cleaner than a1 and close to the flat recipe colour. Smooth new looking brick, pale mortar. THIS OUTPUT CARRIES LETTERING: in the crop at 512,0, on a stretcher face, light characters read 1800 m. The prompt for this target says 1800 mm across and also says, in words, no text. The number in the prompt is where the text came from.",
+      "name": "brick-weathered-a2-edge-2099328355",
+      "output_sha256": "5adbdf76e26ec61f48fca38684720eb143beaa6380400a3d1fff48bd195b35b6",
+      "role": "edge",
+      "seed": 2099328355,
+      "suspected": [
+        "The characters 1800 m are learned text and they are the dimension from this lane's own prompt. Treat as third-party content: refused, and it cannot be published. It is also the second case of the same mechanism, the first being ashlar 2400 and 0.00m in session 2, and it is why job specs from now on carry no numerals in a prompt at all."
+      ],
+      "target": "brick-weathered"
+    },
+    {
+      "candidate": "a2",
+      "found": "Pale orange brick on the recipe's own courses, nearly even brick to brick, much cleaner than a1 and close to the flat recipe colour. Smooth even brick with light mortar and no weathering. No lettering, numeral, logo, badge, signature, watermark or maker's mark anywhere in the four crops, and nothing that reads as a particular real building.",
+      "name": "brick-weathered-a2-edge-3042834048",
+      "output_sha256": "f08de97690115850ba52d56e4e577494c4a0bde777276a5c75d7685437d7e302",
+      "role": "edge",
+      "seed": 3042834048,
+      "suspected": [],
+      "target": "brick-weathered"
+    },
+    {
+      "candidate": "a2",
+      "found": "Pale orange brick on the recipe's own courses, nearly even brick to brick, much cleaner than a1 and close to the flat recipe colour. Smooth brick, pale mortar, a few faint dark patches at the arrises. No lettering, numeral, logo, badge, signature, watermark or maker's mark anywhere in the four crops, and nothing that reads as a particular real building.",
+      "name": "brick-weathered-a2-edge-3098004665",
+      "output_sha256": "cb167295befbfa39b3ddf608b1e32e3724e3096097ffae614d0fe40085ce92a7",
+      "role": "edge",
+      "seed": 3098004665,
+      "suspected": [],
+      "target": "brick-weathered"
+    }
+  ]
+}
