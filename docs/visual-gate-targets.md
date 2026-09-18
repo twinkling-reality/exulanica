@@ -393,6 +393,56 @@ So: a run that makes a generated street look more finished is not what this is, 
 that says generated streets have bare openings. Recorded so the frames are read against a statement
 rather than against an expectation formed while looking at them.
 
+## What the openings run did, measured
+
+Every key unchanged. Five hold, three fail, the same three, and only two deciding numbers moved in
+the whole set.
+
+| predicted | measured |
+| --- | --- |
+| the route is identical, every field | identical: 27500 walked, 28000 refused, 36 qualified |
+| `continuousTexturedStreetAndFacades` still holds | it held, with the same three numbers |
+| `noCutsOrFloatingGeometry` fails AND its count moves up | it failed, and the count DID NOT MOVE |
+| `usefulEyeLevelMovement` still fails at 135 mm | 135 mm |
+| `completeCapsuleClearanceVerification` fails with 4 | 4 |
+| `practicalBrowserBudget` holds at 4,042 triangles | held, 4,042 |
+| unavailable surfaces 18 to 20 | 20, all for no material record |
+
+The only deciding numbers that moved are `environmentTransferredBytes` 565,048 to 701,536 and
+`drawnTriangles` 2,208 to 4,042, both inside the budget key, which holds either way.
+
+**The route being identical to the millidegree is the prediction with a mechanism paying off.** The
+rule reads the arrival pose, the rings and the field; all three come from the `nav_envelope`; the
+rebake moved 1,834 drawn triangles and not one envelope triangle or one ring. So the route could not
+move, and if it had, something would have moved that the triangle count did not report.
+
+### The prediction that was wrong, and what the record says instead
+
+`componentsDetachedFromSupport` was predicted to RISE from 62 because cutting an opening changes what
+counts as a connected component. It is 62 either side. The record says where the triangles went:
+
+    components                     62  ->  62
+    supportComponents               0  ->   0
+    componentsDetachedFromSupport  62  ->  62
+    detachedTriangles           2,208  -> 4,042
+    the first detached component  149 triangles -> 1,983, at the same lowest point
+
+The openings added 1,834 triangles to an EXISTING component and created none. A hole cut in a
+connected surface leaves it connected, and a reveal attaches to the face it is cut into, so nothing
+is separated and nothing new appears. The reasoning was backwards: cutting is precisely the operation
+that does not change membership.
+
+**And the number means something other than its name.** `detachedTriangles` equals `drawnTriangles`
+exactly in both runs, with `supportComponents` zero. So the key is not reporting 62 stray objects on
+an otherwise sound tile. It is reporting that EVERY drawn component is detached, because none is
+classified as support at all, on a tile a walker crosses for 125 m. That is the same shape as the
+textured key: a number correct about its own definition and saying something quite different from
+what its name suggests. The counts are measured; the account of why is a reading.
+
+**Second evidence for the textured key's section, and this time it is a test rather than a
+prediction.** Facades are the most changed thing in the frame and `facadeTriangles` is still zero, so
+the key that names them measured nothing again.
+
 ## A hint about the frontage tie-break, with its n beside it
 
 **A direction, not evidence.** Over all 36 headings the rule qualifies on this tile, each sampled
