@@ -169,7 +169,7 @@ export async function prepareGeneratedTileEvaluation(env: AppEnvironment, name: 
   const opening = openTile(tile, pose, tileToRenderer);
   env.shell.append(statement(tile, { kind: 'development', name, containerSha256 }, opening));
   stateOpening(env, opening);
-  await (await import('../dev/tile-capture.js')).exposeTileCapture(env.preview);
+  await (await import('../dev/tile-capture.js')).exposeTileCapture(env.preview, tile);
   return { ...tile, start: opening.start };
 }
 
@@ -248,7 +248,7 @@ export async function prepareBakedTileWalk(env: AppEnvironment, request: BakedTi
     kind: 'route', bakedTileId, containerSha256: fetched.containerSha256, origin: fetched.origin,
   }, opening));
   stateOpening(env, opening);
-  await (await import('../dev/tile-capture.js')).exposeTileCapture(env.preview);
+  await (await import('../dev/tile-capture.js')).exposeTileCapture(env.preview, tile);
   return { ...tile, start: opening.start };
 }
 

@@ -29,9 +29,11 @@
  * WHICH PAGE IT SCORED is stated by --target, and the page is checked against that target's own
  * rule: its path, the parameters it is reached with, and the exact title the PRODUCT states for it
  * (read from the product's source, never written here). A page that matches no target, a title that
- * cannot be derived, a pose the run chose rather than one a committed file states, or a route
- * rule with no rings to choose between all
- * halt rather than scoring something easier. The targets are declared in TARGETS below and in
+ * cannot be derived, a pose the run chose rather than one a committed file states, a page that
+ * states no way to read the rings its tile carries, or a route rule with no rings to choose between
+ * all halt rather than scoring something easier, and the last two are separate halts because a page
+ * that was never asked and a tile that states none are different facts.
+ * The targets are declared in TARGETS below and in
  * exulanica/evaluation/gate_keys.py, and a test holds the two lists to each other.
  *
  * Environment it needs: the app dev server (default http://127.0.0.1:5188/) proxying /api to a
@@ -632,6 +634,32 @@ const READ_OBSTACLES = `function () {
   }));
 }`;
 
+/**
+ * The route obstruction rings a mounted tile states, and the regions it refused, or `null` where the
+ * page states no hook at all.
+ *
+ * NOT `navigationWorld.polygonObstacles`. That field is what a movement resolver collides against,
+ * and while these rings were carried in it a bench stopped a walker 344 mm from its edge against a
+ * capsule radius of 340. They are stated on the tile now, so the gate reads them from the tile: the
+ * same object the page's own panel reads to say how many there are.
+ *
+ * NULL AND EMPTY ARE DIFFERENT ANSWERS and the caller must halt differently on each. A missing hook
+ * says nothing about the tile's rings; a tile that states none says everything. Reading one as the
+ * other is how the field above came to be read as a tile with nothing in it.
+ */
+const READ_ROUTE_OBSTRUCTIONS = `(() => {
+  const stated = window.__exulanicaTileRouteObstructions;
+  if (typeof stated !== 'function') return null;
+  const { obstacles, refused } = stated();
+  return {
+    obstacles: obstacles.map((obstacle) => ({
+      id: obstacle.id,
+      rings: obstacle.rings.map((ring) => ring.map((point) => [point.x, point.z])),
+    })),
+    refused: refused.map((region) => ({ kind: region.kind, identity: region.identity, reason: region.reason })),
+  };
+})()`;
+
 // ---- the run ---------------------------------------------------------------------------------
 
 async function main() {
@@ -969,28 +997,50 @@ async function main() {
     // feeding continuousTexturedStreetAndFacades. Passing street furniture here would therefore
     // move three keys at once and nothing in a record would show it.
     //
-    // `routeRings` are the route obstruction rings a tile's navigation side states: plan regions a
+    // `routeRings` are the route obstruction rings a TILE states, on the tile itself: plan regions a
     // walking capsule is kept clear of, with everything above head height dropped. They choose a
     // heading and measure nothing.
-    const obstacles = await session.call(bindingId, READ_OBSTACLES);
+    //
+    // THE TWO ARE READ FROM DIFFERENT PLACES, and the split is why. The owned district's rings are
+    // building exteriors in the navigation world, where collision is meant. A tile's rings are not
+    // collision at all, and while they sat in that same field the movement resolver stopped a walker
+    // against a bench, so they are stated on the tile and the gate reads them there.
     const prisms = [];
     const statedRings = [];
-    for (const obstacle of obstacles) {
+    let refusedRings = [];
+    if (scoresOwnedDistrict) {
       // The owned district's rings are building exteriors and take their height from the scored
-      // artifact's own records, so they serve both questions there. A navigation world states plan
-      // regions WITHOUT a height, by design: a tile's navigation side drops everything above head
-      // height. The gate will not invent one, so those rings go to the route rule, which reads
+      // artifact's own records, so they serve both questions there.
+      const obstacles = await session.call(bindingId, READ_OBSTACLES);
+      for (const obstacle of obstacles) {
+        const top = heights.get(obstacle.id);
+        if (top === undefined) {
+          await halt(`collision obstacle ${obstacle.id} has no record in the scored artifact`);
+        }
+        for (const ring of obstacle.rings) prisms.push({ id: obstacle.id, ring, baseY: 0, topY: top });
+      }
+    } else {
+      // A tile states plan regions WITHOUT a height, by design: its navigation side drops everything
+      // above head height. The gate will not invent one, so these go to the route rule, which reads
       // rings and nothing else, and never to the keys, which measure solids. The named request for
       // rings that carry record identity is gate-route-obstruction-rings in the lane requirements.
-      if (!scoresOwnedDistrict) {
+      const stated = await session.evaluate(READ_ROUTE_OBSTRUCTIONS);
+      // AN ABSENT HOOK IS NOT AN EMPTY SET, and reporting one as the other would send the next reader
+      // to the tessellator to find out why a tile states no rings. This says what was established:
+      // the page mounted a tile and states no way to read what that tile carries.
+      if (stated === null) {
+        await halt(
+          'the page states no route obstruction hook, so nothing here says what rings the tile it ' +
+          'mounted carries. This is NOT a tile with no rings: the tile was never asked. The page ' +
+          'states them only on the development preview route, from the module a production build ' +
+          'drops, so a page that mounted a tile and states no hook is a page built or routed ' +
+          'differently from the one this gate scores.',
+        );
+      }
+      refusedRings = stated.refused;
+      for (const obstacle of stated.obstacles) {
         for (const ring of obstacle.rings) statedRings.push({ id: obstacle.id, ring });
-        continue;
       }
-      const top = heights.get(obstacle.id);
-      if (top === undefined) {
-        await halt(`collision obstacle ${obstacle.id} has no record in the scored artifact`);
-      }
-      for (const ring of obstacle.rings) prisms.push({ id: obstacle.id, ring, baseY: 0, topY: top });
     }
     // The route rule reads collision rings: it keeps the headings a capsule can walk, then prefers
     // the one with frontage on both sides. With no rings nothing errors and nothing is decided
@@ -1004,14 +1054,18 @@ async function main() {
     const routeRings = scoresOwnedDistrict ? prisms : statedRings;
     observed.buildingPrisms = prisms.length;
     observed.routeObstacleRings = routeRings.length;
+    // What the runtime refused, carried beside what it kept, so a smaller set is never silent: a
+    // tile that states sixteen regions and carries fourteen is a different fact from one that states
+    // fourteen, and only the refusals tell the two apart.
+    observed.routeObstacleRingsRefused = refusedRings;
     if (routeRings.length === 0) {
       await halt(
         'the page states no route obstruction rings, so the route rule has nothing to choose between: ' +
         'every heading would qualify equally and the walk would be the lowest heading that fits, ' +
-        'which no rule chose. A scored walk needs the rings the tile states on its navigation ' +
-        'side, read from the runtime rather than derived here: a gate with its own rings scores a ' +
-        'walk past obstacles the world does not have. Those rings choose a heading; they are not ' +
-        'collision solids and nothing in them stops a body.',
+        'which no rule chose. The page WAS asked, and answered with an empty set. A scored walk ' +
+        'needs the rings the tile states, read from the runtime rather than derived here: a gate ' +
+        'with its own rings scores a walk past obstacles the world does not have. Those rings ' +
+        'choose a heading; they are not collision solids and nothing in them stops a body.',
       );
     }
     // THE FIELD THE WALK IS BOUNDED BY. The owned district states a rectangle in its artifact. A
@@ -1557,6 +1611,8 @@ async function main() {
         candidatesWithFrontage: plan.candidatesWithFrontage,
         obstacles: prisms.length,
         routeRings: routeRings.length,
+        // What the runtime refused and why, so the count above is never a quietly smaller set.
+        routeRingsRefused: observed.routeObstacleRingsRefused ?? [],
         // How many candidates the tie-break could actually separate. Zero says the rule ran with
         // nothing to choose between, which is why a run with no rings halts before reaching here.
         candidatesWithFrontage: plan.frontageBothSidesSamples > 0 ? plan.candidatesQualified : 0,
