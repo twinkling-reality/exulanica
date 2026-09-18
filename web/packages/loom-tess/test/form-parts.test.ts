@@ -255,6 +255,63 @@ describe('an ellipsoid, whose surface the grammar\'s two frames do not cover', (
   });
 });
 
+describe('the two things a mutation of the rule proved these tests could not see', () => {
+  // Both of these were written after breaking the rule on purpose: winding was reversed and the
+  // ellipse's two plan sizes were swapped, and every test above still passed. A docstring claim no
+  // test holds is the failure this project spent a day naming, so here are the tests.
+
+  /** Twice the triangle's normal, from its own two edges. */
+  function normal(triangle: FormTriangle): readonly [number, number, number] {
+    const [a, b, c] = triangle.vertices;
+    const u = [b.xMm - a.xMm, b.yMm - a.yMm, b.zMm - a.zMm] as const;
+    const v = [c.xMm - a.xMm, c.yMm - a.yMm, c.zMm - a.zMm] as const;
+    return [
+      u[1] * v[2] - u[2] * v[1],
+      u[2] * v[0] - u[0] * v[2],
+      u[0] * v[1] - u[1] * v[0],
+    ];
+  }
+
+  it('winds every triangle of a solid so its normal points away from the inside', () => {
+    // Each of these parts is convex, so the mean of its vertices lies inside it, and a triangle
+    // wound counter-clockwise seen from outside has a normal pointing away from that point. A
+    // solid wound inside out fails here and nowhere else.
+    for (const part of [
+      { shape: 'box' } as const,
+      { shape: 'prism', segments: 8 } as const,
+      { shape: 'prism', segments: 8, topScaleMillionths: 0 } as const,
+      { shape: 'ellipsoid', segments: 8, rings: 4, sizeXMm: 900, sizeYMm: 700, sizeZMm: 500 } as const,
+    ]) {
+      const triangles = expandFormParts(withPart(part));
+      const vertices = triangles.flatMap((triangle) => triangle.vertices);
+      const inside = [0, 1, 2].map((axis) =>
+        vertices.reduce((total, vertex) => total + [vertex.xMm, vertex.yMm, vertex.zMm][axis]!, 0)
+        / vertices.length);
+      for (const triangle of triangles) {
+        const face = normal(triangle);
+        const outward = [0, 1, 2].map((axis) => {
+          const corner = triangle.vertices[0]!;
+          return [corner.xMm, corner.yMm, corner.zMm][axis]! - inside[axis]!;
+        });
+        const dot = face[0] * outward[0]! + face[1] * outward[1]! + face[2] * outward[2]!;
+        expect(dot, `${part.shape} ${JSON.stringify(triangle.vertices)}`).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('inscribes a prism in the ellipse its two sizes state, which a square footprint hides', () => {
+    // 2000 by 1000 with four segments: the vertex on +x is 1000 from the centre and the one on +y
+    // is 500. Swapping the two sizes passes every test that uses a square part.
+    const triangles = expandFormParts(
+      withPart({ shape: 'prism', sizeXMm: 2000, sizeYMm: 1000, segments: 4 }),
+    );
+    expect(corners(triangles).has('11000,20000,0')).toBe(true);
+    expect(corners(triangles).has('10000,20500,0')).toBe(true);
+    expect(corners(triangles).has('9000,20000,0')).toBe(true);
+    expect(corners(triangles).has('10000,19500,0')).toBe(true);
+  });
+});
+
 describe('what the rule refuses by name rather than guessing', () => {
   it('refuses a facing of zero, which is not a direction', () => {
     expect(refusalOf(() => expandFormParts(object({ facingDxMm: 0, facingDyMm: 0 })))).toBe('facing');
