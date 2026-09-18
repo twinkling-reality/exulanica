@@ -1,4 +1,16 @@
 // Drive a throwaway headless Chrome over CDP: open a URL, run page expressions, save screenshots.
+//
+// WHY THIS EXISTS: a Browser pane composites no frames while it is hidden, so the page drives and
+// reads perfectly and every screenshot times out. That failure looks exactly like a broken page.
+// Headless Chrome composites regardless, so this takes pictures when a pane cannot.
+//
+// TWO TRAPS, both paid for in lost time:
+// 1. `readyExpression` must name something the PAGE UNDER TEST sets. The bench sets
+//    document.body.dataset.ready; the app does not, and using the bench's flag against the app
+//    gives "page never became ready" after the full timeout with nothing wrong.
+// 2. It must also match the page's REFUSAL, e.g. an error heading, or a refused tile looks like a
+//    hang: the ready loop awaits an evaluate that never answers, so its own deadline never fires.
+//    A check that cannot tell "not yet" from "never" will always be read as "not yet".
 // Usage: node cdp-capture.mjs <plan.json>
 // plan: { url, width, height, outDir, readyExpression, steps: [{ eval?: string, shot?: name, wait?: ms }] }
 import { spawn } from 'node:child_process';
@@ -79,6 +91,7 @@ try {
         value.png = file;
       }
       results[step.label ?? `step${Object.keys(results).length}`] = value;
+      writeFileSync(join(plan.outDir, 'results.json'), JSON.stringify(results, null, 1));
     }
     if (step.shot) {
       const shot = await send('Page.captureScreenshot', { format: 'png' });
