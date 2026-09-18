@@ -508,6 +508,54 @@ own contract. What is missing is that nothing states WHERE SUPPORT HAS BEEN REMO
 readers can consult, so each models it differently and each is wrong in its own way. The carve is the
 defect in none of them.
 
+## The corridor run, predicted before it was run
+
+The first run of this gate against the street the project's stop condition is about. Written and
+committed before the API, the page or the harness was started.
+
+**The arithmetic that dominates everything below.** The rule needs its route length plus a stopping
+margin, 125,000 plus 6,000 mm, CLEAR. The committed walk starts at tile x 262,000, which is 6,000 mm
+inside tile (2, 0)'s western edge at 256,000, so a heading due east has 122,000 mm to the tile edge.
+**122 m is less than 131 m, so the heading the corridor's own walk states CANNOT QUALIFY.** The built
+street is 116,600 mm frontage to frontage and the committed walk is 116,000 mm; the gate's route is
+longer than the street it was built to score.
+
+**So the single most likely outcome is a refusal**, and it is the rule's own: "no heading from the
+arrival pose clears the route length; the route cannot be walked". Rays to the far corners are 140.8
+and 135.0 m, so the field alone admits some diagonals, but a diagonal from a footway crosses the
+carriageway into the opposite frontage within about 16 m, and this tile carries 32 massings, 36
+pieces of street furniture and 30 street trees, every one of them an obstruction ring. For a diagonal
+to qualify it must thread 131 m past all of them.
+
+**Predicted, in order of confidence:**
+
+- the run does NOT walk the corridor's stated line, because that line cannot qualify. This is the
+  prediction I would be most surprised to lose;
+- most likely the route rule REFUSES outright, and the gate halts on its message rather than mine;
+- if it does plan, the heading is NOT due east and the walk crosses the street rather than running
+  along it, which is the failure the rule's own header names and the frontage tie-break exists to
+  prevent. That would be the rule working as written on a street too short for it;
+- `routeObstacleRings` is in the low hundreds, not 16. Ninety-eight records obstruct here against
+  nine on the fixture, and the fixture averaged 1.8 rings per record, so 150 to 250 is my range;
+- `candidatesQualified` is FEWER than the fixture's 36 despite a far richer tile, because rings block
+  most directions on a street where the fixture had an empty plain. `candidatesWithFrontage` is a
+  larger share of whatever qualifies than the fixture's 2 of 36;
+- **`facadeTriangles` STAYS ZERO**, on a street with 168 facades and 32 massings. This is not about
+  the tile: the gate never hands a generated target any prisms, by design, because a tile's rings are
+  plan regions with no height and the keys measure solids. So the half of that key named for facades
+  measures nothing on EVERY generated target, however real its buildings, and the fixture was not a
+  special case;
+- if the keys are reached at all, the split stays five and three, with the same three failing;
+- the frames show a street with buildings either side, 85 undressed facade ground bands reading
+  magenta at the base of the frontages, and terrain undressed. Not an empty plain.
+
+**And a revision to this document's own hint, made before the data rather than after.** The section
+below predicts that the tie-break which prefers enclosure will thread the clearance band routinely on
+a street. I now expect the opposite here: a line down a 16.2 m wide street runs metres from every
+ring, where the fixture's preferred line passed a bench at 343 mm. If the ranked walk is not
+exercised on the corridor, that hint is weakened rather than confirmed, and the honest reading is
+that it was formed on a tile whose only frontage was a furniture cluster.
+
 ## A hint about the frontage tie-break, with its n beside it
 
 **A direction, not evidence.** Over all 36 headings the rule qualifies on this tile, each sampled
