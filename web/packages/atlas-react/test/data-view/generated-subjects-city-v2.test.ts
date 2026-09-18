@@ -100,25 +100,23 @@ function expectToday(outcomes: readonly Outcome[]): void {
   expect(outcomes).toHaveLength(180);
   const street = ['carriageway:record', 'gutter:record'];
   const drawn = outcomes.filter(outcome => outcome.state === 'drawn');
-  // Nine faces, the building they are laid out on, the three segments and the terrain.
+  const repeated = (kind: string, times: number): string[] => Array.from({ length: times }, () => kind);
+  // Nine faces, the building they are laid out on, everything whose parts are solids, the three
+  // segments and the terrain.
   expect(drawn.map(outcome => outcome.kind)).toEqual([
-    ...Array.from({ length: 9 }, () => 'city.facade'),
+    ...repeated('city.facade', 9),
     'city.massing',
-    'city.street_segment',
-    'city.street_segment',
-    'city.street_segment',
+    ...repeated('city.rooftop_object', 2),
+    ...repeated('city.street_furniture', 7),
+    ...repeated('city.street_segment', 3),
     'city.terrain',
+    ...repeated('city.vitrine', 6),
   ]);
   expect(drawn.every(outcome => outcome.bounded)).toBe(true);
-  expect(drawn.slice(9).map(outcome => outcome.surfaces)).toEqual([
-    ['wall:record', 'roof:record', 'parapet:record'],
-    street,
-    street,
-    street,
-    ['terrain:none-exists'],
-  ]);
+  expect(drawn[9]!.surfaces).toEqual(['wall:record', 'roof:record', 'parapet:record']);
+  expect(drawn.slice(19, 23).map(outcome => outcome.surfaces)).toEqual([street, street, street, ['terrain:none-exists']]);
   expect(count(outcome => outcome.membership === 'halo' && outcome.subjectId === null)).toBe(3);
-  expect(count(outcome => outcome.state === 'unavailable' && outcome.subjectId !== null && !outcome.bounded)).toBe(41);
+  expect(count(outcome => outcome.state === 'unavailable' && outcome.subjectId !== null && !outcome.bounded)).toBe(26);
   // The corridor's slice 2 kind. The tile states an extent for each, and the container leaves them
   // unavailable needing facade_layout, so each is listed with its reason and draws nothing: no box,
   // no points, exactly like every other spatial record this bake does not draw.

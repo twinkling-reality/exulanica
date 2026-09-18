@@ -28,9 +28,9 @@ import {
   sortList,
 } from './support.js';
 
-/** Over `test/fixtures/tile-conformance.json`, tessellator 7, digest profile v3. */
+/** Over `test/fixtures/tile-conformance.json`, tessellator 8, digest profile v3. */
 const GOLDEN = {
-  render_batch: '37f074b4eb7df8b5b9371b53a8c28d542a0aab65be03c894f3441f982c763dca',
+  render_batch: '86da9acd5daf321ce31473f2d99232cfe86a1470d6aeb4c3a0cc6e7e0bb4bc5e',
   nav_envelope: '8a9264cee81d29369e8597e7b0afb9653a861d0668419b05de432230e72c18bc',
 } as const;
 
@@ -155,11 +155,12 @@ describe('the triangle digest of the conformance fixture', () => {
     // the ground the building stands on, and says no material dresses it: the grammar admits none.
     // Every other surface waits on a rule.
     const render = renderBatch!.header.entries.map((entry) => entry.state);
-    expect(count(render, 'drawn')).toBe(14);
+    expect(count(render, 'drawn')).toBe(29);
     expect(count(render, 'halo')).toBe(grammar.halo.length);
     const drawnTerrain = renderBatch!.header.entries[terrain]!;
     expect(drawnTerrain).toMatchObject({
       state: 'drawn',
+      first_vertex: 1871,
       vertex_count: 520,
       triangle_count: 586,
       surfaces: [{ role: 'terrain', orientation: 'horizontal', material: { state: 'none-exists' }, triangle_count: 586 }],

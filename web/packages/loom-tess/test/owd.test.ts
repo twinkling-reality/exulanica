@@ -185,7 +185,11 @@ describe('decodeOwd', () => {
       }
       throw new Error('no drawn surface cites a material record');
     };
-    refused(rebuilt(dressed, (header) => { cited(header).role = 'lot'; }), /dresses another role/);
+    // Any role but the one the cited material states: the surface then dresses another role.
+    refused(rebuilt(dressed, (header) => {
+      const surface = cited(header);
+      surface.role = surface.role === 'lot' ? 'parapet' : 'lot';
+    }), /dresses another role/);
     refused(rebuilt(dressed, (header) => {
       const other = header.records.findIndex((record: any) => record.kind === 'city.surface_material' && record.fields.role === 'kerb');
       cited(header).material = { record: other, state: 'record' };

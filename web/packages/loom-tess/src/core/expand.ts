@@ -13,10 +13,10 @@
  * widths, form parts with facing vectors and identities. What is missing is on this side: the
  * integer rules that expand them, each declared and versioned here as it is built. This version
  * builds the terrain grid, a street segment's carriageway and gutters (`streets.ts`), a building's
- * own walls, roofs and parapets (`massing.ts`) and the face it shows a street, with its ground band
- * and that band's panels (`facades.ts`), and in the navigation projection carves the ground clear of
- * what the grammar's navigation table says obstructs a walking capsule; everything else states the
- * rule it waits on (`NEEDS`).
+ * own walls, roofs and parapets (`massing.ts`), the face it shows a street with its ground band and
+ * that band's panels (`facades.ts`), and the solids of an object's parts (`form-parts.ts`), and in
+ * the navigation projection carves the ground clear of what the grammar's navigation table says
+ * obstructs a walking capsule; everything else states the rule it waits on (`NEEDS`).
  *
  * Two projections are materialised, each from the records by its own rules and each with its own
  * representation contract: `render_batch`, what is drawn, and `nav_envelope`, what a person is
@@ -24,13 +24,17 @@
  * there. `collision_proxy` and `pick_geometry` wait for contracts of their own.
  */
 import { GRAMMAR_TABLES, nestedShapeOf, recordShapeOf, TILE_RECORD_KIND } from './record-shapes.js';
+import { add, subtract } from './integer-math.js';
 import type { Plan, Space } from './integer-math.js';
 import { facadePieces, faceCover, faceHeights, panelRoles } from './facades.js';
 import type { FacadeFields, GroundBayFields } from './facades.js';
 import { massingPieces } from './massing.js';
 import type { MassingFields } from './massing.js';
-import { runOf } from './faces.js';
+import { piecesOf, runOf, Surface } from './faces.js';
 import type { FaceCover } from './faces.js';
+import { alongEdge } from './faces.js';
+import { expandFormParts, FormPartsRefusal } from './form-parts.js';
+import type { FormObject, FormPart, FormShape, FormTriangle } from './form-parts.js';
 import type { Piece, SurfaceExpansion } from './pieces.js';
 import type { ProjectionName } from './record-shapes.js';
 import { ringClearance } from './ring-clearance.js';
@@ -45,7 +49,7 @@ import type { CoveringTriangle, TerrainPatch } from './terrain-yield.js';
  * Bumped whenever an expander, a statement, a contract or the materialised projection set
  * changes, because each changes the bytes a bake writes. The bake stage's parameters carry it.
  */
-export const TESSELLATOR_SOURCE_VERSION = 7;
+export const TESSELLATOR_SOURCE_VERSION = 8;
 
 /**
  * What each materialised projection preserves and what it may be used for, as separate rows, the
@@ -150,6 +154,7 @@ export const NEEDS = {
 export type Need = (typeof NEEDS)[keyof typeof NEEDS];
 
 export type Fields = { readonly [name: string]: unknown };
+
 
 /** A record the document carries, owned or halo, as an expander may read it. */
 export interface CarriedRecord {
@@ -470,6 +475,94 @@ function renderMassing(fields: Fields, context: ExpandContext): Expansion {
   return { state: 'drawn', pieces };
 }
 
+/** An object's parts as the form parts rule takes them, field for field. */
+function formParts(fields: Fields): FormPart[] {
+  return (fields.parts as readonly Fields[]).map((part) => ({
+    shape: part.shape as FormShape,
+    surfaceRole: part.surface_role as string,
+    offsetXMm: part.offset_x_mm as number,
+    offsetYMm: part.offset_y_mm as number,
+    offsetZMm: part.offset_z_mm as number,
+    sizeXMm: part.size_x_mm as number,
+    sizeYMm: part.size_y_mm as number,
+    sizeZMm: part.size_z_mm as number,
+    topScaleMillionths: part.top_scale_millionths as number,
+    segments: part.segments as number,
+    rings: part.rings as number,
+  }));
+}
+
+/** The triangles of an object's parts, gathered into one surface per role and orientation. */
+function objectPieces(object: FormObject, where: string): Piece[] {
+  let triangles: readonly FormTriangle[];
+  try {
+    triangles = expandFormParts(object);
+  } catch (refusal) {
+    if (refusal instanceof FormPartsRefusal) throw new TessellationError(`${where}: ${refusal.message}`);
+    throw refusal;
+  }
+  const surfaces = new Map<string, Surface>();
+  for (const triangle of triangles) {
+    const key = `${triangle.surfaceRole} ${triangle.orientation}`;
+    let surface = surfaces.get(key);
+    if (surface === undefined) {
+      surface = new Surface(triangle.surfaceRole, triangle.orientation);
+      surfaces.set(key, surface);
+    }
+    const held = surface;
+    held.face(...triangle.vertices.map((vertex) => held.corner([vertex.xMm, vertex.yMm], vertex.zMm, vertex.sMm, vertex.tMm)));
+  }
+  return piecesOf([...surfaces.values()]);
+}
+
+/** An object that states where it stands and which way it faces: furniture, a rooftop object. */
+function renderObject(fields: Fields, kind: string): Expansion {
+  const where = `${kind} ${fields.identity as string}`;
+  const pieces = objectPieces({
+    xMm: fields.x_mm as number,
+    yMm: fields.y_mm as number,
+    zMm: fields.z_mm as number,
+    facingDxMm: fields.facing_dx_mm as number,
+    facingDyMm: fields.facing_dy_mm as number,
+    parts: formParts(fields),
+  }, where);
+  if (pieces.length === 0) return { state: 'unavailable', needs: [NEEDS.form_parts] };
+  return { state: 'drawn', pieces };
+}
+
+/**
+ * A vitrine's fitout. A vitrine states no point and no facing: its frame is the facade it sits in,
+ * `x` along the run, `y` into the building and `z` up from the sill (`city.vitrine`). The run
+ * direction is the facing, and no negation is needed for the rule's "+y is to the left": a ring is
+ * counter-clockwise, which `exulanica.grammar.geometry` refuses a ring for not being, so walking a
+ * tier edge in its stated order keeps the building's interior on the left.
+ */
+function renderVitrine(fields: Fields, context: ExpandContext): Expansion {
+  const where = `city.vitrine ${fields.identity as string}`;
+  const carried = context.carried.get(fields.facade_identity as string);
+  if (carried === undefined) throw new TessellationError(`${where} names a facade the tile does not carry`);
+  const facade = carried.fields as unknown as FacadeFields;
+  const building = context.carried.get(facade.building_identity);
+  if (building === undefined) throw new TessellationError(`${where} names a building the tile does not carry`);
+  const massing = building.fields as unknown as MassingFields;
+  const tier = massing.tiers[facade.tier_ordinal];
+  if (tier === undefined) throw new TessellationError(`${where} sits on a tier its building does not have`);
+  const from = tier.ring_mm[facade.edge_ordinal];
+  if (from === undefined) throw new TessellationError(`${where} sits on an edge its tier does not have`);
+  const to = tier.ring_mm[(facade.edge_ordinal + 1) % tier.ring_mm.length]!;
+  const at = alongEdge(from, to, fields.u_start_mm as number, runOf(from, to, where), where);
+  const pieces = objectPieces({
+    xMm: at[0],
+    yMm: at[1],
+    zMm: add(massing.base_elevation_mm, fields.sill_mm as number, where),
+    facingDxMm: subtract(to[0], from[0], where),
+    facingDyMm: subtract(to[1], from[1], where),
+    parts: formParts(fields),
+  }, where);
+  if (pieces.length === 0) return { state: 'unavailable', needs: [NEEDS.form_parts] };
+  return { state: 'drawn', pieces };
+}
+
 /** A building's face on one tier edge, by the facade rule (`facades.ts`). */
 function renderFacade(fields: Fields, context: ExpandContext): Expansion {
   const facade = fields as unknown as FacadeFields;
@@ -558,11 +651,17 @@ const KIND_RULES: ReadonlyMap<string, KindRules> = new Map<string, KindRules>([
   // An occupancy draws as its building's faces.
   ['city.premises', { render_batch: notInProjection, nav_envelope: notInProjection }],
   ['city.road_marking', { render_batch: needs(NEEDS.marking_stripes), nav_envelope: notInProjection }],
-  ['city.rooftop_object', { render_batch: needs(NEEDS.form_parts), nav_envelope: notInProjection }],
+  ['city.rooftop_object', {
+    render_batch: { rule: 'expand', expand: (fields: Fields): Expansion => renderObject(fields, 'city.rooftop_object'), readsCoverings: false },
+    nav_envelope: notInProjection,
+  }],
   ['city.signal', { render_batch: notInProjection, nav_envelope: notInProjection }],
   // A named street draws as its segments.
   ['city.street', { render_batch: notInProjection, nav_envelope: notInProjection }],
-  ['city.street_furniture', { render_batch: needs(NEEDS.form_parts), nav_envelope: notInProjection }],
+  ['city.street_furniture', {
+    render_batch: { rule: 'expand', expand: (fields: Fields): Expansion => renderObject(fields, 'city.street_furniture'), readsCoverings: false },
+    nav_envelope: notInProjection,
+  }],
   // A node draws as its junction or its segments' ends.
   ['city.street_node', { render_batch: notInProjection, nav_envelope: notInProjection }],
   ['city.street_segment', {
@@ -577,7 +676,10 @@ const KIND_RULES: ReadonlyMap<string, KindRules> = new Map<string, KindRules>([
     render_batch: { rule: 'expand', expand: renderTerrain, readsCoverings: true },
     nav_envelope: { rule: 'expand', expand: supportTerrain, readsCoverings: true },
   }],
-  ['city.vitrine', { render_batch: needs(NEEDS.form_parts), nav_envelope: notInProjection }],
+  ['city.vitrine', {
+    render_batch: { rule: 'expand', expand: renderVitrine, readsCoverings: false },
+    nav_envelope: notInProjection,
+  }],
 ]);
 
 function rulesOf(kind: string): KindRules {
