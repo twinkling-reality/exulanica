@@ -43,14 +43,15 @@ ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = TEXTURE_DIRECTORY / "manifest.json"
 DOC = ROOT / "docs" / "texture-package.md"
 EVIDENCE_DIRECTORY = ROOT / "web" / "packages" / "loom-texture" / "evidence"
-#: The published library's bake on five runtimes, at the commit that published batch 1: every file
-#: the directory holds, sets, objects and indexes included. The two records from 2026-09-16 are of
-#: the library before batch 1 and are kept as history, not held to the committed files.
-EVIDENCE = EVIDENCE_DIRECTORY / "2026-09-17-determinism-batch1.log.txt"
+#: The published library's bake on five runtimes, at the commit that published batch 3: every file
+#: the directory holds, sets, objects and indexes included. The earlier records are of the library
+#: before their own batches and are kept as history, not held to the committed files.
+EVIDENCE = EVIDENCE_DIRECTORY / "2026-09-17-determinism-batch3.log.txt"
 OBJECT_EVIDENCE = EVIDENCE
 HISTORY = (
     EVIDENCE_DIRECTORY / "2026-09-16-determinism.log.txt",
     EVIDENCE_DIRECTORY / "2026-09-16-determinism-objects.log.txt",
+    EVIDENCE_DIRECTORY / "2026-09-17-determinism-batch1.log.txt",
 )
 #: A workspace bake of every published recipe, through the command the bake worker runs.
 WORKSPACE_EVIDENCE = EVIDENCE_DIRECTORY / "2026-09-16-workspace-bake-determinism.log.txt"

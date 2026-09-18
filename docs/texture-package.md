@@ -294,7 +294,16 @@ manifest to v2, again with no uncommitted change in the package or in `assets/te
 same five runtimes. Every one of the 59 files it wrote (the 11 sets, the dedication, the 44 objects,
 the manifest, the catalog and `.gitattributes`) was compared the same way: 0 differ between runs,
 and 0 differ from the committed directory. The eight first sets are the same bytes as in both
-earlier records. `tests/test_texture_sets.py` holds this record to the committed files.
+earlier records.
+
+`web/packages/loom-texture/evidence/2026-09-17-determinism-batch3.log.txt` is the record of the
+library as it stands: the same script at the commit that published batch 3's six sets, which the
+record names in its own header, with no uncommitted change in the package or in `assets/textures/`,
+and on the same five runtimes
+(Node 24 twice, 26 and 20 on arm64, and 20 under Rosetta on x86_64, the last two executing the
+compiled output). All 88 files of every run were compared file by file: 0 differ between runs, and 0
+differ from the committed directory. `tests/test_texture_sets.py` holds this record to the committed
+files, and the batch 1 record is kept beside the two from 2026-09-16 as history.
 
 ## 5. Tiling
 
