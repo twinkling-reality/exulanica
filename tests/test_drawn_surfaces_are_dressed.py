@@ -64,6 +64,12 @@ UNDRESSED: dict[tuple[str, str], int] = {
     # carry a ``wall`` material record. So this line is the fixture's age like the ones above it,
     # and it is here because a person looked at the pair rather than to make a suite green.
     ("city.interior_backing", "wall"): 6,
+    # The returns into a face's openings, drawn since tessellator 18 and taking the ``trim`` role.
+    # The fixture states a trim material for four of its six gridded faces and none for the other
+    # two, which is its age again and not a gap: on the corridor's tile (2, 0) all 51 trim surfaces
+    # carry a material record, and city wide every one of the 151 faces that states an opening grid
+    # has a trim dressing. Measured both ways before this line was written.
+    ("city.facade", "trim"): 2,
     # Terrain is the one surface no published texture set dresses, by decision rather than by
     # oversight: no set depicts bare ground and none is asked for.
     ("city.terrain", "terrain"): 1,
