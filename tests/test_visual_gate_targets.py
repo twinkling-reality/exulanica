@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import copy
 import json
+import re
 from pathlib import Path
 
 import pytest
@@ -129,3 +130,69 @@ def test_each_target_declares_conditions_the_gate_knows():
     for target in GATE_TARGETS:
         assert set(target.authentication_conditions) <= set(AUTHENTICATION_CONDITIONS)
         assert target.authentication_conditions
+
+
+HARNESS = ROOT / "scripts/capture_visual_gate.mjs"
+CONFIG = ROOT / "web/packages/app/src/config.ts"
+
+
+def _harness_targets() -> dict[str, dict[str, object]]:
+    """The harness's own target table, read out of the harness."""
+    source = HARNESS.read_text()
+    block = re.search(r"const TARGETS = Object\.freeze\(\{(.*?)\n\}\);", source, re.S)
+    assert block is not None, "the harness no longer declares a TARGETS table"
+    body = block.group(1)
+    starts = [
+        (match.start(), match.group(1))
+        for match in re.finditer(r"'([a-z-]+)': Object\.freeze\(\{", body)
+    ]
+    # Assert the parse found something before comparing it: an empty table would agree with an
+    # empty expectation and this test would assert nothing at all.
+    assert len(starts) >= 2, f"parsed {len(starts)} targets out of the harness"
+    found: dict[str, dict[str, object]] = {}
+    for index, (offset, identifier) in enumerate(starts):
+        chunk = body[offset : starts[index + 1][0] if index + 1 < len(starts) else len(body)]
+        path = re.search(r"path: '([^']*)'", chunk)
+        title = re.search(r"titleSymbol: '([^']*)'", chunk)
+        required = re.search(r"requiredParameters: Object\.freeze\(\[([^\]]*)\]\)", chunk)
+        assert path is not None and title is not None and required is not None, identifier
+        found[identifier] = {
+            "path": path.group(1),
+            "titleSymbol": title.group(1),
+            "requiredParameters": tuple(re.findall(r"'([a-z_]+)'", required.group(1))),
+        }
+    return found
+
+
+def test_the_harness_and_the_record_declare_the_same_targets_both_ways():
+    """Two lists of targets, held to each other from both sides.
+
+    A target the harness can run and the record cannot state would produce a run nobody can write
+    down; a target the record states and the harness cannot run would be a page nothing can reach.
+    Asserting the SET both ways is what catches either, where "each of mine appears in yours" would
+    not.
+    """
+    harness = _harness_targets()
+    declared = {target.identifier: target for target in GATE_TARGETS}
+    assert set(harness) == set(declared)
+    for identifier, entry in harness.items():
+        target = declared[identifier]
+        assert entry["path"] == target.path
+        assert entry["titleSymbol"] == target.title_symbol
+        assert entry["requiredParameters"] == target.required_parameters
+
+
+def test_every_declared_title_is_one_the_product_states():
+    """The titles the harness will compare against exist in the product's own source.
+
+    The harness halts when a title cannot be derived rather than comparing against nothing. This
+    holds the other end: each symbol a target names is one config.ts actually states today, so the
+    halt is a guard against future drift and not the normal path.
+    """
+    source = CONFIG.read_text()
+    for target in GATE_TARGETS:
+        stated = re.search(rf"const {target.title_symbol} = '([^']+)';", source)
+        assert stated is not None, f"{CONFIG} no longer states {target.title_symbol}"
+        assert stated.group(1).strip(), (
+            f"{target.title_symbol} is empty, which equals an empty title"
+        )

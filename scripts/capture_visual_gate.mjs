@@ -26,6 +26,13 @@
  * It reads no credential and writes none. The API's refusal of an anonymous read is probed
  * without one, and request headers are never recorded.
  *
+ * WHICH PAGE IT SCORED is stated by --target, and the page is checked against that target's own
+ * rule: its path, the parameters it is reached with, and the exact title the PRODUCT states for it
+ * (read from the product's source, never written here). A page that matches no target, a title that
+ * cannot be derived, a pose chosen in the URL, or a route rule with no rings to choose between all
+ * halt rather than scoring something easier. The targets are declared in TARGETS below and in
+ * exulanica/evaluation/gate_keys.py, and a test holds the two lists to each other.
+ *
  * Environment it needs: the app dev server (default http://127.0.0.1:5188/) proxying /api to a
  * running API. Exit 0 with a run record, 3 with halt.json when a precondition of the gate fails.
  */
@@ -46,11 +53,57 @@ import {
   mechanicalMeasurements,
   planRoute,
 } from '../web/packages/loom-gate/src/index.ts';
+import { decodeOwd } from '../web/packages/loom-tess/src/core/index.ts';
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
 const VIEWPORT = Object.freeze({ width: 1440, height: 900 });
-const PRODUCT_TITLE = 'Exulanica';
+
+/**
+ * The pages this harness may score, and how each is recognised.
+ *
+ * A target is a page plus the conditions that make a run of it comparable to another run of the
+ * same page. It is a closed list for the reason the record's list is: a pattern would let the next
+ * page through for free. `exulanica/evaluation/gate_keys.py` declares the same two, and
+ * `tests/test_visual_gate_targets.py` holds the two lists to each other in both directions, so
+ * neither can gain a target the other does not have.
+ *
+ * No title is written here. Each is read from the product's own source, so a page check cannot
+ * drift from what the product shows, and a target whose title cannot be found halts rather than
+ * comparing against nothing: an empty expectation equals an empty title.
+ */
+const TARGETS = Object.freeze({
+  'owned-district': Object.freeze({
+    path: '/',
+    requiredParameters: Object.freeze([]),
+    selectorParameters: Object.freeze([]),
+    titleSymbol: 'PRODUCT_TITLE',
+    binds: 'owned-district-artifact',
+  }),
+  'generated-tile-evaluation': Object.freeze({
+    path: '/',
+    requiredParameters: Object.freeze(['preview']),
+    selectorParameters: Object.freeze(['tile', 'baked_tile', 'city']),
+    titleSymbol: 'PREVIEW_TITLE',
+    binds: 'tile-containers',
+  }),
+});
+
+const TITLE_SOURCE = 'web/packages/app/src/config.ts';
+
+/** The title the product itself states for a target, or a halt naming what it looked for. */
+function titleOf(target) {
+  const source = readFileSync(join(ROOT, TITLE_SOURCE), 'utf8');
+  const pattern = new RegExp(`const ${TARGETS[target].titleSymbol} = '([^']+)';`);
+  const found = pattern.exec(source);
+  if (found === null) {
+    throw new Halt(
+      `${TITLE_SOURCE} no longer states ${TARGETS[target].titleSymbol}, so there is no title to ` +
+      'check the page against; the gate will not fall back to a literal',
+    );
+  }
+  return found[1];
+}
 
 class Halt extends Error {}
 
@@ -63,6 +116,7 @@ function argument(name, fallback) {
 
 const options = {
   app: argument('app', 'http://127.0.0.1:5188/'),
+  target: argument('target', 'owned-district'),
   artifact: argument('artifact', 'assets/owned-world/flatiron/flatiron-owned-district.json'),
   renderer: argument('renderer', 'web/packages/atlas-react/src/playcanvas/owned-district-runtime.ts'),
   out: argument('out'),
@@ -291,7 +345,7 @@ const READ_POSE = `function () {
     enabled: this.controls.enabled === true };
 }`;
 
-const CAPTURE_STATE = `function (origin, title) {
+const CAPTURE_STATE = `function (origin, title, path) {
   const shell = document.getElementById('shell');
   const canvas = document.getElementById('atlas');
   const box = (node) => {
@@ -322,7 +376,7 @@ const CAPTURE_STATE = `function (origin, title) {
   const worldMounted = shell !== null && !shell.hasAttribute('data-world-state') &&
     canvas instanceof HTMLCanvasElement && !canvas.hidden &&
     canvas.dataset.worldTopology !== undefined;
-  const inProductShell = location.origin === origin && location.pathname === '/' &&
+  const inProductShell = location.origin === origin && location.pathname === path &&
     document.title === title && worldMounted &&
     document.querySelector('.credential-gate') === null &&
     document.querySelector('[data-empty-world]') === null;
@@ -498,6 +552,11 @@ const SAMPLE_SUPPORT = `function (pointsText) {
   return encode(heights);
 }`;
 
+const READ_TILE = `function () {
+  const attached = this.generatedTile;
+  return attached === null || attached === undefined ? null : { ...attached.metrics };
+}`;
+
 const READ_OBSTACLES = `function () {
   return (this.navigationWorld.polygonObstacles ?? []).map((obstacle) => ({
     id: obstacle.id,
@@ -524,14 +583,48 @@ async function main() {
     const bytes = readFileSync(join(ROOT, path));
     return { path, byteSize: bytes.byteLength, sha256: sha256(bytes) };
   });
-  const artifactBytes = readFileSync(repoPath(options.artifact));
+  const target = TARGETS[options.target];
+  if (target === undefined) {
+    throw new Halt(
+      `${options.target} is not a gate target; declared targets are ${Object.keys(TARGETS).join(', ')}`,
+    );
+  }
+  const expectedTitle = titleOf(options.target);
+  const search = new URLSearchParams(appUrl.search);
+  for (const name of target.requiredParameters) {
+    if (search.get(name) === null) throw new Halt(`${options.target} is reached with ${name} set, and this run has no ${name}`);
+  }
+  const selectors = target.selectorParameters.filter((name) => search.get(name) !== null);
+  if (target.selectorParameters.length > 0 && selectors.length !== 1) {
+    throw new Halt(
+      `${options.target} names exactly one of ${target.selectorParameters.join(', ')}; this run names ` +
+      `${selectors.length === 0 ? 'none' : selectors.join(' and ')}`,
+    );
+  }
+  // A pose in a URL is a choice the run makes, and the lane a scored run judges must never choose
+  // where the camera starts. A stated pose belongs in a committed file the record binds by digest.
+  const posed = ['pose_x_mm', 'pose_y_mm', 'facing_dx', 'facing_dy'].filter((name) => search.get(name) !== null);
+  if (posed.length > 0) {
+    throw new Halt(
+      `a scored run refuses a pose chosen per run (${posed.join(', ')}); a stated pose is read from a ` +
+      'committed file and bound by its digest',
+    );
+  }
+
+  const scoresOwnedDistrict = target.binds === 'owned-district-artifact';
+  // The module that drew what is scored. A generated page is drawn by the tile runtime, so the
+  // default follows the target rather than making every run of it pass the same flag.
+  if (!scoresOwnedDistrict && !process.argv.includes('--renderer')) {
+    options.renderer = 'web/packages/atlas-react/src/playcanvas/generated-tile/tile-runtime.ts';
+  }
+  const artifactBytes = scoresOwnedDistrict ? readFileSync(repoPath(options.artifact)) : null;
   const rendererBytes = readFileSync(repoPath(options.renderer));
-  const artifact = JSON.parse(artifactBytes.toString('utf8'));
-  if (artifact.profile !== 'exulanica.owned-district/v1') {
+  const artifact = artifactBytes === null ? null : JSON.parse(artifactBytes.toString('utf8'));
+  if (artifact !== null && artifact.profile !== 'exulanica.owned-district/v1') {
     throw new Halt(`no adapter reads ${artifact.profile}; the corridor needs its own prism reader`);
   }
-  const heights = new Map(artifact.buildings.map((building) => [building.id, building.height_cm / 100]));
-  const [west, north, east, south] = artifact.bounds_cm.map((value) => value / 100);
+  const heights = new Map((artifact?.buildings ?? []).map((building) => [building.id, building.height_cm / 100]));
+  const [west, north, east, south] = (artifact?.bounds_cm ?? [0, 0, 0, 0]).map((value) => value / 100);
 
   // The API behind the product's own proxy must refuse a read that carries no credential.
   const anonymous = await fetch(new URL('/api/graph', appUrl));
@@ -598,7 +691,7 @@ async function main() {
   });
 
   const halt = async (reason) => {
-    const state = await session.call(await session.reference('document'), CAPTURE_STATE, [appOrigin, PRODUCT_TITLE]).catch(() => null);
+    const state = await session.call(await session.reference('document'), CAPTURE_STATE, [appOrigin, expectedTitle, target.path]).catch(() => null);
     const { data } = await session.send('Page.captureScreenshot', { format: 'png' }).catch(() => ({ data: null }));
     if (data !== null) writeFileSync(join(out, `${options.label}-halt.png`), Buffer.from(data, 'base64'));
     throw new Halt(`${reason}\nstate: ${JSON.stringify(state)}`);
@@ -664,20 +757,37 @@ async function main() {
     if (bindingId === null) await halt('the Atlas binding was not reachable from the engine update listener');
     phase('the Atlas binding was reached');
     const documentId = await session.reference('document');
-    const captureState = () => session.call(documentId, CAPTURE_STATE, [appOrigin, PRODUCT_TITLE]);
+    const captureState = () => session.call(documentId, CAPTURE_STATE, [appOrigin, expectedTitle, target.path]);
     const pose = () => session.call(bindingId, READ_POSE);
 
     const arrival = await pose();
     const before = await captureState();
     if (!before.inProductShell) await halt('the page is not the product shell with a mounted world');
 
+    const tileMetrics = scoresOwnedDistrict ? null : await session.call(bindingId, READ_TILE);
+    if (!scoresOwnedDistrict && tileMetrics === null) {
+      await halt('the page mounted no generated tile, so there is nothing of that target to score');
+    }
+
     // The route, chosen by rule from the product's own arrival pose and collision proxy.
     const obstacles = await session.call(bindingId, READ_OBSTACLES);
     const prisms = [];
     for (const obstacle of obstacles) {
-      const top = heights.get(obstacle.id);
+      const top = scoresOwnedDistrict ? heights.get(obstacle.id) : obstacle.topY;
       if (top === undefined) await halt(`collision obstacle ${obstacle.id} has no record in the scored artifact`);
       for (const ring of obstacle.rings) prisms.push({ id: obstacle.id, ring, baseY: 0, topY: top });
+    }
+    // The route rule reads collision rings: it keeps the headings a capsule can walk, then prefers
+    // the one with frontage on both sides. With no rings nothing errors and nothing is decided
+    // either: every heading that fits the field qualifies, both tie-breaks are equal for all of
+    // them, and the answer is the lowest heading that fits. That is a default wearing the costume
+    // of a decision, and a record of it would say the rule was applied. So the run stops here.
+    if (prisms.length === 0) {
+      await halt(
+        'the page states no collision rings, so the route rule has nothing to choose between: ' +
+        'every heading would qualify equally and the walk would be the lowest heading that fits, ' +
+        'which no rule chose. A scored walk needs the rings the tile states.',
+      );
     }
     const plan = planRoute([arrival.x, arrival.z], prisms, [west, north, east, south]);
     phase(`the route was planned at ${plan.headingMillidegrees} millidegrees`);
@@ -975,19 +1085,58 @@ async function main() {
       }
     })();
 
-    // The scored artifact, found on the wire by its bytes rather than by its name.
-    let environment = null;
-    for (const [requestId, entry] of network) {
-      if (!entry.finished || entry.decodedBytes !== artifactBytes.byteLength) continue;
+    // What the page drew, found on the wire by its bytes rather than by its name.
+    const bodyOf = async (requestId) => {
       const body = await session.send('Network.getResponseBody', { requestId }).catch(() => null);
-      if (body === null) continue;
-      const bytes = Buffer.from(body.body, body.base64Encoded ? 'base64' : 'utf8');
-      if (sha256(bytes) !== sha256(artifactBytes)) continue;
-      environment = { requestPath: normalizeUrl(entry.url), transferredBytes: entry.encodedBytes, decodedBytes: bytes.byteLength, status: entry.status };
-      break;
+      return body === null ? null : Buffer.from(body.body, body.base64Encoded ? 'base64' : 'utf8');
+    };
+    let environment = null;
+    const containers = [];
+    if (scoresOwnedDistrict) {
+      for (const [requestId, entry] of network) {
+        if (!entry.finished || entry.decodedBytes !== artifactBytes.byteLength) continue;
+        const bytes = await bodyOf(requestId);
+        if (bytes === null || sha256(bytes) !== sha256(artifactBytes)) continue;
+        environment = { requestPath: normalizeUrl(entry.url), transferredBytes: entry.encodedBytes, decodedBytes: bytes.byteLength, status: entry.status };
+        break;
+      }
+      if (environment === null) await halt('the page never fetched the scored artifact byte for byte');
+      phase('the scored artifact was matched on the wire');
+    } else {
+      // Every container the page fetched, read through tess's own decoder rather than through a
+      // hook the page could state differently: what the run binds is what crossed the wire.
+      for (const [requestId, entry] of network) {
+        if (!entry.finished || !normalizeUrl(entry.url).endsWith('.owd')) continue;
+        const bytes = await bodyOf(requestId);
+        if (bytes === null) continue;
+        let header;
+        try {
+          ({ header } = decodeOwd(new Uint8Array(bytes)));
+        } catch (error) {
+          await halt(`a container the page fetched did not decode: ${String(error).slice(0, 200)}`);
+        }
+        const fields = header.tile.fields;
+        containers.push({
+          requestPath: normalizeUrl(entry.url),
+          transferredBytes: entry.encodedBytes,
+          decodedBytes: bytes.byteLength,
+          status: entry.status,
+          sha256: sha256(bytes),
+          tileInputsDigest: header.tile_inputs_digest,
+          citySeed: fields.city_seed,
+          tile: { x: fields.tile_x, y: fields.tile_y, lod: fields.lod },
+          grammars: header.grammars.map((grammar) => ({
+            id: grammar.grammar_id, version: grammar.grammar_version, descriptorSha256: grammar.descriptor_sha256,
+          })),
+          renderBatchTriangles: header.projections.find((projection) => projection.name === 'render_batch')?.triangle_count ?? 0,
+        });
+      }
+      if (containers.length === 0) await halt('the page drew no container this run could bind');
+      const drawnName = tileMetrics?.tileName ?? null;
+      if (drawnName === null) await halt('the page never reported a mounted tile, so nothing says which container it drew');
+      environment = containers[0];
+      phase(`${containers.length} container(s) were matched on the wire`);
     }
-    if (environment === null) await halt('the page never fetched the scored artifact byte for byte');
-    phase('the scored artifact was matched on the wire');
 
     // Listeners on the window, the document and the world canvas, by the script that added them.
     // Read last, once every measurement that needs the binding is done, so toggling the debugger
@@ -1090,9 +1239,13 @@ async function main() {
       profile: 'exulanica.visual-gate-run/v1',
       keySet: GATE_KEY_SET_VERSION,
       label: options.label,
-      app: { origin: appOrigin, path: appUrl.pathname, validationSeconds: options.validationSeconds },
+      app: { origin: appOrigin, path: appUrl.pathname, search: appUrl.search, validationSeconds: options.validationSeconds },
+      target: options.target,
+      pageCheck: { path: target.path, title: expectedTitle, titleFrom: `${TITLE_SOURCE} ${target.titleSymbol}` },
       scored: {
-        artifact: { path: options.artifact, byteSize: artifactBytes.byteLength, sha256: sha256(artifactBytes), profile: artifact.profile, districtId: artifact.district_id },
+        ...(scoresOwnedDistrict
+          ? { artifact: { path: options.artifact, byteSize: artifactBytes.byteLength, sha256: sha256(artifactBytes), profile: artifact.profile, districtId: artifact.district_id } }
+          : { containers, tile: tileMetrics }),
         renderer: { path: options.renderer, byteSize: rendererBytes.byteLength, sha256: sha256(rendererBytes) },
         measuredBy,
       },
@@ -1121,7 +1274,10 @@ async function main() {
         candidatesTried: plan.candidatesTried,
         candidatesQualified: plan.candidatesQualified,
         obstacles: prisms.length,
-        fieldBoundsCm: artifact.bounds_cm,
+        // How many candidates the tie-break could actually separate. Zero says the rule ran with
+        // nothing to choose between, which is why a run with no rings halts before reaching here.
+        candidatesWithFrontage: plan.frontageBothSidesSamples > 0 ? plan.candidatesQualified : 0,
+        fieldBoundsCm: artifact?.bounds_cm ?? null,
       },
       interactions,
       harnessWrites,
