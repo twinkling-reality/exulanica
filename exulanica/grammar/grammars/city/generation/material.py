@@ -3,13 +3,12 @@
 **Which surfaces.** Every role a record draws, and nothing else: a facade's wall always; its ground
 band, and its stall riser, fascia, shopfront frame, glazing, door and awning where its bays have
 them; its trim where it has mouldings or openings; its party wall scar where a neighbour stands
-lower than it. A building's roof, its
-parapet where it has one, and its wall where a ridge roof leaves gables. A rooftop object's parts'
-roles. A segment's carriageway and, with a gutter, its gutter; a curb's kerb and footway; a
-junction's carriageway; a block's and a lot's ground. A street tree's trunk, canopy and pit; a
-crossing's painted band. Terrain is the only role no published set dresses, so it is the only one
-that draws as unavailable, and it does so at the district's edges where no other record covers the
-ground.
+lower than it. A building's roof, its parapet where it has one, and its wall where a ridge roof
+leaves gables. A rooftop object's parts' roles. A segment's carriageway and, with a gutter, its
+gutter; a curb's kerb and footway; a junction's carriageway; a block's and a lot's ground. A street
+tree's trunk, canopy and pit; a crossing's painted band. Terrain is the only role no published set
+dresses, so it is the only one that draws as unavailable, and it does so at the district's edges
+where no other record covers the ground.
 
 **Everything a record draws, including what the late stages make.** This stage runs last but one,
 after streetlife, vitrine and premises, so a street lamp's parts, a vitrine's fitout and the plane

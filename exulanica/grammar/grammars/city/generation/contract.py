@@ -161,14 +161,13 @@ Seventeen published sets, each with a pinned SHA-256 (migrations 0065 and 0078):
 2000), ``cc0.broadleaf-foliage`` (class ``cutout``, 2000) and two of class ``decal``,
 ``cc0.road-paint-white`` and ``cc0.road-paint-yellow`` (1000 by 250). The material catalog
 (``material.v4.json``) holds sixteen of them, each entry naming the surface roles it dresses and
-whether its texture runs one way. Two of those sixteen are not reached by any record this grammar
-makes today: ``cc0.road-paint-yellow`` dresses a lane marking, and ``cc0.road-paint-white`` dresses
-one too besides the crossing band it paints, and no stage emits a marking record yet.
-``cc0.sign-panel`` has no entry at all, because no surface role names a sign panel until the
-lettering lane's records do. Terrain is now the only role no published set dresses, so a terrain
-surface is the only one that carries no material record and draws as the stated unavailable
-surface. Budget: 168 MB decoded texture per corridor; one 1024 set is 16,777,212 bytes as the
-runtime uploads it.
+whether its texture runs one way. Both road paints name the lane marking role and no stage emits a
+marking record yet, so the yellow paint is reached by nothing this grammar makes today and the
+white paint is reached only through the crossing band it also paints. ``cc0.sign-panel`` has no
+entry at all, because no surface role names a sign panel until the lettering lane's records do.
+Terrain is now the only role no published set dresses, so a terrain surface is the only one that
+carries no material record and draws as the stated unavailable surface. Budget: 168 MB decoded
+texture per corridor; one 1024 set is 16,777,212 bytes as the runtime uploads it.
 
 5. THE VISUAL GATE (``docs/visual-gate-rubric.md`` version 5, key set
 ``exulanica.visual-gate-keys/v5``)
