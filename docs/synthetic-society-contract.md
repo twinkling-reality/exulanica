@@ -737,7 +737,8 @@ a gap in support near those two y values is the tree carve and is expected. Both
 on those two curbs are 1,923 mm from the nearer trunk, which is clear of the 1,153 mm the record
 states as that tree's exclusion radius even before a capsule radius is added to it.
 
-**Two sentences of the paragraph above were corrected after the run, and neither is a parameter.**
+**Two sentences of this section's opening paragraph were corrected after the run, and neither is a
+parameter.**
 It said the two curbs of a segment "can differ by 50 mm", which is what this line crosses and not
 what the street states: all 23 segments differ, from 2 mm to 63 mm. And it said every walk taken on
 this city had run along one curb, which is not something this lane can produce; what it can produce
@@ -788,8 +789,8 @@ is the 123 and the 96.
 
 **Six stations the runtime reads no surface at, and the place says so first.** All six are on the two
 curbs whose walking line is 163, each about 1.1 m from a bench. The place's own obstruction predicate
-refuses 12 walking pieces, and the nodes those pieces touch include all six and every one of them: no
-station the runtime refuses is outside that set. None of the six carries a standing spot, so the
+refuses 12 walking pieces; the 16 nodes those pieces touch include all six, and no station the
+runtime refuses is outside that set. None of the six carries a standing spot, so the
 place already walks through them rather than standing anybody there, which is what the contract says
 it does. Two implementations in two languages, sharing the grammar's numbers and no code, put the
 same six points out of reach of a body.
