@@ -410,6 +410,37 @@ Default view unchanged: `evidence/default-view-comparison.log.txt` records a GPU
 the whole backbuffer) at three poses on `?preview=1` with no tile, byte-identical between this
 runtime's branch and main, first on 2026-09-16 and again after the rebase onto main 36e6d2dd.
 
+## 8.1 The paired walk, stated before it is taken
+
+Written before the tessellator 14 bake exists, so the numbers reported afterwards have something to be
+checked against rather than something to be chosen to fit. The corridor lane pre-registered the same
+walk from its side (its street document, commit 15d1352a); these are the parameters this lane will
+match, so the two runs are one experiment from two directions rather than two similar ones.
+
+| | |
+| --- | --- |
+| path | east along the footway centre line, y `70300`, from x `262000` toward x `378000` |
+| pose | stated, `pose_x_mm=262000&pose_y_mm=70300&facing_dx=1&facing_dy=0`, never a default |
+| movement | the product's own walking, a held W key through its movement and support resolution |
+| stepping | `beginTileCapture().advance(dt)`, dt exactly 1/30 s, no clock consulted |
+| never | no camera override and no writing of a position: a walk that teleports proves nothing about support |
+| viewport | 1080 square, which is above the 960 px the app requires before it serves its boundary page |
+| recorded | the camera's position every step, plus frames at the start, at x `320000` and at the end |
+| compared against | the same capture on the tessellator 13 bake, where the walk advanced almost not at all |
+
+**The question, and why one run could not answer it.** On tessellator 13 the walk barely advanced. Two
+things could have caused that and the run cannot separate them: the seven tree-canopy holes, which
+left 53 m of the 116 m unsupported, or the movement rule that returns a walker to safety each frame
+instead of sliding along what it cannot enter. Tessellator 14's carve leaves the walked line
+supported while `render_batch` is unchanged, so the picture is held constant and the only thing that
+moves is the support. If the walk advances, the holes were the limit. If it does not, this is a
+measurement of the recovery behaviour alone, which is worth more than the first run was.
+
+**What is not predicted.** What a walker does when they meet a metre of unsupported footway is the
+corridor lane's open question and it is open here too: stopping, dropping to the terrain 170 mm below,
+and stepping over are all honest answers. Recording the question in advance is what stops whichever
+happens from being described afterwards as the expected behaviour.
+
 ## 9. After this runtime
 
 - The corridor lane bakes the street and iterates on its look, at most three times, by editing

@@ -76,5 +76,5 @@ export {
   listBakedTiles,
   tileAt,
 } from './tile-route.js';
-export type { TileCaptureSession } from './capture.js';
+export type { CapturedPose, TileCaptureSession } from './capture.js';
 export { beginTileCapture } from './capture.js';

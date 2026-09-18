@@ -21,11 +21,29 @@
 
 import * as pc from 'playcanvas';
 
+/** Where the walker is, in the renderer's metres, as the camera reports it. */
+export interface CapturedPose {
+  readonly x: number;
+  readonly y: number;
+  readonly z: number;
+}
+
 export interface TileCaptureSession {
   /** How many frames this session has stepped. */
   readonly frames: number;
   /** Advance by exactly `dtSeconds`, draw, and answer the frame as a PNG data URL. */
   step(dtSeconds: number): string;
+  /**
+   * Advance by exactly `dtSeconds` and draw, answering only where the walker ended up.
+   *
+   * A 116 m walk at walking pace is thousands of frames, and "does the walker advance" is a question
+   * about POSITION rather than about pictures: a trace answers it in a few kilobytes where the frames
+   * would be gigabytes. The stepping is identical either way, so a trace and a film of one walk are
+   * the same walk.
+   */
+  advance(dtSeconds: number): CapturedPose;
+  /** Where the walker is now, without advancing anything. */
+  pose(): CapturedPose;
   /** Hand the engine back its own loop. */
   end(): void;
 }
@@ -50,19 +68,38 @@ export function beginTileCapture(): TileCaptureSession | string {
   let stepped = 0;
   let ended = false;
 
+  const cameraPose = (): CapturedPose => {
+    // The active camera is the walker's eye, so its position is where the product's own movement and
+    // support resolution have put them, which is the thing a walk measures.
+    const camera = app.systems.camera?.cameras?.[0]?.entity ?? null;
+    if (camera === undefined || camera === null) return { x: Number.NaN, y: Number.NaN, z: Number.NaN };
+    const at = camera.getPosition();
+    return { x: at.x, y: at.y, z: at.z };
+  };
+  const drawOne = (dtSeconds: number): void => {
+    if (ended) throw new Error('this capture session has ended');
+    if (!Number.isFinite(dtSeconds) || dtSeconds <= 0) throw new Error(`a frame needs a positive dt, not ${dtSeconds}`);
+    // Update, draw and read in one task. The draw is forced rather than requested: the host draws
+    // only frames its binding asks for, and a capture wants every frame it stepped.
+    app.update(dtSeconds);
+    app.renderNextFrame = true;
+    app.render();
+    stepped += 1;
+  };
+
   return {
     get frames(): number {
       return stepped;
     },
+    advance(dtSeconds: number): CapturedPose {
+      drawOne(dtSeconds);
+      return cameraPose();
+    },
+    pose(): CapturedPose {
+      return cameraPose();
+    },
     step(dtSeconds: number): string {
-      if (ended) throw new Error('this capture session has ended');
-      if (!Number.isFinite(dtSeconds) || dtSeconds <= 0) throw new Error(`a frame needs a positive dt, not ${dtSeconds}`);
-      // Update, draw and read in one task. The draw is forced rather than requested: the host draws
-      // only frames its binding asks for, and a capture wants every frame it stepped.
-      app.update(dtSeconds);
-      app.renderNextFrame = true;
-      app.render();
-      stepped += 1;
+      drawOne(dtSeconds);
       return canvas.toDataURL('image/png');
     },
     end(): void {
