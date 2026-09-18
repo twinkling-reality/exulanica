@@ -174,27 +174,40 @@ are dressed** by a material record and 86 are not: 85 facade ground bands and th
 
 | Waiting on | Entries | The records |
 | --- | --- | --- |
-| `facade_layout` | 126 | 75 entrances and 51 interior backings: the recessed doorways, and the plane that closes a shop window. |
+| `facade_layout` | 126 | 75 entrances and 51 interior backings. The backings are what a shop window is meant to close; the tessellator lane has since measured that all 51 sit entirely inside a face the facade draws as solid wall, because openings are not cut yet, so drawing them would change nothing a viewer sees. |
 | `crossing_band` | 6 | The zebras. |
 | `ground_coverage` | 2 | The two blocks' own ground, where no lot covers it. |
 
 `nav_envelope` holds **39 863 triangles**, and this is where the street is still not a street: see
 section 8.
 
-**The 85 undressed ground bands are not on the street.** At the two frontage planes what draws is
-wall, fascia, shopfront frame and stall riser, every one dressed, and no ground band at all,
-because the corridor's frontages are covered by bays end to end and the band role is only the part
-no bay covers. All 85 are interior: 54 on party walls between neighbours, 31 on rear walls. The
-north terrace is eight buildings from x 258 900 to 381 100 with no gap between any of them, so
-none of those faces can be seen from the footway.
+**Where the 85 undressed ground bands are, and what is not known about them.** Measured: all 85
+are interior faces, 54 on party walls between neighbours and 31 on rear walls, and the north
+terrace is eight buildings from x 258 900 to 381 100 with no gap between any of them.
 
-They are visible anyway, and that is worth understanding before looking at a picture of this
-street. The 51 interior backings are not drawn, so a shop window has nothing behind it: looking
-into a shopfront you are looking through the building at the inside of the terrace, where a 5.2 m
-undressed band glows. **The caption is "you are seeing through the building", not "the frontage is
-undressed"**, and every picture taken before `facade_layout` finishes its interior backings needs
-that sentence to be read correctly. A picture that needs that sentence is not a picture of the
-street: it is a picture of a stage.
+Not known: whether those bands are what appears as the magenta unavailable state in a picture of
+this street. This document said until 2026-09-18 that they were, and that a viewer was looking
+through the buildings at them because the upper glazing had nothing behind it. That was wrong twice
+over and is retracted. There is no upper glazing at all: the glazing on this frontage spans z 556
+to 3404, which is the shopfront band. And the claim rested on a reading of my own that was an
+artefact of the query rather than a fact about the street. Asking which surfaces lie ON a frontage
+plane, by selecting those whose y is constant, silently drops every RECESSED surface, and a
+shopfront's ground band, glazing and door are recessed: they span y 56 700 to 55 253. The filter
+removed the six dressed surfaces in front of the viewer and left the interior bands as the only
+candidate. An artefact that removes the evidence for the alternative is the worst kind, because
+everything that survives it agrees.
+
+Read without that filter, the south frontage in the column in front of the walked pose draws wall,
+ground band, fascia, glazing, shopfront frame and stall riser, and every one is dressed by a
+material record. In that ten metre column there is no undressed surface at all except the terrain.
+
+So the question is open and is being measured by the tessellator lane from the exact pose the
+picture was taken at, `pose_x_mm=320000 pose_y_mm=70300 facing_dx=0 facing_dy=-1` on container
+8194a31e. Two candidates are on the table, ground level glass with only a vitrine's boxes behind
+it, and a wall seen from inside a building, which draws nothing because a back face is not drawn
+and no collision proxy stops a walker entering one. This lane is not choosing between them, and a
+caption for any picture of this street should say the magenta is an unavailable surface and stop
+there until the measurement says more.
 
 ## 8. The walk, and the pose it starts from
 
