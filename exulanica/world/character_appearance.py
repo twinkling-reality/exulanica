@@ -106,8 +106,14 @@ class Parameter(Record):
         elif self.kind == "choice":
             if value not in self.choices:
                 raise ValueError(f"{self.key} is not a declared choice")
-        elif not isinstance(value, str) or re.fullmatch(r"#[0-9a-f]{6}", value) is None:
-            raise ValueError(f"{self.key} must be a lowercase RGB hex color")
+        elif self.kind == "color":
+            if not isinstance(value, str) or re.fullmatch(r"#[0-9a-f]{6}", value) is None:
+                raise ValueError(f"{self.key} must be a lowercase RGB hex color")
+        else:
+            # A kind added to the annotation above without rules here used to be checked as a
+            # colour, so its every value was refused for the wrong reason and the next person was
+            # sent to look at hex digits.
+            raise ValueError(f"{self.key} has kind {self.kind!r}, which has no rules here")
 
 
 class RepresentationBinding(Record):
