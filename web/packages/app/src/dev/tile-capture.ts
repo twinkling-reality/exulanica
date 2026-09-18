@@ -24,6 +24,7 @@ declare global {
   interface Window {
     __exulanicaTileCapture?: () => unknown;
     __exulanicaTileRouteObstructions?: () => unknown;
+    __exulanicaTileUnavailableSurfaces?: () => unknown;
   }
 }
 
@@ -36,4 +37,27 @@ export async function exposeTileCapture(preview: boolean, tile: LoadedGeneratedT
   // the tile says "16 rings and none refused", and a reader could not tell a tile whose regions all
   // stood from one whose regions were quietly dropped.
   window.__exulanicaTileRouteObstructions = () => tile.routeObstructions;
+  // EVERY SURFACE DRAWN AS UNAVAILABLE, COUNTED BY THE REASON THE RUNTIME STATES, verbatim.
+  //
+  // The metric a driver already reads is one total, and a total cannot be read: a surface no
+  // material record dresses and a surface whose texture set could not be fetched are both counted
+  // there, and on this fixture a run that fetches nothing reports about six times a run that does.
+  // A reader holding the total alone cannot tell which kind of run made it.
+  //
+  // GROUPED BY THE RUNTIME'S OWN STRING and by nothing else. Any category this hook invented would
+  // be a second place where reasons are defined, and the two would drift; the caller gets what the
+  // tile says and counts it. If that is ever too many strings to be useful, the collapse belongs
+  // where the reasons are written rather than here.
+  window.__exulanicaTileUnavailableSurfaces = () => {
+    const byReason = new Map<string, number>();
+    for (const range of tile.ranges) {
+      if (range.state !== 'drawn') continue;
+      for (const surface of range.surfaces) {
+        if (surface.state !== 'unavailable') continue;
+        const reason = surface.reason ?? '';
+        byReason.set(reason, (byReason.get(reason) ?? 0) + 1);
+      }
+    }
+    return [...byReason].map(([reason, surfaces]) => ({ reason, surfaces }));
+  };
 }

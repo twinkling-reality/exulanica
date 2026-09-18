@@ -767,6 +767,20 @@ const READ_OBSTACLES = `function () {
  * says nothing about the tile's rings; a tile that states none says everything. Reading one as the
  * other is how the field above came to be read as a tile with nothing in it.
  */
+/**
+ * Every surface the page drew as unavailable, counted by the reason the runtime states.
+ *
+ * The tile metric binds ONE TOTAL, and a total cannot be read: a surface no material record dresses
+ * and a surface whose texture set could not be fetched both count there, and they are different
+ * facts about a world. The record binds the breakdown so no reader has to know which kind of run
+ * produced the number. Null where the page states no hook, which is not the same as a tile with
+ * none, exactly as for the rings.
+ */
+const READ_UNAVAILABLE_SURFACES = `(() => {
+  const stated = window.__exulanicaTileUnavailableSurfaces;
+  return typeof stated !== 'function' ? null : stated();
+})()`;
+
 const READ_ROUTE_OBSTRUCTIONS = `(() => {
   const stated = window.__exulanicaTileRouteObstructions;
   if (typeof stated !== 'function') return null;
@@ -1079,6 +1093,9 @@ async function main() {
 
     const tileMetrics = scoresOwnedDistrict ? null : await session.call(bindingId, READ_TILE);
     observed.tile = tileMetrics;
+    // The breakdown behind `unavailableSurfaces`, which the metric above states only as a total.
+    const unavailableByReason = scoresOwnedDistrict ? null : await session.evaluate(READ_UNAVAILABLE_SURFACES);
+    observed.unavailableSurfacesByReason = unavailableByReason;
     if (!scoresOwnedDistrict) containers = await collectContainers();
     if (!scoresOwnedDistrict && tileMetrics === null) {
       await halt('the page mounted no generated tile, so there is nothing of that target to score');
@@ -1904,7 +1921,13 @@ async function main() {
       scored: {
         ...(scoresOwnedDistrict
           ? { artifact: { path: options.artifact, byteSize: artifactBytes.byteLength, sha256: sha256(artifactBytes), profile: artifact.profile, districtId: artifact.district_id } }
-          : { containers, tile: tileMetrics }),
+          : {
+            containers,
+            tile: tileMetrics,
+            // What the total above is made of, by the reason the runtime states for each surface,
+            // so a reader never has to know that an unfetched texture set counts in it.
+            unavailableSurfacesByReason: unavailableByReason,
+          }),
         renderer: { path: options.renderer, byteSize: rendererBytes.byteLength, sha256: sha256(rendererBytes) },
         measuredBy,
       },
