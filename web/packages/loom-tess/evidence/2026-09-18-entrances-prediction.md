@@ -120,9 +120,11 @@ Five parts, five matches, three of them exact to the unit.
 
 ### Four new trim surfaces for 525 returns
 
-Worth its own line because it says what the remaining stages will cost. The 525 returns landed on 32
-faces, and 28 of those already drew a trim surface for their openings, so the whole second half of
-this piece added FOUR dressed surfaces where the first half added 51. The geometry roughly doubled
+Worth its own line because it says what the remaining stages will cost. Counted from the containers
+rather than by subtracting totals: 51 of the tile's 168 drawn facades carried a trim surface at
+tessellator 18 and 55 do at 19, one surface each. The 525 returns landed on 32 faces, so 28 of those
+already drew trim for their openings and the whole second half of this piece added FOUR dressed
+surfaces where the first half added 51. The geometry roughly doubled
 the openings half's triangle count on the affected faces; the DRESSING cost a twentieth of it.
 
 That is the shape to expect from sills, heads, string courses and cornices too, since all of them
