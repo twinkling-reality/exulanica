@@ -436,6 +436,15 @@ supported while `render_batch` is unchanged, so the picture is held constant and
 moves is the support. If the walk advances, the holes were the limit. If it does not, this is a
 measurement of the recovery behaviour alone, which is worth more than the first run was.
 
+**Neither half decides it alone, which is why both are stated here.** This lane's trace says where the
+walker WENT. The corridor lane samples its own container every 100 mm along the same line and says
+where the bake states a walker COULD have stood. Laid against each other at an x the container calls
+unsupported, the trace either stops, drops 170 mm to the terrain, or passes over, and which of the
+three it is cannot be read off a film. A trace without the container's support is a behaviour with no
+ground truth; the sampling without a trace is ground truth with nothing walking on it. Both halves key
+on the CONTAINER DIGEST rather than on a file name, so they can be lined up without either lane
+trusting the other's label.
+
 **What is not predicted.** What a walker does when they meet a metre of unsupported footway is the
 corridor lane's open question and it is open here too: stopping, dropping to the terrain 170 mm below,
 and stepping over are all honest answers. Recording the question in advance is what stops whichever
