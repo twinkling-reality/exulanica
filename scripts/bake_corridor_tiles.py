@@ -12,6 +12,11 @@ grammar's own document check, bakes each through the Node tessellator's CLI (the
 each through migration 0072. Then it bakes every tile a second time and records it again: the
 answer must be ``identical`` for every tile, and anything else is the fault 0072 exists to keep.
 
+Name tiles as ``x,y`` arguments to bake only those, for instance ``2,0``. Every tile document is
+still generated and the city's reference closure still checked; only the bake and the record are
+narrowed. That is for the case where the tessellator refuses one tile and the others are wanted in
+the store meanwhile, which is a state to say out loud rather than a reason to record nothing.
+
 It never bakes inside a request, never writes to ``assets/``, and connects as whatever role the
 URL names; recording a tile needs the owner, because a baked tile is published by this offline
 bake and never by a runtime process.
@@ -57,15 +62,50 @@ TSX = ROOT / "web" / "node_modules" / ".bin" / "tsx"
 
 
 def bake(document: Path, container: Path) -> dict[str, object]:
-    """The tessellator's own bake, and its statement about what it wrote."""
+    """The tessellator's own bake, and its statement about what it wrote.
+
+    A refusal is raised WITH what the tessellator said. It states which record it could not draw
+    and why, and that sentence is the whole diagnosis; a CalledProcessError that carries only an
+    exit status sends the reader back to run the command again by hand to find out what it already
+    knew. On 2026-09-18 that cost a rebake and a puzzled half hour.
+    """
     result = subprocess.run(
         [str(TSX), str(CLI), "bake", str(document), str(container)],
         capture_output=True,
         text=True,
         cwd=ROOT / "web",
-        check=True,
     )
+    if result.returncode != 0:
+        message = (result.stderr or result.stdout).strip() or "no output"
+        raise SystemExit(f"the tessellator refused {document.name}: {message}")
     return json.loads(result.stdout.strip().splitlines()[-1])
+
+
+def _chosen_tiles(arguments: list[str]) -> set[tuple[int, int]] | None:
+    """The tiles to bake: every corridor tile, or the ones named as ``x,y`` arguments.
+
+    Every tile document is still generated and the whole city's reference closure still checked,
+    because a tile is only well formed with respect to the city it was cut from. Naming a subset
+    says which of them to bake and record, and is for the case where one tile is refused by the
+    tessellator and the rest are wanted meanwhile. A refusal is not a reason to record nothing, and
+    it is not a reason to pretend the refused tile is fine either: it is named on the way out.
+    """
+    if not arguments:
+        return set(CORRIDOR_TILES)
+    chosen = set()
+    for argument in arguments:
+        try:
+            x, y = (int(part) for part in argument.split(","))
+        except ValueError:
+            print(f"a tile is two integers as x,y, not {argument!r}", file=sys.stderr)
+            return None
+        if (x, y) not in CORRIDOR_TILES:
+            print(
+                f"({x}, {y}) is not one of the corridor's tiles {CORRIDOR_TILES}", file=sys.stderr
+            )
+            return None
+        chosen.add((x, y))
+    return chosen
 
 
 def main() -> int:
@@ -76,6 +116,9 @@ def main() -> int:
         return 2
     if not TSX.exists():
         print(f"the web toolchain is missing ({TSX}); run pnpm install in web/", file=sys.stderr)
+        return 2
+    chosen = _chosen_tiles(sys.argv[1:])
+    if chosen is None:
         return 2
     catalogs = load_city_catalogs()
     generation = generate_city(
@@ -106,7 +149,7 @@ def main() -> int:
         repository = BakedTileRepository(connection=connection, store=tile_store(Path(data_dir)))
         outcomes: list[tuple[str, str, str, int, str]] = []
         for pass_name in ("first", "second"):
-            for document in documents:
+            for document in [d for d in documents if (d.tile.tile_x, d.tile.tile_y) in chosen]:
                 tile = document.tile
                 key = baked_tile_id(spec, tile)
                 document_path = Path(work) / f"tile-{tile.tile_x}-{tile.tile_y}.json"
