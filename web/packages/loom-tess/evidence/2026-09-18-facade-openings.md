@@ -39,31 +39,46 @@ rather than by a surface's orientation.
 
     conformance fixture      17                     18
     bytes                    564,788                701,276
-    container                1ef74efa               dbe071f7
-    render_batch             e906150d               d4ebae2f      MOVED
+    container                1ef74efa               3a2fd58d
+    render_batch             e906150d               15129ce5      MOVED
     nav_envelope             dcd548bd               dcd548bd      unchanged
     tile_inputs_digest       5dd2dcb5               5dd2dcb5      unchanged
 
     corridor tile (2,0)      17                     18
     bytes                    11,153,540             12,602,292
-    container                93df0715f5             01890c42e968
-    render_batch             91350a9045             0fc066d470    MOVED
+    container                93df0715f5             e01ffe0e51
+    render_batch             91350a9045             b5a1af14b8    MOVED
     nav_envelope             35388d7849             35388d7849    unchanged
     tile_inputs_digest       2ab27821               2ab27821      unchanged
 
 The 17 row of the corridor reproduces the corridor lane's own digest table exactly, which is the
 control that makes the 18 row mean anything.
 
+FIFTY TRIANGLES OF NO AREA REACHED A CONTAINER BEFORE THIS WAS RIGHT, and 1,650 on the corridor
+tile. The carve keeps the points along a walk's edges so that neighbours meet vertex to vertex, so a
+walk has runs of collinear points; the first version of `walkOn` cut a walk into a FAN from one
+corner, which turns every such run into a triangle with no area. A triangle with no area has no
+normal, and `pnpm run check` failed with "A surface batch holds a value that is not finite" in the
+tile runtime. Every other caller of the carve already cut its walks with the ring rule; this one now
+does too, and the triangle counts are identical either way, 4,042 and 55,338.
+
+An earlier pair of digests for that fanned version is not recorded here, because nothing should be
+able to cite them. What is worth recording is that the corridor container was 12,602,292 bytes
+BEFORE AND AFTER the fix, identical to the byte, while its container digest moved from 01890c42 to
+e01ffe0e and its render digest from 0fc066d4 to b5a1af14. A length is not an identity.
+
 ## Bake time
 
 Through the machine-wide slot, two passes each, both clocks. Both passes of each version wrote
 byte-identical containers.
 
-    17   wall 16.78 / 16.73 s   cpu 17.89 / 17.77
-    18   wall 17.74 / 17.51 s   cpu 18.89 / 18.66
+    17   wall 17.22 / 17.13 s   cpu 18.26 / 18.14   load 16.2 falling to 11.9
+    18   wall 18.19 / 17.98 s   cpu 19.27 / 19.07   load 14.4 falling to 10.8
 
 Carving 51 faces on that tile costs about one second, five per cent. The question was recorded
-before the run rather than a number predicted, because there was no basis for one.
+before the run rather than a number predicted, because there was no basis for one. An earlier pair
+at 16.78 and 17.74 s of wall, taken before the degenerate triangles were fixed, agreed to within a
+second; the pair above is the one to quote, because it was measured on the code that shipped.
 
 An earlier pair taken under load 24 to 29 read 33.24 s and 48.23 s of wall against 25.53 and 28.25
 of cpu, ratios 1.30 and 1.71. Kept here because the wall figures are useless and the ratios say so.

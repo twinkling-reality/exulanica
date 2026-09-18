@@ -38,7 +38,7 @@ import {
  * moved the second of these two lines would be a carve that had escaped the face's own plane.
  */
 const GOLDEN = {
-  render_batch: 'd4ebae2fe31d5fb7564af26e6e81388184d25478f4ff29a495057edf97f04188',
+  render_batch: '15129ce53e574e684c0faee2fd2c695cfb81696a5d03f3acf874e72c1ced9822',
   nav_envelope: 'dcd548bde8d8ca988c1e3b433c9515fe6531c95d7a5f4085d627e1b54e7eb811',
 } as const;
 
@@ -279,6 +279,29 @@ describe('the triangle digest of the conformance fixture', () => {
     header.records.forEach((record, index) => {
       expect(renderBatch!.header.entries[index]!.state === 'halo').toBe(record.membership === 'halo');
     });
+  });
+
+  it('draws no triangle of no area, which has no normal and reaches a renderer as a value that is not finite', async () => {
+    const decoded = await decodedFixture();
+    for (const projection of decoded.projections) {
+      const vertices = absoluteVertices(projection);
+      const corner = (triangle: number, at: number): [number, number, number] => {
+        const vertex = projection.index[triangle * 3 + at]!;
+        return [vertices[vertex * 3]!, vertices[vertex * 3 + 1]!, vertices[vertex * 3 + 2]!];
+      };
+      const flat: string[] = [];
+      for (let triangle = 0; triangle < projection.header.triangle_count; triangle += 1) {
+        const [a, b, c] = [corner(triangle, 0), corner(triangle, 1), corner(triangle, 2)];
+        const edge = (from: readonly number[], to: readonly number[]): number[] =>
+          [to[0]! - from[0]!, to[1]! - from[1]!, to[2]! - from[2]!];
+        const [u, v] = [edge(a, b), edge(a, c)];
+        const normal = [u[1]! * v[2]! - u[2]! * v[1]!, u[2]! * v[0]! - u[0]! * v[2]!, u[0]! * v[1]! - u[1]! * v[0]!];
+        if (normal.every((value) => value === 0)) flat.push(`${String(triangle)} at ${JSON.stringify(a)}`);
+      }
+      // The scan must have something to look at, or an empty projection would pass it silently.
+      expect(projection.header.triangle_count).toBeGreaterThan(0);
+      expect(flat, `${projection.header.name} draws triangles of no area: ${flat.slice(0, 6).join('; ')}`).toEqual([]);
+    }
   });
 
   it('returns the wall into an opening on exactly the faces whose own record states a grid', async () => {

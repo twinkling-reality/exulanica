@@ -11,6 +11,7 @@
  * lattice: the answer is integers, never a rounded fraction of a metre.
  */
 import { alongByCornerRule } from './fillet-arc.js';
+import { triangulateRing } from './ring-triangulation.js';
 import { add, floorDivide, measureAgainst, multiply, subtract } from './integer-math.js';
 import type { Plan } from './integer-math.js';
 import type { Piece, SurfaceExpansion } from './pieces.js';
@@ -147,6 +148,13 @@ export function facePoint(edge: FaceEdge, along: number, depth: number, where: s
  * A face over a walk in the edge's own `(u, z)` plane, at one depth. The walk turns
  * counter-clockwise in that plane, which is the way round the face's own quad is built, so the face
  * it makes looks the way the edge does.
+ *
+ * IT IS CUT BY THE RING RULE AND NOT BY A FAN, for the reason every other caller of the carve
+ * already is. A carved walk KEEPS THE POINTS ALONG ITS EDGES, so that a neighbour holding the same
+ * points on a shared line meets it vertex to vertex (`piece-carve.hullKeepingEdges`). Three of those
+ * in a row are collinear, and a fan from one corner turns each such run into a triangle of no area.
+ * A triangle of no area has no normal, and a renderer that takes one gets a value that is not
+ * finite: fifty of them reached a container here before this was written this way.
  */
 export function walkOn(
   into: Surface,
@@ -156,12 +164,9 @@ export function walkOn(
   datum: number,
   where: string,
 ): void {
-  const corners: number[] = [];
-  for (const point of walk) {
-    const [along, height] = point;
-    corners.push(into.corner(facePoint(edge, along, depth, where), height, along, subtract(datum, height, where)));
-  }
-  into.face(...corners);
+  const corners = walk.map((point) =>
+    into.corner(facePoint(edge, point[0], depth, where), point[1], point[0], subtract(datum, point[1], where)));
+  for (const index of triangulateRing(walk, where)) into.triangles.push(corners[index]!);
 }
 
 /**
