@@ -92,6 +92,68 @@ opening at a stated pose, for two reasons in the product rather than in the gate
 Both are asked of the lanes that own those files. Until they are answered the gate binds the walk it
 read and the pose the page reported, and does not claim to have checked that the page honoured it.
 
+## The run with the rings off the collision field, predicted before it was run
+
+Written and committed before any server was started, so these can be checked rather than fitted.
+
+**What changed under this run, and why it needed a change here.** Route obstruction rings were taken
+out of `navigationWorld.polygonObstacles`, because that field is what a movement resolver collides
+against and a bench stopped a walker against it. They are stated on the loaded tile instead. That
+field was also the only place this harness read rings from, so the fix cut the gate's own input: with
+no change the ringless halt would have fired and the keys would have stayed unmeasured a fourth time.
+The page now states the rings the runtime holds, both what it carried and what it refused, through a
+development hook under the two guards the tile evaluation already sits behind, and the gate reads
+them there. An absent hook and an empty set are separate halts with separate messages, because a
+field emptied on purpose reading as a tile with nothing in it is the error that made this necessary.
+
+**Measured from the container first, by tess's own reader, before the run.** The committed golden
+`tile-conformance.owd`, sha256 `1ef74efa8eef6844...`, 564,788 bytes, tessellator 17, 180 records,
+2,208 render_batch triangles and 5,755 nav_envelope triangles, states **16 route obstruction rings
+across 9 records**: one `city.massing`, fourteen `city.street_furniture`, one `city.street_tree`.
+None has fewer than three corners and none names no record, which are the runtime's two refusals, so
+it should carry sixteen and refuse none. Their plan patch spans 19,110 mm by 28,370 mm.
+
+**What has not moved since the run before this one.** Between the commit that recorded that run and
+the head this run is planned from, `git diff --stat -- web/` over that range is empty: nothing under
+`web/` changed, and the tile itself last moved earlier still. No hash is written here on purpose,
+because a hash in prose stops being true at the next rebase while the sentence keeps its shape; the
+run's own record carries the head it measured. So the route rule's three inputs, the arrival pose,
+the rings and the field, are the same objects that run planned from.
+
+**Predicted:**
+
+- the ringless halt does NOT fire, and the absent-hook halt does not either. `routeObstacleRings`
+  is **16** with **0 refused**;
+- the plan is **identical, field for field**, to the one the run before reported: heading **28000**
+  millidegrees, clear run **136.3 m**, `frontageBothSidesSamples` **1** of **126** samples,
+  `candidatesWithFrontage` **2** of **153** qualifying headings of **720** tried. `planRoute` is a
+  pure function of those three inputs and none of them moved, so any field that differs means one of
+  them did move, and which field differs says which one;
+- the walk passes **52.80 m**, where a bench ring stopped it, and completes its 125 m. Two parts on
+  purpose: passing 52.80 m says the ring no longer stops a body, and completing says nothing else
+  does. If it passes 52.80 m and stops later, the bench is answered and the new stop is a finding,
+  reported as where it stopped and what the product's own surface says there;
+- the eight mechanical keys do NOT all hold, and the ones that fail are named here rather than after
+  the fact. `completeCapsuleClearanceVerification` **fails**, because the rule prefers a heading
+  with frontage on both sides and nothing now stops the capsule, so the walk passes within the 340 mm
+  radius of drawn street furniture. `continuousTexturedStreetAndFacades` **fails**, because this tile
+  draws surfaces no material record dresses. `companionPresent`, `reticlePresent`,
+  `authenticatedShellAndAuthoredHandlersPreserved` and `practicalBrowserBudget` **hold**: 2,208 drawn
+  triangles against Melbourne's 227,173, and a container of 564,788 bytes against 28.2 MB.
+  `noCutsOrFloatingGeometry` and `usefulEyeLevelMovement` are written down as QUESTIONS, because
+  either answer is plausible from here and an expectation with no number behind it can be fitted to
+  whatever arrives: does a bench or a tree read as a component detached from support, and does the
+  drawn floor agree with the product's own support at every resampled point of a 125 m walk.
+
+**And the thing to report whatever the keys say.** A generated target passes the keys NO prisms: a
+tile states route rings, which are not building exteriors and never reach the keys. So on this target
+`ringEdgesWithoutDrawnFacade`, `trianglesInsideBuildings` and `capsuleRingContactSamples` are zero
+with nothing to be non-zero about, and `facadeTriangles` is zero by construction, which means the key
+named for facades measures street alone here. `noCutsOrFloatingGeometry` is decided by two of four
+fields and `completeCapsuleClearanceVerification` by three of its four. A key that holds on this tile
+therefore says less than the same key on the owned district, and the record must say so rather
+than let four green keys read alike.
+
 ## The run with the rings carried, predicted before it was run
 
 Written and committed before the server was restarted, so these can be checked rather than fitted.
