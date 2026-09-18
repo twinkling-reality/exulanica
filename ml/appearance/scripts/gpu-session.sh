@@ -3,13 +3,16 @@
 # possible. The instance must already exist: this script never creates one, because a deploy needs
 # the operator's consent click.
 #
-#   scripts/gpu-session.sh HOST IMAGE_TAG WORK_DIR BILLED_SECONDS_SO_FAR
+#   scripts/gpu-session.sh HOST IMAGE_TAG WORK_DIR BILLED_SECONDS_SO_FAR JOB [JOB...]
 #
 #     HOST                   an ssh destination that works (user@ip, or a scratch ssh config alias)
 #     IMAGE_TAG              the tag to build, normally the lane's head commit
 #     WORK_DIR               a directory on the Mac for what comes back
 #     BILLED_SECONDS_SO_FAR  seconds the instance has been billed when the smoke run ends, from the
 #                            creation instant the orchestrator was told
+#     JOB...                 one or more job names in jobs/, run in the order given after the gate
+#                            passes. Each job's hard limit is its own stop_at_seconds, read from what
+#                            staging wrote, so no limit is typed here and none can drift from a spec.
 #
 # It builds the image on the machine, fetches the weights (each verified as it lands), runs the smoke
 # job, applies the gate, and continues to session 1 ONLY if the gate exits 0. It never deletes the
@@ -21,6 +24,9 @@ host="${1:?an ssh destination}"
 tag="${2:?the image tag, normally the head commit}"
 work="${3:?a directory on this machine for the results}"
 billed="${4:?seconds billed so far when the smoke run ends}"
+shift 4
+[ "$#" -ge 1 ] || { echo "gpu-session: name at least one job to run after the gate" >&2; exit 2; }
+jobs_to_run="$*"
 
 case "${billed}" in
   ''|*[!0-9]*) echo "gpu-session: billed seconds is a whole number" >&2; exit 2 ;;
@@ -36,12 +42,15 @@ budget_seconds=5400
 rate_cents=263
 
 mkdir -p "${work}"
-echo "== staging both jobs on this machine"
-rm -rf "${work}/staged-smoke" "${work}/staged-session-1"
+echo "== staging the smoke job and ${jobs_to_run} on this machine"
+rm -rf "${work}/staged-smoke"
 "${python}" -m exulanica_appearance runner stage --spec "${here}/jobs/track-a-smoke.json" \
   --repository "${repository}" --weights "${here}/weights" --out "${work}/staged-smoke"
-"${python}" -m exulanica_appearance runner stage --spec "${here}/jobs/track-a-session-1.json" \
-  --repository "${repository}" --weights "${here}/weights" --out "${work}/staged-session-1"
+for job in ${jobs_to_run}; do
+  rm -rf "${work}/staged-${job}"
+  "${python}" -m exulanica_appearance runner stage --spec "${here}/jobs/${job}.json" \
+    --repository "${repository}" --weights "${here}/weights" --out "${work}/staged-${job}"
+done
 
 echo "== pushing the lane's code and the staged inputs"
 ssh "${host}" "mkdir -p ${remote}"
@@ -50,7 +59,10 @@ ssh "${host}" "mkdir -p ${remote}"
 rsync -a --delete \
   --exclude '.venv' --exclude '__pycache__' --exclude '.pytest_cache' --exclude 'evidence' \
   "${here}/" "${host}:${remote}/ml-appearance/"
-rsync -a --delete "${work}/staged-smoke" "${work}/staged-session-1" "${host}:${remote}/"
+staged_dirs="${work}/staged-smoke"
+for job in ${jobs_to_run}; do staged_dirs="${staged_dirs} ${work}/staged-${job}"; done
+# shellcheck disable=SC2086
+rsync -a --delete ${staged_dirs} "${host}:${remote}/"
 
 echo "== what the host has (installs the NVIDIA container toolkit only if Docker has no runtime)"
 ssh "${host}" "bash ${remote}/ml-appearance/scripts/host-check.sh"
@@ -82,9 +94,18 @@ else
   exit 1
 fi
 
-ssh "${host}" "python3 ${remote}/ml-appearance/scripts/fetch-weights.py ${remote}/staged-session-1 ${remote}/weights"
-ssh "${host}" "rm -rf ${remote}/out-session-1 && ${remote}/ml-appearance/container/run.sh \
-  '${docker_ref}' '${record_pin}' ${remote}/staged-session-1 ${remote}/weights ${remote}/out-session-1 5670"
-rsync -a "${host}:${remote}/out-session-1" "${work}/"
-"${python}" -m exulanica_appearance runner check --out "${work}/out-session-1"
-echo "== done. Delete the machine before writing the report."
+for job in ${jobs_to_run}; do
+  # The hard limit is the job's own stop, read from what staging wrote rather than typed here.
+  limit=$("${python}" -c "import json,sys;print(json.load(open(sys.argv[1]))['stop_at_seconds'])" \
+    "${work}/staged-${job}/job.json")
+  echo "== ${job}, hard limit ${limit} s"
+  ssh "${host}" "python3 ${remote}/ml-appearance/scripts/fetch-weights.py ${remote}/staged-${job} ${remote}/weights"
+  ssh "${host}" "rm -rf ${remote}/out-${job} && ${remote}/ml-appearance/container/run.sh \
+    '${docker_ref}' '${record_pin}' ${remote}/staged-${job} ${remote}/weights ${remote}/out-${job} ${limit}"
+  rsync -a "${host}:${remote}/out-${job}" "${work}/"
+  "${python}" -m exulanica_appearance runner check --out "${work}/out-${job}"
+  # Each step's logs come back as that step ends: session 1 lost its build and fetch logs to a
+  # deletion that happened before anyone pulled them.
+  ssh "${host}" "cat ${remote}/build.log 2>/dev/null || true" > "${work}/build-${job}.log.txt" || true
+done
+echo "== done. Pull anything else you want off the machine NOW, then delete it before the report."
