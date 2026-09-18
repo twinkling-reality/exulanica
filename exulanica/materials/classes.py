@@ -60,6 +60,18 @@ __all__ = [
     "relief_keys",
 ]
 
+#: The four material classes, closed and append-only, the same list as MATERIAL_CLASSES in
+#: web/packages/loom-texture/src/classes.ts. Nothing compares the two copies directly, and nothing
+#: should: that would be a third place for the fact to live. Adding a fifth name HERE ALONE was
+#: measured to fail three ways, all of them loud:
+#:   - ``tests/test_material_objects.py`` runs the shared case "a v2 maker's class is one of four",
+#:     whose expected refusal spells out all four names, so this reader stops refusing it;
+#:   - ``tests/test_texture_set_class_migration.py`` compares ``texture_set_layouts()`` in migration
+#:     0076 against this reader's own table for every profile and class pair, and the new pair has
+#:     no layouts in the migration;
+#:   - the same file holds the class table's check constraint to these names, which refuses the new
+#:     one until a migration teaches it.
+#: The TypeScript side fails at compile time as well, because its switches are exhaustive.
 MATERIAL_CLASSES: Final = ("opaque", "cutout", "decal", "glazing")
 MAKER_KINDS: Final = ("procedural", "model")
 

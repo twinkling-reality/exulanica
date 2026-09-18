@@ -21,6 +21,18 @@ import { floorDiv } from './integer.js';
  *
  * The list is closed and append-only: a class is never renamed, and a new one (an emissive class,
  * once daylight is modelled) is a new entry that every reader refuses until it is taught it.
+ *
+ * WHAT KEEPS THIS LIST AND ITS PYTHON TWIN IN STEP is not a test comparing the two, which would put
+ * the same fact in a third place. It is three couplings, and adding a fifth name HERE ALONE was
+ * measured to break all three:
+ *   - `tsc` stops compiling. The switches over `MaterialClass` are exhaustive, so a member with no
+ *     case leaves a function without a return (TS2366 in this file), and the package does not build.
+ *   - `test/texture-set-cases.test.ts` holds the shared fixtures to this list, so the new class has
+ *     no fixture in the file all three readers run and the test names it.
+ *   - `test/recipe-cases.json` carries a case, "a v2 maker's class is one of four", whose maker
+ *     states `emissive` and whose expected refusal spells out all four names. Either language whose
+ *     list grows stops refusing that case, and the case is committed data both languages read, so
+ *     the parity rule (one commit touches both languages and the shared cases) is what holds.
  */
 export const MATERIAL_CLASSES = ['opaque', 'cutout', 'decal', 'glazing'] as const;
 export type MaterialClass = (typeof MATERIAL_CLASSES)[number];
