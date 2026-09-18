@@ -352,3 +352,23 @@ describe('society crowd', () => {
     app.destroy();
   });
 });
+
+describe('a place that states heights', () => {
+  it('refuses a walker standing on a stated surface, because this crowd draws the ground plane', () => {
+    const { crowd, app } = setup();
+    const plan = { id: 'p0', synthetic: true as const, position_mm: [1000, 2000] as const };
+    expect(crowd.set(v4(0, [plan]), [0, 0])).toMatchObject({ population: 1, drawn: 1 });
+    expect(() => crowd.set(v4(1, [{ ...plan, support_z_mm: 146 }]), [0, 0])).toThrow(
+      /stands on a surface at 146 mm/,
+    );
+    // A height of zero is a stated height too: the ground plane is where the walker happens to be,
+    // not a reason to accept a number this renderer does not read.
+    expect(() => crowd.set(v4(2, [{ ...plan, support_z_mm: 0 }]), [0, 0])).toThrow(
+      /draws every walker on the ground plane/,
+    );
+    // Absent is not zero: a place that states no height draws exactly as it did.
+    expect(crowd.set(v4(3, [plan]), [0, 0])).toMatchObject({ population: 1, drawn: 1 });
+    crowd.destroy();
+    app.destroy();
+  });
+});

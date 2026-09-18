@@ -49,6 +49,13 @@ export interface SocietyInhabitantSnapshot {
   readonly indoors?: boolean;
   /** v4: this inhabitant's own walking budget per simulated minute. */
   readonly walk_speed_mm_per_tick?: number;
+  /**
+   * The height of the surface this person stands on, millimetres against their place's datum, for
+   * a state whose place states one (`exulanica.society-place/v2`). Absent means the place states
+   * no height, not that the height is zero: the crowd draws every walker on the ground plane, so
+   * it refuses a person who states one rather than drawing them below the surface they stand on.
+   */
+  readonly support_z_mm?: number | null;
   readonly needs?: Readonly<Record<string, number>>;
   readonly explanation?: { readonly summary: string; readonly event_ids: readonly string[] };
 }

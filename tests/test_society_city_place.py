@@ -12,13 +12,15 @@ from itertools import pairwise
 import pytest
 from exulanica.grammar.errors import InvalidRecordError
 from exulanica.grammar.geometry import OUTSIDE, Extent, point_in_ring
-from exulanica.grammar.grammars.city.document import TileDocument
+from exulanica.grammar.grammars.city import CITY_GRAMMAR
+from exulanica.grammar.grammars.city.document import TileDocument, support_top_mm
 from exulanica.grammar.grammars.city.facade import EntranceRecord
 from exulanica.grammar.grammars.city.massing import MassingRecord
 from exulanica.grammar.grammars.city.premises import PremisesRecord
 from exulanica.grammar.grammars.city.roads import RoadMarkingRecord
 from exulanica.grammar.grammars.city.streetlife import StreetFurnitureRecord
 from exulanica.grammar.grammars.city.streets import (
+    KERB_HEIGHT_MAXIMUM_MM,
     BlockRecord,
     CrossingRecord,
     CurbEdgeRecord,
@@ -38,7 +40,14 @@ from exulanica.world.society_living import (
     initial_living_society,
 )
 from exulanica.world.society_metrics import measure_run
-from exulanica.world.society_place import ceil_distance, validate_place
+from exulanica.world.society_place import (
+    PLACE_PROFILE_V2,
+    STEP_LIMIT_MM,
+    ceil_distance,
+    place_stacks_heights,
+    seal_place,
+    validate_place,
+)
 
 from city_v2_fixture import builder
 from society_city_fixtures import (
@@ -455,3 +464,111 @@ def test_a_busier_fixture_tile_lives_a_day_of_homes_shifts_meals_and_sleep():
     published = {c["crossing_id"] for c in document["crossings"]}
     assert {c["crossing_id"] for c in crossings} <= published
     assert all("display_name" not in p for p in state["inhabitants"])
+
+
+def lifted(place: dict, changes: dict[str, int]) -> dict:
+    """The same place with those nodes standing that much higher, their spots carried with them."""
+    copy = json.loads(json.dumps(place))
+    for node in copy["nodes"]:
+        node["support_z_mm"] += changes.get(node["node_id"], 0)
+    for spot in copy["spots"]:
+        spot["support_z_mm"] += changes.get(spot["node_id"], 0)
+    return seal_place(copy)
+
+
+def test_every_node_stands_on_a_surface_the_records_themselves_state():
+    records = owned_records()
+    place = records_place(records)
+    assert place["profile"] == PLACE_PROFILE_V2
+    assert place["frame"]["vertical_unit"] == "millimetre" and place["frame"]["datum"]
+    nodes = {n["node_id"]: n for n in place["nodes"]}
+    assert all(node["support_z_mm"] is not None for node in nodes.values())
+    assert all(spot["support_z_mm"] is not None for spot in place["spots"])
+    footways = 0
+    for node_id, node in sorted(nodes.items()):
+        if not node_id.startswith("footway:"):
+            continue
+        footways += 1
+        _, ordinal, side, _along = node_id.split(":")
+        edge = curb(records, int(ordinal), side)
+        floor = min(z for _x, _y, z in edge.kerb_line_mm) + edge.kerb_height_mm
+        # The walking line stands on the footway: at or above the kerb top it starts from, at or
+        # below the top of the whole strip, which the grammar computes for itself. It is the
+        # middle of the footway and not its back edge, so a footway that falls stands below that.
+        assert floor <= node["support_z_mm"] <= support_top_mm(edge)
+        assert edge.footway_crossfall_millionths == 0 or node["support_z_mm"] < support_top_mm(edge)
+    assert footways == sum(1 for name in nodes if name.startswith("footway:"))
+    # A door stands on its own threshold, and the step up to it from the footway beneath is the
+    # step its record states: the place says so by never saying otherwise.
+    doors = 0
+    for entrance in of_kind(records, EntranceRecord):
+        node = nodes.get(f"entrance:{entrance.identity}")
+        if node is None:
+            continue
+        doors += 1
+        assert node["support_z_mm"] == entrance.threshold_z_mm
+    assert doors == 3
+    assert not any("stated step" in line for line in place["unsupported"])
+    assert not place_stacks_heights(place)
+
+
+def test_a_walking_edge_climbs_at_most_a_step_and_a_stated_step_is_the_records_to_state():
+    model = routine()
+    place = document_place()
+    validate_place(place, model)
+    standing = {n["node_id"]: n["support_z_mm"] for n in place["nodes"]}
+
+    def hung(node_id: str, rise: int) -> dict:
+        """The place with a node that hangs off one edge standing that far above its other end."""
+        [edge] = [e for e in place["edges"] if node_id in (e["from_node_id"], e["to_node_id"])]
+        other = edge["from_node_id"] if edge["to_node_id"] == node_id else edge["to_node_id"]
+        return lifted(place, {node_id: standing[other] + rise - standing[node_id]})
+
+    # A bench is reached over the footway it stands on, and a door over its own threshold. Each
+    # hangs off one edge, so moving it changes that edge's rise and no other's.
+    [bench] = [n for n in standing if n.startswith("furniture:")]
+    door = next(n for n in standing if n.startswith("entrance:"))
+    validate_place(hung(bench, STEP_LIMIT_MM - 1), model)
+    validate_place(hung(bench, STEP_LIMIT_MM), model)
+    with pytest.raises(ValueError, match="may not climb more than one kerb step"):
+        validate_place(hung(bench, STEP_LIMIT_MM + 1), model)
+    validate_place(hung(door, 10 * STEP_LIMIT_MM), model)
+    # A crossing carries the other stated step. Lifting one side of the street whole leaves every
+    # rise inside that side as it was and changes only what the crossings climb.
+    side = next(
+        part for part in components(place, without=frozenset({"crossing"})) if bench not in part
+    )
+    lifted_side = lifted(place, dict.fromkeys(side, 2_000))
+    raised = {n["node_id"]: n["support_z_mm"] for n in lifted_side["nodes"]}
+    climbs = [
+        abs(raised[e["from_node_id"]] - raised[e["to_node_id"]])
+        for e in lifted_side["edges"]
+        if e["kind"] == "crossing" and (e["from_node_id"] in side) != (e["to_node_id"] in side)
+    ]
+    assert climbs and all(climb > STEP_LIMIT_MM for climb in climbs)
+    validate_place(lifted_side, model)
+
+
+def test_the_step_this_contract_allows_is_the_one_the_city_grammar_publishes():
+    # Two sources, neither of them this line: the tallest kerb a curb may have, and the tallest
+    # step a door's threshold may stand above the footway.
+    assert STEP_LIMIT_MM == KERB_HEIGHT_MAXIMUM_MM
+    assert CITY_GRAMMAR.parameters.get("threshold_height_mm").maximum == STEP_LIMIT_MM
+
+
+def test_plan_keyed_measures_refuse_a_place_that_stands_people_over_each_other():
+    model = routine()
+    place = document_place()
+    assert measure_run([], place).ticks == 0
+    copy = json.loads(json.dumps(place))
+    ground = next(s for s in copy["spots"] if s["spot_id"].startswith("footway:"))
+    deck = dict(
+        ground, spot_id=f"{ground['spot_id']}:deck", support_z_mm=ground["support_z_mm"] + 3_000
+    )
+    copy["spots"].insert(copy["spots"].index(ground) + 1, deck)
+    stacked = seal_place(copy)
+    # The contract allows it: two spots at one plan point are one spot only at one height.
+    validate_place(stacked, model)
+    assert place_stacks_heights(stacked)
+    with pytest.raises(ValueError, match="this place has levels"):
+        measure_run([], stacked)

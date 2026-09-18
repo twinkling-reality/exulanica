@@ -4,6 +4,15 @@ These are the numbers a reviewer needs to tell a living population from a collap
 many distinct positions the population occupies, how full each destination is against its
 capacity, what share of the population walked in a tick, and how time divides between
 activities. Nothing here feeds a transition.
+
+Every measure here keys a person by their plan position, so two people at one plan point are one
+position, one collision and one stay. That holds while the place stands everybody on one level,
+and stops holding the moment it stands two people at two heights over one plan point: the
+measures would go on reporting numbers that had quietly stopped meaning what they say, which is
+worse than no number. So such a place is refused rather than measured
+(:func:`exulanica.world.society_place.place_stacks_heights`); measuring it needs these keys to
+carry a level identity, which the place contract does not state yet. Stated heights alone are no
+obstacle, since one level is one plan point per person.
 """
 
 from __future__ import annotations
@@ -12,6 +21,8 @@ from collections import Counter
 from collections.abc import Iterable
 from dataclasses import dataclass, field
 from typing import Any
+
+from exulanica.world.society_place import place_stacks_heights
 
 __all__ = ["RunMetrics", "measure_run"]
 
@@ -63,6 +74,8 @@ def _spread(values: list[int]) -> dict[str, int]:
 
 def measure_run(states: Iterable[dict[str, Any]], place: dict[str, Any]) -> RunMetrics:
     """Measure consecutive states of one society over one place document."""
+    if place_stacks_heights(place):
+        raise ValueError("these measures key a person by plan position and this place has levels")
     metrics = RunMetrics()
     destinations = {d["destination_id"]: d for d in place["destinations"] if d["enabled"]}
     for key, dest in destinations.items():

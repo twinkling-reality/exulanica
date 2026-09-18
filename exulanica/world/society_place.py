@@ -10,6 +10,33 @@ a traffic-aware corridor) only has to publish this document.
 
 Nothing here invents a destination, a path or a job. A place that lacks something says so in
 ``unsupported``, and a population is sized to what the place can hold.
+
+**Heights.** ``exulanica.society-place/v2`` states beside each node and spot the height of the
+surface a person stands on, in the frame's stated vertical unit against its stated datum.
+``support_z_mm`` is ``None`` where there is no support surface at that point at any height, which
+is what a hole is: inside the clearance a walker keeps from a tree trunk, the nav envelope offers
+nothing to stand on. It does not mean the producer did not look; a producer with no vertical data
+at all publishes v1, not v2 with nulls. A place may not stand a person where it states no
+support, so a spot states a height and so does every node a destination is reached at: such a
+place is refused here rather than snapped to the nearest surface, because snapping is what stands
+a person inside a tree and reports success. The height is its own field and never a third
+component of
+``position_mm``, because :func:`ceil_distance` is dimension agnostic: a third component would
+turn every edge length, route cost and place digest into a 3D one without a single check
+complaining. Plan distance stays the walking cost. A v1 place validates exactly as it did, and
+:func:`place_from_society_input` keeps publishing v1, because a society's state pins its place by
+digest and a byte of movement there unbinds every stored society.
+
+**What a height cannot say, and what v3 owns.** A per-node height carries a surface, not a
+structure: it cannot state the step at a kerb, which is a discontinuity in the middle of an edge,
+nor the floor a person indoors stands on, nor the fall across a footway's width, nor the headroom
+above a walker. It carries no level identity either, so nothing here tells two places at one plan
+point on two decks apart. The spot rule below reads the stated height, so stacked spots are no
+longer one spot; but a walkway over a walkway needs a level identity stated here, and that is a
+v3 change. Whoever makes it should know what reads a plan position as though it were a place:
+``society_metrics`` refuses to measure a place that states any height at all, and
+``society_city_place`` joins corners, attaches doors and furniture to the nearest kerb point,
+indexes obstructions and merges one node per plan point all in plan alone.
 """
 
 from __future__ import annotations
@@ -24,15 +51,33 @@ from exulanica.world.society_planner import validate_society_input
 
 __all__ = [
     "PLACE_PROFILE",
+    "PLACE_PROFILES",
+    "PLACE_PROFILE_V2",
+    "STEPPED_KINDS",
+    "STEP_LIMIT_MM",
     "ceil_distance",
     "place_capacity",
     "place_from_society_input",
     "place_sha256",
+    "place_stacks_heights",
+    "place_states_heights",
     "seal_place",
     "validate_place",
 ]
 
 PLACE_PROFILE: Final = "exulanica.society-place/v1"
+#: The profile that states a support height beside each node and spot.
+PLACE_PROFILE_V2: Final = "exulanica.society-place/v2"
+PLACE_PROFILES: Final = (PLACE_PROFILE, PLACE_PROFILE_V2)
+#: The tallest rise a walking person is asked to take between two nodes joined by a walking edge,
+#: which is the tallest kerb a city grammar publishes (``KERB_HEIGHT_MAXIMUM_MM``). A producer
+#: that publishes a ramp climbing more than this over one edge is not refused by accident: this
+#: rule is what has to be revised, by separating a step from a gradient, and the number it then
+#: needs is the steepest gradient a footway is built to.
+STEP_LIMIT_MM: Final = 180
+#: The edge kinds whose rise this document cannot state, because the producing record states it:
+#: a crossing carries the carriageway's kerb upstand, and a door its threshold's step.
+STEPPED_KINDS: Final = ("crossing", "premises_access")
 EDGE_KINDS: Final = ("crossing", "footway", "furniture_access", "premises_access", "sidewalk")
 ORIGINS: Final = ("authored", "district", "furniture", "premises")
 _FIELDS: Final = frozenset(
@@ -112,6 +157,47 @@ def _point(value: Any) -> bool:
     return isinstance(value, list) and len(value) == 2 and all(_int(v) for v in value)
 
 
+def _height(value: Any) -> bool:
+    return value is None or _int(value)
+
+
+def _rise(a: dict[str, Any], b: dict[str, Any]) -> int | None:
+    """How far a walker climbs between two nodes, or ``None`` where either states no height."""
+    if a["support_z_mm"] is None or b["support_z_mm"] is None:
+        return None
+    return abs(a["support_z_mm"] - b["support_z_mm"])
+
+
+_HEIGHT_FIELD: Final = {False: frozenset(), True: frozenset({"support_z_mm"})}
+_VERTICAL_FIELDS: Final = {False: frozenset(), True: frozenset({"vertical_unit", "datum"})}
+
+
+def place_states_heights(document: dict[str, Any]) -> bool:
+    """Whether this place states the height of any surface a person stands on."""
+    if document["profile"] != PLACE_PROFILE_V2:
+        return False
+    return any(row["support_z_mm"] is not None for row in document["nodes"] + document["spots"])
+
+
+def place_stacks_heights(document: dict[str, Any]) -> bool:
+    """Whether the place stands people at two heights over one plan point.
+
+    A reader that keys a person by their plan position tells two such people apart on a place
+    where this is false and cannot on a place where it is true, so this is the question such a
+    reader has to ask before it reports anything.
+    """
+    if not place_states_heights(document):
+        return False
+    held: dict[tuple[int, int], int] = {}
+    for row in [*document["nodes"], *document["spots"]]:
+        if row["support_z_mm"] is None:
+            continue
+        key = (row["position_mm"][0], row["position_mm"][1])
+        if held.setdefault(key, row["support_z_mm"]) != row["support_z_mm"]:
+            return True
+    return False
+
+
 def _sorted_unique(values: list[str], message: str) -> None:
     _require(values == sorted(set(values)), message)
 
@@ -126,7 +212,8 @@ def validate_place(document: dict[str, Any], routine: RoutineModel) -> None:
 
 def _validate_place(document: dict[str, Any], routine: RoutineModel) -> None:
     _require(isinstance(document, dict) and set(document) == _FIELDS, "invalid place fields")
-    _require(document["profile"] == PLACE_PROFILE, "unsupported place profile")
+    _require(document["profile"] in PLACE_PROFILES, "unsupported place profile")
+    heights = document["profile"] == PLACE_PROFILE_V2
     _require(_text(document["place_id"]), "invalid place identity")
     source = document["source"]
     _require(
@@ -140,12 +227,16 @@ def _validate_place(document: dict[str, Any], routine: RoutineModel) -> None:
     )
     frame = document["frame"]
     _require(
-        set(frame) == {"name", "axis_order", "horizontal_unit"}
+        set(frame) == {"name", "axis_order", "horizontal_unit"} | _VERTICAL_FIELDS[heights]
         and _text(frame["name"])
         and frame["horizontal_unit"] == "millimetre"
         and isinstance(frame["axis_order"], list)
         and len(frame["axis_order"]) == 2,
         "invalid place frame",
+    )
+    _require(
+        not heights or (frame["vertical_unit"] == "millimetre" and _text(frame["datum"])),
+        "a place that states heights states the unit and datum they are measured in",
     )
     _require(document["routine_sha256"] == routine.sha256, "place built under another routine")
     _require(_int(document["clearance_mm"], 0, 100_000), "invalid clearance")
@@ -158,9 +249,10 @@ def _validate_place(document: dict[str, Any], routine: RoutineModel) -> None:
     nodes = {}
     for node in document["nodes"]:
         _require(
-            set(node) == {"node_id", "position_mm", "street_id"}
+            set(node) == {"node_id", "position_mm", "street_id"} | _HEIGHT_FIELD[heights]
             and _text(node["node_id"])
             and _point(node["position_mm"])
+            and (not heights or _height(node["support_z_mm"]))
             and (node["street_id"] is None or _text(node["street_id"])),
             "invalid place node",
         )
@@ -185,6 +277,11 @@ def _validate_place(document: dict[str, Any], routine: RoutineModel) -> None:
             and edge["length_mm"]
             == ceil_distance(nodes[a]["position_mm"], nodes[b]["position_mm"]),
             "edge length must be ceil Euclidean distance",
+        )
+        rise = _rise(nodes[a], nodes[b]) if heights else None
+        _require(
+            rise is None or edge["kind"] in STEPPED_KINDS or rise <= STEP_LIMIT_MM,
+            "a walking edge may not climb more than one kerb step",
         )
     _sorted_unique([e["edge_id"] for e in document["edges"]], "edges must be sorted and unique")
     _require(len(pairs) <= 262_144, "edge bound exceeded")
@@ -213,13 +310,24 @@ def _validate_place(document: dict[str, Any], routine: RoutineModel) -> None:
     positions = set()
     for spot in document["spots"]:
         _require(
-            set(spot) == {"spot_id", "node_id", "position_mm", "destination_ids"}
+            set(spot)
+            == {"spot_id", "node_id", "position_mm", "destination_ids"} | _HEIGHT_FIELD[heights]
             and _text(spot["spot_id"])
             and spot["node_id"] in nodes
+            and (not heights or _height(spot["support_z_mm"]))
             and _point(spot["position_mm"]),
             "invalid spot",
         )
-        key = tuple(spot["position_mm"])
+        _require(
+            not heights or spot["support_z_mm"] is not None,
+            "a place may not stand a person where it states no support",
+        )
+        _require(
+            not heights or nodes[spot["node_id"]]["support_z_mm"] is not None,
+            "a spot stands on a node that states no support",
+        )
+        # Two spots at one plan point are one spot, unless they stand at two stated heights.
+        key = (tuple(spot["position_mm"]), spot["support_z_mm"] if heights else None)
         _require(key not in positions, "two spots share a position")
         positions.add(key)
         _require(
@@ -242,6 +350,10 @@ def _validate_place(document: dict[str, Any], routine: RoutineModel) -> None:
             and type(dest["indoors"]) is bool
             and type(dest["enabled"]) is bool,
             "invalid destination",
+        )
+        _require(
+            not heights or nodes[dest["node_id"]]["support_z_mm"] is not None,
+            "a destination is reached at a node that states no support",
         )
         _require(
             isinstance(dest["affordances"], list)

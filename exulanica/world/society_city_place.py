@@ -70,7 +70,12 @@ from exulanica.grammar.grammars.city.streets import (
 )
 from exulanica.grammar.records import canonical_record
 from exulanica.world.society_catalogs import RoutineModel
-from exulanica.world.society_place import PLACE_PROFILE, ceil_distance, seal_place
+from exulanica.world.society_place import (
+    PLACE_PROFILE_V2,
+    STEP_LIMIT_MM,
+    ceil_distance,
+    seal_place,
+)
 
 __all__ = [
     "CITY_RECORDS_PROFILE",
@@ -143,9 +148,11 @@ class _Kerb:
 
     def __init__(self, curb: CurbEdgeRecord, segment: StreetSegmentRecord) -> None:
         points: list[Point] = []
-        for x, y, _ in curb.kerb_line_mm:
+        zs: list[int] = []
+        for x, y, z in curb.kerb_line_mm:
             if not points or points[-1] != (x, y):
                 points.append((x, y))
+                zs.append(z)
         if len(points) < 2:
             raise ValueError(f"curb {curb.identity} has a kerb line of no length")
         self.curb = curb
@@ -154,6 +161,7 @@ class _Kerb:
         self.key = f"{segment.segment_ordinal}:{curb.side}"
         self.offset = curb.kerb_width_mm + curb.footway_width_mm // 2
         self.pieces: list[tuple[int, int, Point, Point]] = []
+        self.piece_z: list[tuple[int, int]] = list(pairwise(zs))
         along = 0
         for a, b in pairwise(points):
             length = ceil_distance(a, b)
@@ -161,13 +169,41 @@ class _Kerb:
             along += length
         self.length = along
 
+    def _piece(self, along: int) -> tuple[int, int]:
+        """``(index, distance into that piece)`` of the kerb piece ``along`` millimetres in."""
+        along = max(0, min(self.length, along))
+        for index, (start, length, _a, _b) in enumerate(self.pieces):
+            if along <= start + length:
+                return index, along - start
+        return len(self.pieces) - 1, self.pieces[-1][1]
+
+    def kerb_top_z(self, along: int) -> int:
+        """The kerb top's height ``along`` millimetres from the kerb line's first point."""
+        index, t = self._piece(along)
+        length = self.pieces[index][1]
+        za, zb = self.piece_z[index]
+        return za + _round_div((zb - za) * t, length) + self.curb.kerb_height_mm
+
+    def surface_z(self, along: int, gap: int) -> int:
+        """The footway surface ``gap`` millimetres out from the kerb line, as the grammar states it.
+
+        The kerb line is the foot of the kerb face at gutter level, the kerb top is
+        ``kerb_width_mm`` wide, and beyond its back edge the footway rises by its crossfall: the
+        curb edge's stated geometry in :mod:`exulanica.grammar.grammars.city.streets`. Out beyond
+        the footway's far edge the surface stops rising, which is where a corner's arc stands.
+        """
+        curb = self.curb
+        out = max(0, min(curb.footway_width_mm, gap - curb.kerb_width_mm))
+        return self.kerb_top_z(along) + out * curb.footway_crossfall_millionths // _E6
+
+    def footway_z(self, along: int) -> int:
+        """The height of the walking line beside the kerb line ``along`` millimetres in."""
+        return self.surface_z(along, self.offset)
+
     def footway(self, along: int) -> Point:
         """The footway point beside the kerb line ``along`` millimetres from its first point."""
-        along = max(0, min(self.length, along))
-        start, length, a, b = next(
-            (piece for piece in self.pieces if along <= piece[0] + piece[1]), self.pieces[-1]
-        )
-        t = along - start
+        index, t = self._piece(along)
+        _start, length, a, b = self.pieces[index]
         base = (
             a[0] + _round_div((b[0] - a[0]) * t, length),
             a[1] + _round_div((b[1] - a[1]) * t, length),
@@ -517,6 +553,7 @@ def place_from_city_records(
     unsupported: set[str] = set()
 
     positions: dict[str, Point] = {}
+    heights: dict[str, int] = {}
     streets: dict[str, str | None] = {}
     stations: dict[str, dict[int, str]] = {curb: {} for curb in kerbs}
     joins: list[tuple[str, str, str]] = []
@@ -528,11 +565,13 @@ def place_from_city_records(
             held = f"footway:{kerb.key}:{along}"
             stations[kerb.curb.identity][along] = held
             positions[held] = kerb.footway(along)
+            heights[held] = kerb.footway_z(along)
             streets[held] = kerb.segment.street_identity
         return held
 
-    def node(name: str, point: Point, street: str | None) -> str:
+    def node(name: str, point: Point, street: str | None, z: int) -> str:
         positions[name] = point
+        heights[name] = z
         streets[name] = street
         return name
 
@@ -542,6 +581,7 @@ def place_from_city_records(
             station(kerb, kerb.length * index // count)
 
     outside = 0
+    stepped = 0
     for kerb in sorted(kerbs.values(), key=lambda k: k.key):
         if not kerb.curb.next_curb_identity:
             continue
@@ -549,13 +589,26 @@ def place_from_city_records(
         if follower is None:
             outside += 1
             continue
-        path = [station(kerb, kerb.walk_end()[0])]
-        for index, point in enumerate(_corner(kerb, follower), start=1):
-            path.append(node(f"corner:{kerb.key}:{index}", point, None))
-        path.append(station(follower, follower.walk_start()[0]))
+        leaving, joining = kerb.walk_end()[0], follower.walk_start()[0]
+        start_z, end_z = kerb.footway_z(leaving), follower.footway_z(joining)
+        # Two footways meet at a corner they can be walked round. A plan corner between surfaces
+        # more than one step apart is two places that happen to stand over each other.
+        if abs(end_z - start_z) > STEP_LIMIT_MM:
+            stepped += 1
+            continue
+        arc = list(_corner(kerb, follower))
+        path = [station(kerb, leaving)]
+        for index, point in enumerate(arc, start=1):
+            climb = _round_div((end_z - start_z) * index, len(arc) + 1)
+            path.append(node(f"corner:{kerb.key}:{index}", point, None, start_z + climb))
+        path.append(station(follower, joining))
         joins.extend((a, b, "footway") for a, b in pairwise(path))
     if outside:
         unsupported.add(f"footway corners that continue outside the place ({outside})")
+    if stepped:
+        unsupported.add(
+            f"footway corners whose two surfaces stand more than one step apart ({stepped})"
+        )
 
     crossing_stops = []
     outside = 0
@@ -590,6 +643,7 @@ def place_from_city_records(
     if lot_doors:
         unsupported.add(f"entrances onto a lot, not a footway ({lot_doors})")
     doors: dict[str, tuple[str, int]] = {}
+    mis_stepped: set[str] = set()
     access: dict[str, tuple[str, int]] = {}
     unknown_uses: dict[str, int] = {}
     premises_units = sorted(by_type[PremisesRecord], key=lambda r: r.identity)
@@ -609,8 +663,21 @@ def place_from_city_records(
                 continue
             if identity not in doors:
                 threshold = (entrance.threshold_x_mm, entrance.threshold_y_mm)
-                name = node(f"entrance:{identity}", threshold, kerb.segment.street_identity)
-                joins.append((station(kerb, kerb.project(threshold)[1]), name, "premises_access"))
+                squared, along = kerb.project(threshold)
+                # The record states the step up from the footway beneath the door; the place holds
+                # it to the surface the curb's own fields put there.
+                if (
+                    entrance.threshold_z_mm - kerb.surface_z(along, math.isqrt(squared))
+                    != entrance.step_height_mm
+                ):
+                    mis_stepped.add(identity)
+                name = node(
+                    f"entrance:{identity}",
+                    threshold,
+                    kerb.segment.street_identity,
+                    entrance.threshold_z_mm,
+                )
+                joins.append((station(kerb, along), name, "premises_access"))
                 doors[identity] = (name, kerb.segment.segment_ordinal)
             access[premises.identity] = doors[identity]
             break
@@ -620,6 +687,11 @@ def place_from_city_records(
             )
     for key, count in sorted(unknown_uses.items()):
         unsupported.add(f"premises use class {key} ({count} units) has no routine mapping")
+    if mis_stepped:
+        unsupported.add(
+            f"doors whose stated step is not the height of the footway beneath them"
+            f" ({len(mis_stepped)})"
+        )
 
     benches = []
     for item in sorted(by_type[StreetFurnitureRecord], key=lambda r: r.identity):
@@ -631,8 +703,14 @@ def place_from_city_records(
             unsupported.add(f"street furniture {item.identity} stands beside no curb in the place")
             continue
         point = (item.x_mm, item.y_mm)
-        name = node(f"furniture:{item.identity}", point, kerb.segment.street_identity)
-        joins.append((station(kerb, kerb.project(point)[1]), name, "furniture_access"))
+        squared, along = kerb.project(point)
+        name = node(
+            f"furniture:{item.identity}",
+            point,
+            kerb.segment.street_identity,
+            kerb.surface_z(along, math.isqrt(squared)),
+        )
+        joins.append((station(kerb, along), name, "furniture_access"))
         benches.append((item, use, name, kerb))
 
     for chain in stations.values():
@@ -643,6 +721,14 @@ def place_from_city_records(
         canonical.setdefault(positions[name], name)
     alias = {name: canonical[point] for name, point in positions.items()}
     nodes = {name: point for point, name in canonical.items()}
+    # The merge is plan-only: this place states no level identity, so two surfaces at one plan
+    # point are one node, and the height kept is the one the surviving name stands on.
+    stacked = sum(1 for name, held in alias.items() if heights[name] != heights[held])
+    if stacked:
+        unsupported.add(
+            f"places at one plan point standing at another height ({stacked}), merged into one"
+            " node: this place states no level identity"
+        )
     edges: dict[frozenset[str], dict[str, Any]] = {}
 
     def connect(a: str, b: str, kind: str) -> str | None:
@@ -748,10 +834,12 @@ def place_from_city_records(
             if not keeps_apart(point, 1) or obstructions.blocks_standing(point, item.identity):
                 continue
             spot_id = f"{name}:seat:{seat}"
+            seat_squared, seat_along = kerb.project(point)
             spots[spot_id] = {
                 "spot_id": spot_id,
                 "node_id": name,
                 "position_mm": list(point),
+                "support_z_mm": kerb.surface_z(seat_along, math.isqrt(seat_squared)),
                 "destination_ids": [name],
             }
             stand(point)
@@ -792,6 +880,7 @@ def place_from_city_records(
                     "spot_id": name,
                     "node_id": name,
                     "position_mm": list(point),
+                    "support_z_mm": heights[name],
                     "destination_ids": [],
                 }
                 stand(point)
@@ -843,7 +932,7 @@ def place_from_city_records(
     for spot in spots.values():
         spot["destination_ids"] = sorted(spot["destination_ids"])
     place = {
-        "profile": PLACE_PROFILE,
+        "profile": PLACE_PROFILE_V2,
         "place_id": place_id,
         "source": {
             "kind": "city-records",
@@ -851,11 +940,22 @@ def place_from_city_records(
             "input_seq": input_seq,
             "document_sha256": records_digest,
         },
-        "frame": {"name": "city_local", "axis_order": ["x", "y"], "horizontal_unit": "millimetre"},
+        "frame": {
+            "name": "city_local",
+            "axis_order": ["x", "y"],
+            "horizontal_unit": "millimetre",
+            "vertical_unit": "millimetre",
+            "datum": "city_local z, the zero the city's own records state their heights against",
+        },
         "routine_sha256": routine.sha256,
         "clearance_mm": clearance,
         "nodes": [
-            {"node_id": name, "position_mm": list(point), "street_id": streets[name]}
+            {
+                "node_id": name,
+                "position_mm": list(point),
+                "support_z_mm": heights[name],
+                "street_id": streets[name],
+            }
             for name, point in sorted(nodes.items())
         ],
         "edges": sorted(edges.values(), key=lambda e: e["edge_id"]),

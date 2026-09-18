@@ -517,8 +517,8 @@ minute at their catalogued rate. Activities relieve one need each, have a durati
 opening window, and take place at a destination, at home, at work (a shift, which outranks every
 need while due) or at any open standing spot (walking and pausing, which needs only the graph).
 
-**The place contract.** A place hands the society `exulanica.society-place/v1`
-(`validate_place`): an integer-millimetre navigation graph with ceil-Euclidean edge lengths,
+**The place contract.** A place hands the society `exulanica.society-place/v1` or
+`exulanica.society-place/v2` (`validate_place`): an integer-millimetre navigation graph with ceil-Euclidean edge lengths,
 standing spots (one person each, at distinct positions), carriageway crossings, destinations with
 affordances, reviewed durations, indoor or outdoor presence, visitor, staff and resident
 capacities, role, shift, address and frontage street segment, unavailable destinations, and a
@@ -547,7 +547,14 @@ sorted list of what the place cannot supply. Two producers exist:
   which runs along its seat. Every node except a corner names its street by the street record's
   identity. A street's name is presentation: `city_street_names` reads it from the city's own
   street records for a label ("a baker on Market Street"), and no name is copied into the place,
-  so restyling a street never changes a society's input.
+  so restyling a street never changes a society's input. Every node states the height of what it
+  stands on, taken from the record it came from: a footway station stands on the footway surface
+  that curb's own fields put there, a corner climbs across its arc between the two footways it
+  joins, a door stands on its threshold, and a bench stands on the footway beneath it. The place
+  holds each door's stated `step_height_mm` to the footway surface it derives under that door and
+  states any door where the two disagree. Two footways meet at a corner only while their surfaces
+  stand within one step of each other. Merging two places at one plan point into one node is
+  plan-only, and the place states how many of the surfaces it merged stood at another height.
 - **What a person may stand on is the city descriptor's navigation table, read as data**
   (`city_navigation`), never a list of kinds in this lane's code. A footway exists because
   `city.curb_edge` is support, and a place whose curbs are not is refused; a crossing or a door is
@@ -559,6 +566,30 @@ sorted list of what the place cannot supply. Two producers exist:
   does not read is stated rather than ignored. Walking lines are not yet routed round
   obstructions: the place counts every footway or door piece that passes within a capsule radius
   of a low part and states that count.
+
+**Heights.** `exulanica.society-place/v2` states beside each node and spot the height of the
+surface a person stands on, `support_z_mm`, in the frame's own `vertical_unit` against its stated
+`datum`. `position_mm` stays two integers: `ceil_distance` zips strict, so a third component
+would turn every edge length, route cost and place digest into a 3D one without a single check
+complaining, and plan distance stays the walking cost. A walking edge may climb at most 180 mm,
+the tallest kerb the city grammar publishes, which is also the tallest step its descriptor lets a
+door's threshold stand above the footway; a crossing edge and a `premises_access` edge are exempt
+because the discontinuity each carries is stated by the record that produced it, the crossing's
+kerb upstand and the entrance's `step_height_mm`. A null height means there is no support surface
+at that point at any height, which is what the clearance a walker keeps round a tree trunk is; it
+never means the producer did not look, and a producer with no vertical data at all publishes v1.
+A place may not stand a person where it states no support, so every spot and every node a
+destination is reached at states a height: such a place is refused rather than snapped to the
+nearest surface, because snapping is what stands a person inside a tree and reports success.
+Three readers refuse rather than report what they cannot read honestly: `validate_place` refuses
+that place, `measure_run` refuses a place that stands two people at two heights over one plan
+point, because every measure there keys a person by their plan position, and the browser crowd
+refuses an inhabitant that states a height, because it draws every walker on the ground plane. A
+per-node height carries a surface and not a structure: it cannot state a step in the middle of an
+edge, the floor a person indoors stands on, the fall across a footway's width or the headroom
+above a walker, and it carries no level identity, so a walkway over a walkway is a v3 change.
+`place_from_society_input` keeps publishing v1, because a society's state pins its place by digest
+and re-deriving a stored society's place has to produce the same bytes it was created under.
 
 **Population.** A place with homes is populated by one inhabitant per catalogued home place. A
 place without homes holds the catalogued share (half) of its standing spots and indoor visitor

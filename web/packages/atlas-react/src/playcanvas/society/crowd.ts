@@ -20,6 +20,12 @@ import type { CrowdRenderable, CrowdRenderableFactory, OwnedSocietyState } from 
  * own recorded speed and stops where the path ends; an older snapshot without a speed is eased
  * along its path over the whole interval. No position is invented between path points.
  *
+ * Everyone is drawn on the ground plane. A recorded point is a plan point and the height each
+ * walker is drawn at is 0, which is the ground a tile bake draws; a person who states the height
+ * of the surface they stand on is refused rather than drawn under it. When a place's stated
+ * heights are wired through to a person, that refusal is what says the ground-plane zeros here
+ * and in the far figures must be read from the person instead of written.
+ *
  * Detail by distance applies to time as well as shape. Every drawn inhabitant is placed at its
  * recorded point every frame, but a full character's limbs are solved and skinned on the CPU, so
  * only the nearest few are posed every frame; the rest are posed every second or third frame and
@@ -152,6 +158,11 @@ export class SocietyCrowd {
     let moving = false;
     for (const person of state.inhabitants) {
       if (person.synthetic !== true) continue;
+      if (person.support_z_mm !== undefined && person.support_z_mm !== null) {
+        throw new Error(
+          `inhabitant ${person.id} stands on a surface at ${person.support_z_mm} mm and this crowd draws every walker on the ground plane`,
+        );
+      }
       const end = [person.position_mm[0] / 1000, person.position_mm[1] / 1000] as const;
       const recorded = person.motion_path_mm?.map(([x, z]) => [x / 1000, z / 1000] as const);
       // Snapshots without a supported path, or out of sequence, jump to the recorded position.
