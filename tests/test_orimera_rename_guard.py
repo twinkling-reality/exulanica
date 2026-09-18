@@ -93,6 +93,10 @@ ALLOWED_PATHS: dict[str, str] = {
     "tests/test_person_withdrawal_evaluation.py": (
         "rejects orimera_spine_test URLs and .orimera evaluation stores"
     ),
+    "web/packages/atlas-react/test/generated-tile-bench/evidence/plan-clip.README.txt": (
+        "names this guard's own file while explaining a redaction this guard required; any "
+        "honest note about this scan has to spell the scan's name"
+    ),
     "web/packages/app/test/preview.test.ts": (
         "rejects the withdrawn orimera-point-map format header"
     ),
