@@ -480,10 +480,13 @@ GATE_TARGETS: Final[tuple[GateTarget, ...]] = (
             "the look descriptor id and version",
         ),
         route_inputs=(
-            "the arrival pose and collision rings the tile's own records state, READ from the "
-            "runtime's navigation world rather than re-derived here, because a gate that derives "
-            "its own rings scores a walk past obstacles the world does not have; a run may choose "
-            "neither, and the gate halts while the tile states neither"
+            "the arrival pose the tile's own records state, and the route obstruction rings its "
+            "navigation side states: the plan regions a walking capsule is kept clear of, READ "
+            "from the runtime's navigation world rather than re-derived here, because a gate that "
+            "derives its own rings scores a walk past obstacles the world does not have. They are "
+            "not collision solids and must never be read as any: they are an input to CHOOSING a "
+            "heading, and nothing in them stops a body. A run may choose neither input, and the "
+            "gate halts while the tile states neither"
         ),
     ),
 )

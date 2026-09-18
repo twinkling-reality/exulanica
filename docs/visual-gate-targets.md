@@ -48,8 +48,12 @@ fail: every heading qualifies, both tie-breaks are equal for all of them, and th
 lowest heading that fits. That is a default in the costume of a decision, and a record of it would
 truthfully say the rule was applied. So a page with no rings halts.
 
-**It will not derive its own rings.** When a tile carries them, the gate reads the rings the runtime
-holds. A gate that derives its own scores a walk past obstacles the world does not have.
+**It will not derive its own rings.** When a tile carries them, the gate reads the route obstruction
+rings the runtime holds. A gate that derives its own scores a walk past obstacles the world does not
+have. Those rings are the plan regions a walking capsule is kept clear of: they choose a heading,
+they drop anything above head height, and they are not collision solids. Nothing in them stops a
+body, so a walk that goes around a bench and a walk that passes through one look the same in a still
+frame.
 
 ## The first run of the generated target, predicted before it was run
 
@@ -67,3 +71,44 @@ mechanical key, with the message about a rule that has nothing to choose between
 If it halts somewhere else, that halt is a finding about the system and will be reported as the
 reason it gave, not worked around. If it does not halt at all, something is wrong with the check
 itself, and that is the more interesting result of the two.
+
+## What that run did, measured
+
+It halted where the prediction said, before a single mechanical key was measured, exit 3.
+
+The page check passed on the way, which is what makes the halt mean anything: path `/`, the preview
+title derived from `config.ts`, a world mounted by the shell and the canvas, and the tile runtime
+reporting `tile-conformance`. The run then bound what the page had drawn, recognised by the
+container's own magic rather than by its URL:
+
+| bound | value |
+| --- | --- |
+| container sha256 | `48a87e1ce5c7ca78...`, 531,884 bytes |
+| tile_inputs_digest | `e91381e15083e8e2...` |
+| tile | x 0, y 0, lod 0, city seed `d0219dae9563...` |
+| grammar | city version 2, descriptor `c82ac5e7d39e95ab...` |
+| drawn | 2,065 render_batch triangles, 9 draw batches, 12 unavailable surfaces |
+| look | `exulanica.generated-tile-look` version 1 |
+| route obstruction rings | **0** |
+
+Those numbers are about THAT container. The pinned tile changes when the tessellator changes, so a
+figure quoted without the digest beside it silently becomes a claim about a different tile.
+
+Three refusals were exercised on the same page, so the checks are known to fire rather than assumed
+to: the owned-district target pointed at the preview page refused with `title "Exulanica", page
+"Exulanica: synthetic read-only development preview"`; the generated target with no tile selector
+refused for naming none of `tile`, `baked_tile`, `city`; and an undeclared target refused by name.
+
+Two things the run found that reading had not:
+
+**A page check that samples once races the title.** `index.html` ships `<title>Exulanica</title>`
+and the app sets the real title while it starts. On the product target those agree, so nothing ever
+raced; on the preview target a single early sample sees the static title and refuses a page that is
+about to be correct. The refusal now names which condition failed rather than saying only that the
+page was not the target, because five conditions reach that one message.
+
+**A URL suffix is not a file type.** The development server answers a `?url` import of a tile with a
+JavaScript module whose path still ends `.owd`. Read by suffix, that module decodes as a broken
+container and stops the run. The scan now uses the URL only to narrow what it reads and the
+container's own magic to decide, and a response that carries the magic and still fails to decode is
+a broken container, which is a different fact and still stops the run.
