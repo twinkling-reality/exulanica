@@ -83,7 +83,7 @@ describe('loading a baked tile through tess\'s decoder', () => {
     // is the patch less the carriageways and gutters the segments draw, so it follows their ranges.
     expect(terrain.state === 'drawn' && terrain.surfaces).toEqual([{
       role: 'terrain', orientation: 'horizontal', state: 'unavailable', textureSetId: null,
-      reason: MATERIAL_NONE_EXISTS_REASON, firstVertex: 6961, vertexCount: 478, firstTriangle: 3235, triangleCount: 495,
+      reason: MATERIAL_NONE_EXISTS_REASON, firstVertex: 7021, vertexCount: 478, firstTriangle: 3265, triangleCount: 495,
     }]);
     expect(terrain.state === 'drawn' && terrain.triangleCount).toBe(495);
     expect(terrain.identity).toBe('2f14328d-39f8-5bee-a06a-f963b701ccf3');
@@ -98,7 +98,7 @@ describe('loading a baked tile through tess\'s decoder', () => {
     const drawnEntry = header.entries.find((entry, index) => entry.state === 'drawn' && decoded.header.records[index]!.kind === 'city.terrain');
     expect(drawnEntry?.state === 'drawn' && drawnEntry.surfaces).toEqual([{
       role: 'terrain', material: { state: 'none-exists' }, orientation: 'horizontal',
-      first_vertex: 6961, vertex_count: 478, first_triangle: 3235, triangle_count: 495,
+      first_vertex: 7021, vertex_count: 478, first_triangle: 3265, triangle_count: 495,
     }]);
     // Halo records are context: the container lists them, and the runtime neither draws nor lists them.
     const halo = header.entries.filter((entry) => entry.state === 'halo').map((entry) => entry.record);
@@ -127,24 +127,24 @@ describe('loading a baked tile through tess\'s decoder', () => {
     const runs: [string, number, number][] = [
       ['city.block', 0, 6],
       ['city.curb_edge', 6, 368],
-      ['city.facade', 368, 2316],
-      ['city.interior_backing', 2316, 2328],
-      ['city.junction', 2328, 2404],
-      ['city.massing', 2404, 2451],
-      ['city.parcel', 2451, 2455],
-      ['city.rooftop_object', 2455, 2665],
-      ['city.street_furniture', 2665, 2957],
-      ['city.street_segment', 2957, 2981],
-      ['city.street_tree', 2981, 3235],
-      ['city.terrain', 3235, 3730],
-      ['city.vitrine', 3730, 4042],
+      ['city.facade', 368, 2346],
+      ['city.interior_backing', 2346, 2358],
+      ['city.junction', 2358, 2434],
+      ['city.massing', 2434, 2481],
+      ['city.parcel', 2481, 2485],
+      ['city.rooftop_object', 2485, 2695],
+      ['city.street_furniture', 2695, 2987],
+      ['city.street_segment', 2987, 3011],
+      ['city.street_tree', 3011, 3265],
+      ['city.terrain', 3265, 3760],
+      ['city.vitrine', 3760, 4072],
     ];
     for (const [kind, from, to] of runs) {
       for (let triangle = from; triangle < to; triangle += 1) {
         expect(tile.rangeAtTriangle(triangle)?.kind).toBe(kind);
       }
     }
-    expect(tile.rangeAtTriangle(4042)).toBeNull();
+    expect(tile.rangeAtTriangle(4072)).toBeNull();
     expect(tile.rangeAtTriangle(-1)).toBeNull();
   });
 
@@ -552,12 +552,12 @@ describe('drawing a tile into the Atlas scene', () => {
     // Every surface is unavailable here: the terrain has no material, and this test serves no set
     // for the segments' carriageways and gutters, the building's walls, roofs and parapets, or the
     // plane behind each face's glass.
-    expect(attachment.metrics).toMatchObject({ tileName: 'tile-conformance', triangles: 4042, drawBatches: 1, unavailableSurfaces: 124, decodedTextureBytes: 0 });
+    expect(attachment.metrics).toMatchObject({ tileName: 'tile-conformance', triangles: 4072, drawBatches: 1, unavailableSurfaces: 124, decodedTextureBytes: 0 });
     const root = environmentRoot.findByName('generated-tile:tile-conformance') as pc.Entity;
     const renders = root.findComponents('render') as pc.RenderComponent[];
     expect(renders).toHaveLength(1);
     const mesh = renders[0]!.meshInstances[0]!.mesh;
-    expect(mesh.vertexBuffer?.numVertices).toBe(8375);
+    expect(mesh.vertexBuffer?.numVertices).toBe(8435);
     const decoded = decodeOwd(baked).projections[0]!;
     const drawn: number[] = [];
     mesh.getPositions(drawn);
@@ -571,11 +571,11 @@ describe('drawing a tile into the Atlas scene', () => {
       return out.sort();
     };
     const expected: number[] = [];
-    for (let vertex = 0; vertex < 8375; vertex += 1) {
+    for (let vertex = 0; vertex < 8435; vertex += 1) {
       expected.push(decoded.position[vertex * 3]!, decoded.position[vertex * 3 + 2]!, -decoded.position[vertex * 3 + 1]!);
     }
     expect(triples(drawn)).toEqual(triples(expected));
-    expect(renders[0]!.meshInstances[0]!.mesh.indexBuffer[0]?.numIndices).toBe(4042 * 3);
+    expect(renders[0]!.meshInstances[0]!.mesh.indexBuffer[0]?.numIndices).toBe(4072 * 3);
     expect(app.scene.fog.start).toBe(tile.look.fog.startM);
     attachment.dispose();
     expect(environmentRoot.findByName('generated-tile:tile-conformance')).toBeNull();
