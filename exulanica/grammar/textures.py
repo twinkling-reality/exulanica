@@ -35,6 +35,7 @@ from types import MappingProxyType
 from typing import Final
 
 from exulanica.grammar.errors import CatalogError
+from exulanica.materials.classes import MATERIAL_CLASSES
 from exulanica.materials.manifest import MANIFEST_PROFILE as _MANIFEST_PROFILE
 from exulanica.materials.manifest import SET_ID
 from exulanica.materials.manifest import read_texture_manifest as _read_manifest
@@ -58,11 +59,19 @@ MANIFEST_PATH: Final = (
 
 @dataclass(frozen=True, slots=True)
 class TextureSet:
-    """What a resolved reference pins: the stable id, its version, and its content digest."""
+    """What a resolved reference pins: the stable id, its version, and its content digest.
+
+    ``material_class`` is not part of the pin, because the pin is what a record records and the
+    class is a reviewed fact about the bytes it names. It travels here because the manifest states
+    it and a catalog check needs it: a material record dresses a surface role, and a role admits
+    only some classes (``ROLE_CLASSES`` in this grammar's ``common``). The manifest reader read this
+    field and dropped it until that check existed.
+    """
 
     set_id: str
     version: int
     content_sha256: str
+    material_class: str
 
     def __post_init__(self) -> None:
         require_texture_set_id("set_id", self.set_id)
@@ -70,6 +79,10 @@ class TextureSet:
             raise CatalogError(f"{self.set_id}: version is a positive int")
         if not is_sha256(self.content_sha256):
             raise CatalogError(f"{self.set_id}: content_sha256 is 64 lowercase hex characters")
+        if self.material_class not in MATERIAL_CLASSES:
+            raise CatalogError(
+                f"{self.set_id}: material_class is one of {', '.join(MATERIAL_CLASSES)}"
+            )
 
     def pin(self) -> Mapping[str, int | str]:
         return MappingProxyType(
@@ -99,7 +112,9 @@ def read_texture_manifest(path: Path = MANIFEST_PATH) -> Mapping[str, TextureSet
         raise CatalogError(str(error)) from error
     return MappingProxyType(
         {
-            set_id: TextureSet(entry.set_id, entry.version, entry.content_sha256)
+            set_id: TextureSet(
+                entry.set_id, entry.version, entry.content_sha256, entry.material_class
+            )
             for set_id, entry in entries.items()
         }
     )

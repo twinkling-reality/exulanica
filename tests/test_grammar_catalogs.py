@@ -41,11 +41,13 @@ from exulanica.grammar.catalogs import (
     text_field,
 )
 from exulanica.grammar.errors import CatalogError, UnresolvedReferenceError
+from exulanica.grammar.grammars.city import catalogs as city_catalogs
 from exulanica.grammar.grammars.city.catalogs import (
     CATALOG_DIRECTORY,
     city_catalog_schemas,
     load_city_catalogs,
 )
+from exulanica.grammar.grammars.city.common import ROLE_CLASSES, SURFACE_ROLES
 from exulanica.grammar.textures import (
     MANIFEST_PROFILE,
     TEXTURE_SET_ID,
@@ -89,7 +91,7 @@ _ORIGINAL = {
 }
 
 _NO_SETS: Mapping[str, TextureSet] = MappingProxyType({})
-_TEST_SETS = {"test-texture-set": TextureSet("test-texture-set", 1, "a" * 64)}
+_TEST_SETS = {"test-texture-set": TextureSet("test-texture-set", 1, "a" * 64, "opaque")}
 
 
 def _version(catalog_id: str) -> int:
@@ -285,7 +287,8 @@ def test_an_unresolvable_texture_set_reference_raises(tmp_path):
         load_catalog(
             path,
             _schema(
-                "material", texture_sets={"another-set": TextureSet("another-set", 1, "a" * 64)}
+                "material",
+                texture_sets={"another-set": TextureSet("another-set", 1, "a" * 64, "opaque")},
             ),
         )
 
@@ -310,6 +313,84 @@ def test_a_material_entry_with_no_texture_set_field_is_refused(tmp_path):
     path = _write(tmp_path, "material", [entry])
     with pytest.raises(CatalogError):
         load_catalog(path, _schema("material", texture_sets=_TEST_SETS))
+
+
+# ---------------------------------------------------------------------------------------------
+# Which classes a surface role admits
+
+
+def _dressed(surfaces: list[str], material_class: str) -> tuple[dict, Mapping[str, TextureSet]]:
+    """A material entry dressing ``surfaces`` with a set of ``material_class``."""
+    entry = {**_MATERIAL_ENTRY, "surfaces": surfaces}
+    sets = {"test-texture-set": TextureSet("test-texture-set", 1, "a" * 64, material_class)}
+    return entry, MappingProxyType(sets)
+
+
+def test_every_surface_role_says_which_classes_it_admits():
+    """ROLE_CLASSES is keyed, not defaulted, so a role added to the vocabulary must be taught here.
+
+    Without this the table would be silent about a new role until somebody happened to write a
+    record that dressed it, which is the failure the table exists to prevent, one level up.
+    """
+    assert tuple(ROLE_CLASSES) == SURFACE_ROLES
+
+
+@pytest.mark.parametrize(
+    ("surfaces", "material_class"),
+    [
+        (["wall"], "opaque"),
+        (["glazing"], "glazing"),
+        (["canopy"], "cutout"),
+        (["marking"], "decal"),
+        # A crossing is a surface with paint over it, so it admits both, and both are in use.
+        (["crossing"], "opaque"),
+        (["crossing", "marking"], "decal"),
+    ],
+)
+def test_a_surface_admits_a_set_of_a_class_it_names(tmp_path, surfaces, material_class):
+    entry, sets = _dressed(surfaces, material_class)
+    path = _write(tmp_path, "material", [entry])
+    [loaded] = load_catalog(path, _schema("material", texture_sets=sets)).entries
+    assert list(dict(loaded.values)["surfaces"]) == surfaces
+
+
+@pytest.mark.parametrize(
+    ("surfaces", "material_class", "message"),
+    [
+        # The two this table exists for: paint drawn opaque is a solid rectangle across the road,
+        # and a canopy drawn opaque is a leaf-patterned slab instead of leaves with gaps.
+        (["marking"], "opaque", "marking admits decal"),
+        (["canopy"], "opaque", "canopy admits cutout"),
+        (["glazing"], "opaque", "glazing admits glazing"),
+        (["wall"], "decal", "wall admits opaque"),
+        (["wall"], "glazing", "wall admits opaque"),
+        # One surface of several is enough to refuse the record.
+        (["crossing", "marking"], "opaque", "marking admits decal"),
+    ],
+)
+def test_a_surface_refuses_a_set_of_a_class_it_does_not_name(
+    tmp_path, surfaces, material_class, message
+):
+    entry, sets = _dressed(surfaces, material_class)
+    path = _write(tmp_path, "material", [entry])
+    with pytest.raises(CatalogError, match=message):
+        load_catalog(path, _schema("material", texture_sets=sets))
+
+
+def test_a_role_the_table_does_not_name_is_refused_rather_than_assumed_opaque(
+    monkeypatch, tmp_path
+):
+    """The load-bearing half: an untaught role blocks the records that dress it.
+
+    A table that defaulted to opaque would accept this silently, and a role that wanted cutout or
+    decal would be drawn solid with nobody told. The message names the role and says what to do.
+    """
+    entry, sets = _dressed(["wall"], "opaque")
+    untaught = {role: classes for role, classes in ROLE_CLASSES.items() if role != "wall"}
+    monkeypatch.setattr(city_catalogs, "ROLE_CLASSES", untaught)
+    path = _write(tmp_path, "material", [entry])
+    with pytest.raises(CatalogError, match="wall admits no material class yet"):
+        load_catalog(path, _schema("material", texture_sets=sets))
 
 
 # ---------------------------------------------------------------------------------------------
@@ -467,7 +548,7 @@ def test_a_well_formed_manifest_is_read_by_id(tmp_path):
     )
     sets = read_texture_manifest(path)
     assert list(sets) == ["cc0.test-one", "cc0.test-two"]
-    assert sets["cc0.test-two"] == TextureSet("cc0.test-two", 3, "c" * 64)
+    assert sets["cc0.test-two"] == TextureSet("cc0.test-two", 3, "c" * 64, "opaque")
 
 
 @pytest.mark.parametrize(

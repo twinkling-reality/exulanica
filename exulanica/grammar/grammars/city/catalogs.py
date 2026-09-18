@@ -50,6 +50,7 @@ from exulanica.grammar.grammars.city.common import (
     APPROACH_CONTROLS,
     FORM_PART_SHAPE,
     OBJECT_ROLES,
+    ROLE_CLASSES,
     SURFACE_ROLES,
     FormPart,
 )
@@ -152,6 +153,38 @@ def _roof_rise(where: str, values: dict[str, FieldValue]) -> None:
 
 
 REASON: Final = ("reason", text_field)
+
+
+def _class_admitted(
+    texture_sets: Mapping[str, TextureSet],
+) -> Callable[[str, dict[str, FieldValue]], None]:
+    """The set's class must be one every surface the record dresses admits.
+
+    ``ROLE_CLASSES`` says which classes a role admits and a role it does not name is REFUSED, not
+    assumed opaque: a role added to the vocabulary blocks the records that dress it until the table
+    is taught. What this catches is a record that dresses ``marking`` or ``canopy`` with an opaque
+    set, which draws road paint as a solid rectangle and a canopy as a leaf-patterned slab, and
+    which nothing else refuses.
+    """
+
+    def check(where: str, values: dict[str, FieldValue]) -> None:
+        texture_set = texture_sets.get(str(values["texture_set_id"]))
+        if texture_set is None:
+            return  # The reference field refuses an unknown set; this check says nothing about it.
+        for surface in values["surfaces"]:
+            admitted = ROLE_CLASSES.get(str(surface))
+            if admitted is None:
+                raise CatalogError(
+                    f"{where}: {surface} admits no material class yet, so nothing may dress it;"
+                    " add it to ROLE_CLASSES with the classes it admits"
+                )
+            if texture_set.material_class not in admitted:
+                raise CatalogError(
+                    f"{where}: {surface} admits {', '.join(admitted)}, and"
+                    f" {texture_set.set_id} is {texture_set.material_class}"
+                )
+
+    return check
 
 
 def city_catalog_schemas(*, texture_sets: Mapping[str, TextureSet]) -> tuple[CatalogSchema, ...]:
@@ -277,6 +310,7 @@ def city_catalog_schemas(*, texture_sets: Mapping[str, TextureSet]) -> tuple[Cat
                 ("grain", choice_field(("none", "directional"))),
                 REASON,
             ),
+            entry_check=_class_admitted(texture_sets),
         ),
         CatalogSchema(
             "parking-kind",

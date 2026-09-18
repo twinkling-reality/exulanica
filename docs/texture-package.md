@@ -981,6 +981,29 @@ over the eight published sets at brotli 11, dropping the height map saves 15.8 p
 bytes to 18,532,589), and dropping the normal's z as well saves 22.8 per cent in all (to
 16,996,931).
 
+### Which classes a surface role admits
+
+A class decides how a renderer draws a set, so a material record that dresses a surface with a set
+of the wrong class is not a subtle fault: road paint drawn opaque is a solid rectangle across the
+carriageway, and a canopy drawn opaque is a leaf-patterned slab instead of leaves with gaps between
+them. Until this check existed nothing refused either.
+
+`ROLE_CLASSES` in `exulanica/grammar/grammars/city/common.py` states which classes each surface
+role admits, and the material catalog's entry check refuses a record whose set's class a listed
+surface does not admit. Three things about its shape:
+
+- Admissibility is per role and class, not one class per role, because `crossing` admits **both**
+  opaque and decal: `cc0.carriageway-asphalt` and `cc0.footway-paving` dress the surface and
+  `cc0.road-paint-white` the paint over it, and all three are in the shipped catalog.
+- A role the table does not name is REFUSED, not assumed opaque. A role added to
+  `SURFACE_ROLE_CODES` blocks the records that dress it until the table is taught what it admits,
+  and a test holds the table's keys to the whole vocabulary so the block arrives at test time
+  rather than when somebody writes the first record. A table that defaulted would be silent about
+  the role nobody thought of.
+- The class travels on the grammar's `TextureSet` because the manifest states it and this check
+  needs it. It is not part of the pin a record records: the pin is the set's identity and digest,
+  and the class is a reviewed fact about those bytes.
+
 ### What a class fixes, and what a set declares
 
 The header's `class` object holds the numbers the CLASS fixes, the one the BAKE measures, and, for

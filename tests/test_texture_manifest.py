@@ -69,7 +69,12 @@ def test_grammar_and_the_resolver_pin_the_same_sets():
     assert MANIFEST_PATH == MANIFEST
     pinned = load_texture_catalog().sets
     assert read_grammar_manifest() == {
-        set_id: TextureSet(pinned_set.set_id, pinned_set.version, pinned_set.content_sha256)
+        set_id: TextureSet(
+            pinned_set.set_id,
+            pinned_set.version,
+            pinned_set.content_sha256,
+            pinned_set.material_class,
+        )
         for set_id, pinned_set in pinned.items()
     }
 

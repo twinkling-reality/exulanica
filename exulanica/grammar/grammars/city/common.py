@@ -80,6 +80,7 @@ __all__ = [
     "ORIENTATIONS",
     "PART_ROLES",
     "POWER_OF_TWO_SEGMENTS",
+    "ROLE_CLASSES",
     "SIDES",
     "SIDE_CODES",
     "SURFACE_ROLES",
@@ -139,6 +140,52 @@ SURFACE_ROLE_CODES: Final = {
     "trunk": 26,
 }
 SURFACE_ROLES: Final = tuple(SURFACE_ROLE_CODES)
+#: Which material classes each surface role admits, as a pair is admitted when the class is in the
+#: role's tuple.
+#:
+#: WHAT THIS IS FOR. A material record names a texture set, and a set states a class that decides
+#: how a renderer draws it: opaque is drawn solid, cutout is tested against its coverage, decal is
+#: blended over the surface beneath it, glazing transmits. Nothing else refuses a record that
+#: dresses ``marking`` or ``canopy`` with an opaque set, and the result is not a subtle fault: road
+#: paint drawn opaque is a solid rectangle across the carriageway, and a canopy drawn opaque is a
+#: leaf-patterned slab instead of leaves with gaps between them.
+#:
+#: A ROLE IS KEYED, NOT DEFAULTED. A role absent from this table is refused rather than assumed to
+#: be opaque, so a role added to SURFACE_ROLE_CODES blocks the records that dress it until this
+#: table is taught what it admits. That is deliberate: a table that defaults is silent about the
+#: role nobody thought of, and being blocked is the failure worth having.
+#:
+#: A ROLE MAY ADMIT SEVERAL CLASSES. ``crossing`` admits opaque and decal, because a crossing is a
+#: surface with paint over it: cc0.carriageway-asphalt and cc0.footway-paving dress the surface and
+#: cc0.road-paint-white the paint. A table keyed by one class per role could not say that.
+ROLE_CLASSES: Final = {
+    "wall": ("opaque",),
+    "ground_band": ("opaque",),
+    "stall_riser": ("opaque",),
+    "fascia": ("opaque",),
+    "shopfront_frame": ("opaque",),
+    "glazing": ("glazing",),
+    "door": ("opaque",),
+    "trim": ("opaque",),
+    "party_wall_scar": ("opaque",),
+    "roof": ("opaque",),
+    "parapet": ("opaque",),
+    "awning": ("opaque",),
+    "carriageway": ("opaque",),
+    "gutter": ("opaque",),
+    "kerb": ("opaque",),
+    "footway": ("opaque",),
+    "crossing": ("opaque", "decal"),
+    "marking": ("decal",),
+    "lot": ("opaque",),
+    "terrain": ("opaque",),
+    "object_primary": ("opaque",),
+    "object_secondary": ("opaque",),
+    "object_tertiary": ("opaque",),
+    "tree_pit": ("opaque",),
+    "canopy": ("cutout",),
+    "trunk": ("opaque",),
+}
 OBJECT_ROLES: Final = ("object_primary", "object_secondary", "object_tertiary")
 #: The roles a street tree's parts take: its trunk, and its canopy, which a foliage set dresses.
 TREE_PART_ROLES: Final = ("trunk", "canopy")
