@@ -44,12 +44,13 @@ def test_the_catalogs_on_disk_are_the_ones_the_tool_is_told_to_build():
     assert sorted(path.name for path in CATALOG_DIRECTORY.glob("*.json")) == [
         f"{catalog_id}.v1.json" for catalog_id in CATALOG_IDS
     ]
-    # A speed bump, not the guard. A fifth catalog is caught without this line: by the comparison
-    # above if it was never built, and by test_the_cases_cover_every_committed_catalog_in_both_
-    # directions in tests/test_lettering_cases.py if its shared cases were never generated. What
-    # the pin adds is that adding a catalog has to touch a test on purpose, beside the font, the
-    # licence and the notices entry it also brings. So do not read it as the thing that notices a
-    # fifth, and do not delete it as duplication of the line above: it is neither.
+    # A speed bump, not the guard. A fifth catalog is already caught without this line: by the
+    # comparison above if it was never built, and by tests/test_lettering_cases.py if its shared
+    # cases were never generated. Measured 2026-09-18, by building a real fifth catalog with this
+    # line deleted and watching those fail. What the pin adds is that a catalog cannot arrive
+    # without a test being edited on purpose, beside the font, the licence and the notices entry
+    # it also brings. So do not read it as the thing that notices a fifth, and do not delete it
+    # as duplication of the line above: it is neither.
     assert CATALOG_IDS == ["condensed", "grotesque", "modern_serif", "slab"]
 
 
@@ -57,11 +58,14 @@ def test_every_committed_font_is_converted_by_exactly_one_catalog():
     """`catalogs.json` is a deliberate list in one half only, and this holds the other half.
 
     Which role a typeface serves is a judgement nothing under `assets/fonts` states, so it is
-    written by hand. Which fonts are committed is no judgement, and nothing derived it: the tool
-    builds what the file names and never looks at what else is there, so a fifth family used to
-    arrive converted to nothing, caught only by the notices test, whose message sends the reader
-    to `THIRD_PARTY_NOTICES.md` when the fact is that a font is committed which nothing converts.
-    A diligent person adds the notices entry and then nothing failed at all.
+    written there by hand. Which fonts are committed is no judgement, and until this nothing
+    derived it: the tool builds what that file names and never looks at what else is committed,
+    so a fifth family arrived converted to nothing. Without a notices entry it was caught by the
+    notices test, whose message sends the reader to `THIRD_PARTY_NOTICES.md` when the fact is
+    that a font is committed which nothing converts; with the notices entry a diligent person
+    adds, nothing failed. Measured 2026-09-18, by committing a fifth family with its OFL.txt, its
+    SOURCE.json and its three notices rows: nothing else in this file or in
+    `tests/test_third_party_notices.py` objected.
 
     Three messages rather than one, because the reader is sent somewhere by whichever fires: a
     font nothing names is an addition half made, an entry naming nothing committed is a removal

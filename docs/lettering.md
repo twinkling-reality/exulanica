@@ -244,4 +244,9 @@ a stated depth, and a back face only where a standoff could show one.
   writes out its own UTF-8 codec rather than reaching for `TextDecoder`.
 - The fonts are committed byte for byte with their `OFL.txt` and a `SOURCE.json` recording each
   file's URL at the pinned commit and its SHA-256. `THIRD_PARTY_NOTICES.md` names every one, and
-  `tests/test_lettering_catalog.py` fails if it stops doing so.
+  `tests/test_lettering_catalog.py` fails if it stops doing so. That file also holds
+  `tools/lettering/catalogs.json` against the directory in both directions, because only half of
+  that list is a judgement: which role a typeface serves is written there by hand, and which fonts
+  are committed is not. Until that check existed a fifth family converted to nothing and, once its
+  notices entry was added, no lettering test failed, because the tool builds what the list names
+  and never looks at what else is committed.
