@@ -1,22 +1,22 @@
 # Model and service selection
 
-Status: current implementation reviewed 2026-09-14; model upgrades require task-specific evidence.
+Status: implementation reviewed 2026-09-14; model upgrades require task-specific evidence.
 
 ## 0. Current stack and selection decision
 
 This section supersedes the routing and deployment descriptions in sections 1-8 below, and
 it is the living correction of [ADR-0002](adr/0002-model-routing.md). ADR-0002 remains the
 accepted original decision (Nemotron Lightning as the reasoning core). The Companion caller
-implemented today is Nemotron 3 Nano 30B-A3B with Lightning as fallback. The ADR number is
+is Nemotron 3 Nano 30B-A3B with Lightning as fallback. The ADR number is
 not reused. Sections 1-8 retain the August research, its prices and rejected alternatives;
-they are historical rationale, not a current runtime inventory. The manifest now describes the implemented structured-extraction callers and distinguishes
+they are historical rationale, not a runtime inventory. The manifest now describes the implemented structured-extraction callers and distinguishes
 configured reasoning candidates from actual production routes.
 The [product roadmap](product-direction.md#model-selection-and-compute-priorities) records the
 ordered work and adoption gates. No model configuration changes are made by this review.
 
 ### Implemented roles
 
-Reviewed against the current integration tree. Implemented means there is a production call path;
+Reviewed against the integration tree. Implemented means there is a production call path;
 it does not mean every configured model is running, deployed or has passed a quality comparison.
 Provider availability and prices must be checked again before an execution campaign.
 
@@ -659,7 +659,7 @@ body, and the full body and response headers are archived. The platform requirem
 execution rather than by design. See [runtime-verification.md](runtime-verification.md) section 1,
 which overrides this document on conflict.
 
-### 7.1 What the project may say today
+### 7.1 What the project may say
 
 - That Exulanica runs `nvidia/Nemotron-3_5-Lightning` on Nebius Token Factory, in the present tense,
   on the evidence of the archived response body and its echoed `model` field.

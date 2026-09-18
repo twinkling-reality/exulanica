@@ -228,9 +228,9 @@ anticipated fails loudly. **No threshold appears in any constraint**: those numb
 engineering choices measured against a synthetic fixture, and a threshold frozen into the schema
 would have to be right before anybody could measure it.
 
-### An artifact may now name a place
+### An artifact may name a place
 
-`artifact` carries `an_artifact_names_one_subject`, which today reads
+`artifact` carries `an_artifact_names_one_subject`, which reads
 `CHECK ((source_blob_sha256 IS NOT NULL) <> (scene_id IS NOT NULL))` (read from the live schema,
 2026-09-07). An artifact names exactly one subject: a blob or a scene.
 
@@ -287,7 +287,7 @@ median. The bounding box is what says whether the median means anything at all, 
 spread beside it invites a confidence nobody measured.
 
 **Absence is ordinary.** A place no member of which carries a fix reports `state: "unavailable"`
-with a reason. That is the only state the corpus that exists today can produce, and it is not a
+with a reason. That is the only state the retained corpus can produce, and it is not a
 degraded place, not an error, and not a gap to be filled by inference.
 
 **What this must never be read as.** A GPS fix says where a photographer stood. It does not say
@@ -310,20 +310,20 @@ For an even number of fixes, v1 takes the lower median separately on each coordi
 selects an observed integer without interpolation. Longitude bounds are numeric minima and maxima,
 so a set crossing the antimeridian can have wide bounds; they do not claim a shortest geographic
 arc. Claims missing valid integer `lat_e7` and `lon_e7` count as `unusable_fix_claims`, with no
-conversion from legacy decimal text. This gives up legacy coverage to keep this basis exact.
+conversion from decimal text. This gives up decimal-text coverage to keep this basis exact.
 The fixture claims exercise the read lifecycle; they are not GPS measurements of the retained
 corpus, and the reconstruction executors used by these tests remain scripted.
 
 #### The trade, stated
 
 A derived position cannot be indexed, so "which places are near here" is a sequential scan over
-assertions. That is the cost, and it is accepted for now on three grounds: nobody has asked for
+assertions. That is the cost, and it is accepted on three grounds: nobody has asked for
 that query, the roadmap explicitly defers Earth and map views to a later bridge view, and the
 corpus holds zero fixes to scan. When it is wanted, the right answer is a materialized position
 carrying an explicit invalidation edge, following the pattern `world_structure_invalidation`
 already implements, and it will properly be a migration then, because it will need that edge. This
 decision does not give it one, which is the point: a materialized column without invalidation is
-the version that is wrong, and it is the version an amendment today would have shipped.
+the version that is wrong, and it is the version an amendment without that invalidation edge would have shipped.
 
 ### The build, and why it needs its own queue
 

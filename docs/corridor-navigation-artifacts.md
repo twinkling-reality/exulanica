@@ -18,11 +18,11 @@ to canonical SHA-256.
 The Atlas-core adapter independently checks the reconstruction and topology bases, accepted rung,
 array shapes, finite values, and look bounds. It transforms the metric local centreline through the
 reviewed island placement and deliberately chooses the narrowest measured width across the path.
-That is conservative: it may reduce freedom compared with a future segment-aware resolver and can
+That is conservative: it may reduce freedom compared with a segment-aware resolver and can
 never expand the validated envelope. Camera look has a separate clamp around the recovered camera
 forward and recorded pitch/yaw bounds.
 
-The current live scene has no persisted corridor artifact pointer because Phase 4 structural world
-authority does not exist yet. It therefore does not publish a new rung-2 result. No real recovered
+The live scene has no persisted corridor artifact pointer because durable spatial world
+authority does not exist. It therefore does not publish a rung-2 result. No real recovered
 poses, collision measurements, required destinations, or topology snapshot were found locally, so
-Phase 3D has not passed its roadmap gate.
+the corridor artifact gate has not passed.

@@ -1,8 +1,8 @@
 # ADR-0008: Generatively completed geometry is not admitted to the reconstruction ladder
 
-- Status: **ACCEPTED as a refusal with a stated path.** The refusal holds now. The admission
+- Status: **ACCEPTED as a refusal with a stated path.** The refusal holds. The admission
   checklist in section 4 is not scheduled and nothing in it is built. It exists so that admitting
-  generated geometry later has to supersede a decision rather than reinterpret a silence.
+  generated geometry has to supersede a decision rather than reinterpret a silence.
 - Date: 2026-09-03
 - Deciders: Exulanica build. Three independent proposals (admit as a segregated appearance layer;
   refuse with a checklist; admit only a transient two-dimensional imagined view) were scored by
@@ -12,7 +12,7 @@
 - Superseded in part by
   [ADR-0023](0023-epistemically-typed-world-memory.md): the refusal still governs the recorded
   reconstruction ladder, evidence, navigation, collision, and unlabeled rendering. A generated
-  receipt may now enter the artifact and read models as explicitly generated, non-citable,
+  receipt may enter the artifact and read models as explicitly generated, non-citable,
   non-rung metadata. Generated geometry bytes remain unserved and unrendered until separately
   admitted.
 - Related: [product-specification.md](../product-specification.md) section 5;
@@ -45,7 +45,7 @@ captured space whatever badge it carries.
 layer, is forbidden by no document. The only text that anticipates a synthesised scene at all is
 the AI Act badge decision, which permits one on disclosure terms
 (privacy-consent-threat-model.md:228, :768). So the real question was whether an appearance-only
-layer could be admitted honestly today, and the answer below is that it cannot, for reasons that
+layer could be admitted honestly, and the answer below is that it cannot, for reasons that
 are about what exists and what is drawn rather than about invariant 2.
 
 ### What the models can and cannot do
@@ -141,7 +141,7 @@ Grounds that carry the refusal:
    worth doing until the grounds above it are answered, since no reading of a licence repairs
    them.
 4. **The badge has no render site.** Art. 50 requires a visible Generated badge. The rung itself is
-   not yet displayed anywhere: the four rung sentences in the app's copy table are referenced by no
+   displayed nowhere: the four rung sentences in the app's copy table are referenced by no
    render site, and the server's terminal formation event hardcodes rung 4
    (exulanica/ingest/formation.py:414). A badge would be satisfied by sequencing rather than by code.
 
@@ -153,7 +153,7 @@ D16 already classes any 3D reconstruction as face-bearing
 geometry cannot fire because the producer writes one unsegmented segment, and the segmentation
 model selected for people-masking (`facebook/sam2.1-hiera-tiny`,
 model-and-service-selection.md:163) appears nowhere in the code. **That condemns the rung 3 path
-that ships today just as much**, so it is named in ADR-0009 as work owed before posed rung 3 runs
+that ships just as much**, so it is named in ADR-0009 as work owed before posed rung 3 runs
 over an ordinary library, and refusing generation does not discharge it.
 
 Grounds that do **not** carry the refusal, recorded so they are not reused:
@@ -168,7 +168,7 @@ Grounds that do **not** carry the refusal, recorded so they are not reused:
   only.** A person-scoped withdrawal reaches no artifact at all: the enqueue trigger returns
   without queueing anything for any scope other than `capture` or `workspace`
   (0015_a_tombstone_marks_what_it_deletes.sql:58), while the scope enum admits `interval`, `entity`
-  and `assertion` (0001_spine.sql:84). That is a live defect in what ships today, recorded as an
+  and `assertion` (0001_spine.sql:84). That is a live defect in what ships, recorded as an
   open item below rather than as a ground here, because it is not about generation.
 - **Mis-citation is not a ground.** A predicate whose claim is "this capture has a completion
   conditioned on it" is supported by the conditioning photograph, exactly as the depth stage cites
@@ -180,11 +180,11 @@ Grounds that do **not** carry the refusal, recorded so they are not reused:
   model-independent, and this record does not claim it does: **the valid mask is itself a MoGe-2
   output**, so epi-1 applies to it, and a zero in that mask means the model declined to place a
   position rather than that the photograph observed nothing. Sky is the clearest case. So the cull
-  separates "where our model placed surface" from "where it did not", which is a weaker statement
+  separates "where the model placed surface" from "where it did not", which is a weaker statement
   than "photographed" versus "invented", and any admission would have to say which of the two it
   is claiming. That is checklist item D5's real burden.
 
-**DECISION 3.** What is settled now, whichever way admission later goes.
+**DECISION 3.** What is settled, whichever way admission goes.
 
 - The licence matrix gains rows refusing World Labs Marble and SpAItial for any feature that sends
   a photograph, on two grounds: the zero-data-retention assumption that governs every provider
@@ -246,7 +246,7 @@ posed-set work of ADR-0009 regardless and are not work done for generation's sak
   output from a people-masked conditioning image.
 - **D11.** The evaluation corpus contract declares that a bundle contains generated geometry.
 - **D12.** The exact-recompute claim is weakened in writing to exclude generated artifacts, which
-  are deleted rather than recomputed. **This is owed now and not by admission**: the claim rests on
+  are deleted rather than recomputed. **This is owed, and not by admission**: the claim rests on
   there being no trained weights, and MoGe-2 is trained weights and is the shipping rung 3
   producer, whose stage is already registered non-deterministic for exactly that reason. It is
   listed here for completeness and tracked as a live defect below.
@@ -307,7 +307,7 @@ reading the recorded rung so that the rung is displayed at all.
 
 ## Live defects this record surfaced, which are not about generation
 
-Both were found while testing the grounds above, and both are defects in what ships today. They
+Both were found while testing the grounds above, and both are defects in what ships. They
 are recorded here because this is where they were found, and they belong to the ladder work rather
 than to any admission.
 

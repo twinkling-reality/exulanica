@@ -59,9 +59,9 @@ and inspects the same backend-produced recipe binding.
 
 Unknown profile versions, modules, capabilities, and parameters fail closed for new proposals and
 for preview-to-apply revalidation. Historical immutable rows may resolve to a warned display
-fallback, but old parameters are discarded and never interpreted against a newer recipe.
+fallback, but historical parameters are discarded and never interpreted against a newer recipe.
 
-New proposals must name a currently supported or experimental exact profile version. Historical
+New proposals must name a supported exact profile version, including one the registry marks experimental. Historical
 versions are never rewritten when support changes:
 
 - a removed, unsupported, or unknown global profile resolves through its reviewed fallback chain
@@ -146,7 +146,7 @@ The domain problem codes are intentionally distinct:
 | --- | --- | --- |
 | `422` | `invalid_style_data` | Correct the profile, manifest-backed parameter, scope, or provenance |
 | `409` | `stale_style_version` | Read current state and create a new proposal |
-| `409` | `protected_topology_conflict` | Recompose/review against the new topology; never force appearance over it |
+| `409` | `protected_topology_conflict` | Recompose/review against the conflicting topology; never force appearance over it |
 | `424` | `unavailable_asset` | Render the recorded honest fallback/state or restore authorised bytes |
 | `409` | `invalid_preview_state` | Do not reapply a closed preview |
 | `404` | `unknown_reference` | Treat absent and cross-workspace IDs identically |

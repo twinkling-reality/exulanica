@@ -2,10 +2,10 @@
 
 Status: **DECISION AND RESEARCH PROGRAM**. Existing evidence, graph, reconstruction,
 spatial-authority, authored-version, World Read, generated-receipt, and package contracts implement
-parts of this architecture. Exulanica does not yet claim a learned general world model, reliable
+parts of this architecture. Exulanica does not claim a learned general world model, reliable
 physical prediction, autonomous open-world simulation, or complete object-level scene memory.
 
-Updated 2026-09-13. This document is the canonical technical meaning of **Personal World Memory
+This document is the canonical technical meaning of **Personal World Memory
 Model**. Product priority remains in [product-direction.md](product-direction.md); exact wire,
 database, and package behavior remains in the corresponding implementation contracts.
 
@@ -13,7 +13,7 @@ database, and package behavior remains in the corresponding implementation contr
 
 Exulanica is not one neural network and should not be redesigned to imitate one.
 
-The term *world model* currently names at least three different systems:
+The term *world model* names at least three different systems:
 
 1. a **descriptive world model** stores an estimate of what exists, where it is, how it is related,
    and how that estimate changed;
@@ -21,7 +21,7 @@ The term *world model* currently names at least three different systems:
 3. a **generative world model** synthesizes plausible observations or environments from prompts and
    controls.
 
-Exulanica currently implements a substantial part of the first, bounded deterministic behavior,
+Exulanica implements a substantial part of the first, bounded deterministic behavior,
 and interfaces through which the second and third may read and propose changes. It has not earned a
 claim to the second or third as a general capability.
 
@@ -102,7 +102,7 @@ The model is a composition of planes, not a flattened universal scene blob.
 | Authored state | What a person chose to add, move, suppress, or restyle | alternate versions, fictional objects, compositional edits | branch-local deltas with compare-and-swap |
 | Generated state | What a model synthesized rather than observed | completed geometry, generated assets, imagined appearances | separate generated artifacts and proposals |
 | Simulation | What happened inside a synthetic or counterfactual branch | actions, goals, schedules, interactions, state transitions | event log plus deterministic state snapshots |
-| Representation | How another system currently consumes a plane | mesh, splat, point map, voxel map, semantic graph, embedding, thumbnail | derived artifact with a representation contract |
+| Representation | How another system consumes a plane | mesh, splat, point map, voxel map, semantic graph, embedding, thumbnail | derived artifact with a representation contract |
 | Session | What this client is doing now | camera, focus, open panel, interpolation | ephemeral runtime only |
 | Governance | What may be read, derived, changed, trained on, or exported | source rights, consent, retention, capability policy | policy evaluated at every materialization boundary |
 
@@ -114,7 +114,7 @@ observation. A user correction may supersede an inference without rewriting the 
 
 Three existing vocabularies answer different questions:
 
-| Axis | Current values | Question answered |
+| Axis | Values | Question answered |
 | --- | --- | --- |
 | Assertion provenance | `capture`, `inference`, `user`, `external` | Who or what supports this assertion? |
 | Content truth class | `authorized_memory`, `admitted_source`, `authored_version`, `simulation` | What kind of world content is this result? |
@@ -333,7 +333,7 @@ worlds**:
 6. a generative or predictive model can read from and write back to the same governed memory; and
 7. the result can be inspected and projected into a signed portable package.
 
-This is a credible research direction. It is not yet evidence that Exulanica is better than a
+This is a credible research direction. It is not evidence that Exulanica is better than a
 temporal graph plus asset store, an OpenUSD stage, or a generative-world service. Section 10 is how
 that claim is earned or rejected.
 

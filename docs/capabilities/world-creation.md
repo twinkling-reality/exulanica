@@ -30,11 +30,11 @@ across memories/imports/creations, geometric blending and general language-drive
 asset creation require the extensions in the
 [composition contract](../world-composition-contract.md). A segmentation mask is
 not automatically a complete editable object, and a map's display permission is
-not permission to extract and remix its content. The current Earth prototype is
+not permission to extract and remix its content. The Earth prototype is
 an incomplete visualization path rather than a validated detailed environment.
 
 Read the [product roadmap](../product-direction.md) for delivery order, the
 [appearance contract](../atlas-world-customization-contract.md) for supported
 style operations, and the [World Memory Package](../world-memory-package.md) for
-current portable-state boundaries. Package verification alone does not load a
+portable-state boundaries. Package verification alone does not load a
 runnable world in another application.

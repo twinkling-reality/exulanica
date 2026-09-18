@@ -71,7 +71,7 @@ The backend serves scene facts through `GET /graph` and artifact bytes through
 set, registered and unregistered outcomes, placement and receipt digests, each placed point-map
 descriptor and transform, the recorded rung and reasons, the displayed rung and reasons, and the
 available substrate. The graph route reads that description inside the same repeatable-read
-snapshot as the rest of the world. `GET /geometry` remains the legacy descriptor list for
+snapshot as the rest of the world. `GET /geometry` remains the descriptor list for
 per-capture maps that have never belonged to a posed scene.
 
 `web/packages/app/src/geometry-api.ts` reads the scene records, checks every reference declares
@@ -101,19 +101,19 @@ The authoritative disclosure names `recordedSceneRung`, `displayedRung` and
 `renderingSubstrate` separately. The recorded value comes only from the scene-rung assertion.
 Decoded OPM bytes cannot promote it. The disclosure also shows registered member count and every
 gate or fallback reason, including the missing scale, coverage, corridor and splat receipts that
-currently hold a production posed scene at rung 3. Its displayed-rung sentence comes from the one
+hold a production posed scene at rung 3. Its displayed-rung sentence comes from the one
 shared `RUNG_COPY` table in `@exulanica/formation`; the app no longer carries a divergent copy.
 
 The load runs on **every** mount, not once at start-up. The graph is re-read and unchanged decoded
 maps are carried forward by artifact id. That is what carries deletion to the renderer: deleting
-any registered or unregistered member removes the complete scene on the next mount. Legacy
+any registered or unregistered member removes the complete scene on the next mount.
 `GET /geometry` omits captures that have belonged to a scene, so a surviving member cannot reappear
 at an invented origin after the placement is withdrawn. Bytes are served `no-store`, so a deleted
 scene is not redrawable from the browser's own disk cache afterwards.
 
 ## Deliberate remaining boundary
 
-The backend may hold regional overrides, but the current renderer exposes only a reviewed global
+The backend may hold regional overrides, but the renderer exposes only a reviewed global
 profile preview. Atlas parses regional history without reinterpreting it and refuses an upstream
 regional proposal rather than painting it globally. Regional controls require a reviewed
 per-region renderer implementation. Structural proposals remain outside the appearance API.

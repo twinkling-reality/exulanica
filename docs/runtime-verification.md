@@ -10,20 +10,20 @@ below.
 This document records what was learned by actually calling the platform, as opposed to reading its
 documentation. Where it contradicts an earlier document, this one wins.
 
-## 1. The NVIDIA claim is now evidenced
+## 1. The NVIDIA claim is evidenced
 
 **VERIFIED.** A real call to `nvidia/Nemotron-3_5-Lightning` returned HTTP 200 in 0.52 s, and the
 response body echoes `"model": "nvidia/Nemotron-3_5-Lightning"`. The full body and all response
 headers are archived at `.exulanica/experiments/platform/x0a_nvidia_provenance.json`.
 
 Per the project's own stop rule ("do not claim Nano Omni/Ultra use until the real model ID and
-runtime call are verified"), the project may now truthfully state that it runs NVIDIA Nemotron on
+runtime call are verified"), the project may truthfully state that it runs NVIDIA Nemotron on
 Nebius Token Factory. Before this file existed, it could not.
 
 ## 2. Catalog preflight passes
 
 **VERIFIED.** All five model identifiers in the manifest resolve against the live catalog
-(30 ids total). No role is currently pointing at a removed model.
+(30 ids total). No role points at a removed model.
 
 ## 3. MiniMax-M3 accepts images. The catalog `type` field is wrong.
 
@@ -173,7 +173,7 @@ The rehearsal created and removed only its own database schema. This is an execu
 not a claim that the missing personal run has occurred.
 
 Inspection found and fixed a real authorization error: the ordinary demonstration previously
-created synthetic authorization and exemption receipts for any supplied photograph. It now reads
+created synthetic authorization and exemption receipts for any supplied photograph. It reads
 existing screening authority before configured models or lifecycle writes. Only the internal
 rehearsal generator can create its synthetic receipts. Observation-only permission is accepted for
 vision alone; depth requires geometry permission. The CLI separately requires per-run hosted-model

@@ -286,7 +286,7 @@ documentation and quoted in [architecture-overview.md](architecture-overview.md)
    policy rule using `"anonymous": {}` with a role limited to `storage.viewer`,
    `storage.object-viewer` or `storage.object-lister`, at most 10 rules per bucket and 10 paths per
    rule. Every S3 tutorial for this step is wrong, and the 10 path limit is a real design constraint:
-   the public prefix has to be planned, not accumulated.
+   the public prefix has to be designed, not accumulated.
 2. **`GetObject` and therefore HTTP `Range` are supported.** So are `PutBucketCORS`, versioning,
    lifecycle rules and full multipart upload.
 3. **Static website hosting is not supported.** Neither are object ACLs, S3 Select, replication,
@@ -297,7 +297,7 @@ documentation and quoted in [architecture-overview.md](architecture-overview.md)
 
 **Bucket setup, in order, and the order matters.** Enable versioning **at bucket creation time**.
 Enabling it on an existing bucket takes up to 15 minutes to propagate, and during that window a
-bucket that appears versioned is not yet protected. Once enabled, versioning can only be suspended
+bucket that appears versioned is unprotected. Once enabled, versioning can only be suspended
 and never disabled, so this is a one way door taken deliberately.
 
 **Write path.** Originals are written under content addressed keys, the SHA-256 of the original
@@ -379,7 +379,7 @@ Training, conversion and authenticated visual acceptance are separate gates.
 
 ## 5. Environment configuration
 
-### 5.1 What exists today
+### 5.1 What exists
 
 `.env.example` is committed, `.env` is ignored, and the current variables are:
 
@@ -408,7 +408,7 @@ Training, conversion and authenticated visual acceptance are separate gates.
 | `EXULANICA_APP_ROLE_PASSWORD`, `EXULANICA_EXECUTOR_ROLE_PASSWORD`, `EXULANICA_PURGE_ROLE_PASSWORD` | Passwords for the three roles `exulanica-db` provisions | Optional. Set only when supplied, because a deployment authenticating by certificate or by peer has none, and inventing one would create a credential nobody asked for |
 | `EXULANICA_PURGE_DATABASE_URL` | The connection `exulanica-purge` uses | No default and **no fallback to the writer**. The purge role holds a cross-workspace read the runtime role must never have, and the runtime role holds writes the purger must never need. Running as the wrong one either destroys another tenant's photograph or cannot tell that it would |
 | `EXULANICA_TEXTURE_DIRECTORY` | Where the published material catalog is: `manifest.json`, `catalog.json` and `objects/` | The API, to check a person's recipe against the published makers, and `exulanica-material-bake`. The API image sets it to `/app/assets/textures`; a checkout finds its own. Without a catalog the `/materials` routes answer 503 and `/readyz` says so; a catalog that is present but not the reviewed one stops startup |
-| `EXULANICA_WEB_DIRECTORY`, `EXULANICA_NODE` | Where the web package and its installed dependencies are, and which Node runs the baker | `exulanica-material-bake` only. Nothing is downloaded at run time; the worker refuses to start without Node, the tsx loader and the baker. Its image recipe is `deploy/material-bake/Dockerfile`, written and not yet built, and the service is not in `compose.yaml` yet. Bakes are written to `EXULANICA_DATA_DIR/materials/<workspace>`, and `exulanica-purge` destroys them from there |
+| `EXULANICA_WEB_DIRECTORY`, `EXULANICA_NODE` | Where the web package and its installed dependencies are, and which Node runs the baker | `exulanica-material-bake` only. Nothing is downloaded at run time; the worker refuses to start without Node, the tsx loader and the baker. Its image recipe is `deploy/material-bake/Dockerfile`, written and unbuilt, and the service is absent from `compose.yaml`. Bakes are written to `EXULANICA_DATA_DIR/materials/<workspace>`, and `exulanica-purge` destroys them from there |
 
 ### Browser accounts and society playback
 
@@ -467,7 +467,7 @@ Migration 0059 adds saved society controls and their event receipts. Automatic p
 by default. A host can construct `Services` with a reviewed `society_runtime`, an explicit
 `society_control_workspaces` allowlist and `society_base_tick_interval_ms` (default 1000), or
 enable account-wide discovery with `EXULANICA_SOCIETY_CONTROL_WORKER`. The normal
-environment-based service loader does not yet load reviewed district runtime bindings, so the
+environment-based service loader does not load reviewed district runtime bindings, so the
 environment switch alone cannot create a usable playback deployment.
 The API starts this explicitly configured worker only after schema/restore validation, stops new
 claims on shutdown and waits for an active batch to finish or roll back. Readiness reports its
@@ -514,7 +514,7 @@ destroyed, the tombstone recorded complete, and another workspace's live photogr
 The purge role's UPDATE is still filtered by `ws_isolation`, so it reads across tenants and writes
 within one. That asymmetry is the whole of the grant.
 
-### 5.1.2 The request body bound, which the application alone owns today
+### 5.1.2 The request body bound, which the application alone owns
 
 `POST /intake` is multipart, and **the body is received and parsed before any route function and
 before any dependency runs**, so it is parsed before authentication: an anonymous request has
@@ -534,7 +534,7 @@ applies two bounds:
 The second is what makes the first more than a courtesy: without it, omitting one header walks
 past the whole thing.
 
-**Today `body_limit.py` is the whole bound, and there is nothing in front of it to configure.**
+**`body_limit.py` is the whole bound, and there is nothing in front of it to configure.**
 D-13 records that the composition has no reverse proxy and no static client host: `compose.yaml`
 publishes uvicorn's own port and there is no service in front of it. So the two bounds above are
 not a second line of defence behind a proxy's, they are the only line, and the paragraph that
@@ -632,7 +632,7 @@ Measured against uvicorn rather than read: 120 concurrent requests to a synchron
 **40 at a time across 40 distinct threads**, 0 errors. There is no uvicorn flag for it
 (`--workers` is processes, `--limit-concurrency` caps connections), and the only place a
 deployment could change it is `anyio.to_thread.current_default_thread_limiter().total_tokens`
-inside the application's own lifespan. Nothing sets it today.
+inside the application's own lifespan. Nothing sets it.
 
 #### 5.4.2 A formation stream costs one thread and one backend, and the cliff is at 40
 
@@ -1059,7 +1059,7 @@ has happened at least once with a stopwatch running.
 | D-13 | There is no reverse proxy and no static client host in the composition | Choosing one, which is D-9 |
 | D-10 | Nobody is named for the weekly check through the unattended window | Asking a person |
 | D-11 | Whether a preview grade service survives the window at all | The canary endpoint's outage log |
-| D-14 | Nothing limits in-flight requests, so a single process can demand more backends than the cluster has slots. Section 5.4.3 measured 48 concurrent streams holding 48 backends against a 40-thread pool and 97 usable slots | Setting `uvicorn --limit-concurrency`, which is the only lever that counts requests where they are actually held. Not set today, and not urgent at one person watching one upload |
+| D-14 | Nothing limits in-flight requests, so a single process can demand more backends than the cluster has slots. Section 5.4.3 measured 48 concurrent streams holding 48 backends against a 40-thread pool and 97 usable slots | Setting `uvicorn --limit-concurrency`, which is the only lever that counts requests where they are actually held. Unset, and not urgent at one person watching one upload |
 | D-15 | Section 5.4.2's container-restart consequence is arithmetic over a measured latency and the Dockerfile. No container was built or run to observe it | Running the image, saturating it, and watching whether Docker restarts it |
 | D-16 | ~~The runtime connects as the database owner, bypassing row-level security~~ **CLOSED 2026-08-31.** The owner credential is confined to migrations; API and derivative-worker composition URLs name `exulanica_app`, and both processes refuse unsafe roles at startup | PostgreSQL role tests plus deployment text contract |
 

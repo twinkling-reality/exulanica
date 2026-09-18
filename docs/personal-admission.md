@@ -191,8 +191,8 @@ statement. Ordinary outline confirmations preserve an existing subject when `sub
 explicit null unlinks it. An edit request names each region at most once; duplicate keys are
 refused before any edit is written. Changed links invalidate screenings through the existing currency policy.
 
-The API path and worker change do not yet deliver HEIC conversion or a fresh workspace's source
-inspector. Those require extensions outside the current writable set, including a distinct decoded
+The API path and worker change do not deliver HEIC conversion or a fresh workspace's source
+inspector. Those require extensions outside the writable set, including a distinct decoded
 source permission in SQL. No migration has been applied or reserved for this work. No hosted calls
 have been authorized in this task.
 
@@ -327,7 +327,7 @@ sensitive region; its masking is not a measured real-person detector or segmenta
 
 The original [record](evaluation/2026-09-08-personal-admission-flow.json) is preserved. Its SQL
 control is a known failing baseline, not a killed mutant. The follow-up record distinguishes that
-baseline from an executed command-local negative control: removing only the new Python currency
+baseline from an executed command-local negative control: removing only the Python currency
 guard in subprocess memory makes
 `tests/test_personal_admission_flow.py::test_changed_region_requires_current_mask_before_geometry`
 fail with `DID NOT RAISE`. The recorder requires that selector's exact `FAILED` line.

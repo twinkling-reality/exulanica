@@ -55,8 +55,8 @@ prevents source media from being smuggled into the metadata archive.
 
 The machine record contains a `phase_2_exit_gate` object. It stays blocked for a synthetic bundle, a
 development rather than blind split, unsafe runtime role, ingest failure, replay model call, missing
-source run, or incomplete metric baseline. Today `metric_baseline_complete` is false because the
-new L0-L11 bundle has not yet been connected to every baseline scorer. That is a named remaining
+source run, or incomplete metric baseline. `metric_baseline_complete` is false because the
+L0-L11 bundle is not connected to every baseline scorer. That is a named remaining
 implementation gap, and no successful mechanical replay is reported as the OGC-1 baseline.
 
 ## 2. Run archives
@@ -79,7 +79,7 @@ uv run exulanica-eval verify-archive \
 The archive includes:
 
 - the human report and `exulanica.evaluation-run/v1` machine record;
-- the exact corpus manifest bytes used by the legacy evaluator;
+- the exact corpus manifest bytes used by the MANIFEST.json evaluator;
 - the full clean Git commit and tree ids; a dirty checkout is refused;
 - the exact model-manifest bytes and SHA-256, every primary and fallback model id, and explicit null
   revisions because the configured serverless provider exposes no model revision;
@@ -96,11 +96,11 @@ SHA-256 values in the archive; their identity and presence remain comparable wit
 private strings. Migration 0019 records the ordered model identifiers tried by new model-backed
 terminal events. Historical rows and a model call that fails before returning its attempt metadata
 remain null, and the execution summary names those events with
-`model_attempt_provenance_complete = false`; it does not reconstruct them from today's manifest.
+`model_attempt_provenance_complete = false`; it does not reconstruct them from the archive's manifest.
 
 The existing `run` command can create this archive with `--archive-parent`. That path still reads the
-old synthetic `MANIFEST.json` format, so its record explicitly has no split, blind-access receipt, or
-gold question fixture and cannot pass Phase 2. It exists to preserve and verify the measurements the
+synthetic `MANIFEST.json` format, so its record explicitly has no split, blind-access receipt, or
+gold question fixture and cannot pass the Phase 2 exit gate. It exists to preserve and verify the measurements the
 current harness can genuinely make while the real `CORPUS.json` bundle is unavailable.
 
 The Phase 2 exit gate additionally needs a clean-database replay from the real OGC-1 split bundle.
@@ -109,7 +109,7 @@ No archive format can substitute for those absent inputs.
 ## 3. What still blocks Phase 2
 
 Both halves end at the same place and it is worth stating once rather than twice. The exit gate
-needs a clean-database replay from the real OGC-1 split bundle, and that bundle does not exist yet.
+needs a clean-database replay from the real OGC-1 split bundle, and that bundle does not exist.
 `metric_baseline_complete` is false because the L0-L11 bundle is not connected to every baseline
 scorer. No archive format substitutes for an absent input, and no successful mechanical replay is
 reported as the OGC-1 baseline.

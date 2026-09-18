@@ -1,4 +1,4 @@
-"""Execute Phase 10 invariant mutations in an isolated copy of the tree.
+"""Execute World Read invariant mutations in an isolated copy of the tree.
 
 Every test in this repository is supposed to have an executed negative control: mutate the
 production code so the invariant is violated, watch the named test fail, restore. The doctrine is

@@ -344,12 +344,12 @@ decoder pins and the migrated courtyard point map are exceptions; preserve their
 The preview also needs its locally supplied synthetic source images. Do not infer a complete
 clean-checkout preview from the presence of one tracked geometry file.
 
-### What runs today
+### What runs
 
 The API and worker entrypoints above exist; execution requires their stated database, role,
 model and artifact prerequisites. This documentation move is not a fresh run of those commands.
 The API and application start separately. `?preview=1` selects a development-only, read-only
 synthetic fixture, not the authenticated backend or a personal-world acceptance run. Stop the
 landing server before starting the application on its default port, or use the port printed by
-Vite. There is currently no single command that starts Exulanica end to end.
+Vite. There is no single command that starts Exulanica end to end.
 See [capability status](README.md#capability-status) and the [product roadmap](product-direction.md).

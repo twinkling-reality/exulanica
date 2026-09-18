@@ -230,7 +230,7 @@ new exact request instead of retrying it.
 [Placement v2](scene-placement-alignment.md) replaces the historical display-only identity scale.
 It fits positive scale from exact COLMAP track/image/point-map correspondences, then validates
 held-out correspondences and coverage. Failed members remain explicit exclusions. This is
-coordinate alignment, not an independent physical measurement. Old identity-scale placements
+coordinate alignment, not an independent physical measurement. Identity-scale placements
 are withheld until rebuilt. Trained geometry remains in the accepted COLMAP frame; browser
 delivery uses its explicit transform/bounds and authenticated content digest.
 
@@ -241,7 +241,7 @@ midpoints, with identical cameras/settings across iterations. After reconstructi
 expand its status and choose **Inspect reconstruction**. Accepted source cameras are available
 independently of point-map bytes, so a trained scene can be inspected even when every OPM is
 unavailable. The browser uses the accepted pose, calibrated focal lengths and principal point;
-legacy records can fall back to the OPM field-of-view estimate. Distorted camera models are
+records that omit calibrated intrinsics can fall back to the OPM field-of-view estimate. Distorted camera models are
 explicitly labelled pinhole approximations, and canvas aspect can extend horizontal coverage.
 Midpoints are unobserved viewpoints, not validated walking routes. **Return to Atlas** restores
 the prior position, orientation, field of view and projection.

@@ -5,7 +5,7 @@
   reasoning that existed before the numbers, including a lean that the measurement overturned.
 - Date: 2026-08-27, resolved 2026-08-28
 - Deciders: Exulanica build
-- Settled at: the bake-off, ahead of the week 3 renderer deadline
+- Settled at: the bake-off, ahead of the renderer deadline
 - Supersedes: nothing
 - Related: [architecture-overview.md](../architecture-overview.md) section 1.1
 - Mobile-delivery consequences in the preserved analysis are superseded by ADR-0006.
@@ -14,7 +14,7 @@
 
 The supplied reference was identified as the Grok Bot-style geometric avatar documented by the
 MIT-licensed Bloub project: one configurable silhouette and two slit eyes. The ordinary and
-production application now uses an original DOM/SVG implementation of that verified grammar. It
+production application uses an original DOM/SVG implementation of that verified grammar. It
 supports saved shape, colour, and expression choices through the V3 presentation contract.
 
 The rejected humanoid PlayCanvas robot, its renderer attachment, and its body/accessory controls are
@@ -24,14 +24,14 @@ historical corrections below remain only as an audit of superseded decisions.
 
 Bloub's MIT license covers its code, not xAI's imitated design. Exulanica does not copy Bloub source or
 claim xAI affiliation; it implements the abstract, user-supplied geometric grammar locally and
-retains attribution in the evaluation document. VRM remains separate research for a future
+retains attribution in the evaluation document. VRM remains separate research for a
 rights-cleared humanoid request, not a justification for adding a body to this reference.
 
 ## HISTORICAL CORRECTION 2026-08-30: the supplied authored Companion reopened one narrow Spline exception
 
 **DECISION, CORRECTED.** The 2026-08-29 closure rested on a false product premise: that there was no
 approved authored Companion and that the code therefore had to invent one. The account holder has
-now supplied the source file and its production scene:
+supplied the source file and its production scene:
 
 - source: `https://app.spline.design/file/9ec46d55-e993-44ae-b5d4-d34e6e3babfd`;
 - runtime scene: `https://prod.spline.design/fqke6-9pFgVx3uvG/scene.splinecode`.
@@ -177,9 +177,9 @@ subject to retaining their notices.
 - **`@lumaai/luma-web`.** **VERIFIED:** npm-deprecated, "Package no longer supported", last publish
   2024-03-06.
 
-## Which way the evidence currently leans, and why
+## Which way the evidence leans, and why
 
-**Toward Option A, three.js plus Spark. Not decisively, and not yet.**
+**Toward Option A, three.js plus Spark. Not decisively, and undecided.**
 
 The reasoning is not that PlayCanvas is worse. On its own terms the browser-rendering stream is right:
 if photoreal Gaussian splats are the substrate the Atlas is made of, PlayCanvas is the better engine
@@ -236,7 +236,7 @@ a day.
 
 X-R1 also retires the standing assumption that a browser can render 1 to 4M splats at 60 fps on
 desktop. **Every desktop splat number in the research corpus is extrapolated from an M4 Max, not
-measured on the M3 Pro that will run the demo.**
+measured on the M3 Pro that runs the demo.**
 
 **Fixed regardless of which engine wins**, so that the ADR's outcome changes as little as possible:
 
@@ -324,7 +324,7 @@ rung 3 of the reconstruction ladder and are drawn with `PRIMITIVE_POINTS`.
 | WebGPU compute path measured faster than WebGL2 | **not-applicable** | The measured speedup is the gsplat compute sorter, and a `PRIMITIVE_POINTS` draw dispatches no compute. On WebGPU this path also **loses point size**, because WGSL has no `gl_PointSize` equivalent and a point-list renders one pixel per point, and it requires hand-written WGSL since glslang and twgsl are not shipped with the engine |
 
 This is the reason the ADR demanded verification rather than repetition. Three claims sourced from
-credible research were each true of the engine and false of our use of it.
+credible research were each true of the engine and false of this project's use of it.
 
 ### The three.js side has its own verified constraint
 
@@ -351,7 +351,7 @@ five at full density.
 
 ### Still OPEN: the PlayCanvas frame rate
 
-**Not yet measured, and honestly so.** Both available browser surfaces report
+**Unmeasured in this section, and honestly so.** Both available browser surfaces report
 `document.visibilityState === "hidden"`, which throttles `requestAnimationFrame`. The three.js
 harness correctly detected this and reported `spoiled: true` with `frames: 0` rather than publishing
 a fabricated number, which is the harness behaving as designed.
@@ -370,7 +370,7 @@ no frame-rate comparison between the two engines is recorded here.
    point size when it got there.
 
 Status at the time of this update remained **PROPOSED** rather than Accepted, because the frame-rate
-comparison the ADR itself demanded had not yet been run. Publishing a decision while calling it
+comparison the ADR itself demanded had not been run. Publishing a decision while calling it
 measured would have been the kind of claim this project exists not to make.
 
 ---
@@ -402,7 +402,7 @@ empty `notes` array, meaning the harness vouches for it.
    while walking through a scene in first person. For a product whose primary interaction is
    embodied movement through space, a 2x improvement in worst-case pacing outweighs a 2x regression
    in a 200 ms load time.
-2. **PlayCanvas covers both reconstruction rungs natively.** It renders point clouds now (rung 3,
+2. **PlayCanvas covers both reconstruction rungs natively.** It renders point clouds (rung 3,
    MoGe point maps, which is the primary path for a photograph corpus) and it has native Gaussian
    splat support for rung 1, the pre-baked hero scene. three.js needs Spark for splats, which is a
    second dependency and, per the probes below, a WebGL2 lock-in.
@@ -427,7 +427,7 @@ from splat machinery. It does not mean PlayCanvas is worse. The lean substituted
 advertised features for a measurement, and the measurement went the other way.
 
 The probes remain valuable and correct: they stopped the project adopting PlayCanvas *for the wrong
-reasons*, and they establish that neither engine gets a WebGPU path here. The decision now rests on
+reasons*, and they establish that neither engine gets a WebGPU path here. The decision rests on
 numbers taken at matched resolution, which is what the ADR asked for from the start.
 
 ### One honest confound, recorded and accepted
@@ -448,5 +448,5 @@ half the worst-case frame consistency of **this PlayCanvas binding** on this wor
   boundary: the switch touches two packages and nothing else.
 - The three.js plus Spark binding is retained in the repository as the measured alternative and as
   insurance, not deleted. It is not built or shipped.
-- Streaming and island residency budgets are now more important given the higher heap, and should be
+- Streaming and island residency budgets are more important given the higher heap, and should be
   designed against the 4M-point figures rather than the 1M ones.

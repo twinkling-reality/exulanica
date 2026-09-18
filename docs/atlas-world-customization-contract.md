@@ -106,7 +106,7 @@ ranges fail closed. The registry itself contains no profile-ID branches, so addi
 recipe does not require adding another conditional path through Options or the renderer binding.
 
 A module is trusted application code and is the only executable part of style resolution. Shared
-modules currently cover registered surface finish and bounded tempo; authored response modules
+modules cover registered surface finish and bounded tempo; authored response modules
 translate Aeroheart and the Survey regression fixture's semantic controls into their own palette,
 material, detail, and atmosphere values. The backend persists inert recipe bindings and style
 versions, but cannot use recipe data to introduce executable behavior. Adding a genuinely new

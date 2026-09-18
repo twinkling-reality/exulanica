@@ -395,7 +395,7 @@ being *stricter* than reality, which costs rights but is safe. The case that end
 opposite: the catalog being more permissive than the card. Exactly one row in this matrix has that
 shape. `nvidia/Nemotron-3-Ultra-550b-a55b` is recorded as `openmdw-1.1` **from the catalog only**; it
 does not appear in the four models whose OpenMDW-1.1 attribution was verified in raw HF frontmatter
-(F39). The exposure is currently zero because Ultra has no role in Exulanica. **If that changes, run
+(F39). The exposure is zero because Ultra has no role in Exulanica. **If that changes, run
 the same `curl` used in section 4a against the Ultra card first.**
 
 ---
@@ -525,7 +525,7 @@ that closes it.
 | L-1 | `nvidia/diar_streaming_sortformer_4spk-v2` license, **DISPUTED** | Determines whether diarization is commercially clean | X-0e, section 4a. 5 min |
 | L-2 | `MiniMaxAI/MiniMax-M3` license text never read | It is Nebius' recommended replacement for the removed NVIDIA vision models and the only catalog model declaring the `video` use case | Read <https://huggingface.co/MiniMaxAI/MiniMax-M3/blob/main/LICENSE>. 10 min |
 | L-3 | `openbmb/MiniCPM-V-4_5` license is recorded from the Nebius catalog, whose URL points at the **code** repo | It is the primary vision sensor. Under the section 5 rule, a catalog reading is not authoritative | `curl` the HF card frontmatter for the pinned SHA. 5 min |
-| L-4 | `nvidia/Nemotron-3-Ultra-550b-a55b` OpenMDW-1.1 attribution is catalog-only, and is the one row where the catalog is **more** permissive than any verified reading | The error direction that ends a project. Exposure is currently zero because Ultra has no role | `curl` the HF card before any use. 5 min |
+| L-4 | `nvidia/Nemotron-3-Ultra-550b-a55b` OpenMDW-1.1 attribution is catalog-only, and is the one row where the catalog is **more** permissive than any verified reading | The error direction that ends a project. Exposure is zero because Ultra has no role | `curl` the HF card before any use. 5 min |
 | L-5 | PostgreSQL 18 and pgvector 0.8.6 license text never read | Two core dependencies | X-0g. 15 min, with the GitHub chip check |
 | L-6 | ffmpeg build configuration in the container: LGPL or GPL | Matters only if the binary is redistributed. We invoke it as a subprocess and do not link it | Inspect the container's ffmpeg build flags |
 | L-7 | RO-Crate and Croissant **tooling library** licenses | The specs are open standards; the libraries were never checked | Read each library's LICENSE before adoption. Fallback: write the RO-Crate JSON-LD by hand |

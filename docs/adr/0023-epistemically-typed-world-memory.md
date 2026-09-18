@@ -73,7 +73,7 @@ become state authority by producing a plausible output.
 ## Current capability wording
 
 “Personal World Memory Model” names the complete system architecture and research direction.
-In the terminology of machine-learning research, the implementation currently provides an
+In the terminology of machine-learning research, the implementation provides an
 evidence-grounded descriptive world-memory substrate with bounded deterministic behaviors.
 
 Exulanica must not claim a general learned predictive world model until action-conditioned,

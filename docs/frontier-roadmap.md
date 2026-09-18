@@ -4,12 +4,12 @@ Status: engineering archive. [product-direction.md](product-direction.md) owns p
 scope and delivery order. This page keeps the earlier exit-gated engineering sequence
 and dependencies. It does not turn an assumption into a shipping claim.
 
-Last reconciled: 2026-08-31. The composition contract and product roadmap were updated
+The composition contract and product roadmap were updated
 2026-09-12; read those first.
 
 ## 1. North-star output
 
-The current product direction is [personal worlds, creation, and later simulation](product-direction.md).
+The product direction is [personal worlds, creation, and later simulation](product-direction.md).
 Build your own world from your life, then change what's possible inside it.
 That direction supersedes the earlier reconstruction-only and competitive "stateless imagination"
 framing. The numbered work below preserves the existing engineering history and dependencies;
@@ -18,24 +18,24 @@ it is not the complete creative-world delivery sequence.
 The [unified composition contract](world-composition-contract.md), added
 2026-09-12, makes imported geography, personal memories and authored/fantasy
 variations part of one editable, queryable world. Its Iceland example and staged
-acceptance supersede a separate Earth-viewer interpretation. Current code and
+acceptance supersede a separate Earth-viewer interpretation. Code and
 scoped evaluation records still determine implementation status.
 
-The next product milestone is a reconstructed place, an alternate version, one created object,
+The first-milestone gate is a reconstructed place, an alternate version, one created object,
 and one bounded interaction, with saved state and a concrete developer read/edit path. See the
 [new delivery gates](product-direction.md#first-milestone).
-General simulation, unconstrained creation, and compatible runtime packages remain future work.
+General simulation, unconstrained creation, and compatible runtime packages remain outside the first-milestone gate.
 
 Original evidence, identity, topology, appearance, and package machinery remain foundations.
 Creative changes must preserve their source history without being restricted to reproducing it.
 
 ### 1.1 Public product and runtime naming
 
-Public entry points name the product, not its current internal runtime. The landing action is
+Public entry points name the product, not its internal runtime. The landing action is
 **Enter Exulanica**. “Enter World” is not used because it is generic, and “Enter Atlas” exposes a
 subsystem name as though it were a second product.
 
-Atlas remains the internal name of the navigable world runtime for now. A future Atlas-to-Exulanica
+Atlas is the internal name of the navigable world runtime. An Atlas-to-Exulanica
 technical migration is a separate release decision, not a landing-copy change. Before scheduling
 it, inventory persisted browser keys, environment variables, routes, package names, tests, and
 operator documentation; then choose either a pre-release clean cutover or an explicitly versioned
@@ -57,7 +57,7 @@ Every phase below preserves these rules.
 - A style or interaction adaptation selects from a reviewed capability registry. It cannot provide
   CSS, markup, JavaScript, shaders, remote texture URLs, renderer programs, or interface layout.
 - New visual or interaction capabilities enter through reviewed code and a versioned registry. No
-  universal schema is invented for capabilities that do not yet exist.
+  universal schema is invented for capabilities that have no implementation.
 - Raw media, credentials, biometric templates, and embeddings are excluded from export by default.
 - A World Memory Package is a projection of the live store at a named instant. It is not the live
   store and cannot be recalled after a recipient downloads it.
@@ -69,7 +69,7 @@ Every phase below preserves these rules.
 - The renderer consumes published assets and manifests. It does not author canonical memory or
   topology state.
 
-## 3. Current implementation baseline
+## 3. Implementation baseline
 
 The status terms in this table describe repository state, not aspiration.
 
@@ -337,7 +337,7 @@ Operational behavior and the boundary of the guarantee are in
 
 ### Phase 2: real corpus and evaluation baseline
 
-Status: **NEXT; the Phase 1 event schema is settled**.
+Status: **the Phase 1 event schema is settled**.
 
 Deliverables:
 
@@ -354,7 +354,7 @@ prove the blind split was not read by any training or tuning path.
 
 ### Phase 3: reconstruction ladder
 
-Status: **Production rung-3 path built 2026-09-04; representative real-corpus run blocked; rungs 1 and 2 experimental**.
+Status: **Production rung-3 path built 2026-09-04; representative real-corpus run blocked; rungs 1 and 2 without a production path**.
 
 #### Phase 3A: production rung 4 and rung 3
 
@@ -740,7 +740,7 @@ Frontend UI/UX work can continue independently while the backend proceeds in sep
 Shared migrations and public schemas have one owner at a time.
 
 1. **Backend processing task:** Phase 1 is complete on `codex/adaptive-world-backend`.
-2. **Corpus/evaluation task:** Phase 2 may begin now that the worker event schema is stable; corpus artifacts stay
+2. **Corpus/evaluation task:** Phase 2 may begin because the worker event schema is stable; corpus artifacts stay
    outside Git when they contain personal media.
 3. **Reconstruction task:** Phase 3 behind an artifact/job interface fixed by Phase 1. It does not
    modify Atlas UI.

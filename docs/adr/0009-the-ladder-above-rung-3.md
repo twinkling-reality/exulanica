@@ -1,12 +1,12 @@
 # ADR-0009: How the ladder earns rungs 1 and 2, and what a posed rung 3 is
 
 - Status: **ACCEPTED; production rung 3 implemented 2026-09-04.** D1, D4, D6, D9, D10, D11 and
-  D12 now run end to end through the normal ingest and separate scene-worker path. D2, D3, D5,
-  D7 and D8 remain decisions for future rung-2 and rung-1 producers. No authorized real dense
+  D12 run end to end through the normal ingest and separate scene-worker path. D2, D3, D5,
+  D7 and D8 remain decisions for rung-2 and rung-1 producers. No authorized real dense
   capture set was available, so no representative registration or quality result is claimed.
 - Date: 2026-09-03
 - Deciders: Exulanica build. Four independent proposals were scored by judges on honesty, on the
-  metric frame and query path, and on what could be implemented now on this machine.
+  metric frame and query path, and on what could be implemented on this machine.
 - Supersedes: nothing wholesale. It corrects two sentences in place, named in D2 and D3.
 - Related: [product-specification.md](../product-specification.md) section 5;
   [reconstruction-findings.md](../reconstruction-findings.md);
@@ -20,7 +20,7 @@
 
 The ladder has four rungs and, until this work, one producer. `decide_rung` awards rung 3 or rung
 4 from one photograph. The controllers for the rungs above it exist and are contract tested, and
-until now none of them had a backend: `pose` shelled out to a `colmap` binary that is not
+until this work none of them had a backend: `pose` shelled out to a `colmap` binary that is not
 installed anywhere in this project, and `splat` delegates to a container entrypoint nobody has
 built. Nothing in `exulanica.ingest` calls any of them, so no rung above 3 has ever been published.
 
@@ -73,9 +73,9 @@ sentence so that nobody is told posed relief is photoreal. `SplatQuality.fallbac
 if a corridor was measured.
 
 **D3. A scene-level threshold that changes only the label leaves the idempotency key. A
-per-capture one does not, and this distinction is the whole decision.** Today every tunable number
+per-capture one does not, and this distinction is the whole decision.** Every tunable number
 lives in stage params, so editing one regenerates every artifact. That is right for a parameter
-that changes the bytes, such as the silhouette threshold. It is also right, today, for the rung 3
+that changes the bytes, such as the silhouette threshold. It is also right for the rung 3
 threshold, and moving that one would be a mistake: the per-capture rung is a persisted assertion
 written once during ingest, and the stage returns early when it reuses an artifact, so a threshold
 outside the key would change no stored rung at all and the displayed rung would silently disagree
@@ -88,8 +88,8 @@ alongside its decision, so a scene threshold change is a named re-label rather t
 `quality.py` already applies to observations, applied to thresholds: a missing measurement is not
 a missing check. The gate refuses with a reason naming the field. It converts the anti-guessing
 protocol from a convention that a reader must honour into a structure that fails. Every threshold
-this design needs is unmeasured today, so on the day it is built it publishes rung 3 with reasons,
-which is the honest state of a pipeline whose numbers do not exist yet.
+this design needs is unmeasured, so on the day it is built it publishes rung 3 with reasons,
+which is the honest state of a pipeline whose numbers do not exist.
 
 **D5. The metric scale is its own receipt, it never opens the query path, and it does not relax
 the splat gate.** The scale receipt binds to the pose receipt's digests and records its method by
@@ -113,7 +113,7 @@ Two things follow that are easy to get wrong, so they are stated rather than imp
   spread the criterion would reintroduce, as the gate, the exact inference this decision rejects.
 
 **D6. A posed multi-view set is a rung 3 sub-state over unchanged member files.** *Written as
-"unchanged OPM/1 files"; ADR-0010 was built on 2026-09-03 and the container is now OPM/2. The
+"unchanged OPM/1 files"; ADR-0010 was built on 2026-09-03 and the container is OPM/2. The
 decision is unaffected, because what it turns on is that placement does not change the FILE, and
 OPM/2 D7 keeps placement out of the container for the same reason.* The specification
 already says rung 3 point maps are "placed at recovered poses where they exist". Placement is
@@ -143,7 +143,7 @@ floor. The look envelope is derived from the members, half the smallest horizont
 field of view across registered cameras, so the envelope provably never leaves what the cameras
 saw and needs no unvalidated constant.
 
-**D9. A fact about a set needs a subject, and deletion has to reach it.** Every artifact today is
+**D9. A fact about a set needs a subject, and deletion has to reach it.** Every artifact is
 keyed to exactly one source blob, which is what the purge cascade and the export projector join
 on. A pose receipt, a splat and a placement record are facts about N photographs and have no home
 in that scheme. They get one: a scene identity with an explicit many-to-many source relation, a
@@ -155,22 +155,22 @@ released and the export changes.** *BUILT 2026-09-03. The identity is migration 
 could be edited afterwards is a deletion that could be undone by an UPDATE. The tombstone path is
 `tombstone_blocks_scene`, one predicate in SQL, reaching a scene through ANY member. The no-ship
 test is in `tests/test_scene_identity.py`. What is NOT built is the scene-level rung assertion,
-which is the remaining clause of this decision, and no producer writes a scene, so nothing ships one
-yet.* The reduction over a group changes with it: worst-first stays
+which is the remaining clause of this decision, and no producer writes a scene, so nothing ships one.*
+The reduction over a group changes with it: worst-first stays
 right for panels, because a hole is a hole, and is wrong for a scene, because four unregistered
 photographs are not holes in a corridor, they are photographs that open as photographs.
 
-*BUILT 2026-09-04. The preceding "not built" state is now closed. Migration 0025 seeds
+*BUILT 2026-09-04. The preceding "not built" state is closed. Migration 0025 seeds
 `reconstruction_scene_rung_is` without the per-frame `valid_fraction` carried by
 `reconstruction_rung_is`. `record_scene_rung` publishes rung 3 as an inference supported by the
 whole-image spans of the registered members, records the complete member count and both reasons
-the receipt gate cannot yet award rungs 1 or 2, and relies on the existing support rule to refuse
+the receipt gate cannot award rungs 1 or 2, and relies on the existing support rule to refuse
 a scene nobody registered. The assertion guard and the read both ask `tombstone_blocks_scene`, so
 deleting an unregistered member withdraws the claim even though that member supplied no support
 span. The world-package projector filters scene assertions from both copies at the same source,
 and its `rung_claims` subject resolves to the same pseudonym as the exported scene.*
 
-*BUILT 2026-09-04. The remaining producer clause is now closed. Migration 0026 adds an immutable
+*BUILT 2026-09-04. The remaining producer clause is closed. Migration 0026 adds an immutable
 ordered job-member set, deterministic scene and job identities, a recorded selection-policy
 digest, and renewable leases. Normal `run_scene_grouping` applies the explicit
 `exulanica.scene-group-pose-selection/v1` policy and queues every group of at least three members.
@@ -180,12 +180,12 @@ atomically publishes the rung assertion and successful job state. Graph and pack
 the retryable prepared state. The policy records its unvalidated limits rather than presenting
 scene grouping as a geometric fact.*
 
-*CORRECTED 2026-09-04. Automatic selection now waits until every member has a current point map.
+*CORRECTED 2026-09-04. Automatic selection waits until every member has a current point map.
 Migration 0027 binds each job to those exact artifact ids and content digests plus all scene-stage
 versions. A changed point map or stage binding creates a new immutable build under the same stable
 scene identity. Per-build registration rows retain both outcomes, while `current_job_id` advances
 only with successful publication. The graph and package no longer select a successful job by
-timestamp. They follow the explicit pointer. The production derivative-worker image now contains
+timestamp. They follow the explicit pointer. The production derivative-worker image contains
 MoGe and Compose configures it, closing the deployment path that previously queued pose before the
 depth artifacts it was meant to place existed.*
 
@@ -218,7 +218,7 @@ not a preference.
 
 *What it did not settle, and two things it changed the shape of.* A region attempts one point map
 and any others it holds are counted as `unplaced`, because D6's placement record does not exist.
-That is the first thing this now unblocks.
+That is the first thing this unblocks.
 
 **D6 and ADR-0010 have an ordering constraint that neither record names, and this route is what
 makes it visible.** D6 binds a placement record to its members by content hash. ADR-0010 D9 is
@@ -232,7 +232,7 @@ deliberately does NOT filter `superseded_by`, so an old row stays fetchable; tha
 reason a stale record would degrade rather than break, and it is documented in
 `exulanica/graph/geometry.py` as a decision rather than left as an omission.
 
-*DISCHARGED 2026-09-03. OPM/2 went first.* ADR-0010 is built, the depth stage's params now read
+*DISCHARGED 2026-09-03. OPM/2 went first.* ADR-0010 is built, the depth stage's params read
 `"container": "opm/2"`, and every point map an existing corpus held is refused by name and
 rewritten under a new idempotency key. So D6 may be built without a regeneration path for a
 record written before the bump, because no such record exists: nothing has ever written one. The
@@ -240,7 +240,7 @@ constraint is retired rather than solved, which is the cheapest of the two outco
 and it is retired only for this bump. **A third container version would recreate it**, and at
 that point D6's records WILL exist and the regeneration path becomes the only option left.
 
-*BUILT 2026-09-04. D6 now has its production delivery contract. `GET /graph` includes one
+*BUILT 2026-09-04. D6 has its production delivery contract. `GET /graph` includes one
 validated reconstruction-scene record with the exact member order, registration outcomes, receipt
 digests, per-map descriptors and transforms, recorded and displayed rung fields, substrate, and
 exclusions. It is read in the graph's repeatable-read snapshot. The server reproduces the gate and
@@ -248,14 +248,14 @@ validates the placement against the live artifact rows before any transform cros
 The browser authenticates and verifies each point map separately and the PlayCanvas binding draws
 one transformed cloud per accepted map under one scene root.*
 
-**D11 is now larger than it was, not smaller.** `buildScene` already lets loaded geometry outrank
+**D11 is larger than it was, not smaller.** `buildScene` already lets loaded geometry outrank
 the recorded rung, on the stated grounds that "a region holding a decoded point map is standing in
-rung 3 geometry right now". That was true of one preview fixture and is now true of every
+rung 3 geometry". That was true of one preview fixture and is true of every
 production region that gains geometry, and `Island.rung` is a mode switch rather than a label: it
 selects the world recipe, the movement model, the arrival pose and whether the source-first grove
 is built. So the scene graph's rung is what the renderer draws, and the rung D11 has to display is
 what the region earned, worst-first across its captures. **Those are two different numbers and
-D11 has to name both**, which the record does not yet do.
+D11 has to name both**, which the record did not do.
 
 **D11. The rung is displayed, from the recorded claim rather than from the container.**
 Specification 5.1 says the rung is shown as part of a region's identity and calls it the honesty
@@ -287,7 +287,7 @@ no tombstone reaches it, and descriptors of a photograph containing a person are
 of derivative the privacy model expects to be destroyed. **The job directory is deleted when the
 receipt is accepted, and until a scene artifact exists to carry it, no pose job may run over a
 capture set outside a scratch location that is purged on a timer.** This is stated as a decision
-rather than a future concern because the executor that makes those directories now exists and
+rather than a deferred concern because the executor that makes those directories exists and
 runs.
 
 *One detail found while building D10, recorded here because it changes what implementing D12
@@ -301,7 +301,7 @@ photographs, and the receipt, which is a statement about a computation;
 either moves. The rest of D12 stands: nothing registers the directory as an artifact, so no
 tombstone reaches it.
 
-*BUILT 2026-09-04. Durable pose, placement and gate receipts now live in the content-addressed
+*BUILT 2026-09-04. Durable pose, placement and gate receipts live in the content-addressed
 store, while staged images, descriptors, the COLMAP database and sparse working files live only in
 locked scratch. Handled success, failure and cancellation remove scratch. Process death retains
 checkpoints for lease reclaim; an age-gated startup sweep removes only inactive, unprotected,
@@ -334,15 +334,15 @@ cleanup, closing the expired-running edge without deleting resumable work from a
 - Rung 2 becomes reachable on a laptop, from three or more overlapping photographs, with no GPU
   and no trained splat. Rung 1 stays blocked on a GPU job that has never run and on a resumable
   trainer that does not exist.
-- The scale of the world this is designed for is not the scale the interface currently admits. The
+- The scale of the world this is designed for is not the scale the interface admits. The
   layout solver refuses more than five islands, and this record does not lift that: a design that
-  is right at a hundred regions is being chosen deliberately while the cap stays where it is,
+  is right at a hundred regions is chosen deliberately while the cap stays where it is,
   because lifting it needs a layout measurement that nobody has made.
 - Every rung above 3 published on the day this is built is published as rung 3 with reasons,
   because every threshold it needs is unmeasured. That is the design working, not failing.
 - The fraction of a real library that can reach rung 2 is unknown and is the number the product
   most needs. Published proxies bracket it between 1.6 and 25 percent.
-- Displaying the rung is now on the critical path rather than beside it.
+- Displaying the rung is on the critical path rather than beside it.
 
 ## What must be measured before this is final
 
@@ -352,7 +352,7 @@ cleanup, closing the expired-running edge without deleting resumable work from a
   registers under defaults, and wall time at full resolution for 8, 20 and 50 images.
 - The filled fraction of the frustum union for a real multi-photograph capture, against the
   single-photograph decomposition already measured.
-- Every threshold named in D3 and D4, each against a corpus that does not exist yet.
+- Every threshold named in D3 and D4, each against a corpus that does not exist.
 - ~~The deletion test of D9, before any scene-level artifact ships.~~ **BUILT 2026-09-03**, both
   halves, in `tests/test_scene_identity.py`: three photographs, one scene over them, and the middle
   one deleted through `insert_tombstone`. The bytes half asserts the receipt is enqueued, that

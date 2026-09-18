@@ -107,7 +107,7 @@ cause is invisible from the response.
    arrived at that number by measurement.
 2. When `finish_reason` is `length` and no answer content was produced, say so distinctly. A
    response that spent its entire budget on reasoning is a different event from a truncated answer,
-   and the caller cannot currently tell them apart.
+   and the caller cannot tell them apart.
 3. If a thinking-off mode is intended to exist, document which parameter controls it, and return an
    error for a parameter that does not.
 
@@ -174,7 +174,7 @@ there.
 **And the `use_cases` reading is the correct one, by execution.** A single `image_url` content part
 was sent to `MiniMaxAI/MiniMax-M3`. It returned HTTP 200 and described the test image accurately:
 "Red rectangle" for a tall vertical red block and "Black rectangle" for a long horizontal bar. It is
-genuinely seeing the image, not merely accepting the request without error. That model is now this
+genuinely seeing the image, not merely accepting the request without error. That model is this
 project's vision sensor.
 
 The `nvidia/Nemotron-3-Nano-Omni` case is the sharpest illustration. Its own catalog `description`
@@ -283,10 +283,10 @@ responses, models, files, image generations, fine-tuning, dedicated endpoints, d
 operations. The strings `audio`, `speech`, `transcription` and `tts` appear **zero** times in the
 entire document. No catalog entry is typed for audio.
 
-**Impact.** This is not a criticism of the platform's scope. It is a planning fact that is currently
+**Impact.** This is not a criticism of the platform's scope. It is a planning fact that is
 only discoverable by exhaustive search. This project scoped a set of features around recurring
 voices and conversations before establishing that the platform has no path for them, and deferred
-that entire pillar with a stated reason as a result. A team that discovers this later than we did
+that entire pillar with a stated reason as a result. A team that discovers this later
 loses more.
 
 **Suggested fix.** One line in the platform overview stating which modalities are supported and
@@ -314,7 +314,7 @@ nearest alternative, `nvidia/Nemotron-3-Embed-1B-BF16`, is a self-hosted deploym
 vector width, so it is not a runtime failover.
 
 **Suggested fix.** A second serverless embedding model, at any price point, would remove this. If
-that is not planned, saying so is still useful, because it tells a developer to precompute and
+that second model is absent from the platform roadmap, saying so is still useful, because it tells a developer to precompute and
 freeze embeddings rather than depending on the endpoint at request time.
 
 ### F8. Documentation is stale in places that produce copy-paste failures
@@ -473,7 +473,7 @@ What would most improve the developer experience, in the order this project woul
    model labelled Text-to-text in the console is a wrong answer to the most common catalog question
    there is (F3).
 4. **State which field carries a reasoning model's thinking text, and guarantee it.** Two fields
-   currently carry it verbatim in the responses this project archived, and this project's own notes
+   carry it verbatim in the responses this project archived, and this project's own notes
    record a third arrangement. Every caller has to write defensive parsing for something the
    platform knows the answer to (F1, OPEN).
 5. **Normalise model identifier casing and show the exact callable string everywhere a model is
@@ -493,4 +493,4 @@ What would most improve the developer experience, in the order this project woul
    so anywhere in the notice (F5).
 10. **Document the smallest orderable managed PostgreSQL configuration.** The only sizing signal on
     the pricing page is a production-shaped worked example, and whether anything smaller can be
-    ordered is currently OPEN (section 4).
+    ordered is OPEN (section 4).

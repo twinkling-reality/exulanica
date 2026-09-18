@@ -1,7 +1,6 @@
 # The generated corridor: one street, from a seed
 
-Status: **GENERATED, VALIDATED AND GATED; NOT YET BAKED INTO THE STORE OR SCORED**. Updated
-2026-09-17.
+Status: **GENERATED, VALIDATED AND GATED; NOT BAKED INTO THE STORE OR SCORED**.
 
 This is the first street the city grammar generates: 126 m of high street with two facing
 frontages, produced from one seed by the eleven stages of city version 2, cut into tiles, and held
@@ -77,7 +76,7 @@ answer, and this is the count across the city:
 | `terrain` | 5 | Bare ground, which no set depicts and none is asked for. |
 
 Doors (228), crossing bands (40), tree pits (118), awnings, glazing, transoms, shopfront frames,
-bark and foliage were on that list earlier today and are not now: `material.v4.json` dresses them
+bark and foliage were on that list before `material.v4.json` and are not after: `material.v4.json` dresses them
 from the sixteen published sets it holds, six of which arrived with texture batch 3. The count is
 measured against the material records the city actually holds, so it falls on its own as sets are
 published and nothing has to remember to edit a list. It counts surfaces, not area: five terrain
@@ -150,7 +149,7 @@ retried.
 A loader is better off listing first and fetching only the digests it does not already hold: one
 small request for a whole city, rather than a revalidation per tile.
 
-## 7. What draws today, and what does not
+## 7. What draws, and what does not
 
 Measured from the container the route serves for tile (2, 0), baked by tessellator 17 at main
 de0ccbd4, container sha256 `93df0715f5...`. The counts are
@@ -195,7 +194,7 @@ Read without that filter, the south frontage in the column in front of the walke
 ground band, fascia, glazing, shopfront frame and stall riser, and every one is dressed by a
 material record. In that ten metre column there is no undressed surface at all except the terrain.
 
-The interior backings now draw, as of tessellator 16, which makes the question testable: the
+The interior backings draw. Tessellator 16 added them, which makes the question testable: the
 experiment is written down, unrun, in
 [magenta-comparison.md](artifacts/corridor/magenta-comparison.md). Until it is run, a caption for
 any picture of this street should say the magenta is an unavailable surface and stop there.
@@ -241,7 +240,7 @@ name the same parameters.
 | never | no camera override (it renders a quarter frame) and no writing of a position: a walk that teleports proves nothing about support |
 | viewport | 960 px wide or more, because the app serves its boundary page below 60rem and would film an apology |
 
-**What I expect it to do, so that a surprise is legible as one.** Tess's carve now leaves the
+**What I expect it to do, so that a surprise is legible as one.** Tess's carve leaves the
 footway supported along the walked line, with fourteen gaps of about a metre where a 151 mm trunk
 plus the 340 mm a body needs interrupt it. The tile carries no `collision_proxy`, so nothing stops
 a walker entering one; what happens when a walker meets a metre of unsupported footway is the open
@@ -275,14 +274,14 @@ walking, which is 146 + 1 620 exactly.
 **What is past the end of the line.** The walk stops at x 378 000 and the curb it is on ends at
 378 300. Beyond that is a junction, and a walker who keeps going steps off the pavement onto
 terrain at z 0, which is a 146 mm fall. That was measured by the tile runtime lane at x 378 334 and
-is a different question from a hole in the footway; it has no parameters written for it yet, and
+is a different question from a hole in the footway; it has no parameters written for it, and
 the walk was deliberately NOT extended to cover it, because a line chosen to include a known event
 is not a walk, it is an illustration of that event.
 
 **What the pictures must not imply.** The pale ground at the base of the frontages is the
 **parcels' lot ground**, the private ground behind the frontage line, and not the footway. And the
-magenta seen through every shop window is an unavailable surface whose visibility is not yet
-explained: see section 7, and the experiment written down in
+magenta seen through every shop window is an unavailable surface whose visibility is
+unexplained: see section 7, and the experiment written down in
 [magenta-comparison.md](artifacts/corridor/magenta-comparison.md). A frame that would need either
 sentence to be read correctly is evidence of a stage, not a picture of a street, and should not be
 used where the sentence cannot travel with it.
@@ -322,7 +321,7 @@ Five predictions, five matches.
 
 **The last row shrank.** Tessellator 17 writes 82 308 fewer bytes than 16 while both its triangle
 digests move, because its corner rule stops a footway short of a frontage that no carried block
-marks: at a tile edge, where the block belongs to the neighbouring tile, the old rule drew the
+marks: at a tile edge, where the block belongs to the neighbouring tile, tessellator 16 drew the
 whole slice and the footway ran through where a building stands. Less geometry and more correct,
 which is a combination a byte count alone would report as a loss.
 

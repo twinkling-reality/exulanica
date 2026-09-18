@@ -1,7 +1,7 @@
 """Per-workspace tile quotas: a ceiling on the tiles one workspace may have materialised on demand.
 
-**Why this exists before anything it meters.** Milestone 1 bakes tiles offline and ships no
-on-demand tile route. The first such route is a compute amplifier: one request turns into a
+**Why this exists before anything it meters.** Tiles are baked offline and no on-demand tile
+route ships. The first such route is a compute amplifier: one request turns into a
 tessellation, and a loop of requests turns into a bill and a full disk. So the ceiling lands
 first, and the route that needs it inherits it by declaration rather than by remembering to call
 it. :func:`exulanica.api.dependencies.authorise_route` charges one tile against this table for

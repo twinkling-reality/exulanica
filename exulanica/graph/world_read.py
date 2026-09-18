@@ -1,6 +1,6 @@
 """The World Read API bundle: what a generative world model may condition on, and nothing else.
 
-Roadmap Phase 10 capability 1. A generative world model of 2026 is stateless imagination: it dreams
+A generative world model of 2026 is stateless imagination: it dreams
 a plausible world for a session and cannot say which of its pixels are real. This bundle is the
 memory it lacks, in the one form it can consume: for one reconstructed scene, the posed views with
 their recovered calibration, the geometry that was actually built from those photographs, the slice

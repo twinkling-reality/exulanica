@@ -1,6 +1,6 @@
 """Which photographs observed a point: recorded provenance, served for click-to-evidence.
 
-Roadmap Phase 10, the Atlas half. A visitor selects a surface and asks what it is made of. The
+A visitor selects a surface and asks what it is made of. The
 honest answer is the set of photographs whose cameras actually observed that piece of the world,
 and it exists: the pose stage retains a bounded sample of COLMAP's tracks in each recovered camera,
 and COLMAP's ``point_id`` is global across the selected model, so grouping those rows by point id
@@ -45,7 +45,7 @@ scene-wide facts: its liveness predicate is an OR over captures sharing a blob, 
 capture would keep serving a fact about a set from which another was withdrawn.
 
 Consent rides along per photograph, through the same seam the World Read bundle uses. Note what
-that does and does not do today: it **reports** each photograph's screening state, and it filters
+that does and does not do: it **reports** each photograph's screening state, and it filters
 nothing, because no per-person consent state exists to filter on. Every observation currently
 carries ``person_consent: unscreened``, which says nobody has looked at that photograph for people
 and never that there is nobody in it. Filtering is Phase 10 capability 5's to add, on the

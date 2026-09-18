@@ -1,10 +1,10 @@
 # Physical residency and renderer hardening
 
 Status, corrected 2026-09-13: **RENDERER CONTRACT IMPLEMENTED; production streaming and
-target-hardware gate OPEN**. Authenticated point-map, splat and authored-asset routes now exist.
+target-hardware gate OPEN**. Authenticated point-map, splat and authored-asset routes exist.
 The point-map and splat routes serve whole objects with `Cache-Control: no-store` and
 `Accept-Ranges: none`; their existence does not establish useful range streaming. The app
-does not yet instantiate `PhysicalResidencyRuntime`, and deployed object-store responses
+does not instantiate `PhysicalResidencyRuntime`, and deployed object-store responses
 and an end-to-end target-hardware trace remain unverified. Predecoded fixture maps and
 mocked HTTP responses do not establish production streaming.
 
@@ -29,10 +29,10 @@ whether a requested byte range returned an observed `206` plus `Content-Range` o
 whole-object `200`. Tests exercise both outcomes. This is instrumentation of the real response, not
 evidence that a production asset route honors Range usefully.
 
-`AtlasBinding.onResidencyActions` is now the production seam. With no executor, already decoded
+`AtlasBinding.onResidencyActions` is the production seam. With no executor, already decoded
 fixture maps settle immediately. With an executor installed, a visual stays at its current physical
-stage until `settleResidencyRequest` acknowledges checked publication. Planned allocation no longer
-enables a not-yet-uploaded visual.
+stage until `settleResidencyRequest` acknowledges checked publication. Allocation does not
+enable an unpublished visual.
 
 ## Measurement-driven downgrade
 
@@ -44,7 +44,7 @@ not influence the renderer. The binding replans only when the measured pressure 
 
 ## Representation inspection is a separate bounded layer
 
-The application now instantiates a renderer representation registry and a **World to data**
+The application instantiates a renderer representation registry and a **World to data**
 inspector for currently borrowed draws. It can blend compatible rendered geometry with bounded
 points, use an existing retained point draw without taking ownership, or generate deterministic
 surface samples from the triangles of a static mesh. Generated samples are labeled as presentation,
@@ -65,7 +65,7 @@ the camera by that origin; overlays and procedural field coordinates apply the i
 Placement verification adds the render origin back before comparing with canonical `localToAtlas`,
 so rebasing cannot hide a transform error.
 
-The world field no longer truncates presentation buffers at five regions and ten traces. Shader
+The world field does not truncate presentation buffers at five regions and ten traces. Shader
 capacity and typed buffers are generated from the exact topology counts, and a 120-region contract
 test verifies that every region reaches the buffer. No additional draw batching is claimed: there
 is no target-hardware measurement in this checkout demonstrating a draw-call bottleneck or a safe
@@ -78,12 +78,12 @@ prevents the browser default, opens the complete World Index, and reports why th
 longer current. The physical executor separately tests retained-decode re-upload and its World Index
 failure callback.
 
-Unit and integration contracts now cover stale/cancelled fetches, honest availability states,
+Unit and integration contracts cover stale/cancelled fetches, honest availability states,
 fetch/decode/upload ordering, downgrade/release/disposal, context restore failure, Range response
 classification, pressure downgrade/recovery, neighborhood rebasing, scalable field buffers, and
 the Index recovery transition.
 
-The Phase 6 exit gate still requires published real assets and a large fixed topology on declared
+The target-hardware streaming gate still requires published real assets and a large fixed topology on declared
 target hardware and network budgets. It also requires an actual authenticated origin/CDN trace to
 answer whether ranges are useful. Those inputs do not exist locally, so the renderer contract can
-be committed while the experiential/operational phase gate remains blocked.
+be committed while the experiential/operational gate remains blocked.

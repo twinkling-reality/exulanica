@@ -1,4 +1,4 @@
-"""``exulanica-frontier demonstrate``: the Phase 8 evidence-to-package gate."""
+"""``exulanica-frontier demonstrate``: the evidence-to-package gate."""
 
 from __future__ import annotations
 

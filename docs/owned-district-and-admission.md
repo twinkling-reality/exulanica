@@ -142,7 +142,7 @@ its placement in a branch is a separate input. No windows receive separate objec
 | Recipe | Authority and bounded meaning |
 | --- | --- |
 | `source-footprint` | Observed source footprint reference, preserving every polygon and ring in the bound base. Building subjects support exterior collision; sidewalks alone do not assert accessibility. |
-| `facade-grid` | Generated mass height, bay/floor spacing, window dimensions, recess and material index. Base height can be source-derived, clamped or fallback; legacy v1 cannot distinguish these cases. No observed windows or material claim. |
+| `facade-grid` | Generated mass height, bay/floor spacing, window dimensions, recess and material index. Base height can be source-derived, clamped or fallback; v1 cannot distinguish these cases. No observed windows or material claim. |
 | `roof-parapet` | Generated flat roof at the declared mass height and parapet height. Holes must remain holes. No surveyed roof equipment or roof access. |
 | `flat-ground` | Authored zero-height datum for visible ground and existing collision support. |
 | `residual-ground` | Generated visible ground minus all retained building and sidewalk subjects. Not observed roads, lanes, crossings or route support. |
@@ -159,7 +159,7 @@ Other components, park interiors, road crossings and unsupported space have no e
 Every node and entire straight edge must fit inside one source sidewalk polygon with strictly
 more than 450 mm clearance from all its rings, all building exterior rings and district bounds.
 Exact integer predicates reject crossings and tangencies, including narrow obstructions between
-valid endpoints. Building courtyard holes remain conservatively blocked to match the old
+valid endpoints. Building courtyard holes remain conservatively blocked to match the v1
 navigation policy; sidewalk holes remain unsupported. Renderers retain holes regardless of this
 navigation restriction. The graph establishes simulated clearance in retained geometry, not
 current real-world pedestrian access, ADA accessibility or legal entry.
@@ -175,7 +175,7 @@ feature/dataset bindings, false observation labels, unsupported recipe uses, unr
 coordinate disagreement and unsafe edges. TypeScript injects a host SHA-256 function because the
 core does not import DOM or Node. The host must hash exact base bytes; a reserialized object digest
 is not equivalent. Parsed interpretation state is copied before asynchronous hashing and frozen.
-Old input without an interpretation still parses; consumers report `interpretation-unavailable`
+Input without an interpretation still parses; consumers report `interpretation-unavailable`
 instead of inventing routes. An empty graph reports `no-supported-connected-sidewalk`.
 
 ### Current availability and authored composition
@@ -202,7 +202,7 @@ authored geometry. Unregistered transforms, unavailable dependencies, positions 
 and blocked connectors produce unavailable targets, never nearest-node snapping. Accepted edits
 must remain ordered even between ticks. Restoring an earlier authored state still checks current
 rights and does not undo simulation history. Persistence, adapter wiring, current-rights resolution,
-Selection/Companion and shared export barrels belong to integration, not this producer. The current
+Selection/Companion and shared export barrels belong to integration, not this producer. The
 integration supplies PostgreSQL composition, current-rights resolution, the authenticated exact-byte
 district view and a browser adapter for the registered translation-only frame. Selection,
 Companion grounding and package export remain incomplete.
@@ -211,7 +211,7 @@ The same authorized input exposes canonical `visit` and `rest` targets to the so
 Typed `go_to` and `perform` requests can name those target IDs through the society action API; the
 server freezes the current target and the next deterministic transition records whether the request
 applied. This adds no road crossing, browser-space destination, teleport or new affordance. The
-current browser can inspect district destinations but does not issue directed-action requests.
+browser can inspect district destinations but does not issue directed-action requests.
 
 ## Relationship to authored worlds
 
@@ -235,14 +235,14 @@ Complete-district validation requires:
 6. bounded CPU, GPU, memory, draw-call and resident-byte measurements; and
 7. no use of reference-only data outside its admitted operations.
 
-The current evaluation record covers only part of this matrix and therefore does not establish
+The evaluation record covers only part of this matrix and therefore does not establish
 complete-district validation.
 
 
 Producer verification is in `tests/test_district_interpretation.py`; the independent TypeScript
 reader, shared-coordinate and clearance tests are in
 `web/packages/atlas-core/test/district-interpretation.test.ts`. These verify retained-source
-recompilation, old artifact compatibility, deterministic output, malformed and cross-bound references,
+recompilation, prior-artifact compatibility, deterministic output, malformed and cross-bound references,
 withdrawn/unresolved dependencies, supported destinations, polygon holes and whole-edge collisions.
 Compiler fixtures do not establish street-level visual quality, authenticated persistence,
 authored-object adapter correctness, Companion grounding or end-to-end acceptance.

@@ -8,13 +8,13 @@ rendered geometry does not establish historical facts.
 
 ## Implementation
 
-The current intake supports still images. Reconstruction quality and available movement depend
+Intake supports still images. Reconstruction quality and available movement depend
 on source coverage and the resulting artifact. Broader media support is separate work.
 
 Single-image depth produces a partial surface, not a complete explorable place. Multi-image pose
 recovery and scene-specific Gaussian training exist, with retained scene evidence; their presence
 does not prove coherent coverage for a new source set. Training a scene is distinct from training
-or integrating a general world-generation model. The roadmap's usable-place milestone still
+or integrating a general world-generation model. The usable-place demonstration
 requires an actual source-to-viewer demonstration and visual acceptance.
 
 See [reconstruction operations](../scene-reconstruction-operations.md),

@@ -3,10 +3,10 @@
 Design note, 2026-09-06. **Implemented and wired end to end, and exercised against a real
 database.** A detected person leaves a row, the row forces a masked derivative, reconstruction
 reads that derivative, the database refuses geometry over the original, and a reviewer can confirm
-who is present and record what each of them agreed to. Read "What exists now" at the foot of this
+who is present and record what each of them agreed to. Read "What exists" at the foot of this
 note for what is still missing, which is not nothing. Written after the first real reconstructions
 showed
-that the current gate ("a named human states there are no visible people or sensitive person
+that the gate ("a named human states there are no visible people or sensitive person
 regions") is too coarse: the retained bowl photographs contain the arms, hands and clothing of
 diners at the frame edge, no faces, and the reviewer's statement said no visible people. The
 system needs an explicit list of person regions and a consent state per person, not a yes/no.
@@ -36,7 +36,7 @@ system needs an explicit list of person regions and a consent state per person, 
 | unknown | detected or confirmed, no decision | masked | excluded | silhouette, unnamed |
 | present | presence consented, likeness not | masked | excluded | silhouette, name if naming consented |
 | shown | likeness consented | original | included | visible |
-| hidden (temporary) | likeness consented, hidden for now | original | included | silhouette at view time |
+| hidden (temporary) | likeness consented, hidden at view time | original | included | silhouette at view time |
 | withdrawn | consent revoked | masked; derived artifacts purged | excluded, rebuilt | absent |
 
 "withdrawn" reuses the existing withdrawal and purge path; the others are new.
@@ -81,7 +81,7 @@ The human screening receipt stays the gate. Its content changes from a statement
 confirmed region list with states. The two retained collections would be re-screened under the
 new stage; the bowl would record two unnamed present people, hidden, and the volcanic set none.
 
-## What exists now
+## What exists
 
 **IMPLEMENTED AND DATABASE-TESTED 2026-09-06.** The chain runs: `person_regions` proposes and
 writes rows, `masked_source` fills every unconsented person, `depth` reads the masked image and
@@ -150,7 +150,7 @@ already made". That was wrong, and an audit found it. `exulanica/ingest/vision.p
 elsewhere and are not part of this record." `person_objects` is a defensive filter for a model that
 disobeys that instruction, not a detector. So the adapter finds almost nobody, its label set is an
 exact-match whitelist of singular nouns that does not match arms or hands, and the honest statement
-is that **a human adding regions through the review screen is the detector today**.
+is that **a human adding regions through the review screen is the detector**.
 
 MEASURED 2026-09-05, and still true: neither extra contains anything that finds people. torchvision,
 transformers, ultralytics, mediapipe, onnxruntime, rembg and segment-anything are all absent, and
@@ -321,7 +321,7 @@ was saying out loud that the guard protects nothing until an operator opts in.
 masking path has no honest route through production.** `record_human_screening` blocks any
 screening listing a region in a `MASKED_STATES` state, and its only production caller,
 `exulanica/ingest/reference_admission.py`, passes `sensitive_regions=[]`. So the screening
-receipt's region list has no production writer, and the only way to reach the masking path today is
+receipt's region list has no production writer, and the only way to reach the masking path is
 for the screening's region list and the `person_region` table to disagree, which is exactly what
 `tests/test_person_masking_end_to_end.py`'s synthetic exemption arranges.
 
@@ -330,7 +330,7 @@ masking stages are not yet wired into the pipeline, so nothing anywhere would ac
 person before depth read them", and "when masking is wired end to end this becomes eligible if
 every masked region has a current `masked_source` derivative".
 
-**DECIDED 2026-09-07: masking is wired end to end, so that is now the rule.** See the section at
+**DECIDED 2026-09-07: masking is wired end to end, so that is the rule.** See the section at
 the foot of this note for what replaced it and the three cases that are executed against a real
 database.
 
@@ -353,7 +353,7 @@ volcanic `79004d44`, are `unscreened` for people in every World Read bundle, whi
 internal_only` for all three scenes.
 
 The end-to-end test proves the mechanism against PostgreSQL, a real migration and a real on-disk
-store, using synthetic data in a throwaway schema. Nobody has yet seen it work on a real
+store, using synthetic data in a throwaway schema. Nobody has seen it work on a real
 photograph.
 
 ## What the World Read bundle now says about people, and what it deliberately does not

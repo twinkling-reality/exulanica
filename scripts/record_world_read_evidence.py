@@ -1,4 +1,4 @@
-"""Read the retained real scenes through the Phase 10 read paths and retain what they answer.
+"""Read the retained real scenes through the World Read paths and retain what they answer.
 
 Read-only against ``postgresql://localhost:5433/exulanica_spine_test`` and the retained
 content-addressed store. Writes one digest-bound record under ``docs/evaluation`` and nothing else:

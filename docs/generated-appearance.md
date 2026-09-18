@@ -3,8 +3,8 @@
 Status: TRACK A SESSION 1 RUN AND MEASURED 2026-09-17 (section 9). 64 model-made texture sets on
 exact structure, on one rented machine for 2.14 h and $5.63 at the day's listed rate; seams inside
 the published sets' own range, structure edges kept, every picked tile looked at at 1:1. Nothing has
-been handed to the texture lane and no set is pinned. Track B has not run and is not approved at the
-current balance. The code is `ml/appearance/` ([its README](../ml/appearance/README.md)).
+been handed to the texture lane and no set is pinned. Track B has not run and is not approved at this
+prepaid balance. The code is `ml/appearance/` ([its README](../ml/appearance/README.md)).
 
 ## 1. In plain words
 
@@ -339,7 +339,7 @@ Measure it again from what the run wrote:
 - **Seams**: over both axes of all 64 outputs, min 756618, median 988545, max 1335650 per million,
   where 1000000 is no seam. The eight published procedural sets, seamless by construction, read
   290000 to 1770000 on the same measure, so every one of the 128 readings sits inside the range
-  shipped today. The lane's own tiling (the per-step cyclic roll with the wrap-padded encode and
+  the eight published procedural sets occupy. The lane's own tiling (the per-step cyclic roll with the wrap-padded encode and
   decode) is the only reason for that, and this is the measurement of it.
 - **Structure kept**: the share of the conditioning picture's own edges that have an output edge
   within 2 px. Depth conditioning holds everywhere, 97.2 to 100 per cent. Edge conditioning holds on
@@ -377,8 +377,8 @@ carries it. Nothing learned from photographs lands on precisely the autoencoder'
 is a defect of the lane's own latent pipeline and not third-party content. Which stage is not
 settled: the per-step roll fitted this one output (step 12 shifted the rows by 51, and 128 - 51 = 77)
 and then failed over the population, where 47 per cent of strong lines sit on a boundary the seed's
-schedule visited against 44 per cent expected by chance. The latents were not retained, so the next
-session records per-latent-row statistics at each step. That set is not offered while the defect
+schedule visited against 44 per cent expected by chance. The latents were not retained, so per-latent-row
+statistics at each step remain unrecorded. That set is not offered while the defect
 stands.
 
 Nothing has been handed to the texture lane. Track B has not run and is not approved.
@@ -387,7 +387,7 @@ Nothing has been handed to the texture lane. Track B has not run and is not appr
 
 - Cosmos 3 transfer's memory and speed on a 96 GB card, and whether vLLM-Omni weights several
   controls at once for it: unpublished, and NVIDIA's documents disagree. It would be measured in
-  Track B's first hour, and Track B is not approved at the current balance.
+  Track B's first hour, and Track B is not approved at this prepaid balance.
 - Seamless tiling on transformer image models: no published method is merged upstream; the lane
   builds it (cyclic latent shift, circular VAE decode) and holds every set to the seam check.
 - Whether a generated look beats the procedural one on the bench says little about a whole street:
@@ -401,9 +401,9 @@ Nothing has been handed to the texture lane. Track B has not run and is not appr
 - Whether the appearance a model invents suits the world's other materials is unknown: four targets
   ran, and the catalog holds eight makers.
 - Which stage of the latent pipeline leaves the dark 8 px-pitch band in painted render a1. It is
-  traced to the latent grid and cleared of being third-party content (section 9). The runner now
+  traced to the latent grid and cleared of being third-party content (section 9). The runner
   measures the latent the decoder is about to read and writes where its rows and columns stand out
-  beside each output (`exulanica.appearance-latent-lines/v1`, in `diagnostics/`), so the next
-  session's outputs answer it: a line whose latent row stands 8 or more robust sigma out is the
+  beside each output (`exulanica.appearance-latent-lines/v1`, in `diagnostics/`), so outputs that
+  carry that diagnostic answer it: a line whose latent row stands 8 or more robust sigma out is the
   latent's, and a line over a level latent is the decoder's or the crop's. Nothing from that set goes
   onward until it is answered.

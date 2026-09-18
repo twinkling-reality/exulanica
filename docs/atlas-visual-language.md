@@ -104,7 +104,7 @@ Removed or rejected from the user-facing origin profile:
 - the five-billboard held-light experiment;
 - the 38-thread/barcode recollection weave;
 - the large rounded onboarding card, CTA, compact encounter card, and standing pill chrome;
-- experimental blurred side wings that did not read clearly enough to justify their presence.
+- blurred side wings that did not read clearly enough to justify their presence.
 
 Survey Relief retains some non-origin geometry only as an internal topology-compatible regression
 fixture. It is not a second product identity.
@@ -150,7 +150,7 @@ The style is **diffuse light**, and it is four rules rather than a look:
 What follows from those: no dividers between rows of the same kind, no filled bands behind
 headers and footers, one hairline per surface rather than one per section, no card, no drop
 shadow standing in for hierarchy, and no ornament of any kind. Every one of those is something
-the interface currently does and will stop doing.
+the interface does and the rules above refuse.
 
 World palette before personal media contributes local colour:
 
@@ -274,7 +274,7 @@ Rejected comparisons retained for audit:
 - [held-light billboard experiment](artifacts/atlas-world/aeroheart-held-light-opening-1366x768.png)
 - [rounded-card/thread-weave experiment](artifacts/atlas-world/aeroheart-memory-tide-opening-1280x720.png)
 
-## 10. Candid assessment and next slice
+## 10. Candid assessment and remaining slice
 
 The result no longer reads as an olive game level or a dashboard covering a renderer. The floor
 platform, abrupt horizon, decorative prop families, barcode source, and rounded onboarding content
@@ -291,7 +291,7 @@ carry a short action-based orientation, and Controls preserves the meaning after
 That implementation closes the documented structural gap; whether the language is sufficient for
 new users still requires observation rather than assumption.
 
-The next production-shaped vertical slice should use real thumbnail lifecycles and mixed aspect
+A production-shaped vertical slice should use real thumbnail lifecycles and mixed aspect
 ratios, test multiple authorized sources per memory, explain focused relationships without a modal
 card, validate the new first-use language with people unfamiliar with Atlas, validate large-library
 Map density, and add a first-party world selection verb. It should not add plants, monuments,

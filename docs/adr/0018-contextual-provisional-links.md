@@ -7,7 +7,7 @@
 ## Invariant
 
 The automatic identity producer writes proposals using only `context_place`,
-`context_cooccurrence` and the permitted but currently dormant `user_text` vocabulary.
+`context_cooccurrence` and the permitted but dormant `user_text` vocabulary.
 A unique highest-scoring entity may acquire an `auto_provisional` link at 800 milli-units.
 It cannot acquire a `confirmed` link: that still requires a human and `user_confirm` at the
 database boundary. The explicit `INCLUDE_PROPOSALS` Selection scope may widen retrieval on
@@ -15,7 +15,7 @@ that guess, and every packet built under that scope remains non-citable.
 
 ## Rationale
 
-The former proposer deliberately wrote no links. The new program explicitly authorizes
+The former proposer deliberately wrote no links. This program explicitly authorizes
 organizational guesses so that the existing proposal-aware Selection and human decision paths
 can operate on production rows. The threshold is an unvalidated organizational policy, not a
 probability or an accuracy measurement. Place and co-occurrence each contribute 400 milli-units;
@@ -24,8 +24,8 @@ entity contribute one best candidate, not multiple votes. A tied best score does
 automatic link, and an entity already confirmed in the candidate's capture is excluded.
 
 `calibrated_p` remains NULL and `calibration` has no new writer. There are no observed user
-calibration bins and the schema does not yet express per-user calibration provenance. Creating
-empirical frequencies from synthetic fixtures would assert evidence we do not have. A-26's
+calibration bins and the schema does not express per-user calibration provenance. Creating
+empirical frequencies from synthetic fixtures would assert evidence the record does not have. A-26's
 minimum sample policy remains unvalidated. Proposal raw scores remain internal storage values:
 neither graph rows nor answer packets gain a score field. The proposal's basis records the
 weights, thresholds, extractor version and the explicit absence of calibration. `user_text`
@@ -59,14 +59,14 @@ index refreshes use the same workspace transaction lock. Model outputs are not r
 No schema migration, API signature, browser model or export shape changes. Proposals retain their
 existing outcomes and scores remain absent from graph responses. `ProposalReport` gains the
 created provisional link ids. Existing emit keys are unchanged: previously recorded proposals
-are not rewritten or retroactively linked under the new arithmetic. They remain available for
+are not rewritten or retroactively linked under this arithmetic. They remain available for
 a human decision. The former no-link test is superseded by the actual widened
 Selection and non-citable packet contract. Confirm, reject and undo use their existing state
 transitions: confirmation revokes the guess, rejection rejects it, and undo restores `proposed`.
 The derivative gives the existing dependency invalidator a real production consumer.
 Existing proposal emit keys remain unchanged: old questions stay human-actionable, and are
 neither rewritten nor retroactively linked when the arithmetic changes. New proposal rows use
-the new organizational policy.
+this organizational policy.
 
 ## Failure behaviour
 

@@ -474,8 +474,8 @@ containers with `true` in place of `1` are refused.
   verifying another directory names that directory's own. What the backend cannot
   check is that the maker, run on the recipe, produces these bytes, because the maker is
   TypeScript; `test/published.test.ts` rebakes every set and compares byte for byte, which is what
-  catches a recipe edited in a way no header shows, such as a colour. The Node bake worker planned
-  for workspace recipes is the step that brings that proof to the server.
+  catches a recipe edited in a way no header shows, such as a colour. The workspace-recipe Node bake
+  worker is the remaining step that brings that proof to the server.
 - `PinnedTextureSet` carries the manifest fields, `extent_u_mm` and `extent_v_mm`, the header's
   title, summary, seed and height range, the maker id and version, the recipe and receipt digests,
   and `pin()`, which returns the three replay fields. `read_bytes()` re-verifies the digest on every
@@ -504,8 +504,8 @@ provisions, with the same inline block 0042 uses, skipping a role the cluster do
 Unlike 0042 it names no role from before the ADR-0011 rename. `READ_ONLY_TABLES` in
 `exulanica/db/roles.py` names the table, so `provision_runtime_role`, which grants insert and
 update on every table and revokes them from that list, leaves a provisioned role with SELECT only.
-Provisioning skips a listed table a partly migrated schema does not have yet, so a role provisioned
-before 0065 is handed writes on the new table by its default privileges when 0065 runs, and the next
+Provisioning skips a listed table a partly migrated schema does not have, so a role provisioned
+before 0065 is handed writes on `world_texture_set` by its default privileges when 0065 runs, and the next
 provisioning takes them back; `tests/test_texture_set_migration.py` walks exactly that upgrade.
 A trigger is the second wall: it refuses every UPDATE and DELETE, even by the owner, and every
 INSERT by a role that is not a member of the owner, so a pinned version never names other bytes, a
@@ -665,13 +665,13 @@ Migration 0066 is the schema and records why it has this shape. The code is:
 - `exulanica/materials/workspace.py`, the request, receipt and licence;
 - `web/packages/loom-texture/src/workspace/`, the baker's side.
 
-**A recipe is a row, checked before it is stored.** A person varies a published set. Later, the
-Companion will propose recipes from words, and a model will read recipes from photographs. Each
+**A recipe is a row, checked before it is stored.** A person varies a published set. A Companion proposal path and a photo-derived path
+are specified below; neither writes a recipe row. Each
 recipe row holds:
 
 - the recipe's canonical bytes, the same document as jsonb, and the digest over the bytes;
 - the maker, by id, version and manifest digest;
-- the origin: `authored`, `proposed` or `photo_derived`. Only `authored` is stored today;
+- the origin: `authored`, `proposed` or `photo_derived`. Only `authored` is stored;
 - the published set it was varied from, if any;
 - the person's own label, which is outside every digest and never reaches a container.
 
@@ -686,14 +686,14 @@ The repository refuses the recipe unless:
 
 A recipe row never changes; a changed recipe is a new row.
 
-**Only a person's own recipe is stored today.** A proposal and a photo-derived recipe are a
+**Only a person's own recipe is stored.** A proposal and a photo-derived recipe are a
 model's output, and a model's output is a claim about that model, which cannot be checked without
 the model's identity. So:
 
-- `POST /materials/recipes` accepts only `"origin": "authored"`, the one origin a client may state
-  today. Any other value is a 422 with the code `origin_not_authorable` and the list of origins the
+- `POST /materials/recipes` accepts only `"origin": "authored"`, the one origin a client may state.
+  Any other value is a 422 with the code `origin_not_authorable` and the list of origins the
   route accepts, because only the service that records a model's identity may write a model's
-  output, never a client. What makes the other two possible later, neither of them through this
+  output, never a client. What makes the other two possible, neither of them through this
   route:
   - `proposed` needs a proposal path: a service that writes the proposing model's provider, role,
     id and revision with the recipe, and the migration that gives that record its columns and
@@ -733,7 +733,7 @@ migration that follows 0073 replaces the two triggers and adds:
 - the model identity (provider, role, model id, revision) and the destination on
   `material_recipe`.
 
-`exulanica.materials.photo_derived.PhotoDerivedRecipe` is the object a model will emit, and it
+`exulanica.materials.photo_derived.PhotoDerivedRecipe` is the object a photo-derived path writes, and it
 already has that shape:
 
 - **One right per photograph.** A personal model right names one capture, one model and one
@@ -748,9 +748,9 @@ asked by the world service that writes the recipe, through `require_model_right`
 object.
 
 **A checkpoint this project trains is pinned by content.** A right pins a local checkpoint to a
-full 40-character commit, and trained weights have none. Their revision will be spelled `sha256:`
+full 40-character commit, and trained weights have none. Their revision is spelled `sha256:`
 followed by the 64-character digest of the weights, with the training receipt as their
-provenance. Neither the right nor the object accepts that form yet. It is added when the first
+provenance. Neither the right nor the object accepts that form. It is added when the first
 checkpoint exists, in a migration and in the personal model right's code together.
 
 **A bake is queued, never made in a request.**
@@ -934,10 +934,10 @@ the record to all of that.
   frame from the tessellator, because a facade's glazing is one surface covering every pane.
 - That a recipe, run through its maker, produces a set's bytes is checked by the package's suite,
   which runs the TypeScript maker. The backend verifies every binding it can see without the maker,
-  and no more, until the planned Node bake worker runs the maker server-side. A stated parameter
+  and no more, until the workspace-recipe Node bake worker runs the maker server-side. A stated parameter
   that is not an integer control (a bond or finish is stated as a sentence) is covered only by the
   reviewed pin and the rebake.
-- The UV derivation in section 6 is arithmetic on stated extents; no surface consumes it yet.
+- The UV derivation in section 6 is arithmetic on stated extents; no surface consumes it.
 - **The workspace bake path has run only in tests.**
   - No deployment runs the bake worker.
   - `deploy/material-bake/Dockerfile` and `ml/container/Dockerfile` have never been built.
@@ -957,7 +957,7 @@ the record to all of that.
 
 Every set in sections 1 to 15 is an opaque tiling surface: brick to kerb, one container layout, one
 way to draw it. A street also needs glass you can see into, leaves you can see between, and paint
-laid over the road, and a renderer cannot draw those the way it draws brick. So a set now DECLARES
+laid over the road, and a renderer cannot draw those the way it draws brick. So a set DECLARES
 what kind of surface it is, as data, and a renderer binds a material by that declaration and by
 nothing else. A class it does not draw is an unavailable surface with a stated reason, never a
 guess.
@@ -1130,17 +1130,17 @@ included, and its class's maps for any other.
 
 A tiling set repeats, and the eye finds the repeat by its most recognisable feature. Two of the
 drafts have a known risk, recorded here because whoever runs the bench check needs it, and so does
-whoever changes these makers next.
+whoever changes these makers.
 
 - **Glazing repeats at the pane.** At 1000 mm over a pane 1.5 to 3 m wide, the same dust clusters
   and rain streaks sat in the same places two or three times in one pane, plainly, in a composite
-  over a dark interior. The set is now 1024 over 2000 mm, which is about one repeat a pane, and the
+  over a dark interior. The set is 1024 over 2000 mm, which is about one repeat a pane, and the
   dust is in faint patches rather than an even haze. If the bench still shows it, on a shopfront
   wider than 4 m drawn as one surface, the levers in order are: less contrast in the dust patches,
   which are the features the eye recognises, and the streaks less so; then a tile offset per pane,
   which needs the same pane-local frame that soiling by position needs.
 - **Foliage repeats at the clump.** With clumps of 333 mm and strong clumping, a dense band of
-  leaves repeated every 2 m across a canopy. The set now uses clumps of 200 mm and gentler
+  leaves repeated every 2 m across a canopy. The set uses clumps of 200 mm and gentler
   clumping, and the band is faint. The price is that no large opening in a canopy can come from the
   texture, so large openings have to come from the canopy's geometry. If a canopy still reads as a
   leaf-patterned blob at eye level, the answer is not a parameter: it is a non-tiling class of

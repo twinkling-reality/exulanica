@@ -1,6 +1,6 @@
 """The World Read API: the routes a generative world model reads a real place through.
 
-Roadmap Phase 10 capability 1. The bundle and every decision inside it are
+The bundle and every decision inside it are
 :mod:`exulanica.graph.world_read`, one layer down. What is left here is the routing: take the
 workspace off the session, ask for one scene or for one place at one time, and turn "not readable"
 into the same answer for every reason it might not be readable.

@@ -13,7 +13,7 @@ compliance with anything, and the project makes no compliance claim (see section
 
 ---
 
-## 1. What is actually being processed
+## 1. What is processed
 
 This section exists because the legal analysis below is worthless if it is applied to the wrong
 system.
@@ -22,7 +22,7 @@ system.
 purpose-shot dense capture of an interior. Not video. **There is no audio.** Rejected alternative:
 shooting a video corpus, rejected because Nebius Token Factory has zero audio capability (verified in
 the platform research) and because a photograph library that already contains recurring people across
-multiple locations exists today, while a video corpus does not.
+multiple locations exists, while a video corpus does not.
 
 **DECISION.** The "recurring voices" and "recurring conversations" pillars are **deferred, not
 claimed**. They have neither a platform path nor source material. Rejected alternative: claiming them
@@ -32,8 +32,8 @@ Consequences that this document depends on:
 
 | Consequence | Effect on this document |
 | --- | --- |
-| No audio exists | Voiceprint law is stated because it is settled and because it binds the moment audio is added, but no voice template is derived today. The `biometric.voice_template` and `transcript.*` scopes are defined and dormant. |
-| No audio exists | Wiretapping statutes (section 2.6) do not currently bite. They are recorded because they bite the wearer, not the service, the moment audio capture is added. |
+| No audio exists | Voiceprint law is stated because it is settled and because it binds the moment audio is added, but no voice template is derived. The `biometric.voice_template` and `transcript.*` scopes are defined and dormant. |
+| No audio exists | Wiretapping statutes (section 2.6) do not apply. They are recorded because they bite the wearer, not the service, the moment audio capture is added. |
 | Photographs, not video | BIPA's photograph exclusion becomes directly load-bearing. See 2.1. |
 | Photographs, not video | The demo corpus is pre-existing rather than staged, which changes the bystander control from "delete the take" to "exclude at selection". See section 9. |
 
@@ -60,7 +60,7 @@ instant an embedding is computed, and the second definition ("biometric informat
 biometric identifier") then sweeps in the cluster centroid, the similarity graph, and the person node
 in the Atlas.
 
-| Exulanica artifact | Statutory characterisation | Present today |
+| Exulanica artifact | Statutory characterisation | Present |
 | --- | --- | --- |
 | Photograph as stored | Excluded from BIPA "biometric identifier"; still personal data under GDPR | Yes |
 | Face embedding from a photograph | "scan of face geometry" (BIPA), "record of face geometry" (CUBI), Art. 4(14) biometric data (GDPR) | Yes |
@@ -453,7 +453,7 @@ CREATE INDEX ON consent_record (tenant_id, subject_ref, granted_at DESC);
 
 Absence of a token means denied.
 
-| Token | Grants | Active today | Note |
+| Token | Grants | Active | Note |
 | --- | --- | --- | --- |
 | `capture.retain_media` | store the original photograph containing this person | Yes | Revoking forces deletion of the capture or irreversible redaction of this person from it |
 | `biometric.face_template` | derive and persist a face embedding | Yes | The BIPA s.15(b) core |
@@ -481,9 +481,9 @@ results immediately even while their embedding row still physically exists.
 | --- | --- | --- |
 | `biometric.cross_capture_link` | person node splits back into per-capture unlinked appearances; every cross-capture edge suppressed from every query | delete edges, recompute affected cluster centroids, reindex (1h) |
 | `biometric.face_template` | face embedding excluded from all retrieval | hard-delete embedding rows and ANN entries, recompute centroids (1h) |
-| `biometric.voice_template` | same for voice | same (1h), dormant today |
-| `transcript.quote_in_answers` | answers stop quoting; cached answers invalidated | purge tenant answer cache (immediate), dormant today |
-| `transcript.retain` | transcript segments hidden | delete segments and their embeddings, reindex, purge derived summaries quoting them (24h), dormant today |
+| `biometric.voice_template` | same for voice | same (1h), dormant |
+| `transcript.quote_in_answers` | answers stop quoting; cached answers invalidated | purge tenant answer cache (immediate), dormant |
+| `transcript.retain` | transcript segments hidden | delete segments and their embeddings, reindex, purge derived summaries quoting them (24h), dormant |
 | `annotation.attach_user_context` | annotations hidden | delete annotations and their embeddings, regenerate affected summaries (24h) |
 | `graph.copresence` | co-presence edges hidden from this subject's side | delete edges (1h) |
 | `capture.retain_media` | capture unviewable for any region containing this person | delete the capture, or run irreversible per-person redaction and re-derive everything from the redacted master (72h, human-confirmed) |
@@ -512,7 +512,7 @@ Anything on this list that is forgotten is a silent retention. The list is kept 
 rows that are dormant in a photograph corpus, so that adding audio later does not require rediscovering
 them.
 
-| # | Derivative | Identifiable content | Present today |
+| # | Derivative | Identifiable content | Present |
 | --- | --- | --- | --- |
 | D1 | Original media object | Yes, directly | Yes |
 | D2 | Transcodes, proxies, thumbnails, sprite sheets | Yes, faces | Yes |
@@ -669,7 +669,7 @@ ZDR is a silent failure with no error, and every deletion promise depends on it.
 Several of these are FTC Section 5 deception exposure, not merely bad manners. Each is forbidden
 **unless and until** the implementation exists and its test is green.
 
-| Forbidden claim | Why it would be false today |
+| Forbidden claim | Why it would be false |
 | --- | --- |
 | "Private" or "privacy-first", unqualified | Photographs of third parties are sent to a third-party cloud for inference. |
 | "On-device", "runs locally", "your data never leaves your device" | Inference runs on Nebius. |
@@ -810,7 +810,7 @@ rather than *impossible*, by ensuring the model has no authority worth stealing.
 
 Every item below is **T2 untrusted**: it is evidence, never an instruction.
 
-| Source | Enters via | Present today |
+| Source | Enters via | Present |
 | --- | --- | --- |
 | OCR text lifted from a photograph (signs, menus, posters, whiteboards, screens, packaging, printed clothing) | Perception pipeline | Yes, and it is the primary vector |
 | Object and scene labels from the vision model | Perception pipeline | Yes |
@@ -1147,12 +1147,11 @@ Three research streams produced three incompatible rules. They cannot all be tru
 
 **The tension is structural, not a drafting error.** Deny-by-default gating makes the
 propose-then-confirm loop impossible for anyone who has not already consented, which is a
-chicken-and-egg problem: the entire point of the loop is to identify people who have not yet been
-named. R-loose resolves it by persisting biometric identifiers for people who never consented, which is
+chicken-and-egg problem: the entire point of the loop is to identify people who are unnamed. R-loose resolves it by persisting biometric identifiers for people who never consented, which is
 precisely the BIPA s.15(b) collection and the GDPR Art. 9(1) processing that section 2 describes.
 
 **What is settled:** for this demonstration corpus the question collapses to nothing, because every person
-in the corpus has signed. Nothing is blocked today.
+in the corpus has signed. Nothing is blocked.
 
 **What is not settled:** the rule for anything beyond this corpus. The research recommends R-middle, on
 the reasoning that it is the strictest rule that still permits the product's defining loop, and that a
@@ -1169,7 +1168,7 @@ Two consequences of leaving it open, so that nobody is surprised later:
   explaining that a template may briefly exist before confirmation. Choosing R-loose would require
   rewriting the disclosure copy and would forfeit the honest framing in section 8.
 - No external Exulanica material may describe the embedding-existence rule until this is decided, because
-  today there are three answers.
+  there are three answers.
 
 ---
 

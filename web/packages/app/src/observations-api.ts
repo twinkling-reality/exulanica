@@ -13,8 +13,8 @@
  * **Why not the whole graph, which this file used to read.** MEASURED 2026-09-11 against a frozen
  * copy of the volcanic scene (210 photographs): the whole graph is 1,015,016,928 bytes of JSON.
  * V8 cannot hold a string that long, so the inspector failed with "Unexpected end of JSON input"
- * and click-to-evidence could never work on a scene that size. The pick it downloaded the graph
- * for now runs on the server, term for term, and a click's answer is kilobytes: 11,277 bytes for a
+ * and click-to-evidence could never work on a scene that size. The pick that once downloaded
+ * the graph runs on the server, term for term, and a click's answer is kilobytes: 11,277 bytes for a
  * point eight photographs observed, 1,784 for a miss, and bounded by the scene's photograph count
  * rather than its point count. The summary is 781 bytes.
  *

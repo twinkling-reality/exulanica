@@ -152,7 +152,7 @@ A receipt, point map or mask that has gone is `stage_failed` and returned as a s
 
 * **One projector.** The masked-geometry check's arithmetic, exposed from
   `exulanica/ingest/masked_geometry.py` as `camera_point`, `image_point` and `ppm_point`, which
-  that check now calls itself one Gaussian at a time and the lift calls with arrays. Margin zero.
+  that check calls itself one Gaussian at a time and the lift calls with arrays. Margin zero.
 * **Samples.** Every placed member's point map, evenly subsampled to 1024 and carried into the scene
   frame by the placement's own transform, and optionally the centres of a trained Gaussian scene
   read by the check's own PLY reader (`--gaussian-ply`, bound by digest with the delivery it was
@@ -278,7 +278,7 @@ depth model's points along that silhouette. Neither is corrected here; both are 
   which publication skips, took 36 to 42 s of the command's run. None of this was measured inside a
   running scene worker.
 * **The polygon is not on the span.** Section 2 says what that would cost.
-* **Detector-prompted objects now have naming targets.** Segmentation writes an unnamed object
+* **Detector-prompted objects have naming targets.** Segmentation writes an unnamed object
   occurrence only for a local-detector mask, using its bounding span. Hosted masks retain the
   hosted occurrence. The existing identity naming route creates the object entity, naming
   assertion and confirmed link only when the user confirms a name. The input contract re-keys
@@ -315,13 +315,13 @@ The first comparison used the same three completed volcanic masks on both paths:
 placement validation, 4.49 s with projection reuse, byte-identical artifacts. Placement alone
 fell from 43.026 s to 0.011 s. With 207 masks still missing that artifact contained zero segments;
 the completed 210-mask comparison took **46.54 s before and 6.88 s after**, again with
-byte-identical output, now containing three segments. Placement took 39.540 s versus 0.011 s.
+byte-identical output, containing three segments. Placement took 39.540 s versus 0.011 s.
 These are single sequential wall-clock measurements, not latency percentiles or memory tests.
 
 ### Naming
 
 A local detector mask gets one unnamed `object` occurrence standing on the mask's bounding span.
-Its `prompt_span_digest` now names that backing occurrence span, just as it names a hosted
+Its `prompt_span_digest` names that backing occurrence span, just as it names a hosted
 occurrence's box span for hosted masks. The existing graph reader and panel can therefore find
 it without a wire-shape change. Segmentation creates no entity or confirmed link. The account
 holder's confirmation through `POST /identity/name` creates the entity and records the name as a
@@ -359,7 +359,7 @@ plate/table are combined for scoring only; production still separates these labe
 | Minimum area 500 ppm | Zero retains a speck. 500 and 2,000 tie on these targets; retain 500 to avoid increasing the small-object exclusion without evidence. |
 | Person overlap drop 500,000 | At 0.25 through 0.90 all three person-dominant raw masks are dropped, together with five other masks. At 0.10 eight other masks are dropped. Retain 0.50; unlabelled objects prevent a claim about false rejections. |
 | Vocabulary | Tested only for the observed targets. Held helmets are not a vocabulary term. No claim of general object recall. |
-| Text threshold 250,000 | Currently unused by the per-word Grounding DINO scorer. It is not an effective independent control. |
+| Text threshold 250,000 | Unused by the per-word Grounding DINO scorer. It is not an effective independent control. |
 | Fallback detector threshold 200,000 | No fallback measurement on these six photographs. Remains unvalidated. |
 | Image edge 1,024, contour simplification 1,500 ppm, vertex cap 256 | Fixed for this study. Finer contours can retain detail at greater storage cost; no comparative measurement establishes an optimum. |
 | Maximum prompts 24 | No selected photograph reached the cap under production defaults. No recall claim for crowded scenes. |
@@ -378,8 +378,8 @@ independent 3D ground truth or a way to attribute every miss to voting.
 | --- | --- |
 | Vote minimum 2 | Keep the requirement for corroboration. One view admits more fringe segments; three does not improve this sample enough to justify excluding two-view support. |
 | Vote fraction 500,000 | Current rock precision/recall is 1.000/0.284; turntable 0.677/0.357. Lowering to 0.40 with the proposed tolerance improves coverage but reduces precision to 0.863 for rock and 0.620 for turntable. Retain 0.50 in the proposal. |
-| Occlusion tolerance 150,000 | **Propose 50,000**, not yet applied: with floor 32 and the other defaults, mean IoU rises from 0.294 to 0.476. Rock precision/recall becomes 0.954/0.601; turntable 0.734/0.423. A stricter visibility test removes conflicting views from the denominator, which also increases assignments; it is not simply a stricter mask. |
-| Minimum segment samples 8 | **Propose 32**, not yet applied: removes the third fringe segment with no change to any scored sample, both at current tolerance and in the combined proposal. Smaller real objects could also disappear. |
+| Occlusion tolerance 150,000 | **Propose 50,000**, unapplied: with floor 32 and the other defaults, mean IoU rises from 0.294 to 0.476. Rock precision/recall becomes 0.954/0.601; turntable 0.734/0.423. A stricter visibility test removes conflicting views from the denominator, which also increases assignments; it is not simply a stricter mask. |
+| Minimum segment samples 8 | **Propose 32**, unapplied: removes the third fringe segment with no change to any scored sample, both at the 150,000 tolerance and in the combined proposal. Smaller real objects could also disappear. |
 | Samples per member 1,024 | At 512, mean IoU is 0.239; at 2,048, 0.303 versus current 0.294, with twice as many samples to vote. Retain 1,024 provisionally. |
 | Voxel grid 128 | Grid 64 raises mean IoU to 0.388 through coarser occupied cells; grid 256 lowers it to 0.273. This metric rewards filled area and cannot establish boundary quality; retain 128. |
 | Region raster 512 | 256 gives mean IoU 0.293 and 1,024 gives 0.290. Retain 512; this sample does not establish a meaningful improvement from either change. |

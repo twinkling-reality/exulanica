@@ -9,13 +9,13 @@ requires the separate asset-read work described below.
 This work starts from integrated `38625d2`, after manual review and personal admission. The
 orchestrator approved adding only `ingest/person_state.py` (its current-state reader and necessary
 imports/docstring) to the original writable set. The existing reader ignored consent expiry and
-future effective times and folded overlapping scopes differently from SQL. The producer now reads
+future effective times and folded overlapping scopes differently from SQL. The producer reads
 one database-resolved snapshot through `ingest/spine/privacy.py`. `CaptureRegionState` and the
 existing mask digest formats remain unchanged. The offline fold, pipeline, stage registry and
 other producer files are unchanged.
 
 The orchestrator subsequently approved only the personal-admission review/rescreen argument
-that now preserves its already-read review rows, including silhouette, subject and naming fields.
+that preserves its already-read review rows, including silhouette, subject and naming fields.
 The shared predicate refuses stale or missing claimed fields; it never synthesizes omitted human
 review input from current state. Approved test-only adaptations are the `_ingest` helper in
 `test_person_masking_end_to_end.py`, `_ingest_two_people` in `test_person_region_stages.py`,
@@ -29,11 +29,11 @@ instant. Its snapshot names the workspace, capture, exact original bytes, latest
 **every** region key (including deleted regions), and each live region's key, silhouette, subject,
 resolved state, naming permission and applicable consent digests. Edit identities distinguish a
 new review input even if its pixels are identical; keeping deleted edit identities prevents an
-old empty-inventory review from reviving after add/delete. Capture absence is not an empty review.
+prior empty-inventory review from reviving after add/delete. Capture absence is not an empty review.
 
 Consent evaluation preserves SQL's region-specific-over-subject-wide precedence, then sequence,
-with explicit refusal if a legacy highest-priority sequence is ambiguous. Future decisions are excluded. Expired
-receipts no longer hold; an older still-valid applicable receipt may hold under this established
+with explicit refusal if a highest-priority sequence from before 0040 is ambiguous. Future decisions are excluded. Expired
+receipts do not hold; an older still-valid applicable receipt may hold under this established
 resolver. Withdrawals remain terminal even if another grant follows. All scopes use the same
 instant. A future effective time or expiry can change the snapshot without a database write.
 No evaluation timestamp is included in the binding, so unchanged effective inputs remain reusable.
@@ -59,14 +59,14 @@ real producer and store. No insertion trigger stamps current inputs onto work co
 SQL checks database records; store readers remain responsible for existence and digest checks of
 actual bytes. Neither newest creation time nor the existence of any mask establishes currency.
 
-New screening canonical records include the exact input snapshot and, when masking is required,
+0040 screening canonical records include the exact input snapshot and, when masking is required,
 the exact existing mask ID/content hash. The SQL predicate compares both bindings with current
 inputs and artifact lineage. A review recorded without its mask cannot activate when a mask later
 appears. Rebuild alone cannot revive a review for changed inputs: explicitly re-screen. A same-input
 retry reuses the existing mask and review; a same-pixel new edit can reuse the mask but needs a new
 review. Mask and review currency are intentionally different comparisons.
 
-Legacy records lacking the new binding remain historical facts but do not authorize new geometry.
+Records lacking the 0040 binding remain historical facts but do not authorize new geometry.
 There is no policy version bump invalidating detection receipts: detection-only remains a separate
 observation purpose. Human screening must cover exactly the current region keys and states; a
 no-person review binds an empty inventory. Synthetic exemption requires no live person regions.
@@ -79,7 +79,7 @@ admission-member/scene policy triggers from 0029, point-map selection/exact reso
 `ingest/spine/artifacts.py`, and training input selection in `world_package/training_inputs.py`.
 No frontier caller change was needed. The Python guard delegates mask currency to the same SQL
 contract. Scene mask declaration and exact resolution also check current lineage and refuse a
-missing declaration when a member now requires masking. Selection determines which captures
+missing declaration when a member requires masking. Selection determines which captures
 currently require masks first, omits unneeded historical derivatives after deletion or likeness
 consent, and finds a matching current artifact even when an obsolete candidate sorts newest.
 Required-but-missing masks refuse; no-person and mixed scenes retain original bytes for members
@@ -99,7 +99,7 @@ capture-only lock. The predicate takes a fresh snapshot after acquiring the lock
 is required; repeatable-read/serializable transaction snapshots are refused with serialization
 failure so the caller can retry in a supported transaction. An executed two-writer control
 showed that the existing consent writer allocates `max(sequence)+1` before its INSERT lock, and
-subject-wide NULL region keys can collide. The new INSERT guard checks the allocated slot after
+subject-wide NULL region keys can collide. The 0040 INSERT guard checks the allocated slot after
 locking and gives the loser serialization failure; exact receipt replay is preserved. No digest
 tie breaker substitutes for correct allocation. Existing ambiguous highest-priority sequences
 refuse until a new resolving decision is appended. Time-dependent consent is evaluated
@@ -118,12 +118,12 @@ The recorder executes generated labelled media through real PostgreSQL and the r
 The end-to-end sequence covers authority, empty review, region addition, masking/review, outline
 edit and blocked review, direct SQL refusal, actual frontier preflight, demonstration selection,
 scene admission and point-map refusal, followed by rebuild/re-screen/retry success. It verifies
-that the old receipt digest is unchanged. Full frontier preflight supplies no signing key; its
+that the receipt digest is unchanged. Full frontier preflight supplies no signing key; its
 screening check passes or fails as expected while signing remains unavailable.
 
 Additional cases cover expired and future grants, region-specific precedence, unknown subject,
 consent changes, expiry without writes, withdrawal, region deletion, cross-workspace requests,
-legacy receipts, premature unbound reviews, immutable mask lineage, geometry UPDATE, missing/stale
+pre-0040 receipts, premature unbound reviews, immutable mask lineage, geometry UPDATE, missing/stale
 worker declarations, unchanged inputs and exact evaluation boundaries. Two-connection tests
 exercise region commit, consent across captures, duplicate writer allocation and expiry while a
 predicate waits; stale transaction snapshots refuse.

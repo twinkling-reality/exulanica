@@ -197,7 +197,7 @@ https://caniuse.com/pointerlock
 
 ### 2.3 Controls
 
-**Camera direction, updated 2026-09-13; implementation pending.** A person can switch between
+**Camera direction, updated 2026-09-13; implementation absent.** A person can switch between
 first-person and third-person views of the same controllable player. Provide a visible camera
 control and a keyboard binding that does not fire while typing. Switching preserves the player's
 position, grounded collision state and interaction context. The player avatar is distinct from the
@@ -367,7 +367,7 @@ order. Closing it retains the existing conversation lifecycle. Confirmation keep
 proposal boundary; Escape cancels through the same handler as Cancel and returns focus to the
 opening control. World panels release pointer lock before focusing their controls.
 
-Application sheets currently apply a fixed cool-neutral reading palette and consistent control
+Application sheets apply a fixed cool-neutral reading palette and consistent control
 geometry. This does not alter world materials, scene identity or the versioned world-profile
 schema. High contrast and reduced-motion overrides remain authoritative. Broader theme authority
 across world profiles still needs visual acceptance; this application pass does not establish
@@ -375,7 +375,7 @@ arbitrary user-supplied interface themes. The desktop viewport restriction remai
 
 The object catalog is reachable from Create. Availability is determined by the existing placement
 contract: the geographic street does not itself establish a reconstructed region on which an
-object can be placed. Development-preview objects, where placement is supported, are temporary
+object can be placed. Development-preview objects, where placement is supported, are
 session state and are not saved. A refusal must remain visible rather than claiming placement.
 
 World details includes a bounded **World to data** inspector for renderer subjects that actually
@@ -389,7 +389,7 @@ In an authenticated configured world, the same panel can read persisted society 
 show saved play/pause and 1x/2x/4x settings, advance one simulated minute while paused, and inspect
 recorded activity/event references. The development preview instead plays an explicitly labeled
 recording and is not persistence or model evidence. The backend also accepts typed user requests for
-an inhabitant to go to or perform a canonical target, but no browser control currently issues those
+an inhabitant to go to or perform a canonical target, but no browser control issues those
 requests. Selecting a destination or inhabitant for inspection must not be described as directing it.
 
 ## 3. Two verbs, and the contextual affordance system
@@ -481,7 +481,7 @@ selection is appearance only and never changes confidence, intent, or what the C
 
 **Exchange, corrected from live review 2026-08-30.** The question occupies one dark optical-glass
 speech squircle across the bottom centre. A small speaker-name pill physically bisects its top
-boundary; the component accepts a name and currently receives `Companion`, so identity is not
+boundary; the component accepts a name and receives `Companion`, so identity is not
 hard-coded as permanent product chrome. Evidence actions stay in this lens because they support
 what was said. Individual numbered answer pills occupy a fixed right-side rail. The next
 numbered answer is `Other…`; opening it replaces that pill in place with an unlined composer and an
@@ -1015,7 +1015,7 @@ only buildable to the extent the pipeline emits real per-stage counters.** If it
 counter-bearing stages degrade to breathing plus elapsed time, which is still honest and still better
 than a fake bar, but is a materially smaller design. Experiment: inspect the pipeline stage boundaries
 for available counters, roughly two hours. **The research says explicitly that this should be checked
-first, because everything else in this section depends on the answer.** It is being verified early.
+first, because everything else in this section depends on the answer.** Verification is first.
 
 ---
 
@@ -1059,7 +1059,7 @@ and formation labels are identical in both modes.
 
 Every interaction mechanism above is described in engine-neutral terms except where a verified source
 is quoted. **CLOSED:** [ADR-0003](adr/0003-renderer-selection.md) selected PlayCanvas Engine
-2.21.4 through the matched-resolution bake-off. The current application, owned district, native
+2.21.4 through the matched-resolution bake-off. The application, owned district, native
 characters and representation runtime use the PlayCanvas binding. Three.js/Spark remains a
 separate implementation and is not the production browser path.
 
@@ -1072,7 +1072,7 @@ The interaction contracts retain these engine-independent requirements:
 - Emphasis is a per-instance numeric attribute plus a uniform, never a per-object material change
   (7.5).
 
-The implementation is not portable for free. A future renderer change would require a new measured
+The implementation is not portable for free. A renderer change would require a new measured
 decision and replacement bindings.
 
 ---
@@ -1081,7 +1081,7 @@ decision and replacement bindings.
 
 | # | Item | Settled by |
 | --- | --- | --- |
-| I-1 | Cross-capture co-registration success rate, which gates the shared-frame exception in 1.3 | An experiment that does not yet exist in the plan. Until it does, do not ship pooled frames |
+| I-1 | Cross-capture co-registration success rate, which gates the shared-frame exception in 1.3 | An experiment that is absent from the plan. Until it exists, do not ship pooled frames |
 | I-2 | Renderer (section 10) | Closed by [ADR-0003](adr/0003-renderer-selection.md): PlayCanvas Engine 2.21.4 |
 | I-3 | Per-stage counters, which gate section 8 | A-29, two hours, do it first |
 | I-4 | Layout at three regions: algorithmic or hand-placed (1.4) | Side-by-side comparison on the three real captures, two hours |

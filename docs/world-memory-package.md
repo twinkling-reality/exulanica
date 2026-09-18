@@ -14,10 +14,10 @@ live store, a backup, a consent grant, or an executable world. An exported copy 
 After a deletion, a new export has a new root and the semantic diff is the durable account of what
 was removed or recomputed.
 
-**Planned composition extension:** [world-composition-contract.md](world-composition-contract.md)
-defines future imported geography, selected subsets, place relationships, source-use
-rights and authored placement. These are not silently added to WMP 1.0 or the
-existing authored-world extension. Scope a versioned contract and verifier/receiver
+**Composition extension:** [world-composition-contract.md](world-composition-contract.md)
+defines imported geography, selected subsets, place relationships, source-use
+rights and authored placement. These are not part of WMP 1.0 or the
+authored-world extension. Scope a versioned contract and verifier/receiver
 capabilities first; a signed package does not grant source reuse rights, carry
 missing asset bytes or establish a runnable import.
 
@@ -85,7 +85,7 @@ is not presented as a public download URL.
 `wmp/manifest.json` lists every payload path, byte length, and SHA-256 digest in sorted path order.
 Leaves bind the domain separator `exulanica-wmp-leaf-v1`, the UTF-8 path, and the file digest.
 Internal nodes bind `exulanica-wmp-node-v1` and the two child hashes; an odd final child is
-duplicated. Those separators are the current v1 domain-separation strings. `wmp/signature.json`
+duplicated. Those separators are the v1 domain-separation strings. `wmp/signature.json`
 contains the Ed25519 public key and a signature over the canonical profile version, manifest digest,
 and Merkle root. The manifest and signature do not include themselves in the Merkle inventory.
 
@@ -123,11 +123,11 @@ declares, says anything about loading.
 
 ## Exit evidence
 
-The phase-specific tests cover a clean subprocess with database URLs removed, one-byte payload and
+The WMP 1.0 exit tests cover a clean subprocess with database URLs removed, one-byte payload and
 manifest mutation, every prohibited class, symlink and unexpected-file rejection, concurrent
 mutation after the repeatable-read snapshot begins, immutable audit receipts, deterministic
 unchanged re-export, and deletion followed by a new root and semantic removed-state diff. The full
-backend PostgreSQL suite, Ruff, migration count, and import boundaries are run before the phase
+backend PostgreSQL suite, Ruff, migration count, and import boundaries are run before that exit
 commit; those command results, not this status sentence alone, are the exit gate.
 
 ## Authored-world extension 1.0
@@ -291,7 +291,7 @@ byte-identical in every file including the signature.
 
 `exulanica-wmp-training-1.1` is an independently selected dataset profile. The ordinary `project`
 command still writes `exulanica-wmp-1.0`, whose eighteen required paths and signed profile identity
-are unchanged. The new profile has its own required documents: RO-Crate metadata, profile,
+are unchanged. The `exulanica-wmp-training-1.1` profile has its own required documents: RO-Crate metadata, profile,
 materials, training consent, and export provenance. It shares the inventory, Merkle construction
 and Ed25519 verifier with the memory profile. It does not imply that a memory export is licensed
 for training, nor does importing a dataset create an interactive memory world.
@@ -352,7 +352,7 @@ source mutations take its shared counterpart, so ordinary ingest and withdrawal 
 race as the existing deletion protocol requires. A package lock serializes training decisions
 with exports. This closes the withdrawal/publication race while permitting other workspaces to
 continue. The tradeoff is that source mutations and other exports in the exporting workspace wait
-during signing and publication. The current authoring API also holds selected asset bytes in memory; it is
+during signing and publication. The authoring API also holds selected asset bytes in memory; it is
 a sample-export path, not a claim of streaming multi-terabyte delivery.
 
 ### Training commands
@@ -378,5 +378,5 @@ The Phase 7B acceptance test produces a synthetic sample with exact source photo
 recovered cameras/calibration, sparse observations, a structurally valid scripted trained SOG,
 frozen split and provenance. No real COLMAP, CUDA training, or vision-model execution is claimed.
 FR-11 remains outstanding: two prospective licensees must independently evaluate a sample and
-state in writing what they would pay for what volume. The phase remains a design until that
+state in writing what they would pay for what volume. That acceptance remains a design until that
 demand evidence exists.

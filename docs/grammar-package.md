@@ -1,7 +1,6 @@
 # The generator system: `exulanica.grammar`
 
-Status: **CITY VOCABULARY VERSION 2 BUILT; EVERY CITY STAGE GENERATES**. Phase 1 of the target
-architecture. Updated 2026-09-17.
+Status: **CITY VOCABULARY VERSION 2 BUILT; EVERY CITY STAGE GENERATES**.
 
 `exulanica.grammar` is a generator system, not a city generator. It holds a generic contract
 (grammar id and version, a closed parameter schema, a parameter cascade, a seed, an output digest
@@ -13,13 +12,13 @@ The package produces **no mesh and no vertices**: every generated value is an in
 turning records into triangles is the tessellator's. City version 2 declares the whole vocabulary:
 28 record kinds with integer geometry, 91 declared parameters, four projection contracts, 18
 licensed catalogs, one identity rule and a hand-written fixture tile that exercises all of it.
-Every one of the eleven city stages now has a generator: see
+Every one of the eleven city stages has a generator: see
 [generated-corridor-street](generated-corridor-street.md) for the street they make together and
 what it measures.
 
 ## 1. Where it sits, and why below `evidence`
 
-The exhaustive import-linter layer list in `pyproject.toml` now reads, from `reconstruction`
+The exhaustive import-linter layer list in `pyproject.toml` reads, from `reconstruction`
 down:
 
 ```text
@@ -54,11 +53,11 @@ available form of [ADR-0008](adr/0008-generated-geometry.md) compliance: a synth
 structurally cannot pass for evidence.
 
 What it deliberately does not claim: every module it names already sits above `grammar`, so the
-layers contract alone refuses those imports today, and this contract is the one that survives a
+layers contract alone refuses those imports, and this contract is the one that survives a
 future move of the layer. It says nothing about how generated content is labelled once something
 above composes it with recorded content; that is the `invented` plane's job (section 9).
 
-**The pure core does not know a database exists.** `exulanica.grammar` is now listed there too,
+**The pure core does not know a database exists.** `exulanica.grammar` is listed there too,
 so a direct `psycopg` import fails as well. A generated world is recomputable on a machine that
 has never seen a database.
 
@@ -223,7 +222,7 @@ other rule, refuses (`tests/test_grammar_city_records.py`).
 
 ## 7. The city stages
 
-City version 2 is registered; version 1 is retired, and its descriptor stays beside the new one as
+City version 2 is registered; version 1 is retired, and its descriptor stays beside version 2 as
 the source of the version 1 to 2 migration.
 
 | Stage | Version | Record kinds | Parameters | Generator |
@@ -499,7 +498,7 @@ vocabulary list.
 
 ## 9. The `invented` truth class
 
-`exulanica.selection.packet.build_content_packet` now maps `origin_kind` `invented` to the truth
+`exulanica.selection.packet.build_content_packet` maps `origin_kind` `invented` to the truth
 class `invented_world`, so generated content never reaches a model as `other`, and `other` still
 means an origin the map does not know. `tests/test_selection_packet_invented.py` pins both.
 
@@ -512,7 +511,7 @@ Each of these is known and deliberately not done here.
   [generated-corridor-street](generated-corridor-street.md).
 - **The city v1 consumers have not been ported.** The tessellator's bake stage and its fixture and
   the traffic lane's provisional records read city v1 record classes, while the living society's
-  city place adapter now reads v2 tile documents. The tessellator lane ports on a branch stacked on
+  city place adapter reads v2 tile documents. The tessellator lane ports on a branch stacked on
   this one and both merge together; the society and traffic lanes port before they merge.
 - **Texture gaps.** No published texture set is glazing, a door, road paint, terrain, a tree pit,
   foliage, bark, timber, fabric or a sign panel, so those surfaces have no material record and
@@ -550,6 +549,6 @@ Each of these is known and deliberately not done here.
   for invented content and would describe it as authorized related content. That file is outside
   this lane.
 - **The truth-class table in [world-memory-model.md](world-memory-model.md) section 3.1** lists
-  four current values and does not yet list `invented_world`. That document is outside this lane.
+  four values and does not list `invented_world`. That document is outside this lane.
 - **Reachability.** Nothing here makes a generated world reachable from any person's atlas. The
   superseding ADR comes first.

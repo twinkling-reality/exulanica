@@ -1,7 +1,7 @@
 # Unified world composition and retrieval
 
 Status: **DECISION** for product and architecture direction; **PARTIAL** implementation.
-Updated 2026-09-12. The Iceland journey is the product example: import a permitted
+The Iceland journey is the product example: import a permitted
 place, combine it with personal memories, and create a fantasy variation.
 
 ## Purpose and authority
@@ -14,12 +14,12 @@ separate orbital map or a navigation-only replacement for the interactive world.
 
 This contract develops [product-direction.md](product-direction.md), which owns
 product priority. It supersedes a reconstruction-only or separate-map reading of
-older plans. Existing API/schema/package contracts describe what is supported
-now; this document does not silently extend them. Implementation evidence is retained in scoped evaluation records, including the
+prior product plans. Existing API/schema/package contracts describe the supported
+surface; this document does not silently extend them. Implementation evidence is retained in scoped evaluation records, including the
 [experience integration](evaluation/2026-09-12-experience-integration.json) and
 [Earth scope correction](evaluation/2026-09-12-earth-experience-correction.json).
 A new task must read the product direction, this contract, the relevant live
-API/data contracts and the newest scoped evaluation records before writing its brief.
+API/data contracts and the scoped evaluation records before writing its brief.
 
 The World Memory Model is the system's representation and behavior across memory,
 creation and interaction. It is not a claim that one trained neural network
@@ -40,7 +40,7 @@ addressable, but disposable render primitives are not promoted to world entities
    supported personal Iceland memories and Iceland-derived authored variations,
    with an explanation of each relationship and filters to narrow the results.
 
-This is a target journey, not a demonstration completed by current fixtures.
+This is a target journey, not a demonstration completed by fixtures.
 Imported Iceland content does not prove a visit. A fantasy scene inspired by
 Iceland does not prove it existed there. A moved landscape retains its source
 identity while its current placement belongs to the person's created world.
@@ -53,7 +53,7 @@ mesh, a caption embedding, a browser-only state object or a second Earth databas
 Do not create a service per content type without a measured reason to cross the
 existing authority boundary. Exact schema and API changes need scoped briefs.
 
-| Conceptual record | Required meaning | Current basis and missing extension |
+| Conceptual record | Required meaning | Existing basis and missing extension |
 | --- | --- | --- |
 | Source and asset | Provider/original identity, revision or observation time, content digest where available, permitted operations and derivation lineage | Evidence/artifact machinery exists; external Earth asset admission and operation-specific rights need contracts |
 | Place and entity | Stable identity, supported names, aliases and explicit geographic containment/association | Place/entity links exist; canonical external geography resolution and containment across content kinds are not established |
@@ -63,7 +63,7 @@ existing authority boundary. Exact schema and API changes need scoped briefs.
 | Rendered representation | Geometry/materials, levels of detail, collision and current residency derived from those records | PlayCanvas and asset runtimes exist; detailed Earth integration remains unaccepted |
 
 The table names responsibilities, not new SQL tables or wire field names. Preserve
-current authority, transactional writes, dependency invalidation and replaceable
+existing authority, transactional writes, dependency invalidation and replaceable
 renderer/model interfaces. Shared public place definitions must not expose private
 associations, trip history or derived personal content across workspaces.
 
@@ -141,15 +141,15 @@ time/filter applicability per kind rather than silently reusing capture dates fo
 imports. An unavailable asset may have an authorized metadata result without
 being renderable; withdrawn/private metadata must not leak in results or counts.
 Broad results need bounded paging and deduplication without erasing distinct
-captures or authored variations. The current bounded capture/entity result model
-does not yet provide this cross-content result contract.
+captures or authored variations. The bounded capture/entity result model
+does not provide this cross-content result contract.
 
 ## Natural-language editing
 
 Translate a request into supported, typed operations with resolved content and
 world/version references: select, place, transform, style, blend, create or attach
 a reviewed behavior. These are target operation categories, not an assertion that
-the current registry implements them. Reuse the existing preview/apply/rollback
+the appearance-proposal registry implements them. Reuse the existing preview/apply/rollback
 pattern and reject stale bases or unsupported actions explicitly.
 
 A compound request must expose what each operation will change. Do not quietly
@@ -228,11 +228,11 @@ Implement in dependency order, with exact file ownership and evidence per stage:
    resolution, test a second geography/source and expand supported operations
    through measured needs rather than a speculative universal abstraction.
 
-The current frontend Earth lane remains bounded by its issued brief; these stages
-are not permission to edit its unowned backend/query/package files. Future briefs
+The frontend Earth lane remains bounded by its issued brief; these stages
+are not permission to edit its unowned backend/query/package files. Briefs
 must name the missing contracts and resolve scope before implementation.
 
-## Acceptance that future tasks must preserve
+## Acceptance that arriving tasks must preserve
 
 The first complete vertical slice uses a clearly identified permitted geographic
 selection, an authorized memory scene and a derived fantasy variation. A synthetic

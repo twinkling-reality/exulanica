@@ -1,7 +1,7 @@
 /**
  * The proof lens: colour a region by what produced what you are looking at.
  *
- * Roadmap Phase 10. The rung ladder is already displayed as a sentence in the status panel, and a
+ * The rung ladder is already displayed as a sentence in the status panel, and a
  * sentence is something a visitor reads once. The lens is the same fact as a property of the
  * picture: turn it on and every surface in view says whether a camera saw it, whether it was
  * reconstructed from photographs, or whether a model imagined it.

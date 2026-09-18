@@ -1,6 +1,6 @@
 # Character representation and movement
 
-Updated 2026-09-17. Status: **CATALOG PEOPLE IMPLEMENTED FOR THE PLAYER AND INHABITANTS; SOURCE-LINKED
+Status: **CATALOG PEOPLE IMPLEMENTED FOR THE PLAYER AND INHABITANTS; SOURCE-LINKED
 LIKENESS OPEN**. This contract defines the shared character foundation for the player, synthetic
 inhabitants, and people observed in scenes. A committed catalog of fitted, textured people now
 supplies the player's default body, every inhabitant's look, the character studio and saved looks,
@@ -208,7 +208,7 @@ independently authorized traits. If presence itself is withdrawn, remove the rep
 a blank character must not bypass that decision. These checks reuse existing identity and source
 permission authority rather than creating an independent identity database.
 
-The generic **World to data** representation inspector is a separate renderer lens. It currently
+The generic **World to data** representation inspector is a separate renderer lens. It
 operates on declared static mesh/point draws and district groups; skinned character meshes are not
 silently sampled or presented as source points. This does not create an observed-person mapping or a
 semantic endpoint for the geometric slider.
@@ -242,8 +242,8 @@ Measured 2026-09-17 in the preview at 1440x900 (headless Chrome 152, Apple M3 Pr
 walking in the crowd evaluation, as the largest horizontal travel of a planted toe during one stance:
 without the lock 25 to 30 mm at the median and up to 52 mm at the 90th percentile; with the lock 0 mm
 at the median and at most 1 mm at the 90th percentile at 0.7, 1.25, 1.6 and 3.4 m/s. Conversational
-gestures, gaze, sitting, reaching, contact-aware interaction and individual motion styles are later
-milestones.
+gestures, gaze, sitting, reaching, contact-aware interaction and individual motion styles remain
+absent.
 
 ## Detail levels and frame budget
 

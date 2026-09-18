@@ -1,6 +1,6 @@
 # Product roadmap
 
-Updated 2026-09-17. This roadmap defines delivery milestones and their acceptance criteria.
+This roadmap defines delivery milestones and their acceptance criteria.
 Implementation status is recorded below; API and package contracts remain authoritative for
 supported capabilities.
 
@@ -18,7 +18,7 @@ relationships and an evolving simulated history. A person's changes can influenc
 and their activities, and those consequences become part of the world's continuing story. The
 Companion should explain both the personal sources and the simulated developments, with each
 answer grounded in the appropriate evidence or event history. This connection is intended product
-behavior, not a claim that the current bounded society already delivers it. Simulation can enrich
+behavior, not a claim that the bounded society already delivers it. Simulation can enrich
 a personal world without becoming evidence that an event happened in the person's life.
 
 People should be able to switch between first-person exploration and a third-person view of their
@@ -36,8 +36,8 @@ future sourced faces, bodies and heights extend the same model. Appearance, iden
 remain separate. The [character contract](character-representation-contract.md) defines visual
 quality, movement, provenance and staged source-to-character mapping. Deliver the abstract base
 and shared representation first; source-linked person placement and likeness fitting follow with
-explicit evidence and current availability, not inferred identity or personality.
-The current code supplies the versioned representation, native rig playback, development
+explicit evidence and recorded availability, not inferred identity or personality.
+The implementation supplies the versioned representation, native rig playback, development
 catalog/studio and authenticated appearance-history foundations. Production family configuration,
 an authenticated studio connection, movement/visual acceptance and source-linked person mapping
 remain later gates.
@@ -46,7 +46,7 @@ The technical meaning of that name is fixed by the
 [world-memory model architecture](world-memory-model.md). Exulanica composes observations,
 interpretations, spatial state, authored alternatives, generated artifacts and simulated events
 without giving them one truth status or treating any mesh, splat, graph, video, or latent tensor as
-the whole world. It currently implements an evidence-grounded descriptive world-memory substrate,
+the whole world. It implements an evidence-grounded descriptive world-memory substrate,
 not a learned general predictive world model. Prediction becomes a supported claim only after
 action-conditioned held-out evaluation earns it.
 
@@ -83,12 +83,12 @@ of a slider. A binary or Matrix-like visual treatment must be labeled as a visua
 it directly encodes identified artifact bytes. It does not establish additional scene evidence.
 Pixels, splats and meshes do not imply complete segmentation or reusable object extraction.
 Available views therefore depend on each scene or subject's actual representations and current
-source authority. These controls are an active implementation milestone, not a delivered global
+source authority. These controls are a delivery gate, not a delivered global
 view switch.
 
 The intended world interface offers rendered appearance, available point geometry and semantic
 structure/data views for the same selected subjects, place, time and branch. This is a product
-requirement, not a claim that the current distance-based representation tiers implement a global
+requirement, not a claim that the distance-based representation tiers implement a global
 view switch. A continuous blend/density slider can accompany compatible spatial representations;
 semantic records remain an inspectable layer rather than pretending to be a geometric endpoint.
 A missing point map is shown as unavailable. Sampling an authored or generated mesh into points
@@ -102,7 +102,7 @@ representations asynchronously, reuse unchanged content, and stream/cache only w
 Private personal worlds require authenticated delivery and deletion propagation through derived
 assets and caches. Explicitly public showcase artifacts can use a separate public delivery path.
 
-Current runtime uses local content-addressed storage and PostgreSQL; a shared cloud object-store
+The runtime uses local content-addressed storage and PostgreSQL; a shared cloud object-store
 backend and retained hosted world are additional delivery work, not established by the local
 preview. The [deployment plan](deployment.md) and [model stack review](model-and-service-selection.md)
 distinguish proposals from running services. Measure storage, egress, build/inference and active
@@ -152,7 +152,7 @@ remain open; selecting or inspecting a destination does not direct an inhabitant
 Vehicle traffic follows the pedestrian/control foundation. It requires independently validated
 road lanes, vehicle routes, intersection and right-of-way policies, pedestrian crossings, parking
 and collision behavior. A pedestrian graph or moving car asset does not establish those
-capabilities. Traffic remains a separate implementation milestone. Delivery order is production
+capabilities. Traffic remains a separate, absent capability. Delivery order is production
 account/worker configuration, continuous pedestrian activity and richer social interactions, then bounded
 vehicle traffic. Higher-level decisions may use evaluated models; navigation, timing and traffic
 rules remain deterministic runtime responsibilities.
@@ -163,7 +163,7 @@ The generated parts of a world, and a person's changes to them, are built from k
 generated instances, decisions, appearance and edits. Personal memories and admitted places keep the
 contracts described above. This section states the intended structure and the direction for each
 world system; it is not a claim that each system exists. The World systems table records what is on
-main, what is in progress and what is missing.
+main, what exists on a branch and what is missing.
 
 **Kinds** are the vocabulary of a world: street and building parts, materials, needs, activities,
 vehicle classes, road rules, and later jobs, goods and climate profiles. Each kind is a versioned
@@ -183,7 +183,7 @@ and borrows only their rhythms.
 
 **Rules** are versioned engines: grammar generators turn a seed into city records, the tessellator
 turns records into geometry, the society engine turns needs into actions and the traffic engine
-governs road lanes, signals and braking. A change to a rule is a new version, and old versions still
+governs road lanes, signals and braking. A change to a rule is a later version, and earlier versions still
 replay. Rules model mechanisms, not scripts. Weather comes from a stochastic generator calibrated to
 a climate profile, and daylight from the sun's position; deliveries follow from shops running low;
 gatherings follow from relationships. Events are what those mechanisms produce, recorded as
@@ -223,24 +223,24 @@ recorded.
 
 ### World systems
 
-In progress means built on a branch and not yet on main.
+A branch-only item is built on a branch and is absent from main.
 
-| System | Made of | On main (2026-09-17) | Next |
+| System | Made of | On main | Absent from main |
 | --- | --- | --- | --- |
 | City vocabulary and validation | Record shapes, catalogs, validators | Version 2 built and generating: 28 record kinds, 91 parameters, 18 catalogs with 125 authored entries, tile documents with owned, halo and external references, and every one of the eleven stages writing records | Bake the generated street and score it |
 | Vocabulary at scale | Model-drafted catalog entries, automatic checks, sampled review | Not implemented | Bulk drafting in the catalog schema, admitted by schema, consistency and statistics checks |
 | Admitted statistics | Licensed time-use, climate, commute and transit datasets | Not implemented | Admit datasets with licence checks; calibrate routines, weather and trips |
 | City generators | Grammar stages | None: every city stage declares its records and states that it is not implemented | The first generated street corridor, then districts |
-| Shapes | Tessellator and container | Version 1 container, triangle digest, render and navigation projections, deterministic bake stage | The version 2 reader (in final verification) and full expanders (building faces, kerbs, corners) |
+| Shapes | Tessellator and container | Version 1 container, triangle digest, render and navigation projections, deterministic bake stage | The version 2 reader (verification incomplete) and full expanders (building faces, kerbs, corners) |
 | Walking on generated tiles | Tile runtime | A development evaluation route draws one baked tile and stands the player on its navigation envelope; reachable from no person's world | Version 2 tiles, material classes and data view selection |
 | Surfaces | Texture makers and recipes | Eight published opaque sets pinned by migration 0065; a workspace's own recipes and private bakes with deletion (0066) | Glazing, foliage, bark, timber, fabric, road paint and sign panels as declared material classes |
 | Generated appearance | Generative models on exact structure | Not implemented | Model-made texture sets and structure-conditioned appearance research, published as versioned objects |
-| People | Society engine and routine catalogs | Persisted v2 and v3 societies; v3 records bounded model decisions. The v1 engine draws roles and names from short fixed lists | A v4 routine society (needs, activities, capacities, homes and workplaces from premises) is in progress |
-| Looks | Character catalogs | A procedural stand-in in the preview | Catalog-driven people looks, deterministic per inhabitant, in progress |
-| Traffic | Traffic engine and cited catalogs | Not implemented | A deterministic simulation with independent rule checks is in progress; trips are not yet generated from inhabitants |
+| People | Society engine and routine catalogs | Persisted v2 and v3 societies; v3 records bounded model decisions. The v1 engine draws roles and names from short fixed lists | A v4 routine society (needs, activities, capacities, homes and workplaces from premises) exists on a branch and is absent from main |
+| Looks | Character catalogs | A procedural stand-in in the preview | Catalog-driven people looks, deterministic per inhabitant, on a branch and absent from main |
+| Traffic | Traffic engine and cited catalogs | Not implemented | A deterministic simulation with independent rule checks exists on a branch and is absent from main; trips are not generated from inhabitants |
 | Decision-makers | Rules, models, people | v3 accepts bounded model proposals and typed user actions; no other engine does | One decision interface for every inhabitant and vehicle, with model effort by level of detail |
 | Weather and time of day | Weather generator, solar position | Not implemented. The v1 society state stores a fixed clear weather value that nothing reads | A seeded weather generator calibrated to a climate profile, and daylight from solar position, read by people, lighting and traffic |
-| Work, goods and economy | Premises, roles, supply | Not implemented beyond the v1 role list | Roles and shifts from premises (v4, in progress), then goods, supply and deliveries |
+| Work, goods and economy | Premises, roles, supply | Not implemented beyond the v1 role list | Roles and shifts from premises (v4, on a branch and absent from main), then goods, supply and deliveries |
 | Events | Mechanisms | Not implemented | Events produced by supply, relationships and weather, recorded as simulation events |
 | Transit service | Stops, routes, timetables | Not implemented | Stops, routes and boarding calibrated to admitted timetables, joint with people and traffic |
 | Relationships and memory | Society memory | v3 communicated beliefs, bounded | Remembered interactions that change later choices |
@@ -250,7 +250,7 @@ In progress means built on a branch and not yet on main.
 
 The inventory below identifies existing code and the extensions required by each milestone.
 
-| Area | Existing basis | New work for this direction |
+| Area | Existing basis | Required work for this direction |
 | --- | --- | --- |
 | Reconstruction and memory | Reconstruction modules, scene graph, identity decisions, lifted scene segments and source-bound GPU-run preflight | Validate a personal scene; reusable complete-object extraction and cross-source alignment remain separate work |
 | Appearance and language | Reviewed appearance capabilities and bounded conversational preview/apply/rollback proposals | General structural edits, geometry blending and generated-asset creation through typed operations |
@@ -259,7 +259,7 @@ The inventory below identifies existing code and the extensions required by each
 | Authored objects and versions | Source snapshots, alternate-version lineage, object add/move/remove/undo, durable admitted environment instances and bounded motion; synthetic browser checks recorded below | Unified selection, environment-instance package projection and real-scene acceptance; arbitrary world branching is not established |
 | Earth and source admission | Bounded, versioned Flatiron source compiler and owned runtime path; visual validation remains incomplete | Additional admitted sources, reusable extraction/indexing, richer geographic interpretation and first-person coexistence |
 | Package | WMP 1.0 and opt-in authored-world extension describe existing state | Environment-instance and society projection, versioned geographic rights support, permitted asset resolution and an explicit runtime loader |
-| Simulation | Reviewed bounded object behaviors, persisted deterministic v2/v3 society, saved playback controls and typed user action requests over canonical targets; no learned or general simulation capability established. A v4 routine society and a deterministic traffic simulation are in progress and not on main. | Browser-directed actions, production worker/runtime configuration, richer affordances, calibrated learned decisions and fictional rules through measured scenarios |
+| Simulation | Reviewed bounded object behaviors, persisted deterministic v2/v3 society, saved playback controls and typed user action requests over canonical targets; no learned or general simulation capability established. A v4 routine society and a deterministic traffic simulation exist on a branch and are absent from main. | Browser-directed actions, production worker/runtime configuration, richer affordances, calibrated learned decisions and fictional rules through measured scenarios |
 
 World Write receipts are not payload delivery. Package verification is not runnable import.
 Neither is evidence that a compatible simulation runtime exists.
@@ -278,19 +278,19 @@ authenticated persistence and deterministic replay are tested. Its model adapter
 against each inhabitant's available context and records stale or unavailable outcomes. Existing
 societies retain their original profile and history.
 
-The live browser currently uses v2. It can inspect persisted inhabitants and events and control
+The live browser uses v2. It can inspect persisted inhabitants and events and control
 configured playback; its development path can also show an explicitly labeled recorded fixture.
-It does not yet issue the implemented directed-action requests. V3 browser interaction and live-model quality have not been
+It does not issue the implemented directed-action requests. V3 browser interaction and live-model quality have not been
 validated. Recorded fact transmission does not establish natural conversation, evolving social
 relationships, general object manipulation or emergent social behavior. Background progression
 between visits remains delivery work. The opt-in composition/v2 adapter records an unreachable
 reviewed activity locally while preserving its collision footprint and independently validated
 movement and activities. Unknown obstacle geometry, invalid frames and withdrawn source rights
 still make the composed input unavailable. PostgreSQL persistence, mixed historical input replay
-and recovery from a prior global pause are tested. Legacy composition remains the default; the
-running browser has not been switched to the new policy.
+and recovery from a prior global pause are tested. `exulanica.society-composition/v1` remains the default; the
+running browser has not been switched to `exulanica.society-composition/v2`.
 
-Research the next layer as a bounded agent-and-affordance system:
+Research a bounded agent-and-affordance system:
 
 - Each synthetic inhabitant converts needs and relationships into goals, bounded plans and typed
   actions. Decisions persist as replayable state and events rather than disappearing in animation.
@@ -309,8 +309,8 @@ Research the next layer as a bounded agent-and-affordance system:
   unavailable state. Model calls are not tied to rendered frames or blindly repeated for the entire
   population at every simulation tick.
 
-The next social-depth milestone connects the bounded cast to the browser, evaluates live-model
-choices, and extends remembered experiences and beliefs into preferences and evolving relationships. Each agent observes only its available world
+The remaining social-depth work is to connect the bounded cast to the browser, evaluate live-model
+choices, and extend remembered experiences and beliefs into preferences and evolving relationships. Each agent observes only its available world
 context, retrieves relevant simulated memories, proposes an allowed action, and updates state
 through a recorded event. Conversations must affect later choices through explicit memory and
 relationship changes; roles and biographies alone do not establish this behavior. Inspecting a
@@ -334,7 +334,7 @@ Memory evidence, authored state and simulated history remain separate truth clas
 share one place.
 
 The population is canonical simulation state; visible avatars are a representation of it. A
-renderer limit, such as the current 24 full characters nearest the viewer with simpler far figures
+renderer limit, such as the 24 full characters nearest the viewer with simpler far figures
 of the same people for everyone else outdoors, must never truncate population persistence,
 queries, events, or model-facing state. Conversely, a visible walk cycle or interpolated position
 must not create a simulation event that the runtime did not record.
@@ -480,13 +480,13 @@ asset/behavior pair it can support. Schedule depends on source readiness, render
 
 The sequence above is the full first product milestone, not a promise that all six steps fit
 one submission window. The October 30 deadline now bounds the working schedule below; available
-compute budget and scene feasibility remain unresolved. Do not convert the old package inventory
+compute budget and scene feasibility remain unresolved. Do not convert the WMP 1.0 package inventory
 into a delivery commitment. Use these gates to make progress visible and bound unfinished work.
 
 | Gate | Required demonstration | Scheduling consequence |
 | --- | --- | --- |
 | Scene viability | Existing trained output opens in the real app; inspect coverage, navigation and visible defects | Diagnose the limiting stage before commissioning training or starting dependent renderer work. A small object scan is a pipeline check, not proof of a reconstructed place. |
-| Memory and useful model interaction | Ask about the selected place through the actual Companion; ground the answer in available evidence and show missing information honestly | Verify the existing runtime path and record the executed model, task, latency and output. Persistent Companion shared history remains separate planned work. |
+| Memory and useful model interaction | Ask about the selected place through the actual Companion; ground the answer in available evidence and show missing information honestly | Verify the existing runtime path and record the executed model, task, latency and output. Persistent Companion shared history remains absent. |
 | Small complete experience | Explore the place, ask the grounded question, accept one supported appearance change, reload and restore the original state | This is the minimum release candidate. Existing appearance persistence may support it; it must be executed, and it must not be called complete alternate-world branching. |
 | Creative extension | Add one persistent authored object, then its bounded motion, following the first-milestone contracts | Admit these extensions only with enough time to integrate, rehearse and fix them. Preserve them in the product roadmap if they miss the submission window. |
 | Release rehearsal | Repeat the complete experience from a clean start; capture actual footage and verify setup, supported claims and failure behavior | Freeze feature additions before submission. Protect the rehearsal, recording and upload buffer in the dated schedule below. |
@@ -516,7 +516,7 @@ training requires a diagnosed failure, suitable data, an explicit compute budget
 acceptance. Learned generation does not replace deterministic identity, permission, collision
 or replay contracts. See the [character pipeline](character-representation-contract.md#extensible-asset-and-customization-pipeline).
 
-Architecture priorities, updated 2026-09-13: optimize each task for demonstrated quality,
+Architecture priorities: optimize each task for demonstrated quality,
 correctness, efficiency and long-term maintainability. NVIDIA models and compute, Nebius,
 and open-source infrastructure are preferred paths when they meet the task. Preserve
 replaceable implementations and durable results so model and provider improvements can
@@ -524,13 +524,13 @@ be adopted without rebuilding the personal memory core or losing world history. 
 outside those preferences needs a concrete product or operational reason, not brand ranking.
 
 Model selection policy, dated 2026-09-12.
-Add the work below to delivery planning; retain current runtime models as the baseline until a
+Add the work below to delivery planning; retain the runtime models as the baseline until a
 candidate passes its comparison. The [current stack review](model-and-service-selection.md#0-current-stack-and-selection-decision)
 separates implemented roles from reserved configurations and historical plans. This is a
 quality-first selection process within actual hardware and interaction constraints, not a rule
 to use the smallest or cheapest model. No comparative results are claimed by this roadmap update.
 
-### Required next work
+### Required model-selection work
 
 | Priority and stage | Concrete work | Evidence required to change production |
 | --- | --- | --- |
@@ -541,9 +541,9 @@ to use the smallest or cheapest model. No comparative results are claimed by thi
 | P2: pose or depth improvement | If a sufficiently overlapping capture still fails COLMAP, compare the Apache MapAnything variant through the existing pose boundary. If the defect is single-image surface detail, compare MoGe-2 with MoGe-3 on Linux instead. | Independent pose/reprojection and held-out-view checks, geometry/scale checks and coverage inspection, plus memory/time. Run downstream scene training only after pose gates pass. A predicted pose or detailed single view cannot establish unseen backs or usable place coverage. |
 | P3: additional architecture | Consider SAM 3 only if concept-driven detection/segmentation is a measured unmet requirement. Evaluate shared object storage, retrieval indexes, worker concurrency or multi-GPU execution only when measured load or host limits require them. | Compatibility with existing outputs, license/dependency review for the exact artifact, quality/recovery tests and measured operational benefit. No framework rewrite, new face-recognition stack or model fine-tuning is selected by this review. |
 
-The P1 comparisons are the next model-selection work, with scene readiness still the prerequisite
+The P1 comparisons are the model-selection work, with scene readiness still the prerequisite
 for place claims. P2/P3 are conditional branches after diagnosing failures, not a requirement to
-install every candidate. Existing retained examples can support preparation, but the current tiny,
+install every candidate. Existing retained examples can support preparation, but the tiny,
 related-image corpus cannot establish broad generalization. A rephrased query over the same scene
 is not an unseen-scene evaluation.
 
@@ -552,7 +552,7 @@ is not an unseen-scene evaluation.
 Before running each comparison, freeze its baseline/candidate revisions, permitted inputs,
 development/held-out split, human rubric, primary task metric, practical minimum improvement,
 and latency/memory ceilings derived from the intended interaction and actual hardware. These
-ceilings and improvement thresholds are not yet measured or numerically selected; set them before
+ceilings and improvement thresholds are unmeasured and numerically unselected; set them before
 examining candidate outputs. Use paired inputs, record denominators and uncertainty, and keep
 repeated calls from being misreported as additional independent examples. Define difficult-task
 subsets and routing rules on development examples before scoring held-out cases. Refresh the
@@ -564,7 +564,7 @@ Inspect false claims, invented identities, stale evidence, permission handling a
 separate regression gates. Model self-confidence is not the routing trigger. Missing evidence
 continues to require abstention; escalation cannot create supporting sources. If Super/Ultra earns
 a role, implement an explicit, tested task-routing policy behind the existing role interface.
-The current provider-error fallback is not that policy. Measure both difficult-task benefit and
+The provider-error fallback is not that policy. Measure both difficult-task benefit and
 the full user-visible response time before widening the route.
 
 Reuse valid authorized stage outputs for fair comparisons: caption/index artifacts, reviewed
@@ -674,14 +674,14 @@ active tasks' ownership through roadmap prose.
 
 ## Improvement over time and training boundaries
 
-This is planned longitudinal work after the usable-scene baseline, not an additional October
+This is longitudinal work after the usable-scene baseline, not an additional October
 release requirement. It complements the existing place-alignment and two-capture backlog rather
 than creating a second competing pipeline. Trace those contracts before scoping implementation.
 Capture dates and alignment do not alone establish successful incremental reconstruction.
 
 Distinguish four mechanisms:
 
-| Mechanism | Existing basis | Next proof |
+| Mechanism | Existing basis | Required proof |
 | --- | --- | --- |
 | Retain and resume scene training | Saved Gaussian output and complete checkpoints bound to the run's exact identity | Preserve the useful scene and recover compatible interrupted work; neither operation learns a general reconstruction model |
 | Improve a particular world | Source, placement and publication lineage; same-input resume does not accept arbitrary new inputs | Add authorized observations and publish a measurably improved candidate version while preserving historical meaning |
@@ -701,7 +701,7 @@ with changed inputs is a distinct capability from resuming an interrupted run: i
 with explicit compatibility, alignment and input-lineage checks, never by weakening checkpoint
 identity validation. Compare it with the rebuild before calling it an optimization.
 
-Evaluate both old and new coverage using evaluation views excluded from training and fitting,
+Evaluate both prior coverage and candidate coverage using evaluation views excluded from training and fitting,
 plus a browser inspection of navigation, holes and visible artifacts. Record quality regressions,
 GPU time, peak memory and storage growth. A candidate must improve the targeted deficiency without
 unacceptable regression in previously supported views; define the task's thresholds before running.
@@ -735,8 +735,8 @@ it. This roadmap does not authorize training runs, collect new data or assign a 
 
 ## Package and API boundaries
 
-Keep `exulanica-wmp-1.0` compatible. Do not silently add required simulation fields to the current
-profile. Specify a new compatible extension or new profile after the object/version contract has
+Keep `exulanica-wmp-1.0` compatible. Do not silently add required simulation fields to the
+`exulanica-wmp-1.0` profile. Specify a new compatible extension or new profile after the object/version contract has
 been implemented and reviewed. Declare unsupported capabilities explicitly on load.
 
 A future package may reference assets and approved behavior identifiers plus their parameters.

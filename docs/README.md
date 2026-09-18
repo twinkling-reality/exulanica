@@ -12,7 +12,7 @@ order. [world-composition-contract.md](world-composition-contract.md) is the int
 world semantics: memories, permitted real-world selections, and authored variations
 in one interactive world. The intended living-world experience adds synthetic inhabitants whose
 activities respond to that world and develop a persistent simulated history; the
-[society contract](synthetic-society-contract.md) separates this ambition from the current bounded
+[society contract](synthetic-society-contract.md) separates this ambition from the bounded
 implementation. [product-specification.md](product-specification.md)
 sections 1 to 4 and 11 retain research-backed limits. Those pages are subordinate
 to the roadmap.
@@ -52,7 +52,7 @@ client code: it records platform behaviour that otherwise causes silent bugs.
 ## Capability status
 
 The ordinary World Memory Package profile is `exulanica-wmp-1.0`; the separate opt-in
-training dataset profile is `exulanica-wmp-training-1.1`. Neither supplies the planned
+training dataset profile is `exulanica-wmp-training-1.1`. Neither supplies a
 general learned simulation runtime or the bounded deterministic society. World Read serves scene and place bundles; World Write records
 generation receipts. Authored object add, move, remove, undo, and alternate versions
 have code and synthetic checks. Optional Google account sessions, account-owned workspaces,
@@ -62,7 +62,7 @@ deployment configuration and live acceptance. A deterministic synthetic society 
 and rendered as a bounded simulation; learned dynamics, natural social behavior and browser
 controls for directed actions remain roadmap work. General structural language editing also
 remains open. Preview recordings, fixtures and local tests establish mechanics only. This status
-describes the current implementation separately from the product experience in the root README.
+describes the implementation separately from the product experience in the root README.
 
 ## Contracts
 

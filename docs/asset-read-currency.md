@@ -12,16 +12,16 @@ Independent integration caught personal checkout prefixes in retained command ar
 the original full gate ran before envelope generation. The two unpublished candidate envelopes
 were regenerated through the recorder with normalized command provenance, replaced hashes and
 the independent failure retained. Accepted historical records were preserved. Post-generation
-retained-record checks now run after writing the candidate, including after dependent bindings.
+retained-record checks run after writing the candidate, including after dependent bindings.
 Migration 0041 was exercised only in disposable test schemas; retained database activation, merge
 and push remain unperformed.
 
 Migration 0041 implements the scope approved at `6270115`, with the single existing viewer-URL
-assertion update approved at `6d12621`. Original/crop/by-URI image delivery now refuses current
+assertion update approved at `6d12621`. Original/crop/by-URI image delivery refuses current
 mask requirements, withdrawal and missing capture identity. Permitted originals retain exact
 bytes; no route substitutes a mask under an original digest. Image track identity is checked even
 when MIME metadata is missing. Ordinary non-image citations do not acquire geometry prerequisites.
-All new viewer image references use `/masked`, including no-person captures.
+Viewer image references use `/masked`, including no-person captures.
 
 ## Current read contract and lineage
 
@@ -35,7 +35,7 @@ A missing capture mapping is not an empty, reviewed person inventory.
 
 Point-map metadata omits policy-refused artifacts. Direct-ID delivery verifies the artifact's own
 source, read-source digest, screening and exact buffered row; a current mask for the capture is
-insufficient. Missing legacy screening lineage refuses. A null read-source means the original,
+insufficient. Missing screening lineage from before 0040 refuses. A null read-source means the original,
 as defined in 0037; it is accepted only when that artifact's persisted screening and actual source
 support current permission. A rebuilt mask does not rebind historical geometry.
 
@@ -50,7 +50,7 @@ No new wire state or schema was added.
 
 The generated scene tests execute real publication/controller/store paths with scripted COLMAP
 and training outputs. They establish delivery/lineage behavior, not measured reconstruction quality.
-The real mask stage rebuilds a changed source in that test; its old trained asset remains refused.
+The real mask stage rebuilds a changed source in that test; its trained asset from the prior source remains refused.
 Masked splat production still refuses at the existing producer's missing held-out-remap seam and
 is not implemented or represented as a successful masked training run here.
 
@@ -146,7 +146,7 @@ code requiring 0039/0040/0041. This is not recipient-checkable World Read releas
 external cache/offline revocation system. Already delivered bytes cannot be revoked by this guard.
 Unresolved surfaces outside this implementation are generated-model asset delivery/conditioning
 metadata, offline/exported packages and their recipients, direct administrative object-store access,
-and external copies/caches. Non-image evidence retains its existing semantics; the new person-image
+and external copies/caches. Non-image evidence retains its existing semantics; the person-image
 policy is not a global media disclosure guarantee. Masked trained-geometry production remains an
 explicit producer activation dependency. Manual review has no new unmasked bypass.
 
@@ -160,7 +160,7 @@ It was moved rather than deleted, because a superseded proposal that was acted o
 rather than a draft: it records what was believed before the work and is the only place the
 reasoning survives. It was moved rather than left in place because a live contract with 145 lines of
 superseded proposal beneath it is a document people read wrongly, and the read contract is the half
-that governs what the system does today.
+that governs what the system does.
 
 This file keeps its path. Two evaluation records name it, and one binds a sha256 of its bytes as of
 an earlier revision; the path is what those records depend on.

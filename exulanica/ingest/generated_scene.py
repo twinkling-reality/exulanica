@@ -1,6 +1,6 @@
 """Recording what a world model generated for a scene, in the tier below every recorded rung.
 
-Roadmap Phase 10 capability 2, the write half. This does not run a model. It records what one
+This does not run a model. It records what one
 produced, together with the receipt that says which model, from which prompt, conditioned on
 exactly which bytes. That distinction is the design: the platform does not want to become the
 place generative models run, it wants to be the place their output is honestly filed.

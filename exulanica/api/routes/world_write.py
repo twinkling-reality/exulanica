@@ -1,6 +1,6 @@
 """The World Write API: where a world model's output is filed, below every recorded rung.
 
-Roadmap Phase 10 capability 2. The counterpart to ``/world-read``, and deliberately a different
+The counterpart to ``/world-read``, and deliberately a different
 prefix rather than a verb on the same one: reading the real world and writing an imagined one are
 not two halves of one resource, and a client that acquired write access by holding a read path
 would be the first step to the two tiers sharing a code path.

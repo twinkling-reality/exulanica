@@ -19,7 +19,7 @@ milestone. The implementation is migration `0042_authored_world_objects.sql`,
 `exulanica/world/assets.py`, migration `0050_durable_environment_composition.sql`,
 `exulanica/world/environment_instances.py`, and the `/world/versions` and `/world/assets` routes.
 
-## 1. The decision: a new plane, bound to the snapshot the way appearance is
+## 1. The decision: a separate plane, bound to the snapshot the way appearance is
 
 The question this document had to answer first was whether an alternate world version and an
 authored object are a new element kind plus a version lineage on the existing structural snapshot
@@ -76,7 +76,7 @@ something already does them.
 | Concurrency | Compare-and-swap against a stored base token under a per-workspace advisory lock, as both existing world planes do |
 | Registry shape | The `interaction_capability_registry` pattern: reviewed rows seeded by the migration, readable by the runtime roles and not writable by them |
 
-Six tables are new. Each stores something no existing table can hold: an alternate version and its
+Six tables each store something no existing table can hold: an alternate version and its
 lineage, an authored object, an override of a source element, an append-only edit log, a reviewed
 asset catalog, and a bounded object-behaviour catalog.
 
@@ -85,7 +85,7 @@ asset catalog, and a bounded object-behaviour catalog.
 `interaction_capability_registry` is a per-world viewer policy. Its `category` check admits only
 `comfort`, `navigation`, `disclosure` and `initiative`, and `world_interaction_policy_version`
 stores one value per capability for the whole world. An object behaviour is per object, and two
-lanterns in one version may hold different bounded parameters. The new registry copies its shape,
+lanterns in one version may hold different bounded parameters. The behaviour registry copies its shape,
 its bounds discipline and its read-only grants, and does not copy its rows or its table.
 
 ## 2. An alternate version
@@ -168,7 +168,7 @@ them, which is what a person who placed a lantern inside a room means by placing
 
 `origin.role` is chosen by the person and is never inferred. Product direction is explicit that an
 uploaded image establishes no personal association by itself and that the first slice asks rather
-than classifies. There is no automatic reality classifier here and none is planned for this route.
+than classifies. There is no automatic reality classifier here and this route specifies none.
 `origin.kind` is always `authored`: this plane cannot express a claim about the source world, and
 nothing it stores may be read as evidence.
 
@@ -371,7 +371,7 @@ The problem codes are distinct, because the recovery differs:
 | `404` | `unknown_reference` | Absent and cross-workspace ids are indistinguishable |
 
 `unknown_reference` and `unavailable_asset` reuse the existing application error classes and their
-existing handlers. The four new codes are mapped inside `exulanica/api/routes/world.py`, following
+existing handlers. The four object-edit codes are mapped inside `exulanica/api/routes/world.py`, following
 the local `_problem` helper that `world_write.py` already uses, so registering this surface adds no
 new global exception handler.
 

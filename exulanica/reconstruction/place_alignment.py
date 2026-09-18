@@ -1,6 +1,6 @@
 """Fit one shared frame between two captures of the same place, or refuse and say why.
 
-Roadmap Phase 10 capability 3, and experiment FR-2's measurement. See
+Experiment FR-2's measurement. See
 ``docs/place-identity.md`` for the design this implements and, more importantly, for the
 constraint that shapes it: retained receipts alone cannot align two captures, because no learned
 feature descriptors are persisted and COLMAP point ids mean nothing across two reconstructions. The

@@ -29,13 +29,13 @@ the live system still described the branch that was not taken. The audit found:
    ingest never produces one. `region` is inside `span_digest`, so such a row would not be a stale
    value to repair later: it would be a permanent citation address naming the wrong pixels.
 
-Item 3 is currently harmless because no code reads the column back. That is exactly why it is cheap
+Item 3 is harmless because no code reads the column back. That is exactly why it is cheap
 to fix now and expensive to fix after the first consumer appears.
 
 ## Decision
 
 **The invariant.** Every `img` track is stored with its pixels already normalised to upright display
-space. Three things follow, and all three are now enforced rather than conventional:
+space. Three things follow, and all three are enforced rather than conventional:
 
 - `media_track.rotation` means *clockwise degrees still to apply*, and is therefore `0` on every
   image track. What was applied, including whether a mirror was applied, lives in
@@ -49,7 +49,7 @@ space. Three things follow, and all three are now enforced rather than conventio
 
 **Mirrored EXIF Orientation values (2, 4, 5, 7) are admitted, not refused.** They are ordinary
 inputs. The refusal in `exulanica/evidence/region.py::rotation_for_exif_orientation` is retained and
-re-documented as what it now is: the guard on the branch that was rejected. Nothing in the pipeline
+re-documented as what it is: the guard on the branch that was rejected. Nothing in the pipeline
 calls it. It exists so that the plausible-looking shortcut of turning an EXIF tag straight into a
 display rotation, which is correct for exactly four of the eight values, fails loudly for the other
 four instead of silently dropping a mirror.
@@ -67,7 +67,7 @@ already record the normalisation, and nothing reads that column, so no consumer 
 
 `media_track.rotation` has recorded `normalised_at_ingest` since `exulanica/ingest/exif.py` was
 introduced (commit `a6b70ee`), so no row written by any released version of this pipeline can
-violate the new constraint.
+violate this constraint.
 
 ## Failure behaviour
 

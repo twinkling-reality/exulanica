@@ -127,7 +127,7 @@ stable synthetic subject identity. Render motion cannot create canonical actions
 
 ## Opt-in local activity failures
 
-The legacy `exulanica.society-composition/v1` projection keeps its original behavior, including
+The `exulanica.society-composition/v1` projection keeps its original behavior, including
 making the whole input unavailable when an active authored affordance has no supported access
 node. Both `build_society_input` and `SocietyRuntime` retain this default. A host can explicitly
 select `composition_profile="exulanica.society-composition/v2"` to enable local failure handling.
@@ -142,7 +142,7 @@ unsupported motion, invalid transforms/frames, structural overrides, invalidated
 withdrawn rights still produce a globally unavailable input with no materializable targets or
 local records.
 
-The new projection is `exulanica.society-input/v2`. It keeps the original fields and adds sorted
+The `exulanica.society-input/v2` projection keeps the original fields and adds sorted
 `unavailable_affordances`, each containing exactly `target_id`, `subject_id`, `object_id`,
 `version_id`, `affordance` and `reason: authored_affordance_unreachable`. These identify an authored
 activity without claiming an access `node_id`. Usable and unavailable target IDs are disjoint;
@@ -160,17 +160,17 @@ ordered inputs, never rewrites of prior failure records or completed actions.
 
 Migration 0057 admits strict input/v1 and input/v2 profiles without modifying migrations 0053 or
 0055. Engines v2/v3 accept both input profiles and replay each retained input with its original
-semantics; v1 engine behavior is unchanged. Legacy projection, state and event digest vectors are
+semantics; v1 engine behavior is unchanged. V1 projection, state and event digest vectors are
 pinned in tests. Historical authorization selects policy references from the stored input profile,
 not the currently selected projection policy, while continuing to recheck current rights and
 asset bytes. The runtime binding structure and its digest do not change.
 
-Apply the reader/schema support before opting a host into the new composition. Future accepted
+Apply the reader/schema support before opting a host into `exulanica.society-composition/v2`. Subsequent accepted
 edits append the chosen projection. To recover an already paused society immediately, explicitly
 append a fresh authorized projection through the runtime input-refresh/edit hook and then advance;
 a configuration change alone does not rewrite the persisted state. A policy refresh can keep the
 same authored edit cursor/delta digest while increasing `input_seq`. Replay therefore retains the
-old global pause and the later locally degraded input exactly. Local records are available in the
+earlier global pause and the later locally degraded input exactly. Local records are available in the
 stored input document for authorized adapters; no new browser endpoint is introduced.
 
 ## Authored edits and inability to act
@@ -215,7 +215,7 @@ Replay starts from the initial seed/population and historical input 1. It checks
 bindings/order, every transition's state digest and ordered events, the full persisted event set,
 and final state equality. Queued but unconsumed inputs are validated too. It never substitutes
 current world geometry. Historical materialization/replay still checks current authorization;
-withdrawn or unavailable dependencies return unavailable rather than reviving old geometry.
+withdrawn or unavailable dependencies return unavailable rather than reviving prior geometry.
 
 This is deterministic replay with immutable input/event/transition history and current snapshots,
 not a claim that events alone reconstruct all state. Losing required input bytes prevents exact
@@ -273,7 +273,7 @@ Deterministic cast and target ordering chooses the interaction. A recipient's be
 `origin: communication`, sender `source_subject_id`, original `source_fact_id`, `communication_id`,
 original input sequence/digest, `learned_tick`, target and availability. Direct beliefs instead use
 `origin: observation` and a null communication ID. Newer factual input sequences supersede older
-ones; an existing belief wins a same-input tie. Relaying old information later does not make its
+ones; an existing belief wins a same-input tie. Relaying earlier information later does not make its
 source newer. These are bounded records of claims, not trusted global truth or learned relationships.
 
 Cast members know public district destinations. They can choose an authored goal only when their
@@ -350,7 +350,7 @@ verifies the final digest. A provider change cannot retroactively change replay.
 ## Validation
 
 Dedicated society tests distinguish pure policy fixtures from PostgreSQL scratch-schema evidence.
-They cover legacy digest compatibility, reachable/disconnected routes, turn-preserving motion,
+They cover v1 digest compatibility, reachable/disconnected routes, turn-preserving motion,
 action timing, edit/undo reactions, no-snap blockage, population independence, malformed inputs,
 authenticated reload, stale writes, branch/workspace isolation and event-history forgery refusal.
 The database cases use real migrations and a synthetic authorized-input adapter, not production
@@ -404,7 +404,7 @@ The authenticated base route is `/world/versions/{version_id}/society/control`:
 - `PUT` accepts only `{base_revision, mode: "playing" | "paused", speed: 1 | 2 | 4}`. Successful
   configuration increments the control revision and cancels any pending claim. Stale revision
   returns 409. Unknown/foreign branches are indistinguishable 404s. Invalid input types are 422;
-  unsupported settings or legacy play are 409. Unavailable current inputs are 424.
+  unsupported settings or v1 play are 409. Unavailable current inputs are 424.
 - `POST /steps` accepts `{base_revision, base_tick, base_state_sha256}` and requires paused mode.
   It performs exactly one existing deterministic step and returns `{control, society, receipt}`.
   Both control revision and simulation tick/digest must match. First successful use persists
@@ -443,7 +443,7 @@ The next deadline is completion plus the configured wait. Excess wall-clock debt
 it is not silently replayed as unlimited offline time.
 
 Pause uses the same workspace lock. An already executing bounded batch can finish before pause
-acknowledges; after acknowledgement its old token cannot advance again. A slow tick is not forcibly
+acknowledges; after acknowledgement its previous token cannot advance again. A slow tick is not forcibly
 interrupted mid-computation, but crossing the lease deadline rolls the entire batch back. Shutdown
 stops new claims and lets current work reach that boundary. Unexpected exceptions roll back ticks
 and leave the previously committed lease recoverable. Expiry permits replacement claims; after
@@ -563,7 +563,7 @@ sorted list of what the place cannot supply. Two producers exist:
   everything the table says obstructs: a building's base ring, and each furniture or tree part
   whose bottom is below the capsule height (1900 mm), as a box in its object's turned frame. A
   seat is clear of every obstruction but its own bench. An obstruction of a kind this producer
-  does not read is stated rather than ignored. Walking lines are not yet routed round
+  does not read is stated rather than ignored. Walking lines are not routed round
   obstructions: the place counts every footway or door piece that passes within a capsule radius
   of a low part and states that count.
 

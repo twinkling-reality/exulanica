@@ -1,6 +1,6 @@
 """The generated tier: what a world model imagined, and the receipt that keeps it separate.
 
-Roadmap Phase 10 capability 2. A generative world model asked to fill in the part of a kitchen no
+A generative world model asked to fill in the part of a kitchen no
 photograph covered produces something plausible. That output is useful and it is not a record, and
 the whole design problem is keeping those two facts attached to the same bytes forever.
 

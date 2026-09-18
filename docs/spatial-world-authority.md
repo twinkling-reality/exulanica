@@ -74,7 +74,7 @@ structural pointer, graph digest, and reconstruction digest to remain byte-for-b
 
 Every spatial snapshot stores a declarative package projection containing its identity, parent,
 input graph and reconstruction identities, composer compatibility, fixed-point unit, and the four
-section paths with their SHA-256 digests. Phase 7 consumes this projection; it does not reread a
+section paths with their SHA-256 digests. World Memory Package v1 consumes this projection; it does not reread a
 mutable renderer scene.
 
 ## Verification

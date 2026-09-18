@@ -775,7 +775,7 @@ that the browser is not the thing deciding what a sentence meant.
 ### 13.2 The form is built from the registry, so it cannot describe a value the registry refuses
 
 `exulanica/selection/proposal.py` constructs the drafter's JSON Schema at call time from
-`STYLE_REGISTRY`. A profile is an enum over the profiles that may currently receive a proposal, a
+`STYLE_REGISTRY`. A profile is an enum over the profiles that may receive a proposal, a
 range control is a number carrying that control's own declared `minimum` and `maximum`, a choice
 control is an enum over that control's own options, and an evidence reference is an enum over a
 bounded catalogue of the current topology's source slots. There is no string field anywhere in it
@@ -933,7 +933,7 @@ been is held by the prompt and by nothing else, exactly as three of the `selecti
 background threads are softer" describes a change that has not happened: the proposal was sitting
 unapplied when it said so. The reviewed sentence under it says "Nothing has changed yet", so the
 person is told the truth by the surface even when the model's half is misleading, and that
-ordering is not an accident. The drafter prompt does not currently say what tense to write in. It
+ordering is not an accident. The drafter prompt does not say what tense to write in. It
 should.
 
 **The injection utterance was classified as a question, which is the safe outcome for the wrong
@@ -1008,8 +1008,8 @@ independent refuters each, with the majority ruling. Twenty-nine were raised. Wh
 was fixed, in the order it matters:
 
 **The merge was not bounded by the profile the draft named.** A workspace whose current global
-style is the experimental `survey-relief@1` is reachable today, because the preview route gates on
-`validate_reference` and that admits an experimental profile. Copying the current profile's keys
+style is `survey-relief@1` (registry status `experimental`) is reachable, because the preview route gates on
+`validate_reference` and that admits a profile whose registry status is `experimental`. Copying the current profile's keys
 into a reference for `origin-landscape@1` made the registry refuse the lot as unknown parameters,
 which this path then reported as a RANGE failure. Every appearance request on such a workspace
 was refused for ever, and the person was told a value fell outside its range when none had. The
@@ -1409,7 +1409,7 @@ count, so those fields are null for the vector call; the selected model is recor
 
 ### Release blockers
 
-This is a candidate, not completed semantic acceptance. Do not enable live indexing yet.
+This is a candidate, not completed semantic acceptance. Do not enable live indexing.
 
 - The new deletion acceptance test finds that capture tombstones block reads and reinsertion,
   but do not enqueue caption vectors for physical purge. Migration 0013 deliberately covered
@@ -1418,7 +1418,7 @@ This is a candidate, not completed semantic acceptance. Do not enable live index
 - The ingest worker exposes an injected pass, avoiding an import from ingest into selection,
   which the import contract prohibits. The application wiring requires an authorized edit to
   `exulanica/api/services.py`; it is not wired on this branch.
-- The web decoder currently types served model and attempt count as non-nullable, although
+- The web decoder types served model and attempt count as non-nullable, although
   its runtime mapping passes values through and provenance selects only reasoning/extraction
   calls. The new vector-call shape violates that declared TypeScript contract. Web was read-only
   for this task; updating that contract is also required before enabling live vector calls.

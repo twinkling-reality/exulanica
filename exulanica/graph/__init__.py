@@ -20,7 +20,7 @@ properties of the server rather than of the adapter:
     What IS returned is ``scene_groups``: the time-and-position clustering the ingest pipeline
     already computed and stored. That is not the same thing as an island and must not be read as
     one. It is an ingest artifact with its own provenance, the client is free to ignore it, and
-    the field is named after what it is rather than after what the client currently does with it.
+    the field is named after what it is rather than after what the client does with it.
     It is carried on this payload rather than on a second endpoint because a grouping fetched at
     a different moment from the graph it groups can disagree with it, and the whole value of a
     snapshot is that its parts were true at one state version.

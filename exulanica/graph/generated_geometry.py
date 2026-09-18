@@ -1,6 +1,6 @@
 """Read the generated tier, kept structurally apart from everything that was observed.
 
-Roadmap Phase 10 capability 2, the read half. This is a separate module and a separate payload
+This is a separate module and a separate payload
 field from :mod:`exulanica.graph.scene_geometry` for one reason: a consumer must have to write
 code that reads ``generated_geometry`` before it can draw a generated surface. A boolean on the
 trained-geometry row would let a client that ignored one field draw imagination as record, and the

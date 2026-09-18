@@ -2,11 +2,11 @@
 
 Status: **implemented; first benchmark-calibrated pose policy verified 2026-09-04**.
 
-`exulanica.reconstruction.validate_opm` now validates every production point map before it is
+`exulanica.reconstruction.validate_opm` validates every production point map before it is
 persisted. The PlayCanvas reader independently validates its untrusted byte boundary before it
 constructs typed-array views. Both sides check the format, version, rung, explicit metric flag,
 camera axes, source dimensions and aspect, field of view, bounds, section types, exact lengths,
-alignment, and container range. Since OPM/2 ([adr/0010-opm-2.md](adr/0010-opm-2.md)) both also
+alignment, and container range. Under OPM/2 ([adr/0010-opm-2.md](adr/0010-opm-2.md)) both also
 refuse version 1 **by name**, with a message naming the regeneration path rather than a converter,
 check that `colorAlpha` declares which quantity the alpha channel holds, and check `modelImage`
 against `sourceImage` for reachability by one uniform resize rather than for equality.
@@ -46,22 +46,22 @@ map and left the receding pavement and a bicycle standing proud of a wall intact
 began deleting that bicycle's frame and wheel rims. A single image is not a corpus, so the number
 carries the same status as the one above and the same reason for being a stage parameter: an edit
 changes the stage key and regenerates rather than leaving stale point maps behind. The
-`discontinuityDropped` statistic now travels in every `.opm`, so the distribution needed to review
+`discontinuityDropped` statistic travels in every `.opm`, so the distribution needed to review
 this threshold can be read off a real corpus the same way the valid fraction is. `oneSidedPoints`
 joins it under OPM/2 and counts the survivors that lost a neighbour to that drop, which is the
 population ADR-0010 D4's flag marks and a number that had never been measured.
 
 No consented OGC-1 corpus, signed consent record, or real quality observations were found locally on
-2026-08-31. Therefore Phase 3A has a productionized contract but has **not** passed its roadmap gate.
+2026-08-31. Therefore the quality-gate contract is productionized but has **not** passed the real-corpus gate.
 
 **CORRECTED 2026-09-04:** scene pose manifests previously wrote all three quality thresholds as
 unmeasured constants even though the durable build input bound the `scene_pose` stage parameters.
-The scene worker now decodes the exact bound stage policy into each pose manifest. Non-integral
+The scene worker decodes the exact bound stage policy into each pose manifest. Non-integral
 thresholds remain integer-quantized in the canonical stage registry as millionths and are converted
 to their declared units only at the pose manifest boundary. The version 1 policy retains no
 measured values and its original receipt remains unchanged. The later measured version 2 policy
-changed both its stage version and parameter digest, queued a new build, and retained the old
-unmeasured receipt rather than rewriting it.
+changed both its stage version and parameter digest, queued a new build, and retained the
+unmeasured version 1 receipt rather than rewriting it.
 
 **VERIFIED 2026-09-04:** the fixed synthetic scene and licensed ETH3D `pipes` scene both completed
 the production pose path. The synthetic run registered 8 of 8 views with 0.256429 pixel mean

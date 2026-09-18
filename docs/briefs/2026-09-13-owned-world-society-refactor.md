@@ -5,7 +5,7 @@ Date: 2026-09-13
 
 ## Decision
 
-Exulanica will not use Google Maps, Apple Maps, or any other visualization-only
+Exulanica does not use Google Maps, Apple Maps, or any other visualization-only
 service as the corpus for walking, collision, extraction, modification, model
 processing, training, persistence, or export.
 
@@ -46,7 +46,7 @@ are reusable without retaining a Google dependency in the owned-world path.
 This correction does not erase useful work. The existing source-admission,
 operation-rights, content-addressed asset, geographic-frame, semantic feature,
 authored-version, unified Selection, Companion, PlayCanvas, and residency
-foundations should be reused after their current behavior is verified.
+foundations should be reused after their behavior is verified.
 
 ## Product and visual north star
 
@@ -289,7 +289,7 @@ Use:
 
 Use models selectively for high-level planning, dialogue, summarization, and
 authored proposals. Model output is never direct authority over canonical state.
-All writes pass typed validation and versioning. Training is a later measured
+All writes pass typed validation and versioning. Training is a separate measured
 option, not a prerequisite for the first society.
 
 ### Phase 7: Companion and retrieval
@@ -343,7 +343,7 @@ budget, timeout, and cleanup plan, such as:
 - texture or asset generation;
 - point-cloud or splat processing;
 - measured self-hosted inference;
-- later fine-tuning from permitted simulation data.
+- fine-tuning from permitted simulation data.
 
 Persist outputs outside ephemeral instances, record actual cost, and delete the
 instance immediately after the bounded job. No GPU purchase, rental, or training

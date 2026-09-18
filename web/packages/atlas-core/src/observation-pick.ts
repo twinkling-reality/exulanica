@@ -1,7 +1,7 @@
 /**
  * Click-to-evidence: turn a click in the reconstruction inspector into a question about one point.
  *
- * Roadmap Phase 10. A visitor selects a surface and asks what it is made of; the answer is the set
+ * A visitor selects a surface and asks what it is made of; the answer is the set
  * of photographs whose cameras actually observed that piece of the world. This module is the part
  * of that gesture that belongs in the browser: where a click lands in the source photograph's own
  * pixels, and the sentence the answer is shown with.

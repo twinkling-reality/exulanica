@@ -14,8 +14,8 @@ existing API or package compatibility by itself.
 of Personal World Memory Model. No renderer scene, mesh, splat, semantic graph,
 embedding, generated video or latent tensor is the whole world. Consequential state
 is epistemically typed and addressable; task representations are derived artifacts
-with declared preserved properties and permitted uses. The current implementation
-is not yet a learned general predictive world model.
+with declared preserved properties and permitted uses. The implementation
+is not a learned general predictive world model.
 
 **Architecture selection, 2026-09-13:** prioritize measured task quality, correctness,
 efficiency and maintainability, with NVIDIA, Nebius and open-source infrastructure as
@@ -259,7 +259,7 @@ not 1024: runtime verification **measured** `Qwen/Qwen3-Embedding-8B` at 4096 di
 for an indexed `halfvec`, so the column carries **no ANN index and search over it is exact**. The
 reasoning and the additive fallback are in
 [domain-and-evidence-model.md](domain-and-evidence-model.md) section 4.4. The overfiltering hazard
-above therefore does not currently apply, and `hnsw.iterative_scan = relaxed_order` is dormant until
+above therefore does not apply, and `hnsw.iterative_scan = relaxed_order` is dormant until
 an approximate index exists to set it on. **ANN is used for recall and ranking only, never for set membership.** A
 question like "which people were present" is answered relationally from confirmed link rows, never
 from a nearest-neighbour result.
@@ -483,7 +483,7 @@ T2 renders as escaped plain text with no HTML, no markdown image loading, and no
 
 **DECISION: regex denylists and injection classifiers are telemetry only, never gates.** A gate that
 fails open creates false confidence, and every published classifier fails open on some input. They are
-worth running to see what is being attempted; they are not worth trusting.
+worth running to observe attempted injection; they are not worth trusting.
 
 **ASSUMPTION:** that the nonce envelope and trust tiers hold against real multimodal injection, and
 that the defences are not English-only. Settled by experiment X-10: stage physical signs including one
@@ -560,7 +560,7 @@ class of silent failure into either automatic recovery or a phone alert.
 | One-command redeploy in the Makefile, tested from a clean shell | A redeploy that has never been run from scratch is not a recovery path |
 | Nightly `pg_dump` to Object Storage | A lost host costs minutes rather than the corpus |
 | A static SPA build on Vercel that works with zero backend, serving a **clearly labelled recorded tour** | Total backend loss. Labelling it as recorded keeps it honest; presenting it as the live app would not |
-| A named person doing a weekly check through the unattended window | Seven weekends of drift. **OPEN:** the person is not yet named |
+| A named person doing a weekly check through the unattended window | Seven weekends of drift. **OPEN:** the person is unnamed |
 
 Model deprecation is the failure mode specific to this platform and this window:
 

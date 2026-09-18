@@ -348,7 +348,7 @@ rather than reusing this one.
 
 **CLOSED 2026-09-04 by refusing, not by inspecting.** Whether the corpus contains motion photographs
 or bursts is still unestablished, and it no longer has to be established before ingest, because a
-container holding more than one frame is now **refused** by `exulanica/ingest/decode.py`, at the
+container holding more than one frame is **refused** by `exulanica/ingest/decode.py`, at the
 header probe and again at the decode.
 
 The alternative was worse than it looked. Nothing checked frame count, so an animated GIF, a
@@ -1063,7 +1063,7 @@ filtering is applied after the index is scanned", and with a filter matching 10 
 default settings roughly 4 of 10 expected results are returned
 (<https://github.com/pgvector/pgvector/blob/master/README.md>, VERIFIED 2026-08-27).
 **CORRECTED:** with exact search there is no approximate index to overfilter, so that hazard is
-currently dormant and the `hnsw.iterative_scan = relaxed_order` setting applies only if the recall
+dormant and the `hnsw.iterative_scan = relaxed_order` setting applies only if the recall
 column described above is ever added. Partitioning is kept regardless, for the stronger reason: it
 is the namespace isolation the privacy analysis requires, not a performance tactic.
 
@@ -1672,7 +1672,7 @@ a caption, because the caption is gone rather than rewritten.
 A third case is neither: `scene_pose` is declared deterministic because it fixes COLMAP's
 `random_seed`, which makes a differing pose worth an event. `exulanica/reconstruction/pycolmap_executor.py`
 records that RANSAC threading still admits variation and that the residual has not been measured, so
-the stage is **declared deterministic and not yet observed to reproduce**, and only the second of
+the stage is **declared deterministic and unobserved to reproduce**, and only the second of
 those licenses an exact-recomputation claim.
 
 **ASSUMPTION (A-24), NARROWED.** Deleting an exemplar and recomputing the **deterministic** closure
@@ -1857,7 +1857,7 @@ or the spelling of an existing one is not**: it is a v2 span format, written alo
 documented and verified migration of every existing span. That is the whole reason this list is kept
 separately from the general gaps below.
 
-The corpus is small and the number of spans is currently near zero, which makes now the cheapest
+The corpus is small and the number of spans is near zero, which makes the pre-ingest window the cheapest
 moment these decisions will ever have. The window closes at first production ingest, and for the
 timebase item specifically at first video ingest.
 

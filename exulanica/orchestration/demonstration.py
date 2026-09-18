@@ -98,7 +98,7 @@ def run_frontier_demonstration(
     vision: VisionModel | None = None,
     depth: DepthModel | None = None,
 ) -> dict[str, Any]:
-    """Run every Phase 8 gate and return the canonical receipt document.
+    """Run every frontier demonstration gate and return the canonical receipt document.
 
     ``vision`` and ``depth`` are dependency-injection seams for acceptance tests.  Production
     callers must make them agree with the manifest; an unavailable stage is represented by

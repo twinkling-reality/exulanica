@@ -4,8 +4,8 @@ Give created objects movement, interactions, and rules for responding to the wor
 
 ## Scope
 
-The initial runtime milestone is one supported behavior with trigger, stop, and reset controls.
-Later milestones address physics, collisions, dynamic objects, and more complex behavior.
+The first supported runtime behavior is one behavior with trigger, stop, and reset controls.
+Physics, collisions, dynamic objects, and more complex behavior are separate work.
 Bounded object motion and a deterministic synthetic society exist; the renderer and generation
 receipts do not implement a general simulation system.
 
@@ -18,7 +18,7 @@ actions and outcomes may share places and objects with a memory without becoming
 happened there. Rendering may interpolate snapshots but may not invent canonical actions or
 positions.
 
-The current deterministic society and bounded object motion do not establish a learned predictive
+The deterministic society and bounded object motion do not establish a learned predictive
 world model. That claim requires action-conditioned prediction evaluated against held-out future
 observations, calibrated uncertainty, increasing-horizon error measurements and improvement over
 deterministic and no-memory baselines. See

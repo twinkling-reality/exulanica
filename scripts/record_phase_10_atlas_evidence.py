@@ -1,4 +1,4 @@
-"""Bind the Phase 10 Atlas captures into one digest-bound record.
+"""Bind the Atlas captures into one digest-bound record.
 
 The two visible halves of P10-A were exercised against the retained real trained bowl in a
 headless browser at exactly 1280x720, and the screenshots are the result. A screenshot on its own

@@ -174,7 +174,7 @@ SUBJECTS: dict[str, str] = {
 #: one entry that is a guess, and it is written down here, in a reviewed diff, rather than
 #: buried in a scorer, for the same reason `exulanica/epistemics/vocabulary.py` exists.
 #:
-#: **What this is for now, which is not what it was added for.** It was added so M6 could be
+#: **What the mapping measures, which is not what it was added for.** It was added so M6 could be
 #: scored against the corpus, and M6 turned out not to be a corpus metric at all: it filters on
 #: confirmed entity ids and an entity exists only where a person confirmed one. The mapping is
 #: what measures why a manifest-derived filter metric would not have been worth having anyway.

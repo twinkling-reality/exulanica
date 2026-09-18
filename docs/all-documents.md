@@ -22,7 +22,7 @@ What the system is. Edited when the system changes.
 - [atlas-visual-language](atlas-visual-language.md) : DECISION and IMPLEMENTED for the new-user arrival, one source-first encounter, and
 - [atlas-world-customization-contract](atlas-world-customization-contract.md) : DECISION and IMPLEMENTED for global appearance customization. PostgreSQL appearance
 - [capture-overlap-and-recovery-state](capture-overlap-and-recovery-state.md) : 2026-09-16, recovery states shipped; the overlap verdict failed its held-out check
-- [character-representation-contract](character-representation-contract.md) : Updated 2026-09-17. Status: CATALOG PEOPLE IMPLEMENTED FOR THE PLAYER AND INHABITANTS; SOURCE-LINKED
+- [character-representation-contract](character-representation-contract.md) : CATALOG PEOPLE IMPLEMENTED FOR THE PLAYER AND INHABITANTS; SOURCE-LINKED
 - [companion-question](companion-question.md) : built, covered by tests, and measured with real models on three passes. Section 6
 - [corridor-navigation-artifacts](corridor-navigation-artifacts.md) : artifact, gate, and conservative runtime adapter implemented; real gate blocked
 - [demo-integrity](demo-integrity.md) : mixed, labelled per item. Audited against the repository on 2026-08-28
@@ -37,15 +37,15 @@ What the system is. Edited when the system changes.
 - [evaluation-methodology](evaluation-methodology.md) : Status of this document: mixed. Every claim below carries exactly one label
 - [frontier-roadmap](frontier-roadmap.md) : engineering archive. product-direction.md owns product
 - [generated-appearance](generated-appearance.md) : TRACK A SESSION 1 RUN AND MEASURED 2026-09-17 (section 9). 64 model-made texture sets on
-- [generated-corridor-street](generated-corridor-street.md) : GENERATED, VALIDATED AND GATED; NOT YET BAKED INTO THE STORE OR SCORED. Updated
+- [generated-corridor-street](generated-corridor-street.md) : GENERATED, VALIDATED AND GATED; NOT BAKED INTO THE STORE OR SCORED
 - [generated-tile-runtime](generated-tile-runtime.md) : IMPLEMENTED as a development evaluation only: the browser reads baked texture sets and
-- [grammar-package](grammar-package.md) : CITY VOCABULARY VERSION 2 BUILT; EVERY CITY STAGE GENERATES. Phase 1 of the target
+- [grammar-package](grammar-package.md) : CITY VOCABULARY VERSION 2 BUILT; EVERY CITY STAGE GENERATES
 - [gsplat-scene-jobs](gsplat-scene-jobs.md) : Status 2026-09-05, evening: the runner image has been built from this recipe and executed on a
 - [interaction-model](interaction-model.md) : mixed. Every claim carries exactly one label, per the convention in
 - [interaction-policy-backend](interaction-policy-backend.md) : IMPLEMENTED for the capability registry, immutable policy history, Settings and
 - [lettering](lettering.md) : IMPLEMENTED for the four glyph catalogs, the conversion tool, the catalog reader and the
 - [license-matrix](license-matrix.md) : VERIFIED where a primary source was read on 2026-08-27, with the exceptions marked
-- [model-and-service-selection](model-and-service-selection.md) : current implementation reviewed 2026-09-14; model upgrades require task-specific evidence
+- [model-and-service-selection](model-and-service-selection.md) : implementation reviewed 2026-09-14; model upgrades require task-specific evidence
 - [owned-district-and-admission](owned-district-and-admission.md) : IMPLEMENTED DATA PATH; VISUAL AND WORLD-MEMORY VALIDATION IN PROGRESS
 - [person-presentation-consent](person-presentation-consent.md) : Design note, 2026-09-06. Implemented and wired end to end, and exercised against a real
 - [personal-admission](personal-admission.md) : A personal photograph is admitted under account authority, screened for people, and read by a
@@ -53,7 +53,7 @@ What the system is. Edited when the system changes.
 - [place-identity](place-identity.md) : Design note, 2026-09-06, with the schema decision added 2026-09-07. No real cross-capture
 - [platform-findings](platform-findings.md) : mixed, labelled per finding. Runtime observations were made on 2026-08-27. Catalog and
 - [privacy-consent-threat-model](privacy-consent-threat-model.md) : mixed. Every claim below carries exactly one label: VERIFIED (primary source URL and
-- [product-direction](product-direction.md) : Updated 2026-09-17. This roadmap defines delivery milestones and their acceptance criteria
+- [product-direction](product-direction.md) : This roadmap defines delivery milestones and their acceptance criteria
 - [product-specification](product-specification.md) : mixed. Every claim carries exactly one label, per the convention in
 - [reconstruction-findings](reconstruction-findings.md) : Historical single-photograph findings plus a retained-bowl geometry observation
 - [reconstruction-quality-gate](reconstruction-quality-gate.md) : implemented; first benchmark-calibrated pose policy verified 2026-09-04
@@ -103,7 +103,7 @@ Numbered, and the number is the identifier. Never renumbered.
 - [0005-unified-selection-model](adr/0005-unified-selection-model.md) : - Status: Accepted
 - [0006-desktop-viewport-boundary](adr/0006-desktop-viewport-boundary.md) : - Status: Accepted
 - [0007-world-composition-and-customization](adr/0007-world-composition-and-customization.md) : ACCEPTED AND IMPLEMENTED for reviewed structural composition authority and appearance
-- [0008-generated-geometry](adr/0008-generated-geometry.md) : - Status: ACCEPTED as a refusal with a stated path. The refusal holds now. The admission
+- [0008-generated-geometry](adr/0008-generated-geometry.md) : - Status: ACCEPTED as a refusal with a stated path. The refusal holds. The admission
 - [0009-the-ladder-above-rung-3](adr/0009-the-ladder-above-rung-3.md) : - Status: ACCEPTED; production rung 3 implemented 2026-09-04. D1, D4, D6, D9, D10, D11 and
 - [0010-opm-2](adr/0010-opm-2.md) : - Status: ACCEPTED and BUILT 2026-09-03. The coordinated pass is done across both writers
 - [0011-exulanica-namespace](adr/0011-exulanica-namespace.md) : - Status: ACCEPTED 2026-09-04. Mode A, a pre-release clean cutover

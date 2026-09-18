@@ -4,9 +4,9 @@ Status: IMPLEMENTED as a development evaluation only: the browser reads baked te
 baked `.owd` tiles, draws a tile's `render_batch` with physically based materials under one
 versioned look, and stands the player on its `nav_envelope`. No generated tile appears in any
 person's world, and none may until a superseding governance ADR is accepted in writing. A baked
-corridor street now exists in the tile store and has been loaded through the product route and
+corridor street exists in the tile store and has been loaded through the product route and
 walked on the development page (2026-09-17): 4 of its 854 records drew, and 851 named a tessellator
-expander that does not exist yet, so what a walker saw was the stated unavailable hatch rather than a
+expander that does not exist, so what a walker saw was the stated unavailable hatch rather than a
 street. Textured tile geometry has still been seen only on a test-only bench.
 
 The code is `web/packages/atlas-core/src/texture-set.ts` (the texture set reader),
@@ -20,7 +20,7 @@ the sets are the texture lane's, documented in [texture-package.md](texture-pack
 ## 1. What a person sees
 
 On the app's development server, `/?preview=1&tile=tile-conformance` opens the normal shell with
-the Companion and the reticle, but the owned district is replaced by the named tile. Today that
+the Companion and the reticle, but the owned district is replaced by the named tile. That
 tile is tess's city version 2 conformance fixture: a 128 m terrain patch, drawn whole (512
 triangles, one `terrain` surface) in the stated unavailable pattern (a magenta hatch carrying the
 word UNAVAILABLE, unlit), because no material record dresses terrain and the tile says so. The player stands on the tile's
@@ -30,7 +30,7 @@ but cannot be stood on. A panel at the bottom left says what this is ("Developme
 generated tile tile-conformance. Not part of any world."), what the player stands on, what is
 missing (no `collision_proxy`, so nothing blocks the capsule), how many of the records render_batch
 lists are drawn and how many surfaces are drawn as unavailable, and lists each such surface (record,
-role and orientation, with its reason) and every record not drawn yet, with the geometry it waits on.
+role and orientation, with its reason) and every record not drawn, with the geometry it waits on.
 
 The eight texture sets are seen on real surfaces only on the test-only bench,
 `web/packages/atlas-react/test/generated-tile-bench/`: a few metres of hand-built street
@@ -267,7 +267,7 @@ the Atlas controller's comfort contract, not a statement about the tile. A tile 
 `nav_envelope` opens at a stated viewpoint south of it and every move gets the app's "no walkable
 surface" notice.
 
-Not yet: no tile carries `collision_proxy`, so the capsule's 1.9 m height has no overhead clearance
+No tile carries `collision_proxy`, so the capsule's 1.9 m height has no overhead clearance
 check and nothing blocks it; the panel says so. The tile route is first person only, because the
 third person camera and avatar stay tied to the owned district until the characters lane's player
 renderable arrives.
@@ -533,7 +533,7 @@ walked line by about 24 mm. Its number said a standing eye would be 1790; this l
 Corrected, support on that line is 146 mm everywhere and 146 + 1620 is exactly 1766. Nothing on
 either side could have exposed that alone: the corridor lane's readings were all measured the same
 wrong way and were internally consistent, and an eye height of 1766 says nothing without a support
-height to subtract from it. `generated-tile-runtime.test.ts` now holds the line they agree on, that a
+height to subtract from it. `generated-tile-runtime.test.ts` holds the line they agree on, that a
 resolved move puts the eye exactly the stated eye height above the support it sampled.
 
 **One candidate excluded by measurement, 2026-09-18, before either half ran.** The pre-registration

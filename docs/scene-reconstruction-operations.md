@@ -49,7 +49,7 @@ initial policy is deliberately narrow and versioned as
 
 The grouping stage's current one-hour and 250-metre boundaries are unvalidated stage parameters.
 They are not hidden product rules. Changing them changes the stage digest and therefore creates a
-new deterministic grouping result. A future reviewed selection policy can replace
+new deterministic grouping result. A reviewed selection policy can replace
 `SceneGroupPosePolicy` without changing scene identity, job leasing, placement, or delivery.
 
 Sources that honestly lack the automatic policy's EXIF assumptions may use
@@ -126,7 +126,7 @@ row-major 4 by 4 `scene_from_opm` matrix.
 COLMAP world units are scale ambiguous. Historical placement version1 used
 `local_units_to_scene_units = 1.0` and `scale_status = unvalidated-identity` for display only.
 As of2026-09-05, [placement version2](scene-placement-alignment.md) fits and validates scale against
-exact COLMAP image/track correspondences; legacy identity placements are withheld until rebuilt.
+exact COLMAP image/track correspondences; identity-scale placements are withheld until rebuilt.
 This alignment is still nonmetric. No query, corridor, navigation, or rung gate may treat those
 units as metres. The [retained reference workflow](retained-reference-workflow.md) records the
 current real-input state and the independent requirements for a visual baseline.
@@ -155,7 +155,7 @@ point-cloud child per accepted member. Residency cost, footprint, arrival framin
 coverage include all loaded children. A corrupt or missing member degrades independently, while
 the member's source photograph remains available through the ordinary source-first region.
 
-Captures that have ever belonged to a reconstruction scene are omitted from the legacy unposed
+Captures that have ever belonged to a reconstruction scene are omitted from the unposed
 `GET /geometry` list. This prevents deletion or a broken scene receipt from silently putting a
 surviving member back at an invented island origin. Exact bytes for a live point-map artifact remain
 available when another validated scene refers to them.
@@ -165,7 +165,7 @@ available when another validated scene refers to them.
 These are separate facts:
 
 - `recorded_rung` is the durable scene assertion produced by the scene gate;
-- `displayed_rung` is the worst-first mode this client can honestly show now; and
+- `displayed_rung` is the worst-first mode this client can honestly show; and
 - `rendering_substrate` is either `posed_point_maps` or `source_photographs` in this client.
 
 Decoded geometry never promotes `recorded_rung`. The measured `scene_pose` policy requires at least
@@ -402,7 +402,7 @@ recorded rung, displayed rung, and substrate.
 
 This section absorbs the retired `colmap-pose-jobs.md`, which stood at the root of `docs/`
 until 2026-09-09. It is named without a path on purpose: the file is gone, and a live-looking
-path to it would fail the documentation link check, which is the behaviour we want. That document was the operating
+path to it would fail the documentation link check, which is the intended behaviour. That document was the operating
 note for `exulanica.reconstruction.pose` before this one existed, and it was retired rather than
 kept because its status line had become false: it read "no authorized real dense capture run" while
 three committed documents record real runs, including the ETH3D benchmark in section 9 above and the

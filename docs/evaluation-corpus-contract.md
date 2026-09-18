@@ -104,7 +104,7 @@ file and manifest name. It found:
 
 It found no OGC-1 `CORPUS.json`, L0-L11 label bundle, signed consent evidence, blind fixture, or dense
 people-free room capture. Therefore no OGC-1 metric, baseline, split claim, reconstruction quality
-claim, or Phase 2 exit-gate claim exists yet.
+claim, or Phase 2 exit-gate claim exists.
 
 The external input needed to unblock the gate is one bundle satisfying this document, with its
 private source media readable locally, consent records retained outside Git, and the blind access key
