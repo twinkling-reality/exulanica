@@ -813,6 +813,16 @@ count is a property of THIS line: x 320,000 is a terrain grid line, so the line 
 edge for its whole length. It belongs to the tile runtime rather than to this producer, and it is
 recorded here rather than changed here.
 
+**Why no test holds this, and what it would take.** The shared conformance fixture carries six
+curbs and its two footway shapes, 4,000 mm at 20,000 millionths and 3,500 mm at 22,858, put their
+walking line at the same 95 mm: `_Kerb.footway_z` reads 95 for all six, which the records log above
+prints from the fixture itself. A guard written over that
+fixture would pass whether the runtime carried a height per curb or one height for the tile, which
+is the shape of test this project has learned to distrust. Either the fixture gains a curb whose
+walking line differs from its neighbour's, which moves the golden digests every consumer pins, or
+the guard runs against a generated tile and pays for a bake. That is a decision across the
+tessellator, the corridor and this producer rather than one this section should take.
+
 **What this does not answer.** Whether a walker can WALK the steps. 40 mm and 50 mm are inside the
 180 mm a walking edge may climb and inside the 0.18 m the movement rule allows, but neither number
 was exercised by a moving body here; this is the surface, not the controller. And the seven walking

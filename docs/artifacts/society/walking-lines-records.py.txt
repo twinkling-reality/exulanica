@@ -29,6 +29,7 @@ from exulanica.grammar.grammars.city.generation.corridor import (
     CORRIDOR_SEED,
     CORRIDOR_TILE,
 )
+from exulanica.grammar.grammars.city.document import read_tile_document
 from exulanica.grammar.grammars.city.generation.tiles import city_records, generate_city
 from exulanica.grammar.grammars.city.streetlife import StreetTreeRecord
 from exulanica.grammar.grammars.city.streets import (
@@ -40,6 +41,8 @@ from exulanica.grammar.grammars.city.tile import TILE_SIZE_MM
 from exulanica.world.society_city_place import _Kerb
 
 OUTPUT = Path(__file__).resolve().parent / "walking-lines-records.log.txt"
+#: The tile every consumer pins its golden digests to, and the only tile a cheap test could use.
+FIXTURE = Path(__file__).resolve().parents[3] / "tests" / "fixtures" / "city-v2" / "tile-document.json"
 
 
 def main() -> int:
@@ -168,6 +171,32 @@ def main() -> int:
                     f"      on {street} {key}, whose walking-line point on the midline is"
                     f" {gap} mm away"
                 )
+    lines.append("")
+
+    fixture = read_tile_document(FIXTURE.read_bytes())
+    carried = [
+        record
+        for grammar in fixture.grammars
+        for record in (*grammar.owned, *grammar.halo)
+    ]
+    fixture_segments = {
+        r.identity: r for r in carried if isinstance(r, StreetSegmentRecord)
+    }
+    fixture_kerbs = [
+        _Kerb(r, fixture_segments[r.segment_identity])
+        for r in carried
+        if isinstance(r, CurbEdgeRecord)
+    ]
+    lines.append(f"== the shared conformance fixture, which a cheap test would have to use")
+    lines.append(f"   {FIXTURE.relative_to(FIXTURE.parents[3])}: {len(fixture_kerbs)} curbs")
+    for kerb in fixture_kerbs:
+        lines.append(
+            f"   {kerb.key:10} walking line {kerb.footway_z(0):4}"
+            f"  footway {kerb.curb.footway_width_mm} mm at"
+            f" {kerb.curb.footway_crossfall_millionths} millionths"
+        )
+    distinct = sorted({kerb.footway_z(0) for kerb in fixture_kerbs})
+    lines.append(f"   distinct walking lines in the fixture: {distinct}")
     lines.append("")
 
     OUTPUT.write_text("\n".join(lines) + "\n", encoding="utf-8")

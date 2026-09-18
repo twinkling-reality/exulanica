@@ -40,3 +40,13 @@ tile (2, 0) spans x 256000 to 384000, y 0 to 128000; its midline is x 320000
    trunk (320795, 115451)   +795 mm from the midline, exclusion radius 1153, pit reaches x 321572
       on Foundry Street 12:right, whose walking-line point on the midline is 1923 mm away
 
+== the shared conformance fixture, which a cheap test would have to use
+   tests/fixtures/city-v2/tile-document.json: 6 curbs
+   1:left     walking line   95  footway 4000 mm at 20000 millionths
+   0:right    walking line   95  footway 4000 mm at 20000 millionths
+   0:left     walking line   95  footway 4000 mm at 20000 millionths
+   2:left     walking line   95  footway 3500 mm at 22858 millionths
+   2:right    walking line   95  footway 3500 mm at 22858 millionths
+   1:right    walking line   95  footway 4000 mm at 20000 millionths
+   distinct walking lines in the fixture: [95]
+
