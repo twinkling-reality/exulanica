@@ -1605,17 +1605,21 @@ async function main() {
         meanFrontageSkewMillionths: plan.meanFrontageSkewMillionths,
         candidatesTried: plan.candidatesTried,
         candidatesQualified: plan.candidatesQualified,
-        // Zero here means the first tie-break was equal for every candidate and a later one
-        // chose, so the heading is the rule's fallback and not its preference. Without it a
+        // HOW MANY QUALIFYING HEADINGS HAD FRONTAGE ON BOTH SIDES AT ANY SAMPLE, counted by the
+        // rule itself. Zero means the first tie-break was equal for every candidate and a later
+        // one chose, so the heading is the rule's fallback and not its preference. Without it a
         // record shows a heading that reads as a decision either way.
+        //
+        // This line stood beside an older one of the same name that derived the count instead,
+        // as `frontageBothSidesSamples > 0 ? candidatesQualified : 0`. A repeated key in an
+        // object literal is a silent overwrite, so the derived value won and a record would have
+        // stated every qualifying heading where two had frontage. Found by reading the record
+        // builder; no run had written a record since the two lines met.
         candidatesWithFrontage: plan.candidatesWithFrontage,
         obstacles: prisms.length,
         routeRings: routeRings.length,
         // What the runtime refused and why, so the count above is never a quietly smaller set.
         routeRingsRefused: observed.routeObstacleRingsRefused ?? [],
-        // How many candidates the tie-break could actually separate. Zero says the rule ran with
-        // nothing to choose between, which is why a run with no rings halts before reaching here.
-        candidatesWithFrontage: plan.frontageBothSidesSamples > 0 ? plan.candidatesQualified : 0,
         fieldBoundsCm: artifact?.bounds_cm ?? null,
       },
       interactions,
