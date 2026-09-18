@@ -746,10 +746,13 @@ is that the only walk whose parameters the repository states does. The line, the
 heights, the signature and the responses are as committed.
 
 **Which tree these numbers are true of.** They were first produced on the tree this lane branched
-from and then produced again, unchanged to the byte in both logs, after rebasing onto a main six
-commits later that had carried a tile's route obstruction rings into the navigation world and added
-a descriptor pin to the container reader. Neither log moves, the container's own sha256 does not
-move, and the tessellator stays at 17: that work changes what a walk may face and not what it
+from, and then produced again, unchanged to the byte in both logs, on each later tree the work moved
+through: a main that had carried a tile's route obstruction rings into the navigation world and
+added a descriptor pin to the container reader, a main that had added the lettering catalog's
+two-way check, and the tree this section was merged into. The middle of those was reproduced by the
+orchestrator's own run rather than by this lane, which had inspected which paths those commits
+touched and said that inspection was all it had. Neither log moves at any of them, the container's
+own sha256 does not move, and the tessellator stays at 17: none of that work changes what a walk
 stands on.
 
 **What it read. The surface steps with the records.** Both halves of the signature hold. Measured by
