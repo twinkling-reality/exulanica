@@ -152,6 +152,16 @@ conformance tile is a tessellator defect at a carve boundary, so the corridor's 
 same class of hole until it is rebaked with the fix, and nobody has measured its envelope for holes.
 A gate run on the corridor before that rebake would halt the same way, one stall earlier or later.
 
+**An open question to answer BEFORE the corridor is scored, not after a no.** The chrome fills much
+of every frame: the Companion panel about a third, the development statement a quarter of the lower
+left, the scene segments panel between them. The rubric names the authenticated shell, the Companion
+and the reticle; it names neither of the other two. Both readings are defensible. KEEPING THEM: the
+page is self-describing, and a frame that shows what the page states is the caption restored to the
+picture rather than a caption compensating for a picture that says nothing. REMOVING THEM: the judge
+is asked whether this is a finished, lived-in street, and answering that through half a frame is a
+different question from the one the rubric asks. This lane will not decide it, because the lane whose
+runs are judged must not choose what the judge sees.
+
 **And what no amount of this proves.** The verdict is one 126 m street with fourteen buildings,
 scored by the named judge. Every mechanical key measured on the conformance tile says the machine
 works; none of them says anything about the street.
@@ -347,8 +357,8 @@ ring; so the most enclosed line is by construction the likeliest to run through 
 is cleared by the rule and the ground is taken away. If that holds, the ranked walk is load bearing
 rather than a safety net, and the gate will descend the rule's order routinely.
 
-**Why this cannot establish it.** Two headings have frontage at all. One of them is walkable, which is
-a counter-example to any strong reading, and a fixture with one massing record cannot exercise the
+**Why this cannot establish it.** Two headings have frontage at all. One of them is walkable, a
+counter-example to any strong reading, and a fixture with one massing record cannot exercise the
 case. The test is a corridor street, which is far more enclosed, and there the same measurement can
 fail. Recorded now so that the prediction exists before the data that could refute it.
 
@@ -410,6 +420,22 @@ at 340 mm; the walk took 27500, the next in the rule's order.
 **The walk itself:** 125,009 mm walked of a 125,000 mm route, lateral deviation 0 mm, recovery events
 0, harness position writes 0, 2,502 trace samples, and no sample where the drawn floor and the
 product's support disagree by more than a step.
+
+### What the three frames are of, which is not what a reader will assume
+
+**They are a picture of the tessellator BEFORE facade openings.** The container they bind is the
+fixture at tessellator 17. The same fixture has since been rebaked at 18 with the openings cut, on a
+branch that has not merged, so the brick block in the start frame is a solid face and the same tile
+after that merge shows holes and reveals in six gridded faces. Anyone shown these frames without that
+sentence takes them as a picture of the current tessellator, and they are a picture of the previous
+one.
+
+They are also of a CONFORMANCE FIXTURE with one massing record, not of a street. The walk crosses an
+empty paved plain. Nothing in them is a claim about what a corridor looks like.
+
+The reticle is the small bracket at frame centre, visible in the midpoint and endpoint frames against
+the pale ground. A key reporting three of three and a pixel being present are different claims, and
+the second was checked.
 
 ### The prediction that was wrong, and it is the one worth reading
 
