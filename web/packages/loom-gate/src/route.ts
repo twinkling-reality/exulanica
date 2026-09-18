@@ -153,13 +153,32 @@ export function firstContact(
       if (along >= 0 && along <= length) best = t;
     }
   }
+  // THE FACE THE RAY LEAVES BY, one per axis, chosen from the sign of its own component.
+  //
+  // MEASURED 2026-09-18: this tested all four faces and kept a crossing only where t was strictly
+  // positive, so a start lying EXACTLY on a face gave t of zero there and the ray was never bounded
+  // by the edge it stood on. A generated tile's default pose is the middle of its southern edge, so
+  // 117 southward headings of 720 "cleared" 132 m off the tile and qualified: 153 qualified against
+  // the 36 that do one millimetre inside. The same on the west edge, 160 against 43.
+  //
+  // The inequality alone cannot fix it either way, which is why the faces are chosen rather than the
+  // comparison loosened. On a boundary pointing INWARD, edge minus origin is also zero, and a bare
+  // `t >= 0` would bound that ray at nothing. Taking the face the ray exits by makes t zero only for
+  // a start on the face it is LEAVING through, which is the case that should bound at zero, so
+  // `t >= 0` is then correct rather than a guess. For a start strictly inside, the two faces behind
+  // the ray give negative t and were already discarded, so this returns the identical answer: pinned
+  // at five interior starts, every field of the plan unchanged, and the pin falsified by choosing
+  // the wrong face, which moves all five.
+  //
+  // The vertex branch above has always written `t >= 0`. The two halves of this function disagreed
+  // about what a zero distance means, and this is the half that was wrong.
   const [west, north, east, south] = bounds;
-  for (const [edge, component, origin] of [
-    [west, fx, sx], [east, fx, sx], [north, fz, sz], [south, fz, sz],
+  for (const [face, component, origin] of [
+    [fx > 0 ? east : west, fx, sx], [fz > 0 ? south : north, fz, sz],
   ] as const) {
     if (Math.abs(component) < 1e-12) continue;
-    const t = (edge - origin) / component;
-    if (t > 0 && t < best) best = t;
+    const t = (face - origin) / component;
+    if (t >= 0 && t < best) best = t;
   }
   return best;
 }

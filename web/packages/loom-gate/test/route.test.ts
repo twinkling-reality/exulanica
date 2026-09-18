@@ -4,6 +4,7 @@ import {
   SupportSamples,
   TriangleTable,
   classify,
+  firstContact,
   measureCapsule,
   measureWalk,
   planRoute,
@@ -154,5 +155,53 @@ describe('the capsule', () => {
     const holed = await walked({ groundHole: true }, straightWalk(5, 130));
     const partial = measureCapsule(holed.samples, holed.table, holed.classification, holed.scene.prisms);
     expect(partial.capsuleSamplesChecked).toBeLessThan(partial.capsuleSamples);
+  });
+});
+
+describe('a start lying exactly on the walkable field boundary', () => {
+  // MEASURED 2026-09-18 on a generated tile, whose runtime opens a walk at the middle of its
+  // nav_envelope's southern edge, which IS the field's south face. `firstContact` tested all four
+  // faces and kept a crossing only where t was strictly positive, so the face the walker stood on
+  // gave t of zero and was skipped: 117 southward headings of 720 "cleared" 132 m off the tile and
+  // qualified. 153 qualified there against the 36 that qualify one millimetre inside.
+  const RINGS: RouteRing[] = [];
+  const FIELD = [0, -128, 128, 0] as const;
+  const ON_THE_SOUTH_EDGE: [number, number] = [64, 0];
+
+  it('is bounded at nothing by the face it is leaving through', () => {
+    // Due south from the south edge, heading 180000 millidegrees: forward is (0, +1), straight out.
+    const out = firstContact(ON_THE_SOUTH_EDGE, [0, 1], 0.34, [], FIELD, 5_000);
+    expect(out).toBe(0);
+  });
+
+  it('CROSSES THE WHOLE FIELD when it points inward from that same face', () => {
+    // The case a loosened inequality gets wrong, and the reason the faces are chosen rather than
+    // the comparison. Today's code passes this by skipping the south face entirely; tomorrow's must
+    // pass it because it bounds by the NORTH face, which is the one this ray leaves by.
+    const inward = firstContact(ON_THE_SOUTH_EDGE, [0, -1], 0.34, [], FIELD, 5_000);
+    expect(inward).toBeCloseTo(128, 9);
+  });
+
+  it('bounds a heading that leaves through a side face at that side', () => {
+    const east = firstContact(ON_THE_SOUTH_EDGE, [1, 0], 0.34, [], FIELD, 5_000);
+    expect(east).toBeCloseTo(64, 9);
+  });
+
+  it('qualifies no heading that walks off the field, with no ring anywhere', () => {
+    // With no rings at all the only thing that can bound a heading is the field, so this counts
+    // exactly the headings the field admits. Every heading pointing south of the two side faces
+    // leaves immediately and must not qualify.
+    const plan = planRoute(ON_THE_SOUTH_EDGE, RINGS, FIELD);
+    expect(plan.candidatesTried).toBe(720);
+    const required = ROUTE_RULE.lengthMm + ROUTE_RULE.stopMarginMm;
+    expect(plan.clearRunMm).toBeGreaterThanOrEqual(required);
+    // A qualifying heading from the middle of the south edge has to reach a far face 131 m away,
+    // which only the northward diagonals do in a field 128 m across.
+    expect(plan.candidatesQualified).toBeGreaterThan(0);
+    for (let millidegrees = 151_000; millidegrees <= 209_000; millidegrees += ROUTE_RULE.headingStepMillidegrees) {
+      const yaw = (millidegrees / 1000) * (Math.PI / 180);
+      const forward: [number, number] = [-Math.sin(yaw), -Math.cos(yaw)];
+      expect(firstContact(ON_THE_SOUTH_EDGE, forward, 0.34, [], FIELD, 5_000)).toBeLessThan(required / 1000);
+    }
   });
 });
