@@ -494,6 +494,32 @@ container's by a constant or by a history, and neither half would see that alone
 that is not 1620 is therefore the first thing to suspect, and a fact about the runtime worth having
 rather than an error in either measurement.
 
+**The walk, run 2026-09-18, and what the pair found.** On the tessellator 14 container
+(`dd0dc7f6`, digest `2adf282b`) the walk ADVANCED: 121,982 mm continuously at 1.62 m/s, 23 to 55 mm a
+step at dt 1/30, with the walked line's y constant at `70300` for all 3,000 steps. So this lane's
+claim of the night before, that the walk barely advances, was about the tessellator 13 tree-canopy
+holes and not about the capture or the movement rule. At x `378334` the eye fell 146 mm and the walker
+came to rest at x `383999`, the tile's eastern edge, for the remaining 779 steps: the end of the world
+rather than a hole in it, and a third case neither half had pre-registered.
+
+Two instrument faults came out of it, and only the pair could have found the second.
+
+*This lane's:* the trace records the CAMERA's world position, and the tile is mounted with its root
+64 m away in x and z, so every raw reading was 64 m from the city frame the corridor lane samples in.
+Corrected, the stated pose landed 17 mm from where it was stated, one step of walking, and that
+agreement is what proves the correction rather than the correction proving itself. A frame mismatch
+survives every check that compares a number with itself.
+
+*The corridor lane's, and the reason the experiment was worth running from two directions:* its
+sampler read the HIGHEST CORNER of the triangle under a sample point rather than interpolating the
+plane at the point, and the footway falls 56 mm across its width to the gutter, so it overstated the
+walked line by about 24 mm. Its number said a standing eye would be 1790; this lane measured 1766.
+Corrected, support on that line is 146 mm everywhere and 146 + 1620 is exactly 1766. Nothing on
+either side could have exposed that alone: the corridor lane's readings were all measured the same
+wrong way and were internally consistent, and an eye height of 1766 says nothing without a support
+height to subtract from it. `generated-tile-runtime.test.ts` now holds the line they agree on, that a
+resolved move puts the eye exactly the stated eye height above the support it sampled.
+
 **One candidate excluded by measurement, 2026-09-18, before either half ran.** The pre-registration
 above is left as written; this is what has since been measured against it. The corridor lane sharpened
 its sampler after finding that a point supported at 170 mm and a point supported at 0 mm both counted

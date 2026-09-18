@@ -216,6 +216,35 @@ describe('standing on the tile\'s own nav_envelope', () => {
   });
 });
 
+describe('where a resolved move puts the eye', () => {
+  // MEASURED 2026-09-18 by two lanes from opposite sides of one container: a walk of 121.982 m
+  // reported an eye at 1766 mm while the corridor lane's sampler said the line's support was 170,
+  // which would have made the eye 1596 rather than the 1620 the grammar states. The sampler was
+  // reading a triangle's highest corner rather than interpolating its plane, and the footway falls
+  // 56 mm across its width to the gutter; corrected, support is 146 and 146 + 1620 is exactly 1766.
+  // So the runtime and the container agree, and this holds the line they agree on: an eye is the
+  // sampled support plus the capsule's stated eye height, and nothing else. If that ever stops being
+  // true, every comparison between a trace and a container's support heights silently changes
+  // meaning, and nothing in either lane's tools would notice.
+  it('stands the eye exactly the stated eye height above the support it sampled, after a move', () => {
+    const world = tile.navigation.world;
+    const from = tile.navigation.start;
+    // The stance is the middle of the envelope's SOUTHERN EDGE facing north, so the step that stays
+    // on the envelope is northward, which is -z in the renderer's frame. A step the other way leaves
+    // the envelope and is recovered, which is correct and is not what this test is about.
+    const sample = world.surface.sample(from.x, from.z - 0.5);
+    expect(sample, 'the envelope supports a point half a metre north').not.toBeNull();
+    const resolved = resolveGroundMovement(world, {
+      current: atlasVec3(from.x, from.y, from.z),
+      desired: atlasVec3(from.x, from.y, from.z - 0.5),
+      lastSafe: null,
+    });
+    expect(resolved.recovered).toBe(false);
+    expect(resolved.position.y).toBeCloseTo(sample!.height + world.eyeHeight, 12);
+    expect(resolved.position.y - sample!.height).toBeCloseTo(1.62, 12);
+  });
+});
+
 describe('a tile whose nav_envelope is there but empty', () => {
   // MEASURED on the corridor lane's first baked street: its container carries a nav_envelope
   // projection with its own digest and no triangle, because the expanders that make walkable
