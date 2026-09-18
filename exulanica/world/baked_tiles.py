@@ -6,7 +6,8 @@ Migration 0072 holds the shape and every rule; this is the path that reaches it.
   stored, the same bytes again change nothing, and different bytes under one key leave the stored
   row exactly as it is and mark it ``nondeterminism_detected``. The bytes are put in the ``tiles``
   store before the row is written, so a row never names bytes that were never stored.
-* :meth:`BakedTileRepository.tiles_of_city` lists what is stored for one city seed, as metadata.
+* :meth:`BakedTileRepository.tiles_of_city` lists the CURRENT bake of each tile of one city seed,
+  as metadata: one row per level of detail and coordinate, the most recently published.
 * :meth:`BakedTileRepository.serve` delivers one tile's bytes to a workspace. The bytes are read
   from the store, held to the row's digest, and the row is read again under the 0041 asset read
   lock, so a tile that stopped being servable between the read and the delivery is refused rather
@@ -214,9 +215,36 @@ class BakedTileRepository:
         return _row(row)
 
     def tiles_of_city(self, city_seed: str, lod: int | None = None) -> Sequence[BakedTile]:
+        """THE CURRENT BAKE OF EACH TILE OF A CITY: one row per level of detail and coordinate.
+
+        CURRENT IS THE MOST RECENTLY PUBLISHED, greatest ``baked_at``, ties broken by
+        ``baked_tile_id`` so the answer is total rather than whichever row the plan happened to
+        yield. A store serves what was last published into it, so republishing an earlier bake
+        makes that bake current, which is the behaviour an operator republishing one would expect.
+
+        WHY THIS IS ONE ROW PER TILE. A tile document says nothing about the tessellator, so a new
+        tessellator's bake is a NEW ROW under a new key rather than a replacement (migration 0077).
+        This listing used to return every one of them ordered by ``lod, tile_y, tile_x``, WHICH DOES
+        NOT ORDER AMONG ROWS SHARING ALL THREE. So a caller reading by coordinate did not get the
+        oldest, it got whichever row the plan yielded, not necessarily the same one twice, and
+        nothing in the answer said which. On 2026-09-18 a page was handed a tessellator 5 container
+        baked the previous night while the store held a 19, and refused it at the decode; the
+        failure read as a missing tile rather than as an ambiguous listing. Returning one row per
+        tile is what makes a client's ``find`` by coordinate correct rather than lucky, and it fixes
+        every client at once rather than the one that noticed.
+
+        A FAULTED ROW THAT IS CURRENT STAYS CURRENT. Skipping it would silently fall back to older
+        geometry, which is a substitution nobody asked for. It is listed, it carries its state, and
+        :meth:`servable` refuses it when its bytes are asked for, which is where the two disagreeing
+        facts actually meet.
+
+        THE HISTORY IS NOT LOST, only unlisted: every earlier bake keeps its row and its bytes, and
+        :meth:`read` reaches any of them by key.
+        """
         rows = self.connection.execute(
-            f"select {_COLUMNS} from baked_tile where city_seed = %s "
-            "and (%s::int is null or lod = %s) order by lod, tile_y, tile_x",
+            f"select distinct on (lod, tile_y, tile_x) {_COLUMNS} from baked_tile "
+            "where city_seed = %s and (%s::int is null or lod = %s) "
+            "order by lod, tile_y, tile_x, baked_at desc, baked_tile_id desc",
             (bytes.fromhex(city_seed), lod, lod),
         ).fetchall()
         return [_row(row) for row in rows]

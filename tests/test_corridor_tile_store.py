@@ -143,21 +143,118 @@ def test_one_tile_document_baked_by_two_tessellators_makes_two_rows(stored):
     assert repository.read(newer).state == "baked"
     assert repository.read(older).container_bytes == len(b"as the old tessellator wrote it")
 
-    # AND A CALLER CAN TELL THEM APART. The two rows agree on coordinate, level of detail and
-    # tile_inputs_digest, because those are the tile's and the tile did not move. What a listing
-    # must carry is what differs: the stage version and the params digest the key was derived
-    # from. Without them a loader reading by coordinate takes whichever row came first, which is
-    # what happened on 2026-09-18: a page drew a container its runtime then refused, and the
-    # failure looked like a missing tile rather than an ambiguous listing.
+    # AND THE LISTING NAMES ONE OF THEM: THE CURRENT ONE. The two rows agree on coordinate, level
+    # of detail and tile_inputs_digest, because those are the tile's and the tile did not move, so
+    # `order by lod, tile_y, tile_x` DOES NOT ORDER AMONG THEM. This test asserted until
+    # 2026-09-18 that the listing returned both, and a caller reading by coordinate therefore took
+    # whichever row the plan yielded, not necessarily the same one twice and with nothing in the
+    # answer saying which. A page was handed a tessellator 5 container baked the previous night
+    # while the store held a 19, and refused it at the decode; the failure read as a missing tile.
+    # The history is not lost, only unlisted: `read` still reaches the older bake by its key.
     listed = repository.tiles_of_city(str(_tile()["city_seed"]))
-    rows = {tile.baked_tile_id: tile for tile in listed}
-    assert set(rows) == {older, newer}
-    assert rows[older].tile_x == rows[newer].tile_x and rows[older].tile_y == rows[newer].tile_y
-    assert rows[older].tile_inputs_digest == rows[newer].tile_inputs_digest
-    assert rows[older].stage_params_sha256 != rows[newer].stage_params_sha256
-    for tile in rows.values():
+    assert [tile.baked_tile_id for tile in listed] == [newer]
+    assert repository.read(older).container_bytes == len(b"as the old tessellator wrote it")
+    # What the listing carries still tells a reader WHICH bake it named, which is what the two rows
+    # differ by: the tile's own fields are equal and the stage params digest is not.
+    current, before = listed[0], repository.read(older)
+    assert current.tile_x == before.tile_x and current.tile_y == before.tile_y
+    assert current.tile_inputs_digest == before.tile_inputs_digest
+    assert current.stage_params_sha256 != before.stage_params_sha256
+    for tile in (current, before):
         assert tile.document()["stage_params_sha256"] == tile.stage_params_sha256
         assert tile.document()["stage_version"] == tile.stage_version
+
+
+def test_a_city_listing_names_the_current_bake_of_each_tile(stored):
+    """One row per level of detail and coordinate, the most recently published.
+
+    THIS TEST WOULD HAVE FAILED BEFORE 2026-09-18 and the failure is the defect: the listing
+    returned every bake ever made, ordered by `lod, tile_y, tile_x`, which does not order among
+    rows sharing all three. A caller reading by coordinate took whichever row the plan yielded.
+    """
+    _admin, repository, _scratch = stored
+    seed = str(_tile()["city_seed"])
+    # Three bakes of tile (2, 0), oldest first, and one of tile (3, 0) for company. Each later bake
+    # is a new key because a new tessellator moves the stage params digest, which is migration 0077.
+    keys = [uuid.uuid4() for _ in range(3)]
+    for index, key in enumerate(keys):
+        assert (
+            repository.record(
+                baked_tile_id=key,
+                stage_version=3,
+                stage_params_sha256=hashlib.sha256(f"params {index}".encode()).digest(),
+                tile=_tile(),
+                document=b"a tile document",
+                container=f"container {index}".encode(),
+                render_batch_sha256=hashlib.sha256(b"render").digest(),
+                nav_envelope_sha256=hashlib.sha256(b"nav").digest(),
+                receipt={"tessellator": index, "container": "owd/3"},
+            )
+            == "stored"
+        )
+    neighbour = uuid.uuid4()
+    assert _record(repository, neighbour, b"the tile next door", tile={"tile_x": 3}) == "stored"
+
+    listed = repository.tiles_of_city(seed)
+    # One row per tile, and for the tile with three bakes it is the last one published.
+    assert [tile.baked_tile_id for tile in listed] == [keys[-1], neighbour]
+    assert listed[0].container_bytes == len(b"container 2")
+    # Every earlier bake is still there, reachable by key, with its own bytes.
+    for index, key in enumerate(keys[:-1]):
+        assert repository.read(key).container_bytes == len(f"container {index}".encode())
+    # And a narrowed listing answers the same way.
+    assert [tile.baked_tile_id for tile in repository.tiles_of_city(seed, lod=0)] == [
+        keys[-1],
+        neighbour,
+    ]
+
+
+def test_a_faulted_current_bake_stays_current_and_is_refused_at_the_bytes(stored):
+    """No silent substitution. A faulted newest row is listed, carries its state, and `servable`
+    refuses it. Falling back to the previous good bake would draw older geometry than the store
+    says it holds, without anybody asking for it."""
+    _admin, repository, _scratch = stored
+    seed = str(_tile()["city_seed"])
+    older, newer = uuid.uuid4(), uuid.uuid4()
+    assert _record(repository, older, b"the bake before") == "stored"
+    assert (
+        repository.record(
+            baked_tile_id=newer,
+            stage_version=3,
+            stage_params_sha256=hashlib.sha256(b"params of the newer tessellator").digest(),
+            tile=_tile(),
+            document=b"a tile document",
+            container=b"the current bake",
+            render_batch_sha256=hashlib.sha256(b"render").digest(),
+            nav_envelope_sha256=hashlib.sha256(b"nav").digest(),
+            receipt={"tessellator": 9, "container": "owd/3"},
+        )
+        == "stored"
+    )
+    # The same key baking to different bytes faults the row without replacing it.
+    assert (
+        repository.record(
+            baked_tile_id=newer,
+            stage_version=3,
+            stage_params_sha256=hashlib.sha256(b"params of the newer tessellator").digest(),
+            tile=_tile(),
+            document=b"a tile document",
+            container=b"the current bake, differently",
+            render_batch_sha256=hashlib.sha256(b"render").digest(),
+            nav_envelope_sha256=hashlib.sha256(b"nav").digest(),
+            receipt={"tessellator": 9, "container": "owd/3"},
+        )
+        == "nondeterminism_detected"
+    )
+    assert repository.read(newer).state != "baked"
+    # Still the one the listing names, and the refusal happens where the bytes are asked for.
+    listed = repository.tiles_of_city(seed)
+    assert [tile.baked_tile_id for tile in listed] == [newer]
+    assert listed[0].state != "baked"
+    with pytest.raises(BakedTileFaulted):
+        repository.servable(newer)
+    # And the older bake is untouched, reachable, and NOT quietly promoted in its place.
+    assert repository.read(older).state == "baked"
 
 
 def test_two_keys_may_not_claim_one_bake(stored):
