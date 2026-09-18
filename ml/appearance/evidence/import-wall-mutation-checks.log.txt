@@ -1,21 +1,39 @@
-Import wall mutation checks, 2026-09-17T17:51:18Z, branch lane/generated-appearance at 534ac8c8cc2534c77d1963622717f28295298080, clean tree
+Import wall mutation checks, 2026-09-18T06:00:28Z, branch lane/generated-appearance at f2e6f58c3bec010d826ad46ebedf02a8867c9e59, clean tree
 Each mutant is applied to the committed tree, run with python -B, then restored from git.
-A first run on 2026-09-17 put M1 in exulanica/__init__.py; the package is absent from the product environment, so collection failed before any test ran. M1 is a static import instead.
+
+This run replaces the one of 2026-09-17T17:51:18Z, whose header named 534ac8c8, a commit the rebase
+onto main c7be2c45 left on no branch. A log that cites a commit nobody can check out cannot be
+re-run against the tree it describes, which is the whole point of keeping it.
+
+The head named above is the tree the mutants ran against. The commit that carries this log is one
+later and differs from it by this file alone, because a log cannot name the commit that contains it.
+
+Commands, from the repository root:
+  uv run python -B -m pytest tests/test_training_boundary.py -rf
+  uv run lint-imports
+A first run on 2026-09-17 put M1 in exulanica/__init__.py; the package is absent from the product
+environment, so collection failed before any test ran. M1 is a static import in a product module
+instead.
 
 == baseline
-8 passed in 3.39s
-Contracts: 10 kept, 0 broken.
+8 passed in 2.12s
+Contracts: 12 kept, 0 broken.
 == M1: the product imports the appearance package statically (exulanica/materials/classes.py gains 'if False: import exulanica_appearance')
 FAILED tests/test_training_boundary.py::test_nothing_in_the_product_imports_the_generated_appearance_code
-1 failed, 7 passed in 2.79s
+1 failed, 7 passed in 1.75s
 The product never imports the generated appearance code BROKEN
-Contracts: 9 kept, 1 broken.
+Contracts: 11 kept, 1 broken.
 == M2: the appearance package imports the product (sheets.py gains 'import exulanica')
 FAILED tests/test_training_boundary.py::test_the_generated_appearance_code_reaches_nothing_of_the_product
-1 failed, 7 passed in 2.45s
+1 failed, 7 passed in 2.03s
 == M3: torch enters the base environment (ml/appearance/pyproject.toml dependencies gain torch)
 FAILED tests/test_training_boundary.py::test_the_generated_appearance_code_keeps_model_libraries_out_of_its_base_environment
-1 failed, 7 passed in 5.43s
+1 failed, 7 passed in 3.71s
 == after restore
-8 passed in 3.22s
-Contracts: 10 kept, 0 broken.
+8 passed in 5.07s
+Contracts: 12 kept, 0 broken.
+
+Three mutants, three named tests, each killed by the test that names that rule. The contract count is
+12 on this base, not the 10 of the 2026-09-17 run: main has since added two contracts of its own,
+including another lane's "The product never imports the lettering tool", which is the same shape as
+this lane's rule.
