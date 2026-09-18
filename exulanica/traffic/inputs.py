@@ -2,8 +2,11 @@
 
 **Trip requests** (``exulanica.traffic-trip-request/v1``). A request names a fleet vehicle, the
 second it wants to leave and a destination: either a parking space, or a society destination by
-its stable ``destination_id`` and the ``street_segment_ordinal`` of its frontage (the society
-place contract, ``exulanica.society-place/v1``). ``request_seq`` starts at 1 and is contiguous.
+its stable ``destination_id`` and the ``street_segment_ordinal`` of its frontage. Those two
+fields are the whole of what traffic reads of a society place, and every ``society-place``
+profile states both, so no profile version is named here: naming one would make this line false
+the day the society publishes the next, and a trip request would not have changed.
+``request_seq`` starts at 1 and is contiguous.
 A request is never a movement: it is decided by the next step at or after its second.
 
 **Crossing feed** (``exulanica.traffic-crossing-feed/v1``). The living society's v4 walkers do
