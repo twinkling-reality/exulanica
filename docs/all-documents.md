@@ -35,7 +35,7 @@ How the system works now. Edited as the system changes.
 - [evaluation-harness](evaluation-harness.md) : REPLAY MECHANICS AND ARCHIVES IMPLEMENTED; REAL OGC-1 BASELINE AND THE PHASE 2 GATE
 - [evaluation-methodology](evaluation-methodology.md) : Status of this document: mixed. Every claim below carries exactly one label
 - [frontier-roadmap](frontier-roadmap.md) : engineering archive. product-direction.md owns product
-- [generated-appearance](generated-appearance.md) : PLAN ACCEPTED 2026-09-17. Structure capture, the four records and the model-free
+- [generated-appearance](generated-appearance.md) : TRACK A SESSION 1 RUN AND MEASURED 2026-09-17 (section 9). 64 model-made texture sets on
 - [generated-corridor-street](generated-corridor-street.md) : GENERATED, VALIDATED AND GATED; NOT YET BAKED INTO THE STORE OR SCORED. Updated
 - [generated-tile-runtime](generated-tile-runtime.md) : IMPLEMENTED as a development evaluation only: the browser reads baked texture sets and
 - [grammar-package](grammar-package.md) : CITY VOCABULARY VERSION 2 BUILT; EVERY CITY STAGE GENERATES. Phase 1 of the target
