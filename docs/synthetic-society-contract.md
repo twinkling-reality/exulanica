@@ -744,6 +744,13 @@ this city had run along one curb, which is not something this lane can produce; 
 is that the only walk whose parameters the repository states does. The line, the step, the six
 heights, the signature and the responses are as committed.
 
+**Which tree these numbers are true of.** They were first produced on the tree this lane branched
+from and then produced again, unchanged to the byte in both logs, after rebasing onto a main six
+commits later that had carried a tile's route obstruction rings into the navigation world and added
+a descriptor pin to the container reader. Neither log moves, the container's own sha256 does not
+move, and the tessellator stays at 17: that work changes what a walk may face and not what it
+stands on.
+
 **What it read. The surface steps with the records.** Both halves of the signature hold. Measured by
 [walking-lines-runtime.py.txt](artifacts/society/walking-lines-runtime.py.txt), whose
 [log](artifacts/society/walking-lines-runtime.log.txt) is where these numbers are read from, over a
