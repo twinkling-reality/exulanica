@@ -127,6 +127,53 @@ away from the origin had an unbounded clear run. No generated run had reached th
 had ever used those bounds, but a record made with them would have described a walk in a field the
 product never allowed.
 
+## What that run did, measured, and where a bench stopped it
+
+Four predictions were committed before the server started. Two held and two did not, and the two
+that did not are the more useful half.
+
+| predicted | measured |
+| --- | --- |
+| the ringless halt does not fire | it did not fire |
+| `routeObstacleRings` is 16 | **16**, the same sixteen the container states |
+| no heading clears 131 m in a 128 m tile | a heading cleared **136.3 m** |
+| frontage high rather than low | `frontageBothSidesSamples` **1**, of 126 |
+
+**Why the third was wrong.** The rule walks diagonals. The field is a 128 m square whose diagonal is
+181 m, and the chosen heading, 28 degrees, is one of those. The arithmetic was about a width the walk
+never had to respect.
+
+**Why the fourth was wrong, having already been revised upward.** Rings within 40 m on BOTH sides at
+the same sample is a far narrower condition than rings within 40 m: this tile's rings sit in one
+patch, and a ray that passes it has it mostly on one side. Beside that 1, `candidatesWithFrontage`
+is **2**, of 153 qualifying headings out of 720 tried. Frontage decided, by one sample, over 151
+candidates that had none. That is what the counter is for: the record would otherwise state heading
+28000 and no reader could tell a decision from a fallback.
+
+**Then a ring stopped the walker**, at 52.80 m of 62.5 m. The halt asks the product's own navigation
+surface what stands ahead, so it names a cause rather than reporting a stop: support underfoot at
+0.088 m and stated for the whole next 10 m, largest rise ahead 0.004 m against the 0.18 m step this
+world says it will climb, and 30.3 m inside a field of radius 90.5 m. None of the three.
+
+The walker came to rest at tile (39214, 46615) mm, **344 mm from the nearest edge of the street
+furniture record `bf14d328`**, where the city grammar states a capsule radius of **340 mm**. It is
+resting against that ring.
+
+The cause is that `navigationWorld.polygonObstacles` is collided against: atlas-core's
+`resolveGroundMovement` reports a move blocked when the polygons hit it, and the path continuity
+check refuses any move they touch. So route obstruction rings carried into that field ARE collision,
+and "they choose which way a walk faces and stop no body" was false the moment it was wired, in the
+three places it is written. Development only: `tileNavigation` is called by the generated tile
+runtime and nothing else, and the owned district builds its polygon obstacles from its own buildings,
+where collision is meant.
+
+This gate's two-input split was built so route rings would not reach the KEYS and be measured as
+solids. They reached the movement resolver instead. The split was watching a door somebody had
+already thought about.
+
+**So the eight mechanical keys are still unmeasured on a generated page.** A measurement taken here
+would have been of the bench and not of the street.
+
 ## The run with rings, predicted before it was run
 
 Written before the run, and before the server was started, so the numbers below can be checked
