@@ -818,8 +818,11 @@ comment says that a point on an edge belongs to the triangle. At 1 mm this line 
 stretches, all 1 or 2 mm wide, every one refused by that same weight, all on flat ground at z 0 and
 none between y 1,000 and y 125,750, which is every footway and carriageway the line crosses. The
 count is a property of THIS line: x 320,000 is a terrain grid line, so the line lies along a shared
-edge for its whole length. It belongs to the tile runtime rather than to this producer, and it is
-recorded here rather than changed here.
+edge for its whole length. It is not only this line's problem, because `tileNavigation` picks a
+tile's opening stance by probing the middle of the envelope's x span, which for this tile is that
+same 320,000; it does not bite there today, since the first probe is at y 0 and y 0 has support. It
+belongs to the tile runtime rather than to this producer, and it is recorded here rather than
+changed here.
 
 **Why no test holds this, and what it would take.** The shared conformance fixture carries six
 curbs and its two footway shapes, 4,000 mm at 20,000 millionths and 3,500 mm at 22,858, put their
