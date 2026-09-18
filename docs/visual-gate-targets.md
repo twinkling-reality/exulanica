@@ -154,6 +154,81 @@ fields and `completeCapsuleClearanceVerification` by three of its four. A key th
 therefore says less than the same key on the owned district, and the record must say so rather
 than let four green keys read alike.
 
+## What that run did, measured, and the hole a walk came to rest against
+
+Four predictions were committed before the server started. Three held exactly, one was half right,
+and the half that failed retracts a cause this document already recorded.
+
+| predicted | measured |
+| --- | --- |
+| the ringless halt does not fire, nor the absent-hook halt | neither fired |
+| `routeObstacleRings` 16, 0 refused | **16**, refused **[]**, and the page's own panel says so |
+| the plan is identical, field for field | every field: 28000, 136,323 mm, 1 of 126, 2 of 153 |
+| the walk passes 52.80 m and completes | it stopped at **52.795 m**, where it stopped before |
+
+**The plan was worth predicting because it could have moved.** `planRoute` is pure and its three
+inputs had not moved, so identity was the falsifiable claim, and three runs on one afternoon returned
+the same eight fields: heading 28000 millidegrees, clear run 136,323 mm, 1 frontage sample of 126,
+mean skew 730,614 millionths, 720 headings tried, 153 qualified, 2 of them with frontage on both
+sides. Frontage decided again, by one sample, over 151 qualifying headings that had none.
+
+**The walk stopped at a hole in the navigation surface, 30 mm wide.** The walker rests at renderer
+(39.2142, -46.6152), tile (39214, 46615) mm, with support 0.088 m underfoot. From 15 mm ahead to
+45 mm ahead the product's own sampler returns no surface, and this walk was advancing **28 mm a
+frame**, the middle of every non-zero step it walked. So its next position lands in the hole, the
+resolver recovers it to where it already was, and it does that again every frame until the run gives
+up after five seconds without progress. The product says so itself, in its own status line, in the
+halt frame, and the last five of those messages are in the record: "Returned to the nearest safe
+place; there is no walkable surface here."
+
+**Tested against the whole route rather than the one point.** Walking the product's sampler over the
+container's `nav_envelope` at 1 mm along the entire planned line: 131 m scanned, 130,969 mm
+supported, 32 mm unsupported, in exactly ONE span, 343.3 mm from the ring of one street furniture
+record. There is no second hole in 131 m. A 32 mm crack is all that stands between this gate and a
+125 m walk.
+
+**What the crack is made of.** The triangle under the walker and the triangle past the hole are both
+1 mm slivers of about 14 mm2, they share no corner, and their outlines come no closer than 2.0 mm.
+A point between them is outside every triangle in the projection. So the carve boundary is
+approximated by a fan of slivers that does not tile the plane, and the envelope is not watertight
+there. That is a bake question and this lane does not touch it.
+
+**It is NOT the sampler's strict edge rule.** A known defect refuses a point lying exactly on an edge
+shared by two triangles, where the weight computes to about -5.6e-17. The refused points here are
+outside the nearest triangle by 6.2e-5 to 8.2e-5 barycentric units, which at this triangle's size is
+millimetres. The sampler is right to refuse them. A tolerance there would hide a real hole.
+
+**And a picture would never have shown it.** The halt frame shows continuous blue paving ahead of the
+walker. The drawn surface and the walkable surface are made by different rules, and the hole is in
+the one nobody can see.
+
+### The correction to the run before this one, left beside it rather than folded into it
+
+That run's section below says a ring stopped the walker, measured at 344 mm from a bench against a
+stated capsule radius of 340 mm. The mechanism was real: route obstruction rings were in
+`navigationWorld.polygonObstacles` and `resolveGroundMovement` collides against that field. It was
+not what stopped the walk. With that field empty the walk stops in the same place to a tenth of a
+millimetre, and the numbers separate the two: the world's `cameraRadius` is the capsule radius,
+0.340 m, so a collision would have rested the walker at 340 mm; the rest is at 344.1 mm and the
+hole's near lip is at 343.3 mm.
+
+Both accounts stand. The first is left exactly as it was written, because a document that quietly
+becomes right teaches nobody, and the next reader needs the failure more than the fact.
+
+**What let the wrong answer survive is the more useful half.** The stall probe sampled support every
+0.25 m and reported "support for the next 10 m and rises at most 0.004 m, so neither the surface
+ending nor a step it refuses stopped this walk". The hole is 30 mm wide and starts 15 mm ahead. A
+probe coarser than one frame of walking measures a population that cannot contain the thing that
+stops a walk, and the sentence it produced sent a reader looking for a collision, which was present
+and innocent. The probe now samples every 5 mm, states where the hole starts, where the surface
+resumes and how wide it is, names the nearest route obstruction ring, and reports the product's own
+recovery messages, which the recorder had been keeping since the walk opened and nothing read.
+
+**The eight mechanical keys are therefore still unmeasured on a generated page.** Not measured and
+passed, and nothing was adjusted to reach them. The fourth prediction's other half, that they would
+not all hold, stays untested, and so does everything the paragraph above it says about which of them
+a generated target decides on partial inputs.
+
 ## The run with the rings carried, predicted before it was run
 
 Written and committed before the server was restarted, so these can be checked rather than fitted.
