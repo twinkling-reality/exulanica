@@ -292,3 +292,49 @@ def test_the_committed_session_records_are_the_run_s_own(repository):
     results = parse_canonical((root / "results.json").read_bytes(), "the results")
     assert {item["record_sha256"] for item in results["generations"]} <= names
     assert results["stopped"] == ""
+
+
+def test_the_committed_session_2_records_and_its_determinism_claim_hold(repository):
+    """Session 2's own records, and the comparison that carries its central claim.
+
+    The determinism claim is that 64 outputs came back at session 1's digests on a second machine.
+    Job A's records are not committed, because they are byte-identical reproductions of records
+    already in evidence/session-1; what is committed is the comparison, so the claim is checkable
+    against session 1's committed records rather than on trust.
+    """
+    from exulanica_appearance.generation import read_generation
+
+    root = repository / "ml/appearance/evidence/session-2"
+    for directory, count in (("records", 40), ("smoke-records", 2)):
+        files = sorted((root / directory).glob("*.json"))
+        assert len(files) == count, directory
+        for item in files:
+            raw = item.read_bytes()
+            assert sha256_hex(raw) == item.stem, item.name
+            assert read_generation(raw)["truth"] == "invented"
+
+    diagnostics = sorted((root / "diagnostics").glob("*.json"))
+    assert len(diagnostics) == 40
+    outputs = set()
+    for item in sorted((root / "records").glob("*.json")):
+        outputs.add(read_generation(item.read_bytes())["outputs"][0]["sha256"])
+    # A diagnostic is named by the output it describes, not by its own digest, and every output has
+    # exactly one: the instrument cannot be quietly missing from a generation.
+    assert {item.stem for item in diagnostics} == outputs
+    for item in diagnostics:
+        entry = parse_canonical(item.read_bytes(), "the latent lines")
+        assert entry["profile"] == "exulanica.appearance-latent-lines/v1"
+        assert entry["output_sha256"] == item.stem
+        assert entry["source"] == "final-latent-before-decode"
+
+    comparison = parse_canonical((root / "determinism.json").read_bytes(), "the comparison")
+    assert comparison["compared"] == 64
+    assert comparison["identical"] == 64
+    assert comparison["verdict"] == "every output identical"
+    session_1 = {
+        read_generation(path.read_bytes())["outputs"][0]["sha256"]
+        for path in (repository / "ml/appearance/evidence/session-1/records").glob("*.json")
+    }
+    # Both sides of the comparison are session 1's own committed digests.
+    assert {row["first_output_sha256"] for row in comparison["generations"]} == session_1
+    assert {row["second_output_sha256"] for row in comparison["generations"]} == session_1

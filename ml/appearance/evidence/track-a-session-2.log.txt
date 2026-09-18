@@ -1,0 +1,131 @@
+Track A session 2, generated appearance lane, 2026-09-18T13:08:50Z to 14:53:12Z
+Branch lane/generated-appearance. The code that ran is commit 48c77a3f with package source
+9e2a3e4c2737dd86273d2f82fbe141a7737543e048c83f45854773f3667f03f1, and unlike session 1 that digest
+IS the digest of a committed tree: the tree was clean when the image was built, and gpu-session.sh
+now refuses to run when it is not.
+Machine: mechanical-cyan-hoverfly, massedcompute_RTXPro6000, 1 x RTX PRO 6000 Blackwell Server
+Edition 96 GB, driver 580.126.09, 16 CPUs, 192 GB RAM, Beltsville MD. Image
+appearance-local@sha256:aba70d3d3366be95. Created 13:08:50Z (the console's instant, not my first
+sighting), deleted 14:53:12Z, confirmed gone from the account 14:54:51Z.
+
+== spend
+  billed 6262 s to the delete request (1.74 h) = $4.57 at the day's listed $2.63
+  6361 s to the confirmed removal (1.77 h) = $4.64, if the provider bills to that instant instead
+  prepaid balance before $40.31; AFTER IS STILL UNREAD, and it is the only figure in two sessions'
+    evidence that is marked rather than measured
+  the lane has now spent about $9.20 of its $25 Track A ceiling
+  3015 of the 6262 billed seconds produced images (71 s smoke, 1795 s job A, 1146 s job B), which is
+    48 per cent, against 24 per cent in session 1
+  roughly 20 minutes and 88 cents went to my own false starts, itemised below
+
+== who deployed the instance is unestablished, and the ledger says so
+  The operator approved, in writing, both creating the machine and accepting the provider consent.
+  This lane selected the machine, opened the deploy dialog, and was filling in the name field when
+  the element vanished and the page was already showing a created instance under an auto-generated
+  name. This lane never clicked Deploy and never clicked the consent. The orchestrator session
+  accounted for its own ten actions in the same browser, none of which can create an instance, and
+  its one click attempt failed with the same "element may have been removed" refusal from the other
+  side of the same race. The likeliest account is that the operator clicked Deploy themselves,
+  without typing the name, which is what the auto-generated name suggests. That is a likelihood.
+  The lesson is a rule now: two agents driving one browser is the shared-handle hazard with a
+  purchase at the end of it. Whoever holds a console holds it alone.
+
+== job A: is this pipeline deterministic?
+  Session 1's committed spec, re-run unchanged on a second machine. 64 generations, 1795 s against
+  session 1's 1785 s, none stopped.
+    measure compare --first evidence/session-1 --second out-track-a-session-1
+    64 OF 64 OUTPUTS IDENTICAL, by sha256 of the raw RGB bytes.
+  Re-measuring all 64 reproduces session 1's seams, structure recall and module retention exactly,
+  so every number in the first report is a property of the pipeline and not of one machine. Before
+  the run I checked that this was a fair test rather than assuming it: the 64 seeds are identical,
+  every conditioning picture is byte-identical, and the only difference in the whole job document is
+  texture_manifest_sha256, a provenance field that never reaches the model. The seeds survived the
+  texture catalog growing from 8 sets to 17 because the seed rule hashes the job's NAME, not its
+  digest.
+  WHAT THIS CANNOT SAY IS "SAME CODE". Session 1's records name commit f61a89fa with source_sha256
+  ad958ff6, and that digest matches none of f61a89fa (3559..), 1bc97ad9 (dbc9..), b42da82e (5c77..)
+  or 48c77a3f (9e2a..): it ran from a working tree mid-fix which was then committed, reformatted and
+  lost, on a machine since deleted. From the fix commit to this run the only change in the GPU
+  backend is the read-only latent diagnostic, so the sampling path is materially the same, but that
+  is an inference from neighbouring commits, not a comparison with what ran.
+
+== the band, and my explanation for it being wrong
+  The painted render a1 edge output at seed 1384410033 came back at digest 4432d3253e0e1b37, which is
+  session 1's own, so the dark three-pixel band at row 616 with its 8.0 px dash pitch is
+  DETERMINISTIC rather than a transient.
+  The instrument built after session 1 to settle its cause says the latent is clean there:
+    row 76 is the most extreme, at 2744 milli-sigma; nothing in either axis passes the 8000 threshold
+    21 of the session's 104 outputs DO carry latent lines past that threshold, up to 35530
+      milli-sigma, and none of them shows a comparable band in its pixels
+  So "a latent row went dark" is refuted, and the instrument does not discriminate the band. Its
+  statistic is the mean over the 16 latent channels, which cancels opposing deviations between them;
+  the next version records the per-channel extreme. The cause is still unidentified and painted
+  render stays refused.
+
+== job B: the three sets session 1 did not dress, against predictions written first
+  40 generations, 1146 s, results d6f372c2df748eac. Recall is the share of the conditioning
+  picture's own edges with an output edge within 2 px, per million, medians of four seeds.
+    limestone-ashlar   depth a1 997244  a2 1000000   edge a1 989070  a2 969141
+    cast-concrete      depth a1 694928  a2  942822   edge a1 529293  a2 903840
+    storefront-metal   depth a1  91772  a2   12025   edge: no such picture, refused at staging
+  PREDICTION 1, ASHLAR HOLDS ON BOTH ROLES WITH EDGE ABOVE 95 PER CENT: HELD. Both medians above 96.
+    One seed's minimum fell to 859004, so the floor is 86 per cent rather than 95.
+  PREDICTION 2, CONCRETE HOLDS ON DEPTH AND FALLS ON EDGE: HALF MISSED. Edge fell as predicted, a1
+    to 529293 against ashlar's 989070. But depth ALSO fell, a1 to 694928, against the 97.2 to 100
+    per cent session 1 measured on every target. SESSION 1'S RULE IS FALSIFIED: depth conditioning
+    does not hold everywhere. The pictures say why: the model keeps the salient module, the regular
+    grid of formwork tie holes, and drops the fine blowhole and board-grain field.
+  PREDICTION 3, METAL HAS NO EDGE ROLE TO FAIL: HELD, and beside the point. I said nothing about its
+    depth and should have. Depth failed too: 91772 for a1, 12025 for a2, one output at zero. Its
+    depth picture holds 795 edges in a 1 mm brush field, so there is almost nothing to keep.
+    STRUCTURE CONDITIONING HAS A FLOOR, and this is where it is. Worse, the model invented broad
+    shading: low-frequency share 713527 for a1 and 885437 for a2 against the published set's 227349,
+    the worst repetition risk measured in either session, visible as vertical bands in the 2 by 2
+    composites.
+  seams, per million, where the eight published sets read 290000 to 1770000:
+    ashlar   809947 to 1176052 (a1), 685503 to 1142911 (a2), medians 983185 and 936120
+    concrete 880106 to 1109759 (a1), 924142 to 1167293 (a2), medians 986261 and 1011320
+    metal    878079 to 1345672 (a1), 598278 to  920207 (a2), medians 961513 and 761415
+  low-frequency share, ashlar against its own published set: 126397 (a1) and 44197 (a2) against
+    396344. Ashlar repeats LESS visibly than what ships today.
+  module retention at the recipe's own stated period, per mille of the published amplitude: ashlar
+    3325 (a1) and 2740 (a2), concrete 1134 and 1093. The measure had to be taught two new makers:
+    loom.ashlar states units_per_course and courses, loom.concrete states panels_per_row and rows,
+    and neither was in the table, so the first pass measured no retention for either.
+
+== the four false starts, all mine
+  1. An apostrophe inside ${var:?message} in the driver opened a shell quote; bash reported
+     "unexpected EOF while looking for matching" at the LAST line of a 117-line file. Quote counting
+     said even, shlex said balanced, truncation-bisecting misled. About 8 minutes of a running
+     machine. The diagnostic that works is reading your own added lines out of the diff.
+  2. The driver passed RELATIVE bind paths and docker refuses them: "invalid mount path:
+     'appearance/staged-smoke' mount path must be absolute", after the image build and 88.5 GB of
+     weights. The script had never been run end to end; session 1's steps were typed by hand from a
+     directory that made them absolute. run.sh now resolves what it mounts and refuses a
+     non-directory. A stub dry run over ssh to localhost would have caught it for nothing.
+  3. The rebuild after that fix re-downloaded the entire environment, because the Dockerfile sets
+     ENV EXULANICA_BUILD_REVISION before the dependency layers, so any new commit invalidates them.
+     About 5 minutes and 22 cents per rebuild.
+  4. Job A was killed 6 minutes in, deliberately, to detach it (below). A trade, not a mistake.
+
+== the disconnect, and what it proved
+  The operator needed to leave wifi mid-run. The container AND its hard timeout lived inside a
+  foreground ssh's process tree from the Mac, so a dropped link would have killed the job and one of
+  the three spend stops while the instance kept billing. Job A was killed and relaunched through
+  scripts/remote-run.sh under nohup setsid: pid 25833, PGID 25833, SID 25833, its own session leader,
+  verified by closing that ssh and reconnecting to find it running. The Mac then only polled through
+  scripts/collect-session.sh. The link dropped for real at 14:36:05Z and cost exactly one failed
+  poll; job A finished 64 of 64 through it.
+
+== what this session does not show
+  - Nothing here is evidence about any real place. Every output is invented appearance on synthetic
+    structure and says so in its own record.
+  - Nothing has been handed to the texture lane, and no set is pinned. Ashlar is the first candidate
+    worth offering that this lane has produced, and offering it is the orchestrator's call.
+  - No look at every texel has been done for session 2. Until it is, no output here may be published,
+    and the numbers above say nothing about lettering or marks.
+  - The determinism result covers one job spec on two machines of the same type with the same driver
+    family. It says nothing about a different GPU, and session 1's driver was never recorded.
+  - Job A's own 64 records are NOT committed: they are byte-identical reproductions of records
+    already in evidence/session-1/, and the comparison document determinism.json names every digest
+    on both sides. Job B's 40 records and the smoke's 2 are committed in full.

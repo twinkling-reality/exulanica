@@ -37,7 +37,9 @@ __all__ = ["MODULES", "compare_runs", "measure_session"]
 #: no period of its own and a retention ratio at some other period would mean nothing: none is
 #: measured for those. The counts are the recipe's own, never this file's.
 MODULES: Final = {
+    "loom.ashlar": {"u": "units_per_course", "v": "courses"},
     "loom.brick": {"u": "units_per_course", "v": "courses"},
+    "loom.concrete": {"u": "panels_per_row", "v": "rows"},
     "loom.paving": {"u": "flags_per_row", "v": "rows"},
 }
 
