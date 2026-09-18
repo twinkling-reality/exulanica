@@ -110,7 +110,9 @@ describe('the waitlist surface', () => {
     expect(page.querySelectorAll('h2')).toHaveLength(0);
     expect(page.querySelector('.reading-copy')).toBeNull();
     expect(page.querySelectorAll('.waitlist-line')).toHaveLength(1);
-    expect(page.textContent).not.toMatch(/[—–]/);
+    // Written as escapes rather than as the characters, so the repository itself carries
+    // no em dash or en dash while still forbidding them on the page.
+    expect(page.textContent).not.toMatch(/[\u2014\u2013]/);
     // The field is nameless to the eye and named to a screen reader.
     expect(page.querySelector(`label[for="${field(page).id}"]`)?.textContent).toBe('Email address');
     expect(field(page).getAttribute('aria-describedby')).toBe(status(page).id);
