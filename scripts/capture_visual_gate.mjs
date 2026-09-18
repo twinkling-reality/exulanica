@@ -872,8 +872,8 @@ async function main() {
       // navigation world states rings WITHOUT a height (atlas-core PolygonObstacle is an id and
       // rings), so a generated tile has no height for the gate to bind. The gate will not invent
       // one: the clearance keys measure a solid, and a fabricated top would make them measure a
-      // shape nothing in the world states. See the request in
-      // .orimera/briefs/lanes/requirements/gate-route-obstruction-rings.md.
+      // shape nothing in the world states. The named request for rings that carry record identity
+      // is gate-route-obstruction-rings in the lane requirements.
       const top = scoresOwnedDistrict ? heights.get(obstacle.id) : obstacle.topY;
       if (top === undefined) {
         await halt(
