@@ -113,8 +113,8 @@ Each carries a representation contract in the header (`PROJECTION_DEFINITIONS` i
 
 ## What draws today
 
-Terrain, a street segment's carriageway and gutters, a building's own walls, roofs and parapets, and
-the face it shows the street.
+Terrain, a street segment's carriageway and gutters, a building's own walls, roofs and parapets, the
+face it shows the street, the solids an object states as its parts, and the ground a lot states.
 
 - In `render_batch`, the patch is drawn less what drawn covering surfaces cover, by the terrain
   yield rule below: the segments' carriageways and gutters, and the ground a drawn building stands
@@ -128,6 +128,19 @@ the face it shows the street.
   of it: where a face draws, the building's own wall gives up exactly the rectangle that face covers
   in the edge's own frame, its run by its storeys, and keeps the rest. Nothing is drawn twice in one
   place at any point.
+- An object draws its parts by the form parts rule (`src/core/form-parts.ts`): street furniture, a
+  rooftop object, a street tree and the fitout of a vitrine, each part a box, a prism or an
+  ellipsoid turned by the object's facing vector. A vitrine states no point and no facing, so the
+  expander gives it the face it sits in: the point at its `u_start_mm` along that tier edge at its
+  sill, and the edge's own run as the facing. No negation is needed for the rule's "+y is to the
+  left", because `exulanica.grammar.geometry` refuses a ring that is not counter-clockwise, so
+  walking a tier edge in stated order keeps the building's interior on the left.
+- A parcel, a block and a street tree's pit draw the ground they state by the lot rule
+  (`src/core/lots.ts`): the ring at its stated elevation, as one horizontal surface. A block draws
+  its boundary LESS the boundaries of the parcels that name it, because parcels tile their block
+  exactly (on the corridor's street, fifteen parcels add to their block's 4,668 m2 to the square
+  millimetre), so a block that drew its whole boundary would draw the same ground twice. A block
+  whose parcels leave nothing states `ground_coverage`.
 - A facade draws the face of one tier edge by the facade rule (`src/core/facades.ts`): the wall of
   its run over the storeys it covers, the ground band below that, every ground panel of every bay
   that names it at that panel's own recess and in the surface role the grammar gives its panel role
@@ -267,8 +280,8 @@ by the expander that needs it, with a new tessellator version.
   meets the air and nowhere the tier above stands.
 
 `test/geometry-blocks.test.ts`, `test/streets.test.ts`, `test/massing.test.ts`,
-`test/support-carve.test.ts` and `test/ring-clearance.test.ts` hold each to its stated properties
-and pin outputs.
+`test/facades.test.ts`, `test/lots.test.ts`, `test/form-parts.test.ts`, `test/support-carve.test.ts`
+and `test/ring-clearance.test.ts` hold each to its stated properties and pin outputs.
 
 ## The triangle digest
 

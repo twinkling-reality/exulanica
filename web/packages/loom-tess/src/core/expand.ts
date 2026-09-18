@@ -14,9 +14,10 @@
  * integer rules that expand them, each declared and versioned here as it is built. This version
  * builds the terrain grid, a street segment's carriageway and gutters (`streets.ts`), a building's
  * own walls, roofs and parapets (`massing.ts`), the face it shows a street with its ground band and
- * that band's panels (`facades.ts`), and the solids of an object's parts (`form-parts.ts`), and in
- * the navigation projection carves the ground clear of what the grammar's navigation table says
- * obstructs a walking capsule; everything else states the rule it waits on (`NEEDS`).
+ * that band's panels (`facades.ts`), the solids of an object's parts (`form-parts.ts`) and the
+ * ground a lot, a block or a tree pit states (`lots.ts`), and in the navigation projection carves
+ * the ground clear of what the grammar's navigation table says obstructs a walking capsule;
+ * everything else states the rule it waits on (`NEEDS`).
  *
  * Two projections are materialised, each from the records by its own rules and each with its own
  * representation contract: `render_batch`, what is drawn, and `nav_envelope`, what a person is
@@ -34,6 +35,7 @@ import { piecesOf, runOf, Surface } from './faces.js';
 import type { FaceCover } from './faces.js';
 import { alongEdge } from './faces.js';
 import { expandFormParts, FormPartsRefusal } from './form-parts.js';
+import { groundPieces } from './lots.js';
 import type { FormObject, FormPart, FormShape, FormTriangle } from './form-parts.js';
 import type { Piece, SurfaceExpansion } from './pieces.js';
 import type { ProjectionName } from './record-shapes.js';
@@ -49,7 +51,7 @@ import type { CoveringTriangle, TerrainPatch } from './terrain-yield.js';
  * Bumped whenever an expander, a statement, a contract or the materialised projection set
  * changes, because each changes the bytes a bake writes. The bake stage's parameters carry it.
  */
-export const TESSELLATOR_SOURCE_VERSION = 8;
+export const TESSELLATOR_SOURCE_VERSION = 9;
 
 /**
  * What each materialised projection preserves and what it may be used for, as separate rows, the
@@ -155,6 +157,9 @@ export type Need = (typeof NEEDS)[keyof typeof NEEDS];
 
 export type Fields = { readonly [name: string]: unknown };
 
+/** The surface roles this file names directly, each a closed value of the grammar's role fields. */
+const LOT = 'lot';
+const TREE_PIT = 'tree_pit';
 
 /** A record the document carries, owned or halo, as an expander may read it. */
 export interface CarriedRecord {
@@ -563,6 +568,48 @@ function renderVitrine(fields: Fields, context: ExpandContext): Expansion {
   return { state: 'drawn', pieces };
 }
 
+/** A lot: a parcel's boundary at the grade it states, as one horizontal surface. */
+function renderParcel(fields: Fields): Expansion {
+  const where = `city.parcel ${fields.identity as string}`;
+  const pieces = groundPieces(fields.boundary_mm as readonly Plan[], fields.grade_elevation_mm as number, LOT, [], where);
+  if (pieces.length === 0) return { state: 'unavailable', needs: [NEEDS.ground_coverage] };
+  return { state: 'drawn', pieces };
+}
+
+/**
+ * A block's own ground, less the parcels that name it. A parcel always draws the boundary it
+ * states, since its rule refuses rather than waits, so a parcel the tile carries is a parcel that
+ * is drawn and this yields to drawn ground rather than to a stated extent.
+ */
+function renderBlock(fields: Fields, context: ExpandContext): Expansion {
+  const where = `city.block ${fields.identity as string}`;
+  const parcels = carriedWhere(context, 'city.parcel', 'block_identity', fields.identity as string)
+    .map((parcel) => parcel.boundary_mm as readonly Plan[]);
+  const pieces = groundPieces(fields.boundary_mm as readonly Plan[], fields.grade_elevation_mm as number, LOT, parcels, where);
+  if (pieces.length === 0) return { state: 'unavailable', needs: [NEEDS.ground_coverage] };
+  return { state: 'drawn', pieces };
+}
+
+/**
+ * A street tree: the pit it stands in, and its own parts. It states no facing vector, so its local
+ * frame faces east, which is how `exulanica.world.society_city_place` reads the same parts.
+ */
+function renderTree(fields: Fields): Expansion {
+  const where = `city.street_tree ${fields.identity as string}`;
+  const pit = groundPieces(fields.pit_mm as readonly Plan[], fields.z_mm as number, TREE_PIT, [], where);
+  const parts = objectPieces({
+    xMm: fields.x_mm as number,
+    yMm: fields.y_mm as number,
+    zMm: fields.z_mm as number,
+    facingDxMm: 1,
+    facingDyMm: 0,
+    parts: formParts(fields),
+  }, where);
+  const pieces = [...pit, ...parts];
+  if (pieces.length === 0) return { state: 'unavailable', needs: [NEEDS.ring_triangulation, NEEDS.form_parts] };
+  return { state: 'drawn', pieces };
+}
+
 /** A building's face on one tier edge, by the facade rule (`facades.ts`). */
 function renderFacade(fields: Fields, context: ExpandContext): Expansion {
   const facade = fields as unknown as FacadeFields;
@@ -619,7 +666,10 @@ interface KindRules {
  * marking, a sign, an occupancy, a relation, and every object, which is collision's concern.
  */
 const KIND_RULES: ReadonlyMap<string, KindRules> = new Map<string, KindRules>([
-  ['city.block', { render_batch: needs(NEEDS.ring_triangulation), nav_envelope: needs(NEEDS.ring_triangulation) }],
+  ['city.block', {
+    render_batch: { rule: 'expand', expand: renderBlock, readsCoverings: false },
+    nav_envelope: needs(NEEDS.ring_triangulation),
+  }],
   ['city.crossing', { render_batch: needs(NEEDS.crossing_band), nav_envelope: needs(NEEDS.crossing_band) }],
   ['city.curb_edge', { render_batch: needs(NEEDS.kerb_offset), nav_envelope: needs(NEEDS.kerb_offset) }],
   ['city.district', { render_batch: notInProjection, nav_envelope: notInProjection }],
@@ -645,7 +695,10 @@ const KIND_RULES: ReadonlyMap<string, KindRules> = new Map<string, KindRules>([
     render_batch: { rule: 'expand', expand: renderMassing, readsCoverings: false },
     nav_envelope: notInProjection,
   }],
-  ['city.parcel', { render_batch: needs(NEEDS.ring_triangulation), nav_envelope: needs(NEEDS.ring_triangulation) }],
+  ['city.parcel', {
+    render_batch: { rule: 'expand', expand: renderParcel, readsCoverings: false },
+    nav_envelope: needs(NEEDS.ring_triangulation),
+  }],
   // A space on a carriageway or a footway draws as that surface; its bay lines are markings.
   ['city.parking_space', { render_batch: notInProjection, nav_envelope: notInProjection }],
   // An occupancy draws as its building's faces.
@@ -669,7 +722,10 @@ const KIND_RULES: ReadonlyMap<string, KindRules> = new Map<string, KindRules>([
     nav_envelope: { rule: 'expand', expand: supportSegment, readsCoverings: false },
   }],
   // A tree's parts, and its pit, which is ground a person may stand on.
-  ['city.street_tree', { render_batch: needs(NEEDS.form_parts, NEEDS.ring_triangulation), nav_envelope: needs(NEEDS.ring_triangulation) }],
+  ['city.street_tree', {
+    render_batch: { rule: 'expand', expand: (fields: Fields): Expansion => renderTree(fields), readsCoverings: false },
+    nav_envelope: needs(NEEDS.ring_triangulation),
+  }],
   // A material is not a surface. A drawn range cites it; it draws nothing of its own.
   ['city.surface_material', { render_batch: notInProjection, nav_envelope: notInProjection }],
   ['city.terrain', {

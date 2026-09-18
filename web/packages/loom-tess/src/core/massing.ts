@@ -33,8 +33,7 @@ import type { Plan } from './integer-math.js';
 import { faceOn, HORIZONTAL, piecesOf, runOf, Surface, VERTICAL } from './faces.js';
 import type { FaceCover } from './faces.js';
 import type { Piece } from './pieces.js';
-import { carvedPiece, twiceWalkArea } from './piece-carve.js';
-import type { ObstructionWalk } from './piece-carve.js';
+import { leftTurning, openRegions } from './piece-carve.js';
 import { requireSimpleRing, triangulateRing } from './ring-triangulation.js';
 
 /** A tier of a building: the storeys it covers, its ring, its light wells and its parapet. */
@@ -79,65 +78,6 @@ export function storeyFloorMm(fields: MassingFields, storey: number, where: stri
 /** `exulanica.grammar.grammars.city.massing.tier_top_mm`: the ceiling of a tier's last storey. */
 export function tierTopMm(fields: MassingFields, tier: Tier, where: string): number {
   return storeyFloorMm(fields, add(tier.last_storey, 1, where), where);
-}
-
-/** A ring turned counter-clockwise, which is how every piece here is built. */
-function leftTurning(ring: readonly Plan[], where: string): readonly Plan[] {
-  return twiceWalkArea(ring, where) < 0 ? [...ring].reverse() : ring;
-}
-
-/** A ring as counter-clockwise triangles, which is what the carve takes as an obstruction. */
-function ringWalks(ring: readonly Plan[], where: string): ObstructionWalk[] {
-  const turned = leftTurning(requireSimpleRing(ring, where), where);
-  const cut = triangulateRing(turned, where);
-  const out: ObstructionWalk[] = [];
-  for (let corner = 0; corner + 2 < cut.length; corner += 3) {
-    out.push([turned[cut[corner]!]!, turned[cut[corner + 1]!]!, turned[cut[corner + 2]!]!]);
-  }
-  return out;
-}
-
-/** Whether a counter-clockwise ring turns only left, so the carve can take it whole. */
-function convex(ring: readonly Plan[], where: string): boolean {
-  return ring.every((here, index) => {
-    const before = ring[(index + ring.length - 1) % ring.length]!;
-    const after = ring[(index + 1) % ring.length]!;
-    return subtract(
-      multiply(subtract(here[0], before[0], where), subtract(after[1], here[1], where), where),
-      multiply(subtract(here[1], before[1], where), subtract(after[0], here[0], where), where),
-      where,
-    ) >= 0;
-  });
-}
-
-/**
- * A tier's ring less every ring standing on it, as convex integer walks. A convex ring is carved
- * whole, which loses nothing: the rings are the generator's own integers and meet on integer
- * points, so every face has integer corners and the carve's rounding never fires. A ring that turns
- * in is cut into triangles first, and each face then rounds to the lattice by under a millimetre,
- * which is the shared carve's stated cost.
- */
-function openRegions(ring: readonly Plan[], standing: readonly (readonly Plan[])[], where: string): Plan[][] {
-  const obstructions: ObstructionWalk[] = [];
-  for (const other of standing) {
-    for (const walk of ringWalks(other, where)) obstructions.push(walk);
-  }
-  if (obstructions.length === 0) {
-    const cut = triangulateRing(ring, where);
-    const whole: Plan[][] = [];
-    for (let corner = 0; corner + 2 < cut.length; corner += 3) {
-      whole.push([ring[cut[corner]!]!, ring[cut[corner + 1]!]!, ring[cut[corner + 2]!]!]);
-    }
-    return whole;
-  }
-  if (convex(ring, where)) return carvedPiece(ring, obstructions, ring, where);
-  const cut = triangulateRing(ring, where);
-  const walks: Plan[][] = [];
-  for (let corner = 0; corner + 2 < cut.length; corner += 3) {
-    const piece: Plan[] = [ring[cut[corner]!]!, ring[cut[corner + 1]!]!, ring[cut[corner + 2]!]!];
-    for (const walk of carvedPiece(piece, obstructions, piece, where)) walks.push(walk);
-  }
-  return walks;
 }
 
 /** Whether a point lies on the closed segment from `from` to `to`, exactly. */

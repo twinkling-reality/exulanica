@@ -512,14 +512,20 @@ def test_the_container_states_membership_frame_identity_and_what_is_drawn(tmp_pa
     segments = [i for i, r in enumerate(header["records"]) if r["kind"] == "city.street_segment"]
     massings = [i for i, r in enumerate(header["records"]) if r["kind"] == "city.massing"]
     facades = [i for i, r in enumerate(header["records"]) if r["kind"] == "city.facade"]
-    # Every kind whose parts this version turns into solids draws too, each its own object.
+    # Every kind whose parts this version turns into solids draws too, each its own object, and
+    # every kind that states a ring of ground draws that ground.
     objects = [
         i
         for i, r in enumerate(header["records"])
         if r["kind"] in ("city.rooftop_object", "city.street_furniture", "city.vitrine")
     ]
+    lots = [
+        i
+        for i, r in enumerate(header["records"])
+        if r["kind"] in ("city.block", "city.parcel", "city.street_tree")
+    ]
     assert [e["record"] for e in render["entries"] if e["state"] == "drawn"] == sorted(
-        [*facades, *massings, *objects, *segments, terrain]
+        [*facades, *lots, *massings, *objects, *segments, terrain]
     )
     for entry in (render["entries"][i] for i in objects):
         assert {s["role"] for s in entry["surfaces"]} <= {
@@ -527,6 +533,13 @@ def test_the_container_states_membership_frame_identity_and_what_is_drawn(tmp_pa
             "object_secondary",
             "object_tertiary",
         }
+    # A block gives up the ground its parcels take, so what it draws is what they leave.
+    for index in lots:
+        roles = {s["role"] for s in render["entries"][index]["surfaces"]}
+        if header["records"][index]["kind"] == "city.street_tree":
+            assert roles == {"tree_pit", "trunk", "canopy"}
+            continue
+        assert roles == {"lot"}
     # A face draws the wall of its run and the ground band below it, and the panels of every bay
     # that names it, so a ground bay draws nothing of its own.
     for entry in (render["entries"][i] for i in facades):
