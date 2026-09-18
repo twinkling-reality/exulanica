@@ -513,6 +513,18 @@ defect in none of them.
 The first run of this gate against the street the project's stop condition is about. Written and
 committed before the API, the page or the harness was started.
 
+**THREE HALTS ARE PREDICTED, FROM THREE LAYERS, and the run meets them in the order the page does
+its work.** Recording the order is worth as much as the halts: each belongs to a different part of
+the system, and only the first one reached says anything.
+
+1. **THE DECODE, before anything else.** The store's newest bake of tile (2, 0) is tessellator 17;
+   this tree's source is 19; and the container reader refuses a version mismatch outright, "there is
+   no upgrade on read, rebake the tile". Until that tile is rebaked at 19 the page never mounts it
+   and the run learns nothing about the street. THIS IS THE ONE I EXPECT TO REACH FIRST, and while
+   it stands the other two are unreachable and therefore untested.
+2. **THE ROUTE RULE**, on the arithmetic below.
+3. **THE AUTHENTICATION CONDITION**, in this gate, described further down.
+
 **The arithmetic that dominates everything below.** The rule needs its route length plus a stopping
 margin, 125,000 plus 6,000 mm, CLEAR. The committed walk starts at tile x 262,000, which is 6,000 mm
 inside tile (2, 0)'s western edge at 256,000, so a heading due east has 122,000 mm to the tile edge.
