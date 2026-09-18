@@ -6,13 +6,13 @@ and fails if this file disagrees with the catalog rules.
 This catalog lists living contracts, capability guides, and decision records.
 Start from [README.md](README.md).
 
-**92 documents** in the public catalog.
+**95 documents** in the public catalog.
 
 ## Living contracts and reference
 
 What the system is. Edited when the system changes.
 
-64 documents.
+66 documents.
 
 - [architecture-overview](architecture-overview.md) : Current direction, 2026-09-12: read product-direction.md
 - [asset-read-currency](asset-read-currency.md) : Final acceptance at source head 03501cea376cf530c185e3b12a5fb0d8d8d7acdf passed 2118 backend
@@ -57,6 +57,7 @@ What the system is. Edited when the system changes.
 - [product-specification](product-specification.md) : mixed. Every claim carries exactly one label, per the convention in
 - [reconstruction-findings](reconstruction-findings.md) : Historical single-photograph findings plus a retained-bowl geometry observation
 - [reconstruction-quality-gate](reconstruction-quality-gate.md) : implemented; first benchmark-calibrated pose policy verified 2026-09-04
+- [representation-decisions](representation-decisions.md) : Every choice about how the world is represented, what each one assumes, and the condition that would
 - [retained-reference-workflow](retained-reference-workflow.md) : A real trained reconstruction is established for one collection and refused for the other
 - [runtime-verification](runtime-verification.md) : VERIFIED by execution on 2026-08-27
 - [scene-placement-alignment](scene-placement-alignment.md) : Implemented 2026-09-05. This corrects the identity-scale limitation documented in
@@ -78,6 +79,7 @@ What the system is. Edited when the system changes.
 - [world-read-posed-views](world-read-posed-views.md) : Wire contract for posed image bytes. Written 2026-09-08; byte delivery is implemented
 - [world-read-recipient-evidence](world-read-recipient-evidence.md) : Wire contract, 2026-09-08. Owning-workspace reads only; release.state remains
 - [world-style-backend](world-style-backend.md) : IMPLEMENTED for appearance styles and protected source-media metadata. Structural
+- [world-variation-and-segments](world-variation-and-segments.md) : What it means that a world is built from records rather than modelled as a surface: any part of it
 
 ## Capability guides
 
@@ -95,7 +97,7 @@ Written for somebody choosing to use the product.
 
 Numbered, and the number is the identifier. Never renumbered.
 
-23 documents.
+24 documents.
 
 - [0002-model-routing](adr/0002-model-routing.md) : - Status: Accepted
 - [0003-renderer-selection](adr/0003-renderer-selection.md) : - Status: ACCEPTED, PlayCanvas Engine 2.21.4. Resolved 2026-08-28 by matched-resolution
@@ -119,4 +121,5 @@ Numbered, and the number is the identifier. Never renumbered.
 - [0021-observed-recomputation-scope](adr/0021-observed-recomputation-scope.md) : - Status: Accepted
 - [0022-withdrawal-at-evidence-serving](adr/0022-withdrawal-at-evidence-serving.md) : - Status: Accepted
 - [0023-epistemically-typed-world-memory](adr/0023-epistemically-typed-world-memory.md) : ACCEPTED AS ARCHITECTURE; RESEARCH CLAIMS OPEN
+- [0024-declared-coordinate-quantum](adr/0024-declared-coordinate-quantum.md) : - Status: Accepted
 - [gsplat-training-and-recorded-rung](adr/gsplat-training-and-recorded-rung.md) : Date: 2026-09-05. Status: accepted for implementation; CUDA execution remains unverified

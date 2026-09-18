@@ -154,6 +154,7 @@ record is missing from this table.
 | [adr/0021-observed-recomputation-scope.md](adr/0021-observed-recomputation-scope.md) | Exactness belongs to observed content; the wider closure stays open | ACCEPTED |
 | [adr/0022-withdrawal-at-evidence-serving.md](adr/0022-withdrawal-at-evidence-serving.md) | Every evidence entrypoint checks withdrawal before reading stored bytes | ACCEPTED |
 | [adr/0023-epistemically-typed-world-memory.md](adr/0023-epistemically-typed-world-memory.md) | World memory is epistemically typed state; no mesh, graph, field, or latent representation is the whole world | ACCEPTED as architecture; research claims open |
+| [adr/0024-declared-coordinate-quantum.md](adr/0024-declared-coordinate-quantum.md) | Coordinates are exact integers at a quantum a document declares and a reader refuses on mismatch | ACCEPTED |
 | [adr/gsplat-training-and-recorded-rung.md](adr/gsplat-training-and-recorded-rung.md) | Gaussian optimization and the recorded scene rung are separate decisions, so a nonmetric scene can be trained honestly | ACCEPTED for implementation; unnumbered, deliberately |
 
 ## Runtime authority
