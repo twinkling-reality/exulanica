@@ -1,0 +1,46 @@
+A loopable clip of the generated street, captured 2026-09-18.
+
+WHAT IT IS. 240 frames of a whole turn on the spot, standing on the corridor tile's nav_envelope,
+fetched through the product route, played at 30 frames a second: an eight second square loop. Tools
+retained beside this record as cdp-clip.mjs.txt and plan-clip.json.txt.
+
+DETERMINISM, WHICH IS THE POINT. Frames are not taken in real time. Chrome's virtual clock is
+advanced by exactly one frame's worth before each screenshot, so the page's requestAnimationFrame
+sees exactly that dt whatever else the machine is doing. A clip whose smoothness depended on machine
+load would be the same class of defect as a frame-time measurement taken at load 90.
+
+THE LOOP IS ARITHMETIC, NOT EYEBALLED. The controls turn at a fixed 1.35 radians a second while an
+arrow key is held (controls.ts), so a whole turn is 2*pi/1.35 seconds. With 240 frames,
+dt = 2*pi/(1.35*240) = 0.019392547 s, and frame 240 is a whole turn past frame 0.
+
+HOW WELL IT WRAPS, MEASURED RATHER THAN CLAIMED. Frame 240 is NOT byte-identical to frame 0, so the
+loop is not exact. Against the same measure, a normal step between adjacent frames:
+
+  wrap, frame 239 to frame 0      PSNR 12.22 dB
+  a normal step, frame 0 to 1     PSNR 13.18 dB
+  a normal step, frame 120 to 121 PSNR 13.27 dB
+
+So the seam is within about one decibel of an ordinary frame transition and should read as seamless,
+but it is a near loop and not a closed one. The residual is some mixture of the page's own frame
+delta not being exactly the budget and the renderer not being bit-identical at the same pose. The
+absolute figures are low for a slow pan because the unavailable hatch is a high-frequency stripe that
+aliases hard; that is a property of the subject, not of the capture.
+
+WHAT IS IN FRAME, AND WHAT IS NOT. Everything drawn is drawn by the runtime from the real baked
+container ddb707d2..., fetched over /tiles with a credential. No lighting the product does not use,
+no camera trick, no cut. The magenta UNAVAILABLE hatch is in frame and stays in frame. What was
+removed is development chrome only, by hiding every element that is not on the canvas's own ancestor
+chain and keeping it hidden as the app redraws: the entry card, the statement panel, the scene
+segments box, the movement buttons, the preview card and the reticle. That removes user interface; it
+never touches what is rendered.
+
+THE CLIP IS NOT YET A GOOD ADVERTISEMENT, and that is a fact about the street rather than the tool.
+4 of 854 records draw. Looking along the street there is asphalt, a kerb line and sky; through most
+of the turn there is bare dark ground and fog, because the buildings, footway, doors, crossings and
+tree pits are waiting on six tessellator expanders. Re-record when kerb_offset and massing land.
+
+THE HONESTY PROBLEM A LANDING PAGE HAS. A clip on a landing page carries no provenance panel, so this
+is the first artefact this project has made that cannot state what it is. Everything else it ships
+says where its bytes came from on the screen beside them. The orchestrator has accepted that for a
+marketing image, and the whole burden therefore falls on the clip containing only true things: if a
+frame of it would need a caption to stop it misleading, it must not be used.

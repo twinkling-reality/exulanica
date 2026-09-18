@@ -1,0 +1,166 @@
+// Capture a LOOPABLE clip of the generated street, frame by frame, on a virtual clock.
+//
+// DETERMINISM IS THE POINT. Frames are not taken in real time: Chrome's virtual time is advanced by
+// exactly one frame's worth before each screenshot, so the page's requestAnimationFrame sees exactly
+// that dt whatever else the machine is doing. A clip whose smoothness depends on machine load is the
+// same class of defect as a frame-time measurement taken at load 90.
+//
+// THE LOOP IS EXACT, NOT NEARLY. The controls turn at a fixed 1.35 rad/s while an arrow key is held,
+// so a whole turn is 2*pi/1.35 seconds. Choosing N frames and dt = 2*pi/(1.35*N) makes frame N the
+// same pose as frame 0 to the last bit, so the clip cuts back to its start with nothing to see.
+//
+// Usage: node cdp-clip.mjs <plan.json>
+import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+
+const plan = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+const TURN_RATE = 1.35; // radians a second, from controls.ts
+const frames = plan.frames ?? 150;
+const dtSeconds = (2 * Math.PI) / (TURN_RATE * frames);
+mkdirSync(plan.outDir, { recursive: true });
+const profile = mkdtempSync(join(tmpdir(), 'cdp-clip-'));
+const port = 9800 + Math.floor(Math.random() * 190);
+const chrome = spawn('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', [
+  '--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`,
+  `--window-size=${plan.size},${plan.size}`, '--hide-scrollbars', '--no-first-run',
+  '--enable-unsafe-swiftshader', '--disable-gpu-vsync', 'about:blank',
+], { stdio: 'ignore' });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let targets;
+for (let i = 0; i < 60; i++) {
+  try { targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json(); break; } catch { await sleep(250); }
+}
+const page = targets.find((t) => t.type === 'page');
+const ws = new WebSocket(page.webSocketDebuggerUrl);
+await new Promise((r) => ws.addEventListener('open', r, { once: true }));
+let id = 0;
+const pending = new Map();
+const events = [];
+ws.addEventListener('message', (event) => {
+  const message = JSON.parse(event.data);
+  if (message.id !== undefined && pending.has(message.id)) { pending.get(message.id)(message); pending.delete(message.id); }
+  if (message.method) events.push(message.method);
+});
+const send = (method, params = {}) => new Promise((resolve) => { const n = ++id; pending.set(n, resolve); ws.send(JSON.stringify({ id: n, method, params })); });
+const evaluate = async (expression) => {
+  const r = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
+  if (r.result?.exceptionDetails) throw new Error(`${expression.slice(0, 60)}: ${r.result.exceptionDetails.exception?.description}`);
+  return r.result?.result?.value;
+};
+// A wait that cannot tell "not yet" from "never" hangs forever: the first run of this tool stopped
+// dead at frame 33 doing exactly that. Every wait here is bounded and says which happened.
+const race = (promise, ms, what) => Promise.race([
+  promise.then((value) => ({ value })),
+  new Promise((resolve) => setTimeout(() => resolve({ timedOut: what }), ms)),
+]);
+const waitForVirtualTime = () => new Promise((resolve) => {
+  const listener = (event) => {
+    const message = JSON.parse(event.data);
+    if (message.method === 'Emulation.virtualTimeBudgetExpired') { ws.removeEventListener('message', listener); resolve(); }
+  };
+  ws.addEventListener('message', listener);
+});
+const results = { frames: 0, dtSeconds, framesPerSecond: Math.round((1 / dtSeconds) * 100) / 100 };
+try {
+  await send('Runtime.enable');
+  await send('Page.enable');
+  await send('Emulation.enable');
+  // A headless page is not the focused window, so `focus()` leaves activeElement on BODY and the
+  // controls, which move only while the canvas holds focus, never see a key. This makes the page
+  // behave as focused; without it the capture is a still.
+  await send('Emulation.setFocusEmulationEnabled', { enabled: true });
+  await send('Page.bringToFront');
+  await send('Emulation.setDeviceMetricsOverride', { width: plan.size, height: plan.size, deviceScaleFactor: 1, mobile: false });
+  await send('Page.navigate', { url: plan.url });
+  const deadline = Date.now() + (plan.readyTimeoutMs ?? 180000);
+  for (;;) {
+    let ready = false;
+    try { ready = await evaluate(plan.readyExpression); } catch { ready = false; }
+    if (ready === true) break;
+    if (Date.now() > deadline) throw new Error('page never became ready');
+    await sleep(500);
+  }
+  await sleep(plan.settleMs ?? 4000);
+  // Development chrome is not part of the product's picture, so it is removed rather than cropped.
+  // Hiding by text alone was not enough: the panels re-render and come back. This hides everything
+  // that is not on the canvas's own ancestor chain, and keeps hiding it as the app redraws, so the
+  // frame holds the rendered scene and nothing else. It removes UI; it never touches what is drawn.
+  results.hidden = await evaluate(`(() => {
+    const canvas = document.getElementById('atlas');
+    if (canvas === null) return 'no atlas canvas';
+    const keep = new Set();
+    for (let el = canvas; el !== null; el = el.parentElement) keep.add(el);
+    const hide = () => {
+      let hidden = 0;
+      for (const el of document.querySelectorAll('body *')) {
+        if (keep.has(el) || canvas.contains(el)) continue;
+        if (el.style.display !== 'none') { el.style.display = 'none'; hidden += 1; }
+      }
+      return hidden;
+    };
+    const first = hide();
+    new MutationObserver(() => hide()).observe(document.body, { childList: true, subtree: true });
+    return { hiddenAtFirst: first, keptChain: [...keep].map((el) => el.tagName + (el.id === '' ? '' : '#' + el.id)) };
+  })()`);
+  // The controls move only while the canvas holds focus (`locked || activeElement === canvas`), and
+  // headless Chrome cannot take pointer lock, so the canvas is clicked and focused explicitly. A
+  // first run skipped this, captured 120 byte-identical frames, and would have been a still wearing
+  // a clip's file name.
+  const box = await evaluate(`(() => { const c = document.querySelector('canvas'); if (c === null) return null; const r = c.getBoundingClientRect(); return { x: Math.round(r.x + r.width / 2), y: Math.round(r.y + r.height / 2) }; })()`);
+  if (box !== null) {
+    await send('Input.dispatchMouseEvent', { type: 'mousePressed', x: box.x, y: box.y, button: 'left', clickCount: 1 });
+    await send('Input.dispatchMouseEvent', { type: 'mouseReleased', x: box.x, y: box.y, button: 'left', clickCount: 1 });
+  }
+  await evaluate("document.querySelector('canvas')?.focus(); true");
+  results.focused = await evaluate("document.activeElement === document.querySelector('canvas')");
+  if (results.focused !== true) throw new Error('the canvas never took focus, so nothing would have moved');
+  // Hold the turn key down for the whole clip: one keydown, no keyup, so the turn never stutters.
+  await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', code: plan.turnKey ?? 'ArrowRight', key: plan.turnKey === 'ArrowLeft' ? 'ArrowLeft' : 'ArrowRight', windowsVirtualKeyCode: plan.turnKey === 'ArrowLeft' ? 37 : 39, nativeVirtualKeyCode: plan.turnKey === 'ArrowLeft' ? 37 : 39 });
+  results.stalls = [];
+  // One frame beyond the turn proves the loop closes: frame `frames` is a whole turn past frame 0,
+  // so it must be the same image. It is compared and then deleted, never shipped.
+  for (let frame = 0; frame <= frames; frame += 1) {
+    const expired = waitForVirtualTime();
+    await send('Emulation.setVirtualTimePolicy', { policy: 'advance', budget: dtSeconds * 1000 });
+    const ticked = await race(expired, 8000, 'virtual time');
+    if (ticked.timedOut) results.stalls.push({ frame, at: 'virtual time' });
+    let shot = await race(send('Page.captureScreenshot', { format: 'png' }), 15000, 'screenshot');
+    if (shot.timedOut) {
+      // A paused clock can leave the compositor with no new frame to hand over. Nudge it and retry
+      // once, and record that it happened rather than pretending the clip was captured cleanly.
+      results.stalls.push({ frame, at: 'screenshot' });
+      await send('Emulation.setVirtualTimePolicy', { policy: 'advance', budget: 1 });
+      shot = await race(send('Page.captureScreenshot', { format: 'png' }), 15000, 'screenshot retry');
+    }
+    if (shot.timedOut) throw new Error(`frame ${frame}: the page would not hand over a frame`);
+    const bytes = Buffer.from(shot.value.result.data, 'base64');
+    writeFileSync(join(plan.outDir, `frame-${String(frame).padStart(4, '0')}.png`), bytes);
+    const digest = createHash('sha256').update(bytes).digest('hex');
+    if (frame === 0) results.firstFrameSha256 = digest;
+    if (frame === 1 && digest === results.firstFrameSha256) {
+      // Refusing to write a still and call it a clip: if two consecutive frames are identical, the
+      // camera is not moving and every later frame will be the same one.
+      throw new Error('frames 0 and 1 are identical, so the camera is not moving');
+    }
+    if (frame === frames) {
+      results.loopFrameSha256 = digest;
+      results.loopsExactly = digest === results.firstFrameSha256;
+      rmSync(join(plan.outDir, `frame-${String(frame).padStart(4, '0')}.png`));
+    } else {
+      results.frames = frame + 1;
+    }
+  }
+  results.finalPose = await evaluate("document.querySelector('canvas') !== null");
+} catch (error) {
+  results.error = String(error);
+} finally {
+  writeFileSync(join(plan.outDir, 'clip.json'), JSON.stringify(results, null, 1));
+  ws.close();
+  chrome.kill('SIGTERM');
+  await sleep(500);
+  rmSync(profile, { recursive: true, force: true });
+}
+console.log(JSON.stringify(results).slice(0, 2000));
