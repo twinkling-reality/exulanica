@@ -1,0 +1,148 @@
+what the tile runtime's support sampler reads where the records state several heights
+
+container   11153540 bytes, sha256 93df0715f5b17284dd8cbf4d4116f54df9310d238ac7e41db7dc58670b91f8f9
+document    3381852 bytes
+tessellator 17, nav_envelope 35388d7849, 96745 walkable triangles
+envelope extent [250000, 0, -49] to [390000, 128000, 207]
+
+== the 6 walking-line points on tile (2, 0)'s midline, x 320000
+
+   street          curb             y  records               runtime    difference
+   Linden Terrace  2:right       2575      123                   123      0.000000
+   Linden Terrace  2:left       13500      163                162.44     -0.560000
+   Harbour Way     7:right      58500      163    162.40740740740742     -0.592593
+   Harbour Way     7:left       70300      146    145.80906260809408     -0.190937
+   Foundry Street  12:right    113700      146     145.8090626080941     -0.190937
+   Foundry Street  12:left     124800       96                    96      0.000000
+
+   records: [123, 163, 163, 146, 146, 96]
+   runtime: [123, 162.44, 162.407, 145.809, 145.809, 96]
+   records' differences between neighbours: [40, 0, -17, 0, -50]
+   runtime's differences between neighbours: [39.44, -0.033, -16.598, 0.0, -49.809]
+
+   the triangle each runtime height comes from, and whether its corners carry the
+   height the records state at that corner's own distance across the footway
+
+   y 2575 on curb 2:right:
+      (390000, 1000, 159) is the same the records' 159 at 3450 mm out
+      (390000, 4150, 87) is the same the records' 87 at 300 mm out
+      (250000, 4150, 87) is the same the records' 87 at 300 mm out
+   y 13500 on curb 2:left:
+      (320355, 13489, 162) is -1 against the records' 163 at 1939 mm out
+      (319549, 13514, 163) is the same the records' 163 at 1964 mm out
+      (319548, 13514, 163) is the same the records' 163 at 1964 mm out
+   y 58500 on curb 7:right:
+      (319646, 58511, 162) is -1 against the records' 163 at 1939 mm out
+      (319645, 58511, 162) is -1 against the records' 163 at 1939 mm out
+      (320516, 58484, 163) is the same the records' 163 at 1966 mm out
+   y 70300 on curb 7:left:
+      (334239, 69665, 139) is the same the records' 139 at 2115 mm out
+      (269413, 72556, 170) is the same the records' 170 at 5006 mm out
+      (261700, 72556, 170) is the same the records' 170 at 5006 mm out
+   y 113700 on curb 12:right:
+      (370587, 111444, 170) is the same the records' 170 at 5006 mm out
+      (305762, 114335, 139) is the same the records' 139 at 2115 mm out
+      (305761, 114335, 139) is the same the records' 139 at 2115 mm out
+   y 124800 on curb 12:left:
+      (250000, 125750, 115) is the same the records' 115 at 2200 mm out
+      (250000, 123850, 77) is the same the records' 77 at 300 mm out
+      (390000, 123850, 77) is the same the records' 77 at 300 mm out
+
+== every footway station the place states for this tile: 284
+   the heights the records state: {163: 107, 146: 101, 96: 38, 123: 38}
+   stations the runtime reads a surface at: 278
+   stations the runtime reads no surface at: 6
+
+   counted at a nanometre, which is far below anything the geometry means:
+   equal to the records:        76
+   runtime below by under 1 mm: 202
+   runtime above the records:   0
+   difference of 1 mm or more:  0
+   furthest below: -0.592593 mm
+
+   no surface at footway:2:left:24839 (286789, 13500), where the records state 163: no up-facing triangle's plan box holds it at all
+      nearest furniture: bench at (286789, 12397), 1103 mm
+      nearest tree: quercus_bicolor at (282437, 12734), 4419 mm
+   no surface at footway:2:left:74518 (336468, 13500), where the records state 163: no up-facing triangle's plan box holds it at all
+      nearest furniture: bench at (336468, 12397), 1103 mm
+      nearest tree: quercus_bicolor at (331607, 12734), 4921 mm
+   no surface at footway:7:right:41582 (303532, 58500), where the records state 163: no up-facing triangle's plan box holds it at all
+      nearest furniture: bench at (303532, 59603), 1103 mm
+      nearest tree: quercus_bicolor at (308393, 59266), 4921 mm
+   no surface at footway:7:right:41711 (303661, 58500), where the records state 163: no up-facing triangle's plan box holds it at all
+      nearest furniture: bench at (303532, 59603), 1111 mm
+      nearest tree: quercus_bicolor at (308393, 59266), 4794 mm
+   no surface at footway:7:right:91094 (353044, 58500), where the records state 163: no up-facing triangle's plan box holds it at all
+      nearest furniture: bench at (353211, 59603), 1116 mm
+      nearest tree: quercus_bicolor at (357563, 59266), 4583 mm
+   no surface at footway:7:right:91261 (353211, 58500), where the records state 163: no up-facing triangle's plan box holds it at all
+      nearest furniture: bench at (353211, 59603), 1103 mm
+      nearest tree: quercus_bicolor at (357563, 59266), 4419 mm
+
+== the whole midline, y 0 to 128000 every 50 mm: 2561 samples
+   samples with a surface: 941
+
+   y       0 to   14950  support, -49 to 198 mm
+   y   15000 to   57000  no surface (42050 mm)
+   y   57050 to   72550  support, -49 to 198 mm
+   y   72600 to  111400  no surface (38850 mm)
+   y  111450 to  126500  support, -49 to 170 mm
+   y  126550 to  126550  no surface (50 mm)
+   y  126600 to  127150  support, 0 to 0 mm
+   y  127200 to  127200  no surface (50 mm)
+   y  127250 to  128000  support, 0 to 0 mm
+== the 12 walking pieces the place's own predicate refuses, and the nodes they touch
+
+   the place states: ['footway corners that continue outside the place (6)', 'walking pieces that pass within a capsule radius of an obstruction (12)']
+
+   entrance:3442dd9a-7526-55cd-83da-203dc663c426
+   entrance:b5a29e30-3e02-5b01-a940-de1b38d20d4b
+   footway:2:left:24020
+   footway:2:left:24839  <- the runtime reads no surface here
+   footway:2:left:28024
+   footway:2:left:72062
+   footway:2:left:74518  <- the runtime reads no surface here
+   footway:2:left:76065
+   footway:7:right:40034
+   footway:7:right:41582  <- the runtime reads no surface here
+   footway:7:right:41711  <- the runtime reads no surface here
+   footway:7:right:44037
+   footway:7:right:88126
+   footway:7:right:91094  <- the runtime reads no surface here
+   footway:7:right:91261  <- the runtime reads no surface here
+   footway:7:right:92079
+
+   nodes those pieces touch: 16
+   of them, footway stations the runtime reads no surface at: 6
+   stations the runtime reads no surface at that these pieces do NOT touch: []
+
+== where support stops at each strip's far edge, asked a millimetre at a time
+
+   2:right    far edge y    1000: support from y    1000,    0 mm inside it, at z 159
+   2:left     far edge y   15300: support from y   14956,  344 mm inside it, at z 198
+   7:right    far edge y   56700: support from y   57044,  344 mm inside it, at z 198
+   7:left     far edge y   72900: support from y   72556,  344 mm inside it, at z 170
+   12:right   far edge y  111100: support from y  111444,  344 mm inside it, at z 170
+   12:left    far edge y  125750: support from y  125750,    0 mm inside it, at z 115
+
+== the midline again at 1 mm: 128001 samples, 262 stretches with no surface
+
+   stretches under 10 mm wide: 260, the widest of them 2 mm
+   stretches 10 mm or wider:   2
+   the narrow ones run from y 64 to y 127918, and the ones on a footway or a carriageway, which is y 1,000 to y 125,750, are: []
+
+   The number beside each is the least barycentric weight among the up-facing triangles
+   whose plan box holds the point. A weight of about -1e-16 is a point ON a shared edge,
+   where the surface is continuous and the sampler's inside test refuses both triangles
+   that share it. This line is x 320,000, which is a terrain grid line, so it lies along
+   such an edge for its whole length: the count is a property of this line, not a rate.
+
+   y      64: least weight -5.551e-17
+   y      66: least weight -5.551e-17
+   y      68: least weight -5.551e-17
+   y      70: least weight -5.551e-17
+   y     189: least weight -5.551e-17
+   ... 255 more, summarised next
+
+   260 of 260 are refused by a weight between -5.551e-17 and -5.551e-17
+

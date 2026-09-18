@@ -1,0 +1,491 @@
+"""Writes docs/artifacts/society/walking-lines-runtime.log.txt: what the tile runtime's own support
+sampler reads where the records state several different footway heights.
+
+Run from the repository root:
+
+    uv run python docs/artifacts/society/walking-lines-runtime.py.txt
+
+It generates corridor tile (2, 0)'s document, bakes it with the tessellator's own CLI, and asks
+`navEnvelopeSupport` for a height at each point. Everything it reports is one of two readings of one
+quantity, produced by code that shares nothing but the grammar's own numbers:
+
+    the records  `_Kerb.surface_z`, the society place's reading of a curb record, in Python
+    the runtime  `navEnvelopeSupport(...).surface.sample(...)`, the function the tile runtime
+                 builds its navigation world from, in TypeScript, over the baked container
+
+NOTHING HERE RE-IMPLEMENTS A SAMPLER. The one piece of TypeScript below that repeats the sampler's
+own inside test, to say WHICH triangle a height came from, is checked against the sampler at every
+point: the plane height of the triangle it picks must equal the height the sampler returned, exactly,
+or the point is reported as unresolved. A second implementation that disagreed silently would be
+worth less than none.
+
+THE FRAME IS THE PART TO GET WRONG. The records are `city_local`: x east, y north, z up, integer
+millimetres. `navEnvelopeSupport` answers in the renderer's metres, so every point is put through
+`tileToRenderer` and every height multiplied by 1,000 on the way back. The two are the same quantity
+only after that.
+
+It reads no clock and no network. It writes a container into a temporary directory and deletes it,
+so nothing about the machine it ran on reaches the log.
+"""
+
+from __future__ import annotations
+
+import json
+import subprocess
+import sys
+import tempfile
+from collections import Counter
+from pathlib import Path
+
+from exulanica.grammar.grammars.city.catalogs import load_city_catalogs
+from exulanica.grammar.grammars.city.document import document_bytes
+from exulanica.grammar.grammars.city.generation.corridor import (
+    CORRIDOR_BINDINGS,
+    CORRIDOR_CITY_IDENTITY,
+    CORRIDOR_LOD,
+    CORRIDOR_SEED,
+    CORRIDOR_TILE,
+)
+from exulanica.grammar.grammars.city.generation.tiles import (
+    city_records,
+    generate_city,
+    tile_document,
+)
+from exulanica.grammar.grammars.city.streetlife import StreetFurnitureRecord, StreetTreeRecord
+from exulanica.grammar.grammars.city.streets import (
+    CurbEdgeRecord,
+    StreetRecord,
+    StreetSegmentRecord,
+)
+from exulanica.grammar.grammars.city.tile import TILE_SIZE_MM
+from exulanica.world import society_city_place
+from exulanica.world.society_city_place import _Kerb, place_from_city_documents
+from exulanica.world.society_living import current_routine
+
+ROOT = Path(__file__).resolve().parents[3]
+TSX = ROOT / "web" / "node_modules" / ".bin" / "tsx"
+OUTPUT = Path(__file__).resolve().parent / "walking-lines-runtime.log.txt"
+
+#: The spacing the tile runtime resamples support at, in millimetres: `SUPPORT_SAMPLE_SPACING_M`.
+STEP_MM = 50
+
+_SAMPLER = """
+import { readFileSync } from 'node:fs';
+import { absoluteVertices, decodeOwd } from '<ROOT>/web/packages/loom-tess/src/core/owd.js';
+import {
+  navEnvelopeSupport,
+  tileToRenderer,
+} from '<ROOT>/web/packages/atlas-react/src/playcanvas/generated-tile/tile-navigation.js';
+
+const owd = decodeOwd(new Uint8Array(readFileSync(process.argv[2])));
+const projection = owd.projections.find((p) => p.header.name === 'nav_envelope');
+if (projection === undefined) throw new Error('the container carries no nav_envelope projection');
+const { surface, extent, triangles } = navEnvelopeSupport(projection);
+const vertices = absoluteVertices(projection);
+const at = (i) => [vertices[i * 3], vertices[i * 3 + 1], vertices[i * 3 + 2]];
+const cross2 = (ax, ay, bx, by) => ax * by - ay * bx;
+
+// Why a point the sampler called unsupported was refused: the least barycentric weight among the
+// up-facing triangles whose plan box holds it. A weight of about -1e-16 means the point lies on a
+// shared edge and the surface is continuous through it; a large negative means no triangle is near.
+function nearMiss(x, y) {
+  let best = null;
+  for (let c = 0; c < projection.index.length; c += 3) {
+    const a = at(projection.index[c]);
+    const b = at(projection.index[c + 1]);
+    const d = at(projection.index[c + 2]);
+    if (x < Math.min(a[0], b[0], d[0]) || x > Math.max(a[0], b[0], d[0])) continue;
+    if (y < Math.min(a[1], b[1], d[1]) || y > Math.max(a[1], b[1], d[1])) continue;
+    const area2 = cross2(b[0] - a[0], b[1] - a[1], d[0] - a[0], d[1] - a[1]);
+    if (area2 <= 0) continue;
+    const wa = cross2(b[0] - x, b[1] - y, d[0] - x, d[1] - y) / area2;
+    const wb = cross2(d[0] - x, d[1] - y, a[0] - x, a[1] - y) / area2;
+    const least = Math.min(wa, wb, 1 - wa - wb);
+    if (best === null || least > best) best = least;
+  }
+  return best;
+}
+
+// The sampler's own inside test, repeated only to NAME the triangle, and checked against it below.
+function covering(x, y, height) {
+  let best = null;
+  for (let c = 0; c < projection.index.length; c += 3) {
+    const a = at(projection.index[c]);
+    const b = at(projection.index[c + 1]);
+    const d = at(projection.index[c + 2]);
+    const area2 = cross2(b[0] - a[0], b[1] - a[1], d[0] - a[0], d[1] - a[1]);
+    if (area2 <= 0) continue;
+    const wa = cross2(b[0] - x, b[1] - y, d[0] - x, d[1] - y) / area2;
+    const wb = cross2(d[0] - x, d[1] - y, a[0] - x, a[1] - y) / area2;
+    const wc = 1 - wa - wb;
+    if (wa < 0 || wb < 0 || wc < 0) continue;
+    const z = wa * a[2] + wb * b[2] + wc * d[2];
+    if (best === null || z > best.z) best = { z, corners: [a, b, d] };
+  }
+  return best !== null && best.z === height ? best.corners : null;
+}
+
+const request = JSON.parse(readFileSync(process.argv[3], 'utf8'));
+const answer = (points, withTriangle, withNearMiss) => points.map(([x, y]) => {
+  const [rx, , rz] = tileToRenderer(x, y, 0);
+  const sample = surface.sample(rx, rz);
+  if (sample === null) return { x, y, z: null, triangle: null, nearMiss: withNearMiss ? nearMiss(x, y) : null };
+  const z = sample.height * 1000;
+  return { x, y, z, triangle: withTriangle ? covering(x, y, z) : null, nearMiss: null };
+});
+process.stdout.write(JSON.stringify({
+  triangles,
+  extent,
+  tessellator_version: owd.header.tessellator_version,
+  nav_envelope_triangle_digest: projection.header.triangle_digest,
+  stations: answer(request.stations, false, true),
+  walking: answer(request.walking, true, false),
+  line: answer(request.line, false, false),
+  edges: answer(request.edges, false, false),
+  fineLine: answer(request.fine_line, false, false),
+  fine: answer(request.fine, false, true),
+}));
+"""
+
+
+def _sample(container: Path, request: dict) -> dict:
+    with tempfile.TemporaryDirectory() as work:
+        program = Path(work) / "sample-support.ts"
+        program.write_text(_SAMPLER.replace("<ROOT>", str(ROOT)), encoding="utf-8")
+        asked = Path(work) / "points.json"
+        asked.write_text(json.dumps(request), encoding="utf-8")
+        result = subprocess.run(
+            [str(TSX), str(program), str(container.resolve()), str(asked)],
+            capture_output=True,
+            text=True,
+            cwd=ROOT / "web",
+        )
+    if result.returncode != 0:
+        raise AssertionError(f"sampling failed: {(result.stderr or result.stdout).strip()}")
+    return json.loads(result.stdout)
+
+
+def main() -> int:
+    tile_x, tile_y = CORRIDOR_TILE
+    x0, x1 = tile_x * TILE_SIZE_MM, (tile_x + 1) * TILE_SIZE_MM
+    y0, y1 = tile_y * TILE_SIZE_MM, (tile_y + 1) * TILE_SIZE_MM
+    midline = (x0 + x1) // 2
+
+    catalogs = tuple(load_city_catalogs())
+    records = city_records(
+        generate_city(
+            seed=CORRIDOR_SEED, subject_identity=CORRIDOR_CITY_IDENTITY, bindings=CORRIDOR_BINDINGS
+        )
+    )
+    segments = {r.identity: r for r in records if isinstance(r, StreetSegmentRecord)}
+    street_of = {
+        identity: street.name_text or street.name
+        for street in records
+        if isinstance(street, StreetRecord)
+        for identity in street.segment_identities
+    }
+    kerbs = {
+        (k := _Kerb(r, segments[r.segment_identity])).key: k
+        for r in records
+        if isinstance(r, CurbEdgeRecord)
+    }
+    document = tile_document(
+        records,
+        seed=CORRIDOR_SEED,
+        subject_identity=CORRIDOR_CITY_IDENTITY,
+        catalogs=catalogs,
+        tile_x=tile_x,
+        tile_y=tile_y,
+        lod=CORRIDOR_LOD,
+    )
+    # The place states only a COUNT of the walking pieces it finds within a capsule radius of an
+    # obstruction. To say WHICH, the producer's own predicate is watched while it runs, rather than
+    # a second copy of the rule being written here: a copy would agree until it mattered.
+    refused_pieces: list[tuple[tuple[int, int], tuple[int, int]]] = []
+    decided = society_city_place._Obstructions.blocks_walking
+
+    def watched(self, a, b):  # noqa: ANN001, ANN202
+        answer = decided(self, a, b)
+        if answer:
+            refused_pieces.append((tuple(a), tuple(b)))
+        return answer
+
+    society_city_place._Obstructions.blocks_walking = watched
+    try:
+        place = place_from_city_documents(
+            place_id="corridor-tile-2-0",
+            documents=[document],
+            routine=current_routine(),
+            catalogs=catalogs,
+        )
+    finally:
+        society_city_place._Obstructions.blocks_walking = decided
+    stations = [
+        (node["node_id"], node["position_mm"][0], node["position_mm"][1], node["support_z_mm"])
+        for node in place["nodes"]
+        if node["node_id"].startswith("footway:")
+    ]
+
+    met = []
+    for kerb in kerbs.values():
+        xs = [p[0] for p in kerb.points]
+        ys = [p[1] for p in kerb.points]
+        if min(ys) != max(ys) or not (y0 <= ys[0] <= y1) or not (min(xs) <= midline <= max(xs)):
+            continue
+        along = kerb.project((midline, ys[0]))[1]
+        reach = kerb.curb.kerb_width_mm + kerb.curb.footway_width_mm
+        away = 1 if kerb.footway(along)[1] > ys[0] else -1
+        met.append(
+            (
+                kerb.footway(along)[1],
+                kerb,
+                kerb.surface_z(along, kerb.offset),
+                ys[0] + away * reach,
+                -away,
+            )
+        )
+    met.sort()
+    # Walk inward from each strip's far edge, a millimetre at a time, until support is found.
+    edge_points = [
+        [midline, far + inward * step]
+        for _walk, _kerb, _z, far, inward in met
+        for step in range(0, 1_001)
+    ]
+
+    with tempfile.TemporaryDirectory() as work:
+        path = Path(work) / "tile.json"
+        path.write_bytes(document_bytes(document))
+        container = Path(work) / "tile.owd"
+        bake = subprocess.run(
+            [str(TSX), "packages/loom-tess/src/node/cli.ts", "bake", str(path), str(container)],
+            capture_output=True,
+            text=True,
+            cwd=ROOT / "web",
+        )
+        if bake.returncode != 0:
+            raise AssertionError(f"the bake failed: {(bake.stderr or bake.stdout).strip()}")
+        baked = json.loads(bake.stdout)
+        read = _sample(
+            container,
+            {
+                "stations": [[x, y] for _id, x, y, _z in stations],
+                "walking": [[midline, walk_y] for walk_y, _kerb, _z, _far, _inward in met],
+                "edges": edge_points,
+                "line": [[midline, y] for y in range(y0, y1 + 1, STEP_MM)],
+                "fine_line": [[midline, y] for y in range(y0, y1 + 1)],
+                "fine": [],
+            },
+        )
+        # An isolated sample with no surface, between two that have one, is either a real hole a
+        # millimetre wide or a point the sampler refused. Ask why, rather than assume either.
+        fine = read["fineLine"]
+        gaps: list[list[int]] = []
+        for row in fine:
+            if row["z"] is not None:
+                continue
+            if gaps and row["y"] - gaps[-1][1] == 1:
+                gaps[-1][1] = row["y"]
+            else:
+                gaps.append([row["y"], row["y"]])
+        narrow = [gap for gap in gaps if gap[1] - gap[0] < 10]
+        refused = _sample(container, {
+            "stations": [], "walking": [], "line": [], "edges": [], "fine_line": [],
+            "fine": [[midline, gap[0]] for gap in narrow],
+        })["fine"]
+
+    lines = [
+        "what the tile runtime's support sampler reads where the records state several heights",
+        "",
+        f"container   {baked['byte_size']} bytes, sha256 {baked['container_sha256']}",
+        f"document    {len(document_bytes(document))} bytes",
+        f"tessellator {read['tessellator_version']}, nav_envelope"
+        f" {read['nav_envelope_triangle_digest'][:10]}, {read['triangles']} walkable triangles",
+        f"envelope extent {read['extent']['min']} to {read['extent']['max']}",
+        "",
+        f"== the {len(met)} walking-line points on tile ({tile_x}, {tile_y})'s midline, x {midline}",
+        "",
+        f"   {'street':16}{'curb':10}{'y':>8}{'records':>9}{'runtime':>22}{'difference':>14}",
+    ]
+    for (walk_y, kerb, stated, _far, _inward), answer in zip(met, read["walking"], strict=True):
+        got = answer["z"]
+        lines.append(
+            f"   {street_of[kerb.curb.segment_identity]:16}{kerb.key:10}{walk_y:8}{stated:9}"
+            f"{'no surface' if got is None else repr(got):>22}"
+            f"{'' if got is None else format(got - stated, '14.6f')}"
+        )
+    heights = [a["z"] for a in read["walking"]]
+    stated = [m[2] for m in met]
+    lines += [
+        "",
+        f"   records: {stated}",
+        f"   runtime: {[None if h is None else round(h, 3) for h in heights]}",
+        f"   records' differences between neighbours: {[b - a for a, b in zip(stated, stated[1:])]}",
+        "   runtime's differences between neighbours: "
+        f"{[None if None in (a, b) else round(b - a, 3) for a, b in zip(heights, heights[1:])]}",
+        "",
+        "   the triangle each runtime height comes from, and whether its corners carry the",
+        "   height the records state at that corner's own distance across the footway",
+        "",
+    ]
+    for (walk_y, kerb, _z, _far, _inward), answer in zip(met, read["walking"], strict=True):
+        if answer["triangle"] is None:
+            lines.append(f"   y {walk_y}: unresolved, or no surface")
+            continue
+        kerb_y = kerb.points[0][1]
+        xs = sorted(p[0] for p in kerb.points)
+        lines.append(f"   y {walk_y} on curb {kerb.key}:")
+        for cx, cy, cz in answer["triangle"]:
+            if not (xs[0] <= cx <= xs[-1]):
+                lines.append(f"      ({cx}, {cy}, {cz}) is off this kerb line in x, not asked")
+                continue
+            there = kerb.surface_z(cx - xs[0], abs(cy - kerb_y))
+            same = "the same" if there == cz else f"{cz - there:+d} against"
+            lines.append(
+                f"      ({cx}, {cy}, {cz}) is {same} the records' {there}"
+                f" at {abs(cy - kerb_y)} mm out"
+            )
+    lines.append("")
+
+    furniture = [r for r in records if isinstance(r, StreetFurnitureRecord)]
+    trees = [r for r in records if isinstance(r, StreetTreeRecord)]
+    got = read["stations"]
+    pairs = [(s, a) for s, a in zip(stations, got, strict=True)]
+    absent = [(s, a) for s, a in pairs if a["z"] is None]
+    present = [(s, a) for s, a in pairs if a["z"] is not None]
+    differences = [a["z"] - s[3] for s, a in present]
+    lines += [
+        f"== every footway station the place states for this tile: {len(pairs)}",
+        f"   the heights the records state: "
+        f"{dict(Counter(s[3] for s, _ in pairs).most_common())}",
+        f"   stations the runtime reads a surface at: {len(present)}",
+        f"   stations the runtime reads no surface at: {len(absent)}",
+        "",
+        "   counted at a nanometre, which is far below anything the geometry means:",
+        f"   equal to the records:        {sum(1 for d in differences if abs(d) < 1e-9)}",
+        f"   runtime below by under 1 mm: {sum(1 for d in differences if -1 < d <= -1e-9)}",
+        f"   runtime above the records:   {sum(1 for d in differences if d > 1e-9)}",
+        f"   difference of 1 mm or more:  {sum(1 for d in differences if abs(d) >= 1)}",
+        f"   furthest below: {min(differences):.6f} mm",
+        "",
+    ]
+    for (node_id, x, y, z), answer in absent:
+        miss = answer["nearMiss"]
+        why = (
+            "no up-facing triangle's plan box holds it at all"
+            if miss is None
+            else f"nearest triangle's least weight {miss:.3e}"
+        )
+        lines.append(
+            f"   no surface at {node_id} ({x}, {y}), where the records state {z}: {why}"
+        )
+        for label, candidates in (("furniture", furniture), ("tree", trees)):
+            gap, nearest = min(
+                (round((((r.x_mm - x) ** 2 + (r.y_mm - y) ** 2) ** 0.5), 0), r)
+                for r in candidates
+            )
+            named = getattr(nearest, "furniture_class", None) or getattr(nearest, "species", "")
+            lines.append(f"      nearest {label}: {named} at ({nearest.x_mm}, {nearest.y_mm}), {gap:.0f} mm")
+    lines.append("")
+
+    walked = read["line"]
+    runs: list[list] = []
+    for row in walked:
+        on = row["z"] is not None
+        if not runs or runs[-1][2] != on:
+            runs.append([row["y"], row["y"], on])
+        else:
+            runs[-1][1] = row["y"]
+    lines += [
+        f"== the whole midline, y {y0} to {y1} every {STEP_MM} mm: {len(walked)} samples",
+        f"   samples with a surface: {sum(1 for r in walked if r['z'] is not None)}",
+        "",
+    ]
+    for a, b, on in runs:
+        if on:
+            heights_here = [r["z"] for r in walked if a <= r["y"] <= b]
+            lines.append(
+                f"   y {a:7} to {b:7}  support, {min(heights_here):.0f} to"
+                f" {max(heights_here):.0f} mm"
+            )
+        else:
+            lines.append(f"   y {a:7} to {b:7}  no surface ({b - a + STEP_MM} mm)")
+    named: dict[tuple[int, int], list[str]] = {}
+    for node in place["nodes"]:
+        named.setdefault(tuple(node["position_mm"]), []).append(node["node_id"])
+    touched = sorted({n for pair in refused_pieces for point in pair for n in named.get(point, [])})
+    with_no_surface = {node_id for (node_id, _x, _y, _z), _a in absent}
+    lines += [
+        f"== the {len(refused_pieces)} walking pieces the place's own predicate refuses,"
+        " and the nodes they touch",
+        "",
+        f"   the place states: {place['unsupported']}",
+        "",
+    ]
+    for node_id in touched:
+        mark = "  <- the runtime reads no surface here" if node_id in with_no_surface else ""
+        lines.append(f"   {node_id}{mark}")
+    lines += [
+        "",
+        f"   nodes those pieces touch: {len(touched)}",
+        f"   of them, footway stations the runtime reads no surface at: "
+        f"{sum(1 for n in touched if n in with_no_surface)}",
+        f"   stations the runtime reads no surface at that these pieces do NOT touch: "
+        f"{sorted(with_no_surface - set(touched))}",
+        "",
+        "== where support stops at each strip's far edge, asked a millimetre at a time",
+        "",
+    ]
+    for index, (_walk, kerb, _z, far, inward) in enumerate(met):
+        scan = read["edges"][index * 1_001 : (index + 1) * 1_001]
+        first = next((row for row in scan if row["z"] is not None), None)
+        if first is None:
+            lines.append(f"   {kerb.key:10} far edge y {far:7}: no support within 1,000 mm inside it")
+            continue
+        lines.append(
+            f"   {kerb.key:10} far edge y {far:7}: support from y {first['y']:7},"
+            f" {abs(first['y'] - far):4} mm inside it, at z {first['z']:.0f}"
+        )
+    lines.append("")
+
+    lines += [
+        f"== the midline again at 1 mm: {len(fine)} samples, {len(gaps)} stretches with no surface",
+        "",
+        f"   stretches under 10 mm wide: {len(narrow)}, the widest of them"
+        f" {max((g[1] - g[0] + 1 for g in narrow), default=0)} mm",
+        f"   stretches 10 mm or wider:   {len(gaps) - len(narrow)}",
+        f"   the narrow ones run from y {min((g[0] for g in narrow), default=0)} to"
+        f" y {max((g[1] for g in narrow), default=0)}, and the ones on a footway or a"
+        f" carriageway, which is y 1,000 to y 125,750, are:"
+        f" {[g for g in narrow if 1_000 <= g[0] <= 125_750]}",
+        "",
+        "   The number beside each is the least barycentric weight among the up-facing triangles",
+        "   whose plan box holds the point. A weight of about -1e-16 is a point ON a shared edge,",
+        "   where the surface is continuous and the sampler's inside test refuses both triangles",
+        "   that share it. This line is x 320,000, which is a terrain grid line, so it lies along",
+        "   such an edge for its whole length: the count is a property of this line, not a rate.",
+        "",
+    ]
+    for row in refused[:5]:
+        miss = row["nearMiss"]
+        lines.append(
+            f"   y {row['y']:7}: "
+            + ("no up-facing triangle's plan box holds it" if miss is None
+               else f"least weight {miss:.3e}")
+        )
+    lines.append(f"   ... {max(0, len(refused) - 5)} more, summarised next")
+    weights = [row["nearMiss"] for row in refused if row["nearMiss"] is not None]
+    if weights:
+        lines.append("")
+        lines.append(
+            f"   {len(weights)} of {len(refused)} are refused by a weight between"
+            f" {min(weights):.3e} and {max(weights):.3e}"
+        )
+    lines.append("")
+
+    OUTPUT.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(OUTPUT, len(OUTPUT.read_bytes()), "bytes")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

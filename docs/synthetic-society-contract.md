@@ -736,6 +736,77 @@ a gap in support near those two y values is the tree carve and is expected. Both
 on those two curbs are 1,923 mm from the nearer trunk, which is clear of the 1,153 mm the record
 states as that tree's exclusion radius even before a capsule radius is added to it.
 
+**What it read. The surface steps with the records.** Both halves of the signature hold. Measured by
+[walking-lines-runtime.py.txt](artifacts/society/walking-lines-runtime.py.txt), whose
+[log](artifacts/society/walking-lines-runtime.log.txt) is where these numbers are read from, over a
+container it bakes: 11,153,540 bytes, sha256 `93df0715f5`, tessellator 17, `nav_envelope`
+`35388d7849`, 96,745 walkable triangles.
+
+| curb | walking line y | records | the runtime | difference |
+| --- | --- | --- | --- | --- |
+| Linden Terrace 2 right | 2,575 | 123 | 123 | 0 |
+| Linden Terrace 2 left | 13,500 | 163 | 162.440 | -0.560 |
+| Harbour Way 7 right | 58,500 | 163 | 162.407 | -0.593 |
+| Harbour Way 7 left | 70,300 | 146 | 145.809 | -0.191 |
+| Foundry Street 12 right | 113,700 | 146 | 145.809 | -0.191 |
+| Foundry Street 12 left | 124,800 | 96 | 96 | 0 |
+
+The records' differences between neighbours are 40, 0, -17, 0, -50; the runtime's are 39.44, -0.03,
+-16.60, 0.00, -49.81. Every height and every difference is inside the millimetre the signature
+allowed, so the runtime is not standing a walker at one height the records do not state: it carries
+the step at each street and the level stretch across each block.
+
+**The population, so one line cannot decide it.** All 284 footway stations the place states for this
+tile, over six curbs and four stated heights. The runtime reads a surface at 278 of them. Counted at
+a nanometre, which is far below anything the geometry means: 76 equal, 202 below by under a
+millimetre, none above, none differing by a millimetre or more, furthest below 0.593 mm.
+
+**Where the fraction of a millimetre comes from, read out of the container rather than assumed.** The
+log names the triangle each of the six heights comes from and asks the records what the footway
+surface is at each of its corners. Fifteen of the eighteen corners carry exactly the height the
+records state at that corner's own distance across the footway; the other three are a millimetre
+below, and all three belong to the two small triangles the carve left beside an obstruction, whose
+heights the carve floors. So the deficit is interpolation between floored integers and nothing else.
+Where the covering triangle spans the strip's own two edges, and the walking line is the middle of
+the strip, the arithmetic lands on an integer and the two readings are equal rather than close: that
+is the 123 and the 96.
+
+**Six stations the runtime reads no surface at, and the place says so first.** All six are on the two
+curbs whose walking line is 163, each about 1.1 m from a bench. The place's own obstruction predicate
+refuses 12 walking pieces, and the nodes those pieces touch include all six and every one of them: no
+station the runtime refuses is outside that set. None of the six carries a standing spot, so the
+place already walks through them rather than standing anybody there, which is what the contract says
+it does. Two implementations in two languages, sharing the grammar's numbers and no code, put the
+same six points out of reach of a body.
+
+**The gap this line was told to expect did not appear.** The parameters said a break in support near
+y 68,549 and y 115,451 would be the tree carve. There is none: support runs unbroken from y 57,050 to
+y 72,550 and from y 111,450 to y 126,500 at the 50 mm step, and the millimetre pass finds no stretch
+without support anywhere between y 1,000 and y 125,750. The line passes 795 mm from each of those two
+trunks and 18 mm outside the nearer one's pit, so it misses the carve rather than showing there is
+none. An expectation written down and not met is reported here because it was written down.
+
+**What else the line shows.** The camber crowns at y 8,000, 64,000 and 120,000, the three streets'
+own centrelines. Support stops 344 mm inside the strip's far edge at each of the four edges a
+building frontage stands on, and 0 mm at the two that are not frontages, where open ground carries
+on. 344 is the capsule's 340 mm radius plus the carve's integer stepping, measured here from a
+second direction.
+
+**A defect in the sampler, found on the way, which is not about heights.** At a plan point lying
+exactly on an edge two envelope triangles share, `navEnvelopeSupport` returns no surface: the
+barycentric weight comes out at -5.551e-17 instead of 0 and both triangles are refused. Its own
+comment says that a point on an edge belongs to the triangle. At 1 mm this line has 260 such
+stretches, all 1 or 2 mm wide, every one refused by that same weight, all on flat ground at z 0 and
+none between y 1,000 and y 125,750, which is every footway and carriageway the line crosses. The
+count is a property of THIS line: x 320,000 is a terrain grid line, so the line lies along a shared
+edge for its whole length. It belongs to the tile runtime rather than to this producer, and it is
+recorded here rather than changed here.
+
+**What this does not answer.** Whether a walker can WALK the steps. 40 mm and 50 mm are inside the
+180 mm a walking edge may climb and inside the 0.18 m the movement rule allows, but neither number
+was exercised by a moving body here; this is the surface, not the controller. And the seven walking
+lines this line does not reach, 125, 137, 151, 155, 158, 159 and 167, are still only stated.
+
 ## Traffic boundary
 
 Cars likewise remain outside the pedestrian implementation. A future traffic producer must supply
