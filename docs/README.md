@@ -27,7 +27,8 @@ and what remains. [world-memory-package.md](world-memory-package.md) is the port
 package profile.
 
 **Build or extend it.** [architecture-overview.md](architecture-overview.md) sections
-1 to 3 for system shape. [model-and-service-selection.md](model-and-service-selection.md)
+1 to 3 for system shape. [documentation-standard.md](documentation-standard.md) for
+how documents, comments, and docstrings name things. [model-and-service-selection.md](model-and-service-selection.md)
 section 0 for the implemented model stack; sections 1 to 8 are historical rationale.
 [domain-and-evidence-model.md](domain-and-evidence-model.md) sections 1 and 4 for the
 evidence address and schema. [runtime-verification.md](runtime-verification.md) before
@@ -166,6 +167,9 @@ belongs in [product-direction.md](product-direction.md). Quote a suite count onl
 a date and a commit, or do not quote one.
 
 ## Conventions
+
+Prose follows [documentation-standard.md](documentation-standard.md): identify a
+thing by what it is, not by when you looked at it.
 
 Every claim carries exactly one epistemic status:
 
