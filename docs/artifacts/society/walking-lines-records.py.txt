@@ -77,6 +77,20 @@ def main() -> int:
     lines.append(f"   lowest {min(walking)} mm, highest {max(walking)} mm")
     varying = [k.key for k in kerbs if len({k.footway_z(a) for a in range(0, k.length + 1, 500)}) > 1]
     lines.append(f"   curbs whose walking line is not constant along their own length: {varying}")
+    paired: dict[int, dict[str, int]] = {}
+    for kerb in kerbs:
+        paired.setdefault(kerb.segment.segment_ordinal, {})[kerb.curb.side] = kerb.footway_z(0)
+    gaps = {
+        ordinal: abs(sides["left"] - sides["right"])
+        for ordinal, sides in paired.items()
+        if len(sides) == 2
+    }
+    lines.append(
+        f"   segments carrying both curbs: {len(gaps)}; the two walking lines differ by"
+        f" {min(gaps.values())} mm at the closest and {max(gaps.values())} mm at the widest"
+    )
+    lines.append(f"   segments whose two curbs are the same height: "
+                 f"{sorted(o for o, g in gaps.items() if g == 0)}")
     lines.append("")
 
     # The curbs the midline meets: an east-west kerb line, inside the tile's y span, whose x span

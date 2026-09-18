@@ -651,11 +651,12 @@ figures above are main-thread work, not intervals.
 
 `exulanica.society-place/v2` states beside each node the height of the surface a person stands on,
 taken from the records. The corridor's records state many heights: eleven distinct footway walking
-lines from 96 to 167 mm across its 46 curbs, and the two curbs of one street segment can differ by
-50 mm. Every walk taken on this city has run ALONG one curb's footway, where the walking line is
-constant along its whole length, so no measurement yet separates a runtime whose surface carries
-the heights the records state from one that stands a walker at a single height the records do not
-state anywhere.
+lines from 96 to 167 mm across its 46 curbs, no curb's line varying along its own length, and the
+two curbs of one street segment differing on all 23 segments, by 2 mm at the closest and 63 mm at
+the widest. The only walk whose parameters this repository states runs east ALONG one curb's
+footway, at a constant height, so no measurement yet separates a runtime whose surface carries the
+heights the records state from one that stands a walker at a single height the records do not state
+anywhere.
 
 The parameters, the expected heights and the response to each outcome below are committed before
 the container is baked and before anything is sampled, so that what is reported afterwards has
@@ -735,6 +736,13 @@ trunk at y 68,549 and 795 mm west of another at y 115,451, and 18 mm east of the
 a gap in support near those two y values is the tree carve and is expected. Both walking-line points
 on those two curbs are 1,923 mm from the nearer trunk, which is clear of the 1,153 mm the record
 states as that tree's exclusion radius even before a capsule radius is added to it.
+
+**Two sentences of the paragraph above were corrected after the run, and neither is a parameter.**
+It said the two curbs of a segment "can differ by 50 mm", which is what this line crosses and not
+what the street states: all 23 segments differ, from 2 mm to 63 mm. And it said every walk taken on
+this city had run along one curb, which is not something this lane can produce; what it can produce
+is that the only walk whose parameters the repository states does. The line, the step, the six
+heights, the signature and the responses are as committed.
 
 **What it read. The surface steps with the records.** Both halves of the signature hold. Measured by
 [walking-lines-runtime.py.txt](artifacts/society/walking-lines-runtime.py.txt), whose

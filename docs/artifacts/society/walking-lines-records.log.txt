@@ -7,6 +7,8 @@ tile (2, 0) spans x 256000 to 384000, y 0 to 128000; its midline is x 320000
    {96: 5, 123: 5, 125: 3, 137: 4, 146: 8, 151: 3, 155: 3, 158: 4, 159: 4, 163: 4, 167: 3}
    lowest 96 mm, highest 167 mm
    curbs whose walking line is not constant along their own length: []
+   segments carrying both curbs: 23; the two walking lines differ by 2 mm at the closest and 63 mm at the widest
+   segments whose two curbs are the same height: []
 
 == the 6 curbs the midline meets, south to north
    their shared x span is 261950 to 378050, whose midpoint is 320000
