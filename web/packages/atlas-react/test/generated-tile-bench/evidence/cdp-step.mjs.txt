@@ -1,0 +1,81 @@
+// Capture by STEPPING THE PAGE, not by stepping a clock: the page exposes a session whose step(dt)
+// updates, draws and reads one frame in a single task, so nothing here waits on a compositor.
+import { spawn } from 'node:child_process';
+import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+const plan = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+mkdirSync(plan.outDir, { recursive: true });
+const profile = mkdtempSync(join(tmpdir(), 'cdp-step-'));
+const port = 9400 + Math.floor(Math.random() * 190);
+const chrome = spawn('/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', [
+  '--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`,
+  `--window-size=${plan.width},${plan.height}`, '--hide-scrollbars', '--no-first-run',
+  '--enable-unsafe-swiftshader', 'about:blank'], { stdio: 'ignore' });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+let targets;
+for (let i = 0; i < 80; i++) { try { targets = await (await fetch(`http://127.0.0.1:${port}/json`)).json(); break; } catch { await sleep(250); } }
+const ws = new WebSocket(targets.find((t) => t.type === 'page').webSocketDebuggerUrl);
+await new Promise((r) => ws.addEventListener('open', r, { once: true }));
+let id = 0; const pending = new Map();
+ws.addEventListener('message', (e) => { const m = JSON.parse(e.data); if (pending.has(m.id)) { pending.get(m.id)(m); pending.delete(m.id); } });
+const send = (method, params = {}) => new Promise((res) => { const n = ++id; pending.set(n, res); ws.send(JSON.stringify({ id: n, method, params })); });
+const evaluate = async (expression) => {
+  const r = await send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true });
+  if (r.result?.exceptionDetails) throw new Error(`${expression.slice(0, 70)}: ${r.result.exceptionDetails.exception?.description}`);
+  return r.result?.result?.value;
+};
+const results = { frames: 0, dtSeconds: plan.dtSeconds ?? 1 / 30 };
+try {
+  await send('Runtime.enable'); await send('Page.enable'); await send('Emulation.enable');
+  await send('Emulation.setFocusEmulationEnabled', { enabled: true });
+  await send('Emulation.setDeviceMetricsOverride', { width: plan.width, height: plan.height, deviceScaleFactor: 1, mobile: false });
+  await send('Page.navigate', { url: plan.url });
+  const by = Date.now() + (plan.readyTimeoutMs ?? 240000);
+  for (;;) {
+    let ready = false;
+    try { ready = await evaluate(plan.readyExpression); } catch { ready = false; }
+    if (ready === true) break;
+    if (Date.now() > by) throw new Error('page never became ready');
+    await sleep(1000);
+  }
+  await sleep(plan.settleMs ?? 5000);
+  results.hidden = await evaluate(`(() => {
+    const canvas = document.getElementById('atlas');
+    if (canvas === null) return 'no atlas canvas';
+    const keep = new Set();
+    for (let el = canvas; el !== null; el = el.parentElement) keep.add(el);
+    const hide = () => { let n = 0; for (const el of document.querySelectorAll('body *')) { if (keep.has(el) || canvas.contains(el)) continue; if (el.style.display !== 'none') { el.style.display = 'none'; n += 1; } } return n; };
+    const first = hide();
+    new MutationObserver(() => hide()).observe(document.body, { childList: true, subtree: true });
+    return first;
+  })()`);
+  await evaluate("document.getElementById('atlas')?.focus(); true");
+  results.focused = await evaluate("document.activeElement === document.getElementById('atlas')");
+  if (results.focused !== true) throw new Error('the canvas never took focus, so nothing would have moved');
+  if (plan.holdKey) {
+    const codes = { KeyW: [87, 'w'], ArrowRight: [39, 'ArrowRight'], ArrowLeft: [37, 'ArrowLeft'] };
+    const [code, key] = codes[plan.holdKey] ?? codes.KeyW;
+    await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', code: plan.holdKey, key, windowsVirtualKeyCode: code, nativeVirtualKeyCode: code });
+  }
+  const began = await evaluate("(() => { const make = window.__exulanicaTileCapture; if (typeof make !== 'function') return 'the page exposes no capture hook'; const session = make(); if (typeof session === 'string') return session; window.__session = session; return 'ready'; })()");
+  if (began !== 'ready') throw new Error(`capture refused: ${began}`);
+  for (let frame = 0; frame < plan.frames; frame += 1) {
+    const url = await evaluate(`window.__session.step(${results.dtSeconds})`);
+    if (typeof url !== 'string' || !url.startsWith('data:image/png;base64,')) throw new Error(`frame ${frame}: the page answered ${String(url).slice(0, 60)}`);
+    const bytes = Buffer.from(url.slice('data:image/png;base64,'.length), 'base64');
+    writeFileSync(join(plan.outDir, `frame-${String(frame).padStart(4, '0')}.png`), bytes);
+    const digest = createHash('sha256').update(bytes).digest('hex');
+    if (frame === 0) results.firstFrameSha256 = digest;
+    if (frame === 1 && digest === results.firstFrameSha256) throw new Error('frames 0 and 1 are identical, so nothing is moving');
+    results.frames = frame + 1;
+  }
+  await evaluate('window.__session.end(); true');
+} catch (error) {
+  results.error = String(error);
+} finally {
+  writeFileSync(join(plan.outDir, 'capture.json'), JSON.stringify(results, null, 1));
+  ws.close(); chrome.kill('SIGTERM'); await sleep(400); rmSync(profile, { recursive: true, force: true });
+}
+console.log(JSON.stringify(results).slice(0, 1200));
