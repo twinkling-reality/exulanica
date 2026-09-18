@@ -28,10 +28,10 @@ import {
   sortList,
 } from './support.js';
 
-/** Over `test/fixtures/tile-conformance.json`, tessellator 11, digest profile v3. */
+/** Over `test/fixtures/tile-conformance.json`, tessellator 12, digest profile v3. */
 const GOLDEN = {
-  render_batch: 'b8b22162f80e0e28302ef59a7982d8e8517241bb14edadbf9dac1ba67fe43f84',
-  nav_envelope: 'd0a4b090ffdba3c7f0883c42e53042a68bf9e242da94925d055f60ce8e868ce3',
+  render_batch: '70ca86e97e4221fbe691c6732af7ca372b68ec1d4edb5c32118c8bbb0c22efdc',
+  nav_envelope: 'b7baf414ab9a2df06439efea94a997cc327e6bc55a7ccdd4a51d69b86150d154',
 } as const;
 
 afterEach(() => {
@@ -160,10 +160,10 @@ describe('the triangle digest of the conformance fixture', () => {
     const drawnTerrain = renderBatch!.header.entries[terrain]!;
     expect(drawnTerrain).toMatchObject({
       state: 'drawn',
-      first_vertex: 2933,
-      vertex_count: 1524,
-      triangle_count: 1069,
-      surfaces: [{ role: 'terrain', orientation: 'horizontal', material: { state: 'none-exists' }, triangle_count: 1069 }],
+      first_vertex: 2805,
+      vertex_count: 829,
+      triangle_count: 690,
+      surfaces: [{ role: 'terrain', orientation: 'horizontal', material: { state: 'none-exists' }, triangle_count: 690 }],
     });
     // The building draws, so the ground it stands on is the building's and not the terrain's: its
     // base ring is cut out of the patch by the same yield rule the segments' surfaces are.
@@ -214,7 +214,7 @@ describe('the triangle digest of the conformance fixture', () => {
     const nav = navEnvelope!.header.entries.map((entry) => entry.state);
     expect(count(nav, 'drawn')).toBe(11);
     expect(count(nav, 'halo')).toBe(grammar.halo.length);
-    expect(navEnvelope!.header.entries[terrain]).toMatchObject({ state: 'drawn', vertex_count: 1874, triangle_count: 2218 });
+    expect(navEnvelope!.header.entries[terrain]).toMatchObject({ state: 'drawn', vertex_count: 1446, triangle_count: 1781 });
     expect(navEnvelope!.surfaceMm).toBeUndefined();
 
     // Halo is exactly what the document lists as halo.

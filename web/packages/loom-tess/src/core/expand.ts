@@ -52,7 +52,7 @@ import type { CoveringTriangle, TerrainPatch } from './terrain-yield.js';
  * Bumped whenever an expander, a statement, a contract or the materialised projection set
  * changes, because each changes the bytes a bake writes. The bake stage's parameters carry it.
  */
-export const TESSELLATOR_SOURCE_VERSION = 11;
+export const TESSELLATOR_SOURCE_VERSION = 12;
 
 /**
  * What each materialised projection preserves and what it may be used for, as separate rows, the

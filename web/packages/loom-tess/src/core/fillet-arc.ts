@@ -95,6 +95,9 @@ function isPowerOfTwo(count: number): boolean {
   return true;
 }
 
+/** A bound on how far inside its circle the corner rule's flooring can place a point. */
+const CORNER_ROUNDING_MM = 2;
+
 /** The centre of the fillet from `P` along `into` to `Q` along `out`, by the rule's second step. */
 export function filletCentre(p: Space, into: Plan, q: Space, out: Plan, radius: number, where: string): Plan {
   if (!Number.isSafeInteger(radius)) throw new GeometryError(`${where} has a radius that is not an integer`);
@@ -147,6 +150,16 @@ export function filletArc(
  * within `maximumSagittaMm` of the circle: `4 * (r - s)^2 <= |u + v|^2` for each chord's plan
  * vectors `u` and `v` from the centre, which is the chord's midpoint at least `r - s` from it,
  * exactly. Refused when no count up to the maximum does.
+ *
+ * THE POINTS THEMSELVES ARE ROUNDED, and the test allows for it. The corner rule places a point by
+ * flooring each axis, so a point it places lies up to the diagonal of one millimetre INSIDE its
+ * circle, whatever the chord count. A test against `r - s` alone is therefore unsatisfiable
+ * wherever that rounding exceeds the sagitta: the chords shrink toward a midpoint distance of the
+ * point radius, not of `r`, and no count converges. That is not a geometry with no answer, it is a
+ * criterion asking integer points to sit closer to a circle than integers can. So the reach is
+ * `r - s - 2`, the two millimetres being a bound on that diagonal, and what the caller gets is a
+ * chord within the stated sagitta PLUS the corner rule's own rounding. A corner that genuinely has
+ * no arc is still refused, by `filletCentre`, before this runs.
  */
 export function filletSegmentsWithin(
   p: Space,
@@ -162,7 +175,7 @@ export function filletSegmentsWithin(
   if (!Number.isSafeInteger(maximumSagittaMm)) throw new GeometryError(`${where} has a sagitta that is not an integer`);
   if (maximumSagittaMm < 0) throw new GeometryError(`${where} has a negative sagitta`);
   const centre = filletCentre(p, into, q, out, radius, where);
-  const reach = subtract(radius, maximumSagittaMm, where);
+  const reach = subtract(subtract(radius, maximumSagittaMm, where), CORNER_ROUNDING_MM, where);
   // A sagitta as large as the radius admits any chord short of a half circle.
   if (reach <= 0) return 1;
   const doubledReach = multiply(reach, 2, where);
