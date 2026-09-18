@@ -22,11 +22,14 @@
  *      least that distance from the corner, which is checked exactly, not assumed.
  *
  * Every test is an integer comparison, and a distance is compared as a square, in BigInt: nothing
- * here can round. What the pieces leave out is nothing. What they cover beyond the true region is
- * under five millimetres, whatever the radius: a band's two millimetres of overhang, a step that
- * passes its distance by under a millimetre and a half, a corner's millimetre of margin, and the
- * diagonal of an overhang against a step. That is the stated cost of covering an arc with integer
- * points, and it is absolute, so at a capsule's radius it is under two parts in a hundred.
+ * here can round.
+ *
+ * WHAT IT COVERS BEYOND THE TRUE REGION is `CLEARANCE_REACH_MM`, which is the sum of the parts
+ * below rather than a number written down beside them. It is absolute rather than proportional, so
+ * at a capsule's radius it is under two parts in a hundred, and at a small radius it is most of the
+ * region. WHAT IT LEAVES OUT IS NOTHING, and that half is the one that keeps a capsule from standing
+ * where it would collide. Read `CLEARANCE_REACH_MM` for how firmly each half is held, because they
+ * are not held equally.
  */
 import { alongByCornerRule } from './fillet-arc.js';
 import { add, exact, GeometryError, multiply, subtract } from './integer-math.js';
@@ -43,6 +46,34 @@ const BAND_SLANT_MM = 2;
 
 /** How far past the radius a corner's points start, before the hull's chords are checked. */
 const CORNER_MARGIN_MM = 1;
+
+/**
+ * A bound on the diagonal of one millimetre on each axis, which is what flooring a point onto the
+ * lattice and then stepping out by one can cost. `fillet-arc`'s `CORNER_ROUNDING_MM` is the same
+ * bound for the same reason.
+ */
+const STEP_DIAGONAL_MM = 2;
+
+/**
+ * HOW FAR PAST THE RADIUS THIS RULE'S PIECES CAN REACH, and how firmly that is held.
+ *
+ * It is the sum of the three parts this rule can account for, not a number set beside them: a
+ * band's slant, a corner's margin, and the diagonal a floored point costs when it steps out.
+ * Writing it as the sum is the point, because a number and its account cannot then drift apart.
+ *
+ * IT IS TESTED, NOT PROVED. `test/ring-clearance.test.ts` asserts that every corner of every piece
+ * is within `radius + CLEARANCE_REACH_MM` of the ring or inside it, over rings at radii 1, 5 and
+ * the capsule's 340, and a radius far from those has not been run. The bound covers a whole piece
+ * and not only its corners because the pieces are convex, and a convex piece's furthest point from
+ * a ring is a corner. Re-derived from this source the worst case is about 4.414, three millimetres
+ * of stated margin plus the diagonal of one, so five is the sum rounded up rather than measured.
+ *
+ * THE OTHER HALF IS WEAKER AND IS THE ONE THAT PROTECTS A WALKER. That the pieces HOLD everything
+ * within the radius, so no support survives where a capsule would collide, is checked by SAMPLING:
+ * a half-millimetre lattice for small rings and seeded points at the capsule radius. It is a
+ * sampled claim rather than an exhaustive one, and anything leaning on it should know that.
+ */
+export const CLEARANCE_REACH_MM = BAND_SLANT_MM + CORNER_MARGIN_MM + STEP_DIAGONAL_MM;
 
 /** How many times a corner's directions may be bisected before the rule refuses the ring. */
 const MOST_BISECTIONS = 8;

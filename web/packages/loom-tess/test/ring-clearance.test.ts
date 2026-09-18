@@ -4,7 +4,7 @@
  *   - NOTHING LEFT OUT: every point within the radius of the ring lies in one of the pieces: on the
  *     half-millimetre lattice of a small ring, at seeded points round a large one, and every
  *     sixteenth of a millimetre round each band's far corners, where the thinnest gap would be;
- *   - LITTLE TAKEN BEYOND: every corner of every piece is within five millimetres past the radius of
+ *   - LITTLE TAKEN BEYOND: every corner of every piece is within `CLEARANCE_REACH_MM` past the radius of
  *     the ring, whatever the radius, so a carve by them loses almost nothing a capsule could stand
  *     on: at the capsule's own radius that is under two parts in a hundred.
  *
@@ -14,7 +14,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Plan } from '../src/core/integer-math.js';
 import { GeometryError } from '../src/core/integer-math.js';
-import { ringClearance } from '../src/core/ring-clearance.js';
+import { CLEARANCE_REACH_MM, ringClearance } from '../src/core/ring-clearance.js';
 import type { ClearancePiece } from '../src/core/ring-clearance.js';
 import { fixtureObject, recordsOf } from './support.js';
 
@@ -90,7 +90,7 @@ function holdsTheRule(ring: readonly Plan[], radius: number, samples: readonly [
     expect(twiceArea(piece) !== 0n, `${JSON.stringify(piece)} has area`).toBe(true);
     // Nothing is taken more than five millimetres past the radius: every corner is that close.
     for (const point of piece) {
-      const reach = radius + 5;
+      const reach = radius + CLEARANCE_REACH_MM;
       const close = ring.some((from, index) => {
         const { numerator, denominator } = distanceSquared(big(point[0]), big(point[1]), 1n, from, ring[(index + 1) % ring.length]!);
         return numerator <= big(reach) * big(reach) * denominator;
@@ -162,6 +162,15 @@ function seededRound(ring: readonly Plan[], radius: number, seed: number, count:
   }
   return out;
 }
+
+describe('the reach the rule states', () => {
+  it('is the sum of the parts its own source names, and not a number set beside them', () => {
+    // Three millimetres of stated margin, a band's slant of two and a corner's of one, plus a bound
+    // of two on the diagonal a floored point costs when it steps out. If any of those moves, this
+    // moves with it, which is the whole reason it is exported rather than written twice.
+    expect(CLEARANCE_REACH_MM).toBe(5);
+  });
+});
 
 describe('the ring clearance rule', () => {
   it('holds every point within the radius of a square, to the half millimetre', () => {
