@@ -524,9 +524,17 @@ def test_the_container_states_membership_frame_identity_and_what_is_drawn(tmp_pa
         for i, r in enumerate(header["records"])
         if r["kind"] in ("city.block", "city.parcel", "city.street_tree")
     ]
+    curbs = [i for i, r in enumerate(header["records"]) if r["kind"] == "city.curb_edge"]
     assert [e["record"] for e in render["entries"] if e["state"] == "drawn"] == sorted(
-        [*facades, *lots, *massings, *objects, *segments, terrain]
+        [*curbs, *facades, *lots, *massings, *objects, *segments, terrain]
     )
+    # A curb is its kerb face, its kerb top and the footway behind it.
+    for entry in (render["entries"][i] for i in curbs):
+        assert [(s["role"], s["orientation"]) for s in entry["surfaces"]] == [
+            ("kerb", "vertical"),
+            ("kerb", "horizontal"),
+            ("footway", "horizontal"),
+        ]
     for entry in (render["entries"][i] for i in objects):
         assert {s["role"] for s in entry["surfaces"]} <= {
             "object_primary",
@@ -576,12 +584,17 @@ def test_the_container_states_membership_frame_identity_and_what_is_drawn(tmp_pa
             ("carriageway", "horizontal", "record"),
             ("gutter", "horizontal", "record"),
         ]
-    # Navigation draws what a person stands on: the same ground, and the segments' own surfaces,
-    # each carved clear of what the grammar's navigation table says obstructs a walking capsule.
+    # Navigation draws what a person stands on: the same ground, the kerb tops and footways of the
+    # curbs and the segments' own surfaces, each carved clear of what the grammar's navigation table
+    # says obstructs a walking capsule.
     drawn = [
         header["records"][e["record"]]["kind"] for e in nav["entries"] if e["state"] == "drawn"
     ]
-    assert drawn == ["city.street_segment"] * len(segments) + ["city.terrain"]
+    assert drawn == (
+        ["city.curb_edge"] * len(curbs)
+        + ["city.street_segment"] * len(segments)
+        + ["city.terrain"]
+    )
 
 
 def descriptor_measures() -> dict[str, dict[str, dict[str, int]]]:

@@ -28,10 +28,10 @@ import {
   sortList,
 } from './support.js';
 
-/** Over `test/fixtures/tile-conformance.json`, tessellator 9, digest profile v3. */
+/** Over `test/fixtures/tile-conformance.json`, tessellator 10, digest profile v3. */
 const GOLDEN = {
-  render_batch: '4ed42efeae748151371db550d1f0ffcecfdb42a255b1e2a85816b920129713c5',
-  nav_envelope: '8a9264cee81d29369e8597e7b0afb9653a861d0668419b05de432230e72c18bc',
+  render_batch: 'a968ae0a9d6e46a209b938fa1ec85119d0e07e4fb3fa2501f619581dc7868dbc',
+  nav_envelope: '3c7d987f53dd857e646b355731927526f4673bcd3c69b0809daca3f664991c93',
 } as const;
 
 afterEach(() => {
@@ -155,15 +155,15 @@ describe('the triangle digest of the conformance fixture', () => {
     // the ground the building stands on, and says no material dresses it: the grammar admits none.
     // Every other surface waits on a rule.
     const render = renderBatch!.header.entries.map((entry) => entry.state);
-    expect(count(render, 'drawn')).toBe(33);
+    expect(count(render, 'drawn')).toBe(39);
     expect(count(render, 'halo')).toBe(grammar.halo.length);
     const drawnTerrain = renderBatch!.header.entries[terrain]!;
     expect(drawnTerrain).toMatchObject({
       state: 'drawn',
-      first_vertex: 2655,
-      vertex_count: 685,
-      triangle_count: 654,
-      surfaces: [{ role: 'terrain', orientation: 'horizontal', material: { state: 'none-exists' }, triangle_count: 654 }],
+      first_vertex: 2727,
+      vertex_count: 545,
+      triangle_count: 536,
+      surfaces: [{ role: 'terrain', orientation: 'horizontal', material: { state: 'none-exists' }, triangle_count: 536 }],
     });
     // The building draws, so the ground it stands on is the building's and not the terrain's: its
     // base ring is cut out of the patch by the same yield rule the segments' surfaces are.
@@ -212,9 +212,9 @@ describe('the triangle digest of the conformance fixture', () => {
     // Navigation draws what a person may stand on: the same ground partition, and the segments'
     // own carriageways and gutters, each carved clear of what the navigation table says obstructs.
     const nav = navEnvelope!.header.entries.map((entry) => entry.state);
-    expect(count(nav, 'drawn')).toBe(4);
+    expect(count(nav, 'drawn')).toBe(10);
     expect(count(nav, 'halo')).toBe(grammar.halo.length);
-    expect(navEnvelope!.header.entries[terrain]).toMatchObject({ state: 'drawn', vertex_count: 4152, triangle_count: 5006 });
+    expect(navEnvelope!.header.entries[terrain]).toMatchObject({ state: 'drawn', vertex_count: 1197, triangle_count: 1406 });
     expect(navEnvelope!.surfaceMm).toBeUndefined();
 
     // Halo is exactly what the document lists as halo.
@@ -336,8 +336,8 @@ describe('the triangle digest of the conformance fixture', () => {
     expect(node.triangleDigests.get('render_batch')).not.toBe(GOLDEN.render_batch);
     expect(node.triangleDigests.get('nav_envelope')).not.toBe(GOLDEN.nav_envelope);
     expect(Object.fromEntries(browser.triangleDigests)).toEqual(Object.fromEntries(node.triangleDigests));
-    // A bake carves navigation exactly, which costs about a second, and this test bakes twice.
-  }, 30_000);
+    // A bake carves navigation exactly, which is most of its work, and this test bakes twice.
+  }, 120_000);
 
   it('moves when a record that draws nothing changes, because its entry is digested too', async () => {
     const document = fixtureObject();

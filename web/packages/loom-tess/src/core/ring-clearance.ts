@@ -31,7 +31,8 @@
  * Not yet wired into a bake. It changes no container until support clearance reads it.
  */
 import { alongByCornerRule } from './fillet-arc.js';
-import { add, exact, GeometryError, subtract } from './integer-math.js';
+import { add, exact, GeometryError, multiply, subtract } from './integer-math.js';
+import { hullKeepingEdges } from './piece-carve.js';
 import type { Plan } from './integer-math.js';
 import { requireSimpleRing, triangulateRing } from './ring-triangulation.js';
 
@@ -174,5 +175,28 @@ export function ringClearance(ring: readonly Plan[], radius: number, where: stri
     pieces.push([from, to, plus(to, step, where), plus(from, step, where)]);
     pieces.push(cornerHull(from, add(radius, BAND_SLANT_MM, where), where));
   });
-  return pieces;
+  if (!turnsOnlyLeft(ring, where)) return pieces;
+  // A CONVEX RING'S CLEARANCE IS CONVEX, so the hull of every piece's corners is the same region as
+  // the pieces, held to the same two claims: it holds everything they hold, since it holds them,
+  // and it lies inside what they lie inside, since that region is convex too and a hull of subsets
+  // of a convex region stays inside it. One piece where there were a dozen, which is what a carve
+  // costs: its work grows with the square of the segments a piece meets.
+  const corners: Plan[] = [];
+  for (const piece of pieces) {
+    for (const point of piece) corners.push(point);
+  }
+  const whole = hullKeepingEdges(corners, where);
+  if (whole.length < 3) return pieces;
+  return [whole];
+}
+
+/** Whether a counter-clockwise ring turns only left, so the region it clears is convex. */
+function turnsOnlyLeft(ring: readonly Plan[], where: string): boolean {
+  return ring.every((here, index) => {
+    const before = ring[(index + ring.length - 1) % ring.length]!;
+    const after = ring[(index + 1) % ring.length]!;
+    const first = minus(here, before, where);
+    const second = minus(after, here, where);
+    return subtract(multiply(first[0], second[1], where), multiply(first[1], second[0], where), where) >= 0;
+  });
 }

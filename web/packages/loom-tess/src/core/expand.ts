@@ -15,9 +15,10 @@
  * builds the terrain grid, a street segment's carriageway and gutters (`streets.ts`), a building's
  * own walls, roofs and parapets (`massing.ts`), the face it shows a street with its ground band and
  * that band's panels (`facades.ts`), the solids of an object's parts (`form-parts.ts`) and the
- * ground a lot, a block or a tree pit states (`lots.ts`), and in the navigation projection carves
- * the ground clear of what the grammar's navigation table says obstructs a walking capsule;
- * everything else states the rule it waits on (`NEEDS`).
+ * ground a lot, a block or a tree pit states (`lots.ts`), and a curb's kerb and footway
+ * (`streets.ts`), and in the navigation projection carves the ground clear of what the grammar's
+ * navigation table says obstructs a walking capsule; everything else states the rule it waits on
+ * (`NEEDS`).
  *
  * Two projections are materialised, each from the records by its own rules and each with its own
  * representation contract: `render_batch`, what is drawn, and `nav_envelope`, what a person is
@@ -40,8 +41,8 @@ import type { FormObject, FormPart, FormShape, FormTriangle } from './form-parts
 import type { Piece, SurfaceExpansion } from './pieces.js';
 import type { ProjectionName } from './record-shapes.js';
 import { ringClearance } from './ring-clearance.js';
-import { segmentSurfaces } from './streets.js';
-import type { StreetFields } from './streets.js';
+import { curbSurfaces, segmentSurfaces } from './streets.js';
+import type { StreetFields, StreetResult } from './streets.js';
 import { carveSupport } from './support-carve.js';
 import type { ClearanceWalk, SupportTriangle } from './support-carve.js';
 import { coveringsWithArea, metCells, yieldedCell } from './terrain-yield.js';
@@ -51,7 +52,7 @@ import type { CoveringTriangle, TerrainPatch } from './terrain-yield.js';
  * Bumped whenever an expander, a statement, a contract or the materialised projection set
  * changes, because each changes the bytes a bake writes. The bake stage's parameters carry it.
  */
-export const TESSELLATOR_SOURCE_VERSION = 9;
+export const TESSELLATOR_SOURCE_VERSION = 10;
 
 /**
  * What each materialised projection preserves and what it may be used for, as separate rows, the
@@ -142,8 +143,6 @@ export const NEEDS = {
   bent_street: 'bent_street',
   /** A segment's two curbs, carried by the tile, whose kerb lines leave its strip a length. */
   street_curbs: 'street_curbs',
-  /** Kerb faces, kerb tops and footways, offset from a kerb line by the floor square root normal, with fillet arcs. */
-  kerb_offset: 'kerb_offset',
   /** A junction's carriageway, filled between its legs with fillet arcs. */
   junction_fill: 'junction_fill',
   /** A crossing's band across its segment, from its line and width. */
@@ -455,6 +454,39 @@ function renderSegment(fields: Fields, context: ExpandContext): Expansion {
   return { state: 'drawn', pieces: result.pieces };
 }
 
+/**
+ * A curb's kerb face, kerb top and footway, by the street rules. The kerb line is digitised in its
+ * segment's direction and every width is a field of the curb, so the rule needs the segment the
+ * curb names and nothing else.
+ */
+function curbPieces(fields: Fields, context: ExpandContext, where: string): StreetResult<'bent_street'> {
+  const segment = context.carried.get(fields.segment_identity as string);
+  if (segment === undefined) throw new TessellationError(`${where} names a segment the tile does not carry`);
+  if (segment.kind !== 'city.street_segment') throw new TessellationError(`${where} names ${segment.kind} as its segment`);
+  return curbSurfaces(fields, segment.fields, where);
+}
+
+/** A curb as it is drawn: its face, its top and its footway. */
+function renderCurb(fields: Fields, context: ExpandContext): Expansion {
+  const where = `city.curb_edge ${fields.identity as string}`;
+  const result = curbPieces(fields, context, where);
+  if (result.state === 'waiting') return { state: 'unavailable', needs: [result.need] };
+  return { state: 'drawn', pieces: result.pieces };
+}
+
+/** A curb's kerb top and footway are ground a person walks on, carved clear of what obstructs. */
+function supportCurb(fields: Fields, context: ExpandContext): Expansion {
+  const where = `city.curb_edge ${fields.identity as string}`;
+  const result = curbPieces(fields, context, where);
+  if (result.state === 'waiting') return { state: 'unavailable', needs: [result.need] };
+  const surfaces: SupportTriangle[] = [];
+  for (const piece of result.pieces) {
+    if (piece.surface?.orientation !== 'horizontal') continue;
+    for (const triangle of spaceTriangles(piece.vertices, piece.triangles)) surfaces.push(triangle);
+  }
+  return carvedSupport(surfaces, context, where);
+}
+
 /** Every record of a kind the tile carries whose named field holds an identity. */
 function carriedWhere(context: ExpandContext, kind: string, field: string, identity: string): Fields[] {
   const found: Fields[] = [];
@@ -671,7 +703,10 @@ const KIND_RULES: ReadonlyMap<string, KindRules> = new Map<string, KindRules>([
     nav_envelope: needs(NEEDS.ring_triangulation),
   }],
   ['city.crossing', { render_batch: needs(NEEDS.crossing_band), nav_envelope: needs(NEEDS.crossing_band) }],
-  ['city.curb_edge', { render_batch: needs(NEEDS.kerb_offset), nav_envelope: needs(NEEDS.kerb_offset) }],
+  ['city.curb_edge', {
+    render_batch: { rule: 'expand', expand: renderCurb, readsCoverings: false },
+    nav_envelope: { rule: 'expand', expand: supportCurb, readsCoverings: false },
+  }],
   ['city.district', { render_batch: notInProjection, nav_envelope: notInProjection }],
   ['city.entrance', { render_batch: needs(NEEDS.facade_layout), nav_envelope: needs(NEEDS.facade_layout) }],
   ['city.facade', {

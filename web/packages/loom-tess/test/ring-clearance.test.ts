@@ -185,9 +185,12 @@ describe('the ring clearance rule', () => {
     const building = recordsOf(fixtureObject(), 'city.massing')[0].fields;
     const ring = building.tiers[0].ring_mm as Plan[];
     const pieces = holdsTheRule(ring, 340, [...seededRound(ring, 340, 20260917, 4000), ...roundBandCorners(ring, 340)]);
-    // The building's base ring is chamfered, which is what a plan box would have closed a footway for.
+    // The building's base ring is chamfered, which is what a plan box would have closed a footway
+    // for, and it turns only left, so its clearance comes back as the one convex piece that holds
+    // every piece the rule builds: a carve's work grows with the square of the segments it meets.
     expect(ring.length).toBeGreaterThan(4);
-    expect(pieces.length).toBeGreaterThan(ring.length);
+    expect(pieces).toHaveLength(1);
+    expect(pieces[0]!.length).toBeGreaterThan(ring.length);
   });
 
   it('holds seeded points round seeded rings at several radii', () => {
