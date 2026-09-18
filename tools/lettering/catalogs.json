@@ -1,5 +1,5 @@
 {
-  "about": "The version 1 glyph catalogs: a role key and the committed font it is made from. Keys name the role, never the font.",
+  "about": "The version 1 glyph catalogs: a role key and the committed font it is made from. Keys name the role, never the font. Deliberate in one half and derived in the other: which role a typeface serves is a judgement about era and shopfront that nothing under assets/fonts states, so it is written here by hand; which fonts exist is no judgement at all, so tests/test_lettering_catalog.py holds these entries against that directory in both directions, and a font committed with nothing to convert it fails there by its own name.",
   "catalogs": [
     {"catalog_id": "condensed", "font": "assets/fonts/francoisone/FrancoisOne-Regular.ttf"},
     {"catalog_id": "grotesque", "font": "assets/fonts/barlow/Barlow-SemiBold.ttf"},

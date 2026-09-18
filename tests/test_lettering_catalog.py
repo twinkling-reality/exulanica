@@ -44,7 +44,49 @@ def test_the_catalogs_on_disk_are_the_ones_the_tool_is_told_to_build():
     assert sorted(path.name for path in CATALOG_DIRECTORY.glob("*.json")) == [
         f"{catalog_id}.v1.json" for catalog_id in CATALOG_IDS
     ]
+    # A speed bump, not the guard. A fifth catalog is caught without this line: by the comparison
+    # above if it was never built, and by test_the_cases_cover_every_committed_catalog_in_both_
+    # directions in tests/test_lettering_cases.py if its shared cases were never generated. What
+    # the pin adds is that adding a catalog has to touch a test on purpose, beside the font, the
+    # licence and the notices entry it also brings. So do not read it as the thing that notices a
+    # fifth, and do not delete it as duplication of the line above: it is neither.
     assert CATALOG_IDS == ["condensed", "grotesque", "modern_serif", "slab"]
+
+
+def test_every_committed_font_is_converted_by_exactly_one_catalog():
+    """`catalogs.json` is a deliberate list in one half only, and this holds the other half.
+
+    Which role a typeface serves is a judgement nothing under `assets/fonts` states, so it is
+    written by hand. Which fonts are committed is no judgement, and nothing derived it: the tool
+    builds what the file names and never looks at what else is there, so a fifth family used to
+    arrive converted to nothing, caught only by the notices test, whose message sends the reader
+    to `THIRD_PARTY_NOTICES.md` when the fact is that a font is committed which nothing converts.
+    A diligent person adds the notices entry and then nothing failed at all.
+
+    Three messages rather than one, because the reader is sent somewhere by whichever fires: a
+    font nothing names is an addition half made, an entry naming nothing committed is a removal
+    half made, and one font under two entries is a typeface asked to serve two roles.
+    """
+    named = [entry["font"] for entry in SPECIFICATION["catalogs"]]
+    twice = sorted({font for font in named if named.count(font) > 1})
+    assert twice == [], f"one font, more than one catalog entry: {twice}"
+    # Everything committed there that is not a licence or a source record, which are the two names
+    # the tool itself opens by name. No list of fonts, so a second style, a second format or a
+    # stray file cannot be a class this goes quiet about.
+    committed = sorted(
+        path.relative_to(ROOT).as_posix()
+        for path in FONT_DIRECTORY.rglob("*")
+        if path.is_file() and path.name not in {"OFL.txt", "SOURCE.json"}
+    )
+    assert committed, "no fonts are committed, so neither direction below means anything"
+    unnamed = sorted(set(committed) - set(named))
+    assert unnamed == [], (
+        f"under assets/fonts and named by no catalog entry: {unnamed}. Every file there that is "
+        "not an OFL.txt or a SOURCE.json is a font the tool converts; give it an entry in "
+        "tools/lettering/catalogs.json, or do not commit it."
+    )
+    absent = sorted(set(named) - set(committed))
+    assert absent == [], f"tools/lettering/catalogs.json names an uncommitted font: {absent}"
 
 
 @pytest.mark.parametrize("catalog_id", CATALOG_IDS)
