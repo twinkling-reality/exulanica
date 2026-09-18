@@ -615,6 +615,79 @@ ring, where the fixture's preferred line passed a bench at 343 mm. If the ranked
 exercised on the corridor, that hint is weakened rather than confirmed, and the honest reading is
 that it was formed on a tile whose only frontage was a furniture cluster.
 
+## What the corridor run did, measured, and the halt that fired first
+
+The gate was pointed at the corridor's street three times. It has still never walked it, and every
+number this run exists to report is UNMEASURED. Saying which is the point of the section.
+
+**The first attempt died inside the harness rather than in the world.** `--walk` resolves its path
+against the process working directory and the harness is started from `web/`, so a path written as
+`docs/generated-corridor-street.md` was looked for at `web/docs/...` and nothing started. My defect,
+in my own file, and it says nothing about the corridor. The run was repeated with an absolute path.
+
+**The second attempt halted at the decode, in the predicted position, in the product's own words.**
+Served by the corridor lane's entry on 5321, which serves that lane's app package at 77ca6bb5 where
+`TESSELLATOR_SOURCE_VERSION` is 17:
+
+    Atlas could not open Tile 7ce4b90f-675b-52dc-b71b-7264aeb00786 refused: .owd refused:
+    tessellator_version is not 17; there is no upgrade on read, rebake the tile
+
+**The third attempt halted the same way at a different version, and the PAIR is the finding.** Served
+by `corridor-walk-gate` on 5322, a new entry serving this worktree's app package at source version 19,
+same city, same tile coordinates, same pose:
+
+    page built at 17     Tile 7ce4b90f refused: tessellator_version is not 17
+    page built at 19     Tile 7ce4b90f refused: tessellator_version is not 19
+
+SAME ROW BOTH TIMES. **The container the page receives does not depend on the page at all**, which is
+a stronger statement than either refusal alone and stronger than the argument the second run was made
+to test. That 7ce4b90f is the OLDEST of seven bakes of this tile, at tessellator 5, was measured by
+the orchestrator against the store rather than by this lane.
+
+**So the prediction's premise was right about the store and irrelevant to the page.** The prediction
+said the store's newest bake is 17 and this tree is 19; both true, and neither decided anything. The
+page is never handed the newest bake, 5 is not 17 either, and the refusal would have fired at any
+source version this tree could hold. The halt fired exactly where predicted, for a reason the
+prediction did not contain.
+
+**AND MY READING OF THE FIRST REFUSAL WAS WRONG IN A WAY WORTH KEEPING.** I wrote that the page
+"resolved the seed and coordinates to the NEWEST row". It resolved to the oldest. The correction
+matters less than why the claim was unsupportable: A REFUSAL NAMING A VERSION THE PAGE DID NOT EXPECT
+IS CONSISTENT WITH ANY ROW THAT IS NOT THE PAGE'S OWN VERSION. The evidence had no power to separate
+newest from oldest in either direction, so had the row happened to be the newest the same reasoning
+would have read as confirmed. That is the failure worth recording: not a wrong answer, an inference
+whose evidence could not have produced a different one.
+
+**What the halt record does NOT carry.** The product's sentence above was read from the page's console
+while the run was live. The record says only "the product shell to mount a world: the product failed
+to start". So the reason the product gave for refusing is not bound by the record and is quoted here
+on the running session's word. That is a gap in my own file and a candidate for repair.
+
+**What the record does carry now, and exactly how much it is worth.** The third run's record states:
+
+    servedBy: { entry: "corridor-walk-gate",
+                worktree: "exulanica-gate-target at c6f312b1",
+                stated: true, bound: false }
+
+A record binds its containers, its artifact, the renderer path and this harness BY DIGEST. It says
+nothing about the tree the application was built from, and these two fields do not change that: they
+carry what the runner claimed. `stated: true, bound: false` is the whole reason to write them, and
+anywhere else a record carries a runner's claim it should say so the same way. Binding it would need
+the page to state its own build commit as data, the way it already states its opening pose, so the
+harness can read it and bind it. That is an app file, so it is a proposal and not a change.
+
+**The absolute path was measured not to reach any record.** The harness stores
+`relative(ROOT, resolve(--walk))`, so both halt records above say `docs/generated-corridor-street.md`,
+and a search for `/Users/` across a halt record and a completed run record returns ZERO. The
+working-directory resolution is therefore a defect to propose after the run, not a fix to slip into
+one.
+
+**Still unmeasured, which is the list that matters:** whether the ringless halt fires,
+`routeObstacleRings`, `frontageBothSidesSamples` on the winning heading with `candidatesWithFrontage`
+beside it, all eight mechanical keys, and both remaining predicted halts. The route rule and the
+authentication condition were never reached, so the arithmetic above stands untested and nothing in
+this section is evidence for or against it.
+
 ## A hint about the frontage tie-break, with its n beside it
 
 **A direction, not evidence.** Over all 36 headings the rule qualifies on this tile, each sampled
