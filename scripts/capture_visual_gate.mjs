@@ -1216,6 +1216,9 @@ async function main() {
     // decided and on what. A halt that carries the reason and not the decision leaves the next
     // reader unable to tell a rule that chose from a rule that fell back.
     observed.route = {
+      // WHERE IT STARTED, because a halt that states a heading and no origin states a direction and
+      // not a route, and every figure below is measured from this point.
+      startMm: [Math.round(plan.start[0] * 1000), Math.round(plan.start[1] * 1000)],
       headingMillidegrees: plan.headingMillidegrees,
       clearRunMm: plan.clearRunMm,
       frontageSamples: plan.frontageSamples,
