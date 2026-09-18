@@ -147,6 +147,14 @@ describe('living society snapshots', () => {
     expect(() => parseSociety(row([person(0, {display_name: 'Emi Fox'}), person(1)]))).toThrow(/living society/);
     expect(() => parseSociety(row([person(0)]))).toThrow(/living society/);
     expect(() => parseSociety(row([person(0, {position_mm: [8000, 0]}), person(1)]))).toThrow(/endpoint/);
+    // A place that states heights has nowhere to put them here yet, and says so rather than
+    // letting the number vanish between the response and the renderer.
+    expect(() => parseSociety(row([person(0, {support_z_mm: 146}), person(1)]))).toThrow(
+      /carries no support height/,
+    );
+    expect(() => parseSociety(row([person(0, {support_z_mm: 0}), person(1)]))).toThrow(
+      /carries no support height/,
+    );
     expect(() => parseSociety({...row([person(0), person(1)]), version_id: 'other'})).toThrow(/living society/);
   });
 });

@@ -39,6 +39,12 @@ function livingPresentation(row: Readonly<Record<string, unknown>>, state: Reado
   const ids = new Set<string>();
   const people = inhabitants.map((value) => {
     const person = record(value);
+    // A v2 place states the height of the surface each person stands on. Nothing here carries it
+    // to the crowd, which draws every walker on the ground plane, so a height that arrives is
+    // refused rather than dropped on the way: see the same refusal in the crowd itself.
+    if ('support_z_mm' in person) {
+      throw new Error('This app carries no support height to a crowd that draws the ground plane');
+    }
     const location = record(person['location']), action = record(person['action']), explanation = record(person['explanation']);
     const path = person['motion_path_mm'];
     if (!textValue(person['id']) || ids.has(person['id']) || person['synthetic'] !== true || !point(person['position_mm']) ||
