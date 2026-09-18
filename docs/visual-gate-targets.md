@@ -54,6 +54,12 @@ integer facing, against the same four integers in the URL. Converting to the ren
 compare would put a frame change inside the gate's own verdict; the renderer pose is a consequence
 of the stated one and the record carries it as measured, not as derived.
 
+**It will say when the rule ran without deciding.** A record states `candidatesWithFrontage`: how
+many qualifying headings had frontage on both sides at any sample. Zero means the first tie-break
+was equal for every candidate and a later one chose, so the heading is the rule's fallback rather
+than its preference. Nothing in the rule reads that count, and the plan it returns was measured to
+be identical, field for field, to the plan it returned before the count existed.
+
 **It will not walk a route that nothing chose.** The route rule keeps the headings a capsule can
 walk and then prefers the one with frontage on both sides. Given no collision rings it does not
 fail: every heading qualifies, both tie-breaks are equal for all of them, and the answer is the

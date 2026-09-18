@@ -1465,6 +1465,10 @@ async function main() {
         meanFrontageSkewMillionths: plan.meanFrontageSkewMillionths,
         candidatesTried: plan.candidatesTried,
         candidatesQualified: plan.candidatesQualified,
+        // Zero here means the first tie-break was equal for every candidate and a later one
+        // chose, so the heading is the rule's fallback and not its preference. Without it a
+        // record shows a heading that reads as a decision either way.
+        candidatesWithFrontage: plan.candidatesWithFrontage,
         obstacles: prisms.length,
         routeRings: routeRings.length,
         // How many candidates the tie-break could actually separate. Zero says the rule ran with

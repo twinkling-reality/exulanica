@@ -9,6 +9,7 @@ import {
   planRoute,
   resampleTrace,
   sampleQueryPoints,
+  type RouteRing,
   type TracePose,
 } from '../src/index.js';
 import { flatSupport, street } from './fixtures.js';
@@ -42,6 +43,43 @@ describe('the route rule', () => {
     expect(plan.meanFrontageSkewMillionths).toBe(0);
     expect(plan.candidatesTried).toBe(720);
     expect(plan.clearRunMm).toBeGreaterThanOrEqual(ROUTE_RULE.lengthMm + ROUTE_RULE.stopMarginMm);
+  });
+
+  it('decides exactly what it decided before it counted anything', () => {
+    // Every field MEASURED on the commit before `candidatesWithFrontage` existed, so this is a
+    // before and after rather than an argument that a counter must be inert. The counter is a
+    // diagnostic: it separates the rule running from the rule deciding, and if adding it had moved
+    // a heading by one step the gate would have been tuned by the lane that runs it.
+    const { rule, candidatesWithFrontage, ...decided } = planRoute([5, 0], street().prisms, BOUNDS);
+    expect(decided).toEqual({
+      start: [5, 0],
+      headingMillidegrees: 270_000,
+      yaw: 4.71238898038469,
+      forward: [1, 1.8369701987210297e-16],
+      right: [-1.8369701987210297e-16, 1],
+      clearRunMm: 245_000,
+      frontageSamples: 126,
+      frontageBothSidesSamples: 126,
+      meanFrontageSkewMillionths: 0,
+      candidatesTried: 720,
+      candidatesQualified: 17,
+    });
+    // And the counter says something: all seventeen qualifying headings had frontage on both sides
+    // here, so on this fixture frontage is what decided.
+    expect(candidatesWithFrontage).toBe(17);
+    expect(rule).toBe(ROUTE_RULE);
+  });
+
+  it('counts no candidate with frontage when nothing stands beside the walk', () => {
+    // The degenerate case the counter exists for: rings the walk never passes on both sides. The
+    // rule still returns a heading, and the count says frontage did not choose it.
+    const aside: RouteRing[] = [
+      { id: 'far', ring: [[200, 40], [204, 40], [204, 44], [200, 44], [200, 40]] },
+    ];
+    const plan = planRoute([5, 0], aside, BOUNDS);
+    expect(plan.candidatesQualified).toBeGreaterThan(0);
+    expect(plan.candidatesWithFrontage).toBe(0);
+    expect(plan.frontageBothSidesSamples).toBe(0);
   });
 
   it('is the same plan every time', () => {

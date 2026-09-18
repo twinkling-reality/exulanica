@@ -67,6 +67,16 @@ export interface RoutePlan {
   readonly meanFrontageSkewMillionths: number;
   readonly candidatesTried: number;
   readonly candidatesQualified: number;
+  /**
+   * How many qualifying headings had frontage on both sides at any sample. A DIAGNOSTIC, read by
+   * nothing in the rule.
+   *
+   * It separates the rule running from the rule deciding. Where this is zero the first tie-break
+   * was equal for every candidate and a later one chose, so the heading is the rule's fallback
+   * rather than its preference, and a record that showed only the chosen heading would read as a
+   * decision either way.
+   */
+  readonly candidatesWithFrontage: number;
 }
 
 /** No clear run is measured beyond this, which is longer than any field the gate walks. */
@@ -219,6 +229,9 @@ export function planRoute(
   let chosen: RoutePlan | null = null;
   let tried = 0;
   let qualified = 0;
+  // Counted, never read: nothing below branches on it, compares against it or orders by it, so the
+  // heading this returns is the heading it returned before the count existed.
+  let withFrontage = 0;
   for (let millidegrees = 0; millidegrees < 360_000; millidegrees += rule.headingStepMillidegrees) {
     tried += 1;
     const yaw = (millidegrees / 1000) * (Math.PI / 180);
@@ -242,6 +255,7 @@ export function planRoute(
       }
       if (onRight !== null && onLeft !== null) both += 1;
     }
+    if (both > 0) withFrontage += 1;
     // Integer mean, so the comparison below never depends on float summation order.
     const meanSkew = hits === 0 ? 1_000_000 : Math.floor(skewTotal / hits);
     const better = chosen === null ||
@@ -261,13 +275,14 @@ export function planRoute(
         meanFrontageSkewMillionths: meanSkew,
         candidatesTried: 0,
         candidatesQualified: 0,
+        candidatesWithFrontage: 0,
       };
     }
   }
   if (chosen === null) {
     throw new Error('no heading from the arrival pose clears the route length; the route cannot be walked');
   }
-  return { ...chosen, candidatesTried: tried, candidatesQualified: qualified };
+  return { ...chosen, candidatesTried: tried, candidatesQualified: qualified, candidatesWithFrontage: withFrontage };
 }
 
 export interface TracePose {
