@@ -495,9 +495,26 @@ export function readTileDocument(bytes: Uint8Array): TileDocument {
 }
 
 /** The table a document's grammar entry was read against. */
-export function tableOf(grammar: Pick<GrammarEntry, 'grammar_id' | 'grammar_version'>): GrammarTable {
+/**
+ * The table for a grammar entry, refused when it is not the table that entry was written against.
+ *
+ * THE VERSION IS NOT ENOUGH AND THIS IS WHERE THAT WAS MISSED. A grammar version does not move when
+ * its descriptor is edited within that version, so an edit to the navigation table or to a contract
+ * measure moves the descriptor's digest and moves NOTHING ELSE a tile carries: not the record bytes,
+ * not the container's sha256, not `tessellator_version`. A reader that matched on version alone
+ * would answer questions about a baked tile out of a table the tile was never baked against, and
+ * every bound value would agree. The entry pins `descriptor_sha256`; this compares it.
+ */
+export function tableOf(grammar: Pick<GrammarEntry, 'grammar_id' | 'grammar_version' | 'descriptor_sha256'>): GrammarTable {
   const table = tableFor(grammar.grammar_id, grammar.grammar_version);
   if (table === undefined) fail('grammar', `${grammar.grammar_id} ${grammar.grammar_version} has no table`);
+  if (table.descriptor_sha256 !== grammar.descriptor_sha256) {
+    fail(
+      'grammar',
+      `${grammar.grammar_id} ${grammar.grammar_version} pins descriptor ${grammar.descriptor_sha256} `
+        + `and this reader holds ${table.descriptor_sha256}; there is no upgrade on read, rebake the tile`,
+    );
+  }
   return table;
 }
 

@@ -86,6 +86,13 @@ export interface NavigationRow {
 export interface GrammarTable {
   readonly grammar_id: string;
   readonly grammar_version: number;
+  /**
+   * The SHA-256 of the descriptor file this table was generated from, which is what a tile's
+   * grammar entry pins. A grammar VERSION does not move when a descriptor is edited within it, so
+   * the version alone cannot tell a reader whether the table it holds is the one a container was
+   * baked against: `tableOf` compares this, and refuses when they differ.
+   */
+  readonly descriptor_sha256: string;
   readonly frame: GrammarFrame;
   readonly measures: ContractMeasures;
   /**

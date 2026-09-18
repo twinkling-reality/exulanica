@@ -6,6 +6,7 @@
 import { beforeAll, describe, expect, it } from 'vitest';
 import { bakeTile, verifyOwd } from '../src/core/bake.js';
 import { canonicalBytes } from '../src/core/canonical-json.js';
+import { CITY_V2 } from '../src/core/city-v2.js';
 import { TESSELLATOR_SOURCE_VERSION } from '../src/core/expand.js';
 import { absoluteVertices, decodeOwd, encodeOwd, OwdError } from '../src/core/owd.js';
 import type { Bake } from '../src/core/bake.js';
@@ -143,6 +144,16 @@ describe('decodeOwd', () => {
     ['a trailing byte', () => { const b = new Uint8Array(baked.container.length + 4); b.set(baked.container); return b; }, /sections end at/],
     ['a missing byte', () => baked.container.slice(0, baked.container.length - 4), /sections end at/],
     ['another tessellator version', () => rebuilt(baked.container, (header) => { header.tessellator_version = TESSELLATOR_SOURCE_VERSION + 1; }), /no upgrade on read/],
+    // A DESCRIPTOR EDITED WITHIN ITS VERSION moves nothing else: not the records, not the version,
+    // not this container's own digest. So a reader that matched on the grammar version alone would
+    // answer questions about this tile out of a table it was never baked against. The tamper has to
+    // move the pin in BOTH places the container states it, since the two are compared to each other
+    // first, which is what a real descriptor edit would do.
+    ['a grammar pinned to another descriptor', () => rebuilt(baked.container, (header) => {
+      const other = `${CITY_V2.descriptor_sha256.slice(0, -1)}${CITY_V2.descriptor_sha256.endsWith('a') ? 'b' : 'a'}`;
+      (header.grammars as { descriptor_sha256: string }[])[0]!.descriptor_sha256 = other;
+      ((header.tile as { fields: { grammar_versions: { descriptor_sha256: string }[] } }).fields.grammar_versions)[0]!.descriptor_sha256 = other;
+    }), /pins descriptor .* and this reader holds .*rebake the tile/],
     ['another profile', () => sameLength('exulanica.owd/v3', 'exulanica.owd/v4'), /profile/],
     ['a truth that is not invented', () => sameLength('"truth":"invented"', '"truth":"recorded"'), /truth/],
     ['a frame its grammar does not state', () => sameLength('"name":"city_local"', '"name":"city_locum"'), /frame is not the frame/],

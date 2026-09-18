@@ -354,6 +354,12 @@ def test_the_tessellator_reads_the_grammars_own_table():
         {
             "grammar_id": descriptor["grammar_id"],
             "grammar_version": descriptor["grammar_version"],
+            # The digest of the descriptor's own bytes, computed here rather than read from the
+            # table, because it is what a tile's grammar entry pins and what the container reader
+            # compares its table against. A descriptor edited WITHIN its version moves this and
+            # moves nothing else a container carries, so it is the only thing that can tell a
+            # reader its table is not the one the tile was baked against.
+            "descriptor_sha256": hashlib.sha256(CITY_DESCRIPTOR_PATH.read_bytes()).hexdigest(),
             "frame": descriptor["frame"],
             "measures": descriptor_measures(),
             # Every projection states a resolution, which a rule that cuts an arc into chords reads

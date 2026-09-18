@@ -224,11 +224,15 @@ solids an object states as its parts, and the ground a lot states.
 ### Route obstruction rings
 
 NO CONTAINER CARRIES A RING SET. The rings are worked out at READ time, from the container's own
-records and grammar table, by the very expander that baked it: `decodeOwd` refuses a container whose
-`tessellator_version` is not this source version, so the code computing a ring and the code that
-baked the tile are the same code and cannot silently diverge. That refusal is what makes this a
-single reader rather than a second one, and loosening it would turn "guaranteed identical" into
-"usually agree", which is the disagreement about a bench that a scored walk must not have.
+records and grammar table, by the very expander that baked it. Two refusals in `decodeOwd` are what
+make that a single reader rather than a second one: `tessellator_version` must be this source
+version, so the code is the code that baked the tile; and each grammar entry's `descriptor_sha256`
+must be the one the loaded table was generated from, because a ring's obstruction axis and capsule
+come from the TABLE, and a descriptor edited WITHIN its grammar version moves neither the records,
+the container's digest nor the tessellator version. Loosening either would turn "guaranteed
+identical" into "usually agree", which is the disagreement about a bench a scored walk must not
+have. The Python document reader has made the same descriptor comparison since it was written; this
+is the browser's half of it.
 
 A consumer choosing WHERE TO WALK reads `routeObstructionRings(header)` (`src/core/route-rings.ts`)
 off a decoded container: the same regions the carve keeps support clear of, one per part of a record

@@ -14,6 +14,7 @@ import type { GrammarTable } from './grammar-table.js';
 export const CITY_V2: GrammarTable = {
   "grammar_id": "city",
   "grammar_version": 2,
+  "descriptor_sha256": "c82ac5e7d39e95abbeef0d3ead599d87d5421fab7727341ae0df620ef208a7f1",
   "frame": {
     "name": "city_local",
     "units": "mm",

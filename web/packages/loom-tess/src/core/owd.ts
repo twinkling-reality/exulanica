@@ -677,12 +677,14 @@ function checkHeader(value: unknown): OwdHeader {
   if (header.media_type !== OWD_MEDIA_TYPE) fail(`media_type is not ${OWD_MEDIA_TYPE}`);
   if (header.generator !== OWD_GENERATOR) fail(`generator is not ${OWD_GENERATOR}`);
   if (header.truth !== OWD_TRUTH) fail(`truth is not ${OWD_TRUTH}`);
-  // THIS REFUSAL IS LOAD-BEARING BEYOND THE BYTES IT GUARDS. A consumer asks this package for a
-  // tile's route obstruction rings (`route-rings.ts`) and gets them from the expander that BAKED
-  // the container, because a container from another tessellator does not load at all. Loosen this
-  // and two sets that are guaranteed identical become two sets that merely usually agree, which is
-  // the re-derivation a route rule must never have: the walk and the world would disagree about a
-  // bench and nothing would say which of them a run was scored against.
+  // THIS REFUSAL IS LOAD-BEARING BEYOND THE BYTES IT GUARDS, and it is HALF of a pair. A consumer
+  // asks this package for a tile's route obstruction rings (`route-rings.ts`) and gets them from
+  // the expander that BAKED the container, because a container from another tessellator does not
+  // load at all. The other half is the grammar entry's `descriptor_sha256`, checked below, because
+  // a ring's obstruction axis and capsule come from the TABLE rather than from this code. Loosen
+  // either and two sets that are guaranteed identical become two sets that merely usually agree,
+  // which is the re-derivation a route rule must never have: the walk and the world would disagree
+  // about a bench and nothing would say which of them a run was scored against.
   if (header.tessellator_version !== TESSELLATOR_SOURCE_VERSION) {
     fail(`tessellator_version is not ${TESSELLATOR_SOURCE_VERSION}; there is no upgrade on read, rebake the tile`);
   }
@@ -711,6 +713,18 @@ function checkHeader(value: unknown): OwdHeader {
     }
     const table = tableFor(grammar.grammar_id, grammar.grammar_version);
     if (table === undefined) fail(`${at} names a grammar version this tessellator does not read`);
+    // AND THE VERSION IS NOT ENOUGH. A descriptor edited WITHIN its version moves this digest and
+    // moves nothing else the container carries: not a record's bytes, not the container's own
+    // sha256, not `tessellator_version`. A reader that matched on the version alone would answer
+    // questions about this tile out of a table it was never baked against, with every bound value
+    // agreeing. What the grammar table states about a tile is only true of the descriptor the tile
+    // was baked from, so the tile's pin decides which table may read it.
+    if (grammar.descriptor_sha256 !== table.descriptor_sha256) {
+      fail(
+        `${at} pins descriptor ${String(grammar.descriptor_sha256)} and this reader holds `
+          + `${table.descriptor_sha256}; there is no upgrade on read, rebake the tile`,
+      );
+    }
     if (canonicalJson(grammar.frame as CanonicalValue) !== canonicalJson(table.frame as unknown as CanonicalValue)) {
       fail(`${at}.frame is not the frame its grammar version states`);
     }

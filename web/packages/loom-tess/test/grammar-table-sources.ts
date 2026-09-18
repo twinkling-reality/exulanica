@@ -1,3 +1,4 @@
+import { createHash } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { REPOSITORY_ROOT } from './support.js';
@@ -31,6 +32,11 @@ export function grammarTableFromSources(): unknown {
   return {
     grammar_id: descriptor.grammar_id,
     grammar_version: descriptor.grammar_version,
+    // The digest of the descriptor's own bytes, which is what a tile's grammar entry pins. A
+    // reader holding this table can then tell whether it is the table a container was baked
+    // against, which the grammar version alone cannot say: a descriptor edited within a version
+    // moves this and moves nothing else a container carries.
+    descriptor_sha256: createHash('sha256').update(readFileSync(CITY_DESCRIPTOR_PATH)).digest('hex'),
     frame: descriptor.frame,
     measures,
     resolutions,

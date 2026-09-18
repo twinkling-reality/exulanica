@@ -14,13 +14,21 @@
  * many words, and `collision_proxy` is the projection for solid occupancy and has no contract yet.
  * A reader that fabricates a top for one of these regions is measuring a shape no record states.
  *
- * WHY THIS IS NOT THE RE-DERIVATION IT LOOKS LIKE, and the one condition that keeps it so. The
- * rings are worked out here from the container's own records and its grammar table, at read time,
- * not carried in the container: no `.owd` holds a ring set. That would be a second reader, except
- * that `decodeOwd` REFUSES a container whose `tessellator_version` is not this source version. So
- * the code computing a ring is necessarily the code that baked the tile it came from, and the two
- * cannot silently diverge. IF THAT PIN EVER LOOSENS THIS BECOMES WRONG: guaranteed identical would
- * become usually agree, and a walk could be scored against obstacles the tile does not have.
+ * WHY THIS IS NOT THE RE-DERIVATION IT LOOKS LIKE, and the TWO refusals that keep it so. The rings
+ * are worked out here from the container's own records and its grammar table, at read time, not
+ * carried in the container: no `.owd` holds a ring set. That would be a second reader, except that
+ * `decodeOwd` refuses a container on both halves of what a ring is made of.
+ *
+ *   - THE CODE. `tessellator_version` must be this source version, so the expander computing a ring
+ *     is the expander that baked the tile.
+ *   - THE TABLE. Each grammar entry's `descriptor_sha256` must be the one the loaded table was
+ *     generated from. The obstruction axis and the capsule come from the TABLE, not from this
+ *     package, and a descriptor edited WITHIN its version moves neither the records, the container
+ *     digest nor the tessellator version. Without that second check the guarantee would hold of the
+ *     code and be false of the answer.
+ *
+ * IF EITHER PIN LOOSENS THIS BECOMES WRONG: guaranteed identical becomes usually agree, and a walk
+ * could be scored against obstacles the tile does not have.
  *
  * HALO RECORDS OBSTRUCT TOO. A bench just over the tile boundary turns a walk on this side of it,
  * so the rings come from every record the container carries, owned or halo, exactly as the carve
