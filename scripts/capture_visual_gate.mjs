@@ -620,7 +620,9 @@ const READ_TILE = `function () {
 
 const READ_FIELD = `function () {
   const world = this.navigationWorld;
-  return { centreX: world.centre.x, centreZ: world.centre.z, fieldRadius: world.fieldRadius };
+  return { centreX: world.centre.x, centreZ: world.centre.z, fieldRadius: world.fieldRadius,
+    recoveryRadius: world.recoveryRadius, maximumStepHeight: world.maximumStepHeight,
+    maximumSlopeDegrees: world.maximumSlopeDegrees, surfaceSampleSpacing: world.surfaceSampleSpacing };
 }`;
 
 const READ_OBSTACLES = `function () {
@@ -1030,6 +1032,19 @@ async function main() {
       }
     }
     const plan = planRoute([arrival.x, arrival.z], routeRings, field);
+    // Bound the moment it is decided, so a halt AFTER the route is chosen still says what the rule
+    // decided and on what. A halt that carries the reason and not the decision leaves the next
+    // reader unable to tell a rule that chose from a rule that fell back.
+    observed.route = {
+      headingMillidegrees: plan.headingMillidegrees,
+      clearRunMm: plan.clearRunMm,
+      frontageSamples: plan.frontageSamples,
+      frontageBothSidesSamples: plan.frontageBothSidesSamples,
+      meanFrontageSkewMillionths: plan.meanFrontageSkewMillionths,
+      candidatesTried: plan.candidatesTried,
+      candidatesQualified: plan.candidatesQualified,
+      candidatesWithFrontage: plan.candidatesWithFrontage,
+    };
     phase(`the route was planned at ${plan.headingMillidegrees} millidegrees`);
 
     const interactions = [];
@@ -1206,9 +1221,56 @@ async function main() {
             bestAt = Date.now();
           }
           if (Date.now() - bestAt > 5000 || Date.now() - started > 600_000) {
+            // A stall has several causes and a message naming one has to tell them apart. Ask the
+            // product's own navigation surface what stands ahead of where it stopped: a walk that
+            // ran out of support and a walk the keyboard lost are different facts, and the record
+            // says which by stating where the surface ends rather than by inferring it.
+            const ahead = new Float64Array(41 * 2);
+            for (let step = 0; step <= 40; step += 1) {
+              ahead[step * 2] = p.x + plan.forward[0] * (step * 0.25);
+              ahead[step * 2 + 1] = p.z + plan.forward[1] * (step * 0.25);
+            }
+            const sampled = float64FromBase64(await session.call(bindingId, SAMPLE_SUPPORT, [toBase64(ahead)]));
+            const supported = [...sampled].map((height, step) => ({ atM: step * 0.25, height }));
+            const firstGap = supported.find((sample) => Number.isNaN(sample.height)) ?? null;
+            // The biggest rise between two consecutive probes before any gap: a step the product
+            // will not climb stops a walk exactly like an absent surface, and the two are
+            // indistinguishable in a message that says only that the walk stopped.
+            let rise = { fromM: null, heightM: 0 };
+            for (let step = 1; step < supported.length; step += 1) {
+              const before = supported[step - 1].height;
+              const after = supported[step].height;
+              if (Number.isNaN(before) || Number.isNaN(after)) break;
+              if (after - before > rise.heightM) rise = { fromM: supported[step - 1].atM, heightM: after - before };
+            }
+            const field = observed.field ?? {};
+            observed.stall = {
+              atX: p.x, atZ: p.z,
+              alongM: Number(along(p).toFixed(3)),
+              targetAlongM: targetAlong,
+              speed: p.speed,
+              supportUnderfoot: supported[0].height,
+              firstUnsupportedAheadM: firstGap === null ? null : firstGap.atM,
+              largestRiseAheadM: rise.heightM,
+              largestRiseAtM: rise.fromM,
+              productMaximumStepHeight: field.maximumStepHeight ?? null,
+              productMaximumSlopeDegrees: field.maximumSlopeDegrees ?? null,
+              metresFromFieldCentre: field.centreX === undefined ? null
+                : Math.round(Math.hypot(p.x - field.centreX, p.z - field.centreZ) * 1000) / 1000,
+              fieldRadius: field.fieldRadius ?? null,
+              supportProbeSpacingM: 0.25,
+              supportProbeReachM: 10,
+            };
             await halt(`the walk stalled at ${along(p).toFixed(2)} m of ${targetAlong} m ` +
               `(speed ${p.speed.toFixed(3)}, enabled ${p.enabled}, conversation ${p.conversationActive}, ` +
-              `repeats ${repeats})`);
+              `repeats ${repeats}); the product's navigation surface ` +
+              (firstGap !== null
+                ? `states no support ${firstGap.atM} m ahead of where it stopped`
+                : rise.heightM > (observed.field?.maximumStepHeight ?? Infinity)
+                  ? `rises ${rise.heightM.toFixed(3)} m at ${rise.fromM} m ahead, over the ` +
+                    `${observed.field.maximumStepHeight} m step this world states it will climb`
+                  : `states support for the next 10 m and rises at most ${rise.heightM.toFixed(3)} m, ` +
+                    'so neither the surface ending nor a step it refuses stopped this walk'));
           }
           if (Date.now() >= nextRepeat) {
             await key('keyDown', 'KeyW', 'w', 87, true);
