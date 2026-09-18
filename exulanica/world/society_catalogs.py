@@ -56,6 +56,9 @@ MODES: Final = ("need", "shift")
 SETTINGS: Final = ("destination", "home", "standing", "work")
 CAPACITY_RULES: Final = ("fixed", "node_clearance", "use_class")
 USE_CLASS_KINDS: Final = ("furniture", "residential", "workplace")
+#: The policy keys the engine reads. Enumerated on purpose, and safe because it is compared for
+#: exact equality against the catalog's own keys in load_routine_model: a key added to the catalog
+#: and a key removed from it are both refused, rather than one of them being read by nobody.
 POLICY_KEYS: Final = frozenset(
     {
         "commute_lead_minutes",

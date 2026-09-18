@@ -474,6 +474,9 @@ class StyleRegistry:
 
     @staticmethod
     def _validate_value(definition: ParameterDefinition, value: StyleParameterValue | Any) -> None:
+        # Starts closed on purpose: a kind with no branch below leaves valid False and is refused,
+        # so an unregistered kind cannot pass by falling out of the checks. _validate_definition
+        # above is written the same way for the same reason.
         valid = False
         if definition.kind == "range":
             valid = (

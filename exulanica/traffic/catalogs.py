@@ -89,6 +89,13 @@ _ENVELOPE: Final = frozenset(
 _SOURCE: Final = re.compile(
     r"cited ([a-z][a-z0-9_]*(?: and [a-z][a-z0-9_]*)*): \S.*|declared: \S.*"
 )
+#: Every catalog file this module reads, by catalog id. Deliberately a list, and not a claim about
+#: the directory: :func:`load_traffic_catalogs` compares it against the directory's own ``*.json``
+#: and refuses a file with no entry here as well as an entry with no file. So a sixth catalog
+#: cannot be read by nobody and left out of the digest, and the list cannot go stale in silence.
+#: Do not replace it with a glob, because each file has its own reader and its own entry shape;
+#: do not trust it without that comparison either, which
+#: ``test_a_catalog_file_the_loader_does_not_read_is_refused`` holds in both directions.
 _FILES: Final = {
     "vehicle-class": "vehicle-class.v1.json",
     "right-of-way-policy": "right-of-way-policy.v1.json",

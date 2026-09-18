@@ -152,6 +152,27 @@ def test_the_catalogs_live_in_their_own_directory_under_the_catalog_root():
     assert not list(CATALOG_DIRECTORY.parent.glob("vehicle-class*.json"))
 
 
+def test_a_catalog_file_the_loader_does_not_read_is_refused(copied):
+    """The list of files in the loader is held against the directory in both directions.
+
+    A loader that reads exactly the files it names would ignore a sixth catalog: nobody would
+    read it, no digest would cover it, and every test here would still pass. The comparison in
+    load_traffic_catalogs is what makes the list safe, so it is tested rather than assumed.
+    """
+    before = load_traffic_catalogs(copied).digest
+    extra = copied / "kerb-access.v1.json"
+    extra.write_text(json.dumps({"schema_version": 1}) + "\n", encoding="utf-8")
+    _refused(copied, "kerb-access.v1.json")
+    extra.unlink()
+    assert load_traffic_catalogs(copied).digest == before
+    (copied / "signal-plan.v1.json").unlink()
+    with pytest.raises(TrafficCatalogError) as caught:
+        load_traffic_catalogs(copied)
+    present, expected = str(caught.value).split(", expected ")
+    assert "signal-plan.v1.json" not in present, present
+    assert "signal-plan.v1.json" in expected, expected
+
+
 def test_the_catalogs_load_with_the_entries_the_simulation_names():
     catalogs = load_traffic_catalogs()
     assert [entry.key for entry in catalogs.vehicle_classes] == [

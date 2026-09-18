@@ -71,6 +71,13 @@ _LEAF_PREFIX: Final = b"exulanica-wmp-leaf-v1\0"
 _NODE_PREFIX: Final = b"exulanica-wmp-node-v1\0"
 _HEX64 = re.compile(r"^[0-9a-f]{64}$")
 
+# The three lists below are a floor and not an account of what a package may not carry. They name
+# the suffixes, path segments and field names refused so far, so a payload under a name nobody
+# listed passes all three. They sit beside checks that read the content rather than its name (bytes
+# under the workspace licence id, and the private key marker), and it is those that make a refusal
+# about the artefact. Adding a name after each incident is how this list grows; it is not how the
+# guarantee gets stronger, and no reader should take a pass here as a statement that a package is
+# safe to publish.
 _FORBIDDEN_SUFFIXES: Final = frozenset(
     {
         ".css",

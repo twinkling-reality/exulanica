@@ -280,7 +280,20 @@ def _reported(usage: Mapping[str, Any], key: str) -> int | None:
 
 
 def render_content_answer(content: tuple[SelectedContent, ...]) -> Answer:
-    """Render typed truth classes without sending personal or simulated state to a model."""
+    """Render typed truth classes without sending personal or simulated state to a model.
+
+    The ladder below names the result kinds this product has words for, and it cannot be held to
+    completeness: a kind is a string literal inside the SQL each source query selects in
+    :mod:`exulanica.selection.executor`, so there is no constant here to ask for the set. A check
+    that recovered the kinds by matching those SQL strings would pass whenever a producer was
+    written in a shape the match missed, which is worse than no check. Measured today: the
+    executor produces six kinds and this ladder names the same six.
+
+    What holds for a kind with no branch is the closing clause, which says that only a memory
+    capture supports a personal visit; what is lost is the marking its own class would carry. A
+    new truth class therefore needs a branch here, and the arrangement that would ask for one is
+    the producers naming their kinds in one place instead of inside their SQL.
+    """
     clauses = []
     for item in content[:8]:
         label = item.label or item.source_id
@@ -300,6 +313,8 @@ def render_content_answer(content: tuple[SelectedContent, ...]) -> Answer:
         elif item.result_kind == "simulation_event":
             text = f"Persisted simulation event: {label}. This is not a real-world visit."
         else:
+            # A kind this ladder does not name. Deliberately neutral rather than guessing at a
+            # class: it says the content was authorized and nothing about what it is.
             text = f"Authorized related content: {label}."
         clauses.append(AnswerClause(text=text, type=ClauseType.META))
     clauses.append(

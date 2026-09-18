@@ -134,7 +134,11 @@ CORRIDOR_BAR: Final = (
     "against a baseline that does not itself hold every key"
 )
 
-#: Text a record may never carry, the same three the retained-records test refuses.
+#: Text a record may never carry. A floor, not an account of what must not leak: it names the
+#: three kinds of string that have actually appeared in this repository's records. Anything
+#: sensitive in a shape nobody listed passes this check, so a record that clears it is not thereby
+#: clean. tests/test_retained_evaluation_records.py refuses these over the retained records by
+#: reading this tuple, rather than repeating the three where nothing would keep them in step.
 _FORBIDDEN_TEXT: Final = ("/Users/", "Bearer ", "api-token")
 
 #: Words that name a role or stand in for a name. A judge field holding one is not a name, which
@@ -1172,6 +1176,13 @@ def beats_baseline(candidate: Mapping[str, Any], baseline: Mapping[str, Any]) ->
 
 
 def _refuse_forbidden_text(value: Any, path: str = "$") -> None:
+    """Walk a record for forbidden text. Complete over canonical JSON, which is the premise.
+
+    A string can carry text, a mapping and a list can hold one, and no other JSON type can, so
+    this needs no list of record kinds. It is complete only because what reaches it is canonical
+    JSON: a set, a dataclass or any other container would be walked past in silence, and
+    :func:`digest_bound` is what holds callers to that form.
+    """
     if isinstance(value, str):
         for text in _FORBIDDEN_TEXT:
             if text in value:
