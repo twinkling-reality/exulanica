@@ -39,7 +39,7 @@ import { expandFormParts, FormPartsRefusal } from './form-parts.js';
 import { groundPieces } from './lots.js';
 import type { FormObject, FormPart, FormShape, FormTriangle } from './form-parts.js';
 import type { Piece, SurfaceExpansion } from './pieces.js';
-import type { ProjectionName } from './record-shapes.js';
+import type { GrammarTable, ProjectionName } from './record-shapes.js';
 import { ringClearance } from './ring-clearance.js';
 import { curbSurfaces, junctionSurface, segmentSurfaces } from './streets.js';
 import type { ApproachContext, CornerContext, CornerNeed, StreetFields, StreetLookup, StreetResult, StripNeed } from './streets.js';
@@ -189,10 +189,24 @@ export interface CapsuleClearance {
   readonly heightMm: number;
 }
 
-/** A region a standing capsule keeps its radius clear of, in plan, with what it was read from. */
+/**
+ * A region a standing capsule keeps its radius clear of, in plan, with the record it was read from.
+ *
+ * A ROUTE OBSTRUCTION RING, FROM THE NAVIGATION SIDE, AND NOT A COLLISION SOLID. It drops
+ * everything standing above the capsule height by design, it is a plan region with NO HEIGHT, and
+ * nothing in it stops a body: it says which way a walk can face, not what a walk can pass through.
+ * A reader wanting solid occupancy wants `collision_proxy`, which has no contract yet; the
+ * nav_envelope contract refuses collision in as many words, and a ring promoted quietly to a solid
+ * would make a bench into a building.
+ */
 export interface ObstructionRegion {
   /** The record kind that obstructs, for the message when a ring is refused. */
   readonly kind: string;
+  /**
+   * The identity of the record it came from, so a reader can bind what a walk passed to the record
+   * that put it there rather than to a shape with no name.
+   */
+  readonly identity: string;
   /** The ring itself, as the navigation table's obstruction axis names it. */
   readonly ring: readonly Plan[];
 }
@@ -942,6 +956,21 @@ export function baseRingOf(kind: string, fields: Fields): readonly Plan[] {
 }
 
 /**
+ * What a grammar measures for the walking capsule of `nav_envelope`'s `capsule_clearance`: the
+ * radius a support surface is carved clear by, and the height below which a record's part stands in
+ * a person's way rather than over their head. Undefined when the grammar measures neither.
+ */
+export function capsuleOf(table: GrammarTable): CapsuleClearance | undefined {
+  const clearance = table.measures.nav_envelope?.capsule_clearance;
+  if (clearance === undefined) return undefined;
+  const radiusMm = clearance.radius_mm;
+  const heightMm = clearance.height_mm;
+  if (radiusMm === undefined) throw new TessellationError(`${table.grammar_id} measures a capsule clearance with no radius`);
+  if (heightMm === undefined) throw new TessellationError(`${table.grammar_id} measures a capsule clearance with no height`);
+  return { radiusMm, heightMm };
+}
+
+/**
  * The regions one record obstructs a walking capsule with, by the navigation table's obstruction
  * axis, and none when it obstructs nothing. A base ring is the ring itself, one region. Low parts
  * are one region each: every part of the record whose bottom stands below the capsule height, in
@@ -954,8 +983,9 @@ export function obstructionsOf(
   capsule: CapsuleClearance | undefined,
   where: string,
 ): ObstructionRegion[] {
+  const identity = fields.identity as string;
   if (region === 'none') return [];
-  if (region === 'base_ring') return [{ kind, ring: baseRingOf(kind, fields) }];
+  if (region === 'base_ring') return [{ kind, identity, ring: baseRingOf(kind, fields) }];
   if (region === 'low_parts') {
     if (capsule === undefined) {
       throw new TessellationError(`${kind} obstructs with its low parts and its grammar measures no capsule to call them low by`);
@@ -977,7 +1007,7 @@ export function obstructionsOf(
       // A part standing in a person's way whose plan region has no area would be walked through,
       // so it is refused rather than passed over: every part this rule reads takes ground.
       if (ring.length < 3) throw new TessellationError(`${where}: part ${ordinal} stands below head height and covers no ground in plan`);
-      regions.push({ kind, ring });
+      regions.push({ kind, identity, ring });
     });
     return regions;
   }

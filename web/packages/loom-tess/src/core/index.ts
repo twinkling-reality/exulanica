@@ -18,7 +18,9 @@ export {
   TESSELLATOR_SOURCE_VERSION,
   TessellationError,
 } from './expand.js';
-export type { Need, ProjectionDefinition } from './expand.js';
+export { capsuleOf, obstructionsOf } from './expand.js';
+export type { CapsuleClearance, Need, ObstructionRegion, ProjectionDefinition } from './expand.js';
+export { routeObstructionRings } from './route-rings.js';
 export {
   absoluteSurfaceCoordinates,
   absoluteVertices,

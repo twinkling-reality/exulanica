@@ -221,6 +221,33 @@ solids an object states as its parts, and the ground a lot states.
   340 mm a capsule keeps clear of it. The tile bakes in 31 s against 22 s for the extent reading,
   which drew far less footway to carve.
 
+### Route obstruction rings
+
+NO CONTAINER CARRIES A RING SET. The rings are worked out at READ time, from the container's own
+records and grammar table, by the very expander that baked it: `decodeOwd` refuses a container whose
+`tessellator_version` is not this source version, so the code computing a ring and the code that
+baked the tile are the same code and cannot silently diverge. That refusal is what makes this a
+single reader rather than a second one, and loosening it would turn "guaranteed identical" into
+"usually agree", which is the disagreement about a bench that a scored walk must not have.
+
+A consumer choosing WHERE TO WALK reads `routeObstructionRings(header)` (`src/core/route-rings.ts`)
+off a decoded container: the same regions the carve keeps support clear of, one per part of a record
+standing below the capsule height its grammar measures, each naming the RECORD IDENTITY it came
+from, from every record the tile carries, owned or halo. It is the tessellator's own answer rather
+than a second reader's, because two readers would disagree about a bench and nothing would say which
+one a walk was scored against.
+
+`obstructionsOf` and `capsuleOf` are exported too, for a caller that wants one record's regions
+rather than a tile's. Prefer the whole-tile call: it reads the grammar table from the container's
+own pins and it includes HALO records, and a caller walking the records itself is a second place to
+forget that a bench over the boundary turns a walk on this side of it.
+
+THEY ARE NOT COLLISION SOLIDS. They drop everything above head height by design, they carry no
+height, and nothing in them stops a body: they say which way a walk can face. A capsule clearance is
+not a solid, which the `nav_envelope` contract states in as many words, and solid occupancy is
+`collision_proxy`, which has no contract yet. A reader that gives one of these regions a top is
+measuring a shape no record states.
+
 Every other record kind states the rule it waits on (`NEEDS` in `src/core/expand.ts`):
 `ring_triangulation`, `facade_layout`, `bent_street`, `street_curbs`, `junction_legs`,
 `concave_corner`, `crossing_band`, `marking_stripes`, `form_parts` or `ground_coverage`. Relations,

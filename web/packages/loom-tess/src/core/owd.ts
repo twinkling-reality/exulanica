@@ -677,6 +677,12 @@ function checkHeader(value: unknown): OwdHeader {
   if (header.media_type !== OWD_MEDIA_TYPE) fail(`media_type is not ${OWD_MEDIA_TYPE}`);
   if (header.generator !== OWD_GENERATOR) fail(`generator is not ${OWD_GENERATOR}`);
   if (header.truth !== OWD_TRUTH) fail(`truth is not ${OWD_TRUTH}`);
+  // THIS REFUSAL IS LOAD-BEARING BEYOND THE BYTES IT GUARDS. A consumer asks this package for a
+  // tile's route obstruction rings (`route-rings.ts`) and gets them from the expander that BAKED
+  // the container, because a container from another tessellator does not load at all. Loosen this
+  // and two sets that are guaranteed identical become two sets that merely usually agree, which is
+  // the re-derivation a route rule must never have: the walk and the world would disagree about a
+  // bench and nothing would say which of them a run was scored against.
   if (header.tessellator_version !== TESSELLATOR_SOURCE_VERSION) {
     fail(`tessellator_version is not ${TESSELLATOR_SOURCE_VERSION}; there is no upgrade on read, rebake the tile`);
   }

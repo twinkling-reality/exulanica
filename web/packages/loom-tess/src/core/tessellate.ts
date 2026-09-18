@@ -23,8 +23,8 @@
 import { canonicalBytes, compareCodeUnits } from './canonical-json.js';
 import type { Membership, RecordPayload, TileDocument } from './document.js';
 import { statedIdentity, tableOf } from './document.js';
-import { baseRingOf, obstructionsOf, PROJECTION_DEFINITIONS, ruleFor, TessellationError } from './expand.js';
-import type { CapsuleClearance, CarriedRecord, ExpandContext, Expansion, Need, ObstructionRegion, PlanBox } from './expand.js';
+import { baseRingOf, capsuleOf, obstructionsOf, PROJECTION_DEFINITIONS, ruleFor, TessellationError } from './expand.js';
+import type { CarriedRecord, ExpandContext, Expansion, Need, ObstructionRegion, PlanBox } from './expand.js';
 import type { Piece } from './pieces.js';
 import type { CoveringTriangle } from './terrain-yield.js';
 import { MATERIAL_RECORD_KIND, navigationRowOf, recordShapeOf } from './record-shapes.js';
@@ -178,21 +178,6 @@ function resolutionOf(table: GrammarTable, projection: ProjectionName): number {
   const stated = table.resolutions[projection];
   if (stated === undefined) throw new TessellationError(`${table.grammar_id} states no resolution for ${projection}`);
   return stated;
-}
-
-/**
- * What a grammar measures for the walking capsule of `nav_envelope`'s `capsule_clearance`: the
- * radius a support surface is carved clear by, and the height below which a record's part stands
- * in a person's way rather than over their head. Undefined when the grammar measures neither.
- */
-function capsuleOf(table: GrammarTable): CapsuleClearance | undefined {
-  const clearance = table.measures.nav_envelope?.capsule_clearance;
-  if (clearance === undefined) return undefined;
-  const radiusMm = clearance.radius_mm;
-  const heightMm = clearance.height_mm;
-  if (radiusMm === undefined) throw new TessellationError(`${table.grammar_id} measures a capsule clearance with no radius`);
-  if (heightMm === undefined) throw new TessellationError(`${table.grammar_id} measures a capsule clearance with no height`);
-  return { radiusMm, heightMm };
 }
 
 /** Every surface material record, by the surface it names and the role it dresses. */
