@@ -408,6 +408,26 @@ class Session {
     this.pending = new Map();
     this.events = [];
     this.listeners = new Map();
+    // A DEAD CONNECTION IS NOT AN UNANSWERED CALL, and until this was written the two were the same
+    // sentence. MEASURED 2026-09-18: reading a 12.68 MB container body closed this socket outright,
+    // and because nothing watched for that, the run reported `Runtime.callFunctionOn was not
+    // answered within 180000 ms` about the NEXT call, which never had a chance. Three hours went
+    // into a page that was healthy and a product that was innocent. The transport now fails with its
+    // own name, at the first call that notices, and every waiting call is told at once rather than
+    // sitting out its timeout.
+    this.closed = null;
+    const died = (what) => {
+      if (this.closed !== null) return;
+      this.closed = what;
+      for (const [id, slot] of this.pending) {
+        this.pending.delete(id);
+        slot.reject(new Error(`${slot.method}: the debugger connection ${what}`));
+      }
+    };
+    socket.addEventListener('close', (event) => died(
+      `closed with code ${event.code}${event.reason ? ` (${event.reason})` : ''}`,
+    ));
+    socket.addEventListener('error', () => died('failed'));
     socket.addEventListener('message', (event) => {
       const message = JSON.parse(event.data);
       if (message.id !== undefined) {
@@ -430,6 +450,9 @@ class Session {
   }
 
   send(method, params = {}, timeoutMs = 180_000) {
+    if (this.closed !== null) {
+      return Promise.reject(new Error(`${method}: the debugger connection ${this.closed}`));
+    }
     const id = (this.nextId += 1);
     return new Promise((resolvePromise, reject) => {
       // A call the browser never answers is a failure with a name, not a silent wait.
@@ -1028,9 +1051,34 @@ async function main() {
   // list with no containers in it and not a value of another shape.
   /** @type {() => Promise<any[]>} */
   let collectContainers = async () => [];
+  // The bytes the page received, read in CHUNKS rather than in one reply.
+  //
+  // MEASURED 2026-09-18, standalone and away from the gate: `Network.getResponseBody` for the
+  // corridor's 12.68 MB container is answered with about 16.9 MB of base64 in a single protocol
+  // message, and Node's own WebSocket CLOSES THE CONNECTION (code 1006) instead of delivering it.
+  // Every container this gate had ever read was the 0.56 MB conformance tile, whose whole body fits
+  // in one message, so the harness met this the first time it was pointed at a real street.
+  //
+  // It still reads what CROSSED THE WIRE, which is the property the record depends on: fetching the
+  // body again over HTTP would be a SECOND fetch, and a second fetch can differ from the one the
+  // page drew. A stream of the same response keeps the binding honest and keeps each message small.
+  const BODY_CHUNK_BYTES = 512 * 1024;
   const bodyOf = async (requestId) => {
-    const body = await session.send('Network.getResponseBody', { requestId }).catch(() => null);
-    return body === null ? null : Buffer.from(body.body, body.base64Encoded ? 'base64' : 'utf8');
+    const stream = await session.send('Network.takeResponseBodyAsStream', { requestId }).catch(() => null);
+    if (stream === null) return null;
+    const parts = [];
+    try {
+      for (;;) {
+        const chunk = await session.send('IO.read', { handle: stream.stream, size: BODY_CHUNK_BYTES });
+        if (chunk.data.length > 0) {
+          parts.push(Buffer.from(chunk.data, chunk.base64Encoded ? 'base64' : 'utf8'));
+        }
+        if (chunk.eof) break;
+      }
+    } finally {
+      await session.send('IO.close', { handle: stream.stream }).catch(() => null);
+    }
+    return Buffer.concat(parts);
   };
   const halt = async (reason) => {
     const state = await session.call(await session.reference('document'), CAPTURE_STATE, [appOrigin, expectedTitle, gateTarget.path]).catch(() => null);
