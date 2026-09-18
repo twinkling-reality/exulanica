@@ -89,8 +89,53 @@ opening at a stated pose, for two reasons in the product rather than in the gate
   scored verdict depend on wording, and the failure direction is the wrong one: a reworded default
   line would read as a stated pose and the gate would pass a frame nobody stated.
 
-Both are asked of the lanes that own those files. Until they are answered the gate binds the walk it
-read and the pose the page reported, and does not claim to have checked that the page honoured it.
+**BOTH HAVE BEEN ANSWERED, and this paragraph is the correction rather than an edit of the two
+above.** Found on 2026-09-18 by reading the app for a different question, not by re-reading this
+document, which is the way a stale claim is usually found. The app now reads a stated pose on the
+committed golden route exactly as it does on the credentialed ones, and refuses a malformed one
+rather than opening at a default; and it states the opening as DATA on the shell, `stated` or
+`default` with the four integers beside it, which is what the harness reads. So the gate does check
+that the page honoured the walk a committed file states: it compares the four integers the page
+states against the four the file states and halts when they differ, and it halts when a file states
+a walk and the page opened at its default.
+
+What the two bullets above described was true when they were written and is no longer true of this
+tree. They stay because the reason they were written down, that a check nobody can exercise is a
+check nobody has seen refuse anything, is the reason it is worth recording that they were closed.
+
+## What it would take to point this gate at the corridor's street
+
+Written before anything is built, because the corridor is the verdict and the conformance tile is
+only the machine. Scoped on 2026-09-18 by reading the app and this harness rather than by trying it.
+
+**What is already true, and this is the load-bearing half.** Nothing in the route rule, the key
+measurements or the record binding is sized to the fixture. The route length is 125 m from the rule,
+walked as two legs of 62.5 m with a capture at the midpoint. The walkable field is read from the
+page's own navigation world rather than from any tile's extent. The container binding reads whatever
+crossed the wire and recognises it by the container's own magic. The harness already declares all
+three selectors the preview route takes, and a baked street is reached by two of them: `baked_tile`
+with an id, or `city` with a seed and tile coordinates.
+
+**So the run is a URL and an environment rather than a change to this gate.** What it needs is the
+API serving `/tiles`, a development token holding `tiles.materialise`, and the app started with that
+token, which is the shape of the corridor lane's own launch entry and not of this lane's. The
+committed golden is served from the working tree and needs none of that, which is exactly why it is
+the target that can be run with no credential.
+
+**The stated pose needs nothing either, which was not true when this document was first written.**
+The corridor lane has committed the file that states its walk, and `--walk` reads it, binds it by
+digest, compares the four integers against the ones in the URL and halts when they differ, then
+compares them against the four the page states as data and halts again when those differ. The
+harness can consume that file as it stands.
+
+**What is NOT established.** That the corridor tile is walkable. The 32 mm hole found on the
+conformance tile is a tessellator defect at a carve boundary, so the corridor's container carries the
+same class of hole until it is rebaked with the fix, and nobody has measured its envelope for holes.
+A gate run on the corridor before that rebake would halt the same way, one stall earlier or later.
+
+**And what no amount of this proves.** The verdict is one 126 m street with fourteen buildings,
+scored by the named judge. Every mechanical key measured on the conformance tile says the machine
+works; none of them says anything about the street.
 
 ## The run with the rings off the collision field, predicted before it was run
 
