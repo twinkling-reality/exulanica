@@ -301,6 +301,7 @@ export function curbSurfaces(
   curb: StreetFields,
   segment: StreetFields,
   corners: readonly CornerContext[],
+  approaches: readonly ApproachContext[],
   where: string,
 ): StreetResult<'bent_street' | CornerNeed> {
   const centre = straight(segment.centreline_mm);
@@ -342,11 +343,31 @@ export function curbSurfaces(
     );
   }
   const topQuad: Space[] = onLeft ? [top0, top1, back1, back0] : [back0, back1, top1, top0];
-  const footwayQuad: Space[] = onLeft ? [back0, back1, footway1, footway0] : [footway0, footway1, back1, back0];
+  // THE FOOTWAY IS A RING IN WALK ORDER, not a quad, because either end of it may GIVE WAY TO A
+  // MITRE. Where a corner's width reaches its radius, this strip and the one it meets would both
+  // cover the ground beyond the arc's centre; the corner rule gives each the side of the line from
+  // that centre to the frontage corner that its own length runs along. Both those points lie on
+  // this strip's own edges by construction, the centre on its end normal and the frontage corner on
+  // its frontage line, so the clip adds no point either strip has to find: it replaces the corner of
+  // the quad with the two the corner rule names, and the two strips meet on the line between them.
+  const [walkStart, walkEnd] = onLeft ? [0, 1] : [1, 0];
+  const backs = [back0, back1];
+  const fronts = [footway0, footway1];
+  const ring: Space[] = [backs[walkStart]!, backs[walkEnd]!];
+  const turnedMitre = corners.length === 0 ? undefined : cornerMitre(curb, corners[0]!.follower, where);
+  const metMitre = approaches.length === 0 ? undefined : cornerMitre(approaches[0]!.owner, curb, where);
+  if (turnedMitre === undefined) ring.push(fronts[walkEnd]!);
+  else ring.push(turnedMitre.centre, turnedMitre.frontage);
+  if (metMitre === undefined) ring.push(fronts[walkStart]!);
+  else ring.push(metMitre.frontage, metMitre.centre);
+  const footwayRing = ring.filter((point, index) => !samePoint(point, ring[(index + ring.length - 1) % ring.length]!));
   const built: { readonly [name: string]: Built } = {
     face: { vertices: faceVertices, coordinates: faceCoordinates, triangles: [...QUAD] },
     top: { ...horizontal(topQuad, origin, direction, where), triangles: [...QUAD] },
-    footway: { ...horizontal(footwayQuad, origin, direction, where), triangles: [...QUAD] },
+    footway: {
+      ...horizontal(footwayRing, origin, direction, where),
+      triangles: [...triangulateRing(footwayRing.map(plan), where)],
+    },
   };
   for (const corner of corners) {
     const turned = curbCorner(curb, corner, origin, direction, where);
@@ -367,10 +388,32 @@ export function curbSurfaces(
 /** What a curb's corner waits on when this version does not draw it. */
 export type CornerNeed = 'concave_corner';
 
+/**
+ * Where the two straight strips that meet at a corner give way to each other, when the corner
+ * mitres: `centre` is the arc's centre, on both strips' end normals, and `frontage` is the corner
+ * `F` where the two frontage lines meet, floored to millimetres. `height` is what the corner's
+ * OWNER puts the footway at there, which both strips take, so the two cannot disagree at a point
+ * they share. Undefined when no width reaches the radius, where the frontage lines never enter the
+ * slice and the strips do not overlap.
+ */
+export interface CornerMitre {
+  readonly centre: Space;
+  readonly frontage: Space;
+}
+
 /** A corner's share of each of the curb's three surfaces, or the rule it waits on. */
 export type CornerResult =
-  | { readonly state: 'drawn'; readonly parts: { readonly face: Built; readonly top: Built; readonly footway: Built } }
+  | {
+      readonly state: 'drawn';
+      readonly parts: { readonly face: Built; readonly top: Built; readonly footway: Built };
+      readonly mitre: CornerMitre | undefined;
+    }
   | { readonly state: 'waiting'; readonly need: CornerNeed };
+
+/** The curb whose corner ENDS at this one's start: the one that states the radius and owns it. */
+export interface ApproachContext {
+  readonly owner: StreetFields;
+}
 
 /** What a curb's corner needs of the tile beyond the curb itself. */
 export interface CornerContext {
@@ -397,7 +440,7 @@ export function curbCorner(
 ): CornerResult {
   const radius = curb.corner_radius_mm as number;
   const nothing: Built = { vertices: [], coordinates: [], triangles: [] };
-  if (radius === 0) return { state: 'drawn', parts: { face: nothing, top: nothing, footway: nothing } };
+  if (radius === 0) return { state: 'drawn', parts: { face: nothing, top: nothing, footway: nothing }, mitre: undefined };
   const [beforeP, p] = walked(curb);
   const [q, afterQ] = walked(corner.follower);
   const into = between(plan(beforeP), plan(p), where);
@@ -443,15 +486,47 @@ export function curbCorner(
   // keep the kerb top's.
   const onBack = new Map<string, number>();
   for (const point of back) onBack.set(`${String(point[0])} ${String(point[1])}`, point[2]);
-  const apex = floorDivide(add(p[2], q[2], where), 2, where);
+  const apex = add(floorDivide(add(p[2], q[2], where), 2, where), height, where);
+  const reach = add(kerbWidth, footwayWidth, where);
+  const follower = add(corner.follower.kerb_width_mm as number, corner.follower.footway_width_mm as number, where);
+  // A corner MITRES when a width reaches the radius: the frontage lines then never enter the slice,
+  // the slice runs to the centre, and the two straight strips, which would overlap beyond it, give
+  // way to each other on the line from the centre to the frontage corner. Otherwise the frontage
+  // lines cut the slice, and what they cut off is the building's: the blocks the curb names carve
+  // it where the tile carries them, and the frontage quadrilateral carves it whether or not it
+  // does, so a block the tile does not carry cannot let a footway run into a building.
+  const mitre = cornerMitre(curb, corner.follower, where);
+  const mitres = mitre !== undefined;
+  const frontage = frontageCorner(p, into, q, out, reach, follower, where);
+  const taken: (readonly Plan[])[] = [...corner.blocks];
+  if (!mitres) {
+    taken.push([
+      moved(plan(p), alongByCornerRule(leftOf(into), reach, where), where),
+      frontage,
+      moved(plan(q), alongByCornerRule(leftOf(out), follower, where), where),
+      [centre[0], centre[1]],
+    ]);
+  }
+  // The wedge stands at the kerb top's height on the back arc, and a crossfall above it elsewhere:
+  // the full crossfall on the frontage, which is a footway width from the back arc, and the
+  // crossfall of its own distance at the centre, which is nearer than that whenever a corner
+  // mitres. Both are what the corner rule's box allows, and the second is what the strips that
+  // meet there take, so the wedge and the strips cannot disagree at the centre.
+  const atCentre = mitre === undefined
+    ? add(apex, floorDivide(multiply(subtract(radius, kerbWidth, where), curb.footway_crossfall_millionths as number, where), CORNER_LENGTH_SCALE, where), where)
+    : mitre.centre[2];
+  const centreKey = `${String(centre[0])} ${String(centre[1])}`;
   const slice: Plan[] = [...back.map(plan), [centre[0], centre[1]]];
   const wedgeVertices: Space[] = [];
   const wedgeTriangles: number[] = [];
-  for (const walk of openRegions(slice, corner.blocks, where)) {
+  for (const walk of openRegions(slice, taken, where)) {
     const first = wedgeVertices.length;
     for (const point of walk) {
-      const kerbTop = onBack.get(`${String(point[0])} ${String(point[1])}`);
-      const z = kerbTop === undefined ? add(add(apex, height, where), rise, where) : kerbTop;
+      const key = `${String(point[0])} ${String(point[1])}`;
+      const kerbTop = onBack.get(key);
+      let z = add(apex, rise, where);
+      if (kerbTop !== undefined) z = kerbTop;
+      else if (key === centreKey) z = atCentre;
       wedgeVertices.push([point[0], point[1], z]);
     }
     for (const index of triangulateRing(walk, where)) wedgeTriangles.push(first + index);
@@ -463,7 +538,54 @@ export function curbCorner(
       top: { ...horizontal(topVertices, origin, direction, where), triangles: topTriangles },
       footway: { ...horizontal(wedgeVertices, origin, direction, where), triangles: wedgeTriangles },
     },
+    mitre,
   };
+}
+
+/**
+ * The mitre of the corner `curb` turns into `follower`, or undefined when it turns none, when it
+ * turns the other way, or when no width reaches the radius and the two strips do not overlap. Read
+ * by the corner itself and by BOTH strips that meet on it, so the three take the same two points.
+ */
+export function cornerMitre(curb: StreetFields, follower: StreetFields, where: string): CornerMitre | undefined {
+  const radius = curb.corner_radius_mm as number;
+  if (radius === 0) return undefined;
+  const [beforeP, p] = walked(curb);
+  const [q, afterQ] = walked(follower);
+  const into = between(plan(beforeP), plan(p), where);
+  const out = between(plan(q), plan(afterQ), where);
+  if (crossVectors(into, out, where) <= 0) return undefined;
+  const kerbWidth = curb.kerb_width_mm as number;
+  const reach = add(kerbWidth, curb.footway_width_mm as number, where);
+  const other = add(follower.kerb_width_mm as number, follower.footway_width_mm as number, where);
+  if (reach < radius && other < radius) return undefined;
+  const crossfall = curb.footway_crossfall_millionths as number;
+  const apex = add(floorDivide(add(p[2], q[2], where), 2, where), curb.kerb_height_mm as number, where);
+  const rise = floorDivide(multiply(curb.footway_width_mm as number, crossfall, where), CORNER_LENGTH_SCALE, where);
+  const centre = filletCentre(p, into, q, out, radius, where);
+  const frontage = frontageCorner(p, into, q, out, reach, other, where);
+  return {
+    centre: [centre[0], centre[1], add(apex, floorDivide(multiply(subtract(radius, kerbWidth, where), crossfall, where), CORNER_LENGTH_SCALE, where), where)],
+    frontage: [frontage[0], frontage[1], add(apex, rise, where)],
+  };
+}
+
+/**
+ * The frontage corner `F`: where the line a `reach` to the left of the piece arriving at `p` meets
+ * the line a `follower` reach to the left of the piece leaving `q`, each axis floored, which is how
+ * every other point of a corner is placed. The grammar holds `F` to be a corner of the block ring
+ * where the curb has a block, and there it is a whole number of millimetres; where it is not, both
+ * strips and the wedge take the same floored point, so they meet on it whatever it rounded from.
+ */
+function frontageCorner(p: Space, into: Plan, q: Space, out: Plan, reach: number, follower: number, where: string): Plan {
+  const first = moved(plan(p), alongByCornerRule(leftOf(into), reach, where), where);
+  const second = moved(plan(q), alongByCornerRule(leftOf(out), follower, where), where);
+  const numerator = crossVectors(between(first, second, where), out, where);
+  const denominator = crossVectors(into, out, where);
+  return [
+    add(first[0], floorDivide(multiply(into[0], numerator, where), denominator, where), where),
+    add(first[1], floorDivide(multiply(into[1], numerator, where), denominator, where), where),
+  ];
 }
 
 /** One surface being built: its vertices, their surface coordinates, and its triangles over them. */

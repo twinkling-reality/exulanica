@@ -186,7 +186,12 @@ solids an object states as its parts, and the ground a lot states.
   exactly through `F`, so carving by the block gives the same answer and also gives the right answer
   where `F` lies outside the arc and the wedge is two pieces rather than one. Measured on the
   corridor's five tiles, 8 of 48 convex corners with both widths under the radius are that shape, and
-  a rule that walked to `F` would draw a ring crossing itself on every one of them. A concave corner
+  a rule that walked to `F` would draw a ring crossing itself on every one of them. WHERE A WIDTH
+  REACHES THE RADIUS the corner MITRES: the frontage lines never enter the slice, the slice runs to
+  the centre, and the two straight strips, which would otherwise both cover the ground beyond that
+  centre, keep their own side of the line from it to `F`. That was 16 corners and about 32 m2 of
+  doubly drawn footway on the corridor before this rule; both of the line's points lie on each
+  strip's own edges, so neither strip has to find a point the other does not have. A concave corner
   waits on `concave_corner`: the grammar states it, no corner on the corridor is one, and a rule
   nothing holds is a rule that is wrong somewhere nobody has looked.
 - In `nav_envelope`, support is what the navigation table calls `support`: the same ground partition

@@ -14,8 +14,8 @@ that no production build emits these bytes or the code that reads them.
   pnpm tess bake packages/loom-tess/test/fixtures/tile-conformance.json packages/app/src/dev/tiles/tile-conformance.owd
   ```
 
-- sha256: `2192debd652a12392a5f98dea25d5967d715a1431b17393316e5696c3cb1f290` (568,956 bytes).
-- render_batch triangle digest: `caf7ec4fc7e91f4f1457e2f9c470b2c3d24d014af9b7ffa2d7c12d98cc817560`,
+- sha256: `1ef74efa8eef6844715e5b33711fccd48692ca245de133124287f3249b89c07f` (564,788 bytes).
+- render_batch triangle digest: `e906150d744f4ad12fab849c45f439e1501a3f5fd729d3e3ce716f88fcc3b455`,
   the value tess's own conformance test pins.
 
 `test/generated-tile-golden.test.ts` rebakes the source through tess's bake command and requires

@@ -103,7 +103,7 @@ describe('the segment rule', () => {
       const gutterPoints = points(result.pieces[1]!).map((point) => point.join(' '));
       for (const side of ['left', 'right']) {
         const curb = curbOf(segment, side)!;
-        const drawn = curbSurfaces(curb, segment, [], 'case');
+        const drawn = curbSurfaces(curb, segment, [], [], 'case');
         if (drawn.state !== 'drawn') throw new Error('not drawn');
         const facePoints = points(drawn.pieces[0]!);
         const bottoms = facePoints.filter((point) => point[2] === curb.kerb_line_mm[0][2]);
@@ -137,7 +137,7 @@ describe('the curb rule, straight parts', () => {
     expect(curbs).toHaveLength(6);
     for (const curb of curbs) {
       const segment = segments.find((candidate) => candidate.identity === curb.segment_identity)!;
-      const result = curbSurfaces(curb, segment, [], 'case');
+      const result = curbSurfaces(curb, segment, [], [], 'case');
       if (result.state !== 'drawn') throw new Error(`curb ${curb.identity} waits on ${result.need}`);
       expect(result.pieces.map((piece) => [piece.surface!.role, piece.surface!.orientation])).toEqual([
         ['kerb', 'vertical'],
@@ -172,7 +172,7 @@ describe('the curb rule, straight parts', () => {
     const curb = curbs.find((candidate) => candidate.block_identity.includes(block.identity) && candidate.side === 'left'
       && candidate.kerb_line_mm[0][1] === candidate.kerb_line_mm[1][1])!;
     const segment = segments.find((candidate) => candidate.identity === curb.segment_identity)!;
-    const result = curbSurfaces(curb, segment, [], 'case');
+    const result = curbSurfaces(curb, segment, [], [], 'case');
     if (result.state !== 'drawn') throw new Error('not drawn');
     const back = points(result.pieces[2]!).filter((point) => point[1] === block.boundary_mm[0][1]);
     expect(back).toHaveLength(2);
@@ -189,6 +189,25 @@ function cornerOf(curb: Fields): CornerContext | undefined {
   const rings = (curb.block_identity as string[]).map((block) =>
     (recordsOf(fixture, 'city.block').find((record: any) => record.fields.identity === block) as any).fields.boundary_mm as [number, number][]);
   return { follower, blocks: rings, resolutionMm: 1 };
+}
+
+/** Whether any triangle of one footway meets any triangle of another, interiors only. */
+function footwaysMeet(first: Piece, second: Piece): boolean {
+  const twice = (a: Point, b: Point, c: number[]): number =>
+    (b[0] - a[0]) * (c[1]! - a[1]) - (b[1] - a[1]) * (c[0]! - a[0]);
+  const turned = (walk: [Point, Point, Point]): Point[] =>
+    twice(walk[0], walk[1], walk[2]) >= 0 ? [...walk] : [walk[0], walk[2], walk[1]];
+  const apart = (edges: Point[], other: Point[]): boolean => edges.some((from, index) => {
+    const to = edges[(index + 1) % edges.length]!;
+    return other.every((point) => twice(from, to, point) <= 0);
+  });
+  for (const a of triangles(first)) {
+    for (const b of triangles(second)) {
+      const [x, y] = [turned(a), turned(b)];
+      if (!apart(x, y) && !apart(y, x)) return true;
+    }
+  }
+  return false;
 }
 
 /** Whether a plan point lies inside a ring, by crossings. */
@@ -212,8 +231,8 @@ describe('the corner rule', () => {
     for (const curb of turning) {
       const segment = segments.find((candidate) => candidate.identity === curb.segment_identity)!;
       const corner = cornerOf(curb)!;
-      const straight = curbSurfaces(curb, segment, [], 'case');
-      const turned = curbSurfaces(curb, segment, [corner], 'case');
+      const straight = curbSurfaces(curb, segment, [], [], 'case');
+      const turned = curbSurfaces(curb, segment, [corner], [], 'case');
       if (straight.state !== 'drawn' || turned.state !== 'drawn') throw new Error('a curb is not drawn');
       expect(turned.pieces.map((piece) => [piece.surface!.role, piece.surface!.orientation])).toEqual([
         ['kerb', 'vertical'],
@@ -241,13 +260,56 @@ describe('the corner rule', () => {
     }
   });
 
+  it('gives way on the mitre where a footway reaches the radius, so two strips never overlap', () => {
+    // A right-angled corner of radius 10 m with a 13.2 m reach, which is the shape the corridor has
+    // sixteen of: the two straight strips would both cover the ground beyond the arc's centre.
+    // Every number below is chosen so the mitre's two points are whole millimetres this test can
+    // write down: the centre is the radius along the first curb's end normal, and the frontage
+    // corner is where the two frontage lines, each a reach to the left of its kerb line, meet.
+    const widths = { kerb_height_mm: 150, kerb_width_mm: 200, footway_width_mm: 13000, footway_crossfall_millionths: 20000 };
+    const first: Fields = { identity: 'first', side: 'left', corner_radius_mm: 10000, next_curb_identity: ['second'],
+      kerb_line_mm: [[-20000, 0, 0], [0, 0, 0]], ...widths };
+    const second: Fields = { identity: 'second', side: 'left', corner_radius_mm: 0, next_curb_identity: [],
+      kerb_line_mm: [[10000, 10000, 0], [10000, 30000, 0]], ...widths };
+    const along: Fields = { centreline_mm: [[-20000, -3000, 0], [0, -3000, 0]] };
+    const up: Fields = { centreline_mm: [[13000, 10000, 0], [13000, 30000, 0]] };
+    const corner: CornerContext = { follower: second, blocks: [], resolutionMm: 1 };
+    const footwayOf = (result: ReturnType<typeof curbSurfaces>): Piece => {
+      if (result.state !== 'drawn') throw new Error(`a curb waits on ${result.need}`);
+      return result.pieces[2]!;
+    };
+    const mitred = [
+      footwayOf(curbSurfaces(first, along, [corner], [], 'case')),
+      footwayOf(curbSurfaces(second, up, [], [{ owner: first }], 'case')),
+    ];
+    const plain = [
+      footwayOf(curbSurfaces(first, along, [], [], 'case')),
+      footwayOf(curbSurfaces(second, up, [], [], 'case')),
+    ];
+    // Both strips take the same two points: the centre on their shared normals, and the frontage
+    // corner where a 13.2 m reach from each kerb line meets.
+    for (const piece of mitred) {
+      const at = points(piece).map((point) => [point[0], point[1]]);
+      expect(at).toContainEqual([0, 10000]);
+      expect(at).toContainEqual([-3200, 13200]);
+    }
+    // The strip is a ring of five where a mitre cuts one of its corners, and of four where none
+    // does. The first curb's piece carries its corner's wedge as well, so only the second is bare.
+    expect(points(mitred[1]!)).toHaveLength(5);
+    expect(points(plain[1]!)).toHaveLength(4);
+    // And the strips no longer cover the same ground. Without the mitre they do, which is the
+    // control: a test that cannot fail on the unmitred pair would not be testing the mitre.
+    expect(footwaysMeet(plain[0]!, plain[1]!)).toBe(true);
+    expect(footwaysMeet(mitred[0]!, mitred[1]!)).toBe(false);
+  });
+
   it('waits on the rule for a corner that turns the other way', () => {
     const curb = curbs.find((candidate) => candidate.corner_radius_mm !== 0)!;
     const segment = segments.find((candidate) => candidate.identity === curb.segment_identity)!;
     const corner = cornerOf(curb)!;
     // The follower's kerb line reversed turns the corner the other way, which is a concave one.
     const reversed = { ...corner.follower, kerb_line_mm: [...(corner.follower.kerb_line_mm as unknown[])].reverse() };
-    const result = curbSurfaces(curb, segment, [{ ...corner, follower: reversed }], 'case');
+    const result = curbSurfaces(curb, segment, [{ ...corner, follower: reversed }], [], 'case');
     expect(result).toEqual({ state: 'waiting', need: 'concave_corner' });
   });
 });

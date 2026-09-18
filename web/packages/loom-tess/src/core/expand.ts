@@ -42,7 +42,7 @@ import type { Piece, SurfaceExpansion } from './pieces.js';
 import type { ProjectionName } from './record-shapes.js';
 import { ringClearance } from './ring-clearance.js';
 import { curbSurfaces, junctionSurface, segmentSurfaces } from './streets.js';
-import type { CornerContext, CornerNeed, StreetFields, StreetLookup, StreetResult, StripNeed } from './streets.js';
+import type { ApproachContext, CornerContext, CornerNeed, StreetFields, StreetLookup, StreetResult, StripNeed } from './streets.js';
 import { hullKeepingEdges } from './piece-carve.js';
 import { carveSupport } from './support-carve.js';
 import type { ClearanceWalk, SupportTriangle } from './support-carve.js';
@@ -53,7 +53,7 @@ import type { CoveringTriangle, TerrainPatch } from './terrain-yield.js';
  * Bumped whenever an expander, a statement, a contract or the materialised projection set
  * changes, because each changes the bytes a bake writes. The bake stage's parameters carry it.
  */
-export const TESSELLATOR_SOURCE_VERSION = 16;
+export const TESSELLATOR_SOURCE_VERSION = 17;
 
 /**
  * What each materialised projection preserves and what it may be used for, as separate rows, the
@@ -494,7 +494,22 @@ function curbPieces(fields: Fields, context: ExpandContext, where: string): Stre
   const segment = context.carried.get(fields.segment_identity as string);
   if (segment === undefined) throw new TessellationError(`${where} names a segment the tile does not carry`);
   if (segment.kind !== 'city.street_segment') throw new TessellationError(`${where} names ${segment.kind} as its segment`);
-  return curbSurfaces(fields, segment.fields, cornersOf(fields, context, where), where);
+  return curbSurfaces(fields, segment.fields, cornersOf(fields, context, where), approachesOf(fields, context), where);
+}
+
+/**
+ * The curbs whose corner ends at this one's start: the carried curbs that name it as their
+ * follower. A curb's own strip gives way on a mitre its PREDECESSOR owns, so it has to find it.
+ */
+function approachesOf(fields: Fields, context: ExpandContext): ApproachContext[] {
+  const identity = fields.identity as string;
+  const owners: ApproachContext[] = [];
+  for (const record of context.carried.values()) {
+    if (record.kind !== 'city.curb_edge') continue;
+    if (!(record.fields.next_curb_identity as readonly string[]).includes(identity)) continue;
+    owners.push({ owner: record.fields });
+  }
+  return owners;
 }
 
 /**

@@ -101,7 +101,7 @@ of detail, the 128 m tile, the 64 m halo, the ownership and halo rules, and ``ed
 sorted) into that field; the empty subsequence is ``EMPTY_EDIT_DELTA_DIGEST``. ``baked_tile_id``
 is ``uuid5(ARTIFACT_NAMESPACE, "baked_tile:<version>:<params digest>:<tile_inputs_digest>")``.
 
-2. THE TESSELLATOR (``web/packages/loom-tess``, stage ``baked_tile`` version 3, tessellator 16)
+2. THE TESSELLATOR (``web/packages/loom-tess``, stage ``baked_tile`` version 3, tessellator 17)
 ===============================================================================
 
 **Container** ``owd/3``, magic ``OWD3``: canonical JSON header (tile record and inputs digest,
@@ -120,7 +120,7 @@ bake; the browser build is a preview held to the same triangle digest. Two bakes
 ``baked_tile_id`` that differ are a fault; the table that records that fault is migration 0072,
 this lane's.
 
-**What draws, measured from the corridor's own container on 2026-09-18, tessellator 16.** Of tile
+**What draws, measured from the corridor's own container on 2026-09-18, tessellator 17.** Of tile
 (2, 0)'s 4,149 entries, 527 draw: 168 facades, 89 rooftop objects, 78 vitrines, 51 interior
 backings, 36 pieces of street furniture, 33 parcels, 32 massings, 30 street trees, 6 curb edges, 3
 street segments and the terrain. That is 1,531 surfaces, 1,445 of them dressed by a material
@@ -135,6 +135,13 @@ remain for others: ``ring_triangulation``, ``form_parts``,
 ``street_curbs``, ``junction_legs``, ``bent_street`` (every corridor street is straight, so nothing
 here has met it), ``concave_corner`` (no corner on this street turns that way) and
 ``marking_stripes`` (no stage emits a road marking record yet).
+
+**TWO STRIPS THAT MEET AT A CORNER GIVE WAY ON ITS MITRE.** Where a footway width reaches the
+corner's radius, the two straight strips both covered the ground beyond the arc's centre: measured
+on the corridor's five tiles, 16 corners with 3.61 m2 or 0.42 m2 of doubly drawn footway each, about
+32 m2, two coplanar surfaces fighting for the same pixel. Each strip now keeps its own side of the
+line from the centre to the frontage corner, which the corner rule states. Both points lie on each
+strip's own edges, so the clip adds no point either strip has to find.
 
 **A CURB TURNS ITS CORNER.** The curb that states ``corner_radius_mm`` draws the kerb face along
 the arc, the kerb top, and the footway wedge up to its follower's tangent point, added to its own

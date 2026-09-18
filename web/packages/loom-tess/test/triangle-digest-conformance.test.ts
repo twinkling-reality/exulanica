@@ -28,10 +28,10 @@ import {
   sortList,
 } from './support.js';
 
-/** Over `test/fixtures/tile-conformance.json`, tessellator 16, digest profile v3. */
+/** Over `test/fixtures/tile-conformance.json`, tessellator 17, digest profile v3. */
 const GOLDEN = {
-  render_batch: 'caf7ec4fc7e91f4f1457e2f9c470b2c3d24d014af9b7ffa2d7c12d98cc817560',
-  nav_envelope: '32308308e484049938980c744c270756dfa1adeccda6eccb50d9af2c39aaa525',
+  render_batch: 'e906150d744f4ad12fab849c45f439e1501a3f5fd729d3e3ce716f88fcc3b455',
+  nav_envelope: 'dcd548bde8d8ca988c1e3b433c9515fe6531c95d7a5f4085d627e1b54e7eb811',
 } as const;
 
 afterEach(() => {
@@ -205,10 +205,10 @@ describe('the triangle digest of the conformance fixture', () => {
     const drawnTerrain = renderBatch!.header.entries[terrain]!;
     expect(drawnTerrain).toMatchObject({
       state: 'drawn',
-      first_vertex: 3476,
-      vertex_count: 468,
-      triangle_count: 491,
-      surfaces: [{ role: 'terrain', orientation: 'horizontal', material: { state: 'none-exists' }, triangle_count: 491 }],
+      first_vertex: 3419,
+      vertex_count: 478,
+      triangle_count: 495,
+      surfaces: [{ role: 'terrain', orientation: 'horizontal', material: { state: 'none-exists' }, triangle_count: 495 }],
     });
     // The building draws, so the ground it stands on is the building's and not the terrain's: its
     // base ring is cut out of the patch by the same yield rule the segments' surfaces are.
@@ -264,7 +264,7 @@ describe('the triangle digest of the conformance fixture', () => {
     expect(count(nav, 'halo')).toBe(grammar.halo.length);
     // Fewer triangles than render's terrain, and far fewer than when terrain drew under the ground
     // a carve had cleared: the segments cover what they stand on whether or not a capsule fits.
-    expect(navEnvelope!.header.entries[terrain]).toMatchObject({ state: 'drawn', vertex_count: 388, triangle_count: 572 });
+    expect(navEnvelope!.header.entries[terrain]).toMatchObject({ state: 'drawn', vertex_count: 394, triangle_count: 576 });
     expect(navEnvelope!.surfaceMm).toBeUndefined();
 
     // Halo is exactly what the document lists as halo.
