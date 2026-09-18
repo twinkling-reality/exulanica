@@ -4,7 +4,7 @@
  "frames": 240,
  "turnKey": "ArrowRight",
  "settleMs": 6000,
- "outDir": "<session scratchpad>/tile-budget/clip/frames",
+ "outDir": "<any directory the runner may create; the frames land here>",
  "readyExpression": "!!document.querySelector('.generated-tile-evaluation') || document.body.innerText.includes('could not open')",
  "readyTimeoutMs": 180000,
  "hideText": [
