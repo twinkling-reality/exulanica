@@ -242,6 +242,16 @@ export async function prepareBakedTileWalk(env: AppEnvironment, request: BakedTi
  * The tile frame has x east, y north and z up in millimetres; the renderer has x east, y up and z
  * south in metres, and yaw 0 looks north with forward (-sin yaw, 0, -cos yaw). So a facing of (dx, dy)
  * is yaw = atan2(-dx, dy): east (1, 0) gives -90 degrees, whose forward is (1, 0, 0), which is east.
+ *
+ * THERE ARE TWO YAW ZEROS IN THIS TREE AND THEY ARE A HALF TURN APART. The one above is the camera's,
+ * with forward (-sin yaw, 0, -cos yaw) as `atlas-binding.ts` states it, so yaw 0 looks north.
+ * `atlas-core`'s own basis has yaw 0 looking along +Z, the opposite pole, and the two are reconciled
+ * in exactly one place: `Controls.forward()` adds a single `Math.PI`, with its reason written beside
+ * it. A reader meeting this header and then meeting atlas-core would otherwise find two conventions
+ * and no sentence saying so. Checked against both, and against a measurement rather than only a
+ * convention: the corridor lane committed a facing of (1, 0) before any walk existed, and a trace of
+ * 3,000 steps moved the walker from x 262,017 to x 383,999, increasing, which is east in the tile
+ * frame.
  * The height is the envelope's, sampled where the walk begins, so a stated pose stands on the ground
  * rather than at a stated altitude; where the envelope has no support there, the pose is still honoured
  * and the statement says the tile states no walkable surface there, rather than moving the walk
