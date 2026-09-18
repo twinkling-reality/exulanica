@@ -22,7 +22,7 @@ from exulanica.grammar.catalogs import (
     catalog_digest,
     integer_field,
     key_list_field,
-    load_catalog,
+    load_catalog_directory,
     text_field,
 )
 from exulanica.grammar.errors import CatalogError
@@ -275,12 +275,16 @@ def load_routine_model(
     chosen = dict(ROUTINE_VERSIONS if versions is None else versions)
     if set(chosen) != set(ROUTINE_VERSIONS):
         raise CatalogError(f"a routine model reads exactly {sorted(ROUTINE_VERSIONS)}")
-    catalogs = []
     for catalog_id, version in sorted(chosen.items()):
-        schema = SCHEMAS[catalog_id]
-        if version != schema.catalog_version:
+        if version != SCHEMAS[catalog_id].catalog_version:
             raise CatalogError(f"{catalog_id} v{version} has no schema")
-        catalogs.append(load_catalog(directory.joinpath(f"{catalog_id}.v{version}.json"), schema))
+    # The directory is asked what is in it, rather than the versions above being taken as an
+    # account of it: load_catalog_directory refuses a file no schema claims and a schema with no
+    # file. A catalog dropped in here therefore cannot sit outside the model and outside the
+    # digest a society records, which is what a list of ids to read would have allowed.
+    catalogs = list(
+        load_catalog_directory(directory, [SCHEMAS[catalog_id] for catalog_id in sorted(chosen)])
+    )
     by_id = {catalog.catalog_id: _values(catalog) for catalog in catalogs}
     needs = {
         key: Need(

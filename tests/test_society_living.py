@@ -95,6 +95,27 @@ def test_routine_catalog_refuses_inconsistent_entries(tmp_path, catalog, mutate,
         load_routine_model(directory)
 
 
+def test_a_routine_catalog_the_model_does_not_read_is_refused(tmp_path):
+    """A sixth catalog in the directory is refused rather than left out of the model.
+
+    The model used to read exactly the five ids in ROUTINE_VERSIONS, so a catalog added to the
+    directory would have been loaded by nobody and covered by no digest, while every test here
+    still passed. The directory is now compared against the schemas both ways.
+    """
+    directory = tmp_path / "society"
+    shutil.copytree(ROUTINE_DIRECTORY, directory)
+    assert load_routine_model(directory).sha256 == load_routine_model().sha256
+    (directory / "society-weather.v1.json").write_text(
+        json.dumps({"schema_version": 1, "catalog_id": "society-weather"}), encoding="utf-8"
+    )
+    with pytest.raises(CatalogError, match="files with no schema"):
+        load_routine_model(directory)
+    (directory / "society-weather.v1.json").unlink()
+    (directory / "society-policy.v1.json").unlink()
+    with pytest.raises(CatalogError, match="schemas with no file"):
+        load_routine_model(directory)
+
+
 def test_flatiron_is_projected_as_published_and_sizes_its_population():
     model = routine()
     document = place_from_society_input(flatiron_input(), model)
