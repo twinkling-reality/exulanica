@@ -20,12 +20,20 @@ import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 
 const plan = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+// A RETAINED PLAN MUST CARRY NO MACHINE PATH. An absolute outDir is a fact about the machine that
+// ran it, not about the work, and it goes stale or wrong the moment the plan leaves the session; one
+// retained here even failed a rename guard on main. So a relative outDir is resolved against the
+// working directory and the plan itself stays portable, rather than a person remembering to strip an
+// absolute path before retaining it.
+plan.outDir = isAbsolute(plan.outDir) ? plan.outDir : resolve(process.cwd(), plan.outDir);
 const TURN_RATE = 1.35; // radians a second, from controls.ts
 const frames = plan.frames ?? 150;
-const dtSeconds = (2 * Math.PI) / (TURN_RATE * frames);
+// A TURN loops by arithmetic: dt is chosen so `frames` steps make exactly one revolution. A WALK
+// does not loop at all, so its dt is simply the playback step and the clip ends where it ends.
+const dtSeconds = plan.mode === 'walk' ? 1 / (plan.fps ?? 30) : (2 * Math.PI) / (TURN_RATE * frames);
 mkdirSync(plan.outDir, { recursive: true });
 const profile = mkdtempSync(join(tmpdir(), 'cdp-clip-'));
 const port = 9800 + Math.floor(Math.random() * 190);
@@ -89,11 +97,37 @@ try {
     if (Date.now() > deadline) throw new Error('page never became ready');
     await sleep(500);
   }
+  // Wait for the thing that must exist, not for a number of seconds. A fixed settle was too short
+  // for a 9.4 MB container and the run failed later, at focus, looking like a different bug.
+  if (typeof plan.mountedExpression === 'string') {
+    const mountedBy = Date.now() + (plan.mountTimeoutMs ?? 120000);
+    for (;;) {
+      let mounted = false;
+      try { mounted = await evaluate(plan.mountedExpression); } catch { mounted = false; }
+      if (mounted === true) break;
+      if (Date.now() > mountedBy) throw new Error('the page never mounted what the clip needs');
+      await sleep(1000);
+    }
+  }
   await sleep(plan.settleMs ?? 4000);
   // Development chrome is not part of the product's picture, so it is removed rather than cropped.
   // Hiding by text alone was not enough: the panels re-render and come back. This hides everything
   // that is not on the canvas's own ancestor chain, and keeps hiding it as the app redraws, so the
   // frame holds the rendered scene and nothing else. It removes UI; it never touches what is drawn.
+  // Anything that must be CLICKED lives in the development chrome, so it is clicked before the
+  // chrome is hidden. Walking forward is driven by the app's own walk assist, which moves the camera
+  // without the canvas holding focus.
+  if (Array.isArray(plan.clickText)) {
+    results.clicked = await evaluate(`(() => {
+      const wanted = ${JSON.stringify(plan.clickText)};
+      const hit = [];
+      for (const el of document.querySelectorAll('button')) {
+        if (wanted.some((t) => (el.textContent ?? '').trim() === t)) { el.click(); hit.push((el.textContent ?? '').trim()); }
+      }
+      return hit;
+    })()`);
+    if (results.clicked.length !== plan.clickText.length) throw new Error(`clicked ${JSON.stringify(results.clicked)}, wanted ${JSON.stringify(plan.clickText)}`);
+  }
   results.hidden = await evaluate(`(() => {
     const canvas = document.getElementById('atlas');
     if (canvas === null) return 'no atlas canvas';
@@ -124,22 +158,34 @@ try {
   results.focused = await evaluate("document.activeElement === document.querySelector('canvas')");
   if (results.focused !== true) throw new Error('the canvas never took focus, so nothing would have moved');
   // Hold the turn key down for the whole clip: one keydown, no keyup, so the turn never stutters.
-  await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', code: plan.turnKey ?? 'ArrowRight', key: plan.turnKey === 'ArrowLeft' ? 'ArrowLeft' : 'ArrowRight', windowsVirtualKeyCode: plan.turnKey === 'ArrowLeft' ? 37 : 39, nativeVirtualKeyCode: plan.turnKey === 'ArrowLeft' ? 37 : 39 });
+  // One key is held down for the whole clip, so the motion never stutters: an arrow to turn, KeyW to
+  // walk. The controls read it only while the canvas holds focus, which is why focus is checked above.
+  const held = plan.holdKey ?? (plan.mode === 'walk' ? 'KeyW' : 'ArrowRight');
+  const keyCodes = { ArrowRight: [39, 'ArrowRight'], ArrowLeft: [37, 'ArrowLeft'], KeyW: [87, 'w'], KeyS: [83, 's'] };
+  const [code, key] = keyCodes[held] ?? keyCodes.ArrowRight;
+  results.heldKey = held;
+  await send('Input.dispatchKeyEvent', { type: 'rawKeyDown', code: held, key, windowsVirtualKeyCode: code, nativeVirtualKeyCode: code });
   results.stalls = [];
   // One frame beyond the turn proves the loop closes: frame `frames` is a whole turn past frame 0,
   // so it must be the same image. It is compared and then deleted, never shipped.
   for (let frame = 0; frame <= frames; frame += 1) {
     const expired = waitForVirtualTime();
-    await send('Emulation.setVirtualTimePolicy', { policy: 'advance', budget: dtSeconds * 1000 });
+    // `pauseIfNetworkFetchesPending` lets the clock wait for the page's own fetches instead of
+    // racing past them: a tile that is still pulling texture sets stops handing over frames if the
+    // clock runs ahead of its network.
+    await send('Emulation.setVirtualTimePolicy', { policy: plan.policy ?? 'pauseIfNetworkFetchesPending', budget: dtSeconds * 1000 });
     const ticked = await race(expired, 8000, 'virtual time');
     if (ticked.timedOut) results.stalls.push({ frame, at: 'virtual time' });
-    let shot = await race(send('Page.captureScreenshot', { format: 'png' }), 15000, 'screenshot');
+    let shot = await race(send('Page.captureScreenshot', { format: 'png' }), plan.shotTimeoutMs ?? 15000, 'screenshot');
     if (shot.timedOut) {
       // A paused clock can leave the compositor with no new frame to hand over. Nudge it and retry
       // once, and record that it happened rather than pretending the clip was captured cleanly.
       results.stalls.push({ frame, at: 'screenshot' });
-      await send('Emulation.setVirtualTimePolicy', { policy: 'advance', budget: 1 });
-      shot = await race(send('Page.captureScreenshot', { format: 'png' }), 15000, 'screenshot retry');
+      // A heavier tile needs more than a token nudge: a 9.4 MB container at 32,834 triangles would
+      // not hand over frame 5 on a 1 ms budget. The nudge is virtual time the frame did not ask for,
+      // so it is counted in `stalls` rather than hidden.
+      await send('Emulation.setVirtualTimePolicy', { policy: 'advance', budget: plan.nudgeMs ?? 16 });
+      shot = await race(send('Page.captureScreenshot', { format: 'png' }), plan.shotTimeoutMs ?? 15000, 'screenshot retry');
     }
     if (shot.timedOut) throw new Error(`frame ${frame}: the page would not hand over a frame`);
     const bytes = Buffer.from(shot.value.result.data, 'base64');
@@ -153,6 +199,7 @@ try {
     }
     if (frame === frames) {
       results.loopFrameSha256 = digest;
+      // For a walk this is simply the frame after the last, kept only to measure the cut.
       results.loopsExactly = digest === results.firstFrameSha256;
       rmSync(join(plan.outDir, `frame-${String(frame).padStart(4, '0')}.png`));
     } else {

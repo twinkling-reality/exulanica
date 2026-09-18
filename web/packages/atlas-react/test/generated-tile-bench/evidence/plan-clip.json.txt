@@ -4,7 +4,7 @@
  "frames": 240,
  "turnKey": "ArrowRight",
  "settleMs": 6000,
- "outDir": "<any directory the runner may create; the frames land here>",
+ "outDir": "clip-frames",
  "readyExpression": "!!document.querySelector('.generated-tile-evaluation') || document.body.innerText.includes('could not open')",
  "readyTimeoutMs": 180000,
  "hideText": [

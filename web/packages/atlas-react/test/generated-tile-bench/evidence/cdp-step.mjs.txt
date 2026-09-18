@@ -4,8 +4,14 @@ import { spawn } from 'node:child_process';
 import { mkdirSync, mkdtempSync, readFileSync, writeFileSync, rmSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { isAbsolute, join, resolve } from 'node:path';
 const plan = JSON.parse(readFileSync(process.argv[2], 'utf8'));
+// A RETAINED PLAN MUST CARRY NO MACHINE PATH. An absolute outDir is a fact about the machine that
+// ran it, not about the work, and it goes stale or wrong the moment the plan leaves the session; one
+// retained here even failed a rename guard on main. So a relative outDir is resolved against the
+// working directory and the plan itself stays portable, rather than a person remembering to strip an
+// absolute path before retaining it.
+plan.outDir = isAbsolute(plan.outDir) ? plan.outDir : resolve(process.cwd(), plan.outDir);
 mkdirSync(plan.outDir, { recursive: true });
 const profile = mkdtempSync(join(tmpdir(), 'cdp-step-'));
 const port = 9400 + Math.floor(Math.random() * 190);
@@ -41,6 +47,9 @@ try {
     await sleep(1000);
   }
   await sleep(plan.settleMs ?? 5000);
+  // Read the page BEFORE hiding anything: hiding erases the text, so a diagnostic taken afterwards
+  // reports an empty page whatever the page was, which is a blind spot of my own making.
+  results.pageBefore = await evaluate("({ text: document.body.innerText.slice(0, 200), elements: document.querySelectorAll('body *').length, panel: !!document.querySelector('.generated-tile-evaluation') })");
   results.hidden = await evaluate(`(() => {
     const canvas = document.getElementById('atlas');
     if (canvas === null) return 'no atlas canvas';
@@ -53,7 +62,12 @@ try {
   })()`);
   await evaluate("document.getElementById('atlas')?.focus(); true");
   results.focused = await evaluate("document.activeElement === document.getElementById('atlas')");
-  if (results.focused !== true) throw new Error('the canvas never took focus, so nothing would have moved');
+  if (results.focused !== true) {
+    // Say WHAT the page is showing, not just that focus failed: the same symptom is produced by an
+    // error page, a boundary page and a real focus problem, and they have different fixes.
+    results.pageSays = await evaluate('document.body.innerText.slice(0, 300)');
+    throw new Error(`the canvas never took focus; the page says: ${results.pageSays}`);
+  }
   if (plan.holdKey) {
     const codes = { KeyW: [87, 'w'], ArrowRight: [39, 'ArrowRight'], ArrowLeft: [37, 'ArrowLeft'] };
     const [code, key] = codes[plan.holdKey] ?? codes.KeyW;
@@ -76,6 +90,9 @@ try {
   results.error = String(error);
 } finally {
   writeFileSync(join(plan.outDir, 'capture.json'), JSON.stringify(results, null, 1));
-  ws.close(); chrome.kill('SIGTERM'); await sleep(400); rmSync(profile, { recursive: true, force: true });
+  ws.close(); chrome.kill('SIGTERM'); await sleep(1500);
+  // Chrome can still be writing its profile as it exits; a cleanup that throws would bury the real
+  // error this block just wrote, which is how a focus failure came back as ENOTEMPTY.
+  try { rmSync(profile, { recursive: true, force: true, maxRetries: 5, retryDelay: 300 }); } catch { /* a temp directory is not worth losing the result over */ }
 }
 console.log(JSON.stringify(results).slice(0, 1200));
