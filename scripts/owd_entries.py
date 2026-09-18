@@ -8,10 +8,13 @@ Python has no reader for the ``owd`` container and should not grow one: two read
 would be worse than none, and the disagreement would be silent. So this hands a small TypeScript
 program to the tessellator's own decoder and document reader and takes back what they say.
 
-The mapping from an entry to its record is the part worth having in one place. A container states
-one entry per record in ONE MERGED LIST SORTED BY KIND, while a document states owned records and
-then halo records. Reading the container's order as the document's gives a confident wrong answer:
-on 2026-09-18 it said a surface material record was drawing a carriageway.
+The mapping from an entry to its record is the part worth having in one place, and the container
+states it itself: ``header.records``, one per entry, in the container's own order. Two attempts to
+RECONSTRUCT that order from the document were wrong before anyone thought to look for it, the first
+visibly and the second invisibly. The first read the document's owned-then-halo order and said a
+surface material record was drawing a carriageway. The second merged and sorted by kind, version
+and identity, which grouped the kinds correctly and so produced right counts by kind with the wrong
+record inside each one, and it took a census matching dressings to surfaces to notice.
 """
 
 from __future__ import annotations
@@ -28,26 +31,30 @@ TSX = ROOT / "web" / "node_modules" / ".bin" / "tsx"
 _READER = """
 import { readFileSync } from 'node:fs';
 import { decodeOwd } from '<ROOT>/web/packages/loom-tess/src/core/owd.js';
-import { readTileDocument } from '<ROOT>/web/packages/loom-tess/src/core/document.js';
 
 const owd = decodeOwd(new Uint8Array(readFileSync(process.argv[2]))) as any;
-const document = readTileDocument(new Uint8Array(readFileSync(process.argv[3]))) as any;
-const records = document.grammars
-  .flatMap((grammar: any) => [...grammar.owned, ...grammar.halo])
-  .sort((a: any, b: any) => (a.kind < b.kind ? -1 : a.kind > b.kind ? 1 : a.version - b.version));
+
+// THE CONTAINER CARRIES ITS OWN RECORD LIST and every entry indexes THAT. Read it; do not rebuild
+// it from the document. Rebuilding was how this file worked until 2026-09-18: it merged the
+// document's owned and halo records and sorted them, which groups the kinds identically and so
+// gives correct counts BY KIND while assigning the wrong identity and the wrong membership inside
+// every kind. Following the container's own material pointer showed 2 of 1445 agreeing.
+const records = owd.header.records;
 
 process.stdout.write(JSON.stringify(Object.values<any>(owd.projections).map((projection: any) => ({
   name: projection.header.name,
   triangles: projection.header.triangle_count,
   entries: projection.header.entries.map((entry: any) => ({
     kind: records[entry.record]?.kind ?? 'unknown record index',
-    identity: records[entry.record]?.fields?.identity ?? null,
+    identity: records[entry.record]?.identity ?? null,
+    membership: records[entry.record]?.membership ?? null,
     state: entry.state,
     needs: entry.needs ?? [],
     surfaces: (entry.surfaces ?? []).map((surface: any) => ({
       role: surface.role,
       orientation: surface.orientation,
       material: surface.material.state,
+      materialRecord: surface.material.state === 'record' ? surface.material.record : null,
     })),
   })),
 }))));
