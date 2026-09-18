@@ -55,6 +55,11 @@ STORE_PARENT = ROOT / ".exulanica/reference-baseline/runtime"
 #: admitted, screened and published; this script neither re-screens nor re-derives anything.
 VOLCANIC = uuid.UUID("79004d44-ca24-4d17-9eef-56786415e233")
 
+#: Databases this script must never replace, whatever it is told: the retained one, and the copy it
+#: only ever reads. Named rather than matched, because a pattern is what fails here (see
+#: replacement_refusal).
+PROTECTED = frozenset({"exulanica_spine_test", "exulanica_inspect_test"})
+
 #: The actor recorded against the composed structural plane and the opened sandbox version. A
 #: stable uuid rather than a fresh one per run, so re-running `prepare` is idempotent in the
 #: audit trail rather than adding a new author every time.
@@ -68,22 +73,82 @@ def _run(command: list[str], **kwargs) -> subprocess.CompletedProcess:
     return result
 
 
-def _copy_database(source: str, target: str, *, force: bool) -> None:
+def replacement_refusal(
+    name: str, *, exists: bool, force: bool, replace: str | None, holdings: str
+) -> str | None:
+    """The reason this run must not drop ``name``, or None when it may.
+
+    Guard added 2026-09-17, after exulanica_corridor_0917_test was dropped on the shared 5433
+    server by something that left no trace (this server does not log successful DDL), costing the
+    corridor lane a rebuild, a re-migration, a workspace and quota redeclaration and a rebake. This
+    script held the only unguarded drop path in the repository: --force dropped whatever its target
+    named, with no check on the name.
+
+    A name pattern is not the guard, because the database that was lost matched every plausible
+    scratch pattern, and so does this script's own default target. What a run cannot do by accident is
+    name the database twice: once in the target URL and once in --replace. Two named databases that
+    are also protected outright, because nothing here may replace them at any confirmation.
+    """
+    if name in PROTECTED:
+        return (
+            f"{name} is the retained database or the copy this script only reads, and this script "
+            "never replaces it."
+        )
+    if not exists:
+        return None
+    if not force:
+        return (
+            f"{name} already exists and holds {holdings}. Pass --force --replace {name} to destroy "
+            "and rebuild it."
+        )
+    if replace != name:
+        said = "nothing" if replace is None else replace
+        return (
+            f"Refusing to drop {name}, which holds {holdings}: this run named {said} as the "
+            f"database to replace. Pass --replace {name} if destroying that database is what you "
+            "mean."
+        )
+    return None
+
+
+def _holdings(connection, name: str, target: str) -> str:
+    """What dropping ``name`` would destroy, in the words of the server itself."""
+    size = connection.execute("select pg_size_pretty(pg_database_size(%s))", (name,)).fetchone()
+    try:
+        with psycopg.connect(target, connect_timeout=5) as inside:
+            inside.execute("set transaction read only")
+            tables = inside.execute(
+                "select count(*) from pg_tables "
+                "where schemaname not in ('pg_catalog', 'information_schema')"
+            ).fetchone()
+    except psycopg.Error:
+        return f"{size[0]}"
+    count = tables[0]
+    return f"{count} table{'' if count == 1 else 's'} and {size[0]}"
+
+
+def _copy_database(source: str, target: str, *, force: bool, replace: str | None) -> None:
     """Replace ``target`` with a fresh dump of ``source``.
 
     `create database ... template` would be faster and is not used: it refuses while any session
     holds the template, and on this machine another session usually does.
     """
     admin = "postgresql://localhost:5433/postgres"
+    name = target.rsplit("/", 1)[-1]
+    # Before any connection: a protected database is not read, counted or opened by this script.
+    protected = replacement_refusal(name, exists=True, force=force, replace=name, holdings="")
+    if protected:
+        raise SystemExit(protected)
     with psycopg.connect(admin, autocommit=True) as connection:
-        name = target.rsplit("/", 1)[-1]
-        exists = connection.execute(
-            "select 1 from pg_database where datname = %s", (name,)
-        ).fetchone()
-        if exists and not force:
-            raise SystemExit(
-                f"{name} already exists. Pass --force to replace it, which drops every row in it."
-            )
+        exists = bool(
+            connection.execute("select 1 from pg_database where datname = %s", (name,)).fetchone()
+        )
+        holdings = _holdings(connection, name, target) if exists else "nothing"
+        refusal = replacement_refusal(
+            name, exists=exists, force=force, replace=replace, holdings=holdings
+        )
+        if refusal:
+            raise SystemExit(refusal)
         if exists:
             connection.execute(f'drop database "{name}"')
         connection.execute(f'create database "{name}"')
@@ -105,7 +170,9 @@ def _copy_database(source: str, target: str, *, force: bool) -> None:
 
 
 def prepare(arguments: argparse.Namespace) -> int:
-    _copy_database(arguments.source, arguments.seed_source, force=arguments.force)
+    _copy_database(
+        arguments.source, arguments.seed_source, force=arguments.force, replace=arguments.replace
+    )
     with psycopg.connect(arguments.seed_source, row_factory=dict_row) as connection:
         connection.execute(
             "select set_config('exulanica.workspace_id', %s, false)", (str(arguments.workspace),)
@@ -152,6 +219,10 @@ def main(argv: list[str] | None = None) -> int:
         "prepare", help="copy the source and compose the structural plane and one sandbox version"
     )
     prepared.add_argument("--force", action="store_true", help="replace an existing seed source")
+    prepared.add_argument(
+        "--replace",
+        help="the database --force may destroy, which must be the one --seed-source names",
+    )
     prepared.set_defaults(handler=prepare)
 
     exported = subparsers.add_parser("export", help="write the archive from the prepared copy")
