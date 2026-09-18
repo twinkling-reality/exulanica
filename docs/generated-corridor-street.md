@@ -142,3 +142,41 @@ ceiling or with none declared, which is never retried.
 
 A loader is better off listing first and fetching only the digests it does not already hold: one
 small request for a whole city, rather than a revalidation per tile.
+
+## 7. What draws today, and what does not
+
+Measured from the container the route served for tile (2, 0), baked by tessellator 5 at main
+dee8567d, not from what any lane expects to be true. The counts below map each entry to its record
+through the tessellator's own document reader, because the container states one entry per record
+in its own sorted order and reading that order by eye gets it wrong. The tessellator lane has
+massing and facades built on its branch, unmerged, so most of this table is queued rather than
+unwritten.
+
+`render_batch` holds **596 triangles** across **4 drawn entries** of the tile's 4 149: three street
+segments, each drawing its carriageway and its gutter dressed by their material records, 8
+triangles apiece, and the tile's terrain, 572 triangles drawn as the unavailable state because no
+material dresses it. **850 entries state unavailable**, and each one names the expander it waits
+for:
+
+| Waiting on | Entries | The records, and what a person would see when it lands |
+| --- | --- | --- |
+| `facade_layout` | 538 | 244 ground bays, 168 facades, 75 entrances, 51 interior backings: the frontages, their bays, stall risers, glazing and doors, and the room behind the glass. |
+| `form_parts` | 233 | 89 rooftop objects, 78 vitrines, 36 pieces of street furniture, 30 street trees: the lamps, benches, bins, shopfronts and trees. |
+| `ring_triangulation` | 65 | 33 parcels, 30 street trees (their pits), 2 blocks: the ground people walk on between the kerb and the frontage. |
+| `massing_faces` | 32 | 32 massings: the building volumes behind the frontages. |
+| `crossing_band` | 6 | 6 crossings: the zebras. |
+| `kerb_offset` | 6 | 6 curb edges: the kerb line and the footways beside it. |
+
+The column sums to 880 and there are 850 entries, because thirty of them name two. They are the
+street trees: a tree waits on `form_parts` for its trunk and canopy and on `ring_triangulation`
+for its pit, and it says both rather than picking one.
+
+`nav_envelope` holds **37 052 triangles** over **31 517 vertices**, so the street is already
+walkable: a capsule can stand on it and walk the 126 m along a carriageway with bare ground either
+side of it. That asymmetry is the honest state of this lane. The records are complete and gated;
+the tessellator draws four of the tile's 4 149 entries; and the question this lane exists to
+answer, whether the street reads as inhabited, cannot be asked of a picture until `facade_layout`
+lands, because it alone holds 538 of the 850 entries that are waiting.
+
+Nothing here is a defect of the records. Every unavailable entry names a reason, and a reader can
+tell a surface nobody has dressed from a surface nobody has yet triangulated.
