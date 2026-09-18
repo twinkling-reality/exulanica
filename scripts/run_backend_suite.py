@@ -31,6 +31,7 @@ from __future__ import annotations
 
 import argparse
 import os
+import shutil
 import subprocess
 import sys
 from collections.abc import Sequence
@@ -44,6 +45,83 @@ DEFAULT_COPY_URL = "postgresql://localhost:5433/exulanica_inspect_test"
 CANNOT_CHECK = 70
 LEFT_BEHIND = 75
 ROOT = Path(__file__).resolve().parents[1]
+#: How long to wait for git before giving up on provenance: a header never holds up the suite.
+GIT_TIMEOUT_SECONDS = 5
+#: How many differing paths the header names before it stops counting them out.
+NAMED_DIFFERENCES = 3
+
+
+def _git(*arguments: str) -> str | None:
+    """One git command's output verbatim, or None when git cannot answer.
+
+    VERBATIM MATTERS: porcelain output carries its status in the first two columns, so stripping the
+    output here would eat the first path's opening character, which it did before this said so.
+
+    It never raises and never waits long, because every caller is decorating a run rather than
+    deciding one, and it cannot say WHY git failed: a missing repository, a repository with no
+    commit yet and a git that hung all arrive here as the same None.
+    """
+    try:
+        finished = subprocess.run(
+            ["git", *arguments],
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=GIT_TIMEOUT_SECONDS,
+        )
+    except (OSError, subprocess.SubprocessError):
+        return None
+    if finished.returncode != 0:
+        return None
+    return finished.stdout
+
+
+def tree_identity() -> str:
+    """WHICH TREE THIS RUN COLLECTED AT, as one line, so a log cannot be read against another one.
+
+    This log used to say nothing whatever about the code it ran. So a count taken minutes before a
+    rebase read exactly like one taken after it, and on 2026-09-18 a lane reported both of its suites
+    as verified on a tree they had never run on. Nothing in the output was wrong; there was simply
+    nothing in it that could disagree. Compare a skip count, which is a sentence about the run and
+    says "12 skipped" out loud the moment a database name is misspelt. An instrument that is silent
+    by construction is the worse half of that pair, and the only cure is to print the thing.
+
+    DIRTY MEANS the working tree differs from the commit it names in any file git is not told to
+    ignore, tracked or untracked alike, because pytest collects an untracked test file exactly as it
+    collects a tracked one and a run over it is not a run of that commit.
+
+    WHAT IT DOES NOT DO is judge whether the difference mattered. It names the paths so a reader can,
+    and a header that ruled on its own relevance would be the same overreach one level down.
+
+    It answers on a detached head, in a worktree, in a fresh clone with no git at all, and when git
+    hangs. The runner is used in all of those, and a suite that refused to start because provenance
+    was unavailable would have traded the measurement for a line about it.
+    """
+    if shutil.which("git") is None:
+        return "run_backend_suite: collected at an unknown commit, because git is not on the path"
+    commit = _git("rev-parse", "--short", "HEAD")
+    if commit is None:
+        return "run_backend_suite: collected at an unknown commit, because git did not name one"
+    short = commit.strip()
+    branch = _git("rev-parse", "--abbrev-ref", "HEAD")
+    named = None if branch is None else branch.strip()
+    where = f"{short}, detached" if named in (None, "HEAD") else f"{short} on {named}"
+    # --no-optional-locks so reading provenance never takes the index lock from a concurrent lane.
+    differences = _git("--no-optional-locks", "status", "--porcelain")
+    if differences is None:
+        return f"run_backend_suite: collected at {where}, and whether its tree is clean is unknown"
+    paths = [line[3:] for line in differences.splitlines()]
+    if not paths:
+        return f"run_backend_suite: collected at {where}, tree clean"
+    shown = ", ".join(paths[:NAMED_DIFFERENCES])
+    remaining = len(paths) - NAMED_DIFFERENCES
+    if remaining > 0:
+        shown = f"{shown} and {remaining} more"
+    counted = "1 path differs" if len(paths) == 1 else f"{len(paths)} paths differ"
+    return (
+        f"run_backend_suite: collected at {where}, but {counted} from it, so this run is not that "
+        f"commit: {shown}"
+    )
 
 
 def phase_environment(*, private_servers: bool, copy_url: str) -> dict[str, str]:
@@ -121,6 +199,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     )
     parser.add_argument("--plan", action="store_true", help="print what each phase would run")
     known, extra = parser.parse_known_args(list(argv) if argv is not None else None)
+    print(tree_identity(), flush=True)
     copy_url = known.reference_copy
     phase_one_extra, phase_two_extra = split_junit(extra)
     phase_one = ["-n", known.jobs, "-m", f"not {REFERENCE_MARKER}", *phase_one_extra]
