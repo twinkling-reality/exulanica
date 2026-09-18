@@ -41,8 +41,8 @@ Measured from the records, not remembered. The evidence is
 [docs/artifacts/corridor/corridor-tiles.log.txt](artifacts/corridor/corridor-tiles.log.txt),
 written by the script beside it.
 
-- **6 310 records** of 23 kinds, in five tiles along one row. The corridor's own tile, (2, 0),
-  owns 2 005 of them and carries 1 987 more in its halo; its document is 3 294 470 bytes.
+- **6 566 records** of 23 kinds, in five tiles along one row. The corridor's own tile, (2, 0),
+  owns 2 073 of them and carries 2 076 more in its halo; its document is 3 381 852 bytes.
 - **98 buildings**, 3 to 6 storeys, frontages 10.5 m to 25.8 m tall, median 17.4 m.
 - **228 premises**: 98 residential, and on the ground floor 52 cafes, 20 grocers, 19 restaurants,
   18 workshops and 17 offices, each with a name drawn from the signage lexicon.
