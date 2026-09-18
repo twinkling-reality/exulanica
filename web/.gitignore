@@ -19,3 +19,7 @@ fixtures/
 # change fails here loudly instead of drifting.
 !packages/graph-client/test/fixtures/*.glb
 bakeoff-results/
+# Wrangler's per-project state directory. Deploying the landing package creates it in
+# packages/landing, and it was untracked and unignored: empty it is invisible to `git status`, so
+# the first thing wrangler writes there is a file nobody knows is a candidate for a commit.
+.wrangler/
