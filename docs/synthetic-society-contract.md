@@ -654,9 +654,9 @@ taken from the records. The corridor's records state many heights: eleven distin
 lines from 96 to 167 mm across its 46 curbs, no curb's line varying along its own length, and the
 two curbs of one street segment differing on all 23 segments, by 2 mm at the closest and 63 mm at
 the widest. The only walk whose parameters this repository states runs east ALONG one curb's
-footway, at a constant height, so no measurement yet separates a runtime whose surface carries the
-heights the records state from one that stands a walker at a single height the records do not state
-anywhere.
+footway, at a constant height, so nothing measured before this separates a runtime whose surface
+carries the heights the records state from one that stands a walker at a single height the records
+do not state anywhere.
 
 The parameters, the expected heights and the response to each outcome below are committed before
 the container is baked and before anything is sampled, so that what is reported afterwards has
@@ -794,11 +794,14 @@ without support anywhere between y 1,000 and y 125,750. The line passes 795 mm f
 trunks and 18 mm outside the nearer one's pit, so it misses the carve rather than showing there is
 none. An expectation written down and not met is reported here because it was written down.
 
-**What else the line shows.** The camber crowns at y 8,000, 64,000 and 120,000, the three streets'
-own centrelines. Support stops 344 mm inside the strip's far edge at each of the four edges a
-building frontage stands on, and 0 mm at the two that are not frontages, where open ground carries
-on. 344 is the capsule's 340 mm radius plus the carve's integer stepping, measured here from a
-second direction.
+**What else the line shows.** The camber crowns at z 0 at y 8,000, 64,000 and 120,000, which is
+where the three street segment records put their own centrelines, each at z 0. Support stops 344 mm
+inside the strip's far edge at each of the four edges a building frontage stands on, and 0 mm at the
+two that are not frontages, where open ground carries on. 344 is the capsule's 340 mm radius plus
+the carve's integer stepping, measured here from a second direction. The vertex that ends the north
+footway of Harbour Way 7 left carries z 170 at y 72,556, and the records' own surface 5,006 mm out
+across that strip is 170 as well, so both halves of the 170 that took three readings to settle are
+reproduced here from one line.
 
 **A defect in the sampler, found on the way, which is not about heights.** At a plan point lying
 exactly on an edge two envelope triangles share, `navEnvelopeSupport` returns no surface: the
