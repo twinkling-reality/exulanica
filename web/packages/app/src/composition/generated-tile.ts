@@ -13,7 +13,7 @@
  */
 
 import type { LoadedGeneratedTile } from '@exulanica/atlas-react/generated-tile';
-import { type BakedTileRequest, credentials, developmentToken } from '../config.js';
+import { type BakedTileRequest, type WalkPose, credentials, developmentToken } from '../config.js';
 import { el } from '../ui/dom.js';
 import type { AppEnvironment } from './session-state.js';
 
@@ -32,7 +32,32 @@ function provenanceLine(provenance: TileProvenance): string {
     + 'Texture sets: the committed library, because no route serves the published library yet.';
 }
 
-function statement(tile: LoadedGeneratedTile, provenance: TileProvenance): HTMLElement {
+/**
+ * The pose a walk opened at, and where it came from.
+ *
+ * A stated pose is the walk's own fact, given by whoever defines the walk, in integer millimetres of
+ * the city frame with an integer facing, so two runs of one walk cannot differ by a rounding and no
+ * bearing convention has to be agreed. An unstated pose falls to this runtime's default, which is a
+ * guess dressed as a convention and must never be load bearing for anything scored: hence the line on
+ * screen saying which of the two a frame is, because two frames that look alike, one reproducible and
+ * one not, are otherwise indistinguishable in a record.
+ */
+interface Opening {
+  readonly pose: WalkPose | null;
+  readonly supported: boolean;
+  readonly start: LoadedGeneratedTile['start'];
+}
+
+/** Where the walk began and whether anybody stated it, which is what makes a frame reproducible. */
+function openingLine(opening: Opening): string {
+  if (opening.pose === null) {
+    return 'Opened at this runtime\'s default pose: the middle of the nav_envelope\'s southern edge, facing north.';
+  }
+  const { xMm, yMm, facingDx, facingDy } = opening.pose;
+  return `Opened at a stated pose: ${xMm}, ${yMm} mm, facing (${facingDx}, ${facingDy})${opening.supported ? '' : ', where the tile states no walkable surface'}.`;
+}
+
+function statement(tile: LoadedGeneratedTile, provenance: TileProvenance, opening: Opening): HTMLElement {
   const drawn = tile.ranges.filter((range) => range.state === 'drawn');
   const named = (range: LoadedGeneratedTile['ranges'][number]): string =>
     `${range.kind}${range.identity === null ? '' : ` ${range.identity}`}`;
@@ -49,6 +74,7 @@ function statement(tile: LoadedGeneratedTile, provenance: TileProvenance): HTMLE
     `${drawn.length} of ${tile.ranges.length} records drawn; ${unavailableSurfaces.length} `
       + `${unavailableSurfaces.length === 1 ? 'surface' : 'surfaces'} drawn as unavailable.`,
     provenanceLine(provenance),
+    openingLine(opening),
   ];
   const items = [...unavailableSurfaces, ...notDrawn].map((text) => el('li', { text }));
   return el('section', {
@@ -89,7 +115,7 @@ export async function prepareGeneratedTileEvaluation(env: AppEnvironment, name: 
   // The title stays the preview's own: the visual gate harness holds the shell to it.
   env.shell.setAttribute(GENERATED_TILE_EVALUATION_ATTRIBUTE, name);
   env.shell.querySelector('.generated-tile-evaluation')?.remove();
-  env.shell.append(statement(tile, { kind: 'committed', name }));
+  env.shell.append(statement(tile, { kind: 'committed', name }, { pose: null, supported: true, start: tile.start }));
   return tile;
 }
 
@@ -157,10 +183,35 @@ export async function prepareBakedTileWalk(env: AppEnvironment, request: BakedTi
     manifest: parseTextureSetManifest(library.textureManifest),
     fetchSet: (entry) => library.textureSet(entry.contentSha256),
   });
+  const opening = openTile(tile, request.pose, route.tileToRenderer);
   env.shell.setAttribute(GENERATED_TILE_EVALUATION_ATTRIBUTE, bakedTileId);
   env.shell.querySelector('.generated-tile-evaluation')?.remove();
   env.shell.append(statement(tile, {
     kind: 'route', bakedTileId, containerSha256: fetched.containerSha256, origin: fetched.origin,
-  }));
-  return tile;
+  }, opening));
+  return { ...tile, start: opening.start };
+}
+
+/**
+ * The walk's opening pose in the renderer's frame, or the tile's own default where none was stated.
+ *
+ * The tile frame has x east, y north and z up in millimetres; the renderer has x east, y up and z
+ * south in metres, and yaw 0 looks north with forward (-sin yaw, 0, -cos yaw). So a facing of (dx, dy)
+ * is yaw = atan2(-dx, dy): east (1, 0) gives -90 degrees, whose forward is (1, 0, 0), which is east.
+ * The height is the envelope's, sampled where the walk begins, so a stated pose stands on the ground
+ * rather than at a stated altitude; where the envelope has no support there, the pose is still honoured
+ * and the statement says the tile states no walkable surface there, rather than moving the walk
+ * somewhere nobody asked for.
+ */
+export function openTile(
+  tile: LoadedGeneratedTile,
+  pose: WalkPose | null,
+  toRenderer: (x: number, y: number, z: number) => readonly [number, number, number],
+): Opening {
+  if (pose === null) return { pose: null, supported: true, start: tile.start };
+  const [x, , z] = toRenderer(pose.xMm, pose.yMm, 0);
+  const sample = tile.navigationWorld.surface.sample(x, z);
+  const yaw = Math.atan2(-pose.facingDx, pose.facingDy);
+  const y = (sample?.height ?? tile.start.y - tile.navigationWorld.eyeHeight) + tile.navigationWorld.eyeHeight;
+  return { pose, supported: sample !== null, start: { x, y, z, yaw, pitch: 0 } };
 }

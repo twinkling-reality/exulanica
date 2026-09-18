@@ -49,7 +49,8 @@ function shell(): HTMLElement {
   return element;
 }
 
-describe('walking a tile fetched from the product route', () => {
+// Each case decodes the committed golden and its texture sets from disk, so the default 5 s is tight.
+describe('walking a tile fetched from the product route', { timeout: 30_000 }, () => {
   let asked: string[] = [];
 
   beforeEach(() => {
@@ -106,6 +107,31 @@ describe('walking a tile fetched from the product route', () => {
     expect(statement?.textContent).toContain('committed library');
   });
 
+  it('opens at a stated pose, faces where the facing points, and says the pose was stated', async () => {
+    const element = shell();
+    const tile = await prepareBakedTileWalk(
+      { shell: element, preview: true } as unknown as AppEnvironment,
+      { kind: 'key', bakedTileId: KEY, pose: { xMm: 4000, yMm: 3000, facingDx: 1, facingDy: 0 } },
+    );
+    // The tile frame has x east and y north in millimetres; the renderer has x east and z south in
+    // metres, and yaw 0 looks north, so a facing of (1, 0) is a quarter turn clockwise from north.
+    expect(tile.start.x).toBeCloseTo(4, 6);
+    expect(tile.start.z).toBeCloseTo(-3, 6);
+    expect(tile.start.yaw).toBeCloseTo(-Math.PI / 2, 6);
+    expect(element.querySelector('.generated-tile-evaluation')?.textContent)
+      .toContain('Opened at a stated pose: 4000, 3000 mm, facing (1, 0)');
+  });
+
+  it('says plainly when nobody stated a pose, so an arbitrary frame cannot look like a chosen one', async () => {
+    const element = shell();
+    await prepareBakedTileWalk(
+      { shell: element, preview: true } as unknown as AppEnvironment,
+      { kind: 'key', bakedTileId: KEY, pose: null },
+    );
+    expect(element.querySelector('.generated-tile-evaluation')?.textContent)
+      .toContain("Opened at this runtime's default pose");
+  });
+
   it('refuses a container whose bytes are not the digest its row records, and draws nothing', async () => {
     vi.stubGlobal('fetch', async (input: RequestInfo | URL): Promise<Response> => {
       const url = String(input);
@@ -124,7 +150,7 @@ describe('walking a tile fetched from the product route', () => {
     const element = shell();
     await expect(prepareBakedTileWalk(
       { shell: element, preview: true } as unknown as AppEnvironment,
-      { kind: 'key', bakedTileId: KEY },
+      { kind: 'key', bakedTileId: KEY, pose: null },
     )).rejects.toThrow(/hashes to/);
     expect(element.querySelector('.generated-tile-evaluation')).toBeNull();
   });
@@ -134,7 +160,7 @@ describe('walking a tile fetched from the product route', () => {
     const element = shell();
     await expect(prepareBakedTileWalk(
       { shell: element, preview: true } as unknown as AppEnvironment,
-      { kind: 'key', bakedTileId: KEY },
+      { kind: 'key', bakedTileId: KEY, pose: null },
     )).rejects.toThrow(/No development token/);
     expect(asked).toHaveLength(0);
   });
@@ -143,7 +169,7 @@ describe('walking a tile fetched from the product route', () => {
     const element = shell();
     await expect(prepareBakedTileWalk(
       { shell: element, preview: false } as unknown as AppEnvironment,
-      { kind: 'key', bakedTileId: KEY },
+      { kind: 'key', bakedTileId: KEY, pose: null },
     )).rejects.toThrow(/development preview route/);
     expect(asked).toHaveLength(0);
   });

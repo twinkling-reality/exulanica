@@ -17,18 +17,18 @@ describe('asking for a baked tile', () => {
   it('reads a city seed and coordinate on the preview route, defaulting the level of detail to 0', () => {
     const search = `?preview=1&city=${CITY}&tile_x=2&tile_y=0`;
     expect(bakedTileRequest(search, isAtlasPreview(search, true)))
-      .toEqual({ kind: 'coordinate', citySeed: CITY, tileX: 2, tileY: 0, lod: 0 });
+      .toEqual({ kind: 'coordinate', citySeed: CITY, tileX: 2, tileY: 0, lod: 0, pose: null });
   });
 
   it('reads a negative coordinate and a stated level of detail', () => {
     const search = `?preview=1&city=${CITY}&tile_x=-3&tile_y=7&lod=2`;
     expect(bakedTileRequest(search, isAtlasPreview(search, true)))
-      .toEqual({ kind: 'coordinate', citySeed: CITY, tileX: -3, tileY: 7, lod: 2 });
+      .toEqual({ kind: 'coordinate', citySeed: CITY, tileX: -3, tileY: 7, lod: 2, pose: null });
   });
 
   it('takes a key as the shortcut, and prefers it when a search carries both', () => {
     const search = `?preview=1&baked_tile=${KEY}&city=${CITY}&tile_x=2&tile_y=0`;
-    expect(bakedTileRequest(search, isAtlasPreview(search, true))).toEqual({ kind: 'key', bakedTileId: KEY });
+    expect(bakedTileRequest(search, isAtlasPreview(search, true))).toEqual({ kind: 'key', bakedTileId: KEY, pose: null });
   });
 
   it('asks for nothing off the preview route, and nothing at all in a production build', () => {
@@ -46,6 +46,32 @@ describe('asking for a baked tile', () => {
     expect(bakedTileRequest(`?preview=1&city=${CITY}&tile_x=2.5&tile_y=0`, preview)).toBeNull();
     expect(bakedTileRequest(`?preview=1&city=${CITY}&tile_x=2&tile_y=0&lod=-1`, preview)).toBeNull();
     expect(bakedTileRequest(`?preview=1&city=${CITY}&tile_x=99999999&tile_y=0`, preview)).toBeNull();
+  });
+
+  it('reads a stated pose as integer millimetres and an integer facing', () => {
+    const search = `?preview=1&city=${CITY}&tile_x=2&tile_y=0&pose_x_mm=320000&pose_y_mm=64500&facing_dx=-1&facing_dy=0`;
+    expect(bakedTileRequest(search, true)).toEqual({
+      kind: 'coordinate', citySeed: CITY, tileX: 2, tileY: 0, lod: 0,
+      pose: { xMm: 320000, yMm: 64500, facingDx: -1, facingDy: 0 },
+    });
+  });
+
+  it('states no pose when none is given, which is the runtime default', () => {
+    const search = `?preview=1&city=${CITY}&tile_x=2&tile_y=0`;
+    expect(bakedTileRequest(search, true)?.pose).toBeNull();
+  });
+
+  it('refuses the WHOLE request when a pose is malformed, rather than falling back to the default', () => {
+    // A silent fallback is how a frame that is not reproducible ends up in a record looking like one
+    // that is: the picture would look perfectly fine.
+    const partial = `?preview=1&city=${CITY}&tile_x=2&tile_y=0&pose_x_mm=320000&pose_y_mm=64500&facing_dx=-1`;
+    expect(bakedTileRequest(partial, true)).toBeNull();
+    const float = `?preview=1&city=${CITY}&tile_x=2&tile_y=0&pose_x_mm=320000.5&pose_y_mm=64500&facing_dx=-1&facing_dy=0`;
+    expect(bakedTileRequest(float, true)).toBeNull();
+    const noDirection = `?preview=1&city=${CITY}&tile_x=2&tile_y=0&pose_x_mm=320000&pose_y_mm=64500&facing_dx=0&facing_dy=0`;
+    expect(bakedTileRequest(noDirection, true)).toBeNull();
+    const wordy = `?preview=1&city=${CITY}&tile_x=2&tile_y=0&pose_x_mm=north&pose_y_mm=64500&facing_dx=-1&facing_dy=0`;
+    expect(bakedTileRequest(wordy, true)).toBeNull();
   });
 
   it('cannot be confused with the committed golden path', () => {

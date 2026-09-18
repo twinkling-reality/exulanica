@@ -103,11 +103,31 @@ const CITY_SEED = /^[0-9a-f]{64}$/;
 const BAKED_TILE_ID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const TILE_COORDINATE_LIMIT = 1_000_000;
 const LOD_LIMIT = 64;
+/** A pose is stated in the city frame, so its bounds are a city's, and a facing is a direction. */
+const POSE_MM_LIMIT = 1_000_000_000;
+const FACING_LIMIT = 1_000_000;
+
+/**
+ * Where a walk begins and which way it faces, stated by whoever defines the walk.
+ *
+ * Integer millimetres in the city frame and an integer direction, because a pose a record names must
+ * be reproducible to the millimetre and a bearing in degrees needs a convention (from north or from
+ * east, clockwise or anticlockwise) that two readers resolve differently. The city's own records
+ * state facing the same way, as `facing_dx_mm` and `facing_dy_mm`, in a frame with x east and y
+ * north. A pose is a fact about the WALK and not about the tile: two walks of one street begin in
+ * different places and neither is more the tile's than the other.
+ */
+export interface WalkPose {
+  readonly xMm: number;
+  readonly yMm: number;
+  readonly facingDx: number;
+  readonly facingDy: number;
+}
 
 /** Which baked tile a walk asked the product route for: a key, or a coordinate in a city. */
 export type BakedTileRequest =
-  | { readonly kind: 'key'; readonly bakedTileId: string }
-  | { readonly kind: 'coordinate'; readonly citySeed: string; readonly tileX: number; readonly tileY: number; readonly lod: number };
+  | { readonly kind: 'key'; readonly bakedTileId: string; readonly pose: WalkPose | null }
+  | { readonly kind: 'coordinate'; readonly citySeed: string; readonly tileX: number; readonly tileY: number; readonly lod: number; readonly pose: WalkPose | null };
 
 function whole(value: string | null, limit: number): number | null {
   if (value === null || !/^-?\d+$/.test(value)) return null;
@@ -131,15 +151,36 @@ function whole(value: string | null, limit: number): number | null {
 export function bakedTileRequest(search: string, preview: boolean): BakedTileRequest | null {
   if (!preview) return null;
   const parameters = new URLSearchParams(search);
+  const pose = walkPose(parameters);
+  // A malformed pose refuses the whole request rather than falling back to the runtime's default: a
+  // silent fallback is how a frame that is not reproducible ends up in a record looking like one
+  // that is, and the picture would look perfectly fine.
+  if (pose === 'malformed') return null;
   const key = parameters.get('baked_tile');
-  if (key !== null) return BAKED_TILE_ID.test(key) ? { kind: 'key', bakedTileId: key } : null;
+  if (key !== null) return BAKED_TILE_ID.test(key) ? { kind: 'key', bakedTileId: key, pose } : null;
   const citySeed = parameters.get('city');
   if (citySeed === null || !CITY_SEED.test(citySeed)) return null;
   const tileX = whole(parameters.get('tile_x'), TILE_COORDINATE_LIMIT);
   const tileY = whole(parameters.get('tile_y'), TILE_COORDINATE_LIMIT);
   const lod = parameters.get('lod') === null ? 0 : whole(parameters.get('lod'), LOD_LIMIT);
   if (tileX === null || tileY === null || lod === null || lod < 0) return null;
-  return { kind: 'coordinate', citySeed, tileX, tileY, lod };
+  return { kind: 'coordinate', citySeed, tileX, tileY, lod, pose };
+}
+
+/** The four pose parameters, all of them or none: anything else is malformed and refuses the walk. */
+function walkPose(parameters: URLSearchParams): WalkPose | null | 'malformed' {
+  const keys = ['pose_x_mm', 'pose_y_mm', 'facing_dx', 'facing_dy'] as const;
+  const given = keys.filter((key) => parameters.get(key) !== null);
+  if (given.length === 0) return null;
+  if (given.length !== keys.length) return 'malformed';
+  const xMm = whole(parameters.get('pose_x_mm'), POSE_MM_LIMIT);
+  const yMm = whole(parameters.get('pose_y_mm'), POSE_MM_LIMIT);
+  const facingDx = whole(parameters.get('facing_dx'), FACING_LIMIT);
+  const facingDy = whole(parameters.get('facing_dy'), FACING_LIMIT);
+  if (xMm === null || yMm === null || facingDx === null || facingDy === null) return 'malformed';
+  // A facing of no direction states nothing, so it is malformed rather than a default.
+  if (facingDx === 0 && facingDy === 0) return 'malformed';
+  return { xMm, yMm, facingDx, facingDy };
 }
 
 /** Keep preview provenance visible in browser chrome without adding permanent world chrome. */
