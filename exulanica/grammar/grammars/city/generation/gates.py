@@ -72,6 +72,9 @@ class GateReport:
     objects_inside_footprints: int = 0
     materials: int = 0
     materials_with_texture_set: int = 0
+    #: Called ``unavailable_roles`` until 2026-09-18, when the name was corrected to say the scope
+    #: it has. A retained log or receipt written before then carries the old key and the same
+    #: numbers; it is a record of what that run produced and is not rewritten to match a rename.
     undressed_roles_asked_about: dict[str, int] = field(default_factory=dict)
     facades: int = 0
     facades_with_section_5_1_fields: int = 0
