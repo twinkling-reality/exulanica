@@ -850,7 +850,21 @@ async function main() {
       await halt('the page mounted no generated tile, so there is nothing of that target to score');
     }
 
-    // The route, chosen by rule from the product's own arrival pose and collision proxy.
+    // TWO INPUTS, NOT ONE. The rings the route rule chooses a heading by and the rings the keys
+    // measure against are different questions, and on the owned district they happen to be the same
+    // set, which is why one array was enough until a second target existed.
+    //
+    // `prisms` are what the keys mean by a ring: BUILDING EXTERIORS with the height their own record
+    // states. Three consumers read them, each verified by reading its body, not its signature:
+    // planRoute for the heading, measureCapsule for capsuleRingContactSamples (skipping any prism
+    // outside the capsule's height band), and classify, which marks a near-vertical triangle as
+    // FACADE when it lies within a band of a prism ring edge and inside that prism's height band,
+    // feeding continuousTexturedStreetAndFacades. Passing street furniture here would therefore
+    // move three keys at once and nothing in a record would show it.
+    //
+    // `routeRings` are the route obstruction rings a tile's navigation side states: plan regions a
+    // walking capsule is kept clear of, with everything above head height dropped. They choose a
+    // heading and measure nothing.
     const obstacles = await session.call(bindingId, READ_OBSTACLES);
     const prisms = [];
     for (const obstacle of obstacles) {
@@ -876,8 +890,13 @@ async function main() {
     // either: every heading that fits the field qualifies, both tie-breaks are equal for all of
     // them, and the answer is the lowest heading that fits. That is a default wearing the costume
     // of a decision, and a record of it would say the rule was applied. So the run stops here.
-    observed.routeObstacleRings = prisms.length;
-    if (prisms.length === 0) {
+    // On the owned district the building exteriors ARE the frontage the rule looks for, so the two
+    // inputs are the same set there and this run is byte-identical to one before the split. On a
+    // generated target the tile states its own route rings, and states none today.
+    const routeRings = scoresOwnedDistrict ? prisms : [];
+    observed.buildingPrisms = prisms.length;
+    observed.routeObstacleRings = routeRings.length;
+    if (routeRings.length === 0) {
       await halt(
         'the page states no route obstruction rings, so the route rule has nothing to choose between: ' +
         'every heading would qualify equally and the walk would be the lowest heading that fits, ' +
@@ -887,7 +906,7 @@ async function main() {
         'collision solids and nothing in them stops a body.',
       );
     }
-    const plan = planRoute([arrival.x, arrival.z], prisms, [west, north, east, south]);
+    const plan = planRoute([arrival.x, arrival.z], routeRings, [west, north, east, south]);
     phase(`the route was planned at ${plan.headingMillidegrees} millidegrees`);
 
     const interactions = [];
@@ -1338,6 +1357,7 @@ async function main() {
         candidatesTried: plan.candidatesTried,
         candidatesQualified: plan.candidatesQualified,
         obstacles: prisms.length,
+        routeRings: routeRings.length,
         // How many candidates the tie-break could actually separate. Zero says the rule ran with
         // nothing to choose between, which is why a run with no rings halts before reaching here.
         candidatesWithFrontage: plan.frontageBothSidesSamples > 0 ? plan.candidatesQualified : 0,
