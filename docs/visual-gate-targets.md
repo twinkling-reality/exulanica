@@ -549,6 +549,22 @@ to qualify it must thread 131 m past all of them.
 - the frames show a street with buildings either side, 85 undressed facade ground bands reading
   magenta at the base of the frontages, and terrain undressed. Not an empty plain.
 
+**A SECOND HALT PREDICTED, in this gate rather than in the world, and it is my own defect.** Added
+after reading the launch entries and the tile route, still before anything was started. A run names
+its authentication condition from two declared members: `credentialed-api` needs NO preview requests,
+and `vite-preview-api` needs NO `/api/` requests. The preview runs so far were the second, with
+`/preview-api/graph`, `/preview-api/formation` and the rest. But a corridor tile is fetched from the
+PRODUCT route, `GET /api/tiles` and `GET /api/tiles/{id}/bytes` against `window.location.origin` plus
+`/api`. So the corridor page makes BOTH kinds of request and satisfies NEITHER condition.
+
+So I expect the run to halt with "the authentication condition cannot be named", and to do it LATE,
+after the walk and all three captures, because the condition is computed near the end. The corridor
+is a third kind of page, a preview shell that fetches a credentialed tile from the real API, and the
+declared list has two members. That list is a closed list on purpose and it is the right shape; what
+is wrong is that it is missing the member this target needs, and I will not widen it during a run I
+am scoring. If this fires, the fix is a declared third condition with its own rule, proposed and
+reviewed, not a loosened check.
+
 **And a revision to this document's own hint, made before the data rather than after.** The section
 below predicts that the tie-break which prefers enclosure will thread the clearance band routinely on
 a street. I now expect the opposite here: a line down a 16.2 m wide street runs metres from every
