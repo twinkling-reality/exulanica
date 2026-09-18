@@ -42,7 +42,7 @@ import type { Piece, SurfaceExpansion } from './pieces.js';
 import type { ProjectionName } from './record-shapes.js';
 import { ringClearance } from './ring-clearance.js';
 import { curbSurfaces, junctionSurface, segmentSurfaces } from './streets.js';
-import type { StreetFields, StreetLookup, StreetResult, StripNeed } from './streets.js';
+import type { CornerContext, CornerNeed, StreetFields, StreetLookup, StreetResult, StripNeed } from './streets.js';
 import { hullKeepingEdges } from './piece-carve.js';
 import { carveSupport } from './support-carve.js';
 import type { ClearanceWalk, SupportTriangle } from './support-carve.js';
@@ -53,7 +53,7 @@ import type { CoveringTriangle, TerrainPatch } from './terrain-yield.js';
  * Bumped whenever an expander, a statement, a contract or the materialised projection set
  * changes, because each changes the bytes a bake writes. The bake stage's parameters carry it.
  */
-export const TESSELLATOR_SOURCE_VERSION = 15;
+export const TESSELLATOR_SOURCE_VERSION = 16;
 
 /**
  * What each materialised projection preserves and what it may be used for, as separate rows, the
@@ -149,6 +149,8 @@ export const NEEDS = {
   street_curbs: 'street_curbs',
   /** A junction leg whose segment, curbs or node the tile does not carry, so its mouth is unknown. */
   junction_legs: 'junction_legs',
+  /** A corner that turns the other way, where the face wraps round it rather than being cut by it. */
+  concave_corner: 'concave_corner',
   /** A crossing's band across its segment, from its line and width. */
   crossing_band: 'crossing_band',
   /** Road marking stripes, each a stated plan quad. */
@@ -488,11 +490,33 @@ function renderSegment(fields: Fields, context: ExpandContext): Expansion {
  * segment's direction and every width is a field of the curb, so the rule needs the segment the
  * curb names and nothing else.
  */
-function curbPieces(fields: Fields, context: ExpandContext, where: string): StreetResult<'bent_street'> {
+function curbPieces(fields: Fields, context: ExpandContext, where: string): StreetResult<'bent_street' | CornerNeed> {
   const segment = context.carried.get(fields.segment_identity as string);
   if (segment === undefined) throw new TessellationError(`${where} names a segment the tile does not carry`);
   if (segment.kind !== 'city.street_segment') throw new TessellationError(`${where} names ${segment.kind} as its segment`);
-  return curbSurfaces(fields, segment.fields, where);
+  return curbSurfaces(fields, segment.fields, cornersOf(fields, context, where), where);
+}
+
+/**
+ * The corner a curb owns for each curb it names as its follower, with the rings of the blocks it
+ * names. A curb that names no follower turns no corner; one that names a follower the tile does
+ * not carry is refused rather than drawn short, since the corner is its own geometry and half of a
+ * record is not a record.
+ */
+function cornersOf(fields: Fields, context: ExpandContext, where: string): CornerContext[] {
+  const blocks: Plan[][] = [];
+  for (const identity of fields.block_identity as readonly string[]) {
+    const block = context.carried.get(identity);
+    if (block === undefined) continue;
+    if (block.kind !== 'city.block') throw new TessellationError(`${where} names ${block.kind} as a block`);
+    blocks.push(block.fields.boundary_mm as Plan[]);
+  }
+  return (fields.next_curb_identity as readonly string[]).map((identity) => {
+    const follower = context.carried.get(identity);
+    if (follower === undefined) throw new TessellationError(`${where} names a following curb the tile does not carry`);
+    if (follower.kind !== 'city.curb_edge') throw new TessellationError(`${where} names ${follower.kind} as its following curb`);
+    return { follower: follower.fields, blocks, resolutionMm: context.resolutionMm };
+  });
 }
 
 /** How the street rules find the records a junction names: the tile's carried records only. */

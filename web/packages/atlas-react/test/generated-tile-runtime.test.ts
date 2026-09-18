@@ -82,9 +82,9 @@ describe('loading a baked tile through tess\'s decoder', () => {
     // is the patch less the carriageways and gutters the segments draw, so it follows their ranges.
     expect(terrain.state === 'drawn' && terrain.surfaces).toEqual([{
       role: 'terrain', orientation: 'horizontal', state: 'unavailable', textureSetId: null,
-      reason: MATERIAL_NONE_EXISTS_REASON, firstVertex: 2829, vertexCount: 829, firstTriangle: 1075, triangleCount: 690,
+      reason: MATERIAL_NONE_EXISTS_REASON, firstVertex: 3476, vertexCount: 468, firstTriangle: 1398, triangleCount: 491,
     }]);
-    expect(terrain.state === 'drawn' && terrain.triangleCount).toBe(690);
+    expect(terrain.state === 'drawn' && terrain.triangleCount).toBe(491);
     expect(terrain.identity).toBe('2f14328d-39f8-5bee-a06a-f963b701ccf3');
     // A segment draws a carriageway and a gutter, each dressed by a texture set this test serves none of.
     const segment = drawn[36]!;
@@ -97,7 +97,7 @@ describe('loading a baked tile through tess\'s decoder', () => {
     const drawnEntry = header.entries.find((entry, index) => entry.state === 'drawn' && decoded.header.records[index]!.kind === 'city.terrain');
     expect(drawnEntry?.state === 'drawn' && drawnEntry.surfaces).toEqual([{
       role: 'terrain', material: { state: 'none-exists' }, orientation: 'horizontal',
-      first_vertex: 2829, vertex_count: 829, first_triangle: 1075, triangle_count: 690,
+      first_vertex: 3476, vertex_count: 468, first_triangle: 1398, triangle_count: 491,
     }]);
     // Halo records are context: the container lists them, and the runtime neither draws nor lists them.
     const halo = header.entries.filter((entry) => entry.state === 'halo').map((entry) => entry.record);
@@ -125,25 +125,25 @@ describe('loading a baked tile through tess\'s decoder', () => {
     // segments, the terrain and the vitrines in the shopfronts.
     const runs: [string, number, number][] = [
       ['city.block', 0, 6],
-      ['city.curb_edge', 6, 42],
-      ['city.facade', 42, 156],
-      ['city.interior_backing', 156, 168],
-      ['city.junction', 168, 244],
-      ['city.massing', 244, 291],
-      ['city.parcel', 291, 295],
-      ['city.rooftop_object', 295, 505],
-      ['city.street_furniture', 505, 797],
-      ['city.street_segment', 797, 821],
-      ['city.street_tree', 821, 1075],
-      ['city.terrain', 1075, 1765],
-      ['city.vitrine', 1765, 2077],
+      ['city.curb_edge', 6, 365],
+      ['city.facade', 365, 479],
+      ['city.interior_backing', 479, 491],
+      ['city.junction', 491, 567],
+      ['city.massing', 567, 614],
+      ['city.parcel', 614, 618],
+      ['city.rooftop_object', 618, 828],
+      ['city.street_furniture', 828, 1120],
+      ['city.street_segment', 1120, 1144],
+      ['city.street_tree', 1144, 1398],
+      ['city.terrain', 1398, 1889],
+      ['city.vitrine', 1889, 2201],
     ];
     for (const [kind, from, to] of runs) {
       for (let triangle = from; triangle < to; triangle += 1) {
         expect(tile.rangeAtTriangle(triangle)?.kind).toBe(kind);
       }
     }
-    expect(tile.rangeAtTriangle(2077)).toBeNull();
+    expect(tile.rangeAtTriangle(2201)).toBeNull();
     expect(tile.rangeAtTriangle(-1)).toBeNull();
   });
 
@@ -172,7 +172,7 @@ describe('loading a baked tile through tess\'s decoder', () => {
 describe('standing on the tile\'s own nav_envelope', () => {
   it('samples support from the envelope and opens standing on it, eye 1.62 m above it', () => {
     const navigation = tile.navigation;
-    expect(navigation.support).toEqual({ state: 'nav_envelope', triangles: 5728 });
+    expect(navigation.support).toEqual({ state: 'nav_envelope', triangles: 5828 });
     expect(navigation.collisionState.state).toBe('unavailable');
     expect(navigation.viewpointOnly).toBe(false);
     const world = navigation.world;
@@ -472,16 +472,16 @@ describe('drawing a tile into the Atlas scene', () => {
     // Every surface is unavailable here: the terrain has no material, and this test serves no set
     // for the segments' carriageways and gutters, the building's walls, roofs and parapets, or the
     // plane behind each face's glass.
-    expect(attachment.metrics).toMatchObject({ tileName: 'tile-conformance', triangles: 2077, drawBatches: 1, unavailableSurfaces: 118, decodedTextureBytes: 0 });
+    expect(attachment.metrics).toMatchObject({ tileName: 'tile-conformance', triangles: 2201, drawBatches: 1, unavailableSurfaces: 118, decodedTextureBytes: 0 });
     const root = environmentRoot.findByName('generated-tile:tile-conformance') as pc.Entity;
     const renders = root.findComponents('render') as pc.RenderComponent[];
     expect(renders).toHaveLength(1);
     const mesh = renders[0]!.meshInstances[0]!.mesh;
-    expect(mesh.vertexBuffer?.numVertices).toBe(4594);
+    expect(mesh.vertexBuffer?.numVertices).toBe(4880);
     const decoded = decodeOwd(baked).projections[0]!;
     const drawn: number[] = [];
     mesh.getPositions(drawn);
-    // The same 4,594 vertices, rotated into the renderer frame, and no other: the mesh keeps
+    // The same 4,880 vertices, rotated into the renderer frame, and no other: the mesh keeps
     // first-use order, so compare them as sorted triples.
     const triples = (values: ArrayLike<number>): string[] => {
       const out: string[] = [];
@@ -491,11 +491,11 @@ describe('drawing a tile into the Atlas scene', () => {
       return out.sort();
     };
     const expected: number[] = [];
-    for (let vertex = 0; vertex < 4594; vertex += 1) {
+    for (let vertex = 0; vertex < 4880; vertex += 1) {
       expected.push(decoded.position[vertex * 3]!, decoded.position[vertex * 3 + 2]!, -decoded.position[vertex * 3 + 1]!);
     }
     expect(triples(drawn)).toEqual(triples(expected));
-    expect(renders[0]!.meshInstances[0]!.mesh.indexBuffer[0]?.numIndices).toBe(2077 * 3);
+    expect(renders[0]!.meshInstances[0]!.mesh.indexBuffer[0]?.numIndices).toBe(2201 * 3);
     expect(app.scene.fog.start).toBe(tile.look.fog.startM);
     attachment.dispose();
     expect(environmentRoot.findByName('generated-tile:tile-conformance')).toBeNull();

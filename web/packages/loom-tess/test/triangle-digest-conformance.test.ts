@@ -28,10 +28,10 @@ import {
   sortList,
 } from './support.js';
 
-/** Over `test/fixtures/tile-conformance.json`, tessellator 15, digest profile v3. */
+/** Over `test/fixtures/tile-conformance.json`, tessellator 16, digest profile v3. */
 const GOLDEN = {
-  render_batch: 'd91ef583dbcdd06bcc5555b8fbc8e36e473abcb50a5943397c628b5432200d74',
-  nav_envelope: 'adec1833518f6a785a90211eb6f0f2d4513a776b366a3946588203aa9eed9e9e',
+  render_batch: 'caf7ec4fc7e91f4f1457e2f9c470b2c3d24d014af9b7ffa2d7c12d98cc817560',
+  nav_envelope: '32308308e484049938980c744c270756dfa1adeccda6eccb50d9af2c39aaa525',
 } as const;
 
 afterEach(() => {
@@ -205,10 +205,10 @@ describe('the triangle digest of the conformance fixture', () => {
     const drawnTerrain = renderBatch!.header.entries[terrain]!;
     expect(drawnTerrain).toMatchObject({
       state: 'drawn',
-      first_vertex: 2829,
-      vertex_count: 829,
-      triangle_count: 690,
-      surfaces: [{ role: 'terrain', orientation: 'horizontal', material: { state: 'none-exists' }, triangle_count: 690 }],
+      first_vertex: 3476,
+      vertex_count: 468,
+      triangle_count: 491,
+      surfaces: [{ role: 'terrain', orientation: 'horizontal', material: { state: 'none-exists' }, triangle_count: 491 }],
     });
     // The building draws, so the ground it stands on is the building's and not the terrain's: its
     // base ring is cut out of the patch by the same yield rule the segments' surfaces are.
@@ -233,8 +233,11 @@ describe('the triangle digest of the conformance fixture', () => {
       if (surface.material.state !== 'record') throw new Error('a building surface cites no record');
       expect(header.records[surface.material.record]!.fields.role).toBe(surface.role);
     }
-    // Yielding to the streets cuts the met cells into more triangles than the grid's 16 by 16.
-    expect(drawnTerrain.state === 'drawn' && drawnTerrain.triangle_count).toBeGreaterThan(16 * 16 * 2);
+    // Yielding takes more from the grid than it adds by cutting: the streets, their corners and the
+    // lots cover whole cells, so terrain draws FEWER triangles than the grid's own 16 by 16 pairs,
+    // and the cells it keeps are cut rather than whole, which is why it is not a multiple of two.
+    expect(drawnTerrain.state === 'drawn' && drawnTerrain.triangle_count).toBeLessThan(16 * 16 * 2);
+    expect(drawnTerrain.state === 'drawn' && drawnTerrain.triangle_count % 2).toBe(1);
     // Each segment draws a carriageway and a gutter, each dressed by its own material record.
     const segments = renderBatch!.header.entries.filter((_entry, index) => header.records[index]!.kind === 'city.street_segment');
     expect(segments).toHaveLength(3);
@@ -261,7 +264,7 @@ describe('the triangle digest of the conformance fixture', () => {
     expect(count(nav, 'halo')).toBe(grammar.halo.length);
     // Fewer triangles than render's terrain, and far fewer than when terrain drew under the ground
     // a carve had cleared: the segments cover what they stand on whether or not a capsule fits.
-    expect(navEnvelope!.header.entries[terrain]).toMatchObject({ state: 'drawn', vertex_count: 622, triangle_count: 842 });
+    expect(navEnvelope!.header.entries[terrain]).toMatchObject({ state: 'drawn', vertex_count: 388, triangle_count: 572 });
     expect(navEnvelope!.surfaceMm).toBeUndefined();
 
     // Halo is exactly what the document lists as halo.

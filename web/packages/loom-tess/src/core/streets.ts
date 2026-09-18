@@ -28,6 +28,32 @@
  *      the two quads from gutter line to kerb line, both horizontal. A quad of no width is left out.
  *   5. Surface coordinates: `s` along the centreline from its start, `t` across it, left positive.
  *
+ * THE CURB'S CORNER, which the curb stating `corner_radius_mm` owns up to its follower's tangent
+ * point (`exulanica.grammar.grammars.city.corners`). `P` is where this curb's walk round its face
+ * ends and `Q` where its follower's begins; the arc is the fillet arc rule's, about the centre that
+ * rule finds, and it carries the heights of `P` and `Q` by the same bisection the arc's points are
+ * placed by.
+ *   1. The kerb face runs along that arc and rises `kerb_height_mm`, facing the carriageway.
+ *   2. The kerb top lies between the arc and the back arc, `kerb_width_mm` further toward the
+ *      centre, which is radius `r - kerb_width_mm` at a convex corner.
+ *   3. THE FOOTWAY WEDGE IS THE PIE SLICE LESS THE BLOCKS THE CURB NAMES. The slice runs from the
+ *      back arc in to the centre, between the two tangent points' normals, which is everything
+ *      between them that is not carriageway and not kerb. What of it is the building's is the
+ *      block's own ring, which the grammar holds to pass exactly through the frontage corner `F`
+ *      where the two frontage lines meet, so carving by the block gives the wedge the corner rule
+ *      describes without this rule placing `F` at all. That matters beyond tidiness: on a corner
+ *      whose radius is large against its footway, `F` lies OUTSIDE the arc, the frontage lines
+ *      never meet inside the slice, and the wedge is two pieces rather than one. Measured on the
+ *      corridor's five tiles: 8 of 48 convex corners with both widths under the radius are that
+ *      shape. A rule that placed `F` and walked to it would draw a ring that crosses itself there.
+ *      A curb that names no block keeps the whole slice, which is the corner rule's own answer
+ *      where a width reaches the radius and the frontage lines never enter the slice at all.
+ *   4. The wedge stands at the kerb top's height along the back arc and rises by the curb's
+ *      crossfall everywhere else, which is what its box allows.
+ *   A CONCAVE CORNER IS NOT DRAWN and says so: the grammar states it as the same partition with the
+ *   arc's side reversed, and no corner on the corridor is concave, so there is nothing to hold a
+ *   rule for it to. It waits on `concave_corner` rather than being guessed at.
+ *
  * THE CURB, its straight part, away from the carriageway along the side's normal:
  *   1. The kerb face is the vertical quad from the kerb line up `kerb_height_mm`, facing the
  *      carriageway. `s` is along the centreline and `t = base - z`, with the kerb line as base.
@@ -57,7 +83,7 @@
  * Not yet wired into a bake. It changes no container until an expander calls it.
  */
 import type { Piece, SurfaceExpansion } from './pieces.js';
-import { alongByCornerRule, filletArc, filletSegmentsWithin } from './fillet-arc.js';
+import { alongByCornerRule, filletArc, filletCentre, filletSegmentsWithin } from './fillet-arc.js';
 import {
   add,
   CORNER_LENGTH_SCALE,
@@ -70,6 +96,7 @@ import {
   subtract,
 } from './integer-math.js';
 import type { Plan, Space } from './integer-math.js';
+import { openRegions } from './piece-carve.js';
 import { triangulateRing } from './ring-triangulation.js';
 
 export type StreetFields = { readonly [name: string]: unknown };
@@ -270,7 +297,12 @@ export function segmentSurfaces(
 }
 
 /** A curb's straight part: its kerb face, its kerb top and its footway. */
-export function curbSurfaces(curb: StreetFields, segment: StreetFields, where: string): StreetResult<'bent_street'> {
+export function curbSurfaces(
+  curb: StreetFields,
+  segment: StreetFields,
+  corners: readonly CornerContext[],
+  where: string,
+): StreetResult<'bent_street' | CornerNeed> {
   const centre = straight(segment.centreline_mm);
   const line = straight(curb.kerb_line_mm);
   if (centre === undefined) return { state: 'waiting', need: 'bent_street' };
@@ -309,21 +341,155 @@ export function curbSurfaces(curb: StreetFields, segment: StreetFields, where: s
       subtract(heightOn(line, direction, plan(point), where), point[2], where),
     );
   }
-  const face: Piece = {
-    vertices: faceVertices,
-    triangles: QUAD,
-    surface: { role: 'kerb', orientation: 'vertical', coordinates: faceCoordinates },
-  };
   const topQuad: Space[] = onLeft ? [top0, top1, back1, back0] : [back0, back1, top1, top0];
   const footwayQuad: Space[] = onLeft ? [back0, back1, footway1, footway0] : [footway0, footway1, back1, back0];
+  const built: { readonly [name: string]: Built } = {
+    face: { vertices: faceVertices, coordinates: faceCoordinates, triangles: [...QUAD] },
+    top: { ...horizontal(topQuad, origin, direction, where), triangles: [...QUAD] },
+    footway: { ...horizontal(footwayQuad, origin, direction, where), triangles: [...QUAD] },
+  };
+  for (const corner of corners) {
+    const turned = curbCorner(curb, corner, origin, direction, where);
+    if (turned.state === 'waiting') return turned;
+    for (const name of ['face', 'top', 'footway']) appended(built[name]!, turned.parts[name as 'face']);
+  }
+  // One surface per role and orientation, however many corners the curb turns into its followers.
   return {
     state: 'drawn',
     pieces: [
-      face,
-      piece(horizontal(topQuad, origin, direction, where), QUAD, 'kerb', 'horizontal'),
-      piece(horizontal(footwayQuad, origin, direction, where), QUAD, 'footway', 'horizontal'),
+      piece(built.face!, built.face!.triangles, 'kerb', 'vertical'),
+      piece(built.top!, built.top!.triangles, 'kerb', 'horizontal'),
+      piece(built.footway!, built.footway!.triangles, 'footway', 'horizontal'),
     ],
   };
+}
+
+/** What a curb's corner waits on when this version does not draw it. */
+export type CornerNeed = 'concave_corner';
+
+/** A corner's share of each of the curb's three surfaces, or the rule it waits on. */
+export type CornerResult =
+  | { readonly state: 'drawn'; readonly parts: { readonly face: Built; readonly top: Built; readonly footway: Built } }
+  | { readonly state: 'waiting'; readonly need: CornerNeed };
+
+/** What a curb's corner needs of the tile beyond the curb itself. */
+export interface CornerContext {
+  /** The curb this one is followed by round the face, which the tile must carry. */
+  readonly follower: StreetFields;
+  /** The rings of the blocks the curb names, which are the building side of its frontage. */
+  readonly blocks: readonly (readonly Plan[])[];
+  /** The resolution the projection states, which the arc's chords keep within. */
+  readonly resolutionMm: number;
+}
+
+/**
+ * The surfaces of the corner a curb turns into its follower: the kerb face along the arc, the kerb
+ * top, and the footway wedge. Empty when the curb states no radius. `origin` and `direction` are
+ * the owning segment's, since every one of these surfaces takes the segment's along-centreline
+ * coordinate, which the grammar fixes for a curb's surfaces however the kerb turns.
+ */
+export function curbCorner(
+  curb: StreetFields,
+  corner: CornerContext,
+  origin: Plan,
+  direction: Plan,
+  where: string,
+): CornerResult {
+  const radius = curb.corner_radius_mm as number;
+  const nothing: Built = { vertices: [], coordinates: [], triangles: [] };
+  if (radius === 0) return { state: 'drawn', parts: { face: nothing, top: nothing, footway: nothing } };
+  const [beforeP, p] = walked(curb);
+  const [q, afterQ] = walked(corner.follower);
+  const into = between(plan(beforeP), plan(p), where);
+  const out = between(plan(q), plan(afterQ), where);
+  const turning = crossVectors(into, out, where);
+  if (turning === 0) throw new GeometryError(`${where} states a radius on a corner that runs straight on`);
+  if (turning < 0) return { state: 'waiting', need: 'concave_corner' };
+  const kerbWidth = curb.kerb_width_mm as number;
+  if (radius <= kerbWidth) throw new GeometryError(`${where} has a convex corner radius that leaves its kerb top no back arc`);
+  const height = curb.kerb_height_mm as number;
+  const footwayWidth = curb.footway_width_mm as number;
+  const rise = floorDivide(multiply(footwayWidth, curb.footway_crossfall_millionths as number, where), CORNER_LENGTH_SCALE, where);
+  const segments = filletSegmentsWithin(p, into, q, out, radius, corner.resolutionMm, segmentBound(radius), where);
+  const arc = filletArc(p, into, q, out, radius, segments, where);
+  const centre = filletCentre(p, into, q, out, radius, where);
+  const back = arc.map((point): Space => {
+    const at = moved(centre, alongByCornerRule(between(centre, plan(point), where), subtract(radius, kerbWidth, where), where), where);
+    return [at[0], at[1], add(point[2], height, where)];
+  });
+
+  // The face, seen from the carriageway, which is outside the arc: each chord from its far end to
+  // its near one, so the quad reads the same way round as the straight part's.
+  const faceVertices: Space[] = [];
+  const faceTriangles: number[] = [];
+  for (let step = 0; step + 1 < arc.length; step += 1) {
+    const [a, b] = [arc[step + 1]!, arc[step]!];
+    const first = faceVertices.length;
+    faceVertices.push(a, b, [b[0], b[1], add(b[2], height, where)], [a[0], a[1], add(a[2], height, where)]);
+    for (const index of QUAD) faceTriangles.push(first + index);
+  }
+  const topVertices: Space[] = [];
+  const topTriangles: number[] = [];
+  for (let step = 0; step + 1 < arc.length; step += 1) {
+    const first = topVertices.length;
+    const [a, b] = [arc[step]!, arc[step + 1]!];
+    topVertices.push([a[0], a[1], add(a[2], height, where)], [b[0], b[1], add(b[2], height, where)], back[step + 1]!, back[step]!);
+    for (const index of QUAD) topTriangles.push(first + index);
+  }
+
+  // The wedge: the slice from the back arc in to the centre, less the blocks the curb names. Its
+  // height is the kerb top's on the back arc and a crossfall above it everywhere else, so a point
+  // the carve makes inside the slice takes the raised height, and only the back arc's own points
+  // keep the kerb top's.
+  const onBack = new Map<string, number>();
+  for (const point of back) onBack.set(`${String(point[0])} ${String(point[1])}`, point[2]);
+  const apex = floorDivide(add(p[2], q[2], where), 2, where);
+  const slice: Plan[] = [...back.map(plan), [centre[0], centre[1]]];
+  const wedgeVertices: Space[] = [];
+  const wedgeTriangles: number[] = [];
+  for (const walk of openRegions(slice, corner.blocks, where)) {
+    const first = wedgeVertices.length;
+    for (const point of walk) {
+      const kerbTop = onBack.get(`${String(point[0])} ${String(point[1])}`);
+      const z = kerbTop === undefined ? add(add(apex, height, where), rise, where) : kerbTop;
+      wedgeVertices.push([point[0], point[1], z]);
+    }
+    for (const index of triangulateRing(walk, where)) wedgeTriangles.push(first + index);
+  }
+  return {
+    state: 'drawn',
+    parts: {
+      face: { ...vertical(faceVertices, origin, direction, p[2], where), triangles: faceTriangles },
+      top: { ...horizontal(topVertices, origin, direction, where), triangles: topTriangles },
+      footway: { ...horizontal(wedgeVertices, origin, direction, where), triangles: wedgeTriangles },
+    },
+  };
+}
+
+/** One surface being built: its vertices, their surface coordinates, and its triangles over them. */
+interface Built {
+  readonly vertices: number[];
+  readonly coordinates: number[];
+  readonly triangles: number[];
+}
+
+/** Another surface's vertices and triangles, added to one being built, indices moved along. */
+function appended(into: Built, from: Built): void {
+  const first = into.vertices.length / 3;
+  for (const value of from.vertices) into.vertices.push(value);
+  for (const value of from.coordinates) into.coordinates.push(value);
+  for (const index of from.triangles) into.triangles.push(first + index);
+}
+
+/** Vertices with vertical surface coordinates: `s` along the centreline and `t = base - z`. */
+function vertical(points: readonly Space[], origin: Plan, direction: Plan, base: number, where: string): Measured {
+  const vertices: number[] = [];
+  const coordinates: number[] = [];
+  for (const point of points) {
+    vertices.push(point[0], point[1], point[2]);
+    coordinates.push(measureAgainst(origin, direction, plan(point), where).along, subtract(base, point[2], where));
+  }
+  return { vertices, coordinates };
 }
 
 /** How a street rule finds the records a record names: carried records only. */

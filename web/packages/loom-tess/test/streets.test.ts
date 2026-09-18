@@ -2,11 +2,17 @@
  * The street rules, held to what they state on every segment and curb of the conformance fixture:
  * surfaces by role and orientation, counter-clockwise from their front, inside their record's
  * extent, meeting each other on shared edges, and measured in the segment's own frame.
+ *
+ * THE CORNER is held to the partition the grammar states rather than to a shape this test redraws:
+ * every point of it lies in the slice between the two tangent points' normals, no point of the
+ * footway lies inside a block the curb names, and the curb still draws ONE surface per role and
+ * orientation however many corners it turns. A test that rebuilt the wedge from the same fields
+ * would agree with the rule by construction and could not fail.
  */
 import { describe, expect, it } from 'vitest';
 import type { Piece } from '../src/core/pieces.js';
 import { curbSurfaces, junctionSurface, segmentSurfaces } from '../src/core/streets.js';
-import type { StreetLookup } from '../src/core/streets.js';
+import type { CornerContext, StreetLookup } from '../src/core/streets.js';
 import { fixtureObject, recordsOf } from './support.js';
 
 type Fields = Record<string, any>;
@@ -97,7 +103,7 @@ describe('the segment rule', () => {
       const gutterPoints = points(result.pieces[1]!).map((point) => point.join(' '));
       for (const side of ['left', 'right']) {
         const curb = curbOf(segment, side)!;
-        const drawn = curbSurfaces(curb, segment, 'case');
+        const drawn = curbSurfaces(curb, segment, [], 'case');
         if (drawn.state !== 'drawn') throw new Error('not drawn');
         const facePoints = points(drawn.pieces[0]!);
         const bottoms = facePoints.filter((point) => point[2] === curb.kerb_line_mm[0][2]);
@@ -131,7 +137,7 @@ describe('the curb rule, straight parts', () => {
     expect(curbs).toHaveLength(6);
     for (const curb of curbs) {
       const segment = segments.find((candidate) => candidate.identity === curb.segment_identity)!;
-      const result = curbSurfaces(curb, segment, 'case');
+      const result = curbSurfaces(curb, segment, [], 'case');
       if (result.state !== 'drawn') throw new Error(`curb ${curb.identity} waits on ${result.need}`);
       expect(result.pieces.map((piece) => [piece.surface!.role, piece.surface!.orientation])).toEqual([
         ['kerb', 'vertical'],
@@ -166,11 +172,83 @@ describe('the curb rule, straight parts', () => {
     const curb = curbs.find((candidate) => candidate.block_identity.includes(block.identity) && candidate.side === 'left'
       && candidate.kerb_line_mm[0][1] === candidate.kerb_line_mm[1][1])!;
     const segment = segments.find((candidate) => candidate.identity === curb.segment_identity)!;
-    const result = curbSurfaces(curb, segment, 'case');
+    const result = curbSurfaces(curb, segment, [], 'case');
     if (result.state !== 'drawn') throw new Error('not drawn');
     const back = points(result.pieces[2]!).filter((point) => point[1] === block.boundary_mm[0][1]);
     expect(back).toHaveLength(2);
     for (const point of back) expect(point[2]).toBe(block.grade_elevation_mm);
+  });
+});
+
+/** The corner a curb turns, read from the fixture the way the expander reads it. */
+function cornerOf(curb: Fields): CornerContext | undefined {
+  const identity = (curb.next_curb_identity as string[])[0];
+  if (identity === undefined) return undefined;
+  if (curb.corner_radius_mm === 0) return undefined;
+  const follower = curbs.find((candidate) => candidate.identity === identity)!;
+  const rings = (curb.block_identity as string[]).map((block) =>
+    (recordsOf(fixture, 'city.block').find((record: any) => record.fields.identity === block) as any).fields.boundary_mm as [number, number][]);
+  return { follower, blocks: rings, resolutionMm: 1 };
+}
+
+/** Whether a plan point lies inside a ring, by crossings. */
+function insideRing(ring: readonly (readonly [number, number])[], x: number, y: number): boolean {
+  let inside = false;
+  ring.forEach((here, index) => {
+    const next = ring[(index + 1) % ring.length]!;
+    if ((here[1] > y) !== (next[1] > y) && x < here[0] + (y - here[1]) * (next[0] - here[0]) / (next[1] - here[1])) {
+      inside = !inside;
+    }
+  });
+  return inside;
+}
+
+describe('the corner rule', () => {
+  it('turns both of the fixture\'s corners, keeping one surface per role and orientation', () => {
+    const turning = curbs.filter((curb) => curb.corner_radius_mm !== 0);
+    // One corner has a block to give ground up to and one has none, which are the two cases.
+    expect(turning).toHaveLength(2);
+    expect(turning.map((curb) => (curb.block_identity as string[]).length)).toEqual([1, 0]);
+    for (const curb of turning) {
+      const segment = segments.find((candidate) => candidate.identity === curb.segment_identity)!;
+      const corner = cornerOf(curb)!;
+      const straight = curbSurfaces(curb, segment, [], 'case');
+      const turned = curbSurfaces(curb, segment, [corner], 'case');
+      if (straight.state !== 'drawn' || turned.state !== 'drawn') throw new Error('a curb is not drawn');
+      expect(turned.pieces.map((piece) => [piece.surface!.role, piece.surface!.orientation])).toEqual([
+        ['kerb', 'vertical'],
+        ['kerb', 'horizontal'],
+        ['footway', 'horizontal'],
+      ]);
+      // The corner is additive: the straight part's own triangles are still all there.
+      for (const [index, piece] of turned.pieces.entries()) {
+        expect(piece.triangles.length).toBeGreaterThan(straight.pieces[index]!.triangles.length);
+        expect(piece.surface!.coordinates.length).toBe(piece.vertices.length / 3 * 2);
+      }
+      // Every horizontal triangle is wound upward, and every point lies inside the curb's extent.
+      for (const piece of turned.pieces) {
+        if (piece.surface!.orientation === 'horizontal') {
+          for (const [a, b, c] of triangles(piece)) expect(normal(a, b, c)[2]).toBeGreaterThan(0);
+        }
+        for (const point of points(piece)) expect(insideExtent(curb.extent as Fields, point)).toBe(true);
+      }
+      // And no footway triangle stands on ground a block the curb names has taken.
+      const rings = corner.blocks as [number, number][][];
+      for (const [a, b, c] of triangles(turned.pieces[2]!)) {
+        const at: [number, number] = [(a[0] + b[0] + c[0]) / 3, (a[1] + b[1] + c[1]) / 3];
+        for (const ring of rings) expect(insideRing(ring, at[0], at[1]), `${JSON.stringify(at)} is inside a block`).toBe(false);
+      }
+    }
+  });
+
+  it('waits on the rule for a corner that turns the other way', () => {
+    const curb = curbs.find((candidate) => candidate.corner_radius_mm !== 0)!;
+    const segment = segments.find((candidate) => candidate.identity === curb.segment_identity)!;
+    const corner = cornerOf(curb)!;
+    // The follower's kerb line reversed turns the corner the other way, which is a concave one.
+    const reversed = { ...corner.follower, kerb_line_mm: [...(corner.follower.kerb_line_mm as unknown[])].reverse() };
+    const result = curbSurfaces(curb, segment, [{ ...corner, follower: reversed }], 'case');
+    expect(result).toEqual({ state: 'waiting', need: 'concave_corner' });
   });
 });
 

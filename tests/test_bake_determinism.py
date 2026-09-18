@@ -629,10 +629,12 @@ def test_the_container_states_membership_frame_identity_and_what_is_drawn(tmp_pa
     [surface] = render["entries"][terrain]["surfaces"]
     assert (surface["role"], surface["orientation"]) == ("terrain", "horizontal")
     assert surface["material"] == {"state": "none-exists"}
-    assert (
-        render["entries"][terrain]["triangle_count"]
-        > 2 * (fixture_terrain().samples_per_side - 1) ** 2
-    )
+    # Yielding takes more from the grid than cutting adds back: the streets, the corners their
+    # curbs turn and the lots cover whole cells, so terrain draws FEWER triangles than the grid's
+    # own pairs, and an odd count says the cells it keeps are cut rather than whole.
+    whole_grid = 2 * (fixture_terrain().samples_per_side - 1) ** 2
+    assert 0 < render["entries"][terrain]["triangle_count"] < whole_grid
+    assert render["entries"][terrain]["triangle_count"] % 2 == 1
     for entry in (render["entries"][i] for i in segments):
         roles = [(s["role"], s["orientation"], s["material"]["state"]) for s in entry["surfaces"]]
         assert roles == [

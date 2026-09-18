@@ -177,6 +177,18 @@ solids an object states as its parts, and the ground a lot states.
   horizontal surface dressed by the material record for its role. Terrain yields to both. A segment
   whose centreline or kerb lines are bent, or whose curbs the tile does not carry, waits on
   `bent_street` or `street_curbs`.
+- A curb draws its straight kerb face, kerb top and footway, AND THE CORNER it turns into each curb
+  it names as its follower: the kerb face along the fillet arc, the kerb top out to the back arc,
+  and the footway wedge, all three added to the curb's own three surfaces so a curb draws one
+  surface per role and orientation however many corners it turns. THE WEDGE IS THE SLICE BETWEEN THE
+  TWO TANGENT POINTS' NORMALS LESS THE BLOCKS THE CURB NAMES, which is the corner rule's partition
+  without this rule placing the frontage corner `F` at all: the grammar holds a block's ring to pass
+  exactly through `F`, so carving by the block gives the same answer and also gives the right answer
+  where `F` lies outside the arc and the wedge is two pieces rather than one. Measured on the
+  corridor's five tiles, 8 of 48 convex corners with both widths under the radius are that shape, and
+  a rule that walked to `F` would draw a ring crossing itself on every one of them. A concave corner
+  waits on `concave_corner`: the grammar states it, no corner on the corridor is one, and a rule
+  nothing holds is a rule that is wrong somewhere nobody has looked.
 - In `nav_envelope`, support is what the navigation table calls `support`: the same ground partition
   render draws, and the segments' own carriageways and gutters, each CARVED clear of every region
   that table's obstruction axis names, by the support carve rule below. A `base_ring` obstruction is
@@ -205,8 +217,8 @@ solids an object states as its parts, and the ground a lot states.
   which drew far less footway to carve.
 
 Every other record kind states the rule it waits on (`NEEDS` in `src/core/expand.ts`):
-`ring_triangulation`, `massing_faces`, `facade_layout`, `bent_street`, `street_curbs`,
-`kerb_offset`, `junction_fill`, `crossing_band`, `marking_stripes` or `form_parts`. Relations,
+`ring_triangulation`, `facade_layout`, `bent_street`, `street_curbs`, `junction_legs`,
+`concave_corner`, `crossing_band`, `marking_stripes`, `form_parts` or `ground_coverage`. Relations,
 occupancies,
 lanes, nodes and dressings are not surfaces of their own, and say so.
 
