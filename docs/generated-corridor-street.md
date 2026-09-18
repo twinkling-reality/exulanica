@@ -85,11 +85,11 @@ records, one per tile, each of them a whole tile's ground grid that the blocks, 
 junctions draw over almost entirely.
 
 Where a terrain grid is not drawn over, it is two strips: 1.0 m along the district's south edge
-and 2.3 m along its north edge, where the outermost footway stops and the city ends. They total 422 m², 2.6 per cent
-of the corridor tile, and they are 64 m from the walked street behind two rows of buildings.
-Nothing between them is bare: the street lattice tiles the district exactly, block frontage to
-kerb line, with no verge and no forecourt. They are a known unavailable, not a defect, and they
-are revisited only if a capture ever looks down a cross street.
+and 2.3 m along its north edge, where the outermost footway stops and the city ends. They total
+422 m², 2.6 per cent of the corridor tile, and they are 64 m from the walked street behind two
+rows of buildings. Nothing between them is bare: the street lattice tiles the district exactly,
+block frontage to kerb line, with no verge and no forecourt. They are a known unavailable, not a
+defect, and they are revisited only if a capture ever looks down a cross street.
 
 ## 5. How to generate it again
 
@@ -132,13 +132,14 @@ revalidation costs nothing, and neither does a delivery that fails: the quota is
 bytes are in hand and held to their digest, never before.
 
 Refusals, each meaning one thing: 404 `unknown_reference` for a key nothing stored, and the same
-status and code for every key when the caller's grant does not hold the permission, so a credential
-that is short cannot learn which keys exist (the two bodies are not identical: the floor refuses
-before the route runs, with its own detail and none of the route's headers, which tells a caller
-only what its own grant is); 409 `nondeterminism_detected` for a key that once baked into two different containers,
-which is never served; 409 `bytes_missing` for a row whose bytes are not in the store, which is an
-operator's problem rather than a client's; 429 `tile_quota_exceeded` for a workspace past its
-ceiling or with none declared, which is never retried.
+status and code for every key when the caller's grant does not hold the permission, so a
+credential that is short cannot learn which keys exist (the two bodies are not identical: the
+floor refuses before the route runs, with its own detail and none of the route's headers, which
+tells a caller only what its own grant is); 409 `nondeterminism_detected` for a key that once
+baked into two different containers, which is never served; 409 `bytes_missing` for a row whose
+bytes are not in the store, which is an operator's problem rather than a client's; 429
+`tile_quota_exceeded` for a workspace past its ceiling or with none declared, which is never
+retried.
 
 A loader is better off listing first and fetching only the digests it does not already hold: one
 small request for a whole city, rather than a revalidation per tile.
@@ -180,3 +181,37 @@ lands, because it alone holds 538 of the 850 entries that are waiting.
 
 Nothing here is a defect of the records. Every unavailable entry names a reason, and a reader can
 tell a surface nobody has dressed from a surface nobody has yet triangulated.
+
+## 8. The walk, and the pose it starts from
+
+The gate scores pictures of a walk, so the walk states where it begins and which way it faces
+rather than taking whatever the runtime would default to. These are measured from the records of
+tile (2, 0), not chosen for the look of them.
+
+The corridor is Harbour Way's segment from x 250 000 to x 390 000, centreline at y 64 000, a
+7100 mm carriageway with a 300 mm gutter each side. Its two kerbs are 150 mm wide and 167 and
+168 mm tall, and its footways are unequal by the seed's own draw: 3600 mm on the south, 5200 mm on
+the north. That puts the south frontage line at y 56 700 and the north at y 72 900, so the street
+is **16 200 mm frontage to frontage**, and the frontages themselves run from x 261 700 to
+x 378 300, **116 600 mm** of built street.
+
+The walk starts on the wider footway, in the middle of it, at the western end of the frontage:
+
+| | |
+| --- | --- |
+| `pose_x_mm` | `262000` |
+| `pose_y_mm` | `70300` (the north footway spans 67 700 to 72 900) |
+| `facing_dx`, `facing_dy` | `1`, `0`, east along the street |
+| ends at | x 378 000, so the walk is 116 m |
+| midpoint | x 320 000 |
+
+Read into the development evaluation route, that is
+`?preview=1&city=<seed>&tile_x=2&tile_y=0&pose_x_mm=262000&pose_y_mm=70300&facing_dx=1&facing_dy=0`.
+
+**What the pictures must not imply.** Until `kerb_offset` lands, the footway this pose stands on
+does not draw at all: a curb edge carries the kerb and the footway together, and it is waiting.
+When `ring_triangulation` lands, the pale ground at the base of the frontages will be the
+**parcels' lot ground**, which is the private ground behind the frontage line, and not the footway.
+A caption that calls it a pavement is wrong, and the ground a person is actually walking on is
+still unavailable. The `nav_envelope` carries that ground whether or not anything draws it, which
+is why the walk is possible before the picture is honest.
