@@ -15,10 +15,10 @@
  * builds the terrain grid, a street segment's carriageway and gutters (`streets.ts`), a building's
  * own walls, roofs and parapets (`massing.ts`), the face it shows a street with its ground band and
  * that band's panels (`facades.ts`), the solids of an object's parts (`form-parts.ts`) and the
- * ground a lot, a block or a tree pit states (`lots.ts`), and a curb's kerb and footway
- * (`streets.ts`), and in the navigation projection carves the ground clear of what the grammar's
- * navigation table says obstructs a walking capsule; everything else states the rule it waits on
- * (`NEEDS`).
+ * ground a lot, a block or a tree pit states (`lots.ts`), and a curb's kerb and footway and the
+ * carriageway that fills a junction (`streets.ts`), and in the navigation projection carves the
+ * ground clear of what the grammar's navigation table says obstructs a walking capsule; everything
+ * else states the rule it waits on (`NEEDS`).
  *
  * Two projections are materialised, each from the records by its own rules and each with its own
  * representation contract: `render_batch`, what is drawn, and `nav_envelope`, what a person is
@@ -41,8 +41,8 @@ import type { FormObject, FormPart, FormShape, FormTriangle } from './form-parts
 import type { Piece, SurfaceExpansion } from './pieces.js';
 import type { ProjectionName } from './record-shapes.js';
 import { ringClearance } from './ring-clearance.js';
-import { curbSurfaces, segmentSurfaces } from './streets.js';
-import type { StreetFields, StreetResult } from './streets.js';
+import { curbSurfaces, junctionSurface, segmentSurfaces } from './streets.js';
+import type { StreetFields, StreetLookup, StreetResult, StripNeed } from './streets.js';
 import { carveSupport } from './support-carve.js';
 import type { ClearanceWalk, SupportTriangle } from './support-carve.js';
 import { coveringsWithArea, metCells, yieldedCell } from './terrain-yield.js';
@@ -52,7 +52,7 @@ import type { CoveringTriangle, TerrainPatch } from './terrain-yield.js';
  * Bumped whenever an expander, a statement, a contract or the materialised projection set
  * changes, because each changes the bytes a bake writes. The bake stage's parameters carry it.
  */
-export const TESSELLATOR_SOURCE_VERSION = 10;
+export const TESSELLATOR_SOURCE_VERSION = 11;
 
 /**
  * What each materialised projection preserves and what it may be used for, as separate rows, the
@@ -143,8 +143,8 @@ export const NEEDS = {
   bent_street: 'bent_street',
   /** A segment's two curbs, carried by the tile, whose kerb lines leave its strip a length. */
   street_curbs: 'street_curbs',
-  /** A junction's carriageway, filled between its legs with fillet arcs. */
-  junction_fill: 'junction_fill',
+  /** A junction leg whose segment, curbs or node the tile does not carry, so its mouth is unknown. */
+  junction_legs: 'junction_legs',
   /** A crossing's band across its segment, from its line and width. */
   crossing_band: 'crossing_band',
   /** Road marking stripes, each a stated plan quad. */
@@ -197,6 +197,11 @@ export interface ExpandContext {
    * answer to this, since a hull round a carved face may otherwise reach a millimetre past it.
    */
   readonly extent: PlanBox | undefined;
+  /**
+   * The resolution the projection being expanded states in the record's grammar: how far a chord
+   * may stand off the curve it stands for. A rule that cuts an arc reads it rather than choosing.
+   */
+  readonly resolutionMm: number;
   /**
    * The capsule radius the record's grammar measures for `nav_envelope`'s `capsule_clearance`, or
    * undefined when it measures none, which an expander claiming clearance refuses. The height and
@@ -466,6 +471,40 @@ function curbPieces(fields: Fields, context: ExpandContext, where: string): Stre
   return curbSurfaces(fields, segment.fields, where);
 }
 
+/** How the street rules find the records a junction names: the tile's carried records only. */
+function streetLookup(context: ExpandContext): StreetLookup {
+  return {
+    record: (identity: string): StreetFields | undefined => context.carried.get(identity)?.fields,
+    curbs: (segment: string) => ({ left: curbOf(context, segment, 'left'), right: curbOf(context, segment, 'right') }),
+  };
+}
+
+/** A junction's carriageway, filled between its legs' mouths and round each corner's fillet arc. */
+function junctionPieces(fields: Fields, context: ExpandContext, where: string): StreetResult<StripNeed | 'junction_legs'> {
+  return junctionSurface(fields, streetLookup(context), context.resolutionMm, where);
+}
+
+/** A junction as it is drawn: the carriageway that fills it. */
+function renderJunction(fields: Fields, context: ExpandContext): Expansion {
+  const where = `city.junction ${fields.identity as string}`;
+  const result = junctionPieces(fields, context, where);
+  if (result.state === 'waiting') return { state: 'unavailable', needs: [result.need] };
+  return { state: 'drawn', pieces: result.pieces };
+}
+
+/** A junction's carriageway is ground a person walks on, carved clear of what obstructs. */
+function supportJunction(fields: Fields, context: ExpandContext): Expansion {
+  const where = `city.junction ${fields.identity as string}`;
+  const result = junctionPieces(fields, context, where);
+  if (result.state === 'waiting') return { state: 'unavailable', needs: [result.need] };
+  const surfaces: SupportTriangle[] = [];
+  for (const piece of result.pieces) {
+    if (piece.surface?.orientation !== 'horizontal') continue;
+    for (const triangle of spaceTriangles(piece.vertices, piece.triangles)) surfaces.push(triangle);
+  }
+  return carvedSupport(surfaces, context, where);
+}
+
 /** A curb as it is drawn: its face, its top and its footway. */
 function renderCurb(fields: Fields, context: ExpandContext): Expansion {
   const where = `city.curb_edge ${fields.identity as string}`;
@@ -716,7 +755,10 @@ const KIND_RULES: ReadonlyMap<string, KindRules> = new Map<string, KindRules>([
   // A ground bay draws as part of its facade's ground band, in the facade's own entry, because the
   // material records that dress its panels name the facade and the panel's surface role.
   ['city.ground_bay', { render_batch: notInProjection, nav_envelope: notInProjection }],
-  ['city.junction', { render_batch: needs(NEEDS.junction_fill), nav_envelope: needs(NEEDS.junction_fill) }],
+  ['city.junction', {
+    render_batch: { rule: 'expand', expand: renderJunction, readsCoverings: false },
+    nav_envelope: { rule: 'expand', expand: supportJunction, readsCoverings: false },
+  }],
   // A room's near wall inside its building, behind its glazing: laid out on its facade, standing on
   // nothing, so it is no more a surface of the ground than the vitrine beside it.
   ['city.interior_backing', { render_batch: needs(NEEDS.facade_layout), nav_envelope: notInProjection }],

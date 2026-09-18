@@ -294,7 +294,7 @@ def test_the_tessellator_states_the_registry_parameters():
 
 def test_the_tessellator_reads_the_grammars_own_table():
     """The table is ``describe_shapes`` over the city's shapes and the descriptor's frame, contract
-    measures and navigation table, each row without its prose reason."""
+    measures, per-projection resolutions and navigation table, each row without its prose reason."""
     from exulanica.grammar.records import _HEX64, _IDENTITY
 
     printed = json.loads(_tess("shapes").stdout)
@@ -316,6 +316,12 @@ def test_the_tessellator_reads_the_grammars_own_table():
             "grammar_version": descriptor["grammar_version"],
             "frame": descriptor["frame"],
             "measures": descriptor_measures(),
+            # Every projection states a resolution, which a rule that cuts an arc into chords reads
+            # rather than choosing a segment count of its own.
+            "resolutions": {
+                projection["projection"]: projection["resolution_mm"]
+                for projection in descriptor["projections"]
+            },
             "navigation": [
                 {key: row[key] for key in ("kind", "ground", "cover", "obstruction")}
                 for row in descriptor["navigation"]
@@ -525,8 +531,9 @@ def test_the_container_states_membership_frame_identity_and_what_is_drawn(tmp_pa
         if r["kind"] in ("city.block", "city.parcel", "city.street_tree")
     ]
     curbs = [i for i, r in enumerate(header["records"]) if r["kind"] == "city.curb_edge"]
+    junctions = [i for i, r in enumerate(header["records"]) if r["kind"] == "city.junction"]
     assert [e["record"] for e in render["entries"] if e["state"] == "drawn"] == sorted(
-        [*curbs, *facades, *lots, *massings, *objects, *segments, terrain]
+        [*curbs, *facades, *junctions, *lots, *massings, *objects, *segments, terrain]
     )
     # A curb is its kerb face, its kerb top and the footway behind it.
     for entry in (render["entries"][i] for i in curbs):
@@ -592,6 +599,7 @@ def test_the_container_states_membership_frame_identity_and_what_is_drawn(tmp_pa
     ]
     assert drawn == (
         ["city.curb_edge"] * len(curbs)
+        + ["city.junction"] * len(junctions)
         + ["city.street_segment"] * len(segments)
         + ["city.terrain"]
     )

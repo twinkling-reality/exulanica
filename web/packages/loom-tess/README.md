@@ -113,9 +113,9 @@ Each carries a representation contract in the header (`PROJECTION_DEFINITIONS` i
 
 ## What draws today
 
-Terrain, a street segment's carriageway and gutters, a curb's kerb and footway, a building's own
-walls, roofs and parapets, the face it shows the street, the solids an object states as its parts,
-and the ground a lot states.
+Terrain, a street segment's carriageway and gutters, a curb's kerb and footway, the carriageway that
+fills a junction, a building's own walls, roofs and parapets, the face it shows the street, the
+solids an object states as its parts, and the ground a lot states.
 
 - In `render_batch`, the patch is drawn less what drawn covering surfaces cover, by the terrain
   yield rule below: the segments' carriageways and gutters, and the ground a drawn building stands
@@ -141,6 +141,11 @@ and the ground a lot states.
   kerb by the crossfall the curb states. Its kerb top and footway are ground a person walks on, so
   the navigation projection carves them clear of what obstructs, exactly as it does the segment's
   own surfaces. The corner a curb owns, inside its `corner_radius_mm` arc, is not drawn yet.
+- A junction draws the carriageway that fills it by the street rules, between its legs' mouths and
+  round each corner's fillet arc, at the least power of two segments whose chords stay within the
+  resolution the projection's contract states. It is ground a person walks on, so navigation carves
+  it as it carves the rest. A leg whose segment, curbs or node the tile does not carry waits on
+  `junction_legs`.
 - A parcel, a block and a street tree's pit draw the ground they state by the lot rule
   (`src/core/lots.ts`): the ring at its stated elevation, as one horizontal surface. A block draws
   its boundary LESS the boundaries of the parcels that name it, because parcels tile their block

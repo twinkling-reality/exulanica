@@ -28,10 +28,10 @@ import {
   sortList,
 } from './support.js';
 
-/** Over `test/fixtures/tile-conformance.json`, tessellator 10, digest profile v3. */
+/** Over `test/fixtures/tile-conformance.json`, tessellator 11, digest profile v3. */
 const GOLDEN = {
-  render_batch: 'a968ae0a9d6e46a209b938fa1ec85119d0e07e4fb3fa2501f619581dc7868dbc',
-  nav_envelope: '3c7d987f53dd857e646b355731927526f4673bcd3c69b0809daca3f664991c93',
+  render_batch: 'b8b22162f80e0e28302ef59a7982d8e8517241bb14edadbf9dac1ba67fe43f84',
+  nav_envelope: 'd0a4b090ffdba3c7f0883c42e53042a68bf9e242da94925d055f60ce8e868ce3',
 } as const;
 
 afterEach(() => {
@@ -155,15 +155,15 @@ describe('the triangle digest of the conformance fixture', () => {
     // the ground the building stands on, and says no material dresses it: the grammar admits none.
     // Every other surface waits on a rule.
     const render = renderBatch!.header.entries.map((entry) => entry.state);
-    expect(count(render, 'drawn')).toBe(39);
+    expect(count(render, 'drawn')).toBe(40);
     expect(count(render, 'halo')).toBe(grammar.halo.length);
     const drawnTerrain = renderBatch!.header.entries[terrain]!;
     expect(drawnTerrain).toMatchObject({
       state: 'drawn',
-      first_vertex: 2727,
-      vertex_count: 545,
-      triangle_count: 536,
-      surfaces: [{ role: 'terrain', orientation: 'horizontal', material: { state: 'none-exists' }, triangle_count: 536 }],
+      first_vertex: 2933,
+      vertex_count: 1524,
+      triangle_count: 1069,
+      surfaces: [{ role: 'terrain', orientation: 'horizontal', material: { state: 'none-exists' }, triangle_count: 1069 }],
     });
     // The building draws, so the ground it stands on is the building's and not the terrain's: its
     // base ring is cut out of the patch by the same yield rule the segments' surfaces are.
@@ -212,9 +212,9 @@ describe('the triangle digest of the conformance fixture', () => {
     // Navigation draws what a person may stand on: the same ground partition, and the segments'
     // own carriageways and gutters, each carved clear of what the navigation table says obstructs.
     const nav = navEnvelope!.header.entries.map((entry) => entry.state);
-    expect(count(nav, 'drawn')).toBe(10);
+    expect(count(nav, 'drawn')).toBe(11);
     expect(count(nav, 'halo')).toBe(grammar.halo.length);
-    expect(navEnvelope!.header.entries[terrain]).toMatchObject({ state: 'drawn', vertex_count: 1197, triangle_count: 1406 });
+    expect(navEnvelope!.header.entries[terrain]).toMatchObject({ state: 'drawn', vertex_count: 1874, triangle_count: 2218 });
     expect(navEnvelope!.surfaceMm).toBeUndefined();
 
     // Halo is exactly what the document lists as halo.

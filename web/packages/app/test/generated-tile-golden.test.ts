@@ -13,8 +13,8 @@ const TESS_CLI = resolve('packages/loom-tess/src/node/cli.ts');
 const TESS_CONFORMANCE = resolve('packages/loom-tess/test/triangle-digest-conformance.test.ts');
 const TSX = resolve('node_modules/tsx/dist/cli.mjs');
 
-const PINNED_SHA256 = '1215ca6de70d286d43fbfe151f98a4159034c1641ce2de943fc39d44994c8676';
-const PINNED_RENDER_BATCH = 'a968ae0a9d6e46a209b938fa1ec85119d0e07e4fb3fa2501f619581dc7868dbc';
+const PINNED_SHA256 = 'db6da2c70bd02b671ab8e8ed8f1c8f4153750d6a0ca1b0ad108f158e65092606';
+const PINNED_RENDER_BATCH = 'b8b22162f80e0e28302ef59a7982d8e8517241bb14edadbf9dac1ba67fe43f84';
 
 describe('the pinned development evaluation tile', () => {
   it('is exactly what tess\'s own bake command makes from tess\'s conformance fixture', () => {

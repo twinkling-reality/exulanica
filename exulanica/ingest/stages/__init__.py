@@ -835,10 +835,11 @@ STAGES: Final[dict[str, StageSpec]] = {
             # follow from its tiers and its roof, how a facade's face and ground band follow from
             # the tier edge it is laid out on, how an object's parts are turned by its facing
             # vector, how a lot's ring becomes ground and gives up what the rings inside it take,
-            # how a curb's kerb face, kerb top and footway follow from its kerb line, and how
+            # how a curb's kerb face, kerb top and footway follow from its kerb line, how a
+            # junction's carriageway fills between its legs and round each corner's arc, and how
             # support is carved clear of what the grammar's navigation table says obstructs a
             # walking capsule.
-            "tessellator": 10,
+            "tessellator": 11,
             # How a projection's triangles are digested; the golden fixture digest depends on it.
             "triangle_digest": "exulanica.owd-triangle-digest/v3",
             # The document the bake reads, whose envelope the city grammar owns.

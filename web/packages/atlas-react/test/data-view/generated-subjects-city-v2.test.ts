@@ -107,6 +107,7 @@ function expectToday(outcomes: readonly Outcome[]): void {
     'city.block',
     ...repeated('city.curb_edge', 6),
     ...repeated('city.facade', 9),
+    'city.junction',
     'city.massing',
     ...repeated('city.parcel', 2),
     ...repeated('city.rooftop_object', 2),
@@ -117,15 +118,15 @@ function expectToday(outcomes: readonly Outcome[]): void {
     ...repeated('city.vitrine', 6),
   ]);
   expect(drawn.every(outcome => outcome.bounded)).toBe(true);
-  expect(drawn[16]!.surfaces).toEqual(['wall:record', 'roof:record', 'parapet:record']);
-  expect(drawn.slice(28, 31).map(outcome => outcome.surfaces)).toEqual([street, street, street]);
-  expect(drawn[32]!.surfaces).toEqual(['terrain:none-exists']);
+  expect(drawn[17]!.surfaces).toEqual(['wall:record', 'roof:record', 'parapet:record']);
+  expect(drawn.slice(29, 32).map(outcome => outcome.surfaces)).toEqual([street, street, street]);
+  expect(drawn[33]!.surfaces).toEqual(['terrain:none-exists']);
   // A tree is its pit and its own parts, and a part's role repeats on the other orientation.
-  expect(drawn[31]!.surfaces).toEqual([
+  expect(drawn[32]!.surfaces).toEqual([
     'tree_pit:none-exists', 'trunk:none-exists', 'trunk:none-exists', 'canopy:none-exists', 'canopy:none-exists',
   ]);
   expect(count(outcome => outcome.membership === 'halo' && outcome.subjectId === null)).toBe(3);
-  expect(count(outcome => outcome.state === 'unavailable' && outcome.subjectId !== null && !outcome.bounded)).toBe(16);
+  expect(count(outcome => outcome.state === 'unavailable' && outcome.subjectId !== null && !outcome.bounded)).toBe(15);
   // The corridor's slice 2 kind. The tile states an extent for each, and the container leaves them
   // unavailable needing facade_layout, so each is listed with its reason and draws nothing: no box,
   // no points, exactly like every other spatial record this bake does not draw.

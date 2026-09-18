@@ -88,6 +88,12 @@ export interface GrammarTable {
   readonly grammar_version: number;
   readonly frame: GrammarFrame;
   readonly measures: ContractMeasures;
+  /**
+   * The resolution each projection's contract states, in millimetres: the length a chord of a
+   * curve may stand off the curve it stands for. A rule that turns an arc into segments reads it
+   * rather than choosing a count.
+   */
+  readonly resolutions: { readonly [projection: string]: number };
   readonly navigation: readonly NavigationRow[];
   readonly shapes: {
     readonly nested: readonly RecordShape[];

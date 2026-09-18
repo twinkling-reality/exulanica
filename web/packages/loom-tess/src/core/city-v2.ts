@@ -29,6 +29,12 @@ export const CITY_V2: GrammarTable = {
       }
     }
   },
+  "resolutions": {
+    "render_batch": 1,
+    "collision_proxy": 1,
+    "nav_envelope": 1,
+    "pick_geometry": 1
+  },
   "navigation": [
     {
       "kind": "city.block",

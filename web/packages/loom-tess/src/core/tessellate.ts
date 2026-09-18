@@ -28,6 +28,7 @@ import type { CarriedRecord, ExpandContext, Expansion, Need, ObstructionRegion, 
 import type { Piece } from './pieces.js';
 import type { CoveringTriangle } from './terrain-yield.js';
 import { MATERIAL_RECORD_KIND, navigationRowOf, recordShapeOf } from './record-shapes.js';
+import type { GrammarTable } from './record-shapes.js';
 import { triangulateRing } from './ring-triangulation.js';
 import type { ProjectionName } from './record-shapes.js';
 import {
@@ -171,6 +172,13 @@ function obstructions(document: TileDocument, records: readonly PlacedRecord[]):
   return regions;
 }
 
+/** The resolution a projection's contract states in this grammar, which a rule cutting an arc reads. */
+function resolutionOf(table: GrammarTable, projection: ProjectionName): number {
+  const stated = table.resolutions[projection];
+  if (stated === undefined) throw new TessellationError(`${table.grammar_id} states no resolution for ${projection}`);
+  return stated;
+}
+
 /**
  * The capsule radius the record's grammar measures for nav_envelope, from its descriptor's
  * contract, or undefined when it measures none.
@@ -264,8 +272,9 @@ export function tessellate(document: TileDocument, digests: readonly string[]): 
     if (carried.has(record.identity)) throw new TessellationError(`two records state the identity ${record.identity}`);
     carried.set(record.identity, { kind: record.payload.kind, fields: record.payload.fields });
   }
-  const contextFor = (record: PlacedRecord, coverings: readonly CoveringTriangle[]): ExpandContext => ({
+  const contextFor = (record: PlacedRecord, projection: ProjectionName, coverings: readonly CoveringTriangle[]): ExpandContext => ({
     tileSizeMm: document.tile.fields.tile_size_mm as number,
+    resolutionMm: resolutionOf(tableOf(document.grammars[record.grammar]!), projection),
     obstructions: obstructing,
     extent: planBox(document, record),
     capsuleRadiusMm: capsuleRadius(document, record),
@@ -299,7 +308,7 @@ export function tessellate(document: TileDocument, digests: readonly string[]): 
       const rule = ruleFor(name, record.payload.kind);
       if (rule.rule !== 'expand') return;
       if (rule.readsCoverings) return;
-      const expansion = rule.expand(record.payload.fields, contextFor(record, []));
+      const expansion = rule.expand(record.payload.fields, contextFor(record, name, []));
       expansions.set(recordIndex, expansion);
       if (expansion.state !== 'drawn') return;
       const row = navigationRowOf(tableOf(document.grammars[record.grammar]!), record.payload.kind);
@@ -336,7 +345,7 @@ export function tessellate(document: TileDocument, digests: readonly string[]): 
           return { record: recordIndex, state: 'unavailable', needs: rule.needs };
         case 'expand': {
           const earlier = expansions.get(recordIndex);
-          const expansion = earlier === undefined ? rule.expand(record.payload.fields, contextFor(record, coverings)) : earlier;
+          const expansion = earlier === undefined ? rule.expand(record.payload.fields, contextFor(record, name, coverings)) : earlier;
           if (expansion.state === 'unavailable') {
             return { record: recordIndex, state: 'unavailable', needs: expansion.needs };
           }
