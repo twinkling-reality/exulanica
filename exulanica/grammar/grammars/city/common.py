@@ -39,12 +39,21 @@ surface role and the orientation alone:
   coordinate (the coordinate ``offset_mm`` and ``along_mm`` use) and the base is the kerb line's
   own ``z``. For an object part's side, ``s`` runs round the part from its local ``+x`` and the
   base is the object's ``z_mm``.
-* A horizontal face: ``t`` is always to the left of ``s``. For a segment's carriageway and gutter,
-  a curb's kerb top and footway, a crossing and a road marking on a segment, ``s`` is the owning
-  segment's along-centreline coordinate. Everything else horizontal (a junction's carriageway,
-  terrain, a lot, a roof, including a pitched roof plane in plan, an awning, a tree pit and the
-  top of an object part) takes ``s = +x`` and ``t = +y`` in plan; a steep roof stretches its set,
-  and says so here rather than hiding it.
+* A horizontal face: ``t`` is always to the left of ``s``, seen from the side the face is seen
+  from, which is the side its normal points to. For a segment's carriageway and gutter, a curb's
+  kerb top and footway, a crossing and a road marking on a segment, ``s`` is the owning segment's
+  along-centreline coordinate. Everything else horizontal (a junction's carriageway, terrain, a
+  lot, a roof, including a pitched roof plane in plan, an awning, a tree pit and the top of an
+  object part) takes ``s = +x`` and ``t = +y`` in plan; a steep roof stretches its set, and says so
+  here rather than hiding it.
+* **An underside**, which is any horizontal face whose normal points down, takes ``s = +x`` and
+  ``t = -y``. It mirrors because the rule above is not "t is +y" but "t is to the left of s from
+  where the face is seen", and an underside is seen from below: keeping ``t = +y`` there would put
+  ``t`` to the right and the texture would read reversed. The only horizontal face with an
+  underside today is an object part's bottom, when its offset lifts it clear of what it stands on.
+  The mirror is invisible on a material whose ``grain`` is ``none``, which most undersides wear,
+  and visible on any material that states a grain, which is why it is stated here rather than left
+  to whichever caller drew one first.
 
 Texture coordinates follow from ``s`` and ``t`` and the material record, as ``material`` states.
 """
