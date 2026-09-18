@@ -472,6 +472,21 @@ answers the world CENTRE at `world.eyeHeight` above the datum rather than above 
 reads as an eye at exactly 1620 mm, not 1767 to 1790, and an x that jumps to the middle of the tile.
 If a trace shows that, it is not a walk at all and must not be reported as one.
 
+**Read the pair, never x alone, and this is fixed before the run rather than after the number.** The
+corridor lane's pre-registered midpoint capture is x `320000`, and tile (2,0) spans x 256000 to 384000
+and y 0 to 128000, so ITS CENTRE IS ALSO x 320000. A trace reading x 320000 is therefore either a
+walker who reached the midpoint or the recovery signature above, and x cannot tell them apart. The
+disambiguator is y, 6.3 m of it: the walked line is y `70300` and the tile centre is y `64000`, which
+is the far side of the carriageway.
+
+| reading | what it is |
+| --- | --- |
+| x 320000, y 70300 | the walker reached the midpoint |
+| x 320000, y 64000 | a recovery to the world centre, which is not a walk |
+
+The eye height stands beside it as the second test: a recovery answers exactly 1620 above the datum,
+while a walker standing on the footway answers that bake's support plus 1620.
+
 **The mirror of this lane's eye caveat, from the corridor lane, recorded before the run:** its support
 heights are the CONTAINER's, not the runtime's. If the runtime applied a step height, a ground offset,
 or held the last known support where it found none, its idea of the floor would differ from the
