@@ -347,3 +347,89 @@ def test_a_walk_outside_the_repository_is_refused(tmp_path):
     outside.write_text("`?pose_x_mm=1&pose_y_mm=2&facing_dx=1&facing_dy=0`")
     reason = _harness_halt(tmp_path, "?preview=1&tile=tile-conformance", walk=str(outside))
     assert "outside the repository" in reason, reason
+
+
+# -- what a record states about the route, against what the rule returned -------------------------
+
+def _route_record(tmp_path: Path, tamper: str) -> dict[str, object]:
+    """Build a route record from a real plan, apply `tamper` to it, and hand it back to the check.
+
+    The plan comes from the rule itself rather than from a literal here, so the set of numbers the
+    check compares is the set the rule actually returns. A list of field names written in this file
+    would be a second source of truth for the thing under test.
+
+    The rings are two long walls either side of the start, because a plan with no frontage on both
+    sides makes the derived value below equal the measured one, and the tamper that matters becomes
+    a no-op. `derived` is reported so a test can assert the tamper changed something.
+    """
+    driver = tmp_path / "route-record.mjs"
+    driver.write_text(
+        "import { planRoute } from "
+        f"{str(ROOT / 'web/packages/loom-gate/src/index.ts')!r};\n"
+        f"const harness = await import({str(HARNESS)!r});\n"
+        "const wall = (x, from, to) => ({ id: `test:wall${x}:${from}`, ring: "
+        "[[x, from], [x + 1, from], [x + 1, to], [x, to], [x, from]] });\n"
+        # One wall the whole length and one only on the southern half, so some qualifying headings
+        # see rings on both sides and some see one. A corridor walled on both sides for its whole
+        # length gives every qualifying heading frontage, and then the derived value the tamper
+        # writes equals the measured one and the overwrite it is testing becomes invisible.
+        "const plan = planRoute([0, 0], [wall(-5, -200, 200), wall(4, -200, -1)], [-500, -500, 500, 500]);\n"
+        "const derived = plan.frontageBothSidesSamples > 0 ? plan.candidatesQualified : 0;\n"
+        "const measured = { field: null, obstacles: 2, routeRings: 2, routeRingsRefused: [], fieldBoundsCm: null };\n"
+        "try {\n"
+        "  const record = harness.routeRecordOf(plan, measured);\n"
+        f"  {tamper}\n"
+        "  console.log(JSON.stringify({ record: harness.checkedRouteRecord(plan, record), plan, derived }));\n"
+        "} catch (error) { console.log(JSON.stringify({ refused: error.message, plan, derived })); }\n"
+    )
+    result = _node(str(driver))
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout.strip().splitlines()[-1])
+
+
+def test_the_record_states_every_number_the_route_rule_returned(tmp_path):
+    """The literal itself, exercised. It is on a path no run reaches until a walk completes."""
+    built = _route_record(tmp_path, "")
+    assert "refused" not in built, built
+    record, plan = built["record"], built["plan"]
+    numbers = {name for name, value in plan.items() if isinstance(value, (int, float))}
+    # `yaw` is the heading in radians, stated as integer millidegrees instead.
+    assert numbers - set(record) == {"yaw"}, numbers - set(record)
+    for name in numbers - {"yaw"}:
+        assert record[name] == plan[name], name
+
+
+def test_a_measured_count_overwritten_by_a_derived_one_is_refused(tmp_path):
+    """The defect this check was written for: a repeated key in the record's own literal.
+
+    JavaScript takes the last assignment silently, so the derived value won and a record would have
+    stated every qualifying heading where the rule counted the ones with frontage.
+    """
+    built = _route_record(
+        tmp_path,
+        "record.candidatesWithFrontage = plan.frontageBothSidesSamples > 0 ? plan.candidatesQualified : 0;",
+    )
+    # The tamper has to change the value, or this test passes over a fixture that cannot reach the
+    # case. The first version of it did exactly that: with no frontage on both sides the derived
+    # value is the measured one and the overwrite was invisible.
+    assert built["derived"] != built["plan"]["candidatesWithFrontage"], built
+    assert "refused" in built, built
+    assert "candidatesWithFrontage" in built["refused"], built
+
+
+def test_a_number_dropped_from_the_record_is_refused(tmp_path):
+    """The direction a value-by-value comparison could not have noticed.
+
+    A loop over the fields the record happens to carry passes a record that carries fewer, so the
+    check compares the two sets as sets.
+    """
+    built = _route_record(tmp_path, "delete record.candidatesTried;")
+    assert "refused" in built, built
+    assert "candidatesTried" in built["refused"], built
+
+
+def test_a_number_the_rule_does_not_record_is_refused_if_it_appears(tmp_path):
+    """And the other side of the same set comparison, so the exclusion cannot grow silently."""
+    built = _route_record(tmp_path, "record.yaw = plan.yaw;")
+    assert "refused" in built, built
+    assert "yaw" in built["refused"], built

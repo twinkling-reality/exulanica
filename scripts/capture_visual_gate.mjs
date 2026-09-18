@@ -156,6 +156,86 @@ export function statedWalkOf(text) {
   return { xMm, yMm, facingDx, facingDy };
 }
 
+/**
+ * The one number the route rule returns that a record does not state, and why.
+ *
+ * `yaw` is the heading in radians, which the record states as `headingMillidegrees` instead: an
+ * integer, in the unit the rule chose the heading in, so two runs of one walk cannot differ by a
+ * float. Naming it here rather than skipping it silently is the whole point of the check below.
+ */
+export const ROUTE_NUMBERS_NOT_RECORDED = Object.freeze(['yaw']);
+
+/**
+ * A record's route section, checked BOTH WAYS against what the route rule actually returned.
+ *
+ * MEASURED 2026-09-18: `candidatesWithFrontage` was assigned twice in the literal below, and the
+ * later, derived value won silently, so the first record this gate ever wrote would have stated
+ * every qualifying heading where the rule counted two. Nothing in this repository could have seen
+ * it: no tsconfig reaches `scripts/`, so the harness is type-checked by nothing; `node --check`
+ * accepts a repeated key because it is legal JavaScript; and there is no JavaScript linter here.
+ * A positive control confirms the class is catchable rather than invisible: the same two lines in a
+ * `.ts` file fail tsc with TS1117.
+ *
+ * BOTH WAYS, because one way is an enumeration wearing a smaller disguise. Comparing only the
+ * fields the record happens to carry cannot see a field the record DROPS, and a record silently
+ * missing a count is as wrong as one stating it differently. So the set of the rule's numbers the
+ * record states must equal the set the rule returned, less the ones named above, and every one of
+ * them must hold the value the rule returned.
+ */
+export function checkedRouteRecord(plan, stated) {
+  const numbers = Object.entries(plan)
+    .filter(([, value]) => typeof value === 'number')
+    .map(([name]) => name);
+  const expected = numbers.filter((name) => !ROUTE_NUMBERS_NOT_RECORDED.includes(name)).sort();
+  const carried = numbers.filter((name) => Object.hasOwn(stated, name)).sort();
+  if (carried.join(',') !== expected.join(',')) {
+    throw new Halt(
+      `the record states ${carried.join(', ') || 'none'} of the route rule's numbers, and it must ` +
+      `state exactly ${expected.join(', ')}; ${ROUTE_NUMBERS_NOT_RECORDED.join(', ')} ${
+        ROUTE_NUMBERS_NOT_RECORDED.length === 1 ? 'is' : 'are'} deliberately not recorded`,
+    );
+  }
+  for (const name of expected) {
+    if (stated[name] !== plan[name]) {
+      throw new Halt(`the record states ${name} ${stated[name]} and the route rule returned ${plan[name]}`);
+    }
+  }
+  return stated;
+}
+
+/**
+ * What a record says about the route: what the rule decided, and what it decided over.
+ *
+ * Built here rather than inside the record literal so that a test can exercise THIS, which is the
+ * thing that can be wrong. The check above only fires where it is called, and it is called on a
+ * path no run reaches until a walk completes.
+ */
+export function routeRecordOf(plan, measured) {
+  return checkedRouteRecord(plan, {
+    rule: plan.rule,
+    // What bounded the walk, and how it was derived from what the product states.
+    field: measured.field,
+    startMm: [Math.round(plan.start[0] * 1000), Math.round(plan.start[1] * 1000)],
+    headingMillidegrees: plan.headingMillidegrees,
+    clearRunMm: plan.clearRunMm,
+    frontageSamples: plan.frontageSamples,
+    frontageBothSidesSamples: plan.frontageBothSidesSamples,
+    meanFrontageSkewMillionths: plan.meanFrontageSkewMillionths,
+    candidatesTried: plan.candidatesTried,
+    candidatesQualified: plan.candidatesQualified,
+    // HOW MANY QUALIFYING HEADINGS HAD FRONTAGE ON BOTH SIDES AT ANY SAMPLE, counted by the rule
+    // itself. Zero means the first tie-break was equal for every candidate and a later one chose,
+    // so the heading is the rule's fallback and not its preference. Without it a record shows a
+    // heading that reads as a decision either way.
+    candidatesWithFrontage: plan.candidatesWithFrontage,
+    obstacles: measured.obstacles,
+    routeRings: measured.routeRings,
+    // What the runtime refused and why, so the count above is never a quietly smaller set.
+    routeRingsRefused: measured.routeRingsRefused,
+    fieldBoundsCm: measured.fieldBoundsCm,
+  });
+}
+
 function argument(name, fallback) {
   const index = process.argv.indexOf(`--${name}`);
   if (index >= 0 && process.argv[index + 1] !== undefined) return process.argv[index + 1];
@@ -1663,35 +1743,13 @@ async function main() {
       // none. A record carrying both can be checked by a reader; one carrying only the walk
       // this run asked for says what was intended and not what happened.
       opening: observed.opening ?? null,
-      route: {
-        rule: plan.rule,
-        // What bounded the walk, and how it was derived from what the product states.
+      route: routeRecordOf(plan, {
         field: observed.field ?? { bounds: [west, north, east, south], from: options.artifact },
-        startMm: [Math.round(plan.start[0] * 1000), Math.round(plan.start[1] * 1000)],
-        headingMillidegrees: plan.headingMillidegrees,
-        clearRunMm: plan.clearRunMm,
-        frontageSamples: plan.frontageSamples,
-        frontageBothSidesSamples: plan.frontageBothSidesSamples,
-        meanFrontageSkewMillionths: plan.meanFrontageSkewMillionths,
-        candidatesTried: plan.candidatesTried,
-        candidatesQualified: plan.candidatesQualified,
-        // HOW MANY QUALIFYING HEADINGS HAD FRONTAGE ON BOTH SIDES AT ANY SAMPLE, counted by the
-        // rule itself. Zero means the first tie-break was equal for every candidate and a later
-        // one chose, so the heading is the rule's fallback and not its preference. Without it a
-        // record shows a heading that reads as a decision either way.
-        //
-        // This line stood beside an older one of the same name that derived the count instead,
-        // as `frontageBothSidesSamples > 0 ? candidatesQualified : 0`. A repeated key in an
-        // object literal is a silent overwrite, so the derived value won and a record would have
-        // stated every qualifying heading where two had frontage. Found by reading the record
-        // builder; no run had written a record since the two lines met.
-        candidatesWithFrontage: plan.candidatesWithFrontage,
         obstacles: prisms.length,
         routeRings: routeRings.length,
-        // What the runtime refused and why, so the count above is never a quietly smaller set.
         routeRingsRefused: observed.routeObstacleRingsRefused ?? [],
         fieldBoundsCm: artifact?.bounds_cm ?? null,
-      },
+      }),
       interactions,
       harnessWrites,
       pointerLock: {
