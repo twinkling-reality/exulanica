@@ -1,0 +1,13 @@
+quiet-slot: waiting for the machine-wide slot at 00:58:58 from /Users/glendonchin/dev/Technology/exulanica-corridor
+quiet-slot: slot taken at 00:59:08; load 44.89 42.15 36.74
+first 0 0 adbac061-04cb-5c34-aa5b-f9fd3f0f2459 2196356 stored drawn 235 surfaces, 228 dressed, undressed {'city.facade ground_band': 6, 'city.terrain terrain': 1}, waiting {'crossing_band': 7, 'facade_layout': 15}
+first 1 0 2f9c602c-99fd-5055-959d-1627e5553338 8807488 stored drawn 1439 surfaces, 1350 dressed, undressed {'city.facade ground_band': 88, 'city.terrain terrain': 1}, waiting {'crossing_band': 10, 'facade_layout': 117, 'ground_coverage': 2}
+first 2 0 3d88d6ff-8b1e-5339-a777-1b805763996e 9483132 stored drawn 1531 surfaces, 1445 dressed, undressed {'city.facade ground_band': 85, 'city.terrain terrain': 1}, waiting {'crossing_band': 6, 'facade_layout': 126, 'ground_coverage': 2}
+first 3 0 d466cf70-f238-5148-b90f-17095f2235f9 7965604 stored drawn 1431 surfaces, 1348 dressed, undressed {'city.facade ground_band': 82, 'city.terrain terrain': 1}, waiting {'crossing_band': 10, 'facade_layout': 108, 'ground_coverage': 2}
+first 4 0 be06b57a-6fa4-5afa-bb77-9aa94a97285f 2060028 stored drawn 226 surfaces, 219 dressed, undressed {'city.facade ground_band': 6, 'city.terrain terrain': 1}, waiting {'crossing_band': 7, 'facade_layout': 13}
+second 0 0 adbac061-04cb-5c34-aa5b-f9fd3f0f2459 2196356 identical drawn 235 surfaces, 228 dressed, undressed {'city.facade ground_band': 6, 'city.terrain terrain': 1}, waiting {'crossing_band': 7, 'facade_layout': 15}
+second 1 0 2f9c602c-99fd-5055-959d-1627e5553338 8807488 identical drawn 1439 surfaces, 1350 dressed, undressed {'city.facade ground_band': 88, 'city.terrain terrain': 1}, waiting {'crossing_band': 10, 'facade_layout': 117, 'ground_coverage': 2}
+second 2 0 3d88d6ff-8b1e-5339-a777-1b805763996e 9483132 identical drawn 1531 surfaces, 1445 dressed, undressed {'city.facade ground_band': 85, 'city.terrain terrain': 1}, waiting {'crossing_band': 6, 'facade_layout': 126, 'ground_coverage': 2}
+second 3 0 d466cf70-f238-5148-b90f-17095f2235f9 7965604 identical drawn 1431 surfaces, 1348 dressed, undressed {'city.facade ground_band': 82, 'city.terrain terrain': 1}, waiting {'crossing_band': 10, 'facade_layout': 108, 'ground_coverage': 2}
+second 4 0 be06b57a-6fa4-5afa-bb77-9aa94a97285f 2060028 identical drawn 226 surfaces, 219 dressed, undressed {'city.facade ground_band': 6, 'city.terrain terrain': 1}, waiting {'crossing_band': 7, 'facade_layout': 13}
+quiet-slot: finished at 01:02:05 with exit 0; load 8.42 26.31 31.09

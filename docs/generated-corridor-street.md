@@ -152,10 +152,15 @@ small request for a whole city, rather than a revalidation per tile.
 
 ## 7. What draws today, and what does not
 
-Measured from the container the route served for tile (2, 0), baked by tessellator 11 at main
-7c0280f2. The counts are `docs/artifacts/corridor/corridor-drawn.log.txt`, written by the script
+Measured from the container the route serves for tile (2, 0), baked by tessellator 13 at main
+f81621cc. The counts are `docs/artifacts/corridor/corridor-drawn.log.txt`, written by the script
 beside it from a container and the document it was baked from, and every bake writes the same
-measurement into its own row's receipt, so the number exists whether or not anybody goes to look.
+measurement into its own row's receipt and onto
+[docs/artifacts/corridor/corridor-bake.log.txt](artifacts/corridor/corridor-bake.log.txt), so the
+number exists whether or not anybody goes to look. Tessellator 11 and 13 draw this tile
+identically: both triangle digests are unchanged between them, and the container moved only
+because its header states which tessellator made it. The two containers are even the same size,
+9 483 132 bytes, which is why the digests are what you compare and not the sizes.
 Both map each entry to its record through the tessellator's own document reader, because the
 container states one entry per record in its own sorted order and reading that order by eye gets it
 wrong.
