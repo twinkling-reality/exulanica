@@ -144,33 +144,9 @@ def test_every_entry_carries_a_shippable_licence_and_a_source_that_exists():
     assert entries == 133
 
 
-_AUTHORED = (
-    "crossing-type",
-    "era",
-    "fitout",
-    "junction-control",
-    "lane-use",
-    "parking-kind",
-    "roof-family",
-    "rooftop-object",
-    "signage-lexicon",
-    "street-furniture",
-    "street-hierarchy",
-    "street-name",
-    "typology",
-    "use-class",
-)
-
-
-@pytest.mark.parametrize("catalog_id", _AUTHORED)
-def test_authored_vocabulary_says_it_is_authored_and_why(catalog_id):
-    catalog = _catalog(catalog_id)
-    assert catalog.entries
-    for entry in catalog.entries:
-        reason = entry_fields(catalog, entry.key)["reason"]
-        assert isinstance(reason, str) and reason.startswith("Authored"), (entry.key, reason)
-        assert len(reason.split()) >= 5, (entry.key, reason)
-        assert entry.licence.origin == "original"
+# The authored register, and every other one, is checked by tests/test_catalog_provenance.py, which
+# discovers the catalogs instead of naming them. A list of ids lived here and covered fourteen of
+# the eighteen that ship, which is how band.v1.json shipped a ground band with no reason at all.
 
 
 def test_a_guide_cited_by_an_authored_value_is_marked_as_not_re_read():
@@ -182,38 +158,27 @@ def test_a_guide_cited_by_an_authored_value_is_marked_as_not_re_read():
 
 
 def test_each_material_depicts_one_of_the_pinned_texture_sets():
+    """Every material names a published set, and the partition says which sets name no material.
+
+    A list of set names lived here and had to be kept in step with the manifest by hand; it said
+    sixteen while the manifest held seventeen. The partition carries the same fact where something
+    checks it: publishing a set, or naming one from a new material, moves the set below rather than
+    waiting for somebody to remember this test.
+    """
     catalog = _catalog("material")
     published = read_texture_manifest()
-    # Sixteen of the seventeen published sets. The seventeenth, cc0.sign-panel, has no material
-    # because no surface role names a sign panel yet.
-    pinned = {
-        "cc0.awning-canvas",
-        "cc0.brick-running-bond",
-        "cc0.broadleaf-foliage",
-        "cc0.carriageway-asphalt",
-        "cc0.cast-concrete",
-        "cc0.float-glazing",
-        "cc0.footway-paving",
-        "cc0.kerb-stone",
-        "cc0.limestone-ashlar",
-        "cc0.painted-render",
-        "cc0.painted-timber",
-        "cc0.road-paint-white",
-        "cc0.road-paint-yellow",
-        "cc0.storefront-metal",
-        "cc0.tree-bark",
-        "cc0.tree-pit-soil",
-    }
-    sets = []
+    depicted = []
     for entry in catalog.entries:
         values = entry_fields(catalog, entry.key)
-        sets.append(values["texture_set_id"])
-        assert values["texture_set_id"] in published
+        depicted.append(values["texture_set_id"])
+        assert values["texture_set_id"] in published, entry.key
         assert str(values["reason"]).startswith(
             f"The material the {values['texture_set_id']} texture set depicts."
         )
         assert entry.licence.content_source.startswith("assets/textures/objects/")
-    assert sorted(sets) == sorted(pinned)
+    assert len(set(depicted)) == len(depicted), "two materials depict the same set"
+    # The one published set no material names, and why. No surface role names a sign panel yet.
+    assert set(published) - set(depicted) == {"cc0.sign-panel"}
 
 
 _SIGN_TEXT = re.compile(r"[A-Z][a-z]+( [A-Z][a-z]+)?")

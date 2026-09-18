@@ -404,6 +404,19 @@ refuses a name that disagrees with the contents, an unknown or missing key at an
 repeated key inside one JSON object, a repeated entry key, any float, `NaN` and `Infinity`.
 `catalog_digest` is SHA-256 over the canonical JSON of every catalog, ordered by id.
 
+**A catalog with no entries carries `empty_reason`**, and one with entries may not. An empty
+vocabulary satisfies every rule about entries by having none, so the file states why it is empty
+and the loader refuses it if it does not; `action-vocabulary.v1.json` is the one that ships that
+way. That sentence is deliberately outside `catalog_digest`, which travels into a tile record and
+from there into a baked tile key: a statement about an absence must not rebake the world.
+
+**Every entry states a reason**, why it exists and where its content came from, and every schema
+declares the field. Three registers ship: authored vocabulary begins "Authored", a derived entry
+begins "Derived:" and names the source its licence points at, and a material says which texture
+set it depicts. `tests/test_catalog_provenance.py` discovers the catalogs rather than listing
+them, and holds both the reasons and the registers; until 2026-09-18 the rule ran over a list of
+fourteen ids while eighteen catalogs shipped, and two schemas did not declare the field at all.
+
 **Every entry carries a licence**, stated the way [license-matrix.md](license-matrix.md) states
 one: `spdx`, `verdict`, `origin`, `licence_source` and `content_source`. Only `SHIP` and
 `SHIP-ATTRIB` are accepted. An `original` entry is authored in this repository, is `Apache-2.0`,

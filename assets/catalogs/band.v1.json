@@ -1,30 +1,31 @@
 {
-  "schema_version": 1,
-  "catalog_id": "band",
-  "catalog_version": 1,
-  "entries": [
-    {
-      "key": "ground",
-      "label": "Ground band",
-      "top_minimum_mm": 4000,
-      "top_maximum_mm": 6000,
-      "elements": [
-        "stall_riser",
-        "glazing",
-        "transom",
-        "recessed_entrance",
-        "threshold",
-        "fascia",
-        "awning",
-        "vitrine"
-      ],
-      "licence": {
-        "spdx": "Apache-2.0",
-        "verdict": "SHIP",
-        "origin": "original",
-        "licence_source": "LICENSE",
-        "content_source": "docs/grammar-package.md"
-      }
-    }
-  ]
+ "schema_version": 1,
+ "catalog_id": "band",
+ "catalog_version": 1,
+ "entries": [
+  {
+   "key": "ground",
+   "label": "Ground band",
+   "top_minimum_mm": 4000,
+   "top_maximum_mm": 6000,
+   "elements": [
+    "stall_riser",
+    "glazing",
+    "transom",
+    "recessed_entrance",
+    "threshold",
+    "fascia",
+    "awning",
+    "vitrine"
+   ],
+   "reason": "Authored target rather than a measurement: transcribed from the operator's dated 2026-09-15 target-architecture brief, whose table states this band against the Flatiron baseline it was written to replace, and recorded in docs/grammar-package.md with the elements it carries.",
+   "licence": {
+    "spdx": "Apache-2.0",
+    "verdict": "SHIP",
+    "origin": "original",
+    "licence_source": "LICENSE",
+    "content_source": "docs/grammar-package.md"
+   }
+  }
+ ]
 }

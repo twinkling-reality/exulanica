@@ -157,7 +157,7 @@ REASON: Final = ("reason", text_field)
 def city_catalog_schemas(*, texture_sets: Mapping[str, TextureSet]) -> tuple[CatalogSchema, ...]:
     texture_pins = {set_id: texture_set.pin() for set_id, texture_set in texture_sets.items()}
     return (
-        CatalogSchema("action-vocabulary", 1, (("label", text_field),)),
+        CatalogSchema("action-vocabulary", 1, (("label", text_field), REASON)),
         CatalogSchema(
             "band",
             1,
@@ -166,6 +166,7 @@ def city_catalog_schemas(*, texture_sets: Mapping[str, TextureSet]) -> tuple[Cat
                 ("top_minimum_mm", _BAND_TOP),
                 ("top_maximum_mm", _BAND_TOP),
                 ("elements", key_list_field),
+                REASON,
             ),
             entry_check=_band_bounds_ordered,
         ),

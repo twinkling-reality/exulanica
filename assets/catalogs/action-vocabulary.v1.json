@@ -1,6 +1,7 @@
 {
-  "schema_version": 1,
-  "catalog_id": "action-vocabulary",
-  "catalog_version": 1,
-  "entries": []
+ "schema_version": 1,
+ "catalog_id": "action-vocabulary",
+ "catalog_version": 1,
+ "entries": [],
+ "empty_reason": "Closed by the architecture and deliberately not enumerated: the lens vocabulary is named rather than listed, as docs/grammar-package.md states, so this file exists to be found empty and a reader who needs an action looks to the architecture, not to a catalog entry."
 }

@@ -113,7 +113,9 @@ def _write(
 ) -> Path:
     """``<stem>.v<version>.json``, whose envelope says the same unless ``envelope`` overrides it.
 
-    The version is the shipped catalog's unless given.
+    The version is the shipped catalog's unless given. An empty entry list gets the statement the
+    loader requires of one, because these fixtures use ``[]`` as a neutral input to the refusals
+    below rather than as a claim that a vocabulary is deliberately empty.
     """
     version = _version(stem) if version is None else version
     document = {
@@ -121,6 +123,7 @@ def _write(
         "catalog_id": stem,
         "catalog_version": version,
         "entries": entries,
+        **({} if entries else {"empty_reason": "A fixture with no entries, written by a test."}),
         **envelope,
     }
     path = directory / f"{stem}.v{version}.json"
@@ -366,25 +369,28 @@ def test_a_repeated_entry_key_is_rejected(tmp_path):
 
 
 _ENVELOPE = '"schema_version": 1, "catalog_id": "typology", "catalog_version": 2'
+#: No entries, and the statement the loader requires of a catalog that has none, so that each
+#: refusal below is refused for its own reason rather than for the missing statement.
+_EMPTY = '"entries": [], "empty_reason": "A fixture with no entries, written by a test."'
 
 
 def test_the_envelope_the_refusals_below_start_from_loads(tmp_path):
     path = tmp_path / "typology.v2.json"
-    path.write_text("{" + _ENVELOPE + ', "entries": []}', encoding="utf-8")
+    path.write_text("{" + _ENVELOPE + ", " + _EMPTY + "}", encoding="utf-8")
     assert load_catalog(path, _schema("typology")).entries == ()
 
 
 @pytest.mark.parametrize(
     "text",
     [
-        "{" + _ENVELOPE + ', "entries": [], "comment": "x"}',
+        "{" + _ENVELOPE + ", " + _EMPTY + ', "comment": "x"}',
         "{" + _ENVELOPE + "}",
-        '{"schema_version": 2, "catalog_id": "typology", "catalog_version": 2, "entries": []}',
-        "{" + _ENVELOPE + ', "catalog_id": "typology", "entries": []}',
-        '{"schema_version": 1.0, "catalog_id": "typology", "catalog_version": 2, "entries": []}',
+        '{"schema_version": 2, "catalog_id": "typology", "catalog_version": 2, ' + _EMPTY + "}",
+        "{" + _ENVELOPE + ', "catalog_id": "typology", ' + _EMPTY + "}",
+        '{"schema_version": 1.0, "catalog_id": "typology", "catalog_version": 2, ' + _EMPTY + "}",
         "{" + _ENVELOPE + ', "entries": NaN}',
-        '{"schema_version": true, "catalog_id": "typology", "catalog_version": 2, "entries": []}',
-        '{"schema_version": 1, "catalog_id": "typology", "catalog_version": true, "entries": []}',
+        '{"schema_version": true, "catalog_id": "typology", "catalog_version": 2, ' + _EMPTY + "}",
+        '{"schema_version": 1, "catalog_id": "typology", "catalog_version": true, ' + _EMPTY + "}",
         "{" + _ENVELOPE + ', "entries": {}}',
         "[]",
         "not json",

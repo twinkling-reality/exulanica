@@ -6,7 +6,13 @@ named ``<catalog_id>.v<version>.json``. This module reads such a file against a 
 consuming grammar supplies; it knows nothing about what any catalog contains.
 
 **Envelope.** ``schema_version``, ``catalog_id``, ``catalog_version`` and ``entries``, and
-nothing else. The id and version inside must match the file name.
+nothing else, except that a catalog with no entries carries ``empty_reason`` and a catalog with
+entries must not. An empty vocabulary otherwise satisfies every rule about entries by having none,
+so the file says why it is empty and the loader refuses it if it does not. That sentence is
+deliberately NOT part of :func:`catalog_digest`: the digest travels into a tile record and from
+there into a baked tile key, and a sentence about an absence cannot change what a tile draws, so
+including it would rebake the world to edit prose. The absence itself is in the digest already, as
+an empty entry list. The id and version inside must match the file name.
 
 **Entries.** Each entry has a ``key``, exactly the fields its schema declares, and a
 ``licence``. An unknown field is refused, a missing one is refused, and a repeated key is
@@ -68,6 +74,8 @@ FieldValue: TypeAlias = int | str | tuple[str, ...]
 FieldCheck: TypeAlias = Callable[[str, object], FieldValue]
 
 _ENVELOPE_KEYS: Final = frozenset({"schema_version", "catalog_id", "catalog_version", "entries"})
+#: Carried only by a catalog with no entries, which cannot be checked by any rule about entries.
+_EMPTY_REASON: Final = "empty_reason"
 _LICENCE_KEYS: Final = frozenset({"spdx", "verdict", "origin", "licence_source", "content_source"})
 _RESERVED_FIELDS: Final = frozenset({"key", "licence"})
 _SPDX: Final = re.compile(r"[A-Za-z0-9][A-Za-z0-9.+-]*")
@@ -235,8 +243,12 @@ def load_catalog(path: Path, schema: CatalogSchema) -> Catalog:
     if (stem, version) != (schema.catalog_id, schema.catalog_version):
         raise CatalogError(f"{path.name} is not {schema.catalog_id}.v{schema.catalog_version}.json")
     document = read_json(path)
-    if not isinstance(document, dict) or set(document) != _ENVELOPE_KEYS:
-        raise CatalogError(f"{path.name}: the envelope is exactly {sorted(_ENVELOPE_KEYS)}")
+    allowed = _ENVELOPE_KEYS | {_EMPTY_REASON}
+    if not isinstance(document, dict) or not _ENVELOPE_KEYS <= set(document) <= allowed:
+        raise CatalogError(
+            f"{path.name}: the envelope is exactly {sorted(_ENVELOPE_KEYS)}, and "
+            f"{_EMPTY_REASON} when it has no entries"
+        )
     if type(document["schema_version"]) is not int or document["schema_version"] != 1:
         raise CatalogError(f"{path.name}: schema_version is 1")
     if type(document["catalog_version"]) is not int or (
@@ -250,6 +262,17 @@ def load_catalog(path: Path, schema: CatalogSchema) -> Catalog:
     raw_entries = document["entries"]
     if not isinstance(raw_entries, list):
         raise CatalogError(f"{path.name}: entries is a list")
+    stated_empty = document.get(_EMPTY_REASON)
+    if raw_entries and stated_empty is not None:
+        raise CatalogError(
+            f"{path.name}: {_EMPTY_REASON} belongs only to a catalog with no entries, and this "
+            f"one has {len(raw_entries)}"
+        )
+    if not raw_entries and not (isinstance(stated_empty, str) and stated_empty.strip()):
+        raise CatalogError(
+            f"{path.name} has no entries, so every rule about entries passes it. State "
+            f"{_EMPTY_REASON} in the file: why this vocabulary is empty and what closes it."
+        )
     expected = {"key", "licence"} | {name for name, _ in schema.fields}
     entries: list[CatalogEntry] = []
     seen: set[str] = set()
