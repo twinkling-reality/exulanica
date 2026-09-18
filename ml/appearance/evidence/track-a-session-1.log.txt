@@ -7,7 +7,11 @@ one writable output directory, hard limit passed to timeout.
 
 == spend
   billed 7707 s (2.14 h) at the day's listed $2.63 an hour = $5.63 at that rate
-  prepaid balance before $40.31; balance after PENDING (only the provider's billing page says it)
+  prepaid balance before $40.31; balance after $35.05, read by the operator off the billing page
+    on 2026-09-18 and reported to this lane. That difference is $5.26, against the $5.63 this log
+    computes from the listed rate times the billed seconds: THE PROVIDER CHARGED 7 PER CENT LESS
+    THAN THE ARITHMETIC, on the safe side. It is also the balance after THIS session only; session
+    2 had not posted when it was read.
   Track A ceiling $25, so this session used 22.5 per cent of it
   of the 7707 s, 1855 s produced images (70 s smoke, 1785 s session 1). The rest was the image build,
   88.5 GB of weights fetched and verified, three false starts, and my own latency between steps.

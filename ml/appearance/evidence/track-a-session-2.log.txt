@@ -11,8 +11,11 @@ sighting), deleted 14:53:12Z, confirmed gone from the account 14:54:51Z.
 == spend
   billed 6262 s to the delete request (1.74 h) = $4.57 at the day's listed $2.63
   6361 s to the confirmed removal (1.77 h) = $4.64, if the provider bills to that instant instead
-  prepaid balance before $40.31; AFTER IS STILL UNREAD, and it is the only figure in two sessions'
-    evidence that is marked rather than measured
+  the balance was read at last, $35.05 on 2026-09-18, and it reflects SESSION 1 AND NOT THIS ONE:
+    $40.31 less $35.05 is $5.26, where both sessions together would be about $10.20. So session 1
+    cost $5.26 against the $5.63 computed from the listed rate, 7 per cent less, and this session's
+    charge had not posted. If it bills in the same proportion the balance settles near $30.80,
+    which is an expectation and not a reading
   the lane has now spent about $9.20 of its $25 Track A ceiling
   3015 of the 6262 billed seconds produced images (71 s smoke, 1795 s job A, 1146 s job B), which is
     48 per cent, against 24 per cent in session 1
