@@ -37,6 +37,19 @@ esac
 
 here=$(cd "$(dirname "$0")/.." && pwd)
 repository=$(cd "${here}/../.." && pwd)
+
+# A dirty tree is refused, because the code pushed to the machine would then be something no commit
+# holds. MEASURED: session 1 ran with three fixes applied but not yet committed, so its generation
+# records name commit f61a89fa while their source_sha256 is ad958ff6, which matches NO tree in this
+# repository. The exact code that produced those 64 outputs is unrecoverable, and the only honest
+# thing a later reader can say about it is its digest. Commit first; the run is then reproducible
+# from the record.
+dirty=$(git -C "${repository}" status --porcelain)
+if [ -n "${dirty}" ]; then
+  echo "gpu-session: the tree is dirty, so a record would name a commit that did not run:" >&2
+  echo "${dirty}" >&2
+  exit 2
+fi
 python="${here}/.venv/bin/python"
 head=$(git -C "${repository}" rev-parse HEAD)
 remote="appearance"
