@@ -438,6 +438,103 @@ def test_a_number_the_rule_does_not_record_is_refused_if_it_appears(tmp_path):
 
 # -- the harness itself, type-checked, because nothing else in this repository checks it -----------
 
+# -- what the product showed when it would not start ------------------------------------------------
+
+
+def _surface(tmp_path: Path, shell_js: str) -> object:
+    """What the harness reads from a page whose ``#shell`` element is `shell_js`.
+
+    THE DOM IS FAKED AND NOTHING ELSE IS. The harness's own page-side expression is run here, so the
+    slice, the character count and the absent-shell branch under test are the ones a run sends to a
+    real page; a test that rebuilt that shape itself would be checking its own arithmetic. Only
+    ``document`` is invented, because the one thing not available here is a browser.
+
+    A STUB BECAUSE THE FIXTURE IS TEMPORARY. This path was built against a live page that reliably
+    refused to start, and the tile route defect behind that page is being fixed. Once it is, nothing
+    here shows an error surface on demand, and a check whose only fixture has gone is a check nobody
+    will see refuse anything again.
+    """
+    driver = tmp_path / "read-surface.mjs"
+    driver.write_text(
+        f"const harness = await import({str(HARNESS)!r});\n"
+        f"const shell = {shell_js};\n"
+        "const document = { getElementById: (id) => (id === 'shell' ? shell : null) };\n"
+        "const value = new Function('document', `return ${harness.PRODUCT_SURFACE}`)(document);\n"
+        "const session = { evaluate: async () => value };\n"
+        "console.log(JSON.stringify({ surface: await harness.productSurfaceOf(session) }));\n"
+    )
+    result = _node(str(driver))
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout.strip().splitlines()[-1])["surface"]
+
+
+def _showing(text: str) -> str:
+    """A shell in its error state showing `text`, as little of an element as the reader touches."""
+    return f"{{ getAttribute: () => 'error', innerText: {json.dumps(text)} }}"
+
+
+def test_the_halt_carries_what_the_product_said_and_adds_nothing_to_it(tmp_path):
+    """The product's own refusal, verbatim, with none of this gate's words mixed into it.
+
+    MEASURED 2026-09-18 and this is the sentence that was lost: two corridor runs halted on "the
+    product failed to start" and the record said only that. The refusal below, naming the tile and
+    the version the page wanted, reached nobody but a live session watching the page, and had that
+    session ended first, a later reader would have had to rediscover the defect from nothing.
+    """
+    product = (
+        "Atlas could not open\n\nTile 7ce4b90f-675b-52dc-b71b-7264aeb00786 refused: .owd refused: "
+        "tessellator_version is not 19; there is no upgrade on read, rebake the tile\n\n"
+        "Retry opening Atlas"
+    )
+    surface = _surface(tmp_path, _showing(product))
+    assert surface["text"] == product
+    assert surface["worldState"] == "error"
+    # No field of this gate's own invention beside the product's words.
+    assert set(surface) == {"worldState", "text", "textCharacters"}
+
+
+def test_a_shell_that_is_not_there_is_not_a_shell_showing_nothing(tmp_path):
+    """Two different failures, and a record that ran them together could not be asked which."""
+    assert _surface(tmp_path, "null") is None
+    assert _surface(tmp_path, _showing("")) == {
+        "worldState": "error",
+        "text": "",
+        "textCharacters": 0,
+    }
+
+
+def test_a_cut_surface_says_how_much_there_was(tmp_path):
+    """A cut that cannot be seen is a quotation a reader would take for the whole thing."""
+    surface = _surface(tmp_path, _showing("x" * 5000))
+    assert len(surface["text"]) == 2000
+    assert surface["textCharacters"] == 5000
+
+
+def test_a_surface_that_cannot_be_read_does_not_replace_the_halt(tmp_path):
+    """Reading the page is a courtesy to the next reader and must never cost them the halt itself.
+
+    This runs inside the failure handler of the mount wait, so an error thrown here would leave the
+    run reporting why the SURFACE could not be read instead of why the PRODUCT would not start.
+    """
+    driver = tmp_path / "unreadable.mjs"
+    driver.write_text(
+        f"const harness = await import({str(HARNESS)!r});\n"
+        "const session = { evaluate: async () => { throw new Error('the session went away'); } };\n"
+        "console.log(JSON.stringify({ surface: await harness.productSurfaceOf(session) }));\n"
+    )
+    result = _node(str(driver))
+    assert result.returncode == 0, result.stderr
+    surface = json.loads(result.stdout.strip().splitlines()[-1])["surface"]
+    assert "the session went away" in surface["unreadable"]
+
+
+def test_a_local_path_the_product_shows_does_not_reach_the_record(tmp_path):
+    """The product may name a file; a record of this repository may not carry this machine."""
+    surface = _surface(tmp_path, _showing("could not read /Users/someone/dev/thing/tile.owd"))
+    assert "/Users/" not in surface["text"]
+    assert "<local-path>" in surface["text"]
+
+
 HARNESS_TSCONFIG = ROOT / "web/tsconfig.scripts.json"
 
 

@@ -346,6 +346,49 @@ function sanitize(text) {
     .replace(/\/Users\/[^\s'")]*/g, '<local-path>');
 }
 
+/**
+ * What the product's own shell is SHOWING, read from where the product shows it.
+ *
+ * MEASURED 2026-09-18, after getting this wrong once. Two corridor runs halted on "the product
+ * failed to start"; the container refusal that caused it, naming the tile and the version it wanted,
+ * reached nobody but a live session that happened to be watching the page. I first collected the
+ * console and exception lists believing the sentence would be there, and the rerun came back with
+ * both EMPTY while the page was displaying it. A PRODUCT STATES A REFUSAL TO THE PERSON IN FRONT OF
+ * IT, not to a console, so this reads what the person would have read.
+ *
+ * It reads the element the mount wait already identifies, by the id and the state attribute that
+ * wait already tests, and returns the text VERBATIM: no parsing, no matching, and none of this
+ * gate's categories laid over the product's words. The halt's `reason` stays the gate's own
+ * sentence and `productSurface.text` is the product's, because a record that runs the two together
+ * cannot afterwards be asked which half the product actually said.
+ *
+ * NULL IS NOT EMPTY: null means the product's shell was not in the document at all, an empty text
+ * means the shell was there and showed nothing, and those are different failures. The text is cut
+ * at 2,000 characters with `textCharacters` beside it, so a cut is visible rather than silent.
+ */
+export const PRODUCT_SURFACE = `(() => {
+  const shell = document.getElementById('shell');
+  if (shell === null) return null;
+  const text = shell.innerText ?? '';
+  return {
+    worldState: shell.getAttribute('data-world-state'),
+    text: text.slice(0, 2000),
+    textCharacters: text.length,
+  };
+})()`;
+
+/**
+ * The reader above, run against a page: the product's words sanitised of this machine's paths, and
+ * NEVER a throw. It runs inside the failure handler of the mount wait, so an error escaping here
+ * would leave a run reporting why the surface could not be read instead of why the product would
+ * not start, which is the one thing the reader exists to preserve.
+ */
+export async function productSurfaceOf(session) {
+  const surface = await session.evaluate(PRODUCT_SURFACE)
+    .catch((error) => ({ unreadable: String(error).slice(0, 200) }));
+  return surface === null || surface.text === undefined ? surface : { ...surface, text: sanitize(surface.text) };
+}
+
 function listenerSource(normalized) {
   if (normalized.startsWith('web/packages/') || normalized.startsWith('web/node_modules/')) {
     return 'product';
@@ -962,6 +1005,24 @@ async function main() {
     if (event.frame.parentId === undefined) navigations.push(event.frame.url);
   });
 
+  // WHAT THE BROWSER REPORTED, ATTACHED TO A HALT AND NOT ONLY TO A COMPLETED RUN.
+  //
+  // Until this was written, a halt recorded the FACT of a halt and nothing either the browser or the
+  // product said about it. These are the SAME THREE LISTS a completed record writes under `errors`,
+  // bound here by reference the moment they exist rather than copied at the end, so a halt carries
+  // whatever had arrived by the time it stopped. One source, and nothing new to keep in step.
+  //
+  // THEY ARE NOT WHERE THE PRODUCT SAYS WHY IT REFUSED, and that is measured rather than assumed. I
+  // added these first believing they would carry the corridor refusal; the rerun came back with
+  // `exceptions` and `consoleErrors` both EMPTY while the page was displaying a container refusal
+  // naming the tile and the version. The product states a refusal on its own surface, which
+  // `productSurfaceOf` reads. An empty list here IS that measurement, so it stays.
+  //
+  // ABSENT AND EMPTY ARE DIFFERENT ANSWERS. No `errors` key at all means the browser never opened,
+  // so nothing was ever given the chance to say anything. An empty list means it ran and said
+  // nothing of that kind.
+  observed.errors = { exceptions, consoleErrors, networkLogErrors };
+
   let containers = null;
   // Empty until the page is reached, rather than nothing at all, so a caller before then holds a
   // list with no containers in it and not a value of another shape.
@@ -994,7 +1055,13 @@ async function main() {
     target.searchParams.set('validation-warmup', '2');
     const navigatedAt = Date.now();
     await session.send('Page.navigate', { url: target.href });
-    const mountMs = await waitFor(session, `(() => {
+    // WHAT THE PRODUCT SHOWED WHEN IT WOULD NOT START, kept apart from what this gate says about it.
+    // Runs on EVERY failure of this wait, the timeout included: a wait that ran out while the page
+    // was showing something is a different fact from one that ran out on a blank page, and the
+    // timeout alone cannot tell them apart.
+    let mountMs;
+    try {
+      mountMs = await waitFor(session, `(() => {
       if (document.querySelector('.credential-gate')) return 'the product showed its credential gate';
       if (document.querySelector('[data-empty-world]')) return 'the product showed its empty world';
       if (document.getElementById('shell')?.getAttribute('data-world-state') === 'error') return 'the product failed to start';
@@ -1003,6 +1070,10 @@ async function main() {
         document.querySelector('#shell .reticle') !== null &&
         document.querySelector('.reconstruction-loading') === null;
     })()`, 'the product shell to mount a world', 240_000);
+    } catch (error) {
+      observed.productSurface = await productSurfaceOf(session);
+      throw error;
+    }
     phase('the shell mounted a world');
     // The direct-navigation transition and the first frames settle before anything is read.
     await sleep(3000);
