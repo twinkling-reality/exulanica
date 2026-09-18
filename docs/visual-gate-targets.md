@@ -11,6 +11,25 @@ Targets are declared twice and held to each other by a test: `GATE_TARGETS` in
 `tests/test_visual_gate_targets.py` asserts the two sets are equal in both directions, so neither
 can gain a page the other cannot.
 
+## Which container each section's figures are about
+
+The pinned development tile has been rebaked three times while this document was being written, and
+every figure below belongs to ONE of those bakes. A triangle count or a byte size quoted out of a
+section without its container is a claim about a different tile a week later, which has already
+happened once: the 4,850 nav_envelope triangles in the first run's section were read, months of
+rebakes later, as a fact about the tile a current run was standing on.
+
+| container | bytes | the sections whose figures are about it |
+| --- | --- | --- |
+| `48a87e1ce5c7ca78...` | 531,884 | the first generated run, before tessellator 14 |
+| `8b729a65...` | 553,804 | the repeat on tessellator 14, in that section's second column |
+| `1ef74efa8eef6844...` | 564,788 | the run with the rings off the collision field, tessellator 17 |
+
+The run that carried rings into the collision field states no container digest of its own. Its ring
+counts match what `1ef74efa` states and the tile file had not moved between that run and this one,
+which is evidence and not a binding: that run's record is the one place this document does not say
+which bytes it scored, and the fix for the next one is that the run record binds the digest itself.
+
 ## The two targets
 
 `owned-district` is the product's own shell showing an owned district. It is the page every retained
