@@ -1,0 +1,46 @@
+Conditioning vocabulary mutation checks, 2026-09-18T06:47:03Z, branch lane/generated-appearance at
+0fae3bf937778a35cc64e9baa8ea285ed942bb72, clean tree. The commit carrying this log is one later and
+differs by this file alone.
+
+WHY THIS EXISTS. `capture/encode.py` stated four conditioning encodings, exported them, and nothing
+in the repository loaded the statement. A published vocabulary that nothing asks is documentation
+with a type annotation: it can drift from the code that produces the pictures and no run notices.
+The four are real (each is one function of a structure record's layers, each is named in a
+generation record and on a sheet's label), so the statement was bound to the code rather than
+deleted, and these checks are what make the binding a rule instead of a claim.
+
+Each mutant is applied to the committed tree, run with python -B, then restored from git.
+Command: .venv/bin/python -B -m pytest tests/test_encode.py -rf
+
+== baseline
+5 passed in 0.06s
+== N1: a fifth picture encoder, stated nowhere (encode.py gains a uint8-returning function)
+FAILED tests/test_encode.py::test_the_stated_encodings_are_exactly_the_pictures_this_module_produces
+1 failed, 4 passed in 0.38s
+== N2: a fifth stated encoding with nothing behind it
+FAILED tests/test_encode.py::test_the_stated_encodings_are_exactly_the_pictures_this_module_produces
+1 failed, 4 passed in 0.05s
+== N3: an encoder points at the wrong producer (edge to inverse_depth)
+FAILED tests/test_encode.py::test_the_stated_encodings_are_exactly_the_pictures_this_module_produces
+1 failed, 4 passed in 0.05s
+== N4: the sheet describes the picture in its own prose again (sheets.py loses one binding)
+FAILED tests/test_encode.py::test_the_before_sheet_labels_come_from_the_stated_encodings
+1 failed, 4 passed in 0.08s
+== N5: the source parse finds nothing (the picture annotation is loosened to NDArray)
+FAILED tests/test_encode.py::test_the_stated_encodings_are_exactly_the_pictures_this_module_produces
+1 failed, 4 passed in 0.06s
+== after restore
+5 passed in 0.03s
+
+Five mutants, five kills. N1 and N2 are the two directions of the same rule: code without a statement
+and a statement without code. N3 catches the pairing being wrong while both sides still look
+complete. N4 holds the one runtime that draws these pictures to naming them from the vocabulary
+rather than re-describing them. N5 is the guard against a vacuous pass: if the source parse stops
+recognising a picture encoder, the test fails instead of agreeing with an empty set.
+
+A MISTAKE MADE WHILE DOING THIS, recorded because it cost real work. I ran the first pass of these
+mutants against an UNCOMMITTED tree. Each mutant restores its file with `git checkout --`, which
+restored the file to the last commit and so deleted the very edits under test; the run then reported
+failures that were the loss, not the mutant. The work came back from the dangling stash commit
+97bd4d04, and the rule that was already written down and ignored is: commit before mutation testing,
+because a mutant harness that restores from git has no other baseline to restore to.
