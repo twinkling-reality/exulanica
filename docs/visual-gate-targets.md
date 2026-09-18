@@ -338,6 +338,61 @@ passed, and nothing was adjusted to reach them. The fourth prediction's other ha
 not all hold, stays untested, and so does everything the paragraph above it says about which of them
 a generated target decides on partial inputs.
 
+## The openings run, predicted before it was run
+
+Tess cut facade openings and rebaked the fixture. Written and committed before the server was
+started, so these can be checked rather than fitted.
+
+**Measured from the new container first, by tess's own reader.** `3a2fd58d76f4d40f...`, 701,276
+bytes, tessellator 18, 180 records. What moved and what did not is the basis of the prediction:
+
+| | before | after |
+| --- | --- | --- |
+| render_batch triangles | 2,208 | **4,042** |
+| nav_envelope triangles | 5,755 | **5,755** |
+| route obstruction rings | 16 across 9 records | **16 across 9 records**, same patch |
+| tile_inputs_digest | `5dd2dcb5...` | **unchanged** |
+
+The openings are cut in vertical faces. The navigation projection did not move at all, and neither
+did a single ring.
+
+**Predicted:**
+
+- the ROUTE IS IDENTICAL, every field, because its three inputs are the arrival pose, the rings and
+  the field, and the nav_envelope those come from is unchanged: 36 qualified, the rule prefers 28000,
+  the ground refuses it 52.81 m along, and the walk takes 27500 with frontage 1 of 126 and
+  `candidatesWithFrontage` 2. If any of that moves, the envelope moved and the triangle count did not
+  say so;
+- `continuousTexturedStreetAndFacades` **still holds**, for the same wrong reason: openings are in
+  vertical faces, the facade half of the key measures nothing on a generated target whatever the
+  facades do, and the walked line crosses an empty plain rather than passing a building;
+- `noCutsOrFloatingGeometry` **still fails**, and this is the one key I expect to MOVE: cutting an
+  opening changes what counts as a connected component, so 62 detached components should go up. If it
+  goes down, my reading of what that number counts is wrong;
+- `usefulEyeLevelMovement` **still fails** at the same 135 mm, because it is decided by the walk and
+  the surface under it, and neither moved;
+- `completeCapsuleClearanceVerification` **still fails**, and its contact count should stay at 4:
+  the walk is unchanged and it passes no building;
+- `practicalBrowserBudget` **still holds** at 4,042 drawn triangles against Melbourne's 227,173;
+- the unavailable surfaces go from 18 to **20**, all still for no material record, because the trim
+  surfaces the openings introduce are undressed on two of the six gridded faces.
+
+**And the frames of THIS FIXTURE will look worse, not better.** Its openings should read bright
+magenta, because the holes are cut and, ON THIS TILE, nothing dresses the interior backing, the
+glazing or the doors behind them: 20 undressed surfaces, of which interior_backing 6, door 3,
+glazing 2 and trim 2. That is the fixture's AGE rather than a gap in the grammar. It is hand
+written and older than the material catalog.
+
+**Scoped deliberately, because the unscoped version is false of the street.** The corridor tile
+draws 1,633 surfaces of which 1,547 are dressed, and its 86 undressed ones are 85 facade ground
+bands and the terrain, AND NOTHING ELSE. Every interior backing, all the glazing and all the doors
+are dressed there. A sentence about magenta openings belongs to this fixture and would be wrong
+about the thing this project is actually building.
+
+So: a run that makes a generated street look more finished is not what this is, and neither is a run
+that says generated streets have bare openings. Recorded so the frames are read against a statement
+rather than against an expectation formed while looking at them.
+
 ## A hint about the frontage tie-break, with its n beside it
 
 **A direction, not evidence.** Over all 36 headings the rule qualifies on this tile, each sampled
