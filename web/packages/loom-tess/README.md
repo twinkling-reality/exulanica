@@ -274,7 +274,10 @@ by the expander that needs it, with a new tessellator version.
   - A band stretched past its edge's ends by a step that leans sideways comes off the edge's own
     line, and points on the edge itself fall outside every piece. There is no overhang now: a point
     past an edge's end belongs to that corner, and the corner covers the radius plus the lean.
-- `src/core/support-carve.ts` has the support carve rule. It grows each clearance piece by a
+- `src/core/support-carve.ts` has the support carve rule. A kept corner's height is its triangle's
+  own plane, floored, and never outside the heights that triangle's corners stand at: a hull corner
+  may sit a millimetre outside its triangle, where flooring the plane alone would put it below the
+  lowest corner and so below the extent its record states. It grows each clearance piece by a
   millimetre, carves every support triangle by the shared piece carve, and floors each kept corner
   onto its triangle's own plane. Growing first is what keeps the carve's own rounding outside the
   clearance itself, so support never enters what obstructs; what it gives up is under two

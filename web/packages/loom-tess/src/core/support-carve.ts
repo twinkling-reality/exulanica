@@ -106,8 +106,21 @@ export function carveSupport(
       continue;
     }
     // Not held to the triangle: a sliver shaved off a sloping edge would crack one surface in two.
+    let lowest = turned[0][2];
+    let highest = turned[0][2];
+    for (const corner of turned) {
+      if (corner[2] < lowest) lowest = corner[2];
+      if (corner[2] > highest) highest = corner[2];
+    }
     for (const walk of carvedPiece(piece, near, hold, where)) {
-      const corners = walk.map((point): Space => [point[0], point[1], heightOnPlane(turned, point, where)]);
+      const corners = walk.map((point): Space => {
+        // The plane's height, floored, and never outside the heights its own corners stand at: a
+        // hull corner can sit a millimetre outside the triangle, where flooring the plane would
+        // put it below the lowest corner and so below the extent its record states.
+        const height = heightOnPlane(turned, point, where);
+        const held = height < lowest ? lowest : height;
+        return [point[0], point[1], held > highest ? highest : held];
+      });
       const cut = triangulateRing(walk, where);
       for (let corner = 0; corner + 2 < cut.length; corner += 3) {
         out.push([corners[cut[corner]!]!, corners[cut[corner + 1]!]!, corners[cut[corner + 2]!]!]);

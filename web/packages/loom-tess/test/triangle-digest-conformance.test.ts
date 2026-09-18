@@ -28,7 +28,7 @@ import {
   sortList,
 } from './support.js';
 
-/** Over `test/fixtures/tile-conformance.json`, tessellator 12, digest profile v3. */
+/** Over `test/fixtures/tile-conformance.json`, tessellator 13, digest profile v3. */
 const GOLDEN = {
   render_batch: '70ca86e97e4221fbe691c6732af7ca372b68ec1d4edb5c32118c8bbb0c22efdc',
   nav_envelope: 'b7baf414ab9a2df06439efea94a997cc327e6bc55a7ccdd4a51d69b86150d154',
