@@ -328,6 +328,67 @@ passed, and nothing was adjusted to reach them. The fourth prediction's other ha
 not all hold, stays untested, and so does everything the paragraph above it says about which of them
 a generated target decides on partial inputs.
 
+## Run five: the eight mechanical keys, measured on a generated page
+
+The first run to reach them. The walk completed 125 m, all three captures were taken, and the block
+fails, which is the gate working rather than a problem to be solved.
+
+**What changed to get here.** The route rule qualifies a heading a capsule can travel without
+touching a ring or leaving the field, and it never consults support, while the clearance carve
+removes support within the radius plus its own integer overshoot. So a line can qualify and have no
+ground. The rule now returns its qualifying headings IN ITS OWN ORDER, nothing reorders them, and the
+gate walks the first one the product's own surface supports. On this tile that refused the rule's
+first choice, 28000, which loses support 52.81 m along, 343 mm from a bench the rule qualifies past
+at 340 mm; the walk took 27500, the next in the rule's order.
+
+| key | verdict | what decided it |
+| --- | --- | --- |
+| `continuousTexturedStreetAndFacades` | **holds** | 819 triangles, 0 untextured, 0 gaps |
+| `noCutsOrFloatingGeometry` | **fails** | 62 components detached from support |
+| `usefulEyeLevelMovement` | **fails** | eye height error 135 mm and support delta 135 mm, over 50 |
+| `completeCapsuleClearanceVerification` | **fails** | 4 capsule triangle contacts of 2,502 checked |
+| `practicalBrowserBudget` | holds | 2,208 triangles, 565 KB, 122.9 MB textures, 50 draw calls |
+| `companionPresent` | holds | 3 of 3 |
+| `reticlePresent` | holds | 3 of 3 |
+| `authenticatedShellAndAuthoredHandlersPreserved` | holds | 3 of 3, 0 foreign listeners |
+
+**The walk itself:** 125,009 mm walked of a 125,000 mm route, lateral deviation 0 mm, recovery events
+0, harness position writes 0, 2,502 trace samples, and no sample where the drawn floor and the
+product's support disagree by more than a step.
+
+### The prediction that was wrong, and it is the one worth reading
+
+`completeCapsuleClearanceVerification` failed for the mechanism predicted: the rule prefers frontage
+on both sides, nothing stops the capsule, so the walk passes within 340 mm of drawn street furniture.
+
+`continuousTexturedStreetAndFacades` was predicted to FAIL because this tile draws surfaces no
+material record dresses. **It held, and it should not be trusted.** Two reasons, both from the
+numbers rather than from looking:
+
+- `facadeTriangles` is zero BY CONSTRUCTION on a generated target, because the keys receive no
+  prisms, so the 819 are walking triangles alone and the half of the key named for facades measured
+  nothing at all. The vacuous-input caveat written above this section did not merely weaken the key,
+  it let it pass;
+- `untexturedStreetAndFacadeTriangles` is zero while the page states 18 surfaces drawn as
+  unavailable, because THE UNAVAILABLE HATCH IS A TEXTURE. The key cannot tell a surface dressed by
+  a material record from a surface wearing the pattern that says it has none.
+
+The endpoint capture is an empty field of magenta diagonal hatching reading UNAVAILABLE under an
+empty sky, with no street, no building and no furniture in it. That frame passed the key that exists
+to ask whether surfaces look like real materials. Neither the key's definition nor its threshold is
+this lane's to change, and a gate that tuned the rule judging its own runs would be worth nothing;
+this is recorded so that whoever owns it can see what it passed.
+
+### The two questions, answered
+
+Both were written down as questions rather than predictions, because either answer was plausible and
+an expectation with no number behind it can be fitted to whatever arrives.
+
+- Does a bench or a tree read as a component detached from support? **Yes: 62 of them.**
+- Does the drawn floor agree with the product's own support at every resampled point? **No: 135 mm
+  at worst, against a 50 mm tolerance**, which is the two-surfaces problem this project already knows
+  from the records, now measured along a walk.
+
 ## The run with the rings carried, predicted before it was run
 
 Written and committed before the server was restarted, so these can be checked rather than fitted.
