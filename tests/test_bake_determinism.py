@@ -55,7 +55,7 @@ from exulanica.grammar.grammars.city.document import (
     read_tile_document,
     validate_city_document,
 )
-from exulanica.grammar.grammars.city.material import SurfaceMaterialRecord
+from exulanica.grammar.grammars.city.material import SURFACE_ROLE_OWNERS, SurfaceMaterialRecord
 from exulanica.grammar.grammars.city.tile import (
     EMPTY_EDIT_DELTA_DIGEST,
     HALO_RADIUS_MM,
@@ -580,9 +580,7 @@ def test_the_container_states_membership_frame_identity_and_what_is_drawn(tmp_pa
     junctions = [i for i, r in enumerate(header["records"]) if r["kind"] == "city.junction"]
     # And behind each face's glass stands one plane, so a person looking in sees a room rather than
     # the far side of the building.
-    backings = [
-        i for i, r in enumerate(header["records"]) if r["kind"] == "city.interior_backing"
-    ]
+    backings = [i for i, r in enumerate(header["records"]) if r["kind"] == "city.interior_backing"]
     assert [e["record"] for e in render["entries"] if e["state"] == "drawn"] == sorted(
         [*backings, *curbs, *facades, *junctions, *lots, *massings, *objects, *segments, terrain]
     )
@@ -609,20 +607,21 @@ def test_the_container_states_membership_frame_identity_and_what_is_drawn(tmp_pa
             assert roles == {"tree_pit", "trunk", "canopy"}
             continue
         assert roles == {"lot"}
-    # A face draws the wall of its run and the ground band below it, and the panels of every bay
-    # that names it, so a ground bay draws nothing of its own.
+    # A face draws the wall of its run less its openings, the return into each of those, the ground
+    # band below it, and the panels of every bay that names it, so a ground bay draws nothing of its
+    # own. WHICH ROLES THOSE MAY BE IS ASKED OF THE GRAMMAR rather than listed here: the grammar
+    # states, per surface role, which record kinds may own a surface of it, so a role a facade draws
+    # that the grammar does not give a facade fails, and a role the grammar adds needs no edit here.
+    # A list would have gone quiet about exactly the role this version added.
+    facade_roles = {role for role, owners in SURFACE_ROLE_OWNERS.items() if "city.facade" in owners}
+    assert "trim" in facade_roles, "the grammar no longer gives a facade the role its returns take"
+    drawn_roles: set[str] = set()
     for entry in (render["entries"][i] for i in facades):
         roles = {s["role"] for s in entry["surfaces"]}
-        assert roles <= {
-            "wall",
-            "ground_band",
-            "party_wall_scar",
-            "stall_riser",
-            "glazing",
-            "fascia",
-            "door",
-            "shopfront_frame",
-        }
+        assert roles <= facade_roles
+        drawn_roles |= roles
+    # And the returns are drawn rather than merely admissible, on this fixture's six gridded faces.
+    assert "trim" in drawn_roles
     for index, record in enumerate(header["records"]):
         if record["kind"] == "city.ground_bay":
             assert render["entries"][index]["state"] == "not_in_projection"
@@ -701,7 +700,9 @@ def test_the_tessellator_carves_support_clear_of_everything_that_obstructs(tmp_p
     # above it takes no ground: the tree's six metre canopy is not here, and nothing is wider than
     # the two metre bench, which is the whole of the difference from reading a stated extent.
     assert len(obstructions) == 16
-    assert max(max(p[0] for p in ring) - min(p[0] for p in ring) for ring in obstructions[1:]) < 2000
+    assert (
+        max(max(p[0] for p in ring) - min(p[0] for p in ring) for ring in obstructions[1:]) < 2000
+    )
 
     terrain = fixture_terrain()
     cell = terrain.cell_mm

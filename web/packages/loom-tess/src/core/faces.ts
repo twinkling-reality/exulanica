@@ -32,6 +32,13 @@ export interface FaceCover {
 export const HORIZONTAL: SurfaceOrientation = 'horizontal';
 export const VERTICAL: SurfaceOrientation = 'vertical';
 
+/** An edge a face is laid out along, with the length the corner rule measures it at. */
+export interface FaceEdge {
+  readonly from: Plan;
+  readonly to: Plan;
+  readonly run: number;
+}
+
 /** One surface of a record: its triangles, and each vertex's position and surface coordinates. */
 export class Surface {
   readonly vertices: number[] = [];
@@ -109,7 +116,7 @@ export function offFace(point: Plan, from: Plan, to: Plan, distance: number, whe
  */
 export function faceOn(
   into: Surface,
-  edge: { readonly from: Plan; readonly to: Plan; readonly run: number },
+  edge: FaceEdge,
   low: number,
   high: number,
   base: number,
@@ -120,13 +127,7 @@ export function faceOn(
 ): void {
   if (top <= base) return;
   if (high <= low) return;
-  const at = (along: number): Plan => offFace(
-    alongEdge(edge.from, edge.to, along, edge.run, where),
-    edge.from,
-    edge.to,
-    depth,
-    where,
-  );
+  const at = (along: number): Plan => facePoint(edge, along, depth, where);
   const [west, east] = [at(low), at(high)];
   const [bottom, crown] = [subtract(datum, base, where), subtract(datum, top, where)];
   into.face(
@@ -135,4 +136,66 @@ export function faceOn(
     into.corner(east, top, high, crown),
     into.corner(west, top, low, crown),
   );
+}
+
+/** Where a face's `(u, z)` point stands in plan, set off the edge by `depth`. */
+export function facePoint(edge: FaceEdge, along: number, depth: number, where: string): Plan {
+  return offFace(alongEdge(edge.from, edge.to, along, edge.run, where), edge.from, edge.to, depth, where);
+}
+
+/**
+ * A face over a walk in the edge's own `(u, z)` plane, at one depth. The walk turns
+ * counter-clockwise in that plane, which is the way round the face's own quad is built, so the face
+ * it makes looks the way the edge does.
+ */
+export function walkOn(
+  into: Surface,
+  edge: FaceEdge,
+  walk: readonly Plan[],
+  depth: number,
+  datum: number,
+  where: string,
+): void {
+  const corners: number[] = [];
+  for (const point of walk) {
+    const [along, height] = point;
+    corners.push(into.corner(facePoint(edge, along, depth, where), height, along, subtract(datum, height, where)));
+  }
+  into.face(...corners);
+}
+
+/**
+ * THE RETURN OF A HOLE INTO THE WALL: one quad per edge of an outline in the face's `(u, z)` plane,
+ * from the face at depth 0 back to `depth` millimetres inside it. Taken in the outline's own order,
+ * which turns counter-clockwise, each quad runs front to front and then back, so every one of them
+ * faces into the hole rather than out of it.
+ *
+ * WHAT THE SURFACE COORDINATES CAN SAY, AND WHAT THEY CANNOT. Both corners of a quad's depth take
+ * the `(u, z)` of the outline point they were set back from, because the frame the grammar fixes for
+ * every role a facade owns is the face's own run and height (`common`), and that frame has no axis
+ * across the face. A return is perpendicular to the face, so it has no extent in the frame at all
+ * along its depth, and a material on it is stretched over that depth. That is a property of the
+ * stated frame rather than a choice made here, and inventing an axis for it would be a tessellator
+ * putting a coordinate where no grammar put one.
+ */
+export function revealOn(
+  into: Surface,
+  edge: FaceEdge,
+  outline: readonly Plan[],
+  depth: number,
+  datum: number,
+  where: string,
+): void {
+  if (depth < 1) return;
+  const inward = subtract(0, depth, where);
+  const corner = (point: Plan, back: number): number => into.corner(
+    facePoint(edge, point[0], back, where),
+    point[1],
+    point[0],
+    subtract(datum, point[1], where),
+  );
+  outline.forEach((here, index) => {
+    const next = outline[(index + 1) % outline.length]!;
+    into.face(corner(here, 0), corner(next, 0), corner(next, inward), corner(here, inward));
+  });
 }

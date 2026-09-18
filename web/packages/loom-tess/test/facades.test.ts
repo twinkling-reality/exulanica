@@ -4,6 +4,11 @@
  *   - THE FACE IS THE RUN BY ITS STOREYS: everything the rule draws for one face, added up in the
  *     face's plane, is its run length times the height of the storeys it covers. Nothing is left
  *     out and nothing is drawn twice.
+ *   - AN OPENING IS MISSING WALL, NOT DRAWN WALL: the wall's area is the rectangle less every
+ *     opening the grid states, one per bay per storey, and the return into each is its perimeter by
+ *     its reveal depth. The two together are checked against the same total as everything else here.
+ *   - A RETURN FACES INTO ITS OPENING: every one of its quads points at the hole rather than away
+ *     from it, so a person in the street sees the wall's thickness and not its back.
  *   - THE BAND BELONGS TO THE BAYS: every ground panel is drawn, at its own recess and in the
  *     surface role the grammar gives its panel role, and the part of the band no bay covers takes
  *     the ground band role.
@@ -19,6 +24,7 @@
 import { describe, expect, it } from 'vitest';
 import { backingPieces, facadePieces, faceCover, panelSurfaceRole } from '../src/core/facades.js';
 import type { BackingFields, FacadeFields, FaceFrame, GroundBayFields } from '../src/core/facades.js';
+import type { OpeningGridFields } from '../src/core/openings.js';
 import { massingPieces } from '../src/core/massing.js';
 import type { MassingFields } from '../src/core/massing.js';
 import type { Plan } from '../src/core/integer-math.js';
@@ -51,9 +57,28 @@ function face(over: Partial<FacadeFields> = {}): FacadeFields {
     last_storey: 2,
     band_top_mm: 4200,
     neighbour_top_mm: 0,
+    bays: { count: 0, pitch_mm: 0, margin_start_mm: 0 },
+    openings: [],
     ...over,
   };
 }
+
+/** One opening grid, in the shape the grammar states it, over what a case wants to change. */
+function grid(over: Partial<OpeningGridFields> = {}): OpeningGridFields {
+  return {
+    storeys: [1],
+    u_offset_mm: 600,
+    width_mm: 1200,
+    height_mm: 1600,
+    sill_height_mm: 900,
+    reveal_depth_mm: 180,
+    head_rise_mm: 0,
+    ...over,
+  };
+}
+
+/** The resolution the city's projections state, which is how far a chord may sit from its circle. */
+const RESOLUTION_MM = 1;
 
 /** The frame the expander builds for a face on the first edge of the block's only tier. */
 function frameOf(massing: MassingFields, facade: FacadeFields): FaceFrame {
@@ -105,11 +130,93 @@ describe('the facade rule', () => {
     const massing = block();
     const facade = face();
     const frame = frameOf(massing, facade);
-    const { area } = measure(facadePieces(facade, frame, [], 'case'));
+    const { area } = measure(facadePieces(facade, massing, frame, [], RESOLUTION_MM, 'case'));
     const height = frame.top - frame.base;
     expect(area.get('ground_band')).toBeCloseTo(12000 * 4200, 6);
     expect(area.get('wall')).toBeCloseTo(12000 * (height - 4200), 6);
     expect([...area.values()].reduce((total, value) => total + value, 0)).toBeCloseTo(12000 * height, 6);
+  });
+
+  it('cuts one opening per bay per storey out of the wall and returns the wall into each', () => {
+    const massing = block();
+    // Four bays of 3 m over the whole run, one storey listed, so four openings and not one.
+    const facade = face({
+      bays: { count: 4, pitch_mm: 3000, margin_start_mm: 0 },
+      openings: [grid({ storeys: [1] })],
+    });
+    const frame = frameOf(massing, facade);
+    const { area } = measure(facadePieces(facade, massing, frame, [], RESOLUTION_MM, 'case'));
+    const height = frame.top - frame.base;
+    const wallHeight = height - 4200;
+    const openings = 4 * 1200 * 1600;
+    expect(area.get('wall')).toBeCloseTo(12000 * wallHeight - openings, 6);
+    // The return is the opening's perimeter by its reveal depth, four times over.
+    expect(area.get('trim')).toBeCloseTo(4 * 2 * (1200 + 1600) * 180, 6);
+    expect(area.get('ground_band')).toBeCloseTo(12000 * 4200, 6);
+    // The face still accounts for its whole rectangle: what is drawn plus what is missing.
+    const drawn = [...area.values()].reduce((total, value) => total + value, 0);
+    expect(drawn - area.get('trim')! + openings).toBeCloseTo(12000 * height, 6);
+  });
+
+  it('cuts an opening in every storey the grid lists, and none where it lists none', () => {
+    const massing = block();
+    const frame = frameOf(massing, face());
+    const areaOf = (storeys: number[]): number => {
+      const facade = face({
+        bays: { count: 4, pitch_mm: 3000, margin_start_mm: 0 },
+        openings: [grid({ storeys })],
+      });
+      return measure(facadePieces(facade, massing, frame, [], RESOLUTION_MM, 'case')).area.get('wall')!;
+    };
+    const whole = measure(facadePieces(face(), massing, frame, [], RESOLUTION_MM, 'case')).area.get('wall')!;
+    expect(whole - areaOf([1])).toBeCloseTo(4 * 1200 * 1600, 6);
+    expect(whole - areaOf([1, 2])).toBeCloseTo(8 * 1200 * 1600, 6);
+  });
+
+  it('returns the wall into its opening rather than out of it', () => {
+    const massing = block();
+    const facade = face({
+      bays: { count: 1, pitch_mm: 12000, margin_start_mm: 0 },
+      openings: [grid({ storeys: [1], u_offset_mm: 6000 })],
+    });
+    const frame = frameOf(massing, facade);
+    const pieces = facadePieces(facade, massing, frame, [], RESOLUTION_MM, 'case');
+    const reveal = pieces.find((piece) => piece.surface!.role === 'trim')!;
+    expect(reveal.surface!.orientation).toBe('vertical');
+    // The opening runs 6000 to 7200 along a face on +x, its sill at 5500 and its head at 7100, so
+    // its middle is (6600, 0, 6300). Every quad of the return faces that point.
+    const middle = [6600, 0, 6300];
+    for (let triangle = 0; triangle + 2 < reveal.triangles.length; triangle += 3) {
+      const corner = (at: number): number[] => {
+        const vertex = reveal.triangles[triangle + at]!;
+        return [reveal.vertices[vertex * 3]!, reveal.vertices[vertex * 3 + 1]!, reveal.vertices[vertex * 3 + 2]!];
+      };
+      const [a, b, c] = [corner(0), corner(1), corner(2)];
+      const edge = (from: number[], to: number[]): number[] => [to[0]! - from[0]!, to[1]! - from[1]!, to[2]! - from[2]!];
+      const [u, v] = [edge(a, b), edge(a, c)];
+      const normal = [u[1]! * v[2]! - u[2]! * v[1]!, u[2]! * v[0]! - u[0]! * v[2]!, u[0]! * v[1]! - u[1]! * v[0]!];
+      const toward = edge(a, middle);
+      const along = normal[0]! * toward[0]! + normal[1]! * toward[1]! + normal[2]! * toward[2]!;
+      expect(along).toBeGreaterThan(0);
+    }
+  });
+
+  it('refuses an opening that falls outside the wall its face draws', () => {
+    const massing = block();
+    const frame = frameOf(massing, face());
+    const cut = (over: Partial<OpeningGridFields>): void => {
+      const facade = face({ bays: { count: 4, pitch_mm: 3000, margin_start_mm: 0 }, openings: [grid(over)] });
+      facadePieces(facade, massing, frame, [], RESOLUTION_MM, 'case');
+    };
+    // The wall starts at 4300 and the storey's floor is 4600, so a sill 301 mm below it is outside.
+    expect(() => cut({ sill_height_mm: 0 })).not.toThrow();
+    expect(() => cut({ storeys: [0] })).toThrow(/below the 4300 mm its face's wall starts at/);
+    // The wall ends at 10600, and storey 2's floor is 7600.
+    expect(() => cut({ storeys: [2], sill_height_mm: 900, height_mm: 2100 })).not.toThrow();
+    expect(() => cut({ storeys: [2], sill_height_mm: 900, height_mm: 2101 })).toThrow(/above the 10600 mm its face's wall ends at/);
+    // The last bay starts at 9000, so 2400 of offset and 600 of width just fits the 12000 run.
+    expect(() => cut({ u_offset_mm: 2400, width_mm: 600 })).not.toThrow();
+    expect(() => cut({ u_offset_mm: 2400, width_mm: 601 })).toThrow(/past the face's 12000 mm run/);
   });
 
   it('gives the band to its bays, each panel in its own role and at its own recess', () => {
@@ -127,7 +234,7 @@ describe('the facade rule', () => {
         { role: 'fascia', u_start_mm: 1000, u_end_mm: 7000, z_bottom_mm: 3400, z_top_mm: 4200, recess_mm: 0 },
       ],
     };
-    const { area, depth } = measure(facadePieces(facade, frame, [bay], 'case'));
+    const { area, depth } = measure(facadePieces(facade, massing, frame, [bay], RESOLUTION_MM, 'case'));
     // The two panes are one surface, since the grammar dresses a transom as glazing.
     expect(panelSurfaceRole('transom', 'case')).toBe('glazing');
     expect(area.get('glazing')).toBeCloseTo(6000 * (2400 + 400), 6);
@@ -148,7 +255,7 @@ describe('the facade rule', () => {
     const massing = block();
     const facade = face({ exposure: 'party_wall', neighbour_top_mm: 7000, band_top_mm: 4200 });
     const frame = frameOf(massing, facade);
-    const { area } = measure(facadePieces(facade, frame, [], 'case'));
+    const { area } = measure(facadePieces(facade, massing, frame, [], RESOLUTION_MM, 'case'));
     const top = frame.top - frame.datum;
     expect(area.get('party_wall_scar')).toBeCloseTo(12000 * (top - 7000), 6);
     expect(area.get('wall')).toBeCloseTo(12000 * (7000 - 4200), 6);

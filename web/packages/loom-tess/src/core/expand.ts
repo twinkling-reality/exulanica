@@ -53,7 +53,7 @@ import type { CoveringTriangle, TerrainPatch } from './terrain-yield.js';
  * Bumped whenever an expander, a statement, a contract or the materialised projection set
  * changes, because each changes the bytes a bake writes. The bake stage's parameters carry it.
  */
-export const TESSELLATOR_SOURCE_VERSION = 17;
+export const TESSELLATOR_SOURCE_VERSION = 18;
 
 /**
  * What each materialised projection preserves and what it may be used for, as separate rows, the
@@ -141,7 +141,11 @@ export const NEEDS = {
   ground_coverage: 'ground_coverage',
   /** Horizontal faces from a ring: a lot, a block, a tree pit. */
   ring_triangulation: 'ring_triangulation',
-  /** A facade's faces: its bays, panels, openings, mouldings, awnings and entrances. */
+  /**
+   * A facade's faces this version does not lay out. Its bays, its panels, its openings and the
+   * returns into them are drawn; what waits here is the sill and head bands an opening grid states,
+   * the string courses and the cornice, the awning, and the entrance, which is a record of its own.
+   */
   facade_layout: 'facade_layout',
   /** A centreline or kerb line of more than one piece, or a kerb line not running with its centreline. */
   bent_street: 'bent_street',
@@ -789,9 +793,9 @@ function facadeOf(identity: string, context: ExpandContext, where: string): Faca
 function renderFacade(fields: Fields, context: ExpandContext): Expansion {
   const facade = fields as unknown as FacadeFields;
   const where = `city.facade ${facade.identity}`;
-  const { frame } = faceFrameOf(facade, context, where);
+  const { massing, frame } = faceFrameOf(facade, context, where);
   const bays = carriedWhere(context, 'city.ground_bay', 'facade_identity', facade.identity) as unknown as GroundBayFields[];
-  const pieces = facadePieces(facade, frame, bays, where);
+  const pieces = facadePieces(facade, massing, frame, bays, context.resolutionMm, where);
   if (pieces.length === 0) throw new TessellationError(`${where} draws no face, which its run and storeys should not allow`);
   return { state: 'drawn', pieces };
 }

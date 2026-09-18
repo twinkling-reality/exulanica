@@ -28,9 +28,17 @@ import {
   sortList,
 } from './support.js';
 
-/** Over `test/fixtures/tile-conformance.json`, tessellator 17, digest profile v3. */
+/**
+ * Over `test/fixtures/tile-conformance.json`, tessellator 18, digest profile v3.
+ *
+ * THE PAIR IS THE POINT. Cutting the fixture's openings out of its faces moved `render_batch` and
+ * left `nav_envelope` byte for byte where it was, which is what the grammar's navigation table says
+ * must happen: `city.facade` carries ground `none`, so nothing it draws is support and nothing it
+ * draws is ground another record yields to, whichever way that surface faces. An opening change that
+ * moved the second of these two lines would be a carve that had escaped the face's own plane.
+ */
 const GOLDEN = {
-  render_batch: 'e906150d744f4ad12fab849c45f439e1501a3f5fd729d3e3ce716f88fcc3b455',
+  render_batch: 'd4ebae2fe31d5fb7564af26e6e81388184d25478f4ff29a495057edf97f04188',
   nav_envelope: 'dcd548bde8d8ca988c1e3b433c9515fe6531c95d7a5f4085d627e1b54e7eb811',
 } as const;
 
@@ -205,7 +213,7 @@ describe('the triangle digest of the conformance fixture', () => {
     const drawnTerrain = renderBatch!.header.entries[terrain]!;
     expect(drawnTerrain).toMatchObject({
       state: 'drawn',
-      first_vertex: 3419,
+      first_vertex: 6961,
       vertex_count: 478,
       triangle_count: 495,
       surfaces: [{ role: 'terrain', orientation: 'horizontal', material: { state: 'none-exists' }, triangle_count: 495 }],
@@ -228,7 +236,7 @@ describe('the triangle digest of the conformance fixture', () => {
     expect(faces).toHaveLength(9);
     expect(faces.every((entry) => entry.state === 'drawn')).toBe(true);
     const roles = new Set(faces.flatMap((entry) => entry.state === 'drawn' ? entry.surfaces!.map((surface) => surface.role) : []));
-    expect([...roles].sort()).toEqual(['door', 'fascia', 'glazing', 'ground_band', 'party_wall_scar', 'stall_riser', 'wall']);
+    expect([...roles].sort()).toEqual(['door', 'fascia', 'glazing', 'ground_band', 'party_wall_scar', 'stall_riser', 'trim', 'wall']);
     for (const surface of building.surfaces!) {
       if (surface.material.state !== 'record') throw new Error('a building surface cites no record');
       expect(header.records[surface.material.record]!.fields.role).toBe(surface.role);
@@ -271,6 +279,22 @@ describe('the triangle digest of the conformance fixture', () => {
     header.records.forEach((record, index) => {
       expect(renderBatch!.header.entries[index]!.state === 'halo').toBe(record.membership === 'halo');
     });
+  });
+
+  it('returns the wall into an opening on exactly the faces whose own record states a grid', async () => {
+    const { header, projections } = await decodedFixture();
+    const faces = header.records
+      .map((record, index) => ({ record, entry: projections[0]!.header.entries[index]! }))
+      .filter((row) => row.record.kind === 'city.facade');
+    // Read from the fixture's own records, so a fixture that gained or lost a grid moves this too.
+    const gridded = faces.map((row) => (row.record.fields.openings as readonly unknown[]).length > 0);
+    const returned = faces.map((row) => row.entry.state === 'drawn'
+      && row.entry.surfaces!.some((surface) => surface.role === 'trim'));
+    // Both halves matter: a fixture where no face states a grid would make the comparison vacuous,
+    // and one where every face did would make it blind to a rule that returns unconditionally.
+    expect(gridded.filter(Boolean).length).toBeGreaterThan(0);
+    expect(gridded.filter((has) => !has).length).toBeGreaterThan(0);
+    expect(returned).toEqual(gridded);
   });
 
   it('supports nothing a capsule could not stand on, over what the navigation table says obstructs', async () => {

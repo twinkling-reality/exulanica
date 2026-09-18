@@ -8,22 +8,33 @@
  *
  * WHAT THIS VERSION DRAWS:
  *
- *   1. THE FACE. The wall of the run, from the floor of its first storey to the ceiling of its
- *      last. Where the face includes storey 0 the ground band is not part of it: the band is
+ *   1. THE FACE, LESS ITS OPENINGS. The wall of the run, from the floor of its first storey to the
+ *      ceiling of its last, carved by every opening the face's grid states (`openings.ts`) so that
+ *      the wall is what is LEFT of the rectangle rather than a rectangle with holes drawn over it.
+ *      Where the face includes storey 0 the ground band is not part of it: the band is
  *      `band_top_mm` tall and its bays draw it.
- *   2. THE GROUND BAND. Each ground bay tiles its own rectangle exactly with panels, each at its
+ *   2. THE RETURNS INTO THOSE OPENINGS, `reveal_depth_mm` deep all the way round each one, in the
+ *      `trim` role. A hole with no return is a wall of no thickness, which reads as a hole cut in
+ *      paper rather than in a building.
+ *   3. THE GROUND BAND. Each ground bay tiles its own rectangle exactly with panels, each at its
  *      own recess and each taking the surface role the grammar gives its panel role. The part of
  *      the band no bay covers is the `ground_band` role, taken as intervals along the run.
- *   3. A PARTY WALL SCAR. Above `neighbour_top_mm` a party wall shows where the neighbour's profile
+ *   4. A PARTY WALL SCAR. Above `neighbour_top_mm` a party wall shows where the neighbour's profile
  *      met it, and that region takes the `party_wall_scar` role rather than `wall`.
  *
- *   4. THE PLANE BEHIND THE GLASS, for an interior backing record, which is laid out in this same
+ *   5. THE PLANE BEHIND THE GLASS, for an interior backing record, which is laid out in this same
  *      frame and is a record of its own. See `backingPieces`.
  *
  * WHAT IT DOES NOT DRAW YET, each of which is additive and none of which this leaves a hole for:
- * openings with their reveals, sills and heads, which will be cut out of the face; string courses
- * and cornices, which are boxes projecting from it; awnings; and the entrance record, which is laid
- * out in this same frame and is a record of its own.
+ * an opening's sill and head as bands projecting from the face, which the grid states separately
+ * from the hole it heads; string courses and cornices, which are boxes projecting from it; awnings;
+ * and the entrance record, which is laid out in this same frame and is a record of its own.
+ *
+ * NOTHING HERE IS GROUND. The grammar's navigation table gives `city.facade` ground `none`, so no
+ * surface this rule makes is support and none of them is ground another record yields to, whichever
+ * way it faces. That is why an opening can be cut without a navigation projection moving, and it is
+ * a property of the table rather than of the geometry: the entrance record beside it carries ground
+ * `support`, and drawing one of those moves what a person can stand on.
  *
  * THE FACE AND THE BUILDING'S OWN WALL ARE NEVER BOTH DRAWN. The massing rule draws a tier edge's
  * wall only where no facade of that building draws over it, taken as a rectangle in the edge's own
@@ -32,11 +43,14 @@
  */
 import { add, exact, GeometryError, subtract } from './integer-math.js';
 import type { Plan } from './integer-math.js';
-import { faceOn, piecesOf, Surface, VERTICAL } from './faces.js';
-import type { FaceCover } from './faces.js';
+import { faceOn, piecesOf, revealOn, Surface, VERTICAL, walkOn } from './faces.js';
+import type { FaceCover, FaceEdge } from './faces.js';
 import type { Piece } from './pieces.js';
 import { storeyFloorMm } from './massing.js';
 import type { MassingFields } from './massing.js';
+import { gridOpenings } from './openings.js';
+import type { BayLayoutFields, Opening, OpeningGridFields, WallRegion } from './openings.js';
+import { openRegions } from './piece-carve.js';
 
 /** The tier edge a facade is laid out on, and the heights its storeys sit at. */
 export interface FaceFrame {
@@ -79,12 +93,16 @@ export interface FacadeFields {
   readonly last_storey: number;
   readonly band_top_mm: number;
   readonly neighbour_top_mm: number;
+  readonly bays: BayLayoutFields;
+  /** A face states at most one grid, which is a rule for every bay and storey it lists. */
+  readonly openings: readonly OpeningGridFields[];
 }
 
 const WALL = 'wall';
 const GROUND_BAND = 'ground_band';
 const PARTY_WALL_SCAR = 'party_wall_scar';
 const PARTY_WALL = 'party_wall';
+const TRIM = 'trim';
 
 /** What this rule reads of an interior backing record (`exulanica.grammar.grammars.city.vitrine`). */
 export interface BackingFields {
@@ -199,17 +217,41 @@ function openAlong(run: number, bays: readonly GroundBayFields[], where: string)
 }
 
 /**
+ * The openings one face states, in its own `(u, z)` plane. A face states at most one grid and a
+ * party wall states none, which the grammar holds it to; what the grid means is `openings.ts`.
+ */
+export function facadeOpenings(
+  facade: FacadeFields,
+  massing: MassingFields,
+  region: WallRegion,
+  resolutionMm: number,
+  where: string,
+): Opening[] {
+  const openings: Opening[] = [];
+  for (const grid of facade.openings) {
+    for (const opening of gridOpenings(grid, facade.bays, massing, region, resolutionMm, where)) {
+      openings.push(opening);
+    }
+  }
+  return openings;
+}
+
+/**
  * A building's face on one tier edge, by the rule above. `frame` is that edge with the heights the
- * face's storeys sit at, and `bays` are the ground bay records that name this facade.
+ * face's storeys sit at, `bays` are the ground bay records that name this facade, and
+ * `resolutionMm` is how far a chord of an arched head may sit from its circle.
  */
 export function facadePieces(
   facade: FacadeFields,
+  massing: MassingFields,
   frame: FaceFrame,
   bays: readonly GroundBayFields[],
+  resolutionMm: number,
   where: string,
 ): Piece[] {
-  const edge = { from: frame.from, to: frame.to, run: frame.run };
+  const edge: FaceEdge = { from: frame.from, to: frame.to, run: frame.run };
   const wall = new Surface(WALL, VERTICAL);
+  const trim = new Surface(TRIM, VERTICAL);
   const band = new Surface(GROUND_BAND, VERTICAL);
   const scar = new Surface(PARTY_WALL_SCAR, VERTICAL);
   const panels = new Map<string, Surface>();
@@ -221,7 +263,22 @@ export function facadePieces(
   const party = facade.exposure === PARTY_WALL;
   const scarBase = party ? add(frame.datum, facade.neighbour_top_mm, where) : frame.top;
   const walled = scarBase < bandTop ? bandTop : scarBase;
-  faceOn(wall, edge, 0, run, bandTop, walled > frame.top ? frame.top : walled, 0, frame.datum, where);
+  const wallTop = walled > frame.top ? frame.top : walled;
+  const region: WallRegion = { run, base: bandTop, top: wallTop };
+  const openings = facadeOpenings(facade, massing, region, resolutionMm, where);
+  if (openings.length === 0) {
+    faceOn(wall, edge, 0, run, bandTop, wallTop, 0, frame.datum, where);
+  } else {
+    // The wall is the rectangle less the openings, and every corner of both is an integer of the
+    // face's own frame, so the shared carve's rounding never fires and each opening is exactly the
+    // hole its record states.
+    const rectangle: readonly Plan[] = [[0, bandTop], [run, bandTop], [run, wallTop], [0, wallTop]];
+    const cut = openings.map((opening) => opening.outline);
+    for (const walk of openRegions(rectangle, cut, where)) walkOn(wall, edge, walk, 0, frame.datum, where);
+    for (const opening of openings) {
+      revealOn(trim, edge, opening.outline, opening.revealDepthMm, frame.datum, where);
+    }
+  }
   if (party) faceOn(scar, edge, 0, run, walled, frame.top, 0, frame.datum, where);
 
   if (banded) {
@@ -250,7 +307,9 @@ export function facadePieces(
       }
     }
   }
-  const drawn = [wall, band, scar];
+  // The face, then what is cut into it, then the band, the scar and the band's panels by role. A
+  // face with no opening draws no trim, so this is the order it already had.
+  const drawn = [wall, trim, band, scar];
   for (const role of [...panels.keys()].sort()) {
     if (role === GROUND_BAND) continue;
     drawn.push(panels.get(role)!);
