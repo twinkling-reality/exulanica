@@ -18,6 +18,7 @@ disagreed would be worse than none, and they would disagree quietly.
 It reads no clock and no network, so two runs over one container agree.
 """
 
+import hashlib
 import sys
 from collections import Counter
 from pathlib import Path
@@ -45,8 +46,12 @@ def main() -> int:
     lines = [
         "what the tessellator draws of the corridor tile",
         "",
-        f"container   {container.name}, {container.stat().st_size} bytes",
-        f"document    {document.name}, {document.stat().st_size} bytes",
+        # A container is named by its digest, not by whatever a local file is called: the file
+        # name says where somebody put it, the digest says which container it is.
+        f"container   {container.stat().st_size} bytes, sha256 "
+        f"{hashlib.sha256(container.read_bytes()).hexdigest()}",
+        f"document    {document.stat().st_size} bytes, sha256 "
+        f"{hashlib.sha256(document.read_bytes()).hexdigest()}",
         f"records     {len(read_back[0]['entries'])}",
         "",
     ]
