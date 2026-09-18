@@ -1279,52 +1279,112 @@ async function main() {
             // product's own navigation surface what stands ahead of where it stopped: a walk that
             // ran out of support and a walk the keyboard lost are different facts, and the record
             // says which by stating where the surface ends rather than by inferring it.
-            const ahead = new Float64Array(41 * 2);
-            for (let step = 0; step <= 40; step += 1) {
-              ahead[step * 2] = p.x + plan.forward[0] * (step * 0.25);
-              ahead[step * 2 + 1] = p.z + plan.forward[1] * (step * 0.25);
+            //
+            // AT A SPACING THE WALK CAN FALL INTO. MEASURED 2026-09-18: this probe ran every
+            // 0.25 m and reported "support for the next 10 m" over a 32 mm hole 13 mm ahead of a
+            // stall, which is where the walker's next frame lands at 1.65 m/s. The product refuses
+            // a desired point with no surface, so a probe coarser than one frame of walking
+            // measures a population that excludes the thing that stops a walk, and the sentence it
+            // produced sent a reader looking for a collision for a whole run.
+            const PROBE_SPACING_M = 0.005;
+            const PROBE_REACH_M = 10;
+            const probes = Math.round(PROBE_REACH_M / PROBE_SPACING_M) + 1;
+            const ahead = new Float64Array(probes * 2);
+            for (let step = 0; step < probes; step += 1) {
+              ahead[step * 2] = p.x + plan.forward[0] * (step * PROBE_SPACING_M);
+              ahead[step * 2 + 1] = p.z + plan.forward[1] * (step * PROBE_SPACING_M);
             }
             const sampled = float64FromBase64(await session.call(bindingId, SAMPLE_SUPPORT, [toBase64(ahead)]));
-            const supported = [...sampled].map((height, step) => ({ atM: step * 0.25, height }));
+            const supported = [...sampled].map((height, step) => ({ atM: Number((step * PROBE_SPACING_M).toFixed(3)), height }));
             const firstGap = supported.find((sample) => Number.isNaN(sample.height)) ?? null;
-            // The biggest rise between two consecutive probes before any gap: a step the product
-            // will not climb stops a walk exactly like an absent surface, and the two are
-            // indistinguishable in a message that says only that the walk stopped.
+            // How wide the hole is, and whether the surface comes back. A gap the walk could step
+            // over, a gap that pins it and an edge the surface never resumes past are three facts,
+            // and only the width and the far side tell them apart.
+            const resumes = firstGap === null ? null
+              : supported.find((sample) => sample.atM > firstGap.atM && !Number.isNaN(sample.height)) ?? null;
+            // The biggest rise between two probes one product sample spacing apart, which is what
+            // the product's own path check compares, taken before any gap.
+            const stride = Math.max(1, Math.round((observed.field?.surfaceSampleSpacing ?? 0.05) / PROBE_SPACING_M));
             let rise = { fromM: null, heightM: 0 };
-            for (let step = 1; step < supported.length; step += 1) {
-              const before = supported[step - 1].height;
+            for (let step = stride; step < supported.length; step += stride) {
+              const before = supported[step - stride].height;
               const after = supported[step].height;
               if (Number.isNaN(before) || Number.isNaN(after)) break;
-              if (after - before > rise.heightM) rise = { fromM: supported[step - 1].atM, heightM: after - before };
+              if (after - before > rise.heightM) rise = { fromM: supported[step - stride].atM, heightM: after - before };
             }
+            // The nearest route obstruction ring to where it stopped, from the rings the page
+            // states. A walk that stopped at a ring and a walk that stopped at a hole in the
+            // surface look identical in a position, and this is what separates them.
+            let nearestRing = null;
+            for (const { id, ring } of routeRings) {
+              for (let k = 0; k < ring.length; k += 1) {
+                const a = ring[k];
+                const b = ring[(k + 1) % ring.length];
+                const ex = b[0] - a[0];
+                const ez = b[1] - a[1];
+                const length2 = ex * ex + ez * ez;
+                const t = length2 === 0 ? 0 : Math.max(0, Math.min(1, ((p.x - a[0]) * ex + (p.z - a[1]) * ez) / length2));
+                const metres = Math.hypot(p.x - (a[0] + ex * t), p.z - (a[1] + ez * t));
+                if (nearestRing === null || metres < nearestRing.metres) nearestRing = { id, metres };
+              }
+            }
+            // What the PRODUCT said, in its own words, while this walk ran. The recorder has been
+            // keeping them since the walk opened and nothing read them at a stall, so a run could
+            // report three causes ruled out while the product's own status line named one.
+            const productSaid = await session.call(recorderId, 'function () { return this.failures.slice(-5); }');
+            // How far the walk was actually moving each frame, from the product's own trace rather
+            // than from any constant here: the middle of the non-zero planar steps over the last
+            // forty recorded frames. It is the step the movement resolver asks its surface about,
+            // so a hole narrower than it can still stop the walk and a reader needs both numbers.
+            const lately = await session.call(recorderId, 'function () { return this.poses.slice(-40).map((pose) => [pose[0], pose[2]]); }');
+            const steps = lately.slice(1)
+              .map((point, index) => Math.hypot(point[0] - lately[index][0], point[1] - lately[index][1]))
+              .filter((step) => step > 0)
+              .sort((a, b) => a - b);
+            const perFrameMm = steps.length === 0 ? null : Math.round(steps[Math.floor(steps.length / 2)] * 1000);
             const field = observed.field ?? {};
             observed.stall = {
               atX: p.x, atZ: p.z,
               alongM: Number(along(p).toFixed(3)),
               targetAlongM: targetAlong,
               speed: p.speed,
+              advancePerFrameMm: perFrameMm,
               supportUnderfoot: supported[0].height,
               firstUnsupportedAheadM: firstGap === null ? null : firstGap.atM,
+              unsupportedResumesAtM: resumes === null ? null : resumes.atM,
+              unsupportedWidthMm: firstGap === null || resumes === null ? null
+                : Math.round((resumes.atM - firstGap.atM) * 1000),
               largestRiseAheadM: rise.heightM,
               largestRiseAtM: rise.fromM,
+              nearestRouteRing: nearestRing === null ? null
+                : { id: nearestRing.id, metres: Number(nearestRing.metres.toFixed(4)) },
+              productRecoveryMessages: productSaid,
               productMaximumStepHeight: field.maximumStepHeight ?? null,
               productMaximumSlopeDegrees: field.maximumSlopeDegrees ?? null,
               metresFromFieldCentre: field.centreX === undefined ? null
                 : Math.round(Math.hypot(p.x - field.centreX, p.z - field.centreZ) * 1000) / 1000,
               fieldRadius: field.fieldRadius ?? null,
-              supportProbeSpacingM: 0.25,
-              supportProbeReachM: 10,
+              supportProbeSpacingM: PROBE_SPACING_M,
+              supportProbeReachM: PROBE_REACH_M,
             };
             await halt(`the walk stalled at ${along(p).toFixed(2)} m of ${targetAlong} m ` +
               `(speed ${p.speed.toFixed(3)}, enabled ${p.enabled}, conversation ${p.conversationActive}, ` +
               `repeats ${repeats}); the product's navigation surface ` +
               (firstGap !== null
-                ? `states no support ${firstGap.atM} m ahead of where it stopped`
+                ? `states no support from ${firstGap.atM} m ahead` +
+                  (resumes === null
+                    ? ', and none again within 10 m, so the surface ends there'
+                    : ` to ${resumes.atM} m ahead, ${Math.round((resumes.atM - firstGap.atM) * 1000)} mm of it` +
+                      (perFrameMm === null ? '' : `, and this walk was advancing ${perFrameMm} mm a frame, so its ` +
+                        'next position falls in that hole and the product recovers to where it already was')) +
+                  (nearestRing === null ? '' : `; the nearest route obstruction ring is ${nearestRing.metres.toFixed(3)} m away`)
                 : rise.heightM > (observed.field?.maximumStepHeight ?? Infinity)
                   ? `rises ${rise.heightM.toFixed(3)} m at ${rise.fromM} m ahead, over the ` +
                     `${observed.field.maximumStepHeight} m step this world states it will climb`
-                  : `states support for the next 10 m and rises at most ${rise.heightM.toFixed(3)} m, ` +
-                    'so neither the surface ending nor a step it refuses stopped this walk'));
+                  : `states support for the next ${PROBE_REACH_M} m sampled every ` +
+                    `${PROBE_SPACING_M * 1000} mm and rises at most ${rise.heightM.toFixed(3)} m, ` +
+                    'so neither the surface ending nor a step it refuses stopped this walk') +
+              (productSaid.length === 0 ? '' : `. The product said: ${productSaid.join(' | ')}`));
           }
           if (Date.now() >= nextRepeat) {
             await key('keyDown', 'KeyW', 'w', 87, true);
