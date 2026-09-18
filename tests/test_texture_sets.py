@@ -42,6 +42,8 @@ from PIL import Image, ImageChops, ImageStat
 ROOT = Path(__file__).resolve().parents[1]
 MANIFEST = TEXTURE_DIRECTORY / "manifest.json"
 DOC = ROOT / "docs" / "texture-package.md"
+#: The entries the bake reads, which carry each set's title. The manifest does not.
+LIBRARY = ROOT / "web" / "packages" / "loom-texture" / "library"
 EVIDENCE_DIRECTORY = ROOT / "web" / "packages" / "loom-texture" / "evidence"
 #: The published library's bake on five runtimes, at the commit that published batch 3: every file
 #: the directory holds, sets, objects and indexes included. The earlier records are of the library
@@ -514,6 +516,27 @@ def test_the_document_names_every_pinned_set_and_the_evidence_it_cites(manifest)
         assert record.is_file() and record.relative_to(ROOT).as_posix() in text
     assert WORKSPACE_EVIDENCE.relative_to(ROOT).as_posix() in text
     assert "\u2014" not in text
+
+
+def test_the_document_describes_every_pinned_set_and_not_only_lists_it(manifest):
+    """A row in the table is not a description, and the paragraphs are written one per set by hand.
+
+    The test above holds every pinned set to a row, which is generated from the same numbers, so it
+    cannot notice a set that was published with no prose about it: the list of paragraphs is a gate
+    that enumerates what it covers. This holds the paragraphs to the pinned sets instead, by each
+    set's title as its library entry states it, appearing inside a bold lead-in somewhere in the
+    document. What that paragraph should say is a person's judgement; that there is one is not.
+    """
+    text = DOC.read_text(encoding="utf-8")
+    missing = []
+    for entry in manifest["sets"]:
+        source = (LIBRARY / f"{entry['set_id']}.json").read_text(encoding="utf-8")
+        title = json.loads(source)["title"]
+        # The class excludes newlines as well as asterisks: with newlines allowed, the pattern
+        # matched a bold span paragraphs away and the check could not fail at all.
+        if not re.search(rf"\*\*[^*\n]*{re.escape(title)}[^*\n]*\*\*", text, re.IGNORECASE):
+            missing.append(f"{entry['set_id']} ({title})")
+    assert missing == [], f"{DOC.name} lists these sets but describes none of them: {missing}"
 
 
 def _run(record, run):
