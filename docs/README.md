@@ -90,7 +90,7 @@ These are the living specifications. Edit them when the system changes.
 Scene, Atlas, screening, and reconstruction wire contracts live at `docs/` root and
 appear in the [catalog](all-documents.md).
 
-## How documents are filed
+## Document filing
 
 Documents are filed by how they change over time.
 
@@ -156,7 +156,7 @@ record is missing from this table.
 | [adr/0023-epistemically-typed-world-memory.md](adr/0023-epistemically-typed-world-memory.md) | World memory is epistemically typed state; no mesh, graph, field, or latent representation is the whole world | ACCEPTED as architecture; research claims open |
 | [adr/gsplat-training-and-recorded-rung.md](adr/gsplat-training-and-recorded-rung.md) | Gaussian optimization and the recorded scene rung are separate decisions, so a nonmetric scene can be trained honestly | ACCEPTED for implementation; unnumbered, deliberately |
 
-## Current state
+## Runtime authority
 
 [runtime-verification.md](runtime-verification.md) overrides every other document on
 conflict about executed platform behaviour. The evidence spine is implemented:

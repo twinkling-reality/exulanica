@@ -10,7 +10,7 @@ should find those related materials together while identifying which are persona
 memories, imports or creations. Putting a landscape beside another place changes
 your arrangement, not their real geographic relationship.
 
-## What exists
+## Existing capability
 
 Reviewed appearance controls and bounded language-driven appearance proposals
 have preview/apply/rollback contracts. Source snapshots, alternate versions,
@@ -23,7 +23,7 @@ The bounded Flatiron implementation, its admitted source data, and the line betw
 and renderer completion are specified in
 [owned district and source admission](../owned-district-and-admission.md).
 
-## What remains
+## Gaps
 
 Reusable real-world extraction, persistent geographic anchors, unified search
 across memories/imports/creations, geometric blending and general language-driven

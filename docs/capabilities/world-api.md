@@ -6,11 +6,11 @@ The platform design allows creation tools to read a named world version and subm
 changes. Edits carry their source version and pass the same permission and acceptance rules as
 changes from the interface.
 
-## Current routes
+## Routes
 
 Every route requires `Authorization: Bearer <token>`, and a token is bound to one workspace.
 
-| Method and path | Current responsibility |
+| Method and path | Responsibility |
 | --- | --- |
 | `GET /world-read/scenes/{scene_id}` | Read an authorized scene bundle |
 | `GET /world-read/places/{place_id}` | Read a place, optionally resolved at a requested time |
