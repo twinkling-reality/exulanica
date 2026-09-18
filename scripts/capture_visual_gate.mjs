@@ -157,6 +157,38 @@ export function statedWalkOf(text) {
 }
 
 /**
+ * The rectangle a walk is bounded by, as the four values the route rule declares, and refused when
+ * it bounds nothing.
+ *
+ * TWO DIFFERENT FAULTS HERE AND NEITHER GUARD CATCHES THE OTHER, which is why both are written.
+ *
+ * A SHORT array is a type fault. `planRoute` declares exactly four values; an array of unknown
+ * length can carry three, and the fourth is then `undefined`, which a bounds test reads as no bound
+ * at all on that side. Nothing in this repository type-checks this file today, so the tuple below
+ * is what a checker would need to see, and a run is not the place to find out.
+ *
+ * A DEGENERATE rectangle is a VALUE fault, and no type refuses it: `[0, 0, 0, 0]` is four perfectly
+ * good numbers. That is what the generated target passed before it read the field from the page, so
+ * every heading pointing away from the origin had an unbounded clear run, and no test failed because
+ * no generated run had ever reached the rule. The first record made with it would have described a
+ * walk in a field the product never allowed. Only this check refuses that, so saying the type would
+ * have caught it would be a guard claiming another's work.
+ */
+function fieldBounds(west, north, east, south, from) {
+  const stated = [west, north, east, south];
+  if (!stated.every((value) => Number.isFinite(value))) {
+    throw new Halt(`${from} states bounds ${JSON.stringify(stated)}, which are not four finite numbers`);
+  }
+  if (!(east > west) || !(south > north)) {
+    throw new Halt(
+      `${from} states a rectangle of no extent, ${JSON.stringify(stated)}: a walk bounded by it is ` +
+      'bounded by nothing, and every heading away from its centre would have an unbounded clear run',
+    );
+  }
+  return /** @type {[number, number, number, number]} */ ([west, north, east, south]);
+}
+
+/**
  * The one number the route rule returns that a record does not state, and why.
  *
  * `yaw` is the heading in radians, which the record states as `headingMillidegrees` instead: an
@@ -899,7 +931,10 @@ async function main() {
   });
 
   let containers = null;
-  let collectContainers = async () => {};
+  // Empty until the page is reached, rather than nothing at all, so a caller before then holds a
+  // list with no containers in it and not a value of another shape.
+  /** @type {() => Promise<any[]>} */
+  let collectContainers = async () => [];
   const bodyOf = async (requestId) => {
     const body = await session.send('Network.getResponseBody', { requestId }).catch(() => null);
     return body === null ? null : Buffer.from(body.body, body.base64Encoded ? 'base64' : 'utf8');
@@ -984,8 +1019,12 @@ async function main() {
     // the page could state differently: what the run binds is what crossed the wire. Collected as
     // soon as the tile is mounted, so a run that halts before it walks still says which tile it was
     // about; a tile named without its digest means a different tile a week later.
+    // It RETURNS them rather than only filling the outer variable, so a caller holds a value it can
+    // see is a list. Filling a variable from inside a closure leaves every later reader looking at
+    // something that might still be null, and the only thing saying otherwise is the order the
+    // calls happen to be written in.
     collectContainers = async () => {
-      if (containers !== null) return;
+      if (containers !== null) return containers;
       containers = [];
       for (const [requestId, entry] of network) {
         // The URL narrows; the MAGIC decides. This page moves about 200 MB across hundreds of
@@ -1027,11 +1066,12 @@ async function main() {
         });
       }
       observed.containers = containers;
+      return containers;
     };
 
     const tileMetrics = scoresOwnedDistrict ? null : await session.call(bindingId, READ_TILE);
     observed.tile = tileMetrics;
-    if (!scoresOwnedDistrict) await collectContainers();
+    if (!scoresOwnedDistrict) containers = await collectContainers();
     if (!scoresOwnedDistrict && tileMetrics === null) {
       await halt('the page mounted no generated tile, so there is nothing of that target to score');
     }
@@ -1155,15 +1195,21 @@ async function main() {
     // bounds. The conservative direction is the right one here: a rectangle drawn around the
     // circle would let the rule qualify a heading whose clear run leaves the world, and a route
     // chosen out there would be scored as if the product allowed it.
-    let field = [west, north, east, south];
-    if (!scoresOwnedDistrict) {
+    // The artifact's rectangle is read only where an artifact was read. On a generated target there
+    // is none, so the four values above are the `[0, 0, 0, 0]` default and asking whether THEY bound
+    // anything would refuse every generated run for a rectangle it never uses. Measured: the check
+    // below did exactly that on its first run, which is the check working and the placement wrong.
+    let field;
+    if (scoresOwnedDistrict) {
+      field = fieldBounds(west, north, east, south, `the scored artifact ${options.artifact}`);
+    } else {
       const bound = await session.call(bindingId, READ_FIELD);
       const half = bound.fieldRadius / Math.SQRT2;
-      field = [bound.centreX - half, bound.centreZ - half, bound.centreX + half, bound.centreZ + half];
+      field = fieldBounds(
+        bound.centreX - half, bound.centreZ - half, bound.centreX + half, bound.centreZ + half,
+        `the page's navigation world, radius ${bound.fieldRadius} about (${bound.centreX}, ${bound.centreZ})`,
+      );
       observed.field = { ...bound, inscribedHalfSideM: half, bounds: field };
-      if (!(bound.fieldRadius > 0)) {
-        await halt(`the page bounds its walkable field by a radius of ${bound.fieldRadius}, which bounds nothing`);
-      }
     }
     const plan = planRoute([arrival.x, arrival.z], routeRings, field);
     // Bound the moment it is decided, so a halt AFTER the route is chosen still says what the rule
@@ -1604,10 +1650,10 @@ async function main() {
       if (environment === null) await halt('the page never fetched the scored artifact byte for byte');
       phase('the scored artifact was matched on the wire');
     } else {
-      await collectContainers();
-      if (containers.length === 0) await halt('the page drew no container this run could bind');
-      environment = containers[0];
-      phase(`${containers.length} container(s) were matched on the wire`);
+      const bound = await collectContainers();
+      if (bound.length === 0) await halt('the page drew no container this run could bind');
+      environment = bound[0];
+      phase(`${bound.length} container(s) were matched on the wire`);
     }
 
     // Listeners on the window, the document and the world canvas, by the script that added them.
