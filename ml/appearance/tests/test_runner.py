@@ -383,6 +383,34 @@ def test_the_session_findings_file_names_every_pick_in_words(repository):
     assert len(set(names)) == len(names)
 
 
+def test_a_conditioning_picture_with_no_structure_in_it_is_refused(tmp_path, repository):
+    """A role a target cannot show is refused at staging, on this machine, not after a GPU ran it."""
+    import copy
+
+    from exulanica_appearance.runner.staging import stage_texture_job
+
+    weights = {}
+    for path in sorted((Path(__file__).resolve().parents[1] / "weights").glob("*.json")):
+        if path.name != "candidates.json":
+            weights[sha256_hex(path.read_bytes())] = path.read_bytes()
+    spec = json.loads(
+        (Path(__file__).resolve().parents[1] / "jobs" / "track-a-session-2.json").read_bytes()
+    )
+    # cc0.storefront-metal's relief is a 1 mm brush field: its edge picture is every pixel black.
+    metal = copy.deepcopy(
+        next(t for t in spec["targets"] if t["id"] == "storefront-metal-weathered")
+    )
+    metal["conditioning"] = ["edge"]
+    metal["reasons"]["conditioning.edge"] = "asking for a role this target cannot show"
+    with pytest.raises(Refused, match="one flat value"):
+        stage_texture_job(
+            repository=repository,
+            job={**spec, "targets": [metal]},
+            weights_manifests=weights,
+            out=tmp_path / "flat",
+        )
+
+
 def test_the_committed_job_specs_stage_and_read(tmp_path, repository):
     from exulanica_appearance.runner.staging import stage_texture_job
 
@@ -392,10 +420,12 @@ def test_the_committed_job_specs_stage_and_read(tmp_path, repository):
             continue
         raw = path.read_bytes()
         weights[sha256_hex(raw)] = raw
-    for name in ("track-a-smoke", "track-a-session-1"):
-        spec = json.loads(
-            (Path(__file__).resolve().parents[1] / "jobs" / f"{name}.json").read_bytes()
-        )
+    # Every committed spec, found rather than listed, so a new job is covered the day it lands.
+    specs = sorted((Path(__file__).resolve().parents[1] / "jobs").glob("*.json"))
+    assert len(specs) >= 3, specs
+    for spec_path in specs:
+        name = spec_path.stem
+        spec = json.loads(spec_path.read_bytes())
         manifest = stage_texture_job(
             repository=repository, job=spec, weights_manifests=weights, out=tmp_path / name
         )
@@ -403,11 +433,12 @@ def test_the_committed_job_specs_stage_and_read(tmp_path, repository):
         assert sha256_hex(manifest) == sha256_hex(canonical_bytes(staged_manifest))
         assert job["name"] == name
         assert all(target["recipe_sha256"] for target in job["targets"])
+        # Summed per target, because a target may carry fewer roles than its neighbours: a
+        # material whose relief has no steps has no edge picture to be conditioned on at all.
         expected = (
-            len(job["targets"])
+            sum(len(target["conditioning"]) for target in job["targets"])
             * len(job["candidates"])
             * job["seeds_per_target"]
-            * len(job["targets"][0]["conditioning"])
         )
         assert len(list(generations(job))) == expected
 

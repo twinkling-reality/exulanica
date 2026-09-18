@@ -56,14 +56,26 @@ def _png(path: Path, pixels: np.ndarray) -> tuple[str, str]:
     )
 
 
-def _picture(role: str, maps: Mapping[str, np.ndarray]) -> np.ndarray:
+def _picture(role: str, maps: Mapping[str, np.ndarray], target: str) -> np.ndarray:
     if role == "depth":
-        return relief.relief_depth(maps["height"])
-    if role == "edge":
-        return relief.relief_edges(maps["height"])
-    if role == "gray":
-        return relief.relief_gray(maps["base_color"])
-    raise Refused(f"there is no conditioning role {role!r}")
+        picture = relief.relief_depth(maps["height"])
+    elif role == "edge":
+        picture = relief.relief_edges(maps["height"])
+    elif role == "gray":
+        picture = relief.relief_gray(maps["base_color"])
+    else:
+        raise Refused(f"there is no conditioning role {role!r}")
+    if int(picture.max()) == int(picture.min()):
+        # MEASURED 2026-09-18: cc0.storefront-metal's edge picture is every pixel black, because the
+        # recipe's relief is a 1 mm field of brush lines with no step a crease or plane test can
+        # find. Conditioning on one flat colour is conditioning on nothing: the model would invent
+        # the whole surface and the record would still say it was given this target's structure.
+        raise Refused(
+            f"the conditioning picture for {target} as {role} is one flat value "
+            f"({int(picture.min())}); that structure has nothing this role can show, so this role "
+            "is not available for this target"
+        )
+    return picture
 
 
 def stage_texture_job(
@@ -115,7 +127,7 @@ def stage_texture_job(
         }
         for role in target["conditioning"]:
             relative = f"conditioning/{target['id']}/{role}.png"
-            pixels_sha256, file_sha256 = _png(out / relative, _picture(role, maps))
+            pixels_sha256, file_sha256 = _png(out / relative, _picture(role, maps, target["id"]))
             inputs.append(
                 {
                     "encoding": relief.RELIEF_ENCODINGS[role]["name"],

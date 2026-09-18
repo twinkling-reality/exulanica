@@ -1,0 +1,149 @@
+{
+  "candidates": [
+    {
+      "backend": "videox-qwenimage-fun-control",
+      "components": [
+        {
+          "role": "base",
+          "subfolder": "",
+          "weights_sha256": "16ffd6e8850b6fb21a70bc0efbbcd09545f4b5e288618ffdee6959c7abc31d46"
+        },
+        {
+          "role": "control",
+          "subfolder": "",
+          "weights_sha256": "924913081f9be08910e36a35eef949c4e7c2c210c7912804c6aef4540d3ed0ce"
+        }
+      ],
+      "id": "a1",
+      "reasons": {
+        "components.base": "Qwen-Image-2512, Apache-2.0 at a pinned revision, accepted 2026-09-17 (licence matrix section 12)",
+        "components.control": "the Fun union control trained for Qwen-Image-2512 (the 2602 release), Apache-2.0; the InstantX union control was trained for the original Qwen-Image",
+        "sampler.control_context_scale_milli": "0.80, VideoX-Fun's example value, inside the 0.70 to 0.95 range the control's card recommends for stronger control and detail",
+        "sampler.guidance_milli": "4.0, the true classifier-free guidance VideoX-Fun's Qwen control example uses",
+        "sampler.height": "1024, the published sets' own height",
+        "sampler.name": "the flow-match Euler scheduler the base repository ships and VideoX-Fun's own example selects",
+        "sampler.negative_prompt": "a single space, which is what enables true classifier-free guidance in this pipeline without describing anything",
+        "sampler.steps": "50, the step count VideoX-Fun's Qwen control example uses",
+        "sampler.tiling": "the lane's tiling schedule: the latent grid and the control latents are rolled by a seeded offset each step and rolled back, because a transformer model has no convolution padding to make periodic",
+        "sampler.width": "1024, the published sets' own width, so the output needs no resampling to become a set",
+        "sampler.wrap_margin_px": "64 px, eight latent pixels of the neighbouring tile given to the VAE on each side and cropped after, so its convolutions see the tile's other edge instead of zeros",
+        "seconds_per_image": "MEASURED in session 1 on this card at this size and step count: 33 s an image over 32 generations. Session 1 estimated this instead, and the estimate was the one number in that job with no measurement behind it"
+      },
+      "sampler": {
+        "control_context_scale_milli": 800,
+        "guidance_milli": 4000,
+        "height": 1024,
+        "name": "flow-match-euler",
+        "negative_prompt": " ",
+        "steps": 50,
+        "tiling": "exulanica.appearance-tiling/v1",
+        "width": 1024,
+        "wrap_margin_px": 64
+      },
+      "seconds_per_image": 33
+    },
+    {
+      "backend": "videox-zimage-fun-control",
+      "components": [
+        {
+          "role": "base",
+          "subfolder": "",
+          "weights_sha256": "77be4d029e07d7889ea3c6f1705bece002615bdaa1aaea3c612d559c4583b1e7"
+        },
+        {
+          "role": "control",
+          "subfolder": "",
+          "weights_sha256": "5d797918cdcbaa32fb7dd7b6f2f04af561905dccdf0633307a9b912bce374d9a"
+        }
+      ],
+      "id": "a2",
+      "reasons": {
+        "components.base": "Z-Image, Apache-2.0 at a pinned revision, whose VAE is byte-identical to FLUX.1-schnell's Apache release (licence matrix section 12)",
+        "components.control": "the Z-Image Fun union control 2.1, Apache-2.0, the full version rather than the deliberately weaker lite one",
+        "sampler.control_context_scale_milli": "0.90, VideoX-Fun's Z-Image control example value",
+        "sampler.guidance_milli": "4.0, the guidance VideoX-Fun's Z-Image control example uses",
+        "sampler.height": "1024, the published sets' own height",
+        "sampler.name": "the flow-match Euler scheduler the base repository ships and VideoX-Fun's own example selects",
+        "sampler.negative_prompt": "a single space, which is what enables true classifier-free guidance in this pipeline without describing anything",
+        "sampler.steps": "25, the step count VideoX-Fun's Z-Image control example uses",
+        "sampler.tiling": "the lane's tiling schedule: the latent grid and the control latents are rolled by a seeded offset each step and rolled back, because a transformer model has no convolution padding to make periodic",
+        "sampler.width": "1024, the published sets' own width, so the output needs no resampling to become a set",
+        "sampler.wrap_margin_px": "64 px, eight latent pixels of the neighbouring tile given to the VAE on each side and cropped after, so its convolutions see the tile's other edge instead of zeros",
+        "seconds_per_image": "MEASURED in session 1 on this card at this size and step count: 20 s an image over 32 generations. Session 1 estimated this instead, and the estimate was the one number in that job with no measurement behind it"
+      },
+      "sampler": {
+        "control_context_scale_milli": 900,
+        "guidance_milli": 4000,
+        "height": 1024,
+        "name": "flow-match-euler",
+        "negative_prompt": " ",
+        "steps": 25,
+        "tiling": "exulanica.appearance-tiling/v1",
+        "width": 1024,
+        "wrap_margin_px": 64
+      },
+      "seconds_per_image": 20
+    }
+  ],
+  "estimate_seconds": 1200,
+  "name": "track-a-session-2",
+  "reasons": {
+    "estimate_seconds": "40 generations at the measured rates is 1060 s (20 at 33 s, 20 at 20 s), plus about 120 s to build both backends: 1200 s, so the stop sits at 1800 s",
+    "seeds_per_target": "four, as in session 1, so a target's spread across seeds can be read the same way and compared with it"
+  },
+  "seeds_per_target": 4,
+  "targets": [
+    {
+      "conditioning": [
+        "depth",
+        "edge"
+      ],
+      "id": "limestone-ashlar-weathered",
+      "prompt": "Seamless tileable texture. Orthographic photograph, taken straight on, of coursed limestone ashlar, eight courses of 300 mm blocks in half bond, 5 mm joints recessed 3 mm, 2400 mm across, weathered by years of city street rain: soot gathered in the joints and along the arrises, pale rain washed block faces, fine pitting and shell flecks in the stone, faint green biological darkening in the joints. Flat even overcast light with no shadows, no highlights and no vignetting. The whole frame is the surface: no windows, no doors, no signs, no text, no people, no sky, no horizon.",
+      "reasons": {
+        "conditioning.depth": "the set's own height map: the recipe's exact courses, joints and recessed arrises",
+        "conditioning.edge": "the set's own step outlines: 8 courses of 4 blocks in half bond is a real module, so this is the target that tests whether the session 1 rule (edge holds where the recipe states a module) carries to a second module material",
+        "prompt": "the recipe's own words for what it painted, weathered, with every feature stated without a position in the world, because a tile that implies where it sits cannot repeat"
+      },
+      "set": {
+        "content_sha256": "4d7b009dcf2280b1ecff7febc97da6ee584211983d85e5399fe7dfb78d73b60b",
+        "set_id": "cc0.limestone-ashlar",
+        "version": 1
+      }
+    },
+    {
+      "conditioning": [
+        "depth",
+        "edge"
+      ],
+      "id": "cast-concrete-weathered",
+      "prompt": "Seamless tileable texture. Orthographic photograph, taken straight on, of board marked cast concrete, 2400 mm across, weathered by years of city street rain: grey rain streaking, small blowholes, patches of pale laitance, fine shrinkage cracking, dirt held in the board grain, regular formwork tie holes. Flat even overcast light with no shadows, no highlights and no vignetting. The whole frame is the surface: no windows, no doors, no signs, no text, no people, no sky, no horizon.",
+      "reasons": {
+        "conditioning.depth": "the set's own height map: the recipe's exact panel seams, board grain and blowholes",
+        "conditioning.edge": "the set's own step outlines: 116858 edge pixels of blowholes, tie holes and board grain, which is a cell field and not a module, the same shape as painted render. Session 1's rule predicts edge conditioning fails here, and this is the target that tests that prediction rather than assuming it",
+        "prompt": "the recipe's own words for what it painted, weathered. The 2 mm panel seams the recipe states are NOT named: at 2400 mm across a 1024 px tile they are 0.85 px wide and do not appear in the structure the model is given, so asking for them would ask the model to invent structure this lane says comes from the record"
+      },
+      "set": {
+        "content_sha256": "e2903a77e5841cd5b97d788fb503e8d2faf3fdd09b5eb62ab062e1ded6223c43",
+        "set_id": "cc0.cast-concrete",
+        "version": 1
+      }
+    },
+    {
+      "conditioning": [
+        "depth"
+      ],
+      "id": "storefront-metal-weathered",
+      "prompt": "Seamless tileable texture. Orthographic photograph, taken straight on, of a clear anodised brushed aluminium shopfront panel, 1000 mm across, weathered by years of a city street: a dulled brushed finish, fine hairline scratches across the brush direction, scattered fingerprint smudges, a thin film of road dust, faint pale corrosion blooms. Flat even overcast light with no shadows, no highlights and no vignetting. The whole frame is the surface: no windows, no doors, no signs, no text, no people, no sky, no horizon.",
+      "reasons": {
+        "conditioning.depth": "the set's own height map: the recipe's exact brush lines and hairlines, a 1 mm height range. Depth is the only role this target has. MEASURED 2026-09-18 while staging: its edge picture is every pixel black, because a 1 mm brush field has no step a crease or plane test can find, and staging now refuses to stage a conditioning picture of one flat value. Session 1's rule said edge fails on a cell field; this material does not even reach the point of failing, and that is a cheaper answer than 16 generations",
+        "prompt": "the recipe's own words for what it painted, weathered, with every feature stated without a position in the world, because a tile that implies where it sits cannot repeat"
+      },
+      "set": {
+        "content_sha256": "7178431b117baaef8b2b6de2416631539237bda296a00bb3305071397fb9b41a",
+        "set_id": "cc0.storefront-metal",
+        "version": 1
+      }
+    }
+  ]
+}
