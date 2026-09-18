@@ -854,8 +854,21 @@ async function main() {
     const obstacles = await session.call(bindingId, READ_OBSTACLES);
     const prisms = [];
     for (const obstacle of obstacles) {
+      // The owned district's rings take their height from the scored artifact's own buildings. A
+      // navigation world states rings WITHOUT a height (atlas-core PolygonObstacle is an id and
+      // rings), so a generated tile has no height for the gate to bind. The gate will not invent
+      // one: the clearance keys measure a solid, and a fabricated top would make them measure a
+      // shape nothing in the world states. See the request in
+      // .orimera/briefs/lanes/requirements/gate-route-obstruction-rings.md.
       const top = scoresOwnedDistrict ? heights.get(obstacle.id) : obstacle.topY;
-      if (top === undefined) await halt(`collision obstacle ${obstacle.id} has no record in the scored artifact`);
+      if (top === undefined) {
+        await halt(
+          scoresOwnedDistrict
+            ? `collision obstacle ${obstacle.id} has no record in the scored artifact`
+            : `the page states a ring for ${obstacle.id} with no height, and this gate will not ` +
+              'invent one: a route ring chooses a heading, while the clearance keys measure a solid',
+        );
+      }
       for (const ring of obstacle.rings) prisms.push({ id: obstacle.id, ring, baseY: 0, topY: top });
     }
     // The route rule reads collision rings: it keeps the headings a capsule can walk, then prefers
