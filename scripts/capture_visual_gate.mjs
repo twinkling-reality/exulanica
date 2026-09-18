@@ -972,6 +972,15 @@ async function main() {
   const { chrome, version, page, log } = await launchChrome(profile);
   const session = await connect(page.webSocketDebuggerUrl);
   const network = new Map();
+  // WHICH RESPONSES COULD BE A CONTAINER, in ONE place because two readers need the same answer: the
+  // one that opens a stream while the response is still arriving, and the one that decides afterwards
+  // what to bind. Written twice they drift, and a drift here is silent both ways: a container nobody
+  // streamed, or megabytes of texture streamed for nothing.
+  const couldBeContainer = (url) => {
+    const path = normalizeUrl(url);
+    return path.endsWith('.owd') || path.includes('/tiles/');
+  };
+  const streamed = new Map();
   const exceptions = [];
   const consoleErrors = [];
   const networkLogErrors = [];
@@ -994,10 +1003,30 @@ async function main() {
       entry.status = event.response.status;
       entry.mimeType = event.response.mimeType;
     }
+    if (!couldBeContainer(event.response.url)) return;
+    // ASK FOR THE BODY AS IT ARRIVES, in the protocol's own event-sized pieces, because a body asked
+    // for afterwards comes back whole. MEASURED 2026-09-18: `Network.getResponseBody` for the
+    // corridor's 12.68 MB container is answered with about 16.9 MB of base64 in ONE message and
+    // Node's own WebSocket closes the connection instead of delivering it, and this Chrome does not
+    // have `Network.takeResponseBodyAsStream` at all. This is the SAME response either way, which is
+    // what the record depends on: a body fetched again is a second fetch and can differ from the one
+    // the page drew.
+    streamed.set(event.requestId, { parts: [], refused: null });
+    session.send('Network.streamResourceContent', { requestId: event.requestId })
+      .then((result) => {
+        // What had already arrived before the stream was opened, so it goes in FRONT of every chunk
+        // the events carry from here on.
+        streamed.get(event.requestId).parts.unshift(Buffer.from(result.bufferedData ?? '', 'base64'));
+      })
+      .catch((error) => {
+        streamed.get(event.requestId).refused = String(error.message ?? error).slice(0, 200);
+      });
   });
   session.on('Network.dataReceived', (event) => {
     const entry = network.get(event.requestId);
     if (entry !== undefined) entry.decodedBytes += event.dataLength;
+    const held = streamed.get(event.requestId);
+    if (held !== undefined && event.data !== undefined) held.parts.push(Buffer.from(event.data, 'base64'));
   });
   session.on('Network.loadingFinished', (event) => {
     const entry = network.get(event.requestId);
@@ -1051,34 +1080,19 @@ async function main() {
   // list with no containers in it and not a value of another shape.
   /** @type {() => Promise<any[]>} */
   let collectContainers = async () => [];
-  // The bytes the page received, read in CHUNKS rather than in one reply.
-  //
-  // MEASURED 2026-09-18, standalone and away from the gate: `Network.getResponseBody` for the
-  // corridor's 12.68 MB container is answered with about 16.9 MB of base64 in a single protocol
-  // message, and Node's own WebSocket CLOSES THE CONNECTION (code 1006) instead of delivering it.
-  // Every container this gate had ever read was the 0.56 MB conformance tile, whose whole body fits
-  // in one message, so the harness met this the first time it was pointed at a real street.
-  //
-  // It still reads what CROSSED THE WIRE, which is the property the record depends on: fetching the
-  // body again over HTTP would be a SECOND fetch, and a second fetch can differ from the one the
-  // page drew. A stream of the same response keeps the binding honest and keeps each message small.
-  const BODY_CHUNK_BYTES = 512 * 1024;
-  const bodyOf = async (requestId) => {
-    const stream = await session.send('Network.takeResponseBodyAsStream', { requestId }).catch(() => null);
-    if (stream === null) return null;
-    const parts = [];
-    try {
-      for (;;) {
-        const chunk = await session.send('IO.read', { handle: stream.stream, size: BODY_CHUNK_BYTES });
-        if (chunk.data.length > 0) {
-          parts.push(Buffer.from(chunk.data, chunk.base64Encoded ? 'base64' : 'utf8'));
-        }
-        if (chunk.eof) break;
-      }
-    } finally {
-      await session.send('IO.close', { handle: stream.stream }).catch(() => null);
-    }
-    return Buffer.concat(parts);
+  /**
+   * The bytes of a response this run streamed, or why it has none.
+   *
+   * REFUSED AND ABSENT AND EMPTY ARE THREE ANSWERS. Until this returned a reason, an unreadable body
+   * was `null` and the collector simply moved on: when a fix of mine called a protocol method this
+   * Chrome does not have, EVERY container read failed and the run wrote `containers: []` and halted
+   * later for an unrelated reason. Nothing said a word. A body that cannot be read now stops the run.
+   */
+  const bodyOf = (requestId) => {
+    const held = streamed.get(requestId);
+    if (held === undefined) return { bytes: null, refused: 'this run never opened a stream for it' };
+    if (held.refused !== null) return { bytes: null, refused: held.refused };
+    return { bytes: Buffer.concat(held.parts), refused: null };
   };
   const halt = async (reason) => {
     const state = await session.call(await session.reference('document'), CAPTURE_STATE, [appOrigin, expectedTitle, gateTarget.path]).catch(() => null);
@@ -1184,15 +1198,27 @@ async function main() {
         // tile under /tiles/. Both then have to carry the magic, which is what keeps a JavaScript
         // module whose path ends .owd from being read as a broken container.
         const path = normalizeUrl(entry.url);
-        const couldBeContainer = path.endsWith('.owd') || path.includes('/tiles/');
-        if (!entry.finished || entry.decodedBytes < 16 || !couldBeContainer) continue;
-        const bytes = await bodyOf(requestId);
+        if (!entry.finished || entry.decodedBytes < 16 || !couldBeContainer(entry.url)) continue;
+        const read = bodyOf(requestId);
+        if (read.bytes === null) {
+          await halt(`the page fetched ${path} and this run could not read its bytes: ${read.refused}`);
+        }
+        const bytes = read.bytes;
+        // TWO COUNTS OF THE SAME RESPONSE, from the protocol's own byte counter and from the pieces
+        // this run assembled. They are independent, so a stream that started late or dropped an
+        // event cannot pass as a whole container, and a digest is never taken of part of a body.
+        if (bytes.byteLength !== entry.decodedBytes) {
+          await halt(
+            `the bytes this run assembled for ${path} are ${bytes.byteLength} and the protocol counted ` +
+            `${entry.decodedBytes}`,
+          );
+        }
         // A container is recognised by its own first bytes, not by its URL. The development server
         // answers a `?url` import of a tile with a JAVASCRIPT MODULE whose path still ends .owd, so
         // a suffix test reads that module as a broken container. Bytes that do not carry the magic
         // are not a container and are passed over; bytes that DO and still fail to decode are a
         // broken container and stop the run, because those are different facts.
-        if (bytes === null || bytes.byteLength < OWD_MAGIC.length) continue;
+        if (bytes.byteLength < OWD_MAGIC.length) continue;
         if (bytes.subarray(0, OWD_MAGIC.length).toString('latin1') !== OWD_MAGIC) continue;
         let header;
         try {
