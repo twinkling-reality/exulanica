@@ -11,9 +11,11 @@ architecture's, as the corridor brief states them for city version 2:
 * **Furniture in footprints.** No furniture or tree position lies inside or on a building's base
   ring.
 * **Materials.** Every surface material names a texture set (a record without one cannot exist),
-  and every surface no material record dresses is counted by role, as the unavailable state. That
-  count is measured against the material records the city holds, so it falls on its own as texture
-  sets are published and nothing has to remember to change a list.
+  and for the kinds this gate asks about, every surface no material record dresses is counted by
+  role. That count is measured against the material records the city holds, so it falls on its own
+  as texture sets are published. It is NOT a complete account of what draws undressed, and cannot
+  be: which surfaces exist is a tessellation fact, not a records fact. The complete account is the
+  container's, and every bake writes it into its own receipt.
 * **Section 5.1.** Every facade states its building identity, grammar version, parameters, seed,
   output digest and declared semantics, none empty.
 """
@@ -70,7 +72,7 @@ class GateReport:
     objects_inside_footprints: int = 0
     materials: int = 0
     materials_with_texture_set: int = 0
-    unavailable_roles: dict[str, int] = field(default_factory=dict)
+    undressed_roles_asked_about: dict[str, int] = field(default_factory=dict)
     facades: int = 0
     facades_with_section_5_1_fields: int = 0
 
@@ -119,7 +121,7 @@ class GateReport:
             "objects_inside_footprints": self.objects_inside_footprints,
             "materials": self.materials,
             "materials_with_texture_set": self.materials_with_texture_set,
-            "unavailable_roles": dict(sorted(self.unavailable_roles.items())),
+            "undressed_roles_asked_about": dict(sorted(self.undressed_roles_asked_about.items())),
             "facades": self.facades,
             "facades_with_section_5_1_fields": self.facades_with_section_5_1_fields,
             "passes": self.passes(),
@@ -173,9 +175,24 @@ def measure_gates(records: Sequence[object]) -> GateReport:
             report.objects_inside_footprints += any(
                 point_in_ring((item.x_mm, item.y_mm), ring) != OUTSIDE for ring in footprints
             )
-    # What draws unavailable is measured, not listed: a surface is unavailable when no material
-    # record dresses it, whatever the catalog happens to hold today.
-    unavailable: Counter[str] = Counter()
+    # WHAT THIS COUNTS, AND WHAT IT CANNOT. Each kind below is asked whether a material record
+    # dresses the surfaces it is known to carry, against the dressed set the city actually holds
+    # rather than against the catalog. That half is measured. The other half, completeness, is NOT
+    # available here and never will be: the chain below is a list, a kind absent from it is
+    # invisible to this gate, and a facade's ground band was invisible until something drew it.
+    #
+    # It cannot be fixed by deriving the list from the records either, which is worth stating so
+    # the next reader does not try. The grammar says which kinds OWN which roles, but not which of
+    # those surfaces EXIST: a facade owns a ground band, and whether one exists depends on whether
+    # its bays cover the frontage end to end, which is a tessellation fact rather than a records
+    # fact. Deriving from ownership would have reported 85 bands on the corridor's frontages that
+    # do not exist.
+    #
+    # The whole answer is the container's, which states per drawn surface whether a material record
+    # dresses it: `scripts/bake_corridor_tiles.py` writes that into every bake's receipt and
+    # `tests/test_drawn_surfaces_are_dressed.py` holds a fixture to it. This gate is the cheap
+    # check that runs before a bake, and it is named for the scope it has.
+    undressed: Counter[str] = Counter()
     dressed = set()
     for item in records:
         if isinstance(item, SurfaceMaterialRecord):
@@ -184,18 +201,18 @@ def measure_gates(records: Sequence[object]) -> GateReport:
             dressed.add((item.surface_identity, item.role))
     for item in records:
         if isinstance(item, RoadMarkingRecord) and (item.identity, "marking") not in dressed:
-            unavailable["marking"] += 1
+            undressed["marking"] += 1
         elif isinstance(item, TerrainRecord) and (item.identity, "terrain") not in dressed:
-            unavailable["terrain"] += 1
+            undressed["terrain"] += 1
         elif isinstance(item, StreetTreeRecord):
             for role in (*sorted({part.surface_role for part in item.parts}), "tree_pit"):
                 if (item.identity, role) not in dressed:
-                    unavailable[role] += 1
+                    undressed[role] += 1
         elif isinstance(item, CrossingRecord) and (item.identity, "crossing") not in dressed:
-            unavailable["crossing"] += 1
+            undressed["crossing"] += 1
     for bay in bays:
         for panel in bay.panels:
             if (bay.facade_identity, PANEL_SURFACE_ROLES[panel.role]) not in dressed:
-                unavailable[panel.role] += 1
-    report.unavailable_roles = dict(unavailable)
+                undressed[panel.role] += 1
+    report.undressed_roles_asked_about = dict(undressed)
     return report

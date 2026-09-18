@@ -54,8 +54,13 @@ def test_the_corridor_tile_alone_passes_every_gate():
     assert report.passes() == dict.fromkeys(_GATES, True)
 
 
-def test_terrain_is_the_only_surface_left_undressed():
-    """Every other role a record carries has a material, and terrain has none by decision.
+def test_terrain_is_the_only_surface_left_undressed_of_those_this_gate_asks_about():
+    """Of the kinds this gate asks about, terrain alone has no material, and that is by decision.
+
+    The name says "of those this gate asks about" because the gate is a list and cannot be
+    complete: which surfaces exist is a tessellation fact, not a records fact. A facade's ground
+    band is the case that proves it, and it is counted by the container instead, in
+    `tests/test_drawn_surfaces_are_dressed.py`.
 
     The count is one per terrain record, which is one per tile: the gate counts surfaces and not
     area, and a tile's terrain is one grid the blocks, streets and kerbs draw over almost
@@ -65,11 +70,15 @@ def test_terrain_is_the_only_surface_left_undressed():
     city = records()
     terrains = [record for record in city if isinstance(record, TerrainRecord)]
     assert terrains
-    assert measure_gates(city).unavailable_roles == {"terrain": len(terrains)}
+    assert measure_gates(city).undressed_roles_asked_about == {"terrain": len(terrains)}
 
 
 def test_a_role_that_loses_its_material_is_counted_again():
-    """The count is measured, not listed: drop one tree's pit material and the pit reappears."""
+    """Within its scope the count is measured: drop one tree's pit material and the pit reappears.
+
+    This is what the gate is for and what it is good at. A tree is a kind it asks about, so the
+    answer for a tree is exact; the limit is which kinds are asked, not how they are counted.
+    """
     tree = _first(StreetTreeRecord)
     dressing = next(
         record
@@ -80,7 +89,7 @@ def test_a_role_that_loses_its_material_is_counted_again():
     )
     undressed = [record for record in records() if record is not dressing]
     report = measure_gates(undressed)
-    assert report.unavailable_roles["tree_pit"] == 1
+    assert report.undressed_roles_asked_about["tree_pit"] == 1
     assert report.passes()["materials_name_texture_sets"] is True
 
 

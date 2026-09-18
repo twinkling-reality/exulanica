@@ -1,5 +1,5 @@
 corridor tiles and gates
-commit e22d49d7946e2fd7f08064cbdc52ab135b7cf9c1
+commit 27c6310a87e8071580edc5c09e189ae61449dd3e
 city seed 75832ac54dcfd499219752e6385149c73624b8c674f9ebb0c1fa0af2bb70b3d1
 city identity 0594ec43-fbf9-5377-86d3-b1b733714b4a
 generation output digest d51c4b15f88e4c0bfd387ffec84bae64fbe72a767979e35e2860ec2e20176693
@@ -50,7 +50,7 @@ gates, every record of the city:
     2923,
     3545
   ],
-  "unavailable_roles": {
+  "undressed_roles_asked_about": {
     "terrain": 5
   }
 }
@@ -90,7 +90,7 @@ gates, the corridor tile's owned records:
     2832,
     3304
   ],
-  "unavailable_roles": {
+  "undressed_roles_asked_about": {
     "terrain": 1
   }
 }
