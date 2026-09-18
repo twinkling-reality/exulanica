@@ -61,6 +61,20 @@ interface Opening {
   readonly start: LoadedGeneratedTile['start'];
 }
 
+/**
+ * The route obstruction rings this tile states, and what they are not.
+ *
+ * The caution travels with the number because a reader meeting rings for the first time will assume
+ * they stop a body. They do not: they have no height, nothing in them blocks the capsule, and they
+ * decide which way a walk faces. Horizontal blocking waits on a collision proxy no tile materialises.
+ */
+function ringLine(tile: LoadedGeneratedTile): string {
+  const { obstacles, refused } = tile.routeObstructions;
+  const records = new Set(obstacles.map((obstacle) => obstacle.id.slice(obstacle.id.indexOf(':') + 1))).size;
+  const dropped = refused.length === 0 ? '' : `, ${refused.length} refused`;
+  return `${obstacles.length} route obstruction rings from ${records} records${dropped}: they choose which way a walk faces and stop no body.`;
+}
+
 /** Where the walk began and whether anybody stated it, which is what makes a frame reproducible. */
 function openingLine(opening: Opening): string {
   if (opening.pose === null) {
@@ -99,6 +113,7 @@ function statement(tile: LoadedGeneratedTile, provenance: TileProvenance, openin
       + `${unavailableSurfaces.length === 1 ? 'surface' : 'surfaces'} drawn as unavailable.`,
     provenanceLine(provenance),
     openingLine(opening),
+    ringLine(tile),
   ];
   const items = [...unavailableSurfaces, ...notDrawn].map((text) => el('li', { text }));
   return el('section', {

@@ -6,6 +6,7 @@ import {
   OwdError,
   absoluteSurfaceCoordinates,
   absoluteVertices,
+  routeObstructionRings,
   verifyOwd,
   type DecodedOwd,
   type DecodedProjection,
@@ -17,6 +18,7 @@ import {
 } from '@exulanica/loom-tess/core';
 import type { GeneratedTileAttachment, GeneratedTileHost, GeneratedTileMetrics, GeneratedTileMount } from './binding-contract.js';
 import { applyTileEnvironment } from './environment.js';
+import { obstructionRings, type ObstructionRings } from './obstruction-rings.js';
 import { TILE_LOOK_V1, type TileLook } from './look.js';
 import { buildSurfaceMesh } from './surface-mesh.js';
 import {
@@ -144,6 +146,14 @@ export interface LoadedGeneratedTile extends GeneratedTileMount {
   readonly look: TileLook;
   readonly ranges: readonly GeneratedTileRange[];
   readonly navigation: TileNavigation;
+  /**
+   * The route obstruction rings this tile states, and any it refused.
+   *
+   * Stated so a caller can report the count and the records it came from rather than counting the
+   * navigation world's obstacles and hoping they are the same thing. A refusal carries its reason,
+   * because a set that quietly got smaller is the thing nobody notices.
+   */
+  readonly routeObstructions: ObstructionRings;
   /** The tile's bytes and every texture set it cites. */
   readonly transferredBytes: number;
   /** The record a render_batch triangle belongs to. */
@@ -442,10 +452,18 @@ export async function loadGeneratedTile(sources: GeneratedTileSources): Promise<
   const surface = absoluteSurfaceCoordinates(render);
   if (surface === undefined) throw new GeneratedTileRefusal(`Tile ${sources.name} carries no surface coordinates.`);
   const { ranges, placements, prepared } = await plan(decoded, render, sources, digest);
+  // ROUTE obstruction rings, built from the container's own records with tess's own reader, so the
+  // rings a walk is routed around are the rings the bake made. They choose which way a walk faces and
+  // stop no body: nothing here blocks the capsule, which waits on a collision proxy no tile yet
+  // materialises. A region that bounds nothing or names no record is refused rather than repaired,
+  // and the refusals are carried so a caller can say what was dropped instead of serving a quietly
+  // smaller set.
+  const rings = obstructionRings(routeObstructionRings(decoded.header));
   const navigation = tileNavigation(
     decoded.projections.find((projection) => projection.header.name === 'nav_envelope'),
     renderExtent(ranges),
     capsule,
+    rings.obstacles,
   );
   const drawn = ranges.filter((range): range is DrawnTileRange => range.state === 'drawn')
     .sort((a, b) => a.firstTriangle - b.firstTriangle);
@@ -473,6 +491,7 @@ export async function loadGeneratedTile(sources: GeneratedTileSources): Promise<
     look,
     ranges,
     navigation,
+    routeObstructions: rings,
     navigationWorld: navigation.world,
     start: navigation.start,
     transferredBytes: sources.bytes.byteLength + setBytes,

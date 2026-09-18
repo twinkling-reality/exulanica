@@ -4,6 +4,7 @@ import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
 import * as pc from 'playcanvas';
 import { atlasVec3, parseTextureSetManifest, resolveGroundMovement, type TextureSetDigest } from '@exulanica/atlas-core';
+import { routeObstructionRings } from '@exulanica/loom-tess/core';
 import { GRAMMAR_TABLES, PROJECTION_DEFINITIONS, bakeTile, decodeOwd, type DecodedProjection, type GrammarTable } from '@exulanica/loom-tess/core';
 import { applyTileEnvironment } from '../src/playcanvas/generated-tile/environment.js';
 import { TILE_LOOK_V1 } from '../src/playcanvas/generated-tile/look.js';
@@ -213,6 +214,31 @@ describe('standing on the tile\'s own nav_envelope', () => {
     });
     expect(resolution.recovered).toBe(false);
     expect(resolution.position.y).toBeCloseTo(world.surface.sample(start.x, north)!.height + 1.62, 12);
+  });
+});
+
+describe('the route obstruction rings a tile states', () => {
+  // MEASURED 2026-09-18: the mapper sat on main for hours with nothing calling it, so a tile that
+  // states rings served a page that carried none and a route rule had nothing to decide with. This
+  // holds the wiring rather than the mapping: the rings a container states must reach the world.
+  it('carries the container\'s own rings into the navigation world, named by record', () => {
+    const carried = tile.navigation.world.polygonObstacles ?? [];
+    expect(carried.length).toBe(tile.routeObstructions.obstacles.length);
+    for (const obstacle of carried) {
+      // `kind:identity`, so a run record can bind what a walk passed to the record that put it there.
+      expect(obstacle.id).toMatch(/^[a-z_.]+:.+/);
+      expect(obstacle.rings[0]!.length).toBeGreaterThanOrEqual(3);
+    }
+  });
+
+  it('states what it refused, so a smaller set is never silent', () => {
+    for (const refusal of tile.routeObstructions.refused) {
+      expect(refusal.reason).not.toBe('');
+      expect(refusal.identity).toBeDefined();
+    }
+    // Every ring the container states is either carried or refused with a reason: none vanishes.
+    expect(tile.routeObstructions.obstacles.length + tile.routeObstructions.refused.length)
+      .toBe(routeObstructionRings(tile.header).length);
   });
 });
 

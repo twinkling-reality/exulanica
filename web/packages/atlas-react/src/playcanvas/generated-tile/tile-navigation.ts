@@ -4,6 +4,7 @@ import {
   atlasVec3,
   type NavigationSurface,
   type NavigationWorld,
+  type PolygonObstacle,
   type SurfaceSample,
 } from '@exulanica/atlas-core';
 import {
@@ -230,7 +231,13 @@ export interface TileNavigation {
   readonly capsule: TileCapsule;
 }
 
-function world(surface: NavigationSurface, centre: readonly [number, number], radius: number, capsule: TileCapsule): NavigationWorld {
+function world(
+  surface: NavigationSurface,
+  centre: readonly [number, number],
+  radius: number,
+  capsule: TileCapsule,
+  polygonObstacles: readonly PolygonObstacle[],
+): NavigationWorld {
   return Object.freeze({
     surface,
     eyeHeight: capsule.eyeHeightM,
@@ -243,7 +250,10 @@ function world(surface: NavigationSurface, centre: readonly [number, number], ra
     surfaceSampleSpacing: SUPPORT_SAMPLE_SPACING_M,
     regions: Object.freeze([]),
     obstacles: Object.freeze([]),
-    polygonObstacles: Object.freeze([]),
+    // ROUTE obstruction rings, which choose which way a walk faces and stop no body: they have no
+    // height and nothing in them blocks the capsule. Horizontal blocking waits on a collision proxy
+    // that no tile materialises, and carrying these does not change that.
+    polygonObstacles,
     traces: Object.freeze([]),
   });
 }
@@ -265,6 +275,7 @@ export function tileNavigation(
   navEnvelope: DecodedProjection | undefined,
   renderExtent: TileExtentMm,
   capsule: TileCapsule,
+  polygonObstacles: readonly PolygonObstacle[] = [],
 ): TileNavigation {
   if (navEnvelope === undefined || navEnvelope.header.triangle_count === 0) {
     // A viewpoint south of the tile, looking north at its middle, at eye height above the city datum.
@@ -277,7 +288,7 @@ export function tileNavigation(
     const [tx, ty, tz] = tileToRenderer(cx, cy, cz);
     const pitch = Math.atan2(ty - capsule.eyeHeightM, Math.hypot(tx - vx, tz - vz));
     return {
-      world: world(NO_SURFACE, [vx, vz], halfDiagonalM(renderExtent) + VIEWPOINT_STANDOFF_MM / MILLIMETRES, capsule),
+      world: world(NO_SURFACE, [vx, vz], halfDiagonalM(renderExtent) + VIEWPOINT_STANDOFF_MM / MILLIMETRES, capsule, polygonObstacles),
       start: { x: vx, y: capsule.eyeHeightM, z: vz, yaw: 0, pitch },
       support: { state: 'unavailable', reason: navEnvelope === undefined
         ? 'The tile carries no nav_envelope projection, so there is nothing to stand on.'
@@ -300,7 +311,7 @@ export function tileNavigation(
   }
   if (stance === null) throw new Error('The nav_envelope has no support on its own north-south midline');
   return {
-    world: world(support.surface, [cx, cz], halfDiagonalM(extent), capsule),
+    world: world(support.surface, [cx, cz], halfDiagonalM(extent), capsule, polygonObstacles),
     start: stance,
     support: { state: 'nav_envelope', triangles: support.triangles },
     collisionState: COLLISION_PENDING,
