@@ -3,13 +3,14 @@ import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { canonicalBytes } from '../src/canonical-json.js';
+import { MATERIAL_CLASSES } from '../src/classes.js';
 import {
   MANIFEST_PROFILE_V2,
   TextureSetRefusal,
   checkTextureSet,
   readTextureManifest,
 } from '../src/manifest-reader.js';
-import { CASES_FILE, FIXTURE_DIRECTORY, conformanceFiles } from './conformance.js';
+import { CASES_FILE, FIXTURE_DIRECTORY, baseFixtures, conformanceFiles } from './conformance.js';
 
 /**
  * The shared texture set cases, run against this package's reader. The backend and the browser run
@@ -65,6 +66,22 @@ describe('the committed conformance files', () => {
       .sort();
     const expected = [...generated.keys()].filter((path) => path !== CASES_FILE).sort();
     expect(committed).toEqual(expected);
+  });
+
+  /**
+   * The fixtures are written out one per kind of container, by hand, which is a gate that
+   * enumerates what it checks: it can only be silent about the kind nobody thought of. A fifth
+   * material class added to the closed list would reach three readers with no fixture in the file
+   * all three run, and every case in it would still pass. So the closed list is the authority here
+   * and the fixtures are held to it, not the other way round.
+   */
+  it('cover every material class the closed list names, in a procedural container', () => {
+    const covered = new Set(
+      baseFixtures()
+        .filter((fixture) => fixture.header.maker_kind === 'procedural')
+        .map((fixture) => fixture.header.material_class as string),
+    );
+    expect([...MATERIAL_CLASSES].filter((materialClass) => !covered.has(materialClass))).toEqual([]);
   });
 });
 
