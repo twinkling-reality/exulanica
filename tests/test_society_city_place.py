@@ -572,3 +572,70 @@ def test_plan_keyed_measures_refuse_a_place_that_stands_people_over_each_other()
     assert place_stacks_heights(stacked)
     with pytest.raises(ValueError, match="this place has levels"):
         measure_run([], stacked)
+
+
+def test_a_place_may_not_stand_a_person_where_it_states_no_support():
+    model = routine()
+    place = document_place()
+    spot = place["spots"][0]
+
+    def without_support(node_id: str) -> dict:
+        copy = json.loads(json.dumps(place))
+        for row in [*copy["nodes"], *copy["spots"]]:
+            if row.get("node_id") == node_id:
+                row["support_z_mm"] = None
+        return seal_place(copy)
+
+    with pytest.raises(ValueError, match="may not stand a person where it states no support"):
+        validate_place(without_support(spot["node_id"]), model)
+    indoors = next(d for d in place["destinations"] if d["indoors"])
+    with pytest.raises(ValueError, match="destination is reached at a node that states no support"):
+        validate_place(without_support(indoors["node_id"]), model)
+
+
+def test_a_door_whose_stated_step_is_not_the_footway_beneath_it_is_stated():
+    records = owned_records()
+    assert not any("stated step" in line for line in records_place(records)["unsupported"])
+    [door] = [
+        r
+        for r in of_kind(records, EntranceRecord)
+        if r.approach_curb_identity and r.step_height_mm == 150
+    ][:1]
+    misread = dataclasses.replace(door, step_height_mm=door.step_height_mm + 1)
+    place = records_place([misread if r is door else r for r in records])
+    assert (
+        "doors whose stated step is not the height of the footway beneath them (1)"
+        in place["unsupported"]
+    )
+    # The door is still a door: the place states the disagreement rather than dropping the unit.
+    assert any(d["origin"] == "premises" for d in place["destinations"])
+
+
+def test_two_footways_meet_at_a_corner_only_while_their_surfaces_are_within_a_step():
+    records = owned_records()
+    joined = records_place(records)
+    edge = curb(records, 0, "left")
+    lifted_line = tuple((x, y, z + 4 * STEP_LIMIT_MM) for x, y, z in edge.kerb_line_mm)
+    deck = dataclasses.replace(
+        edge,
+        kerb_line_mm=lifted_line,
+        extent=dataclasses.replace(
+            edge.extent,
+            min_z_mm=edge.extent.min_z_mm + 4 * STEP_LIMIT_MM,
+            max_z_mm=edge.extent.max_z_mm + 4 * STEP_LIMIT_MM,
+        ),
+    )
+    place = records_place([deck if r is edge else r for r in records])
+    assert (
+        "footway corners whose two surfaces stand more than one step apart (1)"
+        in place["unsupported"]
+    )
+    # Lifting the footway carried its door's step with it, and the place says that too rather
+    # than publishing a threshold whose stated step is no longer the ground beneath it.
+    assert (
+        "doors whose stated step is not the height of the footway beneath them (1)"
+        in place["unsupported"]
+    )
+    # The lifted footway is still walked along; it is no longer walked onto.
+    assert len(components(place)) > len(components(joined))
+    validate_place(place, routine())
