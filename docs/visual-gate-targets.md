@@ -688,6 +688,68 @@ beside it, all eight mechanical keys, and both remaining predicted halts. The ro
 authentication condition were never reached, so the arithmetic above stands untested and nothing in
 this section is evidence for or against it.
 
+## What the corridor run did, measured, once the gate could reach the street
+
+The run at cd1d4848, served by `corridor-walk-gate` from this worktree, quiet slot then GPU slot, load
+5.07 before and 5.46 after. It reached the street and the street refused it.
+
+**THE THREE NUMBERS THIS LANE OWES, and one of them does not exist.**
+
+- **The ringless halt DID NOT FIRE.** The page was asked and it answered: `routeObstacleRingsRefused`
+  is empty and the rings came back.
+- **`routeObstacleRings` is 311.** Predicted "low hundreds, not 16", with a stated range of 150 to
+  250. THE CLASS WAS RIGHT AND THE RANGE WAS WRONG: 311 is a quarter above the top of it. The
+  fixture's 16 was never the scale of a street.
+- **`frontageBothSidesSamples` on the winning heading HAS NO VALUE, because there is no winning
+  heading.** The rule refused every one of them. Writing 0 here would be a claim about a route that
+  was never planned; the honest entry is that the number does not exist for this run.
+
+**The rule's own sentence, which is the result:**
+
+    no heading from the arrival pose clears the route length; the route cannot be walked
+
+That is prediction 2, in the rule's words rather than mine, and it is the outcome the prediction
+called most likely. Prediction 1, the decode halt I was most confident in, did not fire: the page
+mounted a world at 14.0 s and the Atlas binding was reached at 17.4 s. Prediction 3, the
+authentication condition, was NEVER REACHED and remains untested, as the prediction's own ordering
+said it would be if an earlier layer refused.
+
+**THE ARITHMETIC SURVIVED AND ONE OF ITS NUMBERS DID NOT, by a factor of four.** I predicted the room
+due east from the committed pose as 122,000 mm, reasoning from the tile's eastern edge at 384,000 mm.
+The product does not bound the walk by the tile. It states a field, and the gate uses that field's
+inscribed square:
+
+    field centre           (320, -64) m, the tile's own centre
+    field radius           94.847245611035 m
+    inscribed half side    67.06713054842885 m
+    east bound             387.06713054842885 m, which is 3,067 mm BEYOND the tile's edge
+
+    room due east from the committed pose    125,067 mm   (I predicted 122,000)
+    the rule requires 125,000 + 6,000        131,000 mm
+    short by                                   5,933 mm   (I predicted 9,000)
+
+    longest route that would fit             119,067 mm
+    minimumWalkedMm demands                  120,000 mm
+    WINDOW                                      EMPTY, crossing by 933 mm   (I predicted 4,000)
+
+So the conclusion holds exactly as written, and every margin in it was four times narrower than I
+said. The prediction was right for a reason that was only mostly right, and a reader who trusted my
+122,000 would have a wrong picture of how close this is. **933 mm is the whole story of this run.**
+The gate's route is longer than the street it was built to score, and the shortfall is under a metre.
+
+**What else the record carries.** The container is bound now:
+`e59f6cf05d0ff4e09c5f06a8b5c90e4c3e4ea2bc4a9fb0ff62d02b491e6be5f8`, 12,682,828 bytes, tile (2, 0) at
+lod 0, city grammar version 2, 56,388 triangles in the render batch, fetched from
+`/api/tiles/503afcb6-bfc8-500c-a03b-5b58b01e5e3e/bytes`. `buildingPrisms` is 0, as predicted and for
+the predicted reason: the gate hands a generated target no prisms at all. The page states 86 surfaces
+with one reason between them, in the product's own words, "No surface_material record dresses this
+surface: the tile states that none exists." I predicted 85 undressed facade ground bands; 86 surfaces
+share that reason, and I am NOT claiming the two sets are the same one.
+
+**What this run does not say.** No key was measured, because no walk happened. No capture was taken.
+Nothing here bears on the ninth key, and nothing here is a corridor result: it is a measurement of
+the rule against a pose, and the rule refused.
+
 ## The reason the product gave, now in the record, and the wrong fix that came first
 
 The gap above was closed the same evening, while the page that reliably refuses still existed. That
