@@ -219,8 +219,15 @@ one writable output directory, hard limit passed to timeout.
   explains the CONTENT of the text without explaining why the role matters. A signal strong enough to
   reproduce a structure may be strong enough to invite elaboration on it; that part is still a
   hypothesis.
+  WHY THIS STOPPED AT BRICK, as a decision rather than an omission: the sixteen brick outputs are a
+  complete balanced test of the role hypothesis on one target, eight per role, and they produced the
+  mechanism. Once the mechanism was in hand, acting on it beat counting further: the guard against
+  numerals in prompts protects every future session, while another sixteen crops of paving would only
+  have refined a rate. Paving costs nothing to do later and the sheets are already cut for it.
   WHAT IS STILL UNLOOKED AT: this session's other 48 outputs (footway paving 16, painted render 16,
-  carriageway asphalt 16) and session 2's other 24. Nothing from them may be published. The eight
+  carriageway asphalt 16) and session 2's other 24. Nothing from them may be published. THE
+  NO-NUMERALS RULE DOES NOT RETROACTIVELY CLEAN THEM: those prompts carried numerals too, so the
+  risk that produced both known cases was present in every generation of both sessions. The eight
   picks looked at in September are the only other outputs of this session anyone has seen at full
   resolution, and the sentence "no lettering in 32 crops" covers those crops and nothing wider.
 
