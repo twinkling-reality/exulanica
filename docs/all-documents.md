@@ -69,6 +69,7 @@ How the system works now. Edited as the system changes.
 - [texture-package](texture-package.md) : IMPLEMENTED for seventeen baked texture sets, their containers, the manifest, migrations
 - [traffic-contract](traffic-contract.md) : V1 IMPLEMENTED ON CITY V2 ROAD RECORDS; NOT YET RUN BY ANY RUNTIME, STORED OR DRAWN
 - [visual-gate-rubric](visual-gate-rubric.md) : version 5, fixed before any street geometry is generated and before any corridor is scored. Changing it needs a new reconciliation record...
+- [visual-gate-targets](visual-gate-targets.md) : The visual gate scores a page. A target says which page, and everything that makes two runs of
 - [world-composition-contract](world-composition-contract.md) : DECISION for product and architecture direction; PARTIAL implementation
 - [world-memory-model](world-memory-model.md) : DECISION AND RESEARCH PROGRAM. Existing evidence, graph, reconstruction
 - [world-memory-package](world-memory-package.md) : BUILT AND EXIT-GATED. The implementation profile is exulanica-wmp-1.0
