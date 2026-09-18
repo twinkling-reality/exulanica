@@ -266,6 +266,41 @@ millimetres. The sampler is right to refuse them. A tolerance there would hide a
 walker. The drawn surface and the walkable surface are made by different rules, and the hole is in
 the one nobody can see.
 
+### What `candidatesQualified` counted, corrected the same day it was recorded
+
+Every figure above stands except one. `candidatesQualified` 153 is what the rule returned and it is
+not what a reader takes it to mean: **36 headings genuinely qualify, and 117 of the other 153 walk
+south off the tile.**
+
+Found because a count would not reconcile. Running the rule's own `planRoute` offline over the same
+rings reproduced every field of the run, heading, clear run, both frontage counts, the skew, the
+headings tried and the ones with frontage, and returned 36 where the run returned 153. Identical
+inputs cannot give two answers, so one input was not identical, and the halt did not say where the
+route started. It does now.
+
+    start exactly on the field's south edge, which is what the page states      qualified 153
+    thirty-three micrometres north of it                                        qualified  36
+    one millimetre north of it                                                  qualified  36
+    every other field of the plan, in all three                                 identical
+
+`firstContact` bounds a ray by `t = (edge - origin) / component` and keeps it only where `t > 0`. A
+start lying EXACTLY on a boundary gives `t` of zero for that boundary, so the test skips it and the
+ray is never bounded by the edge it stands on. All 117 point south, in one band from 151000 to 209000
+millidegrees, and from the edge heading 151000 clears 132 m where one millimetre inside it clears
+1.1 mm. This target meets it because the runtime's default pose is the middle of the nav_envelope's
+southern edge, which is that boundary.
+
+The chosen heading points north, so the winner, its clear run, both frontage counts and the skew are
+untouched, and `candidatesWithFrontage` is 2 either way. The figure is left as the rule returned it,
+with this beside it, because a record that quietly states a corrected number is a record nobody can
+check against the run that made it.
+
+**And the useful half.** Of the 36 that genuinely qualify, **35 have support at every 5 mm probe over
+the whole 131 m**, and the only one with a gap is the heading the rule chose. So this tile is
+walkable in almost every direction that qualifies, and the run stopped because of which heading was
+preferred rather than because the tile cannot be walked. An earlier sentence of mine said no route on
+this tile has support along its whole length; that was measured over one heading of thirty-six.
+
 ### The correction to the run before this one, left beside it rather than folded into it
 
 That run's section below says a ring stopped the walker, measured at 344 mm from a bench against a
