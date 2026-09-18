@@ -1,0 +1,138 @@
+Track A session 1 on a rented GPU, generated appearance lane, 2026-09-17T21:57:29Z to 2026-09-18T00:05:56Z
+Branch lane/generated-appearance at 1bc97ad927eb9bd0154aa2bcf08dacca7d3e948c (the head the image was built from;
+this log and the measurement code it quotes are committed after it).
+Machine: MassedCompute RTX PRO 6000 Blackwell 96 GB through Shadeform, rented on Brev, name
+exulanica-appearance-a1, image appearance-local@sha256:<the id in every record>, no network, read-only root,
+one writable output directory, hard limit passed to timeout.
+
+== spend
+  billed 7707 s (2.14 h) at the day's listed $2.63 an hour = $5.63 at that rate
+  prepaid balance before $40.31; balance after PENDING (only the provider's billing page says it)
+  Track A ceiling $25, so this session used 22.5 per cent of it
+  of the 7707 s, 1855 s produced images (70 s smoke, 1785 s session 1). The rest was the image build,
+  88.5 GB of weights fetched and verified, three false starts, and my own latency between steps.
+  run record ml/appearance/evidence/gpu-run-a1.json, sha256
+    6d625b0f118e1929354598bf229e4323aca65e55899324001464fd1b9b2a936d
+
+== what ran, in order
+  scripts/host-check.sh                      the GPU, the driver, Docker's NVIDIA runtime
+  docker build -f container/Dockerfile       bases pinned by digest, VideoX-Fun by commit and tree
+  scripts/fetch-weights.py                   88,467,981,605 bytes, each file verified as it landed
+  container/run.sh ... out-smoke 1440        the smoke job, 2 generations at 512 px, 8 steps
+  runner gate                                7 conditions, all passed: gate
+    59a88e5104b157a7ffe44e874ee9f77f79e835c1bdcd5c8bcafd173718d6d64a
+  container/run.sh ... out-session-1 5670    session 1, 64 generations at 1024 px
+  runner check                               64 generations checked; stopped: no
+  scripts/delete-instance.sh now             the machine deleted
+
+== session 1, as measured
+  measure session --repository ../.. --results out-session-1 --staged staged-session-1
+  measurements ad49cf3606be11d5d5962fd7a4540881241516521f5dc7ef52f82683bce6f196
+  results      a30d4a111d37fe701966d5d7db4c15395054b927326fbc49fef14f6472204a1e
+  64 generations: 4 published targets x 2 candidates x 2 conditioning roles x 4 seeds, 1785 s, none stopped.
+  a1 = Qwen-Image-2512 with the Fun union control, 50 steps, 32 to 33 s an image.
+  a2 = Z-Image with the Fun union control, 25 steps, 20 s an image.
+
+  seams, per million, where 1000000 is no seam and the eight published sets read 290000 to 1770000:
+    min 756618  median 988545  max 1335650, over both axes of all 64 outputs.
+    Every one of the 128 axis readings is inside the published range. The tiling is not a claim: it is
+    the per-step cyclic roll plus the wrap-padded encode and decode, and this is what it measured.
+
+  structure kept, as the share of the conditioning picture's own edges with an output edge within 2 px
+  (recall, per million), median of the four seeds, by target, candidate and conditioning role:
+    brick-weathered                a1 depth  998459   a1 edge  976892   a2 depth  999983   a2 edge  976388
+    carriageway-asphalt-weathered  a1 depth  999733   a1 edge  984171   a2 depth  999962   a2 edge  999932
+    footway-paving-weathered       a1 depth 1000000   a1 edge  997736   a2 depth 1000000   a2 edge  990469
+    painted-render-weathered       a1 depth  997966   a1 edge  602339   a2 depth  971942   a2 edge    8290
+    Depth conditioning holds the structure everywhere: 97.2 to 100 per cent of its edges survive.
+    Edge conditioning fails on painted render: that target's relief is a field of 40 small cells, its
+    edge picture has 397100 edge pixels, and a smooth painted wall answers with almost none (a2 kept
+    0.8 per cent, a1 60 per cent). The conclusion for the next session is depth for cell-field
+    materials, and either role for brick and paving.
+    Precision is deliberately not a pass condition: a generated tile invents gum, grime and scuffs
+    that no conditioning edge asks for, which is the point. It runs from 194835 (paving a1 edge, the
+    most invented detail) to 1000000 (asphalt and render, almost none invented).
+
+  module retention, amplitude at the period the recipe itself states, as a ratio to the published set's
+  amplitude at the same period, per mille (1000 = the published amplitude), only for the two makers
+  whose recipes state a module:
+    brick (loom.brick: units_per_course 8 along u, courses 24 along v)
+      a1 u median 1025 (min 401)   v median 173 (min 41)
+      a2 u median  480 (min 182)   v median 755 (min 359)
+    paving (loom.paving: flags_per_row 3, rows 3)
+      a1 u median 2275 (min 1469)  v median 5157 (min 3722)
+      a2 u median 1952 (min 1824)  v median 4763 (min 4226)
+    Read this as a comparison, not a pass mark. The procedural brick paints a razor-sharp mortar line
+    at exactly 24 cycles, so its amplitude there is large (24.751 grey levels) and a generated tile
+    that keeps the courses but varies their tone spreads that energy and reads well below 1000. The
+    generated paving reads 2 to 5 times the published amplitude because its joints are darker than
+    the recipe's. Neither number says the structure was lost: the recall above is what says that.
+    loom.asphalt and loom.render state cells per tile and no module, so no ratio is measured for them:
+    a ratio at some other period would measure nothing.
+
+  low-frequency share, per million (variation at 4 cycles per tile or fewer; higher predicts visible
+  repetition), median over the four seeds, with the published set for comparison:
+    brick        published  22998   a1   5510   a2    433
+    asphalt      published  35716   a1  33086   a2  14217
+    paving       published 211011   a1 185580   a2 121600
+    render       published 215799   a1  48781   a2  34555
+    Every candidate is at or below its published set: these tiles repeat no worse than what ships.
+
+== the look, before anything is handed on
+  Eight picks, one per target per candidate, chosen by the seam ratio closest to 1. Every texel of every
+  pick was looked at at 1:1 in 512 px crops (4 crops a tile), and the findings are in
+  ml/appearance/look/session-1-findings.json, in words, with the records:
+    brick-weathered-a1                 look 530310a827d45d89   0 suspected
+    brick-weathered-a2                 look 79a7a9e0d21afc7f   0 suspected
+    carriageway-asphalt-weathered-a1   look 3b954bd8abfa4d72   0 suspected
+    carriageway-asphalt-weathered-a2   look 2245285f3028bc6a   0 suspected
+    footway-paving-weathered-a1        look deae87924ef934db   0 suspected
+    footway-paving-weathered-a2        look ca2bbad20d5a289d   0 suspected
+    painted-render-weathered-a1        look 8c1f75ec82c5d94c   1 suspected
+    painted-render-weathered-a2        look 54d4b7368570c8a9   0 suspected
+  No lettering, numeral, logo, badge, signature, watermark, road marking or utility mark was found in
+  any of the 32 crops, and nothing that reads as a particular real building or street.
+  The one suspected line: a faint straight horizontal dashed line crosses painted-render a1 for the full
+  width in all four crops. I am unsure what it is. It looks like an artefact of my own per-step latent
+  roll; a straight dashed line is also the shape a learned overlay would take; I have not traced it. The
+  operator decides, and that set is not pinned while it stands.
+
+== what went wrong, and what it cost
+  1. The output directory is a bind mount the host owns, so the container must run as the invoking user.
+     First attempt: "PermissionError: [Errno 13] Permission denied: '/out/outputs'". Fixed in
+     container/run.sh (--user "$(id -u):$(id -g)").
+  2. Triton compiles some of torch's own kernels at run time, so the image needs a C compiler and libc
+     headers. First generation: "RuntimeError: Failed to find C compiler" inside torch's
+     bmm_outer_product kernel. Fixed in container/Dockerfile (gcc, libc6-dev).
+  3. My own tiling wrapper assumed the patched forward returns an object with .sample; this transformer
+     answers with a bare tensor. "AttributeError: 'Tensor' object has no attribute 'sample'". Fixed by
+     returning the same shape it was given (tuple, .sample, or bare tensor).
+     None of the three was findable on the Mac: the dry run exercises the same runner and passes.
+  4. About 14 idle minutes, roughly $0.61, spent waiting on a completion watcher instead of reading the
+     log when the generation count stopped moving. My own failure, and the second time in one day.
+  5. I deleted the instance before pulling the build log and the weights-fetch log, so those two logs no
+     longer exist. Every line I quoted from them was quoted while they existed; they cannot be checked
+     now. Next time, pull each step's log as that step ends.
+  6. The deletion check ran 13 s after the delete request, while the provider still listed the instance
+     as DELETING, so scripts/delete-instance.sh printed "IS STILL LISTED" and exited 1. I recorded the
+     deletion at 00:05:56Z without re-listing. I read the account again at 2026-09-18T00:20:01Z: "No
+     instances in org glendonchin-hq". The proof is that later reading, not the first one, and the
+     script should wait for the provider's own removal rather than a fixed 10 s.
+  7. While writing the findings file I typed a digest from memory for painted-render a2 instead of
+     copying it. I caught it by rewriting every digest from the picks file and verifying each against
+     the bytes on disk: one was wrong, seven were right, and all eight now verify. Nothing was
+     published from the wrong value.
+  8. The module retention numbers I reported to the orchestrator earlier in the session (brick a1 u
+     median 100 per cent, and so on) came from an ad-hoc script with a different normalisation and are
+     superseded by the committed measure above. This log's numbers are the ones to use.
+
+== what this does not show
+  - Nothing here is evidence about any real place. Every output is invented appearance on synthetic
+    structure, labelled "invented" in its own record.
+  - No output has been handed to the texture lane, and no set is pinned.
+  - Track B (structure to photo frames) did not run and is not approved.
+  - The reference for seams is the eight published procedural sets, not a photograph.
+  - docs/reference-gpu-compute.md is a local operator document in this repository (gitignored since
+    b1444b6a "Stop tracking operator docs and keep them local"), so this instance's dated section was
+    appended to the operator's own copy and cannot be committed. The committed record is
+    ml/appearance/evidence/gpu-run-a1.json and the section of docs/generated-appearance.md.

@@ -166,11 +166,17 @@ def ledger_line(raw: bytes) -> str:
     )
 
 
+def _balance(cents: int | None) -> str:
+    if cents is None:
+        return f"PENDING: {AUTHORITATIVE}"
+    return f"${cents // 100}.{cents % 100:02d}"
+
+
 def document_section(
     raw: bytes,
     *,
     balance_before_cents: int,
-    balance_after_cents: int,
+    balance_after_cents: int | None,
     consent: str,
     produced: Sequence[str],
     taught: Sequence[str],
@@ -182,9 +188,13 @@ def document_section(
     and ended, what it cost, what it produced by digest, what it taught including the false starts,
     that the operator accepted the provider's data-sharing consent, and the balance before and after.
     The machine-readable record stays beside it; this is the part a person reads later.
+
+    The balance after is ``None`` until the operator has read it off the provider's billing page:
+    the field is then written as pending rather than computed, because only the provider knows it
+    and this lane does not invent a number it was not given.
     """
     run = read_gpu_run(raw)
-    if balance_before_cents < 0 or balance_after_cents < 0:
+    if balance_before_cents < 0 or (balance_after_cents is not None and balance_after_cents < 0):
         raise Refused("a balance is not negative")
     if not produced or not taught:
         raise Refused(
@@ -208,7 +218,7 @@ def document_section(
         f"| Billed | {run['billed_seconds']} s ({hours:.2f} h) |",
         f"| Cost at the listed rate | ${cents // 100}.{cents % 100:02d} |",
         f"| Prepaid balance before | ${balance_before_cents // 100}.{balance_before_cents % 100:02d} |",
-        f"| Prepaid balance after | ${balance_after_cents // 100}.{balance_after_cents % 100:02d} |",
+        f"| Prepaid balance after | {_balance(balance_after_cents)} |",
         f"| Data-sharing consent | {consent} |",
         f"| Authoritative total | {run['authoritative_total']} |",
         "",

@@ -251,3 +251,15 @@ def test_the_documented_section_says_what_a_person_needs_later():
             produced=["nothing"],
             taught=[],
         )
+    # The balance after is the provider's number, so until the operator has read it the field says
+    # pending rather than the subtraction this lane could do but was not given.
+    pending = document_section(
+        build_gpu_run(_run()),
+        balance_before_cents=4031,
+        balance_after_cents=None,
+        consent="accepted",
+        produced=["2 generation records"],
+        taught=["a stub run teaches nothing about a GPU"],
+    )
+    assert "| Prepaid balance after | PENDING: the provider's billing page" in pending
+    assert "$33.73" not in pending

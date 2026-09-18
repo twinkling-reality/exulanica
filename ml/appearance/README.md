@@ -1,7 +1,10 @@
 # Generated appearance
 
-Status: capture, records and measurement WRITTEN AND TESTED on the operator's Mac; no model has run.
-The full account is [docs/generated-appearance.md](../../docs/generated-appearance.md).
+Status: Track A session 1 RUN AND MEASURED on a rented card, 2026-09-17: 64 texture sets generated on
+exact structure, measured, and every picked tile looked at at 1:1. Nothing is handed to the texture
+lane and no set is pinned. The full account is
+[docs/generated-appearance.md](../../docs/generated-appearance.md), section 9, and the session's
+evidence is [evidence/track-a-session-1.log.txt](evidence/track-a-session-1.log.txt).
 
 Structure is the truth and a model supplies appearance only. This package:
 
@@ -49,6 +52,12 @@ scripts/delete-instance.sh at exulanica-appearance-a1 <epoch>   # this session's
 python3 scripts/fetch-weights.py STAGED WEIGHTS          # on the rented machine's host
 container/run.sh sha256:<image id> appearance-local@sha256:<image id> STAGED WEIGHTS OUT 5670   # no network, read-only, hard time limit
 .venv/bin/python -m exulanica_appearance runner check --out OUT
+
+# after a session: measure every generation, then look at every texel of the picks before handing
+# anything on (the findings are written by hand, in words, and the record refuses an empty finding)
+.venv/bin/python -m exulanica_appearance measure session --repository ../.. --results OUT --staged STAGED --out session.json
+.venv/bin/python -m exulanica_appearance sheet pairs --repository ../.. --results OUT --out PAIRS
+.venv/bin/python -m exulanica_appearance look record --results OUT --findings look/session-1-findings.json --crops LOOK --records look/records
 
 # weights manifests from Hugging Face metadata only (no weights file is fetched)
 scripts/fetch-hf-metadata.sh <repo> <40-hex revision> METADATA/<repo>@<revision>

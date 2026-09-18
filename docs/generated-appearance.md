@@ -1,9 +1,10 @@
 # Generated appearance
 
-Status: PLAN ACCEPTED 2026-09-17. Structure capture, the four records and the model-free
-measurements are BUILT AND TESTED on the operator's Mac, with the procedural look measured as the
-baseline. NO MODEL HAS RUN, NO WEIGHTS HAVE BEEN DOWNLOADED AND NO GPU HAS BEEN RENTED. The code is
-`ml/appearance/` ([its README](../ml/appearance/README.md)).
+Status: TRACK A SESSION 1 RUN AND MEASURED 2026-09-17 (section 9). 64 model-made texture sets on
+exact structure, on one rented machine for 2.14 h and $5.63 at the day's listed rate; seams inside
+the published sets' own range, structure edges kept, every picked tile looked at at 1:1. Nothing has
+been handed to the texture lane and no set is pinned. Track B has not run and is not approved at the
+current balance. The code is `ml/appearance/` ([its README](../ml/appearance/README.md)).
 
 ## 1. In plain words
 
@@ -314,11 +315,71 @@ and as edges, four seeds each, on both Qwen-Image-2512 and Z-Image with their Fu
 `track-a-smoke.json` is the cheap first run that asks only whether the backends load, tile and
 decode.
 
-## 9. Not verified
+## 9. Session 1, measured
+
+One machine, 2026-09-17T21:57:29Z to 2026-09-18T00:05:56Z: MassedCompute RTX PRO 6000 Blackwell 96
+GB through Shadeform on Brev, name `exulanica-appearance-a1`, 7707 billed seconds (2.14 h), $5.63 at
+the day's listed rate, against this lane's $25 Track A ceiling. The dated section for the operator's
+GPU ledger is in `docs/reference-gpu-compute.md` (a local document in this repository, gitignored
+since b1444b6a), the machine-readable record is
+[`gpu-run-a1.json`](../ml/appearance/evidence/gpu-run-a1.json), and the whole session including its
+three false starts is in [the evidence log](../ml/appearance/evidence/track-a-session-1.log.txt).
+
+The smoke job ran first, 2 generations at 512 px, and its gate passed all seven conditions; that is
+what allowed session 1 to start. Session 1 then ran 64 generations at 1024 px in 1785 s: four
+published targets, two candidates, two conditioning roles, four seeds, nothing stopped. a1 is
+Qwen-Image-2512 with the Fun union control at 50 steps, 32 to 33 s an image; a2 is Z-Image with the
+Fun union control at 25 steps, 20 s an image. Both fit the card with no offloading.
+
+Measure it again from what the run wrote:
+
+    cd ml/appearance && .venv/bin/python -m exulanica_appearance measure session \
+      --repository ../.. --results OUT --staged STAGED --out session-1-measurements.json
+
+- **Seams**: over both axes of all 64 outputs, min 756618, median 988545, max 1335650 per million,
+  where 1000000 is no seam. The eight published procedural sets, seamless by construction, read
+  290000 to 1770000 on the same measure, so every one of the 128 readings sits inside the range
+  shipped today. The lane's own tiling (the per-step cyclic roll with the wrap-padded encode and
+  decode) is the only reason for that, and this is the measurement of it.
+- **Structure kept**: the share of the conditioning picture's own edges that have an output edge
+  within 2 px. Depth conditioning holds everywhere, 97.2 to 100 per cent. Edge conditioning holds on
+  brick (97.6), asphalt (98.4 to 100) and paving (99.0 to 99.8) and fails on painted render, whose
+  relief is a field of 40 small cells: a1 kept 60 per cent of it and a2 kept 0.8 per cent, because a
+  smooth painted wall answers dense outlines with almost no edges. Depth is the role for cell-field
+  materials; either role serves brick and paving.
+- **Precision is not a pass condition**: a generated tile invents gum, grime and scuffs no
+  conditioning edge asks for, which is the point of the lane. It ran from 194835 (paving a1, the most
+  invented detail) to 1000000 (asphalt and render, almost none).
+- **Module retention**, amplitude at the period the recipe itself states, as a ratio to the published
+  set's amplitude at that period, and only for the two makers whose recipes state a module
+  (`loom.brick`: 8 units per course, 24 courses; `loom.paving`: a 3 by 3 flag grid). Brick a1 reads
+  1025 per mille along u and 173 along v; a2 reads 480 and 755; paving reads 1952 to 5157. Read it as
+  a comparison and not a pass mark: the procedural brick paints a razor-sharp mortar line at exactly
+  24 cycles, so a generated tile that keeps the courses but varies their tone reads well below 1000,
+  and the generated paving's joints are darker than the recipe's, so it reads above. What says the
+  structure survived is the recall above. `loom.asphalt` and `loom.render` state cells and no module,
+  so nothing is measured for them.
+- **Low-frequency share**: every candidate is at or below its own published set (brick 5510 and 433
+  against 22998; asphalt 33086 and 14217 against 35716; paving 185580 and 121600 against 211011;
+  render 48781 and 34555 against 215799), so these tiles repeat no worse than what ships.
+
+Eight outputs were picked, one per target per candidate by the seam ratio closest to 1, and every
+texel of every pick was looked at at 1:1 before anything was offered onward: findings in
+[`session-1-findings.json`](../ml/appearance/look/session-1-findings.json), records in
+`ml/appearance/look/records/`. No lettering, numeral, logo, badge, signature, watermark, road marking
+or utility mark was found in any of the 32 crops, and nothing that reads as a particular real place.
+One line is unresolved and stated as unresolved: a faint straight horizontal dashed line crosses
+painted render a1 for the full width of all four crops. It looks like an artefact of the lane's own
+latent roll, a straight dashed line is also the shape a learned overlay would take, and the cause is
+untraced. That set is not pinned while it stands.
+
+Nothing has been handed to the texture lane. Track B has not run and is not approved.
+
+## 10. Not verified
 
 - Cosmos 3 transfer's memory and speed on a 96 GB card, and whether vLLM-Omni weights several
-  controls at once for it: unpublished, and NVIDIA's documents disagree. Measured in the first B1
-  hour.
+  controls at once for it: unpublished, and NVIDIA's documents disagree. It would be measured in
+  Track B's first hour, and Track B is not approved at the current balance.
 - Seamless tiling on transformer image models: no published method is merged upstream; the lane
   builds it (cyclic latent shift, circular VAE decode) and holds every set to the seam check.
 - Whether a generated look beats the procedural one on the bench says little about a whole street:
@@ -326,8 +387,10 @@ decode.
   bakes a street, at the gate route's own poses, as research references.
 - The structure layers' digests were produced on one Mac (arm64); a cross-machine comparison of the
   rasteriser's bytes has not been run.
-- The Qwen and Z-Image backends have never run: they are written against VideoX-Fun at a pinned
-  commit and exercised on the Mac only through the stub, which stands in for a model and proves
-  nothing about one. The smoke job is what finds out, in the first minutes of the first session.
-- Whether the tiling schedule leaves a seamless tile with a real model is unmeasured. The seam check
-  answers it on the first outputs, against the published sets' measured range.
+- MEASURED 2026-09-17: both backends ran, tiled and decoded on the card, and the tiling schedule
+  leaves seams inside the published sets' own range (section 9). What is still unmeasured is a
+  second machine: every number in section 9 comes from one instance, one driver and one image.
+- Whether the appearance a model invents suits the world's other materials is unknown: four targets
+  ran, and the catalog holds eight makers.
+- The cause of painted render a1's straight dashed line. Until it is traced, nothing from that set
+  goes onward.
