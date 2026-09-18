@@ -344,3 +344,39 @@ dress what is behind the glass.
 So stage 1 by itself already exceeds the estimate for everything, before one cornice box or string
 course exists. The estimate is not slightly low. Both numbers are here, with the brief's beside them,
 so the next person inherits a measurement rather than an estimate.
+
+### A correction to the paragraph above, measured rather than reasoned
+
+The paragraph headed "cutting the holes turned an invisible gap into a visible one" generalised from
+a frame of the FIXTURE to a statement about the world, and the world does not agree. Measured from
+the two containers, by kind and role:
+
+    conformance fixture, container 3a2fd58d, 124 drawn surfaces, 20 undressed
+        city.interior_backing wall   6      the magenta behind every window in the frame
+        city.facade door             3
+        city.facade glazing          2
+        city.facade trim             2
+        city.street_tree trunk       2
+        city.street_tree canopy      2
+        city.facade ground_band      1
+        city.street_tree tree_pit    1
+        city.terrain terrain         1
+
+    corridor tile (2, 0), container e01ffe0e, 1,633 drawn surfaces, 86 undressed
+        city.facade ground_band     85
+        city.terrain terrain         1
+        and nothing else
+
+ON THE STREET EVERY INTERIOR BACKING, EVERY GLAZING AND EVERY DOOR IS DRESSED. A person looking
+through an opening on the corridor sees a wall behind the glass, not a glow. The fixture's six bare
+backings are its age, the same reason its doors and glazing are bare, and this package's pinned
+undressed set already says so.
+
+So the sentence to attach to that frame is narrower: the magenta behind its windows is the fixture's
+own age, and the street's equivalent gap is the GROUND BAND, 85 of them on one tile, which was
+already visible before today because a ground band is at eye level and nothing covered it.
+
+WHAT THIS MEANS FOR MATERIALS, recorded and not started, since it is the texture piece's census rule
+that decides whether a role needs a new set or only an assignment: the corridor needs nothing for
+glazing or backings. It needs `ground_band`, 85 surfaces on tile (2, 0), and terrain, which no
+published set dresses by a decision already recorded.
