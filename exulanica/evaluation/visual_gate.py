@@ -53,10 +53,12 @@ from exulanica.evaluation.gate_keys import (
     CLASSIFICATION,
     EVIDENCE_KINDS,
     GATE_KEY_SET_VERSION,
+    GATE_TARGET_IDS,
     JUDGED_KEY,
     MELBOURNE_ENVELOPE,
     NOT_ASKED,
     OPTION_ANSWERS,
+    OWNED_DISTRICT_TARGET,
     PICTURE_TITLES,
     REASON_FOLLOW_UP,
     RETAINED_RECORDS,
@@ -71,9 +73,11 @@ from exulanica.evaluation.gate_keys import (
     VERSION_4,
     WORDS_STORAGE,
     GateKey,
+    gate_target,
     key,
     reason_follow_up,
     resolve,
+    target_of,
 )
 
 __all__ = [
@@ -1132,8 +1136,36 @@ def _hard_pass(record: Mapping[str, Any], what: str) -> dict[str, bool]:
     return dict(block)
 
 
+def _comparable(candidate: Mapping[str, Any], baseline: Mapping[str, Any]) -> None:
+    """Refuse a comparison the keys cannot carry, naming both targets when they differ.
+
+    Two records are comparable when they were measured by the same key set and answered against the
+    same rubric. Across targets that is the whole requirement: the keys do not know which page they
+    measured, so two pages scored by one key set under one rubric are as comparable as two runs of
+    one page. What is NOT comparable is a different key set or a different rubric, because then the
+    same verdict word stands for different questions.
+    """
+    for name, path in (
+        ("key set", ("gate", "keySet")),
+        ("rubric", ("gate", "keys", JUDGED_KEY, "answeredAgainst", "rubricSha256")),
+    ):
+        values = []
+        for holder in (candidate, baseline):
+            value: Any = holder
+            for step in path:
+                value = value.get(step) if isinstance(value, Mapping) else None
+            values.append(value)
+        if values[0] != values[1]:
+            raise GateEvidenceError(
+                f"a comparison needs one {name}: the candidate scored "
+                f"{target_of(candidate)} with {values[0]!r} and the baseline scored "
+                f"{target_of(baseline)} with {values[1]!r}"
+            )
+
+
 def beats_baseline(candidate: Mapping[str, Any], baseline: Mapping[str, Any]) -> bool:
     """Whether a candidate clears the corridor bar against a baseline the bar can tell it from."""
+    _comparable(candidate, baseline)
     return all(_hard_pass(candidate, "candidate").values()) and not all(
         _hard_pass(baseline, "baseline").values()
     )
@@ -1187,6 +1219,7 @@ def visual_gate_record(
     evidence: Mapping[str, Mapping[str, Any] | JudgedAnswers],
     rubric_sha256: str,
     authentication_condition: str,
+    target: str = OWNED_DISTRICT_TARGET,
     reason: str,
     checks: Mapping[str, Any],
     claims_not_made: Sequence[str],
@@ -1210,6 +1243,10 @@ def visual_gate_record(
         raise GateEvidenceError(
             f"authentication condition must be one of {', '.join(AUTHENTICATION_CONDITIONS)}"
         )
+    if target not in GATE_TARGET_IDS:
+        raise GateEvidenceError(f"target must be one of {', '.join(GATE_TARGET_IDS)}")
+    if authentication_condition not in gate_target(target).authentication_conditions:
+        raise GateEvidenceError(f"{target} may not be scored under {authentication_condition}")
     if [capture.get("label") for capture in captures] != list(CAPTURE_LABELS):
         raise GateEvidenceError(
             f"captures must be exactly {', '.join(CAPTURE_LABELS)}, in route order"
@@ -1238,7 +1275,10 @@ def visual_gate_record(
             raise GateEvidenceError("a baseline comparison names the baseline record's path")
         held_by_baseline = _hard_pass(baseline, "baseline")
         baseline_holds_every_key = all(held_by_baseline.values())
+        _comparable({"gate": {"keySet": GATE_KEY_SET_VERSION, "keys": detail}}, baseline)
         comparison = {
+            "candidateTarget": target,
+            "baselineTarget": target_of(baseline),
             "baselineRecord": baseline_path,
             "baselineRecordSha256": hashlib.sha256(canonical_json(baseline)).hexdigest(),
             "bar": CORRIDOR_BAR,
@@ -1264,6 +1304,10 @@ def visual_gate_record(
         "captures": [dict(capture) for capture in captures],
         "browser": dict(browser),
         "authenticationCondition": authentication_condition,
+        # Written only when it is not the owned district, so a record of the page the retained
+        # records scored is byte-identical to the ones already retained. target_of reads the
+        # absence, and a test holds both halves.
+        **({} if target == OWNED_DISTRICT_TARGET else {"target": target}),
         "hardPass": hard_pass,
         "gate": {
             "keySet": GATE_KEY_SET_VERSION,

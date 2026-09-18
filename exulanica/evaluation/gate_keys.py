@@ -59,10 +59,14 @@ __all__ = [
     "CLASSIFICATION",
     "EVIDENCE_KINDS",
     "GATE_KEY_SET_VERSION",
+    "GATE_TARGETS",
+    "GATE_TARGET_IDS",
+    "GENERATED_TILE_TARGET",
     "JUDGED_KEY",
     "MELBOURNE_ENVELOPE",
     "NOT_ASKED",
     "OPTION_ANSWERS",
+    "OWNED_DISTRICT_TARGET",
     "PICTURE_TITLES",
     "REASON_FOLLOW_UP",
     "RETAINED_RECORDS",
@@ -79,14 +83,17 @@ __all__ = [
     "VERSION_4",
     "WORDS_STORAGE",
     "GateKey",
+    "GateTarget",
     "RetainedRecord",
     "SupersededRubric",
     "SupersededVersion",
     "UnknownGateKey",
+    "gate_target",
     "judge_prompt",
     "key",
     "reason_follow_up",
     "resolve",
+    "target_of",
 ]
 
 EvidenceKind = Literal["mechanical", "judged"]
@@ -391,6 +398,114 @@ SUPERSEDED_VERSIONS: Final[tuple[SupersededVersion, ...]] = (VERSION_2, VERSION_
 #: The two conditions the product-shell key has actually been scored under. Melbourne's record
 #: set the key true while its preview API answered three 404s, so the key alone never says which.
 AUTHENTICATION_CONDITIONS: Final[tuple[str, ...]] = ("credentialed-api", "vite-preview-api")
+
+#: The page a run scored, as data rather than as a check written into the harness.
+#:
+#: **Why this is a closed list and not a rule.** The gate refuses any page whose title is not the
+#: one its target states. A pattern would let the next page through for free; a list makes admitting
+#: one an edit somebody has to make and somebody else has to read. Appending is how a target is
+#: added, and a record naming a target nobody listed is refused rather than scored.
+#:
+#: **Why a record without a target reads as the owned district.** The retained records were written
+#: before any other page could be scored and they are immutable, so the default is the only reading
+#: that keeps them true. :func:`target_of` is the one place that reading lives.
+#:
+#: Each target states how its page is reached, the exact title it must show, what mounted means for
+#: it, which conditions it may run under, what its record binds, and where the route rule's inputs
+#: come from. The titles are NOT written here: the harness derives each from the product's own
+#: source, and halts when the derivation finds nothing.
+OWNED_DISTRICT_TARGET: Final = "owned-district"
+GENERATED_TILE_TARGET: Final = "generated-tile-evaluation"
+
+
+@dataclass(frozen=True)
+class GateTarget:
+    """One page the gate may score, and everything that makes a run of it comparable."""
+
+    identifier: str
+    path: str
+    #: Query parameters the page must carry, and for each the parameters it may be selected by.
+    required_parameters: tuple[str, ...]
+    selector_parameters: tuple[str, ...]
+    #: Where the expected title comes from in the product's own source.
+    title_source: str
+    title_symbol: str
+    mounted: str
+    authentication_conditions: tuple[str, ...]
+    binds: tuple[str, ...]
+    route_inputs: str
+
+
+GATE_TARGETS: Final[tuple[GateTarget, ...]] = (
+    GateTarget(
+        identifier=OWNED_DISTRICT_TARGET,
+        path="/",
+        required_parameters=(),
+        selector_parameters=(),
+        title_source="web/packages/app/src/config.ts",
+        title_symbol="PRODUCT_TITLE",
+        mounted=(
+            "#shell carries no data-world-state, #atlas is a canvas that is not hidden and states "
+            "worldTopology, and neither a credential gate nor an empty world is on the page"
+        ),
+        authentication_conditions=AUTHENTICATION_CONDITIONS,
+        binds=(
+            "the owned district artifact, matched byte for byte on the wire",
+            "the renderer module that drew it",
+        ),
+        route_inputs=(
+            "the product's own arrival pose, the collision rings its navigation world holds, and "
+            "the field bounds the artifact states"
+        ),
+    ),
+    GateTarget(
+        identifier=GENERATED_TILE_TARGET,
+        path="/",
+        required_parameters=("preview",),
+        selector_parameters=("tile", "baked_tile", "city"),
+        title_source="web/packages/app/src/config.ts",
+        title_symbol="PREVIEW_TITLE",
+        mounted=(
+            "everything the owned district target requires, and the tile runtime reporting the "
+            "containers it loaded"
+        ),
+        # A committed golden is served by the development module with no credential; a stored tile
+        # is fetched from /tiles with the session's own, so both conditions are reachable here.
+        authentication_conditions=AUTHENTICATION_CONDITIONS,
+        binds=(
+            "every drawn container's sha256, matched byte for byte on the wire",
+            "every drawn container's tile_inputs_digest",
+            "the city seed and the grammar id and version set the containers state",
+            "the tile runtime module that drew them",
+            "the look descriptor id and version",
+        ),
+        route_inputs=(
+            "the arrival pose and collision rings the tile's own records state; a run may choose "
+            "neither, and the gate halts while the tile states neither"
+        ),
+    ),
+)
+
+GATE_TARGET_IDS: Final[tuple[str, ...]] = tuple(target.identifier for target in GATE_TARGETS)
+
+
+def gate_target(identifier: str) -> GateTarget:
+    """The declared target, or a refusal naming the list it is missing from."""
+    for target in GATE_TARGETS:
+        if target.identifier == identifier:
+            return target
+    raise ValueError(
+        f"{identifier!r} is not a gate target; declared targets are {', '.join(GATE_TARGET_IDS)}"
+    )
+
+
+def target_of(record: Mapping[str, object]) -> str:
+    """The target a record scored. A record without one is the owned district, and always was."""
+    stated = record.get("target", OWNED_DISTRICT_TARGET)
+    if not isinstance(stated, str):
+        raise ValueError("a record's target is a string")
+    return gate_target(stated).identifier
+
 
 #: Every geometric tolerance the gate uses. Millimetres unless the name says otherwise.
 THRESHOLDS: Final[Mapping[str, int]] = MappingProxyType(
