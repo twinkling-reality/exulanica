@@ -12,6 +12,10 @@ pnpm --dir web landing
 pnpm --dir web landing:build
 ```
 
+`DEPLOYING.md` records where the public site is hosted, the value each build-time variable is set to
+there, and the check to run before deploying. Neither variable below reaches the bundle from a file
+in `src/`, so this README describes what they mean and that file records what they are.
+
 ## Canonical Atlas handoff
 
 The title's **Enter Exulanica** link opens the single application composition root in

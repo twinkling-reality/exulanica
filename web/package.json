@@ -20,6 +20,7 @@
     "app:build": "pnpm --filter @exulanica/app build",
     "landing": "pnpm --filter @exulanica/landing dev",
     "landing:build": "pnpm --filter @exulanica/landing build",
+    "landing:verify": "tsx scripts/verify-landing-deployment.ts",
     "forms": "pnpm --filter @exulanica/companion-forms dev",
     "forms:build": "pnpm --filter @exulanica/companion-forms build"
   },
