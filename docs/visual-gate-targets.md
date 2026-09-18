@@ -94,6 +94,23 @@ container's own magic rather than by its URL:
 Those numbers are about THAT container. The pinned tile changes when the tessellator changes, so a
 figure quoted without the digest beside it silently becomes a claim about a different tile.
 
+**Repeated on tessellator 14**, which rebaked that tile. What moved and what did not is worth as much
+as the halt:
+
+| | before | after |
+| --- | --- | --- |
+| container sha256 | `48a87e1c...`, 531,884 bytes | `8b729a65...`, 553,804 bytes |
+| nav_envelope | 4,850 triangles, 4,001 vertices | 5,728 triangles, 4,466 vertices |
+| render_batch | 2,065 triangles, 40 drawn | **unchanged** |
+| tile_inputs_digest | `e91381e15083e8e2...` | **unchanged** |
+| catalog digest | `a50ce477b7612743...` | **unchanged** |
+| drawn, batches, unavailable surfaces | 2,065, 9, 12 | **unchanged** |
+| route obstruction rings | 0 | **0** |
+
+So the container is a different file and the picture is the same picture: the carve landed entirely
+in the navigation projection, and the header states a new tessellator version. A rerun was needed to
+know that, and the digests are what say which half moved.
+
 Three refusals were exercised on the same page, so the checks are known to fire rather than assumed
 to: the owned-district target pointed at the preview page refused with `title "Exulanica", page
 "Exulanica: synthetic read-only development preview"`; the generated target with no tile selector
