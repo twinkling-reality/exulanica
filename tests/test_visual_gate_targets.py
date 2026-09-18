@@ -375,7 +375,8 @@ def _route_record(tmp_path: Path, tamper: str) -> dict[str, object]:
         # writes equals the measured one and the overwrite it is testing becomes invisible.
         "const plan = planRoute([0, 0], [wall(-5, -200, 200), wall(4, -200, -1)], [-500, -500, 500, 500]);\n"
         "const derived = plan.frontageBothSidesSamples > 0 ? plan.candidatesQualified : 0;\n"
-        "const measured = { field: null, obstacles: 2, routeRings: 2, routeRingsRefused: [], fieldBoundsCm: null };\n"
+        "const measured = { field: null, obstacles: 2, routeRings: 2, routeRingsRefused: [], "
+        "groundRefused: [], routeGround: null, fieldBoundsCm: null };\n"
         "try {\n"
         "  const record = harness.routeRecordOf(plan, measured);\n"
         f"  {tamper}\n"

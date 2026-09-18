@@ -55,6 +55,7 @@ import {
   measureScene,
   mechanicalMeasurements,
   planRoute,
+  rankedRoutes,
 } from '../web/packages/loom-gate/src/index.ts';
 import { OWD_MAGIC, decodeOwd } from '../web/packages/loom-tess/src/core/index.ts';
 
@@ -264,6 +265,13 @@ export function routeRecordOf(plan, measured) {
     routeRings: measured.routeRings,
     // What the runtime refused and why, so the count above is never a quietly smaller set.
     routeRingsRefused: measured.routeRingsRefused,
+    // WHICH OF THE RULE'S PREFERENCES THE GROUND TURNED DOWN, and where each lost support. Zero
+    // means this walk is the rule's own first choice. Without it a record states a heading and no
+    // reader can tell a route that was preferred from one that was third, which is the same thing
+    // `candidatesWithFrontage` exists to say about the tie-break.
+    headingsRefusedForNoGround: measured.groundRefused.length,
+    groundRefused: measured.groundRefused,
+    routeGround: measured.routeGround,
     fieldBoundsCm: measured.fieldBoundsCm,
   });
 }
@@ -1211,27 +1219,19 @@ async function main() {
       );
       observed.field = { ...bound, inscribedHalfSideM: half, bounds: field };
     }
-    const plan = planRoute([arrival.x, arrival.z], routeRings, field);
-    // Bound the moment it is decided, so a halt AFTER the route is chosen still says what the rule
-    // decided and on what. A halt that carries the reason and not the decision leaves the next
-    // reader unable to tell a rule that chose from a rule that fell back.
-    observed.route = {
-      // WHERE IT STARTED, because a halt that states a heading and no origin states a direction and
-      // not a route, and every figure below is measured from this point.
-      startMm: [Math.round(plan.start[0] * 1000), Math.round(plan.start[1] * 1000)],
-      headingMillidegrees: plan.headingMillidegrees,
-      clearRunMm: plan.clearRunMm,
-      frontageSamples: plan.frontageSamples,
-      frontageBothSidesSamples: plan.frontageBothSidesSamples,
-      meanFrontageSkewMillionths: plan.meanFrontageSkewMillionths,
-      candidatesTried: plan.candidatesTried,
-      candidatesQualified: plan.candidatesQualified,
-      candidatesWithFrontage: plan.candidatesWithFrontage,
-    };
-    phase(`the route was planned at ${plan.headingMillidegrees} millidegrees`);
-
-    // IS THERE GROUND ALONG IT, asked of the product's own surface before a single frame is
-    // captured, because the rule cannot ask.
+    // THE RULE RANKS, THE GROUND REFUSES. The rule's order is taken as it comes and nothing here
+    // reorders it: the walk is the FIRST heading the rule prefers that the product can actually
+    // walk. The rule is never told why one was refused, because the moment qualification and
+    // preference mix, the order that decides which street is looked at stops being a fact about
+    // geometry. `planRoute` is this list's first entry, so a run that takes it reports exactly what
+    // a run before this change reported.
+    const ranked = rankedRoutes([arrival.x, arrival.z], routeRings, field);
+    if (ranked.length === 0) {
+      await halt('no heading from the arrival pose clears the route length; the route cannot be walked');
+    }
+    const preferred = ranked[0];
+    // IS THERE GROUND ALONG EACH, asked of the product's own surface before a single frame is
+    // captured, taking the rule's order and the first heading that has any.
     //
     // MEASURED 2026-09-18, and this is the whole reason it exists. `planRoute` qualifies a heading a
     // 0.34 m capsule can travel without touching a ring or leaving the field, and it never consults
@@ -1239,17 +1239,19 @@ async function main() {
     // makes the walkable surface removes support within the capsule radius PLUS its own integer
     // overshoot, which `ring-clearance.ts` states as under five millimetres. So any line whose
     // closest approach to a ring falls between the radius and the radius plus that overshoot
-    // QUALIFIES UNDER THE RULE AND HAS NO GROUND UNDER IT. Run four's line passes a bench at
-    // 343.470 mm against a 340 mm radius, which is inside that band, and it walked 52.795 m before
-    // the product refused to move and kept refusing.
+    // QUALIFIES UNDER THE RULE AND HAS NO GROUND UNDER IT. Of this tile's 36 qualifying headings, 35
+    // have support for the whole route and the one that does not is the one the rule prefers: it
+    // passes a bench at 343.5 mm. That walk ran 52.795 m before the product refused to move.
     //
-    // This does not choose a heading and cannot: it refuses the one the rule chose, before the
-    // captures, naming where the ground stops. A run that walks into it instead reports a stalled
-    // walk, which took three runs and two wrong causes to read.
+    // THIS DOES NOT CHOOSE. It takes the rule's order as given and refuses, in order, until one has
+    // ground. Every refusal is recorded with where its ground stopped, so a record says whether the
+    // walk was the rule's first preference or its fourth, which is what `candidatesWithFrontage`
+    // exists to say about the tie-break and what this says about the ground.
     //
-    // Sampled at 5 mm rather than at the product's own 0.05 m path spacing: the unsupported run
-    // here is 32 mm and the walker advances about 28 mm a frame, so a probe at the product's
-    // spacing can step over the thing that stops the walk. One batch, about 26,000 points.
+    // Sampled at 5 mm rather than at the product's own 0.05 m path spacing: the unsupported run on
+    // this tile is 32 mm and the walker advances about 28 mm a frame, so a probe at the product's
+    // spacing can step over the thing that stops the walk. One batch per heading, about 26,000
+    // points.
     //
     // THE GENERATED TARGET ONLY, and that is a limit rather than a judgement. The disagreement was
     // measured on a tile's carve; whether this check is inert on the owned district has NOT been
@@ -1258,33 +1260,10 @@ async function main() {
     // able to refuse it. Extending it there needs the product target run before and after, with
     // every plan field pinned, which is the measurement the orchestrator has asked for.
     const GROUND_PROBE_SPACING_M = 0.005;
-    const walked = (plan.rule.lengthMm + plan.rule.stopMarginMm) / 1000;
-    const groundProbes = Math.round(walked / GROUND_PROBE_SPACING_M) + 1;
-    const groundPoints = new Float64Array(groundProbes * 2);
-    for (let step = 0; step < groundProbes; step += 1) {
-      groundPoints[step * 2] = plan.start[0] + plan.forward[0] * (step * GROUND_PROBE_SPACING_M);
-      groundPoints[step * 2 + 1] = plan.start[1] + plan.forward[1] * (step * GROUND_PROBE_SPACING_M);
-    }
-    const groundHeights = scoresOwnedDistrict ? new Float64Array(0)
-      : float64FromBase64(await session.call(bindingId, SAMPLE_SUPPORT, [toBase64(groundPoints)]));
-    let firstUnsupported = null;
-    let unsupportedProbes = 0;
-    for (let step = 0; step < groundHeights.length; step += 1) {
-      if (!Number.isNaN(groundHeights[step])) continue;
-      unsupportedProbes += 1;
-      if (firstUnsupported === null) firstUnsupported = step * GROUND_PROBE_SPACING_M;
-    }
-    observed.routeGround = {
-      asked: !scoresOwnedDistrict,
-      probeSpacingM: GROUND_PROBE_SPACING_M,
-      probes: groundHeights.length,
-      lengthM: walked,
-      unsupportedProbes,
-      firstUnsupportedAtM: firstUnsupported,
-    };
-    if (firstUnsupported !== null) {
-      const x = plan.start[0] + plan.forward[0] * firstUnsupported;
-      const z = plan.start[1] + plan.forward[1] * firstUnsupported;
+    const walkedM = (preferred.rule.lengthMm + preferred.rule.stopMarginMm) / 1000;
+    const groundProbes = Math.round(walkedM / GROUND_PROBE_SPACING_M) + 1;
+    /** The nearest route obstruction ring to a point, which separates a carve boundary from an edge. */
+    const nearestRingTo = (x, z) => {
       let nearest = null;
       for (const { id, ring } of routeRings) {
         for (let k = 0; k < ring.length; k += 1) {
@@ -1298,22 +1277,96 @@ async function main() {
           if (nearest === null || metres < nearest.metres) nearest = { id, metres };
         }
       }
-      observed.routeGround.nearestRouteRingAtFirstGap = nearest === null ? null
-        : { id: nearest.id, metres: Number(nearest.metres.toFixed(4)) };
-      await halt(
-        `the route rule chose a heading the product cannot walk: its own navigation surface states ` +
-        `no support ${firstUnsupported.toFixed(3)} m along the ${walked} m line, and ` +
-        `${unsupportedProbes} of ${groundHeights.length} probes at ${GROUND_PROBE_SPACING_M * 1000} mm find ` +
-        `none` +
-        (nearest === null ? '' : `. The nearest route obstruction ring there is ${nearest.metres.toFixed(3)} m away, ` +
-          `against the ${THRESHOLDS.capsuleRadiusMm} mm radius the rule qualifies by`) +
-        '. The rule reads rings and the field and never asks what holds a body up, so a line that ' +
-        'clears every ring by the radius can still cross ground the carve took away. This refuses ' +
-        'the heading rather than walking into it and reporting a stalled walk.',
-      );
+      return nearest;
+    };
+    /** Where the product's own surface first states no support along a candidate, or null. */
+    const groundUnder = async (candidate) => {
+      const points = new Float64Array(groundProbes * 2);
+      for (let step = 0; step < groundProbes; step += 1) {
+        points[step * 2] = candidate.start[0] + candidate.forward[0] * (step * GROUND_PROBE_SPACING_M);
+        points[step * 2 + 1] = candidate.start[1] + candidate.forward[1] * (step * GROUND_PROBE_SPACING_M);
+      }
+      const heights = float64FromBase64(await session.call(bindingId, SAMPLE_SUPPORT, [toBase64(points)]));
+      let firstGap = null;
+      let gaps = 0;
+      for (let step = 0; step < heights.length; step += 1) {
+        if (!Number.isNaN(heights[step])) continue;
+        gaps += 1;
+        if (firstGap === null) firstGap = step * GROUND_PROBE_SPACING_M;
+      }
+      if (firstGap === null) return null;
+      const x = candidate.start[0] + candidate.forward[0] * firstGap;
+      const z = candidate.start[1] + candidate.forward[1] * firstGap;
+      const nearest = nearestRingTo(x, z);
+      return {
+        headingMillidegrees: candidate.headingMillidegrees,
+        firstUnsupportedAtM: firstGap,
+        unsupportedProbes: gaps,
+        nearestRouteRing: nearest === null ? null : { id: nearest.id, metres: Number(nearest.metres.toFixed(4)) },
+      };
+    };
+    let walkPlan = preferred;
+    const groundRefused = [];
+    if (!scoresOwnedDistrict) {
+      walkPlan = null;
+      for (const candidate of ranked) {
+        const gap = await groundUnder(candidate);
+        if (gap === null) {
+          walkPlan = candidate;
+          break;
+        }
+        groundRefused.push(gap);
+      }
+      observed.routeGround = {
+        asked: true,
+        probeSpacingM: GROUND_PROBE_SPACING_M,
+        probesPerHeading: groundProbes,
+        lengthM: walkedM,
+        preferredByTheRule: preferred.headingMillidegrees,
+        refusedForNoGround: groundRefused,
+        walked: walkPlan === null ? null : walkPlan.headingMillidegrees,
+      };
+      if (walkPlan === null) {
+        const first = groundRefused[0];
+        await halt(
+          `no heading the route rule qualifies has ground along it: all ${groundRefused.length} were ` +
+          `refused by the product's own navigation surface, sampled every ` +
+          `${GROUND_PROBE_SPACING_M * 1000} mm over ${walkedM} m. The one the rule preferred, ` +
+          `${first.headingMillidegrees} millidegrees, loses support ${first.firstUnsupportedAtM.toFixed(3)} m ` +
+          `along` +
+          (first.nearestRouteRing === null ? '' : `, ${first.nearestRouteRing.metres.toFixed(3)} m from a ring ` +
+            `the rule qualifies past at ${THRESHOLDS.capsuleRadiusMm} mm`) +
+          '. The rule reads rings and the field and never asks what holds a body up, so every line it ' +
+          'offers can still cross ground the carve took away.',
+        );
+      }
+      if (groundRefused.length > 0) {
+        phase(`${groundRefused.length} heading(s) the rule preferred have no ground; walking ${walkPlan.headingMillidegrees}`);
+      }
     }
-    phase(scoresOwnedDistrict ? 'the route ground was not asked about on this target'
-      : `the route has support at all ${groundHeights.length} probes`);
+    // Bound the moment it is decided, so a halt AFTER the route is chosen still says what the rule
+    // decided and on what. A halt that carries the reason and not the decision leaves the next
+    // reader unable to tell a rule that chose from a rule that fell back.
+    observed.route = {
+      // WHERE IT STARTED, because a halt that states a heading and no origin states a direction and
+      // not a route, and every figure below is measured from this point.
+      startMm: [Math.round(walkPlan.start[0] * 1000), Math.round(walkPlan.start[1] * 1000)],
+      headingMillidegrees: walkPlan.headingMillidegrees,
+      clearRunMm: walkPlan.clearRunMm,
+      frontageSamples: walkPlan.frontageSamples,
+      frontageBothSidesSamples: walkPlan.frontageBothSidesSamples,
+      meanFrontageSkewMillionths: walkPlan.meanFrontageSkewMillionths,
+      candidatesTried: walkPlan.candidatesTried,
+      candidatesQualified: walkPlan.candidatesQualified,
+      candidatesWithFrontage: walkPlan.candidatesWithFrontage,
+      // How many headings the rule preferred to this one and the ground refused. Zero means the walk
+      // is the rule's own first choice, which is what a record stating only a heading cannot say.
+      headingsRefusedForNoGround: groundRefused.length,
+    };
+    // Everything downstream reads the plan that will be WALKED, which is the rule's own first
+    // choice unless the ground refused it, and the record says which by `headingsRefusedForNoGround`.
+    const plan = walkPlan;
+    phase(`the route was planned at ${plan.headingMillidegrees} millidegrees`);
 
     const interactions = [];
     const harnessWrites = [];
@@ -1882,6 +1935,8 @@ async function main() {
         obstacles: prisms.length,
         routeRings: routeRings.length,
         routeRingsRefused: observed.routeObstacleRingsRefused ?? [],
+        groundRefused,
+        routeGround: observed.routeGround ?? null,
         fieldBoundsCm: artifact?.bounds_cm ?? null,
       }),
       interactions,
