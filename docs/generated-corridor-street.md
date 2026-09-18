@@ -222,6 +222,29 @@ The walk starts on the wider footway, in the middle of it, at the western end of
 Read into the development evaluation route, that is
 `?preview=1&city=<seed>&tile_x=2&tile_y=0&pose_x_mm=262000&pose_y_mm=70300&facing_dx=1&facing_dy=0`.
 
+**The walk itself, stated before it is taken.** The pose says where a picture starts; these say
+what the walk does, and they are written here before the tessellator 14 rebake so that the numbers
+this lane reports afterwards have something to be checked against rather than to be chosen to fit.
+The tile runtime lane is running the same walk from its own side, so both halves of the experiment
+name the same parameters.
+
+| | |
+| --- | --- |
+| path | east along the footway centre line, y `70300`, from x `262000` to x `378000` |
+| distance | 116 000 mm |
+| captures | at the start, at x `320000`, and at the end |
+| movement | the product's own walking, a held W key through its movement and support resolution |
+| never | no camera override (it renders a quarter frame) and no writing of a position: a walk that teleports proves nothing about support |
+| viewport | 960 px wide or more, because the app serves its boundary page below 60rem and would film an apology |
+
+**What I expect it to do, so that a surprise is legible as one.** Tess's carve now leaves the
+footway supported along the walked line, with fourteen gaps of about a metre where a 151 mm trunk
+plus the 340 mm a body needs interrupt it. The tile carries no `collision_proxy`, so nothing stops
+a walker entering one; what happens when a walker meets a metre of unsupported footway is the open
+question of this walk, and the honest answers include stopping, dropping to the terrain 170 mm
+below, and stepping over it. I do not know which, and I would rather record the question in advance
+than discover the answer and call it the expected behaviour.
+
 **What the walk found, and what it costs.** The footway now draws, and the navigation envelope
 carries it: at the stated pose the surface under the walker is the footway at 170 mm, not the
 terrain below it. But **56 m of the 116 m has no walkable surface at all**. Sampling the envelope
