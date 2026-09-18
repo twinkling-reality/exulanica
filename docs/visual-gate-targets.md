@@ -443,6 +443,43 @@ what its name suggests. The counts are measured; the account of why is a reading
 prediction.** Facades are the most changed thing in the frame and `facadeTriangles` is still zero, so
 the key that names them measured nothing again.
 
+## Why no component is ever seeded as support, measured
+
+`noCutsOrFloatingGeometry` reports 62 components detached from support, which reads as sixty-two
+objects floating over a sound street. What it reports is that EVERY drawn component is detached, and
+the reason is in the seeding condition rather than in the world.
+
+A component is seeded as support only when it holds a walking-classified triangle AND THE WHOLE
+COMPONENT'S LOWEST POINT sits within the 50 mm contact tolerance of the product's support height at
+that plan position. Both clauses measured on the openings run:
+
+- the walking classification FIRES: 819 triangles. So this is not the textured key's defect, where an
+  input is empty by construction;
+- the height comparison NEVER HAPPENS. Sampling the product's own surface at each detached
+  component's lowest plan position, ELEVEN OF THE TWELVE the record lists return NO SURFACE AT ALL.
+  There is nothing to be 50 mm from, so `height !== null` fails and the tolerance is never reached.
+
+**A component's lowest point is exactly where support is absent by design.** The largest component is
+1,983 triangles spanning five meshes, brick, cast concrete, limestone ashlar, painted render and the
+unavailable surfaces: the whole building is one component, and its lowest point is its own footprint
+corner, where the carve removed the walkable surface because the massing obstructs. The test asks
+whether there is ground under the lowest corner of a thing whose lowest corner is inside the
+obstruction the ground was carved away from.
+
+So the key's verdict is right and its number is not what a reader takes it for. That is the second
+key on this page in that condition, and neither is this lane's to change.
+
+**The twelfth row, and an inference marked as one.** One component of 2 triangles has its lowest at
+69 mm with support at 80.1 mm, 11.1 mm apart, inside the tolerance. It satisfies the height clause
+and nothing was seeded, so it must hold no walking triangle. The record does not carry per-component
+walking membership and that was not measured.
+
+**And an open question for the owned district, which this lane cannot answer.** The same test would
+consult the lowest point of that district's buildings. Whether that lands on supported ground depends
+on whether its ground extends under them. If it does not, this key has reported the same thing on
+every retained record, and the baseline's failure of it would need re-reading. Not claimed here:
+running that target needs a credential this lane does not hold.
+
 ## A hint about the frontage tie-break, with its n beside it
 
 **A direction, not evidence.** Over all 36 headings the rule qualifies on this tile, each sampled
