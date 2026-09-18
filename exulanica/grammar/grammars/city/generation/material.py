@@ -5,9 +5,10 @@ band, stall riser, fascia and awning where its bays have them; its trim where it
 openings; its party wall scar where a neighbour stands lower than it. A building's roof, its
 parapet where it has one, and its wall where a ridge roof leaves gables. A rooftop object's parts'
 roles. A segment's carriageway and, with a gutter, its gutter; a curb's kerb and footway; a
-junction's carriageway; a block's and a lot's ground. A street tree's trunk and canopy. A role no
-published set dresses (a door, paint, terrain, a tree's pit) gets no record and draws as
-unavailable.
+junction's carriageway; a block's and a lot's ground. A street tree's trunk, canopy and pit; a
+crossing's painted band. Terrain is the only role no published set dresses, so it is the only one
+that draws as unavailable, and it does so at the district's edges where no other record covers the
+ground.
 
 **Everything a record draws, including what the late stages make.** This stage runs last but one,
 after streetlife, vitrine and premises, so a street lamp's parts, a vitrine's fitout and the plane
@@ -82,7 +83,7 @@ ROLE_MATERIALS: Final = {
     "fascia": ("painted_render", "storefront_metal"),
     "trim": ("wall", "limestone_ashlar", "cast_concrete"),
     "party_wall_scar": ("wall", "brick_running_bond"),
-    "awning": ("storefront_metal",),
+    "awning": ("awning_canvas", "storefront_metal"),
     "roof": ("cast_concrete",),
     "parapet": ("wall", "limestone_ashlar"),
     "carriageway": ("carriageway_asphalt",),
@@ -93,8 +94,14 @@ ROLE_MATERIALS: Final = {
     "object_primary": ("storefront_metal",),
     "object_secondary": ("cast_concrete", "storefront_metal"),
     "object_tertiary": ("storefront_metal",),
-    "shopfront_frame": ("storefront_metal",),
+    "shopfront_frame": ("painted_timber", "storefront_metal"),
     "glazing": ("float_glazing",),
+    "door": ("painted_timber",),
+    "tree_pit": ("tree_pit_soil",),
+    # A crossing's band is paint over the carriageway, not a different road surface. There is no
+    # entry for a lane marking: the record kind exists in the grammar and no stage emits one yet,
+    # and a preference for a role nothing asks for would never be read.
+    "crossing": ("road_paint_white",),
     "trunk": ("tree_bark",),
     "canopy": ("broadleaf_foliage",),
 }
@@ -223,7 +230,7 @@ def _generate(context: StageContext) -> Iterator[material.SurfaceMaterialRecord]
                 roles.append("ground_band")
             roles += [
                 role
-                for role in ("stall_riser", "fascia", "shopfront_frame", "glazing")
+                for role in ("stall_riser", "fascia", "shopfront_frame", "glazing", "door")
                 if role in panel_roles
             ]
             if face.string_courses or face.cornice or face.openings:
@@ -331,6 +338,15 @@ def _generate(context: StageContext) -> Iterator[material.SurfaceMaterialRecord]
             placement,
             _STREETS + street_ordinals[segments_by_identity[junction.segment_identities[0]]],
         )
+    for crossing in prior_records(context, streets.STAGE_ID, streets.CrossingRecord):
+        yield record(
+            crossing.identity,
+            "city.crossing",
+            "crossing",
+            _material_for("crossing", None),
+            street_placement[crossing.segment_identity],
+            _STREETS + street_ordinals[segments_by_identity[crossing.segment_identity]],
+        )
     for item in prior_records(context, streetlife.STAGE_ID, streetlife.StreetFurnitureRecord):
         placement = street_placement[item.segment_identity]
         for role in sorted({part.surface_role for part in item.parts}):
@@ -356,7 +372,9 @@ def _generate(context: StageContext) -> Iterator[material.SurfaceMaterialRecord]
     for tree in prior_records(context, streetlife.STAGE_ID, streetlife.StreetTreeRecord):
         placement = street_placement[tree.segment_identity]
         ordinal = _STREETS + street_ordinals[segments_by_identity[tree.segment_identity]]
-        for role in sorted({part.surface_role for part in tree.parts}):
+        # The pit is the tree's too: open ground beside its trunk, which the navigation table
+        # calls a support surface a person may stand on.
+        for role in (*sorted({part.surface_role for part in tree.parts}), "tree_pit"):
             yield record(
                 tree.identity,
                 "city.street_tree",

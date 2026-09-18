@@ -152,16 +152,22 @@ change, through ``validateTileLook``.
 4. TEXTURES (``assets/textures/manifest.json``, ``docs/texture-package.md``)
 ===========================================================================
 
-Eleven published sets, each with a pinned SHA-256 (migration 0065): eight of class ``opaque``
-(``cc0.brick-running-bond`` 1800 mm, ``cc0.carriageway-asphalt`` 2000, ``cc0.cast-concrete`` 2400,
-``cc0.footway-paving`` 1800, ``cc0.kerb-stone`` 1800 by 450, ``cc0.limestone-ashlar`` 2400,
-``cc0.painted-render`` 2000, ``cc0.storefront-metal`` 1000), ``cc0.tree-bark`` (opaque, 1000),
-``cc0.float-glazing`` (class ``glazing``, 2000) and ``cc0.broadleaf-foliage`` (class ``cutout``,
-2000). The material catalog (``material.v3.json``) has one entry per set with the surface roles it
-dresses and whether its texture runs one way. No published set dresses a door, an awning, road
-paint, terrain or a tree pit, so those surfaces carry no material record and draw as the stated
-unavailable surface; timber, fabric, road paint (``decal``) and sign panels are batch 3 on the
-texture lane. Budget: 168 MB decoded texture per corridor; one 1024 set is 16,777,212 bytes as the
+Seventeen published sets, each with a pinned SHA-256 (migrations 0065 and 0078): thirteen of class
+``opaque`` (``cc0.brick-running-bond`` 1800 mm, ``cc0.carriageway-asphalt`` 2000,
+``cc0.cast-concrete`` 2400, ``cc0.footway-paving`` 1800, ``cc0.kerb-stone`` 1800 by 450,
+``cc0.limestone-ashlar`` 2400, ``cc0.painted-render`` 2000, ``cc0.painted-timber`` 1000,
+``cc0.awning-canvas`` 1000, ``cc0.sign-panel`` 1000, ``cc0.storefront-metal`` 1000,
+``cc0.tree-bark`` 1000, ``cc0.tree-pit-soil`` 900), ``cc0.float-glazing`` (class ``glazing``,
+2000), ``cc0.broadleaf-foliage`` (class ``cutout``, 2000) and two of class ``decal``,
+``cc0.road-paint-white`` and ``cc0.road-paint-yellow`` (1000 by 250). The material catalog
+(``material.v4.json``) holds sixteen of them, each entry naming the surface roles it dresses and
+whether its texture runs one way. Two of those sixteen are not reached by any record this grammar
+makes today: ``cc0.road-paint-yellow`` dresses a lane marking, and ``cc0.road-paint-white`` dresses
+one too besides the crossing band it paints, and no stage emits a marking record yet.
+``cc0.sign-panel`` has no entry at all, because no surface role names a sign panel until the
+lettering lane's records do. Terrain is now the only role no published set dresses, so a terrain
+surface is the only one that carries no material record and draws as the stated unavailable
+surface. Budget: 168 MB decoded texture per corridor; one 1024 set is 16,777,212 bytes as the
 runtime uploads it.
 
 5. THE VISUAL GATE (``docs/visual-gate-rubric.md`` version 5, key set

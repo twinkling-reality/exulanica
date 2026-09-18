@@ -454,7 +454,7 @@ exist, a sign for a use class that takes none, and a signed use class with no si
 | `fitout.v1.json` | 7 | Vitrine fitout units as explicit parts, with the use classes each dresses. |
 | `junction-control.v1.json` | 4 | Right-of-way classes; the keys equal the traffic lane's right-of-way policy keys. |
 | `lane-use.v2.json` | 6 | General, bus, bus layover, cycle, parking and buffer, with width ranges and the tightest turn each must admit; traffic maps them to vehicle classes. |
-| `material.v3.json` | 11 | One material per pinned texture set, with the surface roles it dresses, its baked modules and whether its texture runs one way. |
+| `material.v4.json` | 16 | One material per pinned texture set it dresses with, with the surface roles it dresses, its baked modules and whether its texture runs one way. |
 | `parking-kind.v1.json` | 5 | General, loading, accessible, bus layover and cycle stand, with placement and size. |
 | `roof-family.v2.json` | 3 | Flat with parapet, flat with eaves, and gable: form, rise, parapet and rooftop objects. |
 | `rooftop-object.v1.json` | 4 | HVAC unit, water tank, lift overrun and stair bulkhead as explicit parts. |

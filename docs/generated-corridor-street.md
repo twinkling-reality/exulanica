@@ -70,22 +70,22 @@ Every check runs on every tile, and the evidence log records all of them.
 ## 4. What is drawn unavailable, and why
 
 A surface no published texture set dresses is drawn as the unavailable hatch. That is the honest
-answer, and these are the counts across the city:
+answer, and this is the count across the city:
 
 | Role | Surfaces | Waiting on |
 | --- | --- | --- |
-| `door` | 228 | The painted-timber set, texture batch 3. |
-| `crossing` | 40 | Road paint, texture batch 3. |
-| tree pit | 118 | The soil set, texture batch 3. |
+| `terrain` | 5 | Bare ground, which no set depicts and none is asked for. |
 
-Glazing, transoms, shopfront frames, bark and foliage were on that list this morning and are not
-now: `material.v3.json` dresses them from the published `cc0.float-glazing`, `cc0.tree-bark` and
-`cc0.broadleaf-foliage` sets. The count above is measured against the material records the city
-actually holds, so it falls on its own as sets are published and nothing has to remember to edit a
-list.
+Doors (228), crossing bands (40), tree pits (118), awnings, glazing, transoms, shopfront frames,
+bark and foliage were on that list earlier today and are not now: `material.v4.json` dresses them
+from the sixteen published sets it holds, six of which arrived with texture batch 3. The count is
+measured against the material records the city actually holds, so it falls on its own as sets are
+published and nothing has to remember to edit a list. It counts surfaces, not area: five terrain
+records, one per tile, each of them a whole tile's ground grid that the blocks, streets, kerbs and
+junctions draw over almost entirely.
 
-Two strips of terrain are also bare: 1.0 m along the district's south edge and 2.3 m along its
-north edge, where the outermost footway stops and the city ends. They total 422 m², 2.6 per cent
+Where a terrain grid is not drawn over, it is two strips: 1.0 m along the district's south edge
+and 2.3 m along its north edge, where the outermost footway stops and the city ends. They total 422 m², 2.6 per cent
 of the corridor tile, and they are 64 m from the walked street behind two rows of buildings.
 Nothing between them is bare: the street lattice tiles the district exactly, block frontage to
 kerb line, with no verge and no forecourt. They are a known unavailable, not a defect, and they

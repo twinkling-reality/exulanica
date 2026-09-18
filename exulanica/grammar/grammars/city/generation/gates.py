@@ -44,6 +44,7 @@ from exulanica.grammar.grammars.city.streets import (
     CrossingRecord,
     CurbEdgeRecord,
 )
+from exulanica.grammar.grammars.city.terrain import TerrainRecord
 
 __all__ = ["BAY_PITCH_BAND_MM", "PITCH_SHARE_PERCENT", "GateReport", "measure_gates"]
 
@@ -182,8 +183,10 @@ def measure_gates(records: Sequence[object]) -> GateReport:
             report.materials_with_texture_set += bool(item.texture_set_id)
             dressed.add((item.surface_identity, item.role))
     for item in records:
-        if isinstance(item, RoadMarkingRecord):
+        if isinstance(item, RoadMarkingRecord) and (item.identity, "marking") not in dressed:
             unavailable["marking"] += 1
+        elif isinstance(item, TerrainRecord) and (item.identity, "terrain") not in dressed:
+            unavailable["terrain"] += 1
         elif isinstance(item, StreetTreeRecord):
             for role in (*sorted({part.surface_role for part in item.parts}), "tree_pit"):
                 if (item.identity, role) not in dressed:

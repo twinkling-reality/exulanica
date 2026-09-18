@@ -141,7 +141,7 @@ def test_every_entry_carries_a_shippable_licence_and_a_source_that_exists():
             assert ROOT.joinpath(entry.licence.content_source).is_file(), where
             if entry.licence.origin == "derived":
                 assert entry.licence.content_source.startswith("assets/catalogs/sources/"), where
-    assert entries == 128
+    assert entries == 133
 
 
 _AUTHORED = (
@@ -184,18 +184,25 @@ def test_a_guide_cited_by_an_authored_value_is_marked_as_not_re_read():
 def test_each_material_depicts_one_of_the_pinned_texture_sets():
     catalog = _catalog("material")
     published = read_texture_manifest()
+    # Sixteen of the seventeen published sets. The seventeenth, cc0.sign-panel, has no material
+    # because no surface role names a sign panel yet.
     pinned = {
+        "cc0.awning-canvas",
         "cc0.brick-running-bond",
+        "cc0.broadleaf-foliage",
         "cc0.carriageway-asphalt",
         "cc0.cast-concrete",
+        "cc0.float-glazing",
         "cc0.footway-paving",
         "cc0.kerb-stone",
         "cc0.limestone-ashlar",
         "cc0.painted-render",
+        "cc0.painted-timber",
+        "cc0.road-paint-white",
+        "cc0.road-paint-yellow",
         "cc0.storefront-metal",
-        "cc0.float-glazing",
         "cc0.tree-bark",
-        "cc0.broadleaf-foliage",
+        "cc0.tree-pit-soil",
     }
     sets = []
     for entry in catalog.entries:
@@ -486,6 +493,6 @@ def test_a_broken_cross_catalog_reference_is_refused(tmp_path, why, name, change
 
 def test_a_material_naming_an_unpublished_texture_set_is_refused(tmp_path):
     directory = _copy_catalogs(tmp_path)
-    _edit(directory, "material.v3.json", _set("kerb_stone", "texture_set_id", "cc0.granite-sett"))
+    _edit(directory, "material.v4.json", _set("kerb_stone", "texture_set_id", "cc0.granite-sett"))
     with pytest.raises(UnresolvedReferenceError, match=re.escape("cc0.granite-sett")):
         load_city_catalogs(directory)

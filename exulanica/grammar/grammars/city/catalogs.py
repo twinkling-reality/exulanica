@@ -241,7 +241,7 @@ def city_catalog_schemas(*, texture_sets: Mapping[str, TextureSet]) -> tuple[Cat
         ),
         CatalogSchema(
             "material",
-            3,
+            4,
             (
                 ("label", text_field),
                 (
@@ -258,6 +258,10 @@ def city_catalog_schemas(*, texture_sets: Mapping[str, TextureSet]) -> tuple[Cat
                             "glazing",
                             "bark",
                             "foliage",
+                            "timber",
+                            "fabric",
+                            "soil",
+                            "paint",
                         )
                     ),
                 ),

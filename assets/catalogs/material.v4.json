@@ -1,8 +1,30 @@
 {
   "schema_version": 1,
   "catalog_id": "material",
-  "catalog_version": 3,
+  "catalog_version": 4,
   "entries": [
+    {
+      "key": "awning_canvas",
+      "label": "Awning canvas",
+      "category": "fabric",
+      "texture_set_id": "cc0.awning-canvas",
+      "surfaces": [
+        "awning"
+      ],
+      "course_module_mm": 0,
+      "mortar_module_mm": 0,
+      "unit_length_mm": 0,
+      "bond": "none",
+      "grain": "directional",
+      "reason": "The material the cc0.awning-canvas texture set depicts. Its frame runs u along the shopfront and v down the slope, so the stripes fall the way an awning's do, and turning it a quarter would run them across the fall. It states no course, joint or unit.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "assets/textures/objects/98b2716184313ba2604243c0f99b01a13372468bc2409d95e5abdee7ef64ffcb.json"
+      }
+    },
     {
       "key": "brick_running_bond",
       "label": "Brick, running bond",
@@ -233,6 +255,75 @@
       }
     },
     {
+      "key": "painted_timber",
+      "label": "Painted timber",
+      "category": "timber",
+      "texture_set_id": "cc0.painted-timber",
+      "surfaces": [
+        "stall_riser",
+        "shopfront_frame",
+        "door"
+      ],
+      "course_module_mm": 0,
+      "mortar_module_mm": 0,
+      "unit_length_mm": 0,
+      "bond": "none",
+      "grain": "directional",
+      "reason": "The material the cc0.painted-timber texture set depicts. A painted board, which a door, a shopfront frame and a stall board are made of. It states no course, joint or unit, because boards are not laid in units. Its texture runs one way, along the grain, so it is never turned a quarter.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "assets/textures/objects/ebfb74d626d943464c8efeb12dff6d0249ad421bfa07f8e2ac90a2332f562295.json"
+      }
+    },
+    {
+      "key": "road_paint_white",
+      "label": "White road paint",
+      "category": "paint",
+      "texture_set_id": "cc0.road-paint-white",
+      "surfaces": [
+        "crossing",
+        "marking"
+      ],
+      "course_module_mm": 0,
+      "mortar_module_mm": 0,
+      "unit_length_mm": 0,
+      "bond": "none",
+      "grain": "directional",
+      "reason": "The material the cc0.road-paint-white texture set depicts. The paint a zebra's bands and a lane's markings are made of, drawn over the carriageway rather than instead of it. Its 1000 by 250 mm extent is a stripe, so its frame decides which way the bands run and a quarter turn would lay them along the road instead of across it.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "assets/textures/objects/98d8fb453cbe2ca3349a13adf27c69d79390bf6b12b5412611c898b9459adc40.json"
+      }
+    },
+    {
+      "key": "road_paint_yellow",
+      "label": "Yellow road paint",
+      "category": "paint",
+      "texture_set_id": "cc0.road-paint-yellow",
+      "surfaces": [
+        "marking"
+      ],
+      "course_module_mm": 0,
+      "mortar_module_mm": 0,
+      "unit_length_mm": 0,
+      "bond": "none",
+      "grain": "directional",
+      "reason": "The material the cc0.road-paint-yellow texture set depicts. The paint a restriction is marked in, where a white line would say something else. Its extent and frame are the white paint's, and it is never turned a quarter for the same reason.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "assets/textures/objects/d6d7212886778b2ca80e3694a6ef30c4e17160b17b3264012edf386479140ac8.json"
+      }
+    },
+    {
       "key": "storefront_metal",
       "label": "Storefront metal",
       "category": "metal",
@@ -280,6 +371,28 @@
         "origin": "original",
         "licence_source": "LICENSE",
         "content_source": "assets/textures/objects/97401e79fd48a3ca25829e279153cd405746a651cc7be2f9427f9f7bf6be90b8.json"
+      }
+    },
+    {
+      "key": "tree_pit_soil",
+      "label": "Tree pit soil",
+      "category": "soil",
+      "texture_set_id": "cc0.tree-pit-soil",
+      "surfaces": [
+        "tree_pit"
+      ],
+      "course_module_mm": 0,
+      "mortar_module_mm": 0,
+      "unit_length_mm": 0,
+      "bond": "none",
+      "grain": "none",
+      "reason": "The material the cc0.tree-pit-soil texture set depicts. The open ground a street tree stands in. Its 900 mm extent is one tile across the narrowest pit the grammar admits, so a pit shows no repeat of itself. It states no course, joint or unit, and its texture has no direction, so a quarter turn of it reads the same.",
+      "licence": {
+        "spdx": "Apache-2.0",
+        "verdict": "SHIP",
+        "origin": "original",
+        "licence_source": "LICENSE",
+        "content_source": "assets/textures/objects/b136a6cdb7aa887dbcc7210dd83e2e8406caa020bba847413fd22b8310cd9b1f.json"
       }
     }
   ]

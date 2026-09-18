@@ -19,8 +19,9 @@ from exulanica.grammar.grammars.city.generation.corridor import CORRIDOR_TILE
 from exulanica.grammar.grammars.city.generation.gates import measure_gates
 from exulanica.grammar.grammars.city.massing import MassingRecord
 from exulanica.grammar.grammars.city.material import SurfaceMaterialRecord
-from exulanica.grammar.grammars.city.streetlife import StreetFurnitureRecord
+from exulanica.grammar.grammars.city.streetlife import StreetFurnitureRecord, StreetTreeRecord
 from exulanica.grammar.grammars.city.streets import CurbEdgeRecord
+from exulanica.grammar.grammars.city.terrain import TerrainRecord
 from exulanica.grammar.records import record_payload
 
 from corridor_city import documents, records
@@ -51,6 +52,36 @@ def test_the_corridor_tile_alone_passes_every_gate():
     report = measure_gates(owned)
     assert report.buildings >= 14
     assert report.passes() == dict.fromkeys(_GATES, True)
+
+
+def test_terrain_is_the_only_surface_left_undressed():
+    """Every other role a record carries has a material, and terrain has none by decision.
+
+    The count is one per terrain record, which is one per tile: the gate counts surfaces and not
+    area, and a tile's terrain is one grid the blocks, streets and kerbs draw over almost
+    entirely. Nothing lists what is unavailable, so a role falls off this count when a material
+    record dresses it and appears on it when one stops.
+    """
+    city = records()
+    terrains = [record for record in city if isinstance(record, TerrainRecord)]
+    assert terrains
+    assert measure_gates(city).unavailable_roles == {"terrain": len(terrains)}
+
+
+def test_a_role_that_loses_its_material_is_counted_again():
+    """The count is measured, not listed: drop one tree's pit material and the pit reappears."""
+    tree = _first(StreetTreeRecord)
+    dressing = next(
+        record
+        for record in records()
+        if isinstance(record, SurfaceMaterialRecord)
+        and record.surface_identity == tree.identity
+        and record.role == "tree_pit"
+    )
+    undressed = [record for record in records() if record is not dressing]
+    report = measure_gates(undressed)
+    assert report.unavailable_roles["tree_pit"] == 1
+    assert report.passes()["materials_name_texture_sets"] is True
 
 
 def _first(record_type: type) -> object:
