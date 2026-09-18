@@ -4,7 +4,12 @@ from __future__ import annotations
 
 import pytest
 
-from exulanica_appearance.canonical import Refused, canonical_bytes, parse_canonical
+from exulanica_appearance.canonical import (
+    Refused,
+    canonical_bytes,
+    parse_canonical,
+    sha256_hex,
+)
 from exulanica_appearance.generation import (
     REGENERATION,
     build_generation,
@@ -263,3 +268,27 @@ def test_the_documented_section_says_what_a_person_needs_later():
     )
     assert "| Prepaid balance after | PENDING: the provider's billing page" in pending
     assert "$33.73" not in pending
+
+
+def test_the_committed_session_records_are_the_run_s_own(repository):
+    """The copied evidence is exactly what the run wrote, and the run record pins exactly it."""
+    from exulanica_appearance.generation import read_generation
+    from exulanica_appearance.gpu_run import read_gpu_run
+
+    root = repository / "ml/appearance/evidence/session-1"
+    names = set()
+    for directory, count in (("records", 64), ("smoke-records", 2)):
+        files = sorted((root / directory).glob("*.json"))
+        assert len(files) == count, directory
+        for path in files:
+            raw = path.read_bytes()
+            assert sha256_hex(raw) == path.stem, path.name
+            record = read_generation(raw)
+            assert record["truth"] == "invented"
+            assert record["generated"] is True
+            names.add(path.stem)
+    run = read_gpu_run((repository / "ml/appearance/evidence/gpu-run-a1.json").read_bytes())
+    assert set(run["generations"]) == names
+    results = parse_canonical((root / "results.json").read_bytes(), "the results")
+    assert {item["record_sha256"] for item in results["generations"]} <= names
+    assert results["stopped"] == ""

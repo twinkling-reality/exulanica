@@ -160,6 +160,14 @@ one writable output directory, hard limit passed to timeout.
      median 100 per cent, and so on) came from an ad-hoc script with a different normalisation and are
      superseded by the committed measure above. This log's numbers are the ones to use.
 
+== where the run's own records are
+  Copied unchanged into ml/appearance/evidence/session-1/ after the report of 2026-09-17, so this
+  session can be checked from the repository and not from one Mac's disk: 64 generation records, the
+  smoke job's 2, both results summaries, the gate, and the measurements this log quotes. Every record
+  is named by the sha256 of its own bytes and a test holds that, and holds that the directory is
+  exactly the set of generations the run record pins. The 64 raw outputs (192 MB) and the 32 look
+  crops with their sheets (31 MB) stay out of git under .exulanica/appearance/, pinned by digest.
+
 == what this does not show
   - Nothing here is evidence about any real place. Every output is invented appearance on synthetic
     structure, labelled "invented" in its own record.
