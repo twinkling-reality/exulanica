@@ -13,8 +13,9 @@ can gain a page the other cannot.
 
 ## Which container each section's figures are about
 
-The pinned development tile has been rebaked three times while this document was being written, and
-every figure below belongs to ONE of those bakes. A triangle count or a byte size quoted out of a
+The pinned development tile has been rebaked FIVE times while this document was being written, and
+every figure below belongs to ONE of those bakes. None of them belongs to the bake the development
+server serves today. A triangle count or a byte size quoted out of a
 section without its container is a claim about a different tile a week later, which has already
 happened once: the 4,850 nav_envelope triangles in the first run's section were read, months of
 rebakes later, as a fact about the tile a current run was standing on.
@@ -24,6 +25,12 @@ rebakes later, as a fact about the tile a current run was standing on.
 | `48a87e1ce5c7ca78...` | 531,884 | the first generated run, before tessellator 14 |
 | `8b729a65...` | 553,804 | the repeat on tessellator 14, in that section's second column |
 | `1ef74efa8eef6844...` | 564,788 | the run with the rings off the collision field, tessellator 17 |
+| `3a2fd58d76f4d40f...` | 701,276 | the openings run, tessellator 18 |
+| `bd07246d...` | 703,556 | **NO SECTION IS ABOUT IT.** The current golden, with the ground bay |
+
+**The last row is the point of this table.** A reader on a later tree finds several digests here and
+none of them is what the server serves, which is the state this table exists to make visible rather
+than to hide. Every figure below is true of the bake its section names and of no other.
 
 The run that carried rings into the collision field states no container digest of its own. Its ring
 counts match what `1ef74efa` states and the tile file had not moved between that run and this one,
