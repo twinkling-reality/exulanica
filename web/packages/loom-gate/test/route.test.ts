@@ -8,6 +8,7 @@ import {
   measureCapsule,
   measureWalk,
   planRoute,
+  rankedRoutes,
   resampleTrace,
   sampleQueryPoints,
   type RouteRing,
@@ -203,5 +204,52 @@ describe('a start lying exactly on the walkable field boundary', () => {
       const forward: [number, number] = [-Math.sin(yaw), -Math.cos(yaw)];
       expect(firstContact(ON_THE_SOUTH_EDGE, forward, 0.34, [], FIELD, 5_000)).toBeLessThan(required / 1000);
     }
+  });
+});
+
+describe('the qualifying headings in the order the rule prefers them', () => {
+  it('begins with the heading planRoute returns, field for field', () => {
+    // One computation rather than two: planRoute IS the first of these, so a caller walking the
+    // order and a caller taking the winner can never disagree about what the rule preferred.
+    const { prisms } = street();
+    const ranked = rankedRoutes([5, 0], prisms, BOUNDS);
+    expect(ranked.length).toBeGreaterThan(0);
+    expect(ranked[0]).toEqual(planRoute([5, 0], prisms, BOUNDS));
+  });
+
+  it('holds exactly the headings that qualified, and states the same counts on each', () => {
+    const { prisms } = street();
+    const ranked = rankedRoutes([5, 0], prisms, BOUNDS);
+    expect(ranked.length).toBe(ranked[0]!.candidatesQualified);
+    for (const candidate of ranked) {
+      expect(candidate.candidatesTried).toBe(ranked[0]!.candidatesTried);
+      expect(candidate.candidatesQualified).toBe(ranked.length);
+      expect(candidate.clearRunMm).toBeGreaterThanOrEqual(ROUTE_RULE.lengthMm + ROUTE_RULE.stopMarginMm);
+    }
+  });
+
+  it('orders by frontage, then by skew, then by the smaller angle, and never otherwise', () => {
+    // The rule's own preference, stated as a comparison a reader can check rather than as a loop
+    // that keeps a winner. A caller may take a later entry; nothing may reorder this.
+    const { prisms } = street();
+    const ranked = rankedRoutes([5, 0], prisms, BOUNDS);
+    for (let index = 1; index < ranked.length; index += 1) {
+      const before = ranked[index - 1]!;
+      const after = ranked[index]!;
+      const ordered = before.frontageBothSidesSamples > after.frontageBothSidesSamples ||
+        (before.frontageBothSidesSamples === after.frontageBothSidesSamples &&
+          (before.meanFrontageSkewMillionths < after.meanFrontageSkewMillionths ||
+            (before.meanFrontageSkewMillionths === after.meanFrontageSkewMillionths &&
+              before.headingMillidegrees < after.headingMillidegrees)));
+      expect(ordered, `${before.headingMillidegrees} before ${after.headingMillidegrees}`).toBe(true);
+    }
+  });
+
+  it('is empty where no heading qualifies, and planRoute refuses on the same case', () => {
+    // A field too small for the route length. The order says nothing rather than saying the least
+    // bad thing, which is what leaves the refusal to the caller that knows what to do about it.
+    const tiny = [0, 0, 10, 10] as const;
+    expect(rankedRoutes([5, 5], [], tiny)).toEqual([]);
+    expect(() => planRoute([5, 5], [], tiny)).toThrow(/no heading/);
   });
 });

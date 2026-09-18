@@ -220,16 +220,35 @@ function skewMillionths(forward: Point2, edge: Edge): number {
   return Math.round((Math.abs(forward[0] * dz - forward[1] * dx) / length) * 1_000_000);
 }
 
-export function planRoute(
+/**
+ * Every heading that qualifies, in the order this rule prefers them, most preferred first.
+ *
+ * WHY A CALLER MAY NEED MORE THAN THE WINNER. Qualification here is geometry: a capsule's radius
+ * from every ring, inside the field. Whether there is GROUND along a line is a different question
+ * and this rule cannot ask it, so a caller that can ask may find the preferred heading unwalkable.
+ * MEASURED 2026-09-18 on a generated tile: of the 36 headings that qualify, 35 have support for the
+ * whole route and the one that does not is the one this rule prefers. It passes a bench at 343.5 mm
+ * where the rule qualifies at 340 mm and the clearance carve reaches about 344 mm.
+ *
+ * THE ORDER IS THIS RULE'S AND NOTHING MAY REORDER IT, and no caller's rejection reaches this
+ * function. The moment qualification and preference mix, the ordering that decides which street the
+ * gate looks at stops being a fact about geometry and becomes a fact about what was walkable, which
+ * is how a route gets picked to flatter what it looks at. A caller may take a later entry; it may
+ * not tell this rule why.
+ *
+ * WHAT THIS DOES NOT ADD. The rule still has no notion of walkability. This fix to the field bounds
+ * changed only which headings it believes it can walk WITHIN the field; the 340 mm it clears a ring
+ * by, against the clearance carve's reach of that plus its own overshoot, is untouched, and closing
+ * that gap is exactly what a caller walking this order is for.
+ *
+ * `planRoute` is the first of these, so there is one computation rather than two.
+ */
+export function rankedRoutes(
   start: Point2,
-  // What the rule reads is the rings, and only the rings: it asks for the type it reads, so a
-  // caller with plan regions and no heights is not pushed into inventing a vertical span to pass
-  // them. An ObstaclePrism is a RouteRing with a span, so the owned district passes what it always
-  // passed and the rule computes exactly what it computed before.
   prisms: readonly RouteRing[],
   bounds: FieldBounds,
   rule: RouteRule = ROUTE_RULE,
-): RoutePlan {
+): RoutePlan[] {
   const edges = edgesOf(prisms);
   const grid = new PlanarGrid(8, Math.max(1, edges.length));
   edges.forEach((edge, index) => {
@@ -245,7 +264,7 @@ export function planRoute(
   const search = rule.frontageSearchMm / 1000;
   const spacing = rule.frontageSampleSpacingMm / 1000;
   const samples = Math.floor(length / spacing) + 1;
-  let chosen: RoutePlan | null = null;
+  const qualifying: RoutePlan[] = [];
   let tried = 0;
   let qualified = 0;
   // Counted, never read: nothing below branches on it, compares against it or orders by it, so the
@@ -277,31 +296,51 @@ export function planRoute(
     if (both > 0) withFrontage += 1;
     // Integer mean, so the comparison below never depends on float summation order.
     const meanSkew = hits === 0 ? 1_000_000 : Math.floor(skewTotal / hits);
-    const better = chosen === null ||
-      both > chosen.frontageBothSidesSamples ||
-      (both === chosen.frontageBothSidesSamples && meanSkew < chosen.meanFrontageSkewMillionths);
-    if (better) {
-      chosen = {
-        rule,
-        start,
-        headingMillidegrees: millidegrees,
-        yaw,
-        forward,
-        right,
-        clearRunMm: millimetres(clear),
-        frontageSamples: samples,
-        frontageBothSidesSamples: both,
-        meanFrontageSkewMillionths: meanSkew,
-        candidatesTried: 0,
-        candidatesQualified: 0,
-        candidatesWithFrontage: 0,
-      };
-    }
+    qualifying.push({
+      rule,
+      start,
+      headingMillidegrees: millidegrees,
+      yaw,
+      forward,
+      right,
+      clearRunMm: millimetres(clear),
+      frontageSamples: samples,
+      frontageBothSidesSamples: both,
+      meanFrontageSkewMillionths: meanSkew,
+      candidatesTried: 0,
+      candidatesQualified: 0,
+      candidatesWithFrontage: 0,
+    });
   }
-  if (chosen === null) {
+  // The same preference the single-winner loop applied, as an order: most both-sides frontage
+  // samples, then the most parallel to the frontage its side rays hit, then the smaller angle. The
+  // last of those is what made the old loop keep the first of equal candidates, since headings are
+  // tried in increasing order, so a stable sort on the first two would have agreed anyway; it is
+  // written out because a reader cannot see the tie-break in a loop that never states it.
+  qualifying.sort((one, other) =>
+    other.frontageBothSidesSamples - one.frontageBothSidesSamples ||
+    one.meanFrontageSkewMillionths - other.meanFrontageSkewMillionths ||
+    one.headingMillidegrees - other.headingMillidegrees);
+  return qualifying.map((candidate) => ({
+    ...candidate, candidatesTried: tried, candidatesQualified: qualified, candidatesWithFrontage: withFrontage,
+  }));
+}
+
+export function planRoute(
+  start: Point2,
+  // What the rule reads is the rings, and only the rings: it asks for the type it reads, so a
+  // caller with plan regions and no heights is not pushed into inventing a vertical span to pass
+  // them. An ObstaclePrism is a RouteRing with a span, so the owned district passes what it always
+  // passed and the rule computes exactly what it computed before.
+  prisms: readonly RouteRing[],
+  bounds: FieldBounds,
+  rule: RouteRule = ROUTE_RULE,
+): RoutePlan {
+  const ranked = rankedRoutes(start, prisms, bounds, rule);
+  if (ranked.length === 0) {
     throw new Error('no heading from the arrival pose clears the route length; the route cannot be walked');
   }
-  return { ...chosen, candidatesTried: tried, candidatesQualified: qualified, candidatesWithFrontage: withFrontage };
+  return ranked[0]!;
 }
 
 export interface TracePose {

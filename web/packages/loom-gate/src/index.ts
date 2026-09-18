@@ -54,6 +54,7 @@ export {
   measureCapsule,
   measureWalk,
   planRoute,
+  rankedRoutes,
   resampleTrace,
   sampleQueryPoints,
   type CapsuleMeasurement,
