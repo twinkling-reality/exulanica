@@ -167,6 +167,18 @@ export function bakedTileRequest(search: string, preview: boolean): BakedTileReq
   return { kind: 'coordinate', citySeed, tileX, tileY, lod, pose };
 }
 
+/**
+ * The pose a walk states, for any development route rather than only a baked tile's.
+ *
+ * The committed golden route needs this as much as the product route does: it is the only target a
+ * check can exercise with no credential, so a pose that could not be stated there would leave the
+ * "stated or default" distinction with no credential-free proof.
+ */
+export function statedWalkPose(search: string, preview: boolean): WalkPose | null | 'malformed' {
+  if (!preview) return null;
+  return walkPose(new URLSearchParams(search));
+}
+
 /** The four pose parameters, all of them or none: anything else is malformed and refuses the walk. */
 function walkPose(parameters: URLSearchParams): WalkPose | null | 'malformed' {
   const keys = ['pose_x_mm', 'pose_y_mm', 'facing_dx', 'facing_dy'] as const;

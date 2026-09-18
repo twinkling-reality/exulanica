@@ -15,7 +15,12 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { bakedTileRequest } from '../src/config.js';
-import { prepareBakedTileWalk, prepareGeneratedTileEvaluation } from '../src/composition/generated-tile.js';
+import {
+  GENERATED_TILE_OPENING_ATTRIBUTE,
+  GENERATED_TILE_POSE_ATTRIBUTE,
+  prepareBakedTileWalk,
+  prepareGeneratedTileEvaluation,
+} from '../src/composition/generated-tile.js';
 import type { AppEnvironment } from '../src/composition/session-state.js';
 
 // Relative to web/, where the suite runs.
@@ -145,6 +150,55 @@ describe('walking a tile fetched from the product route', { timeout: 30_000 }, (
     expect(said).toContain("served from this development server's working tree");
     expect(said).toContain(goldenSha256);
     expect(said).not.toContain('committed to this repository');
+  });
+
+  it('states the opening as data on the shell, which is what a check binds', async () => {
+    // The sentence is for a person. A check that had to parse it would read a reworded default line
+    // as a stated pose and pass a frame nobody stated, so the same fact is stated as data.
+    const element = shell();
+    await prepareBakedTileWalk(
+      { shell: element, preview: true } as unknown as AppEnvironment,
+      { kind: 'key', bakedTileId: KEY, pose: { xMm: 4000, yMm: 3000, facingDx: 1, facingDy: 0 } },
+    );
+    expect(element.getAttribute(GENERATED_TILE_OPENING_ATTRIBUTE)).toBe('stated');
+    expect(element.getAttribute(GENERATED_TILE_POSE_ATTRIBUTE)).toBe('4000,3000,1,0');
+  });
+
+  it('says default as data, and carries no pose attribute to be misread as one', async () => {
+    const element = shell();
+    await prepareBakedTileWalk(
+      { shell: element, preview: true } as unknown as AppEnvironment,
+      { kind: 'key', bakedTileId: KEY, pose: null },
+    );
+    expect(element.getAttribute(GENERATED_TILE_OPENING_ATTRIBUTE)).toBe('default');
+    expect(element.hasAttribute(GENERATED_TILE_POSE_ATTRIBUTE)).toBe(false);
+  });
+
+  it('lets the committed golden route state a pose too, so the check has a credential-free case', async () => {
+    const element = shell();
+    window.history.replaceState(null, '', '/?preview=1&tile=tile-conformance&pose_x_mm=9000&pose_y_mm=7000&facing_dx=0&facing_dy=-1');
+    try {
+      const tile = await prepareGeneratedTileEvaluation({ shell: element, preview: true } as unknown as AppEnvironment, 'tile-conformance');
+      expect(element.getAttribute(GENERATED_TILE_OPENING_ATTRIBUTE)).toBe('stated');
+      expect(element.getAttribute(GENERATED_TILE_POSE_ATTRIBUTE)).toBe('9000,7000,0,-1');
+      // Facing (0, -1) is south, a half turn from yaw 0, which looks north.
+      expect(Math.abs(tile.start.yaw)).toBeCloseTo(Math.PI, 6);
+      expect(tile.start.x).toBeCloseTo(9, 6);
+      expect(tile.start.z).toBeCloseTo(-7, 6);
+    } finally {
+      window.history.replaceState(null, '', '/');
+    }
+  });
+
+  it('refuses a malformed pose on the golden route rather than opening at a default', async () => {
+    const element = shell();
+    window.history.replaceState(null, '', '/?preview=1&tile=tile-conformance&pose_x_mm=9000&pose_y_mm=7000&facing_dx=0&facing_dy=0');
+    try {
+      await expect(prepareGeneratedTileEvaluation({ shell: element, preview: true } as unknown as AppEnvironment, 'tile-conformance'))
+        .rejects.toThrow(/refused rather than opened at a default/);
+    } finally {
+      window.history.replaceState(null, '', '/');
+    }
   });
 
   it('refuses a container whose bytes are not the digest its row records, and draws nothing', async () => {

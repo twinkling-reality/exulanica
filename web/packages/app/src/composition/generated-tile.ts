@@ -13,11 +13,18 @@
  */
 
 import type { LoadedGeneratedTile } from '@exulanica/atlas-react/generated-tile';
-import { type BakedTileRequest, type WalkPose, credentials, developmentToken } from '../config.js';
+import { type BakedTileRequest, type WalkPose, credentials, developmentToken, statedWalkPose } from '../config.js';
 import { el } from '../ui/dom.js';
 import type { AppEnvironment } from './session-state.js';
 
 export const GENERATED_TILE_EVALUATION_ATTRIBUTE = 'data-generated-tile-evaluation';
+/**
+ * Where the walk opened, as DATA rather than as prose, because a check that had to parse the
+ * sentence would read a reworded default line as a stated pose and pass a frame nobody stated.
+ * `stated` or `default`, and for a stated pose the four integers the walk named.
+ */
+export const GENERATED_TILE_OPENING_ATTRIBUTE = 'data-generated-tile-opening';
+export const GENERATED_TILE_POSE_ATTRIBUTE = 'data-generated-tile-pose';
 
 /** Where a tile's container came from, said on screen so no picture of a walk can hide it. */
 export type TileProvenance =
@@ -63,6 +70,17 @@ function openingLine(opening: Opening): string {
   return `Opened at a stated pose: ${xMm}, ${yMm} mm, facing (${facingDx}, ${facingDy})${opening.supported ? '' : ', where the tile states no walkable surface'}.`;
 }
 
+/** The opening as data on the shell: what a check binds, beside the sentence a person reads. */
+function stateOpening(env: AppEnvironment, opening: Opening): void {
+  env.shell.setAttribute(GENERATED_TILE_OPENING_ATTRIBUTE, opening.pose === null ? 'default' : 'stated');
+  if (opening.pose === null) {
+    env.shell.removeAttribute(GENERATED_TILE_POSE_ATTRIBUTE);
+    return;
+  }
+  const { xMm, yMm, facingDx, facingDy } = opening.pose;
+  env.shell.setAttribute(GENERATED_TILE_POSE_ATTRIBUTE, `${xMm},${yMm},${facingDx},${facingDy}`);
+}
+
 function statement(tile: LoadedGeneratedTile, provenance: TileProvenance, opening: Opening): HTMLElement {
   const drawn = tile.ranges.filter((range) => range.state === 'drawn');
   const named = (range: LoadedGeneratedTile['ranges'][number]): string =>
@@ -105,11 +123,17 @@ export async function prepareGeneratedTileEvaluation(env: AppEnvironment, name: 
   if (!import.meta.env.DEV || !env.preview) {
     throw new Error('A generated tile can be evaluated only on the development preview route.');
   }
-  const [{ loadGeneratedTile }, { ambientTextureSetDigest, parseTextureSetManifest }, sources] = await Promise.all([
+  const [{ loadGeneratedTile, tileToRenderer }, { ambientTextureSetDigest, parseTextureSetManifest }, sources] = await Promise.all([
     import('@exulanica/atlas-react/generated-tile'),
     import('@exulanica/atlas-core'),
     import('../dev/generated-tile-sources.js'),
   ]);
+  // A malformed pose refuses the whole request here exactly as it does on the product route: a
+  // silent fallback is how a frame that is not reproducible ends up in a record looking like one.
+  const pose = statedWalkPose(window.location.search, env.preview);
+  if (pose === 'malformed') {
+    throw new Error('The stated pose is not four integers with a direction, so this walk is refused rather than opened at a default.');
+  }
   const source = await sources.generatedTileSource(name);
   const digest = ambientTextureSetDigest();
   if (digest === null) {
@@ -126,9 +150,11 @@ export async function prepareGeneratedTileEvaluation(env: AppEnvironment, name: 
   // The title stays the preview's own: the visual gate harness holds the shell to it.
   env.shell.setAttribute(GENERATED_TILE_EVALUATION_ATTRIBUTE, name);
   env.shell.querySelector('.generated-tile-evaluation')?.remove();
-  env.shell.append(statement(tile, { kind: 'development', name, containerSha256 }, { pose: null, supported: true, start: tile.start }));
+  const opening = openTile(tile, pose, tileToRenderer);
+  env.shell.append(statement(tile, { kind: 'development', name, containerSha256 }, opening));
+  stateOpening(env, opening);
   await (await import('../dev/tile-capture.js')).exposeTileCapture(env.preview);
-  return tile;
+  return { ...tile, start: opening.start };
 }
 
 function hex(buffer: ArrayBuffer): string {
@@ -205,6 +231,7 @@ export async function prepareBakedTileWalk(env: AppEnvironment, request: BakedTi
   env.shell.append(statement(tile, {
     kind: 'route', bakedTileId, containerSha256: fetched.containerSha256, origin: fetched.origin,
   }, opening));
+  stateOpening(env, opening);
   await (await import('../dev/tile-capture.js')).exposeTileCapture(env.preview);
   return { ...tile, start: opening.start };
 }
