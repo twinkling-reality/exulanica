@@ -13,7 +13,7 @@ const TESS_CLI = resolve('packages/loom-tess/src/node/cli.ts');
 const TESS_CONFORMANCE = resolve('packages/loom-tess/test/triangle-digest-conformance.test.ts');
 const TSX = resolve('node_modules/tsx/dist/cli.mjs');
 
-const PINNED_SHA256 = 'ca028d60a5d0330ac44287138e4a122ba22e5e7af08e40e916610e3793d95912';
+const PINNED_SHA256 = '74e4524558b1e7ebcb533cb4bd7238f440652e460ce4e74335bf79e32b17b0c9';
 const PINNED_RENDER_BATCH = '00d9a4d792cb2a7eb414268ecc9a25e4ec935ca65910144c78b0d9f5c3642ac9';
 
 describe('the pinned development evaluation tile', () => {
