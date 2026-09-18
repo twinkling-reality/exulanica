@@ -518,6 +518,25 @@ def test_the_document_names_every_pinned_set_and_the_evidence_it_cites(manifest)
     assert "\u2014" not in text
 
 
+def test_every_pinned_set_has_a_square_texel_however_its_tile_is_shaped(manifest):
+    """The library's rule: a tile may be longer than it is wide, a texel may not.
+
+    Three sets are not square, `cc0.kerb-stone` at 4 to 1 since 0065 and the two road paints at the
+    same ratio, and each states both axes so a reader can scale them independently. What makes those
+    tiles safe is that the texel is the same size both ways, so a maker's cells are round in
+    millimetres and a mip chain halves both axes alike. Stated in micrometres, as integers, because
+    the pitch is exact at every published size.
+    """
+    uneven = [
+        f"{entry['set_id']}: {entry['extent_mm']['u'] * 1000 // entry['resolution']['width']}"
+        f" by {entry['extent_mm']['v'] * 1000 // entry['resolution']['height']} micrometres"
+        for entry in manifest["sets"]
+        if entry["extent_mm"]["u"] * 1000 // entry["resolution"]["width"]
+        != entry["extent_mm"]["v"] * 1000 // entry["resolution"]["height"]
+    ]
+    assert uneven == []
+
+
 def test_the_document_describes_every_pinned_set_and_not_only_lists_it(manifest):
     """A row in the table is not a description, and the paragraphs are written one per set by hand.
 
