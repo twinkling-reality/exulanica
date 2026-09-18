@@ -1,0 +1,63 @@
+what the tessellator draws of the corridor tile
+
+container   served-2-0.owd, 5607448 bytes
+document    corridor-tile-2-0.json, 3381852 bytes
+records     4149
+
+== render_batch: 596 triangles, 744 vertices, 4149 entries
+     2076  halo
+     1219  not_in_projection
+      850  unavailable
+        4  drawn
+   drawn, by record kind:
+        3  city.street_segment
+        1  city.terrain
+   drawn surfaces: 7, of which 6 dressed by a material record and 1 with none
+        3  city.street_segment carriageway (record, horizontal)
+        3  city.street_segment gutter (record, horizontal)
+        1  city.terrain terrain (none-exists, horizontal)
+   unavailable, by what each entry waits for:
+      538  facade_layout
+              244  city.ground_bay
+              168  city.facade
+               75  city.entrance
+               51  city.interior_backing
+      233  form_parts
+               89  city.rooftop_object
+               78  city.vitrine
+               36  city.street_furniture
+               30  city.street_tree
+       65  ring_triangulation
+               33  city.parcel
+               30  city.street_tree
+                2  city.block
+       32  massing_faces
+               32  city.massing
+        6  crossing_band
+                6  city.crossing
+        6  kerb_offset
+                6  city.curb_edge
+
+== nav_envelope: 37052 triangles, 31517 vertices, 4149 entries
+     2076  halo
+     1885  not_in_projection
+      184  unavailable
+        4  drawn
+   drawn, by record kind:
+        3  city.street_segment
+        1  city.terrain
+   drawn surfaces: 0, of which 0 dressed by a material record and 0 with none
+   unavailable, by what each entry waits for:
+       75  facade_layout
+               75  city.entrance
+       65  ring_triangulation
+               33  city.parcel
+               30  city.street_tree
+                2  city.block
+       32  massing_faces
+               32  city.massing
+        6  crossing_band
+                6  city.crossing
+        6  kerb_offset
+                6  city.curb_edge
+

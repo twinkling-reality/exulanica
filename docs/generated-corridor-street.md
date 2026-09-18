@@ -147,9 +147,11 @@ small request for a whole city, rather than a revalidation per tile.
 ## 7. What draws today, and what does not
 
 Measured from the container the route served for tile (2, 0), baked by tessellator 5 at main
-dee8567d, not from what any lane expects to be true. The counts below map each entry to its record
-through the tessellator's own document reader, because the container states one entry per record
-in its own sorted order and reading that order by eye gets it wrong. The tessellator lane has
+dee8567d, not from what any lane expects to be true. The counts below are
+`docs/artifacts/corridor/corridor-drawn.log.txt`, written by the script beside it from a container
+and the document it was baked from; it maps each entry to its record through the tessellator's own
+document reader, because the container states one entry per record in its own sorted order and
+reading that order by eye gets it wrong. The tessellator lane has
 massing and facades built on its branch, unmerged, so most of this table is queued rather than
 unwritten.
 
@@ -212,6 +214,14 @@ Read into the development evaluation route, that is
 does not draw at all: a curb edge carries the kerb and the footway together, and it is waiting.
 When `ring_triangulation` lands, the pale ground at the base of the frontages will be the
 **parcels' lot ground**, which is the private ground behind the frontage line, and not the footway.
-A caption that calls it a pavement is wrong, and the ground a person is actually walking on is
-still unavailable. The `nav_envelope` carries that ground whether or not anything draws it, which
-is why the walk is possible before the picture is honest.
+A caption that calls it a pavement is wrong.
+
+And the walker is not standing on the footway in any sense yet, which is worth stating exactly
+rather than loosely. The curb edge is unavailable in the **navigation** projection too, not only in
+the drawn one: `docs/artifacts/corridor/corridor-drawn.log.txt` shows `nav_envelope` waiting on
+`kerb_offset` for the same six curb edges. What holds the walker up at this pose is the terrain
+grid, which is level at **0 mm** across the whole tile because the corridor states no relief. The
+footway will stand a kerb above that, **167 mm** on the north side. So the walk happens 167 mm
+below the pavement it will one day be on, and the kerb a person would step up is not there to step
+on. The picture will not show any of that, which is the point: a person can stand where nothing is
+drawn, and a screenshot of it looks like a person standing on something.
