@@ -474,11 +474,32 @@ key on this page in that condition, and neither is this lane's to change.
 and nothing was seeded, so it must hold no walking triangle. The record does not carry per-component
 walking membership and that was not measured.
 
-**And an open question for the owned district, which this lane cannot answer.** The same test would
-consult the lowest point of that district's buildings. Whether that lands on supported ground depends
-on whether its ground extends under them. If it does not, this key has reported the same thing on
-every retained record, and the baseline's failure of it would need re-reading. Not claimed here:
-running that target needs a credential this lane does not hold.
+**That open question is CLOSED, and it goes the other way.** This lane asked whether the same test
+fails identically on the owned district, in which case the key would have reported the same thing on
+every retained record. Read from the retained baseline record itself rather than reasoned about:
+
+    supportComponents               44      not zero
+    componentsDetachedFromSupport   9,323
+    detachedTriangles               19,244
+    drawnTriangles                  63,730  so detached is about 30 per cent, not all
+    walkingTriangles                23,993
+
+So on the owned district the key's model works: it finds support components and reports a partial
+figure of the kind the key exists to produce. The signature found here, detached EXACTLY equal to
+drawn with support at zero, belongs to the generated target. **The baseline failed this key for a
+real reason and its record stands.** What remains inferred, by whoever measured the above and not by
+this lane, is that the district's ground extends under its buildings where the generated tile's does
+not; settling that needs the product target run.
+
+**And the pattern these two keys belong to, which no lane can see from inside itself.** This is the
+third component in the tree to assume the ground is continuous where the clearance carve, behaving
+exactly as its own contract states, has removed it: the route rule qualifies a heading at the capsule
+radius from a ring while the carve reaches past it; a porch floor is stated as drawn and stood on
+while the massing's clearance removes support inside its base ring; and this key seeds support from a
+component's lowest point, which for a building is inside its own footprint. Each is correct by its
+own contract. What is missing is that nothing states WHERE SUPPORT HAS BEEN REMOVED in a form these
+readers can consult, so each models it differently and each is wrong in its own way. The carve is the
+defect in none of them.
 
 ## A hint about the frontage tie-break, with its n beside it
 
