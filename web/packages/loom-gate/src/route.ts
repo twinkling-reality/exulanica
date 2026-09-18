@@ -29,6 +29,7 @@ import {
   drawnSupport,
   type Classification,
   type ObstaclePrism,
+  type RouteRing,
   type SupportSamples,
   type TriangleTable,
 } from './scene.js';
@@ -87,7 +88,7 @@ interface Edge {
   readonly b: Point2;
 }
 
-function edgesOf(prisms: readonly ObstaclePrism[]): Edge[] {
+function edgesOf(prisms: readonly RouteRing[]): Edge[] {
   const edges: Edge[] = [];
   for (const prism of prisms) {
     for (let k = 1; k < prism.ring.length; k += 1) {
@@ -192,7 +193,11 @@ function skewMillionths(forward: Point2, edge: Edge): number {
 
 export function planRoute(
   start: Point2,
-  prisms: readonly ObstaclePrism[],
+  // What the rule reads is the rings, and only the rings: it asks for the type it reads, so a
+  // caller with plan regions and no heights is not pushed into inventing a vertical span to pass
+  // them. An ObstaclePrism is a RouteRing with a span, so the owned district passes what it always
+  // passed and the rule computes exactly what it computed before.
+  prisms: readonly RouteRing[],
   bounds: FieldBounds,
   rule: RouteRule = ROUTE_RULE,
 ): RoutePlan {

@@ -921,6 +921,35 @@ async function main() {
       await halt('the page mounted no generated tile, so there is nothing of that target to score');
     }
 
+    // WHERE THE PAGE ACTUALLY OPENED, from the page rather than from this run's intention. The
+    // product states it as data: an opening of 'stated' or 'default', and the four integers only
+    // when stated, the attribute absent otherwise. Read as data on purpose: the page also says it
+    // in a sentence, and a scored verdict that depended on that wording would pass a frame nobody
+    // stated the day the sentence was reworded.
+    if (!scoresOwnedDistrict) {
+      const mounted = await captureState();
+      const attributes = mounted.shellAttributes ?? {};
+      const opening = attributes['data-generated-tile-opening'] ?? null;
+      const openedAt = attributes['data-generated-tile-pose'] ?? null;
+      observed.opening = { state: opening, pose: openedAt };
+      if (opening === null) {
+        await halt('the page states no opening, so nothing says whether its frame was one anybody stated');
+      }
+      if (observed.statedWalk !== undefined) {
+        const walk = observed.statedWalk;
+        const wanted = [walk.xMm, walk.yMm, walk.facingDx, walk.facingDy].join(',');
+        if (opening !== 'stated') {
+          await halt(
+            `${walk.path} states a walk and the page opened at its ${opening} pose, so the frame ` +
+            'scored would not be the frame anybody stated',
+          );
+        }
+        if (openedAt !== wanted) {
+          await halt(`the page opened at ${openedAt}, and ${walk.path} states ${wanted}`);
+        }
+      }
+    }
+
     // TWO INPUTS, NOT ONE. The rings the route rule chooses a heading by and the rings the keys
     // measure against are different questions, and on the owned district they happen to be the same
     // set, which is why one array was enough until a second target existed.
@@ -938,21 +967,21 @@ async function main() {
     // heading and measure nothing.
     const obstacles = await session.call(bindingId, READ_OBSTACLES);
     const prisms = [];
+    const statedRings = [];
     for (const obstacle of obstacles) {
-      // The owned district's rings take their height from the scored artifact's own buildings. A
-      // navigation world states rings WITHOUT a height (atlas-core PolygonObstacle is an id and
-      // rings), so a generated tile has no height for the gate to bind. The gate will not invent
-      // one: the clearance keys measure a solid, and a fabricated top would make them measure a
-      // shape nothing in the world states. The named request for rings that carry record identity
-      // is gate-route-obstruction-rings in the lane requirements.
-      const top = scoresOwnedDistrict ? heights.get(obstacle.id) : obstacle.topY;
+      // The owned district's rings are building exteriors and take their height from the scored
+      // artifact's own records, so they serve both questions there. A navigation world states plan
+      // regions WITHOUT a height, by design: a tile's navigation side drops everything above head
+      // height. The gate will not invent one, so those rings go to the route rule, which reads
+      // rings and nothing else, and never to the keys, which measure solids. The named request for
+      // rings that carry record identity is gate-route-obstruction-rings in the lane requirements.
+      if (!scoresOwnedDistrict) {
+        for (const ring of obstacle.rings) statedRings.push({ id: obstacle.id, ring });
+        continue;
+      }
+      const top = heights.get(obstacle.id);
       if (top === undefined) {
-        await halt(
-          scoresOwnedDistrict
-            ? `collision obstacle ${obstacle.id} has no record in the scored artifact`
-            : `the page states a ring for ${obstacle.id} with no height, and this gate will not ` +
-              'invent one: a route ring chooses a heading, while the clearance keys measure a solid',
-        );
+        await halt(`collision obstacle ${obstacle.id} has no record in the scored artifact`);
       }
       for (const ring of obstacle.rings) prisms.push({ id: obstacle.id, ring, baseY: 0, topY: top });
     }
@@ -963,8 +992,9 @@ async function main() {
     // of a decision, and a record of it would say the rule was applied. So the run stops here.
     // On the owned district the building exteriors ARE the frontage the rule looks for, so the two
     // inputs are the same set there and this run is byte-identical to one before the split. On a
-    // generated target the tile states its own route rings, and states none today.
-    const routeRings = scoresOwnedDistrict ? prisms : [];
+    // generated target the rings are the ones the tile states on its navigation side, read from
+    // the runtime, and the keys keep measuring building exteriors, of which a tile may state none.
+    const routeRings = scoresOwnedDistrict ? prisms : statedRings;
     observed.buildingPrisms = prisms.length;
     observed.routeObstacleRings = routeRings.length;
     if (routeRings.length === 0) {
@@ -1421,6 +1451,10 @@ async function main() {
       // run opened wherever the page opens. A record that says neither is a record that cannot
       // say whether its opening frame was reproducible.
       statedWalk: observed.statedWalk ?? null,
+      // What the page itself said about its opening frame, or null on a target that states
+      // none. A record carrying both can be checked by a reader; one carrying only the walk
+      // this run asked for says what was intended and not what happened.
+      opening: observed.opening ?? null,
       route: {
         rule: plan.rule,
         startMm: [Math.round(plan.start[0] * 1000), Math.round(plan.start[1] * 1000)],

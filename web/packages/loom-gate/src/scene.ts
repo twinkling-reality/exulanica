@@ -36,10 +36,21 @@ export interface DrawnMesh {
   readonly decodedTextureBytes: number;
 }
 
-/** A building exterior ring from the collision proxy, with the vertical span it occupies. */
-export interface ObstaclePrism {
+/**
+ * A plan region the route rule chooses a heading between, named by the record that states it.
+ *
+ * No height, because choosing a heading does not need one and a world may state a region without
+ * one: a tile's navigation side drops everything above head height and keeps plan regions only.
+ * Kept separate from {@link ObstaclePrism} so a route input can never be read as a solid: nothing
+ * in a route ring stops a body, and the keys that measure solids ask for the height they need.
+ */
+export interface RouteRing {
   readonly id: string;
   readonly ring: readonly Point2[];
+}
+
+/** A building exterior ring from the collision proxy, with the vertical span it occupies. */
+export interface ObstaclePrism extends RouteRing {
   readonly baseY: number;
   readonly topY: number;
 }

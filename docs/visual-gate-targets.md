@@ -86,6 +86,31 @@ opening at a stated pose, for two reasons in the product rather than in the gate
 Both are asked of the lanes that own those files. Until they are answered the gate binds the walk it
 read and the pose the page reported, and does not claim to have checked that the page honoured it.
 
+## The run with rings, predicted before it was run
+
+Written before the run, and before the server was started, so the numbers below can be checked
+against it rather than fitted to it.
+
+**Measured from the container first, by tess's own reader.** `routeObstructionRings` over the
+committed golden states **16 rings across 9 of its 180 records**: one `city.massing`, fourteen
+`city.street_furniture`, one `city.street_tree`. So the page should report 16. A different number is
+a disagreement between the container and the runtime that carries it, and is worth more than the
+run.
+
+**Predicted:**
+
+- the ringless halt stops firing, because the tile now states rings;
+- `routeObstacleRings` is 16;
+- the chosen heading's `frontageBothSidesSamples` is **0 or close to it**. Frontage on both sides
+  wants rings either side of the walked line; this tile has one massing block and a scatter of
+  street furniture. If it is zero, the rule ran on the world's own rings and still decided by a
+  later tie-break, which is a finding about the rule and not a failure of the run, and it is
+  reported either way;
+- the eight mechanical keys FAIL, because terrain is drawn as the stated unavailable surface. That
+  failure is the point: it is the proof that this gate can fail a generated page;
+- the opening reads `default`, because no committed file states a walk for this tile and this lane
+  will not write one for a page it scores.
+
 ## The first run of the generated target, predicted before it was run
 
 Written and committed before the harness was pointed at the development route, so the order is a

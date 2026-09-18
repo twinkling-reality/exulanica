@@ -46,6 +46,7 @@ export {
   type DrawnMesh,
   type IntegrityMeasurement,
   type ObstaclePrism,
+  type RouteRing,
 } from './scene.js';
 export {
   ROUTE_RULE,
