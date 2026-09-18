@@ -688,6 +688,68 @@ beside it, all eight mechanical keys, and both remaining predicted halts. The ro
 authentication condition were never reached, so the arithmetic above stands untested and nothing in
 this section is evidence for or against it.
 
+## The reason the product gave, now in the record, and the wrong fix that came first
+
+The gap above was closed the same evening, while the page that reliably refuses still existed. That
+timing is the whole argument for doing it then: the refusal comes from a tile route defect that is
+being fixed, and once it is, nothing here shows an error surface on demand. A repair to a path whose
+only fixture has gone is a repair nobody can watch work.
+
+**THE FIRST ATTEMPT WAS WRONG AND THE RERUN SAID SO.** I attached the three error lists a completed
+record already writes, `exceptions`, `consoleErrors` and `networkLogErrors`, expecting the container
+refusal to be among them. It was not. The rerun halted with both `exceptions` and `consoleErrors`
+EMPTY while the page was displaying the refusal in front of anyone looking at it:
+
+    "errors": { "exceptions": [], "consoleErrors": [],
+                "networkLogErrors": ["network: Failed to load resource: ... 404 (Not Found)"] }
+
+A PRODUCT STATES A REFUSAL TO THE PERSON IN FRONT OF IT, not to a console. I had reasoned about
+where a message of that kind usually goes instead of looking at where this product puts it, which is
+the same error as reading a copy rather than the code. The empty lists are KEPT rather than removed,
+because an empty list is the measurement that says the console carries nothing.
+
+**What the halt record carries now**, read out of the record rather than off a console:
+
+    "productSurface": {
+      "worldState": "error",
+      "text": "Atlas could not open\n\nTile 7ce4b90f-675b-52dc-b71b-7264aeb00786 refused: .owd
+               refused: tessellator_version is not 19; there is no upgrade on read, rebake the tile
+               \n\nRetry opening Atlas",
+      "textCharacters": 183
+    }
+
+The tile, the version the page wanted, and the product's own instruction, in the product's own words.
+
+**Four decisions in it, each one a thing this record has been caught on before.**
+
+- **The gate's words and the product's words stay in separate fields.** `reason` remains the gate's
+  sentence, "the product shell to mount a world: the product failed to start"; `productSurface.text`
+  is the product's. A record that runs the two together cannot afterwards be asked which half the
+  product actually said.
+- **Verbatim, with no categories of mine over it.** No parsing, no matching for "tessellator", no
+  classification into a kind of failure. The reader records what a person would have read.
+- **NULL IS NOT EMPTY.** A missing shell element returns null; a shell showing nothing returns an
+  empty text. Those are different failures and a run that reported them alike would hide one.
+- **It never throws.** It runs inside the failure handler of the mount wait, so an error escaping it
+  would leave the run reporting why the SURFACE could not be read instead of why the PRODUCT would
+  not start, destroying the one thing it exists to preserve. An unreadable page records that it was
+  unreadable and the halt keeps its own reason. It also runs on a TIMEOUT, because a wait that ran
+  out while the page was showing something is a different fact from one that ran out on a blank page.
+
+**The check does not depend on the fixture, and it was falsified rather than trusted.** The tests run
+the harness's OWN page-side expression against a faked document, so the slice, the character count
+and the absent-shell branch under test are the ones a run sends to a real page; a test that rebuilt
+that shape itself would have been checking its own arithmetic. Six deliberate breaks, each restored
+from a committed tree and each refused by the test that claims that property: no cut at all; a
+character count that reports the cut length rather than the true one; an absent shell reported as a
+shell showing nothing; a category of the gate's own added beside the product's words; the reader
+throwing instead of recording; and the sanitiser skipped, which is the one that would put this
+machine's paths into a record.
+
+**What this does not touch.** A halt record is written only when a run halts, and a run that halts
+scores nothing, so nothing here can reach a scored run. The three numbers this lane owes are still
+unmeasured and the corridor is still blocked on the route defect.
+
 ## A hint about the frontage tie-break, with its n beside it
 
 **A direction, not evidence.** Over all 36 headings the rule qualifies on this tile, each sampled
