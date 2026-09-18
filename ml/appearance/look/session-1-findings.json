@@ -1,0 +1,90 @@
+{
+  "session": "track-a-session-1",
+  "looked_by": "the generated appearance lane",
+  "looked_on": "2026-09-17",
+  "note": "One pick per target per candidate, chosen by the seam ratio closest to 1. a1 is Qwen-Image-2512 with the Fun union control; a2 is Z-Image-Turbo with the Fun union control. Every crop was looked at at 1:1 before these words were written. Anything I am unsure about is in suspected, for the operator to decide, and no set is pinned while a suspected line is unresolved.",
+  "picks": [
+    {
+      "name": "brick-weathered-a1",
+      "target": "brick-weathered",
+      "candidate": "a1",
+      "role": "depth",
+      "seed": 1848595245,
+      "output_sha256": "eca75e125090784d332e8ea64a3b10fda41ea25e50de66d40e7dfd30f9821ec0",
+      "found": "Red stretcher bond brick sitting on the recipe's own courses. Each brick is a slightly different red, the mortar is recessed and dark grey, a few bricks carry thin grey soot streaks and there is one pale efflorescence patch near the top left. No lettering, numeral, logo, badge, signature or watermark anywhere in the four crops. Nothing in it reads as a particular building: no window reveal, no pipe, no sign fixing, no shadow of anything outside the tile.",
+      "suspected": []
+    },
+    {
+      "name": "brick-weathered-a2",
+      "target": "brick-weathered",
+      "candidate": "a2",
+      "role": "depth",
+      "seed": 113773412,
+      "output_sha256": "d5499912c01c0855edcebd00d8ae1b3968cac244ce358cc267555cc6cc4f34cf",
+      "found": "Pale orange brick on the same courses, much cleaner than a1: brick to brick colour is nearly even, the mortar is dark, and only a few headers carry faint grey streaking. There is no efflorescence, growth or damage, so this sits close to the flat recipe colour and the model added little beyond the relief it was given. No lettering, numeral, logo, badge, signature or watermark, and nothing that reads as a particular building.",
+      "suspected": []
+    },
+    {
+      "name": "painted-render-weathered-a1",
+      "target": "painted-render-weathered",
+      "candidate": "a1",
+      "role": "edge",
+      "seed": 1384410033,
+      "output_sha256": "4432d3253e0e1b3706cdaa646b0408a96c71032666565bc92906a139b5cdb8f5",
+      "found": "Painted render with grime streaks running down from the top, paint flaking to a grey patch on the left, and one hairline crack. The paint colour and the flaking read as a wall that has been out in the weather. No lettering, numeral, logo, badge, signature or watermark, and no fixing, downpipe or window reveal that would tie it to a particular building.",
+      "suspected": [
+        "A faint straight horizontal dashed line crosses the tile about a third of the way down, the full width, in all four crops. I am unsure what it is. It looks like an artefact of my own per step latent roll, because it is perfectly straight, perfectly horizontal and belongs to no render; but a straight dashed line is also the shape a learned overlay or a watermark would take, and I have not traced its cause. The operator decides. Do not pin this set while this line is unresolved."
+      ]
+    },
+    {
+      "name": "painted-render-weathered-a2",
+      "target": "painted-render-weathered",
+      "candidate": "a2",
+      "role": "depth",
+      "seed": 1316699003,
+      "output_sha256": "cc8f9d5fa1346161a37a418510a2113c7f68152005c9fe16c5beac0e69a15bd9",
+      "found": "Mottled ochre and sand coloured render with grey patches and a fine even grain. No streaks, no cracks, no flaking: it reads as a rough cast render in good condition and carries none of the weathering the recipe's name asks for. No lettering, numeral, logo, badge, signature or watermark, and nothing that ties it to a particular building.",
+      "suspected": []
+    },
+    {
+      "name": "footway-paving-weathered-a1",
+      "target": "footway-paving-weathered",
+      "candidate": "a1",
+      "role": "edge",
+      "seed": 2523670033,
+      "output_sha256": "7302c5f4fc8ef844398c1acb0f978fa34eb252a3c5a22efb17741c67c7e840e1",
+      "found": "Concrete flags on the recipe's own joint grid, each flag a slightly different grey, with dark gum spots, scuffs across the flag faces and dirt gathered in the joints. It reads as a footway that has been walked on. No lettering, numeral, logo, watermark, utility cover, tactile paving or inspection mark, and no kerb or drain that would tie it to a particular street.",
+      "suspected": []
+    },
+    {
+      "name": "footway-paving-weathered-a2",
+      "target": "footway-paving-weathered",
+      "candidate": "a2",
+      "role": "depth",
+      "seed": 2989305721,
+      "output_sha256": "4e82f2e3f1886def08bccacef24198aeab907a8b4604185fdfdce15f1560371d",
+      "found": "Very clean pale grey flags with dark joints carrying a little rust brown staining, and almost no wear on the flag faces. Closer to newly laid tile than to a weathered footway, and like brick a2 it stays near the flat recipe colour. No lettering, numeral, logo, watermark, utility cover or inspection mark.",
+      "suspected": []
+    },
+    {
+      "name": "carriageway-asphalt-weathered-a1",
+      "target": "carriageway-asphalt-weathered",
+      "candidate": "a1",
+      "role": "edge",
+      "seed": 759252437,
+      "output_sha256": "155faea8f65bc8508a1414f760f8e0a9ef1cd0c0fd1183ceb02344f03e08fc2b",
+      "found": "Exposed pale aggregate in a dark binder with one black crack running down the lower left. Broad dark diagonal bands sweep across the whole tile. Those bands are a large scale gradient rather than road wear, and they are what the 122471 ppm low frequency share is measuring; tiled, they would read as a repeating diagonal, so the texture lane should see this before it takes a1 for asphalt. No lettering, numeral, road marking, arrow, logo or watermark, and no kerb, manhole or gully.",
+      "suspected": []
+    },
+    {
+      "name": "carriageway-asphalt-weathered-a2",
+      "target": "carriageway-asphalt-weathered",
+      "candidate": "a2",
+      "role": "depth",
+      "seed": 1426743791,
+      "output_sha256": "96d224bd1bc40eea809578b6b88676ea4addd1c8da92b47810c33b0bf82f7997",
+      "found": "Grey aggregate in a mid grey binder with orange brown staining in patches and a network of fine hairline cracks. Even across the tile, with none of a1's large scale diagonal banding. No lettering, numeral, road marking, arrow, logo or watermark, and no kerb, manhole or gully.",
+      "suspected": []
+    }
+  ]
+}

@@ -5,6 +5,8 @@
     capture bench    --geometry FILE --out DIR
     measure frames   --structure DIR --frames DIR --out FILE
     measure textures --repository ROOT --out FILE
+    measure session  --repository ROOT --results DIR --staged DIR --out FILE
+    look record      --results DIR --findings FILE --crops DIR --records DIR
     sheet before     --structure DIR --frames DIR --out DIR
     sheet pairs      --repository . --results DIR --out DIR
     runner stage     --spec jobs/track-a-session-1.json --repository . --weights weights/ --out DIR
@@ -199,6 +201,65 @@ def _runner_dry_run(args: argparse.Namespace) -> int:
     return 0
 
 
+def _measure_session(args: argparse.Namespace) -> int:
+    """Measure every generation of a finished run against the published set it dresses."""
+    from exulanica_appearance.canonical import parse_canonical
+    from exulanica_appearance.metrics.session import measure_session
+
+    raw = measure_session(
+        repository=Path(args.repository),
+        results=Path(args.results),
+        staged=Path(args.staged) if args.staged else None,
+    )
+    Path(args.out).write_bytes(raw)
+    document = parse_canonical(raw, "the session measurements")
+    summary = document["summary"]
+    seams = summary["seams_ppm"]
+    print(
+        f"{summary['count']} generations: seams min {seams['min']} median {seams['median']} "
+        f"max {seams['max']} (per million, 1000000 is no seam)"
+    )
+    skipped = summary.get("conditioning_not_measured")
+    if skipped:
+        print(f"structure edges not measured for {skipped['count']} outputs: {skipped['why']}")
+    recall = summary.get("conditioning_recall_ppm")
+    if recall:
+        print(
+            f"structure edges kept: recall median {recall['median']} ppm, min {recall['min']}, "
+            f"max {recall['max']} over {recall['measured_over']} outputs"
+        )
+    for candidate, entry in sorted(summary["by_candidate"].items()):
+        words = f"  {candidate}: {entry['seconds']['median']} s an image"
+        retention = entry.get("retention_permille")
+        if retention:
+            words += (
+                f", module retention over {retention['measured_over']} axes with a module: median "
+                f"{retention['median']} per mille, min {retention['min']}, max {retention['max']}"
+            )
+        print(words)
+    return 0
+
+
+def _look_record(args: argparse.Namespace) -> int:
+    """Cut every picked output into 1:1 crops, sheet them, and write the look record."""
+    from exulanica_appearance.look import look_at_results
+
+    findings = json.loads(Path(args.findings).read_bytes())
+    looked = look_at_results(
+        findings=findings,
+        results=Path(args.results),
+        crops_root=Path(args.crops),
+        records_root=Path(args.records),
+    )
+    for item in looked:
+        print(
+            f"{item['name']}: {item['crops']} crops at 1:1, look {item['look_sha256'][:16]}, "
+            f"{item['suspected']} suspected"
+        )
+    print(f"{len(looked)} outputs looked at; crops and sheets under {args.crops}")
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(prog="python -m exulanica_appearance")
     groups = parser.add_subparsers(dest="group", required=True)
@@ -230,6 +291,20 @@ def main(argv: list[str] | None = None) -> int:
     textures.add_argument("--repository", required=True)
     textures.add_argument("--out", required=True)
     textures.set_defaults(run=_measure_textures)
+    session = measure.add_parser("session")
+    session.add_argument("--repository", required=True)
+    session.add_argument("--results", required=True)
+    session.add_argument("--staged")
+    session.add_argument("--out", required=True)
+    session.set_defaults(run=_measure_session)
+
+    look = groups.add_parser("look").add_subparsers(dest="command", required=True)
+    look_record = look.add_parser("record")
+    look_record.add_argument("--results", required=True)
+    look_record.add_argument("--findings", required=True)
+    look_record.add_argument("--crops", required=True)
+    look_record.add_argument("--records", required=True)
+    look_record.set_defaults(run=_look_record)
 
     sheet = groups.add_parser("sheet").add_subparsers(dest="command", required=True)
     before = sheet.add_parser("before")

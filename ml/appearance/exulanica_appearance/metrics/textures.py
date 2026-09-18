@@ -20,11 +20,13 @@
 
 from __future__ import annotations
 
+from collections.abc import Mapping
 from typing import Final
 
 import numpy as np
 from numpy.typing import NDArray
 
+from exulanica_appearance.canonical import Refused
 from exulanica_appearance.metrics.edges import luminance
 
 __all__ = [
@@ -32,6 +34,7 @@ __all__ = [
     "decoded_bytes",
     "dominant_cycles",
     "low_frequency_share_ppm",
+    "module_amplitude_milli",
     "seam_ratio_ppm",
     "texel_pitch_um",
 ]
@@ -87,6 +90,33 @@ def dominant_cycles(pixels: NDArray[np.uint8]) -> dict[str, int]:
         spectrum = np.abs(np.fft.rfft(profile - profile.mean()))
         spectrum[0] = 0
         out[name] = int(np.argmax(spectrum))
+    return out
+
+
+def module_amplitude_milli(pixels: NDArray[np.uint8], cycles: Mapping[str, int]) -> dict[str, int]:
+    """How strongly a tile varies at a stated period, in thousandths of a grey level.
+
+    A generated tile keeps the structure it was given only if it still varies at the period the
+    recipe paints: brick courses, flag joints. This measures the amplitude at that stated number
+    of cycles across the tile rather than at whichever period happens to be strongest, because the
+    strongest period can be something the model invented. Read it as a ratio against the same
+    measure on the published set: 1000 per mille of the published amplitude is full retention.
+    """
+    lum = (
+        luminance(pixels)
+        if pixels.ndim == 3 and pixels.shape[2] >= 3
+        else pixels[..., 0].astype(np.float64)
+    )
+    out = {}
+    for axis, name in ((0, "u"), (1, "v")):
+        profile = lum.mean(axis=axis)
+        wanted = cycles[name]
+        if wanted < 1 or wanted > profile.size // 2:
+            raise Refused(
+                f"a period of {wanted} cycles is not inside a profile of {profile.size} texels"
+            )
+        coefficient = np.fft.rfft(profile - profile.mean())[wanted]
+        out[name] = round(2 * abs(coefficient) / profile.size * 1000)
     return out
 
 

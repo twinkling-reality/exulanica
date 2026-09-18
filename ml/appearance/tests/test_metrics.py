@@ -7,8 +7,9 @@ import json
 import numpy as np
 import pytest
 from conftest import quad_scene
+from PIL import Image
 
-from exulanica_appearance.canonical import Refused
+from exulanica_appearance.canonical import Refused, parse_canonical
 from exulanica_appearance.capture.raster import rasterize
 from exulanica_appearance.containers import read_container
 from exulanica_appearance.metrics.edges import edge_agreement, image_edges
@@ -91,6 +92,69 @@ def test_seams_repetition_and_modules_on_known_patterns():
         low_frequency_share_ppm(np.repeat(blotch[..., None], 3, axis=-1).astype(np.uint8)) > 990_000
     )
     assert low_frequency_share_ppm(tiling) < 10_000
+
+
+def test_a_session_is_measured_against_the_recipe_and_the_conditioning(tmp_path, repository):
+    from exulanica_appearance.metrics.session import MODULES, measure_session
+    from exulanica_appearance.runner.dry_run import dry_run
+
+    dry_run(repository, tmp_path / "dry")
+    results, staged = tmp_path / "dry" / "run", tmp_path / "dry" / "staged"
+    document = parse_canonical(
+        measure_session(repository=repository, results=results, staged=staged),
+        "the session measurements",
+    )
+    assert len(document["generations"]) == 4
+    row = document["generations"][0]
+    # The period comes from the brick recipe's own parameters, not from whatever peak is strongest.
+    module = row["published_module"]
+    assert module["maker"] == "loom.brick"
+    assert module["from"] == {axis: MODULES["loom.brick"][axis] for axis in ("u", "v")}
+    assert module["cycles"]["v"] == 24
+    assert set(row["retention_permille"]) == {"u", "v"}
+    # The stub generates at 256 while the conditioning is 1024, and a resize is not the structure
+    # that was given, so the agreement is not measured and the record says why rather than going
+    # quiet about it.
+    assert row["conditioning_agreement"] == {}
+    assert "256" in row["conditioning_not_measured"]
+    assert document["summary"]["conditioning_not_measured"]["count"] == 4
+    assert "conditioning_recall_ppm" not in document["summary"]
+    # Without the staged directory the same run measures, and says nothing about the conditioning.
+    without = parse_canonical(
+        measure_session(repository=repository, results=results), "the session measurements"
+    )
+    assert without["generations"][0]["conditioning_agreement"] == {}
+    assert without["generations"][0]["conditioning_not_measured"] == ""
+    # A conditioning picture changed after the run cannot stand in for the structure that was given.
+    picture = next((staged / "conditioning").rglob("*.png"))
+    pixels = np.array(Image.open(picture).convert("RGB"), dtype=np.uint8)
+    pixels[0, 0] = 255 - pixels[0, 0]
+    Image.fromarray(pixels).save(picture)
+    with pytest.raises(Refused, match="not the pixels the record pins"):
+        measure_session(repository=repository, results=results, staged=staged)
+
+
+def test_the_module_amplitude_is_read_at_a_stated_period_not_the_strongest():
+    from exulanica_appearance.metrics.textures import (
+        dominant_cycles,
+        module_amplitude_milli,
+    )
+
+    size = 256
+    x = np.arange(size)
+    # 8 cycles across the tile at 20 grey levels, plus a stronger 3-cycle wave the model might add.
+    courses = 128 + 20 * np.sin(2 * np.pi * 8 * x / size) + 40 * np.sin(2 * np.pi * 3 * x / size)
+    tile = np.repeat(courses.reshape(1, size), size, axis=0)
+    pixels = np.repeat(np.round(tile).astype(np.uint8)[..., None], 3, axis=-1)
+    # The strongest period is the invented one; the module's own period is still read at 8 cycles.
+    assert dominant_cycles(pixels)["u"] == 3
+    amplitude = module_amplitude_milli(pixels, {"u": 8, "v": 1})
+    assert 19_500 <= amplitude["u"] <= 20_500
+    assert amplitude["v"] <= 100
+    flat = np.full((size, size, 3), 128, dtype=np.uint8)
+    assert module_amplitude_milli(flat, {"u": 8, "v": 8}) == {"u": 0, "v": 0}
+    with pytest.raises(Refused, match="not inside a profile"):
+        module_amplitude_milli(pixels, {"u": size, "v": 8})
 
 
 def test_decoded_bytes_match_lane_16s_binding_and_pitch_rounds():

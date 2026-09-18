@@ -42,6 +42,7 @@ __all__ = [
     "build_look",
     "contact_sheet",
     "crop_sheets",
+    "look_at_results",
     "read_look",
 ]
 
@@ -225,3 +226,72 @@ def contact_sheet(crops: Sequence[Mapping[str, Any]], directory: Path, out: Path
     out.parent.mkdir(parents=True, exist_ok=True)
     sheet.save(out)
     return out
+
+
+def look_at_results(
+    *,
+    findings: Mapping[str, Any],
+    results: Path,
+    crops_root: Path,
+    records_root: Path,
+) -> list[dict[str, Any]]:
+    """Cut, sheet and record the look for every pick a findings file names.
+
+    The findings file carries the words: one ``found`` per pick and a ``suspected`` list. This
+    reads the picked output out of a finished run, checks the bytes against the digest the run's
+    own record pinned, and writes the crops, the contact sheet and the record. It invents nothing:
+    the size and the map's name come from the generation record, not from this file.
+    """
+    where = "the session look"
+    sizes: dict[str, tuple[str, int, int, int, str]] = {}
+    for record_path in sorted((results / "records").glob("*.json")):
+        record = parse_canonical(record_path.read_bytes(), f"{where}: {record_path.name}")
+        sampler = record["sampler"]
+        for output in record["outputs"]:
+            sizes[output["sha256"]] = (
+                record_path.stem,
+                sampler["height"],
+                sampler["width"],
+                output["byte_length"],
+                str(output["role"]).replace("-", "_"),
+            )
+    looked: list[dict[str, Any]] = []
+    for pick in findings["picks"]:
+        name, digest = pick["name"], pick["output_sha256"]
+        if digest not in sizes:
+            raise Refused(
+                f"{where}: {name} names the output {digest}, which no record in {results} pins"
+            )
+        record_stem, height, width, byte_length, map_name = sizes[digest]
+        raw = (results / "outputs" / f"{digest}.rgb").read_bytes()
+        if len(raw) != byte_length:
+            raise Refused(f"{where}: {name} is {len(raw)} bytes and its record pins {byte_length}")
+        if hashlib.sha256(raw).hexdigest() != digest:
+            raise Refused(f"{where}: the bytes of {name} are not the bytes its record pins")
+        pixels = np.frombuffer(raw, dtype=np.uint8).reshape(height, width, 3)
+        directory = crops_root / name / "crops"
+        crops = crop_sheets({map_name: pixels}, directory)
+        sheet = contact_sheet(crops, directory, crops_root / name / "contact-sheet.png")
+        record_raw = build_look(
+            output_sha256=digest,
+            crops=crops,
+            maps={map_name: (height, width)},
+            found=pick["found"],
+            suspected=pick["suspected"],
+            looked_on=findings["looked_on"],
+            looked_by=findings["looked_by"],
+        )
+        records_root.mkdir(parents=True, exist_ok=True)
+        (records_root / f"{name}.json").write_bytes(record_raw)
+        looked.append(
+            {
+                "contact_sheet": str(sheet),
+                "crops": len(crops),
+                "generation_record": record_stem,
+                "look_sha256": hashlib.sha256(record_raw).hexdigest(),
+                "name": name,
+                "output_sha256": digest,
+                "suspected": len(pick["suspected"]),
+            }
+        )
+    return looked

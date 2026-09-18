@@ -16,7 +16,13 @@ from exulanica_appearance.handoff import (
     maker_generation,
     read_candidate,
 )
-from exulanica_appearance.look import CROP_PX, build_look, crop_sheets, read_look
+from exulanica_appearance.look import (
+    CROP_PX,
+    build_look,
+    crop_sheets,
+    look_at_results,
+    read_look,
+)
 from exulanica_appearance.runner import relief, tiling
 from exulanica_appearance.runner.dry_run import dry_run
 from exulanica_appearance.runner.job import generations, read_job, seed_for
@@ -274,6 +280,80 @@ def test_the_look_covers_every_texel_or_it_is_not_a_look(tmp_path):
         read_look(canonical_bytes({**document, "crops": document["crops"][:1]}))
     with pytest.raises(Refused, match="an empty finding is not a finding"):
         read_look(canonical_bytes({**document, "found": ""}))
+
+
+def test_the_session_look_reads_the_run_and_refuses_bytes_it_cannot_pin(tmp_path):
+    rng = np.random.default_rng(5)
+    pixels = rng.integers(0, 255, (CROP_PX, CROP_PX, 3), dtype=np.uint8)
+    raw = pixels.tobytes()
+    digest = sha256_hex(raw)
+    results = tmp_path / "out"
+    (results / "records").mkdir(parents=True)
+    (results / "outputs").mkdir(parents=True)
+    (results / "outputs" / f"{digest}.rgb").write_bytes(raw)
+    (results / "records" / f"{'b' * 64}.json").write_bytes(
+        canonical_bytes(
+            {
+                "outputs": [
+                    {
+                        "byte_length": len(raw),
+                        "media_type": "application/vnd.exulanica.rgb8",
+                        "role": "base-color",
+                        "sha256": digest,
+                    }
+                ],
+                "sampler": {"height": CROP_PX, "width": CROP_PX},
+            }
+        )
+    )
+    pick = {
+        "found": "brick faces, joints and grime; no lettering, no logo, no mark",
+        "name": "brick-a1",
+        "output_sha256": digest,
+        "suspected": ["a straight dashed line I cannot explain; the operator decides"],
+    }
+    findings = {
+        "looked_by": "the generated appearance lane",
+        "looked_on": "2026-09-17",
+        "picks": [pick],
+    }
+    places = {"crops_root": tmp_path / "look", "records_root": tmp_path / "records"}
+    looked = look_at_results(findings=findings, results=results, **places)
+    assert looked[0]["crops"] == 1
+    assert looked[0]["suspected"] == 1
+    record = read_look((tmp_path / "records" / "brick-a1.json").read_bytes())
+    # The size and the map's name come from the generation record, never from the findings file.
+    assert record["maps"] == {"base_color": {"height": CROP_PX, "width": CROP_PX}}
+    assert record["crops"][0]["pixels_sha256"] == sha256_hex(raw)
+    assert (tmp_path / "look" / "brick-a1" / "contact-sheet.png").is_file()
+    unpinned = {**findings, "picks": [{**pick, "output_sha256": "c" * 64}]}
+    with pytest.raises(Refused, match="which no record"):
+        look_at_results(findings=unpinned, results=results, **places)
+    (results / "outputs" / f"{digest}.rgb").write_bytes(bytes(len(raw)))
+    with pytest.raises(Refused, match="are not the bytes its record pins"):
+        look_at_results(findings=findings, results=results, **places)
+
+
+def test_the_session_findings_file_names_every_pick_in_words(repository):
+    findings = json.loads((repository / "ml/appearance/look/session-1-findings.json").read_bytes())
+    assert len(findings["picks"]) == 8
+    for pick in findings["picks"]:
+        assert set(pick) == {
+            "candidate",
+            "found",
+            "name",
+            "output_sha256",
+            "role",
+            "seed",
+            "suspected",
+            "target",
+        }
+        assert pick["name"] == f"{pick['target']}-{pick['candidate']}"
+        assert len(pick["found"]) > 120, pick["name"]
+        # Every finding says whether it found a mark, because that is what the look is for.
+        assert "lettering" in pick["found"], pick["name"]
+    names = [pick["name"] for pick in findings["picks"]]
+    assert len(set(names)) == len(names)
 
 
 def test_the_committed_job_specs_stage_and_read(tmp_path, repository):
