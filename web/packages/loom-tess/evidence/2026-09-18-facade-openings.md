@@ -380,3 +380,22 @@ WHAT THIS MEANS FOR MATERIALS, recorded and not started, since it is the texture
 that decides whether a role needs a new set or only an assignment: the corridor needs nothing for
 glazing or backings. It needs `ground_band`, 85 surfaces on tile (2, 0), and terrain, which no
 published set dresses by a decision already recorded.
+
+WHAT MADE THE WRONG VERSION SURVIVE, which is the part worth more than the correction. The sentence
+was a TRUE OBSERVATION OF ONE PICTURE ATTACHED TO THE WRONG OBJECT. Every word of it was right about
+the frame: the openings there are magenta, nothing dresses what is behind them, and that was
+invisible while the wall was solid. Nothing in the picture said which tile it was of, and the claim
+needed no evidence it did not already have, so there was nothing to doubt. It is the third instance
+of that shape in one day's work here: 79 cracks that were a graze, a chord deviation attached to the
+wrong arc, and this. In all three a correct statement about geometry was fastened to the wrong
+population, and in all three what caught it was measuring the population rather than re-reading the
+sentence.
+
+IT ALSO REACHED THE OPERATOR BEFORE IT WAS CAUGHT, relayed and glossed, about twenty minutes ahead
+of the correction. Recorded because a retraction that only names the fix reads as if the claim never
+travelled.
+
+FOR A READER MEETING THE FRAME COLD: the tessellator does not draw bare interiors. The fixture's six
+interior backings have no material because the fixture is a hand-written tile older than the material
+catalog, which this package's pinned undressed set says in those words, and the generated street
+dresses every one of its fifty-one.
