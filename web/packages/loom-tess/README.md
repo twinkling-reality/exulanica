@@ -113,7 +113,8 @@ Each carries a representation contract in the header (`PROJECTION_DEFINITIONS` i
 
 ## What draws today
 
-Terrain, a street segment's carriageway and gutters, and a building's own walls, roofs and parapets.
+Terrain, a street segment's carriageway and gutters, a building's own walls, roofs and parapets, and
+the face it shows the street.
 
 - In `render_batch`, the patch is drawn less what drawn covering surfaces cover, by the terrain
   yield rule below: the segments' carriageways and gutters, and the ground a drawn building stands
@@ -124,9 +125,18 @@ Terrain, a street segment's carriageway and gutters, and a building's own walls,
   tier the one above is set back from, a wall round every light well, a parapet where a deck meets
   the open air, and, where the roof form is a ridge, two planes up to the stated ridge with a gable
   on each of the two edges it runs between. A facade is laid out on a tier edge and will cover part
-  of it: until a facade DRAWS, the building's own wall stands there, and when the facade rule lands
-  the wall yields to the facade surfaces that are drawn, by the same rule terrain yields by. Nothing
-  is drawn twice in one place at any point.
+  of it: where a face draws, the building's own wall gives up exactly the rectangle that face covers
+  in the edge's own frame, its run by its storeys, and keeps the rest. Nothing is drawn twice in one
+  place at any point.
+- A facade draws the face of one tier edge by the facade rule (`src/core/facades.ts`): the wall of
+  its run over the storeys it covers, the ground band below that, every ground panel of every bay
+  that names it at that panel's own recess and in the surface role the grammar gives its panel role
+  (`PANEL_SURFACE_ROLES`, which collapses a transom onto glazing and a panel's wall onto the ground
+  band), and the scar above the neighbour's top on a party wall. What it does not draw yet is
+  additive and leaves no hole: openings with their reveals, sills and heads, string courses,
+  cornices, awnings, and the entrance and interior backing records, each of which is laid out in
+  this same frame. A ground bay draws nothing of its own, because the material records that dress
+  its panels name the facade and the panel's surface role.
 - A street segment draws its carriageway and its gutters by the street rules
   (`src/core/streets.ts`), between the kerb lines of the two curbs the tile carries for it, each a
   horizontal surface dressed by the material record for its role. Terrain yields to both. A segment

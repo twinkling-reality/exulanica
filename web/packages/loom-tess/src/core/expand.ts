@@ -12,20 +12,25 @@
  * what every surface needs: footprints, tiers, elevations, facade layouts, kerb lines, crossing
  * widths, form parts with facing vectors and identities. What is missing is on this side: the
  * integer rules that expand them, each declared and versioned here as it is built. This version
- * builds the terrain grid, a street segment's carriageway and gutters (`streets.ts`) and a
- * building's own walls, roofs and parapets (`massing.ts`), and in the navigation projection carves
- * the ground clear of what the grammar's navigation table says obstructs a walking capsule;
- * everything else states the rule it waits on (`NEEDS`).
+ * builds the terrain grid, a street segment's carriageway and gutters (`streets.ts`), a building's
+ * own walls, roofs and parapets (`massing.ts`) and the face it shows a street, with its ground band
+ * and that band's panels (`facades.ts`), and in the navigation projection carves the ground clear of
+ * what the grammar's navigation table says obstructs a walking capsule; everything else states the
+ * rule it waits on (`NEEDS`).
  *
  * Two projections are materialised, each from the records by its own rules and each with its own
  * representation contract: `render_batch`, what is drawn, and `nav_envelope`, what a person is
  * supported by. Navigation is never read back out of the render mesh; Melbourne failed exactly
  * there. `collision_proxy` and `pick_geometry` wait for contracts of their own.
  */
-import { GRAMMAR_TABLES, recordShapeOf, TILE_RECORD_KIND } from './record-shapes.js';
+import { GRAMMAR_TABLES, nestedShapeOf, recordShapeOf, TILE_RECORD_KIND } from './record-shapes.js';
 import type { Plan, Space } from './integer-math.js';
+import { facadePieces, faceCover, faceHeights, panelRoles } from './facades.js';
+import type { FacadeFields, GroundBayFields } from './facades.js';
 import { massingPieces } from './massing.js';
 import type { MassingFields } from './massing.js';
+import { runOf } from './faces.js';
+import type { FaceCover } from './faces.js';
 import type { Piece, SurfaceExpansion } from './pieces.js';
 import type { ProjectionName } from './record-shapes.js';
 import { ringClearance } from './ring-clearance.js';
@@ -40,7 +45,7 @@ import type { CoveringTriangle, TerrainPatch } from './terrain-yield.js';
  * Bumped whenever an expander, a statement, a contract or the materialised projection set
  * changes, because each changes the bytes a bake writes. The bake stage's parameters carry it.
  */
-export const TESSELLATOR_SOURCE_VERSION = 6;
+export const TESSELLATOR_SOURCE_VERSION = 7;
 
 /**
  * What each materialised projection preserves and what it may be used for, as separate rows, the
@@ -440,10 +445,54 @@ function renderSegment(fields: Fields, context: ExpandContext): Expansion {
   return { state: 'drawn', pieces: result.pieces };
 }
 
-/** A building's own walls, roofs, terraces and parapets, by the massing rule (`massing.ts`). */
-function renderMassing(fields: Fields): Expansion {
-  const pieces = massingPieces(fields as unknown as MassingFields, `city.massing ${fields.identity as string}`);
-  if (pieces.length === 0) throw new TessellationError('a massing with no tier, which its grammar refuses');
+/** Every record of a kind the tile carries whose named field holds an identity. */
+function carriedWhere(context: ExpandContext, kind: string, field: string, identity: string): Fields[] {
+  const found: Fields[] = [];
+  for (const record of context.carried.values()) {
+    if (record.kind !== kind) continue;
+    if (record.fields[field] !== identity) continue;
+    found.push(record.fields);
+  }
+  return found;
+}
+
+/**
+ * A building's own walls, roofs, terraces and parapets, by the massing rule (`massing.ts`), less
+ * every part of a tier edge a facade of this building draws over.
+ */
+function renderMassing(fields: Fields, context: ExpandContext): Expansion {
+  const massing = fields as unknown as MassingFields;
+  const where = `city.massing ${fields.identity as string}`;
+  const covers: FaceCover[] = carriedWhere(context, 'city.facade', 'building_identity', fields.identity as string)
+    .map((facade) => faceCover(facade as unknown as FacadeFields, massing, where));
+  const pieces = massingPieces(massing, covers, where);
+  if (pieces.length === 0) return { state: 'unavailable', needs: [NEEDS.ground_coverage] };
+  return { state: 'drawn', pieces };
+}
+
+/** A building's face on one tier edge, by the facade rule (`facades.ts`). */
+function renderFacade(fields: Fields, context: ExpandContext): Expansion {
+  const facade = fields as unknown as FacadeFields;
+  const where = `city.facade ${facade.identity}`;
+  const building = context.carried.get(facade.building_identity);
+  if (building === undefined) throw new TessellationError(`${where} names a building the tile does not carry`);
+  if (building.kind !== 'city.massing') throw new TessellationError(`${where} names ${building.kind} as its building`);
+  const massing = building.fields as unknown as MassingFields;
+  const tier = massing.tiers[facade.tier_ordinal];
+  if (tier === undefined) throw new TessellationError(`${where} is laid out on a tier its building does not have`);
+  const ring = tier.ring_mm;
+  const from = ring[facade.edge_ordinal];
+  if (from === undefined) throw new TessellationError(`${where} is laid out on an edge its tier does not have`);
+  const to = ring[(facade.edge_ordinal + 1) % ring.length]!;
+  const heights = faceHeights(facade, massing, where);
+  const bays = carriedWhere(context, 'city.ground_bay', 'facade_identity', facade.identity) as unknown as GroundBayFields[];
+  const pieces = facadePieces(
+    facade,
+    { from, to, run: runOf(from, to, where), datum: massing.base_elevation_mm, base: heights.base, top: heights.top },
+    bays,
+    where,
+  );
+  if (pieces.length === 0) throw new TessellationError(`${where} draws no face, which its run and storeys should not allow`);
   return { state: 'drawn', pieces };
 }
 
@@ -482,8 +531,13 @@ const KIND_RULES: ReadonlyMap<string, KindRules> = new Map<string, KindRules>([
   ['city.curb_edge', { render_batch: needs(NEEDS.kerb_offset), nav_envelope: needs(NEEDS.kerb_offset) }],
   ['city.district', { render_batch: notInProjection, nav_envelope: notInProjection }],
   ['city.entrance', { render_batch: needs(NEEDS.facade_layout), nav_envelope: needs(NEEDS.facade_layout) }],
-  ['city.facade', { render_batch: needs(NEEDS.facade_layout), nav_envelope: notInProjection }],
-  ['city.ground_bay', { render_batch: needs(NEEDS.facade_layout), nav_envelope: notInProjection }],
+  ['city.facade', {
+    render_batch: { rule: 'expand', expand: renderFacade, readsCoverings: false },
+    nav_envelope: notInProjection,
+  }],
+  // A ground bay draws as part of its facade's ground band, in the facade's own entry, because the
+  // material records that dress its panels name the facade and the panel's surface role.
+  ['city.ground_bay', { render_batch: notInProjection, nav_envelope: notInProjection }],
   ['city.junction', { render_batch: needs(NEEDS.junction_fill), nav_envelope: needs(NEEDS.junction_fill) }],
   // A room's near wall inside its building, behind its glazing: laid out on its facade, standing on
   // nothing, so it is no more a surface of the ground than the vitrine beside it.
@@ -495,7 +549,7 @@ const KIND_RULES: ReadonlyMap<string, KindRules> = new Map<string, KindRules>([
   // A building stands nobody on itself and covers the ground it stands on, which the navigation
   // table states as ground `cover`: it is no surface of the navigation projection at all.
   ['city.massing', {
-    render_batch: { rule: 'expand', expand: (fields: Fields): Expansion => renderMassing(fields), readsCoverings: false },
+    render_batch: { rule: 'expand', expand: renderMassing, readsCoverings: false },
     nav_envelope: notInProjection,
   }],
   ['city.parcel', { render_batch: needs(NEEDS.ring_triangulation), nav_envelope: needs(NEEDS.ring_triangulation) }],
@@ -594,6 +648,15 @@ for (const table of GRAMMAR_TABLES) {
     .filter((kind): kind is string => kind !== undefined && kind !== TILE_RECORD_KIND);
   for (const kind of [...KIND_RULES.keys()].sort()) {
     if (!kinds.includes(kind)) throw new TessellationError(`a rule for ${kind}, which no table declares`);
+  }
+  // Every ground panel role the table states is a role this tessellator draws as some surface.
+  for (const field of nestedShapeOf(table, 'GroundPanel').fields) {
+    if (field.name !== 'role') continue;
+    const values = field.values;
+    if (values === undefined) continue;
+    for (const role of values) {
+      if (!panelRoles().includes(role)) throw new TessellationError(`a ground panel role ${role} this tessellator has no surface role for`);
+    }
   }
   for (const row of table.navigation) {
     // A kind whose ground is covered stands nobody, and nobody may stand inside it either, so it

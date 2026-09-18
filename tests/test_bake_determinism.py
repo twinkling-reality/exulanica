@@ -511,9 +511,27 @@ def test_the_container_states_membership_frame_identity_and_what_is_drawn(tmp_pa
     # segments and the terrain.
     segments = [i for i, r in enumerate(header["records"]) if r["kind"] == "city.street_segment"]
     massings = [i for i, r in enumerate(header["records"]) if r["kind"] == "city.massing"]
+    facades = [i for i, r in enumerate(header["records"]) if r["kind"] == "city.facade"]
     assert [e["record"] for e in render["entries"] if e["state"] == "drawn"] == sorted(
-        [*massings, *segments, terrain]
+        [*facades, *massings, *segments, terrain]
     )
+    # A face draws the wall of its run and the ground band below it, and the panels of every bay
+    # that names it, so a ground bay draws nothing of its own.
+    for entry in (render["entries"][i] for i in facades):
+        roles = {s["role"] for s in entry["surfaces"]}
+        assert roles <= {
+            "wall",
+            "ground_band",
+            "party_wall_scar",
+            "stall_riser",
+            "glazing",
+            "fascia",
+            "door",
+            "shopfront_frame",
+        }
+    for index, record in enumerate(header["records"]):
+        if record["kind"] == "city.ground_bay":
+            assert render["entries"][index]["state"] == "not_in_projection"
     for entry in (render["entries"][i] for i in massings):
         assert [(s["role"], s["orientation"]) for s in entry["surfaces"]] == [
             ("wall", "vertical"),

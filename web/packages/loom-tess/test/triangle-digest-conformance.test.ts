@@ -28,9 +28,9 @@ import {
   sortList,
 } from './support.js';
 
-/** Over `test/fixtures/tile-conformance.json`, tessellator 6, digest profile v3. */
+/** Over `test/fixtures/tile-conformance.json`, tessellator 7, digest profile v3. */
 const GOLDEN = {
-  render_batch: 'e691171e27caa0e6018e3901798afc5ec9b226d6290988f63e38463b5268d341',
+  render_batch: '37f074b4eb7df8b5b9371b53a8c28d542a0aab65be03c894f3441f982c763dca',
   nav_envelope: '8a9264cee81d29369e8597e7b0afb9653a861d0668419b05de432230e72c18bc',
 } as const;
 
@@ -155,7 +155,7 @@ describe('the triangle digest of the conformance fixture', () => {
     // the ground the building stands on, and says no material dresses it: the grammar admits none.
     // Every other surface waits on a rule.
     const render = renderBatch!.header.entries.map((entry) => entry.state);
-    expect(count(render, 'drawn')).toBe(5);
+    expect(count(render, 'drawn')).toBe(14);
     expect(count(render, 'halo')).toBe(grammar.halo.length);
     const drawnTerrain = renderBatch!.header.entries[terrain]!;
     expect(drawnTerrain).toMatchObject({
@@ -167,14 +167,22 @@ describe('the triangle digest of the conformance fixture', () => {
     // The building draws, so the ground it stands on is the building's and not the terrain's: its
     // base ring is cut out of the patch by the same yield rule the segments' surfaces are.
     const building = renderBatch!.header.entries[header.records.findIndex((record) => record.kind === 'city.massing')]!;
-    expect(building).toMatchObject({ state: 'drawn', vertex_count: 125, triangle_count: 65 });
+    expect(building).toMatchObject({ state: 'drawn', vertex_count: 89, triangle_count: 47 });
     if (building.state !== 'drawn') throw new Error('the building is not drawn');
-    // Each of the three is dressed by the material record that names the building and that role.
+    // Its own wall keeps only what no face covers. A facade covers the run it states and the
+    // storeys it states, so where a run stops short of its edge the building's wall stands there,
+    // and the building drew 65 triangles before its nine faces took their part of it.
     expect(building.surfaces!.map((surface) => [surface.role, surface.orientation, surface.material.state])).toEqual([
       ['wall', 'vertical', 'record'],
       ['roof', 'horizontal', 'record'],
       ['parapet', 'vertical', 'record'],
     ]);
+    // Nine faces draw, one per tier edge, each its wall and ground band with that band's panels.
+    const faces = renderBatch!.header.entries.filter((_entry, index) => header.records[index]!.kind === 'city.facade');
+    expect(faces).toHaveLength(9);
+    expect(faces.every((entry) => entry.state === 'drawn')).toBe(true);
+    const roles = new Set(faces.flatMap((entry) => entry.state === 'drawn' ? entry.surfaces!.map((surface) => surface.role) : []));
+    expect([...roles].sort()).toEqual(['door', 'fascia', 'glazing', 'ground_band', 'party_wall_scar', 'stall_riser', 'wall']);
     for (const surface of building.surfaces!) {
       if (surface.material.state !== 'record') throw new Error('a building surface cites no record');
       expect(header.records[surface.material.record]!.fields.role).toBe(surface.role);

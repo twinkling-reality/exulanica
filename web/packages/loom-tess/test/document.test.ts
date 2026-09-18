@@ -171,9 +171,14 @@ describe('the bake', () => {
     // A building standing on the whole tile: its base ring obstructs, so a capsule fits nowhere.
     const covered = broken((d) => {
       const massing = first(d, 'city.massing');
-      massing.tiers[0].ring_mm = [[0, 0], [128000, 0], [128000, 128000], [0, 128000]];
+      // Each ring keeps its own corner count, since its facades name the edges by ordinal.
+      massing.tiers[0].ring_mm = [[0, 0], [128000, 0], [128000, 64000], [128000, 128000], [0, 128000]];
       massing.tiers[1].ring_mm = [[0, 0], [128000, 0], [128000, 128000], [0, 128000]];
       Object.assign(massing.extent, { min_x_mm: 0, min_y_mm: 0, max_x_mm: 128000, max_y_mm: 128000 });
+      // Its faces move with its tiers, so their stated extents have to hold the whole tile too.
+      for (const facade of recordsOf(d, 'city.facade')) {
+        Object.assign(facade.fields.extent, { min_x_mm: 0, min_y_mm: 0, max_x_mm: 128000, max_y_mm: 128000 });
+      }
     });
     expect(await terrainEntry(covered, 1)).toMatchObject({ state: 'unavailable', needs: ['ground_coverage'] });
   });

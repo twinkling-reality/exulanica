@@ -28,10 +28,11 @@
  * yields to the facade surfaces that are drawn, by that same rule, and never to a facade record
  * that only states it will be there. Nothing is drawn twice in one place at any point.
  */
-import { add, exact, floorDivide, measureAgainst, multiply, subtract } from './integer-math.js';
+import { add, exact, measureAgainst, multiply, subtract } from './integer-math.js';
 import type { Plan } from './integer-math.js';
-import type { Piece, SurfaceExpansion } from './pieces.js';
-import type { SurfaceOrientation } from './triangle-digest.js';
+import { faceOn, HORIZONTAL, piecesOf, runOf, Surface, VERTICAL } from './faces.js';
+import type { FaceCover } from './faces.js';
+import type { Piece } from './pieces.js';
 import { carvedPiece, twiceWalkArea } from './piece-carve.js';
 import type { ObstructionWalk } from './piece-carve.js';
 import { requireSimpleRing, triangulateRing } from './ring-triangulation.js';
@@ -65,9 +66,6 @@ const WALL = 'wall';
 const ROOF = 'roof';
 const PARAPET = 'parapet';
 
-const HORIZONTAL: SurfaceOrientation = 'horizontal';
-const VERTICAL: SurfaceOrientation = 'vertical';
-
 /** `exulanica.grammar.grammars.city.massing.storey_floor_mm`. */
 export function storeyFloorMm(fields: MassingFields, storey: number, where: string): number {
   if (storey === 0) return exact(fields.base_elevation_mm, where);
@@ -86,53 +84,6 @@ export function tierTopMm(fields: MassingFields, tier: Tier, where: string): num
 /** A ring turned counter-clockwise, which is how every piece here is built. */
 function leftTurning(ring: readonly Plan[], where: string): readonly Plan[] {
   return twiceWalkArea(ring, where) < 0 ? [...ring].reverse() : ring;
-}
-
-/** One surface of a record: its triangles, and the plan and frame coordinates of each vertex. */
-class Surface {
-  readonly vertices: number[] = [];
-  readonly triangles: number[] = [];
-  readonly coordinates: number[] = [];
-
-  constructor(readonly role: string, readonly orientation: SurfaceOrientation) {}
-
-  /** A corner, at a height, with its own surface coordinates. */
-  corner(point: Plan, height: number, s: number, t: number): number {
-    const index = this.vertices.length / 3;
-    this.vertices.push(point[0], point[1], height);
-    this.coordinates.push(s, t);
-    return index;
-  }
-
-  face(...corners: readonly number[]): void {
-    for (let corner = 1; corner + 1 < corners.length; corner += 1) {
-      this.triangles.push(corners[0]!, corners[corner]!, corners[corner + 1]!);
-    }
-  }
-
-  piece(): Piece | undefined {
-    if (this.triangles.length === 0) return undefined;
-    const surface: SurfaceExpansion = { role: this.role, orientation: this.orientation, coordinates: this.coordinates };
-    return { vertices: this.vertices, triangles: this.triangles, surface };
-  }
-}
-
-/**
- * A vertical band along a plan segment, from `base` to `top`, facing out of the counter-clockwise
- * walk it belongs to.
- */
-function band(into: Surface, from: Plan, to: Plan, base: number, top: number, datum: number, where: string): void {
-  if (top <= base) return;
-  if (from[0] === to[0] && from[1] === to[1]) return;
-  const direction: Plan = [subtract(to[0], from[0], where), subtract(to[1], from[1], where)];
-  const run = measureAgainst(from, direction, to, where).along;
-  const [low, high] = [subtract(datum, base, where), subtract(datum, top, where)];
-  into.face(
-    into.corner(from, base, 0, low),
-    into.corner(to, base, run, low),
-    into.corner(to, top, run, high),
-    into.corner(from, top, 0, high),
-  );
 }
 
 /** A ring as counter-clockwise triangles, which is what the carve takes as an obstruction. */
@@ -234,18 +185,6 @@ function openAlong(from: Plan, to: Plan, standing: readonly (readonly Plan[])[],
   return open;
 }
 
-/** The point at a distance along a plan segment, floored onto the lattice. */
-function alongEdge(from: Plan, to: Plan, distance: number, run: number, where: string): Plan {
-  if (distance === 0) return from;
-  if (distance >= run) return to;
-  const axis = (index: 0 | 1): number => add(
-    from[index],
-    floorDivide(multiply(subtract(to[index], from[index], where), distance, where), run, where),
-    where,
-  );
-  return [axis(0), axis(1)];
-}
-
 /**
  * A ridge roof on a convex four-sided top tier. The ridge runs between the floored midpoints of two
  * opposite edges, `roof_rise_mm` above the wall top: those two edges carry gables and the other two
@@ -293,8 +232,42 @@ function ridgeRoof(
   }
 }
 
-/** A building's own faces, by the rule above: its walls, its roofs and terraces, and its parapets. */
-export function massingPieces(fields: MassingFields, where: string): Piece[] {
+/**
+ * The parts of one tier edge's wall that no facade draws over, as rectangles in the edge's frame.
+ * The boundaries of every cover, and the wall's own, cut the wall into cells; a cell no cover holds
+ * is drawn. Cells that meet share their whole edge, so nothing cracks between them.
+ */
+function openWall(
+  run: number,
+  base: number,
+  top: number,
+  covers: readonly FaceCover[],
+): [number, number, number, number][] {
+  if (covers.length === 0) return [[0, run, base, top]];
+  const cuts = (low: number, high: number, values: readonly number[]): number[] => {
+    const inside = values.filter((value) => value > low && value < high);
+    return [low, ...inside.sort((first, second) => first - second), high]
+      .filter((value, index, all) => index === 0 ? true : value !== all[index - 1]);
+  };
+  const along = cuts(0, run, covers.flatMap((cover) => [cover.low, cover.high]));
+  const up = cuts(base, top, covers.flatMap((cover) => [cover.base, cover.top]));
+  const open: [number, number, number, number][] = [];
+  for (let u = 0; u + 1 < along.length; u += 1) {
+    for (let z = 0; z + 1 < up.length; z += 1) {
+      const cell: [number, number, number, number] = [along[u]!, along[u + 1]!, up[z]!, up[z + 1]!];
+      const held = covers.some((cover) =>
+        cover.low <= cell[0] && cell[1] <= cover.high && cover.base <= cell[2] && cell[3] <= cover.top);
+      if (!held) open.push(cell);
+    }
+  }
+  return open;
+}
+
+/**
+ * A building's own faces, by the rule above: its walls, its roofs and terraces, and its parapets.
+ * `covered` names the parts of its tier edges that facades draw over, which its own walls give up.
+ */
+export function massingPieces(fields: MassingFields, covered: readonly FaceCover[], where: string): Piece[] {
   const walls = new Surface(WALL, VERTICAL);
   const roof = new Surface(ROOF, HORIZONTAL);
   const parapets = new Surface(PARAPET, VERTICAL);
@@ -307,12 +280,23 @@ export function massingPieces(fields: MassingFields, where: string): Piece[] {
     const standing: (readonly Plan[])[] = [];
     if (above !== undefined) standing.push(leftTurning(requireSimpleRing(above.ring_mm, where), where));
 
-    ring.forEach((point, corner) => band(walls, point, ring[(corner + 1) % ring.length]!, base, top, datum, where));
+    ring.forEach((point, corner) => {
+      const next = ring[(corner + 1) % ring.length]!;
+      const run = runOf(point, next, where);
+      const covers = covered.filter((cover) => cover.tier === index && cover.edge === corner);
+      for (const [low, high, from, to] of openWall(run, base, top, covers)) {
+        faceOn(walls, { from: point, to: next, run }, low, high, from, to, 0, datum, where);
+      }
+    });
     for (const well of tier.light_wells_mm) {
       const turned = leftTurning(requireSimpleRing(well, where), where);
       // A well's walls face into the well, so its walk is taken the other way round.
       const inward = [...turned].reverse();
-      inward.forEach((point, corner) => band(walls, point, inward[(corner + 1) % inward.length]!, base, top, datum, where));
+      inward.forEach((point, corner) => {
+        const next = inward[(corner + 1) % inward.length]!;
+        const run = runOf(point, next, where);
+        faceOn(walls, { from: point, to: next, run }, 0, run, base, top, 0, datum, where);
+      });
       standing.push(turned);
     }
 
@@ -330,26 +314,12 @@ export function massingPieces(fields: MassingFields, where: string): Piece[] {
       const crown = add(top, tier.parapet_height_mm, where);
       ring.forEach((point, corner) => {
         const next = ring[(corner + 1) % ring.length]!;
-        const direction: Plan = [subtract(next[0], point[0], where), subtract(next[1], point[1], where)];
-        const run = measureAgainst(point, direction, next, where).along;
+        const run = runOf(point, next, where);
         for (const [low, high] of openAlong(point, next, standing, where)) {
-          band(
-            parapets,
-            alongEdge(point, next, low, run, where),
-            alongEdge(point, next, high, run, where),
-            top,
-            crown,
-            datum,
-            where,
-          );
+          faceOn(parapets, { from: point, to: next, run }, low, high, top, crown, 0, datum, where);
         }
       });
     }
   });
-  const pieces: Piece[] = [];
-  for (const surface of [walls, roof, parapets]) {
-    const piece = surface.piece();
-    if (piece !== undefined) pieces.push(piece);
-  }
-  return pieces;
+  return piecesOf([walls, roof, parapets]);
 }

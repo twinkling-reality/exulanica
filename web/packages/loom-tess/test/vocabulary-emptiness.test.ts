@@ -96,7 +96,14 @@ const tableShapes = () => GRAMMAR_TABLES.flatMap((table) => [...table.shapes.rec
 /** Every schema word core legitimately spells: record kinds, shape and field names, projections, needs. */
 function schemaWords(): Set<string> {
   const tokens = [
-    ...tableShapes().flatMap((shape) => [shape.shape, ...shape.fields.map((field) => field.name)]),
+    // A field's CLOSED values are schema, not vocabulary: they say where a surface is or what part
+    // it is, never what it is made of, and a catalog key is always a `key` field and never a
+    // `choice`. So a role like `glazing` is spelled here because a pane goes there, and a material
+    // word stays forbidden because no choice lists one.
+    ...tableShapes().flatMap((shape) => [
+      shape.shape,
+      ...shape.fields.flatMap((field) => [field.name, ...(field.values === undefined ? [] : field.values)]),
+    ]),
     ...PROJECTIONS,
     ...Object.keys(NEEDS),
     ...ENTRY_STATES,
@@ -295,11 +302,14 @@ describe('the vocabulary-emptiness scan', () => {
 
   it('reads a vocabulary that actually contains the repository vocabulary', () => {
     const vocabularyWords = vocabulary();
-    for (const word of ['baker', 'brick', 'limestone', 'asphalt', 'glazing', 'transom', 'victorian', 'granite']) {
+    // What a thing is made of, and what era it is from.
+    for (const word of ['baker', 'brick', 'limestone', 'asphalt', 'victorian', 'granite']) {
       expect(vocabularyWords.has(word), word).toBe(true);
     }
-    // Schema words core must be able to spell are not vocabulary.
-    for (const word of ['render', 'batch', 'terrain', 'material', 'surface', 'vitrine']) {
+    // Schema words core must be able to spell are not vocabulary, closed field values included:
+    // `glazing` and `transom` are where a pane goes and which pane it is, not what it is made of,
+    // and each is a value of a role field the table states.
+    for (const word of ['render', 'batch', 'terrain', 'material', 'surface', 'vitrine', 'glazing', 'transom']) {
       expect(vocabularyWords.has(word), word).toBe(false);
     }
   });

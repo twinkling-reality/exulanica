@@ -99,16 +99,26 @@ function expectToday(outcomes: readonly Outcome[]): void {
   const count = (test: (outcome: Outcome) => boolean) => outcomes.filter(test).length;
   expect(outcomes).toHaveLength(180);
   const street = ['carriageway:record', 'gutter:record'];
-  expect(outcomes.filter(outcome => outcome.state === 'drawn').map(outcome => [outcome.kind, outcome.bounded, outcome.surfaces]))
-    .toEqual([
-      ['city.massing', true, ['wall:record', 'roof:record', 'parapet:record']],
-      ['city.street_segment', true, street],
-      ['city.street_segment', true, street],
-      ['city.street_segment', true, street],
-      ['city.terrain', true, ['terrain:none-exists']],
-    ]);
+  const drawn = outcomes.filter(outcome => outcome.state === 'drawn');
+  // Nine faces, the building they are laid out on, the three segments and the terrain.
+  expect(drawn.map(outcome => outcome.kind)).toEqual([
+    ...Array.from({ length: 9 }, () => 'city.facade'),
+    'city.massing',
+    'city.street_segment',
+    'city.street_segment',
+    'city.street_segment',
+    'city.terrain',
+  ]);
+  expect(drawn.every(outcome => outcome.bounded)).toBe(true);
+  expect(drawn.slice(9).map(outcome => outcome.surfaces)).toEqual([
+    ['wall:record', 'roof:record', 'parapet:record'],
+    street,
+    street,
+    street,
+    ['terrain:none-exists'],
+  ]);
   expect(count(outcome => outcome.membership === 'halo' && outcome.subjectId === null)).toBe(3);
-  expect(count(outcome => outcome.state === 'unavailable' && outcome.subjectId !== null && !outcome.bounded)).toBe(63);
+  expect(count(outcome => outcome.state === 'unavailable' && outcome.subjectId !== null && !outcome.bounded)).toBe(41);
   // The corridor's slice 2 kind. The tile states an extent for each, and the container leaves them
   // unavailable needing facade_layout, so each is listed with its reason and draws nothing: no box,
   // no points, exactly like every other spatial record this bake does not draw.
@@ -118,7 +128,9 @@ function expectToday(outcomes: readonly Outcome[]): void {
     expect(outcome).toMatchObject({ membership: 'owned', state: 'unavailable', hasExtent: true, bounded: false, surfaces: [] });
     expect(outcome.subjectId).toMatch(/^generated:city\.interior_backing:[0-9a-f-]{36}$/);
   }
-  expect(count(outcome => outcome.state === 'not_in_projection' && outcome.hasExtent && !outcome.bounded)).toBe(24);
+  // A ground bay states an extent and draws nothing of its own: its panels are drawn in its
+  // facade's entry, because the material records that dress them name the facade and the role.
+  expect(count(outcome => outcome.state === 'not_in_projection' && outcome.hasExtent && !outcome.bounded)).toBe(37);
   expect(count(outcome => outcome.membership === 'owned' && !outcome.hasExtent && outcome.subjectId === null)).toBe(85);
 }
 

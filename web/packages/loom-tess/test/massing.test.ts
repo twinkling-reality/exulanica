@@ -44,7 +44,7 @@ function measure(fields: MassingFields, where: string): Measured {
   const vertical = new Map<string, number>();
   const heights: number[] = [];
   let horizontal = 0;
-  for (const piece of massingPieces(fields, where)) {
+  for (const piece of massingPieces(fields, [], where)) {
     const surface = piece.surface!;
     for (let triangle = 0; triangle + 2 < piece.triangles.length; triangle += 3) {
       const corners = [0, 1, 2].map((corner) => {

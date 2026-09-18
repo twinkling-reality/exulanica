@@ -176,7 +176,15 @@ describe('decodeOwd', () => {
   });
 
   it('refuses a material that dresses another role or another record', () => {
-    const cited = (header: any) => header.projections[0].entries.find((entry: any) => entry.state === 'drawn').surfaces[0];
+    // The first drawn surface that cites a material record, whichever record now draws first.
+    const cited = (header: any) => {
+      for (const entry of header.projections[0].entries) {
+        if (entry.state !== 'drawn') continue;
+        const surface = entry.surfaces.find((candidate: any) => candidate.material.state === 'record');
+        if (surface !== undefined) return surface;
+      }
+      throw new Error('no drawn surface cites a material record');
+    };
     refused(rebuilt(dressed, (header) => { cited(header).role = 'lot'; }), /dresses another role/);
     refused(rebuilt(dressed, (header) => {
       const other = header.records.findIndex((record: any) => record.kind === 'city.surface_material' && record.fields.role === 'kerb');
