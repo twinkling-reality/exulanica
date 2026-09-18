@@ -61,3 +61,37 @@ I am building what the tessellator can honestly say, which is that the floor dra
 and is carved to nothing in `nav_envelope`, and reporting the contradiction rather than choosing
 between the two rows. Choosing would mean either drawing support a capsule cannot use, or silently
 dropping a row the grammar states.
+
+## The half that is buildable today, and its own prediction
+
+`city.entrance` OWNS NO SURFACE ROLE. It is in no tuple of `SURFACE_ROLE_OWNERS`, and
+`material.py`'s `_role_owner` refuses a material record whose surface kind is not among a role's
+owners. So a surface an entrance draws is not undressed, it is UNDRESSABLE, and there is no role for
+a porch floor at all: every horizontal role the grammar states is owned by a curb, a parcel, a block
+or the terrain. That is a second gap beside the contradiction above, and both are routed rather than
+worked around.
+
+What needs neither is THE RETURNS BETWEEN A GROUND BAY'S OWN PANELS, which the facade draws in its
+own `trim` role, a role a facade does own.
+
+MEASURED FIRST. A bay's panels tile it exactly in `(u, z)` and each sits at its own recess, so
+wherever two panels share an edge and differ in recess there is a step with nothing drawn across it.
+On the corridor tile: 525 such pairs, in exactly the 75 bays that have a door, by role pair
+
+    frame and transom   172      door and frame    86      wall and wall    64
+    transom and wall     96      door and wall     64      fascia and transom  43
+
+and 225 of the tile's 853 panels are recessed from the face at all. THAT is what makes a door read
+as a rectangle floating up to 1.79 m behind a wall: not a missing door, a missing jamb.
+
+### Prediction
+
+1. `render_batch` MOVES. `nav_envelope` DOES NOT, in digest, triangle count or vertex count, for the
+   same reason as the openings half: a facade's navigation row is ground `none`.
+2. 525 returns on the corridor tile, two triangles each, so 1,050 new triangles there and no change
+   to any other record's count.
+3. The returns appear on exactly 75 of the tile's 244 ground bays, which is exactly the set that has
+   a door, because a bay with all its panels at one recess has no step.
+4. Every return faces INTO the recess, so a person in the street sees the jamb rather than its back.
+5. The trim surface count rises by one per affected FACE rather than per return, since a facade
+   draws one trim surface and adds to it.
