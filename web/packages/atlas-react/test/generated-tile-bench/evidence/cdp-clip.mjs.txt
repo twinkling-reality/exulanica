@@ -9,6 +9,12 @@
 // so a whole turn is 2*pi/1.35 seconds. Choosing N frames and dt = 2*pi/(1.35*N) makes frame N the
 // same pose as frame 0 to the last bit, so the clip cuts back to its start with nothing to see.
 //
+// THE SQUARE TRAP: the app refuses a window narrower than 60rem (960 px) and serves a boundary page
+// instead, which still mounts a canvas, so a small square viewport captures a clip of an apology.
+// A square clip must therefore be RENDERED at 960 square or wider (this plan uses 1080) and scaled
+// or cropped afterwards, never rendered at 640 square. Asking for the shape you want is how you get
+// a page that is not the one you think you are filming.
+//
 // Usage: node cdp-clip.mjs <plan.json>
 import { spawn } from 'node:child_process';
 import { createHash } from 'node:crypto';
