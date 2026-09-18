@@ -468,6 +468,11 @@ def test_the_harness_type_checks_and_the_checker_looked_at_it():
         timeout=600,
     )
     read = [line.strip() for line in result.stdout.splitlines() if line.strip().endswith(".mjs")]
-    assert str(HARNESS) in read, f"the checker did not read {HARNESS}; it read {read}"
     findings = [line for line in result.stdout.splitlines() if "error TS" in line]
-    assert result.returncode == 0, "\n".join(findings) or result.stderr
+    # FINDINGS FIRST. A syntax error stops the compiler before it lists anything, so asking about
+    # coverage first reports "the checker did not read it" for a file it read and refused, which
+    # sends the reader to this configuration instead of to the line that is wrong. Measured by
+    # breaking it: the duplicate key failed the coverage assertion until this order was fixed.
+    assert not findings, "\n".join(findings)
+    assert result.returncode == 0, result.stderr
+    assert str(HARNESS) in read, f"the checker did not read {HARNESS}; it read {read}"
