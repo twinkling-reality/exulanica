@@ -33,8 +33,6 @@
  *
  * The segment count comes from the projection contract's `resolution_mm`, as the least power of two
  * whose every chord keeps within it (`filletSegmentsWithin`); nothing here chooses a number.
- *
- * Not yet wired into a bake. It changes no container until an expander calls it.
  */
 import {
   add,

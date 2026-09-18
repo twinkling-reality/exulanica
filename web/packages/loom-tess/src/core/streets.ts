@@ -79,8 +79,6 @@
  *
  * Every triangle is counter-clockwise seen from its front: from above for a horizontal surface,
  * from the carriageway for a kerb face.
- *
- * Not yet wired into a bake. It changes no container until an expander calls it.
  */
 import type { Piece, SurfaceExpansion } from './pieces.js';
 import { alongByCornerRule, filletArc, filletCentre, filletSegmentsWithin } from './fillet-arc.js';

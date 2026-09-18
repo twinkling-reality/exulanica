@@ -27,8 +27,6 @@
  * passes its distance by under a millimetre and a half, a corner's millimetre of margin, and the
  * diagonal of an overhang against a step. That is the stated cost of covering an arc with integer
  * points, and it is absolute, so at a capsule's radius it is under two parts in a hundred.
- *
- * Not yet wired into a bake. It changes no container until support clearance reads it.
  */
 import { alongByCornerRule } from './fillet-arc.js';
 import { add, exact, GeometryError, multiply, subtract } from './integer-math.js';

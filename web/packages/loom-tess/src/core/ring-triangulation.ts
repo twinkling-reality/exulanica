@@ -43,9 +43,6 @@
  *
  * Triangles index the outer ring's vertices, then each hole's in the order given, so every vertex
  * is an original one, and their areas sum to the outer ring's less the holes'.
- *
- * Not yet wired into a bake. It changes no container until an expander calls it, which is a new
- * `TESSELLATOR_SOURCE_VERSION`.
  */
 import { add, cross, dot, GeometryError, multiply, subtract } from './integer-math.js';
 import type { Plan } from './integer-math.js';
