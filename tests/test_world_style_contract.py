@@ -8,7 +8,13 @@ import pathlib
 import re
 
 import pytest
-from exulanica.world import STYLE_REGISTRY, InvalidStyleData, StyleReference, StyleRegistry
+from exulanica.world import (
+    STYLE_REGISTRY,
+    InvalidStyleData,
+    StyleReference,
+    StyleRegistry,
+    registry,
+)
 
 ROOT = pathlib.Path(__file__).resolve().parents[1]
 REGISTRY_PATH = ROOT / "exulanica" / "world" / "style-registry.v1.json"
@@ -148,6 +154,35 @@ def test_only_registered_capabilities_can_enter_a_profile_manifest():
         }
     )
     with pytest.raises(ValueError, match="unregistered"):
+        StyleRegistry(document)
+
+
+def test_a_registered_parameter_kind_with_no_definition_rules_fails_closed(monkeypatch):
+    """A kind in _KINDS that _validate_definition has no rules for is refused, not accepted.
+
+    The definition validator used to run out of branches for a kind that was neither a range nor
+    a choice and return, while its sibling _validate_value starts closed and opens only where a
+    kind's rules hold. Only a kind in _KINDS can arrive, so what this holds is the next kind
+    somebody registers: it cannot enter the registry until its definition rules exist.
+    """
+    document = registry_document()
+    document["capabilities"].append(
+        {"capability": "world.gradient", "kind": "gradient", "group": "world"}
+    )
+    document["modules"][0]["capabilities"].append("world.gradient")
+    document["profiles"][0]["controls"].append(
+        {
+            "key": "gradient",
+            "capability": "world.gradient",
+            "kind": "gradient",
+            "group": "world",
+            "label": "Gradient",
+            "description": "A kind whose definition rules nobody has written.",
+            "default_value": "#402080",
+        }
+    )
+    monkeypatch.setattr(registry, "_KINDS", registry._KINDS | {"gradient"})
+    with pytest.raises(ValueError, match="no definition rules"):
         StyleRegistry(document)
 
 

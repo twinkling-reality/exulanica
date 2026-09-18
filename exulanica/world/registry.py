@@ -428,6 +428,14 @@ class StyleRegistry:
     def _validate_definition(
         definition: ParameterDefinition, capability: CapabilityDefinition
     ) -> None:
+        """Hold a definition to its kind's rules, and refuse a kind that has none here.
+
+        Shaped like :meth:`_validate_value`, which starts closed and opens only where a kind's
+        rules hold. A kind added to ``_KINDS`` without rules here is then refused rather than
+        accepted in silence. Only a kind in ``_KINDS`` reaches this, because the capability parse
+        refuses any other, so the closing refusal is about the kind somebody registers next.
+        """
+        checked = False
         if definition.kind == "range":
             capability_minimum = (
                 capability.minimum if capability.minimum is not None else definition.minimum
@@ -445,14 +453,24 @@ class StyleRegistry:
                 or definition.maximum > capability_maximum
             ):
                 raise ValueError(f"invalid range definition {definition.key}")
-        elif definition.kind == "choice" and (
-            len(definition.options) < 2 or len(set(definition.options)) != len(definition.options)
-        ):
-            raise ValueError(f"invalid choice definition {definition.key}")
-        elif definition.kind == "choice" and any(
-            value not in capability.options for value in definition.options
-        ):
-            raise ValueError(f"choice definition {definition.key} exceeds capability options")
+            checked = True
+        elif definition.kind == "choice":
+            if len(definition.options) < 2 or len(set(definition.options)) != len(
+                definition.options
+            ):
+                raise ValueError(f"invalid choice definition {definition.key}")
+            if any(value not in capability.options for value in definition.options):
+                raise ValueError(f"choice definition {definition.key} exceeds capability options")
+            checked = True
+        elif definition.kind in ("color", "toggle"):
+            # Neither states bounds or options; what can be wrong is the default value, and
+            # _validate_value holds that to the same kind.
+            checked = True
+        if not checked:
+            raise ValueError(
+                f"world style definition {definition.key} has kind {definition.kind!r}, "
+                "which has no definition rules here"
+            )
 
     @staticmethod
     def _validate_value(definition: ParameterDefinition, value: StyleParameterValue | Any) -> None:
