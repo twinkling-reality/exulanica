@@ -168,6 +168,26 @@ one writable output directory, hard limit passed to timeout.
   exactly the set of generations the run record pins. The 64 raw outputs (192 MB) and the 32 look
   crops with their sheets (31 MB) stay out of git under .exulanica/appearance/, pinned by digest.
 
+== THE SOURCE THIS SESSION RAN IS UNRECOVERABLE, established 2026-09-18
+  The generation records here name commit f61a89fa4b8a8d8163fe085c1b48b6a34cff0687 with
+  source_sha256 ad958ff691de3626cc3f20537f13dfb77803214d7d68f64541f2288fbe182eeb. THAT DIGEST
+  MATCHES NO TREE IN THIS REPOSITORY. Checked by rebuilding each candidate tree and hashing it the
+  way the runner does: f61a89fa gives 3559020756d235ec, 1bc97ad9 gives dbc985850613d61d, b42da82e
+  gives 5c7712d259a6221d, 48c77a3f gives 9e2a3e4c2737dd86. The run used a working tree with the
+  three live fixes applied but not yet committed; that tree was committed, reformatted by ruff and
+  lost, and the machine holding the pushed copy was deleted. The commit field is worse than useless
+  here: f61a89fa PREDATES the tensor fix this run needed to produce any output at all, so it names
+  code that provably could not have made these 64 images.
+  A record naming a source digest that matches nothing reads as provenance and is not, which is why
+  this is written here rather than left to be discovered.
+  WHAT CAN STILL BE SAID, as an inference and not a comparison: from the fix commit 1bc97ad9 to
+  48c77a3f the only change in the GPU backend is the read-only latent diagnostic, so the sampling
+  path is materially the same. That is a diff of neighbouring commits, not a diff against what ran.
+  Consequence for session 2's determinism result: 64 of 64 outputs came back byte-identical on a
+  second machine, and that holds across machine AND code revision. It cannot be narrowed to "the
+  same code on a different machine", because one side of the comparison cannot be reconstructed.
+  gpu-session.sh now refuses to run from a dirty tree, which is what stops the next one.
+
 == what this does not show
   - Nothing here is evidence about any real place. Every output is invented appearance on synthetic
     structure, labelled "invented" in its own record.

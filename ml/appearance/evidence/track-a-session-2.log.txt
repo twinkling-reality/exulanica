@@ -117,6 +117,37 @@ sighting), deleted 14:53:12Z, confirmed gone from the account 14:54:51Z.
   scripts/collect-session.sh. The link dropped for real at 14:36:05Z and cost exactly one failed
   poll; job A finished 64 of 64 through it.
 
+== THE LOOK, and it found lettering
+  All SIXTEEN limestone ashlar outputs looked at at 1:1, four 512 px crops each covering every
+  texel, 64 crops in total. Records in ml/appearance/look/records-session-2/, words in
+  ml/appearance/look/session-2-findings.json. The session's other 24 outputs, cast concrete and
+  storefront metal, were NOT looked at at full resolution, and nothing from them may be published.
+  ONE OUTPUT CARRIES LETTERING. a2 edge seed 2496137620, output ce5b6d46efcd72bc: incised on a block
+  face in the crop at 0,0 are characters reading approximately "2400" then "0.00m", digits with a
+  decimal point and what reads as a metre unit, the shape of a dimension or a datum level mark found
+  in photographs of surveyed stonework. The prompt for this target explicitly forbade text. It is
+  refused and it cannot be published.
+  EVERY MEASUREMENT ON THAT OUTPUT WAS GOOD: seams 940450 and 1142911, recall 985326, and the second
+  lowest low-frequency share of the sixteen. Worse, MY OWN SELECTION RULE PICKED IT: choosing the two
+  lowest low-frequency shares per candidate selected it as one of four to offer. Numbers cannot see
+  lettering. The look gates the offer; it does not follow it, and a rule that picks candidates by
+  measurement must have the look after it rather than before.
+  ONE MORE IS AMBIGUOUS AND STAYS UNDECIDED. a1 edge seed 3314839143 carries faint shapes on a block
+  face that may be characters, something like a 4 and a 2, unreadable at 1:1 and at five times
+  magnification. I am not deciding it; the operator does. Not offered either way.
+  THE EYE ALSO FOUND DEFECTS NO MEASUREMENT FLAGGED:
+    a1 edge 3314839143 invented ROCK FACED blocks with their own shading, which the recipe does not
+      paint and the height map does not carry; baked into a base colour map that shading contradicts
+      the geometry under any light.
+    a2 edge 228176232 invented PILLOWED block edges, the same problem in a different shape.
+    the a2 depth outputs carry OVER SATURATED NEON GREEN along parts of the joints.
+    a2's palette drifts near white against the recipe's cream, on every a2 edge output.
+    a1 edge 1999256553 paints scallop shells that read as whole shells applied to the surface rather
+      than as fossil sections through the stone.
+  WHAT I WOULD OFFER, AFTER LOOKING: the four a1 DEPTH outputs, seeds 339555107, 134886902,
+  520797699 and 3072735581. All four hold the recipe's courses, joints and colour, invent no
+  geometry, and carry no lettering or mark. Nothing is offered yet; that is the orchestrator's call.
+
 == what this session does not show
   - Nothing here is evidence about any real place. Every output is invented appearance on synthetic
     structure and says so in its own record.

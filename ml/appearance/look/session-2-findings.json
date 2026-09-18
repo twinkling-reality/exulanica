@@ -1,0 +1,172 @@
+{
+  "looked_by": "the generated appearance lane",
+  "looked_on": "2026-09-18",
+  "note": "Every one of the sixteen limestone ashlar outputs of session 2, looked at at 1:1 in four 512 px crops covering every texel, because one of them turned out to carry lettering and an offer cannot rest on a sample once that is known. The session's other 24 outputs, cast concrete and storefront metal, were NOT looked at at full resolution and nothing from them may be published. Selection by measurement picked a tainted output: the rule that chose the two lowest low-frequency shares per candidate selected a2-edge-2496137620, which carries the lettering. The look gates the offer; it does not follow it.",
+  "session": "track-a-session-2",
+  "picks": [
+    {
+      "candidate": "a1",
+      "found": "Coursed limestone ashlar on the recipe's own 8 courses of 4 blocks in half bond, with the joints and arrises where the structure puts them. The same stone carrying much heavier algae: large green patches spread from the joints well onto the block faces, so it reads as a damp shaded wall rather than a street elevation. No lettering, numeral, logo, badge, signature, watermark or mason's mark anywhere in the four crops, and nothing that reads as a particular real building.",
+      "name": "limestone-ashlar-weathered-a1-depth-134886902",
+      "output_sha256": "f321df18bf16a725bd4989bd091e7ebec1e9655492b818ea22365dae8cbed4f4",
+      "role": "depth",
+      "seed": 134886902,
+      "suspected": [],
+      "target": "limestone-ashlar-weathered"
+    },
+    {
+      "candidate": "a1",
+      "found": "Coursed limestone ashlar on the recipe's own 8 courses of 4 blocks in half bond, with the joints and arrises where the structure puts them. Cream blocks with green growth spreading from the joints in soft patches and warm ochre bloom on several faces. No lettering, numeral, logo, badge, signature, watermark or mason's mark anywhere in the four crops, and nothing that reads as a particular real building.",
+      "name": "limestone-ashlar-weathered-a1-depth-3072735581",
+      "output_sha256": "9b8d10003800405b5470cc29efe32627d4ea7ff7fe74702649e8f7fb17fc948b",
+      "role": "depth",
+      "seed": 3072735581,
+      "suspected": [],
+      "target": "limestone-ashlar-weathered"
+    },
+    {
+      "candidate": "a1",
+      "found": "Coursed limestone ashlar on the recipe's own 8 courses of 4 blocks in half bond, with the joints and arrises where the structure puts them. Pale cream blocks, green biological growth along the recessed joints, ochre and rust staining mottled over the faces, chamfered arrises. Colour sits where the recipe's palette sits. No lettering, numeral, logo, badge, signature, watermark or mason's mark anywhere in the four crops, and nothing that reads as a particular real building.",
+      "name": "limestone-ashlar-weathered-a1-depth-339555107",
+      "output_sha256": "d90b9a636d2bc882d187086d60b0d04021874fd61b083464a48f528d09b3519b",
+      "role": "depth",
+      "seed": 339555107,
+      "suspected": [],
+      "target": "limestone-ashlar-weathered"
+    },
+    {
+      "candidate": "a1",
+      "found": "Coursed limestone ashlar on the recipe's own 8 courses of 4 blocks in half bond, with the joints and arrises where the structure puts them. Clean cream blocks, thin green growth confined to the joints, faint vertical grain on the faces. The most restrained of the sixteen and the closest to the recipe's own colour. No lettering, numeral, logo, badge, signature, watermark or mason's mark anywhere in the four crops, and nothing that reads as a particular real building.",
+      "name": "limestone-ashlar-weathered-a1-depth-520797699",
+      "output_sha256": "32c98aaefdd93789f5ec8c79c06683548f792531ff8198a2d7d783ad9afcb840",
+      "role": "depth",
+      "seed": 520797699,
+      "suspected": [],
+      "target": "limestone-ashlar-weathered"
+    },
+    {
+      "candidate": "a1",
+      "found": "Coursed limestone ashlar on the recipe's own 8 courses of 4 blocks in half bond, with the joints and arrises where the structure puts them. Heavily weathered grey green stone: thick moss and algae washing down from every bed joint, dark soot in the joints, small pale shell inclusions on some faces. Convincing as an old wall and far from the recipe's clean colour. No lettering, numeral, logo, badge, signature, watermark or mason's mark anywhere in the four crops, and nothing that reads as a particular real building.",
+      "name": "limestone-ashlar-weathered-a1-edge-1192580880",
+      "output_sha256": "57810e831e2fd016ba538959a4bf03d345462455b622433b8b0dc8d421078b61",
+      "role": "edge",
+      "seed": 1192580880,
+      "suspected": [],
+      "target": "limestone-ashlar-weathered"
+    },
+    {
+      "candidate": "a1",
+      "found": "Coursed limestone ashlar on the recipe's own 8 courses of 4 blocks in half bond, with the joints and arrises where the structure puts them. Weathered stone with algae streaks, black spotting and prominent scallop shells. The shells read as whole shells applied to the surface rather than as fossil sections through the stone, which is an oddity rather than a mark. No lettering, numeral, logo, badge, signature, watermark or mason's mark anywhere in the four crops, and nothing that reads as a particular real building.",
+      "name": "limestone-ashlar-weathered-a1-edge-1999256553",
+      "output_sha256": "d4175a269030788c39cfa6b1f202e3075484900d894f9023b29b09d33eec8576",
+      "role": "edge",
+      "seed": 1999256553,
+      "suspected": [],
+      "target": "limestone-ashlar-weathered"
+    },
+    {
+      "candidate": "a1",
+      "found": "Coursed limestone ashlar on the recipe's own 8 courses of 4 blocks in half bond, with the joints and arrises where the structure puts them. The model has invented ROCK FACED blocks: several courses carry deep rusticated projections with their own shading, which the recipe does not paint and the height map does not carry (its faces are 6 mm with slight waviness). Baked into a base colour map, that shading will contradict the geometry under any lighting. Small pebbles and shells scattered on the faces. No lettering, numeral, logo, badge, signature, watermark or mason's mark anywhere in the four crops, and nothing that reads as a particular real building.",
+      "name": "limestone-ashlar-weathered-a1-edge-3314839143",
+      "output_sha256": "85f1d79b033d1e4aec8e641487895332bb5b8f40e8604657bc5e234c728d594a",
+      "role": "edge",
+      "seed": 3314839143,
+      "suspected": [
+        "In the crop at 512,0, on a block face, there are faint shapes that may be characters, something like a 4 and a 2 with others beside them, degraded and ambiguous at 1:1 and at five times magnification. I cannot tell whether they are lettering or weathering, and I am not deciding it. The operator decides; this output is not offered either way."
+      ],
+      "target": "limestone-ashlar-weathered"
+    },
+    {
+      "candidate": "a1",
+      "found": "Coursed limestone ashlar on the recipe's own 8 courses of 4 blocks in half bond, with the joints and arrises where the structure puts them. Grey white blocks with green algae down the joints, dense black spotting in patches and small shell inclusions. No lettering, numeral, logo, badge, signature, watermark or mason's mark anywhere in the four crops, and nothing that reads as a particular real building.",
+      "name": "limestone-ashlar-weathered-a1-edge-3736529213",
+      "output_sha256": "ec74bc9635c42883501cbfd48747a086a8a8665fc3e16aa8a4c29f5109d64bc1",
+      "role": "edge",
+      "seed": 3736529213,
+      "suspected": [],
+      "target": "limestone-ashlar-weathered"
+    },
+    {
+      "candidate": "a2",
+      "found": "Coursed limestone ashlar on the recipe's own 8 courses of 4 blocks in half bond, with the joints and arrises where the structure puts them. Smooth pale blocks, very little weathering, and OVER SATURATED NEON GREEN along parts of the joints that no lichen is that colour. A colour defect rather than a mark. No lettering, numeral, logo, badge, signature, watermark or mason's mark anywhere in the four crops, and nothing that reads as a particular real building.",
+      "name": "limestone-ashlar-weathered-a2-depth-189772028",
+      "output_sha256": "0baee9db3f298939acbb9fe7c32da5e60b55ca5a09f391038389de290cddd691",
+      "role": "depth",
+      "seed": 189772028,
+      "suspected": [],
+      "target": "limestone-ashlar-weathered"
+    },
+    {
+      "candidate": "a2",
+      "found": "Coursed limestone ashlar on the recipe's own 8 courses of 4 blocks in half bond, with the joints and arrises where the structure puts them. Smooth cream blocks, olive staining along the joints, almost no weathering on the faces. No lettering, numeral, logo, badge, signature, watermark or mason's mark anywhere in the four crops, and nothing that reads as a particular real building.",
+      "name": "limestone-ashlar-weathered-a2-depth-2602690745",
+      "output_sha256": "b921e371169f282b73d49bae3dcf3d72e8950ceeedde8f61408c0d4452f4ce67",
+      "role": "depth",
+      "seed": 2602690745,
+      "suspected": [],
+      "target": "limestone-ashlar-weathered"
+    },
+    {
+      "candidate": "a2",
+      "found": "Coursed limestone ashlar on the recipe's own 8 courses of 4 blocks in half bond, with the joints and arrises where the structure puts them. Smooth pale blocks with thin olive joints and warm patches on a few faces, with small bright green flecks. No lettering, numeral, logo, badge, signature, watermark or mason's mark anywhere in the four crops, and nothing that reads as a particular real building.",
+      "name": "limestone-ashlar-weathered-a2-depth-2725176506",
+      "output_sha256": "98cb50a5e4b6c92851a511ca7897b97bc8bec54a72492befaafe0ce960d349be",
+      "role": "depth",
+      "seed": 2725176506,
+      "suspected": [],
+      "target": "limestone-ashlar-weathered"
+    },
+    {
+      "candidate": "a2",
+      "found": "Coursed limestone ashlar on the recipe's own 8 courses of 4 blocks in half bond, with the joints and arrises where the structure puts them. Smooth pale blocks with mild joint staining and the same over saturated green in places. Cleaner than any a1 output and further from the weathering the prompt asked for. No lettering, numeral, logo, badge, signature, watermark or mason's mark anywhere in the four crops, and nothing that reads as a particular real building.",
+      "name": "limestone-ashlar-weathered-a2-depth-535340768",
+      "output_sha256": "64780e605ec7fced848f8f18e4e3f5c55db00797b56cab6cfe3fa545540b3de1",
+      "role": "depth",
+      "seed": 535340768,
+      "suspected": [],
+      "target": "limestone-ashlar-weathered"
+    },
+    {
+      "candidate": "a2",
+      "found": "Coursed limestone ashlar on the recipe's own 8 courses of 4 blocks in half bond, with the joints and arrises where the structure puts them. Bleached near white blocks with soot and dirt washing down from each bed joint and small green tufts in the joints. Note the palette drifts well lighter than the recipe's cream. No lettering, numeral, logo, badge, signature, watermark or mason's mark anywhere in the four crops, and nothing that reads as a particular real building.",
+      "name": "limestone-ashlar-weathered-a2-edge-2012711938",
+      "output_sha256": "c2c6ae08e3cfd740e9eb8cfabc0cf5b940340206dc855e50ba3e97e32e274dd9",
+      "role": "edge",
+      "seed": 2012711938,
+      "suspected": [],
+      "target": "limestone-ashlar-weathered"
+    },
+    {
+      "candidate": "a2",
+      "found": "Coursed limestone ashlar on the recipe's own 8 courses of 4 blocks in half bond, with the joints and arrises where the structure puts them. Near white blocks whose edges the model has PILLOWED: it invented pronounced bevels with their own shading, which the recipe's flat faces do not have. Algae in the joints and dirt washing down. The invented shading has the same problem as the rock facing above. No lettering, numeral, logo, badge, signature, watermark or mason's mark anywhere in the four crops, and nothing that reads as a particular real building.",
+      "name": "limestone-ashlar-weathered-a2-edge-228176232",
+      "output_sha256": "f12c73411cc000123d51fa3d8bcc5630728adb41567fd5237a6d5d1d47a28300",
+      "role": "edge",
+      "seed": 228176232,
+      "suspected": [],
+      "target": "limestone-ashlar-weathered"
+    },
+    {
+      "candidate": "a2",
+      "found": "Coursed limestone ashlar on the recipe's own 8 courses of 4 blocks in half bond, with the joints and arrises where the structure puts them. Near white blocks, heavy black soot gathered under the bed joints and running down, faint green in the joints. The most sooted of the a2 outputs. No lettering, numeral, logo, badge, signature, watermark or mason's mark anywhere in the four crops, and nothing that reads as a particular real building.",
+      "name": "limestone-ashlar-weathered-a2-edge-2457877368",
+      "output_sha256": "88331951b2b8e2c7f5127ee70f1e7e25c93c86b929f41dd595304c56fb5912c8",
+      "role": "edge",
+      "seed": 2457877368,
+      "suspected": [],
+      "target": "limestone-ashlar-weathered"
+    },
+    {
+      "candidate": "a2",
+      "found": "Coursed limestone ashlar on the recipe's own 8 courses of 4 blocks in half bond, with the joints and arrises where the structure puts them. Near white blocks with soot under the joints and green tufts. THIS OUTPUT CARRIES LETTERING. In the crop at 0,0, incised on a block face, are characters reading approximately 2400 then 0 point 00m: digits, a decimal point and what reads as a metre unit, the shape of a dimension or a datum level mark. The prompt for this target explicitly forbade text. Every measurement on this output was good, seams 0.94 and 1.14, recall 985326, the second lowest low frequency share of the sixteen, so nothing but looking at the pixels would have found it.",
+      "name": "limestone-ashlar-weathered-a2-edge-2496137620",
+      "output_sha256": "ce5b6d46efcd72bc552f470e9dacc9a6059aeb69a9d06d85689241b78152a7f2",
+      "role": "edge",
+      "seed": 2496137620,
+      "suspected": [
+        "The characters described in the finding are learned content: the model was told no text and produced digits, a decimal point and a unit anyway, which is the shape of text seen in photographs of surveyed or dimensioned stonework. Treat as third-party content. This output is refused, and it cannot be published."
+      ],
+      "target": "limestone-ashlar-weathered"
+    }
+  ]
+}
