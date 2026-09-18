@@ -28,8 +28,8 @@
 import { GRAMMAR_TABLES, nestedShapeOf, recordShapeOf, TILE_RECORD_KIND } from './record-shapes.js';
 import { add, subtract } from './integer-math.js';
 import type { Plan, Space } from './integer-math.js';
-import { facadePieces, faceCover, faceHeights, panelRoles } from './facades.js';
-import type { FacadeFields, GroundBayFields } from './facades.js';
+import { backingPieces, facadePieces, faceCover, faceHeights, panelRoles } from './facades.js';
+import type { BackingFields, FaceFrame, FacadeFields, GroundBayFields } from './facades.js';
 import { massingPieces } from './massing.js';
 import type { MassingFields } from './massing.js';
 import { piecesOf, runOf, Surface } from './faces.js';
@@ -53,7 +53,7 @@ import type { CoveringTriangle, TerrainPatch } from './terrain-yield.js';
  * Bumped whenever an expander, a statement, a contract or the materialised projection set
  * changes, because each changes the bytes a bake writes. The bake stage's parameters carry it.
  */
-export const TESSELLATOR_SOURCE_VERSION = 14;
+export const TESSELLATOR_SOURCE_VERSION = 15;
 
 /**
  * What each materialised projection preserves and what it may be used for, as separate rows, the
@@ -651,24 +651,15 @@ function renderObject(fields: Fields, kind: string): Expansion {
  */
 function renderVitrine(fields: Fields, context: ExpandContext): Expansion {
   const where = `city.vitrine ${fields.identity as string}`;
-  const carried = context.carried.get(fields.facade_identity as string);
-  if (carried === undefined) throw new TessellationError(`${where} names a facade the tile does not carry`);
-  const facade = carried.fields as unknown as FacadeFields;
-  const building = context.carried.get(facade.building_identity);
-  if (building === undefined) throw new TessellationError(`${where} names a building the tile does not carry`);
-  const massing = building.fields as unknown as MassingFields;
-  const tier = massing.tiers[facade.tier_ordinal];
-  if (tier === undefined) throw new TessellationError(`${where} sits on a tier its building does not have`);
-  const from = tier.ring_mm[facade.edge_ordinal];
-  if (from === undefined) throw new TessellationError(`${where} sits on an edge its tier does not have`);
-  const to = tier.ring_mm[(facade.edge_ordinal + 1) % tier.ring_mm.length]!;
-  const at = alongEdge(from, to, fields.u_start_mm as number, runOf(from, to, where), where);
+  const facade = facadeOf(fields.facade_identity as string, context, where);
+  const { frame } = faceFrameOf(facade, context, where);
+  const at = alongEdge(frame.from, frame.to, fields.u_start_mm as number, frame.run, where);
   const pieces = objectPieces({
     xMm: at[0],
     yMm: at[1],
-    zMm: add(massing.base_elevation_mm, fields.sill_mm as number, where),
-    facingDxMm: subtract(to[0], from[0], where),
-    facingDyMm: subtract(to[1], from[1], where),
+    zMm: add(frame.datum, fields.sill_mm as number, where),
+    facingDxMm: subtract(frame.to[0], frame.from[0], where),
+    facingDyMm: subtract(frame.to[1], frame.from[1], where),
     parts: formParts(fields),
   }, where);
   if (pieces.length === 0) return { state: 'unavailable', needs: [NEEDS.form_parts] };
@@ -711,9 +702,12 @@ function renderTree(fields: Fields): Expansion {
 }
 
 /** A building's face on one tier edge, by the facade rule (`facades.ts`). */
-function renderFacade(fields: Fields, context: ExpandContext): Expansion {
-  const facade = fields as unknown as FacadeFields;
-  const where = `city.facade ${facade.identity}`;
+/**
+ * The tier edge a face is laid out on, and the heights it sits at. Derived ONCE and read by the
+ * facade itself and by every record laid out in its frame, because two derivations of one frame is
+ * a disagreement waiting to happen: a vitrine, a backing and the face must all take the same edge.
+ */
+function faceFrameOf(facade: FacadeFields, context: ExpandContext, where: string): { massing: MassingFields; frame: FaceFrame } {
   const building = context.carried.get(facade.building_identity);
   if (building === undefined) throw new TessellationError(`${where} names a building the tile does not carry`);
   if (building.kind !== 'city.massing') throw new TessellationError(`${where} names ${building.kind} as its building`);
@@ -725,14 +719,45 @@ function renderFacade(fields: Fields, context: ExpandContext): Expansion {
   if (from === undefined) throw new TessellationError(`${where} is laid out on an edge its tier does not have`);
   const to = ring[(facade.edge_ordinal + 1) % ring.length]!;
   const heights = faceHeights(facade, massing, where);
+  return {
+    massing,
+    frame: { from, to, run: runOf(from, to, where), datum: massing.base_elevation_mm, base: heights.base, top: heights.top },
+  };
+}
+
+/** The facade a record laid out on a face names, which the tile must carry for it to be drawn. */
+function facadeOf(identity: string, context: ExpandContext, where: string): FacadeFields {
+  const carried = context.carried.get(identity);
+  if (carried === undefined) throw new TessellationError(`${where} names a facade the tile does not carry`);
+  if (carried.kind !== 'city.facade') throw new TessellationError(`${where} names ${carried.kind} as its facade`);
+  return carried.fields as unknown as FacadeFields;
+}
+
+function renderFacade(fields: Fields, context: ExpandContext): Expansion {
+  const facade = fields as unknown as FacadeFields;
+  const where = `city.facade ${facade.identity}`;
+  const { frame } = faceFrameOf(facade, context, where);
   const bays = carriedWhere(context, 'city.ground_bay', 'facade_identity', facade.identity) as unknown as GroundBayFields[];
-  const pieces = facadePieces(
-    facade,
-    { from, to, run: runOf(from, to, where), datum: massing.base_elevation_mm, base: heights.base, top: heights.top },
-    bays,
-    where,
-  );
+  const pieces = facadePieces(facade, frame, bays, where);
   if (pieces.length === 0) throw new TessellationError(`${where} draws no face, which its run and storeys should not allow`);
+  return { state: 'drawn', pieces };
+}
+
+/**
+ * The plane behind one face's glass, by the backing rule (`facades.ts`). Without it a building is
+ * see-through: upper glazing has nothing behind it and a person looks through a first floor window
+ * and out of the far side of the terrace.
+ */
+function renderBacking(fields: Fields, context: ExpandContext): Expansion {
+  const backing = fields as unknown as BackingFields;
+  const where = `city.interior_backing ${backing.identity}`;
+  const facade = facadeOf(backing.facade_identity, context, where);
+  if (facade.building_identity !== backing.building_identity) {
+    throw new TessellationError(`${where} names one building and its facade names another`);
+  }
+  const { frame } = faceFrameOf(facade, context, where);
+  const pieces = backingPieces(backing, facade, frame, where);
+  if (pieces.length === 0) throw new TessellationError(`${where} draws no plane, which its width and height should not allow`);
   return { state: 'drawn', pieces };
 }
 
@@ -790,7 +815,10 @@ const KIND_RULES: ReadonlyMap<string, KindRules> = new Map<string, KindRules>([
   }],
   // A room's near wall inside its building, behind its glazing: laid out on its facade, standing on
   // nothing, so it is no more a surface of the ground than the vitrine beside it.
-  ['city.interior_backing', { render_batch: needs(NEEDS.facade_layout), nav_envelope: notInProjection }],
+  ['city.interior_backing', {
+    render_batch: { rule: 'expand', expand: renderBacking, readsCoverings: false },
+    nav_envelope: notInProjection,
+  }],
   ['city.junction_approach', { render_batch: notInProjection, nav_envelope: notInProjection }],
   // A lane is a path on its segment's carriageway, and draws as that carriageway.
   ['city.lane', { render_batch: notInProjection, nav_envelope: notInProjection }],

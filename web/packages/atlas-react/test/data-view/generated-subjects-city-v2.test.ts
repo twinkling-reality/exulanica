@@ -101,12 +101,13 @@ function expectToday(outcomes: readonly Outcome[]): void {
   const street = ['carriageway:record', 'gutter:record'];
   const drawn = outcomes.filter(outcome => outcome.state === 'drawn');
   const repeated = (kind: string, times: number): string[] => Array.from({ length: times }, () => kind);
-  // Nine faces, the building they are laid out on, everything whose parts are solids, the three
-  // segments and the terrain.
+  // Nine faces, the plane behind each one's glass, the building they are laid out on, everything
+  // whose parts are solids, the three segments and the terrain.
   expect(drawn.map(outcome => outcome.kind)).toEqual([
     'city.block',
     ...repeated('city.curb_edge', 6),
     ...repeated('city.facade', 9),
+    ...repeated('city.interior_backing', 6),
     'city.junction',
     'city.massing',
     ...repeated('city.parcel', 2),
@@ -118,22 +119,24 @@ function expectToday(outcomes: readonly Outcome[]): void {
     ...repeated('city.vitrine', 6),
   ]);
   expect(drawn.every(outcome => outcome.bounded)).toBe(true);
-  expect(drawn[17]!.surfaces).toEqual(['wall:record', 'roof:record', 'parapet:record']);
-  expect(drawn.slice(29, 32).map(outcome => outcome.surfaces)).toEqual([street, street, street]);
-  expect(drawn[33]!.surfaces).toEqual(['terrain:none-exists']);
+  expect(drawn[23]!.surfaces).toEqual(['wall:record', 'roof:record', 'parapet:record']);
+  expect(drawn.slice(35, 38).map(outcome => outcome.surfaces)).toEqual([street, street, street]);
+  expect(drawn[39]!.surfaces).toEqual(['terrain:none-exists']);
   // A tree is its pit and its own parts, and a part's role repeats on the other orientation.
-  expect(drawn[32]!.surfaces).toEqual([
+  expect(drawn[38]!.surfaces).toEqual([
     'tree_pit:none-exists', 'trunk:none-exists', 'trunk:none-exists', 'canopy:none-exists', 'canopy:none-exists',
   ]);
   expect(count(outcome => outcome.membership === 'halo' && outcome.subjectId === null)).toBe(3);
-  expect(count(outcome => outcome.state === 'unavailable' && outcome.subjectId !== null && !outcome.bounded)).toBe(15);
-  // The corridor's slice 2 kind. The tile states an extent for each, and the container leaves them
-  // unavailable needing facade_layout, so each is listed with its reason and draws nothing: no box,
-  // no points, exactly like every other spatial record this bake does not draw.
+  expect(count(outcome => outcome.state === 'unavailable' && outcome.subjectId !== null && !outcome.bounded)).toBe(9);
+  // The corridor's slice 2 kind, drawn since tessellator 15: one plane per face, behind its glass,
+  // in the wall role. Each is a subject of its own with a box that holds it, and the six that were
+  // listed with a reason and no points are now listed with geometry.
   const backing = outcomes.filter(outcome => outcome.kind === 'city.interior_backing');
   expect(backing).toHaveLength(6);
   for (const outcome of backing) {
-    expect(outcome).toMatchObject({ membership: 'owned', state: 'unavailable', hasExtent: true, bounded: false, surfaces: [] });
+    expect(outcome).toMatchObject({ membership: 'owned', state: 'drawn', hasExtent: true, bounded: true });
+    expect(outcome.surfaces).toHaveLength(1);
+    expect(outcome.surfaces[0]).toMatch(/^wall:/);
     expect(outcome.subjectId).toMatch(/^generated:city\.interior_backing:[0-9a-f-]{36}$/);
   }
   // A ground bay states an extent and draws nothing of its own: its panels are drawn in its

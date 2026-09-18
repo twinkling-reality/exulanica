@@ -28,9 +28,9 @@ import {
   sortList,
 } from './support.js';
 
-/** Over `test/fixtures/tile-conformance.json`, tessellator 14, digest profile v3. */
+/** Over `test/fixtures/tile-conformance.json`, tessellator 15, digest profile v3. */
 const GOLDEN = {
-  render_batch: '70ca86e97e4221fbe691c6732af7ca372b68ec1d4edb5c32118c8bbb0c22efdc',
+  render_batch: 'd91ef583dbcdd06bcc5555b8fbc8e36e473abcb50a5943397c628b5432200d74',
   nav_envelope: 'adec1833518f6a785a90211eb6f0f2d4513a776b366a3946588203aa9eed9e9e',
 } as const;
 
@@ -191,12 +191,21 @@ describe('the triangle digest of the conformance fixture', () => {
     // the ground the building stands on, and says no material dresses it: the grammar admits none.
     // Every other surface waits on a rule.
     const render = renderBatch!.header.entries.map((entry) => entry.state);
-    expect(count(render, 'drawn')).toBe(40);
+    expect(count(render, 'drawn')).toBe(46);
+    // Six of them are the interior backings, one plane per face, standing behind the upper glazing
+    // so a person looking in sees a room rather than the far side of the building.
+    const backings = renderBatch!.header.entries.filter((_entry, index) => header.records[index]!.kind === 'city.interior_backing');
+    expect(backings).toHaveLength(6);
+    for (const entry of backings) {
+      expect(entry).toMatchObject({ state: 'drawn', vertex_count: 4, triangle_count: 2 });
+      if (entry.state !== 'drawn') throw new Error('a backing is not drawn');
+      expect(entry.surfaces!.map((surface) => [surface.role, surface.orientation])).toEqual([['wall', 'vertical']]);
+    }
     expect(count(render, 'halo')).toBe(grammar.halo.length);
     const drawnTerrain = renderBatch!.header.entries[terrain]!;
     expect(drawnTerrain).toMatchObject({
       state: 'drawn',
-      first_vertex: 2805,
+      first_vertex: 2829,
       vertex_count: 829,
       triangle_count: 690,
       surfaces: [{ role: 'terrain', orientation: 'horizontal', material: { state: 'none-exists' }, triangle_count: 690 }],

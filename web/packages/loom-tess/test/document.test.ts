@@ -175,9 +175,9 @@ describe('the bake', () => {
       massing.tiers[0].ring_mm = [[0, 0], [128000, 0], [128000, 64000], [128000, 128000], [0, 128000]];
       massing.tiers[1].ring_mm = [[0, 0], [128000, 0], [128000, 128000], [0, 128000]];
       Object.assign(massing.extent, { min_x_mm: 0, min_y_mm: 0, max_x_mm: 128000, max_y_mm: 128000 });
-      // Its faces move with its tiers, and its vitrines with its faces, so every stated extent
-      // that holds drawn geometry has to hold the whole tile too.
-      for (const kind of ['city.facade', 'city.vitrine']) {
+      // Its faces move with its tiers, and its vitrines and interior backings with its faces, so
+      // every stated extent that holds drawn geometry has to hold the whole tile too.
+      for (const kind of ['city.facade', 'city.vitrine', 'city.interior_backing']) {
         for (const record of recordsOf(d, kind)) {
           Object.assign(record.fields.extent, { min_x_mm: 0, min_y_mm: 0, max_x_mm: 128000, max_y_mm: 128000 });
         }

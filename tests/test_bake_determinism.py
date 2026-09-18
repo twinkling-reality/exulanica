@@ -572,9 +572,17 @@ def test_the_container_states_membership_frame_identity_and_what_is_drawn(tmp_pa
     ]
     curbs = [i for i, r in enumerate(header["records"]) if r["kind"] == "city.curb_edge"]
     junctions = [i for i, r in enumerate(header["records"]) if r["kind"] == "city.junction"]
+    # And behind each face's glass stands one plane, so a person looking in sees a room rather than
+    # the far side of the building.
+    backings = [
+        i for i, r in enumerate(header["records"]) if r["kind"] == "city.interior_backing"
+    ]
     assert [e["record"] for e in render["entries"] if e["state"] == "drawn"] == sorted(
-        [*curbs, *facades, *junctions, *lots, *massings, *objects, *segments, terrain]
+        [*backings, *curbs, *facades, *junctions, *lots, *massings, *objects, *segments, terrain]
     )
+    for entry in (render["entries"][i] for i in backings):
+        assert [(s["role"], s["orientation"]) for s in entry["surfaces"]] == [("wall", "vertical")]
+        assert (entry["vertex_count"], entry["triangle_count"]) == (4, 2)
     # A curb is its kerb face, its kerb top and the footway behind it.
     for entry in (render["entries"][i] for i in curbs):
         assert [(s["role"], s["orientation"]) for s in entry["surfaces"]] == [

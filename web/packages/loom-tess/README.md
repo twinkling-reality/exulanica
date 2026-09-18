@@ -158,9 +158,20 @@ solids an object states as its parts, and the ground a lot states.
   (`PANEL_SURFACE_ROLES`, which collapses a transom onto glazing and a panel's wall onto the ground
   band), and the scar above the neighbour's top on a party wall. What it does not draw yet is
   additive and leaves no hole: openings with their reveals, sills and heads, string courses,
-  cornices, awnings, and the entrance and interior backing records, each of which is laid out in
-  this same frame. A ground bay draws nothing of its own, because the material records that dress
-  its panels name the facade and the panel's surface role.
+  cornices, awnings, and the entrance record, which is laid out in this same frame. A ground bay
+  draws nothing of its own, because the material records that dress its panels name the facade and
+  the panel's surface role.
+- An interior backing draws the plane behind that face's glass, by the same rule file: ONE rectangle
+  per face and not one per window, `depth_mm` back from the face's outer plane, from `sill_mm` to
+  `sill_mm + height_mm` above the BUILDING's base, `width_mm` along the run from `u_start_mm`,
+  facing the way the face does and dressed in the `wall` role. The grammar's reason for one plane is
+  that "the rooms behind a face are a floor of rooms and not a box per opening", and that "a plane a
+  person can never walk to needs no more detail than closing the view". Without it a terrace is
+  see-through: upper glazing has nothing behind it and a person looks through a first floor window
+  and out of the far side of the building. It also states `light_level_millionths`, which this
+  tessellator carries NOWHERE, because a container states no light and there is no honest field for
+  it to reach. Its frame is derived once, by the same function the facade and the vitrine read, so
+  the three cannot disagree about which edge they stand on.
 - A street segment draws its carriageway and its gutters by the street rules
   (`src/core/streets.ts`), between the kerb lines of the two curbs the tile carries for it, each a
   horizontal surface dressed by the material record for its role. Terrain yields to both. A segment

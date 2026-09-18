@@ -17,17 +17,20 @@
  *   3. A PARTY WALL SCAR. Above `neighbour_top_mm` a party wall shows where the neighbour's profile
  *      met it, and that region takes the `party_wall_scar` role rather than `wall`.
  *
+ *   4. THE PLANE BEHIND THE GLASS, for an interior backing record, which is laid out in this same
+ *      frame and is a record of its own. See `backingPieces`.
+ *
  * WHAT IT DOES NOT DRAW YET, each of which is additive and none of which this leaves a hole for:
  * openings with their reveals, sills and heads, which will be cut out of the face; string courses
- * and cornices, which are boxes projecting from it; awnings; and the entrance and interior backing
- * records, which are laid out in this same frame and are records of their own.
+ * and cornices, which are boxes projecting from it; awnings; and the entrance record, which is laid
+ * out in this same frame and is a record of its own.
  *
  * THE FACE AND THE BUILDING'S OWN WALL ARE NEVER BOTH DRAWN. The massing rule draws a tier edge's
  * wall only where no facade of that building draws over it, taken as a rectangle in the edge's own
  * `(u, z)`: the facade's run by its storeys. So a facade replaces the wall it covers rather than
  * standing proud of it, which is what stops the two fighting for the same pixels.
  */
-import { add, exact, subtract } from './integer-math.js';
+import { add, exact, GeometryError, subtract } from './integer-math.js';
 import type { Plan } from './integer-math.js';
 import { faceOn, piecesOf, Surface, VERTICAL } from './faces.js';
 import type { FaceCover } from './faces.js';
@@ -82,6 +85,55 @@ const WALL = 'wall';
 const GROUND_BAND = 'ground_band';
 const PARTY_WALL_SCAR = 'party_wall_scar';
 const PARTY_WALL = 'party_wall';
+
+/** What this rule reads of an interior backing record (`exulanica.grammar.grammars.city.vitrine`). */
+export interface BackingFields {
+  readonly identity: string;
+  readonly facade_identity: string;
+  readonly building_identity: string;
+  readonly u_start_mm: number;
+  readonly width_mm: number;
+  readonly sill_mm: number;
+  readonly height_mm: number;
+  readonly depth_mm: number;
+}
+
+/**
+ * THE PLANE BEHIND A FACE'S GLASS: one rectangle in the face's own frame, `depth_mm` back from the
+ * face's outer plane, from `sill_mm` to `sill_mm + height_mm` above the BUILDING'S base, and
+ * `width_mm` along the run from `u_start_mm`.
+ *
+ * One plane per face and not one per window, which is the grammar's decision and its reason: "the
+ * rooms behind a face are a floor of rooms and not a box per opening", and "a plane a person can
+ * never walk to needs no more detail than closing the view". It faces the way the face does, since
+ * it is seen from the street through the glass, and it takes the `wall` role, which is the role the
+ * grammar's material table gives an interior backing.
+ *
+ * It states `light_level_millionths` and this rule carries it nowhere. A container states no light,
+ * so there is no field for it to reach; putting it somewhere would be a number appearing in
+ * geometry that no record put there. When light belongs in a container it arrives as a stated field
+ * with a version of its own.
+ */
+export function backingPieces(backing: BackingFields, facade: FacadeFields, frame: FaceFrame, where: string): Piece[] {
+  const end = add(backing.u_start_mm, backing.width_mm, where);
+  if (end > facade.run_length_mm) {
+    throw new GeometryError(`${where} reaches ${String(end)} mm along a face whose run is ${String(facade.run_length_mm)} mm`);
+  }
+  const base = add(frame.datum, backing.sill_mm, where);
+  const surface = new Surface(WALL, VERTICAL);
+  faceOn(
+    surface,
+    { from: frame.from, to: frame.to, run: frame.run },
+    backing.u_start_mm,
+    end,
+    base,
+    add(base, backing.height_mm, where),
+    subtract(0, backing.depth_mm, where),
+    frame.datum,
+    where,
+  );
+  return piecesOf([surface]);
+}
 
 /**
  * What a ground panel's role is a surface of, which the grammar fixes

@@ -11,10 +11,14 @@
  *     the rest is the wall's.
  *   - THE BUILDING GIVES UP WHAT THE FACE COVERS: the massing rule draws no wall where a facade
  *     draws, so the two together cover a tier edge exactly once.
+ *   - THE BACKING IS ONE PLANE, BEHIND THE GLASS AND FACING OUT: its area is its width by its
+ *     height, it stands at the depth it states back from the face, its heights are above the
+ *     BUILDING's base rather than the face's, and it faces the way the face does, so a person in
+ *     the street sees it through the window rather than seeing its back from inside the room.
  */
 import { describe, expect, it } from 'vitest';
-import { facadePieces, faceCover, panelSurfaceRole } from '../src/core/facades.js';
-import type { FacadeFields, FaceFrame, GroundBayFields } from '../src/core/facades.js';
+import { backingPieces, facadePieces, faceCover, panelSurfaceRole } from '../src/core/facades.js';
+import type { BackingFields, FacadeFields, FaceFrame, GroundBayFields } from '../src/core/facades.js';
 import { massingPieces } from '../src/core/massing.js';
 import type { MassingFields } from '../src/core/massing.js';
 import type { Plan } from '../src/core/integer-math.js';
@@ -84,6 +88,18 @@ function measure(pieces: readonly Piece[]): { area: Map<string, number>; depth: 
   return { area, depth };
 }
 
+/** The outward normal of a piece's first triangle, which is which way its surface faces. */
+function normalOf(piece: Piece): [number, number, number] {
+  const corner = (at: number): number[] => {
+    const vertex = piece.triangles[at]!;
+    return [piece.vertices[vertex * 3]!, piece.vertices[vertex * 3 + 1]!, piece.vertices[vertex * 3 + 2]!];
+  };
+  const [a, b, c] = [corner(0), corner(1), corner(2)];
+  const edge = (from: number[], to: number[]): number[] => [to[0]! - from[0]!, to[1]! - from[1]!, to[2]! - from[2]!];
+  const [u, v] = [edge(a, b), edge(a, c)];
+  return [u[1]! * v[2]! - u[2]! * v[1]!, u[2]! * v[0]! - u[0]! * v[2]!, u[0]! * v[1]! - u[1]! * v[0]!];
+}
+
 describe('the facade rule', () => {
   it('draws the run by its storeys exactly once, as a band below and a wall above', () => {
     const massing = block();
@@ -137,6 +153,54 @@ describe('the facade rule', () => {
     expect(area.get('party_wall_scar')).toBeCloseTo(12000 * (top - 7000), 6);
     expect(area.get('wall')).toBeCloseTo(12000 * (7000 - 4200), 6);
     expect(area.get('ground_band')).toBeCloseTo(12000 * 4200, 6);
+  });
+
+  it('stands one plane behind the glass, facing out, at the depth and heights it states', () => {
+    const massing = block();
+    const facade = face();
+    const frame = frameOf(massing, facade);
+    const backing: BackingFields = {
+      identity: 'backing',
+      facade_identity: 'face',
+      building_identity: 'building',
+      u_start_mm: 1000,
+      width_mm: 6000,
+      sill_mm: 5000,
+      height_mm: 4000,
+      depth_mm: 700,
+    };
+    const pieces = backingPieces(backing, facade, frame, 'case');
+    const { area, depth } = measure(pieces);
+    // One surface, one rectangle, in the role the grammar's material table gives a backing.
+    expect(pieces.map((piece) => [piece.surface!.role, piece.surface!.orientation])).toEqual([['wall', 'vertical']]);
+    expect([...area.keys()]).toEqual(['wall']);
+    expect(area.get('wall')).toBeCloseTo(6000 * 4000, 6);
+    // The plane stands its whole depth into the building, not a millimetre of it outside.
+    expect(depth.get('wall')).toBeCloseTo(700, 6);
+    // Heights are above the BUILDING's base: 100 + 5000, not the face's base plus 5000.
+    const heights = pieces.flatMap((piece) => [...Array(piece.vertices.length / 3).keys()].map((vertex) => piece.vertices[vertex * 3 + 2]!));
+    expect(Math.min(...heights)).toBe(massing.base_elevation_mm + 5000);
+    expect(Math.max(...heights)).toBe(massing.base_elevation_mm + 9000);
+    // And it faces the way the face does. The face runs along +x, so out of the building is -y.
+    expect(normalOf(pieces[0]!)[1]).toBeLessThan(0);
+    expect(normalOf(massingPieces(block(), [], 'case')[0]!)[1]).toBeLessThan(0);
+  });
+
+  it('refuses a backing that reaches past the run of the face it is laid out on', () => {
+    const facade = face({ run_length_mm: 5000 });
+    const frame = frameOf(block(), facade);
+    const over = (width: number): BackingFields => ({
+      identity: 'backing',
+      facade_identity: 'face',
+      building_identity: 'building',
+      u_start_mm: 1000,
+      width_mm: width,
+      sill_mm: 5000,
+      height_mm: 4000,
+      depth_mm: 700,
+    });
+    expect(() => backingPieces(over(4000), facade, frame, 'case')).not.toThrow();
+    expect(() => backingPieces(over(4001), facade, frame, 'case')).toThrow(/reaches 5001 mm along a face whose run is 5000 mm/);
   });
 
   it('takes its part of the tier edge away from the building\'s own wall', () => {

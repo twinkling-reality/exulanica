@@ -58,6 +58,12 @@ UNDRESSED: dict[tuple[str, str], int] = {
     ("city.street_tree", "canopy"): 2,
     ("city.facade", "ground_band"): 1,
     ("city.street_tree", "tree_pit"): 1,
+    # The plane behind each face's glass, drawn since tessellator 15. The fixture predates the
+    # record kind itself and states no material for any of its six; the generated city dresses
+    # every one of them, measured on the corridor's tile (2, 0), where all 99 interior backings
+    # carry a ``wall`` material record. So this line is the fixture's age like the ones above it,
+    # and it is here because a person looked at the pair rather than to make a suite green.
+    ("city.interior_backing", "wall"): 6,
     # Terrain is the one surface no published texture set dresses, by decision rather than by
     # oversight: no set depicts bare ground and none is asked for.
     ("city.terrain", "terrain"): 1,
