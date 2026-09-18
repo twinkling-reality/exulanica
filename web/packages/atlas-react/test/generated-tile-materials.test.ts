@@ -199,12 +199,17 @@ describe('drawing a set by its material class', () => {
     expect(drawn).toEqual({
       'fixture.cutout': 'available',
       'fixture.decal': 'available',
+      // The tile that is not square: 16 by 4 texels over 1000 by 250 mm, the road paint's shape.
+      'fixture.decal-wide': 'available',
       'fixture.glazing': 'available',
       'fixture.legacy-opaque': 'available',
       'fixture.model-opaque': 'available',
       'fixture.opaque': 'available',
     });
-    expect(textures.resolvedSetIds).toEqual(['fixture.cutout', 'fixture.decal', 'fixture.glazing', 'fixture.legacy-opaque', 'fixture.model-opaque', 'fixture.opaque']);
+    expect(textures.resolvedSetIds).toEqual([
+      'fixture.cutout', 'fixture.decal', 'fixture.decal-wide', 'fixture.glazing',
+      'fixture.legacy-opaque', 'fixture.model-opaque', 'fixture.opaque',
+    ]);
     textures.destroy();
   });
 
