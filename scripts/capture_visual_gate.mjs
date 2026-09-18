@@ -786,7 +786,9 @@ async function main() {
       await halt(
         'the page states no collision rings, so the route rule has nothing to choose between: ' +
         'every heading would qualify equally and the walk would be the lowest heading that fits, ' +
-        'which no rule chose. A scored walk needs the rings the tile states.',
+        'which no rule chose. A scored walk needs the rings the tile states, read from the ' +
+        'runtime rather than derived here: a gate with its own rings scores a walk past obstacles ' +
+        'the world does not have.',
       );
     }
     const plan = planRoute([arrival.x, arrival.z], prisms, [west, north, east, south]);
