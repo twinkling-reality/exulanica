@@ -13,9 +13,12 @@ the plan into one entry per second.
 
 from __future__ import annotations
 
+import ast
 from functools import cache
+from pathlib import Path
 
 import pytest
+from exulanica.traffic import signals
 from exulanica.traffic.catalogs import load_traffic_catalogs
 from exulanica.traffic.kinematics import (
     braking_run,
@@ -27,6 +30,8 @@ from exulanica.traffic.kinematics import (
     stopping_distance,
 )
 from exulanica.traffic.signals import (
+    PEDESTRIAN_INDICATIONS,
+    VEHICLE_INDICATIONS,
     interval_index,
     pedestrian_indication,
     seconds_until_red,
@@ -221,6 +226,32 @@ def _expanded(plan) -> list[int]:
     for index, interval in enumerate(plan.intervals):
         seconds += [index] * (interval.duration_ms // 1000)
     return seconds
+
+
+def test_the_published_indications_are_the_ones_the_module_can_return():
+    """Both tuples are read back from the returns of the functions that produce them.
+
+    VEHICLE_INDICATIONS and PEDESTRIAN_INDICATIONS are exported for the society lane to read, and
+    until this test nothing in the repository loaded either: they stated what an indication can be
+    where nothing compared the statement with the code, so a fourth indication would have left
+    both tuples quietly wrong. The indications are returned as literals by two small functions, so
+    the sets come from there.
+    """
+    tree = ast.parse(Path(signals.__file__).read_text(encoding="utf-8"), filename=signals.__file__)
+    returned: dict[str, set[str]] = {}
+    for node in ast.walk(tree):
+        if isinstance(node, ast.FunctionDef) and node.name.endswith("_indication"):
+            returned[node.name] = {
+                child.value.value
+                for child in ast.walk(node)
+                if isinstance(child, ast.Return)
+                and isinstance(child.value, ast.Constant)
+                and isinstance(child.value.value, str)
+            }
+    assert set(returned) == {"vehicle_indication", "pedestrian_indication"}, sorted(returned)
+    assert all(len(values) >= 3 for values in returned.values()), returned
+    assert returned["vehicle_indication"] == set(VEHICLE_INDICATIONS)
+    assert returned["pedestrian_indication"] == set(PEDESTRIAN_INDICATIONS)
 
 
 def test_indications_are_the_plan_expanded_second_by_second(plan):
