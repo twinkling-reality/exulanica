@@ -2,7 +2,7 @@
  "url": "http://localhost:5191/?preview=1&city=75832ac54dcfd499219752e6385149c73624b8c674f9ebb0c1fa0af2bb70b3d1&tile_x=2&tile_y=0",
  "width": 1440,
  "height": 900,
- "outDir": "/private/tmp/claude-501/-Users-glendonchin-dev-Technology-orimera/cc6398bb-59f0-43ad-8d7a-153e8b139581/scratchpad/tile-budget/shots/corridor",
+ "outDir": "corridor-shots",
  "readyExpression": "!!document.querySelector('.generated-tile-evaluation') || document.body.innerText.includes('could not open')",
  "readyTimeoutMs": 120000,
  "steps": [
