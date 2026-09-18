@@ -222,3 +222,38 @@ of THE TEST rather than of the fixture: it passes a `fetchSet` that throws, so n
 prepared and every surface carrying a material reference is unavailable for that reason. The
 fixture's sets are real published ones. A run that fetched them would report a smaller number, and
 anybody reading 124 as "how much of this tile has no material" would be wrong by a factor of six.
+
+## A picture, predicted before the server started
+
+Written before any frame was captured, so it can be wrong. The route is the app's development
+preview, `?preview=1&tile=tile-conformance`, which serves the golden rebaked at tessellator 18,
+container `3a2fd58d`.
+
+WHAT THE FIXTURE STATES, counted from its records and not from the picture: nine facades, six of
+which carry an opening grid, 38 openings in all, 26 of them with an arched head rising 250 mm over
+a 1,200 mm width and 12 with a flat head. The six gridded faces belong to ONE building, whose tier
+0 ring runs (41050, 48950) to (53050, 62950) and whose tier 1 sits above part of it.
+
+THE PREDICTION.
+
+1. Holes are visible. At least one face shows a row of openings cut through it, and above a ground
+   band rather than in it, since the grammar puts every opening on an upper storey.
+2. An arched head is distinguishable from a flat one. Four of the six gridded faces state
+   `head_treatment` arch with a 250 mm rise, which at a 1,200 mm width is a segmental curve of
+   about 845 mm radius drawn in 8 chords. If every head looks flat, either the arch rule is not
+   reaching the container or the rise is too small to see at this distance, and I will say which.
+3. A reveal is visible as a returned edge, 180 mm deep on every grid in this fixture, so an
+   opening should read as a hole in a wall with thickness rather than as a dark rectangle.
+4. Through the holes, on the four faces that have one, an INTERIOR BACKING should close the view
+   rather than the far side of the building. The fixture states six.
+5. THE SURFACES SHOULD DRAW TEXTURED, not as unavailable. The 104 unavailable surfaces I measured
+   this afternoon came from the TEST's `fetchSet` stub, which throws; the development page is a
+   different caller and fetches its sets over HTTP. So I expect the page to report a non-zero
+   `decodedTextureBytes` and far fewer than 124 unavailable surfaces, and I expect the trim
+   returns to be dressed on four of the six faces and undressed on two, which is what the fixture
+   states.
+
+WHAT A PICTURE OF THIS CANNOT SHOW, decided now rather than after looking: it is the CONFORMANCE
+FIXTURE and not the corridor street. It can prove the holes are drawn. It cannot say whether they
+look right, which is a judgement, and it says nothing about the corridor beyond the fact that the
+two tiles are cut by one rule.
