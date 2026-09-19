@@ -91,6 +91,7 @@ from exulanica.evaluation.gate_keys import (
 )
 from exulanica.evaluation.visual_gate import (
     GateEvidenceError,
+    _comparable,
     CarriedWords,
     JudgedAnswers,
     PictureAnswer,
@@ -1820,9 +1821,10 @@ def _refused_record(
     artifacts: list[dict[str, Any]],
     judgement_file: dict[str, Any],
     names_the_captures: dict[str, Any],
+    asked_as: dict[str, Any],
     scored: dict[str, Any],
     supplement: dict[str, Any],
-    blocker: dict[str, Any] | None,
+    blocker: dict[str, Any],
     rubric_sha256: str,
     record_path: str,
 ) -> dict[str, Any]:
@@ -1854,6 +1856,10 @@ def _refused_record(
                 "rubricVersion": RUBRIC_VERSION,
                 "rubricSha256": rubric_sha256,
                 "refusedBecause": refusals,
+                # Known only when the file was readable, which a file that records answers and
+                # not asks is not. A record about how the asking went says how the asking went,
+                # where the asking was written down at all.
+                **({} if not asked_as else {"whatTheJudgeWasShown": asked_as}),
                 "departuresTheSessionRecorded": departures,
                 "whatADepartureDoes": (
                     "Each line above stops this record. They are the asking session's own prose "
@@ -1870,7 +1876,7 @@ def _refused_record(
                     "git ignores the directory it lives in."
                 ),
                 "reAsk": _re_ask(),
-                **({} if blocker is None else {"andBeforeAnyReAskIsScored": blocker}),
+                "andWhatAReAskIsReadAgainst": blocker,
             },
             "measuredKeys": mechanical,
             "measuredKeysHeld": held,
@@ -1910,72 +1916,59 @@ def _refused_record(
     )
 
 
-def _comparison_blocker(baseline: dict[str, Any], rubric_sha256: str) -> dict[str, Any] | None:
-    """Whether the corridor bar can be read at all, decided from the two records themselves.
+def _rubric_equivalence(baseline: dict[str, Any], rubric_sha256: str) -> dict[str, Any]:
+    """Whether a fresh judgement can be read against the baseline at all, asked of the gate.
 
-    Both digests are read here: the baseline's from the baseline record, this one's from the
-    rubric on disk. Neither is quoted from anywhere.
+    Not predicted here. The two digests are read, one from the baseline record and one from the
+    rubric on disk, and then ``_comparable`` itself is asked whether it would allow the
+    comparison, so this reports what the gate does rather than what this file believes about it.
     """
     answered = baseline["gate"]["keys"][JUDGED_KEY]["answeredAgainst"]
-    if answered["rubricSha256"] == rubric_sha256:
-        return None
+    fresh = {
+        "target": GENERATED_TILE_TARGET,
+        "gate": {
+            "keySet": baseline["gate"]["keySet"],
+            "keys": {
+                JUDGED_KEY: {
+                    "rubricSha256": rubric_sha256,
+                    "answeredAgainst": {"rubricSha256": rubric_sha256},
+                }
+            },
+        },
+    }
+    try:
+        _comparable(fresh, baseline)
+    except GateEvidenceError as error:
+        refused: str | None = str(error)
+    else:
+        refused = None
     return {
-        "finding": (
-            "NO CORRIDOR JUDGED UNDER THE CURRENT RUBRIC CAN BE READ AGAINST THIS BASELINE, for a "
-            "reason that has nothing to do with any corridor. The corridor bar reads a candidate "
-            "against the Flatiron baseline; _comparable in exulanica/evaluation/visual_gate.py "
-            "holds two records comparable only when their judged keys name one "
-            "answeredAgainst.rubricSha256; the baseline's judge answered under rubric version "
-            f"{answered['rubricVersion']} and every judgement given from now on is given under "
-            f"version {RUBRIC_VERSION}. The rubric itself says version {RUBRIC_VERSION} shows the "
-            "judge exactly what the version before it showed, which is the only reason a version "
-            f"{answered['rubricVersion']} answer is read under version {RUBRIC_VERSION} at all, "
-            "so the two records are answered against the same words and refused for differing in "
-            "a digest the rubric already reconciles."
-        ),
         "baselineAnsweredAgainst": answered["rubricSha256"],
         "baselineRubricVersion": answered["rubricVersion"],
         "aFreshJudgementAnswersAgainst": rubric_sha256,
         "freshRubricVersion": RUBRIC_VERSION,
-        "notDecidedHere": (
-            "Whether the comparison should read the rubric a record is WRITTEN with, or should "
-            "apply the same equivalence _answered_version applies, is a decision this script does "
-            "not make and this record does not make. It is stated so that a proper re-ask is not "
-            "asked for a second time before it is settled."
+        "theGateReconcilesThem": refused is None,
+        **({} if refused is None else {"andRefusesTheComparison": refused}),
+        "whatThisCost": (
+            "UNTIL 2026-09-19 THE GATE DID NOT RECONCILE THEM, AND NO CORRIDOR COULD EVER HAVE "
+            "BEEN READ AGAINST THIS BASELINE. _comparable required the two records to name one "
+            "answeredAgainst.rubricSha256; the baseline's judge answered under rubric version "
+            f"{answered['rubricVersion']} and every judgement from now on is given under version "
+            f"{RUBRIC_VERSION}; and _answered_version in the same file reads a version "
+            f"{answered['rubricVersion']} answer under version {RUBRIC_VERSION} precisely because "
+            f"{RUBRIC_PATH} says version {RUBRIC_VERSION} shows the judge exactly what the "
+            "version before it showed. One file reconciled two versions in one function and "
+            "refused them in another, over a difference the rubric declares immaterial. A "
+            "perfectly conducted re-ask would have produced nothing and the judge's attention "
+            "would have been spent finding that out."
+        ),
+        "howItWasFixed": (
+            "_comparable now asks _answered_version's own question of each record: both must be "
+            "WRITTEN with one rubric, and each must have been answered against a digest that "
+            "rubric reconciles. Nothing wider: a digest that function does not reconcile still "
+            "refuses the comparison, and a test holds both halves."
         ),
     }
-
-
-def _comparable_with_the_baseline(baseline: dict[str, Any], judged_detail: dict[str, Any]) -> None:
-    """Refuse a comparison the gate cannot make, and say what the two records disagree about.
-
-    FINDING, 2026-09-19. ``_comparable`` holds two records comparable only when their judged keys
-    name one ``answeredAgainst.rubricSha256``. The Flatiron baseline's judge answered under rubric
-    version 4 and every judgement given from now on is given under version 5, so no corridor can
-    be read against the baseline at all, whatever it measures. The rubric itself says version 5
-    shows the judge exactly what version 4 showed, and ``_answered_version`` accepts a version 4
-    answer under version 5 for that reason, so the two records ARE answered against the same words
-    and are refused for differing in a digest the rubric already reconciles. This file does not
-    decide that: it refuses, names it, and leaves it to whoever owns the comparison.
-    """
-    theirs = baseline["gate"]["keys"][JUDGED_KEY]["answeredAgainst"]["rubricSha256"]
-    ours = judged_detail["answeredAgainst"]["rubricSha256"]
-    if theirs == ours:
-        return
-    raise SystemExit(
-        "nothing is written. FINDING: the corridor bar reads a candidate against the Flatiron "
-        f"baseline, whose judge answered against rubric {theirs} (version "
-        f"{baseline['gate']['keys'][JUDGED_KEY]['answeredAgainst']['rubricVersion']}), and this "
-        f"judgement was given against rubric {ours} (version "
-        f"{judged_detail['answeredAgainst']['rubricVersion']}). "
-        "exulanica/evaluation/visual_gate.py _comparable requires one digest across the two, so "
-        "no corridor judged under the current rubric can be compared with this baseline, for a "
-        f"reason that has nothing to do with the corridor. {RUBRIC_PATH} says version "
-        f"{RUBRIC_VERSION} shows the judge exactly what the version before it showed, which is "
-        "why a judgement given under that version is read under this one at all. Whether the "
-        "comparison should read the rubric a record is WRITTEN with, or should apply the same "
-        "equivalence, is a decision this script does not make."
-    )
 
 
 def _corridor_predecessors() -> list[dict[str, str]]:
@@ -2141,11 +2134,10 @@ def corridor(arguments: argparse.Namespace) -> int:
             artifacts=artifacts,
             judgement_file=judgement_file,
             names_the_captures=_names_the_captures(judgement_path, captures),
+            asked_as=asked_as,
             scored=scored,
             supplement=supplement,
-            blocker=_comparison_blocker(
-                json.loads(BASELINE.read_bytes())["record"], rubric_sha
-            ),
+            blocker=_rubric_equivalence(json.loads(BASELINE.read_bytes())["record"], rubric_sha),
             rubric_sha256=rubric_sha,
             record_path=relative_record,
         )
@@ -2195,7 +2187,6 @@ def corridor(arguments: argparse.Namespace) -> int:
     report = run["validationReport"]
     measurement = report["measurement"]
     baseline_document = json.loads(BASELINE.read_bytes())
-    _comparable_with_the_baseline(baseline_document["record"], judged_detail)
     try:
         document = visual_gate_record(
             profile=CORRIDOR_PROFILE,

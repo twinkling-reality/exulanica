@@ -1697,7 +1697,7 @@ def _corridor_writer(monkeypatch, tmp_path: Path):
 def _corridor_run(tmp_path: Path, **changes) -> Path:
     """The real harness run the refusal record retains, laid out as the harness wrote it."""
     run_dir = tmp_path / "run"
-    run_dir.mkdir()
+    run_dir.mkdir(exist_ok=True)
     run = json.loads((_REFUSED_ARTIFACTS / "run.json").read_bytes())
     if changes:
         # A changed run is different bytes, so the record that states its store has to bind those
@@ -1928,24 +1928,72 @@ def test_the_judgement_words_collector_keeps_what_it_does_not_recognise(monkeypa
     assert writer._judgement_words(shown, rubric) == []
 
 
-def test_no_corridor_can_be_read_against_the_baseline_under_the_current_rubric(
+def test_a_corridor_judged_under_the_current_rubric_is_read_against_the_baseline(
     monkeypatch, tmp_path
 ):
-    """The finding the refusal record carries, asserted against the two records themselves."""
+    """The comparison the gate refused until 2026-09-19, and the one it must still refuse.
+
+    The baseline's judge answered under rubric version 4 and a fresh judgement is given under
+    version 5, which the rubric declares shows the judge the same words. Both must compare. A
+    digest _answered_version does not reconcile must not.
+    """
     writer, root = _corridor_writer(monkeypatch, tmp_path)
-    baseline = json.loads((root / _BASELINE_PATH).read_bytes())["record"]
     current = hashlib.sha256(_RUBRIC.read_bytes()).hexdigest()
-    blocker = writer._comparison_blocker(baseline, current)
-    assert blocker is not None
-    assert blocker["baselineAnsweredAgainst"] == VERSION_4.rubric_sha256
-    assert blocker["aFreshJudgementAnswersAgainst"] == current
-    # And the check is not a constant: two records answered against one rubric are comparable.
-    assert writer._comparison_blocker(baseline, VERSION_4.rubric_sha256) is None
-    # Which is what the verb refuses on, before anything is written.
-    judgement = _corridor_judgement_file(tmp_path, rubricSha256=current)
-    with pytest.raises(SystemExit, match="no corridor judged under the current rubric"):
-        _corridor(writer, _corridor_run(tmp_path), judgement)
-    assert not (root / _CORRIDOR_RECORD).exists()
+    baseline = json.loads((root / _BASELINE_PATH).read_bytes())["record"]
+    answered = baseline["gate"]["keys"][JUDGED_KEY]["answeredAgainst"]
+    assert answered["rubricSha256"] == VERSION_4.rubric_sha256 != current
+
+    equivalence = writer._rubric_equivalence(baseline, current)
+    assert equivalence["theGateReconcilesThem"] is True
+    assert equivalence["baselineAnsweredAgainst"] == VERSION_4.rubric_sha256
+    assert equivalence["aFreshJudgementAnswersAgainst"] == current
+
+    # Both directions end to end: a version 5 judgement and a version 4 one both write a record.
+    run_path = _corridor_run(tmp_path)
+    for index, digest in enumerate((current, VERSION_4.rubric_sha256)):
+        record = f"docs/evaluation/2026-09-19-corridor-under-test-{index}.json"
+        judgement = _corridor_judgement_file(tmp_path, name=f"j{index}.json", rubricSha256=digest)
+        assert _corridor(writer, run_path, judgement, record=record) == 0
+        written = json.loads((root / record).read_bytes())["record"]
+        assert written["baselineComparison"]["baselineRecord"] == _BASELINE_PATH
+
+    # And no wider. A third digest never reaches the comparison: decide_judged refuses it first,
+    # so the verb records a refusal and scores nothing. That the COMPARISON also refuses it is the
+    # next test, which asks _comparable directly rather than through a judgement it would reject.
+    judgement = _corridor_judgement_file(tmp_path, name="third.json", rubricSha256=_SHA)
+    assert _corridor(writer, run_path, judgement, record=_CORRIDOR_RECORD) == 1
+    refused = json.loads((root / _CORRIDOR_RECORD).read_bytes())["record"]
+    assert refused["profile"] == writer.REFUSED_PROFILE
+    assert any("rubric digest mismatch" in line for line in refused["judgedKey"]["refusedBecause"])
+
+
+def test_the_comparison_refuses_a_rubric_the_answer_version_rule_does_not_reconcile():
+    """_comparable applies one equivalence and not a licence to compare any two rubrics."""
+    current = hashlib.sha256(_RUBRIC.read_bytes()).hexdigest()
+
+    def holder(written, answered_against, target="generated-tile-evaluation"):
+        return {
+            "target": target,
+            "gate": {
+                "keySet": GATE_KEY_SET_VERSION,
+                "keys": {
+                    JUDGED_KEY: {
+                        "rubricSha256": written,
+                        "answeredAgainst": {"rubricSha256": answered_against},
+                    }
+                },
+            },
+        }
+
+    baseline = holder(current, VERSION_4.rubric_sha256, target="owned-district")
+    visual_gate._comparable(holder(current, current), baseline)
+    visual_gate._comparable(holder(current, VERSION_4.rubric_sha256), baseline)
+    for refused in (VERSION_3.rubric_sha256, VERSION_2.rubric_sha256, _SHA):
+        with pytest.raises(GateEvidenceError, match="does not reconcile"):
+            visual_gate._comparable(holder(current, refused), baseline)
+    # Two records written with different rubrics are not comparable whatever they answered.
+    with pytest.raises(GateEvidenceError, match="a comparison needs one rubric"):
+        visual_gate._comparable(holder(_RUBRIC_SHA, _RUBRIC_SHA), baseline)
 
 
 def test_the_re_ask_this_record_states_is_one_the_writer_would_accept(monkeypatch, tmp_path):

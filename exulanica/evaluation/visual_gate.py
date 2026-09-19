@@ -1140,31 +1140,60 @@ def _hard_pass(record: Mapping[str, Any], what: str) -> dict[str, bool]:
     return dict(block)
 
 
+def _read(holder: Mapping[str, Any], *path: str) -> Any:
+    """One value down a path of names, or None where the path stops."""
+    value: Any = holder
+    for step in path:
+        value = value.get(step) if isinstance(value, Mapping) else None
+    return value
+
+
 def _comparable(candidate: Mapping[str, Any], baseline: Mapping[str, Any]) -> None:
     """Refuse a comparison the keys cannot carry, naming both targets when they differ.
 
-    Two records are comparable when they were measured by the same key set and answered against the
-    same rubric. Across targets that is the whole requirement: the keys do not know which page they
-    measured, so two pages scored by one key set under one rubric are as comparable as two runs of
-    one page. What is NOT comparable is a different key set or a different rubric, because then the
-    same verdict word stands for different questions.
+    Two records are comparable when they were measured by the same key set and answered against
+    the same rubric. Across targets that is the whole requirement: the keys do not know which page
+    they measured, so two pages scored by one key set under one rubric are as comparable as two
+    runs of one page. What is NOT comparable is a different key set or a different rubric, because
+    then the same verdict word stands for different questions.
+
+    **The same rubric, by the same equivalence that reads an answer at all.** Until 2026-09-19 the
+    rubric axis compared ``answeredAgainst.rubricSha256`` for equality, and that refused every
+    comparison this gate exists to make. :func:`_answered_version` reads an answer given against
+    the version this one superseded, when that version showed the judge exactly what this one
+    shows; the Flatiron baseline's judge answered under version 4 for that reason, and every
+    judgement from now on is given under version 5. So one file reconciled two versions in one
+    function and refused them in another, over a difference the rubric itself declares immaterial,
+    and NO CORRIDOR COULD EVER HAVE BEEN READ AGAINST THAT BASELINE.
+
+    The fix applies that one equivalence and nothing wider: both records must be WRITTEN with the
+    same rubric, and each must have been answered against a digest that rubric reconciles, which
+    is :func:`_answered_version`'s own question, asked here rather than restated. A digest that
+    function does not reconcile still refuses, which is what keeps this from becoming "any two
+    rubric digests compare".
     """
-    for name, path in (
-        ("key set", ("gate", "keySet")),
-        ("rubric", ("gate", "keys", JUDGED_KEY, "answeredAgainst", "rubricSha256")),
-    ):
-        values = []
-        for holder in (candidate, baseline):
-            value: Any = holder
-            for step in path:
-                value = value.get(step) if isinstance(value, Mapping) else None
-            values.append(value)
+    keys = ("key set", ("gate", "keySet")), ("rubric", ("gate", "keys", JUDGED_KEY, "rubricSha256"))
+    for name, path in keys:
+        values = [_read(holder, *path) for holder in (candidate, baseline)]
         if values[0] != values[1]:
             raise GateEvidenceError(
                 f"a comparison needs one {name}: the candidate scored "
                 f"{target_of(candidate)} with {values[0]!r} and the baseline scored "
                 f"{target_of(baseline)} with {values[1]!r}"
             )
+    written = _read(candidate, "gate", "keys", JUDGED_KEY, "rubricSha256")
+    for holder, what in ((candidate, "candidate"), (baseline, "baseline")):
+        answered = _read(holder, "gate", "keys", JUDGED_KEY, "answeredAgainst", "rubricSha256")
+        if answered == written:
+            continue
+        try:
+            _answered_version(answered, written)
+        except GateEvidenceError as error:
+            raise GateEvidenceError(
+                f"a comparison needs one rubric: the {what} scored "
+                f"{target_of(holder)} answered against {answered!r}, which the rubric both "
+                f"records are written with, {written!r}, does not reconcile"
+            ) from error
 
 
 def beats_baseline(candidate: Mapping[str, Any], baseline: Mapping[str, Any]) -> bool:
