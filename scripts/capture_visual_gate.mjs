@@ -1018,20 +1018,60 @@ const CAPTURE_STATE = `function (origin, title, path) {
   };
 }`;
 
-const INSTALL_RECORDER = `function () {
+const INSTALL_RECORDER = `async function (pcUrl) {
+  const pc = await import(pcUrl);
   const binding = this;
   const recorder = { poses: [], recording: false, failures: [], handle: null, frameHandle: null,
-    observer: null, maxDrawCalls: 0, renderedFrames: 0 };
+    observer: null, maxDrawCalls: 0, renderedFrames: 0,
+    countedMaxDrawCalls: 0, maxRasterisedTriangles: 0, busiestFrame: null, restoreDraw: null };
   recorder.handle = binding.app.on('update', () => {
     if (!recorder.recording) return;
     const s = binding.controls.state;
     recorder.poses.push([s.x, s.y, s.z, s.yaw, s.pitch, binding.controls.movementSpeed]);
   });
+  // WHICH PASS EACH DRAW BELONGS TO, AND WHAT IT RASTERISES, as evidence beside the total.
+  //
+  // maxDrawCalls is one number over a world's geometry and a look's passes together: shadow
+  // cascades, a depth prepass and post effect quads are all in it, and nothing in the total says
+  // which moved. The render target bound at a draw IS the pass that made it, so counting by target
+  // separates them. Triangles are counted beside the draws because A DRAW CALL IS NOT A TRIANGLE:
+  // batching that merges draws adds geometry to the ones that remain, and only the second column
+  // says so. Neither figure decides any key.
+  const device = binding.app.graphicsDevice;
+  const original = device.draw.bind(device);
+  let perTarget = {};
+  let trianglesPerTarget = {};
+  let draws = 0;
+  let triangles = 0;
+  device.draw = function (...rest) {
+    const target = device.renderTarget;
+    const name = target === null || target === undefined ? 'backbuffer' : (target.name ?? 'unnamed');
+    perTarget[name] = (perTarget[name] ?? 0) + 1;
+    draws += 1;
+    const primitive = rest[0];
+    if (primitive && primitive.type === pc.PRIMITIVE_TRIANGLES) {
+      trianglesPerTarget[name] = (trianglesPerTarget[name] ?? 0) + primitive.count / 3;
+      triangles += primitive.count / 3;
+    }
+    return original(...rest);
+  };
+  recorder.restoreDraw = () => { device.draw = original; };
   // The same counter the product's validation recorder reads, over the whole route rather than
-  // its capped window.
+  // its capped window. NOTE THE OFFSET, because the two counts below are not of one frame:
+  // Stats.updateBasic runs at the START of a tick, so app.stats.drawCalls.total read here is the
+  // PREVIOUS tick's total, while the per-target counts are this tick's, cleared after each frame.
   recorder.frameHandle = binding.app.on('frameend', () => {
     recorder.renderedFrames += 1;
     recorder.maxDrawCalls = Math.max(recorder.maxDrawCalls, binding.app.stats.drawCalls.total);
+    recorder.maxRasterisedTriangles = Math.max(recorder.maxRasterisedTriangles, triangles);
+    if (draws > recorder.countedMaxDrawCalls) {
+      recorder.countedMaxDrawCalls = draws;
+      recorder.busiestFrame = { draws, drawsPerTarget: perTarget, triangles, trianglesPerTarget };
+    }
+    perTarget = {};
+    trianglesPerTarget = {};
+    draws = 0;
+    triangles = 0;
   });
   const status = document.querySelector('.travel-status');
   if (status !== null) {
@@ -2119,7 +2159,7 @@ async function main() {
     noteLock('when the heading was written', await captureState());
     harnessWrites.push({ field: 'controls.state.yaw', valueMicroradians: Math.round(plan.yaw * 1e6), why: 'mouse look needs pointer movement under a held lock, which the harness does not synthesize; the heading is written once and no position is written' });
 
-    const recorderId = await session.call(bindingId, INSTALL_RECORDER, [], false);
+    const recorderId = await session.call(bindingId, INSTALL_RECORDER, [pcUrl], false);
     const accelTime = await session.call(bindingId, `function () { return this.controls.config.accelTime; }`);
     const [fx, fz] = plan.forward;
     const along = (p) => (p.x - arrival.x) * fx + (p.z - arrival.z) * fz;
@@ -2375,10 +2415,12 @@ async function main() {
     await session.call(recorderId, `function () { this.recording = false; return true; }`);
     const recorded = await session.call(recorderId, `function () {
       const out = { poses: this.poses, failures: this.failures, maxDrawCalls: this.maxDrawCalls,
-        renderedFrames: this.renderedFrames };
+        renderedFrames: this.renderedFrames, countedMaxDrawCalls: this.countedMaxDrawCalls,
+        maxRasterisedTriangles: this.maxRasterisedTriangles, busiestFrame: this.busiestFrame };
       this.handle.off();
       this.frameHandle.off();
       this.observer?.disconnect();
+      this.restoreDraw?.();
       return out;
     }`);
     const poses = recorded.poses.map(([x, y, z, yaw, pitch, speed]) => ({ x, y, z, yaw, pitch, speed }));
@@ -2680,6 +2722,7 @@ async function main() {
       harnessObservers: [
         'one engine update listener that copies the controls state each frame while the walk runs',
         'one engine frameend listener that keeps the largest per-frame draw call count from the start capture to the endpoint capture',
+        'one wrapper around the graphics device draw entry point that counts each draw and its triangles by the render target bound at that moment, restored when the recorder is read',
         'one MutationObserver on the travel status that records failure messages while the walk runs',
       ],
       drawCalls: {
@@ -2688,6 +2731,18 @@ async function main() {
         routeMax: recorded.maxDrawCalls,
         routeRenderedFrames: recorded.renderedFrames,
         decidingMax: Math.max(report.renderer.max_draw_calls, recorded.maxDrawCalls),
+        // THE SAME DRAWS, SPLIT BY THE PASS THAT MADE THEM, and the triangles each pass rasterised.
+        // Evidence, not a decision: no key reads anything below this line. `routeMaxCounted` counts
+        // the tick it is read in and `routeMax` the tick before it, so they are maxima over the same
+        // frames offset by one.
+        routeMaxCounted: recorded.countedMaxDrawCalls,
+        routeBusiestFrame: recorded.busiestFrame,
+      },
+      // WHAT THE FRAME ACTUALLY RASTERISED, which is a different population from `drawnTriangles`:
+      // that counts the scene's triangles once, and a frame draws them once per pass it is in.
+      rasterisedTriangles: {
+        routeMax: recorded.maxRasterisedTriangles,
+        routeRenderedFrames: recorded.renderedFrames,
       },
       captures,
       trace: {
