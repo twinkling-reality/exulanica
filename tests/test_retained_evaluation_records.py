@@ -101,6 +101,31 @@ def test_retained_screenshots_match_the_artifact_bound_into_their_record():
     assert checked > 0, "no retained record binds an image"
 
 
+#: Predecessors that are retained evidence but are NOT in the repository. Each is named by a
+#: committed record and excluded from git in ``.git/info/exclude`` under "Local-only evaluation
+#: campaigns. Not published." That exclude file is per-clone and versioned nowhere, so these four
+#: exist in the main checkout and in NO worktree and NO fresh clone.
+#:
+#: Naming them here publishes nothing: all four are already named inside committed records, which
+#: is how this test finds them at all (MEASURED 2026-09-19: 1, 11, 11 and 11 committed files
+#: respectively).
+#:
+#: This is a DECLARED GAP, not a waiver. Where the file is present its digest is still checked, so
+#: the main checkout verifies everything it always did. Where it is absent the binding is counted
+#: as unresolvable-by-design and reported, rather than failing a test that no lane could ever pass.
+#: Before 2026-09-19 this test passed in the main checkout and failed in every worktree, which
+#: taught every lane that one failure in this file is expected: the state in which the next real
+#: failure here is invisible.
+LOCAL_ONLY_PREDECESSORS: frozenset[str] = frozenset(
+    {
+        "docs/evaluation/2026-09-12-environment-source-admission.json",
+        "docs/evaluation/2026-09-12-helsinki-terminal-lod-successor.json",
+        "docs/evaluation/2026-09-12-helsinki-visual-feasibility.json",
+        "docs/evaluation/2026-09-12-melbourne-c4-29-visual-feasibility.json",
+    }
+)
+
+
 def _declared_predecessors(record: dict) -> list[tuple[str, dict]]:
     """Every predecessor a record declares, whether it declares one or several.
 
@@ -140,13 +165,20 @@ def test_every_declared_predecessor_binding_resolves_and_matches():
     new mistake rather than history.
     """
     checked = 0
+    absent: list[str] = []
     for path in _records():
         record = json.loads(path.read_bytes())["record"]
         for key, declared in _declared_predecessors(record):
             predecessor = _ROOT / declared["path"]
-            assert predecessor.is_file(), (
-                f"{path.name} {key} names {declared['path']}, which is not in the tree"
-            )
+            if not predecessor.is_file():
+                # A path that resolves on disk measures the checkout and not the commit. The only
+                # absences allowed are the ones declared above, by name.
+                assert declared["path"] in LOCAL_ONLY_PREDECESSORS, (
+                    f"{path.name} {key} names {declared['path']}, which is not in the tree "
+                    f"and is not a declared local-only predecessor"
+                )
+                absent.append(f"{path.name} {key} -> {declared['path']}")
+                continue
             digest = hashlib.sha256(
                 canonical_json(json.loads(predecessor.read_bytes())["record"])
             ).hexdigest()
@@ -161,6 +193,39 @@ def test_every_declared_predecessor_binding_resolves_and_matches():
     # removed, which shortens the chain and is exactly the silent re-parenting this test exists to
     # catch. Raise the floor when the chain grows, never lower it.
     assert checked >= 16, f"only {checked} predecessor bindings found, expected at least 16"
+    if absent:
+        # Loud on every run, like the sibling inventory below, because a declared gap that goes
+        # quiet is a gap nobody revisits. The count differs between the main checkout and a
+        # worktree BY DESIGN and that difference is the thing being reported.
+        warnings.warn(
+            f"predecessor chain: {checked} bindings verified; {len(absent)} name a local-only "
+            f"predecessor absent from this tree and were not verified here: "
+            + ", ".join(sorted(absent)),
+            stacklevel=1,
+        )
+
+
+def test_the_local_only_predecessor_list_cannot_grow_without_being_noticed():
+    """The declared gap is a fixed set, and every member of it is still named by a record.
+
+    A list of allowed absences is the kind of thing that grows one line at a time until it means
+    nothing. Two directions are held here. A path that stops being referenced should leave the
+    set, and a new unresolvable predecessor must not be waived by appending to it: that requires
+    editing this test, which is the point.
+    """
+    referenced = {
+        declared["path"]
+        for path in _records()
+        for _, declared in _declared_predecessors(json.loads(path.read_bytes())["record"])
+    }
+    unreferenced = LOCAL_ONLY_PREDECESSORS - referenced
+    assert not unreferenced, (
+        f"declared local-only predecessors no record names any more: {sorted(unreferenced)}"
+    )
+    assert len(LOCAL_ONLY_PREDECESSORS) == 4, (
+        f"the local-only predecessor set is {len(LOCAL_ONLY_PREDECESSORS)} entries, not 4; "
+        f"adding one waives a real check and must be a deliberate edit with a reason"
+    )
 
 
 def test_records_that_declare_no_predecessor_are_inventoried_rather_than_silent():
