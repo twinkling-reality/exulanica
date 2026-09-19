@@ -56,10 +56,20 @@ export {
   batchTileSurfaces,
   loadGeneratedTile,
 } from './tile-runtime.js';
-export type { TileCapsule, TileCollisionState, TileExtentMm, TileNavigation, TileSupportState } from './tile-navigation.js';
+export type {
+  ComposedSupport,
+  ComposedTile,
+  NavigationTile,
+  TileCapsule,
+  TileCollisionState,
+  TileExtentMm,
+  TileNavigation,
+  TileSupportState,
+} from './tile-navigation.js';
 export {
   SUPPORT_SAMPLE_SPACING_M,
   TILE_FRAME,
+  composedSupport,
   navEnvelopeSupport,
   rendererToTile,
   tileCapsule,

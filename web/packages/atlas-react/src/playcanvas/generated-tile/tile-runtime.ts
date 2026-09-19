@@ -36,6 +36,7 @@ import {
   rendererToTile,
   tileCapsule,
   tileNavigation,
+  type NavigationTile,
   tileToRenderer,
   unsupportedFrame,
   type TileExtentMm,
@@ -131,6 +132,27 @@ export interface GeneratedTileSources {
   readonly look?: TileLook;
   /** The page's `crypto.subtle` by default; null refuses every tile. */
   readonly digest?: TextureSetDigest | null;
+  /**
+   * NEIGHBOURING TILES WHOSE GROUND THIS WALK MAY REACH, as whole containers.
+   *
+   * A tile is 128,000 mm across and the route rule asks for 125,000 plus a 6,000 stopping margin, so
+   * ground for a whole route does not fit on the tile a route is laid on. These are composed into
+   * the navigation world and into nothing else: NOT drawn, NOT picked, NOT measured, and no record
+   * of theirs reaches the page's list of what is undressed. Each is verified against its own digest
+   * exactly as the tile is, because it is ground a person stands on.
+   *
+   * ONLY THE `nav_envelope` OF EACH IS READ. A caller that can serve a container's sections
+   * separately should serve only those: measured on the corridor, a neighbour's navigation is
+   * 1,969,322 bytes against 11,630,504 for its container, and the float `position` section is
+   * exactly fround(position_mm / 1000) so it need not be sent at all.
+   */
+  readonly neighbours?: readonly NeighbourTileSource[];
+}
+
+/** One neighbouring tile's container, named so a refusal can say which tile was refused. */
+export interface NeighbourTileSource {
+  readonly name: string;
+  readonly bytes: Uint8Array;
 }
 
 export interface TilePick {
@@ -460,10 +482,37 @@ export async function loadGeneratedTile(sources: GeneratedTileSources): Promise<
   // nothing or names no record is refused rather than repaired, and the refusals are carried so a
   // caller can say what was dropped instead of serving a quietly smaller set.
   const rings = obstructionRings(routeObstructionRings(decoded.header));
+  const neighbours: NavigationTile[] = [];
+  for (const source of sources.neighbours ?? []) {
+    let near: DecodedOwd;
+    try {
+      near = await verifyOwd(source.bytes, sha256);
+    } catch (error) {
+      if (error instanceof OwdError) throw new GeneratedTileRefusal(`Neighbour ${source.name} refused: ${error.message}`);
+      throw error;
+    }
+    const nearFrame = unsupportedFrame(near.header.grammars);
+    if (nearFrame !== null) throw new GeneratedTileRefusal(`Neighbour ${source.name} refused: ${nearFrame}`);
+    // A NEIGHBOUR CARVED FOR ANOTHER BODY IS NOT GROUND FOR THIS ONE. An envelope is carved to a
+    // capsule, so composing one carved to a different radius would put a walker on ground that was
+    // cleared for somebody else and stop it somewhere the rule cannot explain.
+    const nearCapsule = tileCapsule(near.header.grammars);
+    if (typeof nearCapsule === 'string') throw new GeneratedTileRefusal(`Neighbour ${source.name} refused: ${nearCapsule}`);
+    if (nearCapsule.radiusM !== capsule.radiusM || nearCapsule.heightM !== capsule.heightM || nearCapsule.eyeHeightM !== capsule.eyeHeightM) {
+      throw new GeneratedTileRefusal(
+        `Neighbour ${source.name} refused: its envelope is carved for a capsule of ${nearCapsule.radiusM} m by `
+        + `${nearCapsule.heightM} m, and ${sources.name} for one of ${capsule.radiusM} m by ${capsule.heightM} m.`,
+      );
+    }
+    const envelope = near.projections.find((projection) => projection.header.name === 'nav_envelope');
+    if (envelope === undefined) throw new GeneratedTileRefusal(`Neighbour ${source.name} refused: it carries no nav_envelope.`);
+    neighbours.push({ tile: source.name, projection: envelope });
+  }
   const navigation = tileNavigation(
     decoded.projections.find((projection) => projection.header.name === 'nav_envelope'),
     renderExtent(ranges),
     capsule,
+    neighbours,
   );
   const drawn = ranges.filter((range): range is DrawnTileRange => range.state === 'drawn')
     .sort((a, b) => a.firstTriangle - b.firstTriangle);

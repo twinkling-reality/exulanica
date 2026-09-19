@@ -35,6 +35,16 @@ import type { CameraState } from '../controls.js';
  * The capsule's height needs overhead clearance from `collision_proxy`, which no tile carries yet;
  * until it does, the world has no blockers and says so in `collisionState`.
  *
+ * A WORLD IS MORE THAN ONE TILE, AND WALKABLE IS NOT DRAWN. A tile is 128,000 mm across and the
+ * route rule asks for 125,000 plus a 6,000 stopping margin, so the ground a route needs does not fit
+ * in the tile a route is laid on. The neighbours' `nav_envelope` projections are composed into one
+ * world for that reason, and for that reason only: THE COMPOSED WORLD IS WALKABLE PAST THE EDGE AND
+ * NOT DRAWN PAST IT, AND THE ENDPOINT FRAME IS THEREFORE NOT JUDGEABLE. A camera at the end of a
+ * route looks east at ground it can stand on and at no street at all, because nothing of the
+ * neighbour's `render_batch` is loaded, and a person scoring that frame would be answering a
+ * question about the edge of the loaded world while believing they were answering one about a city.
+ * Drawing the neighbour is a separate piece and it must exist before any capture is put to a judge.
+ *
  * FRAMES. Tile records are `city_local`: x east, y north, z up, integer millimetres, and a grammar
  * that states any other frame is refused ({@link unsupportedFrame}). The renderer is metres with +Y
  * up, and a tile point (x, y, z) is drawn at (x, z, -y) / 1000: a proper rotation, so winding and
@@ -134,54 +144,116 @@ function cross2(ax: number, ay: number, bx: number, by: number): number {
   return ax * by - ay * bx;
 }
 
+/** One tile's walkable envelope in a composed world, with the name a refusal would use. */
+export interface NavigationTile {
+  readonly tile: string;
+  readonly projection: DecodedProjection;
+}
+
+/** What one tile put into the composed ground, so a caller can add the parts up and check. */
+export interface ComposedTile {
+  readonly tile: string;
+  /** What this tile alone covers, which is what fixes a stance when this is the tile being walked. */
+  readonly extent: TileExtentMm;
+  /** Triangles the projection declares, which is the number a container's own header states. */
+  readonly stated: number;
+  /** Of those, the ones that hold a person up: plan area, facing up. */
+  readonly walkable: number;
+}
+
+export interface ComposedSupport {
+  readonly surface: NavigationSurface;
+  readonly extent: TileExtentMm;
+  readonly triangles: number;
+  readonly tiles: readonly ComposedTile[];
+}
+
 /**
- * Support from a `nav_envelope` projection: the height of the highest envelope triangle over a
- * plan point, interpolated exactly on its plane, with that triangle's normal. Null off the envelope.
+ * Support from one or more `nav_envelope` projections: the height of the highest envelope triangle
+ * over a plan point, interpolated exactly on its plane, with that triangle's normal. Null off the
+ * envelope.
  *
  * Triangles with no plan area (walls) and triangles facing down support nothing and are skipped;
  * an envelope is walkable ground by contract.
+ *
+ * WHY MORE THAN ONE, AND WHY THIS IS A UNION AND NOT A MERGE. A tile is 128,000 mm across and the
+ * route rule asks for 125,000 plus a 6,000 stopping margin, so a route laid east to west can never
+ * have ground for its whole length inside one tile, whatever pose is chosen. The tiles either side
+ * hold that ground already, at the same bake, and a tile's coordinates are ABSOLUTE city
+ * millimetres: measured across the corridor's five, the terrains run 0 to 128,000, 128,000 to
+ * 256,000 and so on to 640,000, abutting exactly with no gap and no overlap. So composition needs no
+ * transform and no reconciliation. Every triangle goes into one index in one frame and the highest
+ * one over a plan point wins, exactly as it does within a tile, because a curb top over a road is
+ * the same question whichever tile owns the curb.
+ *
+ * WHAT IT IS NOT is the halo. Every container already carries its neighbours' records, 2,076 of them
+ * against 2,073 owned on the corridor's middle tile, and every one is state `halo` in both
+ * projections. Drawing those instead would put the same ground in the world twice, the neighbour's
+ * halo copy and the neighbour's own owned copy, with two supports at one plan point and nothing to
+ * say which is the answer. Halo exists so a tile can know its neighbours in order to carve against
+ * them, not in order to draw them.
+ *
+ * MEASURED AT THE SEAM, corridor tiles (2,0) and (3,0) across x 384,000, 513 stations 250 mm apart:
+ * every station supported on both sides, largest step 49.000 mm, mean 10.16. The control is the same
+ * measurement at a join INSIDE one tile, where its terrain meets its own street: 192.987 mm, four
+ * times worse, and open ground with nothing joining reads 0.000 over 189 stations, so the instrument
+ * can return zero and a reading that is not zero means something. A seam is not a special place.
  */
-export function navEnvelopeSupport(projection: DecodedProjection): { readonly surface: NavigationSurface; readonly extent: TileExtentMm; readonly triangles: number } {
-  const vertices = absoluteVertices(projection);
+export function composedSupport(tiles: readonly NavigationTile[]): ComposedSupport {
   const triangles: SupportTriangle[] = [];
   const cells = new Map<string, number[]>();
   const min = [Infinity, Infinity, Infinity];
   const max = [-Infinity, -Infinity, -Infinity];
-  const at = (vertex: number): Vec3 => [vertices[vertex * 3]!, vertices[vertex * 3 + 1]!, vertices[vertex * 3 + 2]!];
-  for (let corner = 0; corner < projection.index.length; corner += 3) {
-    const a = at(projection.index[corner]!);
-    const b = at(projection.index[corner + 1]!);
-    const c = at(projection.index[corner + 2]!);
-    const area2 = cross2(b[0] - a[0], b[1] - a[1], c[0] - a[0], c[1] - a[1]);
-    if (area2 <= 0) continue;
-    const ux = b[0] - a[0]; const uy = b[1] - a[1]; const uz = b[2] - a[2];
-    const vx = c[0] - a[0]; const vy = c[1] - a[1]; const vz = c[2] - a[2];
-    const nx = uy * vz - uz * vy;
-    const ny = uz * vx - ux * vz;
-    const nz = ux * vy - uy * vx;
-    const length = Math.hypot(nx, ny, nz);
-    // Tile normal (nx, ny, nz) in the renderer frame is (nx, nz, -ny).
-    const normal = Object.freeze({ x: nx / length, y: nz / length, z: -ny / length });
-    const index = triangles.length;
-    triangles.push({ a, b, c, area2, normal });
-    for (const point of [a, b, c]) {
-      for (let axis = 0; axis < 3; axis += 1) {
-        min[axis] = Math.min(min[axis]!, point[axis]!);
-        max[axis] = Math.max(max[axis]!, point[axis]!);
+  const composed: ComposedTile[] = [];
+  for (const { tile, projection } of tiles) {
+    const vertices = absoluteVertices(projection);
+    const before = triangles.length;
+    const low = [Infinity, Infinity, Infinity];
+    const high = [-Infinity, -Infinity, -Infinity];
+    const at = (vertex: number): Vec3 => [vertices[vertex * 3]!, vertices[vertex * 3 + 1]!, vertices[vertex * 3 + 2]!];
+    for (let corner = 0; corner < projection.index.length; corner += 3) {
+      const a = at(projection.index[corner]!);
+      const b = at(projection.index[corner + 1]!);
+      const c = at(projection.index[corner + 2]!);
+      const area2 = cross2(b[0] - a[0], b[1] - a[1], c[0] - a[0], c[1] - a[1]);
+      if (area2 <= 0) continue;
+      const ux = b[0] - a[0]; const uy = b[1] - a[1]; const uz = b[2] - a[2];
+      const vx = c[0] - a[0]; const vy = c[1] - a[1]; const vz = c[2] - a[2];
+      const nx = uy * vz - uz * vy;
+      const ny = uz * vx - ux * vz;
+      const nz = ux * vy - uy * vx;
+      const length = Math.hypot(nx, ny, nz);
+      // Tile normal (nx, ny, nz) in the renderer frame is (nx, nz, -ny).
+      const normal = Object.freeze({ x: nx / length, y: nz / length, z: -ny / length });
+      const index = triangles.length;
+      triangles.push({ a, b, c, area2, normal });
+      for (const point of [a, b, c]) {
+        for (let axis = 0; axis < 3; axis += 1) {
+          low[axis] = Math.min(low[axis]!, point[axis]!);
+          high[axis] = Math.max(high[axis]!, point[axis]!);
+          min[axis] = Math.min(min[axis]!, point[axis]!);
+          max[axis] = Math.max(max[axis]!, point[axis]!);
+        }
+      }
+      const x0 = Math.floor(Math.min(a[0], b[0], c[0]) / INDEX_CELL_MM);
+      const x1 = Math.floor(Math.max(a[0], b[0], c[0]) / INDEX_CELL_MM);
+      const y0 = Math.floor(Math.min(a[1], b[1], c[1]) / INDEX_CELL_MM);
+      const y1 = Math.floor(Math.max(a[1], b[1], c[1]) / INDEX_CELL_MM);
+      for (let cx = x0; cx <= x1; cx += 1) {
+        for (let cy = y0; cy <= y1; cy += 1) {
+          const key = `${cx}:${cy}`;
+          const list = cells.get(key);
+          if (list === undefined) cells.set(key, [index]);
+          else list.push(index);
+        }
       }
     }
-    const x0 = Math.floor(Math.min(a[0], b[0], c[0]) / INDEX_CELL_MM);
-    const x1 = Math.floor(Math.max(a[0], b[0], c[0]) / INDEX_CELL_MM);
-    const y0 = Math.floor(Math.min(a[1], b[1], c[1]) / INDEX_CELL_MM);
-    const y1 = Math.floor(Math.max(a[1], b[1], c[1]) / INDEX_CELL_MM);
-    for (let cx = x0; cx <= x1; cx += 1) {
-      for (let cy = y0; cy <= y1; cy += 1) {
-        const key = `${cx}:${cy}`;
-        const list = cells.get(key);
-        if (list === undefined) cells.set(key, [index]);
-        else list.push(index);
-      }
-    }
+    composed.push({
+      tile,
+      extent: { min: [low[0]!, low[1]!, low[2]!], max: [high[0]!, high[1]!, high[2]!] },
+      stated: projection.header.triangle_count,
+      walkable: triangles.length - before,
+    });
   }
   if (triangles.length === 0) throw new Error('The nav_envelope has no walkable triangle');
   const surface: NavigationSurface = Object.freeze({
@@ -208,13 +280,19 @@ export function navEnvelopeSupport(projection: DecodedProjection): { readonly su
     surface,
     extent: { min: [min[0]!, min[1]!, min[2]!], max: [max[0]!, max[1]!, max[2]!] },
     triangles: triangles.length,
+    tiles: composed,
   };
+}
+
+/** The support one tile's envelope gives on its own, which is the composed ground of a world of one. */
+export function navEnvelopeSupport(projection: DecodedProjection): ComposedSupport {
+  return composedSupport([{ tile: 'the tile', projection }]);
 }
 
 const NO_SURFACE: NavigationSurface = Object.freeze({ sample: () => null });
 
 export type TileSupportState =
-  | { readonly state: 'nav_envelope'; readonly triangles: number }
+  | { readonly state: 'nav_envelope'; readonly triangles: number; readonly tiles: readonly ComposedTile[] }
   | { readonly state: 'unavailable'; readonly reason: string };
 
 export type TileCollisionState = { readonly state: 'unavailable'; readonly reason: string };
@@ -260,6 +338,24 @@ function halfDiagonalM(extent: TileExtentMm): number {
   return Math.hypot(extent.max[0] - extent.min[0], extent.max[1] - extent.min[1]) / 2 / MILLIMETRES;
 }
 
+/**
+ * How far the field must reach from a centre to hold every corner of an extent, in metres.
+ *
+ * NOT the extent's own half-diagonal, which is only the answer when the centre is the extent's
+ * middle. A composed world keeps its centre on the tile being walked and reaches over its
+ * neighbours, so the two differ by a whole tile and a field sized to the wrong one would recover a
+ * walker who had stepped onto perfectly good ground.
+ */
+function reachFromM(centreMm: readonly [number, number], extent: TileExtentMm): number {
+  let reach = 0;
+  for (const x of [extent.min[0], extent.max[0]]) {
+    for (const y of [extent.min[1], extent.max[1]]) {
+      reach = Math.max(reach, Math.hypot(x - centreMm[0], y - centreMm[1]));
+    }
+  }
+  return reach / MILLIMETRES;
+}
+
 const COLLISION_PENDING: TileCollisionState = {
   state: 'unavailable',
   reason: 'The tile carries no collision_proxy, so nothing on it blocks the capsule.',
@@ -273,6 +369,7 @@ export function tileNavigation(
   navEnvelope: DecodedProjection | undefined,
   renderExtent: TileExtentMm,
   capsule: TileCapsule,
+  neighbours: readonly NavigationTile[] = [],
 ): TileNavigation {
   if (navEnvelope === undefined || navEnvelope.header.triangle_count === 0) {
     // A viewpoint south of the tile, looking north at its middle, at eye height above the city datum.
@@ -295,11 +392,18 @@ export function tileNavigation(
       capsule,
     };
   }
-  const support = navEnvelopeSupport(navEnvelope);
-  const extent = support.extent;
-  const [cx, , cz] = tileToRenderer((extent.min[0] + extent.max[0]) / 2, (extent.min[1] + extent.max[1]) / 2, 0);
+  const support = composedSupport([{ tile: 'the tile', projection: navEnvelope }, ...neighbours]);
+  // THE TILE BEING WALKED FIXES WHERE THE WALK OPENS, AND THE NEIGHBOURS ONLY EXTEND WHAT IT CAN
+  // STAND ON. Taking the centre or the stance from the composed extent would move both by half a
+  // tile the moment a neighbour was loaded, so the same request would open somewhere else depending
+  // on how much of the world came with it, and a pose nobody chose would be the one a frame was
+  // captured from. The field's REACH is the composed one, because a walk that steps past the edge
+  // onto ground this world holds must not be recovered as though it had left the world.
+  const extent = support.tiles[0]!.extent;
+  const middle: [number, number] = [(extent.min[0] + extent.max[0]) / 2, (extent.min[1] + extent.max[1]) / 2];
+  const [cx, , cz] = tileToRenderer(middle[0], middle[1], 0);
   // Stand on the envelope nearest the middle of its southern edge, facing north.
-  const [sx, , sz] = tileToRenderer((extent.min[0] + extent.max[0]) / 2, extent.min[1], 0);
+  const [sx, , sz] = tileToRenderer(middle[0], extent.min[1], 0);
   let stance: CameraState | null = null;
   for (let step = 0; step <= 400 && stance === null; step += 1) {
     const probeZ = sz - step * SUPPORT_SAMPLE_SPACING_M;
@@ -308,9 +412,9 @@ export function tileNavigation(
   }
   if (stance === null) throw new Error('The nav_envelope has no support on its own north-south midline');
   return {
-    world: world(support.surface, [cx, cz], halfDiagonalM(extent), capsule),
+    world: world(support.surface, [cx, cz], reachFromM(middle, support.extent), capsule),
     start: stance,
-    support: { state: 'nav_envelope', triangles: support.triangles },
+    support: { state: 'nav_envelope', triangles: support.triangles, tiles: support.tiles },
     collisionState: COLLISION_PENDING,
     viewpointOnly: false,
     capsule,

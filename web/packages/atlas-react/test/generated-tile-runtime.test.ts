@@ -21,6 +21,7 @@ import {
 import { surfaceUv, unavailableUv } from '../src/playcanvas/generated-tile/texture-materials.js';
 import {
   SUPPORT_SAMPLE_SPACING_M,
+  composedSupport,
   navEnvelopeSupport,
   rendererToTile,
   tileCapsule,
@@ -28,6 +29,8 @@ import {
   tileToRenderer,
   unsupportedFrame,
   type TileCapsule,
+  type TileNavigation,
+  type TileSupportState,
 } from '../src/playcanvas/generated-tile/tile-navigation.js';
 
 // Relative to web/, where the suite runs.
@@ -173,7 +176,11 @@ describe('loading a baked tile through tess\'s decoder', () => {
 describe('standing on the tile\'s own nav_envelope', () => {
   it('samples support from the envelope and opens standing on it, eye 1.62 m above it', () => {
     const navigation = tile.navigation;
-    expect(navigation.support).toEqual({ state: 'nav_envelope', triangles: 5755 });
+    expect(navigation.support).toEqual({
+      state: 'nav_envelope',
+      triangles: 5755,
+      tiles: [{ tile: 'the tile', extent: { min: [0, 0, -95], max: [128000, 128000, 135] }, stated: 5755, walkable: 5755 }],
+    });
     expect(navigation.collisionState.state).toBe('unavailable');
     expect(navigation.viewpointOnly).toBe(false);
     const world = navigation.world;
@@ -511,7 +518,11 @@ describe('support from a nav_envelope', () => {
   it('stands the capsule on it and lets a 150 mm kerb be climbed but not a 200 mm step', () => {
     const kerb = tileNavigation(envelope(150), extent, CITY_V2_CAPSULE);
     expect(kerb.viewpointOnly).toBe(false);
-    expect(kerb.support).toEqual({ state: 'nav_envelope', triangles: 6 });
+    expect(kerb.support).toEqual({
+      state: 'nav_envelope',
+      triangles: 6,
+      tiles: [{ tile: 'the tile', extent: { min: [0, -4000, 0], max: [8000, 4000, 550] }, stated: 6, walkable: 6 }],
+    });
     expect(kerb.start.y).toBeCloseTo(1.62, 12);
     const [x, , z] = tileToRenderer(1000, -500, 0);
     const [, , zUp] = tileToRenderer(1000, 500, 0);
@@ -638,5 +649,124 @@ describe('the camera frame waits for a canvas with a size', () => {
     expect(camera.camera!.framePasses).toHaveLength(1);
     environment.dispose();
     expect(camera.camera!.framePasses).toEqual([]);
+  });
+});
+
+/** A flat slab the size of one envelope, laid immediately east of it: the neighbouring tile. */
+function eastNeighbour(height: number): DecodedProjection {
+  const vertices = [8000, -4000, height, 16000, -4000, height, 16000, 4000, height, 8000, 4000, height];
+  const origin = [8000, -4000, 0] as const;
+  const positionMm = new Int32Array(vertices.map((value, index) => value - origin[index % 3]!));
+  return {
+    header: {
+      name: 'nav_envelope', contract: PROJECTION_DEFINITIONS.find((definition) => definition.name === 'nav_envelope')!.contract,
+      triangle_digest: '1'.repeat(64), origin_mm: origin,
+      vertex_count: 4, triangle_count: 2, entries: [],
+    },
+    positionMm,
+    position: new Float32Array(positionMm.length),
+    index: new Uint32Array([0, 1, 2, 0, 2, 3]),
+  };
+}
+
+function composedOf(support: TileSupportState) {
+  if (support.state !== 'nav_envelope') throw new Error(`expected a composed envelope, got: ${support.reason}`);
+  return support;
+}
+
+describe('a neighbouring tile reaching the runtime', () => {
+  it('is checked against its own digest like any other ground, and refused by name', async () => {
+    const tampered = new Uint8Array(baked);
+    const at = decodeOwd(baked).header.sections.find((section) => section.name === 'position_mm')!.byte_offset;
+    tampered[at] = tampered[at]! ^ 1;
+    await expect(loadGeneratedTile({
+      name: 'tile-conformance', bytes: baked, manifest, fetchSet: noSets, digest: subtle,
+      neighbours: [{ name: 'the tile east', bytes: tampered }],
+    })).rejects.toThrow(/^Neighbour the tile east refused/);
+  });
+
+  it('adds its envelope to the support and is named in what the tile says it stands on', async () => {
+    // The fixture standing in for its own neighbour: the plumbing is what is under test, and the
+    // doubled ground is itself the demonstration that a tile must never be composed with a copy of
+    // itself, which is exactly what drawing the halo would have done.
+    const twice = await loadGeneratedTile({
+      name: 'tile-conformance', bytes: baked, manifest, fetchSet: noSets, digest: subtle,
+      neighbours: [{ name: 'a second copy', bytes: baked }],
+    });
+    const composed = composedOf(twice.navigation.support);
+    expect(composed.tiles.map((entry) => entry.tile)).toEqual(['the tile', 'a second copy']);
+    expect(composed.tiles.map((entry) => entry.walkable)).toEqual([5755, 5755]);
+    expect(composed.triangles).toBe(11510);
+    // It changes nothing that is drawn, picked, or reported as undressed.
+    expect(twice.ranges).toEqual(tile.ranges);
+    expect(twice.navigation.start).toEqual(tile.navigation.start);
+  });
+});
+
+describe('a world of more than one tile', () => {
+  const extent = { min: [0, -4000, 0] as const, max: [8000, 4000, 550] as const };
+  const heightAt = (navigation: TileNavigation, x: number, y: number) => {
+    const [rx, , rz] = tileToRenderer(x, y, 0);
+    return navigation.world.surface.sample(rx, rz);
+  };
+
+  it('carries the ground past the tile edge, and moves nothing about where the walk opens', () => {
+    const alone = tileNavigation(envelope(150), extent, CITY_V2_CAPSULE);
+    const composed = tileNavigation(envelope(150), extent, CITY_V2_CAPSULE, [
+      { tile: 'the tile east', projection: eastNeighbour(550) },
+    ]);
+    // THE POINT OF THE PIECE: ground that was not there is there.
+    expect(heightAt(alone, 12000, 0)).toBeNull();
+    expect(heightAt(composed, 12000, 0)?.height).toBeCloseTo(0.55, 12);
+    // AND THE POINT OF DOING IT THIS WAY: a pose that does not depend on how much world came with
+    // it. Taking the centre or the stance from the composed extent would move both half a tile east
+    // the moment a neighbour loaded, and a frame would be captured from a pose nobody chose.
+    expect(composed.start).toEqual(alone.start);
+    expect(composed.world.centre).toEqual(alone.world.centre);
+    expect(heightAt(composed, 1000, 1000)?.height).toBe(heightAt(alone, 1000, 1000)?.height);
+  });
+
+  it('is exactly its tiles added up, which is the count that can fail', () => {
+    const own = envelope(150);
+    const east = eastNeighbour(550);
+    const support = composedSupport([
+      { tile: 'the tile', projection: own },
+      { tile: 'the tile east', projection: east },
+    ]);
+    // A held digest passes if nothing was composed at all. This cannot.
+    expect(support.tiles.map((tile) => tile.stated)).toEqual([own.header.triangle_count, east.header.triangle_count]);
+    expect(support.tiles.reduce((total, tile) => total + tile.walkable, 0)).toBe(support.triangles);
+    expect(support.triangles).toBe(navEnvelopeSupport(own).triangles + navEnvelopeSupport(east).triangles);
+    expect(support.extent.max[0]).toBe(16000);
+  });
+
+  it('reaches over the neighbour, so a step past the edge is ground and not a recovery', () => {
+    const alone = tileNavigation(envelope(150), extent, CITY_V2_CAPSULE);
+    // The neighbour meets the ramp's top, since this test is about the edge of the world and not
+    // about the step limit: 540 mm of ramp against a 550 mm slab is a 10 mm step, which is ground.
+    const composed = tileNavigation(envelope(150), extent, CITY_V2_CAPSULE, [
+      { tile: 'the tile east', projection: eastNeighbour(550) },
+    ]);
+    // The field is a radius about the tile's own middle, so it is not the composed extent's own
+    // half-diagonal: it has to reach the far corner of a world whose centre it is not.
+    expect(composed.world.fieldRadius).toBeGreaterThan(alone.world.fieldRadius);
+    expect(composed.world.fieldRadius).toBeCloseTo(Math.hypot(16000 - 4000, 4000 - 0) / 1000, 12);
+    const [x, , z] = tileToRenderer(7900, 0, 0);
+    const [ex, , ez] = tileToRenderer(8100, 0, 0);
+    const eye = heightAt(composed, 7900, 0)!.height + 1.62;
+    const step = (navigation: typeof alone) => resolveGroundMovement(navigation.world, {
+      current: atlasVec3(x, eye, z), desired: atlasVec3(ex, eye, ez), lastSafe: atlasVec3(x, eye, z),
+    });
+    expect(step(alone).recovered).toBe(true);
+    expect(step(composed).recovered).toBe(false);
+  });
+
+  it('names a neighbour that held nothing, rather than leaving it out', () => {
+    const empty: DecodedProjection = { ...eastNeighbour(150), index: new Uint32Array([]) };
+    const composed = composedOf(tileNavigation(envelope(150), extent, CITY_V2_CAPSULE, [
+      { tile: 'the tile east', projection: empty },
+    ]).support);
+    expect(composed.tiles.map((tile) => [tile.tile, tile.walkable])).toEqual([['the tile', 6], ['the tile east', 0]]);
+    expect(composed.triangles).toBe(6);
   });
 });
