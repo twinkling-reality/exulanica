@@ -779,9 +779,9 @@ def test_each_closed_field_this_fixture_stamps_is_the_value_it_names():
     MEMBER, `SET[0]` and the named constant are the same value, so no assertion over this fixture
     can tell the two forms apart: it is a fixture whose values make the right answer and the wrong
     answer coincide. The only thing that has ever separated them is a deliberate break with a
-    second entry added, run once and recorded in
-    `docs/artifacts/world-identity/positional-stamp.log.txt`. The gap closes itself on the day a
-    set gains a second member, and that is not the same as being covered now.
+    second entry added, run once against each of two committed trees and recorded in
+    `docs/artifacts/world-identity/positional-stamp.md`. The gap closes itself on the day a set
+    gains a second member, and that is not the same as being covered now.
     """
     assert COORDINATE_UNITS == (WRITTEN_COORDINATE_UNIT,)
     assert OWNERSHIP_RULES == (ANCHOR_FLOOR_DIVISION,)

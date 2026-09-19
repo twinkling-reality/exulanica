@@ -1,4 +1,4 @@
-"""Writes docs/artifacts/world-identity/positional-stamp.log.txt: does a producer name its value?
+"""Does a producer stamp the value it names, or position zero of the admissible set?
 
 Run from the repository root, on a COMMITTED tree, naming the arm AND the commit it is:
 
@@ -80,7 +80,7 @@ def git(*arguments: str) -> str:
 def stamped() -> dict[str, str]:
     """What each producer writes, asked in a child process so this one holds no stale import."""
     probe = (
-        "import json, sys;"
+        "import json, os, sys;"
         "sys.path.insert(0, 'tests');"
         "from exulanica.grammar.grammars.city.generation import tiles as g;"
         "from exulanica.grammar.grammars.city.catalogs import load_city_catalogs;"
@@ -89,7 +89,12 @@ def stamped() -> dict[str, str]:
         "f = builder();"
         "r = g.tile_record(seed='0'*64, catalogs=load_city_catalogs(), tile_x=0, tile_y=0, lod=0);"
         "print(json.dumps({"
-        "'module': t.__file__,"
+        # RELATIVE, and the relativising is what is being asserted. The module a probe resolved is
+        # the fact worth keeping, because a worktree can shadow another checkout's package and the
+        # reading would then be about the wrong tree. WHERE THAT TREE SITS ON THIS DISK IS NOT PART
+        # OF WHAT THIS EVIDENCE PROVES: it is a fact about the machine, it goes stale the moment
+        # anything moves, and it carries a person's home directory into a retained record.
+        "'module': os.path.relpath(t.__file__, os.getcwd()),"
         "'admissible_units': list(t.COORDINATE_UNITS),"
         "'generator_unit': r.coordinate_unit,"
         "'generator_ownership': r.ownership_rule,"
