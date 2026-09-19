@@ -57,10 +57,15 @@ pytestmark = pytest.mark.postgres
 WORLDS = "/world-generation/worlds"
 GRAMMARS = "/world-generation/grammars"
 
-#: A five by one tile city that GENERATES, measured rather than assumed: every value here is either
-#: one of the seven a world cannot be asked for without, or the block depth that keeps the street
-#: count inside the six ``local_street`` names the catalog holds. Five tiles, so a charge of five is
-#: distinguishable from the one a generic route charges per request.
+#: A five by one tile city that GENERATES, measured rather than assumed: every value here is one of
+#: the seven a world cannot be asked for without, plus a block depth that lets it through. Five
+#: tiles, so a charge of five is distinguishable from the one a generic route charges per request.
+#:
+#: The depth is NOT justified here by a count of street names. It was, and that was a claim about a
+#: catalog's current contents sitting in a test that does not depend on it: the same sentence would
+#: have gone false when the street-name catalog grew. What this constant needs to be true is only
+#: that the specification generates, which every test using it would fail to establish if it did
+#: not.
 FIVE_TILES = {
     "driving_side": "right",
     "city_extent_x_mm": 640_000,
@@ -285,11 +290,20 @@ def test_the_cascade_s_refusal_survives_the_trip_through_http(asking, what, body
 def test_a_stage_s_refusal_survives_too_even_though_it_names_no_parameter(asking):
     """A value inside its declared range, refused later by a stage. Measured, not hypothesised.
 
-    ``block_length_mm`` is declared [60000, 250000]. Short blocks lay more cross streets than the
-    six ``local_street`` names ``assets/catalogs/street-name.v1.json`` holds, and the refusal that
-    produces is an ``InvalidRecordError`` whose message names no parameter at all. That is why this
-    route generates inside the request instead of resolving and stopping: the caller meets this
-    from the thing it called rather than later from a component it did not.
+    A district 128000 mm deep cannot hold a block between four streets when ``block_depth_mm`` is
+    at the maximum it declares, and the refusal the streets stage makes NAMES NO PARAMETER. That is
+    why this route generates inside the request instead of resolving and stopping: the caller meets
+    this from the thing it called rather than later from a component it did not.
+
+    THE ASSERTION IS THE PROPERTY, NOT THE SENTENCE. Two earlier versions of this test pinned a
+    particular message, the street-name catalog running dry and then a rooftop clearance bound, and
+    both were examples rather than facts: the first stopped happening when the catalog grew from 6
+    names to 105, and the second is parked for city grammar v4 and will stop happening when the
+    bound is widened. A test pinned to whichever generation defect is currently outstanding breaks
+    once per fix and teaches nobody anything. So this asserts that the refusal names NONE of the
+    parameters the caller bound, which is the thing the route's design rests on, and it holds
+    whatever words the stage chooses. The value is read off the catalog rather than typed, so
+    narrowing the declared range moves the test with it.
 
     AND THE FIVE TILES ARE SPENT, which is asserted rather than left implicit. It is the opposite of
     what the four cascade refusals above assert, and both are deliberate: resolution happens before
@@ -298,11 +312,19 @@ def test_a_stage_s_refusal_survives_too_even_though_it_names_no_parameter(asking
     tile is materialised and not refunded when materialisation fails", and a test that did not pin
     it would let a later refactor add a refund nobody decided on.
     """
+    deepest = _published(asking)["block_depth_mm"]["maximum"]
+    assert deepest is not None
+    stated = {**FIVE_TILES, "block_depth_mm": deepest}
     before = asking.used("asker")
-    answer = asking.ask("asker", _city({**FIVE_TILES, "block_length_mm": 60_000}))
+    answer = asking.ask("asker", _city(stated))
     assert answer.status_code == 422, answer.text
     assert answer.json()["code"] == "invalid_record"
-    assert "local_street" in answer.json()["detail"]
+    detail = answer.json()["detail"]
+    named = sorted(name for name in stated if name in detail)
+    assert not named, (
+        f"this refusal names {named}, so it is no longer an example of a stage refusing without "
+        f"telling the caller which value to change: {detail!r}"
+    )
     assert asking.used("asker") == before + 5
 
 
