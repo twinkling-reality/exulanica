@@ -382,6 +382,51 @@ users to avoid personal information in queries. Source: https://www.tavily.com/p
 **DECISION.** Tavily queries are server-constructed, opt-in, and never carry personal content from
 the corpus.
 
+### 2.6 A fallback that is not a model has no slot. NOTHING DECIDED.
+
+**VERIFIED, 2026-09-19, by the society decision lane.** Every `fallback` value in
+`exulanica/models/models.manifest.json` is either another Token Factory identifier or `null`, and `parse_manifest`
+enforces both directions: a fallback must resolve to a model entry, and every member of `Role` must
+be bound. So a role whose fallback is a **deterministic function** rather than a model cannot be
+expressed. This is a fact about the manifest's design and it outlives the experiment that found it.
+
+It came up because the living society's chooser, `society_living._choose`, is exactly such a
+fallback: the thing that answers when no model does. Section 2.4's hole is the neighbouring case,
+a role with no same-tier model to fall back to; this one is a role whose correct fallback is not a
+model at all.
+
+**WHAT IT WOULD COST, measured by reading the readers rather than estimating.** Three of them
+dereference `binding.primary.model_id` for every member of `Role`, so a role with no model primary
+breaks all three:
+
+| Reader | Line | What breaks |
+| --- | --- | --- |
+| `exulanica/api/routes/health.py` | 229 | `{str(role): manifest[role].primary.model_id for role in Role}` raises inside the try, so the endpoint reports the whole application unable to name a model |
+| `exulanica/evaluation/provenance.py` | 114 | `model_snapshot` raises, and it is what every retained archive stores as its model provenance |
+| `exulanica/models/preflight.py` | 149, 189 | both match `spec.model_id` across `binding.chain`, and a chain member that is not a model has none |
+
+Plus `parse_manifest`'s primary-must-exist rule, `RoleBinding.chain`, `RoleBinding.min_max_tokens`,
+and four tests in `tests/test_models_manifest.py`.
+
+**THREE SHAPES.**
+
+1. **A null primary with a deterministic fallback.** Breaks all of the above, and destroys an
+   invariant that currently holds everywhere: that `primary.model_id` exists for every role. Not
+   recommended.
+2. **A separate section beside `local_roles`,** read by its own loader, which `parse_manifest`
+   already ignores exactly as it ignores `local_models`. No change to any existing reader, to
+   `Role`, to the preflight, or to those four tests. Recommended if anything is ever needed,
+   and it is consistent rather than a widening: `local_roles` declares `null` to mean *refuse
+   rather than substitute a model*, so a fallback that is not a model is a family this file has.
+3. **No manifest change; the seam names its own binding in code.** Then removing an experiment is
+   a code edit rather than a manifest edit, which was the property worth having.
+
+**NOTHING LANDED AND NO ADR WAS WRITTEN,** deliberately. The seam in
+`exulanica/world/society_choice.py` works today with no manifest change; the row would buy exactly
+one property, that removal is a one-line edit, and there is nothing to remove. An ADR for a row
+with nothing to put in it records a decision ahead of its evidence. This section exists so that
+whoever does need the row finds the analysis already done.
+
 ---
 
 ## 3. The 2026-08-31 deprecation
