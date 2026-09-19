@@ -231,3 +231,51 @@ existed anywhere.
 exactly, and a reader who had seen only those would reasonably conclude a container has one origin.
 Each projection states its own, and code that places drawn geometry must take the origin of the
 projection it is drawing. Found by adding the fifth tile to a measurement that had four.
+
+## The drawing path against the real street, and the two figures it settles
+
+Run 2026-09-19 with these containers: tile (2,0) loaded as the drawn tile with (1,0) and (3,0) as
+its neighbours, through `loadGeneratedTile` and the committed texture library. This exercises
+LOADING and not a frame: nothing was attached, no mesh was built and no pixel was drawn.
+
+    worldTiles          all three drawn and stood on
+    own tile's ranges   610 listed, 527 drawn, 56,388 triangles, which is the DRAWN TILE ALONE
+    stated triangles    own 56,388, (1,0) 52,366, (3,0) 57,132, sum 165,886
+    texture sets        13 distinct, 13 requests, for three tiles
+    composed ground     313,165 triangles = 96,745 + 121,530 + 94,890 exactly
+    obstruction rings   508 composed and deduplicated across the three, 0 refused
+
+**DRAWING THE NEIGHBOURS COSTS NO BYTES, MEASURED ON BOTH TREES RATHER THAN DERIVED.** The same
+world loaded on main `bfa398cb`, where a neighbour is read for navigation and never drawn, and on
+this lane at `014db258`, where all three are drawn:
+
+    tree bfa398cb   tiles drawn 1   transferredBytes 102,625,116
+    tree 014db258   tiles drawn 3   transferredBytes 102,625,116
+
+Identical. The container is 12,682,860 of that and the rest is the thirteen texture sets, which are
+the same thirteen whether one tile is drawn or three, because neighbouring tiles of one city draw
+one street with one set of materials. Each arm REFUSES TO RUN unless the tree it imports from is at
+the sha it was told to measure and is clean, and it writes nothing into either tree, because a
+control that labels its arms rather than asserting them measured one tree twice in this project on
+2026-09-18 across ten consistent green runs. Both refusals fired on the first attempt, one because
+main had moved under me and one because my own probe file had made the worktree dirty.
+
+**AND THE TIME IS NOT A MEASUREMENT OF THIS CHANGE, WHICH IS WHY IT IS REPORTED RATHER THAN
+QUOTED.** Two runs on each arm:
+
+    bfa398cb   120,209 ms   111,750 ms      and a later single run at 82,035 ms
+    014db258    98,976 ms    83,225 ms      and a later single run at 84,221 ms
+
+The AFTER arm is faster than the BEFORE arm on every pairing, which cannot mean that drawing three
+tiles is cheaper than drawing one. The spread within one arm is larger than the difference between
+them, so this instrument cannot resolve the change at all, and there is a structural reason it never
+could: the load is `verifyOwd` REBAKING three containers totalling 36.6 MB from their own records
+and comparing every byte, which both arms pay in full, while the work this change adds at load is
+planning about 6,700 more entries, and the work it adds at DRAW time is in `attach`, which this
+probe never calls. One tile alone loaded in 20,540 ms against 87,744 ms for three, which is the
+verification and not the drawing.
+
+  WHAT THE FRAME COSTS IS A THIRD QUANTITY AND NOBODY HAS MEASURED IT. Bytes fetched, bytes decoded
+  and verified, and triangles submitted per frame are three populations. This section settles the
+  first at 102,625,116 for a three tile world, states the second as the thing the wall clock is
+  actually reporting, and leaves the third to a run that opens a browser.
