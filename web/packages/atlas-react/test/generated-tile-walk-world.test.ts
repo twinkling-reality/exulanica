@@ -9,7 +9,7 @@
 import { webcrypto } from 'node:crypto';
 import { readFileSync } from 'node:fs';
 import { beforeAll, describe, expect, it } from 'vitest';
-import { bakeTile } from '@exulanica/loom-tess/core';
+import { bakeTile, decodeOwd } from '@exulanica/loom-tess/core';
 import {
   BAKED_TILE_MEDIA_TYPE,
   TileRouteRefusal,
@@ -234,6 +234,28 @@ describe('the obstacles of a world of several tiles', () => {
 
   const massing = (identity: string, sha256: string) => ({ kind: 'city.massing', identity, sha256: sha256.padEnd(64, '0') });
 
+  let container: Uint8Array;
+  beforeAll(async () => {
+    const hash = async (bytes: Uint8Array): Promise<string> => {
+      const hashed = await digest.digest('SHA-256', bytes);
+      return [...new Uint8Array(hashed)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+    };
+    container = (await bakeTile(new Uint8Array(readFileSync('packages/loom-tess/test/fixtures/tile-conformance.json')), hash)).container;
+  }, 60_000);
+
+  it('says which tile stated every ring, on rings a real container really makes', () => {
+    const composed = composedObstructionRings([{ tile: 'the tile', header: decodeOwd(container).header }]);
+    expect(composed.rings.length).toBeGreaterThan(0);
+    expect([...new Set(composed.rings.map((ring) => ring.statedBy))]).toEqual(['the tile']);
+  });
+
+  /**
+   * WHAT THIS FILE CANNOT COVER, said here rather than left looking covered. The RUNTIME composing a
+   * neighbour's records into the set is not exercised anywhere in this repository: it commits one
+   * container, and a second tile's bytes would have to be baked, so a neighbour either duplicates
+   * this one (and is correctly deduplicated to nothing) or fails verification. The live route test
+   * is what exercises it, against a store that holds real neighbours.
+   */
   it('keeps one copy of a building two tiles both state, and says nothing disagreed', () => {
     // The ordinary case: a tile's HALO copy and its neighbour's OWNED copy are the same bytes.
     const composed = composedObstructionRings([
