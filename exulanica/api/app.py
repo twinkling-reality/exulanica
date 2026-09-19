@@ -85,6 +85,7 @@ from exulanica.api.routes import (
     society_district,
     tiles,
     world,
+    world_generation,
     world_read,
     world_write,
 )
@@ -97,6 +98,12 @@ from exulanica.errors import (
     EpistemicViolation,
     IntegrityError,
     TombstonedError,
+)
+from exulanica.grammar.errors import (
+    GrammarError,
+    InvalidParameterError,
+    InvalidRecordError,
+    UnregisteredGrammarError,
 )
 from exulanica.identity.subjects import (
     AlreadyIdentified,
@@ -252,6 +259,7 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(interaction.router)
     app.include_router(world_read.router)
     app.include_router(world_write.router)
+    app.include_router(world_generation.router)
     # After the last router and before the application is handed to anybody: a route nobody
     # declared, or a declaration for a route that is gone, is a build failure with its name in it.
     require_complete_declaration(app)
@@ -415,5 +423,63 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     @app.exception_handler(WorldNotConfigured)
     async def _world_not_configured(_request: Request, exc: WorldNotConfigured) -> JSONResponse:
         return _problem(409, "world_not_configured", str(exc))
+
+    # -- the generator's refusals ----------------------------------------------------------
+    #
+    # A REFUSAL IS THE FEATURE HERE, not a side effect. The cascade in
+    # exulanica.grammar.parameters refuses an unknown parameter, an unknown level, a second
+    # binding at one level and a value outside its declared range rather than ignoring any of
+    # them, and each refusal names the parameter and says what was wrong with it. Before these
+    # handlers existed nothing in this map mentioned any member of exulanica.grammar.errors and
+    # there is no catch-all, so every one of those refusals reached a client as a bare 500
+    # carrying none of it. That was a missing check rather than a wrong line: thirty-odd
+    # handlers and no gap anybody could read, visible only by asking what happens to a class
+    # nobody listed.
+    #
+    # THE LINE IS THE ONE exulanica.grammar.errors ALREADY DRAWS, in its own words: "the
+    # difference between them is the difference between a caller's mistake and a data file's".
+    # Mapping the base class alone would collapse the two and answer 422 for a broken reviewed
+    # catalog, telling a caller to fix a request they got right.
+    #
+    # WHICH SIDE OF THAT LINE A CLASS FALLS ON DEPENDS ON WHAT A REQUEST CAN REACH, so it is
+    # decided per class and not per hierarchy. InvalidSeedError is the example worth keeping:
+    # it looks like a caller's mistake and is not one here, because
+    # exulanica.api.routes.world_generation DERIVES the seed from the specification and no route
+    # accepts one. A seed this codebase built and cannot parse is this codebase's fault, so it
+    # falls through to the 500 below rather than getting a 422 of its own.
+    @app.exception_handler(InvalidParameterError)
+    async def _invalid_parameter(_request: Request, exc: InvalidParameterError) -> JSONResponse:
+        # 422 rather than 400: the request parsed and the specification it carried is the problem.
+        # The message is passed through verbatim because it already names the parameter, the value
+        # and the bound or level that refused it. Anything summarised here would be a second
+        # statement of the same fact, free to drift from the one the cascade makes.
+        return _problem(422, "invalid_parameter", str(exc))
+
+    @app.exception_handler(InvalidRecordError)
+    async def _invalid_record(_request: Request, exc: InvalidRecordError) -> JSONResponse:
+        # A stage refused what it was asked to emit, and a caller CAN reach this: measured on
+        # 15e8198c, block_length_mm at 90000 mm is inside its declared [60000, 250000] and asks
+        # for more cross streets than the street-name catalog has local_street names. That
+        # refusal names no parameter, which is exactly why its own words have to survive.
+        return _problem(422, "invalid_record", str(exc))
+
+    @app.exception_handler(UnregisteredGrammarError)
+    async def _unknown_grammar(_request: Request, exc: UnregisteredGrammarError) -> JSONResponse:
+        # 422 and not the 404 an unknown id gets. The rule this map follows for 404 is about not
+        # being an existence oracle for another tenant's rows; the grammar registry is identical
+        # for every caller and holds no workspace's data, so naming a grammar that is not
+        # registered leaks nothing. It is also NOT a 500: the id and version came from the body.
+        return _problem(422, "unknown_grammar", str(exc))
+
+    @app.exception_handler(GrammarError)
+    async def _grammar(_request: Request, exc: GrammarError) -> JSONResponse:
+        # The base class last, and it is the reason a future member of this hierarchy cannot go
+        # quiet. CatalogError and UnresolvedReferenceError arrive here, which is correct and is
+        # the whole point of the split: reviewed data that breaks its own schema is loud and is
+        # not the caller's fault, because no request can reach a catalog file. So is
+        # InvalidSeedError, for the reason given above, and so is any class added later, which
+        # arrives carrying its own words and its own class name instead of an empty 500, so the
+        # mapping it deserves can be decided from a real answer rather than guessed.
+        return _problem(500, f"grammar_refusal_{type(exc).__name__}", str(exc))
 
     return app

@@ -142,6 +142,14 @@ SELF_CHARGING_TILE_ROUTES: Final[Mapping[tuple[str, str], str]] = MappingProxyTy
             "migration 0072's ledger spends one tile the first time a workspace is served one, in "
             "the same statement as the delivery row; a reload of a tile already delivered is free"
         ),
+        ("POST", "/world-generation/worlds"): (
+            "one request covers every tile of the world it specifies, up to the 16 by 16 the "
+            "declared extent range allows, so it charges one tile per tile it covers, counted "
+            "from the resolved extents before a record is made. AN OPEN QUESTION RIDES WITH "
+            "THIS ENTRY: a route that BAKES a generated city does not exist yet, and when one "
+            "lands it has to decide whether it charges again for a tile whose generation was "
+            "already charged here. Deciding it now would be deciding it without the route"
+        ),
     }
 )
 
@@ -378,6 +386,12 @@ ROUTE_RULES: Final[Mapping[tuple[str, str], Public | Authentication | Requires]]
         ("GET", _APPEARANCE): _WORLD_READ,
         ("GET", _APPEARANCE + "/history"): _WORLD_READ,
         ("GET", _APPEARANCE + "/families"): _WORLD_READ,
+        # -- asking for a generated world, and the parameters one can be asked for by -----
+        # The catalog is a read of declared data and materialises nothing, so it is a world read
+        # like the style catalog beside it. The generation route is metered instead: it is the
+        # first route whose cost scales with what the caller asked for.
+        ("GET", "/world-generation/grammars"): _WORLD_READ,
+        ("POST", "/world-generation/worlds"): _TILES,
         # -- baked tiles of a generated city -----------------------------------------------
         ("GET", "/tiles"): _TILES,
         ("GET", "/tiles/{baked_tile_id}/bytes"): _TILES,

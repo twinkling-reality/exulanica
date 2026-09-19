@@ -87,6 +87,12 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
         "json": {"base_revision": 0, "base_tick": 0, "base_state_sha256": "0" * 64}
     },
     ("GET", "/world/versions/{version_id}/society/control/events"): {},
+    ("GET", "/world-generation/grammars"): {},
+    # Enough of a specification to reach the permission floor, which is all this sweep asks of
+    # it. What the route does with a body it accepts is tests/test_world_generation_route.py.
+    ("POST", "/world-generation/worlds"): {
+        "json": {"grammar_id": "city", "grammar_version": 3, "bindings": []}
+    },
     ("GET", "/graph"): {},
     ("GET", "/graph/sources"): {},
     ("POST", "/environment-resources/sources"): {"json": {}},
