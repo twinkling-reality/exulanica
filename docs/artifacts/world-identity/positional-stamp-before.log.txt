@@ -1,7 +1,7 @@
 # Does a producer stamp the value it names, or position zero of the admissible set?
 
 arm             before
-commit          0a7cda92
+commit          0e49b7aa
 tile.py before  1fea34f9f575ecbd8579a173bd53e32154fd43028709f3b2a45385ff4cd20eb7
 anchors applied COORDINATE_UNITS, OWNERSHIP_RULES, HALO_RULES
 
@@ -13,7 +13,7 @@ anchors applied COORDINATE_UNITS, OWNERSHIP_RULES, HALO_RULES
   generator_halo         extent_meets_grown_square
   generator_ownership    anchor_floor_division
   generator_unit         millimetre
-  module                 /Users/glendonchin/dev/Technology/exulanica-world-identity/exulanica/grammar/grammars/city/tile.py
+  module                 exulanica/grammar/grammars/city/tile.py
 
 ## with a second entry admitted, first in each tuple
   admissible_units       ['nanolitre', 'millimetre']
@@ -23,7 +23,7 @@ anchors applied COORDINATE_UNITS, OWNERSHIP_RULES, HALO_RULES
   generator_halo         by_vibe
   generator_ownership    by_lottery
   generator_unit         nanolitre
-  module                 /Users/glendonchin/dev/Technology/exulanica-world-identity/exulanica/grammar/grammars/city/tile.py
+  module                 exulanica/grammar/grammars/city/tile.py
 
 ## the restored tree, printed rather than trusted
   tile.py after        1fea34f9f575ecbd8579a173bd53e32154fd43028709f3b2a45385ff4cd20eb7

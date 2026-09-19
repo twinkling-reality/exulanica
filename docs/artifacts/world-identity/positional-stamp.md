@@ -32,8 +32,16 @@ consistent green runs out of one tree measured twice. The two arms are provably 
 they carry different commits AND different `tile.py` digests, both printed.
 
     arm      commit     tile.py digest
-    before   0a7cda92   1fea34f9f575ecbd8579a173bd53e32154fd43028709f3b2a45385ff4cd20eb7
-    after    e7123589   9c6ed93c8db347686853140c6b753449fffd26c15d034f7f3cf1f37a02e10aa6
+    before   0e49b7aa   1fea34f9f575ecbd8579a173bd53e32154fd43028709f3b2a45385ff4cd20eb7
+    after    6187b72f   9c6ed93c8db347686853140c6b753449fffd26c15d034f7f3cf1f37a02e10aa6
+
+Both arms were RE-TAKEN after the first pair, because the probe had printed the module's absolute
+path and a path a run chose is a fact about the machine rather than about the work. The fix is in
+the script, which now reports the module relative to the repository root, rather than in somebody
+remembering to strip it; the logs were re-run rather than edited, because editing a log makes it a
+record of nothing. The module line is kept because a worktree can shadow another checkout's
+package and the reading would then be about the wrong tree. Every value below came back identical
+across the two pairs.
 
 With `nanolitre`, `by_lottery` and `by_vibe` admitted first:
 
