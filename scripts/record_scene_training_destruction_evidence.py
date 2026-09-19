@@ -46,8 +46,9 @@ WORKER = "exulanica/deletion/worker.py"
 QUEUE = "exulanica/deletion/queue.py"
 ROLES = "exulanica/db/roles.py"
 
-#: The predecessor this work continues: the right itself, whose withdrawal stopped at a refusal.
-PREDECESSOR = "docs/evaluation/2026-09-18-scene-training-right-v3.json"
+#: The predecessor this work continues. v1 of this record named the right itself; v2 names v1,
+#: because v1 bound a test file digest that moved when one over-specific assertion was replaced.
+PREDECESSOR = "docs/evaluation/2026-09-19-scene-training-destruction.json"
 
 #: One break each, applied alone to a committed tree, with the test that CLAIMS the property it
 #: removes. ``expect`` is compared by identity by the tool, so a neighbouring test failing instead
@@ -208,7 +209,12 @@ def predecessor_binding() -> dict:
     return {
         "path": PREDECESSOR,
         "record_sha256": hashlib.sha256(canonical_json(document["record"])).hexdigest(),
-        "why": "the right whose withdrawal stopped at a refusal; this is the destruction it named",
+        "why": (
+            "v1 of this record, taken before one assertion in the test file was replaced: it "
+            "pinned which of two missing grants an unprovisioned purge role hits first, which "
+            "turned out to depend on whether an offline restore replay had run in the same "
+            "process. v1 itself names the right whose withdrawal stopped at a refusal."
+        ),
     }
 
 
