@@ -79,6 +79,15 @@ import {
  * exists, so an attached tile is complete on its first frame.
  */
 
+/** One container of a tile's world, and the two things this runtime may have used it for. */
+export interface WorldTile {
+  readonly name: string;
+  /** Its own records reached the scene. */
+  readonly drawn: boolean;
+  /** Its `nav_envelope` reached the surface a person stands on. */
+  readonly stoodOn: boolean;
+}
+
 /** A surface whose material is `none-exists`: no surface_material record dresses its record's role. */
 export const MATERIAL_NONE_EXISTS_REASON = 'No surface_material record dresses this surface: the tile states that none exists.';
 export const MATERIAL_PLACEMENT_UNSTATED =
@@ -182,7 +191,22 @@ export interface LoadedGeneratedTile extends GeneratedTileMount {
    * because a set that quietly got smaller is the thing nobody notices.
    */
   readonly routeObstructions: ObstructionRings;
-  /** The tile's bytes and every texture set it cites. */
+  /**
+   * EVERY CONTAINER OF THIS TILE'S WORLD AND WHAT THE RUNTIME DID WITH EACH, the tile first.
+   *
+   * Two facts about one container, kept apart because they come apart. A container is DRAWN when
+   * its own records reached the scene, and STOOD ON when its `nav_envelope` reached the walkable
+   * surface. Today every neighbour a walk fetches is both, so the difference is empty; the day a
+   * caller serves a neighbour's navigation sections alone, measured at 1,969,322 bytes against
+   * 11,630,504 for the container, it will be stood on and not drawn. A reader takes the difference
+   * rather than being handed a field that has to be renamed when it stops being true.
+   *
+   * IT IS DERIVED FROM THE TWO COLLECTIONS THE RUNTIME ACTUALLY BUILT, not from one list rendered
+   * twice: a statement whose halves come from one source cannot disagree, and cannot therefore say
+   * anything.
+   */
+  readonly worldTiles: readonly WorldTile[];
+  /** The tile's bytes and every texture set THE WORLD cites, fetched once between all of them. */
   readonly transferredBytes: number;
   /** The record a render_batch triangle belongs to. */
   rangeAtTriangle(triangle: number): DrawnTileRange | null;
@@ -608,6 +632,13 @@ export async function loadGeneratedTile(sources: GeneratedTileSources): Promise<
     capsule,
     neighbours,
   );
+  // WHAT WAS DRAWN COMES FROM `planned`, which is the list `attach` draws, and WHAT WAS STOOD ON
+  // comes from the navigation's own account of the envelopes it composed. Two collections, each
+  // built by the step it describes.
+  const stoodOn = new Set(navigation.viewpointOnly ? [] : [sources.name, ...neighbours.map((one) => one.tile)]);
+  const worldTiles: readonly WorldTile[] = Object.freeze(planned.map((one) => ({
+    name: one.name, drawn: true, stoodOn: stoodOn.has(one.name),
+  })));
   const drawn = ranges.filter((range): range is DrawnTileRange => range.state === 'drawn')
     .sort((a, b) => a.firstTriangle - b.firstTriangle);
   const vertices = absoluteVertices(render);
@@ -635,6 +666,7 @@ export async function loadGeneratedTile(sources: GeneratedTileSources): Promise<
     ranges,
     navigation,
     routeObstructions: rings,
+    worldTiles,
     navigationWorld: navigation.world,
     start: navigation.start,
     transferredBytes: sources.bytes.byteLength + setBytes,

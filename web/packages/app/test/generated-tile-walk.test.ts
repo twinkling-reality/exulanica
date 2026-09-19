@@ -23,6 +23,7 @@ import {
   prepareGeneratedTileEvaluation,
   worldLine,
 } from '../src/composition/generated-tile.js';
+import type { LoadedGeneratedTile } from '@exulanica/atlas-react/generated-tile';
 import type { AppEnvironment } from '../src/composition/session-state.js';
 
 // Relative to web/, where the suite runs.
@@ -322,31 +323,53 @@ describe('walking a tile fetched from the product route', { timeout: 30_000 }, (
     const request = bakedTileRequest(`?preview=1&city=${CITY}&tile_x=0&tile_y=0`, true);
     const element = shell();
     await prepareBakedTileWalk({ shell: element, preview: true } as unknown as AppEnvironment, request!);
+    // TWO SETS AND THE DIFFERENCE IS THE READER'S. Both hold the one container here, because a walk
+    // draws every neighbour it stands on; a container that were ever ground with no street would be
+    // in `stoodOn` and not in `drawn`, and nothing about this shape would have to be renamed to say
+    // so. `opensOn` is the one the frames are OF, which neither set carries.
     expect(JSON.parse(element.getAttribute(GENERATED_TILE_WORLD_ATTRIBUTE)!)).toEqual({
       reach: 'unstated',
-      drawnAndStoodOn: { name: KEY, containerSha256: goldenSha256 },
-      stoodOnOnly: [],
-      transferredBytes: 0,
+      opensOn: { tile: KEY, tileX: 0, tileY: 0, containerSha256: goldenSha256 },
+      drawn: [{ tile: KEY, tileX: 0, tileY: 0, containerSha256: goldenSha256 }],
+      stoodOn: [{ tile: KEY, tileX: 0, tileY: 0, containerSha256: goldenSha256 }],
+      neighbourTransferredBytes: 0,
       absent: [],
     });
   });
 
-  it('says which containers were drawn and which were only stood on, and names the squares with no ground', () => {
-    const composed = worldLine({
+  it('says which containers were drawn and which were ground with no street, and names the squares with no ground', () => {
+    const fetched = {
       neighbours: [
         { name: 'tile (1,0)', tileX: 1, tileY: 0, bytes: new Uint8Array(), containerSha256: 'aaaa1111'.padEnd(64, '0'), transferredBytes: 12 },
         { name: 'tile (3,0)', tileX: 3, tileY: 0, bytes: new Uint8Array(), containerSha256: 'bbbb2222'.padEnd(64, '0'), transferredBytes: 34 },
       ],
       transferredBytes: 46,
       absent: [{ tileX: 1, tileY: 1, reason: 'no_row' }, { tileX: 2, tileY: 1, reason: 'nondeterminism_detected' }],
-    }, 'the-drawn-tile');
-    expect(composed).toContain('World: 3 containers');
-    expect(composed).toContain('Drawn and stood on: the-drawn-tile');
-    expect(composed).toContain('STOOD ON ONLY, never drawn: tile (1,0) aaaa1111, tile (3,0) bbbb2222');
-    expect(composed).toContain('46 bytes fetched for them');
+    };
+    const loaded = (worldTiles: { name: string; drawn: boolean; stoodOn: boolean }[]) =>
+      ({ name: 'the-drawn-tile', worldTiles } as unknown as LoadedGeneratedTile);
+    const composed = worldLine(fetched, loaded([
+      { name: 'the-drawn-tile', drawn: true, stoodOn: true },
+      { name: 'tile (1,0)', drawn: true, stoodOn: true },
+      { name: 'tile (3,0)', drawn: true, stoodOn: true },
+    ]));
+    expect(composed).toContain('World: 3 containers, opening on the-drawn-tile');
+    expect(composed).toContain('Drawn and stood on: the-drawn-tile, tile (1,0) aaaa1111, tile (3,0) bbbb2222');
+    expect(composed).toContain('None is ground without a street.');
+    expect(composed).toContain('46 bytes fetched for the neighbours');
     // The two absences are different facts and the line keeps them apart.
     expect(composed).toContain('No ground within reach at: (1,1) no_row, (2,1) nondeterminism_detected.');
-    expect(worldLine(null, 'the-drawn-tile')).toContain('World: this one tile');
+    expect(worldLine(null, loaded([]))).toContain('World: this one tile');
+
+    // AND THE CASE THE DIFFERENCE EXISTS FOR, which no run reaches today and which this line has to
+    // be able to say the moment one does: a neighbour served its ground and not its street.
+    const partial = worldLine(fetched, loaded([
+      { name: 'the-drawn-tile', drawn: true, stoodOn: true },
+      { name: 'tile (1,0)', drawn: true, stoodOn: true },
+      { name: 'tile (3,0)', drawn: false, stoodOn: true },
+    ]));
+    expect(partial).toContain('Drawn and stood on: the-drawn-tile, tile (1,0) aaaa1111.');
+    expect(partial).toContain('STOOD ON AND NOT DRAWN: tile (3,0) bbbb2222.');
   });
 
   it('asks for no neighbour and says the world is one tile when the walk states no reach', async () => {

@@ -49,6 +49,7 @@ export type {
   SurfacePlacement,
   TilePick,
   TileSurfaceBatch,
+  WorldTile,
 } from './tile-runtime.js';
 export {
   GeneratedTileRefusal,

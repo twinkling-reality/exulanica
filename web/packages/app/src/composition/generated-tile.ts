@@ -28,10 +28,11 @@ export const GENERATED_TILE_POSE_ATTRIBUTE = 'data-generated-tile-pose';
 /**
  * WHAT THE WALK'S WORLD IS, AS DATA, for the same reason the opening pose is data: a check that had
  * to parse a sentence would read a reworded line as something it is not, and a record binding
- * several containers must be able to say which was DRAWN and which was only STOOD ON without
- * depending on the wording of the statement beside it. `reach` is `stated` or `unstated`, because a
- * world of one tile because nobody said how far the walk goes is a different fact from a world of
- * one tile because there was nothing within reach.
+ * several containers must be able to say what each one was for without depending on the wording of
+ * the statement beside it. It states `opensOn`, the container the frames are OF, and two SETS,
+ * `drawn` and `stoodOn`; see `stateWorld` for why a set rather than a relationship. `reach` is
+ * `stated` or `unstated`, because a world of one tile because nobody said how far the walk goes is
+ * a different fact from a world of one tile because there was nothing within reach.
  */
 export const GENERATED_TILE_WORLD_ATTRIBUTE = 'data-generated-tile-world';
 
@@ -94,25 +95,70 @@ function openingLine(opening: Opening): string {
   return `Opened at a stated pose: ${xMm}, ${yMm} mm, facing (${facingDx}, ${facingDy})${opening.supported ? '' : ', where the tile states no walkable surface'}.`;
 }
 
-/** The opening as data on the shell: what a check binds, beside the sentence a person reads. */
+/** One container of the world, as a record binds it. Coordinates beside the name, never instead. */
+interface StatedContainer {
+  readonly tile: string;
+  readonly tileX: number;
+  readonly tileY: number;
+  readonly containerSha256: string;
+}
+
+/**
+ * The world as data on the shell: what a check binds, beside the sentence a person reads.
+ *
+ * TWO SETS, AND THE READER TAKES THE DIFFERENCE. `drawn` is every container whose records reached
+ * the frame and `stoodOn` is every container whose ground reached the walkable surface, each
+ * including the tile the walk opens on. They hold the same containers today, because a walk draws
+ * every neighbour it fetches, and the empty difference is therefore something a reader COMPUTES
+ * rather than a field somebody maintains.
+ *
+ * THE FIELD THIS REPLACES NAMED A RELATIONSHIP RATHER THAN A SET. `stoodOnOnly` was correct while
+ * neighbours were composed and never drawn; the moment they are drawn, its own name states
+ * something untrue, into an append-only record. Keeping it and leaving it always empty would have
+ * been worse than renaming it: an empty list reads as a distinction that is tracked and came out
+ * empty, rather than one that is vestigial. The difference will not stay empty for ever. A
+ * neighbour served its navigation sections alone, measured at 1,969,322 bytes against 11,630,504
+ * for its whole container, is ground with no street, and on that day `stoodOn` is a superset of
+ * `drawn` and this shape says so with nothing renamed.
+ *
+ * `opensOn` IS THE FACT NEITHER SET CARRIES. A frame is OF a container and a pose is ON one, and a
+ * reader should not have to take the first entry of a list, which is a position rather than an
+ * identity.
+ */
 function stateWorld(
   env: AppEnvironment,
-  drawn: { readonly name: string; readonly containerSha256: string },
+  opensOn: StatedContainer,
+  tile: LoadedGeneratedTile,
   world: FetchedWalkWorld | null,
 ): void {
-  env.shell.setAttribute(GENERATED_TILE_WORLD_ATTRIBUTE, JSON.stringify({
-    reach: world === null ? 'unstated' : 'stated',
-    drawnAndStoodOn: drawn,
-    // THE COORDINATES, NOT ONLY THE NAME. A reader that had to parse `tile (3,0)` back into numbers
-    // would be parsing a string this file formats, which is the same fault as binding the sentence
-    // one level down.
-    stoodOnOnly: world === null ? [] : world.neighbours.map((neighbour) => ({
+  // THE COORDINATES, NOT ONLY THE NAME. A reader that had to parse `tile (3,0)` back into numbers
+  // would be parsing a string this file formats, which is the same fault as binding the sentence
+  // one level down.
+  const byName = new Map<string, StatedContainer>([[tile.name, opensOn]]);
+  for (const neighbour of world?.neighbours ?? []) {
+    byName.set(neighbour.name, {
       tile: neighbour.name,
       tileX: neighbour.tileX,
       tileY: neighbour.tileY,
       containerSha256: neighbour.containerSha256,
-    })),
-    transferredBytes: world === null ? 0 : world.transferredBytes,
+    });
+  }
+  // THE RUNTIME'S ACCOUNT OF THE WORLD, HELD AGAINST THIS PAGE'S. The runtime says which containers
+  // it drew and stood on; this page says which it fetched. They are two observations of one world
+  // and a name in one and not the other is a world assembled from something nobody asked for.
+  const stated = (one: { readonly name: string }): StatedContainer => {
+    const container = byName.get(one.name);
+    if (container === undefined) {
+      throw new Error(`The runtime says its world holds ${one.name}, which this page did not fetch.`);
+    }
+    return container;
+  };
+  env.shell.setAttribute(GENERATED_TILE_WORLD_ATTRIBUTE, JSON.stringify({
+    reach: world === null ? 'unstated' : 'stated',
+    opensOn,
+    drawn: tile.worldTiles.filter((one) => one.drawn).map(stated),
+    stoodOn: tile.worldTiles.filter((one) => one.stoodOn).map(stated),
+    neighbourTransferredBytes: world === null ? 0 : world.transferredBytes,
     absent: world === null ? [] : world.absent,
   }));
 }
@@ -130,22 +176,30 @@ function stateOpening(env: AppEnvironment, opening: Opening): void {
 /**
  * WHICH CONTAINERS THIS WALK STANDS ON, AND WHICH OF THEM IT DRAWS.
  *
- * Exactly one container is drawn: the tile asked for. Any others are composed into the navigation
- * world and into nothing else, so a reader meeting several digests and a walk that completed can
- * tell what each one was for without remembering the evening it was built. The squares within reach
- * that hold no ground are named for the same reason: they are the edge of the loaded world, not a
- * defect in a street, and a sampler returning nothing there is correct.
+ * Every container within the walk's reach is drawn and stood on, so a camera at the end of a route
+ * looks down a street rather than at the edge of the loaded world. A reader meeting several digests
+ * and a walk that completed can tell what each one was for without remembering the evening it was
+ * built, and a container that were ever stood on and not drawn would be named as such HERE rather
+ * than left to be inferred from a count. The squares within reach that hold no ground are named for
+ * the same reason: they are the edge of the loaded world, not a defect in a street, and a sampler
+ * returning nothing there is correct.
  */
-export function worldLine(world: FetchedWalkWorld | null, drawn: string): string {
+export function worldLine(world: FetchedWalkWorld | null, tile: LoadedGeneratedTile): string {
   if (world === null) {
     return 'World: this one tile. The walk stated no reach, so no neighbouring ground was asked for '
       + 'and the ground ends at this tile\'s own edge.';
   }
-  const stoodOn = world.neighbours.map((tile) => `${tile.name} ${tile.containerSha256.slice(0, 8)}`);
-  const missing = world.absent.map((tile) => `(${tile.tileX},${tile.tileY}) ${tile.reason}`);
-  return `World: ${world.neighbours.length + 1} containers. Drawn and stood on: ${drawn}. `
-    + `STOOD ON ONLY, never drawn: ${stoodOn.length === 0 ? 'none' : stoodOn.join(', ')}, `
-    + `${world.transferredBytes.toLocaleString()} bytes fetched for them. `
+  const named = (one: { readonly name: string }): string => {
+    const digest = one.name === tile.name ? '' : world.neighbours.find((each) => each.name === one.name)?.containerSha256;
+    return digest === undefined || digest === '' ? one.name : `${one.name} ${digest.slice(0, 8)}`;
+  };
+  const drawn = tile.worldTiles.filter((one) => one.drawn).map(named);
+  const groundOnly = tile.worldTiles.filter((one) => one.stoodOn && !one.drawn).map(named);
+  const missing = world.absent.map((each) => `(${each.tileX},${each.tileY}) ${each.reason}`);
+  return `World: ${tile.worldTiles.length} containers, opening on ${tile.name}. `
+    + `Drawn and stood on: ${drawn.join(', ')}. `
+    + `${groundOnly.length === 0 ? 'None is ground without a street.' : `STOOD ON AND NOT DRAWN: ${groundOnly.join(', ')}.`} `
+    + `${world.transferredBytes.toLocaleString()} bytes fetched for the neighbours. `
     + `${missing.length === 0 ? 'Every square within reach has ground.' : `No ground within reach at: ${missing.join(', ')}.`}`;
 }
 
@@ -171,7 +225,7 @@ function statement(
     `${drawn.length} of ${tile.ranges.length} records drawn; ${unavailableSurfaces.length} `
       + `${unavailableSurfaces.length === 1 ? 'surface' : 'surfaces'} drawn as unavailable.`,
     provenanceLine(provenance),
-    worldLine(world, tile.name),
+    worldLine(world, tile),
     openingLine(opening),
     ringLine(tile),
   ];
@@ -198,7 +252,7 @@ export async function prepareGeneratedTileEvaluation(env: AppEnvironment, name: 
   if (!import.meta.env.DEV || !env.preview) {
     throw new Error('A generated tile can be evaluated only on the development preview route.');
   }
-  const [{ loadGeneratedTile, tileToRenderer }, { ambientTextureSetDigest, parseTextureSetManifest }, sources] = await Promise.all([
+  const [{ loadGeneratedTile, tilePlacement, tileToRenderer }, { ambientTextureSetDigest, parseTextureSetManifest }, sources] = await Promise.all([
     import('@exulanica/atlas-react/generated-tile'),
     import('@exulanica/atlas-core'),
     import('../dev/generated-tile-sources.js'),
@@ -228,8 +282,10 @@ export async function prepareGeneratedTileEvaluation(env: AppEnvironment, name: 
   const opening = openTile(tile, pose, tileToRenderer);
   env.shell.append(statement(tile, { kind: 'development', name, containerSha256 }, opening, null));
   // A committed golden has no rows to compose a world from, so its world is this one tile and the
-  // attribute says the reach was never stated rather than leaving a reader to infer it.
-  stateWorld(env, { name: tile.name, containerSha256 }, null);
+  // attribute says the reach was never stated rather than leaving a reader to infer it. It carries
+  // no row either, so its coordinates come from the container's own tile record.
+  const placed = tilePlacement(source.tile);
+  stateWorld(env, { tile: tile.name, tileX: placed.tileX, tileY: placed.tileY, containerSha256 }, tile, null);
   stateOpening(env, opening);
   await (await import('../dev/tile-capture.js')).exposeTileCapture(env.preview, tile);
   return { ...tile, start: opening.start };
@@ -359,7 +415,9 @@ export async function prepareBakedTileWalk(env: AppEnvironment, request: BakedTi
   env.shell.append(statement(tile, {
     kind: 'route', bakedTileId, containerSha256: fetched.containerSha256, origin: fetched.origin,
   }, opening, world));
-  stateWorld(env, { name: tile.name, containerSha256: fetched.containerSha256 }, world);
+  stateWorld(env, {
+    tile: tile.name, tileX: placement.tileX, tileY: placement.tileY, containerSha256: fetched.containerSha256,
+  }, tile, world);
   stateOpening(env, opening);
   await (await import('../dev/tile-capture.js')).exposeTileCapture(env.preview, tile);
   return { ...tile, start: opening.start };
