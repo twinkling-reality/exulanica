@@ -519,9 +519,16 @@ export function checkedWalkWorld(statement, containers, reachWasStated) {
       `${world.reach}`,
     );
   }
-  const stoodOn = world.stoodOnOnly ?? [];
-  const stated = [world.drawnAndStoodOn?.containerSha256, ...stoodOn.map((one) => one.containerSha256)]
-    .filter((digest) => typeof digest === 'string');
+  // TWO SETS, AND THE UNION IS WHAT THIS RUN MUST HAVE READ. `drawn` and `stoodOn` both include
+  // the tile the walk opens on, and they are not two renderings of one list: `drawn` is the
+  // runtime's account of what it planned, `stoodOn` the navigation's account of the envelopes it
+  // composed. Taking `drawn` alone would silently stop covering a tile that is ground with no
+  // street, which is a world the slim navigation slice makes reachable.
+  const drawn = world.drawn ?? [];
+  const stoodOn = world.stoodOn ?? [];
+  const stated = [...new Set(
+    [...drawn, ...stoodOn].map((one) => one.containerSha256).filter((d) => typeof d === 'string'),
+  )];
   const onTheWire = containers.map((container) => container.sha256);
   const missing = stated.filter((digest) => !onTheWire.includes(digest));
   const unstated = onTheWire.filter((digest) => !stated.includes(digest));
@@ -532,22 +539,29 @@ export function checkedWalkWorld(statement, containers, reachWasStated) {
       `${unstated.length} fetched but not stated (${unstated.map((d) => d.slice(0, 16)).join(', ') || 'none'})`,
     );
   }
-  // The page's own byte figure, against the bodies this run actually decoded for those digests.
-  const stoodOnDigests = stoodOn.map((one) => one.containerSha256);
+  // The page's own byte figure, against the bodies this run decoded for those digests. THE FIELD
+  // COUNTS THE NEIGHBOURS ALONE, so the tile the walk opens on is excluded here: `stoodOnOnly` was
+  // neighbours-only by construction and `stoodOn` is not, and summing it whole would compare a
+  // neighbour figure against a world figure. That pair has been reconciled wrongly once already.
+  const opensOnDigest = world.opensOn?.containerSha256;
+  const neighbourDigests = stoodOn
+    .map((one) => one.containerSha256)
+    .filter((digest) => digest !== opensOnDigest);
   const measuredBytes = containers
-    .filter((container) => stoodOnDigests.includes(container.sha256))
+    .filter((container) => neighbourDigests.includes(container.sha256))
     .reduce((sum, container) => sum + container.decodedBytes, 0);
-  if (world.transferredBytes !== measuredBytes) {
+  if (world.neighbourTransferredBytes !== measuredBytes) {
     throw new Halt(
-      `the page states ${world.transferredBytes} bytes for the tiles it only stood on and this run ` +
-      `decoded ${measuredBytes} for them`,
+      `the page states ${world.neighbourTransferredBytes} bytes for the neighbours it stood on and ` +
+      `this run decoded ${measuredBytes} for them`,
     );
   }
   return {
     reach: world.reach,
-    drawnAndStoodOn: world.drawnAndStoodOn ?? null,
-    stoodOnOnly: stoodOn,
-    statedBytes: world.transferredBytes,
+    opensOn: world.opensOn ?? null,
+    drawn,
+    stoodOn,
+    statedBytes: world.neighbourTransferredBytes,
     measuredBytes,
     absent: world.absent ?? [],
     checkedAgainst: 'the containers this run read from the wire',

@@ -435,7 +435,7 @@ def _route_record(tmp_path: Path, tamper: str) -> dict[str, object]:
         "const measured = { field: null, obstacles: 2, routeRings: 2, routeRingsRefused: [], "
         "groundRefused: [], routeGround: null, fieldBoundsCm: null, "
         "horizons: { obstacleBounds: null, groundRadiusM: 7 }, "
-        "walkWorld: { reach: 'stated', stoodOnOnly: [] } };\n"
+        "walkWorld: { reach: 'stated', drawn: [], stoodOn: [] } };\n"
         "try {\n"
         "  const record = harness.routeRecordOf(plan, measured);\n"
         f"  {tamper}\n"
@@ -493,7 +493,7 @@ def test_the_record_carries_what_the_builder_was_handed(tmp_path):
     assert "refused" not in built, built
     record = built["record"]
     assert record["horizons"] == {"obstacleBounds": None, "groundRadiusM": 7}, record
-    assert record["walkWorld"] == {"reach": "stated", "stoodOnOnly": []}, record
+    assert record["walkWorld"] == {"reach": "stated", "drawn": [], "stoodOn": []}, record
 
 
 def test_a_number_dropped_from_the_record_is_refused(tmp_path):
@@ -969,9 +969,17 @@ def _agreeing() -> tuple[dict, list[dict]]:
     """The shape measured from the live page on 2026-09-18, its first populated execution."""
     statement = {
         "reach": "stated",
-        "drawnAndStoodOn": {"name": "503afcb6", "containerSha256": WORLD_DRAWN},
-        "stoodOnOnly": [{"tile": "tile (1,0)", "containerSha256": WORLD_STOOD}],
-        "transferredBytes": 12294368,
+        "opensOn": {"tile": "tile (2,0)", "containerSha256": WORLD_DRAWN},
+        # DRAWN AND STOOD ON ARE TWO SETS AND BOTH CARRY THE TILE THE WALK OPENS ON. This fixture
+        # keeps the case that matters: WORLD_STOOD is stood on and never drawn, which is a tile
+        # served ground with no street, and it is the only reason the union below is not the
+        # drawn list.
+        "drawn": [{"tile": "tile (2,0)", "containerSha256": WORLD_DRAWN}],
+        "stoodOn": [
+            {"tile": "tile (2,0)", "containerSha256": WORLD_DRAWN},
+            {"tile": "tile (1,0)", "containerSha256": WORLD_STOOD},
+        ],
+        "neighbourTransferredBytes": 12294368,
         "absent": [{"tileX": 1, "tileY": -1, "reason": "no_row"}],
     }
     containers = [
@@ -986,8 +994,9 @@ def test_a_world_the_wire_agrees_with_is_bound_with_what_each_container_was_for(
     statement, containers = _agreeing()
     read = _check_world(tmp_path, _world(statement, containers))
     assert "refused" not in read, read
-    assert read["bound"]["drawnAndStoodOn"]["containerSha256"] == WORLD_DRAWN
-    assert [one["containerSha256"] for one in read["bound"]["stoodOnOnly"]] == [WORLD_STOOD]
+    assert read["bound"]["opensOn"]["containerSha256"] == WORLD_DRAWN
+    assert [one["containerSha256"] for one in read["bound"]["drawn"]] == [WORLD_DRAWN]
+    assert [one["containerSha256"] for one in read["bound"]["stoodOn"]] == [WORLD_DRAWN, WORLD_STOOD]
     assert read["bound"]["measuredBytes"] == read["bound"]["statedBytes"]
     assert read["bound"]["absent"] == [{"tileX": 1, "tileY": -1, "reason": "no_row"}]
 
@@ -995,7 +1004,7 @@ def test_a_world_the_wire_agrees_with_is_bound_with_what_each_container_was_for(
 def test_a_container_the_page_names_but_nobody_fetched_is_refused(tmp_path):
     """The page's statement and its prose come from ONE object, so only the wire can refuse this."""
     statement, containers = _agreeing()
-    statement["stoodOnOnly"].append({"tile": "tile (9,9)", "containerSha256": "de" * 32})
+    statement["stoodOn"].append({"tile": "tile (9,9)", "containerSha256": "de" * 32})
     read = _check_world(tmp_path, _world(statement, containers))
     assert "refused" in read, read
     assert "never fetched" in read["refused"], read
@@ -1013,7 +1022,7 @@ def test_a_container_fetched_but_missing_from_the_page_s_world_is_refused(tmp_pa
 def test_a_byte_figure_the_bodies_do_not_support_is_refused(tmp_path):
     """The page counts what it asked for; this run counts what it decoded. They must agree."""
     statement, containers = _agreeing()
-    statement["transferredBytes"] = 26406608
+    statement["neighbourTransferredBytes"] = 26406608
     read = _check_world(tmp_path, _world(statement, containers))
     assert "refused" in read, read
     assert "26406608" in read["refused"] and "12294368" in read["refused"], read
