@@ -1,0 +1,882 @@
+{
+  "schema_version": 1,
+  "grammar_id": "city",
+  "source_version": 2,
+  "target_version": 3,
+  "identity_policy": "preserved",
+  "identity_reason": "Version 3 changes one record shape and no subject rule: every (kind, owner, ordinal) derives the identity version 2 derived for it, so an edit naming a version 2 identity names the same subject here.",
+  "levels": [
+    {
+      "source": "city",
+      "target": "city"
+    },
+    {
+      "source": "district",
+      "target": "district"
+    },
+    {
+      "source": "block",
+      "target": "block"
+    },
+    {
+      "source": "lot",
+      "target": "lot"
+    },
+    {
+      "source": "building",
+      "target": "building"
+    },
+    {
+      "source": "face",
+      "target": "face"
+    }
+  ],
+  "carried": [
+    {
+      "source": "terrain_cell_mm",
+      "target": "terrain_cell_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "terrain_relief_mm",
+      "target": "terrain_relief_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "city_extent_x_mm",
+      "target": "city_extent_x_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "city_extent_y_mm",
+      "target": "city_extent_y_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "block_length_mm",
+      "target": "block_length_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "block_depth_mm",
+      "target": "block_depth_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "storey_band_low",
+      "target": "storey_band_low",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "storey_band_high",
+      "target": "storey_band_high",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "lane_width_mm",
+      "target": "lane_width_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "camber_millionths",
+      "target": "camber_millionths",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "crossing_width_mm",
+      "target": "crossing_width_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "dropped_kerb_upstand_mm",
+      "target": "dropped_kerb_upstand_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "speed_limit_mm_s",
+      "target": "speed_limit_mm_s",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "kerb_height_mm",
+      "target": "kerb_height_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "kerb_width_mm",
+      "target": "kerb_width_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "gutter_width_mm",
+      "target": "gutter_width_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "footway_width_mm",
+      "target": "footway_width_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "footway_crossfall_millionths",
+      "target": "footway_crossfall_millionths",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "corner_radius_mm",
+      "target": "corner_radius_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "lot_frontage_mm",
+      "target": "lot_frontage_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "lot_depth_mm",
+      "target": "lot_depth_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "memory_precinct_lots",
+      "target": "memory_precinct_lots",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "front_setback_mm",
+      "target": "front_setback_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "storeys",
+      "target": "storeys",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "ground_storey_height_mm",
+      "target": "ground_storey_height_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "upper_storey_height_mm",
+      "target": "upper_storey_height_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "setback_depth_mm",
+      "target": "setback_depth_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "setback_top_storeys",
+      "target": "setback_top_storeys",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "roof_rise_mm",
+      "target": "roof_rise_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "parapet_height_mm",
+      "target": "parapet_height_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "light_well_count",
+      "target": "light_well_count",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "rooftop_plant_count",
+      "target": "rooftop_plant_count",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "rooftop_tank_count",
+      "target": "rooftop_tank_count",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "bay_pitch_mm",
+      "target": "bay_pitch_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "opening_width_mm",
+      "target": "opening_width_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "opening_height_mm",
+      "target": "opening_height_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "sill_height_mm",
+      "target": "sill_height_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "reveal_depth_mm",
+      "target": "reveal_depth_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "sill_projection_mm",
+      "target": "sill_projection_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "sill_thickness_mm",
+      "target": "sill_thickness_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "head_rise_mm",
+      "target": "head_rise_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "head_band_mm",
+      "target": "head_band_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "head_projection_mm",
+      "target": "head_projection_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "string_course_height_mm",
+      "target": "string_course_height_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "string_course_projection_mm",
+      "target": "string_course_projection_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "cornice_height_mm",
+      "target": "cornice_height_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "cornice_projection_mm",
+      "target": "cornice_projection_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "stall_riser_height_mm",
+      "target": "stall_riser_height_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "transom_height_mm",
+      "target": "transom_height_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "fascia_height_mm",
+      "target": "fascia_height_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "awning_projection_mm",
+      "target": "awning_projection_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "awning_valance_mm",
+      "target": "awning_valance_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "door_width_mm",
+      "target": "door_width_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "door_height_mm",
+      "target": "door_height_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "entrance_recess_mm",
+      "target": "entrance_recess_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "threshold_height_mm",
+      "target": "threshold_height_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "repeat_size_millionths",
+      "target": "repeat_size_millionths",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "texture_offset_u_mm",
+      "target": "texture_offset_u_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "texture_offset_v_mm",
+      "target": "texture_offset_v_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "texture_quarter_turns",
+      "target": "texture_quarter_turns",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "soiling_gradient_millionths",
+      "target": "soiling_gradient_millionths",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "base_weathering_millionths",
+      "target": "base_weathering_millionths",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "reveal_darkening_millionths",
+      "target": "reveal_darkening_millionths",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "glazing_soil_band_bottom_mm",
+      "target": "glazing_soil_band_bottom_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "glazing_soil_band_edge_mm",
+      "target": "glazing_soil_band_edge_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "tree_spacing_mm",
+      "target": "tree_spacing_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "tree_trunk_clear_height_mm",
+      "target": "tree_trunk_clear_height_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "tree_trunk_diameter_mm",
+      "target": "tree_trunk_diameter_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "tree_crown_radius_mm",
+      "target": "tree_crown_radius_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "tree_crown_height_mm",
+      "target": "tree_crown_height_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "tree_pit_width_mm",
+      "target": "tree_pit_width_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "lamp_spacing_mm",
+      "target": "lamp_spacing_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "furniture_spacing_mm",
+      "target": "furniture_spacing_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "furniture_kerb_offset_mm",
+      "target": "furniture_kerb_offset_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "exclusion_clearance_mm",
+      "target": "exclusion_clearance_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "vitrine_depth_mm",
+      "target": "vitrine_depth_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "vitrine_light_level_millionths",
+      "target": "vitrine_light_level_millionths",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "interior_backing_depth_mm",
+      "target": "interior_backing_depth_mm",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "interior_backing_light_level_millionths",
+      "target": "interior_backing_light_level_millionths",
+      "multiply": 1,
+      "add": 0
+    },
+    {
+      "source": "units_per_storey",
+      "target": "units_per_storey",
+      "multiply": 1,
+      "add": 0
+    }
+  ],
+  "mapped": [
+    {
+      "source": "driving_side",
+      "target": "driving_side",
+      "options": [
+        {
+          "source": "right",
+          "target": "right"
+        },
+        {
+          "source": "left",
+          "target": "left"
+        }
+      ]
+    },
+    {
+      "source": "typology",
+      "target": "typology",
+      "options": [
+        {
+          "source": "apartment_block",
+          "target": "apartment_block"
+        },
+        {
+          "source": "civic_building",
+          "target": "civic_building"
+        },
+        {
+          "source": "loft_building",
+          "target": "loft_building"
+        },
+        {
+          "source": "mansion_block",
+          "target": "mansion_block"
+        },
+        {
+          "source": "office_block",
+          "target": "office_block"
+        },
+        {
+          "source": "rowhouse",
+          "target": "rowhouse"
+        },
+        {
+          "source": "shophouse",
+          "target": "shophouse"
+        }
+      ]
+    },
+    {
+      "source": "era",
+      "target": "era",
+      "options": [
+        {
+          "source": "contemporary",
+          "target": "contemporary"
+        },
+        {
+          "source": "interwar",
+          "target": "interwar"
+        },
+        {
+          "source": "postwar",
+          "target": "postwar"
+        },
+        {
+          "source": "prewar_masonry",
+          "target": "prewar_masonry"
+        }
+      ]
+    },
+    {
+      "source": "roof_family",
+      "target": "roof_family",
+      "options": [
+        {
+          "source": "flat_eaves",
+          "target": "flat_eaves"
+        },
+        {
+          "source": "flat_parapet",
+          "target": "flat_parapet"
+        },
+        {
+          "source": "gable",
+          "target": "gable"
+        }
+      ]
+    },
+    {
+      "source": "head_treatment",
+      "target": "head_treatment",
+      "options": [
+        {
+          "source": "plain",
+          "target": "plain"
+        },
+        {
+          "source": "lintel",
+          "target": "lintel"
+        },
+        {
+          "source": "arch",
+          "target": "arch"
+        },
+        {
+          "source": "hood",
+          "target": "hood"
+        }
+      ]
+    },
+    {
+      "source": "awning_present",
+      "target": "awning_present",
+      "options": [
+        {
+          "source": "yes",
+          "target": "yes"
+        },
+        {
+          "source": "no",
+          "target": "no"
+        }
+      ]
+    },
+    {
+      "source": "wall_material",
+      "target": "wall_material",
+      "options": [
+        {
+          "source": "brick_running_bond",
+          "target": "brick_running_bond"
+        },
+        {
+          "source": "cast_concrete",
+          "target": "cast_concrete"
+        },
+        {
+          "source": "limestone_ashlar",
+          "target": "limestone_ashlar"
+        },
+        {
+          "source": "painted_render",
+          "target": "painted_render"
+        }
+      ]
+    },
+    {
+      "source": "tree_species",
+      "target": "tree_species",
+      "options": [
+        {
+          "source": "acer_platanoides",
+          "target": "acer_platanoides"
+        },
+        {
+          "source": "acer_rubrum",
+          "target": "acer_rubrum"
+        },
+        {
+          "source": "acer_saccharinum",
+          "target": "acer_saccharinum"
+        },
+        {
+          "source": "fraxinus_pennsylvanica",
+          "target": "fraxinus_pennsylvanica"
+        },
+        {
+          "source": "ginkgo_biloba",
+          "target": "ginkgo_biloba"
+        },
+        {
+          "source": "gleditsia_triacanthos_var_inermis",
+          "target": "gleditsia_triacanthos_var_inermis"
+        },
+        {
+          "source": "liquidambar_styraciflua",
+          "target": "liquidambar_styraciflua"
+        },
+        {
+          "source": "platanus_x_acerifolia",
+          "target": "platanus_x_acerifolia"
+        },
+        {
+          "source": "prunus_cerasifera",
+          "target": "prunus_cerasifera"
+        },
+        {
+          "source": "pyrus_calleryana",
+          "target": "pyrus_calleryana"
+        },
+        {
+          "source": "quercus_bicolor",
+          "target": "quercus_bicolor"
+        },
+        {
+          "source": "quercus_palustris",
+          "target": "quercus_palustris"
+        },
+        {
+          "source": "quercus_rubra",
+          "target": "quercus_rubra"
+        },
+        {
+          "source": "styphnolobium_japonicum",
+          "target": "styphnolobium_japonicum"
+        },
+        {
+          "source": "tilia_americana",
+          "target": "tilia_americana"
+        },
+        {
+          "source": "tilia_cordata",
+          "target": "tilia_cordata"
+        },
+        {
+          "source": "tilia_tomentosa",
+          "target": "tilia_tomentosa"
+        },
+        {
+          "source": "ulmus_americana",
+          "target": "ulmus_americana"
+        },
+        {
+          "source": "zelkova_serrata",
+          "target": "zelkova_serrata"
+        }
+      ]
+    },
+    {
+      "source": "fitout",
+      "target": "fitout",
+      "options": [
+        {
+          "source": "bakery_counter",
+          "target": "bakery_counter"
+        },
+        {
+          "source": "book_shelves",
+          "target": "book_shelves"
+        },
+        {
+          "source": "cafe_tables",
+          "target": "cafe_tables"
+        },
+        {
+          "source": "display_boards",
+          "target": "display_boards"
+        },
+        {
+          "source": "grocery_racks",
+          "target": "grocery_racks"
+        },
+        {
+          "source": "office_desks",
+          "target": "office_desks"
+        },
+        {
+          "source": "work_bench",
+          "target": "work_bench"
+        }
+      ]
+    },
+    {
+      "source": "ground_floor_use",
+      "target": "ground_floor_use",
+      "options": [
+        {
+          "source": "bakery",
+          "target": "bakery"
+        },
+        {
+          "source": "bookshop",
+          "target": "bookshop"
+        },
+        {
+          "source": "cafe",
+          "target": "cafe"
+        },
+        {
+          "source": "grocery",
+          "target": "grocery"
+        },
+        {
+          "source": "library",
+          "target": "library"
+        },
+        {
+          "source": "office",
+          "target": "office"
+        },
+        {
+          "source": "pharmacy",
+          "target": "pharmacy"
+        },
+        {
+          "source": "residential",
+          "target": "residential"
+        },
+        {
+          "source": "restaurant",
+          "target": "restaurant"
+        },
+        {
+          "source": "school",
+          "target": "school"
+        },
+        {
+          "source": "workshop",
+          "target": "workshop"
+        }
+      ]
+    },
+    {
+      "source": "upper_floor_use",
+      "target": "upper_floor_use",
+      "options": [
+        {
+          "source": "bakery",
+          "target": "bakery"
+        },
+        {
+          "source": "bookshop",
+          "target": "bookshop"
+        },
+        {
+          "source": "cafe",
+          "target": "cafe"
+        },
+        {
+          "source": "grocery",
+          "target": "grocery"
+        },
+        {
+          "source": "library",
+          "target": "library"
+        },
+        {
+          "source": "office",
+          "target": "office"
+        },
+        {
+          "source": "pharmacy",
+          "target": "pharmacy"
+        },
+        {
+          "source": "residential",
+          "target": "residential"
+        },
+        {
+          "source": "restaurant",
+          "target": "restaurant"
+        },
+        {
+          "source": "school",
+          "target": "school"
+        },
+        {
+          "source": "workshop",
+          "target": "workshop"
+        }
+      ]
+    }
+  ],
+  "removed": [],
+  "introduced": []
+}

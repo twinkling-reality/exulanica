@@ -1,4 +1,9 @@
-"""The city v2 fixture tile, written by hand, and the one command that writes its files.
+"""The city fixture tile, written by hand, and the one command that writes its files.
+
+The tile is written at whatever grammar version this tree states, and the directory keeps the name
+it was created under. That name is historical: it is a path, it carries no behaviour, and renaming
+it would touch fifteen files across two languages to say something the document itself already
+states in its own pins.
 
 Every value below was chosen by hand for this fixture. The builder computes only what a written
 rule derives from those values: identities (``exulanica.grammar.subjects``), facade output
@@ -38,7 +43,12 @@ from exulanica.grammar.grammars.city import CITY_GRAMMAR, CITY_SHAPES
 from exulanica.grammar.grammars.city.catalogs import entry_fields, form_parts, load_city_catalogs
 from exulanica.grammar.grammars.city.common import SIDE_CODES, SURFACE_ROLE_CODES, FormPart
 from exulanica.grammar.grammars.city.corners import corner_box
-from exulanica.grammar.grammars.city.descriptor import CITY_DESCRIPTOR_PATH, CITY_SURFACE
+from exulanica.grammar.grammars.city.descriptor import (
+    CITY_DESCRIPTOR_PATH,
+    CITY_GRAMMAR_ID,
+    CITY_GRAMMAR_VERSION,
+    CITY_SURFACE,
+)
 from exulanica.grammar.grammars.city.districts import DistrictRecord
 from exulanica.grammar.grammars.city.document import (
     GrammarRecords,
@@ -86,6 +96,7 @@ from exulanica.grammar.grammars.city.streets import (
 )
 from exulanica.grammar.grammars.city.terrain import TerrainRecord
 from exulanica.grammar.grammars.city.tile import (
+    COORDINATE_UNITS,
     EMPTY_EDIT_DELTA_DIGEST,
     HALO_RADIUS_MM,
     GrammarPin,
@@ -1772,7 +1783,14 @@ terrain = TerrainRecord(
 
 tile = TileRecord(
     city_seed=SEED,
-    grammar_versions=(GrammarPin("city", 2, descriptor_sha256(CITY_DESCRIPTOR_PATH)),),
+    # The version and the unit are read from the grammar this builder is running, never typed:
+    # a fixture that named its own version would be a second place the version is written down.
+    grammar_versions=(
+        GrammarPin(
+            CITY_GRAMMAR_ID, CITY_GRAMMAR_VERSION, descriptor_sha256(CITY_DESCRIPTOR_PATH)
+        ),
+    ),
+    coordinate_unit=COORDINATE_UNITS[0],
     catalog_digest=catalog_digest(CATALOGS),
     tile_x=0,
     tile_y=0,

@@ -31,6 +31,14 @@ draws owned subjects only and reads halo subjects for context.
 Ownership reads the anchor alone, so every anchored subject is owned by exactly one tile, and it
 is in the halo of every other tile whose grown square its extent reaches.
 
+**The coordinate unit** (``coordinate_unit``, ADR-0024). The record states the unit its document's
+coordinates are in, beside the grammar pins. It is stated rather than assumed because the container
+asserts its records are in millimetres and, before version 3 of this record, the records asserted
+nothing: a producer writing another unit was refused by nothing, and a reader had no way to tell a
+document that means millimetres from one that does not. A document written at an earlier version
+carries no such field and is millimetres because that version fixes it, never because a reader
+supplied one.
+
 :func:`tile_inputs_digest` is the digest over exactly the inputs the target architecture lists:
 the city seed, the grammar version set, the catalog digest, the tile coordinate, the level of
 detail, the halo radius, and the digest of the ordered edit subsequence that targets owned or halo
@@ -55,6 +63,7 @@ from exulanica.grammar.grammars.city.common import TILE_SIZE_MM
 from exulanica.grammar.records import record_payload
 
 __all__ = [
+    "COORDINATE_UNITS",
     "EMPTY_EDIT_DELTA_DIGEST",
     "HALO",
     "HALO_RADIUS_MM",
@@ -77,8 +86,13 @@ __all__ = [
 ]
 
 STAGE_ID: Final = "tile"
-STAGE_VERSION: Final = 2
+STAGE_VERSION: Final = 3
 HALO_RADIUS_MM: Final = 64_000
+#: The coordinate units a tile document may declare (ADR-0024). One entry, and a second would be a
+#: decision about the whole world rather than about one document: the quantum is a constant of the
+#: tessellator version, so two of them coexisting would put a scaling step, and a place to be wrong
+#: by a factor of a thousand, into every rule that reads two documents.
+COORDINATE_UNITS: Final = ("millimetre",)
 OWNERSHIP_RULES: Final = ("anchor_floor_division",)
 HALO_RULES: Final = ("extent_meets_grown_square",)
 EMPTY_EDIT_DELTA_DIGEST: Final = sha256_of_canonical([]).hex()
@@ -109,11 +123,15 @@ GRAMMAR_PIN_SHAPE: Final = shapes.RecordShape(
 @dataclass(frozen=True, slots=True)
 class TileRecord:
     RECORD_KIND: ClassVar[str] = "city.tile"
-    RECORD_VERSION: ClassVar[int] = 2
+    RECORD_VERSION: ClassVar[int] = 3
 
     city_seed: str
     #: Sorted by grammar id, one per grammar.
     grammar_versions: tuple[GrammarPin, ...]
+    #: The unit every coordinate in this document is in. Stated rather than assumed: the container
+    #: asserts its records are in millimetres, and before version 3 the records said nothing, so a
+    #: reader could not tell a document that means millimetres from one that does not.
+    coordinate_unit: str
     catalog_digest: str
     tile_x: int
     tile_y: int
@@ -136,6 +154,7 @@ SHAPE: Final = shapes.RecordShape(
     (
         shapes.seed("city_seed"),
         shapes.records("grammar_versions", GRAMMAR_PIN_SHAPE, count_minimum=1),
+        shapes.choice("coordinate_unit", COORDINATE_UNITS),
         shapes.hex64("catalog_digest"),
         shapes.integer("tile_x"),
         shapes.integer("tile_y"),

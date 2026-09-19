@@ -1,10 +1,20 @@
-"""Parameter migrations: the city's version 1 to 2 migration, and the machinery on probe grammars.
+"""Parameter migrations: the city's shipped migrations, and the machinery on probe grammars.
 
-**The city migration is vacuous, and says so.** City version 1 declared no parameters, so no
-binding written for it can name one: every version 2 parameter is ``introduced``, and the identity
-policy is ``introduced`` because version 1 derived no identities. What is tested is that the
-migration is total over both surfaces, that empty bindings at every level carry across unchanged,
-and that a version 1 binding naming any parameter is refused rather than dropped.
+**The version 1 to 2 migration is vacuous, and says so.** City version 1 declared no parameters, so
+no binding written for it can name one: every version 2 parameter is ``introduced``, and the
+identity policy is ``introduced`` because version 1 derived no identities. What is tested is that
+the migration is total over both surfaces, that empty bindings at every level carry across
+unchanged, and that a version 1 binding naming any parameter is refused rather than dropped.
+
+**The version 2 to 3 migration is the first real one, so it is tested as a positive control.** It
+exists because ADR-0024 puts a coordinate unit in the tile record, which is a RECORD SHAPE change
+and moves no parameter, so every parameter is carried or mapped to itself. Until it shipped, no
+migration in this repository had a non-empty ``carried`` at all: that path had been exercised only
+on probe grammars written under ``tmp_path``. So the test that matters here is not a refusal. It is
+that every one of the city's own parameters goes through the real migration and comes back with the
+value it went in with, at BOTH ends of every integer range and at every option of every choice. The
+bindings are derived from the surface rather than typed, so a parameter added later is covered
+without anybody having to remember this file.
 
 **The machinery is exercised on probe grammars** written under ``tmp_path``: an integer carried by
 ``value * multiply + add``, a choice mapped option by option, a removed parameter reported among
@@ -26,6 +36,7 @@ from exulanica.grammar.grammars.city.descriptor import (
     CITY_MIGRATION_PATHS,
     CITY_SURFACE,
     CITY_V1_SURFACE,
+    CITY_V2_SURFACE,
 )
 from exulanica.grammar.migration import (
     DroppedBinding,
@@ -38,8 +49,16 @@ from exulanica.grammar.parameters import CascadeBinding
 # The city
 
 
-def _city_migration() -> ParameterMigration:
-    return ParameterMigration.read(CITY_MIGRATION_PATHS[2])
+#: Every city surface by its version, so a test names the version it means rather than "current".
+CITY_SURFACES: dict[int, ParameterSurface] = {
+    1: CITY_V1_SURFACE,
+    2: CITY_V2_SURFACE,
+    CITY_GRAMMAR_VERSION: CITY_SURFACE,
+}
+
+
+def _city_migration(target: int) -> ParameterMigration:
+    return ParameterMigration.read(CITY_MIGRATION_PATHS[target])
 
 
 def test_every_city_version_after_the_first_ships_its_migration():
@@ -49,12 +68,19 @@ def test_every_city_version_after_the_first_ships_its_migration():
         assert (migration.source_version, migration.target_version) == (version - 1, version)
 
 
-def test_the_city_migration_is_total_and_introduces_every_parameter():
-    migration = _city_migration()
-    migration.check(CITY_V1_SURFACE, CITY_SURFACE)
+def test_every_shipped_city_migration_has_a_surface_at_each_end():
+    """A migration with no surface to check against is a document nothing holds to a grammar."""
+    assert set(CITY_SURFACES) == set(range(1, CITY_GRAMMAR_VERSION + 1))
+    for version, surface in CITY_SURFACES.items():
+        assert surface.key.grammar_version == version
+
+
+def test_the_city_version_1_migration_is_total_and_introduces_every_parameter():
+    migration = _city_migration(2)
+    migration.check(CITY_V1_SURFACE, CITY_V2_SURFACE)
     assert (migration.carried, migration.mapped, migration.removed) == ((), (), ())
     assert sorted(entry.target for entry in migration.introduced) == sorted(
-        CITY_SURFACE.parameters.names()
+        CITY_V2_SURFACE.parameters.names()
     )
     assert len(migration.introduced) == 91
     assert migration.identity_policy == "introduced"
@@ -63,18 +89,18 @@ def test_the_city_migration_is_total_and_introduces_every_parameter():
 
 
 def test_empty_city_bindings_at_every_level_carry_across_unchanged():
-    migration = _city_migration()
+    migration = _city_migration(2)
     levels = CITY_V1_SURFACE.cascade.levels
     everything = tuple(CascadeBinding.of(level, {}) for level in levels)
-    result = migration.migrate(CITY_V1_SURFACE, CITY_SURFACE, everything)
+    result = migration.migrate(CITY_V1_SURFACE, CITY_V2_SURFACE, everything)
     assert result.bindings == everything
     assert result.dropped == ()
     for level in levels:
-        alone = migration.migrate(CITY_V1_SURFACE, CITY_SURFACE, (CascadeBinding.of(level, {}),))
+        alone = migration.migrate(CITY_V1_SURFACE, CITY_V2_SURFACE, (CascadeBinding.of(level, {}),))
         assert alone.bindings == (CascadeBinding.of(level, {}),)
     chained = migrate_chain(
         [migration],
-        {1: CITY_V1_SURFACE, 2: CITY_SURFACE},
+        {1: CITY_V1_SURFACE, 2: CITY_V2_SURFACE},
         everything,
         from_version=1,
         to_version=2,
@@ -86,14 +112,90 @@ def test_empty_city_bindings_at_every_level_carry_across_unchanged():
 @pytest.mark.parametrize("level", ["city", "face"])
 def test_a_city_version_1_binding_naming_any_parameter_is_refused(name, level):
     with pytest.raises(InvalidParameterError, match="is not a declared parameter"):
-        _city_migration().migrate(
-            CITY_V1_SURFACE, CITY_SURFACE, (CascadeBinding.of(level, {name: 1}),)
+        _city_migration(2).migrate(
+            CITY_V1_SURFACE, CITY_V2_SURFACE, (CascadeBinding.of(level, {name: 1}),)
         )
 
 
 def test_a_city_binding_at_a_level_version_1_does_not_have_is_refused():
     with pytest.raises(InvalidParameterError):
-        _city_migration().migrate(CITY_V1_SURFACE, CITY_SURFACE, (CascadeBinding.of("room", {}),))
+        _city_migration(2).migrate(CITY_V1_SURFACE, CITY_V2_SURFACE, (CascadeBinding.of("room", {}),))
+
+
+# -------------------------------------------------------------------------------------------
+# Version 2 to 3: ADR-0024's coordinate unit, which moves a record shape and no parameter
+
+
+def _every_parameter_by_level(surface: ParameterSurface, pick) -> tuple[CascadeBinding, ...]:
+    """One binding per cascade level, setting every parameter that level admits to ``pick(spec)``.
+
+    Derived from the surface, so this covers whatever the grammar declares rather than a list
+    somebody has to extend. A parameter is bound at the finest level it may be set at, which is the
+    level the migration's own level check reads.
+    """
+    values: dict[str, dict[str, object]] = {level: {} for level in surface.cascade.levels}
+    for name in sorted(surface.parameters.names()):
+        spec = surface.parameters.get(name)
+        finest = spec.level or surface.cascade.levels[-1]
+        values[finest][name] = pick(spec)
+    return tuple(CascadeBinding.of(level, values[level]) for level in surface.cascade.levels)
+
+
+def _lowest(spec) -> object:
+    return spec.minimum if spec.kind == "integer" else spec.options[0]
+
+
+def _highest(spec) -> object:
+    return spec.maximum if spec.kind == "integer" else spec.options[-1]
+
+
+def test_the_city_version_2_migration_carries_or_maps_every_parameter_exactly_once():
+    migration = _city_migration(3)
+    migration.check(CITY_V2_SURFACE, CITY_SURFACE)
+    assert (migration.removed, migration.introduced) == ((), ())
+    names = sorted(CITY_V2_SURFACE.parameters.names())
+    assert sorted([entry.source for entry in migration.carried] + [entry.source for entry in migration.mapped]) == names
+    assert sorted([entry.target for entry in migration.carried] + [entry.target for entry in migration.mapped]) == names
+    # Nothing is renamed, scaled or shifted: this bump changes a record shape, not a parameter.
+    assert all(entry.source == entry.target for entry in migration.carried)
+    assert all(entry.source == entry.target for entry in migration.mapped)
+    assert all((entry.multiply, entry.add) == (1, 0) for entry in migration.carried)
+    assert all(all(old == new for old, new in entry.options) for entry in migration.mapped)
+    assert migration.identity_policy == "preserved"
+    assert migration.levels == tuple((level, level) for level in CITY_V2_SURFACE.cascade.levels)
+
+
+def test_the_kinds_the_city_version_2_migration_splits_are_the_kinds_the_surface_declares():
+    """The split is carried for integers and mapped for choices, because `check` admits no other."""
+    migration = _city_migration(3)
+    kinds = {name: CITY_V2_SURFACE.parameters.get(name).kind for name in CITY_V2_SURFACE.parameters.names()}
+    assert {entry.source for entry in migration.carried} == {n for n, k in kinds.items() if k == "integer"}
+    assert {entry.source for entry in migration.mapped} == {n for n, k in kinds.items() if k == "choice"}
+    assert len(migration.carried) == 80
+    assert len(migration.mapped) == 11
+    assert len(migration.carried) + len(migration.mapped) == len(kinds) == 91
+
+
+@pytest.mark.parametrize("pick,edge", [(_lowest, "lowest"), (_highest, "highest")])
+def test_every_city_parameter_survives_the_version_2_migration_with_its_value(pick, edge):
+    """THE POSITIVE CONTROL. No shipped migration had ever carried a value before this one."""
+    migration = _city_migration(3)
+    bindings = _every_parameter_by_level(CITY_V2_SURFACE, pick)
+    bound = sum(len(binding.values) for binding in bindings)
+    assert bound == 91, f"the control binds {bound} parameters, not the 91 the surface declares"
+    result = migration.migrate(CITY_V2_SURFACE, CITY_SURFACE, bindings)
+    assert result.dropped == ()
+    assert result.bindings == bindings, f"a value moved at the {edge} end of its range"
+
+
+def test_a_city_chain_from_version_1_reaches_the_current_version():
+    migrations = [_city_migration(target) for target in sorted(CITY_MIGRATION_PATHS)]
+    empty = tuple(CascadeBinding.of(level, {}) for level in CITY_V1_SURFACE.cascade.levels)
+    result = migrate_chain(
+        migrations, CITY_SURFACES, empty, from_version=1, to_version=CITY_GRAMMAR_VERSION
+    )
+    assert result.bindings == empty
+    assert result.dropped == ()
 
 
 # -------------------------------------------------------------------------------------------

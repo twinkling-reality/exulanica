@@ -43,6 +43,7 @@ from exulanica.grammar.grammars.city.document import (
     select_tile,
 )
 from exulanica.grammar.grammars.city.tile import (
+    COORDINATE_UNITS,
     EMPTY_EDIT_DELTA_DIGEST,
     HALO_RADIUS_MM,
     HALO_RULES,
@@ -96,6 +97,7 @@ def tile_record(
                 CITY_GRAMMAR.key.grammar_id, CITY_GRAMMAR.key.grammar_version, descriptor_sha256()
             ),
         ),
+        coordinate_unit=COORDINATE_UNITS[0],
         catalog_digest=catalog_digest(catalogs),
         tile_x=tile_x,
         tile_y=tile_y,

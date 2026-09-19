@@ -1,0 +1,2840 @@
+{
+  "nested": [
+    {
+      "fields": [
+        {
+          "kind": "integer",
+          "minimum": 1,
+          "name": "wall_z_mm"
+        },
+        {
+          "kind": "integer",
+          "minimum": 1,
+          "name": "front_z_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 4000,
+          "minimum": 300,
+          "name": "projection_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 600,
+          "minimum": 0,
+          "name": "valance_mm"
+        }
+      ],
+      "rules": [
+        "awning_profile"
+      ],
+      "shape": "Awning"
+    },
+    {
+      "fields": [
+        {
+          "kind": "integer",
+          "maximum": 1000,
+          "minimum": 0,
+          "name": "count"
+        },
+        {
+          "kind": "integer",
+          "maximum": 100000,
+          "minimum": 0,
+          "name": "pitch_mm"
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "margin_start_mm"
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "margin_end_mm"
+        }
+      ],
+      "rules": [
+        "bay_count_and_pitch"
+      ],
+      "shape": "BayLayout"
+    },
+    {
+      "fields": [
+        {
+          "kind": "key",
+          "name": "subject_kind"
+        },
+        {
+          "count_minimum": 0,
+          "kind": "choices",
+          "name": "admissible_uses",
+          "values": [
+            "render_batch",
+            "collision_proxy",
+            "nav_envelope",
+            "pick_geometry",
+            "export_gltf"
+          ]
+        },
+        {
+          "kind": "choice",
+          "name": "plane",
+          "values": [
+            "invented"
+          ]
+        }
+      ],
+      "rules": [
+        "semantics_plane_invented"
+      ],
+      "shape": "DeclaredSemantics"
+    },
+    {
+      "fields": [
+        {
+          "kind": "integer",
+          "name": "min_x_mm"
+        },
+        {
+          "kind": "integer",
+          "name": "min_y_mm"
+        },
+        {
+          "kind": "integer",
+          "name": "min_z_mm"
+        },
+        {
+          "kind": "integer",
+          "name": "max_x_mm"
+        },
+        {
+          "kind": "integer",
+          "name": "max_y_mm"
+        },
+        {
+          "kind": "integer",
+          "name": "max_z_mm"
+        }
+      ],
+      "rules": [
+        "extent_corners_ordered"
+      ],
+      "shape": "Extent"
+    },
+    {
+      "fields": [
+        {
+          "kind": "choice",
+          "name": "shape",
+          "values": [
+            "box",
+            "prism",
+            "ellipsoid"
+          ]
+        },
+        {
+          "kind": "choice",
+          "name": "surface_role",
+          "values": [
+            "object_primary",
+            "object_secondary",
+            "object_tertiary",
+            "trunk",
+            "canopy"
+          ]
+        },
+        {
+          "kind": "integer",
+          "name": "offset_x_mm"
+        },
+        {
+          "kind": "integer",
+          "name": "offset_y_mm"
+        },
+        {
+          "kind": "integer",
+          "name": "offset_z_mm"
+        },
+        {
+          "kind": "integer",
+          "minimum": 1,
+          "name": "size_x_mm"
+        },
+        {
+          "kind": "integer",
+          "minimum": 1,
+          "name": "size_y_mm"
+        },
+        {
+          "kind": "integer",
+          "minimum": 1,
+          "name": "size_z_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 1000000,
+          "minimum": 0,
+          "name": "top_scale_millionths"
+        },
+        {
+          "kind": "integer",
+          "maximum": 64,
+          "minimum": 4,
+          "name": "segments"
+        },
+        {
+          "kind": "integer",
+          "maximum": 32,
+          "minimum": 1,
+          "name": "rings"
+        }
+      ],
+      "rules": [
+        "form_part_counts"
+      ],
+      "shape": "FormPart"
+    },
+    {
+      "fields": [
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "edge_ordinal"
+        },
+        {
+          "kind": "identity",
+          "name": "curb_identity",
+          "refers_to": [
+            "city.curb_edge"
+          ]
+        },
+        {
+          "kind": "integer",
+          "minimum": 1,
+          "name": "run_length_mm"
+        }
+      ],
+      "rules": [],
+      "shape": "Frontage"
+    },
+    {
+      "fields": [
+        {
+          "kind": "key",
+          "name": "grammar_id"
+        },
+        {
+          "kind": "integer",
+          "minimum": 1,
+          "name": "grammar_version"
+        },
+        {
+          "kind": "hex64",
+          "name": "descriptor_sha256"
+        }
+      ],
+      "rules": [],
+      "shape": "GrammarPin"
+    },
+    {
+      "fields": [
+        {
+          "kind": "choice",
+          "name": "role",
+          "values": [
+            "stall_riser",
+            "glazing",
+            "transom",
+            "fascia",
+            "wall",
+            "frame",
+            "door"
+          ]
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "u_start_mm"
+        },
+        {
+          "kind": "integer",
+          "minimum": 1,
+          "name": "u_end_mm"
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "z_bottom_mm"
+        },
+        {
+          "kind": "integer",
+          "minimum": 1,
+          "name": "z_top_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 3000,
+          "minimum": 0,
+          "name": "recess_mm"
+        }
+      ],
+      "rules": [
+        "panel_positive"
+      ],
+      "shape": "GroundPanel"
+    },
+    {
+      "fields": [
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "z_bottom_mm"
+        },
+        {
+          "kind": "integer",
+          "minimum": 1,
+          "name": "z_top_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 1500,
+          "minimum": 1,
+          "name": "projection_mm"
+        }
+      ],
+      "rules": [
+        "moulding_bottom_below_top"
+      ],
+      "shape": "Moulding"
+    },
+    {
+      "fields": [
+        {
+          "count_minimum": 1,
+          "increasing": "strictly",
+          "kind": "integers",
+          "maximum": 119,
+          "minimum": 1,
+          "name": "storeys"
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "u_offset_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 4000,
+          "minimum": 300,
+          "name": "width_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 5000,
+          "minimum": 500,
+          "name": "height_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 3000,
+          "minimum": 0,
+          "name": "sill_height_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 250,
+          "minimum": 120,
+          "name": "reveal_depth_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 150,
+          "minimum": 0,
+          "name": "sill_projection_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 200,
+          "minimum": 0,
+          "name": "sill_thickness_mm"
+        },
+        {
+          "kind": "choice",
+          "name": "head_treatment",
+          "values": [
+            "plain",
+            "lintel",
+            "arch",
+            "hood"
+          ]
+        },
+        {
+          "kind": "integer",
+          "maximum": 2000,
+          "minimum": 0,
+          "name": "head_rise_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 900,
+          "minimum": 0,
+          "name": "head_band_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 300,
+          "minimum": 0,
+          "name": "head_projection_mm"
+        }
+      ],
+      "rules": [
+        "opening_head_rise"
+      ],
+      "shape": "OpeningGrid"
+    },
+    {
+      "fields": [
+        {
+          "kind": "key",
+          "name": "name"
+        },
+        {
+          "kind": "scalar",
+          "name": "value"
+        },
+        {
+          "kind": "key",
+          "name": "source"
+        }
+      ],
+      "rules": [],
+      "shape": "ParameterBinding"
+    },
+    {
+      "fields": [
+        {
+          "kind": "key",
+          "name": "group"
+        },
+        {
+          "count_minimum": 0,
+          "kind": "identities",
+          "name": "connection_identities",
+          "refers_to": [
+            "city.lane_connection"
+          ]
+        },
+        {
+          "count_minimum": 0,
+          "kind": "identities",
+          "name": "crossing_identities",
+          "refers_to": [
+            "city.crossing"
+          ]
+        }
+      ],
+      "rules": [
+        "signal_group_not_empty"
+      ],
+      "shape": "SignalGroup"
+    },
+    {
+      "fields": [
+        {
+          "kind": "identity",
+          "name": "furniture_identity",
+          "refers_to": [
+            "city.street_furniture"
+          ]
+        },
+        {
+          "kind": "identity",
+          "name": "serves_identity",
+          "refers_to": [
+            "city.lane_connection",
+            "city.crossing"
+          ]
+        }
+      ],
+      "rules": [],
+      "shape": "SignalHead"
+    },
+    {
+      "fields": [
+        {
+          "count_maximum": 4,
+          "count_minimum": 4,
+          "dimension": 3,
+          "kind": "points",
+          "name": "corners"
+        }
+      ],
+      "rules": [
+        "stripe_is_a_plan_quad"
+      ],
+      "shape": "Stripe"
+    },
+    {
+      "fields": [
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "first_storey"
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "last_storey"
+        },
+        {
+          "count_minimum": 3,
+          "kind": "ring",
+          "name": "ring_mm"
+        },
+        {
+          "count_minimum": 0,
+          "kind": "rings",
+          "name": "light_wells_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 2000,
+          "minimum": 0,
+          "name": "parapet_height_mm"
+        }
+      ],
+      "rules": [
+        "tier_storeys_and_wells"
+      ],
+      "shape": "Tier"
+    }
+  ],
+  "records": [
+    {
+      "extent_field": "extent",
+      "fields": [
+        {
+          "kind": "identity",
+          "name": "identity"
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "block_ordinal"
+        },
+        {
+          "kind": "identity",
+          "name": "district_identity",
+          "refers_to": [
+            "city.district"
+          ]
+        },
+        {
+          "count_minimum": 3,
+          "kind": "ring",
+          "name": "boundary_mm"
+        },
+        {
+          "kind": "integer",
+          "name": "centroid_x_mm"
+        },
+        {
+          "kind": "integer",
+          "name": "centroid_y_mm"
+        },
+        {
+          "kind": "integer",
+          "name": "grade_elevation_mm"
+        },
+        {
+          "kind": "record",
+          "name": "extent",
+          "shape": "Extent"
+        }
+      ],
+      "identity": {
+        "field": "identity",
+        "ordinal": "block_ordinal",
+        "owner_field": "(root)",
+        "subject_kind": "block"
+      },
+      "kind": "city.block",
+      "rules": [
+        "block_geometry"
+      ],
+      "shape": "city.block",
+      "version": 1
+    },
+    {
+      "extent_field": "extent",
+      "fields": [
+        {
+          "kind": "identity",
+          "name": "identity"
+        },
+        {
+          "kind": "identity",
+          "name": "segment_identity",
+          "refers_to": [
+            "city.street_segment"
+          ]
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "crossing_ordinal"
+        },
+        {
+          "kind": "key",
+          "name": "crossing_type",
+          "vocabulary": "crossing-type"
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "offset_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 10000,
+          "minimum": 1500,
+          "name": "width_mm"
+        },
+        {
+          "count_maximum": 2,
+          "count_minimum": 2,
+          "dimension": 3,
+          "kind": "points",
+          "name": "line_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 180,
+          "minimum": 0,
+          "name": "kerb_upstand_mm"
+        },
+        {
+          "count_maximum": 1,
+          "count_minimum": 0,
+          "kind": "identities",
+          "name": "signal_identity",
+          "refers_to": [
+            "city.signal"
+          ]
+        },
+        {
+          "kind": "record",
+          "name": "extent",
+          "shape": "Extent"
+        }
+      ],
+      "identity": {
+        "field": "identity",
+        "ordinal": "crossing_ordinal",
+        "owner_field": "segment_identity",
+        "subject_kind": "crossing"
+      },
+      "kind": "city.crossing",
+      "rules": [
+        "crossing_geometry"
+      ],
+      "shape": "city.crossing",
+      "version": 1
+    },
+    {
+      "extent_field": "extent",
+      "fields": [
+        {
+          "kind": "identity",
+          "name": "identity"
+        },
+        {
+          "kind": "identity",
+          "name": "segment_identity",
+          "refers_to": [
+            "city.street_segment"
+          ]
+        },
+        {
+          "kind": "choice",
+          "name": "side",
+          "values": [
+            "left",
+            "right"
+          ]
+        },
+        {
+          "count_maximum": 1,
+          "count_minimum": 0,
+          "kind": "identities",
+          "name": "block_identity",
+          "refers_to": [
+            "city.block"
+          ]
+        },
+        {
+          "count_minimum": 2,
+          "dimension": 3,
+          "kind": "points",
+          "name": "kerb_line_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 180,
+          "minimum": 100,
+          "name": "kerb_height_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 600,
+          "minimum": 100,
+          "name": "kerb_width_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 900,
+          "minimum": 0,
+          "name": "gutter_width_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 12000,
+          "minimum": 1000,
+          "name": "footway_width_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 50000,
+          "minimum": 0,
+          "name": "footway_crossfall_millionths"
+        },
+        {
+          "count_maximum": 1,
+          "count_minimum": 0,
+          "kind": "identities",
+          "name": "next_curb_identity",
+          "refers_to": [
+            "city.curb_edge"
+          ]
+        },
+        {
+          "kind": "integer",
+          "maximum": 50000,
+          "minimum": 0,
+          "name": "corner_radius_mm"
+        },
+        {
+          "kind": "record",
+          "name": "extent",
+          "shape": "Extent"
+        }
+      ],
+      "identity": {
+        "field": "identity",
+        "ordinal": {
+          "codes": {
+            "left": 0,
+            "right": 1
+          },
+          "field": "side"
+        },
+        "owner_field": "segment_identity",
+        "subject_kind": "curb_edge"
+      },
+      "kind": "city.curb_edge",
+      "rules": [
+        "curb_geometry"
+      ],
+      "shape": "city.curb_edge",
+      "version": 2
+    },
+    {
+      "extent_field": "extent",
+      "fields": [
+        {
+          "kind": "identity",
+          "name": "identity"
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "district_ordinal"
+        },
+        {
+          "count_minimum": 3,
+          "kind": "ring",
+          "name": "boundary_mm"
+        },
+        {
+          "kind": "choice",
+          "name": "driving_side",
+          "values": [
+            "right",
+            "left"
+          ]
+        },
+        {
+          "kind": "record",
+          "name": "extent",
+          "shape": "Extent"
+        }
+      ],
+      "identity": {
+        "field": "identity",
+        "ordinal": "district_ordinal",
+        "owner_field": "(root)",
+        "subject_kind": "district"
+      },
+      "kind": "city.district",
+      "rules": [
+        "district_boundary_in_extent"
+      ],
+      "shape": "city.district",
+      "version": 1
+    },
+    {
+      "extent_field": "extent",
+      "fields": [
+        {
+          "kind": "identity",
+          "name": "identity"
+        },
+        {
+          "kind": "identity",
+          "name": "facade_identity",
+          "refers_to": [
+            "city.facade"
+          ]
+        },
+        {
+          "kind": "identity",
+          "name": "bay_identity",
+          "refers_to": [
+            "city.ground_bay"
+          ]
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "entrance_ordinal"
+        },
+        {
+          "kind": "integer",
+          "minimum": 1,
+          "name": "u_centre_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 4000,
+          "minimum": 700,
+          "name": "width_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 5000,
+          "minimum": 1900,
+          "name": "height_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 3000,
+          "minimum": 0,
+          "name": "recess_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 600,
+          "minimum": 0,
+          "name": "step_height_mm"
+        },
+        {
+          "kind": "integer",
+          "name": "threshold_x_mm"
+        },
+        {
+          "kind": "integer",
+          "name": "threshold_y_mm"
+        },
+        {
+          "kind": "integer",
+          "name": "threshold_z_mm"
+        },
+        {
+          "count_maximum": 1,
+          "count_minimum": 0,
+          "kind": "identities",
+          "name": "approach_curb_identity",
+          "refers_to": [
+            "city.curb_edge"
+          ]
+        },
+        {
+          "kind": "record",
+          "name": "extent",
+          "shape": "Extent"
+        }
+      ],
+      "identity": {
+        "field": "identity",
+        "ordinal": "entrance_ordinal",
+        "owner_field": "facade_identity",
+        "subject_kind": "entrance"
+      },
+      "kind": "city.entrance",
+      "rules": [
+        "entrance_placed"
+      ],
+      "shape": "city.entrance",
+      "version": 1
+    },
+    {
+      "extent_field": "extent",
+      "fields": [
+        {
+          "kind": "identity",
+          "name": "building_identity",
+          "refers_to": [
+            "city.massing"
+          ]
+        },
+        {
+          "kind": "integer",
+          "maximum": 2,
+          "minimum": 2,
+          "name": "grammar_version"
+        },
+        {
+          "count_minimum": 0,
+          "kind": "records",
+          "name": "parameters",
+          "shape": "ParameterBinding"
+        },
+        {
+          "kind": "seed",
+          "name": "seed"
+        },
+        {
+          "kind": "hex64",
+          "name": "output_digest"
+        },
+        {
+          "kind": "record",
+          "name": "declared_semantics",
+          "shape": "DeclaredSemantics"
+        },
+        {
+          "kind": "identity",
+          "name": "identity"
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "facade_ordinal"
+        },
+        {
+          "kind": "integer",
+          "maximum": 1000,
+          "minimum": 0,
+          "name": "tier_ordinal"
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "edge_ordinal"
+        },
+        {
+          "kind": "choice",
+          "name": "exposure",
+          "values": [
+            "frontage",
+            "flank",
+            "rear",
+            "party_wall"
+          ]
+        },
+        {
+          "count_maximum": 1,
+          "count_minimum": 0,
+          "kind": "identities",
+          "name": "faces_segment_identity",
+          "refers_to": [
+            "city.street_segment"
+          ]
+        },
+        {
+          "count_maximum": 1,
+          "count_minimum": 0,
+          "kind": "identities",
+          "name": "faces_curb_identity",
+          "refers_to": [
+            "city.curb_edge"
+          ]
+        },
+        {
+          "kind": "integer",
+          "minimum": 1,
+          "name": "run_length_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 119,
+          "minimum": 0,
+          "name": "first_storey"
+        },
+        {
+          "kind": "integer",
+          "maximum": 119,
+          "minimum": 0,
+          "name": "last_storey"
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "band_top_mm"
+        },
+        {
+          "kind": "record",
+          "name": "bays",
+          "shape": "BayLayout"
+        },
+        {
+          "count_maximum": 1,
+          "count_minimum": 0,
+          "kind": "records",
+          "name": "openings",
+          "shape": "OpeningGrid"
+        },
+        {
+          "count_minimum": 0,
+          "kind": "records",
+          "name": "string_courses",
+          "shape": "Moulding"
+        },
+        {
+          "count_minimum": 0,
+          "kind": "records",
+          "name": "cornice",
+          "shape": "Moulding"
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "neighbour_top_mm"
+        },
+        {
+          "kind": "record",
+          "name": "extent",
+          "shape": "Extent"
+        }
+      ],
+      "identity": {
+        "field": "identity",
+        "ordinal": "facade_ordinal",
+        "owner_field": "building_identity",
+        "subject_kind": "facade"
+      },
+      "kind": "city.facade",
+      "rules": [
+        "facade_layout"
+      ],
+      "shape": "city.facade",
+      "version": 2
+    },
+    {
+      "extent_field": "extent",
+      "fields": [
+        {
+          "kind": "identity",
+          "name": "identity"
+        },
+        {
+          "kind": "identity",
+          "name": "facade_identity",
+          "refers_to": [
+            "city.facade"
+          ]
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "bay_ordinal"
+        },
+        {
+          "kind": "choice",
+          "name": "bay_kind",
+          "values": [
+            "shopfront",
+            "entrance",
+            "blank",
+            "service"
+          ]
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "u_start_mm"
+        },
+        {
+          "kind": "integer",
+          "minimum": 1,
+          "name": "width_mm"
+        },
+        {
+          "count_minimum": 1,
+          "kind": "records",
+          "name": "panels",
+          "shape": "GroundPanel"
+        },
+        {
+          "count_maximum": 1,
+          "count_minimum": 0,
+          "kind": "records",
+          "name": "awning",
+          "shape": "Awning"
+        },
+        {
+          "kind": "record",
+          "name": "extent",
+          "shape": "Extent"
+        }
+      ],
+      "identity": {
+        "field": "identity",
+        "ordinal": "bay_ordinal",
+        "owner_field": "facade_identity",
+        "subject_kind": "ground_bay"
+      },
+      "kind": "city.ground_bay",
+      "rules": [
+        "bay_panels_tile"
+      ],
+      "shape": "city.ground_bay",
+      "version": 1
+    },
+    {
+      "extent_field": "extent",
+      "fields": [
+        {
+          "kind": "identity",
+          "name": "identity"
+        },
+        {
+          "kind": "identity",
+          "name": "facade_identity",
+          "refers_to": [
+            "city.facade"
+          ]
+        },
+        {
+          "kind": "identity",
+          "name": "building_identity",
+          "refers_to": [
+            "city.massing"
+          ]
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "u_start_mm"
+        },
+        {
+          "kind": "integer",
+          "minimum": 1,
+          "name": "width_mm"
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "sill_mm"
+        },
+        {
+          "kind": "integer",
+          "minimum": 1,
+          "name": "height_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 3000,
+          "minimum": 300,
+          "name": "depth_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 1000000,
+          "minimum": 0,
+          "name": "light_level_millionths"
+        },
+        {
+          "kind": "record",
+          "name": "extent",
+          "shape": "Extent"
+        }
+      ],
+      "identity": {
+        "field": "identity",
+        "ordinal": 0,
+        "owner_field": "facade_identity",
+        "subject_kind": "interior_backing"
+      },
+      "kind": "city.interior_backing",
+      "rules": [],
+      "shape": "city.interior_backing",
+      "version": 1
+    },
+    {
+      "extent_field": "extent",
+      "fields": [
+        {
+          "kind": "identity",
+          "name": "identity"
+        },
+        {
+          "kind": "identity",
+          "name": "node_identity",
+          "refers_to": [
+            "city.street_node"
+          ]
+        },
+        {
+          "kind": "key",
+          "name": "control",
+          "vocabulary": "junction-control"
+        },
+        {
+          "count_minimum": 1,
+          "kind": "identities",
+          "name": "segment_identities",
+          "refers_to": [
+            "city.street_segment"
+          ]
+        },
+        {
+          "count_maximum": 1,
+          "count_minimum": 0,
+          "kind": "identities",
+          "name": "signal_identity",
+          "refers_to": [
+            "city.signal"
+          ]
+        },
+        {
+          "kind": "record",
+          "name": "extent",
+          "shape": "Extent"
+        }
+      ],
+      "identity": {
+        "field": "identity",
+        "ordinal": 0,
+        "owner_field": "node_identity",
+        "subject_kind": "junction"
+      },
+      "kind": "city.junction",
+      "rules": [],
+      "shape": "city.junction",
+      "version": 1
+    },
+    {
+      "fields": [
+        {
+          "kind": "identity",
+          "name": "identity"
+        },
+        {
+          "kind": "identity",
+          "name": "junction_identity",
+          "refers_to": [
+            "city.junction"
+          ]
+        },
+        {
+          "kind": "identity",
+          "name": "segment_identity",
+          "refers_to": [
+            "city.street_segment"
+          ]
+        },
+        {
+          "kind": "integer",
+          "maximum": 64,
+          "minimum": 0,
+          "name": "approach_ordinal"
+        },
+        {
+          "kind": "choice",
+          "name": "control",
+          "values": [
+            "signal",
+            "stop",
+            "yield",
+            "priority"
+          ]
+        },
+        {
+          "kind": "integer",
+          "maximum": 16,
+          "minimum": 0,
+          "name": "priority_rank"
+        },
+        {
+          "kind": "integer",
+          "maximum": 30000,
+          "minimum": 0,
+          "name": "turning_radius_mm"
+        }
+      ],
+      "identity": {
+        "field": "identity",
+        "ordinal": "approach_ordinal",
+        "owner_field": "junction_identity",
+        "subject_kind": "junction_approach"
+      },
+      "kind": "city.junction_approach",
+      "rules": [],
+      "shape": "city.junction_approach",
+      "version": 2
+    },
+    {
+      "extent_field": "extent",
+      "fields": [
+        {
+          "kind": "identity",
+          "name": "identity"
+        },
+        {
+          "kind": "identity",
+          "name": "segment_identity",
+          "refers_to": [
+            "city.street_segment"
+          ]
+        },
+        {
+          "kind": "integer",
+          "maximum": 64,
+          "minimum": 0,
+          "name": "lane_index"
+        },
+        {
+          "kind": "key",
+          "name": "lane_use",
+          "vocabulary": "lane-use"
+        },
+        {
+          "kind": "choice",
+          "name": "direction",
+          "values": [
+            "forward",
+            "backward",
+            "none"
+          ]
+        },
+        {
+          "kind": "integer",
+          "maximum": 6000,
+          "minimum": 1000,
+          "name": "width_mm"
+        },
+        {
+          "count_minimum": 2,
+          "dimension": 3,
+          "kind": "points",
+          "name": "centreline_mm"
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "start_offset_mm"
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "end_offset_mm"
+        },
+        {
+          "count_minimum": 0,
+          "kind": "choices",
+          "name": "turns",
+          "values": [
+            "left",
+            "straight",
+            "right",
+            "u_turn"
+          ]
+        },
+        {
+          "kind": "choice",
+          "name": "left_marking",
+          "values": [
+            "none",
+            "dashed",
+            "solid",
+            "double_solid"
+          ]
+        },
+        {
+          "kind": "choice",
+          "name": "right_marking",
+          "values": [
+            "none",
+            "dashed",
+            "solid",
+            "double_solid"
+          ]
+        },
+        {
+          "kind": "record",
+          "name": "extent",
+          "shape": "Extent"
+        }
+      ],
+      "identity": {
+        "field": "identity",
+        "ordinal": "lane_index",
+        "owner_field": "segment_identity",
+        "subject_kind": "lane"
+      },
+      "kind": "city.lane",
+      "rules": [
+        "lane_direction_and_turns"
+      ],
+      "shape": "city.lane",
+      "version": 1
+    },
+    {
+      "extent_field": "extent",
+      "fields": [
+        {
+          "kind": "identity",
+          "name": "identity"
+        },
+        {
+          "kind": "identity",
+          "name": "junction_identity",
+          "refers_to": [
+            "city.junction"
+          ]
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "connection_ordinal"
+        },
+        {
+          "kind": "identity",
+          "name": "from_lane_identity",
+          "refers_to": [
+            "city.lane"
+          ]
+        },
+        {
+          "kind": "identity",
+          "name": "to_lane_identity",
+          "refers_to": [
+            "city.lane"
+          ]
+        },
+        {
+          "kind": "choice",
+          "name": "movement",
+          "values": [
+            "left",
+            "straight",
+            "right",
+            "u_turn"
+          ]
+        },
+        {
+          "count_minimum": 2,
+          "dimension": 3,
+          "kind": "points",
+          "name": "path_mm"
+        },
+        {
+          "kind": "record",
+          "name": "extent",
+          "shape": "Extent"
+        }
+      ],
+      "identity": {
+        "field": "identity",
+        "ordinal": "connection_ordinal",
+        "owner_field": "junction_identity",
+        "subject_kind": "lane_connection"
+      },
+      "kind": "city.lane_connection",
+      "rules": [
+        "connection_path"
+      ],
+      "shape": "city.lane_connection",
+      "version": 1
+    },
+    {
+      "extent_field": "extent",
+      "fields": [
+        {
+          "kind": "identity",
+          "name": "identity"
+        },
+        {
+          "kind": "identity",
+          "name": "parcel_identity",
+          "refers_to": [
+            "city.parcel"
+          ]
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "building_ordinal"
+        },
+        {
+          "kind": "integer",
+          "name": "base_elevation_mm"
+        },
+        {
+          "kind": "key",
+          "name": "typology",
+          "vocabulary": "typology"
+        },
+        {
+          "kind": "key",
+          "name": "era",
+          "vocabulary": "era"
+        },
+        {
+          "kind": "integer",
+          "maximum": 120,
+          "minimum": 1,
+          "name": "storeys"
+        },
+        {
+          "kind": "integer",
+          "maximum": 6000,
+          "minimum": 4000,
+          "name": "ground_storey_height_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 6000,
+          "minimum": 2400,
+          "name": "upper_storey_height_mm"
+        },
+        {
+          "count_minimum": 1,
+          "kind": "records",
+          "name": "tiers",
+          "shape": "Tier"
+        },
+        {
+          "kind": "key",
+          "name": "roof_family",
+          "vocabulary": "roof-family"
+        },
+        {
+          "kind": "choice",
+          "name": "roof_form",
+          "values": [
+            "flat",
+            "ridge"
+          ]
+        },
+        {
+          "count_maximum": 2,
+          "count_minimum": 0,
+          "dimension": 2,
+          "kind": "points",
+          "name": "ridge_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 20000,
+          "minimum": 0,
+          "name": "roof_rise_mm"
+        },
+        {
+          "kind": "record",
+          "name": "extent",
+          "shape": "Extent"
+        }
+      ],
+      "identity": {
+        "field": "identity",
+        "ordinal": "building_ordinal",
+        "owner_field": "parcel_identity",
+        "subject_kind": "building"
+      },
+      "kind": "city.massing",
+      "rules": [
+        "massing_tiers_and_roof"
+      ],
+      "shape": "city.massing",
+      "version": 2
+    },
+    {
+      "extent_field": "extent",
+      "fields": [
+        {
+          "kind": "identity",
+          "name": "identity"
+        },
+        {
+          "kind": "identity",
+          "name": "block_identity",
+          "refers_to": [
+            "city.block"
+          ]
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "parcel_ordinal"
+        },
+        {
+          "kind": "choice",
+          "name": "lot_class",
+          "values": [
+            "building",
+            "memory_precinct"
+          ]
+        },
+        {
+          "count_minimum": 3,
+          "kind": "ring",
+          "name": "boundary_mm"
+        },
+        {
+          "kind": "integer",
+          "name": "centroid_x_mm"
+        },
+        {
+          "kind": "integer",
+          "name": "centroid_y_mm"
+        },
+        {
+          "kind": "integer",
+          "name": "grade_elevation_mm"
+        },
+        {
+          "count_minimum": 1,
+          "kind": "records",
+          "name": "frontages",
+          "shape": "Frontage"
+        },
+        {
+          "kind": "integer",
+          "minimum": 1,
+          "name": "frontage_mm"
+        },
+        {
+          "kind": "integer",
+          "minimum": 1,
+          "name": "address_number"
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "threshold_offset_mm"
+        },
+        {
+          "kind": "record",
+          "name": "extent",
+          "shape": "Extent"
+        }
+      ],
+      "identity": {
+        "field": "identity",
+        "ordinal": "parcel_ordinal",
+        "owner_field": "block_identity",
+        "subject_kind": "parcel"
+      },
+      "kind": "city.parcel",
+      "rules": [
+        "parcel_geometry"
+      ],
+      "shape": "city.parcel",
+      "version": 2
+    },
+    {
+      "extent_field": "extent",
+      "fields": [
+        {
+          "kind": "identity",
+          "name": "identity"
+        },
+        {
+          "kind": "identity",
+          "name": "curb_identity",
+          "refers_to": [
+            "city.curb_edge"
+          ]
+        },
+        {
+          "kind": "identity",
+          "name": "segment_identity",
+          "refers_to": [
+            "city.street_segment"
+          ]
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "space_ordinal"
+        },
+        {
+          "kind": "key",
+          "name": "parking_kind",
+          "vocabulary": "parking-kind"
+        },
+        {
+          "kind": "choice",
+          "name": "placement",
+          "values": [
+            "carriageway",
+            "footway"
+          ]
+        },
+        {
+          "kind": "integer",
+          "maximum": 256,
+          "minimum": 1,
+          "name": "capacity"
+        },
+        {
+          "count_maximum": 4,
+          "count_minimum": 4,
+          "kind": "ring",
+          "name": "footprint_mm"
+        },
+        {
+          "count_maximum": 1,
+          "count_minimum": 0,
+          "kind": "identities",
+          "name": "lane_identity",
+          "refers_to": [
+            "city.lane"
+          ]
+        },
+        {
+          "kind": "identity",
+          "name": "access_lane_identity",
+          "refers_to": [
+            "city.lane"
+          ]
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "access_start_mm"
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "access_end_mm"
+        },
+        {
+          "count_minimum": 0,
+          "kind": "identities",
+          "name": "furniture_identities",
+          "refers_to": [
+            "city.street_furniture"
+          ]
+        },
+        {
+          "kind": "record",
+          "name": "extent",
+          "shape": "Extent"
+        }
+      ],
+      "identity": {
+        "field": "identity",
+        "ordinal": "space_ordinal",
+        "owner_field": "curb_identity",
+        "subject_kind": "parking_space"
+      },
+      "kind": "city.parking_space",
+      "rules": [
+        "parking_placement"
+      ],
+      "shape": "city.parking_space",
+      "version": 1
+    },
+    {
+      "extent_field": "extent",
+      "fields": [
+        {
+          "kind": "identity",
+          "name": "identity"
+        },
+        {
+          "kind": "identity",
+          "name": "building_identity",
+          "refers_to": [
+            "city.massing"
+          ]
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "unit_ordinal"
+        },
+        {
+          "kind": "key",
+          "name": "use_class",
+          "vocabulary": "use-class"
+        },
+        {
+          "count_maximum": 1,
+          "count_minimum": 0,
+          "kind": "keys",
+          "name": "sign",
+          "vocabulary": "signage-lexicon"
+        },
+        {
+          "count_maximum": 1,
+          "count_minimum": 0,
+          "kind": "texts",
+          "name": "sign_text"
+        },
+        {
+          "kind": "integer",
+          "maximum": 119,
+          "minimum": 0,
+          "name": "first_storey"
+        },
+        {
+          "kind": "integer",
+          "maximum": 119,
+          "minimum": 0,
+          "name": "last_storey"
+        },
+        {
+          "kind": "integer",
+          "minimum": 1,
+          "name": "floor_area_mm2"
+        },
+        {
+          "count_minimum": 0,
+          "kind": "identities",
+          "name": "bay_identities",
+          "refers_to": [
+            "city.ground_bay"
+          ]
+        },
+        {
+          "count_minimum": 1,
+          "kind": "identities",
+          "name": "entrance_identities",
+          "refers_to": [
+            "city.entrance"
+          ]
+        },
+        {
+          "kind": "record",
+          "name": "extent",
+          "shape": "Extent"
+        }
+      ],
+      "identity": {
+        "field": "identity",
+        "ordinal": "unit_ordinal",
+        "owner_field": "building_identity",
+        "subject_kind": "premises"
+      },
+      "kind": "city.premises",
+      "rules": [
+        "premises_sign_and_storeys"
+      ],
+      "shape": "city.premises",
+      "version": 2
+    },
+    {
+      "extent_field": "extent",
+      "fields": [
+        {
+          "kind": "identity",
+          "name": "identity"
+        },
+        {
+          "kind": "identity",
+          "name": "marks_identity",
+          "refers_to": [
+            "city.street_segment",
+            "city.junction",
+            "city.crossing",
+            "city.lane",
+            "city.parking_space"
+          ]
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "marking_ordinal"
+        },
+        {
+          "kind": "choice",
+          "name": "marking",
+          "values": [
+            "lane_line",
+            "centre_line",
+            "edge_line",
+            "stop_line",
+            "crossing_stripe",
+            "bay_line"
+          ]
+        },
+        {
+          "count_minimum": 1,
+          "kind": "records",
+          "name": "stripes",
+          "shape": "Stripe"
+        },
+        {
+          "kind": "record",
+          "name": "extent",
+          "shape": "Extent"
+        }
+      ],
+      "identity": {
+        "field": "identity",
+        "ordinal": "marking_ordinal",
+        "owner_field": "marks_identity",
+        "subject_kind": "road_marking"
+      },
+      "kind": "city.road_marking",
+      "rules": [
+        "marking_in_extent"
+      ],
+      "shape": "city.road_marking",
+      "version": 1
+    },
+    {
+      "extent_field": "extent",
+      "fields": [
+        {
+          "kind": "identity",
+          "name": "identity"
+        },
+        {
+          "kind": "identity",
+          "name": "building_identity",
+          "refers_to": [
+            "city.massing"
+          ]
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "object_ordinal"
+        },
+        {
+          "kind": "key",
+          "name": "object_class",
+          "vocabulary": "rooftop-object"
+        },
+        {
+          "kind": "integer",
+          "name": "x_mm"
+        },
+        {
+          "kind": "integer",
+          "name": "y_mm"
+        },
+        {
+          "kind": "integer",
+          "name": "z_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 1000000,
+          "minimum": -1000000,
+          "name": "facing_dx_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 1000000,
+          "minimum": -1000000,
+          "name": "facing_dy_mm"
+        },
+        {
+          "count_minimum": 1,
+          "kind": "records",
+          "name": "parts",
+          "shape": "FormPart"
+        },
+        {
+          "kind": "integer",
+          "maximum": 10000,
+          "minimum": 0,
+          "name": "clearance_mm"
+        },
+        {
+          "kind": "record",
+          "name": "extent",
+          "shape": "Extent"
+        }
+      ],
+      "identity": {
+        "field": "identity",
+        "ordinal": "object_ordinal",
+        "owner_field": "building_identity",
+        "subject_kind": "rooftop_object"
+      },
+      "kind": "city.rooftop_object",
+      "rules": [
+        "rooftop_object_placed"
+      ],
+      "shape": "city.rooftop_object",
+      "version": 1
+    },
+    {
+      "fields": [
+        {
+          "kind": "identity",
+          "name": "identity"
+        },
+        {
+          "kind": "identity",
+          "name": "controls_identity",
+          "refers_to": [
+            "city.junction",
+            "city.crossing"
+          ]
+        },
+        {
+          "kind": "key",
+          "name": "plan"
+        },
+        {
+          "kind": "hex64",
+          "name": "plan_catalog_sha256"
+        },
+        {
+          "kind": "integer",
+          "maximum": 3600000,
+          "minimum": 0,
+          "name": "offset_ms"
+        },
+        {
+          "count_minimum": 1,
+          "kind": "records",
+          "name": "groups",
+          "shape": "SignalGroup"
+        },
+        {
+          "count_minimum": 1,
+          "kind": "records",
+          "name": "heads",
+          "shape": "SignalHead"
+        }
+      ],
+      "identity": {
+        "field": "identity",
+        "ordinal": 0,
+        "owner_field": "controls_identity",
+        "subject_kind": "signal"
+      },
+      "kind": "city.signal",
+      "rules": [
+        "signal_groups_distinct"
+      ],
+      "shape": "city.signal",
+      "version": 1
+    },
+    {
+      "extent_field": "extent",
+      "fields": [
+        {
+          "kind": "identity",
+          "name": "identity"
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "street_ordinal"
+        },
+        {
+          "kind": "key",
+          "name": "name",
+          "vocabulary": "street-name"
+        },
+        {
+          "kind": "text",
+          "name": "name_text"
+        },
+        {
+          "count_minimum": 1,
+          "kind": "identities",
+          "name": "segment_identities",
+          "refers_to": [
+            "city.street_segment"
+          ]
+        },
+        {
+          "kind": "record",
+          "name": "extent",
+          "shape": "Extent"
+        }
+      ],
+      "identity": {
+        "field": "identity",
+        "ordinal": "street_ordinal",
+        "owner_field": "(root)",
+        "subject_kind": "street"
+      },
+      "kind": "city.street",
+      "rules": [],
+      "shape": "city.street",
+      "version": 1
+    },
+    {
+      "extent_field": "extent",
+      "fields": [
+        {
+          "kind": "identity",
+          "name": "identity"
+        },
+        {
+          "kind": "identity",
+          "name": "curb_identity",
+          "refers_to": [
+            "city.curb_edge"
+          ]
+        },
+        {
+          "kind": "identity",
+          "name": "segment_identity",
+          "refers_to": [
+            "city.street_segment"
+          ]
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "item_ordinal"
+        },
+        {
+          "kind": "key",
+          "name": "furniture_class",
+          "vocabulary": "street-furniture"
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "along_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 12000,
+          "minimum": 0,
+          "name": "kerb_offset_mm"
+        },
+        {
+          "kind": "integer",
+          "name": "x_mm"
+        },
+        {
+          "kind": "integer",
+          "name": "y_mm"
+        },
+        {
+          "kind": "integer",
+          "name": "z_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 1000000,
+          "minimum": -1000000,
+          "name": "facing_dx_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 1000000,
+          "minimum": -1000000,
+          "name": "facing_dy_mm"
+        },
+        {
+          "count_minimum": 1,
+          "kind": "records",
+          "name": "parts",
+          "shape": "FormPart"
+        },
+        {
+          "kind": "integer",
+          "maximum": 10000,
+          "minimum": 0,
+          "name": "exclusion_radius_mm"
+        },
+        {
+          "kind": "record",
+          "name": "extent",
+          "shape": "Extent"
+        }
+      ],
+      "identity": {
+        "field": "identity",
+        "ordinal": "item_ordinal",
+        "owner_field": "curb_identity",
+        "subject_kind": "street_furniture"
+      },
+      "kind": "city.street_furniture",
+      "rules": [
+        "furniture_placed"
+      ],
+      "shape": "city.street_furniture",
+      "version": 2
+    },
+    {
+      "extent_field": "extent",
+      "fields": [
+        {
+          "kind": "identity",
+          "name": "identity"
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "node_ordinal"
+        },
+        {
+          "kind": "integer",
+          "name": "x_mm"
+        },
+        {
+          "kind": "integer",
+          "name": "y_mm"
+        },
+        {
+          "kind": "integer",
+          "name": "z_mm"
+        },
+        {
+          "kind": "record",
+          "name": "extent",
+          "shape": "Extent"
+        }
+      ],
+      "identity": {
+        "field": "identity",
+        "ordinal": "node_ordinal",
+        "owner_field": "(root)",
+        "subject_kind": "street_node"
+      },
+      "kind": "city.street_node",
+      "rules": [
+        "node_extent_is_point"
+      ],
+      "shape": "city.street_node",
+      "version": 2
+    },
+    {
+      "extent_field": "extent",
+      "fields": [
+        {
+          "kind": "identity",
+          "name": "identity"
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "segment_ordinal"
+        },
+        {
+          "kind": "identity",
+          "name": "street_identity",
+          "refers_to": [
+            "city.street"
+          ]
+        },
+        {
+          "kind": "identity",
+          "name": "district_identity",
+          "refers_to": [
+            "city.district"
+          ]
+        },
+        {
+          "kind": "identity",
+          "name": "start_node_identity",
+          "refers_to": [
+            "city.street_node"
+          ]
+        },
+        {
+          "kind": "identity",
+          "name": "end_node_identity",
+          "refers_to": [
+            "city.street_node"
+          ]
+        },
+        {
+          "count_minimum": 2,
+          "dimension": 3,
+          "kind": "points",
+          "name": "centreline_mm"
+        },
+        {
+          "kind": "integer",
+          "minimum": 1,
+          "name": "length_mm"
+        },
+        {
+          "kind": "key",
+          "name": "hierarchy",
+          "vocabulary": "street-hierarchy"
+        },
+        {
+          "kind": "integer",
+          "minimum": 1,
+          "name": "carriageway_width_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 100000,
+          "minimum": 0,
+          "name": "camber_millionths"
+        },
+        {
+          "kind": "integer",
+          "maximum": 55555,
+          "minimum": 1,
+          "name": "speed_limit_mm_s"
+        },
+        {
+          "kind": "record",
+          "name": "extent",
+          "shape": "Extent"
+        }
+      ],
+      "identity": {
+        "field": "identity",
+        "ordinal": "segment_ordinal",
+        "owner_field": "(root)",
+        "subject_kind": "street_segment"
+      },
+      "kind": "city.street_segment",
+      "rules": [
+        "segment_geometry"
+      ],
+      "shape": "city.street_segment",
+      "version": 2
+    },
+    {
+      "extent_field": "extent",
+      "fields": [
+        {
+          "kind": "identity",
+          "name": "identity"
+        },
+        {
+          "kind": "identity",
+          "name": "curb_identity",
+          "refers_to": [
+            "city.curb_edge"
+          ]
+        },
+        {
+          "kind": "identity",
+          "name": "segment_identity",
+          "refers_to": [
+            "city.street_segment"
+          ]
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "tree_ordinal"
+        },
+        {
+          "kind": "key",
+          "name": "species",
+          "vocabulary": "tree-species"
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "along_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 12000,
+          "minimum": 0,
+          "name": "kerb_offset_mm"
+        },
+        {
+          "kind": "integer",
+          "name": "x_mm"
+        },
+        {
+          "kind": "integer",
+          "name": "y_mm"
+        },
+        {
+          "kind": "integer",
+          "name": "z_mm"
+        },
+        {
+          "count_maximum": 4,
+          "count_minimum": 4,
+          "kind": "ring",
+          "name": "pit_mm"
+        },
+        {
+          "count_minimum": 1,
+          "kind": "records",
+          "name": "parts",
+          "shape": "FormPart"
+        },
+        {
+          "kind": "integer",
+          "maximum": 10000,
+          "minimum": 0,
+          "name": "exclusion_radius_mm"
+        },
+        {
+          "kind": "record",
+          "name": "extent",
+          "shape": "Extent"
+        }
+      ],
+      "identity": {
+        "field": "identity",
+        "ordinal": "tree_ordinal",
+        "owner_field": "curb_identity",
+        "subject_kind": "street_tree"
+      },
+      "kind": "city.street_tree",
+      "rules": [
+        "tree_placed"
+      ],
+      "shape": "city.street_tree",
+      "version": 1
+    },
+    {
+      "fields": [
+        {
+          "kind": "identity",
+          "name": "identity"
+        },
+        {
+          "kind": "identity",
+          "name": "surface_identity",
+          "refers_to": [
+            "city.block",
+            "city.crossing",
+            "city.curb_edge",
+            "city.facade",
+            "city.interior_backing",
+            "city.junction",
+            "city.massing",
+            "city.parcel",
+            "city.road_marking",
+            "city.rooftop_object",
+            "city.street_furniture",
+            "city.street_segment",
+            "city.street_tree",
+            "city.terrain",
+            "city.vitrine"
+          ]
+        },
+        {
+          "kind": "choice",
+          "name": "surface_kind",
+          "values": [
+            "city.block",
+            "city.crossing",
+            "city.curb_edge",
+            "city.facade",
+            "city.interior_backing",
+            "city.junction",
+            "city.massing",
+            "city.parcel",
+            "city.road_marking",
+            "city.rooftop_object",
+            "city.street_furniture",
+            "city.street_segment",
+            "city.street_tree",
+            "city.terrain",
+            "city.vitrine"
+          ]
+        },
+        {
+          "kind": "choice",
+          "name": "role",
+          "values": [
+            "wall",
+            "ground_band",
+            "stall_riser",
+            "fascia",
+            "shopfront_frame",
+            "glazing",
+            "door",
+            "trim",
+            "party_wall_scar",
+            "roof",
+            "parapet",
+            "awning",
+            "carriageway",
+            "gutter",
+            "kerb",
+            "footway",
+            "crossing",
+            "marking",
+            "lot",
+            "terrain",
+            "object_primary",
+            "object_secondary",
+            "object_tertiary",
+            "tree_pit",
+            "canopy",
+            "trunk"
+          ]
+        },
+        {
+          "kind": "key",
+          "name": "material",
+          "vocabulary": "material"
+        },
+        {
+          "kind": "texture_set_id",
+          "name": "texture_set_id"
+        },
+        {
+          "kind": "integer",
+          "maximum": 2000000,
+          "minimum": 500000,
+          "name": "repeat_size_millionths"
+        },
+        {
+          "kind": "integer",
+          "maximum": 6283185,
+          "minimum": 0,
+          "name": "uv_rotation_urad"
+        },
+        {
+          "kind": "integer",
+          "maximum": 100000,
+          "minimum": 0,
+          "name": "uv_offset_u_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 100000,
+          "minimum": 0,
+          "name": "uv_offset_v_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 100000,
+          "minimum": 0,
+          "name": "course_module_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 1000,
+          "minimum": 0,
+          "name": "mortar_module_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 1000000,
+          "minimum": 0,
+          "name": "soiling_gradient_millionths"
+        },
+        {
+          "kind": "integer",
+          "maximum": 1000000,
+          "minimum": 0,
+          "name": "base_weathering_millionths"
+        },
+        {
+          "kind": "integer",
+          "maximum": 1000000,
+          "minimum": 0,
+          "name": "reveal_darkening_millionths"
+        },
+        {
+          "kind": "integer",
+          "maximum": 100000,
+          "minimum": 0,
+          "name": "soil_band_bottom_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 100000,
+          "minimum": 0,
+          "name": "soil_band_edge_mm"
+        }
+      ],
+      "identity": {
+        "field": "identity",
+        "ordinal": {
+          "codes": {
+            "awning": 12,
+            "canopy": 25,
+            "carriageway": 13,
+            "crossing": 17,
+            "door": 7,
+            "fascia": 4,
+            "footway": 16,
+            "glazing": 6,
+            "ground_band": 2,
+            "gutter": 14,
+            "kerb": 15,
+            "lot": 19,
+            "marking": 18,
+            "object_primary": 21,
+            "object_secondary": 22,
+            "object_tertiary": 23,
+            "parapet": 11,
+            "party_wall_scar": 9,
+            "roof": 10,
+            "shopfront_frame": 5,
+            "stall_riser": 3,
+            "terrain": 20,
+            "tree_pit": 24,
+            "trim": 8,
+            "trunk": 26,
+            "wall": 1
+          },
+          "field": "role"
+        },
+        "owner_field": "surface_identity",
+        "subject_kind": "surface_material"
+      },
+      "kind": "city.surface_material",
+      "rules": [
+        "material_role_owner",
+        "soil_band_role"
+      ],
+      "shape": "city.surface_material",
+      "version": 2
+    },
+    {
+      "extent_field": "extent",
+      "fields": [
+        {
+          "kind": "identity",
+          "name": "identity"
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "tile_ordinal"
+        },
+        {
+          "kind": "integer",
+          "name": "tile_x"
+        },
+        {
+          "kind": "integer",
+          "name": "tile_y"
+        },
+        {
+          "kind": "integer",
+          "maximum": 128000,
+          "minimum": 500,
+          "name": "cell_mm"
+        },
+        {
+          "kind": "integer",
+          "minimum": 2,
+          "name": "samples_per_side"
+        },
+        {
+          "count_minimum": 4,
+          "kind": "integers",
+          "name": "height_mm"
+        },
+        {
+          "count_minimum": 4,
+          "kind": "integers",
+          "minimum": 0,
+          "name": "slope_millionths"
+        },
+        {
+          "kind": "choice",
+          "name": "triangulation",
+          "values": [
+            "sw_ne"
+          ]
+        },
+        {
+          "kind": "record",
+          "name": "extent",
+          "shape": "Extent"
+        }
+      ],
+      "identity": {
+        "field": "identity",
+        "ordinal": "tile_ordinal",
+        "owner_field": "(root)",
+        "subject_kind": "terrain"
+      },
+      "kind": "city.terrain",
+      "rules": [
+        "terrain_grid_matches_tile",
+        "terrain_slope_exact",
+        "terrain_extent_is_tile"
+      ],
+      "shape": "city.terrain",
+      "version": 2
+    },
+    {
+      "fields": [
+        {
+          "kind": "seed",
+          "name": "city_seed"
+        },
+        {
+          "count_minimum": 1,
+          "kind": "records",
+          "name": "grammar_versions",
+          "shape": "GrammarPin"
+        },
+        {
+          "kind": "hex64",
+          "name": "catalog_digest"
+        },
+        {
+          "kind": "integer",
+          "name": "tile_x"
+        },
+        {
+          "kind": "integer",
+          "name": "tile_y"
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "lod"
+        },
+        {
+          "kind": "integer",
+          "maximum": 128000,
+          "minimum": 128000,
+          "name": "tile_size_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 64000,
+          "minimum": 64000,
+          "name": "halo_radius_mm"
+        },
+        {
+          "kind": "choice",
+          "name": "ownership_rule",
+          "values": [
+            "anchor_floor_division"
+          ]
+        },
+        {
+          "kind": "choice",
+          "name": "halo_rule",
+          "values": [
+            "extent_meets_grown_square"
+          ]
+        },
+        {
+          "kind": "hex64",
+          "name": "edit_delta_digest"
+        }
+      ],
+      "kind": "city.tile",
+      "rules": [
+        "tile_grammar_versions_sorted"
+      ],
+      "shape": "city.tile",
+      "version": 2
+    },
+    {
+      "extent_field": "extent",
+      "fields": [
+        {
+          "kind": "identity",
+          "name": "identity"
+        },
+        {
+          "kind": "identity",
+          "name": "bay_identity",
+          "refers_to": [
+            "city.ground_bay"
+          ]
+        },
+        {
+          "kind": "identity",
+          "name": "facade_identity",
+          "refers_to": [
+            "city.facade"
+          ]
+        },
+        {
+          "kind": "identity",
+          "name": "building_identity",
+          "refers_to": [
+            "city.massing"
+          ]
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "u_start_mm"
+        },
+        {
+          "kind": "integer",
+          "minimum": 1,
+          "name": "width_mm"
+        },
+        {
+          "kind": "integer",
+          "minimum": 0,
+          "name": "sill_mm"
+        },
+        {
+          "kind": "integer",
+          "minimum": 1,
+          "name": "height_mm"
+        },
+        {
+          "kind": "integer",
+          "maximum": 1500,
+          "minimum": 600,
+          "name": "depth_mm"
+        },
+        {
+          "kind": "key",
+          "name": "fitout",
+          "vocabulary": "fitout"
+        },
+        {
+          "kind": "integer",
+          "maximum": 1000000,
+          "minimum": 0,
+          "name": "light_level_millionths"
+        },
+        {
+          "count_minimum": 0,
+          "kind": "records",
+          "name": "parts",
+          "shape": "FormPart"
+        },
+        {
+          "kind": "record",
+          "name": "extent",
+          "shape": "Extent"
+        }
+      ],
+      "identity": {
+        "field": "identity",
+        "ordinal": 0,
+        "owner_field": "bay_identity",
+        "subject_kind": "vitrine"
+      },
+      "kind": "city.vitrine",
+      "rules": [],
+      "shape": "city.vitrine",
+      "version": 2
+    }
+  ]
+}

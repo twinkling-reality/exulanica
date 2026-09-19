@@ -7,7 +7,7 @@ this file, which is the prompt to bump the version instead.
 
 Schema 2 states the frame, the stages and the record kinds each validates, declared parameters
 and one representation contract per admitted projection. Each refusal below edits one thing in a
-copy of ``city.v2.json`` and loads it against the city's real stages.
+copy of the current city descriptor and loads it against the city's real stages.
 """
 
 from __future__ import annotations
@@ -36,10 +36,15 @@ from exulanica.grammar.grammars.box import BOX_GRAMMAR
 from exulanica.grammar.grammars.city import CITY_GRAMMAR, CITY_SHAPES, CITY_STAGES
 from exulanica.grammar.grammars.city.descriptor import (
     CITY_DESCRIPTOR_PATH,
+    CITY_GRAMMAR_VERSION,
     CITY_SURFACE,
     CITY_V1_DESCRIPTOR_PATH,
     CITY_V1_SURFACE,
+    CITY_V2_DESCRIPTOR_PATH,
+    CITY_V2_SHAPES_PATH,
 )
+from exulanica.grammar.grammars.city.tile import COORDINATE_UNITS
+from exulanica.grammar.shapes import describe_shapes
 
 ROOT = Path(__file__).resolve().parents[1]
 _GRAMMARS = ROOT / "exulanica" / "grammar" / "grammars"
@@ -50,17 +55,40 @@ DESCRIPTOR_SHA256 = {
     ("box", 1): "2c2c8481c90e3a33021a014e7a7d5ece016b34fbbaed779a76979f8793d08e46",
     ("city", 1): "1e580ada17333e886ad1067e65585ebd7014006749ba4f84a26ae0f9f673d273",
     ("city", 2): "c82ac5e7d39e95abbeef0d3ead599d87d5421fab7727341ae0df620ef208a7f1",
+    ("city", 3): "e771deef96b49ba35f8a145acbd67dda4d939f93f7730a2b50da78e1727ab41f",
 }
 
 
 def _descriptor_files() -> dict[tuple[str, int], Path]:
+    """Every descriptor beside the grammars, found by ASKING EACH FILE what it is.
+
+    This used to glob ``*.v*.json`` and skip the one other kind of versioned file that existed, by
+    spelling ``-migration`` in its name. That is a list of what is NOT a descriptor, and it went
+    quiet the moment a third kind arrived: ``city-shapes.v2.json``, version 2's frozen record
+    shapes, was read as a descriptor for a grammar called ``city-shapes``. A descriptor is the
+    document that states a ``grammar_version``; a migration states a source and a target version
+    instead, and a shape table states no version at all. So the discriminator is read from the
+    document rather than from a list somebody has to extend.
+    """
     found = {}
     for path in sorted(_GRAMMARS.rglob("*.v*.json")):
-        stem, _, rest = path.name.partition(".v")
-        if "-migration" in stem:
+        document = json.loads(path.read_text(encoding="utf-8"))
+        if not isinstance(document, dict) or "grammar_version" not in document:
             continue
+        stem, _, rest = path.name.partition(".v")
         found[(stem, int(rest.removesuffix(".json")))] = path
     return found
+
+
+def test_the_descriptor_discovery_can_tell_a_descriptor_from_its_neighbours():
+    """The positive control for the test below: it must find descriptors AND reject the rest."""
+    found = _descriptor_files()
+    assert found, "the discovery returned nothing, so an empty comparison below would pass"
+    beside = {path.name for path in _GRAMMARS.rglob("*.v*.json")}
+    kept = {path.name for path in found.values()}
+    # Both kinds of neighbour are present to be rejected, so this is not a vacuous exclusion.
+    assert "city-migration.v3.json" in beside and "city-migration.v3.json" not in kept
+    assert "city-shapes.v2.json" in beside and "city-shapes.v2.json" not in kept
 
 
 def test_every_shipped_descriptor_is_pinned_by_its_digest():
@@ -68,14 +96,68 @@ def test_every_shipped_descriptor_is_pinned_by_its_digest():
     assert set(files) == set(DESCRIPTOR_SHA256)
     for key, path in files.items():
         assert hashlib.sha256(path.read_bytes()).hexdigest() == DESCRIPTOR_SHA256[key], key
-    assert files[("city", 2)] == CITY_DESCRIPTOR_PATH
+    assert files[("city", 3)] == CITY_DESCRIPTOR_PATH
+    assert files[("city", 2)] == CITY_V2_DESCRIPTOR_PATH
     assert files[("city", 1)] == CITY_V1_DESCRIPTOR_PATH
 
 
 def test_the_registered_grammars_are_exactly_the_pinned_current_versions():
     keys = {(key.grammar_id, key.grammar_version) for key in builtin_registry().registered_keys()}
-    assert keys == {("box", 1), ("city", 2)}
+    assert keys == {("box", 1), ("city", 3)}
     assert (BOX_GRAMMAR.descriptor_schema, CITY_GRAMMAR.descriptor_schema) == (1, 2)
+
+
+def test_the_frozen_version_2_shapes_differ_from_the_live_ones_in_two_stated_ways():
+    """The frozen version 2 record shape table is a CHECKED DIFFERENCE, not an unchecked copy.
+
+    It is the one file in the grammar package with no producer: record shapes come from
+    ``describe_shapes`` over the current code, and the current code describes one version. It is
+    kept so the tessellator can go on reading documents written before version 3 (ADR-0024).
+    Nothing else would notice it drifting, so this states what the difference between the two
+    versions IS, both ways round.
+
+    TWO RECORDS MOVE, and the second was found by this test rather than predicted. ``city.tile``
+    gains ``coordinate_unit`` and a record version, which is the change ADR-0024 asked for. And
+    ``city.facade`` carries its own ``grammar_version`` field, bounded to the grammar version that
+    wrote it, so that bound moves with every bump whether or not the record changes otherwise. That
+    one is not a defect and not part of this change: it is what makes a version 2 facade belong to
+    a version 2 document and be refused by the version 3 table, which is the same rule ADR-0024 is
+    written about, already in force for one record before the unit existed.
+    """
+    frozen = json.loads(CITY_V2_SHAPES_PATH.read_text(encoding="utf-8"))
+    live = json.loads(json.dumps(describe_shapes(CITY_SHAPES)))
+    assert set(frozen) == set(live) == {"records", "nested"}
+    assert frozen["nested"] == live["nested"]
+
+    by_kind = {shape["kind"]: shape for shape in frozen["records"]}
+    live_by_kind = {shape["kind"]: shape for shape in live["records"]}
+    assert set(by_kind) == set(live_by_kind)
+    moved = sorted(kind for kind in by_kind if by_kind[kind] != live_by_kind[kind])
+    assert moved == ["city.facade", "city.tile"], "version 3 moves these two records and no other"
+
+    was, now = by_kind["city.tile"], live_by_kind["city.tile"]
+    assert (was["version"], now["version"]) == (2, 3)
+    names = [field["name"] for field in was["fields"]]
+    live_names = [field["name"] for field in now["fields"]]
+    assert set(live_names) - set(names) == {"coordinate_unit"}
+    assert set(names) - set(live_names) == set()
+    # Everything else about the tile record is untouched, field for field and in order.
+    assert [field for field in now["fields"] if field["name"] != "coordinate_unit"] == was["fields"]
+    [unit] = [field for field in now["fields"] if field["name"] == "coordinate_unit"]
+    assert (unit["kind"], tuple(unit["values"])) == ("choice", COORDINATE_UNITS)
+
+    # The facade moves in its version bound alone: same record version, same fields, one bound.
+    was, now = by_kind["city.facade"], live_by_kind["city.facade"]
+    assert was["version"] == now["version"]
+    differing = [
+        (before, after)
+        for before, after in zip(was["fields"], now["fields"], strict=True)
+        if before != after
+    ]
+    assert [before["name"] for before, _ in differing] == ["grammar_version"]
+    [(before, after)] = differing
+    assert (before["minimum"], before["maximum"]) == (2, 2)
+    assert (after["minimum"], after["maximum"]) == (CITY_GRAMMAR_VERSION, CITY_GRAMMAR_VERSION)
 
 
 def test_the_grammar_and_the_parameter_surface_read_the_descriptor_alike():
@@ -159,7 +241,8 @@ def _city_document() -> dict[str, Any]:
 
 
 def _load(tmp_path: Path, document: dict[str, Any]) -> Grammar:
-    path = tmp_path / "city.v2.json"
+    # Named for the descriptor under test, so the copy declares the version its name says.
+    path = tmp_path / CITY_DESCRIPTOR_PATH.name
     path.write_text(json.dumps(document), encoding="utf-8")
     return Grammar.from_descriptor(path, CITY_STAGES)
 
@@ -417,7 +500,7 @@ def test_the_parameter_surface_refuses_what_the_grammar_refuses_without_stage_co
     for change in (_level_unknown, _parameter_default, _basis_missing):
         document = _city_document()
         change(document)
-        path = tmp_path / "city.v2.json"
+        path = tmp_path / CITY_DESCRIPTOR_PATH.name
         path.write_text(json.dumps(document), encoding="utf-8")
         with pytest.raises((InvalidRecordError, InvalidParameterError)):
             ParameterSurface.read(path)
