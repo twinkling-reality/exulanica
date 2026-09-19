@@ -744,6 +744,53 @@ fails; and **`practicalBrowserBudget` is the one I would watch**, because this t
 across the wire and decoded 149.6 MB of texture, where the fixture that passed moved a fraction of
 that. A key that passed on a fixture and fails on a street is the gate working.
 
+## What the retained baseline's frames carry, and what the generated ones carry
+
+**Measured by opening all six frames**, the three retained Flatiron captures and the three from this
+run, rather than reasoning from which target each belongs to.
+
+    THE RETAINED BASELINE, all three frames
+      the Companion panel, about a quarter of the frame at the right
+      "Press P to add an object to this world", a small hint, on the START frame only
+      NOTHING ELSE
+
+    THIS RUN, all three frames
+      the Companion panel, the same panel in the same place
+      A DEVELOPMENT EVALUATION PANEL, about an eighth of the frame at the left
+      a scene segments card, below it
+      magenta UNAVAILABLE hatching across ground and facades
+
+**THE BASELINE CARRIES NO EVALUATION PANEL.** So this is the second of the two cases: every
+generated frame carries a caption the baseline never had, and that caption tells the reader what to
+conclude about the thing being judged. It reads, in part, "Development evaluation of generated tile
+503afcb6... **NOT PART OF ANY WORLD**", followed by the container digest, "527 of 610 records drawn;
+86 surfaces drawn as unavailable", and "Unavailable or not drawn (169)".
+
+**AND THE HANDICAP HAS NEVER REACHED A JUDGEMENT, which is the part that matters.** The judged key
+on every generated run in this record reads `awaiting-named-judge`. No generated frame has ever been
+put to the judge, so the comparison has not yet been made unfairly: THIS IS CAUGHT BEFORE THE FIRST
+JUDGEMENT RATHER THAN AFTER IT. Nor was it anybody's doing: the baseline is the product shell, which
+has no preview furniture to show, and the generated target is the development preview, which does.
+The two pages differ and nobody chose the difference.
+
+**A DISTINCTION THE FIX MUST NOT BLUR.** Three things sit on these frames and only two are furniture.
+
+- The **evaluation panel** and the **segments card** are about THE RUN. They belong in the record,
+  which already states the condition, the digests, what was drawn and what was not.
+- The **magenta hatching is not furniture. It is the world.** It is the product drawing, honestly,
+  the surfaces it has no material for, and a judge deciding whether a street reads as inhabited
+  SHOULD SEE IT. Hiding it would be the fallback-imagery fault inverted: dressing an absence so it
+  photographs better. The baseline has no such marks because its district has nothing undressed, not
+  because it was cleaned.
+
+**WHY A CAPTION IS WORSE THAN AN OCCLUSION.** The Companion covers more of the frame than the
+evaluation panel does, and it stays: it is the product, `companionPresent` counts it in three of
+three captures, and a frame without it would not be a frame of this product. The evaluation panel is
+different in kind rather than in size, because it does not merely cover the street, IT MAKES A CLAIM
+ABOUT IT. A record is read by someone asking what this run was. A frame is looked at by someone
+asking whether it looks like a street. Putting the first inside the second contaminates the only
+measurement in this project a machine cannot take.
+
 ## The first scored run of a real street, measured
 
 **The gate scored a generated street.** Eight mechanical keys measured, the ninth left for the named
