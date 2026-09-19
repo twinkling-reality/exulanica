@@ -458,3 +458,60 @@ settled above and do not move: the neighbours cost no texture fetch.
 
 Measuring milliseconds per frame needs a visible surface and a loop somebody drives on purpose,
 which is what the visual gate's own harness is for.
+
+## The gate on a composed world, predicted before the run
+
+Written 2026-09-19 on main `bd4db95a` with the harness not yet started. The last scored run got FOUR
+of eight key predictions wrong and every one failed the same way: reasoning from a quantity the key
+does not measure. So each prediction below names the FIELDS the key is decided by, read from
+`DECIDED_BY` and `decideMechanical` in `loom-gate/src/keys.ts`, rather than from the key's name.
+
+The walk is `docs/visual-gate-corridor-walk.md`, pose 256,000 / 70,300 facing (1,0), which is the
+walk the 2026-09-18 run scored: its `walkedDisplacementMm` of 125,010 from 256,000 ends at 381,010,
+which is the 2,990 mm from the tile edge that run reported. From that pose a reach of 131,000
+composes FOUR containers, (2,0) + (1,0) + (0,0) + (3,0), the same four as that run. **The one thing
+that differs is that three of them are now DRAWN.**
+
+| key | predicted | the fields it is decided by, and why |
+| --- | --- | --- |
+| continuousTexturedStreetAndFacades | TRUE | more street and facade triangles, all dressed from the same 13 sets |
+| noCutsOrFloatingGeometry | **FALSE** | `componentsDetachedFromSupport` was 773 on one tile |
+| usefulEyeLevelMovement | **FALSE** | `maxEyeHeightErrorMm` was 146; the walk and the ground are unchanged |
+| completeCapsuleClearanceVerification | TRUE | see below, this is the one I am least sure of |
+| practicalBrowserBudget | TRUE | see below, `maxDrawCalls` is the number at risk |
+| companionPresent | TRUE | captures and the Companion, untouched by drawing |
+| reticlePresent | TRUE | untouched by drawing |
+| authenticatedShellAndAuthoredHandlersPreserved | TRUE | untouched by drawing |
+
+**THE NUMBERS, WHICH ARE THE FALSIFIABLE HALF.**
+
+    componentsDetachedFromSupport   was 773 on one tile; PREDICT 2,000 to 2,500, about three times
+    maxEyeHeightErrorMm             PREDICT 146, unchanged: the composed GROUND is not new
+    drawnTriangles                  PREDICT about 175,034 = 56,388 + 52,366 + 9,148 + 57,132
+    environmentTransferredBytes     PREDICT about 12,682,860, ONE container, see the defect below
+    capsuleTriangleContactSamples   PREDICT 0
+    maxDrawCalls                    the number to watch, and I have no prior for it
+
+**THE KEY I AM LEAST SURE OF IS THE CAPSULE ONE, and the mechanism is worth stating whichever way it
+goes.** That key measures clearance from every DRAWN triangle, so its population has just tripled.
+And the neighbours' records OVERHANG their squares: (1,0) draws east to x 261,950 and (3,0) draws
+west from x 378,050, so the walk's first 5,950 mm and last 3,000 mm now pass through geometry that
+was not drawn last run and is therefore checked for the first time. I predict TRUE anyway, because
+that geometry is the same street's own frontage continued, and tile (2,0)'s equivalents gave zero
+contacts over 2,502 of 2,502 samples. If it comes back FALSE, the overhang is the first place to
+look and not the seam.
+
+**AND `practicalBrowserBudget` IS THE OTHER ONE, for a different reason.** Three of its four
+quantities barely move: the texture bytes are the same 13 sets, the transferred bytes read one
+container, and 175,034 triangles is still under Melbourne's 227,173, though with only 52,139 to
+spare where there used to be 170,785. `maxDrawCalls` against Melbourne's 87 is the exposed one: this
+change gives EVERY TILE ITS OWN ROOT AND ITS OWN BATCHES, so four drawn tiles submit roughly four
+times the tile's batch count. I have no figure for the last run's draw calls, so this prediction is
+a direction with no number, and I am saying that rather than inventing one.
+
+**A DEFECT IN THE HARNESS, REPORTED AND NOT TOUCHED.** `capture_visual_gate.mjs` sets
+`environment = bound[0]` for a generated target, so `environmentTransferredBytes` is whichever
+container happens to sit first in the list the page fetched. THAT IS A POSITION IN A LIST, and until
+this change the list had one member so the position could not be wrong. It now has four. The gate's
+own document already says this key "measures one artefact"; `bound[0]` is the mechanism, and which
+artefact it names is now decided by fetch order. I do not own that file and have not changed it.
