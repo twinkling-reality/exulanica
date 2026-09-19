@@ -714,8 +714,29 @@ def test_a_page_served_something_other_than_a_tile_is_refused(tmp_path):
     assert _condition(tmp_path, traffic, 401) is None
 
 
+def test_a_page_that_never_asked_for_the_graph_is_refused(tmp_path):
+    """Clause 3, and this is the case that actually isolates it.
+
+    MEASURED by falsification 2026-09-18: deleting clause 3 was noticed by NOTHING, because the test
+    that claimed it fed traffic where the graph was SERVED, and a served graph is a 200 that is not a
+    tile, so CLAUSE 2 refused it. The property was pinned somewhere other than where it was claimed.
+
+    The independent content of clause 3 is the ASKING. A page that never asks proves nothing about
+    what its credential carries, and clause 2 is perfectly happy with it. That is also the dependency
+    written into the condition's definition: the evidence is the page's habit, and it fails toward
+    refusing.
+    """
+    traffic = [one for one in _corridor_traffic() if one["path"] != "/api/graph"]
+    assert _condition(tmp_path, traffic, 401) is None
+
+
 def test_a_page_whose_credential_carries_the_graph_is_refused(tmp_path):
-    """Clause 3. A credential that CAN read the graph is not the narrow one this condition names."""
+    """A credential that CAN read the graph is not the narrow one this condition names.
+
+    KEPT, AND PINNED BY CLAUSE 2 RATHER THAN CLAUSE 3, which the falsification above established. A
+    served graph is a 200 that is not a tile. The outcome is right and the reason is not the one the
+    name suggests, so the name says the property and this docstring says which clause enforces it.
+    """
     traffic = [
         {"path": "/api/graph", "status": 200} if one["path"] == "/api/graph" else one
         for one in _corridor_traffic()
