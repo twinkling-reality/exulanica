@@ -417,6 +417,22 @@ export function steepestRiseOf(heights, spacingM) {
   return { riseMm: Math.round(steepest.rise * 1e6) / 1000, atM: steepest.atM };
 }
 
+/**
+ * How finely both support probes sample the product's surface, in metres.
+ *
+ * NOT A TUNING KNOB. MEASURED 2026-09-18: at 0.25 m this reported "support for the next 10 m" over a
+ * 30 mm hole 15 mm ahead of a stalled walker, and that single figure misdirected a whole run's
+ * diagnosis. A probe coarser than the holes it is looking for does not find fewer of them, IT
+ * REPORTS THEIR ABSENCE, which is worse than not probing at all.
+ *
+ * Exported so a test can hold it to that: it must stay fine enough to see the hole that misled that
+ * run, rather than merely being whatever it was last set to.
+ */
+export const PROBE_SPACING_M = 0.005;
+
+/** The hole that was missed, in metres, kept beside the spacing it is the reason for. */
+export const HOLE_THAT_WAS_MISSED_M = 0.03;
+
 function listenerSource(normalized) {
   if (normalized.startsWith('web/packages/') || normalized.startsWith('web/node_modules/')) {
     return 'product';
@@ -1464,9 +1480,8 @@ async function main() {
     // A check that has never been run against the one page every retained record scored must not be
     // able to refuse it. Extending it there needs the product target run before and after, with
     // every plan field pinned, which is the measurement the orchestrator has asked for.
-    const GROUND_PROBE_SPACING_M = 0.005;
     const walkedM = (preferred.rule.lengthMm + preferred.rule.stopMarginMm) / 1000;
-    const groundProbes = Math.round(walkedM / GROUND_PROBE_SPACING_M) + 1;
+    const groundProbes = Math.round(walkedM / PROBE_SPACING_M) + 1;
     /** The nearest route obstruction ring to a point, which separates a carve boundary from an edge. */
     const nearestRingTo = (x, z) => {
       let nearest = null;
@@ -1488,8 +1503,8 @@ async function main() {
     const groundUnder = async (candidate) => {
       const points = new Float64Array(groundProbes * 2);
       for (let step = 0; step < groundProbes; step += 1) {
-        points[step * 2] = candidate.start[0] + candidate.forward[0] * (step * GROUND_PROBE_SPACING_M);
-        points[step * 2 + 1] = candidate.start[1] + candidate.forward[1] * (step * GROUND_PROBE_SPACING_M);
+        points[step * 2] = candidate.start[0] + candidate.forward[0] * (step * PROBE_SPACING_M);
+        points[step * 2 + 1] = candidate.start[1] + candidate.forward[1] * (step * PROBE_SPACING_M);
       }
       const heights = float64FromBase64(await session.call(bindingId, SAMPLE_SUPPORT, [toBase64(points)]));
       let firstGap = null;
@@ -1497,11 +1512,11 @@ async function main() {
       for (let step = 0; step < heights.length; step += 1) {
         if (!Number.isNaN(heights[step])) continue;
         gaps += 1;
-        if (firstGap === null) firstGap = step * GROUND_PROBE_SPACING_M;
+        if (firstGap === null) firstGap = step * PROBE_SPACING_M;
       }
       // Measured for EVERY candidate, supported or not, because the rise is a fact about the line
       // whether or not the ground also runs out later along it.
-      const steepestRise = steepestRiseOf(heights, GROUND_PROBE_SPACING_M);
+      const steepestRise = steepestRiseOf(heights, PROBE_SPACING_M);
       if (firstGap === null) {
         return { headingMillidegrees: candidate.headingMillidegrees, supported: true, steepestRise };
       }
@@ -1539,7 +1554,7 @@ async function main() {
       }
       observed.routeGround = {
         asked: true,
-        probeSpacingM: GROUND_PROBE_SPACING_M,
+        probeSpacingM: PROBE_SPACING_M,
         probesPerHeading: groundProbes,
         lengthM: walkedM,
         preferredByTheRule: preferred.headingMillidegrees,
@@ -1555,7 +1570,7 @@ async function main() {
         await halt(
           `no heading the route rule qualifies has ground along it: all ${groundRefused.length} were ` +
           `refused by the product's own navigation surface, sampled every ` +
-          `${GROUND_PROBE_SPACING_M * 1000} mm over ${walkedM} m. The one the rule preferred, ` +
+          `${PROBE_SPACING_M * 1000} mm over ${walkedM} m. The one the rule preferred, ` +
           `${first.headingMillidegrees} millidegrees, loses support ${first.firstUnsupportedAtM.toFixed(3)} m ` +
           `along, at (${first.at.xM}, ${first.at.zM})` +
           (first.nearestRouteRing === null ? '' : `, ${first.nearestRouteRing.metres.toFixed(3)} m from a ring ` +
@@ -1784,7 +1799,6 @@ async function main() {
             // a desired point with no surface, so a probe coarser than one frame of walking
             // measures a population that excludes the thing that stops a walk, and the sentence it
             // produced sent a reader looking for a collision for a whole run.
-            const PROBE_SPACING_M = 0.005;
             const PROBE_REACH_M = 10;
             const probes = Math.round(PROBE_REACH_M / PROBE_SPACING_M) + 1;
             const ahead = new Float64Array(probes * 2);

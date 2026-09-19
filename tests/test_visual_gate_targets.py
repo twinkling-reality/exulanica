@@ -550,6 +550,28 @@ def test_a_local_path_the_product_shows_does_not_reach_the_record(tmp_path):
     assert "<local-path>" in surface["text"]
 
 
+def test_the_support_probe_stays_fine_enough_to_see_the_hole_that_misled_a_run(tmp_path):
+    """The spacing is a requirement, not a setting, and nothing held it to that until now.
+
+    MEASURED 2026-09-18: at 0.25 m the probe reported "support for the next 10 m" over a 30 mm hole
+    15 mm ahead of a stalled walker, and that one figure misdirected a whole run's diagnosis. A probe
+    coarser than the hole does not find fewer holes, IT REPORTS THEIR ABSENCE.
+
+    This asserts the relationship rather than the number: at least two samples must land inside the
+    hole that was missed, so the spacing cannot drift back toward it. Retyping 0.005 here would make
+    the test a copy of the code and it could then never refuse anything.
+    """
+    driver = tmp_path / "spacing.mjs"
+    driver.write_text(
+        f"const harness = await import({str(HARNESS)!r});\n"
+        "console.log(JSON.stringify({ spacing: harness.PROBE_SPACING_M, hole: harness.HOLE_THAT_WAS_MISSED_M }));\n"
+    )
+    result = _node(str(driver))
+    assert result.returncode == 0, result.stderr
+    read = json.loads(result.stdout.strip().splitlines()[-1])
+    assert read["spacing"] <= read["hole"] / 2, read
+
+
 # -- a hole and a kerb are different sentences -----------------------------------------------------
 
 

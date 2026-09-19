@@ -66,14 +66,20 @@ def _selected(output: str) -> int:
     """How many tests pytest actually ran, from its own final summary line.
 
     THE NUMBER THIS FILE EXISTS FOR. A selection of zero exits 5 and prints "no tests ran", which
-    reads as a clean run to anything that only looks at whether something failed. Counted off the
-    LAST summary line so a traceback quoting these words cannot inflate it, and "deselected" is not
-    one of the words counted.
+    reads as a clean run to anything that only looks at whether something failed.
+
+    Read off the LAST line carrying counts, so a traceback quoting these words cannot inflate it.
+    It must not look for pytest's "=" banner: THIS PROJECT ALREADY PASSES -q IN ADDOPTS, so the
+    summary arrives undecorated as "35 passed in 5.87s", and the first version of this function
+    returned 0 for every run and reported a real falsification as having asked nothing. "deselected"
+    is deliberately not one of the words counted.
     """
-    summaries = [line for line in output.splitlines() if re.search(r"=+.*(passed|failed|no tests ran|error)", line)]
-    if not summaries:
-        return 0
-    return sum(int(count) for count, _ in re.findall(r"(\d+) (passed|failed|errors?|xfailed|xpassed)", summaries[-1]))
+    counted = 0
+    for line in output.splitlines():
+        found = re.findall(r"(\d+) (passed|failed|errors?|xfailed|xpassed)\b", line)
+        if found:
+            counted = sum(int(number) for number, _ in found)
+    return counted
 
 
 def _failed_by(output: str, name: str) -> bool:
@@ -90,7 +96,12 @@ def falsify(case: dict, arguments: list[str]) -> dict:
     text = original.decode("utf8")
     found = text.count(case["old"])
     if found != 1:
-        return {"name": case["name"], "verdict": "ANCHOR NOT UNIQUE", "occurrences": found}
+        # Nothing was written, so the file is untouched by definition: saying otherwise would raise
+        # an alarm about a restore that never had to happen.
+        return {
+            "name": case["name"], "verdict": f"ANCHOR NOT UNIQUE: {found} occurrences",
+            "selected": 0, "exit": None, "restored": True,
+        }
     try:
         path.write_text(text.replace(case["old"], case["new"]))
         output, code = _run_pytest(case["tests"], arguments)
