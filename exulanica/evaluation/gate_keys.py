@@ -395,9 +395,19 @@ VERSION_4: Final = SupersededVersion(
 #: Every one-question version this one supersedes, oldest first.
 SUPERSEDED_VERSIONS: Final[tuple[SupersededVersion, ...]] = (VERSION_2, VERSION_3, VERSION_4)
 
-#: The two conditions the product-shell key has actually been scored under. Melbourne's record
+#: The conditions the product-shell key has actually been scored under. Melbourne's record
 #: set the key true while its preview API answered three 404s, so the key alone never says which.
-AUTHENTICATION_CONDITIONS: Final[tuple[str, ...]] = ("credentialed-api", "vite-preview-api")
+#:
+#: ``preview-shell-credentialed-tiles`` was added on 2026-09-18 by an operator decision, not by the
+#: lane that needed it: a development preview reading its street from the real API with a credential
+#: satisfies neither of the first two, and the lane whose run it would unblock proposed it, stated
+#: what a yes admits at its widest, and held until the decision was made. The case is in
+#: ``docs/visual-gate-third-authentication-condition.md`` and the rule lives in the harness.
+AUTHENTICATION_CONDITIONS: Final[tuple[str, ...]] = (
+    "credentialed-api",
+    "vite-preview-api",
+    "preview-shell-credentialed-tiles",
+)
 
 #: The page a run scored, as data rather than as a check written into the harness.
 #:

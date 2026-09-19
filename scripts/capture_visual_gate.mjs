@@ -547,6 +547,56 @@ export function checkedWalkWorld(statement, containers, reachWasStated) {
   };
 }
 
+/**
+ * How a page proved who it was, named from the traffic of ONE RUN, or null when nothing fits.
+ *
+ * The gate records HOW a scored page got its content before it will score what that page drew, and
+ * it refuses rather than guess. Two conditions were always known. The third was measured on the
+ * corridor page, put to the operator as a decision with the evidence attached, and admitted by them
+ * on 2026-09-18; the case is in `docs/visual-gate-third-authentication-condition.md`.
+ *
+ * `preview-shell-credentialed-tiles` is a development preview that reads its street from the real
+ * API with a credential, which is neither of the other two and not a hybrid by accident: a street
+ * lives in the store and only the real API serves it. Its four clauses are the approved ones,
+ * unchanged:
+ *
+ *   1. at least one `/preview-api/` request, so it IS the preview and not the product shell;
+ *   2. every `/api/` response served 200 was under `/api/tiles`, so nothing else was served to it;
+ *   3. `/api/graph` was asked and NOT served, so its credential does not carry the graph;
+ *   4. an anonymous read is refused, the same evidence `credentialed-api` rests on.
+ *
+ * CLAUSE 3 RESTS ON THE PAGE'S HABIT. The page asks for the graph because that is what it does, not
+ * because anything requires it to; if it stops, the property stays true and the evidence for it
+ * disappears, and a run then halts for a reason that looks nothing like its cause. It fails toward
+ * REFUSING, which is the safe direction. The durable repair is for the gate to ask with the page's
+ * own credential rather than wait for the page to do it, which is a credential question.
+ *
+ * WHAT THIS CERTIFIES, AND WHAT IT CANNOT. It is judged per run from that run's own traffic, so a
+ * page holding a wider credential passes only if it did not use it, and a run that used it fails
+ * clause 2 and cannot be scored. THE RULE CERTIFIES THAT A RUN WAS CLEAN; IT CANNOT CERTIFY THAT THE
+ * CREDENTIAL WAS NARROW.
+ */
+export function authenticationConditionOf(paths, anonymousStatus) {
+  const preview = paths.filter((one) => one.path.startsWith('/preview-api/'));
+  const api = paths.filter((one) => one.path.startsWith('/api/'));
+  const served = api.filter((one) => one.status === 200);
+  const graph = api.filter((one) => one.path === '/api/graph');
+  const graphRead = graph.some((one) => one.status === 200);
+  if (preview.length === 0 && graphRead && anonymousStatus === 401) {
+    return 'credentialed-api';
+  }
+  if (preview.length > 0 && api.length === 0) {
+    return 'vite-preview-api';
+  }
+  if (preview.length > 0
+    && served.every((one) => one.path.startsWith('/api/tiles'))
+    && graph.length > 0 && !graphRead
+    && anonymousStatus === 401) {
+    return 'preview-shell-credentialed-tiles';
+  }
+  return null;
+}
+
 function listenerSource(normalized) {
   if (normalized.startsWith('web/packages/') || normalized.startsWith('web/node_modules/')) {
     return 'product';
@@ -2315,9 +2365,10 @@ async function main() {
       .filter((entry) => pathOf(entry).startsWith('/preview-api/'))
       .map((entry) => ({ url: normalizeUrl(entry.url), status: entry.status }));
     const graphRead = requests.some((entry) => pathOf(entry) === '/api/graph' && entry.status === 200);
-    let authenticationCondition = null;
-    if (previewApi.length === 0 && graphRead && anonymousStatus === 401) authenticationCondition = 'credentialed-api';
-    else if (previewApi.length > 0 && !requests.some((entry) => pathOf(entry).startsWith('/api/'))) authenticationCondition = 'vite-preview-api';
+    const authenticationCondition = authenticationConditionOf(
+      requests.map((entry) => ({ path: pathOf(entry), status: entry.status })),
+      anonymousStatus,
+    );
     if (authenticationCondition === null) {
       await halt(`the authentication condition cannot be named: preview requests ${previewApi.length}, graph read ${graphRead}, anonymous status ${anonymousStatus}`);
     }

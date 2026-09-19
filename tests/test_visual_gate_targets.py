@@ -187,9 +187,17 @@ def test_the_harness_and_the_record_declare_the_same_targets_both_ways():
 
 
 def _harness_conditions() -> set[str]:
-    """Every authentication condition the harness can actually name, read out of the harness."""
+    """Every authentication condition the harness can actually name, read out of the harness.
+
+    Scoped to the function that names them, so a literal elsewhere in the file cannot be counted as
+    a condition the harness can assign.
+    """
     source = HARNESS.read_text()
-    found = set(re.findall(r"authenticationCondition = '([a-z-]+)'", source))
+    block = re.search(
+        r"export function authenticationConditionOf\(.*?\n\}", source, re.S
+    )
+    assert block is not None, "the harness no longer has a function that names conditions"
+    found = set(re.findall(r"return '([a-z-]+)';", block.group(0)))
     # Assert the parse found something before comparing it: an empty parse agrees with an empty
     # expectation and this test would assert nothing at all. That is the fault this file has a rule
     # about, and the targets parse above guards itself the same way.
@@ -638,6 +646,98 @@ def test_no_world_is_composed_around_the_committed_fixture(tmp_path):
     """
     assert _reach(tmp_path, "?preview=1&tile=tile-conformance")["reach"] is None
     assert _reach(tmp_path, "?preview=1&city=abc&tile_x=2&tile_y=0", owned="true")["reach"] is None
+
+
+# -- how a page proved who it was --------------------------------------------------------------
+
+
+def _condition(tmp_path: Path, paths: list[dict], anonymous: int) -> object:
+    """What the harness's own rule names for this traffic."""
+    driver = tmp_path / "condition.mjs"
+    driver.write_text(
+        f"const harness = await import({str(HARNESS)!r});\n"
+        f"const named = harness.authenticationConditionOf({json.dumps(paths)}, {json.dumps(anonymous)});\n"
+        "console.log(JSON.stringify({ named }));\n"
+    )
+    result = _node(str(driver))
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout.strip().splitlines()[-1])["named"]
+
+
+def _corridor_traffic() -> list[dict[str, object]]:
+    """The corridor page's own traffic, CAPTURED LIVE from the running page on 2026-09-18.
+
+    Read from the protocol's request log rather than remembered, because the page's resource timing
+    buffer holds 250 entries and had long since dropped these. Six preview requests, which is the
+    count the harness reported in its own halt, one refused graph read, and five tile reads.
+    """
+    return [
+        {"path": "/preview-api/graph", "status": 200},
+        {"path": "/preview-api/companion/memory/recent", "status": 404},
+        {"path": "/preview-api/formation", "status": 200},
+        {"path": "/preview-api/environment-resources/sources/{id}/features", "status": 200},
+        {"path": "/preview-api/world/assets", "status": 404},
+        {"path": "/preview-api/world/versions", "status": 404},
+        {"path": "/api/graph", "status": 403},
+        {"path": "/api/tiles", "status": 200},
+        {"path": "/api/tiles/{id}/bytes", "status": 200},
+        {"path": "/api/tiles/{id}/bytes", "status": 200},
+        {"path": "/api/tiles/{id}/bytes", "status": 200},
+        {"path": "/api/tiles/{id}/bytes", "status": 200},
+    ]
+
+
+def test_the_corridor_page_as_it_stands_satisfies_the_condition(tmp_path):
+    """THE POSITIVE CONTROL, and it comes before any refusal test.
+
+    A rule that refuses everything refuses correctly for the wrong reason, and this lane has already
+    written a clause that would never have matched the page it was written for: the first draft said
+    the page never asks for anything else, and the page asks and is refused 403. The match is proved
+    from the page's own measured traffic before any of the refusals below mean anything.
+    """
+    assert _condition(tmp_path, _corridor_traffic(), 401) == "preview-shell-credentialed-tiles"
+
+
+def test_a_page_that_used_no_preview_route_is_not_the_preview_shell(tmp_path):
+    """Clause 1. Without it the condition would admit the product shell itself."""
+    traffic = [one for one in _corridor_traffic() if not one["path"].startswith("/preview-api/")]
+    assert _condition(tmp_path, traffic, 401) is None
+
+
+def test_a_page_served_something_other_than_a_tile_is_refused(tmp_path):
+    """Clause 2, and it is the clause that makes the credential's USE the thing being certified.
+
+    A page holding a wider credential passes only if it did not use it; one that used it was served
+    something that is not a tile and cannot be scored at all.
+    """
+    traffic = [*_corridor_traffic(), {"path": "/api/people", "status": 200}]
+    assert _condition(tmp_path, traffic, 401) is None
+
+
+def test_a_page_whose_credential_carries_the_graph_is_refused(tmp_path):
+    """Clause 3. A credential that CAN read the graph is not the narrow one this condition names."""
+    traffic = [
+        {"path": "/api/graph", "status": 200} if one["path"] == "/api/graph" else one
+        for one in _corridor_traffic()
+    ]
+    assert _condition(tmp_path, traffic, 401) is None
+
+
+def test_an_api_that_serves_anonymous_readers_is_refused(tmp_path):
+    """Clause 4. If the API answers with no credential at all, a credential proved nothing."""
+    assert _condition(tmp_path, _corridor_traffic(), 200) is None
+
+
+def test_the_two_older_conditions_still_name_themselves(tmp_path):
+    """The third condition must not have eaten either of the first two.
+
+    A new branch placed before an old one silently reclassifies every run the old one used to name,
+    and records already exist under both.
+    """
+    product_shell = [{"path": "/api/graph", "status": 200}]
+    preview_only = [{"path": "/preview-api/graph", "status": 200}]
+    assert _condition(tmp_path, product_shell, 401) == "credentialed-api"
+    assert _condition(tmp_path, preview_only, 401) == "vite-preview-api"
 
 
 # -- the page's world, held against what crossed the wire ------------------------------------------
