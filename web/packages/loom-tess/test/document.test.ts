@@ -343,7 +343,7 @@ describe('the coordinate unit a tile document states (ADR-0024)', () => {
     // would be asserting the grammar's refusal under this one's name. So the check is exercised
     // where it lives, and what it costs is one comparison against the day a grammar admits a
     // second unit while a build still writes one.
-    expect(() => checkCoordinateUnit(COORDINATE_UNIT)).not.toThrow();
+    expect(checkCoordinateUnit(COORDINATE_UNIT)).toBe(COORDINATE_UNIT);
     expect(() => checkCoordinateUnit('micrometre')).toThrow(/coordinates are in "micrometre" and this tessellator writes/);
     expect(() => checkCoordinateUnit('micrometre')).toThrow(TileDocumentError);
   });

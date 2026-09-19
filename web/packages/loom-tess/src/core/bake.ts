@@ -123,9 +123,15 @@ export const BAKE_PARAMETERS = {
  * millimetre or closes `coordinate_unit` to millimetre alone, so the shape check always fires
  * first and a bake never reaches this. It costs one comparison and it will fire on the day
  * somebody builds the case that invalidates it, which is the point of writing it now.
+ *
+ * IT RETURNS THE UNIT SO THE CALL CANNOT BE DROPPED. No test can prove a bake calls this: the
+ * grammar refuses a foreign unit before a bake reaches it, so removing the call changes no
+ * observable behaviour and every test goes on passing. Deleting it was tried, and 83 tests passed.
+ * Handing back the value the caller needs makes the compiler the thing that notices, which is the
+ * only check here that does not depend on somebody remembering to write one.
  */
-export function checkCoordinateUnit(unit: string): void {
-  if (unit === COORDINATE_UNIT) return;
+export function checkCoordinateUnit(unit: string): string {
+  if (unit === COORDINATE_UNIT) return unit;
   throw new TileDocumentError(
     `tile: its coordinates are in ${JSON.stringify(unit)} and this tessellator writes `
       + `${JSON.stringify(COORDINATE_UNIT)}; the quantum is a constant of the tessellator version, `
@@ -142,8 +148,9 @@ export async function bakeTile(documentBytes: Uint8Array, sha256: Sha256Hex): Pr
         + 'at another level is refused rather than drawn at this one',
     );
   }
-  const coordinateUnit = coordinateUnitOf(tileTableOf(GRAMMAR_TABLES, document.tile, 'tile'), document.tile);
-  checkCoordinateUnit(coordinateUnit);
+  const coordinateUnit = checkCoordinateUnit(
+    coordinateUnitOf(tileTableOf(GRAMMAR_TABLES, document.tile, 'tile'), document.tile),
+  );
   const recordDigests: string[] = [];
   for (const record of documentRecords(document)) recordDigests.push(await sha256(recordBytes(record.payload)));
   const tessellation = tessellate(document, recordDigests);
