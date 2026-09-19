@@ -1,0 +1,179 @@
+"""Writes docs/artifacts/world-identity/positional-stamp.log.txt: does a producer name its value?
+
+Run from the repository root, on a COMMITTED tree, naming the arm AND the commit it is:
+
+    uv run python docs/artifacts/world-identity/positional-stamp.py.txt <arm> <short sha>
+
+It writes `positional-stamp-<arm>.log.txt` beside itself, so one arm cannot overwrite the other.
+
+THE QUESTION. Three fields of the city tile record are closed sets of exactly one value, and both
+producers in this repository stamped them by taking position zero of that set. While a set has one
+member, `SET[0]` and the value the producer means ARE THE SAME VALUE, so no test over this tree can
+tell the two forms apart: it is a fixture whose values make the right answer and the wrong answer
+coincide. The only thing that separates them is a set with two members, and this is the run that
+makes one.
+
+WHAT IT DOES. It adds a SECOND admissible entry, first in each tuple, to
+`exulanica/grammar/grammars/city/tile.py`, then asks the generator and the fixture builder what
+they stamp. On the `before` tree, whose producers read position zero, they stamp the invented
+entry. On the `after` tree, whose producers name the value, they stamp the real one.
+
+HOW IT REFUSES TO MEASURE ONE TREE TWICE. Each arm is told which commit it is, and REFUSES TO RUN
+unless `git rev-parse HEAD` is that commit, because an arm that merely LABELS itself is how ten
+green runs came to measure one tree twice in this project. It also refuses a dirty tree, since the
+restore below is a hard reset and would take uncommitted work with it, and it prints the digest of
+the file it edits on both sides of the edit so the restore is shown rather than trusted.
+
+WHAT IT DOES NOT COVER. It asks two producers about three fields. It says nothing about any other
+closed-set field anywhere, and the tessellator's own tables are a separate question in another
+language.
+"""
+
+import hashlib
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[3]
+HERE = Path(__file__).resolve().parent
+TILE = ROOT / "exulanica" / "grammar" / "grammars" / "city" / "tile.py"
+
+#: The second entry, first in each tuple. Nothing admits these values and nothing ever will: they
+#: exist for the length of this run so that position zero and the named value stop coinciding.
+#: Each pair is (the anchor as ONE tree spells it, the same line with an invented entry first).
+#: Both spellings of each are listed because the two arms spell them differently, and an anchor
+#: that does not occur exactly once is skipped and named in the log rather than applied.
+INVENTED = (
+    (
+        'COORDINATE_UNITS: Final = ("millimetre",)',
+        'COORDINATE_UNITS: Final = ("nanolitre", "millimetre")',
+    ),
+    (
+        "COORDINATE_UNITS: Final = (WRITTEN_COORDINATE_UNIT,)",
+        'COORDINATE_UNITS: Final = ("nanolitre", WRITTEN_COORDINATE_UNIT)',
+    ),
+    (
+        'OWNERSHIP_RULES: Final = ("anchor_floor_division",)',
+        'OWNERSHIP_RULES: Final = ("by_lottery", "anchor_floor_division")',
+    ),
+    (
+        "OWNERSHIP_RULES: Final = (ANCHOR_FLOOR_DIVISION,)",
+        'OWNERSHIP_RULES: Final = ("by_lottery", ANCHOR_FLOOR_DIVISION)',
+    ),
+    (
+        'HALO_RULES: Final = ("extent_meets_grown_square",)',
+        'HALO_RULES: Final = ("by_vibe", "extent_meets_grown_square")',
+    ),
+    (
+        "HALO_RULES: Final = (EXTENT_MEETS_GROWN_SQUARE,)",
+        'HALO_RULES: Final = ("by_vibe", EXTENT_MEETS_GROWN_SQUARE)',
+    ),
+)
+
+
+def git(*arguments: str) -> str:
+    return subprocess.run(
+        ["git", "-C", str(ROOT), *arguments], capture_output=True, text=True, check=True
+    ).stdout.strip()
+
+
+def stamped() -> dict[str, str]:
+    """What each producer writes, asked in a child process so this one holds no stale import."""
+    probe = (
+        "import json, sys;"
+        "sys.path.insert(0, 'tests');"
+        "from exulanica.grammar.grammars.city.generation import tiles as g;"
+        "from exulanica.grammar.grammars.city.catalogs import load_city_catalogs;"
+        "import exulanica.grammar.grammars.city.tile as t;"
+        "from city_v2_fixture import builder;"
+        "f = builder();"
+        "r = g.tile_record(seed='0'*64, catalogs=load_city_catalogs(), tile_x=0, tile_y=0, lod=0);"
+        "print(json.dumps({"
+        "'module': t.__file__,"
+        "'admissible_units': list(t.COORDINATE_UNITS),"
+        "'generator_unit': r.coordinate_unit,"
+        "'generator_ownership': r.ownership_rule,"
+        "'generator_halo': r.halo_rule,"
+        "'fixture_unit': f.tile.coordinate_unit,"
+        "'fixture_ownership': f.tile.ownership_rule,"
+        "'fixture_halo': f.tile.halo_rule}))"
+    )
+    result = subprocess.run(
+        [str(ROOT / ".venv/bin/python"), "-c", probe],
+        cwd=ROOT,
+        capture_output=True,
+        text=True,
+    )
+    if result.returncode != 0:
+        return {"refused": (result.stdout + result.stderr).strip().splitlines()[-1][:300]}
+    import json
+
+    return json.loads(result.stdout.strip().splitlines()[-1])
+
+
+def main() -> int:
+    if len(sys.argv) != 3:
+        print("name an arm and the commit it is: <arm> <short sha>", file=sys.stderr)
+        return 2
+    arm, expected = sys.argv[1], sys.argv[2]
+    target = HERE / f"positional-stamp-{arm}.log.txt"
+    head = git("rev-parse", "--short", "HEAD")
+    if head != expected:
+        print(
+            f"this arm was told it is {expected} and HEAD is {head}. An arm that LABELS itself "
+            "rather than checking is how a control comes to measure one tree twice.",
+            file=sys.stderr,
+        )
+        return 2
+    dirty = git("status", "--porcelain")
+    if dirty:
+        print(f"dirty, and the restore below is a hard reset:\n{dirty}", file=sys.stderr)
+        return 2
+
+    original = TILE.read_bytes()
+    before_digest = hashlib.sha256(original).hexdigest()
+    text = original.decode("utf8")
+    applied = []
+    for old, new in INVENTED:
+        if text.count(old) == 1:
+            text = text.replace(old, new)
+            applied.append(old.split(":")[0])
+
+    lines = [
+        "# Does a producer stamp the value it names, or position zero of the admissible set?",
+        "",
+        f"arm             {arm}",
+        f"commit          {head}",
+        f"tile.py before  {before_digest}",
+        f"anchors applied {', '.join(applied) if applied else 'NONE, so this arm asked nothing'}",
+        "",
+        "## unbroken",
+    ]
+    for key, value in sorted(stamped().items()):
+        lines.append(f"  {key:<22} {value}")
+
+    try:
+        TILE.write_text(text)
+        lines += ["", "## with a second entry admitted, first in each tuple"]
+        for key, value in sorted(stamped().items()):
+            lines.append(f"  {key:<22} {value}")
+    finally:
+        git("reset", "-q", "--hard", "HEAD")
+        subprocess.run(["git", "-C", str(ROOT), "clean", "-qfd", str(TILE.parent)], check=False)
+
+    after_digest = hashlib.sha256(TILE.read_bytes()).hexdigest()
+    lines += [
+        "",
+        "## the restored tree, printed rather than trusted",
+        f"  tile.py after        {after_digest}",
+        f"  restored             {after_digest == before_digest}",
+        f"  git status           {git('status', '--porcelain') or '(clean)'}",
+        "",
+    ]
+    target.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print("\n".join(lines))
+    return 0 if after_digest == before_digest else 1
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
