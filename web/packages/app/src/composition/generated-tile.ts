@@ -103,8 +103,14 @@ function stateWorld(
   env.shell.setAttribute(GENERATED_TILE_WORLD_ATTRIBUTE, JSON.stringify({
     reach: world === null ? 'unstated' : 'stated',
     drawnAndStoodOn: drawn,
+    // THE COORDINATES, NOT ONLY THE NAME. A reader that had to parse `tile (3,0)` back into numbers
+    // would be parsing a string this file formats, which is the same fault as binding the sentence
+    // one level down.
     stoodOnOnly: world === null ? [] : world.neighbours.map((neighbour) => ({
-      tile: neighbour.name, containerSha256: neighbour.containerSha256,
+      tile: neighbour.name,
+      tileX: neighbour.tileX,
+      tileY: neighbour.tileY,
+      containerSha256: neighbour.containerSha256,
     })),
     transferredBytes: world === null ? 0 : world.transferredBytes,
     absent: world === null ? [] : world.absent,

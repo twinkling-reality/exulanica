@@ -106,7 +106,7 @@ describe.runIf(live)('the page against a running tile route', { timeout: 120_000
     const stated: {
       reach: string;
       drawnAndStoodOn: { name: string; containerSha256: string };
-      stoodOnOnly: { tile: string; containerSha256: string }[];
+      stoodOnOnly: { tile: string; tileX: number; tileY: number; containerSha256: string }[];
       transferredBytes: number;
       absent: { tileX: number; tileY: number; reason: string }[];
     } = JSON.parse(element.getAttribute(GENERATED_TILE_WORLD_ATTRIBUTE)!);
@@ -120,12 +120,13 @@ describe.runIf(live)('the page against a running tile route', { timeout: 120_000
     // AGAINST THE NETWORK, not against the sentence beside it. Every container the attribute says
     // was STOOD ON ONLY was fetched from the route, and the one it says was DRAWN was fetched too.
     const fetchedIds = asked.flatMap((url) => /\/tiles\/([0-9a-fA-F-]{36})\/bytes/.exec(url)?.[1] ?? []);
-    const rowFor = (tile: string) => {
-      const found = /\((-?\d+),(-?\d+)\)/.exec(tile)!;
-      return tiles.find((row) => row.tileX === Number(found[1]) && row.tileY === Number(found[2]) && row.lod === placement.lod)!;
-    };
+    // BY COORDINATE, NOT BY PARSING THE DISPLAY NAME. The name is for a person; a check that had to
+    // read numbers back out of `tile (3,0)` would be binding a string this codebase formats, which is
+    // the fault the attribute exists to avoid, one level down.
+    const rowFor = (at: { readonly tileX: number; readonly tileY: number }) =>
+      tiles.find((row) => row.tileX === at.tileX && row.tileY === at.tileY && row.lod === placement.lod)!;
     for (const stoodOn of stated.stoodOnOnly) {
-      const row = rowFor(stoodOn.tile);
+      const row = rowFor(stoodOn);
       expect(row, `${stoodOn.tile} is listed`).toBeDefined();
       expect(stoodOn.containerSha256, `${stoodOn.tile} states the digest its row records`).toBe(row.containerSha256);
       expect(fetchedIds, `${stoodOn.tile} was fetched`).toContain(row.bakedTileId);
@@ -135,7 +136,7 @@ describe.runIf(live)('the page against a running tile route', { timeout: 120_000
     // Nothing is both drawn and only stood on.
     expect(stated.stoodOnOnly.map((tile) => tile.containerSha256)).not.toContain(stated.drawnAndStoodOn.containerSha256);
     // The bytes the page says it moved for the neighbours are the neighbours' own recorded lengths.
-    expect(stated.transferredBytes).toBe(stated.stoodOnOnly.reduce((total, tile) => total + rowFor(tile.tile).containerBytes, 0));
+    expect(stated.transferredBytes).toBe(stated.stoodOnOnly.reduce((total, tile) => total + rowFor(tile).containerBytes, 0));
 
     // Absent squares, against the listing rather than hard-coded: the city's shape is the city's fact.
     for (const square of stated.absent) {

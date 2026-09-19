@@ -204,7 +204,10 @@ export interface FetchedWalkWorld {
    * would otherwise have to remember which was which.
    */
   readonly neighbours: readonly {
+    /** For a person: `tile (3,0)`. NOTHING SHOULD PARSE IT; the coordinates are beside it. */
     readonly name: string;
+    readonly tileX: number;
+    readonly tileY: number;
     readonly bytes: Uint8Array;
     readonly containerSha256: string;
     readonly transferredBytes: number;
@@ -266,6 +269,8 @@ export async function fetchWalkWorld(
     transferredBytes += fetched.transferredBytes;
     neighbours.push({
       name: tileName(row),
+      tileX: row.tileX,
+      tileY: row.tileY,
       bytes: fetched.bytes,
       containerSha256: fetched.containerSha256,
       transferredBytes: fetched.transferredBytes,

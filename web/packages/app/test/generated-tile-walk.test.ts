@@ -334,8 +334,8 @@ describe('walking a tile fetched from the product route', { timeout: 30_000 }, (
   it('says which containers were drawn and which were only stood on, and names the squares with no ground', () => {
     const composed = worldLine({
       neighbours: [
-        { name: 'tile (1,0)', bytes: new Uint8Array(), containerSha256: 'aaaa1111'.padEnd(64, '0'), transferredBytes: 12 },
-        { name: 'tile (3,0)', bytes: new Uint8Array(), containerSha256: 'bbbb2222'.padEnd(64, '0'), transferredBytes: 34 },
+        { name: 'tile (1,0)', tileX: 1, tileY: 0, bytes: new Uint8Array(), containerSha256: 'aaaa1111'.padEnd(64, '0'), transferredBytes: 12 },
+        { name: 'tile (3,0)', tileX: 3, tileY: 0, bytes: new Uint8Array(), containerSha256: 'bbbb2222'.padEnd(64, '0'), transferredBytes: 34 },
       ],
       transferredBytes: 46,
       absent: [{ tileX: 1, tileY: 1, reason: 'no_row' }, { tileX: 2, tileY: 1, reason: 'nondeterminism_detected' }],
