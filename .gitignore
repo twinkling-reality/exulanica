@@ -106,6 +106,23 @@ venv/
 AGENTS.md
 CLAUDE.md
 
+# Two different things are held out of this repository under docs/, and only one of them is
+# named here.
+#
+# THE FIRST IS OPERATOR PROCESS, and the rules below name it: briefs, records, patches and a
+# handful of documents at the docs/ root. Every one is matched by a rule in THIS file, which is
+# tracked, so a clone can see what is missing and why, and a test in
+# tests/test_documentation_links.py reads that back from git rather than trusting this sentence.
+#
+# THE SECOND IS A SET OF EVALUATION CAMPAIGNS under docs/evaluation/ that were run locally and
+# not published: the record and the artifacts it binds exist only on the machine that ran them.
+# THOSE ARE EXCLUDED PER CLONE IN .git/info/exclude AND DELIBERATELY NOT LISTED HERE, so this
+# repository does not carry their names. The consequence is worth stating rather than leaving to
+# be discovered: no clone can enumerate them, and a rule that lives in one checkout cannot stop a
+# different checkout committing them by accident. What a reader can see is the subset this
+# repository itself points at, named one by one in tests/test_documentation_links.py, because a
+# pointer nobody can follow is the only part of this that costs a reader anything.
+#
 # Operator process. Kept on disk for evidence tests. Not published.
 docs/briefs/
 docs/records/
