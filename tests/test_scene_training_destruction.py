@@ -799,7 +799,7 @@ def test_the_destroy_question_refuses_rather_than_answering_yes(trained):
             "select scene_training_withdrawal_releases_artifact(%s,null) as releases", tombstone_id
         )
     assert "absent content hash" in str(refused.value)
-    # And a tombstone of another scope is not an authority this question answers for.
+    # A tombstone nobody wrote is not an authority.
     assert (
         trained.one(
             "select scene_training_withdrawal_releases_artifact(%s,%s) as releases",
@@ -808,3 +808,81 @@ def test_the_destroy_question_refuses_rather_than_answering_yes(trained):
         )["releases"]
         is False
     )
+    # Nor is a tombstone of another scope, and this is the half a break got past first: with the
+    # scope test removed, a random id still answers false because there is no row at all, so only
+    # a REAL tombstone of a different scope asks the question that clause is there for.
+    second = admit_personal(
+        trained.repository, trained.store, photo_bytes(size=(120, 80)), "deleted.jpg"
+    )
+    deletion = trained.repository.insert_tombstone(
+        scope="capture", capture_id=second.capture_id, requested_by=ACCOUNT
+    )
+    assert (
+        trained.one(
+            "select scene_training_withdrawal_releases_artifact(%s,%s) as releases",
+            deletion,
+            bytes(32),
+        )["releases"]
+        is False
+    )
+
+
+def test_each_withdrawal_enqueues_only_its_own_photograph_s_reconstruction(trained):
+    """A tombstone names what IT asked to have destroyed, and completes on its own work.
+
+    Two photographs, two runs, two withdrawals. Without the cascade's capture test the second
+    tombstone would enqueue the first's artefact as well, because that right is withdrawn too. The
+    jobs are idempotent and the bytes would still go, so this is not about the bytes: it is
+    ``tombstone_purge_is_complete``, which is asked per tombstone, and a tombstone carrying another
+    tombstone's objects is one whose completion waits on somebody else's work.
+    """
+    mine = trained.subject
+    also = admit_personal(
+        trained.repository, trained.store, photo_bytes(size=(120, 80)), "also.jpg"
+    )
+    first = _grant(mine)
+    second = _grant(also)
+    _my_artifact, my_blob, _my_job = _run_and_publish(trained)
+    their_job = _queue(also, subjects=[also])
+    _their_artifact, their_blob = trained.publish(
+        _scene_of(trained.repository, their_job), "scene_splat_evaluation", b"the other run"
+    )
+
+    _withdraw(trained, first.right_id)
+    _withdraw(trained, second.right_id)
+
+    by_tombstone: dict = {}
+    for row in _jobs(trained):
+        by_tombstone.setdefault(row["tombstone_id"], []).append(row["target_ref"])
+    assert sorted(by_tombstone.values()) == sorted([[my_blob.hex], [their_blob.hex]]), by_tombstone
+
+    outcome = trained.worker().drain()
+
+    assert outcome.destroyed == 2
+    assert len(outcome.completed_tombstones) == 2, "each tombstone completed on its own work"
+
+
+def test_an_interval_redaction_enqueues_no_reconstruction(trained):
+    """A redaction removes a moment, not a photograph, and not what was trained from one.
+
+    0013's scope paragraph says an interval tombstone queues nothing at all, and ``test_purge``
+    holds that for the general enqueue. This holds it for the training cascade, which runs on the
+    same insert and has to decline the same way.
+    """
+    right = _grant(trained.subject)
+    _artifact_id, blob_id, _job_id = _run_and_publish(trained)
+    _withdraw(trained, right.right_id)
+    withdrawal = _tombstones(trained)[0]["tombstone_id"]
+
+    redaction = trained.repository.insert_tombstone(
+        scope="interval",
+        capture_id=trained.subject.capture_id,
+        track_key="img",
+        interval_ns=[(0, 1)],
+        requested_by=ACCOUNT,
+        reason="the user redacted a moment",
+    )
+
+    assert {row["tombstone_id"] for row in _jobs(trained)} == {withdrawal}
+    assert [row["target_ref"] for row in _jobs(trained)] == [blob_id.hex]
+    assert trained.rows("select purge_id from purge_job where tombstone_id=%s", redaction) == []
