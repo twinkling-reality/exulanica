@@ -264,3 +264,53 @@ Nothing in the measurement. Every repair worth making moves the gate's headline 
 The third is additive and changes no verdict, but it would put a long array into every record, so it
 is a shape decision rather than a lane's. The first two change what the gate says. All three are
 recorded for the orchestrator and none is taken.
+
+## State at the checkpoint of 2026-09-19, and what is NOT run
+
+Written because the session pauses here and the lane carries more measured detail than it has
+published. Everything above is measured; this section says what is missing.
+
+**THE TREE.** Branch `lane/what-holds-a-component-up` in worktree `orimera-component-support`,
+rebased twice: first onto main `775d44f8`, then onto main `1f3697c1`. Nothing merged, nothing
+pushed, working tree clean. `web/packages/loom-gate/src/scene.ts` is restored and its digest re-read
+as `9366119258eabcb86ba848381fcaac68ee19d6ba098e61ad000d36c1e355e8e7`: the example cap was patched
+three times during the classification and reverted three times, and that is the file it was patched
+in.
+
+**THE BACKEND SUITE HAS NOT BEEN RUN ON THIS TREE.** It was queued twice and cancelled twice, once
+for a rebase and once for the checkpoint, because the machine was carrying three other lanes' suites
+at a load average near 80. `pnpm run check` over `web/` has not been run either. What HAS been run,
+repeatedly and green, is `npx vitest run packages/loom-gate/test/`: 55 tests in 6 files, including
+the 6 new ones. THE LANE'S OWN PACKAGE IS VERIFIED AND THE REPOSITORY GATES ARE NOT, and the new
+Python script in `scripts/` is the part most likely to meet a gate nobody in this lane thought of.
+
+**AN EARLIER RUN ON AN UNDER-PROVISIONED WORKTREE, recorded so nobody repeats it.** At main
+`15e8198c` before the worktree was finished: 19 failed, 9,352 passed, 33 skipped, 6 errors. None of
+it was the tree. 23 of the skips and every failure but one were `docs/` files that are git-excluded
+and therefore absent from a fresh worktree; the exception needs `pycolmap`, which is in the `pose`
+extra. `uv sync --extra reconstruction` alone is not enough: `pose` and `segmentation` are needed
+too, and the check that settles it is that the worktree's venv and the main checkout's hold the same
+number of site-packages entries, 167 on the day. The count of missing `docs/` files is 660, not the
+164 this lane first reported: `git status --ignored --porcelain` collapses an ignored DIRECTORY into
+one line, so `git ls-files --others --ignored --exclude-standard -- docs/` is the form that counts.
+
+**THE NEAREST-DISTANCE DISTRIBUTION IN FULL**, because the pile-up at the tolerance is the finding
+and three summary statistics do not show it. Distance from each detached component to the nearest
+component the measurement reached, in millimetres, over the 351:
+
+    50.018  63      50.003  45      50.000  20      75.005  20
+    260.010 35      260.002 15      260.000 15      214.966 25
+    4003.363 21     4003.362 15     and a tail of single values
+
+128 of 351 are within 0.1 mm of 50.000, at exactly three distances. Against ANY other component
+rather than a reached one, 164 sit at 0.000 mm: they touch their siblings exactly and the whole
+cluster is adrift, which is why the count moves in blocks rather than one at a time.
+
+**WHAT IS DECIDED AND NEEDS NOTHING FURTHER FROM THIS LANE.** The 18 terrain slivers were measured
+here rather than handed to tess as a number, and the junction control above is the result. The
+offline rebake and recompute are committed as tools:
+`scripts/rebake_corridor_offline.py` and `web/scripts/recompute-gate-integrity.ts`.
+
+**WHAT IS OPEN.** The three decisions at the end of the previous section, all with the orchestrator:
+the single-point root probe, the tolerance equalling `DIMENSION_MODULE_MM`, and the twelve-example
+cap. None is a lane's to take, and none is taken here.
