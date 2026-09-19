@@ -1,0 +1,242 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "a_society_over_one_tile": {
+      "answer": "No, and the repository already said so in a guard the society does not call: check_city_reference_closure accepts only the whole five-tile city and refuses every subset, including four of five. Walking connectivity heals at two tiles while the closure accepts only five, so two guards disagree about what a world is by three tiles, and the society checked neither.",
+      "per_tile": {
+        "0,0": {
+          "destinations": 1,
+          "home_places": 0,
+          "needs_modelled": [
+            "fatigue",
+            "leisure"
+          ],
+          "nodes": 212,
+          "population": 97,
+          "society": "built",
+          "spots": 195,
+          "staff_places": 0,
+          "walking_graph_pieces": 1
+        },
+        "1,0": {
+          "destinations": 83,
+          "home_places": 62,
+          "needs_modelled": [
+            "fatigue",
+            "leisure",
+            "meal",
+            "provisions",
+            "sleep"
+          ],
+          "nodes": 415,
+          "population": 62,
+          "society": "built",
+          "spots": 310,
+          "staff_places": 138,
+          "walking_graph_pieces": 1
+        },
+        "2,0": {
+          "destinations": 83,
+          "home_places": 64,
+          "nodes": 367,
+          "refusal": "this place's walking graph is in 3 pieces and 37 of 64 inhabitants could not walk from where they live to their workplace",
+          "society": "refused",
+          "spots": 269,
+          "staff_places": 136,
+          "walking_graph_pieces": 3
+        },
+        "3,0": {
+          "destinations": 81,
+          "home_places": 58,
+          "needs_modelled": [
+            "fatigue",
+            "leisure",
+            "meal",
+            "provisions",
+            "sleep"
+          ],
+          "nodes": 419,
+          "population": 58,
+          "society": "built",
+          "spots": 300,
+          "staff_places": 122,
+          "walking_graph_pieces": 1
+        },
+        "4,0": {
+          "destinations": 0,
+          "home_places": 0,
+          "needs_modelled": [
+            "leisure"
+          ],
+          "nodes": 213,
+          "population": 99,
+          "society": "built",
+          "spots": 199,
+          "staff_places": 0,
+          "walking_graph_pieces": 1
+        }
+      },
+      "question": "should a society ever be created over one tile",
+      "why_two_of_them_look_fine": "Of five tiles, two are end tiles with no homes and no staff places at all, one is in three pieces and strands 37 of its 64 inhabitants, and TWO LOOK COMPLETELY HEALTHY. A lane that measured the tile the gate walks, or either of the two healthy ones, would have concluded that a tile holds a society and reported the reachability as proof. The only reason this lane did not is that it ran all five."
+    },
+    "controls_that_changed_the_answer": [
+      "A FAILURE IN YOUR TREE IS A FACT ABOUT YOUR TREE UNTIL YOU HAVE RUN IT SOMEWHERE ELSE, AND THE BETTER YOUR EXPLANATION OF IT, THE MORE URGENT THAT IS, BECAUSE A GOOD EXPLANATION IS WHAT STOPS YOU CHECKING. test_documentation_links failed in this worktree on two evaluation records named by tests/test_visual_gate.py that resolve nowhere. There was a specific and convincing culprit: they arrive with two commits of another lane, and the shape is a regression of an earlier commit whose subject line is literally about keeping that test's made-up record paths outside docs. It was not reported. Main was checked out in a throwaway worktree and the file run there: IT PASSED, because main had moved two further commits in the meantime and one of them resolves documentation paths against the tree at the commit rather than against the checkout. Neither answer available from this tree alone was right.",
+      "The comparison that established the shortage reason moves no behaviour was run with every explanation stripped, and would have been worthless without its own control: the same comparison with one arm on a different seed, which DIFFERS at tick 1. Without that, identical could have meant stripping too much.",
+      "Each of the four new tests was shown to be able to fail, by breaking the thing it checks and restoring: the refusal, the shortage message and the metric's source."
+    ],
+    "corrections_this_lane_made_to_itself": [
+      "A midday figure of 6 to 10 people outdoors on the gate's own tile was withdrawn before it was sent. Those people cannot get to work: that tile's graph is in three pieces and 27 of 64 can route from home to work, against 196 of 196 across five tiles. A TRUE MECHANISM, the tile boundary cutting the graph, produced a number that would have read as reassurance about a street.",
+      "A ratio printed 0 of 97 for an end tile, which reads as NOBODY CAN REACH WORK and means NOBODY HAS WORK. One ratio over everybody reported an absence of jobs as a failure to reach them. Caught only because the script crashed on a person with no home.",
+      "A script that repinned two moved digests reimplemented the test's run helper and got branch_id wrong, computing three digests for a society the test never builds and overwriting a constant that had not moved. Its second independent read agreed, because both reads ran the same wrong helper: A RE-READ CONFIRMS SELF-CONSISTENCY, NOT CORRECTNESS. The reader that settled it was the test itself.",
+      "A baseline suite run waited 26 minutes for the machine slot and took it after the tree had been edited. The runner refused to let it pass as a baseline: 'collected at 15e8198c ... but 1 path differs from it, so this run is not that commit'. Discarded. COMMIT BEFORE YOU START A SUITE."
+    ],
+    "date": "2026-09-19",
+    "decided_not_built": {
+      "a later place edit reports, and never refuses or reassigns": {
+        "because_of_the_layering": "A place is a fact about the world and a society lives in it. If living_places_follow could refuse a successor place, a society would be able to VETO A WORLD EDIT and the world would stop being the thing that is true. Refusing at creation is different in kind: nothing exists yet, so it costs nobody anything and prevents a bad state from being born, where refusing a successor destroys a legitimate edit to protect a derived thing.",
+        "because_reassignment_is_not_free": "Moving somebody's workplace because the world changed under them moves the transition, so it is profile work and rides with the join and the visitors, exactly like the two shortage consumers deliberately left unwired. It must not be done quietly later because it looks like a fix.",
+        "because_the_shape_is_already_settled": "It is the end-tile case later in time: a legitimate place that makes a degenerate society. That was settled as report rather than refuse, because a place with nothing in it is legitimate and a silent success is the wrong answer to both.",
+        "what": "The creation refusal is at creation only. A place edit can cut the walking graph under a living society, living_places_follow accepts the successor, and nothing re-checks. Decided 2026-09-19 by the orchestrator: when a successor place strands inhabitants the society SAYS SO, in the numbers, by the same route the run measurement already uses to read a place's own unsupported list. It does not refuse and it does not reassign."
+      }
+    },
+    "how_this_record_was_sequenced": {
+      "the_circular_one": "A record committed BEFORE it is generated would have to name its own commit, whose sha depends on the record's contents, which is a fixed point nothing can satisfy. The staleness fault has a fix; this one has only a sequence. The record is generated while HEAD is the CODE commit, and committed on top of it afterwards, so it names the commit whose behaviour it describes and never itself. Anybody writing the next self-describing artefact meets this second.",
+      "the_queued_measurement": "What a queued suite run carries is a DIRECTORY; what it reads is a COMMIT, and it reads it when it finally starts. The wrapper blocks on a machine-wide lock and only then runs the suite, which takes its provenance at its own start, so a run queued before a rebase measures the tree AFTER it. This entry first said the opposite, that such a run measures the pre-rebase commit, which would have had lanes discarding good runs. The claim was reasoned from the queue-time log line, which names a directory and a time and NO COMMIT, with the commit filled in from when the run had been asked for. A FIGURE THAT FITS THE STORY ALREADY BEING TOLD IS THE ONE TO CHECK; a surprising one gets checked by reflex. The real hazard is the opposite: a run that starts while the tree is being EDITED measures a tree matching no commit, and the runner says so by naming the paths that differ.",
+      "the_stale_one": "A rebase rewrites the commit the record names, so a record carried across one names a tree that no longer exists. This record was REGENERATED after its rebase rather than having its head re-stated, which also re-derives every figure instead of trusting that nine commits landing underneath moved none of them. Checking which files those commits touched says what to EXPECT, never what happened. The figures came back unchanged, which is a result rather than an assumption.",
+      "why_it_matters": "This is a self-describing artefact: it names the commit it measures, and it is committed into that same branch. Two different faults follow, and the second is only met after solving the first."
+    },
+    "kind": "measurement",
+    "not_established": {
+      "no baseline suite run was ever obtained": "Two were attempted and both discarded. The first measured a worktree missing 164 local-only files under docs/ and the `pose` python extra, which failed 19 tests and errored 6 for reasons that were nothing to do with this lane. The second waited 26 minutes for the slot and took it against a tree being edited under it, which the runner itself refused to let pass: 'collected at 15e8198c ... but 1 path differs from it, so this run is not that commit'.",
+      "the full backend suite has not run on this commit": "What HAS run at this tip: 49 passed across tests/test_society_living.py and tests/test_society_city_place.py, which is the suite that can see this change, plus tests/test_documentation_links.py. Every one of the seven new tests was shown to be able to fail by breaking the thing it checks and restoring, and the three pinned v4 digests were re-checked after every amend and never moved. What that does NOT establish is that nothing ELSEWHERE broke, which is a real and separate property. The machine-wide suite slot was held for over 70 minutes with five lanes queued when this was written, and two queued waiters had already been killed during an interruption, so the run is hours away and was not waited for. Decided by the orchestrator, not by this lane. THE GAP IS THE SIZE OF THIS COMMIT AND NOT OF THE BRANCH: the only commit after this one adds this record, a single JSON file under docs/evaluation that no code reads, so what is unestablished is whether THIS commit broke something elsewhere, and never whether the branch tip did. Those are different sizes of gap and a reader left to guess assumes the larger."
+    },
+    "not_measured_here": {
+      "the gate walk's clock": "There is none. docs/product-direction.md records solar position as not implemented and the generated tile's light is a fixed sun in look.ts. The society's clock starts at 480 and advances a minute a tick, and nothing binds the number of ticks advanced to the light in a frame.",
+      "whether any v4 society is stored": "Needs a shared database this lane did not touch. It decides whether the profile question is theoretical."
+    },
+    "owner": "the society destinations lane",
+    "subject": "why a generated street has four destinations, where the destinations it does have go, and what a society over one tile of it is",
+    "the_corridor_supply": {
+      "city_records": 6566,
+      "corridor_tile_alone": {
+        "capacity": 861,
+        "destinations": 83,
+        "nodes": 367,
+        "spots": 269
+      },
+      "entrances": 228,
+      "five_tiles": {
+        "capacity": 2843,
+        "destinations": 262,
+        "home_places": 196,
+        "nodes": 1687,
+        "spots": 1267,
+        "staff_places": 438,
+        "use_classes": {
+          "bench": 34,
+          "cafe": 52,
+          "grocery": 20,
+          "office": 17,
+          "pharmacy": 4,
+          "residential": 98,
+          "restaurant": 19,
+          "workshop": 18
+        },
+        "visitor_places": 1448
+      },
+      "premises": 228,
+      "street_furniture": 130
+    },
+    "the_flatiron_four": {
+      "buildings_beyond_100_m_from_any_walkable_node": 351,
+      "buildings_in_the_base": 400,
+      "buildings_measured": 400,
+      "buildings_with_a_candidate_node": 1,
+      "by_affordance": {
+        "rest": 3,
+        "visit": 1
+      },
+      "entrance_destination_cap": 8,
+      "interpretation_bytes": 773086,
+      "navigation_nodes": 93,
+      "nearest_walkable_node_per_building_mm": {
+        "max": 491450,
+        "median": 233783,
+        "min": 841,
+        "p10": 89949,
+        "p90": 380666
+      },
+      "place_capacity": 93,
+      "place_destinations": 4,
+      "place_spots": 93,
+      "published_destinations": 4,
+      "rest_pad_cap": 3,
+      "walkable_envelope_mm": {
+        "x_from": 32000,
+        "x_to": 64000,
+        "y_from": 64000,
+        "y_to": 144000
+      },
+      "what": "The four destinations are real and they are the calibration world, not the generated street. The committed district interpretation publishes exactly four.",
+      "why_four": "Not the caps. The producer caps entrance destinations at 8 and rest pads at 3; the rest cap binds and the entrance cap does not. Re-running the producer's own 450 to 5000 mm candidate rule over the committed base and the committed interpretation's own published nodes gives the entrance supply below: the binding constraint is that the walkable envelope covers a small rectangle of a district of 400 buildings, not the cap. The interpretation's own unsupported list says 'actual doors and interiors' up front."
+    },
+    "three_figures_in_this_lane_s_brief_that_no_longer_held": {
+      "128 people": "v2 and v3 size a society at a fixed 128; v4 sizes it from the place. Two populations, not one that shrank.",
+      "coincident collapse draws 1": "The rule is gone: society/crowd.ts says two people standing on one point are both drawn there. And under v4 on that place there is nothing coincident to collapse.",
+      "the rest threshold never fires": "FALSE at head on four seeds under both engines over the same place: v2 peak need_milli 892 to 902 against its condition of 750 with 123 to 171 person-ticks satisfying it, and v4 peak fatigue 755 to 862 against its threshold of 500 with 413 to 638. The branch fires; it is not what caused the convergence.",
+      "why_they_were_believed": "They were measured on 2026-09-15 against the v2 purposeful planner and written into a memory note with no date and no commit. The v4 merge on 2026-09-17 moved all three and nothing re-measured. A FIGURE WITH NO DATE AND NO COMMIT IS A CLAIM ABOUT A TREE NOBODY CAN IDENTIFY."
+    },
+    "tree": {
+      "branch": "lane/society-destinations",
+      "branched_from": "e41b4bb77fa5ec51b9079960cb5a9dbaf2644884",
+      "clean": false,
+      "commit": "982d0d208b63fef51c31767c7bf90c78fb08fdbf",
+      "main_head_when_this_was_written": "a4c0fb4b02e5b7c5200bca4ff318dedb42e70f3f"
+    },
+    "what_a_walker_would_see": {
+      "everyone_has_a_home": true,
+      "everyone_has_a_job": true,
+      "how": "The v4 living society, unmodified, over the place the city producer already derives, five tiles, one simulated day of 1440 ticks from the routine's own start_minute_of_day. A person inside premises is counted by the society and NOT DRAWN by the crowd, because interiors are not rendered, so the outdoor count is what decides what a walker sees.",
+      "minutes_measured": 1440,
+      "minutes_with_nobody_outdoors": 510,
+      "outdoors_max": 79,
+      "outdoors_median": 9,
+      "outdoors_median_by_hour": {
+        "00": 0,
+        "01": 0,
+        "02": 0,
+        "03": 12,
+        "04": 38,
+        "05": 56,
+        "06": 71,
+        "07": 49,
+        "08": 14,
+        "09": 13,
+        "10": 6,
+        "11": 0,
+        "12": 0,
+        "13": 0,
+        "14": 0,
+        "15": 8,
+        "16": 24,
+        "17": 40,
+        "18": 56,
+        "19": 38,
+        "20": 55,
+        "21": 5,
+        "22": 0,
+        "23": 0
+      },
+      "population": 196,
+      "the_finding": "The world does not offer too few reasons to be somewhere. It offers 262 reasons and 1,448 visitor places, and generates too few people, every one of whom is employed indoors. The population can never exceed the home places, because the residents rule sets size to the number of home places; the city generates about 2.2 staff places per home place, so every inhabitant gets a job; and work outweighs every need while a shift is due. Nobody is left to be a customer."
+    },
+    "what_changed": {
+      "metric": "measure_run reports what the place OFFERED beside what the population did: its destination count, the needs its people can hold at all, and the place's own unsupported list, read from the place rather than from the run.",
+      "refusal": "initial_living_society refuses a place that hands any inhabitant a workplace it cannot walk to from where it lives, naming the number of pieces and the count. Written as the society's precondition rather than as a tile count or a graph rule, because a place may honestly be in pieces: an island is a place.",
+      "shortage": "_targets returns which shortage emptied its list instead of an empty list alone: nothing here offers this, the places that do are full, and no route reaches them were three findings reported as one. The value has no consumer in v4 on purpose.",
+      "why_the_shortage_has_no_consumer": "A goal's because and a blocked action's reason are canonical state, _replay_living recomputes every stored transition digest from genesis, and the pinned digests in tests/test_society_living.py carry the rule in one line: a change there is a new profile. Measured either side of the change: consuming the reason moves the tick-30 digest while leaving behaviour identical over 240 ticks on two places, and returning it moves nothing at all. So the consumer waits for the profile that carries the city place join."
+    },
+    "which_of_three_was_true": "The destinations exist and no runtime path can see them. A WIRING FAULT, not a generation fault and not a threshold fault. exulanica/world/society_city_place.py derives 262 place destinations from the generated corridor's own records and has no production caller anywhere in the repository: every reference to it is a test, a docstring or a comment. The runtime's only place producer is place_from_society_input, reached through society_living.living_places, which takes society INPUT documents."
+  },
+  "record_sha256": "b85d87745f1784cce5406a5ff60cadb2b9183b9df66b74c96ebe9fd9d79f4073"
+}
