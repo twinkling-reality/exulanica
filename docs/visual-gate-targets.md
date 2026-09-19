@@ -688,6 +688,62 @@ beside it, all eight mechanical keys, and both remaining predicted halts. The ro
 authentication condition were never reached, so the arithmetic above stands untested and nothing in
 this section is evidence for or against it.
 
+## The walk from the tile's edge, predicted before the server was asked for a frame
+
+The second stated walk, from `docs/visual-gate-corridor-walk.md`, starting at the tile's western edge
+at 256,000 with the corridor lane's own y and heading. Committed before this run. The page on 5322
+was already serving from the previous run, so this is pre-registration against the RUN rather than
+against the server, and saying which is the honest form.
+
+**DUE EAST SHOULD NOW QUALIFY, BY 67 MM.** 131,067 mm of room against the 131,000 the rule requires.
+That is the least interesting of these predictions and the easiest to be right about.
+
+**QUALIFYING IS NOT WINNING, AND THIS IS THE ONE WORTH READING.** The rule ranks by both-sides
+frontage, then least skew, then smallest angle, so due east has to WIN rather than merely fit.
+
+- **I predict the rule picks due east, 270,000 millidegrees**, and that it wins on the FIRST
+  criterion rather than on a tie-break: a line down the middle of a street keeps frontage on both
+  sides for nearly its whole length, and any heading tilted off it drifts toward one side and loses
+  both-sides samples near the end.
+- **I predict FEW headings qualify: between 1 and 15, most likely under 10.** A heading tilted more
+  than about 3.5 degrees off east crosses the 16.2 m street into a frontage inside 131 m, and of the
+  fifteen or so headings within that cone, most should meet one of the 311 rings.
+- **THE FAILURE MODE THAT WOULD BE A BIGGER FINDING THAN LAST RUN:** if the rule picks a DIAGONAL on
+  a street this dense, the frontage tie-break is not doing what it was written for. I do not expect
+  it here, and I expect it less than I did on the fixture, where the preferred line passed a bench at
+  343 mm.
+- **And the outcome I would be most surprised by: NOTHING qualifies.** Due east down the carriageway
+  has to thread 131 m past 311 rings. One tree or bollard on the centre line refuses it, and then a
+  street built to be walked cannot be walked in any direction.
+
+**THE RANKED WALK: I predict the FIRST candidate has ground and none is refused.** On a 16.2 m street
+the chosen line should run metres from every ring, where the fixture's preferred line passed one at
+343 mm and lost its support to the clearance carve. If a heading IS refused for no ground here, the
+carve is reaching further than a street's own geometry explains.
+
+**THE THREE NUMBERS.**
+
+- the ringless halt does not fire, and `routeObstacleRings` is **311 again, exactly**: same tile, same
+  bake, same digest. A different number would mean the rings are not a function of the container.
+- **`frontageBothSidesSamples` between 100 and 120 of 126.** The route is 125,000 mm and the street is
+  116,600 mm, so about 6,000 mm at the start and 2,400 mm at the end run past the frontage into the
+  junction, which is eight or nine samples with nothing on one side or both.
+- `candidatesWithFrontage` beside it: I expect it to equal or nearly equal the qualifying count,
+  unlike the fixture's 2 of 36, because every line down this street has buildings either side.
+
+**THE EIGHT KEYS: I PREDICT NONE OF THEM IS MEASURED.** The authentication condition halts this run
+after the walk and after all three captures, because the corridor page is a preview shell that
+fetches a credentialed tile from the product API and satisfies neither declared condition. That was
+pre-registered before the first corridor run and has never yet been reached. If the walk completes,
+this is the halt that ends the run, and the captures exist but no key does.
+
+**If the keys ARE reached**, then: `usefulEyeLevelMovement` passes for the first time, because the
+walk finally exceeds the minimum; `continuousTexturedStreetAndFacades` fails, on 86 surfaces stating
+no material and on facade triangles that are zero by construction; `completeCapsuleClearanceVerification`
+fails; and **`practicalBrowserBudget` is the one I would watch**, because this tile moved 102.6 MB
+across the wire and decoded 149.6 MB of texture, where the fixture that passed moved a fraction of
+that. A key that passed on a fixture and fails on a street is the gate working.
+
 ## What the corridor run did, measured, once the gate could reach the street
 
 The run at cd1d4848, served by `corridor-walk-gate` from this worktree, quiet slot then GPU slot, load
