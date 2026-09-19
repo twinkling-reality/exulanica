@@ -1149,6 +1149,30 @@ async function main() {
   const networkLogErrors = [];
   const navigations = [];
   session.on('Network.requestWillBeSent', (event) => {
+    // ASK FOR THE BODY BEFORE IT ARRIVES, not once the response is seen.
+    //
+    // MEASURED 2026-09-18, twice and differently. First: `Network.getResponseBody` for the
+    // corridor's 12.68 MB container is answered with about 16.9 MB of base64 in ONE message and
+    // Node's own WebSocket CLOSES rather than deliver it, and this Chrome has no
+    // `Network.takeResponseBodyAsStream` at all, so the body must be streamed. Then: opening that
+    // stream from the `responseReceived` handler LOST A RACE against the smallest of four
+    // containers, 2,481,736 bytes, which had "already finished loading" by the time the call was
+    // processed. A run before it had read all four and was simply lucky.
+    //
+    // Asked for here, the request cannot have finished yet, so there is no race to lose. It is still
+    // the SAME response, which is what the record depends on: a body fetched again is a second fetch
+    // and can differ from the one the page drew.
+    if (couldBeContainer(event.request.url)) {
+      streamed.set(event.requestId, { parts: [], refused: null });
+      session.send('Network.streamResourceContent', { requestId: event.requestId })
+        .then((result) => {
+          // Whatever had arrived before the stream opened goes in FRONT of the chunks that follow.
+          streamed.get(event.requestId).parts.unshift(Buffer.from(result.bufferedData ?? '', 'base64'));
+        })
+        .catch((error) => {
+          streamed.get(event.requestId).refused = String(error.message ?? error).slice(0, 200);
+        });
+    }
     network.set(event.requestId, {
       url: event.request.url,
       method: event.request.method,
@@ -1166,24 +1190,6 @@ async function main() {
       entry.status = event.response.status;
       entry.mimeType = event.response.mimeType;
     }
-    if (!couldBeContainer(event.response.url)) return;
-    // ASK FOR THE BODY AS IT ARRIVES, in the protocol's own event-sized pieces, because a body asked
-    // for afterwards comes back whole. MEASURED 2026-09-18: `Network.getResponseBody` for the
-    // corridor's 12.68 MB container is answered with about 16.9 MB of base64 in ONE message and
-    // Node's own WebSocket closes the connection instead of delivering it, and this Chrome does not
-    // have `Network.takeResponseBodyAsStream` at all. This is the SAME response either way, which is
-    // what the record depends on: a body fetched again is a second fetch and can differ from the one
-    // the page drew.
-    streamed.set(event.requestId, { parts: [], refused: null });
-    session.send('Network.streamResourceContent', { requestId: event.requestId })
-      .then((result) => {
-        // What had already arrived before the stream was opened, so it goes in FRONT of every chunk
-        // the events carry from here on.
-        streamed.get(event.requestId).parts.unshift(Buffer.from(result.bufferedData ?? '', 'base64'));
-      })
-      .catch((error) => {
-        streamed.get(event.requestId).refused = String(error.message ?? error).slice(0, 200);
-      });
   });
   session.on('Network.dataReceived', (event) => {
     const entry = network.get(event.requestId);
