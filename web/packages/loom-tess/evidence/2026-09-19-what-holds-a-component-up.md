@@ -133,9 +133,20 @@ populations and the same three record kinds.
 128 of the 351 sit within 0.1 mm of that 50.000 mm threshold, at three distinct distances: 50.000,
 50.003 and 50.018 mm. That is the whole of the 490 against 351 against 322 spread above.
 
-**This is the check, not a fault.** Nothing is floating: the vitrines are fitted where the grammar
-puts them. Where the 50 mm comes from on the tessellator's side is a question for tess, and it is
-not stated in the city grammar table, which holds no field whose value is 50.
+**And the coincidence is not one.** `exulanica/grammar/grammars/city/generation/streets.py` states
+it in a named constant:
+
+    #: The module every street dimension this stage derives is a multiple of.
+    DIMENSION_MODULE_MM: Final = 50
+
+THE CITY IS DIMENSIONED ON A 50 MM MODULE. So the smallest gap the generator can put between two
+parts is 50 mm, which makes 50 mm the commonest gap in the world, and the gate tests contact at
+exactly 50 mm. This is not a quirk of vitrines and it will recur wherever two parts sit one module
+apart. Neither number appears as a literal in the tessellator core or in the city grammar table,
+which is why nothing connected them before: the token 50 occurs nowhere in either.
+
+**This is the check, not a fault.** Nothing is floating: the vitrines are fitted where the generator
+puts them, one module off the facade.
 
 ### 82 are objects on roofs, and the rule asks for ground under them
 
@@ -211,8 +222,10 @@ Nothing in the measurement. Every repair worth making moves the gate's headline 
 1. **The root rule probes one plan point per component,** its lowest vertex, and believes a refusal.
    A component's lowest vertex is the worst available probe for a component that is not a ground
    plane, and for a rooftop object it is meaningless.
-2. **The contact tolerance equals a clearance the world actually contains,** so 128 components are
-   decided by the renderer's last bit.
+2. **The contact tolerance equals the module the world is dimensioned on,** 50 mm against
+   `DIMENSION_MODULE_MM`, so 128 components are decided by the renderer's last bit. Whichever way
+   this is settled, the two numbers should not be equal and neither should be chosen without
+   knowing about the other.
 3. **The measurement names twelve of its detached components.** Classifying 322 required patching
    that cap three times. A key whose verdict is one number should be able to say which things it
    counted.
