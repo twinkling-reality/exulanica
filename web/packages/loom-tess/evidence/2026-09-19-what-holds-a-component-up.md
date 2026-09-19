@@ -176,6 +176,30 @@ Six per tile on exactly the three tiles that were not the scored one. They are 8
 they lie on the datum, and the nearest thing the gate reached is a kerb edge a hundred millimetres
 or two away. This is the population worth looking at as geometry, and it is 18 of 322.
 
+**SIXTEEN OF THE EIGHTEEN ARE JUNCTION GEOMETRY, and the control is the tile with none.** Asking
+each sliver which drawn record's extent holds it, 16 stand inside a `city.junction` and a
+`city.curb_edge`. The remaining two are on tile (3,0) at x 506,783 and 510,857, inside a parcel and
+its massing, 5,217 mm and 1,143 mm short of that tile's eastern boundary at 512,000, which is the
+edge of the DRAWN world: tile (4,0) was not loaded, so the terrain they continue into is not there
+to touch. That is the composition case above rather than a fault.
+
+The control is what makes this a pattern rather than a coincidence, and it is exact:
+
+    drawn junctions   halo junctions   detached terrain slivers
+    tile (0,0)   3         0                  6
+    tile (1,0)   3         3                  6
+    tile (2,0)   0         6                  0
+    tile (3,0)   3         3                  6      (4 at junctions, 2 at the world's edge)
+
+**The scored tile draws no junction at all.** It carries six as halo, so it knows about them and
+carves against them, and it draws none: the corridor is the block BETWEEN the cross streets at
+x 250,000 and x 390,000, and those junctions belong to its neighbours. Three drawn junctions give
+six slivers on every tile that has them, and the tile with none has none.
+
+So the finding for tess is not "18 slivers". It is that A DRAWN JUNCTION LEAVES TWO PIECES OF
+TERRAIN THAT TOUCH NOTHING WITHIN THE CONTACT TOLERANCE, reproducibly, twice per junction on three
+independent tiles, and the pieces are small: 1 to 6 triangles each, 86 in all.
+
 ### Nothing is floating over ground that holds it
 
 No component in the 351 has the envelope answering BELOW it. The ten where the envelope answers at
