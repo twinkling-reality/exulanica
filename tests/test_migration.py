@@ -103,7 +103,6 @@ RESERVED_ELSEWHERE: dict[str, str] = {
     "0069": "edit lane",
     "0070": "precinct anchor lane",
     "0071": "lenses lane",
-    "0081": "assigned to another lane running the same night as 0082's training right destruction",
 }
 
 
