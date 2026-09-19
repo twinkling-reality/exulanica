@@ -357,11 +357,40 @@ def main() -> int:
     parser.add_argument("--acceptance-passed", type=int, required=True)
     parser.add_argument("--acceptance-failed", type=int, required=True)
     parser.add_argument("--neighbour-passed", type=int, required=True)
+    parser.add_argument(
+        "--predecessor",
+        help=(
+            "an earlier record this one supersedes. docs/evaluation/ is append-only, so a tree that "
+            "has moved gets a NEW record bound to the one before it rather than an edit."
+        ),
+    )
     arguments = parser.parse_args()
 
     falsification = breaks_from(Path(arguments.falsification))
     not_caught = [row["break"] for row in falsification if row.get("verdict") != "refused"]
     specification = json.loads(Path(arguments.specification).read_bytes())
+
+    predecessor = None
+    if arguments.predecessor:
+        # Read the predecessor's digest from ITS OWN BYTES and check the file agrees with itself
+        # before binding to it. A predecessor binding that copied the number out of the file would
+        # bind to what the file claims rather than to what it is.
+        earlier = json.loads((ROOT / arguments.predecessor).read_bytes())
+        recomputed = hashlib.sha256(canonical_json(earlier["record"])).hexdigest()
+        if recomputed != earlier["record_sha256"]:
+            raise SystemExit(
+                f"{arguments.predecessor} does not reproduce its own digest: it says "
+                f"{earlier['record_sha256']} and its bytes say {recomputed}"
+            )
+        predecessor = {
+            "path": arguments.predecessor,
+            "record_sha256": recomputed,
+            "why": (
+                "the same door, recorded before a test was added for the refusal an extent that "
+                "ends mid-tile produces. Its figures are true of the tree it names and this one "
+                "supersedes it rather than correcting it."
+            ),
+        }
 
     record: dict[str, object] = {
         "profile": PROFILE,
@@ -378,6 +407,7 @@ def main() -> int:
             "the feature it exposes."
         ),
         "source_files": [binding(path) for path in SOURCES],
+        **({"predecessor_record": predecessor} if predecessor else {}),
         "acceptance": {
             "selectors": ["tests/test_world_generation_route.py"],
             "passed": arguments.acceptance_passed,
