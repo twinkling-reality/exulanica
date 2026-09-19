@@ -4,13 +4,22 @@ from __future__ import annotations
 
 import json
 
-import numpy as np
 import pytest
 from exulanica.canonical import canonical_json
 from exulanica.environment import scene_extraction as extraction
 from exulanica.ingest.scene_segments import _opm_positions, _placed, _voxels
 
 from test_reconstruction_placement import _maps, _receipt, _record
+
+#: numpy arrives with the `reconstruction` extra, which `uv sync` alone does not install.
+#:
+#: MEASURED 2026-09-19 in a fresh clone provisioned exactly as README.md says: an unguarded
+#: `import numpy as np` here was THE ONLY collection error in the whole suite, and one collection
+#: error stops pytest before it runs anything, so 9,379 collected tests produced no result at all.
+#: The reason names the extra, because a skip that does not say what to install is a dead end.
+np = pytest.importorskip(
+    "numpy", reason="numpy is absent; install it with `uv sync --extra reconstruction`"
+)
 
 
 def _envelope(payload):
