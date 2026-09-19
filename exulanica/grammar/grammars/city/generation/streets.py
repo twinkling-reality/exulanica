@@ -60,8 +60,10 @@ fill the corner rule states (:func:`~exulanica.grammar.grammars.city.corners.jun
 from __future__ import annotations
 
 import dataclasses
-from collections.abc import Iterator, Sequence
+from collections import Counter
+from collections.abc import Iterator, Mapping, Sequence
 from dataclasses import dataclass, field
+from itertools import combinations
 from typing import Final
 
 from exulanica.grammar.contract import StageContext
@@ -87,7 +89,16 @@ from exulanica.grammar.grammars.city.generation.stage import (
 )
 from exulanica.grammar.grammars.city.generation.terrain import DATUM_MM
 
-__all__ = ["DIMENSION_MODULE_MM", "STAGE"]
+__all__ = [
+    "DIMENSION_MODULE_MM",
+    "STAGE",
+    "narrowest_reach",
+    "street_hierarchies",
+    "street_name_demand",
+    "street_name_shortfall",
+    "street_names_by_hierarchy",
+    "widest_reach",
+]
 
 #: The module every street dimension this stage derives is a multiple of.
 DIMENSION_MODULE_MM: Final = 50
@@ -168,6 +179,190 @@ def _ranges(hierarchies: Sequence[str], low_key: str, high_key: str) -> tuple[in
             f"the hierarchies {sorted(set(hierarchies))} share no {low_key} to {high_key} range"
         )
     return low, high
+
+
+def _section(hierarchy: str, lane_width_mm: int, gutter_width_mm: int) -> tuple[int, int, int]:
+    """Lanes, carriageway width, and the room a line of this hierarchy needs clear of the edge.
+
+    ONE STATEMENT OF THE FORMULA. The layout reads it with the widths this city derived, and the
+    two reaches below read it with the narrowest and widest the declared ranges admit.
+    """
+    fields = entry("street-hierarchy", hierarchy)
+    lanes = fields["lanes_minimum"]
+    carriageway = lanes * lane_width_mm + 2 * gutter_width_mm
+    reach = (
+        carriageway // 2
+        + CITY_SURFACE.parameters.get("kerb_width_mm").maximum
+        + fields["footway_width_maximum_mm"]
+    )
+    return lanes, carriageway, reach
+
+
+def _lane_width(hierarchy: str, widest: bool) -> int:
+    """The narrowest or widest lane this hierarchy can be given, on the even module a lane needs."""
+    declared = CITY_SURFACE.parameters.get("lane_width_mm")
+    fields = entry("street-hierarchy", hierarchy)
+    if widest:
+        width = min(declared.maximum, fields["lane_width_maximum_mm"])
+        return width - width % 2
+    width = max(declared.minimum, fields["lane_width_minimum_mm"])
+    return width + width % 2
+
+
+def narrowest_reach(hierarchy: str) -> int:
+    """The least room a line of this hierarchy can need, over the declared ranges.
+
+    THE LEAST ROOM LAYS THE MOST STREETS, so this is the reach a vocabulary must be able to name.
+    """
+    _lanes, _carriageway, reach = _section(
+        hierarchy,
+        _lane_width(hierarchy, widest=False),
+        CITY_SURFACE.parameters.get("gutter_width_mm").minimum,
+    )
+    return reach
+
+
+def widest_reach(hierarchy: str) -> int:
+    """The most room a line of this hierarchy can need, over the declared ranges.
+
+    THE MOST ROOM LAYS THE FEWEST STREETS, so this is the reach a caller refusing before
+    generation must assume: refusing on any other would refuse a city a narrower street builds.
+    """
+    _lanes, _carriageway, reach = _section(
+        hierarchy,
+        _lane_width(hierarchy, widest=True),
+        CITY_SURFACE.parameters.get("gutter_width_mm").maximum,
+    )
+    return reach
+
+
+def street_hierarchies(
+    along_positions: Sequence[int], across_positions: Sequence[int], middle_y: int
+) -> list[str]:
+    """Every street's hierarchy, in the order this stage numbers streets.
+
+    THE ONE STATEMENT of which street is which: the high street is the line along x through the
+    district's middle and every other street is local. The layout below builds its streets from
+    this and the vocabulary check counts it, so a version that assigns hierarchies differently
+    moves both rather than leaving a check measuring a rule nobody follows any more.
+    """
+    along = [_HIGH if position == middle_y else _LOCAL for position in along_positions]
+    return along + [_LOCAL] * len(across_positions)
+
+
+def street_name_demand(
+    span_x_mm: int, span_y_mm: int, block_length_mm: int, block_depth_mm: int, reach_mm: int
+) -> Mapping[str, int]:
+    """How many streets of each hierarchy a district of this shape lays out.
+
+    A district's offset does not move how many lines fit inside it, so a span is enough and a
+    caller need not know where it starts. ``reach_mm`` decides the rest: pass
+    :func:`narrowest_reach` for the most streets the shape can lay and :func:`widest_reach` for
+    the fewest.
+    """
+    middle_x, middle_y = span_x_mm // 2, span_y_mm // 2
+    along = _lay_out(0, span_y_mm, middle_y, block_depth_mm, reach_mm, centred=True)
+    across = _lay_out(0, span_x_mm, middle_x, block_length_mm, reach_mm, centred=False)
+    return Counter(street_hierarchies(along, across, middle_y))
+
+
+def street_names_by_hierarchy() -> Mapping[str, frozenset[str]]:
+    """Every street-name key that suits each street hierarchy, read from the two catalogs."""
+    entries = catalog("street-name").entries
+    hierarchies = catalog("street-hierarchy").keys()
+    return {
+        hierarchy: frozenset(
+            item.key
+            for item in entries
+            if hierarchy in entry("street-name", item.key)["hierarchies"]
+        )
+        for hierarchy in hierarchies
+    }
+
+
+def _shortfall(
+    wanted: Mapping[str, int], span_x_mm: int, span_y_mm: int, length: int, depth: int
+) -> str | None:
+    """Why no naming of these streets could exist, or ``None`` when one can.
+
+    HALL'S CONDITION, over the sets of street hierarchies: streets can be given distinct names
+    exactly when, for every set of hierarchies, the streets wanting one of them are no more
+    numerous than the names suiting one of them. Holding each hierarchy to its own supply alone
+    is not enough, because a name suiting two hierarchies is spent on whichever draws it first,
+    and it is also too strict in the other direction for the same reason.
+
+    IT ANSWERS ONLY "COULD THIS EVER WORK". A layout it admits can still run the catalog dry
+    while drawing, because the draw takes names in street order rather than solving the matching.
+
+    ONLY THE ONE-HIERARCHY CASE CAN FIRE ON A LAYOUT THIS STAGE VERSION LAYS, since it lays one
+    high street and makes every other street local, so the larger subsets are a property of this
+    function rather than of any world it can be handed. They are here because the demand is
+    public and a caller passes its own, and because a version that lays an avenue would reach
+    them with nothing to say so. `tests/test_street_name_vocabulary.py` puts the question to the
+    function directly for that reason.
+    """
+    names = street_names_by_hierarchy()
+    vocabulary = catalog("street-name")
+    present = sorted(wanted)
+    for size in range(1, len(present) + 1):
+        for subset in combinations(present, size):
+            demand = sum(wanted[hierarchy] for hierarchy in subset)
+            supply = len(frozenset().union(*(names[hierarchy] for hierarchy in subset)))
+            if demand <= supply:
+                continue
+            return (
+                f"city_extent_x_mm and city_extent_y_mm give a district {span_x_mm} by "
+                f"{span_y_mm} mm, and with block_length_mm {length} and block_depth_mm {depth} "
+                f"it lays {demand} streets needing {' or '.join(subset)} names, above the "
+                f"{supply} that {vocabulary.catalog_id} v{vocabulary.catalog_version} holds"
+            )
+    return None
+
+
+def _declared(name: str, value: int) -> int:
+    """``value``, or a refusal naming the parameter whose declared range it falls outside.
+
+    :func:`street_name_shortfall` is public and pure, so it is reachable with values no cascade
+    ever admitted, and `_lay_out` DOES NOT TERMINATE on a spacing of zero: its two candidate
+    positions stop moving and one of them stays inside the district for ever. So the guard is
+    not tidiness. A caller that resolved the cascade first can never trip it.
+    """
+    spec = CITY_SURFACE.parameters.get(name)
+    if not spec.minimum <= value <= spec.maximum:
+        raise InvalidParameterError(
+            f"{name} is {value}, outside the {spec.minimum} to {spec.maximum} it declares"
+        )
+    return value
+
+
+def street_name_shortfall(
+    *, span_x_mm: int, span_y_mm: int, block_length_mm: int, block_depth_mm: int
+) -> str | None:
+    """``None`` when a distinct name for every street could exist, else the sentence saying why not.
+
+    PURE: no seed, no context, no records, so a caller can ask before it generates anything and
+    before it charges for anything. The sentence it returns IS the refusal, written once here,
+    in the module that knows the rule, so a caller need not compose one of its own.
+
+    IT ASSUMES THE WIDEST STREET THE DECLARED RANGES ADMIT, which lays the FEWEST streets, so a
+    caller passing values a city might take can never be refused a city that would have been
+    built. A caller with a derived block length or depth should pass the declared MAXIMUM for the
+    same reason: both lay fewer streets as they grow.
+
+    A ``None`` MEANS NO NAMING PROBLEM, NOT A WORLD. This stage refuses a district too small to
+    hold a block between four streets, and that refusal is not this one's to make.
+
+    Each value is held to the range its parameter declares and refused by name outside it: the
+    spans against ``city_extent_x_mm`` and ``city_extent_y_mm``, which are what decide a
+    district's size in this version.
+    """
+    _declared("city_extent_x_mm", span_x_mm)
+    _declared("city_extent_y_mm", span_y_mm)
+    _declared("block_length_mm", block_length_mm)
+    _declared("block_depth_mm", block_depth_mm)
+    reach = widest_reach(_LOCAL)
+    wanted = street_name_demand(span_x_mm, span_y_mm, block_length_mm, block_depth_mm, reach)
+    return _shortfall(wanted, span_x_mm, span_y_mm, block_length_mm, block_depth_mm)
 
 
 @dataclass(slots=True)
@@ -323,14 +518,7 @@ def _generate(context: StageContext) -> Iterator[object]:
     speed = derived(context, "speed_limit_mm_s", _DISTRICT, minimum=speed_low, maximum=speed_high)
 
     def section(hierarchy: str) -> tuple[int, int, int]:
-        lanes = entry("street-hierarchy", hierarchy)["lanes_minimum"]
-        carriageway = lanes * lane_width + 2 * gutter
-        widest = (
-            carriageway // 2
-            + CITY_SURFACE.parameters.get("kerb_width_mm").maximum
-            + entry("street-hierarchy", hierarchy)["footway_width_maximum_mm"]
-        )
-        return lanes, carriageway, widest
+        return _section(hierarchy, lane_width, gutter)
 
     middle_x, middle_y = (min_x + max_x) // 2, (min_y + max_y) // 2
     _lanes, _width, local_reach = section(_LOCAL)
@@ -341,12 +529,19 @@ def _generate(context: StageContext) -> Iterator[object]:
     if len(along_positions) < 2 or not across_positions:
         raise InvalidRecordError("the district is too small for a block between four streets")
 
-    along = []
-    for position in along_positions:
-        hierarchy = _HIGH if position == middle_y else _LOCAL
-        along.append(_Street(len(along), _EAST, position, hierarchy))
+    hierarchies = street_hierarchies(along_positions, across_positions, middle_y)
+    # BEFORE ANY RECORD EXISTS, and on the hierarchies this layout actually lays rather than on
+    # the widest-street estimate `street_name_shortfall` gives a caller, so it refuses exactly
+    # the cities no naming could serve.
+    shortfall = _shortfall(Counter(hierarchies), max_x - min_x, max_y - min_y, length, depth)
+    if shortfall is not None:
+        raise InvalidParameterError(shortfall)
+    along = [
+        _Street(index, _EAST, position, hierarchies[index])
+        for index, position in enumerate(along_positions)
+    ]
     across = [
-        _Street(len(along) + index, _NORTH, position, _LOCAL)
+        _Street(len(along) + index, _NORTH, position, hierarchies[len(along) + index])
         for index, position in enumerate(across_positions)
     ]
     for street in along:
@@ -369,8 +564,17 @@ def _generate(context: StageContext) -> Iterator[object]:
         taken = {other.name for other in every_street if other.name}
         options = [name for name in options if name not in taken]
         if not options:
-            raise InvalidRecordError(
-                f"the street-name catalog has no more {street.hierarchy} names"
+            # The refusal above says no naming could exist; this one says the draw did not find
+            # the one that does, because it takes names in street order rather than solving the
+            # matching. It names the same parameters, so a caller meets something to act on.
+            vocabulary = catalog("street-name")
+            raise InvalidParameterError(
+                f"street {street.ordinal} of {len(every_street)} needs a {street.hierarchy} "
+                f"name and every one {vocabulary.catalog_id} v{vocabulary.catalog_version} "
+                f"holds is taken; block_length_mm {length} and block_depth_mm {depth} over a "
+                f"{max_x - min_x} by {max_y - min_y} mm district lay "
+                f"{sum(1 for other in every_street if other.hierarchy == street.hierarchy)} "
+                f"streets needing one"
             )
         street.name = options[draw(context, "street_name", street.ordinal, 0, len(options) - 1)]
 
