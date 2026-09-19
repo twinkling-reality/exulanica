@@ -114,6 +114,19 @@ class ChoiceQuestion:
     answers this question is choosing among the same things the rule would. It carries no
     photograph, no caption and nothing derived from one; see the module docstring of
     ``exulanica.models.model_rights`` for what crossing that line would require.
+
+    **ONE ROW PER ACTIVITY, AND THE TARGET INSIDE IT WAS ALREADY NARROWED.** ``society_living``
+    builds each row by choosing that activity's best target first, so this question asks WHICH
+    ACTIVITY and not which destination. Anyone running a destination-choice experiment must widen
+    ``_question`` to carry every target rather than the narrowed pick, or they will measure a
+    model choosing between things that were already decided.
+
+    MEASURED on the Flatiron place, 120 ticks, 2026-09-19, so the size of what is hidden is stated
+    rather than guessed: the narrowing discards essentially nothing for destinations, because
+    ``rest`` offers a mean of 1.07 reachable pads with room and ``visit`` offers exactly 1.00. It
+    discards a great deal for ``stroll``, which offers about 47 standing spots and picks among
+    them by a seeded hash. So on that place a destination choice barely exists to be made, and the
+    wide choice is which paving stone to stand on.
     """
 
     subject_ordinal: int
