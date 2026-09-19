@@ -103,6 +103,24 @@ class Trained:
             netloc += f":{parsed.port}"
         return Database(urllib.parse.urlunsplit(parsed._replace(netloc=netloc)))
 
+    def owner_session(self, workspace_id: uuid.UUID):
+        """An owner connection scoped to ``workspace_id``, for rows another workspace holds.
+
+        ``artifact`` refuses a write whose workspace is not the session's, through
+        ``assert_workspace_context``, so a stranger's row cannot be inserted on this test's own
+        connection the way ``test_purge`` inserts a stranger's capture.
+        """
+        import urllib.parse
+
+        from exulanica.db.session import Database
+
+        base = env_get("TEST_DATABASE_URL")
+        assert base is not None
+        options = urllib.parse.quote(f"-csearch_path={self.scratch},public", safe="")
+        return Database(url=f"{base}{'&' if '?' in base else '?'}options={options}").session(
+            workspace_id
+        )
+
     def worker(self) -> PurgeWorker:
         return PurgeWorker(
             self.database(role=_PURGE_ROLE, password=_PURGE_PASSWORD),
@@ -264,3 +282,453 @@ def test_the_withdrawal_that_exists_today_refuses_the_read_and_destroys_nothing(
         require_artifact_training_right(trained.repository, artifact_id)
     assert refused.value.reason == "withdrawn"
     assert trained.store.exists(blob_id), "the refusal is a refusal to read, not a destruction"
+
+
+# -- what 0082 adds: the withdrawal destroys ------------------------------------------------------
+
+
+def _withdraw(trained: Trained, right_id: uuid.UUID):
+    from exulanica.ingest.training_rights import withdraw_training_right
+
+    return withdraw_training_right(trained.repository, right_id=right_id, withdrawn_by=ACCOUNT)
+
+
+def _tombstones(trained: Trained):
+    return trained.rows(
+        "select tombstone_id,scope::text as scope,capture_id,requested_by,effective_at,reason,"
+        "purge_completed_at from tombstone where workspace_id=%s order by requested_at",
+        trained.workspace_id,
+    )
+
+
+def _jobs(trained: Trained):
+    return trained.rows(
+        "select purge_id,tombstone_id,target_kind,target_ref,state,last_error from purge_job "
+        "where workspace_id=%s order by created_at",
+        trained.workspace_id,
+    )
+
+
+def test_a_withdrawal_destroys_what_the_run_produced(trained):
+    """The whole point of the lane: the bytes go, asked of the store rather than of a row.
+
+    Before 0082 this ended at a refusal to read. The artefact is the evaluation bundle, which is
+    published on every run INCLUDING one the quality gate rejects, and which carries the frames
+    the trainer read whenever rectification changed the pixels.
+    """
+    right = _grant(trained.subject)
+    artifact_id, blob_id, _job_id = _run_and_publish(trained)
+    assert trained.store.exists(blob_id)
+
+    _withdraw(trained, right.right_id)
+
+    tombstones = _tombstones(trained)
+    assert [row["scope"] for row in tombstones] == ["scene_training"]
+    assert tombstones[0]["capture_id"] == trained.subject.capture_id
+    assert tombstones[0]["requested_by"] == ACCOUNT
+    jobs = _jobs(trained)
+    assert [(row["target_kind"], row["target_ref"]) for row in jobs] == [("artifact", blob_id.hex)]
+
+    outcome = trained.worker().drain()
+
+    assert outcome.errors == [], outcome.errors
+    assert outcome.skipped == 0
+    assert outcome.destroyed == 1
+    assert not trained.store.exists(blob_id), "the trained bytes are still on disk"
+    assert (
+        trained.one("select purged_at,storage_key from artifact where artifact_id=%s", artifact_id)[
+            "purged_at"
+        ]
+        is not None
+    )
+    assert tombstones[0]["tombstone_id"] in outcome.completed_tombstones
+    assert _tombstones(trained)[0]["purge_completed_at"] is not None
+
+
+def test_the_photograph_survives_what_was_trained_from_it(trained):
+    """The sentence the scope has to make true, tested rather than asserted in a comment.
+
+    A capture tombstone would have soft-deleted the photograph and queued its original bytes. This
+    one erases outputs and spares its subject, because withdrawing permission to train is not
+    asking for your photograph back.
+    """
+    right = _grant(trained.subject)
+    _artifact_id, blob_id, _job_id = _run_and_publish(trained)
+    original = BlobId(
+        bytes(
+            trained.one(
+                "select blob_sha256 from capture where capture_id=%s", trained.subject.capture_id
+            )["blob_sha256"]
+        )
+    )
+
+    _withdraw(trained, right.right_id)
+    outcome = trained.worker().drain()
+
+    assert outcome.destroyed == 1
+    assert not trained.store.exists(blob_id), "what the run produced"
+    assert trained.store.exists(original), "the photograph itself"
+    capture = trained.one(
+        "select deleted_at from capture where capture_id=%s", trained.subject.capture_id
+    )
+    assert capture["deleted_at"] is None
+    assert (
+        trained.one("select purged_at from blob where blob_sha256=%s", original.digest)["purged_at"]
+        is None
+    )
+
+
+def test_a_withdrawal_does_not_destroy_bytes_a_standing_right_holds(trained):
+    """The negative control, and without it the destroy predicate could be `true`.
+
+    Two photographs whose runs published IDENTICAL bytes, so one content hash and two artefacts.
+    One right is withdrawn and the other stands. The bytes must stay, because the artefact whose
+    right still stands is a reason to keep them, and the account holder can still open it.
+    """
+    from exulanica.ingest.training_rights import require_artifact_training_right
+
+    mine = trained.subject
+    theirs = admit_personal(
+        trained.repository, trained.store, photo_bytes(size=(120, 80)), "other.jpg"
+    )
+    right = _grant(mine)
+    _grant(theirs)
+    my_artifact, blob_id, _my_job = _run_and_publish(trained)
+    their_job = _queue(theirs, subjects=[theirs])
+    their_artifact, their_blob = trained.publish(
+        _scene_of(trained.repository, their_job), "scene_splat_evaluation", EVALUATION_BYTES
+    )
+    assert their_blob.hex == blob_id.hex, "the two runs published one content hash"
+
+    _withdraw(trained, right.right_id)
+    outcome = trained.worker().drain()
+
+    assert outcome.destroyed == 0
+    assert outcome.skipped == 1
+    assert trained.store.exists(blob_id), "bytes a standing right still holds were destroyed"
+    assert [row["state"] for row in _jobs(trained)] == ["skipped"]
+    assert _jobs(trained)[0]["last_error"] == "something live still holds these bytes"
+    assert (
+        trained.one("select purged_at from artifact where artifact_id=%s", their_artifact)[
+            "purged_at"
+        ]
+        is None
+    )
+    # And the artefact whose right stands is still readable, which is the half a reader cares
+    # about: the refusal above is not a quiet loss of somebody else's reconstruction.
+    assert require_artifact_training_right(trained.repository, their_artifact) is not None
+    # The withdrawn one is refused for reading all the same, by 0080, bytes or no bytes.
+    assert (
+        trained.one(
+            "select scene_training_artifact_withdrawn(%s,%s,clock_timestamp()) as withdrawn",
+            trained.workspace_id,
+            my_artifact,
+        )["withdrawn"]
+        is True
+    )
+
+
+def test_a_withdrawal_leaves_another_photograph_s_reconstruction_alone(trained):
+    """The cascade names ONE capture, so a withdrawal is not a workspace-wide erasure."""
+    mine = trained.subject
+    theirs = admit_personal(
+        trained.repository, trained.store, photo_bytes(size=(120, 80)), "other.jpg"
+    )
+    right = _grant(mine)
+    _grant(theirs)
+    _mine_artifact, my_blob, _my_job = _run_and_publish(trained)
+    their_job = _queue(theirs, subjects=[theirs])
+    their_artifact, their_blob = trained.publish(
+        _scene_of(trained.repository, their_job),
+        "scene_splat_evaluation",
+        b"a different run over a different photograph",
+    )
+
+    _withdraw(trained, right.right_id)
+    outcome = trained.worker().drain()
+
+    assert outcome.destroyed == 1
+    assert not trained.store.exists(my_blob)
+    assert trained.store.exists(their_blob), "another photograph's reconstruction was destroyed"
+    assert (
+        trained.one("select purged_at from artifact where artifact_id=%s", their_artifact)[
+            "purged_at"
+        ]
+        is None
+    )
+    assert [row["target_ref"] for row in _jobs(trained)] == [my_blob.hex]
+
+
+# -- the predictions, written before they were measured --------------------------------------------
+
+
+def test_the_photograph_can_be_granted_again_and_trained_again(trained):
+    """P-extra. The tombstone is inert for everything except the erasure it asked for.
+
+    A capture tombstone blocks every later derivative of its photograph, which is right for a
+    deletion and would be wrong here: somebody who withdrew a right for one destination and later
+    changes their mind has not lost the use of their own photograph. A scene is identified by its
+    member set, so the second run is the same scene and this publishes a second artefact against
+    it, which is what a re-run does.
+    """
+    from exulanica.ingest.privacy import admit_reconstruction_scene
+
+    first = _grant(trained.subject)
+    _artifact, blob_id, job_id = _run_and_publish(trained)
+    scene_id = _scene_of(trained.repository, job_id)
+    _withdraw(trained, first.right_id)
+    assert trained.worker().drain().destroyed == 1
+    assert not trained.store.exists(blob_id)
+
+    second = _grant(trained.subject)
+    assert second.right_id != first.right_id
+    admission = admit_reconstruction_scene(
+        trained.repository,
+        capture_ids=[trained.subject.capture_id],
+        screening_ids=[trained.subject.review_id],
+    )
+    assert admission.eligibility_state == "eligible", admission.blocking_reasons
+    new_artifact, new_blob = trained.publish(
+        scene_id, "scene_splat_evaluation", b"a second run's bundle"
+    )
+    assert require_artifact_training_right(trained.repository, new_artifact) is not None
+    assert trained.store.exists(new_blob)
+
+
+def test_two_withdrawals_over_one_scene_queue_the_same_object_twice(trained):
+    """P4, and the duplicate is a choice rather than an oversight.
+
+    A scene trained from two photographs binds once per photograph, so each account holder's
+    withdrawal reaches the same artefact. The tombstone's subject is a capture and it has no column
+    for a right, so the second withdrawal enqueues what the first one did if that purge has not
+    finished. One object is destroyed once and the second job finds it already absent. A uniqueness
+    constraint collapsing the two would make one tombstone's completion depend on another
+    tombstone's job, which is worse than a duplicate.
+    """
+    mine = trained.subject
+    also = admit_personal(
+        trained.repository, trained.store, photo_bytes(size=(120, 80)), "also.jpg"
+    )
+    first = _grant(mine)
+    second = _grant(also)
+    job_id = _queue(mine, subjects=[mine, also])
+    artifact_id, blob_id = trained.publish(
+        _scene_of(trained.repository, job_id), "scene_splat_evaluation", EVALUATION_BYTES
+    )
+    assert (
+        len(
+            trained.rows(
+                "select capture_id from scene_training_artifact where artifact_id=%s", artifact_id
+            )
+        )
+        == 2
+    ), "one artefact, two photographs, two bindings"
+
+    _withdraw(trained, first.right_id)
+    assert [row["target_ref"] for row in _jobs(trained)] == [blob_id.hex]
+    _withdraw(trained, second.right_id)
+
+    jobs = _jobs(trained)
+    assert [row["target_ref"] for row in jobs] == [blob_id.hex, blob_id.hex]
+    assert len({row["tombstone_id"] for row in jobs}) == 2
+
+    outcome = trained.worker().drain()
+
+    assert outcome.errors == []
+    assert outcome.destroyed == 1, "the object is destroyed once"
+    assert outcome.already_absent == 1, "and the duplicate finds it already gone"
+    assert not trained.store.exists(blob_id)
+    assert {row["state"] for row in _jobs(trained)} == {"done"}
+
+
+def test_the_same_bytes_in_another_workspace_block_the_destruction_permanently(trained):
+    """P5, measured rather than chosen, and the answer is worse than "deferred".
+
+    The purge role reads `artifact` across workspaces, because `blob` is shared and the destroy
+    question is about every holder. It does NOT read `scene_training_artifact` across workspaces,
+    so another workspace's artefact holding these bytes cannot be shown to be withdrawn and is a
+    reason to keep them. That is the safe direction. It is also permanent: nothing here can ever
+    observe the other workspace's own withdrawal, so this job skips until it has spent every
+    attempt and is then reported exhausted.
+    """
+    right = _grant(trained.subject)
+    _artifact_id, blob_id, _job_id = _run_and_publish(trained)
+    stranger = uuid.uuid4()
+    original = trained.one(
+        "select blob_sha256 from capture where capture_id=%s", trained.subject.capture_id
+    )["blob_sha256"]
+    with trained.owner_session(stranger) as connection:
+        connection.execute(
+            "insert into artifact (artifact_id,workspace_id,kind,source_blob_sha256,stage_key,"
+            "stage_version,params_digest,input_digest,idempotency_key,content_sha256,byte_size) "
+            "values (%s,%s,'scene_splat_evaluation',%s,'scene_splat_evaluation',1,%s,%s,%s,%s,%s)",
+            (
+                uuid.uuid4(),
+                stranger,
+                original,
+                bytes(32),
+                bytes(32),
+                f"stranger:{uuid.uuid4()}",
+                blob_id.digest,
+                1,
+            ),
+        )
+
+    _withdraw(trained, right.right_id)
+    outcome = trained.worker().drain()
+
+    assert outcome.destroyed == 0
+    assert outcome.skipped == 1
+    assert trained.store.exists(blob_id)
+    # The mechanism, asked of the database rather than inferred from the outcome: there is no
+    # cross-workspace policy on either table the destroy question reads about withdrawal.
+    policies = trained.rows(
+        "select tablename from pg_policies where tablename = any(%s) "
+        "and policyname='purge_sees_every_holder_of_these_bytes'",
+        ["artifact", "scene_training_artifact", "scene_training_right"],
+    )
+    assert [row["tablename"] for row in policies] == ["artifact"]
+
+
+def test_a_withdrawal_after_the_bytes_are_already_gone_enqueues_nothing(trained):
+    """P3. The cascade filters an artefact already marked purged, so a late withdrawal is quiet."""
+    first = _grant(trained.subject)
+    _artifact_id, blob_id, _job_id = _run_and_publish(trained)
+    _withdraw(trained, first.right_id)
+    assert trained.worker().drain().destroyed == 1
+
+    second = _grant(trained.subject, destination="local-process")
+    _withdraw(trained, second.right_id)
+
+    assert len(_tombstones(trained)) == 2
+    assert [row["target_ref"] for row in _jobs(trained)] == [blob_id.hex], (
+        "the second withdrawal enqueued an artefact whose bytes were already destroyed"
+    )
+    outcome = trained.worker().drain()
+    assert outcome.handled == 0
+    assert not trained.store.exists(blob_id)
+
+
+def test_the_erasure_request_is_written_in_the_withdrawal_s_own_transaction(trained):
+    """P2's half that can be measured without two connections: it is one transaction, not two.
+
+    A withdrawal that rolls back leaves no tombstone and no queued destruction, because the
+    tombstone is written by a trigger on the withdrawing UPDATE rather than by a later step. The
+    other half of P2, that a withdrawal cannot commit while a final read check holds the asset read
+    lock, is 0080's `tg_asset_read_mutation` and is tested where that trigger lives.
+    """
+    right = _grant(trained.subject)
+    _artifact_id, blob_id, _job_id = _run_and_publish(trained)
+
+    with (
+        pytest.raises(RuntimeError, match="rolled back on purpose"),
+        trained.repository.connection.transaction(),
+    ):
+        _withdraw(trained, right.right_id)
+        assert len(_tombstones(trained)) == 1, "written inside the transaction"
+        raise RuntimeError("rolled back on purpose")
+
+    assert _tombstones(trained) == []
+    assert _jobs(trained) == []
+    assert trained.store.exists(blob_id)
+    assert (
+        trained.one(
+            "select withdrawn_at from scene_training_right where right_id=%s", right.right_id
+        )["withdrawn_at"]
+        is None
+    )
+
+
+def test_a_purge_role_provisioned_before_this_migration_fails_loudly_and_locally(trained):
+    """The operational consequence, measured rather than reasoned from the grant shape.
+
+    The two reads the destroy question needs go in ``_PURGE_WORKSPACE_READS`` rather than in
+    ``_PURGE_READS``. The second would have moved ``PURGE_CROSS_WORKSPACE_TABLES``, which
+    ``read_visibility`` requires in full, so every purge role provisioned before this migration
+    would have refused to destroy ANYTHING until re-provisioned. This is the measurement that the
+    first choice is loud and local instead: an old role goes on draining every other tombstone, and
+    only the training-withdrawal job fails.
+    """
+    right = _grant(trained.subject)
+    _artifact_id, blob_id, _job_id = _run_and_publish(trained)
+    original = BlobId(
+        bytes(
+            trained.one(
+                "select blob_sha256 from capture where capture_id=%s", trained.subject.capture_id
+            )["blob_sha256"]
+        )
+    )
+    with trained.owner_session(trained.workspace_id) as connection:
+        connection.execute(f"set search_path to {trained.scratch}, public")
+        for table in ("scene_training_artifact", "scene_training_right"):
+            connection.execute(f"revoke select on {table} from {_PURGE_ROLE}")
+        connection.execute(
+            "revoke execute on function scene_training_withdrawal_releases_artifact(uuid,bytea) "
+            f"from {_PURGE_ROLE}"
+        )
+
+    _withdraw(trained, right.right_id)
+    second = admit_personal(
+        trained.repository, trained.store, photo_bytes(size=(120, 80)), "deleted.jpg"
+    )
+    trained.repository.insert_tombstone(
+        scope="capture",
+        capture_id=second.capture_id,
+        requested_by=ACCOUNT,
+        reason="the user deleted this photograph",
+    )
+    outcome = trained.worker().drain()
+
+    assert outcome.blocked is None, "the pass was not refused as a whole"
+    assert outcome.destroyed >= 1, "the ordinary capture tombstone still drained"
+    assert outcome.failed == 1, outcome.errors
+    assert len(outcome.errors) == 1
+    assert (
+        "permission denied for function scene_training_withdrawal_releases_artifact"
+        in (outcome.errors[0])
+    ), outcome.errors
+    # EXACTLY the training job failed. This assertion is the one that caught the first design:
+    # with the three questions in one SQL `case`, every artifact job of the capture deletion
+    # failed too, because EXECUTE is checked on every function in an expression rather than on
+    # the arm that runs.
+    assert [
+        row["target_ref"]
+        for row in trained.rows(
+            "select target_ref from purge_job where workspace_id=%s and state='failed'",
+            trained.workspace_id,
+        )
+    ] == [blob_id.hex]
+    assert trained.store.exists(blob_id), "the training withdrawal destroyed nothing"
+    assert trained.store.exists(original), "and it did not reach this photograph either"
+
+
+def test_a_withdrawn_artefact_is_still_refused_once_its_bytes_are_gone(trained):
+    """Destruction does not replace the refusal, and the refusal does not become an error.
+
+    0080's refusal covers the interval between a withdrawal committing and a purge completing,
+    which is of unbounded and sometimes infinite length. After the purge it still has to answer,
+    because the row survives the bytes: 0001 keeps the stub so a citation into deleted content
+    resolves to "this was removed" rather than to nothing.
+    """
+    from exulanica.ingest.training_rights import TrainingRightRefused
+
+    right = _grant(trained.subject)
+    artifact_id, blob_id, _job_id = _run_and_publish(trained)
+    _withdraw(trained, right.right_id)
+    assert trained.worker().drain().destroyed == 1
+    assert not trained.store.exists(blob_id)
+
+    with pytest.raises(TrainingRightRefused) as refused:
+        require_artifact_training_right(trained.repository, artifact_id)
+    assert refused.value.reason == "withdrawn"
+    sources = artifact_training_sources(trained.repository, artifact_id)
+    assert [(source.capture_id, source.current) for source in sources] == [
+        (trained.subject.capture_id, False)
+    ]
+    row = trained.one(
+        "select purged_at,storage_key,content_sha256 from artifact where artifact_id=%s",
+        artifact_id,
+    )
+    assert row["purged_at"] is not None
+    assert row["storage_key"] is None
+    assert bytes(row["content_sha256"]) == blob_id.digest, "the stub still names what it held"

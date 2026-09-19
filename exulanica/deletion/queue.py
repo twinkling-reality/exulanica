@@ -120,8 +120,8 @@ class Visibility:
         named = ", ".join(f"`{table}`" for table in PURGE_CROSS_WORKSPACE_TABLES)
         return (
             f"connected as {self.role!r}, which has no cross-workspace read of {named}. `blob` "
-            "is shared between workspaces, so this connection would answer \"does anything still "
-            "hold these bytes\" about its own workspace only and destroy objects another one is "
+            'is shared between workspaces, so this connection would answer "does anything still '
+            'hold these bytes" about its own workspace only and destroy objects another one is '
             "using. Point EXULANICA_PURGE_DATABASE_URL at the `exulanica_purge` role that "
             "`exulanica-db` provisions"
         )
@@ -150,9 +150,7 @@ def read_visibility(connection: psycopg.Connection) -> Visibility:
         (CROSS_WORKSPACE_POLICY, tables),
     ).fetchone()
     assert row is not None
-    return Visibility(
-        role=str(row["role"]), sees_every_workspace=int(row["tables"]) == len(tables)
-    )
+    return Visibility(role=str(row["role"]), sees_every_workspace=int(row["tables"]) == len(tables))
 
 
 @dataclass(frozen=True, slots=True)
@@ -171,6 +169,14 @@ class PurgeTarget:
     #: PurgeAuthorization, and they come from the tombstone row rather than from a caller.
     requested_by: uuid.UUID
     reason: str | None
+    #: The tombstone's scope, which decides WHICH destroy question this job is asked. Carried here
+    #: rather than re-asked in that question's own statement, and the difference is not style:
+    #: PostgreSQL checks EXECUTE on every function in an expression when the expression is
+    #: initialised, not only on the arm a ``case`` takes. Measured with the three questions in one
+    #: ``case`` and a role lacking the newest grant: EVERY artifact job failed with "permission
+    #: denied", including jobs of an ordinary capture tombstone that would never have reached that
+    #: arm. Choosing in Python keeps each statement naming only the function it needs.
+    scope: str
 
 
 def claim_purge(
@@ -219,8 +225,9 @@ def claim_purge(
         "     and pj.target_kind = any(%s) "
         "     and (pj.target_kind <> 'embedding' or "
         "       caption_vector_purge_is_authorized(pj.workspace_id, pj.tombstone_id, "
-        "                                          pj.target_ref::uuid)) " + bakes +
-        "     and pj.attempts < %s "
+        "                                          pj.target_ref::uuid)) "
+        + bakes
+        + "     and pj.attempts < %s "
         "     and (pj.state = 'queued' "
         "          or (pj.state in ('skipped', 'failed', 'running') "
         "              and (pj.attempted_at is null or pj.attempted_at < now() - %s))) "
@@ -232,7 +239,8 @@ def claim_purge(
     if row is None:
         return None
     tombstone = connection.execute(
-        "select requested_by, reason from tombstone where tombstone_id = %s and workspace_id = %s",
+        "select requested_by, reason, scope::text as scope from tombstone "
+        "where tombstone_id = %s and workspace_id = %s",
         (row["tombstone_id"], workspace_id),
     ).fetchone()
     # The tombstone is what authorises the destruction and it is read here rather than carried on
@@ -248,6 +256,7 @@ def claim_purge(
         attempts=row["attempts"],
         requested_by=tombstone["requested_by"],
         reason=tombstone["reason"],
+        scope=tombstone["scope"],
     )
 
 
@@ -319,9 +328,7 @@ def mark_purged(connection: psycopg.Connection, target: PurgeTarget) -> None:
     )
 
 
-def is_purge_complete(
-    connection: psycopg.Connection, tombstone_id: uuid.UUID
-) -> bool:
+def is_purge_complete(connection: psycopg.Connection, tombstone_id: uuid.UUID) -> bool:
     """Did the deletion happen, rather than did the queue go quiet. Correction 4."""
     row = connection.execute(
         "select tombstone_purge_is_complete(%s) as complete", (tombstone_id,)

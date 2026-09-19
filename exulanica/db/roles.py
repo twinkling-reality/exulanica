@@ -237,14 +237,36 @@ _PURGE_WRITES: Final = {
 #: bake's update guard and ``tombstone_purge_is_complete`` read, and the one the purger sets.
 #: Granted only once the table exists, because provisioning also runs on a schema migrated part
 #: of the way.
+#:
+#: **The two training tables are here rather than in :data:`_PURGE_READS`, and that is a decision
+#: with a cost.** ``scene_training_withdrawal_releases_artifact`` (migration 0082) asks whether any
+#: unpurged artefact holding these bytes has a training right that still stands, and it reads these
+#: two to answer it. Putting them in the cross-workspace dict would move
+#: :data:`PURGE_CROSS_WORKSPACE_TABLES`, which :func:`exulanica.deletion.queue.read_visibility`
+#: requires in full, so every purge role provisioned before 0082 would refuse to destroy ANYTHING
+#: until it was re-provisioned. Here instead, a role provisioned before 0082 goes on draining every
+#: other tombstone and only a training-withdrawal job fails, with `permission denied for function
+#: scene_training_withdrawal_releases_artifact`. Loud and local rather than closed and global, and
+#: measured in `tests/test_scene_training_destruction.py` rather than reasoned from this shape.
+#:
+#: What it costs: the purger cannot see another workspace's bindings, so an artefact of another
+#: workspace holding the same trained bytes can never be shown to be withdrawn and blocks the
+#: destruction permanently. Safe, and permanent rather than deferred, because nothing observes that
+#: workspace's own later withdrawal. Migration 0082's header carries the same paragraph.
 _PURGE_WORKSPACE_READS: Final = {
     "material_bake": ("workspace_id", "content_sha256", "purged_at"),
+    "scene_training_artifact": ("workspace_id", "artifact_id", "right_id"),
+    "scene_training_right": ("workspace_id", "right_id", "withdrawn_at"),
 }
 _PURGE_WORKSPACE_WRITES: Final = {
     "material_bake": ("purged_at",),
 }
-#: The destroy question for a bake, which migration 0066 revokes from PUBLIC.
-_PURGE_FUNCTIONS: Final = (("material_bake_purge_is_authorized", "uuid,uuid,bytea"),)
+#: The destroy questions this role may ask, each revoked from PUBLIC by the migration that added
+#: it: a bake's in 0066, a withdrawn training right's in 0082.
+_PURGE_FUNCTIONS: Final = (
+    ("material_bake_purge_is_authorized", "uuid,uuid,bytea"),
+    ("scene_training_withdrawal_releases_artifact", "uuid,bytea"),
+)
 
 #: What the purger may write on the queue and on the tombstone. Exactly the columns the worker
 #: sets and no others: not `effective_at`, which decides whether a tombstone blocks a derivative

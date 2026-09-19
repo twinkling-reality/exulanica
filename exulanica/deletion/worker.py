@@ -28,6 +28,14 @@ another workspace holds them but whether the tombstone reaches the bake, which
 ``material_bake_purge_is_authorized`` answers. A worker built without ``material_stores`` claims no
 bake job, and the tombstone it belongs to stays incomplete.
 
+**A withdrawn training right is destroyed here too, and it is the one erasure whose subject stays
+alive.** Migration 0082 writes a ``scene_training`` tombstone when an account holder withdraws the
+right that let a trainer read their photograph, and it enqueues the artefacts that run published.
+The photograph is not deleted, which is what the person asked for and is exactly why step 2 cannot
+use the general question: a scene artefact all of whose members are live still holds its bytes, so
+``purge_releases_bytes`` refuses these for ever. ``scene_training_withdrawal_releases_artifact`` is
+the question a tombstone of that scope asks instead.
+
 **What this can delete from the database.** The purge role has DELETE on ``embedding`` only.
 Person withdrawal must remove the vector itself, and a soft marker would retain the sensitive
 derivative. Stored objects still use the content-addressed purge path and keep their stub rows.
@@ -260,20 +268,12 @@ class PurgeWorker:
         # The lock and the question share one transaction, so nothing can start holding these
         # bytes between the answer and the destruction. The lock is released at commit, which is
         # after the row is marked, which is after the object is gone.
+        #
         with connection.transaction():
             connection.execute("select purge_lock_object(%s)", (target.target_ref,))
             row = connection.execute(
-                "select case when %s = 'artifact' and exists ("
-                "  select 1 from tombstone where tombstone_id=%s and scope='entity') "
-                "then person_withdrawal_releases_artifact(%s,decode(%s,'hex')) "
-                "else purge_releases_bytes(decode(%s,'hex')) end as releases",
-                (
-                    target.target_kind,
-                    target.tombstone_id,
-                    target.tombstone_id,
-                    target.target_ref,
-                    target.target_ref,
-                ),
+                f"select {_releases(target)} as releases",
+                {"tombstone": target.tombstone_id, "ref": target.target_ref},
             ).fetchone()
             assert row is not None
             if not row["releases"]:
@@ -375,6 +375,45 @@ class PurgeWorker:
         )
         if updated.rowcount:
             outcome.completed_tombstones.append(target.tombstone_id)
+
+
+#: The destroy question each tombstone scope asks, by the scope a claimed job carries.
+#:
+#: **Which question gets asked matters in the direction that leaves bytes on disk for ever.**
+#: ``purge_releases_bytes`` asks whether any live capture, any unpurged artifact of a live capture,
+#: or any unpurged scene artifact all of whose members are live still holds these bytes. Two
+#: withdrawals need a narrower question, and for the same reason: they erase derivatives while
+#: their subject SURVIVES, so the general one sees a live holder and refuses. Measured for the
+#: training case before migration 0082 was written: ``purge_releases_bytes`` over a trained
+#: artefact's own content hash, with its capture live, answers false, so a job enqueued without a
+#: question of its own skips, spends its eight attempts and is reported exhausted while the bytes
+#: are still there.
+_ARTIFACT_QUESTION: Final = {
+    "entity": "person_withdrawal_releases_artifact(%(tombstone)s,decode(%(ref)s,'hex'))",
+    "scene_training": (
+        "scene_training_withdrawal_releases_artifact(%(tombstone)s,decode(%(ref)s,'hex'))"
+    ),
+}
+_GENERAL_QUESTION: Final = "purge_releases_bytes(decode(%(ref)s,'hex'))"
+
+
+def _releases(target: queue.PurgeTarget) -> str:
+    """The one destroy question this job is asked, chosen here rather than in one SQL ``case``.
+
+    **The three questions were in one ``case`` first, and a role missing the newest grant failed
+    EVERY artifact job**, including jobs of an ordinary capture tombstone whose arm would never
+    have been taken: PostgreSQL checks EXECUTE on every function in an expression when the
+    expression is initialised, not only on the arm that runs. Measured, with the grant revoked:
+    ``permission denied for function scene_training_withdrawal_releases_artifact`` on two jobs of a
+    capture deletion that has nothing to do with training. Choosing here keeps the failure where it
+    belongs, and each statement names only the function it needs.
+
+    An unknown scope gets the general question, which is the safe direction: it refuses bytes
+    something still holds rather than destroying on a question nobody wrote.
+    """
+    if target.target_kind != "artifact":
+        return _GENERAL_QUESTION
+    return _ARTIFACT_QUESTION.get(target.scope, _GENERAL_QUESTION)
 
 
 def _exhausted(connection: psycopg.Connection, workspace_id: uuid.UUID) -> int:
