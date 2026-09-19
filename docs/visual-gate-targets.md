@@ -744,6 +744,41 @@ fails; and **`practicalBrowserBudget` is the one I would watch**, because this t
 across the wire and decoded 149.6 MB of texture, where the fixture that passed moved a fraction of
 that. A key that passed on a fixture and fails on a street is the gate working.
 
+## Why the neighbour fetch asks for a disk, and why that is not waste
+
+Recorded before the wiring lands, because the number invites the wrong edit. Fetching every tile
+within reach of the start costs **39,089,436 bytes** for four containers against the 12,682,828 this
+gate moves today, and fetching only along the walk's own line would cost **24,313,332**. A reader who
+meets those two figures cold will compute 38 per cent unused and narrow it.
+
+**THE NARROW RULE CANNOT BE WRITTEN AT ALL, and this is the load-bearing reason:**
+
+    the route rule chooses a heading from 720 candidates
+    it chooses using the FIELD and the RINGS
+    the field is the COMPOSED one, by the tess lane's own design decision
+    so THE WORLD MUST BE COMPOSED BEFORE A HEADING EXISTS
+
+A fetch along the walk's line would be reading a heading that has not been decided yet. On a three
+tile row the rule may legitimately choose WEST, and a fetch that guessed east then fails as MISSING
+GROUND rather than as a wrong guess about which way a person would go. **That is the expensive
+failure mode: it looks like a hole in the pavement**, and this record already carries four separate
+evenings of that misreading. The over-fetch is not a tolerance. It is the only rule computable from
+what is known at fetch time.
+
+**A second reason, weaker, and marked weaker on purpose.** This lane declined to narrow on transport
+grounds: what broke was ONE MESSAGE and not total bytes, streaming bounds the message, and four
+containers is three times the work of the same shape. That is true and it is REVISABLE: one
+measurement of 39 MB through that path could overturn it, and this lane has not yet made that
+measurement. The composition argument cannot be overturned by any measurement, so it is the one a
+later reader should find first.
+
+**And four squares on this street have no ground at all**, which the tess lane's piece enumerates
+rather than leaving to be discovered. The corridor is a single ROW of tiles, so a walk along it is
+four squares from ground that does not exist, north and south. **That is the edge of the world and
+not a defect**, and the distinction did not exist before 2026-09-18: without it, a sampler returning
+nothing reads as a fault in the pavement, which is the single most expensive misreading this record
+has accumulated.
+
 ## What the walk from the tile's edge did, measured
 
 The run at a423835d, load 5.27 before and 5.26 after. Due east qualified, the rule chose it, and the
