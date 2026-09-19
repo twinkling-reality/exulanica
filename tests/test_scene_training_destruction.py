@@ -26,6 +26,7 @@ import hashlib
 import secrets
 import uuid
 
+import psycopg
 import pytest
 from exulanica.db.roles import (
     PURGE_ROLE,
@@ -732,3 +733,78 @@ def test_a_withdrawn_artefact_is_still_refused_once_its_bytes_are_gone(trained):
     assert row["purged_at"] is not None
     assert row["storage_key"] is None
     assert bytes(row["content_sha256"]) == blob_id.digest, "the stub still names what it held"
+
+
+def test_a_withdrawal_reaches_only_what_the_withdrawn_right_produced(trained):
+    """One photograph, two destinations, two runs: withdrawing one does not erase the other.
+
+    A person who lets their photograph be trained locally and on a rented machine, and then takes
+    the rented one back, has not asked for the local reconstruction to be destroyed. The cascade
+    reads the binding's own right rather than treating a tombstone over a capture as a statement
+    about everything ever trained from it.
+
+    Two SCENES, because a scene is identified by its member set and the binding trigger picks one
+    right per capture per scene. This is the only shape in which a capture can carry a standing
+    binding and a withdrawn one at once.
+    """
+    from test_scene_training_right import GPU, OTHER_GPU
+
+    mine = trained.subject
+    also = admit_personal(
+        trained.repository, trained.store, photo_bytes(size=(120, 80)), "also.jpg"
+    )
+    standing = _grant(mine, destination=GPU)
+    withdrawn = _grant(mine, destination=OTHER_GPU)
+    _grant(also, destination=OTHER_GPU)
+    alone = _queue(mine, destination=GPU)
+    kept_artifact, kept_blob = trained.publish(
+        _scene_of(trained.repository, alone), "scene_splat_evaluation", b"trained at the first"
+    )
+    together = _queue(mine, subjects=[mine, also], destination=OTHER_GPU)
+    gone_artifact, gone_blob = trained.publish(
+        _scene_of(trained.repository, together), "scene_splat_evaluation", b"trained at the second"
+    )
+    assert {
+        (row["artifact_id"], row["right_id"])
+        for row in trained.rows(
+            "select artifact_id,right_id from scene_training_artifact where capture_id=%s",
+            mine.capture_id,
+        )
+    } == {(kept_artifact, standing.right_id), (gone_artifact, withdrawn.right_id)}
+
+    _withdraw(trained, withdrawn.right_id)
+    outcome = trained.worker().drain()
+
+    assert [row["target_ref"] for row in _jobs(trained)] == [gone_blob.hex]
+    assert outcome.destroyed == 1
+    assert not trained.store.exists(gone_blob)
+    assert trained.store.exists(kept_blob), "the run the standing right permitted was destroyed"
+    assert require_artifact_training_right(trained.repository, kept_artifact) is not None
+
+
+def test_the_destroy_question_refuses_rather_than_answering_yes(trained):
+    """Asked about bytes nobody can name, it raises. The same shape as 0013's correction 2.
+
+    Every clause is an ``exists`` over an equality, and ``= NULL`` is never true, so every one of
+    them is vacuously satisfied for NULL and the answer would be "destroy these bytes" for exactly
+    the rows whose content hash was never recorded.
+    """
+    right = _grant(trained.subject)
+    _artifact_id, _blob_id, _job_id = _run_and_publish(trained)
+    _withdraw(trained, right.right_id)
+    tombstone_id = _tombstones(trained)[0]["tombstone_id"]
+
+    with pytest.raises(psycopg.errors.NullValueNotAllowed) as refused:
+        trained.one(
+            "select scene_training_withdrawal_releases_artifact(%s,null) as releases", tombstone_id
+        )
+    assert "absent content hash" in str(refused.value)
+    # And a tombstone of another scope is not an authority this question answers for.
+    assert (
+        trained.one(
+            "select scene_training_withdrawal_releases_artifact(%s,%s) as releases",
+            uuid.uuid4(),
+            bytes(32),
+        )["releases"]
+        is False
+    )
