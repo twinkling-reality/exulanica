@@ -870,7 +870,12 @@ headings across a field three and a half times wider WHILE SEEING OBSTACLES FROM
 > walk's eastern end, not most of a street. Superseded in
 > `docs/evaluation/2026-09-18-obstacle-reach-measured-from-the-rings.json`; the earlier record stands
 > unedited. The lesson is the count: 311 was stable across composition, and I read stability as
-> scope. The
+> scope.
+>
+> **Who measured which half.** The EXTENT is this lane's, taken twice: from the page's own hook and
+> from the harness during a walk. The MEMBERSHIP, 140 owned against 171 halo with no filter applied,
+> was reported by the tess lane and then verified independently by the orchestrator in the route
+> rings source. This lane has not read that code and does not restate it as its own measurement. The
 chosen heading reports a clear run of 294,755 mm, which reaches well into tile (3,0), through
 buildings the rule cannot see. **This walk is unaffected**: it ran from x 256,000 to 381,000 and never
 left tile (2,0). But `candidatesQualified` rose from 3 to 68 on a world whose obstacles did not
