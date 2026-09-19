@@ -160,6 +160,18 @@ def test_preflight_rejects_store_symlink_into_original_photos(tmp_path, monkeypa
 
 @pytest.mark.parametrize("name", ["PGHOSTADDR", "PGSERVICE", "PGSERVICEFILE"])
 def test_libpq_environment_cannot_redirect_the_permitted_database(name, monkeypatch):
+    """The reference selection is set HERE rather than inherited from whoever ran the suite.
+
+    MEASURED 2026-09-19 in a fresh clone: without this line the three cases FAIL under a plain
+    `uv run pytest` and pass under scripts/run_backend_suite.py, which exports
+    EXULANICA_REFERENCE_DATABASE_URL for the whole run. The refusal that arrived instead was the
+    one for an unset selection, so the test never reached the libpq redirection it is named for
+    and would have kept passing with that check deleted. The sibling below already sets it; this
+    one relied on the environment.
+    """
+    monkeypatch.setenv(
+        "EXULANICA_REFERENCE_DATABASE_URL", "postgresql://localhost:5433/exulanica_inspect_test"
+    )
     monkeypatch.setenv(name, "unexpected-route")
     with pytest.raises(ValueError, match="Unset"):
         permitted_database_url("postgresql://localhost:5433/exulanica_inspect_test")
