@@ -1623,33 +1623,39 @@ async function main() {
       // Deriving a horizon from `tile_size_mm` was the same fault in a third costume, after a route
       // window taken from a tile edge and a clear run taken from ground. The extent of the rings the
       // rule ACTUALLY HOLDS is the only honest statement of where it can see anything.
-      let obstacleBounds = null;
+      let ringWest = Infinity;
+      let ringNorth = Infinity;
+      let ringEast = -Infinity;
+      let ringSouth = -Infinity;
+      let ringPoints = 0;
       for (const { ring } of routeRings) {
         for (const point of ring) {
           const [x, z] = point;
-          obstacleBounds = obstacleBounds === null
-            ? { west: x, north: z, east: x, south: z }
-            : {
-              west: Math.min(obstacleBounds.west, x),
-              north: Math.min(obstacleBounds.north, z),
-              east: Math.max(obstacleBounds.east, x),
-              south: Math.max(obstacleBounds.south, z),
-            };
+          ringPoints += 1;
+          ringWest = Math.min(ringWest, x);
+          ringNorth = Math.min(ringNorth, z);
+          ringEast = Math.max(ringEast, x);
+          ringSouth = Math.max(ringSouth, z);
         }
       }
+      // NULL WHEN THERE WAS NOTHING TO MEASURE, which is not the same as a reach of zero: a run with
+      // no rings at all has no obstacle extent, and `Infinity` in a record would read as one.
+      const reach = ringPoints === 0
+        ? null
+        : { west: ringWest, north: ringNorth, east: ringEast, south: ringSouth };
       const [groundWest, groundNorth, groundEast, groundSouth] = field;
       observed.horizons = {
         frame: 'the renderer frame in metres, the same frame as field.bounds',
         groundBounds: { west: groundWest, north: groundNorth, east: groundEast, south: groundSouth },
         groundRadiusM: bound.fieldRadius,
-        obstacleBounds,
+        obstacleBounds: reach,
         obstacleSource: 'the rings the rule holds, whatever records they came from',
         rings: routeRings.length,
         // The question a reader actually has: is there ground the rule can rank over and see nothing
         // standing on? A `false` here is why a clear run past the obstacles is not a clearance.
-        obstaclesCoverTheGround: obstacleBounds !== null
-          && obstacleBounds.west <= groundWest && obstacleBounds.north <= groundNorth
-          && obstacleBounds.east >= groundEast && obstacleBounds.south >= groundSouth,
+        obstaclesCoverTheGround: reach !== null
+          && reach.west <= groundWest && reach.north <= groundNorth
+          && reach.east >= groundEast && reach.south >= groundSouth,
       };
     }
     // THE RULE RANKS, THE GROUND REFUSES. The rule's order is taken as it comes and nothing here
