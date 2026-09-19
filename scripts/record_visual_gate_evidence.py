@@ -1567,9 +1567,7 @@ def _judgement_shape(given: Any) -> list[str]:
         label = entry.get("label", where)
         if entry.get("asked") is False:
             continue
-        said += [
-            f"{label} carries no {name}" for name in ASKED_PICTURE_KEYS if name not in entry
-        ]
+        said += [f"{label} carries no {name}" for name in ASKED_PICTURE_KEYS if name not in entry]
     return said
 
 
@@ -1684,14 +1682,17 @@ def _corridor_scored(run: dict[str, Any], measured_at: str) -> dict[str, Any]:
         "tile": scored["tile"],
         "containers": scored["containers"],
         "unavailableSurfacesByReason": scored["unavailableSurfacesByReason"],
-        "renderer": _unmodified(scored["renderer"]["path"], scored["renderer"]["sha256"], measured_at),
+        "renderer": _unmodified(
+            scored["renderer"]["path"], scored["renderer"]["sha256"], measured_at
+        ),
         "measuredBy": [
             _measured_file(item["path"], item["sha256"], measured_at)
             for item in scored["measuredBy"]
         ],
-        "statedWalk": _bind(ROOT / run["statedWalk"]["path"], **{
-            name: run["statedWalk"][name] for name in ("xMm", "yMm", "facingDx", "facingDy")
-        }),
+        "statedWalk": _bind(
+            ROOT / run["statedWalk"]["path"],
+            **{name: run["statedWalk"][name] for name in ("xMm", "yMm", "facingDx", "facingDy")},
+        ),
         "containersAreNotFilesOfThisRepository": (
             "Each container was matched byte for byte on the wire and is bound by its sha256 and "
             "its tile_inputs_digest. None is committed, and the store that served them is the one "
@@ -2064,7 +2065,9 @@ def corridor(arguments: argparse.Namespace) -> int:
 
     if artifacts_dir.exists():
         if not arguments.replace:
-            raise SystemExit(f"{_relative(artifacts_dir)} exists; retained artifacts are not rewritten")
+            raise SystemExit(
+                f"{_relative(artifacts_dir)} exists; retained artifacts are not rewritten"
+            )
         shutil.rmtree(artifacts_dir)
     artifacts_dir.mkdir(parents=True)
     run_dir = run_path.parent
@@ -2106,7 +2109,8 @@ def corridor(arguments: argparse.Namespace) -> int:
     judgement_path = Path(arguments.judgement).resolve()
     judgement_bytes = judgement_path.read_bytes()
     judgement_file = {
-        "path": judge_words_path(relative_record).rsplit("/", 1)[0] + f"/inputs/{judgement_path.name}",
+        "path": judge_words_path(relative_record).rsplit("/", 1)[0]
+        + f"/inputs/{judgement_path.name}",
         "byte_size": len(judgement_bytes),
         "sha256": hashlib.sha256(judgement_bytes).hexdigest(),
         "tracked": False,
@@ -2149,10 +2153,12 @@ def corridor(arguments: argparse.Namespace) -> int:
             shown=sorted(_shown_to_the_judge()),
         )
         written = record_path.read_bytes()
-        print(f"{relative_record} {len(written)} bytes, sha256 "
-              f"{hashlib.sha256(written).hexdigest()}, record_sha256 {document['record_sha256']}, "
-              f"judged key REFUSED on {len(refusals)} counts and "
-              f"{len(departures)} recorded departures")
+        print(
+            f"{relative_record} {len(written)} bytes, sha256 "
+            f"{hashlib.sha256(written).hexdigest()}, record_sha256 {document['record_sha256']}, "
+            f"judged key REFUSED on {len(refusals)} counts and "
+            f"{len(departures)} recorded departures"
+        )
         for refusal in refusals:
             print(f"  refused: {refusal}")
         for departure in departures:
@@ -2182,7 +2188,11 @@ def corridor(arguments: argparse.Namespace) -> int:
         f"The corridor at tile {run['scored']['tile']['tileName']}, composed from "
         f"{len(run['scored']['containers'])} containers and walked inside the product's own "
         "preview shell, "
-        + (f"fails the reconciled block. It fails {body}." if failed else f"holds all nine keys: {body}.")
+        + (
+            f"fails the reconciled block. It fails {body}."
+            if failed
+            else f"holds all nine keys: {body}."
+        )
     )
     report = run["validationReport"]
     measurement = report["measurement"]
