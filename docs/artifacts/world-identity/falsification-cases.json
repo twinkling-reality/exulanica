@@ -1,0 +1,50 @@
+[
+  {
+    "name": "the migration adds world_seed beside city_seed instead of renaming it, which is the silent-empty-world failure this rename was most at risk of",
+    "file": "exulanica/migrations/0081_a_world_has_an_identity.sql",
+    "old": "alter table baked_tile rename column city_seed to world_seed;",
+    "new": "alter table baked_tile add column world_seed bytea;",
+    "tests": ["tests/test_corridor_tile_store.py", "tests/test_corridor_tile_route.py"],
+    "expect": "test_the_identity_a_row_carries_is_the_world_the_tile_record_stated"
+  },
+  {
+    "name": "the index keeps the old word while the column it leads on carries the new one",
+    "file": "exulanica/migrations/0081_a_world_has_an_identity.sql",
+    "old": "alter index baked_tile_by_city rename to baked_tile_by_world;\n",
+    "new": "",
+    "tests": ["tests/test_corridor_tile_store.py", "tests/test_corridor_tile_route.py"],
+    "expect": "test_the_identity_a_row_carries_is_the_world_the_tile_record_stated"
+  },
+  {
+    "name": "the repository asks the old column for a world",
+    "file": "exulanica/world/baked_tiles.py",
+    "old": "\"where world_seed = %s and (%s::int is null or lod = %s) \"",
+    "new": "\"where city_seed = %s and (%s::int is null or lod = %s) \"",
+    "tests": ["tests/test_corridor_tile_store.py", "tests/test_corridor_tile_route.py"],
+    "expect": "test_the_identity_a_row_carries_is_the_world_the_tile_record_stated"
+  },
+  {
+    "name": "the record path reads the column's spelling out of a tile record that does not carry it",
+    "file": "exulanica/world/baked_tiles.py",
+    "old": "bytes.fromhex(tile[\"city_seed\"]),",
+    "new": "bytes.fromhex(tile[\"world_seed\"]),",
+    "tests": ["tests/test_corridor_tile_store.py", "tests/test_corridor_tile_route.py"],
+    "expect": "test_the_identity_a_row_carries_is_the_world_the_tile_record_stated"
+  },
+  {
+    "name": "the route drops the alias, so the wire moves with the column",
+    "file": "exulanica/api/routes/tiles.py",
+    "old": "world_seed: Annotated[str, Query(alias=\"city_seed\", pattern=r\"^[0-9a-f]{64}$\")],",
+    "new": "world_seed: Annotated[str, Query(pattern=r\"^[0-9a-f]{64}$\")],",
+    "tests": ["tests/test_corridor_tile_store.py", "tests/test_corridor_tile_route.py"],
+    "expect": "test_the_route_is_asked_and_answers_in_the_wire_name_it_was_born_with"
+  },
+  {
+    "name": "the route answers the new spelling in a body key nothing reads",
+    "file": "exulanica/api/routes/tiles.py",
+    "old": "content={\"city_seed\": world_seed, \"tiles\": [tile.document() for tile in tiles]},",
+    "new": "content={\"world_seed\": world_seed, \"tiles\": [tile.document() for tile in tiles]},",
+    "tests": ["tests/test_corridor_tile_store.py", "tests/test_corridor_tile_route.py"],
+    "expect": "test_the_route_is_asked_and_answers_in_the_wire_name_it_was_born_with"
+  }
+]

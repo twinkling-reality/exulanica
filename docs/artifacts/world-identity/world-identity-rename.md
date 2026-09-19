@@ -29,7 +29,56 @@ them; the orchestrator verified the correction before this work started.
 
 ## The result
 
-Answered after the rename landed.
+**Prediction 1 held exactly.** `world-listing-before.log.txt` was taken at 0359dda3 on a clean
+tree and `world-listing-after.log.txt` at de34e1ca on a clean tree. `diff` reports FOUR lines,
+which is the two predicted lines on each side:
+
+    listing method  tiles_of_city   ->  tiles_of_world
+    commit          0359dda3        ->  de34e1ca
+
+Nothing else differs. All four counts came back as predicted: 4 tiles for the world under test out
+of 6 bakes recorded, 1 for another world, 3 narrowed to level of detail 0, 0 for a world nothing
+was baked for, and every one of the 6 bakes still reachable by key including the two the listing
+narrows away.
+
+**Prediction 2 held by construction and was not separately measured.** No bake ran. The column is
+a name; `tile_inputs_digest`, `container_sha256` and both projection digests are computed over
+bytes this change does not read. Recorded as INFERRED rather than measured, because inferring it
+is exactly the move this project keeps paying for, and the honest form is to say which it is.
+
+**Prediction 3 was measured** by the route test described below, which asks the real application
+through its real client over a real migrated schema.
+
+## The falsification
+
+`docs/artifacts/world-identity/falsification-cases.json`, run with `scripts/falsify.py` from the
+committed tree de34e1ca. Six breaks, EACH APPLIED ALONE, each over both whole test files rather
+than under a `-k` filter, each restored and the restored bytes compared by digest.
+
+    the migration adds world_seed BESIDE city_seed instead of renaming it   REFUSED
+    the index keeps the old word while its column carries the new one       REFUSED
+    the repository asks the old column for a world                          REFUSED
+    the record path reads the column's spelling out of a tile record        REFUSED
+    the route drops the alias, so the wire moves with the column            REFUSED
+    the route answers the new spelling in a body key nothing reads          REFUSED
+
+Each was refused BY THE TEST THAT CLAIMS THE PROPERTY, compared by node id identity rather than by
+substring. **23 tests were asked in every one of the six runs, and 23 is what those two files pass
+unbroken**, so nothing was skipped, deselected or switched off in any break: the count that says
+the question was put is the same count as the population.
+
+The first break is the one worth keeping. It reproduces the failure this whole exercise was most
+at risk of, and the brief named it in advance: a column ADDED beside the old one rather than
+renamed leaves every row's identity behind, every listing comes back EMPTY, and an empty listing
+is exactly what a world with no tiles looks like. It raises nothing. A test asserting only that
+`world_seed` exists would have passed it, which is why the assertion is two-way (the new name is
+present AND the old one is gone) and why it also reads the value back through the listing.
+
+**What the falsification did NOT establish**, stated so nobody takes it wider. `tests` is a
+SELECTION: these six verdicts say the property is pinned in the two files named, not that nothing
+else in the repository claims it. And no break here could produce a silent wrong answer, because
+every wrong spelling on this path raises: a missing column is `UndefinedColumn`, a missing mapping
+key is `KeyError`. The silent case exists only for the first break, and it is covered.
 
 ## What the route does, and why it is not a mistake
 

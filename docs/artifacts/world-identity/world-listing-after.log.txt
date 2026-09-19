@@ -1,0 +1,153 @@
+# A world read by its identity: the listing before and after the column rename
+
+listing method  tiles_of_world
+commit          de34e1ca
+
+recorded        6 bakes across 2 worlds
+  stored     72a75c0d 2 0 0 0
+  stored     72a75c0d 3 0 0 0
+  stored     72a75c0d 3 0 0 1
+  stored     72a75c0d 4 0 1 0
+  stored     72a75c0d 2 1 0 0
+  stored     81c07d68 2 0 0 0
+
+## the world under test: 72a75c0dd28834578057ebf902daf5b0f1cf5c5ef556b0bf2a7faadf5d9cc566
+listed          4 tiles
+[
+  {
+    "baked_tile_id": "004faa9d-8e1f-5f22-b00a-d57e88f57381",
+    "container_bytes": 26,
+    "container_sha256": "2d792586a833ec3d02c145d463d1457261063e461b046842aef4f4c01be84095",
+    "lod": 0,
+    "nav_envelope_sha256": "23e9a500f49de82779e478f18bf4cacf1315a507fff6b8a427598b004fca64ef",
+    "render_batch_sha256": "279968bca014be1001a14d322e07713a531767fb72f8aeb3475da00a02cc8b40",
+    "stage_params_sha256": "53e9147376b368778b34dc131b5f4562968b3e9191a0ed4586ae5a96c10fc20c",
+    "stage_version": 3,
+    "state": "baked",
+    "tile_inputs_digest": "be23ec5237dc6d06122029d4945e51332e30a415748d40c40cfb061da760edb4",
+    "tile_x": 2,
+    "tile_y": 0
+  },
+  {
+    "baked_tile_id": "c37d3543-be93-56b1-b7f9-5f493fba37c0",
+    "container_bytes": 26,
+    "container_sha256": "e166ee60991910840bc65f70ebc1e9eec67272d0a3ce03214748a69c2bfd356a",
+    "lod": 0,
+    "nav_envelope_sha256": "8edf045b092cd6ab23fafb5c56ae6b0409afb5e90c4dd90464665642b329b235",
+    "render_batch_sha256": "55c284c4b0821a31b7ad2f3c9bd45f135ddea92fbbc3325b69abb76c2f4b024b",
+    "stage_params_sha256": "43eb121a9581d29fcdccee437709fb180ce1ced526966618d49be8f8c9cc3f9f",
+    "stage_version": 3,
+    "state": "baked",
+    "tile_inputs_digest": "2a0caafedf764addf8bf708a317290e10c297649de927e3dae5bd9197c90e5c9",
+    "tile_x": 3,
+    "tile_y": 0
+  },
+  {
+    "baked_tile_id": "0695615c-642c-5549-b3cf-b1f43338854c",
+    "container_bytes": 26,
+    "container_sha256": "286a9465970da41bb64ae11e5ee80277442598606262948a64d050835cc7b4ff",
+    "lod": 0,
+    "nav_envelope_sha256": "4c5d2238f227615057de4f211852af93fbd610bd20c75069db9cfbfa2a8c25eb",
+    "render_batch_sha256": "951a5947bb5b618d3f2aa5109804b051e45c70fc43172b7f7b488b165cc7a38b",
+    "stage_params_sha256": "53e9147376b368778b34dc131b5f4562968b3e9191a0ed4586ae5a96c10fc20c",
+    "stage_version": 3,
+    "state": "baked",
+    "tile_inputs_digest": "6a1dbe5458a2b45253c1a63cd1b7f9bcd217af00008d46439b5b76573c6ee663",
+    "tile_x": 2,
+    "tile_y": 1
+  },
+  {
+    "baked_tile_id": "476c843d-00d0-5c68-8ec6-36f6d2f7a6bd",
+    "container_bytes": 26,
+    "container_sha256": "70dab77c4e1007bf08db6fba60708a9fd81f86f794accaa655c4c5cd4149770a",
+    "lod": 1,
+    "nav_envelope_sha256": "73afda5b0db8d2078ec54376efbc45733ce170b55deb3147d0584e97e73ace47",
+    "render_batch_sha256": "066e6f2f8d69ac02a14bf4e78eafea53cd00afdae574498b34d9efc361921656",
+    "stage_params_sha256": "53e9147376b368778b34dc131b5f4562968b3e9191a0ed4586ae5a96c10fc20c",
+    "stage_version": 3,
+    "state": "baked",
+    "tile_inputs_digest": "0aae30b1584baab50c292e02c9c4b80da3530a069a1d84807f9424e83944d20c",
+    "tile_x": 4,
+    "tile_y": 0
+  }
+]
+
+## another world: 81c07d6876c873019b3a37f57c102cedad192bf0f8473f5c23a4fbe06d7ba5ed
+listed          1 tiles
+[
+  {
+    "baked_tile_id": "aaa8f3eb-5dae-5fe2-9c9c-183e464d8f42",
+    "container_bytes": 26,
+    "container_sha256": "b95942cd03d383ac4f411dda4316e85b8d575f602f03d9d11e96a69875d08cb0",
+    "lod": 0,
+    "nav_envelope_sha256": "b2918f6ed24e9dadf526ecda4bfa601daf29dab257a5ca563197fa56903bf564",
+    "render_batch_sha256": "beb3d9b1c339e02e263d05ccc1a5f12cad712f2e8220e2b84fdd7d443f0352fc",
+    "stage_params_sha256": "53e9147376b368778b34dc131b5f4562968b3e9191a0ed4586ae5a96c10fc20c",
+    "stage_version": 3,
+    "state": "baked",
+    "tile_inputs_digest": "820277eb792cdb8861944bdf91af8d04102a54c334f066cdb89ef68c7058f4a5",
+    "tile_x": 2,
+    "tile_y": 0
+  }
+]
+
+## the world under test, narrowed to level of detail 0
+listed          3 tiles
+[
+  {
+    "baked_tile_id": "004faa9d-8e1f-5f22-b00a-d57e88f57381",
+    "container_bytes": 26,
+    "container_sha256": "2d792586a833ec3d02c145d463d1457261063e461b046842aef4f4c01be84095",
+    "lod": 0,
+    "nav_envelope_sha256": "23e9a500f49de82779e478f18bf4cacf1315a507fff6b8a427598b004fca64ef",
+    "render_batch_sha256": "279968bca014be1001a14d322e07713a531767fb72f8aeb3475da00a02cc8b40",
+    "stage_params_sha256": "53e9147376b368778b34dc131b5f4562968b3e9191a0ed4586ae5a96c10fc20c",
+    "stage_version": 3,
+    "state": "baked",
+    "tile_inputs_digest": "be23ec5237dc6d06122029d4945e51332e30a415748d40c40cfb061da760edb4",
+    "tile_x": 2,
+    "tile_y": 0
+  },
+  {
+    "baked_tile_id": "c37d3543-be93-56b1-b7f9-5f493fba37c0",
+    "container_bytes": 26,
+    "container_sha256": "e166ee60991910840bc65f70ebc1e9eec67272d0a3ce03214748a69c2bfd356a",
+    "lod": 0,
+    "nav_envelope_sha256": "8edf045b092cd6ab23fafb5c56ae6b0409afb5e90c4dd90464665642b329b235",
+    "render_batch_sha256": "55c284c4b0821a31b7ad2f3c9bd45f135ddea92fbbc3325b69abb76c2f4b024b",
+    "stage_params_sha256": "43eb121a9581d29fcdccee437709fb180ce1ced526966618d49be8f8c9cc3f9f",
+    "stage_version": 3,
+    "state": "baked",
+    "tile_inputs_digest": "2a0caafedf764addf8bf708a317290e10c297649de927e3dae5bd9197c90e5c9",
+    "tile_x": 3,
+    "tile_y": 0
+  },
+  {
+    "baked_tile_id": "0695615c-642c-5549-b3cf-b1f43338854c",
+    "container_bytes": 26,
+    "container_sha256": "286a9465970da41bb64ae11e5ee80277442598606262948a64d050835cc7b4ff",
+    "lod": 0,
+    "nav_envelope_sha256": "4c5d2238f227615057de4f211852af93fbd610bd20c75069db9cfbfa2a8c25eb",
+    "render_batch_sha256": "951a5947bb5b618d3f2aa5109804b051e45c70fc43172b7f7b488b165cc7a38b",
+    "stage_params_sha256": "53e9147376b368778b34dc131b5f4562968b3e9191a0ed4586ae5a96c10fc20c",
+    "stage_version": 3,
+    "state": "baked",
+    "tile_inputs_digest": "6a1dbe5458a2b45253c1a63cd1b7f9bcd217af00008d46439b5b76573c6ee663",
+    "tile_x": 2,
+    "tile_y": 1
+  }
+]
+
+## a world nothing was baked for
+listed          0 tiles
+
+## every bake, by key, whether or not the listing names it
+{
+  "72a75c0d 2 0 0 0": 26,
+  "72a75c0d 2 1 0 0": 26,
+  "72a75c0d 3 0 0 0": 26,
+  "72a75c0d 3 0 0 1": 26,
+  "72a75c0d 4 0 1 0": 26,
+  "81c07d68 2 0 0 0": 26
+}
+
