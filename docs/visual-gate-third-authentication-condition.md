@@ -106,6 +106,20 @@ gate can only observe the requests that were made. If what matters to you is the
 rather than the authority used, this rule does not give you that, and no rule written from observed
 traffic can.
 
+**That is the honest general statement, and here is the bound on it, which is narrower and in this
+rule's favour.** The condition is judged for each run separately, out of that run's own traffic, and
+clause 2 requires that everything the API actually served was a tile. So a page holding a wider
+credential passes ONLY IF IT DID NOT USE IT, and a run that did use it fails clause 2 and cannot be
+scored at all. The gap is therefore not "a powerful credential is admitted". Precisely:
+
+> **The rule certifies that a run was clean. It cannot certify that the credential was narrow.**
+
+For a gate whose job is to state how a scored page got its content, run-cleanliness is the property
+that matters and is the property this rule delivers. The gap can be closed entirely from outside the
+gate, by issuing the harness a credential that carries tiles and nothing else, at which point used
+authority and granted authority are the same thing and the distinction stops existing. That is a
+credential action rather than a gate rule, and it is not this lane's to take.
+
 ## What is already decided, and by whom
 
 - The gate refusing to score a page whose condition it cannot name: existing behaviour, working.
