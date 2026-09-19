@@ -46,9 +46,11 @@ WORKER = "exulanica/deletion/worker.py"
 QUEUE = "exulanica/deletion/queue.py"
 ROLES = "exulanica/db/roles.py"
 
-#: The predecessor this work continues. v1 of this record named the right itself; v2 names v1,
-#: because v1 bound a test file digest that moved when one over-specific assertion was replaced.
-PREDECESSOR = "docs/evaluation/2026-09-19-scene-training-destruction.json"
+#: The predecessor this work continues. v1 named the right itself; v2 named v1, because v1 bound a
+#: test file digest that moved when one over-specific assertion was replaced; v3 names v2, because
+#: the lane rebased onto main and the commit v2 called its tested_head is no longer reachable. A
+#: record naming a tree nobody can check out is a figure with nothing to contradict it.
+PREDECESSOR = "docs/evaluation/2026-09-19-scene-training-destruction-v2.json"
 
 #: One break each, applied alone to a committed tree, with the test that CLAIMS the property it
 #: removes. ``expect`` is compared by identity by the tool, so a neighbouring test failing instead
@@ -210,10 +212,11 @@ def predecessor_binding() -> dict:
         "path": PREDECESSOR,
         "record_sha256": hashlib.sha256(canonical_json(document["record"])).hexdigest(),
         "why": (
-            "v1 of this record, taken before one assertion in the test file was replaced: it "
-            "pinned which of two missing grants an unprovisioned purge role hits first, which "
-            "turned out to depend on whether an offline restore replay had run in the same "
-            "process. v1 itself names the right whose withdrawal stopped at a refusal."
+            "v2 of this record, taken before the lane rebased onto main 854fd7f1. v2's "
+            "tested_head is not reachable from this branch any more, so this is the same table "
+            "re-taken against the tree that exists. v2 itself names v1, which was re-taken when "
+            "one over-specific assertion in the test file was replaced, and v1 names the right "
+            "whose withdrawal stopped at a refusal."
         ),
     }
 
