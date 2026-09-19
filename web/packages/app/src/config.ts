@@ -126,8 +126,11 @@ export interface WalkPose {
 
 /** Which baked tile a walk asked the product route for: a key, or a coordinate in a city. */
 export type BakedTileRequest =
-  | { readonly kind: 'key'; readonly bakedTileId: string; readonly pose: WalkPose | null }
-  | { readonly kind: 'coordinate'; readonly citySeed: string; readonly tileX: number; readonly tileY: number; readonly lod: number; readonly pose: WalkPose | null };
+  | { readonly kind: 'key'; readonly bakedTileId: string; readonly pose: WalkPose | null; readonly reachMm: number | null }
+  | {
+    readonly kind: 'coordinate'; readonly citySeed: string; readonly tileX: number; readonly tileY: number;
+    readonly lod: number; readonly pose: WalkPose | null; readonly reachMm: number | null;
+  };
 
 function whole(value: string | null, limit: number): number | null {
   if (value === null || !/^-?\d+$/.test(value)) return null;
@@ -156,15 +159,24 @@ export function bakedTileRequest(search: string, preview: boolean): BakedTileReq
   // silent fallback is how a frame that is not reproducible ends up in a record looking like one
   // that is, and the picture would look perfectly fine.
   if (pose === 'malformed') return null;
+  // HOW FAR THIS WALK MAY GO, which decides which neighbouring tiles its world is composed of.
+  // THE PAGE DOES NOT KNOW THIS NUMBER AND MUST NOT INVENT IT: a route length is a gate threshold
+  // bound in retained reconciliation records, so whoever defines the walk states it and the page
+  // fetches for exactly what was stated. Absent, the world is the one tile and the page says so; a
+  // malformed one refuses the request, for the reason a malformed pose does.
+  const reach = parameters.get('walk_reach_mm');
+  const reachMm = reach === null ? null : whole(reach, POSE_MM_LIMIT);
+  if (reachMm !== null && reachMm < 0) return null;
+  if (reach !== null && reachMm === null) return null;
   const key = parameters.get('baked_tile');
-  if (key !== null) return BAKED_TILE_ID.test(key) ? { kind: 'key', bakedTileId: key, pose } : null;
+  if (key !== null) return BAKED_TILE_ID.test(key) ? { kind: 'key', bakedTileId: key, pose, reachMm } : null;
   const citySeed = parameters.get('city');
   if (citySeed === null || !CITY_SEED.test(citySeed)) return null;
   const tileX = whole(parameters.get('tile_x'), TILE_COORDINATE_LIMIT);
   const tileY = whole(parameters.get('tile_y'), TILE_COORDINATE_LIMIT);
   const lod = parameters.get('lod') === null ? 0 : whole(parameters.get('lod'), LOD_LIMIT);
   if (tileX === null || tileY === null || lod === null || lod < 0) return null;
-  return { kind: 'coordinate', citySeed, tileX, tileY, lod, pose };
+  return { kind: 'coordinate', citySeed, tileX, tileY, lod, pose, reachMm };
 }
 
 /**

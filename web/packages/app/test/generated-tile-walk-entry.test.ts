@@ -17,18 +17,18 @@ describe('asking for a baked tile', () => {
   it('reads a city seed and coordinate on the preview route, defaulting the level of detail to 0', () => {
     const search = `?preview=1&city=${CITY}&tile_x=2&tile_y=0`;
     expect(bakedTileRequest(search, isAtlasPreview(search, true)))
-      .toEqual({ kind: 'coordinate', citySeed: CITY, tileX: 2, tileY: 0, lod: 0, pose: null });
+      .toEqual({ kind: 'coordinate', citySeed: CITY, tileX: 2, tileY: 0, lod: 0, pose: null, reachMm: null });
   });
 
   it('reads a negative coordinate and a stated level of detail', () => {
     const search = `?preview=1&city=${CITY}&tile_x=-3&tile_y=7&lod=2`;
     expect(bakedTileRequest(search, isAtlasPreview(search, true)))
-      .toEqual({ kind: 'coordinate', citySeed: CITY, tileX: -3, tileY: 7, lod: 2, pose: null });
+      .toEqual({ kind: 'coordinate', citySeed: CITY, tileX: -3, tileY: 7, lod: 2, pose: null, reachMm: null });
   });
 
   it('takes a key as the shortcut, and prefers it when a search carries both', () => {
     const search = `?preview=1&baked_tile=${KEY}&city=${CITY}&tile_x=2&tile_y=0`;
-    expect(bakedTileRequest(search, isAtlasPreview(search, true))).toEqual({ kind: 'key', bakedTileId: KEY, pose: null });
+    expect(bakedTileRequest(search, isAtlasPreview(search, true))).toEqual({ kind: 'key', bakedTileId: KEY, pose: null, reachMm: null });
   });
 
   it('asks for nothing off the preview route, and nothing at all in a production build', () => {
@@ -52,8 +52,19 @@ describe('asking for a baked tile', () => {
     const search = `?preview=1&city=${CITY}&tile_x=2&tile_y=0&pose_x_mm=320000&pose_y_mm=64500&facing_dx=-1&facing_dy=0`;
     expect(bakedTileRequest(search, true)).toEqual({
       kind: 'coordinate', citySeed: CITY, tileX: 2, tileY: 0, lod: 0,
-      pose: { xMm: 320000, yMm: 64500, facingDx: -1, facingDy: 0 },
+      pose: { xMm: 320000, yMm: 64500, facingDx: -1, facingDy: 0 }, reachMm: null,
     });
+  });
+
+  it('reads how far the walk may go, which is what decides its world, and refuses a malformed one', () => {
+    // The page does not know a route length: a threshold bound in retained records is stated by
+    // whoever defines the walk. Absent means one tile; malformed refuses, as a malformed pose does.
+    const base = `?preview=1&city=${CITY}&tile_x=2&tile_y=0`;
+    expect(bakedTileRequest(`${base}&walk_reach_mm=131000`, true)?.reachMm).toBe(131_000);
+    expect(bakedTileRequest(base, true)?.reachMm).toBeNull();
+    expect(bakedTileRequest(`${base}&walk_reach_mm=131000.5`, true)).toBeNull();
+    expect(bakedTileRequest(`${base}&walk_reach_mm=`, true)).toBeNull();
+    expect(bakedTileRequest(`${base}&walk_reach_mm=-1`, true)).toBeNull();
   });
 
   it('states no pose when none is given, which is the runtime default', () => {

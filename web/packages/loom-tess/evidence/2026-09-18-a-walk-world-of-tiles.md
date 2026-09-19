@@ -151,10 +151,61 @@ one. A rule taking the reach along the walk's own stated pose and heading would 
 route can touch. THAT IS A DECISION FOR WHOEVER OWNS THE BUDGET and it is named here with its number
 rather than taken quietly.
 
+**AND THE LINE RULE CANNOT BE WRITTEN TODAY, WHICH IS WHY THE DISK IS NOT MERELY THE CAUTIOUS
+CHOICE.** The heading does not exist when the fetch happens. The route rule chooses a heading from
+its candidates using the FIELD and the rings, and the field is the composed one, so the world must be
+composed before a heading exists. A fetch narrowed to the walk's line would be reading a heading that
+has not been decided: the pose's `facing` is an arrival facing rather than the route's, the rule can
+and does prefer another, and on a three tile world it can prefer WESTWARD. Fetch eastward on that
+assumption and the walk runs off the end going the other way, and the failure presents as missing
+ground rather than as a wrong fetch. So 38 per cent over-fetched is not waste; it is the price of
+computing the world from what is known at the time it must be computed.
+
+THE LINE RULE IS RECORDED AS AVAILABLE UNDER ONE CONDITION, not as rejected: a heading known BEFORE
+the world is composed, which means a walk that states its heading up front rather than deriving it.
+On that day 14,776,104 bytes come back.
+
+## What the page now does, and the two checks the wiring made necessary
+
+The page reads the container's OWN account of where it sits (`tilePlacement`), plans its world from
+the list, fetches the neighbours, and hands them to `loadGeneratedTile`. It states on screen which
+container was DRAWN AND STOOD ON and which were STOOD ON ONLY, with their digests, so a record
+binding several containers does not need anybody's memory of the evening to say what each was for.
+
+**THE PAGE DOES NOT KNOW A ROUTE LENGTH AND MUST NOT INVENT ONE.** How far a walk may go arrives as
+`walk_reach_mm`, stated by whoever defines the walk from their own thresholds. Absent, the world is
+the one tile and the page says so; malformed, the request is refused, for the reason a malformed pose
+is: a silent fallback is how a frame that is not reproducible ends up in a record looking like one
+that is.
+
+WITHOUT A STATED POSE THE REACH IS TAKEN FROM THE WHOLE SQUARE rather than from a guess at where the
+walk will open, because an unstated walk opens at the runtime's default and that is decided after the
+world exists. A square is the superset of every point in it, so this can only over-fetch.
+
+**TWO INTEGRITY CHECKS THAT DID NOT EXIST BEFORE, and the wiring is what made them necessary.** A row
+points at bytes; the bytes state their own identity. Until now nothing compared them, because nothing
+depended on the answer. Now the NEIGHBOURS ARE CHOSEN FROM WHAT THE CONTAINER SAYS ABOUT ITSELF, so a
+row pointing at the wrong container would compose a world out of another part of the city, and every
+tile would arrive verified, whole, and in the wrong place. So the page refuses a row whose container
+disagrees with it, and `fetchWalkWorld` refuses the same for every neighbour.
+
+THE TEST FIXTURE WAS ONE OF THE THINGS THAT DISAGREED. The page's walk test served the committed
+golden, which states city `d0219dae` tile (0,0), under an invented row saying city `23a5f107` tile
+(2,0). Nothing had ever compared them. The row now states what the bytes state.
+
+WHAT THE PAGE TEST CAN AND CANNOT PROVE, said here because it is a real limit. It exercises list,
+plan, fetch and check end to end, and it ends in a REFUSAL rather than a composed world, because this
+repository commits exactly one container and a second tile's bytes would have to be baked. The
+neighbour it serves is that container with its `tile_x` restated, and the edit that makes it claim to
+be (1,0) is the same edit that makes it not itself, so it is refused for not baking to its own
+records. A container that is internally consistent and in the wrong place is covered separately, and
+the wording of a composed statement is covered by a unit test of the line itself.
+
 ## What is not done
 
-- Nothing CALLS `walkWorldTiles` or `fetchWalkWorld` yet: the page still loads one tile and does not
-  hand the neighbours it now knows how to choose and fetch to `loadGeneratedTile`.
+- NOTHING END TO END HAS EVER COMPOSED TWO REAL CONTAINERS THROUGH THE PAGE. The composition itself
+  is measured on the corridor's real tiles (2,0) and (3,0) through the runtime's own code, and the
+  page path is exercised as far as a refusal. A second baked container closes that gap.
 - Nothing serves a container's nav sections separately, so the 1,969,322 above is a measurement of
   what a slice would cost and not of a slice anybody can request today.
 - No neighbour is drawn, per the statement above.

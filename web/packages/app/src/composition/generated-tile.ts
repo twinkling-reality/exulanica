@@ -12,7 +12,7 @@
  * the tile does not draw is listed on screen, record by record, rather than filled in.
  */
 
-import type { LoadedGeneratedTile } from '@exulanica/atlas-react/generated-tile';
+import type { FetchedWalkWorld, LoadedGeneratedTile } from '@exulanica/atlas-react/generated-tile';
 import { type BakedTileRequest, type WalkPose, credentials, developmentToken, statedWalkPose } from '../config.js';
 import { el } from '../ui/dom.js';
 import type { AppEnvironment } from './session-state.js';
@@ -96,7 +96,34 @@ function stateOpening(env: AppEnvironment, opening: Opening): void {
   env.shell.setAttribute(GENERATED_TILE_POSE_ATTRIBUTE, `${xMm},${yMm},${facingDx},${facingDy}`);
 }
 
-function statement(tile: LoadedGeneratedTile, provenance: TileProvenance, opening: Opening): HTMLElement {
+/**
+ * WHICH CONTAINERS THIS WALK STANDS ON, AND WHICH OF THEM IT DRAWS.
+ *
+ * Exactly one container is drawn: the tile asked for. Any others are composed into the navigation
+ * world and into nothing else, so a reader meeting several digests and a walk that completed can
+ * tell what each one was for without remembering the evening it was built. The squares within reach
+ * that hold no ground are named for the same reason: they are the edge of the loaded world, not a
+ * defect in a street, and a sampler returning nothing there is correct.
+ */
+export function worldLine(world: FetchedWalkWorld | null, drawn: string): string {
+  if (world === null) {
+    return 'World: this one tile. The walk stated no reach, so no neighbouring ground was asked for '
+      + 'and the ground ends at this tile\'s own edge.';
+  }
+  const stoodOn = world.neighbours.map((tile) => `${tile.name} ${tile.containerSha256.slice(0, 8)}`);
+  const missing = world.absent.map((tile) => `(${tile.tileX},${tile.tileY}) ${tile.reason}`);
+  return `World: ${world.neighbours.length + 1} containers. Drawn and stood on: ${drawn}. `
+    + `STOOD ON ONLY, never drawn: ${stoodOn.length === 0 ? 'none' : stoodOn.join(', ')}, `
+    + `${world.transferredBytes.toLocaleString()} bytes fetched for them. `
+    + `${missing.length === 0 ? 'Every square within reach has ground.' : `No ground within reach at: ${missing.join(', ')}.`}`;
+}
+
+function statement(
+  tile: LoadedGeneratedTile,
+  provenance: TileProvenance,
+  opening: Opening,
+  world: FetchedWalkWorld | null,
+): HTMLElement {
   const drawn = tile.ranges.filter((range) => range.state === 'drawn');
   const named = (range: LoadedGeneratedTile['ranges'][number]): string =>
     `${range.kind}${range.identity === null ? '' : ` ${range.identity}`}`;
@@ -113,6 +140,7 @@ function statement(tile: LoadedGeneratedTile, provenance: TileProvenance, openin
     `${drawn.length} of ${tile.ranges.length} records drawn; ${unavailableSurfaces.length} `
       + `${unavailableSurfaces.length === 1 ? 'surface' : 'surfaces'} drawn as unavailable.`,
     provenanceLine(provenance),
+    worldLine(world, tile.name),
     openingLine(opening),
     ringLine(tile),
   ];
@@ -167,7 +195,7 @@ export async function prepareGeneratedTileEvaluation(env: AppEnvironment, name: 
   env.shell.setAttribute(GENERATED_TILE_EVALUATION_ATTRIBUTE, name);
   env.shell.querySelector('.generated-tile-evaluation')?.remove();
   const opening = openTile(tile, pose, tileToRenderer);
-  env.shell.append(statement(tile, { kind: 'development', name, containerSha256 }, opening));
+  env.shell.append(statement(tile, { kind: 'development', name, containerSha256 }, opening, null));
   stateOpening(env, opening);
   await (await import('../dev/tile-capture.js')).exposeTileCapture(env.preview, tile);
   return { ...tile, start: opening.start };
@@ -213,11 +241,13 @@ export async function prepareBakedTileWalk(env: AppEnvironment, request: BakedTi
   }
 
   let summary: Awaited<ReturnType<typeof route.listBakedTiles>>[number] | undefined;
+  let neighbourhood: Awaited<ReturnType<typeof route.listBakedTiles>> = [];
   let bakedTileId: string;
   if (request.kind === 'key') {
     bakedTileId = request.bakedTileId;
   } else {
     const tiles = await route.listBakedTiles(access, { citySeed: request.citySeed, lod: request.lod });
+    neighbourhood = tiles;
     const found = route.tileAt(tiles, { tileX: request.tileX, tileY: request.tileY, lod: request.lod });
     if (found === null) {
       throw new Error(`City ${request.citySeed} has no tile at (${request.tileX}, ${request.tileY}) at level of detail ${request.lod}.`);
@@ -234,19 +264,66 @@ export async function prepareBakedTileWalk(env: AppEnvironment, request: BakedTi
   });
   held.set(bakedTileId, { containerSha256: fetched.containerSha256, bytes: fetched.bytes });
 
+  // THE WALK'S WORLD, which is more than this tile whenever the walk states how far it may go.
+  // A tile is 128,000 mm across and a route is longer, so the ground a route needs does not fit on
+  // the tile it is laid on. Only the neighbours' nav_envelope is ever read: THE COMPOSED WORLD IS
+  // WALKABLE PAST THE EDGE AND NOT DRAWN PAST IT, and a camera looking past the edge sees no street.
+  const placement = route.tilePlacement(fetched.bytes);
+  // A ROW AND ITS CONTAINER MUST AGREE ABOUT WHICH TILE THIS IS, and the container is the one that
+  // decides, because the bytes state their own identity and a row only points at them. They are
+  // checked because THIS is what the neighbours are chosen against: a row naming the wrong container
+  // would otherwise compose a world out of another part of the city, and every tile would arrive
+  // verified, whole, and in the wrong place.
+  if (summary !== undefined
+    && (summary.tileX !== placement.tileX || summary.tileY !== placement.tileY || summary.lod !== placement.lod)) {
+    throw new Error(
+      `The route lists ${bakedTileId} at (${summary.tileX}, ${summary.tileY}) level ${summary.lod}, `
+      + `and the container it served says it is (${placement.tileX}, ${placement.tileY}) level ${placement.lod}.`,
+    );
+  }
+  if (request.kind === 'coordinate' && request.citySeed !== placement.citySeed) {
+    throw new Error(
+      `This walk asked for city ${request.citySeed} and the container it was served belongs to ${placement.citySeed}.`,
+    );
+  }
+  let world: Awaited<ReturnType<typeof route.fetchWalkWorld>> | null = null;
+  if (request.reachMm !== null) {
+    const listed = summary === undefined
+      ? await route.listBakedTiles(access, { citySeed: placement.citySeed, lod: placement.lod })
+      : neighbourhood;
+    const plan = route.walkWorldTiles(listed, {
+      standingOn: placement,
+      // A STATED pose is measured from exactly; without one the reach is taken from the whole
+      // square, because an unstated walk opens at the runtime's default and that is decided after
+      // the world exists. See `walk-world.ts`.
+      ...(request.pose === null ? {} : { startMm: [request.pose.xMm, request.pose.yMm] as const }),
+      reachMm: request.reachMm,
+      lod: placement.lod,
+      tileSizeMm: placement.tileSizeMm,
+    });
+    world = await route.fetchWalkWorld(access, plan, {
+      digest,
+      held: new Map([...held.values()].map((entry) => [entry.containerSha256, entry])),
+    });
+    plan.neighbours.forEach((row, at) => {
+      held.set(row.bakedTileId, { containerSha256: row.containerSha256, bytes: world!.neighbours[at]!.bytes });
+    });
+  }
+
   const library = await sources.committedTextureLibrary();
   const tile = await route.loadGeneratedTile({
     name: bakedTileId,
     bytes: fetched.bytes,
     manifest: parseTextureSetManifest(library.textureManifest),
     fetchSet: (entry) => library.textureSet(entry.contentSha256),
+    ...(world === null ? {} : { neighbours: world.neighbours }),
   });
   const opening = openTile(tile, request.pose, route.tileToRenderer);
   env.shell.setAttribute(GENERATED_TILE_EVALUATION_ATTRIBUTE, bakedTileId);
   env.shell.querySelector('.generated-tile-evaluation')?.remove();
   env.shell.append(statement(tile, {
     kind: 'route', bakedTileId, containerSha256: fetched.containerSha256, origin: fetched.origin,
-  }, opening));
+  }, opening, world));
   stateOpening(env, opening);
   await (await import('../dev/tile-capture.js')).exposeTileCapture(env.preview, tile);
   return { ...tile, start: opening.start };

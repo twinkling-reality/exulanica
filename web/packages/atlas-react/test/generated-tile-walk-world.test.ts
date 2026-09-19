@@ -7,12 +7,15 @@
  */
 
 import { webcrypto } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { beforeAll, describe, expect, it } from 'vitest';
+import { bakeTile } from '@exulanica/loom-tess/core';
 import {
   BAKED_TILE_MEDIA_TYPE,
   TileRouteRefusal,
   fetchWalkWorld,
   tileName,
+  tilePlacement,
   walkWorldTiles,
   type BakedTileSummary,
   type TileRouteAccess,
@@ -40,8 +43,9 @@ function summary(tileX: number, tileY: number, over: Partial<BakedTileSummary> =
 const CORRIDOR = [0, 1, 2, 3, 4].map((tileX) => summary(tileX, 0));
 /** The gate's walk: it starts on the west edge of tile (2,0) and runs east. */
 const START: readonly [number, number] = [256_000, 64_000];
+const STANDING = { tileX: 2, tileY: 0 };
 const plan = (tiles: readonly BakedTileSummary[] = CORRIDOR) =>
-  walkWorldTiles(tiles, { startMm: START, reachMm: REACH_MM, lod: 0, tileSizeMm: TILE_SIZE_MM });
+  walkWorldTiles(tiles, { standingOn: STANDING, startMm: START, reachMm: REACH_MM, lod: 0, tileSizeMm: TILE_SIZE_MM });
 
 const place = (tiles: readonly { tileX: number; tileY: number }[]) => tiles.map((tile) => [tile.tileX, tile.tileY]);
 
@@ -73,8 +77,26 @@ describe('which tiles a walk\'s world is', () => {
   });
 
   it('refuses to lay out a world on a tile of no size, rather than dividing by it', () => {
-    expect(() => walkWorldTiles(CORRIDOR, { startMm: START, reachMm: REACH_MM, lod: 0, tileSizeMm: 0 }))
+    expect(() => walkWorldTiles(CORRIDOR, { standingOn: STANDING, startMm: START, reachMm: REACH_MM, lod: 0, tileSizeMm: 0 }))
       .toThrow(TileRouteRefusal);
+  });
+
+  it('takes the reach from the whole square when the walk states no pose', () => {
+    // An unstated walk opens at this runtime's default, which is decided AFTER the world exists, so
+    // there is no point to measure from. A square is the superset of every point in it, so this can
+    // only over-fetch, which is the safe direction: tile (4,0) joins because it is a tile away from
+    // (2,0)'s eastern edge, where a pose on the western edge could never reach it.
+    const stated = plan();
+    const unstated = walkWorldTiles(CORRIDOR, { standingOn: STANDING, reachMm: REACH_MM, lod: 0, tileSizeMm: TILE_SIZE_MM });
+    expect(place(unstated.neighbours)).toEqual([[1, 0], [3, 0], [0, 0], [4, 0]]);
+    expect(place(stated.neighbours)).toEqual([[1, 0], [0, 0], [3, 0]]);
+    expect(unstated.neighbours.length).toBeGreaterThan(stated.neighbours.length);
+  });
+
+  it('refuses a stated pose that is not on the tile it says it stands on', () => {
+    expect(() => walkWorldTiles(CORRIDOR, {
+      standingOn: STANDING, startMm: [640_000, 64_000], reachMm: REACH_MM, lod: 0, tileSizeMm: TILE_SIZE_MM,
+    })).toThrow(/is not on tile \(2,0\)/);
   });
 
   it('reads only the level of detail the walk is at', () => {
@@ -84,57 +106,101 @@ describe('which tiles a walk\'s world is', () => {
 });
 
 describe('fetching a walk\'s world', () => {
-  const bytesOf = (tile: BakedTileSummary) => new TextEncoder().encode(`container for ${tileName(tile)}`);
+  // REAL CONTAINERS, because the fetch now reads each one's own account of which tile it is. The
+  // fixture bakes to tile (0,0); the others are that container with `tile_x` restated, which is one
+  // character of a canonical header and so leaves every section offset exactly where it was. Their
+  // GEOMETRY is still tile (0,0)'s, which is why nothing here walks on them: what is under test is
+  // which containers are asked for, which are already held, and what is refused.
+  let baked: Uint8Array;
+  beforeAll(async () => {
+    baked = (await bakeTile(new Uint8Array(readFileSync('packages/loom-tess/test/fixtures/tile-conformance.json')), sha256)).container;
+  }, 60_000);
+
+  async function sha256(bytes: Uint8Array): Promise<string> {
+    const hashed = await digest.digest('SHA-256', bytes);
+    return [...new Uint8Array(hashed)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  }
+
+  /** The same container saying it is another tile: one digit, in place, so no offset moves. */
+  function asTile(tileX: number): Uint8Array {
+    const copy = new Uint8Array(baked);
+    const headerBytes = new DataView(copy.buffer, copy.byteOffset).getUint32(4, true);
+    const header = new TextDecoder().decode(copy.subarray(8, 8 + headerBytes));
+    // ANCHORED ON THE TILE RECORD, not on the first `tile_x` in the file: the header lists every
+    // record before it, and a record of its own carries that field, so a plain search edits somebody
+    // else's. The edit is then READ BACK, because an edit that silently did nothing would leave
+    // every row pointing at tile (0,0) and the test would be about a container nobody meant.
+    const record = header.indexOf('"tile":{"fields":');
+    expect(record).toBeGreaterThan(0);
+    const at = header.indexOf('"tile_x":', record);
+    expect(at).toBeGreaterThan(record);
+    const digit = at + '"tile_x":'.length;
+    expect(header[digit + 1]).toBe(',');
+    copy[8 + digit] = String(tileX).charCodeAt(0);
+    expect(tilePlacement(copy).tileX).toBe(tileX);
+    return copy;
+  }
+
   const access = (fetch: typeof globalThis.fetch): TileRouteAccess => ({ baseUrl: 'https://api.test', token: 't', fetch });
 
-  const serving = (asked: string[]): typeof globalThis.fetch => (async (input: RequestInfo | URL) => {
-    const url = String(input);
-    asked.push(url);
-    const tile = CORRIDOR.find((candidate) => url.includes(candidate.bakedTileId))!;
-    const bytes = bytesOf(tile);
-    const hashed = await digest.digest('SHA-256', bytes);
-    const hex = [...new Uint8Array(hashed)].map((byte) => byte.toString(16).padStart(2, '0')).join('');
-    return new Response(bytes, {
-      status: 200,
-      headers: { 'Content-Type': BAKED_TILE_MEDIA_TYPE, ETag: `"${hex}"` },
-    });
-  }) as typeof globalThis.fetch;
-
-  const hashedCorridor = async () => {
+  async function corridorOf(bytesFor: (tileX: number) => Uint8Array) {
     const rows: BakedTileSummary[] = [];
+    const served = new Map<string, Uint8Array>();
     for (const tile of CORRIDOR) {
-      const hashed = await digest.digest('SHA-256', bytesOf(tile));
-      rows.push({
-        ...tile,
-        containerSha256: [...new Uint8Array(hashed)].map((b) => b.toString(16).padStart(2, '0')).join(''),
-        containerBytes: bytesOf(tile).byteLength,
-      });
+      const bytes = bytesFor(tile.tileX);
+      served.set(tile.bakedTileId, bytes);
+      rows.push({ ...tile, containerSha256: await sha256(bytes), containerBytes: bytes.byteLength });
     }
-    return rows;
-  };
+    return { rows, served };
+  }
+
+  const serving = (served: ReadonlyMap<string, Uint8Array>, asked: string[]): typeof globalThis.fetch =>
+    (async (input: RequestInfo | URL) => {
+      const url = String(input);
+      asked.push(url);
+      const id = [...served.keys()].find((key) => url.includes(key))!;
+      const bytes = served.get(id)!;
+      return new Response(bytes.slice().buffer as ArrayBuffer, {
+        status: 200,
+        headers: { 'Content-Type': BAKED_TILE_MEDIA_TYPE, ETag: `"${await sha256(bytes)}"` },
+      });
+    }) as typeof globalThis.fetch;
 
   it('asks the route for each neighbour and reports what crossed the network', async () => {
-    const rows = await hashedCorridor();
+    const { rows, served } = await corridorOf(asTile);
     const asked: string[] = [];
-    const world = await fetchWalkWorld(access(serving(asked)), plan(rows), { digest });
+    const world = await fetchWalkWorld(access(serving(served, asked)), plan(rows), { digest });
     expect(world.neighbours.map((neighbour) => neighbour.name)).toEqual(['tile (1,0)', 'tile (0,0)', 'tile (3,0)']);
     expect(asked.length).toBe(3);
     expect(world.transferredBytes).toBe(world.neighbours.reduce((total, n) => total + n.bytes.byteLength, 0));
+    expect(world.neighbours.map((n) => n.containerSha256)).toEqual(
+      ['tile (1,0)', 'tile (0,0)', 'tile (3,0)'].map((name) => rows.find((row) => tileName(row) === name)!.containerSha256));
     expect(world.absent.length).toBe(4);
   });
 
   it('costs no request at all for a neighbour already held at the digest its row names', async () => {
-    const rows = await hashedCorridor();
-    const held = new Map(rows.map((tile) => [tile.containerSha256, { containerSha256: tile.containerSha256, bytes: bytesOf(tile) }]));
+    const { rows, served } = await corridorOf(asTile);
+    const held = new Map(rows.map((row) => [row.containerSha256, {
+      containerSha256: row.containerSha256, bytes: served.get(row.bakedTileId)!,
+    }]));
     const asked: string[] = [];
-    const world = await fetchWalkWorld(access(serving(asked)), plan(rows), { digest, held });
+    const world = await fetchWalkWorld(access(serving(served, asked)), plan(rows), { digest, held });
     expect(asked).toEqual([]);
     expect(world.transferredBytes).toBe(0);
     expect(world.neighbours.length).toBe(3);
   });
 
+  it('refuses a row whose container says it is a different tile', async () => {
+    // Every row served the SAME container, the one that says it is (0,0). It is whole, it is
+    // exactly the bytes its row's digest names, and for two of the three rows it is the wrong
+    // ground: this is the only check between here and standing on another part of the city.
+    const { rows, served } = await corridorOf(() => baked);
+    await expect(fetchWalkWorld(access(serving(served, [])), plan(rows), { digest }))
+      .rejects.toThrow(/says it is tile \(0,0\)/);
+  });
+
   it('stops the walk when a tile the store says it has cannot be served', async () => {
-    const rows = await hashedCorridor();
+    const { rows } = await corridorOf(asTile);
     const refusing: typeof globalThis.fetch = (async () => new Response(
       JSON.stringify({ code: 'unknown_reference', detail: 'no such key' }),
       { status: 404, headers: { 'Content-Type': 'application/problem+json' } },

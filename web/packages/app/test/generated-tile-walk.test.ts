@@ -20,17 +20,35 @@ import {
   GENERATED_TILE_POSE_ATTRIBUTE,
   prepareBakedTileWalk,
   prepareGeneratedTileEvaluation,
+  worldLine,
 } from '../src/composition/generated-tile.js';
 import type { AppEnvironment } from '../src/composition/session-state.js';
 
 // Relative to web/, where the suite runs.
 const GOLDEN = resolve('packages/app/src/dev/tiles/tile-conformance.owd');
 const TEXTURES = resolve('../assets/textures');
-const CITY = '23a5f1075cb3b4438e63fb570ffc33cecc191be782d3e03b068ab7fcd9a2bd8d';
+// THE GOLDEN'S OWN CITY AND COORDINATE, read from its container rather than invented: the row this
+// test serves must agree with the bytes it serves, because the page now chooses a walk's neighbours
+// from what the container says about itself and refuses a row that disagrees with it.
+const CITY = 'd0219dae956352ef4a56e32030cb6ab1a80bfa5a63fd288e9aacccfb71966a60';
 const KEY = '603b9404-e384-444a-815d-ae34af219969';
 
 const golden = new Uint8Array(readFileSync(GOLDEN));
 const goldenSha256 = createHash('sha256').update(golden).digest('hex');
+
+/** A second tile for the walk's world: the golden restated as (1,0), one digit of a canonical header. */
+const EAST_KEY = '7f0f0d5a-2c31-4d0e-9a44-1b5c2d3e4f50';
+const east = (() => {
+  const copy = new Uint8Array(golden);
+  const headerBytes = new DataView(copy.buffer).getUint32(4, true);
+  const header = new TextDecoder().decode(copy.subarray(8, 8 + headerBytes));
+  // Anchored on the tile record: every record is listed before it and one of them carries the same
+  // field name, so a plain search would edit somebody else's tile.
+  const at = header.indexOf('"tile_x":', header.indexOf('"tile":{"fields":'));
+  copy[8 + at + '"tile_x":'.length] = '1'.charCodeAt(0);
+  return copy;
+})();
+const eastSha256 = createHash('sha256').update(east).digest('hex');
 
 /** A file the development page asks for by URL, read from the repository instead. */
 function fileFor(url: string): Uint8Array | null {
@@ -60,9 +78,12 @@ function shell(): HTMLElement {
 // Each case decodes the committed golden and its texture sets from disk, so the default 5 s is tight.
 describe('walking a tile fetched from the product route', { timeout: 30_000 }, () => {
   let asked: string[] = [];
+  /** Where the LIST says the golden is. The container says (0,0); a test may make the row disagree. */
+  let listedTileX = 0;
 
   beforeEach(() => {
     asked = [];
+    listedTileX = 0;
     vi.stubEnv('VITE_EXULANICA_TOKEN', 'a-token-this-test-invented');
     vi.stubGlobal('fetch', async (input: RequestInfo | URL): Promise<Response> => {
       const url = String(input);
@@ -71,11 +92,21 @@ describe('walking a tile fetched from the product route', { timeout: 30_000 }, (
         return new Response(JSON.stringify({
           city_seed: CITY,
           tiles: [{
-            baked_tile_id: KEY, tile_x: 2, tile_y: 0, lod: 0,
+            baked_tile_id: KEY, tile_x: listedTileX, tile_y: 0, lod: 0,
             tile_inputs_digest: 'b'.repeat(64), container_sha256: goldenSha256, container_bytes: golden.length,
+            render_batch_sha256: 'c'.repeat(64), nav_envelope_sha256: 'd'.repeat(64), state: 'baked',
+          }, {
+            baked_tile_id: EAST_KEY, tile_x: 1, tile_y: 0, lod: 0,
+            tile_inputs_digest: 'b'.repeat(64), container_sha256: eastSha256, container_bytes: east.length,
             render_batch_sha256: 'c'.repeat(64), nav_envelope_sha256: 'd'.repeat(64), state: 'baked',
           }],
         }), { status: 200, headers: { 'Content-Type': 'application/json' } });
+      }
+      if (url.includes(`/tiles/${EAST_KEY}/bytes`)) {
+        return new Response(body(east), {
+          status: 200,
+          headers: { 'Content-Type': 'application/vnd.exulanica.owd', ETag: `"${eastSha256}"` },
+        });
       }
       if (url.includes(`/tiles/${KEY}/bytes`)) {
         return new Response(body(golden), {
@@ -100,7 +131,7 @@ describe('walking a tile fetched from the product route', { timeout: 30_000 }, (
   });
 
   it('fetches by coordinate, checks the container against its row and draws what the golden draws', async () => {
-    const request = bakedTileRequest(`?preview=1&city=${CITY}&tile_x=2&tile_y=0`, true);
+    const request = bakedTileRequest(`?preview=1&city=${CITY}&tile_x=0&tile_y=0`, true);
     expect(request).not.toBeNull();
     const element = shell();
     const tile = await prepareBakedTileWalk({ shell: element, preview: true } as unknown as AppEnvironment, request!);
@@ -119,7 +150,7 @@ describe('walking a tile fetched from the product route', { timeout: 30_000 }, (
     const element = shell();
     const tile = await prepareBakedTileWalk(
       { shell: element, preview: true } as unknown as AppEnvironment,
-      { kind: 'key', bakedTileId: KEY, pose: { xMm: 4000, yMm: 3000, facingDx: 1, facingDy: 0 } },
+      { kind: 'key', bakedTileId: KEY, pose: { xMm: 4000, yMm: 3000, facingDx: 1, facingDy: 0 }, reachMm: null },
     );
     // The tile frame has x east and y north in millimetres; the renderer has x east and z south in
     // metres, and yaw 0 looks north, so a facing of (1, 0) is a quarter turn clockwise from north.
@@ -134,7 +165,7 @@ describe('walking a tile fetched from the product route', { timeout: 30_000 }, (
     const element = shell();
     await prepareBakedTileWalk(
       { shell: element, preview: true } as unknown as AppEnvironment,
-      { kind: 'key', bakedTileId: KEY, pose: null },
+      { kind: 'key', bakedTileId: KEY, pose: null, reachMm: null },
     );
     expect(element.querySelector('.generated-tile-evaluation')?.textContent)
       .toContain("Opened at this runtime's default pose");
@@ -158,7 +189,7 @@ describe('walking a tile fetched from the product route', { timeout: 30_000 }, (
     const element = shell();
     await prepareBakedTileWalk(
       { shell: element, preview: true } as unknown as AppEnvironment,
-      { kind: 'key', bakedTileId: KEY, pose: { xMm: 4000, yMm: 3000, facingDx: 1, facingDy: 0 } },
+      { kind: 'key', bakedTileId: KEY, pose: { xMm: 4000, yMm: 3000, facingDx: 1, facingDy: 0 }, reachMm: null },
     );
     expect(element.getAttribute(GENERATED_TILE_OPENING_ATTRIBUTE)).toBe('stated');
     expect(element.getAttribute(GENERATED_TILE_POSE_ATTRIBUTE)).toBe('4000,3000,1,0');
@@ -168,7 +199,7 @@ describe('walking a tile fetched from the product route', { timeout: 30_000 }, (
     const element = shell();
     await prepareBakedTileWalk(
       { shell: element, preview: true } as unknown as AppEnvironment,
-      { kind: 'key', bakedTileId: KEY, pose: null },
+      { kind: 'key', bakedTileId: KEY, pose: null, reachMm: null },
     );
     expect(element.getAttribute(GENERATED_TILE_OPENING_ATTRIBUTE)).toBe('default');
     expect(element.hasAttribute(GENERATED_TILE_POSE_ATTRIBUTE)).toBe(false);
@@ -219,7 +250,7 @@ describe('walking a tile fetched from the product route', { timeout: 30_000 }, (
     const element = shell();
     await expect(prepareBakedTileWalk(
       { shell: element, preview: true } as unknown as AppEnvironment,
-      { kind: 'key', bakedTileId: KEY, pose: null },
+      { kind: 'key', bakedTileId: KEY, pose: null, reachMm: null },
     )).rejects.toThrow(/hashes to/);
     expect(element.querySelector('.generated-tile-evaluation')).toBeNull();
   });
@@ -229,7 +260,7 @@ describe('walking a tile fetched from the product route', { timeout: 30_000 }, (
     const element = shell();
     await expect(prepareBakedTileWalk(
       { shell: element, preview: true } as unknown as AppEnvironment,
-      { kind: 'key', bakedTileId: KEY, pose: null },
+      { kind: 'key', bakedTileId: KEY, pose: null, reachMm: null },
     )).rejects.toThrow(/No development token/);
     expect(asked).toHaveLength(0);
   });
@@ -238,8 +269,84 @@ describe('walking a tile fetched from the product route', { timeout: 30_000 }, (
     const element = shell();
     await expect(prepareBakedTileWalk(
       { shell: element, preview: false } as unknown as AppEnvironment,
-      { kind: 'key', bakedTileId: KEY, pose: null },
+      { kind: 'key', bakedTileId: KEY, pose: null, reachMm: null },
     )).rejects.toThrow(/development preview route/);
     expect(asked).toHaveLength(0);
   });
+
+  it('asks the route for the neighbour a stated reach names, and checks it is the tile the row claims', async () => {
+    // WHAT THIS CAN AND CANNOT PROVE. The walk states how far it may go, which is the only reason any
+    // neighbour is asked for, and the page then lists, plans, fetches and checks: all of that runs
+    // here. It cannot end with a COMPOSED world, because this repository commits exactly one
+    // container and a second tile's bytes would have to be baked.
+    //
+    // THE NEIGHBOUR SERVED HERE IS THAT CONTAINER WITH ITS `tile_x` RESTATED, and the edit that
+    // makes it claim to be (1,0) is the same edit that makes it not itself: it is refused for not
+    // baking to its own records, which is the deepest of the three checks this path makes and fires
+    // before the other two can. A container that is internally consistent and in the wrong place is
+    // caught by the placement check instead, which `generated-tile-walk-world.test.ts` covers with
+    // an unedited container under another tile's row. The wording of a composed statement is covered
+    // by `worldLine` below.
+    const request = bakedTileRequest(`?preview=1&city=${CITY}&tile_x=0&tile_y=0&walk_reach_mm=131000`, true);
+    expect(request?.reachMm).toBe(131_000);
+    const element = shell();
+    await expect(prepareBakedTileWalk({ shell: element, preview: true } as unknown as AppEnvironment, request!))
+      .rejects.toThrow(/^Neighbour tile \(1,0\) refused: .*not what its own records bake to/);
+    expect(asked.some((url) => url.includes(`/tiles/${EAST_KEY}/bytes`))).toBe(true);
+  });
+
+  it('refuses a row that puts its container somewhere the container does not agree with', async () => {
+    // A row points at bytes and the BYTES STATE THEIR OWN IDENTITY. Nothing compared them until the
+    // walk's neighbours began to be chosen from what the container says about itself: a row pointing
+    // at the wrong container would otherwise compose a world out of another part of the city, and
+    // every tile would arrive verified, whole, and in the wrong place.
+    listedTileX = 5;
+    const request = bakedTileRequest(`?preview=1&city=${CITY}&tile_x=5&tile_y=0`, true);
+    const element = shell();
+    await expect(prepareBakedTileWalk({ shell: element, preview: true } as unknown as AppEnvironment, request!))
+      .rejects.toThrow(/lists .* at \(5, 0\) level 0, and the container it served says it is \(0, 0\) level 0/);
+  });
+
+  it('refuses a container belonging to a city the walk did not ask for', async () => {
+    const request = bakedTileRequest(`?preview=1&city=${'a'.repeat(64)}&tile_x=0&tile_y=0`, true);
+    const element = shell();
+    await expect(prepareBakedTileWalk({ shell: element, preview: true } as unknown as AppEnvironment, request!))
+      .rejects.toThrow(/asked for city a{64} and the container it was served belongs to/);
+  });
+
+  it('says which containers were drawn and which were only stood on, and names the squares with no ground', () => {
+    const composed = worldLine({
+      neighbours: [
+        { name: 'tile (1,0)', bytes: new Uint8Array(), containerSha256: 'aaaa1111'.padEnd(64, '0'), transferredBytes: 12 },
+        { name: 'tile (3,0)', bytes: new Uint8Array(), containerSha256: 'bbbb2222'.padEnd(64, '0'), transferredBytes: 34 },
+      ],
+      transferredBytes: 46,
+      absent: [{ tileX: 1, tileY: 1, reason: 'no_row' }, { tileX: 2, tileY: 1, reason: 'nondeterminism_detected' }],
+    }, 'the-drawn-tile');
+    expect(composed).toContain('World: 3 containers');
+    expect(composed).toContain('Drawn and stood on: the-drawn-tile');
+    expect(composed).toContain('STOOD ON ONLY, never drawn: tile (1,0) aaaa1111, tile (3,0) bbbb2222');
+    expect(composed).toContain('46 bytes fetched for them');
+    // The two absences are different facts and the line keeps them apart.
+    expect(composed).toContain('No ground within reach at: (1,1) no_row, (2,1) nondeterminism_detected.');
+    expect(worldLine(null, 'the-drawn-tile')).toContain('World: this one tile');
+  });
+
+  it('asks for no neighbour and says the world is one tile when the walk states no reach', async () => {
+    const request = bakedTileRequest(`?preview=1&city=${CITY}&tile_x=0&tile_y=0`, true);
+    expect(request?.reachMm).toBeNull();
+    const element = shell();
+    await prepareBakedTileWalk({ shell: element, preview: true } as unknown as AppEnvironment, request!);
+
+    expect(asked.some((url) => url.includes(`/tiles/${EAST_KEY}/bytes`))).toBe(false);
+    const statement = element.querySelector('.generated-tile-evaluation')?.textContent ?? '';
+    expect(statement).toContain('World: this one tile');
+    expect(statement).toContain('stated no reach');
+  });
+
+  it('refuses a walk_reach_mm that is not a whole number, rather than falling back to one tile', () => {
+    expect(bakedTileRequest(`?preview=1&city=${CITY}&tile_x=0&tile_y=0&walk_reach_mm=lots`, true)).toBeNull();
+    expect(bakedTileRequest(`?preview=1&city=${CITY}&tile_x=0&tile_y=0&walk_reach_mm=-1`, true)).toBeNull();
+  });
 });
+
