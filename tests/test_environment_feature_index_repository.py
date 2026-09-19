@@ -197,6 +197,40 @@ def test_source_index_and_render_withdrawal_fail_closed(indexed_environment, wit
         repo.read_features(source.admission_id)
 
 
+def test_a_withdrawal_landing_during_a_read_is_refused_by_the_final_check(
+    indexed_environment, monkeypatch
+):
+    """The test above withdraws BEFORE the read, so the authorised row is never issued and the
+    final check never runs. This is the case the final check exists for, and nothing reached it.
+
+    Measured 2026-09-19: deleting `self._require_publication_current(row, current)` from
+    repository.py left every test in the five environment test files passing, 27 asked, and no
+    test anywhere names any of the three messages it raises. A read that begins while the source
+    is live and finishes after it is withdrawn would have returned the catalog.
+
+    Only the TIMING is arranged here. The withdrawal is the repository's own, on the repository's
+    own connection, and it lands where a real one would: after the authorised row was read and
+    before the final check re-reads it, which is the window the blob fetch opens."""
+    repo, source, render, store = indexed_environment
+    repo.publish_feature_index(
+        source.admission_id, _publication(render.asset_id, "Hall"), actor=uuid.uuid4()
+    )
+    # The control. Without the withdrawal this same read returns the catalog, so the refusal
+    # below is about the withdrawal and not about the fixture or the patched fetch.
+    assert repo.read_features(source.admission_id).features
+
+    fetch = store.get
+
+    def withdraw_while_the_bytes_are_being_read(blob_id):
+        data = fetch(blob_id)
+        repo.withdraw("source", source.admission_id)
+        return data
+
+    monkeypatch.setattr(store, "get", withdraw_while_the_bytes_are_being_read)
+    with pytest.raises(EnvironmentResourceWithdrawn):
+        repo.read_features(source.admission_id)
+
+
 def test_catalog_byte_corruption_and_cross_workspace_reads_fail_closed(
     indexed_environment, tmp_path
 ):
