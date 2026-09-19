@@ -4,7 +4,14 @@ The composed corridor run scored `noCutsOrFloatingGeometry` FALSE on
 `componentsDetachedFromSupport` 322, against 773 on the same tile drawn alone, and against a
 committed prediction of 2,000 to 2,500. This measures why, on the run's own containers.
 
-Measured on `lane/what-holds-a-component-up` off main `15e8198c`, tessellator source version 20.
+Measured on `lane/what-holds-a-component-up` off main `15e8198c`, tessellator source version 20,
+and every figure below re-established unchanged after rebasing onto main `775d44f8`, which touched
+no geometry: its fourteen files are evaluation records, the gate's Python side and its tests.
+
+The run being read is `docs/evaluation/artifacts/2026-09-19-corridor-composed-world-judgement-refused/run.json`,
+which `775d44f8` committed. It is 77,022 bytes and `dcc8b78a9d7dca7dd1fce0f05dbcf6a6d0b69ec3aa9cf0da3c1ade3790758445`,
+the same bytes the private-store supplement binds, so the analysis below no longer rests on a file
+in one session's scratch.
 
 ## The prediction, found and quoted
 
