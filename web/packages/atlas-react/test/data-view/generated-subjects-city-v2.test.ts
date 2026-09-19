@@ -147,6 +147,36 @@ function expectToday(outcomes: readonly Outcome[]): void {
 }
 
 describe('generated subject contract v2 over real city containers', () => {
+  it('reads fields whose shape is the same in every version on its list', () => {
+    // TYING THE LISTS PROVES THE LISTS AGREE, NOT THAT THE FIELDS DO. The contract admits city 2 and
+    // 3 because the things it reads do not differ between them, and that was a claim nobody checked:
+    // adding a version to the list would otherwise be a silent re-assumption of compatibility, which
+    // is the defect ADR-0024 exists to remove, reappearing one layer out. So what this reader takes
+    // out of a record is named here and held identical across every version it is told to read.
+    const READ_BY_CONTRACT = ['identity', 'extent', 'role', 'surface_kind', 'surface_identity'];
+    const tables = GRAMMAR_TABLES.filter(
+      table => table.grammar_id === 'city' && GENERATED_CITY_GRAMMAR_VERSIONS.includes(table.grammar_version),
+    );
+    expect(tables).toHaveLength(GENERATED_CITY_GRAMMAR_VERSIONS.length);
+    const kinds = [...new Set(tables.flatMap(table => table.shapes.records.map(shape => shape.kind!)))].sort();
+    let compared = 0;
+    for (const kind of kinds) {
+      const perVersion = tables.map(table => table.shapes.records.find(shape => shape.kind === kind));
+      // A kind present in one listed version and not another is itself a difference this reader
+      // must not meet, so it fails here rather than at the first container that carries one.
+      expect(perVersion.every(shape => shape !== undefined), `${kind} is in every listed version`).toBe(true);
+      for (const field of READ_BY_CONTRACT) {
+        const found = perVersion.map(shape => shape!.fields.find(candidate => candidate.name === field));
+        const distinct = new Set(found.map(shape => JSON.stringify(shape ?? null)));
+        expect(distinct.size, `${kind}.${field} has one shape across ${GENERATED_CITY_GRAMMAR_VERSIONS.join(' and ')}`).toBe(1);
+        if (found[0] !== undefined) compared += 1;
+      }
+    }
+    // The loop must have found the fields it claims to compare: an empty comparison passes.
+    expect(compared).toBeGreaterThan(0);
+    expect(kinds).toContain('city.surface_material');
+  });
+
   it('reads exactly the city grammar versions the tessellator reads', () => {
     // THE TIE THAT STOPS THE CONTRACT FALLING BEHIND. atlas-core states which city versions it can
     // read a subject out of and does not depend on loom-tess, so nothing in that package can notice
