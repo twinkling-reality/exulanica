@@ -217,6 +217,7 @@ def test_an_answer_above_the_bar_is_taken_and_moves_the_world():
 def test_an_answer_below_the_bar_falls_through_to_the_rule():
     counters = ChoiceCounters()
     below, _ = _run(60, ModelChoices(Answers(899), 900, counters))
+    assert counters.answered_outside_the_set == 0
     ruled, _ = _run(60, DeterministicChoices())
     assert counters.asked > 0
     assert counters.not_the_rule == 0
@@ -239,6 +240,11 @@ def test_an_answer_outside_the_closed_set_is_refused_not_repaired():
     assert counters.asked > 0
     assert counters.not_the_rule == 0
     assert society_state_sha256(_world(invented)) == society_state_sha256(_world(ruled))
+    # An answer outside the set and an answer below the bar are different failures, and a run
+    # that reported only "the model did not decide" could not tell an operator which is happening.
+    assert counters.answered_outside_the_set == counters.asked
+    assert counters.below_threshold == 0
+    assert counters.provider_silent == 0
 
 
 def test_the_threshold_is_bounded():

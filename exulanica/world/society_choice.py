@@ -24,10 +24,14 @@ not produce an answer, including a provider that raises, ends at the same determ
 so a society whose provider is unreachable runs exactly as it runs today. ``tests`` proves that by
 running one with a provider that raises on every call.
 
-``ChoiceCounters`` names five different sets and never adds one to another. ``asked`` counts calls
-to this seam; ``model`` and ``fallback`` partition it by who answered; ``below_threshold`` is the
-part of ``fallback`` that had a model answer and rejected it. People and ticks are not counted
-here because they belong to the run, not to the seam.
+``ChoiceCounters`` names different sets and never adds one into another. ``asked`` counts calls to
+this seam. ``not_the_rule`` and ``fallback`` partition it by who answered, and they partition on
+``RULE`` against not-``RULE`` rather than on model against not-model, so a bound or an oracle
+counts honestly. Three separate counts say why a fallback happened: ``below_threshold`` had an
+answer and rejected it for confidence, ``answered_outside_the_set`` had one and rejected it for
+naming a thing that was not offered, and ``provider_silent`` had none at all. A single "the model
+did not decide" count would hide which of the three is happening, and they call for different
+actions. People and ticks are not counted here because they belong to the run, not to the seam.
 """
 
 from __future__ import annotations
@@ -83,6 +87,7 @@ class ChoiceCounters:
     not_the_rule: int = 0
     fallback: int = 0
     below_threshold: int = 0
+    answered_outside_the_set: int = 0
     provider_silent: int = 0
     without_destination: int = 0
     nothing_possible: int = 0
@@ -96,6 +101,8 @@ class ChoiceCounters:
             self.not_the_rule += 1
         if decision.rejected_confidence_milli is not None:
             self.below_threshold += 1
+        if decision.answered_outside_the_set:
+            self.answered_outside_the_set += 1
         if decision.provider_silent:
             self.provider_silent += 1
         if decision.destination_id is not None:
@@ -186,6 +193,7 @@ class ChoiceDecision:
     blocked_reason: str | None
     confidence_milli: int | None = None
     rejected_confidence_milli: int | None = None
+    answered_outside_the_set: bool = False
     provider_silent: bool = False
 
     def recorded(self) -> dict[str, Any]:
@@ -317,6 +325,7 @@ class ModelChoices:
                 destination_id=destination_id,
                 blocked_reason=blocked,
                 rejected_confidence_milli=taken.confidence_milli if taken is not None else None,
+                answered_outside_the_set=answer is not None and taken is None,
                 provider_silent=answer is None and bool(asked.options),
             )
         if self.counters is not None:
