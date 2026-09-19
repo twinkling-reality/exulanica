@@ -88,6 +88,16 @@ def test_the_twelve_names_this_catalog_began_as_are_unchanged():
     Every one of the twelve keeps its key, its text and its hierarchies. A composition rule that
     quietly moved `market_street` from high street to local street would be a different vocabulary
     wearing the same name, and two of these keys are named by other tests.
+
+    THIS IS A FACT ABOUT THE CATALOG AND NOT ABOUT ANY WORLD GENERATED FROM IT. "Purely additive"
+    reads as the stronger claim and the stronger claim is FALSE: a street's name is
+    ``options[draw(..., 0, len(options) - 1)]``, so a longer options list moves the index without
+    moving how many streets there are. Measured 2026-09-19 on the corridor's own specification:
+    the record count held at 6,566 either side and ALL SEVEN OF ITS STREET NAMES CHANGED,
+    linden_terrace and harbour_way and five others becoming hawthorn_street and harbour_road and
+    five others. Every street record's digest therefore moves, and because ``tessellate`` sorts by
+    (kind, sha256) their order and their triangles move with them. A record COUNT could not have
+    seen any of that, and it was quoted as though it had.
     """
     began_as = {
         "bridge_street": ("Bridge Street", ["high_street", "local_street"]),
