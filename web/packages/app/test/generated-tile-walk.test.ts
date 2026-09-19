@@ -312,7 +312,7 @@ describe('walking a tile fetched from the product route', { timeout: 30_000 }, (
     const request = bakedTileRequest(`?preview=1&city=${'a'.repeat(64)}&tile_x=0&tile_y=0`, true);
     const element = shell();
     await expect(prepareBakedTileWalk({ shell: element, preview: true } as unknown as AppEnvironment, request!))
-      .rejects.toThrow(/asked for city a{64} and the container it was served belongs to/);
+      .rejects.toThrow(/asked for world a{64} and the container it was served belongs to/);
   });
 
   it('states the world as data on the shell, so a record binds what was drawn without parsing prose', async () => {

@@ -148,7 +148,15 @@ export function walkWorldTiles(
 
 /** Where a container says it sits in its city. No list row carries the seed or the tile's size. */
 export interface TilePlacement extends TileCoordinate {
-  readonly citySeed: string;
+  /**
+   * The identity of the WORLD this tile belongs to.
+   *
+   * `worldSeed` rather than `citySeed`: a city is one kind of world, and new code naming this
+   * concept takes the name the project settled on. The container's own field is still `city_seed`
+   * and is READ as such, because renaming what a baked record states is a separate change that
+   * moves every digest.
+   */
+  readonly worldSeed: string;
   readonly lod: number;
   readonly tileSizeMm: number;
 }
@@ -184,7 +192,7 @@ export function tilePlacement(bytes: Uint8Array): TilePlacement {
     return value;
   };
   return {
-    citySeed: text('city_seed'),
+    worldSeed: text('city_seed'),
     lod: whole('lod'),
     tileX: whole('tile_x'),
     tileY: whole('tile_y'),
@@ -312,8 +320,8 @@ export async function fetchWalkWorld(
   plan: WalkWorldPlan,
   options: {
     readonly digest: TextureSetDigest;
-    /** The city the walk is in, as the tile being walked states it. A neighbour from another is refused. */
-    readonly citySeed: string;
+    /** The world the walk is in, as the tile being walked states it. A neighbour from another is refused. */
+    readonly worldSeed: string;
     readonly held?: ReadonlyMap<string, HeldTile>;
   },
 ): Promise<FetchedWalkWorld> {
@@ -332,13 +340,13 @@ export async function fetchWalkWorld(
     // in the wrong place. This is the one check that catches that, because every other check the
     // fetch makes is about the bytes being what the row CLAIMS rather than where they belong.
     const placed = tilePlacement(fetched.bytes);
-    // THE CITY TOO, WHICH THE COORDINATES ALONE DO NOT SETTLE. A listing is asked for one city, so
-    // its rows are that city's by construction; the CONTAINERS are not. A row of this city pointing
+    // THE WORLD TOO, WHICH THE COORDINATES ALONE DO NOT SETTLE. A listing is asked for one world, so
+    // its rows are that world's by construction; the CONTAINERS are not. A row of this world pointing
     // at (3,0) of another one agrees about (3,0) and is somebody else's street.
-    if (placed.citySeed !== options.citySeed) {
+    if (placed.worldSeed !== options.worldSeed) {
       throw new TileRouteRefusal(
-        `${tileName(row)} is listed for city ${options.citySeed} and the container it served belongs to ${placed.citySeed}.`,
-        'container_is_another_city',
+        `${tileName(row)} is listed for world ${options.worldSeed} and the container it served belongs to ${placed.worldSeed}.`,
+        'container_is_another_world',
       );
     }
     if (placed.tileX !== row.tileX || placed.tileY !== row.tileY || placed.lod !== row.lod) {

@@ -315,15 +315,15 @@ export async function prepareBakedTileWalk(env: AppEnvironment, request: BakedTi
       + `and the container it served says it is (${placement.tileX}, ${placement.tileY}) level ${placement.lod}.`,
     );
   }
-  if (request.kind === 'coordinate' && request.citySeed !== placement.citySeed) {
+  if (request.kind === 'coordinate' && request.citySeed !== placement.worldSeed) {
     throw new Error(
-      `This walk asked for city ${request.citySeed} and the container it was served belongs to ${placement.citySeed}.`,
+      `This walk asked for world ${request.citySeed} and the container it was served belongs to ${placement.worldSeed}.`,
     );
   }
   let world: Awaited<ReturnType<typeof route.fetchWalkWorld>> | null = null;
   if (request.reachMm !== null) {
     const listed = summary === undefined
-      ? await route.listBakedTiles(access, { citySeed: placement.citySeed, lod: placement.lod })
+      ? await route.listBakedTiles(access, { citySeed: placement.worldSeed, lod: placement.lod })
       : neighbourhood;
     const plan = route.walkWorldTiles(listed, {
       standingOn: placement,
@@ -337,7 +337,7 @@ export async function prepareBakedTileWalk(env: AppEnvironment, request: BakedTi
     });
     world = await route.fetchWalkWorld(access, plan, {
       digest,
-      citySeed: placement.citySeed,
+      worldSeed: placement.worldSeed,
       held: new Map([...held.values()].map((entry) => [entry.containerSha256, entry])),
     });
     plan.neighbours.forEach((row, at) => {

@@ -163,7 +163,7 @@ describe.runIf(live)('against a running tile route', () => {
       }) as typeof globalThis.fetch,
     };
     const began = Date.now();
-    const world = await fetchWalkWorld(watched, plan, { digest, citySeed: placement.citySeed });
+    const world = await fetchWalkWorld(watched, plan, { digest, worldSeed: placement.worldSeed });
     const tookMs = Date.now() - began;
     expect(world.neighbours.length).toBe(plan.neighbours.length);
     expect(world.transferredBytes).toBe(plan.neighbours.reduce((total, row) => total + row.containerBytes, 0));

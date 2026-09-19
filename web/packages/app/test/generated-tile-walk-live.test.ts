@@ -141,7 +141,7 @@ describe.runIf(live)('the page against a running tile route', { timeout: 120_000
     const sized = await fetchBakedTile(access, { bakedTileId: wanted!.bakedTileId, expect: wanted!, digest });
     const placement = tilePlacement(sized.bytes);
 
-    const search = `?preview=1&city=${placement.citySeed}&tile_x=${placement.tileX}&tile_y=${placement.tileY}`
+    const search = `?preview=1&city=${placement.worldSeed}&tile_x=${placement.tileX}&tile_y=${placement.tileY}`
       + `&lod=${placement.lod}&walk_reach_mm=${placement.tileSizeMm}`;
     const request = bakedTileRequest(search, true);
     expect(request?.reachMm).toBe(placement.tileSizeMm);
