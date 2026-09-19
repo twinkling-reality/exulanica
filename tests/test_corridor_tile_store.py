@@ -36,6 +36,14 @@ EMPTY_EDIT_DELTA = "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202
 
 
 def _tile(tile_x: int = 2, seed: str | None = None) -> dict[str, object]:
+    """A tile record as `record` is handed one.
+
+    IT SAYS `city_seed` BECAUSE THE TILE RECORD DOES. Migration 0081 renamed the COLUMN to
+    `world_seed`; the grammar's field is renamed at city version 4, which is a schema change that
+    moves every digest. A test that spelled this key `world_seed` today would be describing a
+    record shape that does not exist, and it would pass, because `record` would read `None` out of
+    a mapping and fail on something else entirely.
+    """
     return {
         "tile_inputs_digest": hashlib.sha256(f"inputs {tile_x}".encode()).hexdigest(),
         "city_seed": seed or hashlib.sha256(b"a corridor city").hexdigest(),
@@ -81,6 +89,63 @@ def test_the_table_is_global_and_read_only_for_the_runtime():
     assert "baked_tile" in GLOBAL_TABLES
     assert "baked_tile" in READ_ONLY_TABLES
     assert "workspace_baked_tile" in INSERT_ONLY_TABLES
+
+
+def test_the_identity_a_row_carries_is_the_world_the_tile_record_stated(stored):
+    """Migration 0081: the column is `world_seed`, and the value in it came from the tile record.
+
+    Two claims and they are separate. THAT THE COLUMN MOVED is checked from the catalog, both
+    ways: the new name is there and the old one is gone, so a migration that added a column
+    beside the old one rather than renaming it would fail here. THAT THE VALUE STILL ARRIVES is
+    checked from the record that was handed in, because a rename that quietly wrote nulls, or
+    wrote the wrong field, would leave every listing empty and an empty listing is exactly what a
+    world with no tiles looks like.
+
+    The index is named too. An index called `by_city` leading on a column called `world_seed`
+    is a second place the old word survives to be read as authoritative by whoever meets it first.
+    """
+    admin, repository, scratch = stored
+    key = uuid.uuid4()
+    record = _tile()
+    repository.record(
+        baked_tile_id=key,
+        stage_version=3,
+        stage_params_sha256=hashlib.sha256(b"params").digest(),
+        tile=record,
+        document=b"a tile document",
+        container=b"a container",
+        render_batch_sha256=hashlib.sha256(b"render").digest(),
+        nav_envelope_sha256=hashlib.sha256(b"nav").digest(),
+        receipt={"tessellator": 3, "container": "owd/3"},
+    )
+    columns = {
+        row["column_name"]
+        for row in admin.execute(
+            "select column_name from information_schema.columns "
+            "where table_schema = %s and table_name = 'baked_tile'",
+            (scratch,),
+        ).fetchall()
+    }
+    assert "world_seed" in columns
+    assert "city_seed" not in columns
+    indexes = {
+        row["indexname"]
+        for row in admin.execute(
+            "select indexname from pg_indexes where schemaname = %s and tablename = 'baked_tile'",
+            (scratch,),
+        ).fetchall()
+    }
+    assert "baked_tile_by_world" in indexes
+    assert "baked_tile_by_city" not in indexes
+
+    # The value is the tile record's, not a constant retyped here, and it is what the listing
+    # finds the row by. Both operands come from the record that was recorded.
+    stated = str(record["city_seed"])
+    row = admin.execute(
+        "select world_seed from baked_tile where baked_tile_id = %s", (key,)
+    ).fetchone()
+    assert bytes(row["world_seed"]).hex() == stated
+    assert [tile.baked_tile_id for tile in repository.tiles_of_world(stated)] == [key]
 
 
 def test_a_bake_is_stored_once_and_the_same_bytes_change_nothing(stored):
@@ -151,7 +216,7 @@ def test_one_tile_document_baked_by_two_tessellators_makes_two_rows(stored):
     # answer saying which. A page was handed a tessellator 5 container baked the previous night
     # while the store held a 19, and refused it at the decode; the failure read as a missing tile.
     # The history is not lost, only unlisted: `read` still reaches the older bake by its key.
-    listed = repository.tiles_of_city(str(_tile()["city_seed"]))
+    listed = repository.tiles_of_world(str(_tile()["city_seed"]))
     assert [tile.baked_tile_id for tile in listed] == [newer]
     assert repository.read(older).container_bytes == len(b"as the old tessellator wrote it")
     # What the listing carries still tells a reader WHICH bake it named, which is what the two rows
@@ -195,7 +260,7 @@ def test_a_city_listing_names_the_current_bake_of_each_tile(stored):
     neighbour = uuid.uuid4()
     assert _record(repository, neighbour, b"the tile next door", tile={"tile_x": 3}) == "stored"
 
-    listed = repository.tiles_of_city(seed)
+    listed = repository.tiles_of_world(seed)
     # One row per tile, and for the tile with three bakes it is the last one published.
     assert [tile.baked_tile_id for tile in listed] == [keys[-1], neighbour]
     assert listed[0].container_bytes == len(b"container 2")
@@ -203,7 +268,7 @@ def test_a_city_listing_names_the_current_bake_of_each_tile(stored):
     for index, key in enumerate(keys[:-1]):
         assert repository.read(key).container_bytes == len(f"container {index}".encode())
     # And a narrowed listing answers the same way.
-    assert [tile.baked_tile_id for tile in repository.tiles_of_city(seed, lod=0)] == [
+    assert [tile.baked_tile_id for tile in repository.tiles_of_world(seed, lod=0)] == [
         keys[-1],
         neighbour,
     ]
@@ -248,7 +313,7 @@ def test_a_faulted_current_bake_stays_current_and_is_refused_at_the_bytes(stored
     )
     assert repository.read(newer).state != "baked"
     # Still the one the listing names, and the refusal happens where the bytes are asked for.
-    listed = repository.tiles_of_city(seed)
+    listed = repository.tiles_of_world(seed)
     assert [tile.baked_tile_id for tile in listed] == [newer]
     assert listed[0].state != "baked"
     with pytest.raises(BakedTileFaulted):

@@ -6,8 +6,8 @@ Migration 0072 holds the shape and every rule; this is the path that reaches it.
   stored, the same bytes again change nothing, and different bytes under one key leave the stored
   row exactly as it is and mark it ``nondeterminism_detected``. The bytes are put in the ``tiles``
   store before the row is written, so a row never names bytes that were never stored.
-* :meth:`BakedTileRepository.tiles_of_city` lists the CURRENT bake of each tile of one city seed,
-  as metadata: one row per level of detail and coordinate, the most recently published.
+* :meth:`BakedTileRepository.tiles_of_world` lists the CURRENT bake of each tile of one world, as
+  metadata: one row per level of detail and coordinate, the most recently published.
 * :meth:`BakedTileRepository.serve` delivers one tile's bytes to a workspace. The bytes are read
   from the store, held to the row's digest, and the row is read again under the 0041 asset read
   lock, so a tile that stopped being servable between the read and the delivery is refused rather
@@ -185,6 +185,10 @@ class BakedTileRepository:
                 stage_version,
                 stage_params_sha256,
                 bytes.fromhex(tile["tile_inputs_digest"]),
+                # THE GRAMMAR'S SPELLING, NOT THE COLUMN'S. `tile` is a tile record, and that
+                # record still states `city_seed`: renaming a field of a baked record moves every
+                # digest and is a grammar version (city 4), where renaming a column is not.
+                # The value is one identity written under two names until that lands.
                 bytes.fromhex(tile["city_seed"]),
                 json.dumps(tile["grammar_versions"]),
                 bytes.fromhex(tile["catalog_digest"]),
@@ -214,8 +218,15 @@ class BakedTileRepository:
             raise UnknownBakedTile(f"no baked tile {baked_tile_id} is stored here")
         return _row(row)
 
-    def tiles_of_city(self, city_seed: str, lod: int | None = None) -> Sequence[BakedTile]:
-        """THE CURRENT BAKE OF EACH TILE OF A CITY: one row per level of detail and coordinate.
+    def tiles_of_world(self, world_seed: str, lod: int | None = None) -> Sequence[BakedTile]:
+        """THE CURRENT BAKE OF EACH TILE OF A WORLD: one row per level of detail and coordinate.
+
+        ``world_seed`` IS THE IDENTITY OF A GENERATED WORLD INSTANCE, and a city is one kind of
+        world. The kind is not a second argument and never was: it is carried by the grammar the
+        tile pins, so a city is a world whose records are in the city grammar. Migration 0081 has
+        the whole argument, and the short form is that generic code composing a world out of
+        neighbouring tiles cannot ask a row for its identity if each grammar spells that field
+        after itself.
 
         CURRENT IS THE MOST RECENTLY PUBLISHED, greatest ``baked_at``, ties broken by
         ``baked_tile_id`` so the answer is total rather than whichever row the plan happened to
@@ -243,9 +254,9 @@ class BakedTileRepository:
         """
         rows = self.connection.execute(
             f"select distinct on (lod, tile_y, tile_x) {_COLUMNS} from baked_tile "
-            "where city_seed = %s and (%s::int is null or lod = %s) "
+            "where world_seed = %s and (%s::int is null or lod = %s) "
             "order by lod, tile_y, tile_x, baked_at desc, baked_tile_id desc",
-            (bytes.fromhex(city_seed), lod, lod),
+            (bytes.fromhex(world_seed), lod, lod),
         ).fetchall()
         return [_row(row) for row in rows]
 

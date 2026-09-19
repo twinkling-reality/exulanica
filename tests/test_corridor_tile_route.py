@@ -75,6 +75,8 @@ def _record(repository: BakedTileRepository, key: uuid.UUID, tile_x: int, contai
         baked_tile_id=key,
         stage_version=3,
         stage_params_sha256=hashlib.sha256(b"params").digest(),
+        # `city_seed` is the TILE RECORD's spelling and it is not the column's. Migration 0081
+        # renamed the column to `world_seed`; the record's field moves at city grammar version 4.
         tile={
             "tile_inputs_digest": hashlib.sha256(f"inputs {tile_x}".encode()).hexdigest(),
             "city_seed": CITY_SEED,
@@ -169,6 +171,38 @@ def test_both_routes_are_declared_and_charge_their_own_quota():
         rule = ROUTE_RULES[("GET", path)]
         assert rule.permissions == frozenset({Permission.TILES_MATERIALISE})
         assert ("GET", path) in SELF_CHARGING_TILE_ROUTES
+
+
+def test_the_route_is_asked_and_answers_in_the_wire_name_it_was_born_with(tiles):
+    """THE WIRE SAYS `city_seed`; THE COLUMN, THE REPOSITORY AND THE ROUTE SAY `world_seed`.
+
+    That disagreement is a decision, and this test is what makes it one. Migration 0081 renamed
+    the identity of a generated world everywhere inside this repository and left both of the
+    route's public spellings alone, because one line of production code in
+    `web/packages/atlas-react/src/playcanvas/generated-tile/tile-route.ts` builds `?city_seed=`
+    and renaming a wire is a coordinated release rather than a migration.
+
+    Without this test that reasoning is prose sitting where nothing checks it, and the next reader
+    cannot tell a decision from an oversight. With it, the wire rename is a deliberate edit here
+    rather than something a careless change can do by accident.
+
+    BOTH HALVES ARE ASSERTED AND THEY ARE NOT THE SAME CLAIM. The query parameter is READ by a
+    web client, so changing it breaks a caller. The response's top-level key is written by us and
+    read by nobody, so changing it breaks nothing and is kept for coherence rather than for
+    compatibility. A test asserting only the parameter would leave the second free to drift.
+
+    AND THE ROUTE ADMITS ONE SPELLING, NOT TWO. A parameter accepting both names would be a gate
+    that enumerates, so the new name is refused on the wire exactly as any other unknown one is.
+    """
+    answer = tiles.get("walker", f"/tiles?city_seed={CITY_SEED}")
+    assert answer.status_code == 200
+    assert answer.json()["city_seed"] == CITY_SEED
+    assert "world_seed" not in answer.json()
+
+    # The new spelling is not a second door. FastAPI reports a missing required query parameter,
+    # so this is 422 rather than an empty world, which is the refusal the rename exists to keep.
+    under_the_new_name = tiles.get("walker", f"/tiles?world_seed={CITY_SEED}")
+    assert under_the_new_name.status_code == 422
 
 
 def test_a_city_lists_the_tiles_stored_for_it(tiles):

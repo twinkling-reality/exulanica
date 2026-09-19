@@ -1,6 +1,6 @@
 """Baked tiles of a generated city, over HTTP. Two routes, and neither of them bakes.
 
-*   ``GET /tiles?city_seed=<64 hex>[&lod=<int>]`` lists what is stored for one city: each tile's
+*   ``GET /tiles?city_seed=<64 hex>[&lod=<int>]`` lists what is stored for one WORLD: each tile's
     key, coordinate, level of detail, container digest and size, its two triangle digests and its
     state. Metadata only, and no tile quota is spent on it.
 *   ``GET /tiles/{baked_tile_id}/bytes`` serves one container. The bytes come from the ``tiles``
@@ -31,6 +31,24 @@ ceiling declared, is 429 and never retried.
 runtime must hash what it received and refuse to draw anything whose digest is not that one.
 Caching is ``private, no-cache``: the bytes hold nothing personal and are named by their own
 digest, so a browser may keep them and revalidate.
+
+**THE WIRE SAYS ``city_seed`` AND EVERYTHING BEHIND IT SAYS ``world_seed``, DELIBERATELY.** The
+identity of a generated world instance is ``world_seed`` (migration 0081 argues it): a city is one
+kind of world, and generic code composing a world out of neighbouring tiles cannot ask a row for
+an identity each grammar spells after itself. The column, the repository and this module's own
+names moved. The two public spellings did not, because they are a different object with a
+different cost: ``web/packages/atlas-react/.../generated-tile/tile-route.ts`` builds
+``?city_seed=`` and two web tests assert that literal URL, so renaming the wire is a coordinated
+release in a package this change does not touch. The response's own top-level key is a third case
+and is kept for the same reason rather than a weaker one: nothing reads it at all, since the
+client takes ten keys out of each ``tiles`` entry and never looks at the body's own key, so
+renaming it would have been free and half a renamed wire is harder to read than either whole one.
+
+The route was NOT made to accept both spellings. A parameter admitting two names is a gate that
+enumerates, and a reader here refuses an unrecognised name rather than widening to admit it.
+``tests/test_corridor_tile_route.py`` holds both spellings, so this paragraph is checked rather
+than merely written: the wire rename is then a deliberate edit to that test rather than something
+a careless change can do by accident.
 
 **A revalidation is answered here, not by the framework.** ``If-None-Match`` naming the tile's
 digest (or ``*``) is answered 304 with the same ``ETag`` and no body, and spends no tile of the
@@ -102,16 +120,21 @@ def list_tiles(
     request: Request,
     connection: ScopedConnection,
     session: CurrentSession,
-    city_seed: Annotated[str, Query(pattern=r"^[0-9a-f]{64}$")],
+    # The alias is the wire name and the parameter is the concept. Spelled as an alias rather
+    # than as the parameter's own name so the disagreement is visible here, where a reader meets
+    # it, instead of being inferred from a name that happens not to have moved.
+    world_seed: Annotated[str, Query(alias="city_seed", pattern=r"^[0-9a-f]{64}$")],
     lod: Annotated[int | None, Query(ge=0, le=64)] = None,
 ) -> JSONResponse:
     try:
-        tiles = _repository(request, connection).tiles_of_city(city_seed, lod)
+        tiles = _repository(request, connection).tiles_of_world(world_seed, lod)
     except (BakedTileError, _Unavailable) as error:
         return _refused(error)
     return JSONResponse(
         status_code=200,
-        content={"city_seed": city_seed, "tiles": [tile.document() for tile in tiles]},
+        # Answered under the wire's spelling, which the module docstring argues and
+        # `tests/test_corridor_tile_route.py` holds. Nothing reads this key today.
+        content={"city_seed": world_seed, "tiles": [tile.document() for tile in tiles]},
         headers=_HEADERS,
     )
 
