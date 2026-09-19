@@ -5,7 +5,15 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import * as pc from 'playcanvas';
 import { atlasVec3, parseTextureSetManifest, resolveGroundMovement, type TextureSetDigest } from '@exulanica/atlas-core';
 import { routeObstructionRings } from '@exulanica/loom-tess/core';
-import { GRAMMAR_TABLES, PROJECTION_DEFINITIONS, bakeTile, decodeOwd, type DecodedProjection, type GrammarTable } from '@exulanica/loom-tess/core';
+import {
+  GRAMMAR_TABLES,
+  PROJECTION_DEFINITIONS,
+  absoluteVertices,
+  bakeTile,
+  decodeOwd,
+  type DecodedProjection,
+  type GrammarTable,
+} from '@exulanica/loom-tess/core';
 import { applyTileEnvironment } from '../src/playcanvas/generated-tile/environment.js';
 import { TILE_LOOK_V1 } from '../src/playcanvas/generated-tile/look.js';
 import {
@@ -674,6 +682,22 @@ function composedOf(support: TileSupportState) {
   return support;
 }
 
+/** A scene a tile can be attached into: the null device, a camera, and the environment root. */
+function scene(): { app: pc.AppBase; camera: pc.Entity; environmentRoot: pc.Entity } {
+  const canvas = document.createElement('canvas');
+  const app = new pc.AppBase(canvas);
+  const options = new pc.AppOptions();
+  options.graphicsDevice = new pc.NullGraphicsDevice(canvas);
+  options.componentSystems = [pc.RenderComponentSystem, pc.CameraComponentSystem, pc.LightComponentSystem];
+  app.init(options);
+  const camera = new pc.Entity('camera');
+  camera.addComponent('camera');
+  app.root.addChild(camera);
+  const environmentRoot = new pc.Entity('geographic-environment');
+  app.root.addChild(environmentRoot);
+  return { app, camera, environmentRoot };
+}
+
 describe('a neighbouring tile reaching the runtime', () => {
   it('is checked against its own digest like any other ground, and refused by name', async () => {
     const tampered = new Uint8Array(baked);
@@ -685,22 +709,128 @@ describe('a neighbouring tile reaching the runtime', () => {
     })).rejects.toThrow(/^Neighbour the tile east refused/);
   });
 
-  it('adds its envelope to the support and is named in what the tile says it stands on', async () => {
-    // The fixture standing in for its own neighbour: the plumbing is what is under test, and the
-    // doubled ground is itself the demonstration that a tile must never be composed with a copy of
-    // itself, which is exactly what drawing the halo would have done.
-    const twice = await loadGeneratedTile({
+  it('refuses a world that would draw one record twice, naming the record and both tiles', async () => {
+    // THE FIXTURE AS ITS OWN NEIGHBOUR, which is the smallest world that draws a building twice.
+    // Every neighbour a real walk composes carries the tile beside it as HALO and draws none of it,
+    // measured across the corridor's four containers: all six pairs share zero drawn records while
+    // 287 of tile (2,0)'s drawn records are carried by tile (3,0). So this refusal is vacuous on a
+    // real world and fires on the one shape that would put two copies of a street in one place.
+    await expect(loadGeneratedTile({
       name: 'tile-conformance', bytes: baked, manifest, fetchSet: noSets, digest: subtle,
       neighbours: [{ name: 'a second copy', bytes: baked }],
-    });
-    const composed = composedOf(twice.navigation.support);
-    expect(composed.tiles.map((entry) => entry.tile)).toEqual(['the tile', 'a second copy']);
-    expect(composed.tiles.map((entry) => entry.walkable)).toEqual([5755, 5755]);
-    expect(composed.triangles).toBe(11510);
-    // It changes nothing that is drawn, picked, or reported as undressed.
-    expect(twice.ranges).toEqual(tile.ranges);
-    expect(twice.navigation.start).toEqual(tile.navigation.start);
+    })).rejects.toThrow(/tile-conformance and a second copy both draw the city\.block record identity .*draw it twice/);
   });
+});
+
+/**
+ * TWO REAL CONTAINERS FROM ONE DOCUMENT, each owning half its records and carrying the other half
+ * as halo, which is exactly what a tile and its neighbour are.
+ *
+ * WHY NOT THE FIXTURE TWICE, AND WHY NOT A CONTAINER WRITTEN HERE. This repository commits one
+ * container, so there is no second tile to serve; the fixture as its own neighbour is refused above
+ * and rightly. A container built in this file from the format as this file understands it would
+ * share every misreading with the reader under test, which is the defect where two operands come
+ * from one source. So the TESSELLATOR writes both of these, from the committed document, and the
+ * only thing done here is to partition one list and sort each half: when that sort was wrong the
+ * bake refused it by name, which is the bake holding this fixture to the document's own rules.
+ *
+ * WHAT IT CAN AND CANNOT REACH. The two halves interleave in space rather than lying side by side,
+ * so this says nothing about a street continuing past a tile edge; that is the corridor's to show.
+ * What it does reach is every claim this runtime makes: two containers, disjoint owned records,
+ * overlapping halo, DIFFERENT render origins, and geometry that has to land where each container
+ * says it is.
+ */
+function partitioned(document: Record<string, any>, take: (index: number) => boolean): Uint8Array {
+  const grammar = document['grammars'][0];
+  const order = (a: any, b: any): number =>
+    String(a.kind).localeCompare(String(b.kind)) || (a.version - b.version)
+    || String(a.fields?.identity ?? '').localeCompare(String(b.fields?.identity ?? ''));
+  const owned = grammar.owned.filter((_: unknown, index: number) => take(index));
+  const halo = [...grammar.owned.filter((_: unknown, index: number) => !take(index)), ...grammar.halo];
+  return new TextEncoder().encode(JSON.stringify({
+    ...document,
+    grammars: [{ ...grammar, owned: [...owned].sort(order), halo: [...halo].sort(order) }],
+  }));
+}
+
+describe('a world of several tiles, drawn', () => {
+  let west: Uint8Array;
+  let east: Uint8Array;
+  let world: LoadedGeneratedTile;
+
+  beforeAll(async () => {
+    const document = JSON.parse(new TextDecoder().decode(readFileSync(FIXTURE)));
+    const half = Math.floor(document.grammars[0].owned.length / 2);
+    west = (await bakeTile(partitioned(document, (index) => index < half), sha256)).container;
+    east = (await bakeTile(partitioned(document, (index) => index >= half), sha256)).container;
+    world = await loadGeneratedTile({
+      name: 'the west half', bytes: west, manifest, fetchSet: noSets, digest: subtle,
+      neighbours: [{ name: 'the east half', bytes: east }],
+    });
+  }, 120_000);
+
+  it('draws the neighbour, and counts each tile under its own name rather than adding them up', () => {
+    const renderOf = (bytes: Uint8Array): DecodedProjection =>
+      decodeOwd(bytes).projections.find((projection) => projection.header.name === 'render_batch')!;
+    // The populations, from the containers themselves rather than from figures written here.
+    const ownTriangles = renderOf(west).header.triangle_count;
+    const neighbourTriangles = renderOf(east).header.triangle_count;
+    expect(ownTriangles).toBeGreaterThan(0);
+    expect(neighbourTriangles).toBeGreaterThan(0);
+
+    const { environmentRoot, app, camera } = scene();
+    const attachment = world.attach({ app, environmentRoot, camera });
+    expect(attachment.metrics.tileName).toBe('the west half');
+    expect(attachment.metrics.triangles).toBe(ownTriangles);
+    expect(attachment.metrics.neighbours.map((one) => [one.tileName, one.triangles]))
+      .toEqual([['the east half', neighbourTriangles]]);
+    // A neighbour drawing what it CARRIES rather than what it OWNS would show here as a count
+    // larger than its own container states, and the east half carries the west half as halo.
+    expect(attachment.metrics.neighbours[0]!.triangles).toBeLessThan(ownTriangles + neighbourTriangles);
+    attachment.dispose();
+    expect(environmentRoot.findByName('generated-tile:the east half')).toBeNull();
+  });
+
+  it('puts the neighbour where its own container says it is, with no offset applied anywhere', () => {
+    const eastRender = decodeOwd(east).projections.find((projection) => projection.header.name === 'render_batch')!;
+    // The two containers do not share an origin, so drawing the neighbour at the drawn tile's
+    // origin would displace it by the difference and this test is what would say so.
+    const westRender = decodeOwd(west).projections.find((projection) => projection.header.name === 'render_batch')!;
+    expect(eastRender.header.origin_mm).not.toEqual(westRender.header.origin_mm);
+
+    const { environmentRoot, app, camera } = scene();
+    const attachment = world.attach({ app, environmentRoot, camera });
+    const root = environmentRoot.findByName('generated-tile:the east half') as pc.Entity;
+    const at = root.getLocalPosition();
+    const drawn: string[] = [];
+    for (const render of root.findComponents('render') as pc.RenderComponent[]) {
+      const positions: number[] = [];
+      render.meshInstances[0]!.mesh.getPositions(positions);
+      for (let vertex = 0; vertex < positions.length / 3; vertex += 1) {
+        // Back to absolute city millimetres the long way round: the renderer frame, through the
+        // root the runtime placed, through the runtime's own inverse of the frame it drew in.
+        const [x, y, z] = rendererToTile(positions[vertex * 3]! + at.x, positions[vertex * 3 + 1]! + at.y, positions[vertex * 3 + 2]! + at.z);
+        drawn.push([x, y, z].map((value) => Math.round(value * 100) / 100).join(','));
+      }
+    }
+    const stated = absoluteVertices(eastRender);
+    const expected: string[] = [];
+    for (let vertex = 0; vertex < stated.length / 3; vertex += 1) {
+      expected.push([stated[vertex * 3]!, stated[vertex * 3 + 1]!, stated[vertex * 3 + 2]!].join(','));
+    }
+    expect(drawn.length).toBe(expected.length);
+    expect([...new Set(drawn)].sort()).toEqual([...new Set(expected)].sort());
+    attachment.dispose();
+  });
+
+  it('leaves what is identified, picked and reported undressed as the drawn tile\'s own', async () => {
+    const alone = await loadGeneratedTile({ name: 'the west half', bytes: west, manifest, fetchSet: noSets, digest: subtle });
+    expect(world.ranges).toEqual(alone.ranges);
+    expect(world.navigation.start).toEqual(alone.navigation.start);
+    // And the neighbour's ground is composed, which is the half that was already working.
+    const composed = composedOf(world.navigation.support);
+    expect(composed.tiles.map((entry) => entry.tile)).toEqual(['the tile', 'the east half']);
+  }, 60_000);
 });
 
 describe('a world of more than one tile', () => {

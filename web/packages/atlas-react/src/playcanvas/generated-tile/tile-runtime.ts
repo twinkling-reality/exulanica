@@ -15,7 +15,13 @@ import {
   type OwdRecord,
   type SurfaceOrientation,
 } from '@exulanica/loom-tess/core';
-import type { GeneratedTileAttachment, GeneratedTileHost, GeneratedTileMetrics, GeneratedTileMount } from './binding-contract.js';
+import type {
+  DrawnTileMetrics,
+  GeneratedTileAttachment,
+  GeneratedTileHost,
+  GeneratedTileMetrics,
+  GeneratedTileMount,
+} from './binding-contract.js';
 import { applyTileEnvironment } from './environment.js';
 import { obstructionRings, type ObstructionRings } from './obstruction-rings.js';
 import { composedObstructionRings, type StatingTile } from './walk-world.js';
@@ -226,38 +232,46 @@ interface Plan {
   readonly ranges: GeneratedTileRange[];
   /** The placement of every textured surface. */
   readonly placements: Map<GeneratedTileSurface, SurfacePlacement>;
-  readonly prepared: Map<string, PreparedTextureSet>;
 }
 
-async function plan(
-  decoded: DecodedOwd,
-  render: DecodedProjection,
-  sources: GeneratedTileSources,
-  digest: TextureSetDigest,
-): Promise<Plan> {
-  const records = decoded.header.records;
-  const readMaterial = (material: MaterialRef): TileMaterialReference | string =>
-    material.state === MATERIAL_NONE_EXISTS ? MATERIAL_NONE_EXISTS_REASON : materialReference(records[material.record]!);
-  const surfacesOf = (entry: DrawnEntry): readonly DrawnSurface[] => {
-    // tess's decoder requires surfaces on every drawn entry of a projection that carries surfaces.
-    if (entry.surfaces === undefined || entry.surfaces.length === 0) {
-      throw new GeneratedTileRefusal(`The render_batch entry of record ${entry.record} states no surfaces.`);
-    }
-    return entry.surfaces;
-  };
-  const setIds = new Set<string>();
+/** tess's decoder requires surfaces on every drawn entry of a projection that carries surfaces. */
+function surfacesOf(tile: string, entry: DrawnEntry): readonly DrawnSurface[] {
+  if (entry.surfaces === undefined || entry.surfaces.length === 0) {
+    throw new GeneratedTileRefusal(`The render_batch entry of record ${entry.record} of ${tile} states no surfaces.`);
+  }
+  return entry.surfaces;
+}
+
+function readMaterialOf(records: readonly OwdRecord[], material: MaterialRef): TileMaterialReference | string {
+  return material.state === MATERIAL_NONE_EXISTS ? MATERIAL_NONE_EXISTS_REASON : materialReference(records[material.record]!);
+}
+
+/**
+ * The texture sets a tile's drawn surfaces cite, added to a set shared by every tile of the world.
+ *
+ * ONE LIBRARY FOR THE WHOLE WORLD, not one per tile, because neighbouring tiles of one city draw the
+ * same street with the same materials: measured on the corridor's four containers, each cites 13
+ * texture sets and the union across all four is 13, so drawing the neighbours costs no fetch, no
+ * decode and no upload beyond the ones the tile alone already paid for. Preparing per tile would
+ * fetch each set once per tile and upload it again.
+ */
+function citeTextureSets(records: readonly OwdRecord[], tile: string, render: DecodedProjection, into: Set<string>): void {
   for (const entry of render.header.entries) {
     if (entry.state !== 'drawn') continue;
-    for (const surface of surfacesOf(entry)) {
-      const read = readMaterial(surface.material);
-      if (typeof read !== 'string') setIds.add(read.textureSetId);
+    for (const surface of surfacesOf(tile, entry)) {
+      const read = readMaterialOf(records, surface.material);
+      if (typeof read !== 'string') into.add(read.textureSetId);
     }
   }
-  const prepared = new Map<string, PreparedTextureSet>();
-  for (const result of await Promise.all(
-    [...setIds].sort().map((setId) => prepareTextureSet(sources.manifest, setId, sources.fetchSet, digest)),
-  )) prepared.set(result.setId, result);
+}
 
+function planTile(
+  records: readonly OwdRecord[],
+  tile: string,
+  render: DecodedProjection,
+  prepared: ReadonlyMap<string, PreparedTextureSet>,
+): Plan {
+  const readMaterial = (material: MaterialRef): TileMaterialReference | string => readMaterialOf(records, material);
   const placements = new Map<GeneratedTileSurface, SurfacePlacement>();
   const ranges: GeneratedTileRange[] = [];
   for (const entry of render.header.entries) {
@@ -265,7 +279,7 @@ async function plan(
     const identity = record.identity === IDENTITY_NOT_STATED ? null : record.identity;
     switch (entry.state) {
       case 'drawn': {
-        const surfaces = surfacesOf(entry).map((surface): GeneratedTileSurface => {
+        const surfaces = surfacesOf(tile, entry).map((surface): GeneratedTileSurface => {
           const read = readMaterial(surface.material);
           const set = typeof read === 'string' ? undefined : prepared.get(read.textureSetId);
           const reason = typeof read === 'string'
@@ -314,7 +328,15 @@ async function plan(
           reason: 'Not drawn: its grammar does not admit render_batch.',
         });
         break;
-      // Not a surface of this projection, or context from a neighbour: neither is drawn or listed.
+      // Not a surface of this projection, or a record this tile carries only so it can carve
+      // against it: neither is drawn or listed. HALO IS THE ONE THAT MATTERS WHEN A NEIGHBOUR IS
+      // DRAWN. A container carries its neighbours' records as halo, and its own copy of a
+      // neighbour's building coincides with that neighbour's owned copy: measured on the corridor,
+      // 287 of tile (2,0)'s drawn records are carried by tile (3,0). Drawing what a tile CARRIES
+      // rather than what it OWNS would put those 287 buildings on the screen twice, in the same
+      // place, where nothing about the picture would say so. The container states which is which
+      // and `owd.ts` refuses any container whose entry state disagrees with its record's
+      // membership, so this one line is what keeps a composed world drawn once.
       case 'not_in_projection':
       case 'halo':
         break;
@@ -322,7 +344,7 @@ async function plan(
         throw new GeneratedTileRefusal(`A render_batch entry has a state this runtime was not written for: ${String((entry as { state: unknown }).state)}.`);
     }
   }
-  return { ranges, placements, prepared };
+  return { ranges, placements };
 }
 
 /** One draw's geometry, ready for `buildSurfaceMesh`: renderer-frame metres, normals, final UVs. */
@@ -448,9 +470,58 @@ function rayTriangle(origin: Vec3, direction: Vec3, a: Vec3, b: Vec3, c: Vec3): 
   return distance >= 0 ? distance : null;
 }
 
+/** One tile of the world, verified and read, before anything has been planned from it. */
+interface ReadTile {
+  readonly name: string;
+  readonly header: OwdHeader;
+  readonly render: DecodedProjection;
+  /** Its own surface coordinates, absolute, which is what places a texture on a surface. */
+  readonly surfaceMm: Float64Array;
+}
+
+/** One tile of the world, planned: what it draws, and where each textured surface's texture goes. */
+interface DrawnTile extends ReadTile, Plan {}
+
 /**
- * Verify and read a baked tile, with every texture set it cites. Refuses, with a reason, rather
- * than drawing anything unchecked.
+ * REFUSE A WORLD THAT WOULD DRAW ONE RECORD TWICE, naming the record and both tiles that draw it.
+ *
+ * A building at a tile boundary exists in two containers: the tile that OWNS it, and the neighbour
+ * that carries it as HALO so it can carve against it. Only the owner draws it, which the container
+ * states per entry and `owd.ts` enforces, so on a world composed from real neighbours this refusal
+ * is vacuous: measured across the corridor's four containers, all six pairs share ZERO drawn
+ * records, while 287 of tile (2,0)'s drawn records are carried by tile (3,0) and 281 of tile
+ * (1,0)'s are carried by tile (2,0).
+ *
+ * IT IS WRITTEN BECAUSE THE FAILURE IT CATCHES IS INVISIBLE. Two copies of one building land in the
+ * same place in the same frame; nothing flickers, no count looks wrong to anybody who did not know
+ * the right one, and the cost is paid in triangles and in z-fighting that reads as a material
+ * fault. A world assembled from the wrong rows, or a caller handing the same container in twice, or
+ * a bake that ever writes a halo entry as drawn, all arrive here. The key is the record's own
+ * `sha256`, which is the same key the obstruction rings deduplicate on.
+ */
+function refuseARecordDrawnTwice(tiles: readonly ReadTile[]): void {
+  const drawnBy = new Map<string, { readonly tile: string; readonly record: OwdRecord }>();
+  for (const tile of tiles) {
+    for (const entry of tile.render.header.entries) {
+      if (entry.state !== 'drawn') continue;
+      const record = tile.header.records[entry.record]!;
+      const already = drawnBy.get(record.sha256);
+      if (already === undefined) {
+        drawnBy.set(record.sha256, { tile: tile.name, record });
+        continue;
+      }
+      const named = record.identity === IDENTITY_NOT_STATED ? 'which states no identity' : `identity ${record.identity}`;
+      throw new GeneratedTileRefusal(
+        `${already.tile} and ${tile.name} both draw the ${record.kind} record ${named}, `
+        + `sha256 ${record.sha256}, so this world would draw it twice in the same place.`,
+      );
+    }
+  }
+}
+
+/**
+ * Verify and read a baked tile and every neighbour of it, with every texture set they cite.
+ * Refuses, with a reason, rather than drawing anything unchecked.
  */
 export async function loadGeneratedTile(sources: GeneratedTileSources): Promise<LoadedGeneratedTile> {
   const digest = sources.digest === undefined ? ambientDigest() : sources.digest;
@@ -473,7 +544,6 @@ export async function loadGeneratedTile(sources: GeneratedTileSources): Promise<
   if (render === undefined) throw new GeneratedTileRefusal(`Tile ${sources.name} carries no render_batch.`);
   const surface = absoluteSurfaceCoordinates(render);
   if (surface === undefined) throw new GeneratedTileRefusal(`Tile ${sources.name} carries no surface coordinates.`);
-  const { ranges, placements, prepared } = await plan(decoded, render, sources, digest);
   // ROUTE obstruction rings, built from the container's own records with tess's own reader, so the
   // rings a walk is routed around are the rings the bake made. They are stated ON THE TILE and NOT in
   // the navigation world: `resolveGroundMovement` collides against `polygonObstacles` by
@@ -483,6 +553,7 @@ export async function loadGeneratedTile(sources: GeneratedTileSources): Promise<
   // caller can say what was dropped instead of serving a quietly smaller set.
   const neighbours: NavigationTile[] = [];
   const stating: StatingTile[] = [{ tile: sources.name, header: decoded.header }];
+  const read: ReadTile[] = [{ name: sources.name, header: decoded.header, render, surfaceMm: surface }];
   for (const source of sources.neighbours ?? []) {
     let near: DecodedOwd;
     try {
@@ -506,13 +577,31 @@ export async function loadGeneratedTile(sources: GeneratedTileSources): Promise<
     }
     const envelope = near.projections.find((projection) => projection.header.name === 'nav_envelope');
     if (envelope === undefined) throw new GeneratedTileRefusal(`Neighbour ${source.name} refused: it carries no nav_envelope.`);
+    // A NEIGHBOUR IS DRAWN, so it is refused for the same two absences the drawn tile is refused
+    // for, by name. A container that holds ground and no street is the shape of the endpoint frame
+    // this whole piece exists to stop: a camera standing on something and looking at nothing.
+    const nearRender = near.projections.find((projection) => projection.header.name === 'render_batch');
+    if (nearRender === undefined) throw new GeneratedTileRefusal(`Neighbour ${source.name} refused: it carries no render_batch.`);
+    const nearSurface = absoluteSurfaceCoordinates(nearRender);
+    if (nearSurface === undefined) throw new GeneratedTileRefusal(`Neighbour ${source.name} refused: it carries no surface coordinates.`);
     neighbours.push({ tile: source.name, projection: envelope });
     stating.push({ tile: source.name, header: near.header });
+    read.push({ name: source.name, header: near.header, render: nearRender, surfaceMm: nearSurface });
   }
   // COMPOSED ACROSS THE WORLD'S TILES, the drawn one first so a building both state is attributed
   // to the street underfoot. Still never collision: see `obstruction-rings.ts`.
   const composed = composedObstructionRings(stating);
   const rings = obstructionRings(composed.rings, composed.disagreed);
+  refuseARecordDrawnTwice(read);
+  // ONE TEXTURE LIBRARY FOR THE WHOLE WORLD, prepared once from the union of what every tile cites.
+  const setIds = new Set<string>();
+  for (const one of read) citeTextureSets(one.header.records, one.name, one.render, setIds);
+  const prepared = new Map<string, PreparedTextureSet>();
+  for (const result of await Promise.all(
+    [...setIds].sort().map((setId) => prepareTextureSet(sources.manifest, setId, sources.fetchSet, digest)),
+  )) prepared.set(result.setId, result);
+  const planned: DrawnTile[] = read.map((one) => ({ ...one, ...planTile(one.header.records, one.name, one.render, prepared) }));
+  const { ranges } = planned[0]!;
   const navigation = tileNavigation(
     decoded.projections.find((projection) => projection.header.name === 'nav_envelope'),
     renderExtent(ranges),
@@ -567,69 +656,103 @@ export async function loadGeneratedTile(sources: GeneratedTileSources): Promise<
       return best;
     },
     attach(host: GeneratedTileHost): GeneratedTileAttachment {
-      return attachTile(host, tile, render, surface, placements, prepared);
+      return attachTile(host, tile, planned, prepared);
     },
   };
   return tile;
 }
 
+/**
+ * EVERY TILE OF THE WORLD, DRAWN, each under its own root at its own stated origin.
+ *
+ * THERE IS NO OFFSET ARITHMETIC ANYWHERE HERE AND THAT IS A FACT ABOUT THE CONTAINERS, not a
+ * convenience. A projection's float positions are `fround((mm - origin_mm) / 1000)` and its
+ * `origin_mm` is in ABSOLUTE city millimetres, so a tile placed at its own origin lands where the
+ * city says it is. Measured on the corridor's four containers, whose render origins are
+ * [0, 0, -49], [110000, 0, -49], [250000, 0, -49] and [378050, 0, -49] for tiles (0,0) to (3,0):
+ * the origin is not the tile's corner, it is the minimum of that tile's own drawn extent, which
+ * OVERHANGS its square, which is why adjacent tiles' drawn ranges overlap in x and why nothing here
+ * may assume a tile stops at its edge.
+ *
+ * ONE ROOT PER TILE rather than one for the world, because each tile's positions are relative to
+ * its own origin and the root is where that origin is applied. The alternative, rebuilding every
+ * vertex as an absolute metre, would throw away the float payload the container already carries and
+ * put the whole city's magnitude into every vertex.
+ */
 function attachTile(
   host: GeneratedTileHost,
   tile: LoadedGeneratedTile,
-  render: DecodedProjection,
-  surfaceMm: Float64Array,
-  placements: ReadonlyMap<GeneratedTileSurface, SurfacePlacement>,
+  tiles: readonly DrawnTile[],
   prepared: ReadonlyMap<string, PreparedTextureSet>,
 ): GeneratedTileAttachment {
   const device = host.app.graphicsDevice;
   const look = tile.look;
   const environment = applyTileEnvironment(host.app, host.camera, look);
   const uploads = new TileTextureUploads(device, look);
-  const root = new pc.Entity(`generated-tile:${tile.name}`);
-  const origin = render.header.origin_mm;
-  if (origin.length === 3) root.setLocalPosition(...tileToRenderer(origin[0], origin[1], origin[2]));
-  host.environmentRoot.addChild(root);
-
-  // One draw per texture set, and one for every unavailable surface.
-  const batches = batchTileSurfaces(render, surfaceMm, tile.ranges, placements, look);
-
+  const roots: pc.Entity[] = [];
   const meshes: pc.Mesh[] = [];
-  for (const batch of batches) {
-    let material: pc.Material = uploads.unavailableMaterial;
-    let shadows = true;
-    let bucket: number | null = null;
-    if (batch.key !== '') {
-      const resolution = uploads.adopt(prepared.get(batch.key)!);
-      if (resolution.state !== 'available') throw new Error(`Texture set ${batch.key} was prepared and then refused`);
-      material = resolution.material;
-      shadows = castsShadow(resolution.set);
-      bucket = drawBucket(resolution.set);
-      // Glazing transmits what the scene drew behind it, which needs the colour copied before it draws.
-      if (resolution.set.materialClass === 'glazing') environment.requestSceneColor();
+  const drawn: DrawnTileMetrics[] = [];
+
+  for (const one of tiles) {
+    const root = new pc.Entity(`generated-tile:${one.name}`);
+    const origin = one.render.header.origin_mm;
+    if (origin.length === 3) root.setLocalPosition(...tileToRenderer(origin[0], origin[1], origin[2]));
+    host.environmentRoot.addChild(root);
+    roots.push(root);
+
+    // One draw per texture set, and one for every unavailable surface, per tile. Sets are shared
+    // across the world, so two tiles drawing one set upload it once and draw it twice.
+    const batches = batchTileSurfaces(one.render, one.surfaceMm, one.ranges, one.placements, look);
+    for (const batch of batches) {
+      let material: pc.Material = uploads.unavailableMaterial;
+      let shadows = true;
+      let bucket: number | null = null;
+      if (batch.key !== '') {
+        const resolution = uploads.adopt(prepared.get(batch.key)!);
+        if (resolution.state !== 'available') throw new Error(`Texture set ${batch.key} was prepared and then refused`);
+        material = resolution.material;
+        shadows = castsShadow(resolution.set);
+        bucket = drawBucket(resolution.set);
+        // Glazing transmits what the scene drew behind it, which needs the colour copied before it draws.
+        if (resolution.set.materialClass === 'glazing') environment.requestSceneColor();
+      }
+      // The UV is already final, so the builder is handed it as the surface pair and passes it on.
+      const mesh = buildSurfaceMesh(device, { ...batch, surfaceMm: batch.uvs }, (u, v) => [u, v]);
+      meshes.push(mesh);
+      const entity = new pc.Entity(batch.key === '' ? 'generated-tile:unavailable-surfaces' : `generated-tile:${batch.key}`);
+      const instance = new pc.MeshInstance(mesh, material, entity);
+      // Decal before glazing among blended surfaces; within one set, triangles draw in record order.
+      if (bucket !== null) instance.drawBucket = bucket;
+      entity.addComponent('render', {
+        meshInstances: [instance],
+        castShadows: shadows,
+        receiveShadows: batch.key !== '',
+      });
+      root.addChild(entity);
     }
-    // The UV is already final, so the builder is handed it as the surface pair and passes it on.
-    const mesh = buildSurfaceMesh(device, { ...batch, surfaceMm: batch.uvs }, (u, v) => [u, v]);
-    meshes.push(mesh);
-    const entity = new pc.Entity(batch.key === '' ? 'generated-tile:unavailable-surfaces' : `generated-tile:${batch.key}`);
-    const instance = new pc.MeshInstance(mesh, material, entity);
-    // Decal before glazing among blended surfaces; within one set, triangles draw in record order.
-    if (bucket !== null) instance.drawBucket = bucket;
-    entity.addComponent('render', {
-      meshInstances: [instance],
-      castShadows: shadows,
-      receiveShadows: batch.key !== '',
+
+    drawn.push({
+      tileName: one.name,
+      triangles: batches.reduce((total, batch) => total + batch.triangles, 0),
+      drawBatches: batches.length,
+      unavailableSurfaces: one.ranges.reduce((count, range) =>
+        count + (range.state === 'drawn' ? range.surfaces.filter((surface) => surface.state === 'unavailable').length : 0), 0),
     });
-    root.addChild(entity);
   }
 
+  // EVERY FIGURE HERE COUNTS THE TILE NAMED BESIDE IT, and the neighbours are a separate list rather
+  // than added in, because `capture_visual_gate.mjs` spreads this whole object into an append-only
+  // scored record. Widening `triangles` from one tile to a world would leave every retained figure
+  // reading as something it never counted, with nothing in the record saying which it was.
+  const own = drawn[0]!;
   const metrics: GeneratedTileMetrics = {
     tileName: tile.name,
-    triangles: batches.reduce((total, batch) => total + batch.triangles, 0),
-    drawBatches: batches.length,
+    triangles: own.triangles,
+    drawBatches: own.drawBatches,
     transferredBytes: tile.transferredBytes,
     decodedTextureBytes: uploads.decodedTextureBytes,
-    unavailableSurfaces: tile.ranges.reduce((count, range) =>
-      count + (range.state === 'drawn' ? range.surfaces.filter((surface) => surface.state === 'unavailable').length : 0), 0),
+    unavailableSurfaces: own.unavailableSurfaces,
+    neighbours: Object.freeze(drawn.slice(1)),
     lookId: look.id,
     lookVersion: look.version,
   };
@@ -639,7 +762,7 @@ function attachTile(
     dispose() {
       if (disposed) return;
       disposed = true;
-      root.destroy();
+      for (const root of roots) root.destroy();
       for (const mesh of meshes) mesh.destroy();
       uploads.destroy();
       environment.dispose();

@@ -29,13 +29,39 @@ export interface GeneratedTileHost {
   readonly camera: pc.Entity;
 }
 
-export interface GeneratedTileMetrics {
+/**
+ * What one drawn tile put on the screen. THE TILE IS NAMED BESIDE EVERY FIGURE ON PURPOSE.
+ *
+ * An attachment draws the tile that was asked for and every neighbour of it whose ground the walk
+ * can reach, so one triangle count for an attachment would be a count over a population that
+ * changes with how much world came with the request. Each tile counts itself here and a reader adds
+ * them up, which is the arrangement where the sum can be checked rather than assumed.
+ */
+export interface DrawnTileMetrics {
   readonly tileName: string;
   readonly triangles: number;
   readonly drawBatches: number;
+  readonly unavailableSurfaces: number;
+}
+
+export interface GeneratedTileMetrics {
+  readonly tileName: string;
+  /** The tile named above and NOT its neighbours, which count themselves in `neighbours`. */
+  readonly triangles: number;
+  /** Draws for the tile named above. A texture set two tiles draw is uploaded once and drawn twice. */
+  readonly drawBatches: number;
+  /** The named tile's own container, and every texture set the WORLD cites, fetched once between them. */
   readonly transferredBytes: number;
   readonly decodedTextureBytes: number;
+  /** Surfaces of the named tile drawn as unavailable: its own, not the world's. */
   readonly unavailableSurfaces: number;
+  /**
+   * Every NEIGHBOURING container this attachment also drew, each counting only itself.
+   *
+   * Empty when no neighbour was given, which is a different fact from neighbours that drew nothing,
+   * and the two are told apart by there being no entry rather than by an entry reading zero.
+   */
+  readonly neighbours: readonly DrawnTileMetrics[];
   readonly lookId: string;
   readonly lookVersion: number;
 }

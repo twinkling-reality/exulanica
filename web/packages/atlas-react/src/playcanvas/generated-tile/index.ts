@@ -7,6 +7,7 @@
  */
 
 export type {
+  DrawnTileMetrics,
   GeneratedTileAttachment,
   GeneratedTileHost,
   GeneratedTileMetrics,
