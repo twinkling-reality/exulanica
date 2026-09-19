@@ -5,12 +5,21 @@ from __future__ import annotations
 import hashlib
 import json
 
+import pytest
 from exulanica.canonical import canonical_json
 from exulanica.evaluation.synthetic_multiview import (
     SyntheticFixtureParameters,
     generate_synthetic_multiview,
 )
 from PIL import Image
+
+#: Both tests here generate a fixture, and the generator refuses without numpy by raising
+#: RuntimeError("synthetic fixture generation needs numpy and Pillow"). A RuntimeError out of
+#: production code is a correct refusal and a wrong test outcome: it says the stack is missing
+#: and reports it as a defect in the code under test.
+pytest.importorskip(
+    "numpy", reason="numpy is absent; install it with `uv sync --extra reconstruction`"
+)
 
 
 def _record(path):

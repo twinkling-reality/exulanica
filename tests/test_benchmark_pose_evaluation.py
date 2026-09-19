@@ -6,8 +6,14 @@ import hashlib
 import json
 from pathlib import Path
 
+import pytest
 from exulanica.canonical import canonical_json
 from exulanica.evaluation.benchmark_pose import evaluate_benchmark_pose
+
+#: The one test here joins through the synthetic pose comparison, which refuses without numpy.
+pytest.importorskip(
+    "numpy", reason="numpy is absent; install it with `uv sync --extra reconstruction`"
+)
 
 
 def _write(path: Path, payload: bytes) -> str:

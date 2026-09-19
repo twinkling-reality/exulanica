@@ -10,6 +10,14 @@ import pytest
 from exulanica.canonical import canonical_json
 from exulanica.evaluation.synthetic_pose import evaluate_synthetic_pose
 
+#: Every test here reaches evaluate_synthetic_pose, which refuses without numpy by raising
+#: RuntimeError("synthetic pose evaluation needs numpy"). See the note in
+#: tests/test_synthetic_multiview.py: a correct refusal from production code is still the wrong
+#: test outcome.
+pytest.importorskip(
+    "numpy", reason="numpy is absent; install it with `uv sync --extra reconstruction`"
+)
+
 
 def _write_envelope(path: Path, record: dict) -> str:
     payload = canonical_json(record)

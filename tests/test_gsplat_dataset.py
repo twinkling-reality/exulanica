@@ -2,11 +2,29 @@
 
 from __future__ import annotations
 
+import importlib.util
 import subprocess
 import sys
 
+import pytest
+
+#: What the child program below needs, checked WITHOUT importing any of it: this file keeps torch
+#: out of the parent process deliberately. An absent stack used to arrive as the child exiting
+#: non-zero and the parent asserting `1 == 0`, which names nothing a reader can install.
+_CHILD_NEEDS = {
+    "pycolmap": "uv sync --extra pose",
+    "numpy": "uv sync --extra reconstruction",
+    "PIL": "uv sync",
+}
+
 
 def test_real_colmap_rectification_preserves_pose_and_binds_training_pixels(tmp_path):
+    absent = [name for name in _CHILD_NEEDS if importlib.util.find_spec(name) is None]
+    if absent:
+        pytest.skip(
+            "this rectification runs in a child process that needs "
+            + ", ".join(f"{name} (`{_CHILD_NEEDS[name]}`)" for name in absent)
+        )
     program = r"""
 from pathlib import Path
 import json, sys

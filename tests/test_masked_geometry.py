@@ -251,6 +251,11 @@ def test_a_nonfinite_gaussian_is_refused_rather_than_skipped():
 def test_the_array_reader_returns_the_tuple_readers_centres_and_refuses_what_it_refuses():
     """The scene segment lift reads a trained scene through the array reader. It must agree with
     the check's own reader value for value, and share every refusal, because it shares the walk."""
+    pytest.importorskip(
+        "numpy",
+        reason="the array reader returns a numpy array; install it with "
+        "`uv sync --extra reconstruction`",
+    )
     vertices = [(0.25, -1.5, 3.0, 0.1), (1e-7, 2.5, -4.75, 0.9), (-3.0, 0.0, 1.0, -2.0)]
     array = gaussian_centre_array(_ply(vertices))
     centres, _opacity = read_gaussian_centres(_ply(vertices))

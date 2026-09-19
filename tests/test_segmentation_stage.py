@@ -226,11 +226,13 @@ def test_the_frontmatter_licence_is_read_from_the_leading_block_only():
 def test_a_licence_that_drifted_from_the_manifest_refuses_to_load(tmp_path, monkeypatch):
     readme = tmp_path / "README.md"
     readme.write_text("---\nlicense: cc-by-nc-4.0\n---\n", encoding="utf-8")
-    monkeypatch.setattr("huggingface_hub.hf_hub_download", lambda *a, **k: str(readme))
+    # The skip comes FIRST. monkeypatch.setattr resolves "huggingface_hub" by importing it, so
+    # below the patch this guard never ran: the test failed with ModuleNotFoundError instead.
     pytest.importorskip(
         "huggingface_hub",
         reason="huggingface_hub is absent; install it with `uv sync --extra segmentation`",
     )
+    monkeypatch.setattr("huggingface_hub.hf_hub_download", lambda *a, **k: str(readme))
     pin = LocalModelPin("test/model", "a" * 40, "apache-2.0")
     with pytest.raises(SegmenterUnavailable, match=r"cc-by-nc-4\.0"):
         segmentation_stage.verify_frontmatter_licence(pin)

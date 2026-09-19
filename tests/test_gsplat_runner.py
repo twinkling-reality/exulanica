@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import hashlib
+import importlib.util
 import json
 import os
 import random
@@ -32,6 +33,11 @@ def _isolated_torch(test):
 
     @wraps(test)
     def execute(*args, **kwargs):
+        # find_spec rather than importorskip: importing torch here is the thing this decorator
+        # exists to prevent, and an absent torch previously surfaced as the child exiting
+        # non-zero, which the parent reported as a bare `assert 1 == 0`.
+        if importlib.util.find_spec("torch") is None:
+            pytest.skip("torch is absent; install it with `uv sync --extra reconstruction`")
         if os.environ.get("EXULANICA_TORCH_TEST_CHILD") == test.__name__:
             return test(*args, **kwargs)
         result = subprocess.run(
