@@ -1,0 +1,137 @@
+#!/bin/zsh
+# Break each of ADR-0024's rules, one at a time, on a committed tree.
+#
+# THE FIRST BREAK IS THE OLD-VERSION READ, deliberately, because it is the only one whose failure is
+# silent in the other direction: an eager refusal that rejects every document written before the
+# field existed looks exactly like a working refusal until somebody feeds it an old document.
+#
+# Whole files are run, never a -k filter, because a filter that matches the CODE's vocabulary misses
+# a test named after the PROPERTY. Restores with reset --hard plus clean, and PRINTS the restored
+# state, because a restore command's success reports only that it had nothing to object to.
+emulate -L zsh
+set -u
+# Derived, never typed: a path a run chose is a fact about the machine and not about the work,
+# and an absolute one committed here would carry this checkout's name into the repository.
+ROOT=$(git rev-parse --show-toplevel)
+OUT=${TMPDIR:-/tmp}/coordinate-unit-breaks
+mkdir -p $OUT
+cd $ROOT || exit 1
+
+dirty=$(git status --porcelain | wc -l | tr -d ' ')
+if [[ $dirty != 0 ]]; then
+  print -r -- "REFUSING: the tree is dirty ($dirty paths); a break needs a committed tree"
+  exit 1
+fi
+print -r -- "baseline $(git rev-parse --short HEAD), clean"
+
+run_break() {
+  local label="$1" file="$2" from="$3" to="$4" suite="$5"
+  print -r -- ""
+  print -r -- "================ BREAK: $label"
+  python3 - "$ROOT/$file" "$from" "$to" <<'PY'
+import sys
+path, frm, to = sys.argv[1], sys.argv[2], sys.argv[3]
+text = open(path).read()
+n = text.count(frm)
+if n != 1:
+    print(f"PLANT FAILED: the text occurs {n} times in {path}")
+    sys.exit(3)
+open(path, "w").write(text.replace(frm, to))
+print(f"planted in {path}")
+PY
+  if [[ $? != 0 ]]; then
+    git reset -q --hard HEAD && git clean -qfd
+    print -r -- "restored: $(git status --porcelain | wc -l | tr -d ' ') dirty paths"
+    return 1
+  fi
+  print -r -- "tree while broken: $(git status --porcelain | tr '\n' ' ')"
+  local log=$OUT/break2-$label.log.txt
+  if [[ $suite == web ]]; then
+    (cd $ROOT/web && pnpm exec vitest run packages/loom-tess) > $log 2>&1
+  else
+    # ${=suite} so a multi-file suite splits into arguments; unsplit, pytest exits 4 on a path
+    # that does not exist and the break asks nothing while looking like a pass.
+    (cd $ROOT && uv run pytest ${=suite}) > $log 2>&1
+  fi
+  local rc=$?
+  print -r -- "exit $rc"
+  grep -E '^\s+(Test Files|Tests)\s|passed|failed' $log | tail -3
+  local failed
+  if [[ $suite == web ]]; then
+    failed=$(grep -c '^\s*×' $log)
+    print -r -- "FAILED TEST COUNT: $failed"
+    [[ $failed != 0 ]] && grep '^\s*×' $log | sed 's/^/    /' | head -12
+  else
+    failed=$(grep -c '^FAILED' $log)
+    print -r -- "FAILED TEST COUNT: $failed"
+    [[ $failed != 0 ]] && grep '^FAILED' $log | sed 's/^/    /' | head -12
+  fi
+  if [[ $failed == 0 ]]; then
+    print -r -- "!!! THE BREAK ASKED NOTHING. Suspect the harness before believing the result."
+  fi
+  git reset -q --hard HEAD && git clean -qfd
+  print -r -- "restored: $(git status --porcelain | wc -l | tr -d ' ') dirty paths, HEAD $(git rev-parse --short HEAD)"
+}
+
+# 1. THE OLD VERSION IS REFUSED RATHER THAN READ. An eager rule that demands the field of every
+#    document, whatever version it is in, refuses every document written before the field existed.
+run_break old-version-refused web/packages/loom-tess/src/core/document.ts \
+  "export function declaresCoordinateUnit(table: GrammarTable): boolean {
+  return tileShapeOf(table).fields.some((field) => field.name === COORDINATE_UNIT_FIELD);
+}" \
+  "export function declaresCoordinateUnit(_table: GrammarTable): boolean {
+  return true;
+}" web
+
+# 2. The same rule from the other side: the version list that fixes a unit is consulted, but an
+#    unknown version falls through to millimetres instead of being refused.
+run_break unknown-version-defaults web/packages/loom-tess/src/core/document.ts \
+  "  if (fixed === undefined) {
+    fail(
+      'tile',
+      \`is written in \${table.grammar_id} version \${table.grammar_version}, which states no \`
+        + \`\${COORDINATE_UNIT_FIELD} and fixes none, so what unit its coordinates are in is unknown\`,
+    );
+  }
+  return fixed.unit;" \
+  "  if (fixed === undefined) return 'millimetre';
+  return fixed.unit;" web
+
+# 3. The field is optional at the version that declares it, so a document omitting it is admitted.
+run_break field-optional exulanica/grammar/grammars/city/tile.py \
+  '        shapes.choice("coordinate_unit", COORDINATE_UNITS),' \
+  '        shapes.choices("coordinate_unit", COORDINATE_UNITS),' \
+  "tests/test_grammar_city_fixture.py tests/test_grammar_descriptor.py"
+
+# 4. The unit is not closed, so a document may state any unit it likes.
+run_break unit-not-closed exulanica/grammar/grammars/city/tile.py \
+  '        shapes.choice("coordinate_unit", COORDINATE_UNITS),' \
+  '        shapes.text("coordinate_unit"),' \
+  "tests/test_grammar_city_fixture.py tests/test_grammar_descriptor.py"
+
+# 5. The build's own quantum check returns rather than refusing.
+run_break build-unit-unchecked web/packages/loom-tess/src/core/bake.ts \
+  "export function checkCoordinateUnit(unit: string): void {
+  if (unit === COORDINATE_UNIT) return;" \
+  "export function checkCoordinateUnit(unit: string): void {
+  if (unit !== COORDINATE_UNIT) return;
+  if (unit === COORDINATE_UNIT) return;" web
+
+# 6. The load-time guard that stops the fixed-version list going quiet about a table nobody decided.
+run_break load-guard-removed web/packages/loom-tess/src/core/document.ts \
+  "    if (!fixed) {
+      throw new TileDocumentError(
+        \`\${table.grammar_id} version \${table.grammar_version} states no \${COORDINATE_UNIT_FIELD} and \`
+          + 'no version fixes one for it, so this tessellator cannot say what unit it reads',
+      );
+    }" \
+  "    void fixed;" web
+
+# 7. The producer writes the unit from a constant of its own rather than from the grammar's.
+run_break producer-writes-another-unit exulanica/grammar/grammars/city/generation/tiles.py \
+  "        coordinate_unit=COORDINATE_UNITS[0]," \
+  '        coordinate_unit="micrometre",' \
+  "tests/test_grammar_city_records.py tests/test_grammar_draw.py"
+
+print -r -- ""
+print -r -- "FINAL TREE: $(git rev-parse --short HEAD), $(git status --porcelain | wc -l | tr -d ' ') dirty paths"
