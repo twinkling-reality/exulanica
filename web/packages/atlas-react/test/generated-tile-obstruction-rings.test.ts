@@ -12,6 +12,7 @@ import { obstructionRings, type StatedObstructionRing } from '../src/playcanvas/
 const bench: StatedObstructionRing = {
   kind: 'city.street_furniture',
   identity: 'bench-7',
+  statedBy: 'the tile',
   ring: [[1000, 2000], [2000, 2000], [2000, 3000], [1000, 3000]],
 };
 
@@ -34,12 +35,13 @@ describe('carrying a tile\'s route obstruction rings', () => {
   });
 
   it('refuses a region that bounds nothing, and says so rather than thinning the set silently', () => {
-    const line: StatedObstructionRing = { kind: 'city.street_tree', identity: 'tree-2', ring: [[0, 0], [1000, 0]] };
+    const line: StatedObstructionRing = { statedBy: 'the tile', kind: 'city.street_tree', identity: 'tree-2', ring: [[0, 0], [1000, 0]] };
     const { obstacles, refused } = obstructionRings([bench, line]);
     expect(obstacles).toHaveLength(1);
     expect(refused).toEqual([{
       kind: 'city.street_tree',
       identity: 'tree-2',
+      statedBy: 'the tile',
       reason: 'a plan ring needs 3 corners to bound anything and this states 2',
     }]);
   });

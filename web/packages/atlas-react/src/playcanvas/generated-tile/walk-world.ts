@@ -22,7 +22,9 @@
  * ranges (`tile-route.ts`), and a whole neighbour is smaller than the tile a walk already loads.
  */
 import type { TextureSetDigest } from '@exulanica/atlas-core';
-import { decodeOwd } from '@exulanica/loom-tess/core';
+import { decodeOwd, routeObstructionRings } from '@exulanica/loom-tess/core';
+import type { OwdHeader } from '@exulanica/loom-tess/core';
+import type { StatedObstructionRing } from './obstruction-rings.js';
 import {
   BAKED_TILE_SERVED_STATE,
   TileRouteRefusal,
@@ -188,6 +190,86 @@ export function tilePlacement(bytes: Uint8Array): TilePlacement {
     tileY: whole('tile_y'),
     tileSizeMm: whole('tile_size_mm'),
   };
+}
+
+/** One tile of a walk's world, as the thing that states records rather than as bytes. */
+export interface StatingTile {
+  readonly tile: string;
+  readonly header: OwdHeader;
+}
+
+/**
+ * THE ROUTE'S OBSTACLE SET FOR A WORLD OF SEVERAL TILES, each ring saying which tile stated it.
+ *
+ * WHAT WAS WRONG BEFORE, and it is not what it looked like. The set came from the tile being walked
+ * and nothing else, and because a container ALREADY CARRIES ITS NEIGHBOURS AS HALO, that set already
+ * reached well past its own edge: measured on the corridor, tile (2,0) states 311 rings of which only
+ * 140 come from records it owns, and they span 80,408 mm past its eastern edge. So the count did not
+ * change when the world grew, and "311 before and after" was read as "obstacles from one tile". It
+ * never was. What the halo does NOT reach is the far side of a neighbour, and the composed ground
+ * now does: standing on the corridor's end tile, its own rings reach east to 205,250 and its two
+ * neighbours state 462 MORE that it has never heard of, carrying the set to 464,408.
+ *
+ * DEDUPLICATED BY RECORD DIGEST, WHICH IS THE PART THAT IS EASY TO GET WRONG. A tile's halo copy of
+ * a building and the neighbour's own owned copy are THE SAME BUILDING, so concatenating ring sets
+ * double counts: 311 and 242 for two corridor tiles is 553 rings of which only 401 are distinct.
+ * Every record carries its own `sha256`, so the first tile to state one keeps it, and the tile being
+ * walked is passed first so a shared building is attributed to the street underfoot.
+ *
+ * THESE NEVER BECOME COLLISION. `obstruction-rings.ts` says why at length: they decide which way a
+ * walk faces and stop no body, and the navigation world's `polygonObstacles` collides by
+ * construction, which once stopped a walker 344 mm from a bench against a 340 mm capsule.
+ */
+export interface DisagreeingRecord {
+  readonly kind: string;
+  readonly identity: string;
+  /** The tile whose copy was kept. */
+  readonly kept: string;
+  /** The tile that states the same record differently. */
+  readonly against: string;
+}
+
+export interface ComposedObstruction {
+  readonly rings: readonly StatedObstructionRing[];
+  /**
+   * Records two tiles state under one identity with DIFFERENT digests, so the deduplication below
+   * could not match them and both copies are in the set.
+   *
+   * A HALO COPY IS A STAND-IN FOR A TILE YOU DO NOT HAVE. When the neighbour loads, its owned copy
+   * supersedes the halo copy of the same building, and today the two agree byte for byte, which is
+   * what makes digest equality the right key. If a halo copy is ever written as a REDUCED form of
+   * its original, digest equality stops firing and duplicates return SILENTLY, which is not inert: a
+   * building described twice is the shape that once stopped a walker 344 mm from a bench. So the
+   * condition is checked rather than relied on, and a caller can state it.
+   */
+  readonly disagreed: readonly DisagreeingRecord[];
+}
+
+export function composedObstructionRings(tiles: readonly StatingTile[]): ComposedObstruction {
+  const seen = new Set<string>();
+  const byIdentity = new Map<string, { readonly digest: string; readonly tile: string }>();
+  const rings: StatedObstructionRing[] = [];
+  const disagreed: DisagreeingRecord[] = [];
+  for (const { tile, header } of tiles) {
+    const fresh = header.records.filter((record) => !seen.has(record.sha256));
+    for (const record of fresh) {
+      seen.add(record.sha256);
+      const named = `${record.kind}:${statedIdentityOf(record)}`;
+      const held = byIdentity.get(named);
+      if (held === undefined) byIdentity.set(named, { digest: record.sha256, tile });
+      else disagreed.push({ kind: record.kind, identity: statedIdentityOf(record), kept: held.tile, against: tile });
+    }
+    // A record's `grammar` is an index into `header.grammars`, which filtering records does not move.
+    for (const region of routeObstructionRings({ ...header, records: fresh })) {
+      rings.push({ kind: region.kind, identity: region.identity, ring: region.ring, statedBy: tile });
+    }
+  }
+  return { rings, disagreed };
+}
+
+/** A record's stated identity, or the empty string where it states none. */
+function statedIdentityOf(record: OwdHeader['records'][number]): string {
+  return typeof record.identity === 'string' ? record.identity : '';
 }
 
 /** How a neighbour is named wherever a refusal or a record has to say which tile it was. */

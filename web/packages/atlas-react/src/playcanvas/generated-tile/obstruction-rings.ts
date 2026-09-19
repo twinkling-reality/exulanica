@@ -40,6 +40,12 @@ export interface StatedObstructionRing {
   readonly kind: string;
   readonly identity: string;
   readonly ring: readonly (readonly [number, number])[];
+  /**
+   * WHICH TILE'S RECORDS STATED IT. Required, not optional. A walk's world is several tiles now, and
+   * the first person debugging a refused heading has to be able to tell a ring from the street they
+   * are standing on from one stated by a tile they are only standing over.
+   */
+  readonly statedBy: string;
 }
 
 /** Where a ring was refused, with the reason, so a caller can state what it dropped rather than thin the set silently. */
@@ -47,11 +53,16 @@ export interface RefusedObstructionRing {
   readonly kind: string;
   readonly identity: string;
   readonly reason: string;
+  readonly statedBy: string;
 }
 
 export interface ObstructionRings {
   readonly obstacles: readonly PolygonObstacle[];
   readonly refused: readonly RefusedObstructionRing[];
+  /** One per accepted obstacle, in the same order, saying which tile stated it. */
+  readonly stated: readonly { readonly id: string; readonly statedBy: string }[];
+  /** Records two tiles state under one identity and different digests; empty is the expected state. */
+  readonly disagreed: readonly { readonly kind: string; readonly identity: string; readonly kept: string; readonly against: string }[];
 }
 
 /** A plan ring needs three distinct corners to bound anything; fewer states no region. */
@@ -65,18 +76,26 @@ const RING_MINIMUM = 3;
  * no record of why. The identity is carried into the obstacle's id because the gate's run record
  * binds the record identities a walk passed, and an id that does not name a record cannot be bound.
  */
-export function obstructionRings(regions: readonly StatedObstructionRing[]): ObstructionRings {
+export function obstructionRings(
+  regions: readonly StatedObstructionRing[],
+  disagreed: ObstructionRings['disagreed'] = [],
+): ObstructionRings {
   const obstacles: PolygonObstacle[] = [];
   const refused: RefusedObstructionRing[] = [];
+  const stated: { id: string; statedBy: string }[] = [];
   for (const region of regions) {
     if (region.identity === '') {
-      refused.push({ kind: region.kind, identity: region.identity, reason: 'the region names no record identity' });
+      refused.push({
+        kind: region.kind, identity: region.identity, statedBy: region.statedBy,
+        reason: 'the region names no record identity',
+      });
       continue;
     }
     if (region.ring.length < RING_MINIMUM) {
       refused.push({
         kind: region.kind,
         identity: region.identity,
+        statedBy: region.statedBy,
         reason: `a plan ring needs ${RING_MINIMUM} corners to bound anything and this states ${region.ring.length}`,
       });
       continue;
@@ -88,7 +107,16 @@ export function obstructionRings(regions: readonly StatedObstructionRing[]): Obs
       const [x, , z] = tileToRenderer(xMm, yMm, 0);
       return atlasVec3(x, 0, z);
     });
-    obstacles.push({ id: `${region.kind}:${region.identity}`, rings: [ring] });
+    const id = `${region.kind}:${region.identity}`;
+    obstacles.push({ id, rings: [ring] });
+    // The id stays `kind:identity`, because a run record binds the record identities a walk passed
+    // and changing that string would change what those records mean. Which tile stated it goes here.
+    stated.push({ id, statedBy: region.statedBy });
   }
-  return { obstacles: Object.freeze(obstacles), refused: Object.freeze(refused) };
+  return {
+    obstacles: Object.freeze(obstacles),
+    refused: Object.freeze(refused),
+    stated: Object.freeze(stated),
+    disagreed: Object.freeze(disagreed),
+  };
 }

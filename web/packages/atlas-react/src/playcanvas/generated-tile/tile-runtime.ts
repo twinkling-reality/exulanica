@@ -6,7 +6,6 @@ import {
   OwdError,
   absoluteSurfaceCoordinates,
   absoluteVertices,
-  routeObstructionRings,
   verifyOwd,
   type DecodedOwd,
   type DecodedProjection,
@@ -19,6 +18,7 @@ import {
 import type { GeneratedTileAttachment, GeneratedTileHost, GeneratedTileMetrics, GeneratedTileMount } from './binding-contract.js';
 import { applyTileEnvironment } from './environment.js';
 import { obstructionRings, type ObstructionRings } from './obstruction-rings.js';
+import { composedObstructionRings, type StatingTile } from './walk-world.js';
 import { TILE_LOOK_V1, type TileLook } from './look.js';
 import { buildSurfaceMesh } from './surface-mesh.js';
 import {
@@ -481,8 +481,8 @@ export async function loadGeneratedTile(sources: GeneratedTileSources): Promise<
   // which way a walk faces and stop no body; a route rule reads them from here. A region that bounds
   // nothing or names no record is refused rather than repaired, and the refusals are carried so a
   // caller can say what was dropped instead of serving a quietly smaller set.
-  const rings = obstructionRings(routeObstructionRings(decoded.header));
   const neighbours: NavigationTile[] = [];
+  const stating: StatingTile[] = [{ tile: sources.name, header: decoded.header }];
   for (const source of sources.neighbours ?? []) {
     let near: DecodedOwd;
     try {
@@ -507,7 +507,12 @@ export async function loadGeneratedTile(sources: GeneratedTileSources): Promise<
     const envelope = near.projections.find((projection) => projection.header.name === 'nav_envelope');
     if (envelope === undefined) throw new GeneratedTileRefusal(`Neighbour ${source.name} refused: it carries no nav_envelope.`);
     neighbours.push({ tile: source.name, projection: envelope });
+    stating.push({ tile: source.name, header: near.header });
   }
+  // COMPOSED ACROSS THE WORLD'S TILES, the drawn one first so a building both state is attributed
+  // to the street underfoot. Still never collision: see `obstruction-rings.ts`.
+  const composed = composedObstructionRings(stating);
+  const rings = obstructionRings(composed.rings, composed.disagreed);
   const navigation = tileNavigation(
     decoded.projections.find((projection) => projection.header.name === 'nav_envelope'),
     renderExtent(ranges),

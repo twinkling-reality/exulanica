@@ -26,10 +26,11 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseTextureSetManifest } from '@exulanica/atlas-core';
-import { decodeOwd } from '@exulanica/loom-tess/core';
+import { decodeOwd, routeObstructionRings } from '@exulanica/loom-tess/core';
 import {
   GeneratedTileRefusal,
   TileRouteRefusal,
+  composedObstructionRings,
   composedSupport,
   fetchBakedTile,
   fetchWalkWorld,
@@ -213,9 +214,52 @@ describe.runIf(live)('against a running tile route', () => {
       expect(square.tileX === placement.tileX && square.tileY === placement.tileY).toBe(false);
     }
 
+    // THE OBSTACLE HALF, AND THIS IS THE CONTROL RATHER THAN THE FIX. The ground now reaches over the
+    // neighbours; the obstruction set the route rule is given comes from the TILE'S OWN HEADER. That
+    // header already carries its halo, so its rings reach well past its own edge, which is why a
+    // count of them did not change when the world grew and was read as "obstacles from one tile".
+    // What it does NOT carry is the neighbour's records beyond that halo, and those are buildings a
+    // heading can cross with nothing in the set to describe them.
+    const headerOf = (bytes: Uint8Array) => decodeOwd(bytes).header;
+    const ownHeader = headerOf(own.bytes);
+    const ownRings = routeObstructionRings(ownHeader);
+    const ownRecords = new Set(ownHeader.records.map((record) => record.sha256));
+    const unseen = world.neighbours.flatMap((neighbour) => {
+      const header = headerOf(neighbour.bytes);
+      return routeObstructionRings({ ...header, records: header.records.filter((r) => !ownRecords.has(r.sha256)) });
+    });
+    // The control has to exist before it can prove anything: a city whose neighbours held no record
+    // this tile has never heard of could not show the gap, and would report green either way.
+    expect(unseen.length, 'the neighbours state buildings this tile has never heard of').toBeGreaterThan(0);
+    const reach = (rings: readonly { readonly ring: readonly (readonly [number, number])[] }[]) =>
+      Math.max(...rings.flatMap((one) => one.ring.map((point) => point[0])));
+    expect(reach([...ownRings, ...unseen])).toBeGreaterThan(reach(ownRings));
+
+    // THE FIX, MEASURED ON THE SAME DATA. The composed set holds every ring either tile states, ONCE.
+    const stating = [{ tile: 'the tile', header: ownHeader },
+      ...world.neighbours.map((neighbour) => ({ tile: neighbour.name, header: headerOf(neighbour.bytes) }))];
+    const composedRings = composedObstructionRings(stating);
+    const ringsApart = stating.reduce((total, one) => total + routeObstructionRings(one.header).length, 0);
+    expect(composedRings.rings.length).toBeGreaterThan(ownRings.length);
+    expect(composedRings.rings.length, 'the same building is not described twice').toBeLessThan(ringsApart);
+    expect(reach(composedRings.rings)).toBe(reach([...ownRings, ...unseen]));
+    // A HALO COPY AGREEING WITH ITS OWNED ORIGINAL IS ASSERTED, NOT ASSUMED. The deduplication keys
+    // on record digest, so if a halo copy were ever a reduced form of its original the digests would
+    // stop matching and both copies would silently enter the set.
+    expect(composedRings.disagreed, 'a halo copy and its owned original state the same record').toEqual([]);
+    // Every ring says which tile stated it, and both kinds of tile are represented.
+    expect(new Set(composedRings.rings.map((one) => one.statedBy)).size).toBe(stating.length);
+
     // eslint-disable-next-line no-console
     console.log(JSON.stringify({
       standingOn: `(${placement.tileX},${placement.tileY})`,
+      ownRings: ownRings.length,
+      ringsSeparately: ringsApart,
+      ringsComposedAndDeduplicated: composedRings.rings.length,
+      recordsTwoTilesStateDifferently: composedRings.disagreed.length,
+      ownRingsReachEastTo: reach(ownRings),
+      ringsOnlyTheNeighboursState: unseen.length,
+      composedRingsReachEastTo: reach([...ownRings, ...unseen]),
       neighbours: world.neighbours.map((neighbour) => neighbour.name),
       absent: world.absent,
       transferredBytes: world.transferredBytes,

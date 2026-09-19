@@ -243,6 +243,51 @@ happy-dom enforces the same-origin policy on its `fetch`, so a page test that de
 another origin has to go under the window through Node's HTTP client rather than relax the policy for
 every test sharing that environment.
 
+## The obstacle half, and the count that did not mean what it was read to mean
+
+The composed world gave GROUND from its neighbours and not OBSTACLES, so the route rule ranked
+headings across a field three and a half times wider than the set of rings it was given. The gate
+measured `routeObstacleRings` at 311 before and after composition and read the stability as scope:
+obstacles from one tile.
+
+**IT WAS NEVER ONE TILE.** `routeObstructionRings` iterates `header.records` with no membership
+filter, and a container carries its neighbours as halo, so the set already reached past its own edge:
+
+    tile (2,0)   311 rings, of which ONLY 140 come from records it owns; 171 are halo
+                 they span x 178,394 to 464,408, and its own tile ends at 384,000
+
+So the number was right, the population was never stated, and a count stable across a change was
+mistaken for a count that covered the change. The defect is real and smaller than it was written as:
+obstacles reach about 80 m past the tile edge, composed ground reaches 326 m, and the ungoverned
+stretch is the difference.
+
+**MEASURED ON THE END TILE, WHERE IT IS WORST**, standing on (0,0) with reach 128,000, composing
+(1,0) and (2,0):
+
+    its own rings                                 115, reaching east to 205,250
+    rings only the neighbours state                462
+    rings counted separately across three tiles    700
+    composed and DEDUPLICATED by record digest     418
+    records two tiles state differently              0
+    composed reach east                          464,408, which is 259,158 mm further
+
+**DEDUPLICATION IS THE PART THAT IS EASY TO GET WRONG.** A tile's halo copy of a building and the
+neighbour's owned copy are the same building: concatenating ring sets put 282 duplicates into the
+set above, and a duplicate ring is not inert, since a building described twice is the shape that once
+stopped a walker 344 mm from a bench against a 340 mm capsule. The key is the record's own `sha256`,
+and the tile being walked is passed first so a shared building is attributed to the street underfoot.
+
+**A HALO COPY IS A STAND-IN FOR A TILE YOU DO NOT HAVE**, and the rule leans on its agreeing with the
+owned original. That is ASSERTED rather than assumed: a record two tiles state under one identity
+with different digests is reported, and on the corridor today the count is zero. If a halo copy is
+ever written as a reduced form of its original, digest equality stops firing and the duplicates
+return silently, which is why the check exists rather than a comment saying it should be fine.
+
+Every ring now carries which tile stated it. The obstacle id stays `kind:identity`, because a run
+record binds the record identities a walk passed and changing that string would change what those
+records mean. And none of this becomes collision: the rings decide which way a walk faces and stop no
+body, for the reason `obstruction-rings.ts` gives at length.
+
 ## What is not done
 
 - The obstacle half. Neighbours give GROUND and not OBSTACLES: the route rule ranks headings across a
