@@ -43,12 +43,12 @@ from exulanica.grammar.grammars.city.document import (
     select_tile,
 )
 from exulanica.grammar.grammars.city.tile import (
-    COORDINATE_UNITS,
+    ANCHOR_FLOOR_DIVISION,
     EMPTY_EDIT_DELTA_DIGEST,
+    EXTENT_MEETS_GROWN_SQUARE,
     HALO_RADIUS_MM,
-    HALO_RULES,
-    OWNERSHIP_RULES,
     TILE_SIZE_MM,
+    WRITTEN_COORDINATE_UNIT,
     GrammarPin,
     TileRecord,
 )
@@ -97,15 +97,15 @@ def tile_record(
                 CITY_GRAMMAR.key.grammar_id, CITY_GRAMMAR.key.grammar_version, descriptor_sha256()
             ),
         ),
-        coordinate_unit=COORDINATE_UNITS[0],
+        coordinate_unit=WRITTEN_COORDINATE_UNIT,
         catalog_digest=catalog_digest(catalogs),
         tile_x=tile_x,
         tile_y=tile_y,
         lod=lod,
         tile_size_mm=TILE_SIZE_MM,
         halo_radius_mm=HALO_RADIUS_MM,
-        ownership_rule=OWNERSHIP_RULES[0],
-        halo_rule=HALO_RULES[0],
+        ownership_rule=ANCHOR_FLOOR_DIVISION,
+        halo_rule=EXTENT_MEETS_GROWN_SQUARE,
         edit_delta_digest=edit_delta_digest,
     )
 

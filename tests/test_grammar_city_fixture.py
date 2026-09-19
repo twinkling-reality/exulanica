@@ -47,10 +47,15 @@ from exulanica.grammar.grammars.city.facade import (
 )
 from exulanica.grammar.grammars.city.streets import BlockRecord, StreetSegmentRecord
 from exulanica.grammar.grammars.city.tile import (
+    ANCHOR_FLOOR_DIVISION,
+    COORDINATE_UNITS,
+    EXTENT_MEETS_GROWN_SQUARE,
     HALO,
     HALO_RULES,
     OUTSIDE_TILE,
     OWNED,
+    OWNERSHIP_RULES,
+    WRITTEN_COORDINATE_UNIT,
     halo_square,
     membership,
 )
@@ -750,9 +755,40 @@ def test_a_document_is_refused_against_another_descriptor():
 
 
 def test_the_halo_rule_is_extent_based():
-    assert HALO_RULES == ("extent_meets_grown_square",)
-    assert FIXTURE.tile.halo_rule == "extent_meets_grown_square"
+    assert HALO_RULES == (EXTENT_MEETS_GROWN_SQUARE,)
+    assert FIXTURE.tile.halo_rule == EXTENT_MEETS_GROWN_SQUARE
     assert halo_square(FIXTURE.tile) == (-64_000, -64_000, 192_000, 192_000)
+
+
+def test_each_closed_field_this_fixture_stamps_is_the_value_it_names():
+    """A producer names the value it writes; it does not take position zero of the admissible set.
+
+    THREE FIELDS OF THE TILE RECORD ARE CLOSED SETS, and until 2026-09-19 both producers in this
+    repository stamped them with `SET[0]`. That is silent by construction: whatever comes out of
+    position zero is a legal member of the set, so it validates, it is the right type, and every
+    reader downstream succeeds on it. ADR-0024 contemplates a second coordinate unit, and on the
+    day one is admitted a positional stamp writes whichever entry sits first onto every document,
+    independent of what the document is actually written in.
+
+    WHAT THESE ASSERTIONS DO. The whole-tuple comparisons fail the day a set gains an entry, which
+    is the day the question matters, and they send whoever adds one to this docstring. The fixture
+    comparisons hold each stamped value to the constant its producer names, read from the built
+    fixture rather than retyped.
+
+    WHAT THEY CANNOT DO, and it cannot be fixed by writing a better test. While a set has ONE
+    MEMBER, `SET[0]` and the named constant are the same value, so no assertion over this fixture
+    can tell the two forms apart: it is a fixture whose values make the right answer and the wrong
+    answer coincide. The only thing that has ever separated them is a deliberate break with a
+    second entry added, run once and recorded in
+    `docs/artifacts/world-identity/positional-stamp.log.txt`. The gap closes itself on the day a
+    set gains a second member, and that is not the same as being covered now.
+    """
+    assert COORDINATE_UNITS == (WRITTEN_COORDINATE_UNIT,)
+    assert OWNERSHIP_RULES == (ANCHOR_FLOOR_DIVISION,)
+    assert HALO_RULES == (EXTENT_MEETS_GROWN_SQUARE,)
+    assert FIXTURE.tile.coordinate_unit == WRITTEN_COORDINATE_UNIT
+    assert FIXTURE.tile.ownership_rule == ANCHOR_FLOOR_DIVISION
+    assert FIXTURE.tile.halo_rule == EXTENT_MEETS_GROWN_SQUARE
 
 
 @pytest.mark.parametrize(

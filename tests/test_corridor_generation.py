@@ -38,6 +38,11 @@ from exulanica.grammar.grammars.city.streets import (
     StreetRecord,
     StreetSegmentRecord,
 )
+from exulanica.grammar.grammars.city.tile import (
+    ANCHOR_FLOOR_DIVISION,
+    EXTENT_MEETS_GROWN_SQUARE,
+    WRITTEN_COORDINATE_UNIT,
+)
 from exulanica.grammar.records import record_payload
 
 from corridor_city import catalogs, documents, records
@@ -71,6 +76,21 @@ def test_every_corridor_tile_validates(tile):
     document = _documents()[tile]
     validate_city_document(document, catalogs=_catalogs())
     assert document_bytes(document)
+
+
+@pytest.mark.parametrize("tile", CORRIDOR_TILES)
+def test_every_generated_tile_states_the_closed_values_the_generator_names(tile):
+    """Read off a tile the GENERATOR produced, not off a record this test builds.
+
+    `tests/test_grammar_city_fixture.py` asks the same question of the hand-written fixture. Both
+    are needed and they are not one claim: the fixture and the generator are two producers, they
+    were both stamping these three fields by position until 2026-09-19, and a test over one says
+    nothing about the other. That docstring carries the reasoning and the limit.
+    """
+    stated = _documents()[tile].tile
+    assert stated.coordinate_unit == WRITTEN_COORDINATE_UNIT
+    assert stated.ownership_rule == ANCHOR_FLOOR_DIVISION
+    assert stated.halo_rule == EXTENT_MEETS_GROWN_SQUARE
 
 
 def test_the_city_is_closed_over_its_references_and_its_pieces_are_short():

@@ -63,8 +63,10 @@ from exulanica.grammar.grammars.city.common import TILE_SIZE_MM
 from exulanica.grammar.records import record_payload
 
 __all__ = [
+    "ANCHOR_FLOOR_DIVISION",
     "COORDINATE_UNITS",
     "EMPTY_EDIT_DELTA_DIGEST",
+    "EXTENT_MEETS_GROWN_SQUARE",
     "HALO",
     "HALO_RADIUS_MM",
     "HALO_RULES",
@@ -76,6 +78,7 @@ __all__ = [
     "STAGE_ID",
     "STAGE_VERSION",
     "TILE_SIZE_MM",
+    "WRITTEN_COORDINATE_UNIT",
     "GrammarPin",
     "TileRecord",
     "extent_meets_halo",
@@ -88,13 +91,30 @@ __all__ = [
 STAGE_ID: Final = "tile"
 STAGE_VERSION: Final = 3
 HALO_RADIUS_MM: Final = 64_000
-#: The coordinate units a tile document may declare (ADR-0024). One entry, and a second would be a
-#: decision about the whole world rather than about one document: the quantum is a constant of the
-#: tessellator version, so two of them coexisting would put a scaling step, and a place to be wrong
-#: by a factor of a thousand, into every rule that reads two documents.
-COORDINATE_UNITS: Final = ("millimetre",)
-OWNERSHIP_RULES: Final = ("anchor_floor_division",)
-HALO_RULES: Final = ("extent_meets_grown_square",)
+#: WHAT A PRODUCER HERE WRITES, and what a document MAY DECLARE, are two different facts that
+#: coincide while each set has one member. Each pair below states the first and derives the second,
+#: rather than letting a producer reach position zero of the set: `SET[0]` and the value you mean
+#: are indistinguishable from outside a one-member set, and they stop being the same thing on the
+#: day the set gains an entry, which for the unit is exactly what ADR-0024 contemplates. A stamp
+#: taken by position is then a legal member of the closed set whatever it is, so it passes
+#: validation, is the right type, and every reader downstream succeeds on the wrong value.
+#:
+#: The identity-addressed form was already in the same expression: `tile_record` names
+#: `CITY_GRAMMAR.key.grammar_id` two lines above where it took three values by position.
+
+#: The unit a document written here states, and the units a tile document may declare (ADR-0024).
+#: One admissible entry, and a second would be a decision about the whole world rather than about
+#: one document: the quantum is a constant of the tessellator version, so two of them coexisting
+#: would put a scaling step, and a place to be wrong by a factor of a thousand, into every rule
+#: that reads two documents.
+WRITTEN_COORDINATE_UNIT: Final = "millimetre"
+COORDINATE_UNITS: Final = (WRITTEN_COORDINATE_UNIT,)
+
+#: The ownership and halo rules :func:`membership` implements, and the rules a record may name.
+ANCHOR_FLOOR_DIVISION: Final = "anchor_floor_division"
+OWNERSHIP_RULES: Final = (ANCHOR_FLOOR_DIVISION,)
+EXTENT_MEETS_GROWN_SQUARE: Final = "extent_meets_grown_square"
+HALO_RULES: Final = (EXTENT_MEETS_GROWN_SQUARE,)
 EMPTY_EDIT_DELTA_DIGEST: Final = sha256_of_canonical([]).hex()
 OWNED: Final = "owned"
 HALO: Final = "halo"

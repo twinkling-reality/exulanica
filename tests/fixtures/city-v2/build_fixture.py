@@ -96,9 +96,11 @@ from exulanica.grammar.grammars.city.streets import (
 )
 from exulanica.grammar.grammars.city.terrain import TerrainRecord
 from exulanica.grammar.grammars.city.tile import (
-    COORDINATE_UNITS,
+    ANCHOR_FLOOR_DIVISION,
     EMPTY_EDIT_DELTA_DIGEST,
+    EXTENT_MEETS_GROWN_SQUARE,
     HALO_RADIUS_MM,
+    WRITTEN_COORDINATE_UNIT,
     GrammarPin,
     TileRecord,
 )
@@ -1790,15 +1792,15 @@ tile = TileRecord(
             CITY_GRAMMAR_ID, CITY_GRAMMAR_VERSION, descriptor_sha256(CITY_DESCRIPTOR_PATH)
         ),
     ),
-    coordinate_unit=COORDINATE_UNITS[0],
+    coordinate_unit=WRITTEN_COORDINATE_UNIT,
     catalog_digest=catalog_digest(CATALOGS),
     tile_x=0,
     tile_y=0,
     lod=0,
     tile_size_mm=128_000,
     halo_radius_mm=HALO_RADIUS_MM,
-    ownership_rule="anchor_floor_division",
-    halo_rule="extent_meets_grown_square",
+    ownership_rule=ANCHOR_FLOOR_DIVISION,
+    halo_rule=EXTENT_MEETS_GROWN_SQUARE,
     edit_delta_digest=EMPTY_EDIT_DELTA_DIGEST,
 )
 
