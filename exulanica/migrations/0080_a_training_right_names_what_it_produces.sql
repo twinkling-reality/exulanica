@@ -366,6 +366,17 @@ for each row execute function tg_scene_training_member_right();
 -- already be wrong: an unmerged branch adds gaussian_splat_master as a fourth. This catches the
 -- pose artefact of a trained scene too, which is derived from the same photographs and which
 -- nobody has argued should escape. Under-covering is the failure that matters here.
+--
+-- AND A LIST OF KINDS WOULD HAVE BEEN WRONG ABOUT THE WEIGHTS TOO, which is the measured reason
+-- rather than the anticipated one. One run publishes three artifacts in scene_reconstruction.py
+-- _train_splat, and only scene_splat_delivery sits inside the `if quality.accepted:` branch.
+-- scene_splat_evaluation is appended BEFORE it, so A RUN THE QUALITY GATE REJECTS PUBLISHES NO
+-- WEIGHTS AND STILL PUBLISHES RENDERED VIEWS OF THE PLACE, plus, whenever rectification changes
+-- the pixels, the frames it was trained on under training/undistorted/images. Those frames are the
+-- MASKED derivative wherever a mask applies, traced through _manifest's apply_masked_sources and
+-- the staged source directory it hands to _train_splat, so a person who never consented is already
+-- hidden in them. They are still the account holder's own photographs of their own place, and they
+-- outlive a run that produced nothing anybody wanted.
 create function tg_scene_training_publication_right() returns trigger language plpgsql as $fn$
 declare v_reason text; v_capture uuid; v_job uuid;
 begin
@@ -443,6 +454,7 @@ for each row execute function tg_scene_training_artifact_binds();
 -- WHAT THIS MIGRATION DOES NOT DO, said plainly rather than left to be discovered: it does not
 -- enqueue destruction. That reaches into the tombstone and purge-queue invariants of 0013 and 0015
 -- and is its own piece of work. This predicate and the binding table are what that work will read.
+-- The boundary is deliberate and not unfinished: A CORRECT HALF, NAMED, BEATS A PLAUSIBLE WHOLE.
 create function scene_training_artifact_withdrawn(
   p_workspace uuid,p_artifact uuid,p_at timestamptz)
 returns boolean language sql stable as $fn$

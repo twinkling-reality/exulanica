@@ -24,6 +24,14 @@ how such a machine presents itself locally, and a right recording that spelling 
 the bytes never left this machine when they did. A genuinely local run is ``local-process``;
 anything else names the host it actually reaches, through :func:`rented_host`.
 
+**What the gate covers, and why it is not the weights.** One run publishes three artifacts, and
+only the delivery is inside the acceptance branch. A run the quality gate REJECTS publishes no
+weights and still publishes ``scene_splat_evaluation``, which carries rendered views of the place
+and, whenever rectification changes the pixels, the frames the trainer read. Those frames are the
+MASKED derivative wherever a mask applies, so somebody who never consented is already hidden in
+them; they remain the account holder's own photographs of their own place, and they outlive a run
+nobody wanted. A right that named only the weights would not reach them.
+
 **Deny by default, and checked twice, because a training run takes a long time.** Migration 0080
 refuses a member insert for a training job whose captures have no current right, so a run cannot be
 queued; and it refuses the artifact insert that would publish anything, so a right that was current
