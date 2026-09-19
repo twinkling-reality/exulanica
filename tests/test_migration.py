@@ -575,6 +575,7 @@ _FILES_STATING_THE_WORKSPACE_POLICY_COUNT = (
     "exulanica/db/session.py",
     "exulanica/ingest/spine/__init__.py",
     "tests/test_ingest_persistence.py",
+    "docs/deployment.md",
 )
 
 #: The sentence those files carry. The number is the capture; the rest is the phrase that says
