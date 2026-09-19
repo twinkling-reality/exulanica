@@ -246,6 +246,7 @@ export type {
 } from './representation.js';
 export {
   GENERATED_CITY_FRAME,
+  GENERATED_CITY_GRAMMAR_VERSIONS,
   generatedDressing,
   generatedRecordSubjectV2,
   generatedTileFrameId,

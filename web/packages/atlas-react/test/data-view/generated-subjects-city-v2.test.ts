@@ -3,11 +3,12 @@ import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   generatedDressing,
+  GENERATED_CITY_GRAMMAR_VERSIONS,
   generatedRecordSubjectV2,
   type GeneratedRecordEntry,
   type GeneratedTileReferenceV2,
 } from '@exulanica/atlas-core';
-import { bakeTile, decodeOwd, type DecodedOwd } from '@exulanica/loom-tess/core';
+import { bakeTile, decodeOwd, GRAMMAR_TABLES, type DecodedOwd } from '@exulanica/loom-tess/core';
 
 // Relative to web/, where the suite runs.
 /** Tess's owd/3 development golden. */
@@ -145,7 +146,18 @@ function expectToday(outcomes: readonly Outcome[]): void {
   expect(count(outcome => outcome.membership === 'owned' && !outcome.hasExtent && outcome.subjectId === null)).toBe(85);
 }
 
-describe('generated subject contract v2 over real city v2 containers', () => {
+describe('generated subject contract v2 over real city containers', () => {
+  it('reads exactly the city grammar versions the tessellator reads', () => {
+    // THE TIE THAT STOPS THE CONTRACT FALLING BEHIND. atlas-core states which city versions it can
+    // read a subject out of and does not depend on loom-tess, so nothing in that package can notice
+    // a version it has not been told about. This test depends on both, so it can. A version added
+    // to the tessellator without somebody deciding whether this contract reads it fails here,
+    // rather than refusing every tile of that version in a data view.
+    const read = GRAMMAR_TABLES.filter(table => table.grammar_id === 'city').map(table => table.grammar_version);
+    expect(read.length).toBeGreaterThan(0);
+    expect([...GENERATED_CITY_GRAMMAR_VERSIONS].sort()).toEqual([...read].sort());
+  });
+
   it('reads tess\'s owd/3 development golden: every owned drawn record a subject, every halo record none', () => {
     const outcomes = readThroughContract(decodeOwd(new Uint8Array(readFileSync(GOLDEN))));
     expectContract(outcomes);

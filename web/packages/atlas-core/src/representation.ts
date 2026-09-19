@@ -594,6 +594,23 @@ export interface GeneratedDressing {
   readonly dressesSubjectId: string;
 }
 
+/**
+ * The city grammar versions this contract reads a subject out of.
+ *
+ * NOT EVERY VERSION, and not the newest: a version that changed how an identity derives, or what a
+ * surface role or a dressing reference means, would produce wrong subjects here in silence, which
+ * is why this is a list and an unlisted version is refused.
+ *
+ * What the contract actually reads is a record's kind, its stated identity, its declared extent and
+ * its surfaces' roles and dressing references, and a tile's coordinates, level of detail, inputs
+ * digest, frame name and subject identity. Versions 2 and 3 differ in the tile record's
+ * `coordinate_unit` (ADR-0024) and in the bound on a facade's own `grammar_version`, and this
+ * contract reads neither. `packages/atlas-react/test/data-view/generated-subjects-city-v2.test.ts`
+ * holds this list to the versions the tessellator reads, so it cannot quietly fall behind: this
+ * package does not depend on loom-tess, and that test does.
+ */
+export const GENERATED_CITY_GRAMMAR_VERSIONS: readonly number[] = [2, 3];
+
 const ENTRY_NEED = /^[a-z][a-z0-9_]*$/;
 const EXTENT_KEYS = ['max_x_mm', 'max_y_mm', 'max_z_mm', 'min_x_mm', 'min_y_mm', 'min_z_mm'];
 
@@ -604,8 +621,10 @@ export function generatedTileFrameId(tile: GeneratedTileReferenceV2): string {
     || typeof tile.inputsDigest !== 'string' || !/^[0-9a-f]{64}$/.test(tile.inputsDigest)) {
     throw new TypeError('A generated tile reference needs integer coordinates and its inputs digest');
   }
-  if (tile.grammarId !== 'city' || tile.grammarVersion !== 2) {
-    throw new TypeError('Generated subject contract v2 reads city grammar version 2 only');
+  if (tile.grammarId !== 'city' || !GENERATED_CITY_GRAMMAR_VERSIONS.includes(tile.grammarVersion)) {
+    throw new TypeError(
+      `Generated subject contract v2 reads city grammar ${GENERATED_CITY_GRAMMAR_VERSIONS.join(' and ')} only`,
+    );
   }
   if (tile.frameName !== GENERATED_CITY_FRAME) {
     throw new TypeError(`A generated tile reference must state the frame ${GENERATED_CITY_FRAME}`);

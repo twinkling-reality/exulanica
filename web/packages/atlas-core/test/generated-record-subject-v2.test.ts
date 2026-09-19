@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   DEFAULT_REPRESENTATION_INTENT,
+  GENERATED_CITY_GRAMMAR_VERSIONS,
   generatedDressing,
   generatedRecordSubject,
   generatedRecordSubjectV2,
@@ -93,7 +94,17 @@ describe('generated street subject contract v2', () => {
     expect(() => generatedTileFrameId({ ...tile, subjectIdentity: '' })).toThrow('city subject identity');
     const { subjectIdentity: _dropped, ...noSubject } = tile;
     expect(() => generatedTileFrameId(noSubject as GeneratedTileReferenceV2)).toThrow('city subject identity');
-    expect(() => generatedTileFrameId({ ...tile, grammarVersion: 1 })).toThrow('version 2 only');
+    // Every listed version is read, and a version on either side of the list is refused: a check
+    // that only ever meets version 1 would pass just as well if the list had been widened to admit
+    // everything, which is the failure this one is here to notice.
+    for (const version of GENERATED_CITY_GRAMMAR_VERSIONS) {
+      expect(generatedTileFrameId({ ...tile, grammarVersion: version })).toBe(`city_local:${CITY}`);
+    }
+    const unread = [Math.min(...GENERATED_CITY_GRAMMAR_VERSIONS) - 1, Math.max(...GENERATED_CITY_GRAMMAR_VERSIONS) + 1];
+    for (const version of unread) {
+      expect(() => generatedTileFrameId({ ...tile, grammarVersion: version })).toThrow('city grammar');
+    }
+    expect(() => generatedTileFrameId({ ...tile, grammarId: 'town' })).toThrow('city grammar');
     expect(() => generatedTileFrameId({ ...tile, inputsDigest: 'x' })).toThrow('inputs digest');
   });
 
