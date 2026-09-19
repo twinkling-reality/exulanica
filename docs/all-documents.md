@@ -6,13 +6,13 @@ and fails if this file disagrees with the catalog rules.
 This catalog lists living contracts, capability guides, and decision records.
 Start from [README.md](README.md).
 
-**97 documents** in the public catalog.
+**96 documents** in the public catalog.
 
 ## Living contracts and reference
 
 What the system is. Edited when the system changes.
 
-67 documents.
+66 documents.
 
 - [architecture-overview](architecture-overview.md) : Current direction, 2026-09-12: read product-direction.md
 - [asset-read-currency](asset-read-currency.md) : Final acceptance at source head 03501cea376cf530c185e3b12a5fb0d8d8d7acdf passed 2118 backend
@@ -46,7 +46,6 @@ What the system is. Edited when the system changes.
 - [lettering](lettering.md) : IMPLEMENTED for the four glyph catalogs, the conversion tool, the catalog reader and the
 - [license-matrix](license-matrix.md) : VERIFIED where a primary source was read on 2026-08-27, with the exceptions marked
 - [model-and-service-selection](model-and-service-selection.md) : implementation reviewed 2026-09-14; model upgrades require task-specific evidence
-- [naming](naming.md) : Where the names in this repository come from, and what each one is allowed to mean. Recorded because
 - [owned-district-and-admission](owned-district-and-admission.md) : IMPLEMENTED DATA PATH; VISUAL AND WORLD-MEMORY VALIDATION IN PROGRESS
 - [person-presentation-consent](person-presentation-consent.md) : Design note, 2026-09-06. Implemented and wired end to end, and exercised against a real
 - [personal-admission](personal-admission.md) : A personal photograph is admitted under account authority, screened for people, and read by a

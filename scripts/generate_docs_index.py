@@ -32,6 +32,7 @@ ROOT_CATALOG_EXCLUDE = frozenset({
     "engineering-log.md",
     "engineering-log-reconstructed.md",
     "judge-access.md",
+    "naming.md",
     "infrastructure-backlog.md",
     "first-place-2026-09-11.md",
     "goal-brief-2026-09-05-unblocked-backend-program.md",
