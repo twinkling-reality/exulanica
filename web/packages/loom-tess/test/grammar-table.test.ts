@@ -18,6 +18,7 @@ import { BAKE_PARAMETERS, boundOf, recordShapeVersions } from '../src/core/bake.
 import { CITY_V2 } from '../src/core/city-v2.js';
 import { CITY_V3 } from '../src/core/city-v3.js';
 import {
+  checkEveryVersionStatesItsUnit,
   coordinateUnitOf,
   declaresCoordinateUnit,
   TileDocumentError,
@@ -159,16 +160,22 @@ describe('the coordinate unit a document is read in (ADR-0024)', () => {
     );
   });
 
-  it('is fixed for every version this tessellator reads that states none', () => {
-    // The load-time guard in document.ts holds this, so the module would not have imported at all
-    // if it were false. Asserted here so a reader can see what that guard is about.
-    for (const table of GRAMMAR_TABLES) {
-      const fixed = UNIT_FIXED_BY_VERSION.some(
-        (entry) => entry.grammar_id === table.grammar_id && entry.grammar_version === table.grammar_version,
-      );
-      expect(declaresCoordinateUnit(table) || fixed, `city v${table.grammar_version}`).toBe(true);
-    }
+  it('is fixed for every version this tessellator reads that states none, and the guard refuses one that is not', () => {
+    // The property, over the real tables. It holds, and the load-time call in document.ts means
+    // the module would not have imported at all if it did not.
+    expect(() => checkEveryVersionStatesItsUnit(GRAMMAR_TABLES)).not.toThrow();
     expect(UNIT_FIXED_BY_VERSION).toEqual([{ grammar_id: 'city', grammar_version: 2, unit: 'millimetre' }]);
+
+    // AND THE GUARD ITSELF, which the property above cannot speak for: a guard that has never been
+    // seen to refuse is a claim about the tables sitting where nothing tests it. This is the table
+    // a later grammar version would be if somebody added it without deciding its unit.
+    const undecided = cityAt(NEXT_VERSION, (shape) => {
+      shape.fields = shape.fields.filter((field: any) => field.name !== 'coordinate_unit');
+    });
+    expect(() => checkEveryVersionStatesItsUnit([...GRAMMAR_TABLES, undecided])).toThrow(
+      /city version 4 states no coordinate_unit and no version fixes one for it/,
+    );
+    expect(() => checkEveryVersionStatesItsUnit([...GRAMMAR_TABLES, undecided])).toThrow(TileDocumentError);
   });
 });
 

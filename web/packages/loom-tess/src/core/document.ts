@@ -521,21 +521,31 @@ export function coordinateUnitOf(table: GrammarTable, tile: RecordPayload): stri
   return fixed.unit;
 }
 
-// Held at load: a grammar version this tessellator reads either states its coordinate unit or is a
-// version whose unit is fixed above. Neither, and no document of it could be read without this
-// reader supplying a unit nothing stated, so it is refused here instead.
-for (const table of GRAMMAR_TABLES) {
-  if (declaresCoordinateUnit(table)) continue;
-  const fixed = UNIT_FIXED_BY_VERSION.some(
-    (entry) => entry.grammar_id === table.grammar_id && entry.grammar_version === table.grammar_version,
-  );
-  if (!fixed) {
-    throw new TileDocumentError(
-      `${table.grammar_id} version ${table.grammar_version} states no ${COORDINATE_UNIT_FIELD} and `
-        + 'no version fixes one for it, so this tessellator cannot say what unit it reads',
+/**
+ * Every table given here either states its coordinate unit or is a version whose unit is fixed
+ * above. Neither, and no document of that version could be read without this reader supplying a
+ * unit nothing stated, so it is refused before any document is.
+ *
+ * TAKES THE TABLES rather than reading the module's own, so it can be SEEN to refuse. Held at load
+ * over `GRAMMAR_TABLES` below, where it is vacuously true today and is the thing that stops the
+ * fixed-version list going quiet about a table somebody adds without deciding its unit.
+ */
+export function checkEveryVersionStatesItsUnit(tables: readonly GrammarTable[]): void {
+  for (const table of tables) {
+    if (declaresCoordinateUnit(table)) continue;
+    const fixed = UNIT_FIXED_BY_VERSION.some(
+      (entry) => entry.grammar_id === table.grammar_id && entry.grammar_version === table.grammar_version,
     );
+    if (!fixed) {
+      throw new TileDocumentError(
+        `${table.grammar_id} version ${table.grammar_version} states no ${COORDINATE_UNIT_FIELD} and `
+          + 'no version fixes one for it, so this tessellator cannot say what unit it reads',
+      );
+    }
   }
 }
+
+checkEveryVersionStatesItsUnit(GRAMMAR_TABLES);
 
 /**
  * Read and validate a tile document from its canonical bytes. Returns the document unchanged in
