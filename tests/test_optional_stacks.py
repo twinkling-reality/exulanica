@@ -6,7 +6,8 @@ reader gets is the reason string, and "could not import 'scipy'" does not tell a
 four extras carries scipy.
 
 MEASURED 2026-09-19 at main f3a5d521, before this file existed: of the 17 `pytest.importorskip`
-calls under `tests/`, 3 passed a reason and 14 passed none.
+calls under `tests/`, 3 passed a reason and 14 passed none. This branch has 22, all with a reason,
+18 of which name an extra; the floors below are that measurement and not a round number.
 
 WHAT IS CHECKED AND WHAT IS NOT, because the reason strings assert two different things and only
 one of them is checkable here. That an extra NAMED in a reason exists is checked below against
@@ -64,9 +65,9 @@ def _reason(call: ast.Call) -> str | None:
 def test_every_optional_import_skip_says_what_is_missing():
     """A reason on every one, and a floor under the count so an empty parse cannot pass."""
     calls = _skip_calls()
-    assert len(calls) >= 18, (
-        f"only {len(calls)} importorskip calls were parsed out of tests/, which was 18 on "
-        "2026-09-19; a parse that finds fewer is checking less than it says"
+    assert len(calls) >= 22, (
+        f"only {len(calls)} importorskip calls were parsed out of tests/, which was 22 on this "
+        "branch on 2026-09-19; a parse that finds fewer is checking less than it says"
     )
     silent = [f"{path}:{line}" for path, line, call in calls if not (_reason(call) or "").strip()]
     assert not silent, (
@@ -98,9 +99,9 @@ def test_every_extra_named_in_a_skip_reason_is_an_extra_this_project_declares():
     # A reason may legitimately name no extra: psycopg is a hard dependency, not an optional one.
     # What cannot happen is that NONE of them names one, which would make this test vacuous while
     # still passing, so the floor is here rather than in a comment.
-    assert len(named) >= 10, (
-        f"only {len(named)} skip reasons name an extra, which was 14 on 2026-09-19; this check "
-        "passes trivially when reasons stop naming extras"
+    assert len(named) >= 18, (
+        f"only {len(named)} skip reasons name an extra, which was 18 on this branch on "
+        "2026-09-19; this check passes trivially when reasons stop naming extras"
     )
     unknown = sorted({f"{path}:{line} names --extra {extra}" for path, line, extra in named
                       if extra not in EXTRAS})
