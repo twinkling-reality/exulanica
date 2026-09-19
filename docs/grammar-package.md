@@ -473,10 +473,23 @@ exist, a sign for a use class that takes none, and a signed use class with no si
 | `signage-lexicon.v2.json` | 18 | Generic descriptors ("Bakery", "Books") for the signed use classes; never a brand or business name. |
 | `street-furniture.v2.json` | 9 | Lamps, benches, bins, bollards, hydrants, cycle stands, signal poles and sign posts as explicit parts, with exclusion radius, kerb offsets, where each stands, how far apart and what it pairs with. |
 | `street-hierarchy.v2.json` | 4 | Avenue, high street, local street and narrow street, with lane, width, speed and kerb ranges. |
-| `street-name.v1.json` | 12 | Generic street names and the hierarchies each suits. Presentation, never identity. |
+| `street-name.v1.json` | 147 | Generic street names and the hierarchies each suits, composed from authored elements and street types. Presentation, never identity. |
 | `tree-species.v2.json` | 19 | Derived from the 2015 NYC Street Tree Census: each named species of at least one percent of the named trees. |
 | `typology.v2.json` | 7 | Building types: storeys, frontage, attachment, ground and upper floor uses, eras and roof families. |
 | `use-class.v1.json` | 11 | Exactly the living society lane's use-class keys; it maps them to roles through its own catalog. |
+
+**The street names are composed, not listed.** A name is an element and a street type, and each
+part states the band of street-hierarchy ranks it suits: a composition is admissible when the two
+bands meet, and the composed name suits exactly the hierarchies in both. The parts are authored in
+`assets/catalogs/sources/street-name-parts.json` and `scripts/generate_street_names.py` writes the
+catalog from them, so a word authored once reaches every street type it can take. The catalog held
+twelve names until 2026-09-19, and that was a cap on how large a city could be: a district lays one
+high street and a local street between each pair of blocks, and six local names refused a world part
+way through generation with a message naming no parameter.
+`tests/test_street_name_vocabulary.py` holds the committed catalog to what the generator writes,
+holds the composition rule over the committed file, and holds the vocabulary to the most streets the
+declared parameter space can lay out, deriving both sides so that widening an extent or narrowing a
+block fails there rather than in a bake.
 
 **The tree census source** is retained unchanged at
 `assets/catalogs/sources/nyc-2015-street-tree-census-species.json`, SHA-256

@@ -65,7 +65,7 @@ from exulanica.grammar.textures import read_texture_manifest
 from city_v2_fixture import builder
 
 FIXTURE = builder()
-DOCUMENT_SHA256 = "49be7eff98247649e1276b9c6ef5c441be9ad3289b220ba8135ce7e87aad8e77"
+DOCUMENT_SHA256 = "c380ee5b40f8b5b6b7e5ab31a84a007f87cba4038383012992167d1ff3eaa5f9"
 DOCUMENT_BYTES = 132_778
 SHAPES_SHA256 = "35603f3d7e5831de00dcd2e0ce9deca98faf84354274253aa384d50a7cbcfdb5"
 SHAPES_BYTES = 62_167

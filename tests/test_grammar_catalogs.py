@@ -76,7 +76,7 @@ EXPECTED_CATALOGS = {
     "signage-lexicon": (2, 18),
     "street-furniture": (2, 9),
     "street-hierarchy": (2, 4),
-    "street-name": (1, 12),
+    "street-name": (1, 147),
     "tree-species": (2, 19),
     "typology": (2, 7),
     "use-class": (1, 11),
@@ -147,7 +147,7 @@ def test_the_shipped_catalogs_load_and_hold_what_is_pinned():
     assert {
         catalog.catalog_id: (catalog.catalog_version, len(catalog.entries)) for catalog in catalogs
     } == EXPECTED_CATALOGS
-    assert sum(count for _version, count in EXPECTED_CATALOGS.values()) == 133
+    assert sum(count for _version, count in EXPECTED_CATALOGS.values()) == 268
 
 
 def test_every_shipped_entry_carries_a_licence():

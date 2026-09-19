@@ -14,7 +14,7 @@ that no production build emits these bytes or the code that reads them.
   pnpm tess bake packages/loom-tess/test/fixtures/tile-conformance.json packages/app/src/dev/tiles/tile-conformance.owd
   ```
 
-- sha256: `4c76b9e0e20030883af478e932ca561e91ba79e6f45e881b31f017d91168637c` (703,588 bytes).
+- sha256: `7b7c9fe9464a2de7264a56ae830ca0dd7ed59b1f8a51150dde415a1792e51678` (703,588 bytes).
 - render_batch triangle digest: `185d7be67689db9b290e5c8571b09485a822ba843dae9cd80b85922bcc6ccec4`,
   the value tess's own conformance test pins.
 
@@ -53,6 +53,16 @@ emits them in a DIFFERENT ORDER, because `tessellate` sorts records by `(kind, s
 `city.facade` records carry the grammar version that wrote them, so nine digests moved, so those
 nine reordered and their triangles with them. `nav_envelope` holds its ORDER too, since a facade
 draws nothing there, and moved only through the record digests every entry carries.
+
+And again on 2026-09-19, WITHOUT THE TESSELLATOR MOVING, when the street-name catalog stopped being
+a list of twelve authored names and became the composition of authored elements and street types.
+This is the same class as the 2026-09-17 move above and it came out the same way: the container's
+bytes moved from `4c76b9e0e20030883af478e932ca561e91ba79e6f45e881b31f017d91168637c` to
+`7b7c9fe9464a2de7264a56ae830ca0dd7ed59b1f8a51150dde415a1792e51678`, THE SIZE DID NOT MOVE AT ALL, at 703,588 bytes, because a
+catalog digest is a fixed number of bytes wherever it appears, and `render_batch` held at
+`185d7be67689db9b290e5c8571b09485a822ba843dae9cd80b85922bcc6ccec4` for the second time. The catalog
+pin reaches the container's header and not its triangles, and this is now the second independent
+occasion on which that was predicted in advance and measured afterwards.
 
 The lesson for whoever moves a schema next: on this format a record's place is content-addressed, so
 "a schema change moves no geometry" is true of the geometry and false of its order. The check that

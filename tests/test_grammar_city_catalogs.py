@@ -141,7 +141,7 @@ def test_every_entry_carries_a_shippable_licence_and_a_source_that_exists():
             assert ROOT.joinpath(entry.licence.content_source).is_file(), where
             if entry.licence.origin == "derived":
                 assert entry.licence.content_source.startswith("assets/catalogs/sources/"), where
-    assert entries == 133
+    assert entries == 268
 
 
 # The authored register, and every other one, is checked by tests/test_catalog_provenance.py, which
