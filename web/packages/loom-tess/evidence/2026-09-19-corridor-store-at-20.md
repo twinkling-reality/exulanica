@@ -1,7 +1,15 @@
-# The corridor's five tiles, rebaked into the store at tessellator 20
+# The corridor's five tiles at tessellator 20, and why they are not in the store
 
 Written 2026-09-19 by the draw-the-neighbours lane on `lane/draw-neighbours` at `bfa398cb`, which is
 main `bfa398cb`, with NOTHING REBAKED YET. Written first so the result cannot be read back onto it.
+
+**THE TITLE IS THE ONE THING ABOVE THE RESULT THAT WAS EDITED, AND THIS LINE IS WHY.** It read "the
+corridor's five tiles, rebaked into the store at tessellator 20", which was a description of what was
+about to be done. It was not done: the publish needs a shared database and a shared store and this
+session's permissions refuse it, so the containers measured below were baked into a directory of mine
+and NO ROW NAMES THEM. Everything else above the result line stands exactly as it was committed in
+`0f963d74`, before any of it was measured. A title left saying "into the store" would have been the
+one sentence in this file that a reader could take at face value and be wrong about.
 
 ## Why a rebake was needed at all, and it is a gap rather than a decision
 
