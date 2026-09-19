@@ -1,9 +1,9 @@
 /**
- * THE CITY GRAMMAR, VERSION 2, AS DATA. GENERATED: do not edit by hand.
+ * THE CITY GRAMMAR, VERSION 3, AS DATA. GENERATED: do not edit by hand.
  *
  * Written by `test/write-grammar-table.ts` from the grammar's own record shape table
- * (`exulanica/grammar/grammars/city/city-shapes.v2.json`) and the frame, contract measures and navigation table of
- * `exulanica/grammar/grammars/city/city.v2.json`.
+ * (`tests/fixtures/city-v2/record-shapes.json`) and the frame, contract measures and navigation table of
+ * `exulanica/grammar/grammars/city/city.v3.json`.
  * `test/grammar-table.test.ts` and `tests/test_bake_determinism.py` hold it equal to both.
  *
  * It is one of the files in `src/core` that spells grammar vocabulary: field names, bounds and
@@ -11,10 +11,10 @@
  */
 import type { GrammarTable } from './grammar-table.js';
 
-export const CITY_V2: GrammarTable = {
+export const CITY_V3: GrammarTable = {
   "grammar_id": "city",
-  "grammar_version": 2,
-  "descriptor_sha256": "c82ac5e7d39e95abbeef0d3ead599d87d5421fab7727341ae0df620ef208a7f1",
+  "grammar_version": 3,
+  "descriptor_sha256": "e771deef96b49ba35f8a145acbd67dda4d939f93f7730a2b50da78e1727ab41f",
   "frame": {
     "name": "city_local",
     "units": "mm",
@@ -1109,8 +1109,8 @@ export const CITY_V2: GrammarTable = {
           },
           {
             "kind": "integer",
-            "maximum": 2,
-            "minimum": 2,
+            "maximum": 3,
+            "minimum": 3,
             "name": "grammar_version"
           },
           {
@@ -2902,6 +2902,13 @@ export const CITY_V2: GrammarTable = {
             "shape": "GrammarPin"
           },
           {
+            "kind": "choice",
+            "name": "coordinate_unit",
+            "values": [
+              "millimetre"
+            ]
+          },
+          {
             "kind": "hex64",
             "name": "catalog_digest"
           },
@@ -2954,7 +2961,7 @@ export const CITY_V2: GrammarTable = {
           "tile_grammar_versions_sorted"
         ],
         "shape": "city.tile",
-        "version": 2
+        "version": 3
       },
       {
         "extent_field": "extent",

@@ -57,7 +57,62 @@ The rebake prints all four values. Item 4 is checked separately by comparing the
 projections' vertex arrays before and after, not by comparing the digests, since a digest that moves
 for the reason in item 3 cannot tell me anything about item 4.
 
-## Result
+## Result: three of four, and the fourth was wrong in a way worth keeping
 
-Filled in after the rebake, in the record named in this file's own commit, not by editing the
-prediction above.
+Measured after the rebuild. Nothing above this line was edited.
+
+| | before | after |
+| --- | --- | --- |
+| container sha256 | `bd07246d…` | `4c76b9e0e20030883af478e932ca561e91ba79e6f45e881b31f017d91168637c` |
+| `tile_inputs_digest` | `5dd2dcb5…` | `915fef63f3291278573dadcb1102968f82f8997cdc1bb63020ef72516ee0a68f` |
+| `render_batch` | `3aee7162…` | `185d7be67689db9b290e5c8571b09485a822ba843dae9cd80b85922bcc6ccec4` |
+| `nav_envelope` | `dcd548bd…` | `f6158941949203038233d445a8a5aeaa9bdb5ce524a092ec6faf7e19f64424a2` |
+
+**Items 1, 2 and 3 hold.** All four digests moved, and item 3's reasoning was the right one: the
+tile record is not an entry, so the unit alone moves no triangle digest, and both moved because nine
+facade payloads did.
+
+**ITEM 4 WAS WRONG AS STATED, and its correction is the finding.** I predicted the vertex integers
+would be identical. The right statement, measured rather than reasoned:
+
+| projection | vertices | triangles | sequence identical | triangle MULTISET identical |
+| --- | --- | --- | --- | --- |
+| `render_batch` | 8,435 | 4,072 | **no** | **yes** |
+| `nav_envelope` | 4,414 | 5,755 | yes | yes |
+
+Not one triangle of the drawn world changed. They are EMITTED IN A DIFFERENT ORDER, and the reason
+is a property of the format I had not accounted for: `tessellate` sorts records by `(kind, sha256)`,
+so a record's place among its siblings is CONTENT-ADDRESSED. Nine facades changed one field, so nine
+digests moved, so those nine reordered, and every triangle they draw moved with them.
+`nav_envelope` is untouched because a facade contributes no triangle to it.
+
+So "a schema change moves no geometry" is true of the geometry and false of its order, and on this
+format the order is part of the bytes. The check that separates them is the triangle multiset, not
+the section digest.
+
+## Two ways to isolate it, because one measurement could not
+
+The comparison above mixes a tessellator bump with a document change. Split, holding one fixed:
+
+- **the tessellator bump alone** (the version 2 document baked at tessellator 20 against the
+  committed version 19 golden): ALL SEVEN SECTIONS BYTE-IDENTICAL, and `tessellator_version` is the
+  only header key that differs. Both triangle digests and `tile_inputs_digest` are unchanged
+  (`3aee7162…`, `dcd548bd…`, `5dd2dcb5…`). Every code change in this lane is inert on geometry.
+- **the document change alone** (version 2 document against version 3 document, both at tessellator
+  20): `nav_envelope`'s three sections identical; all four `render_batch` sections moved.
+
+That first line is also ADR-0024's third rule proved end to end rather than asserted: a version 2
+document, which states no unit, is read at millimetres and produces exactly the geometry it always
+produced.
+
+## An instrument fault found in the middle of this, and how
+
+The first section comparison keyed sections by NAME. There are seven sections across two
+projections, and `render_batch` and `nav_envelope` each have a `position_mm`, so one silently
+overwrote the other and the tool reported four sections instead of seven. It said `position_mm` was
+identical, which was true of `nav_envelope` and false of `render_batch`.
+
+Nothing failed. What caught it was reading the output and asking whether it could be true: the same
+run said entry 15 changed from 258 triangles to 136 while claiming the vertex array had not moved,
+and both cannot hold. Re-keyed by projection AND name, with a duplicate-key assertion so the
+collapse cannot happen silently again, the picture above is the corrected one.

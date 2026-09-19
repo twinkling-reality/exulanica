@@ -982,7 +982,7 @@ class Face:
         tier = building.tiers[self.tier]
         draft = FacadeRecord(
             building_identity=BUILDING,
-            grammar_version=2,
+            grammar_version=CITY_GRAMMAR_VERSION,
             parameters=bindings(self.values),
             seed=SEED,
             output_digest="0" * 64,
@@ -1837,8 +1837,8 @@ def build_document() -> TileDocument:
         tile=tile,
         grammars=(
             GrammarRecords(
-                grammar_id="city",
-                grammar_version=2,
+                grammar_id=CITY_GRAMMAR_ID,
+                grammar_version=CITY_GRAMMAR_VERSION,
                 descriptor_sha256=descriptor_sha256(CITY_DESCRIPTOR_PATH),
                 declared_semantics=CITY_GRAMMAR.semantics,
                 subject_identity=CITY,

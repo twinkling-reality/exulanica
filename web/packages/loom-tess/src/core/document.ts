@@ -473,6 +473,70 @@ export function tileTableOf(tables: readonly GrammarTable[], value: unknown, whe
   return table;
 }
 
+/** The tile record field a version states its coordinate unit in, from city version 3 (ADR-0024). */
+export const COORDINATE_UNIT_FIELD = 'coordinate_unit';
+
+/**
+ * The versions that FIX a coordinate unit by being that version, because they declare no field for
+ * one.
+ *
+ * ADR-0024 puts the unit in the tile record from city version 3. A document written before that
+ * carries no such field and is in millimetres BECAUSE VERSION 2 FIXED IT, never because a reader
+ * supplied a value when it found nothing. That distinction is the whole reason this is a list of
+ * versions and not a default: a reader never invents a unit, it reads the field or it reads a
+ * version named here, and a version in neither is REFUSED. An unrecognised version carrying on in
+ * millimetres is the assumption the ADR exists to remove.
+ *
+ * It cannot go quiet about a version nobody thought of either: the loop below holds every table
+ * this build reads to declaring the field or being named here, at load, so a table added without
+ * deciding its unit fails on import rather than at the first document written in it.
+ */
+export const UNIT_FIXED_BY_VERSION: readonly {
+  readonly grammar_id: string;
+  readonly grammar_version: number;
+  readonly unit: string;
+}[] = [{ grammar_id: TILE_GRAMMAR_ID, grammar_version: 2, unit: 'millimetre' }];
+
+/** Whether `table`'s tile record states its own coordinate unit, rather than its version fixing one. */
+export function declaresCoordinateUnit(table: GrammarTable): boolean {
+  return tileShapeOf(table).fields.some((field) => field.name === COORDINATE_UNIT_FIELD);
+}
+
+/**
+ * The coordinate unit a tile document's records are in: the unit its tile record states, or the one
+ * its version fixes. Never a unit this reader chose.
+ */
+export function coordinateUnitOf(table: GrammarTable, tile: RecordPayload): string {
+  if (declaresCoordinateUnit(table)) return tile.fields[COORDINATE_UNIT_FIELD] as string;
+  const fixed = UNIT_FIXED_BY_VERSION.find(
+    (entry) => entry.grammar_id === table.grammar_id && entry.grammar_version === table.grammar_version,
+  );
+  if (fixed === undefined) {
+    fail(
+      'tile',
+      `is written in ${table.grammar_id} version ${table.grammar_version}, which states no `
+        + `${COORDINATE_UNIT_FIELD} and fixes none, so what unit its coordinates are in is unknown`,
+    );
+  }
+  return fixed.unit;
+}
+
+// Held at load: a grammar version this tessellator reads either states its coordinate unit or is a
+// version whose unit is fixed above. Neither, and no document of it could be read without this
+// reader supplying a unit nothing stated, so it is refused here instead.
+for (const table of GRAMMAR_TABLES) {
+  if (declaresCoordinateUnit(table)) continue;
+  const fixed = UNIT_FIXED_BY_VERSION.some(
+    (entry) => entry.grammar_id === table.grammar_id && entry.grammar_version === table.grammar_version,
+  );
+  if (!fixed) {
+    throw new TileDocumentError(
+      `${table.grammar_id} version ${table.grammar_version} states no ${COORDINATE_UNIT_FIELD} and `
+        + 'no version fixes one for it, so this tessellator cannot say what unit it reads',
+    );
+  }
+}
+
 /**
  * Read and validate a tile document from its canonical bytes. Returns the document unchanged in
  * shape, or throws `TileDocumentError` or `CanonicalJsonError` naming the first problem.

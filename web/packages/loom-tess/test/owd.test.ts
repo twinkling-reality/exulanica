@@ -7,6 +7,7 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { bakeTile, verifyOwd } from '../src/core/bake.js';
 import { canonicalBytes } from '../src/core/canonical-json.js';
 import { CITY_V2 } from '../src/core/city-v2.js';
+import { GRAMMAR_TABLES } from '../src/core/record-shapes.js';
 import { TESSELLATOR_SOURCE_VERSION } from '../src/core/expand.js';
 import { absoluteVertices, decodeOwd, encodeOwd, OwdError } from '../src/core/owd.js';
 import type { Bake } from '../src/core/bake.js';
@@ -160,10 +161,12 @@ describe('decodeOwd', () => {
     // then refused for a field of that other version's shape. Both places the container states the
     // version move together, which is what a real bake at another version would have written.
     ['a tile record at a grammar version this tessellator does not read', () => rebuilt(baked.container, (header) => {
-      const next = CITY_V2.grammar_version + 1;
+      // Past every version this build reads, taken from the tables rather than typed, so this case
+      // does not quietly become a version this tessellator DOES read the next time one is added.
+      const next = Math.max(...GRAMMAR_TABLES.map((table) => table.grammar_version)) + 1;
       (header.grammars as { grammar_version: number }[])[0]!.grammar_version = next;
       ((header.tile as { fields: { grammar_versions: { grammar_version: number }[] } }).fields.grammar_versions)[0]!.grammar_version = next;
-    }), /pins city version 3, and this tessellator reads \[2\]/],
+    }), /pins city version 4, and this tessellator reads \[2,3\]/],
     ['another profile', () => sameLength('exulanica.owd/v3', 'exulanica.owd/v4'), /profile/],
     ['a truth that is not invented', () => sameLength('"truth":"invented"', '"truth":"recorded"'), /truth/],
     ['a frame its grammar does not state', () => sameLength('"name":"city_local"', '"name":"city_locum"'), /frame is not the frame/],

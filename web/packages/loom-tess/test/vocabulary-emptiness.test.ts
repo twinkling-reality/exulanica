@@ -19,8 +19,8 @@
  *     float32 payload, which no digest reads);
  *   - an import that is not a relative `./*.js` module inside `src/core`.
  *
- * `src/core/city-v2.ts` is exempt from the word and number rules, and only from those. It is the
- * grammar's own table, generated from the grammar's files, and `test/grammar-table.test.ts` and
+ * The generated `src/core/city-v<N>.ts` tables are exempt from the word and number rules, and only
+ * from those. Each is a grammar's own table, generated from the grammar's files, and `test/grammar-table.test.ts` and
  * `tests/test_bake_determinism.py` hold it to them. Schema words (record kinds, shape and field
  * names, projections, states and needs) are not vocabulary. The detector itself is tested against
  * planted violations first, so a scan that stopped finding things would fail rather than pass.
@@ -35,7 +35,17 @@ import { ENTRY_STATES } from '../src/core/triangle-digest.js';
 import { PACKAGE_ROOT, REPOSITORY_ROOT } from './support.js';
 
 const CORE = join(PACKAGE_ROOT, 'src', 'core');
-const EXEMPT_FROM_WORDS_AND_NUMBERS = new Set(['city-v2.ts']);
+/**
+ * The generated grammar tables, exempt from the word and number rules and from nothing else.
+ *
+ * DERIVED FROM THE VERSIONS THIS TESSELLATOR READS, not listed: a list here would have gone quiet
+ * the day a second table arrived, exempting the one somebody remembered and failing on the other,
+ * or worse, being widened by hand to a pattern that also excuses a file nobody meant to excuse.
+ * The generator writes `<grammar_id>-v<grammar_version>.ts`, so each table names its own file.
+ */
+const EXEMPT_FROM_WORDS_AND_NUMBERS = new Set(
+  GRAMMAR_TABLES.map((table) => `${table.grammar_id}-v${table.grammar_version}.ts`),
+);
 
 /**
  * Numbers core may write anywhere: 0 and 1 (counting), 2 (a pair, two surface coordinates, two
@@ -316,6 +326,13 @@ describe('the vocabulary-emptiness scan', () => {
 });
 
 describe('src/core', () => {
+  it('exempts exactly the generated tables, and every one of them is a file that exists', () => {
+    // A name that stopped matching would exempt nothing and the scan would fail on real vocabulary,
+    // which is the safe direction; this says so out loud rather than leaving it to luck.
+    expect(EXEMPT_FROM_WORDS_AND_NUMBERS.size).toBe(GRAMMAR_TABLES.length);
+    for (const name of [...EXEMPT_FROM_WORDS_AND_NUMBERS].sort()) expect(coreFiles()).toContain(name);
+  });
+
   it('holds no vocabulary, no default, no fallback, no clock and no host import', () => {
     const forbidden = vocabulary();
     const files = coreFiles();

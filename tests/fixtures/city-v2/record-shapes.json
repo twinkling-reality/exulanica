@@ -901,8 +901,8 @@
         },
         {
           "kind": "integer",
-          "maximum": 2,
-          "minimum": 2,
+          "maximum": 3,
+          "minimum": 3,
           "name": "grammar_version"
         },
         {
@@ -2694,6 +2694,13 @@
           "shape": "GrammarPin"
         },
         {
+          "kind": "choice",
+          "name": "coordinate_unit",
+          "values": [
+            "millimetre"
+          ]
+        },
+        {
           "kind": "hex64",
           "name": "catalog_digest"
         },
@@ -2746,7 +2753,7 @@
         "tile_grammar_versions_sorted"
       ],
       "shape": "city.tile",
-      "version": 2
+      "version": 3
     },
     {
       "extent_field": "extent",

@@ -119,7 +119,9 @@ def test_a_city_version_1_binding_naming_any_parameter_is_refused(name, level):
 
 def test_a_city_binding_at_a_level_version_1_does_not_have_is_refused():
     with pytest.raises(InvalidParameterError):
-        _city_migration(2).migrate(CITY_V1_SURFACE, CITY_V2_SURFACE, (CascadeBinding.of("room", {}),))
+        _city_migration(2).migrate(
+            CITY_V1_SURFACE, CITY_V2_SURFACE, (CascadeBinding.of("room", {}),)
+        )
 
 
 # -------------------------------------------------------------------------------------------
@@ -154,8 +156,12 @@ def test_the_city_version_2_migration_carries_or_maps_every_parameter_exactly_on
     migration.check(CITY_V2_SURFACE, CITY_SURFACE)
     assert (migration.removed, migration.introduced) == ((), ())
     names = sorted(CITY_V2_SURFACE.parameters.names())
-    assert sorted([entry.source for entry in migration.carried] + [entry.source for entry in migration.mapped]) == names
-    assert sorted([entry.target for entry in migration.carried] + [entry.target for entry in migration.mapped]) == names
+    sources = [entry.source for entry in migration.carried]
+    sources += [entry.source for entry in migration.mapped]
+    targets = [entry.target for entry in migration.carried]
+    targets += [entry.target for entry in migration.mapped]
+    assert sorted(sources) == names
+    assert sorted(targets) == names
     # Nothing is renamed, scaled or shifted: this bump changes a record shape, not a parameter.
     assert all(entry.source == entry.target for entry in migration.carried)
     assert all(entry.source == entry.target for entry in migration.mapped)
@@ -168,9 +174,14 @@ def test_the_city_version_2_migration_carries_or_maps_every_parameter_exactly_on
 def test_the_kinds_the_city_version_2_migration_splits_are_the_kinds_the_surface_declares():
     """The split is carried for integers and mapped for choices, because `check` admits no other."""
     migration = _city_migration(3)
-    kinds = {name: CITY_V2_SURFACE.parameters.get(name).kind for name in CITY_V2_SURFACE.parameters.names()}
-    assert {entry.source for entry in migration.carried} == {n for n, k in kinds.items() if k == "integer"}
-    assert {entry.source for entry in migration.mapped} == {n for n, k in kinds.items() if k == "choice"}
+    kinds = {
+        name: CITY_V2_SURFACE.parameters.get(name).kind
+        for name in CITY_V2_SURFACE.parameters.names()
+    }
+    carried = {name for name, kind in kinds.items() if kind == "integer"}
+    mapped = {name for name, kind in kinds.items() if kind == "choice"}
+    assert {entry.source for entry in migration.carried} == carried
+    assert {entry.source for entry in migration.mapped} == mapped
     assert len(migration.carried) == 80
     assert len(migration.mapped) == 11
     assert len(migration.carried) + len(migration.mapped) == len(kinds) == 91

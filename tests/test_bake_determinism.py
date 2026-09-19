@@ -176,7 +176,14 @@ def test_the_bake_stage_is_registered_deterministic_with_no_model_role():
     assert spec.params["tile_size_mm"] == TILE_SIZE_MM
     assert spec.params["halo_radius_mm"] == HALO_RADIUS_MM
     assert spec.params["record_shapes"] == baked_tile_record_shapes()
-    assert spec.params["record_shapes"] == {shape.kind: shape.version for shape in CITY_SHAPES}
+    # Every version the bake READS, which since ADR-0024 is two for the tile record and one
+    # for every other kind. The live shapes are the newest of them, so they are one side of
+    # this rather than the whole of it, and the parameter says so per kind.
+    for shape in CITY_SHAPES:
+        assert shape.version in spec.params["record_shapes"][shape.kind], shape.kind
+        assert max(spec.params["record_shapes"][shape.kind]) == shape.version, shape.kind
+    assert set(spec.params["record_shapes"]) == {shape.kind for shape in CITY_SHAPES}
+    assert spec.params["record_shapes"]["city.tile"] == [2, 3]
 
 
 def test_the_bake_stage_refuses_any_binding():
@@ -332,6 +339,67 @@ def test_the_tessellator_states_the_registry_parameters():
     assert printed.encode("ascii") == canonical_json(stage("baked_tile").params) + b"\n"
 
 
+def _shipped_city_descriptors() -> list[Path]:
+    """Every city descriptor that declares stages, oldest first: the versions a tile can be in."""
+    found = []
+    for path in sorted(CITY_DESCRIPTOR_PATH.parent.glob("city.v*.json")):
+        if "stages" in json.loads(path.read_bytes()):
+            found.append(path)
+    return found
+
+
+def _expected_table(descriptor_path: Path) -> dict[str, Any]:
+    """The grammar table the tessellator must state for one city version, from that version's files.
+
+    The shapes come from the frozen table beside a superseded descriptor, and from the live
+    ``describe_shapes`` for the version this code describes. Which is which is decided by whether
+    the frozen file exists, and the pairing is checked: a table whose tile record version disagrees
+    with the version its descriptor declares is two files from two versions, and is refused rather
+    than compared.
+    """
+    descriptor = json.loads(descriptor_path.read_bytes())
+    frozen = descriptor_path.parent / f"city-shapes.v{descriptor['grammar_version']}.json"
+    shapes = (
+        json.loads(frozen.read_bytes())
+        if frozen.exists()
+        else json.loads(json.dumps(describe_shapes(CITY_SHAPES)))
+    )
+    declared = next(
+        record
+        for stage_document in descriptor["stages"]
+        for record in stage_document["records"]
+        if record["kind"] == "city.tile"
+    )
+    stated = next(shape for shape in shapes["records"] if shape["kind"] == "city.tile")
+    assert declared["version"] == stated["version"], (
+        f"{descriptor_path.name} declares city.tile version {declared['version']} and its shape "
+        f"table states {stated['version']}, so those two files are not one grammar version"
+    )
+    return {
+        "grammar_id": descriptor["grammar_id"],
+        "grammar_version": descriptor["grammar_version"],
+        # The digest of the descriptor's own bytes, computed here rather than read from the table,
+        # because it is what a tile's grammar entry pins and what the container reader compares its
+        # table against. A descriptor edited WITHIN its version moves this and moves nothing else a
+        # container carries, so it is the only thing that can tell a reader its table is not the one
+        # the tile was baked against.
+        "descriptor_sha256": hashlib.sha256(descriptor_path.read_bytes()).hexdigest(),
+        "frame": descriptor["frame"],
+        "measures": descriptor_measures(descriptor),
+        # Every projection states a resolution, which a rule that cuts an arc into chords reads
+        # rather than choosing a segment count of its own.
+        "resolutions": {
+            projection["projection"]: projection["resolution_mm"]
+            for projection in descriptor["projections"]
+        },
+        "navigation": [
+            {key: row[key] for key in ("kind", "ground", "cover", "obstruction")}
+            for row in descriptor["navigation"]
+        ],
+        "shapes": shapes,
+    }
+
+
 def test_the_tessellator_reads_the_grammars_own_table():
     """The table is ``describe_shapes`` over the city's shapes and the descriptor's frame, contract
     measures, per-projection resolutions and navigation table, each row without its prose reason."""
@@ -348,33 +416,12 @@ def test_the_tessellator_reads_the_grammars_own_table():
     }
     assert printed["material_record_kind"] == SurfaceMaterialRecord.RECORD_KIND
     assert printed["tile_record_kind"] == "city.tile"
-    descriptor = json.loads(CITY_DESCRIPTOR_PATH.read_bytes())
     described = json.loads(json.dumps(describe_shapes(CITY_SHAPES)))
-    assert printed["grammars"] == [
-        {
-            "grammar_id": descriptor["grammar_id"],
-            "grammar_version": descriptor["grammar_version"],
-            # The digest of the descriptor's own bytes, computed here rather than read from the
-            # table, because it is what a tile's grammar entry pins and what the container reader
-            # compares its table against. A descriptor edited WITHIN its version moves this and
-            # moves nothing else a container carries, so it is the only thing that can tell a
-            # reader its table is not the one the tile was baked against.
-            "descriptor_sha256": hashlib.sha256(CITY_DESCRIPTOR_PATH.read_bytes()).hexdigest(),
-            "frame": descriptor["frame"],
-            "measures": descriptor_measures(),
-            # Every projection states a resolution, which a rule that cuts an arc into chords reads
-            # rather than choosing a segment count of its own.
-            "resolutions": {
-                projection["projection"]: projection["resolution_mm"]
-                for projection in descriptor["projections"]
-            },
-            "navigation": [
-                {key: row[key] for key in ("kind", "ground", "cover", "obstruction")}
-                for row in descriptor["navigation"]
-            ],
-            "shapes": described,
-        }
-    ]
+    # ONE ENTRY PER VERSION THE TESSELLATOR READS, derived from the descriptors on disk rather than
+    # from the current one alone. Since ADR-0024 the tessellator reads two city versions, and a test
+    # that built its expectation from the newest would have compared one entry against two and, had
+    # it been written to compare only the first, would have said nothing about the other.
+    assert printed["grammars"] == [_expected_table(path) for path in _shipped_city_descriptors()]
     assert json.loads(SHAPE_TABLE.read_bytes()) == described
 
 
@@ -660,9 +707,16 @@ def test_the_container_states_membership_frame_identity_and_what_is_drawn(tmp_pa
     )
 
 
-def descriptor_measures() -> dict[str, dict[str, dict[str, int]]]:
-    """Every integer measure the city descriptor's projection contracts state, by projection."""
-    descriptor = json.loads(CITY_DESCRIPTOR_PATH.read_bytes())
+def descriptor_measures(
+    descriptor: dict[str, Any] | None = None,
+) -> dict[str, dict[str, dict[str, int]]]:
+    """Every integer measure a city descriptor's projection contracts state, by projection.
+
+    Defaults to the current descriptor, and takes one so a caller checking a superseded version
+    reads that version's contracts rather than this one's.
+    """
+    if descriptor is None:
+        descriptor = json.loads(CITY_DESCRIPTOR_PATH.read_bytes())
     measures: dict[str, dict[str, dict[str, int]]] = {}
     for projection in descriptor["projections"]:
         for row in projection["preserved"]:

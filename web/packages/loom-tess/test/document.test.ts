@@ -3,12 +3,16 @@
  * the conformance fixture, and every one must be refused by name.
  */
 import { describe, expect, it } from 'vitest';
-import { bakeTile, documentOf, verifyOwd } from '../src/core/bake.js';
-import { decodeOwd } from '../src/core/owd.js';
+import { bakeTile, checkCoordinateUnit, documentOf, verifyOwd } from '../src/core/bake.js';
+import { COORDINATE_UNIT, decodeOwd } from '../src/core/owd.js';
+import { coordinateUnitOf, tileTableOf } from '../src/core/document.js';
+import { GRAMMAR_TABLES } from '../src/core/record-shapes.js';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { CanonicalJsonError, readTileDocument, TessellationError, TileDocumentError } from '../src/core/index.js';
 import { AsciiError } from '../src/core/ascii.js';
 import { nodeSha256 } from '../src/node/sha256.js';
-import { documentBytes, dressedTerrainObject, fixtureBytes, fixtureObject, recordsOf, sortList } from './support.js';
+import { documentBytes, dressedTerrainObject, fixtureBytes, fixtureObject, PACKAGE_ROOT, recordsOf, sortList } from './support.js';
 
 const text = (): string => new TextDecoder().decode(fixtureBytes());
 const bytesOf = (value: string): Uint8Array => new TextEncoder().encode(value);
@@ -105,11 +109,11 @@ describe('the tile document reader', () => {
       ['a tile with another ownership rule', (d: any) => { d.tile.fields.ownership_rule = 'nearest'; }, /ownership_rule: is not one of/],
       ['a grammar the tile does not pin', (d: any) => { d.grammars[0].grammar_id = 'town'; }, /grammar_id: is not the tile's pin/],
       ['a descriptor the tile does not pin', (d: any) => { d.grammars[0].descriptor_sha256 = '0'.repeat(64); }, /descriptor_sha256: is not the tile's pin/],
-      ['a grammar version this tessellator does not read', (d: any) => { d.grammars[0].grammar_version = 1; d.tile.fields.grammar_versions[0].grammar_version = 1; }, /pins city version 1, and this tessellator reads \[2\]/],
+      ['a grammar version this tessellator does not read', (d: any) => { d.grammars[0].grammar_version = 1; d.tile.fields.grammar_versions[0].grammar_version = 1; }, /pins city version 1, and this tessellator reads \[2,3\]/],
       // The version a tile record pins decides which shape that record is read against, so it is
       // answered before any field of it. A document at an unread version must say THAT, and must
       // never report a field of some other version's shape as the thing that is wrong with it.
-      ['a tile record at an unread version, with a field of it missing too', (d: any) => { d.grammars[0].grammar_version = 9; d.tile.fields.grammar_versions[0].grammar_version = 9; delete d.tile.fields.lod; }, /pins city version 9, and this tessellator reads \[2\]/],
+      ['a tile record at an unread version, with a field of it missing too', (d: any) => { d.grammars[0].grammar_version = 9; d.tile.fields.grammar_versions[0].grammar_version = 9; delete d.tile.fields.lod; }, /pins city version 9, and this tessellator reads \[2,3\]/],
       ['a plane that is not invented', (d: any) => { d.grammars[0].declared_semantics.plane = 'recorded'; }, /plane: is not one of/],
       ['a use that is not a projection', (d: any) => { d.grammars[0].declared_semantics.admissible_uses = ['display']; }, /is not one of/],
       ['uses out of order', (d: any) => { d.grammars[0].declared_semantics.admissible_uses = ['nav_envelope', 'render_batch']; }, /in the order/],
@@ -260,5 +264,78 @@ describe('the bake', () => {
       sortList(owned(d));
     }, dressedTerrainObject);
     await expect(bake(twice)).rejects.toThrow(/two material records dress/);
+  });
+});
+
+/**
+ * ADR-0024: a tile document states its coordinate unit, and what happens when it does not.
+ *
+ * FOUR CASES, and the first is the one an eager refusal breaks. City version 2 wrote no unit, and a
+ * rule that refused a document for not stating one would refuse every document written before the
+ * field existed. It is not read as millimetres because a reader defaulted; it is read as
+ * millimetres because version 2 fixes the unit, and the difference is the whole decision.
+ *
+ * The version 2 document here is not built by this test. It is the conformance fixture exactly as
+ * the version 2 Python grammar wrote it, frozen when the grammar moved on, so a misreading of the
+ * format on this side could not have produced it.
+ */
+describe('the coordinate unit a tile document states (ADR-0024)', () => {
+  const V2_PATH = resolve(PACKAGE_ROOT, 'test', 'fixtures', 'tile-city-v2.json');
+  const v2Object = (): any => JSON.parse(readFileSync(V2_PATH, 'utf8'));
+  const v2Bytes = (): Uint8Array => new Uint8Array(readFileSync(V2_PATH));
+
+  it('reads a version 2 document, which states no unit, at millimetres', () => {
+    const fixture = v2Object();
+    // The premise: this really is a document from before the field existed.
+    expect(fixture.tile.version).toBe(2);
+    expect(fixture.tile.fields.coordinate_unit).toBeUndefined();
+    expect(fixture.tile.fields.grammar_versions.map((pin: any) => pin.grammar_version)).toEqual([2]);
+
+    const document = readTileDocument(v2Bytes());
+    expect(document.tile.version).toBe(2);
+    const table = tileTableOf(GRAMMAR_TABLES, document.tile, 'tile');
+    expect(table.grammar_version).toBe(2);
+    expect(coordinateUnitOf(table, document.tile)).toBe('millimetre');
+  });
+
+  it('reads a version 3 document at the unit the document itself states', () => {
+    const document = readTileDocument(fixtureBytes());
+    expect(document.tile.version).toBe(3);
+    expect(document.tile.fields.coordinate_unit).toBe('millimetre');
+    const table = tileTableOf(GRAMMAR_TABLES, document.tile, 'tile');
+    expect(table.grammar_version).toBe(3);
+    expect(coordinateUnitOf(table, document.tile)).toBe('millimetre');
+  });
+
+  it('refuses a version 3 document that omits the unit, rather than supplying one', () => {
+    refuses(broken((d) => { delete d.tile.fields.coordinate_unit; }), /missing keys \["coordinate_unit"\]/);
+  });
+
+  it('refuses a version 3 document stating a unit the grammar does not admit', () => {
+    refuses(broken((d) => { d.tile.fields.coordinate_unit = 'micrometre'; }), /coordinate_unit: is not one of/);
+  });
+
+  it('refuses a version this tessellator does not read, rather than carrying on in millimetres', () => {
+    const unread = broken((d) => {
+      d.tile.fields.grammar_versions[0].grammar_version = 99;
+      d.grammars[0].grammar_version = 99;
+    });
+    refuses(unread, /pins city version 99, and this tessellator reads \[2,3\]/);
+  });
+
+  it('refuses to BAKE a unit this build does not write, which no shipped grammar can yet produce', () => {
+    // TWO REFUSALS, NOT ONE. The grammar's closed values refuse `micrometre` in the test above:
+    // that is the GRAMMAR saying its version does not admit the unit. This one is the BUILD saying
+    // the quantum is a constant of the tessellator version (ADR-0024 point 3).
+    //
+    // IT IS VACUOUS TODAY AND SAYS SO. Every city version this tessellator reads either fixes
+    // millimetre (version 2) or closes `coordinate_unit` to millimetre alone (version 3), so the
+    // shape check always fires first and `bakeTile` never reaches this. Asserting it end to end
+    // would be asserting the grammar's refusal under this one's name. So the check is exercised
+    // where it lives, and what it costs is one comparison against the day a grammar admits a
+    // second unit while a build still writes one.
+    expect(() => checkCoordinateUnit(COORDINATE_UNIT)).not.toThrow();
+    expect(() => checkCoordinateUnit('micrometre')).toThrow(/coordinates are in "micrometre" and this tessellator writes/);
+    expect(() => checkCoordinateUnit('micrometre')).toThrow(TileDocumentError);
   });
 });

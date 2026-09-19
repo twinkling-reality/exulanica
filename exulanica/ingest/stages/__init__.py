@@ -31,6 +31,7 @@ a version bump still changes the key and still forces regeneration.
 from __future__ import annotations
 
 import hashlib
+import json
 import re
 import uuid
 from collections.abc import Mapping, Sequence
@@ -41,6 +42,7 @@ from exulanica.canonical import canonical_json, sha256_of_canonical
 from exulanica.corpus.decode import decoder_inventory
 from exulanica.evidence.blob import BlobId
 from exulanica.grammar.grammars.city import CITY_STAGES
+from exulanica.grammar.grammars.city.descriptor import CITY_DESCRIPTOR_PATH
 from exulanica.grammar.grammars.city.tile import (
     HALO_RADIUS_MM,
     TILE_SIZE_MM,
@@ -222,19 +224,28 @@ def vision_stage_params() -> dict[str, Any]:
     }
 
 
-def baked_tile_record_shapes() -> dict[str, int]:
-    """Every record kind the city grammar declares, with its version, derived from the stages.
+def baked_tile_record_shapes() -> dict[str, list[int]]:
+    """Every record kind the city grammar declares, with EVERY version the bake reads it at.
 
     The tessellator reads exactly these, so they are the grammar reference the bake is keyed on. A
     new record kind or a record version bump in the grammar moves this without anybody restating
     it, and the tessellator refuses the kind until it has a shape and an expander for it.
+
+    A LIST PER KIND, NOT A VERSION. This was one version a kind while the tessellator read one
+    grammar version. Since ADR-0024 it reads two, which differ in ``city.tile``, and a single
+    version could not state that: it would name whichever version was written last and the bake key
+    would be keyed on a claim about the producer rather than on what the bake can read. The
+    superseded versions are the ones this repository still ships a frozen shape table for, beside
+    their descriptors, which is exactly the set ``web/packages/loom-tess`` builds a table from.
     """
-    shapes = {
-        record_type.RECORD_KIND: record_type.RECORD_VERSION
-        for city_stage in CITY_STAGES
-        for record_type, _validator in city_stage.validators
-    }
-    return dict(sorted(shapes.items()))
+    versions: dict[str, set[int]] = {}
+    for path in sorted(CITY_DESCRIPTOR_PATH.parent.glob("city-shapes.v*.json")):
+        for shape in json.loads(path.read_text(encoding="utf-8"))["records"]:
+            versions.setdefault(shape["kind"], set()).add(shape["version"])
+    for city_stage in CITY_STAGES:
+        for record_type, _validator in city_stage.validators:
+            versions.setdefault(record_type.RECORD_KIND, set()).add(record_type.RECORD_VERSION)
+    return {kind: sorted(found) for kind, found in sorted(versions.items())}
 
 
 STAGES: Final[dict[str, StageSpec]] = {
@@ -841,7 +852,7 @@ STAGES: Final[dict[str, StageSpec]] = {
             # bay's own panels return across the steps in depth between them, and how
             # support is carved clear of what the grammar's navigation table says obstructs a
             # walking capsule.
-            "tessellator": 19,
+            "tessellator": 20,
             # How a projection's triangles are digested; the golden fixture digest depends on it.
             "triangle_digest": "exulanica.owd-triangle-digest/v3",
             # The document the bake reads, whose envelope the city grammar owns.

@@ -14,8 +14,8 @@ that no production build emits these bytes or the code that reads them.
   pnpm tess bake packages/loom-tess/test/fixtures/tile-conformance.json packages/app/src/dev/tiles/tile-conformance.owd
   ```
 
-- sha256: `bd07246dbeb9b1116498a233ede7790da2cbcf8eeef1024b4e33682460f351c1` (703,556 bytes).
-- render_batch triangle digest: `3aee7162da258e98e1de96ba73a551d0b578a97263eda013d9a7608fb0b1cd7e`,
+- sha256: `4c76b9e0e20030883af478e932ca561e91ba79e6f45e881b31f017d91168637c` (703,588 bytes).
+- render_batch triangle digest: `185d7be67689db9b290e5c8571b09485a822ba843dae9cd80b85922bcc6ccec4`,
   the value tess's own conformance test pins.
 
 `test/generated-tile-golden.test.ts` rebakes the source through tess's bake command and requires
@@ -43,3 +43,17 @@ drawn between it and the face, which is why it read as a rectangle floating behi
 render_batch moved, nav_envelope held at
 `dcd548bde8d8ca988c1e3b433c9515fe6531c95d7a5f4085d627e1b54e7eb811` for the third version running,
 and `tile_inputs_digest` held at `5dd2dcb5de5b684fc485e4c2ad3b25bdc89c0f9ce3a73e4af043e13ec4b75b22`.
+
+And again at tessellator 20, from 703,556 bytes to 703,588, when ADR-0024 put a coordinate unit in
+the tile record at city grammar version 3. EVERY DIGEST MOVED THIS TIME, including the two that had
+held for three versions, and the reason is worth reading before the next schema change: not one
+triangle of the drawn world changed. Measured as multisets, `render_batch`'s 8,435 vertices and
+4,072 triangles and `nav_envelope`'s 4,414 and 5,755 are identical either side. `render_batch`
+emits them in a DIFFERENT ORDER, because `tessellate` sorts records by `(kind, sha256)`: nine
+`city.facade` records carry the grammar version that wrote them, so nine digests moved, so those
+nine reordered and their triangles with them. `nav_envelope` holds its ORDER too, since a facade
+draws nothing there, and moved only through the record digests every entry carries.
+
+The lesson for whoever moves a schema next: on this format a record's place is content-addressed, so
+"a schema change moves no geometry" is true of the geometry and false of its order. The check that
+tells them apart is the triangle multiset, not the section digest.

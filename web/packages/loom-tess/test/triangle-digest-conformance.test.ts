@@ -38,8 +38,8 @@ import {
  * moved the second of these two lines would be a carve that had escaped the face's own plane.
  */
 const GOLDEN = {
-  render_batch: '3aee7162da258e98e1de96ba73a551d0b578a97263eda013d9a7608fb0b1cd7e',
-  nav_envelope: 'dcd548bde8d8ca988c1e3b433c9515fe6531c95d7a5f4085d627e1b54e7eb811',
+  render_batch: '185d7be67689db9b290e5c8571b09485a822ba843dae9cd80b85922bcc6ccec4',
+  nav_envelope: 'f6158941949203038233d445a8a5aeaa9bdb5ce524a092ec6faf7e19f64424a2',
 } as const;
 
 afterEach(() => {

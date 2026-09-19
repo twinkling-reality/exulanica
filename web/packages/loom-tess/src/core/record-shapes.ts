@@ -28,6 +28,7 @@
  * tile record's fixed bounds and every record kind's version).
  */
 import { CITY_V2 } from './city-v2.js';
+import { CITY_V3 } from './city-v3.js';
 import { FIELD_KINDS } from './grammar-table.js';
 import type { FieldShape, GrammarTable, NavigationRow, RecordShape } from './grammar-table.js';
 
@@ -46,8 +47,16 @@ export const HEX64_PATTERN = /^[0-9a-f]{64}$/;
 /** `exulanica.grammar.textures.TEXTURE_SET_ID`. */
 export const TEXTURE_SET_ID_PATTERN = /^[a-z][a-z0-9.-]*$/;
 
-/** Every grammar version this tessellator reads. */
-export const GRAMMAR_TABLES: readonly GrammarTable[] = [CITY_V2];
+/**
+ * Every grammar version this tessellator reads, oldest first.
+ *
+ * A DOCUMENT IS READ AGAINST THE VERSION IT PINS, never against this list's first entry: city
+ * version 2 wrote no coordinate unit and version 3 states one (ADR-0024), so the two tile shapes
+ * differ and a reader that took either for the other would report a field as the fault when the
+ * fault is a version. `document.tileTableOf` is what resolves it, and the order here decides
+ * nothing.
+ */
+export const GRAMMAR_TABLES: readonly GrammarTable[] = [CITY_V2, CITY_V3];
 
 export class ShapeTableError extends Error {}
 

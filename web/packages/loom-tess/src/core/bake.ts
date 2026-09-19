@@ -8,7 +8,7 @@
  */
 import { canonicalBytes, compareCodeUnits } from './canonical-json.js';
 import type { CanonicalValue } from './canonical-json.js';
-import { readTileDocument, TILE_DOCUMENT_PROFILE, TileDocumentError } from './document.js';
+import { coordinateUnitOf, readTileDocument, TILE_DOCUMENT_PROFILE, TileDocumentError, tileTableOf } from './document.js';
 import { MATERIALISED_LOD, MATERIALISED_PROJECTIONS, TESSELLATOR_SOURCE_VERSION } from './expand.js';
 import { COORDINATE_UNIT, decodeOwd, encodeOwd, OWD_CONTAINER, OwdError } from './owd.js';
 import type { DecodedOwd, OwdHeader, OwdRecord } from './owd.js';
@@ -51,26 +51,32 @@ export function boundOf(tables: readonly GrammarTable[], name: string): number {
 }
 
 /**
- * Every record kind of every grammar version this tessellator reads, with its version.
+ * Every record kind of every grammar version this tessellator reads, with EVERY version it reads
+ * that kind at, ascending.
  *
- * ONE VERSION PER KIND, AND A SECOND ONE IS REFUSED RATHER THAN OVERWRITTEN. This map keyed by
- * kind cannot say that a kind is read at two versions, so the day two tables declare one kind
- * differently it stops being able to state what it names, and a silent last-one-wins would put
- * whichever table sat last into a bake parameter that every tile's key is built from.
+ * THIS WAS ONE VERSION A KIND, and it could not stay that way. A map from kind to a single version
+ * said what it named only while this tessellator read one grammar version; reading two, it has a
+ * key written twice and would have taken whichever table came last, silently, into a bake
+ * parameter every tile's key is built from. City version 2 and version 3 differ in `city.tile`
+ * (ADR-0024's coordinate unit) and agree on every other kind, which is exactly the case a single
+ * version per kind cannot state.
+ *
+ * A list, ascending, rather than the newest: the newest is a claim about what a producer writes,
+ * and this parameter is about what the bake READS. Those are different questions and the bake key
+ * must move when either does.
  */
-export function recordShapeVersions(tables: readonly GrammarTable[]): { [kind: string]: number } {
-  const versions: { [kind: string]: number } = {};
+export function recordShapeVersions(tables: readonly GrammarTable[]): { [kind: string]: number[] } {
+  const versions: { [kind: string]: number[] } = {};
   for (const table of tables) {
     for (const shape of table.shapes.records) {
       if (shape.kind === undefined) throw new RangeError(`${shape.shape} is a record with no kind`);
       if (shape.version === undefined) throw new RangeError(`${shape.shape} is a record with no version`);
-      const already = versions[shape.kind];
-      if (already !== undefined && already !== shape.version) {
-        throw new RangeError(`${shape.kind} is read at versions ${already} and ${shape.version}, and this states one version a kind`);
-      }
-      versions[shape.kind] = shape.version;
+      const read = versions[shape.kind];
+      if (read === undefined) versions[shape.kind] = [shape.version];
+      else if (!read.includes(shape.version)) read.push(shape.version);
     }
   }
+  for (const kind of Object.keys(versions).sort()) versions[kind]!.sort((a, b) => a - b);
   return versions;
 }
 
@@ -92,6 +98,31 @@ export const BAKE_PARAMETERS = {
   record_shapes: recordShapeVersions(GRAMMAR_TABLES),
 } as const;
 
+/**
+ * ADR-0024 POINT 3: one millimetre is a constant of this tessellator version, not something a
+ * document may choose. Two quanta coexisting in one world would put a scaling step, and a place to
+ * be wrong by a factor of a thousand while still looking like a plausible building, into every rule
+ * that reads two documents.
+ *
+ * TWO REFUSALS, NOT ONE, AND THIS IS THE SECOND. The grammar refuses a unit its own version does
+ * not admit, through the tile record's closed values. This refuses a unit THIS BUILD does not work
+ * in, which is a different question with a different answer the day a grammar admits two units
+ * while a build still writes one.
+ *
+ * SO IT IS VACUOUS TODAY, deliberately. Every city version this tessellator reads either fixes
+ * millimetre or closes `coordinate_unit` to millimetre alone, so the shape check always fires
+ * first and a bake never reaches this. It costs one comparison and it will fire on the day
+ * somebody builds the case that invalidates it, which is the point of writing it now.
+ */
+export function checkCoordinateUnit(unit: string): void {
+  if (unit === COORDINATE_UNIT) return;
+  throw new TileDocumentError(
+    `tile: its coordinates are in ${JSON.stringify(unit)} and this tessellator writes `
+      + `${JSON.stringify(COORDINATE_UNIT)}; the quantum is a constant of the tessellator version, `
+      + 'so a document in another unit is refused rather than scaled',
+  );
+}
+
 /** Bake one tile document. Same bytes in, same bytes out, on any host that hashes correctly. */
 export async function bakeTile(documentBytes: Uint8Array, sha256: Sha256Hex): Promise<Bake> {
   const document = readTileDocument(documentBytes);
@@ -101,6 +132,7 @@ export async function bakeTile(documentBytes: Uint8Array, sha256: Sha256Hex): Pr
         + 'at another level is refused rather than drawn at this one',
     );
   }
+  checkCoordinateUnit(coordinateUnitOf(tileTableOf(GRAMMAR_TABLES, document.tile, 'tile'), document.tile));
   const recordDigests: string[] = [];
   for (const record of documentRecords(document)) recordDigests.push(await sha256(recordBytes(record.payload)));
   const tessellation = tessellate(document, recordDigests);
