@@ -14,8 +14,8 @@ from exulanica.world.assets import reviewed_assets
 from pydantic import ValidationError
 
 
-def imported_fixture():
-    payload = reviewed_assets()[0].payload
+def imported_fixture(payload=None):
+    payload = reviewed_assets()[0].payload if payload is None else payload
     licence = b"Upstream fixture licence evidence, CC0-1.0."
     manifest = ReviewedAssetImport(
         profile="exulanica.reviewed-asset-import/v1",
@@ -69,6 +69,28 @@ def test_receipt_preserves_upstream_provenance_and_exact_bytes():
 def test_refuses_unavailable_or_unreviewed_dependencies(document):
     with pytest.raises(ValueError):
         validate_import_container(glb(document))
+
+
+def test_the_container_boundary_is_reached_through_validate_asset_import():
+    """The seven cases above test the guard. This one tests the CALL, which nothing else did.
+
+    Measured 2026-09-19: deleting `validate_import_container(payload)` from asset_import.py
+    left every test in this file passing, 9 asked and none objecting, and a GLB carrying a URI
+    reference to a resource this host does not hold was handed back a valid receipt. The reason
+    no test noticed is that every one that drives this path uses an admissible GLB, and the two
+    malformed payloads disagree with their manifest, so the size and digest checks refuse them
+    before the container is ever looked at.
+
+    So the input has to be built the other way round: take a payload that is NOT an admissible
+    container and give it a manifest that describes it exactly. The two assertions below are the
+    test rather than preamble to it, because they are what says the earlier guards cannot be the
+    ones answering."""
+    remote = glb({"asset": {"version": "2.0"}, "images": [{"uri": "https://example.org/held.png"}]})
+    manifest, payload, licence = imported_fixture(remote)
+    assert len(payload) == manifest.byte_size
+    assert hashlib.sha256(payload).hexdigest() == manifest.content_sha256
+    with pytest.raises(ValueError, match="must be embedded, not URI references"):
+        validate_asset_import(manifest, payload, licence)
 
 
 def test_refuses_unlicensed_or_unknown_manifest_fields():

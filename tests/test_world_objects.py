@@ -128,6 +128,26 @@ def test_an_object_id_the_schema_would_refuse_is_refused_first(object_id):
         validate_object_id(object_id)
 
 
+def test_validate_object_puts_every_object_through_the_id_contract():
+    """The test above tests the function and the one above that tests the schema. This tests the
+    CALL, which nothing else did.
+
+    Measured 2026-09-19: deleting `validate_object_id(obj.object_id)` from objects.py left every
+    test in this file passing, 62 asked and none objecting. `validate_object` is driven six times
+    here and each one goes through `authored()`, whose default id is valid, so each of those tests
+    fails on a different guard and none of them would notice this one leaving.
+
+    Everything but the id is admissible below, so the id contract is the only guard that can
+    answer, which is why the message is matched and not just the type."""
+    with pytest.raises(InvalidObjectData, match="object_id must be"):
+        validate_object(
+            authored(object_id="Object:Lantern"),
+            region_ids=frozenset({"region-a"}),
+            asset_digests=frozenset({CUBE}),
+            registry=REGISTRY,
+        )
+
+
 # -- the canonical delta -----------------------------------------------------------------------
 
 
