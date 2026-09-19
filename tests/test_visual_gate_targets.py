@@ -215,7 +215,7 @@ def test_the_harness_and_the_record_name_the_same_conditions_both_ways():
     anything that noticed the list itself growing.
 
     Both directions, because each is a different broken thing. A condition the record may state and
-    the harness can never assign is one nothing can ever be scored under. A condition the harness can
+    the harness can never assign is one nothing can be scored under. A condition the harness can
     assign and the record does not list would halt a COMPLETED run at verification, after the walk,
     the captures and the keys, which is the most expensive moment to find out.
     """
@@ -249,7 +249,9 @@ WALK_PARAMETERS = ("pose_x_mm", "pose_y_mm", "facing_dx", "facing_dy")
 def _node(*arguments: str) -> subprocess.CompletedProcess[str]:
     """Run something under the web toolchain's tsx, because the harness imports TypeScript."""
     if not TSX.exists():
-        pytest.skip(f"the web toolchain is not installed ({TSX} is missing); run pnpm install in web/")
+        pytest.skip(
+            f"the web toolchain is not installed ({TSX} is missing); run pnpm install in web/"
+        )
     if shutil.which("node") is None:
         pytest.skip("node is not on PATH")
     return subprocess.run(
@@ -320,7 +322,10 @@ def test_one_walk_written_twice_is_one_walk(tmp_path):
 
 @pytest.mark.parametrize(
     "written",
-    ["pose_x_mm=262000.5&pose_y_mm=70300&facing_dx=1&facing_dy=0", "pose_x_mm=262000&pose_y_mm=70300&facing_dx=1"],
+    [
+        "pose_x_mm=262000.5&pose_y_mm=70300&facing_dx=1&facing_dy=0",
+        "pose_x_mm=262000&pose_y_mm=70300&facing_dx=1",
+    ],
 )
 def test_a_walk_stated_incompletely_or_in_fractions_is_not_a_walk(tmp_path, written):
     read = _read_walk(tmp_path, f"`?{written}`")
@@ -328,7 +333,7 @@ def test_a_walk_stated_incompletely_or_in_fractions_is_not_a_walk(tmp_path, writ
 
 
 def _harness_halt(tmp_path: Path, search: str, walk: str | None) -> str:
-    """The reason the harness stopped, from the halt it writes, for a run that never opens a browser.
+    """Why the harness stopped, from the halt it writes, for a run that never opens a browser.
 
     The walk rule is checked before Chrome is launched, so these runs cost no browser and no server:
     a halt here is the refusal itself and not a failure to reach a page.
@@ -424,7 +429,8 @@ def _route_record(tmp_path: Path, tamper: str) -> dict[str, object]:
         # see rings on both sides and some see one. A corridor walled on both sides for its whole
         # length gives every qualifying heading frontage, and then the derived value the tamper
         # writes equals the measured one and the overwrite it is testing becomes invisible.
-        "const plan = planRoute([0, 0], [wall(-5, -200, 200), wall(4, -200, -1)], [-500, -500, 500, 500]);\n"
+        "const plan = planRoute([0, 0], [wall(-5, -200, 200), wall(4, -200, -1)], "
+        "[-500, -500, 500, 500]);\n"
         "const derived = plan.frontageBothSidesSamples > 0 ? plan.candidatesQualified : 0;\n"
         "const measured = { field: null, obstacles: 2, routeRings: 2, routeRingsRefused: [], "
         "groundRefused: [], routeGround: null, fieldBoundsCm: null, "
@@ -433,8 +439,10 @@ def _route_record(tmp_path: Path, tamper: str) -> dict[str, object]:
         "try {\n"
         "  const record = harness.routeRecordOf(plan, measured);\n"
         f"  {tamper}\n"
-        "  console.log(JSON.stringify({ record: harness.checkedRouteRecord(plan, record), plan, derived }));\n"
-        "} catch (error) { console.log(JSON.stringify({ refused: error.message, plan, derived })); }\n"
+        "  console.log(JSON.stringify({ record: harness.checkedRouteRecord(plan, record), "
+        "plan, derived }));\n"
+        "} catch (error) { console.log(JSON.stringify({ refused: error.message, plan, "
+        "derived })); }\n"
     )
     result = _node(str(driver))
     assert result.returncode == 0, result.stderr
@@ -461,7 +469,8 @@ def test_a_measured_count_overwritten_by_a_derived_one_is_refused(tmp_path):
     """
     built = _route_record(
         tmp_path,
-        "record.candidatesWithFrontage = plan.frontageBothSidesSamples > 0 ? plan.candidatesQualified : 0;",
+        "record.candidatesWithFrontage = plan.frontageBothSidesSamples > 0 ? "
+        "plan.candidatesQualified : 0;",
     )
     # The tamper has to change the value, or this test passes over a fixture that cannot reach the
     # case. The first version of it did exactly that: with no frontage on both sides the derived
@@ -507,7 +516,7 @@ def test_a_number_the_rule_does_not_record_is_refused_if_it_appears(tmp_path):
 
 # -- the harness itself, type-checked, because nothing else in this repository checks it -----------
 
-# -- what the product showed when it would not start ------------------------------------------------
+# -- what the product showed when it would not start ----------------------------------------------
 
 
 def _surface(tmp_path: Path, shell_js: str) -> object:
@@ -608,7 +617,7 @@ def test_the_support_probe_stays_fine_enough_to_see_the_hole_that_misled_a_run(t
     """The spacing is a requirement, not a setting, and nothing held it to that until now.
 
     MEASURED 2026-09-18: at 0.25 m the probe reported "support for the next 10 m" over a 30 mm hole
-    15 mm ahead of a stalled walker, and that one figure misdirected a whole run's diagnosis. A probe
+    15 mm ahead of a stalled walker, and that figure misdirected a whole run's diagnosis. A probe
     coarser than the hole does not find fewer holes, IT REPORTS THEIR ABSENCE.
 
     This asserts the relationship rather than the number: at least two samples must land inside the
@@ -618,7 +627,8 @@ def test_the_support_probe_stays_fine_enough_to_see_the_hole_that_misled_a_run(t
     driver = tmp_path / "spacing.mjs"
     driver.write_text(
         f"const harness = await import({str(HARNESS)!r});\n"
-        "console.log(JSON.stringify({ spacing: harness.PROBE_SPACING_M, hole: harness.HOLE_THAT_WAS_MISSED_M }));\n"
+        "console.log(JSON.stringify({ spacing: harness.PROBE_SPACING_M, "
+        "hole: harness.HOLE_THAT_WAS_MISSED_M }));\n"
     )
     result = _node(str(driver))
     assert result.returncode == 0, result.stderr
@@ -635,7 +645,8 @@ def _reach(tmp_path: Path, search: str, owned: str = "false") -> object:
         f"{str(ROOT / 'web/packages/loom-gate/src/index.ts')!r})).ROUTE_RULE;\n"
         f"const url = new URL('http://127.0.0.1:1/{search}');\n"
         f"const reach = harness.composedWorldReachMm(url, {owned});\n"
-        "console.log(JSON.stringify({ reach, lengthMm: rule.lengthMm, stopMarginMm: rule.stopMarginMm }));\n"
+        "console.log(JSON.stringify({ reach, lengthMm: rule.lengthMm, "
+        "stopMarginMm: rule.stopMarginMm }));\n"
     )
     result = _node(str(driver))
     assert result.returncode == 0, result.stderr
@@ -647,7 +658,7 @@ def test_the_page_is_told_to_compose_the_whole_route_and_its_stopping_margin(tmp
 
     The assertion is the RELATIONSHIP and not the number 131000. Writing that literal here would put
     a second copy of the rule in a test, which could then never refuse a change to the rule. Summing
-    the two fields still refuses the mutation that matters: sending the route length while forgetting
+    the two fields still refuses the mutation that matters: sending the length while forgetting
     the stopping margin, which would compose a world 6 m short of where the walk actually stops.
     """
     read = _reach(tmp_path, "?preview=1&city=abc&tile_x=2&tile_y=0")
@@ -674,7 +685,8 @@ def _condition(tmp_path: Path, paths: list[dict], anonymous: int) -> object:
     driver = tmp_path / "condition.mjs"
     driver.write_text(
         f"const harness = await import({str(HARNESS)!r});\n"
-        f"const named = harness.authenticationConditionOf({json.dumps(paths)}, {json.dumps(anonymous)});\n"
+        f"const named = harness.authenticationConditionOf({json.dumps(paths)}, "
+        f"{json.dumps(anonymous)});\n"
         "console.log(JSON.stringify({ named }));\n"
     )
     result = _node(str(driver))
@@ -784,7 +796,8 @@ def _graph_predicate(tmp_path: Path, api: list[dict]) -> object:
     driver = tmp_path / "graph-predicate.mjs"
     driver.write_text(
         f"const harness = await import({str(HARNESS)!r});\n"
-        f"console.log(JSON.stringify({{ held: harness.credentialDoesNotCarryTheGraph({json.dumps(api)}) }}));\n"
+        f"console.log(JSON.stringify({{ held: "
+        f"harness.credentialDoesNotCarryTheGraph({json.dumps(api)}) }}));\n"
     )
     result = _node(str(driver))
     assert result.returncode == 0, result.stderr
@@ -794,7 +807,7 @@ def _graph_predicate(tmp_path: Path, api: list[dict]) -> object:
 def test_the_graph_predicate_refuses_a_served_graph_even_though_nothing_reaches_it(tmp_path):
     """A redundant check that nothing exercises is a check somebody will believe is working.
 
-    MEASURED: through the whole condition this half CANNOT FAIL, because a served graph is a 200 that
+    MEASURED: through the whole condition this half CANNOT FAIL: a served graph is a 200 that
     is not a tile and clause 2 refuses it first. It is kept because the day clause 2 is loosened to
     permit another endpoint, this becomes the only thing catching a served graph, and the transfer
     would happen silently. So it is asked at its own level, where it can still answer.
@@ -824,11 +837,11 @@ def test_a_page_that_never_asked_for_the_graph_is_refused(tmp_path):
     """Clause 3, and this is the case that actually isolates it.
 
     MEASURED by falsification 2026-09-18: deleting clause 3 was noticed by NOTHING, because the test
-    that claimed it fed traffic where the graph was SERVED, and a served graph is a 200 that is not a
+    that claimed it fed traffic where the graph was SERVED; a served graph is a 200 that is not a
     tile, so CLAUSE 2 refused it. The property was pinned somewhere other than where it was claimed.
 
     The independent content of clause 3 is the ASKING. A page that never asks proves nothing about
-    what its credential carries, and clause 2 is perfectly happy with it. That is also the dependency
+    what its credential carries, and clause 2 is happy with it. That is also the dependency
     written into the condition's definition: the evidence is the page's habit, and it fails toward
     refusing.
     """
@@ -958,7 +971,9 @@ def test_a_reach_the_run_did_not_ask_for_is_refused(tmp_path):
 def test_a_world_that_is_not_data_is_refused_rather_than_parsed(tmp_path):
     """An absent attribute and an unreadable one are both refusals, and say which they are."""
     _, containers = _agreeing()
-    absent = _check_world(tmp_path, f"harness.checkedWalkWorld(null, {json.dumps(containers)}, true)")
+    absent = _check_world(
+        tmp_path, f"harness.checkedWalkWorld(null, {json.dumps(containers)}, true)"
+    )
     assert "states no data-generated-tile-world" in absent.get("refused", ""), absent
     broken = _check_world(
         tmp_path, f"harness.checkedWalkWorld('not json at all', {json.dumps(containers)}, true)"
@@ -970,7 +985,7 @@ def test_a_world_that_is_not_data_is_refused_rather_than_parsed(tmp_path):
 
 
 def _steepest_rise(tmp_path: Path, heights: list[object], spacing_m: float = 0.005) -> object:
-    """What the harness makes of a run of sampled heights. `None` in the list is the product's NaN."""
+    """What the harness makes of sampled heights. `None` in the list is the product's NaN."""
     driver = tmp_path / "rise.mjs"
     written = ", ".join("Number.NaN" if h is None else repr(float(h)) for h in heights)
     driver.write_text(
@@ -1014,7 +1029,7 @@ def test_no_rise_is_measured_across_missing_ground(tmp_path):
 def test_a_drop_is_not_a_step_up(tmp_path):
     """A fall is not a climb. A route that only descends has a steepest rise of zero, not of 2 m."""
     # The drop must be LARGER than the rise, or the two answers coincide and this asserts nothing.
-    # Measured 2026-09-18: written first as [2, 1, 0], where a mutation that ranks by magnitude gives
+    # Measured 2026-09-18: written first as [2, 1, 0], where a mutation ranking by magnitude gives
     # the same number, so the test passed against the defect it names.
     rise = _steepest_rise(tmp_path, [0.0, 1.0, -10.0])
     assert rise["riseMm"] == 1000.0
@@ -1033,7 +1048,7 @@ HARNESS_TSCONFIG = ROOT / "web/tsconfig.scripts.json"
 def test_the_harness_type_checks_and_the_checker_looked_at_it():
     """Nothing else checks this file, and a checker that looked at nothing also exits 0.
 
-    MEASURED 2026-09-18: no tsconfig in this repository reaches outside ``web/``, so the gate harness
+    MEASURED 2026-09-18: no tsconfig in this repository reaches outside ``web/``, so this harness
     was type-checked by nothing; ``node --check`` accepts a duplicate object key because it is legal
     JavaScript; and there is no JavaScript linter here. A duplicated key in the record builder
     therefore replaced a measured count with a derived one in silence, and a hand-run ``tsc`` over a
@@ -1049,7 +1064,9 @@ def test_the_harness_type_checks_and_the_checker_looked_at_it():
     """
     tsc = WEB / "node_modules/.bin/tsc"
     if not tsc.exists():
-        pytest.skip(f"the web toolchain is not installed ({tsc} is missing); run pnpm install in web/")
+        pytest.skip(
+            f"the web toolchain is not installed ({tsc} is missing); run pnpm install in web/"
+        )
     result = subprocess.run(
         [str(tsc), "-p", str(HARNESS_TSCONFIG), "--listFiles"],
         cwd=ROOT,
