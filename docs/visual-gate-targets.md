@@ -783,6 +783,16 @@ The two pages differ and nobody chose the difference.
   photographs better. The baseline has no such marks because its district has nothing undressed, not
   because it was cleaned.
 
+**BUILT AND VERIFIED BY LOOKING, at 97d8caa1.** The harness hides the two selectors before every
+frame and names them in every frame's record; the run's captures each carry
+`furnitureHidden: ['.generated-tile-evaluation', '.scene-segments']`. Opening the new midpoint frame:
+the panel and the card are gone, the Companion is where it was, AND THE MAGENTA IS STILL THERE on the
+facades and the ground. The instrument was altered and the subject was not.
+
+Three breaks, each refused: the panel surviving into a frame, the hiding reaching the world and
+taking the hatching with it, and the refusal itself ceasing to name what it refuses. The second is
+the one that matters in a year.
+
 **WHY A CAPTION IS WORSE THAN AN OCCLUSION.** The Companion covers more of the frame than the
 evaluation panel does, and it stays: it is the product, `companionPresent` counts it in three of
 three captures, and a frame without it would not be a frame of this product. The evaluation panel is
