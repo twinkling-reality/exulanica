@@ -70,7 +70,6 @@ What the system is. Edited when the system changes.
 - [synthetic-society-contract](synthetic-society-contract.md) : BOUNDED DETERMINISTIC SIMULATION; NOT A LEARNED SOCIETY MODEL
 - [texture-package](texture-package.md) : IMPLEMENTED for seventeen baked texture sets, their containers, the manifest, migrations
 - [traffic-contract](traffic-contract.md) : V1 IMPLEMENTED ON CITY V2 ROAD RECORDS; NOT YET RUN BY ANY RUNTIME, STORED OR DRAWN
-- [visual-gate-corridor-walk](visual-gate-corridor-walk.md) : The corridor lane's own walk is stated in docs/generated-corridor-street.md and is not touched by
 - [visual-gate-rubric](visual-gate-rubric.md) : version 5, fixed before any street geometry is generated and before any corridor is scored. Changing it needs a new reconciliation record...
 - [visual-gate-targets](visual-gate-targets.md) : The visual gate scores a page. A target says which page, and everything that makes two runs of
 - [world-composition-contract](world-composition-contract.md) : DECISION for product and architecture direction; PARTIAL implementation
