@@ -32,17 +32,27 @@ where ``cases.json`` is a list of objects:
 
 ``expect`` is the test that CLAIMS the property the break removes. The case passes only when that
 test fails; another test failing instead is reported as a different finding, because it means the
-property is pinned somewhere other than where it is claimed.
+property is pinned somewhere other than where it is claimed. It is compared BY IDENTITY, against the
+last segment of the failing node id with any parametrisation stripped, because matching a name as a
+SUBSTRING would let ``test_x_at_the_end`` answer for ``test_x`` and the central verdict would read
+true while being false.
+
+THE LIMIT THIS CANNOT CLOSE, and the next reader will assume otherwise. ``tests`` is a SELECTION,
+chosen by whoever wrote the case. A verdict of "nothing noticed" means NOTHING IN THE FILES NAMED
+HERE claims the property; it does NOT mean nothing in the repository does. The tool cannot tell those
+apart and does not try, which is why that verdict names the harness as the first suspect rather than
+declaring the property untested.
 """
 
 from __future__ import annotations
 
 import hashlib
 import json
-import re
+import os
 import subprocess
 import sys
 from pathlib import Path
+from tempfile import TemporaryDirectory
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -51,41 +61,45 @@ def _digest(path: Path) -> str:
     return hashlib.sha256(path.read_bytes()).hexdigest()
 
 
-def _run_pytest(tests: list[str], arguments: list[str]) -> tuple[str, int]:
-    """Run pytest over `tests` and hand back its output and exit code."""
+def _run_pytest(tests: list[str], arguments: list[str], report: Path) -> dict:
+    """Run pytest over `tests` and read WHAT IT DID from the plugin's own report, not from its text.
+
+    A missing report is a REFUSAL and never a fallback to parsing the summary. A fallback that
+    activates silently is the whole fault this file exists to remove: it would turn "the plugin did
+    not load" into a number that looks like a measurement.
+    """
+    environment = dict(os.environ)
+    environment["FALSIFY_REPORT"] = str(report)
+    environment["PYTHONPATH"] = str(ROOT / "scripts") + os.pathsep + environment.get("PYTHONPATH", "")
     result = subprocess.run(
-        [str(ROOT / ".venv/bin/python"), "-m", "pytest", *tests, *arguments],
+        [str(ROOT / ".venv/bin/python"), "-m", "pytest", "-p", "falsify_plugin", *tests, *arguments],
         cwd=ROOT,
         capture_output=True,
         text=True,
+        env=environment,
     )
-    return result.stdout + result.stderr, result.returncode
+    if not report.exists():
+        return {"collected": None, "failed": [], "exitstatus": result.returncode,
+                "unreadable": (result.stdout + result.stderr)[-400:]}
+    read = json.loads(report.read_text())
+    read["exitstatus"] = result.returncode
+    return read
 
 
-def _selected(output: str) -> int:
-    """How many tests pytest actually ran, from its own final summary line.
+def _claimed_by(failed: list[str], name: str) -> bool:
+    """Did the test that CLAIMS this property fail, compared BY IDENTITY and not by resemblance?
 
-    THE NUMBER THIS FILE EXISTS FOR. A selection of zero exits 5 and prints "no tests ran", which
-    reads as a clean run to anything that only looks at whether something failed.
-
-    Read off the LAST line carrying counts, so a traceback quoting these words cannot inflate it.
-    It must not look for pytest's "=" banner: THIS PROJECT ALREADY PASSES -q IN ADDOPTS, so the
-    summary arrives undecorated as "35 passed in 5.87s", and the first version of this function
-    returned 0 for every run and reported a real falsification as having asked nothing. "deselected"
-    is deliberately not one of the words counted.
+    A node id is ``file::test_name`` with an optional ``[parameters]`` tail. Matching with ``in``
+    would let ``test_a_drop_is_not_a_step_up_at_the_end`` answer for
+    ``test_a_drop_is_not_a_step_up``, and this tool's central verdict, that the property is pinned
+    where it is claimed, would read true while being false. That is the same fault as reaching into
+    a shared list by position: addressing by something that RESEMBLES identity.
     """
-    counted = 0
-    for line in output.splitlines():
-        found = re.findall(r"(\d+) (passed|failed|errors?|xfailed|xpassed)\b", line)
-        if found:
-            counted = sum(int(number) for number, _ in found)
-    return counted
-
-
-def _failed_by(output: str, name: str) -> bool:
-    """Did the test that CLAIMS this property fail, as opposed to some other test failing?"""
-    tail = output.split("short test summary info")[-1]
-    return any(line.startswith("FAILED") and name in line for line in tail.splitlines())
+    for nodeid in failed:
+        last = nodeid.split("::")[-1]
+        if last.split("[")[0] == name:
+            return True
+    return False
 
 
 def falsify(case: dict, arguments: list[str]) -> dict:
@@ -102,27 +116,31 @@ def falsify(case: dict, arguments: list[str]) -> dict:
             "name": case["name"], "verdict": f"ANCHOR NOT UNIQUE: {found} occurrences",
             "selected": 0, "exit": None, "restored": True,
         }
-    try:
-        path.write_text(text.replace(case["old"], case["new"]))
-        output, code = _run_pytest(case["tests"], arguments)
-    finally:
-        path.write_bytes(original)
+    with TemporaryDirectory() as scratch:
+        report = Path(scratch) / "falsify-report.json"
+        try:
+            path.write_text(text.replace(case["old"], case["new"]))
+            ran = _run_pytest(case["tests"], arguments, report)
+        finally:
+            path.write_bytes(original)
     restored = _digest(path)
-    selected = _selected(output)
-    expected_failed = _failed_by(output, case["expect"])
-    if selected == 0:
+    selected = ran["collected"]
+    if selected is None:
+        verdict = "UNREADABLE: the plugin wrote no report, so this run measured nothing"
+    elif selected == 0:
         verdict = "ASKED NOTHING: no test was selected"
-    elif code == 0:
+    elif ran["exitstatus"] == 0:
         verdict = f"NOTHING NOTICED over {selected} tests, so the harness is the first suspect"
-    elif expected_failed:
+    elif _claimed_by(ran["failed"], case["expect"]):
         verdict = f"REFUSED by {case['expect']}, of {selected} selected"
     else:
-        verdict = f"refused, but NOT by {case['expect']}, of {selected} selected"
+        verdict = (f"refused, but NOT by {case['expect']}, of {selected} selected"
+                   f" (by {', '.join(ran['failed']) or 'nothing named'})")
     return {
         "name": case["name"],
         "verdict": verdict,
         "selected": selected,
-        "exit": code,
+        "exit": ran["exitstatus"],
         "restored": restored == before,
     }
 
