@@ -453,6 +453,100 @@ export function composedWorldReachMm(url, scoresOwnedDistrict, rule = ROUTE_RULE
   return rule.lengthMm + rule.stopMarginMm;
 }
 
+/** The shell attribute the page states its composed world on, as data rather than as a sentence. */
+const WALK_WORLD_ATTRIBUTE = 'data-generated-tile-world';
+
+const READ_WALK_WORLD = `(() => {
+  const shell = document.getElementById('shell');
+  if (shell === null) return null;
+  return shell.getAttribute('${WALK_WORLD_ATTRIBUTE}');
+})()`;
+
+/** The two values the page uses for whether a reach was stated, as a closed list. */
+const WALK_WORLD_REACH = Object.freeze(['stated', 'unstated']);
+
+/**
+ * The page's statement of its composed world, HELD AGAINST WHAT CROSSED THE WIRE.
+ *
+ * The statement and the prose line beside it are both derived from one `world` object by two
+ * mappings, so THEY AGREEING PROVES ONLY THAT NEITHER MAPPING HAS A TYPO. It cannot catch a shared
+ * misunderstanding of what that object holds, because both operands come from one source: the test
+ * that cannot fail. The containers this run bound are a GENUINELY SEPARATE observation of the same
+ * fact, taken from the protocol's own record of what was requested and decoded, so that is what this
+ * compares against.
+ *
+ * Every disagreement refuses. A record whose world binding is wrong is worse than no binding at all,
+ * and `docs/evaluation/` is append only, so a wrong one is permanent.
+ *
+ * MEASURED 2026-09-18: this attribute's populated form had never executed anywhere. The repository
+ * commits exactly ONE container, so no test can reach a composed world, and every attempt to serve a
+ * second tile ends in a correct refusal before a world is built. The only assertions on it are the
+ * empty case. This run is its first execution, which is the reason to check it rather than read it.
+ */
+export function checkedWalkWorld(statement, containers, reachWasStated) {
+  if (statement === null) {
+    throw new Halt(
+      `the page states no ${WALK_WORLD_ATTRIBUTE}, so nothing says which containers were drawn and ` +
+      'which were only stood on',
+    );
+  }
+  let world;
+  try {
+    world = JSON.parse(statement);
+  } catch (error) {
+    throw new Halt(`the page's ${WALK_WORLD_ATTRIBUTE} is not readable as data: ${String(error).slice(0, 200)}`);
+  }
+  if (!WALK_WORLD_REACH.includes(world.reach)) {
+    throw new Halt(
+      `the page states a reach of ${JSON.stringify(world.reach)}, which is not one of ` +
+      `${WALK_WORLD_REACH.join(' or ')}`,
+    );
+  }
+  // TWO SIDES OF ONE FACT, FROM DIFFERENT PLACES. This run knows whether it asked for a world; the
+  // page says whether it was told how far. A world of one tile because nobody stated a reach is a
+  // different fact from a world of one tile because nothing was within reach, and if those two ever
+  // disagree, neither the record's world nor its absences mean what they say.
+  if (world.reach !== (reachWasStated ? 'stated' : 'unstated')) {
+    throw new Halt(
+      `this run ${reachWasStated ? 'stated' : 'did not state'} a reach and the page reports ` +
+      `${world.reach}`,
+    );
+  }
+  const stoodOn = world.stoodOnOnly ?? [];
+  const stated = [world.drawnAndStoodOn?.containerSha256, ...stoodOn.map((one) => one.containerSha256)]
+    .filter((digest) => typeof digest === 'string');
+  const onTheWire = containers.map((container) => container.sha256);
+  const missing = stated.filter((digest) => !onTheWire.includes(digest));
+  const unstated = onTheWire.filter((digest) => !stated.includes(digest));
+  if (missing.length > 0 || unstated.length > 0) {
+    throw new Halt(
+      `the page's world and the containers this run read do not name the same bytes: ` +
+      `${missing.length} stated but never fetched (${missing.map((d) => d.slice(0, 16)).join(', ') || 'none'}), ` +
+      `${unstated.length} fetched but not stated (${unstated.map((d) => d.slice(0, 16)).join(', ') || 'none'})`,
+    );
+  }
+  // The page's own byte figure, against the bodies this run actually decoded for those digests.
+  const stoodOnDigests = stoodOn.map((one) => one.containerSha256);
+  const measuredBytes = containers
+    .filter((container) => stoodOnDigests.includes(container.sha256))
+    .reduce((sum, container) => sum + container.decodedBytes, 0);
+  if (world.transferredBytes !== measuredBytes) {
+    throw new Halt(
+      `the page states ${world.transferredBytes} bytes for the tiles it only stood on and this run ` +
+      `decoded ${measuredBytes} for them`,
+    );
+  }
+  return {
+    reach: world.reach,
+    drawnAndStoodOn: world.drawnAndStoodOn ?? null,
+    stoodOnOnly: stoodOn,
+    statedBytes: world.transferredBytes,
+    measuredBytes,
+    absent: world.absent ?? [],
+    checkedAgainst: 'the containers this run read from the wire',
+  };
+}
+
 function listenerSource(normalized) {
   if (normalized.startsWith('web/packages/') || normalized.startsWith('web/node_modules/')) {
     return 'product';
@@ -1336,6 +1430,14 @@ async function main() {
     const unavailableByReason = scoresOwnedDistrict ? null : await session.evaluate(READ_UNAVAILABLE_SURFACES);
     observed.unavailableSurfacesByReason = unavailableByReason;
     if (!scoresOwnedDistrict) containers = await collectContainers();
+    // WHICH CONTAINERS WERE DRAWN AND WHICH WERE ONLY STOOD ON, bound from the page's own data
+    // attribute and held against the bytes this run read off the wire. The composed world is
+    // walkable past the edge and NOT DRAWN past it, so a record naming four containers without
+    // saying what each was for would be cited for something it never measured.
+    const walkWorld = scoresOwnedDistrict
+      ? null
+      : checkedWalkWorld(await session.evaluate(READ_WALK_WORLD), containers, reachMm !== null);
+    observed.walkWorld = walkWorld;
     if (!scoresOwnedDistrict && tileMetrics === null) {
       await halt('the page mounted no generated tile, so there is nothing of that target to score');
     }
@@ -2226,6 +2328,8 @@ async function main() {
         routeRingsRefused: observed.routeObstacleRingsRefused ?? [],
         groundRefused,
         routeGround: observed.routeGround ?? null,
+        // What each container was FOR, not merely that it was fetched.
+        walkWorld: observed.walkWorld ?? null,
         fieldBoundsCm: artifact?.bounds_cm ?? null,
       }),
       interactions,

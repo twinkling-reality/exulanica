@@ -612,6 +612,105 @@ def test_no_world_is_composed_around_the_committed_fixture(tmp_path):
     assert _reach(tmp_path, "?preview=1&city=abc&tile_x=2&tile_y=0", owned="true")["reach"] is None
 
 
+# -- the page's world, held against what crossed the wire ------------------------------------------
+
+WORLD_DRAWN = "e59f6cf05d0ff4e09c5f06a8b5c90e4c3e4ea2bc4a9fb0ff62d02b491e6be5f8"
+WORLD_STOOD = "8f2188783a8f0347b7d6954e78949ae0086c82b4f8af817d6f8689acac5856d0"
+
+
+def _world(statement: dict | None, containers: list[dict], reach_stated: bool = True) -> str:
+    """A statement and a set of fetched containers, as JavaScript for the checker to read."""
+    return (
+        f"harness.checkedWalkWorld({json.dumps(json.dumps(statement) if statement else None)}, "
+        f"{json.dumps(containers)}, {json.dumps(reach_stated)})"
+    )
+
+
+def _check_world(tmp_path: Path, expression: str) -> dict[str, object]:
+    driver = tmp_path / "world.mjs"
+    driver.write_text(
+        f"const harness = await import({str(HARNESS)!r});\n"
+        f"try {{ console.log(JSON.stringify({{ bound: {expression} }})); }}\n"
+        "catch (error) { console.log(JSON.stringify({ refused: error.message })); }\n"
+    )
+    result = _node(str(driver))
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout.strip().splitlines()[-1])
+
+
+def _agreeing() -> tuple[dict, list[dict]]:
+    """The shape measured from the live page on 2026-09-18, its first populated execution."""
+    statement = {
+        "reach": "stated",
+        "drawnAndStoodOn": {"name": "503afcb6", "containerSha256": WORLD_DRAWN},
+        "stoodOnOnly": [{"tile": "tile (1,0)", "containerSha256": WORLD_STOOD}],
+        "transferredBytes": 12294368,
+        "absent": [{"tileX": 1, "tileY": -1, "reason": "no_row"}],
+    }
+    containers = [
+        {"sha256": WORLD_DRAWN, "decodedBytes": 12682828},
+        {"sha256": WORLD_STOOD, "decodedBytes": 12294368},
+    ]
+    return statement, containers
+
+
+def test_a_world_the_wire_agrees_with_is_bound_with_what_each_container_was_for(tmp_path):
+    """The case this exists to record: four digests, and which of them drew anything."""
+    statement, containers = _agreeing()
+    read = _check_world(tmp_path, _world(statement, containers))
+    assert "refused" not in read, read
+    assert read["bound"]["drawnAndStoodOn"]["containerSha256"] == WORLD_DRAWN
+    assert [one["containerSha256"] for one in read["bound"]["stoodOnOnly"]] == [WORLD_STOOD]
+    assert read["bound"]["measuredBytes"] == read["bound"]["statedBytes"]
+    assert read["bound"]["absent"] == [{"tileX": 1, "tileY": -1, "reason": "no_row"}]
+
+
+def test_a_container_the_page_names_but_nobody_fetched_is_refused(tmp_path):
+    """The page's statement and its prose come from ONE object, so only the wire can refuse this."""
+    statement, containers = _agreeing()
+    statement["stoodOnOnly"].append({"tile": "tile (9,9)", "containerSha256": "de" * 32})
+    read = _check_world(tmp_path, _world(statement, containers))
+    assert "refused" in read, read
+    assert "never fetched" in read["refused"], read
+
+
+def test_a_container_fetched_but_missing_from_the_page_s_world_is_refused(tmp_path):
+    """The other direction, which a check written only one way cannot see."""
+    statement, containers = _agreeing()
+    containers.append({"sha256": "ab" * 32, "decodedBytes": 5})
+    read = _check_world(tmp_path, _world(statement, containers))
+    assert "refused" in read, read
+    assert "not stated" in read["refused"], read
+
+
+def test_a_byte_figure_the_bodies_do_not_support_is_refused(tmp_path):
+    """The page counts what it asked for; this run counts what it decoded. They must agree."""
+    statement, containers = _agreeing()
+    statement["transferredBytes"] = 26406608
+    read = _check_world(tmp_path, _world(statement, containers))
+    assert "refused" in read, read
+    assert "26406608" in read["refused"] and "12294368" in read["refused"], read
+
+
+def test_a_reach_the_run_did_not_ask_for_is_refused(tmp_path):
+    """One tile because nobody stated a reach is not one tile because nothing was within reach."""
+    statement, containers = _agreeing()
+    read = _check_world(tmp_path, _world(statement, containers, reach_stated=False))
+    assert "refused" in read, read
+    assert "did not state" in read["refused"], read
+
+
+def test_a_world_that_is_not_data_is_refused_rather_than_parsed(tmp_path):
+    """An absent attribute and an unreadable one are both refusals, and say which they are."""
+    _, containers = _agreeing()
+    absent = _check_world(tmp_path, f"harness.checkedWalkWorld(null, {json.dumps(containers)}, true)")
+    assert "states no data-generated-tile-world" in absent.get("refused", ""), absent
+    broken = _check_world(
+        tmp_path, f"harness.checkedWalkWorld('not json at all', {json.dumps(containers)}, true)"
+    )
+    assert "not readable as data" in broken.get("refused", ""), broken
+
+
 # -- a hole and a kerb are different sentences -----------------------------------------------------
 
 
