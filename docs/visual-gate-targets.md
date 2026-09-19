@@ -744,6 +744,77 @@ fails; and **`practicalBrowserBudget` is the one I would watch**, because this t
 across the wire and decoded 149.6 MB of texture, where the fixture that passed moved a fraction of
 that. A key that passed on a fixture and fails on a street is the gate working.
 
+## What the first walk of a composed world did, measured
+
+The run at 4b2e02b0, served by `corridor-walk-gate` from this worktree, quiet slot then GPU slot.
+**The gate walked a real street end to end for the first time**, took all three captures, and stopped
+exactly where it was predicted to stop.
+
+**THE BYTES, EXACT.** Four containers, read off the wire and bound by digest:
+
+    503afcb6  e59f6cf05d0ff4e0   12,682,828   drawn and stood on
+    db1de1de  8f2188783a8f0347   12,294,368   tile (1,0), stood on only
+    26e25f5c  acf1474b71855749    2,481,736   tile (0,0), stood on only
+    79fd317d  5b5225f2404fbd1b   11,630,504   tile (3,0), stood on only
+                                 ----------
+                                 39,089,436   predicted 39,089,436
+                  neighbours     26,406,608   the page states 26,406,608
+
+**THE PAGE'S WORLD WAS CHECKED, NOT READ.** The page states its world as data, and its prose line
+beside it says the same thing; BOTH ARE DERIVED FROM ONE OBJECT, so their agreeing would prove only
+that neither mapping has a typo. The record binds the statement only after holding it against the
+containers this run read from the protocol's own log: same digests both ways, in both directions, and
+the page's 26,406,608 equals the bytes this run decoded for exactly those three. That is a genuinely
+separate observation of the same fact. Four squares have no ground at all, each stating its own kind
+of absence, `no_row` for all four: the corridor is a single ROW of tiles, so this is the edge of the
+loaded world and not a defect.
+
+**EIGHT PREDICTIONS HELD AND ONE FAILED.** Due east qualified and THE RULE PREFERRED IT at 270000
+millidegrees. The pre-walk ground check passed on the FIRST candidate where all three were refused
+before, `headingsRefusedForNoGround` is 0, and the walked line's steepest rise is 0.2 mm at 3.15 m,
+so the 192.987 mm kerb was never crossed, as predicted. The walk reached 125.01 m of 125 m. All three
+captures exist. And the authentication condition halted the run with NO KEY MEASURED, which has been
+the standing prediction since before the first corridor run and is the first time anything reached
+it.
+
+**WHAT FAILED: `frontageBothSidesSamples` is 123 of 126 and I predicted 100 to 120.** The reasoning
+was that about 8,400 mm of the 125,000 mm route runs past the frontage into the junction, which would
+be eight or nine samples. Only THREE lack frontage on both sides. **The reasoning was right about the
+street and wrong about the world**: with neighbours composed, the frontage continues past the tile
+edge, so a route running off the end of this street arrives at the start of the next one.
+
+**AND THE NUMBER I SHOULD NOT HAVE CLAIMED AT ALL.** I predicted a second run of the same walk would
+fetch 0 new bytes, because a neighbour already held at its digest costs no request. Every run here
+opens a FRESH BROWSER PROFILE, so nothing is held between runs and this one fetched the same
+39,089,436. That prediction was about a reload inside one session and my runs cannot test it. It is
+untested, not confirmed and not refuted.
+
+**A FINDING THE RUN TURNED UP, which belongs to the rule rather than to this walk.** The field grew
+with composition and the obstacle set did not:
+
+    field radius, one tile      94.847 m        composed   326.337 m
+    routeObstacleRings          311             composed   311, unchanged
+
+The neighbours contribute their navigation envelope and not their records, so the rule now ranks 720
+headings across a field three and a half times wider WHILE SEEING OBSTACLES FROM ONE TILE ONLY. The
+chosen heading reports a clear run of 294,755 mm, which reaches well into tile (3,0), through
+buildings the rule cannot see. **This walk is unaffected**: it ran from x 256,000 to 381,000 and never
+left tile (2,0). But `candidatesQualified` rose from 3 to 68 on a world whose obstacles did not
+change, and some of those 68 are clear only because nothing told the rule otherwise.
+
+**THE ENDPOINT CAPTURE IS NOT JUDGEABLE AND THIS IS SAID BEFORE ANYONE LOOKS AT IT.** The composed
+world is walkable past the edge and NOT DRAWN past it: only the neighbours' navigation envelope is
+loaded, none of their render batch. The endpoint frame stands at x 381,000 on ground that continues
+and sees no street beyond the tile edge. That limit is recorded here, with the frames, rather than in
+anyone's memory of the evening.
+
+**Three transport defects of mine were spent getting here**, and the third is the one worth keeping:
+opening a body stream from a network EVENT is a race against a localhost response that can finish
+inside the round trip. It lost on the smallest container of four, then on a larger one, and the run
+before those had read all four and WAS SIMPLY LUCKY. Pausing the request before it is sent removes
+the race: measured 4 of 4 streams opened, 0 refused. The harness supplies nothing and continues the
+request untouched, so the bytes are still the ones the server sent to the page.
+
 ## The first walk of a composed world, predicted before the server was restarted
 
 The first run against a world of more than one tile, and the first LIVE exercise of that path
