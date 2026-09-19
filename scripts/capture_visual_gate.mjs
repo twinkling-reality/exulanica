@@ -563,7 +563,29 @@ export function checkedWalkWorld(statement, containers, reachWasStated) {
  *   1. at least one `/preview-api/` request, so it IS the preview and not the product shell;
  *   2. every `/api/` response served 200 was under `/api/tiles`, so nothing else was served to it;
  *   3. `/api/graph` was asked and NOT served, so its credential does not carry the graph;
- *   4. an anonymous read is refused, the same evidence `credentialed-api` rests on.
+ *   4. an anonymous read is refused, the same evidence `credentialed-api` rests on;
+ *   5. AT LEAST ONE tile was actually served, which the operator's four did not require.
+ *
+ * The fifth is a NARROWING added after approval and on the orchestrator's authority rather than the
+ * operator's, because it admits strictly less: every run passing five passes the four, so nothing is
+ * newly admitted and the question the operator answered, how wide the gate opens, is untouched.
+ * Without it clause 2 is universally quantified over an empty set and therefore TRUE of a page
+ * served nothing at all, so a run could satisfy a condition NAMED for tiles having been served none.
+ * Not reachable today, because a gate with no street cannot walk, but a condition whose name asserts
+ * what its clauses do not require is a record waiting to say a false thing.
+ *
+ * BOTH TARGETS CARRY THIS CONDITION, matching the structure where both take the same tuple, and THE
+ * OWNED DISTRICT CAN NEVER BE NAMED UNDER IT: it is the product shell, it makes no `/preview-api/`
+ * request, and clause 1 fails. The list does not say so, which is why this does.
+ *
+ * CLAUSE 3'S REFUSAL HALF IS SHADOWED TODAY AND IS KEPT ANYWAY. `credentialDoesNotCarryTheGraph`
+ * asks two things: that the graph was ASKED FOR, which nothing else checks, and that it was NOT
+ * SERVED, which cannot fail here because a served graph is a 200 that is not a tile and clause 2
+ * refuses it first. MEASURED by falsification: deleting the whole of clause 3 was noticed by
+ * nothing until its test was moved onto the asking. It stays because the day clause 2 is loosened to
+ * permit any other endpoint, that half becomes the only thing catching a served graph, and nobody
+ * would notice the transfer. It is therefore exercised at its own level, by a test on the predicate
+ * rather than through the condition, so a check nothing can reach is still a check something asks.
  *
  * CLAUSE 3 RESTS ON THE PAGE'S HABIT. The page asks for the graph because that is what it does, not
  * because anything requires it to; if it stops, the property stays true and the evidence for it
@@ -576,12 +598,17 @@ export function checkedWalkWorld(statement, containers, reachWasStated) {
  * clause 2 and cannot be scored. THE RULE CERTIFIES THAT A RUN WAS CLEAN; IT CANNOT CERTIFY THAT THE
  * CREDENTIAL WAS NARROW.
  */
+export function credentialDoesNotCarryTheGraph(api) {
+  const graph = api.filter((one) => one.path === '/api/graph');
+  return graph.length > 0 && !graph.some((one) => one.status === 200);
+}
+
 export function authenticationConditionOf(paths, anonymousStatus) {
   const preview = paths.filter((one) => one.path.startsWith('/preview-api/'));
   const api = paths.filter((one) => one.path.startsWith('/api/'));
   const served = api.filter((one) => one.status === 200);
-  const graph = api.filter((one) => one.path === '/api/graph');
-  const graphRead = graph.some((one) => one.status === 200);
+  const tilesServed = served.filter((one) => one.path.startsWith('/api/tiles'));
+  const graphRead = api.some((one) => one.path === '/api/graph' && one.status === 200);
   if (preview.length === 0 && graphRead && anonymousStatus === 401) {
     return 'credentialed-api';
   }
@@ -589,8 +616,9 @@ export function authenticationConditionOf(paths, anonymousStatus) {
     return 'vite-preview-api';
   }
   if (preview.length > 0
+    && tilesServed.length > 0
     && served.every((one) => one.path.startsWith('/api/tiles'))
-    && graph.length > 0 && !graphRead
+    && credentialDoesNotCarryTheGraph(api)
     && anonymousStatus === 401) {
     return 'preview-shell-credentialed-tiles';
   }

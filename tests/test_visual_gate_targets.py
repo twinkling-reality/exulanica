@@ -698,6 +698,43 @@ def test_the_corridor_page_as_it_stands_satisfies_the_condition(tmp_path):
     assert _condition(tmp_path, _corridor_traffic(), 401) == "preview-shell-credentialed-tiles"
 
 
+def test_a_page_served_no_tile_at_all_is_refused(tmp_path):
+    """Clause 5, the narrowing, and the vacuity it closes.
+
+    Clause 2 is universally quantified: "every 200 was a tile" is TRUE of a page served nothing. A
+    run could then satisfy a condition NAMED for credentialed tiles having been served none. It is
+    not reachable today, since a gate with no street cannot walk, but a condition whose name asserts
+    what its clauses do not require is a record waiting to say a false thing.
+    """
+    traffic = [one for one in _corridor_traffic() if not one["path"].startswith("/api/tiles")]
+    assert _condition(tmp_path, traffic, 401) is None
+
+
+def _graph_predicate(tmp_path: Path, api: list[dict]) -> object:
+    """Clause 3's own predicate, asked directly rather than through the whole condition."""
+    driver = tmp_path / "graph-predicate.mjs"
+    driver.write_text(
+        f"const harness = await import({str(HARNESS)!r});\n"
+        f"console.log(JSON.stringify({{ held: harness.credentialDoesNotCarryTheGraph({json.dumps(api)}) }}));\n"
+    )
+    result = _node(str(driver))
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout.strip().splitlines()[-1])["held"]
+
+
+def test_the_graph_predicate_refuses_a_served_graph_even_though_nothing_reaches_it(tmp_path):
+    """A redundant check that nothing exercises is a check somebody will believe is working.
+
+    MEASURED: through the whole condition this half CANNOT FAIL, because a served graph is a 200 that
+    is not a tile and clause 2 refuses it first. It is kept because the day clause 2 is loosened to
+    permit another endpoint, this becomes the only thing catching a served graph, and the transfer
+    would happen silently. So it is asked at its own level, where it can still answer.
+    """
+    assert _graph_predicate(tmp_path, [{"path": "/api/graph", "status": 403}]) is True
+    assert _graph_predicate(tmp_path, [{"path": "/api/graph", "status": 200}]) is False
+    assert _graph_predicate(tmp_path, [{"path": "/api/tiles", "status": 200}]) is False
+
+
 def test_a_page_that_used_no_preview_route_is_not_the_preview_shell(tmp_path):
     """Clause 1. Without it the condition would admit the product shell itself."""
     traffic = [one for one in _corridor_traffic() if not one["path"].startswith("/preview-api/")]
