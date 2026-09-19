@@ -572,6 +572,46 @@ def test_the_support_probe_stays_fine_enough_to_see_the_hole_that_misled_a_run(t
     assert read["spacing"] <= read["hole"] / 2, read
 
 
+def _reach(tmp_path: Path, search: str, owned: str = "false") -> object:
+    """What the harness would tell the page to compose, for a URL and a target."""
+    driver = tmp_path / "reach.mjs"
+    driver.write_text(
+        f"const harness = await import({str(HARNESS)!r});\n"
+        "const rule = (await import("
+        f"{str(ROOT / 'web/packages/loom-gate/src/index.ts')!r})).ROUTE_RULE;\n"
+        f"const url = new URL('http://127.0.0.1:1/{search}');\n"
+        f"const reach = harness.composedWorldReachMm(url, {owned});\n"
+        "console.log(JSON.stringify({ reach, lengthMm: rule.lengthMm, stopMarginMm: rule.stopMarginMm }));\n"
+    )
+    result = _node(str(driver))
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout.strip().splitlines()[-1])
+
+
+def test_the_page_is_told_to_compose_the_whole_route_and_its_stopping_margin(tmp_path):
+    """The page must not hold a route length, so the gate sends one, and it must be the WHOLE one.
+
+    The assertion is the RELATIONSHIP and not the number 131000. Writing that literal here would put
+    a second copy of the rule in a test, which could then never refuse a change to the rule. Summing
+    the two fields still refuses the mutation that matters: sending the route length while forgetting
+    the stopping margin, which would compose a world 6 m short of where the walk actually stops.
+    """
+    read = _reach(tmp_path, "?preview=1&city=abc&tile_x=2&tile_y=0")
+    assert read["reach"] == read["lengthMm"] + read["stopMarginMm"]
+    assert read["reach"] != read["lengthMm"], "the stopping margin is part of what must hold ground"
+
+
+def test_no_world_is_composed_around_the_committed_fixture(tmp_path):
+    """A recorded baseline must keep fetching what it fetched.
+
+    The conformance tile is a committed file with no store rows to compose from, and asking for a
+    world around it would change what those runs move over the wire. Two runs that fetched different
+    things are not two measurements of the same thing.
+    """
+    assert _reach(tmp_path, "?preview=1&tile=tile-conformance")["reach"] is None
+    assert _reach(tmp_path, "?preview=1&city=abc&tile_x=2&tile_y=0", owned="true")["reach"] is None
+
+
 # -- a hole and a kerb are different sentences -----------------------------------------------------
 
 

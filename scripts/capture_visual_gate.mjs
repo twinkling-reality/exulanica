@@ -50,6 +50,7 @@ import {
   CAPTURE_LABELS,
   GATE_KEY_SET_VERSION,
   MELBOURNE_ENVELOPE,
+  ROUTE_RULE,
   THRESHOLDS,
   keySet,
   measureScene,
@@ -432,6 +433,25 @@ export const PROBE_SPACING_M = 0.005;
 
 /** The hole that was missed, in metres, kept beside the spacing it is the reason for. */
 export const HOLE_THAT_WAS_MISSED_M = 0.03;
+
+/**
+ * How far the page must compose its world for this run, or null when it must not compose one.
+ *
+ * A tile is 128,000 mm across and the rule asks for its length plus a stopping margin, so no
+ * east-west route inside one tile ever has ground for its whole length. The page fixes that by
+ * fetching neighbours, and IT CANNOT KNOW HOW FAR: a route length belongs to the gate, so a page
+ * holding its own copy would be inventing the gate's number. It comes from the rule's own fields
+ * here rather than being typed into a URL, because a hand written 131000 is a second source for a
+ * number that already exists and drifts the first time either field moves.
+ *
+ * NULL FOR THE COMMITTED FIXTURE, which has no store rows to compose from, and for the owned
+ * district, which is not a tile at all. Asking for a world around the fixture would change what a
+ * RECORDED BASELINE run fetches and make it no longer comparable with the runs before it.
+ */
+export function composedWorldReachMm(url, scoresOwnedDistrict, rule = ROUTE_RULE) {
+  if (scoresOwnedDistrict || url.searchParams.get('city') === null) return null;
+  return rule.lengthMm + rule.stopMarginMm;
+}
 
 function listenerSource(normalized) {
   if (normalized.startsWith('web/packages/') || normalized.startsWith('web/node_modules/')) {
@@ -1161,6 +1181,21 @@ async function main() {
     await session.send('Emulation.setFocusEmulationEnabled', { enabled: true });
 
     const target = new URL(appUrl);
+    // HOW FAR THE PAGE MUST COMPOSE ITS WORLD, stated by the rule that decides what gets walked.
+    //
+    // A tile is 128,000 mm across and this rule asks for 131,000, so no east-west route inside one
+    // tile ever has ground for its whole length: MEASURED 2026-09-18, three qualifying headings all
+    // ran out of support past the tile's own edge. The page composes neighbours to fix that, and it
+    // CANNOT KNOW THIS NUMBER: a route length is the gate's, so the page would be inventing it.
+    // Written here from the rule's own fields rather than typed into a URL, because a hand typed
+    // 131000 is a second source for a number that already exists and would drift the first time
+    // either field moved.
+    //
+    // ONLY FOR A RUN POINTED AT THE STORE. The committed conformance tile has no rows to compose
+    // from, and asking for a world around it would change what a RECORDED BASELINE run fetches,
+    // which would make that run and its predecessors no longer comparable.
+    const reachMm = composedWorldReachMm(target, scoresOwnedDistrict);
+    if (reachMm !== null) target.searchParams.set('walk_reach_mm', String(reachMm));
     target.searchParams.set('validation', '1');
     target.searchParams.set('validation-seconds', String(options.validationSeconds));
     target.searchParams.set('validation-warmup', '2');
