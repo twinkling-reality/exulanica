@@ -968,7 +968,7 @@ def masked_queued(repository, tmp_path, *, masked=(0, 1), heldout_index=0):
     """
     from exulanica.ingest.person_review import review_list
     from exulanica.ingest.privacy import authorize_personal_capture, record_human_screening
-    from exulanica.ingest.training_rights import grant_training_right, rented_host
+    from exulanica.ingest.training_rights import grant_training_right
 
     store = LocalContentAddressedStore(tmp_path / "store")
     pipeline = PhotoIngestPipeline(repository, store, vision=CountingVisionModel())
