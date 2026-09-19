@@ -536,6 +536,28 @@ def test_an_extent_no_level_bound_is_refused_by_name_rather_than_counted(asking)
     assert asking.used("asker") == before
 
 
+def test_an_extent_that_ends_mid_tile_is_refused_before_the_charge(asking):
+    """The likeliest refusal a real caller meets, and it was the one this file did not ask about.
+
+    ``city_extent_x_mm`` is declared [128000, 2048000] and the terrain stage covers a city with
+    whole 128000 mm patches, so of the 1,920,001 values the cascade admits, SIXTEEN are acceptable.
+    A caller picking a round number in metres almost certainly picks one of the other 1,920,000.
+
+    ``city_tiles`` raises that refusal, and it reaches HTTP through this route's coverage rule while
+    it is counting tiles, which is BEFORE the quota is charged. Both halves are asserted: that the
+    refusal arrives naming the parameter and the tile size, and that it cost nothing. Found by
+    reading the route rather than by a failing test, which is why it is here.
+    """
+    before = asking.used("asker")
+    answer = asking.ask("asker", _city({**ONE_TILE, "city_extent_x_mm": 200_000}))
+    assert answer.status_code == 422, answer.text
+    assert answer.json()["code"] == "invalid_parameter"
+    detail = answer.json()["detail"]
+    assert "city_extent_x_mm" in detail and "200000" in detail
+    assert "128000" in detail and "mid-tile" in detail
+    assert asking.used("asker") == before
+
+
 def test_a_grammar_whose_tiles_cannot_be_counted_is_refused(asking):
     """``box`` is registered, generates, and is not a world anybody walks. With no coverage rule
     its tiles cannot be counted, so a request naming it cannot be metered and is refused rather
