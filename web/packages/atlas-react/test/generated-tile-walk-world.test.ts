@@ -21,6 +21,8 @@ import {
   type TileRouteAccess,
 } from '../src/playcanvas/generated-tile/index.js';
 
+/** The conformance fixture's own city, read from its container rather than invented. */
+const FIXTURE_CITY = 'd0219dae956352ef4a56e32030cb6ab1a80bfa5a63fd288e9aacccfb71966a60';
 const TILE_SIZE_MM = 128_000;
 /** loom-gate's own `routeLengthMm` plus `stopMarginMm`. */
 const REACH_MM = 125_000 + 6_000;
@@ -169,7 +171,7 @@ describe('fetching a walk\'s world', () => {
   it('asks the route for each neighbour and reports what crossed the network', async () => {
     const { rows, served } = await corridorOf(asTile);
     const asked: string[] = [];
-    const world = await fetchWalkWorld(access(serving(served, asked)), plan(rows), { digest });
+    const world = await fetchWalkWorld(access(serving(served, asked)), plan(rows), { digest, citySeed: FIXTURE_CITY });
     expect(world.neighbours.map((neighbour) => neighbour.name)).toEqual(['tile (1,0)', 'tile (0,0)', 'tile (3,0)']);
     expect(asked.length).toBe(3);
     expect(world.transferredBytes).toBe(world.neighbours.reduce((total, n) => total + n.bytes.byteLength, 0));
@@ -184,7 +186,7 @@ describe('fetching a walk\'s world', () => {
       containerSha256: row.containerSha256, bytes: served.get(row.bakedTileId)!,
     }]));
     const asked: string[] = [];
-    const world = await fetchWalkWorld(access(serving(served, asked)), plan(rows), { digest, held });
+    const world = await fetchWalkWorld(access(serving(served, asked)), plan(rows), { digest, citySeed: FIXTURE_CITY, held });
     expect(asked).toEqual([]);
     expect(world.transferredBytes).toBe(0);
     expect(world.neighbours.length).toBe(3);
@@ -195,8 +197,17 @@ describe('fetching a walk\'s world', () => {
     // exactly the bytes its row's digest names, and for two of the three rows it is the wrong
     // ground: this is the only check between here and standing on another part of the city.
     const { rows, served } = await corridorOf(() => baked);
-    await expect(fetchWalkWorld(access(serving(served, [])), plan(rows), { digest }))
+    await expect(fetchWalkWorld(access(serving(served, [])), plan(rows), { digest, citySeed: FIXTURE_CITY }))
       .rejects.toThrow(/says it is tile \(0,0\)/);
+  });
+
+  it('refuses a container that belongs to another city, which the coordinates alone do not settle', async () => {
+    // A listing is asked for ONE city, so its rows are that city's by construction. The containers
+    // are not: a row of this city pointing at (3,0) of another agrees about (3,0) and is somebody
+    // else's street, and every other check this fetch makes would pass it.
+    const { rows, served } = await corridorOf(asTile);
+    await expect(fetchWalkWorld(access(serving(served, [])), plan(rows), { digest, citySeed: 'f'.repeat(64) }))
+      .rejects.toThrow(/is listed for city f{64} and the container it served belongs to d0219dae/);
   });
 
   it('stops the walk when a tile the store says it has cannot be served', async () => {
@@ -205,6 +216,6 @@ describe('fetching a walk\'s world', () => {
       JSON.stringify({ code: 'unknown_reference', detail: 'no such key' }),
       { status: 404, headers: { 'Content-Type': 'application/problem+json' } },
     )) as typeof globalThis.fetch;
-    await expect(fetchWalkWorld(access(refusing), plan(rows), { digest })).rejects.toBeInstanceOf(TileRouteRefusal);
+    await expect(fetchWalkWorld(access(refusing), plan(rows), { digest, citySeed: FIXTURE_CITY })).rejects.toBeInstanceOf(TileRouteRefusal);
   });
 });

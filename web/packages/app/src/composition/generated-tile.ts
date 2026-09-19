@@ -331,6 +331,7 @@ export async function prepareBakedTileWalk(env: AppEnvironment, request: BakedTi
     });
     world = await route.fetchWalkWorld(access, plan, {
       digest,
+      citySeed: placement.citySeed,
       held: new Map([...held.values()].map((entry) => [entry.containerSha256, entry])),
     });
     plan.neighbours.forEach((row, at) => {

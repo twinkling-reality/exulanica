@@ -225,7 +225,12 @@ export interface FetchedWalkWorld {
 export async function fetchWalkWorld(
   access: TileRouteAccess,
   plan: WalkWorldPlan,
-  options: { readonly digest: TextureSetDigest; readonly held?: ReadonlyMap<string, HeldTile> },
+  options: {
+    readonly digest: TextureSetDigest;
+    /** The city the walk is in, as the tile being walked states it. A neighbour from another is refused. */
+    readonly citySeed: string;
+    readonly held?: ReadonlyMap<string, HeldTile>;
+  },
 ): Promise<FetchedWalkWorld> {
   const neighbours: FetchedWalkWorld['neighbours'][number][] = [];
   let transferredBytes = 0;
@@ -242,6 +247,15 @@ export async function fetchWalkWorld(
     // in the wrong place. This is the one check that catches that, because every other check the
     // fetch makes is about the bytes being what the row CLAIMS rather than where they belong.
     const placed = tilePlacement(fetched.bytes);
+    // THE CITY TOO, WHICH THE COORDINATES ALONE DO NOT SETTLE. A listing is asked for one city, so
+    // its rows are that city's by construction; the CONTAINERS are not. A row of this city pointing
+    // at (3,0) of another one agrees about (3,0) and is somebody else's street.
+    if (placed.citySeed !== options.citySeed) {
+      throw new TileRouteRefusal(
+        `${tileName(row)} is listed for city ${options.citySeed} and the container it served belongs to ${placed.citySeed}.`,
+        'container_is_another_city',
+      );
+    }
     if (placed.tileX !== row.tileX || placed.tileY !== row.tileY || placed.lod !== row.lod) {
       throw new TileRouteRefusal(
         `The route lists ${row.bakedTileId} as ${tileName(row)} level ${row.lod}, and the container it `
