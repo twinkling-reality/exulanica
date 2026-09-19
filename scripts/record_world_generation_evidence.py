@@ -60,21 +60,60 @@ def git(*arguments: str) -> str:
 
 
 def breaks_from(log: Path) -> list[dict[str, object]]:
-    """The falsification table, parsed from the harness's log rather than restated here."""
+    """The falsification table, parsed from the harness's log rather than restated here.
+
+    ANCHORED ON THE VERDICT LINE, and that is the whole of why this function is not three lines.
+    The first version created a break for every line at column zero that was not in a list of known
+    prefixes, and `uv run` prints "Uninstalled 1 package in 5ms" and "Installed 1 package in 6ms" at
+    column zero before the harness says anything. So it reported TWELVE breaks of which TWO WERE
+    NOTHING NOTICED, naming two lines of package output as unrefused holes in the tests. A false
+    "nothing noticed" in a record is worse than a missing one: it reads as a finding, and the
+    record's own digest control cannot catch it because a wrong value hashed correctly is still
+    wrong.
+
+    So a break exists only where the harness stated a verdict, its label is the last line at column
+    zero before that verdict, and every break must also carry the harness's post-restore `git
+    status`. Anything that does not have all three is a parse this function got wrong, and it says
+    so rather than returning it.
+    """
     rows: list[dict[str, object]] = []
-    current: dict[str, object] | None = None
+    label = None
     for line in log.read_text(encoding="utf-8").splitlines():
-        if line and not line.startswith(" ") and not line.startswith(("tree", "HEAD", "dirty", "every")):
-            current = {"break": line.strip(), "named": []}
-            rows.append(current)
-        elif current is not None and line.strip().startswith(("refused:", "NOTHING NOTICED:")):
-            verdict, _, summary = line.strip().partition(":")
-            current["verdict"] = verdict
-            current["summary"] = summary.strip()
-        elif current is not None and line.strip().startswith(("FAILED", "ERROR")):
-            current["named"].append(line.strip())  # type: ignore[union-attr]
-        elif current is not None and line.strip().startswith("restored, tree now:"):
-            current["tree_after_restore"] = line.split("restored, tree now:")[1].strip()
+        stripped = line.strip()
+        if line and not line.startswith(" "):
+            label = stripped
+            continue
+        verdict = next(
+            (word for word in ("refused:", "NOTHING NOTICED:") if stripped.startswith(word)), None
+        )
+        if verdict is not None:
+            rows.append(
+                {
+                    "break": label,
+                    "verdict": verdict.rstrip(":"),
+                    "summary": stripped[len(verdict) :].strip(),
+                    "named": [],
+                }
+            )
+        elif rows and stripped.startswith(("FAILED", "ERROR")):
+            rows[-1]["named"].append(stripped)  # type: ignore[union-attr]
+        elif rows and stripped.startswith("restored, tree now:"):
+            rows[-1]["tree_after_restore"] = stripped.split("restored, tree now:")[1].strip()
+    restores = sum(
+        1
+        for line in log.read_text(encoding="utf-8").splitlines()
+        if line.strip().startswith("restored, tree now:")
+    )
+    if len(rows) != restores:
+        raise SystemExit(
+            f"{log.name}: parsed {len(rows)} verdicts and {restores} restores. They must agree or "
+            "this table is describing something other than the harness's breaks."
+        )
+    for row in rows:
+        if not row["break"] or "tree_after_restore" not in row or not row["summary"]:
+            raise SystemExit(
+                f"{log.name}: a break parsed without a label, a count or a restore: {row}"
+            )
     return rows
 
 
@@ -125,9 +164,9 @@ def from_bake_log(log: Path) -> dict[str, object]:
         found = re.search(rf"^{field}\s+(.+)$", text, re.MULTILINE)
         if found:
             stated[field] = found.group(1).strip()
-    stated["second_pass_all_identical"] = bool(
-        re.search(r"^second ", text, re.MULTILINE)
-    ) and "not identical" not in text
+    stated["second_pass_all_identical"] = (
+        bool(re.search(r"^second ", text, re.MULTILINE)) and "not identical" not in text
+    )
     return stated
 
 
@@ -203,6 +242,7 @@ def refusals(database: str) -> list[dict[str, object]]:
     )
     rows: list[dict[str, object]] = []
     with TestClient(create_app(services, verify=False)) as client:
+
         def ask(bindings: list[dict[str, object]]) -> dict[str, object]:
             answer = client.post(
                 "/world-generation/worlds",
@@ -212,29 +252,59 @@ def refusals(database: str) -> list[dict[str, object]]:
             return {"status": answer.status_code, "body": answer.json()}
 
         bodies = [
-            ("an unknown parameter name", [{"level": "city", "values": {**WORKING, "blok_length_mm": 140_000}}]),
-            ("a value outside its declared range", [{"level": "city", "values": {**WORKING, "city_extent_x_mm": 40_000_000}}]),
-            ("two bindings at one level", [
-                {"level": "city", "values": dict(WORKING)},
-                {"level": "city", "values": {"block_length_mm": 140_000}},
-            ]),
-            ("a level that does not exist", [
-                {"level": "city", "values": dict(WORKING)},
-                {"level": "attic", "values": {"block_length_mm": 140_000}},
-            ]),
-            ("a parameter set at too fine a level", [
-                {"level": "city", "values": dict(WORKING)},
-                {"level": "face", "values": {"block_length_mm": 140_000}},
-            ]),
-            ("a required parameter nobody set", [
-                {"level": "city", "values": {k: v for k, v in WORKING.items() if k != "driving_side"}}
-            ]),
-            ("an extent no level bound, so no tile count", [
-                {"level": "city", "values": {k: v for k, v in WORKING.items() if not k.startswith("city_extent")}}
-            ]),
-            ("a value inside its declared range that a stage refuses", [
-                {"level": "city", "values": {**WORKING, "block_length_mm": 60_000}}
-            ]),
+            (
+                "an unknown parameter name",
+                [{"level": "city", "values": {**WORKING, "blok_length_mm": 140_000}}],
+            ),
+            (
+                "a value outside its declared range",
+                [{"level": "city", "values": {**WORKING, "city_extent_x_mm": 40_000_000}}],
+            ),
+            (
+                "two bindings at one level",
+                [
+                    {"level": "city", "values": dict(WORKING)},
+                    {"level": "city", "values": {"block_length_mm": 140_000}},
+                ],
+            ),
+            (
+                "a level that does not exist",
+                [
+                    {"level": "city", "values": dict(WORKING)},
+                    {"level": "attic", "values": {"block_length_mm": 140_000}},
+                ],
+            ),
+            (
+                "a parameter set at too fine a level",
+                [
+                    {"level": "city", "values": dict(WORKING)},
+                    {"level": "face", "values": {"block_length_mm": 140_000}},
+                ],
+            ),
+            (
+                "a required parameter nobody set",
+                [
+                    {
+                        "level": "city",
+                        "values": {k: v for k, v in WORKING.items() if k != "driving_side"},
+                    }
+                ],
+            ),
+            (
+                "an extent no level bound, so no tile count",
+                [
+                    {
+                        "level": "city",
+                        "values": {
+                            k: v for k, v in WORKING.items() if not k.startswith("city_extent")
+                        },
+                    }
+                ],
+            ),
+            (
+                "a value inside its declared range that a stage refuses",
+                [{"level": "city", "values": {**WORKING, "block_length_mm": 60_000}}],
+            ),
         ]
         for what, bindings in bodies:
             answer = ask(bindings)
@@ -245,7 +315,11 @@ def refusals(database: str) -> list[dict[str, object]]:
             headers={"Authorization": f"Bearer {token}"},
         )
         rows.append(
-            {"asked": "a grammar that is not registered", "status": unknown.status_code, "body": unknown.json()}
+            {
+                "asked": "a grammar that is not registered",
+                "status": unknown.status_code,
+                "body": unknown.json(),
+            }
         )
     return rows
 
@@ -347,6 +421,55 @@ def tile_key_blindness() -> dict[str, object]:
     }
 
 
+def the_likeliest_refusal() -> dict[str, object]:
+    """How many of the extents the cascade admits can actually be asked for, counted here.
+
+    This is the refusal a real caller meets most often and the one nothing in the route's test file
+    asked about until the route was read back as a reviewer would. It is arithmetic about tile size
+    that no caller could reasonably predict, which is worth handing over as a number rather than as
+    a feeling.
+
+    Counted from the declared range and the tile size, not stated: a figure like this one typed from
+    memory would be the right order of magnitude and wrong, and nothing about it would look wrong.
+    """
+    from exulanica.grammar.grammars.city.descriptor import CITY_SURFACE
+    from exulanica.grammar.grammars.city.generation.terrain import TILE_SIZE_MM
+
+    counted = {}
+    for name in ("city_extent_x_mm", "city_extent_y_mm"):
+        spec = CITY_SURFACE.parameters.get(name)
+        admitted = spec.maximum - spec.minimum + 1
+        acceptable = sum(
+            1 for value in range(spec.minimum, spec.maximum + 1) if value % TILE_SIZE_MM == 0
+        )
+        counted[name] = {
+            "declared_range": [spec.minimum, spec.maximum],
+            "values_the_cascade_admits": admitted,
+            "values_the_terrain_stage_accepts": acceptable,
+            "values_it_refuses": admitted - acceptable,
+        }
+    return {
+        "what": (
+            "An extent inside its declared range that does not end on a tile boundary. The terrain "
+            "stage covers a city with whole patches of the tile size and refuses an extent that ends "
+            "mid-tile, so almost every value the cascade admits is refused a moment later."
+        ),
+        "tile_size_mm": TILE_SIZE_MM,
+        "counted": counted,
+        "where_it_is_refused": (
+            "city_tiles, reached by this route's world coverage rule while it is counting tiles, "
+            "which is BEFORE the quota is charged. So this refusal SPENDS NOTHING, unlike a refusal "
+            "a later stage makes, which spends the whole world. Both are asserted by "
+            "tests/test_world_generation_route.py."
+        ),
+        "how_it_was_found": (
+            "By reading the route back rather than by a failing test. No test in this lane's own file "
+            "asked about it until then, which is why it is recorded as a gap that was closed rather "
+            "than as a feature that was built."
+        ),
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", required=True)
@@ -357,11 +480,40 @@ def main() -> int:
     parser.add_argument("--acceptance-passed", type=int, required=True)
     parser.add_argument("--acceptance-failed", type=int, required=True)
     parser.add_argument("--neighbour-passed", type=int, required=True)
+    parser.add_argument(
+        "--predecessor",
+        help=(
+            "an earlier record this one supersedes. docs/evaluation/ is append-only, so a tree that "
+            "has moved gets a NEW record bound to the one before it rather than an edit."
+        ),
+    )
     arguments = parser.parse_args()
 
     falsification = breaks_from(Path(arguments.falsification))
-    not_caught = [row["break"] for row in falsification if row.get("verdict") != "refused"]
+    not_caught = [row["break"] for row in falsification if row["verdict"] != "refused"]
     specification = json.loads(Path(arguments.specification).read_bytes())
+
+    predecessor = None
+    if arguments.predecessor:
+        # Read the predecessor's digest from ITS OWN BYTES and check the file agrees with itself
+        # before binding to it. A predecessor binding that copied the number out of the file would
+        # bind to what the file claims rather than to what it is.
+        earlier = json.loads((ROOT / arguments.predecessor).read_bytes())
+        recomputed = hashlib.sha256(canonical_json(earlier["record"])).hexdigest()
+        if recomputed != earlier["record_sha256"]:
+            raise SystemExit(
+                f"{arguments.predecessor} does not reproduce its own digest: it says "
+                f"{earlier['record_sha256']} and its bytes say {recomputed}"
+            )
+        predecessor = {
+            "path": arguments.predecessor,
+            "record_sha256": recomputed,
+            "why": (
+                "the same door, recorded before a test was added for the refusal an extent that "
+                "ends mid-tile produces. Its figures are true of the tree it names and this one "
+                "supersedes it rather than correcting it."
+            ),
+        }
 
     record: dict[str, object] = {
         "profile": PROFILE,
@@ -378,6 +530,7 @@ def main() -> int:
             "the feature it exposes."
         ),
         "source_files": [binding(path) for path in SOURCES],
+        **({"predecessor_record": predecessor} if predecessor else {}),
         "acceptance": {
             "selectors": ["tests/test_world_generation_route.py"],
             "passed": arguments.acceptance_passed,
@@ -441,6 +594,7 @@ def main() -> int:
             "states the one it makes.",
         ],
         "why_the_seed_is_derived_and_not_chosen": tile_key_blindness(),
+        "the_likeliest_refusal_a_caller_meets": the_likeliest_refusal(),
         "the_refusals_over_http": {
             "why": (
                 "The cascade refuses an unknown parameter, an unknown level, a second binding at "
