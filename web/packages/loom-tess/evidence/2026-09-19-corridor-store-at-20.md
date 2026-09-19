@@ -302,3 +302,37 @@ same kind of file behind.
   LEAVE STANDING, because nobody investigates a check that says what they expected. Ask what the
   search could not have looked at, and ask whether its subject is the thing being protected: here
   the subject should have been rows and store paths, and it was filenames.
+
+## Re-checked after main moved, because every figure above was taken on a tree main has left behind
+
+Main gained fourteen commits between `bfa398cb`, which this record's figures were measured on, and
+`854fd7f1`. Among them is a rename of a generated world's identity to `world_seed` and a change to
+`exulanica/grammar/grammars/city/generation/tiles.py`, WHICH IS THE FILE THAT WRITES THE TILE
+DOCUMENTS EVERY CONTAINER ABOVE WAS BAKED FROM. A figure measured from a document nobody will
+generate again is true of a tree nobody is standing in.
+
+The change is the positional-stamp fix: `COORDINATE_UNITS[0]`, `OWNERSHIP_RULES[0]` and
+`HALO_RULES[0]` become `WRITTEN_COORDINATE_UNIT`, `ANCHOR_FLOOR_DIVISION` and
+`EXTENT_MEETS_GROWN_SQUARE`, so each closed field is stamped with the value its producer NAMES
+rather than with whatever sits at position zero. Intended to be inert. Measured rather than taken:
+
+    tile     documents at bfa398cb   documents at 854fd7f1
+    (0,0)    8d00b38441ff2e47        8d00b38441ff2e47        identical
+    (1,0)    98d9bc0229d36873        98d9bc0229d36873        identical
+    (2,0)    c6cad9240b124b6a        c6cad9240b124b6a        identical
+    (3,0)    c0e8371b7443910b        c0e8371b7443910b        identical
+    (4,0)    1cf3f797a16ba94f        1cf3f797a16ba94f        identical
+
+**WITH A CONTROL, because five identical digests are exactly what a comparison that cannot fail
+produces.** One byte appended to one of the regenerated documents reads DIFFERENT; removed again, it
+reads identical. So the instrument can disagree and its agreement means something.
+
+The bake's other input has not moved either: `web/packages/loom-tess/src` and `assets/textures` are
+byte for byte unchanged across those fourteen commits. So every container, digest, multiset and byte
+count above is still exactly what a rebake on `854fd7f1` produces, and the rename that prompted this
+check left the tile record's own `city_seed` field alone, for the reason
+`docs/artifacts/world-identity/tile-record-half-is-blocked.md` measures at length.
+
+The tile record's half of that rename is the thing to watch: when it lands it needs city grammar
+version 4, and a version bump alone moves every container digest again and makes everything above
+historical. This record will not say so on its own.
