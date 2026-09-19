@@ -79,7 +79,7 @@ def _run_pytest(tests: list[str], arguments: list[str], report: Path) -> dict:
         env=environment,
     )
     if not report.exists():
-        return {"collected": None, "failed": [], "exitstatus": result.returncode,
+        return {"collected": None, "asked": None, "failed": [], "exitstatus": result.returncode,
                 "unreadable": (result.stdout + result.stderr)[-400:]}
     read = json.loads(report.read_text())
     read["exitstatus"] = result.returncode
@@ -124,22 +124,29 @@ def falsify(case: dict, arguments: list[str]) -> dict:
         finally:
             path.write_bytes(original)
     restored = _digest(path)
-    selected = ran["collected"]
-    if selected is None:
+    asked = ran["asked"]
+    collected = ran["collected"]
+    # Named whenever it is not zero, because a run that collected more than it asked was a run with
+    # something switched off, and that reads as a property being unpinned unless it is said out loud.
+    unanswered = "" if asked is None or collected in (None, asked) else (
+        f" ({collected - asked} of {collected} collected never answered)")
+    if asked is None:
         verdict = "UNREADABLE: the plugin wrote no report, so this run measured nothing"
-    elif selected == 0:
-        verdict = "ASKED NOTHING: no test was selected"
+    elif asked == 0:
+        verdict = ("ASKED NOTHING: no test answered"
+                   + (f", though {collected} were collected and skipped" if collected else ""))
     elif ran["exitstatus"] == 0:
-        verdict = f"NOTHING NOTICED over {selected} tests, so the harness is the first suspect"
+        verdict = f"NOTHING NOTICED over {asked} asked{unanswered}, so the harness is the first suspect"
     elif _claimed_by(ran["failed"], case["expect"]):
-        verdict = f"REFUSED by {case['expect']}, of {selected} selected"
+        verdict = f"REFUSED by {case['expect']}, of {asked} asked{unanswered}"
     else:
-        verdict = (f"refused, but NOT by {case['expect']}, of {selected} selected"
+        verdict = (f"refused, but NOT by {case['expect']}, of {asked} asked{unanswered}"
                    f" (by {', '.join(ran['failed']) or 'nothing named'})")
     return {
         "name": case["name"],
         "verdict": verdict,
-        "selected": selected,
+        "asked": asked,
+        "collected": collected,
         "exit": ran["exitstatus"],
         "restored": restored == before,
     }
