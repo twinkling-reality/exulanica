@@ -23,6 +23,7 @@ import uuid
 
 import psycopg
 import pytest
+from exulanica.canonical import canonical_json, sha256_digest
 from exulanica.errors import PrivacyAdmissionError
 from exulanica.evidence.scene import scene_member_digest
 from exulanica.ingest.pipeline import PhotoIngestPipeline
@@ -47,6 +48,7 @@ from exulanica.ingest.training_rights import (
     withdraw_training_right,
 )
 from exulanica.store.local import LocalContentAddressedStore
+from psycopg.types.json import Jsonb
 
 from conftest import photo_bytes
 from test_personal_model_right import ACCOUNT, PURPOSE, SOMEBODY_ELSE, admit_personal
@@ -406,29 +408,83 @@ def test_a_rented_host_names_its_provider_and_instance():
             rented_host(provider, instance)
 
 
-def test_the_database_refuses_a_loopback_destination_too(repository, store):
-    """Python refuses it, and so does the database, which a caller can reach directly."""
+def _bypass_triggers_and_insert(connection, row, **changes):
+    """Insert a copy of ``row`` with its receipt rebuilt, triggers off, so only CHECKs decide."""
+    values = {**row, "right_id": uuid.uuid4(), **changes}
+    record = {**row["receipt_record"]}
+    for field in ("destination", "purpose"):
+        if field in changes:
+            record[field] = changes[field]
+    values["receipt_record"] = record
+    values["receipt_canonical"] = canonical_json(record)
+    values["receipt_sha256"] = sha256_digest(values["receipt_canonical"])
+    columns = [key for key in values if key not in {"withdrawn_at", "withdrawn_by"}]
+    connection.execute(
+        f"insert into scene_training_right ({','.join(columns)}) "
+        f"values ({','.join(['%s'] * len(columns))})",
+        [Jsonb(values[c]) if c == "receipt_record" else values[c] for c in columns],
+    )
+
+
+def test_the_database_holds_one_spelling_of_each_destination(repository, store):
+    """The destination CHECK itself, with the triggers off in a transaction that never commits.
+
+    IT ASSERTS THE CONSTRAINT'S NAME, and that is the whole point of this version. The first one
+    inserted a hand-made row and asserted only CheckViolation, which the profile CHECK raises
+    first, so it passed whether or not the destination was refused at all. MEASURED: with the
+    loopback alternative added back to the destination CHECK, that weaker test still passed all 21.
+    """
     subject = admit_personal(repository, store, photo_bytes(), "direct.jpg")
-    with (
-        pytest.raises(psycopg.errors.CheckViolation),
-        repository.connection.transaction(),
-    ):
-        repository.connection.execute(
-            "insert into scene_training_right (workspace_id,right_id,capture_id,source_sha256,"
-            "authorization_id,operation,destination,purpose,granted_by,granted_at,valid_until,"
-            "receipt_record,receipt_canonical,receipt_sha256) values "
-            "(%s,%s,%s,%s,%s,'scene_training','http://localhost:8080','x',%s,now(),"
-            "now()+interval '1 hour','{}'::jsonb,'\\x00'::bytea,%s)",
-            (
-                repository.workspace_id,
-                uuid.uuid4(),
-                subject.capture_id,
-                bytes(32),
-                subject.authorization_id,
-                ACCOUNT,
-                bytes(32),
-            ),
-        )
+    connection = repository.connection
+    good = _grant(subject, destination=LOCAL_PROCESS)
+    row = connection.execute(
+        "select * from scene_training_right where right_id=%s", (good.right_id,)
+    ).fetchone()
+    refused = (
+        "http://localhost:8080",
+        "https://localhost",
+        "http://models.example.org",
+        "rented-host:Brev/l40s",
+        "rented-host:brev",
+        "https://models.example.org:443",
+        "local-process ",
+    )
+    with connection.transaction():
+        connection.execute("alter table scene_training_right disable trigger user")
+        for index, destination in enumerate((LOCAL_PROCESS, GPU, "https://models.example.org")):
+            with connection.transaction():
+                _bypass_triggers_and_insert(
+                    connection, row, destination=destination, purpose=f"accepted {index}"
+                )
+        for destination in refused:
+            with (
+                pytest.raises(psycopg.errors.CheckViolation) as violated,
+                connection.transaction(),
+            ):
+                _bypass_triggers_and_insert(connection, row, destination=destination)
+            assert violated.value.diag.constraint_name == "scene_training_right_destination_check"
+        raise psycopg.Rollback()
+    assert len(training_rights_for_capture(repository, subject.capture_id)) == 1
+
+
+def test_a_right_does_not_allow_another_photograph(repository, store):
+    """scene_training_right_allows compares the photograph, and this is what holds THAT line.
+
+    The queue path filters by capture in ``scene_training_right_current`` as well, so removing the
+    term from ``allows`` alone changes nothing any queue test can see. MEASURED: that break passed
+    all 21 tests. This one asks ``allows`` directly, with its own positive control beside it.
+    """
+    subject = admit_personal(repository, store, photo_bytes(), "mine.jpg")
+    other = admit_personal(repository, store, photo_bytes(size=(120, 80)), "theirs.jpg")
+    right = _grant(subject)
+    question = "select scene_training_right_allows(%s,%s,%s,%s,clock_timestamp()) as ok"
+    allows = repository.connection.execute(
+        question, (repository.workspace_id, right.right_id, subject.capture_id, GPU)
+    ).fetchone()["ok"]
+    refuses = repository.connection.execute(
+        question, (repository.workspace_id, right.right_id, other.capture_id, GPU)
+    ).fetchone()["ok"]
+    assert (allows, refuses) == (True, False)
 
 
 # -- what needs no right ---------------------------------------------------------------------------
