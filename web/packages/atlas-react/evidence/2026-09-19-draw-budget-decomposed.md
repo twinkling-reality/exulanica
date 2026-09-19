@@ -143,11 +143,13 @@ Note where that record lives: it is listed in `.git/info/exclude` and exists onl
 file in the main checkout, so no lane worktree has it. A number that gates the project's stop
 condition is justified by a document that is in one tree on one machine.
 
-The only figure this harness has ever produced on the baseline is 29, from
-`docs/evaluation/artifacts/2026-09-15-flatiron-owned-district-baseline/gate-measurements.json`:
-`observation/maxDrawCalls` 29 with `drawnMeshes` 16 and `drawnTriangles` 63,730. Sixteen instances
-and twenty-nine draws is 1.8 draws per instance; the corridor's fifty-six and one hundred and
-seventy-nine is 3.2.
+The only figure this harness has ever produced on the baseline is 29, and it produced it twice: the
+retained run and its repeat both state `observation/maxDrawCalls` 29 with `drawnMeshes` 16 and
+`drawnTriangles` 63,730, in
+`docs/evaluation/artifacts/2026-09-15-flatiron-owned-district-baseline/`. Sixteen instances and
+twenty-nine draws is 1.8 draws per instance against the corridor's 3.2. THAT RATIO IS NOT A
+DECOMPOSITION: the 29 includes whatever else that frame drew, and nobody has ever split it, which is
+what the harness change in this lane exists to stop happening again.
 
 **AND 29 IS NOT REPRODUCIBLE BY A LANE.** Two attempts on this tree, both halted by the product
 rather than by the harness: first `not_authorised: this credential does not hold library.read, which
@@ -248,9 +250,13 @@ walk, same pose, same four containers, at `d1b9fb87` plus that one file:
 
 **THE BUSIEST FRAME OF A 125 METRE WALK IS THE FRAME THE STANDALONE MEASUREMENT FOUND AT THE OPENING
 POSE**, target for target and triangle for triangle. Two instruments written separately, one driving
-its own browser and one inside the gate's, agreeing on every figure. And `routeMaxCounted` agrees
-with `routeMax`, which is the product's own field: the count added here is the same frame's draws
-and not a second opinion about them.
+its own browser and one inside the gate's, agreeing on every figure. THAT IS AN INDEPENDENT
+CONFIRMATION AND NOT A REPEAT: different browser, different process, different code, and a maximum
+taken over 4,986 frames of a walk rather than over one pose.
+
+And `routeMaxCounted` agrees with `routeMax`, which is the product's own field. That agreement is
+what makes this a decomposition rather than a second opinion: without it the per-pass figures would
+be about a frame, and with it they are about THE SAME 179 THE KEY DECIDES ON.
 
 All eight mechanical keys are what the first run measured, key for key, including the two that are
 false. Nothing in this lane moved a key.
@@ -267,3 +273,61 @@ should do, and the fix was to put the grant back to `world.read` and `tiles.mate
 is the same condition as the first. Recorded because a lane widening a grant for an unrelated reason
 is an easy way to make a run incomparable to the one before it, and the only thing that caught it was
 the harness declining.
+
+## The unavailable hatching is in the world, and this lane left it exactly where it was
+
+The rule this lane was given first is that the magenta unavailable hatching is the world drawing
+honestly the surfaces it has no material for, and that a judge must see it. Nothing here touched the
+batching, so nothing could have merged an unavailable surface into a material one, and the scored run
+says the surfaces are there:
+
+    own tile (2,0)   86 surfaces      all for one reason, which the record states in the tile's own
+    tile (1,0)       89               words: "No surface_material record dresses this surface: the
+    tile (0,0)        7                tile states that none exists."
+    tile (3,0)       83
+    the world       265
+
+Each is drawn in that tile's own unavailable-surfaces batch, which is the batch whose key is the
+empty string and which therefore can never merge with a textured one: THE KEY IS THE MATERIAL. Any
+future batching change keeps that property for free, and a test should say so out loud anyway.
+
+## Checkpoint, 2026-09-19 11:30, written because the machine is about to pause mid turn
+
+**WHERE THIS LANE IS.** `lane/draw-budget`, four commits, the last of which this file is part of.
+Local main was `775d44f8` when this was written and this branch is based on `0a415394`. NOT REBASED
+YET. Measured rather than assumed: the four commits main gained touch NO FILE UNDER `web/`, and the
+new `scripts/record_visual_gate_evidence.py` still indexes only `decidingMax` out of the `drawCalls`
+block and spreads the rest, so the harness change in this lane is compatible with it.
+
+**WHAT RAN AND WHAT IT SAID.**
+
+    web `pnpm run check` at 8e8eb38f     typecheck and boundaries PASS; vitest 2,853 passed,
+                                         7 skipped, 3 FAILED, all three TIMEOUTS in
+                                         generated-tile-runtime.test.ts, at load average 82 to 96
+                                         with seven lanes on the machine
+    the same file at 15e8198c            490 passed, 6 skipped, all three of those tests among them,
+                                         at load average 15
+    web typecheck of the gate harness    `tsc -p web/tsconfig.scripts.json` exit 0, which is where
+                                         `scripts/capture_visual_gate.mjs` is actually checked
+
+**THE THREE FAILURES ARE UNEXPLAINED AND THE LANE IS NOT CLAIMING THEY ARE LOAD.** They took 5,863,
+2,763 and 3,051 ms in the clean baseline against timeouts of 30,000 and 5,000 ms, which is consistent
+with a loaded machine and is not evidence. A re-run of that one file in the quiet slot was started
+and STOPPED BEFORE IT TOOK THE SLOT, because holding the machine-wide lock across a pause blocks
+every lane. THE NEXT THING TO DO IS THAT RE-RUN.
+
+**WHAT IS LEFT, IN ORDER.** Re-run `generated-tile-runtime.test.ts` in the quiet slot and settle the
+three timeouts. Rebase onto current main. Re-run the web check on the rebased tree. Run the backend
+suite once through `.exulanica/bin/full-suite`, expecting 6 skips. Send the final report with the
+key redefinition proposal.
+
+**THE STACK THIS LANE BUILT IS STILL UP AND IS LOCAL.** A private PostgreSQL server on port 59783
+migrated through 0082, a private store holding the five corridor tiles at tessellator 20, the API on
+port 8031 and the app dev server on port 5345 with a token granted `world.read` and
+`tiles.materialise` and nothing else. THE GRANT MATTERS: widening it to `library.read` makes the
+corridor run unable to name its authentication condition, which is the halt recorded above.
+
+**NOT IN A FILE ANYWHERE ELSE.** The batching change was NOT built, by the orchestrator's decision on
+this evidence, and the reason is in this record rather than in a commit: merging optimises 44 draws
+of a 179 draw frame against a budget that is not a comparison, and it trades 144,000 rasterised
+triangles for two draw calls at the pose where that trade was measured.
