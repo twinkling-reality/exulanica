@@ -1,0 +1,222 @@
+"""Writes docs/artifacts/world-identity/world-listing-control.log.txt: can a world still be read?
+
+Run from the repository root, naming the listing method to exercise:
+
+    uv run python docs/artifacts/world-identity/world-listing-control.py.txt <method>
+
+It starts a PostgreSQL server of its own through ``scripts/test_postgres.py``, the way the suite
+does, and removes it at exit. It needs no environment and shares nothing with any other run.
+
+THE QUESTION. Renaming `baked_tile.city_seed` to `world_seed` changes how a world is asked for. A
+rename that breaks retrieval does not raise: `where world_seed = %s` against rows that carry the
+identity under another spelling returns NO ROWS, and an empty listing is what a world with no
+tiles looks like. The failure would present as an empty world rather than as an error, which is
+the worst shape available, so it is measured on both sides rather than reasoned about.
+
+HOW THE TWO SIDES ARE COMPARED. This script takes the listing method BY NAME and refuses a name
+the repository does not carry, rather than falling back to whichever exists: a fallback would make
+one run silently measure the other side's method and the comparison would be of one tree twice.
+Run it as `tiles_of_city` on the tree before the rename and as `tiles_of_world` on the tree after,
+and compare the two logs. The operands then come from two trees rather than from one stub used
+twice.
+
+WHAT IS FIXED SO THE TWO RUNS ARE COMPARABLE. Every value below is derived from a written string:
+the keys are uuid5 over a name, the digests are SHA-256 over bytes stated here, and the containers
+are literal. Nothing reads a clock, a random source or the environment, so a difference between
+two logs is a difference in behaviour. The scratch database is created and dropped by the harness
+and its name never reaches this log.
+
+WHAT IT DOES NOT COVER, stated so the next reader does not take it wider. It exercises the listing
+by identity and the read by key. It says nothing about the API route, about the container's own
+tile record, or about any web reader: those are asked elsewhere.
+"""
+
+import contextlib
+import hashlib
+import importlib.util
+import json
+import os
+import subprocess
+import sys
+import tempfile
+import uuid
+from collections.abc import Iterator
+from pathlib import Path
+
+from psycopg.rows import dict_row
+
+ROOT = Path(__file__).resolve().parents[3]
+sys.path.insert(0, str(ROOT / "tests"))
+
+from exulanica.store.namespaces import tile_store  # noqa: E402
+from exulanica.world.baked_tiles import BakedTileRepository  # noqa: E402
+
+
+def _helper() -> object:
+    """``scripts/test_postgres.py``, loaded the way ``tests/conftest.py`` loads it."""
+    name = "exulanica_test_postgres"
+    if name in sys.modules:
+        return sys.modules[name]
+    spec = importlib.util.spec_from_file_location(name, ROOT / "scripts" / "test_postgres.py")
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    spec.loader.exec_module(module)
+    return module
+
+
+@contextlib.contextmanager
+def private_server() -> Iterator[None]:
+    """A PostgreSQL server of this run's own, removed however this run ends."""
+    helper = _helper()
+    server, url = helper.start_test_server("world-listing-control")
+    os.environ["EXULANICA_TEST_DATABASE_URL"] = url
+    try:
+        yield
+    finally:
+        os.environ.pop("EXULANICA_TEST_DATABASE_URL", None)
+        helper.remove_test_server(server)
+
+TARGET = Path(__file__).resolve().parent / "world-listing-control.log.txt"
+EMPTY_EDIT_DELTA = "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945"
+NAMESPACE = uuid.uuid5(uuid.NAMESPACE_URL, "https://exulanica.invalid/world-listing-control")
+
+#: Two worlds, so a listing that answered with every row would be caught rather than flattered.
+FIRST_WORLD = hashlib.sha256(b"the world under test").hexdigest()
+OTHER_WORLD = hashlib.sha256(b"a different world entirely").hexdigest()
+
+#: (world, tile_x, tile_y, lod, how many times it has been baked). More than one bake of one tile
+#: is the case the listing narrows to the current row, so it is in the population rather than
+#: outside it.
+PLAN = (
+    (FIRST_WORLD, 2, 0, 0, 1),
+    (FIRST_WORLD, 3, 0, 0, 2),
+    (FIRST_WORLD, 4, 0, 1, 1),
+    (FIRST_WORLD, 2, 1, 0, 1),
+    (OTHER_WORLD, 2, 0, 0, 1),
+)
+
+
+def key_of(name: str) -> uuid.UUID:
+    return uuid.uuid5(NAMESPACE, name)
+
+
+def tile_of(world: str, tile_x: int, tile_y: int, lod: int) -> dict[str, object]:
+    return {
+        "tile_inputs_digest": hashlib.sha256(
+            f"{world} {tile_x} {tile_y} {lod}".encode()
+        ).hexdigest(),
+        "city_seed": world,
+        "grammar_versions": [
+            {"grammar_id": "city", "grammar_version": 3, "descriptor_sha256": "0" * 64}
+        ],
+        "catalog_digest": hashlib.sha256(b"catalogs").hexdigest(),
+        "edit_delta_digest": EMPTY_EDIT_DELTA,
+        "tile_x": tile_x,
+        "tile_y": tile_y,
+        "lod": lod,
+        "tile_size_mm": 128_000,
+        "halo_radius_mm": 64_000,
+    }
+
+
+def main() -> int:
+    if len(sys.argv) != 2:
+        print(__doc__.splitlines()[2], file=sys.stderr)
+        return 2
+    method_name = sys.argv[1]
+    if not hasattr(BakedTileRepository, method_name):
+        print(
+            f"BakedTileRepository carries no {method_name}. This script names the method it means "
+            "and refuses to fall back, because a fallback would measure one tree twice.",
+            file=sys.stderr,
+        )
+        return 2
+
+    commit = subprocess.run(
+        ["git", "-C", str(ROOT), "rev-parse", "--short", "HEAD"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+    dirty = subprocess.run(
+        ["git", "-C", str(ROOT), "status", "--porcelain"],
+        capture_output=True,
+        text=True,
+        check=True,
+    ).stdout.strip()
+
+    lines = [
+        "# A world read by its identity: the listing before and after the column rename",
+        "",
+        f"listing method  {method_name}",
+        f"commit          {commit}{' (dirty)' if dirty else ''}",
+        "",
+    ]
+
+    from pg_harness import migrated_schema
+
+    with (
+        private_server(),
+        tempfile.TemporaryDirectory() as scratch,
+        migrated_schema() as (_module, admin),
+    ):
+        admin.row_factory = dict_row
+        repository = BakedTileRepository(connection=admin, store=tile_store(Path(scratch)))
+        lister = getattr(repository, method_name)
+        recorded = []
+        for world, tile_x, tile_y, lod, bakes in PLAN:
+            for bake in range(bakes):
+                name = f"{world[:8]} {tile_x} {tile_y} {lod} {bake}"
+                outcome = repository.record(
+                    baked_tile_id=key_of(name),
+                    stage_version=3,
+                    stage_params_sha256=hashlib.sha256(f"params {bake}".encode()).digest(),
+                    tile=tile_of(world, tile_x, tile_y, lod),
+                    document=f"document {name}".encode(),
+                    container=f"container {name}".encode(),
+                    render_batch_sha256=hashlib.sha256(f"render {name}".encode()).digest(),
+                    nav_envelope_sha256=hashlib.sha256(f"nav {name}".encode()).digest(),
+                    receipt={"tessellator": bake, "container": "owd/3"},
+                )
+                recorded.append((name, outcome))
+
+        worlds = len({entry[0] for entry in PLAN})
+        lines.append(f"recorded        {len(recorded)} bakes across {worlds} worlds")
+        for name, outcome in recorded:
+            lines.append(f"  {outcome:<10} {name}")
+        lines.append("")
+
+        for label, world in (("the world under test", FIRST_WORLD), ("another world", OTHER_WORLD)):
+            listed = [tile.document() for tile in lister(world)]
+            lines.append(f"## {label}: {world}")
+            lines.append(f"listed          {len(listed)} tiles")
+            lines.append(json.dumps(listed, indent=2, sort_keys=True))
+            lines.append("")
+
+        narrowed = [tile.document() for tile in lister(FIRST_WORLD, 0)]
+        lines.append("## the world under test, narrowed to level of detail 0")
+        lines.append(f"listed          {len(narrowed)} tiles")
+        lines.append(json.dumps(narrowed, indent=2, sort_keys=True))
+        lines.append("")
+
+        unknown = hashlib.sha256(b"no world was ever baked under this").hexdigest()
+        lines.append("## a world nothing was baked for")
+        lines.append(f"listed          {len(lister(unknown))} tiles")
+        lines.append("")
+
+        # Every bake is still reachable by key, including the ones the listing narrows away.
+        by_key = {
+            name: repository.read(key_of(name)).container_bytes for name, _outcome in recorded
+        }
+        lines.append("## every bake, by key, whether or not the listing names it")
+        lines.append(json.dumps(by_key, indent=2, sort_keys=True))
+        lines.append("")
+
+    TARGET.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    print(f"wrote {TARGET.relative_to(ROOT)}")
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())
