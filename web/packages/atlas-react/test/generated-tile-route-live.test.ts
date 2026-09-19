@@ -9,6 +9,16 @@
  *
  * What it proves is the transport and the checking, not the drawing: a development server may serve
  * a stand-in whose bytes are not a container at all, and this file neither parses nor draws them.
+ * THE ONE EXCEPTION is the walk's-world test below, which must parse, because a composition that is
+ * not parsed is not a composition; it says so where it does it.
+ *
+ * WHAT THE LIVE PATH CAN AND CANNOT SHOW ABOUT THE PLACEMENT CHECKS. Every neighbour fetched here
+ * has its container's own account of which tile and which city it is compared against the row that
+ * named it, so the check RUNS on every live neighbour. A passing run cannot demonstrate it, because
+ * the check's only visible behaviour is a refusal, and a real store row pointing at a real container
+ * in the wrong place is a defect nobody can conjure on demand. The firing case is covered against
+ * fixtures in `generated-tile-walk-world.test.ts`; what this file adds is that the check is exercised
+ * against containers nobody here made.
  */
 
 import { webcrypto } from 'node:crypto';
@@ -140,16 +150,17 @@ describe.runIf(live)('against a running tile route', () => {
       }) as typeof globalThis.fetch,
     };
     const began = Date.now();
-    const world = await fetchWalkWorld(watched, plan, { digest });
+    const world = await fetchWalkWorld(watched, plan, { digest, citySeed: placement.citySeed });
     const tookMs = Date.now() - began;
     expect(world.neighbours.length).toBe(plan.neighbours.length);
     expect(world.transferredBytes).toBe(plan.neighbours.reduce((total, row) => total + row.containerBytes, 0));
-    // Every neighbour named was asked for, once, and the tile already in hand was not asked for again.
-    for (const row of plan.neighbours) {
-      expect(asked.filter((url) => url.includes(row.bakedTileId)).length, `${row.bakedTileId} was asked for once`).toBe(1);
-    }
-    expect(asked.filter((url) => url.includes(wanted!.bakedTileId)).length).toBe(0);
-    expect(asked.length).toBe(plan.neighbours.length);
+    // A SET, NOT A COUNT: two counts that happen to match is the agreement this project keeps being
+    // fooled by, and a set cannot be satisfied by asking for the wrong tiles the right number of
+    // times. THE LISTING AND THE FIRST FETCH ARE OUTSIDE THIS RECORDING, which watches the neighbour
+    // fetch alone, so the set below is exactly what composing the world cost in requests.
+    const requested = asked.map((url) => /\/tiles\/([0-9a-fA-F-]{36})\/bytes/.exec(url)?.[1]).filter((id) => id !== undefined);
+    expect([...requested].sort()).toEqual(plan.neighbours.map((row) => row.bakedTileId).sort());
+    expect(asked.length).toBe(requested.length);
 
     const envelope = (bytes: Uint8Array) =>
       decodeOwd(bytes).projections.find((projection) => projection.header.name === 'nav_envelope')!;
@@ -171,6 +182,24 @@ describe.runIf(live)('against a running tile route', () => {
     const grew = composed.extent.max[0] > alone.extent.max[0] || composed.extent.min[0] < alone.extent.min[0]
       || composed.extent.max[1] > alone.extent.max[1] || composed.extent.min[1] < alone.extent.min[1];
     expect(grew, 'the composed world reaches past the tile it was laid on').toBe(true);
+
+    // ABSENT IS ASSERTED AGAINST THE ROUTE'S OWN LISTING, not logged and not hard-coded: the squares
+    // are the city's fact and a test holding them would hold a copy of the city. What is checkable
+    // is the RELATIONSHIP, and the listing is the separate source it is checked against.
+    const rowAt = (square: { readonly tileX: number; readonly tileY: number }) =>
+      tiles.find((tile) => tile.tileX === square.tileX && tile.tileY === square.tileY && tile.lod === placement.lod);
+    for (const square of world.absent) {
+      const row = rowAt(square);
+      if (square.reason === 'no_row') {
+        expect(row, `(${square.tileX},${square.tileY}) is named no_row and the listing has it`).toBeUndefined();
+      } else {
+        expect(row, `(${square.tileX},${square.tileY}) is named ${square.reason} and the listing has no row`).toBeDefined();
+        expect(row!.state).toBe(square.reason);
+      }
+      // And nothing is both absent and composed.
+      expect(plan.neighbours.some((n) => n.tileX === square.tileX && n.tileY === square.tileY)).toBe(false);
+      expect(square.tileX === placement.tileX && square.tileY === placement.tileY).toBe(false);
+    }
 
     // eslint-disable-next-line no-console
     console.log(JSON.stringify({
