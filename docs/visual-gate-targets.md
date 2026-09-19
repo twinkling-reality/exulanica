@@ -744,6 +744,46 @@ fails; and **`practicalBrowserBudget` is the one I would watch**, because this t
 across the wire and decoded 149.6 MB of texture, where the fixture that passed moved a fraction of
 that. A key that passed on a fixture and fails on a street is the gate working.
 
+## The first walk of a composed world, predicted before the server was restarted
+
+The first run against a world of more than one tile, and the first LIVE exercise of that path
+anywhere: the live route test covers transport for ONE tile and contains no reference to the
+neighbour fetch, so nothing automated has ever asked a real server for a composed world. **A failure
+here is an untested path and not a regression**, and it is written down before the run so that
+distinction is not made afterwards by whoever is disappointed.
+
+**THE BYTES, WHICH ARE THE FIGURE ONLY THIS SEAT CAN TAKE.** The two numbers in circulation are one
+number: 26,406,608 is the neighbours alone and 12,682,828 is the tile the page already fetched today,
+and they sum to exactly the 39,089,436 predicted. I predict the measured total matches that sum, and
+that a second run of the same walk fetches **0 new bytes**, because a neighbour already held at the
+digest its row names costs no request. I have NO prediction for the time; that is the number I said I
+would bring rather than guess at.
+
+**FOUR CONTAINERS, NOT FIVE.** I said five to the orchestrator earlier from my own assumption; the
+page's own statement says four, one drawn and stood on plus three stood on only. **Correcting my own
+number before the run rather than after it.**
+
+**THE WALK.** Due east should qualify again and the rule should prefer it, as it did at 270000
+millidegrees with three qualifying. The pre-walk ground check should now pass on the FIRST candidate,
+where all three were refused before, because the ground no longer stops at x 384,000.
+
+**THEN THE KERB, AND I EXPECT IT NOT TO FIRE.** Tile (2,0) steps 192.987 mm where its terrain meets
+its street, against the 180 mm the walker states it will climb. A walk ALONG the street should never
+cross that join, which is at the street's edge rather than down its middle. If it does fire, the halt
+now says which of the two it is, with the position and the nearest ring beside it.
+
+**AND THE HALT I HAVE PREDICTED THREE TIMES AND NEVER REACHED: the authentication condition.** The
+corridor page is a preview shell fetching a credentialed tile from the product API, satisfying
+neither declared condition. I predict the run WALKS 125 m, TAKES ALL THREE CAPTURES, and then halts
+on "the authentication condition cannot be named" with NO KEY MEASURED. That has been the standing
+prediction since before the first corridor run and this is the first run that can reach it.
+
+**The endpoint capture will exist and must not be judged.** The composed world is walkable past the
+edge and not drawn past it: only the neighbours' nav envelope is loaded, none of their render batch.
+The endpoint frame stands on ground that continues and sees no street beyond the edge. That is stated
+here, before the frame exists, so the limit travels with the evidence rather than with anyone's
+memory of tonight.
+
 ## Making the falsification rule a mechanism, and what it found in the first minute
 
 Two falsifications in one evening ASKED NOTHING and both reported success: one over a fixture whose
