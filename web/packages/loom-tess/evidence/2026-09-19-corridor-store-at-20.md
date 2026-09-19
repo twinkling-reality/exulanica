@@ -275,7 +275,30 @@ planning about 6,700 more entries, and the work it adds at DRAW time is in `atta
 probe never calls. One tile alone loaded in 20,540 ms against 87,744 ms for three, which is the
 verification and not the drawing.
 
-  WHAT THE FRAME COSTS IS A THIRD QUANTITY AND NOBODY HAS MEASURED IT. Bytes fetched, bytes decoded
+  WHAT A FRAME COSTS IS A THIRD QUANTITY AND NOBODY HAS MEASURED IT. Bytes fetched, bytes decoded
   and verified, and triangles submitted per frame are three populations. This section settles the
   first at 102,625,116 for a three tile world, states the second as the thing the wall clock is
   actually reporting, and leaves the third to a run that opens a browser.
+
+## An instrument note, the second of this family on this store in two nights
+
+The record for the tessellator 19 bake ends with one: `find -newermt '-20 minutes'` over that store
+reported ZERO files written moments after writing five, and the zero was nearly believed. Here is
+the same family from the other side, and this time the wrong reading was the reassuring one.
+
+Checking that this lane had not published, the orchestrator reported NO `.owd` WRITTEN SINCE
+MIDNIGHT ANYWHERE OUTSIDE LANE WORKTREES. TEN WERE WRITTEN, 36.6 MB of them, at 00:48, in this
+session's own scratchpad, which is not a lane worktree: the five corridor tiles at tessellator 20,
+baked twice each, which are the containers every figure above is measured from.
+
+THE CONCLUSION WAS RIGHT AND THAT CHECK IS NOT WHAT MADE IT RIGHT. Two other checks were run in the
+same breath and both are sound: the corridor database still carries its rows, and the store
+directory is untouched. Those ask about THE STORE, which is the thing the permission protects. The
+`.owd` search asks about a FILE EXTENSION, and a file extension is not a publish: baking a container
+into a private directory and recording one into a shared store are different acts that leave the
+same kind of file behind.
+
+  A CHECK THAT AGREES WITH THE TRUTH BY A ROUTE THAT COULD NOT HAVE SEEN IT IS THE WORST KIND TO
+  LEAVE STANDING, because nobody investigates a check that says what they expected. Ask what the
+  search could not have looked at, and ask whether its subject is the thing being protected: here
+  the subject should have been rows and store paths, and it was filenames.
