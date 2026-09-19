@@ -154,6 +154,16 @@ describe('decodeOwd', () => {
       (header.grammars as { descriptor_sha256: string }[])[0]!.descriptor_sha256 = other;
       ((header.tile as { fields: { grammar_versions: { descriptor_sha256: string }[] } }).fields.grammar_versions)[0]!.descriptor_sha256 = other;
     }), /pins descriptor .* and this reader holds .*rebake the tile/],
+    // AND THE TILE RECORD IN A HEADER IS READ AGAINST THE TABLE ITS OWN PIN NAMES. A container
+    // baked from a document of a version this reader does not hold has to be refused for the
+    // version it states, not read against whichever table this build happens to list first and
+    // then refused for a field of that other version's shape. Both places the container states the
+    // version move together, which is what a real bake at another version would have written.
+    ['a tile record at a grammar version this tessellator does not read', () => rebuilt(baked.container, (header) => {
+      const next = CITY_V2.grammar_version + 1;
+      (header.grammars as { grammar_version: number }[])[0]!.grammar_version = next;
+      ((header.tile as { fields: { grammar_versions: { grammar_version: number }[] } }).fields.grammar_versions)[0]!.grammar_version = next;
+    }), /pins city version 3, and this tessellator reads \[2\]/],
     ['another profile', () => sameLength('exulanica.owd/v3', 'exulanica.owd/v4'), /profile/],
     ['a truth that is not invented', () => sameLength('"truth":"invented"', '"truth":"recorded"'), /truth/],
     ['a frame its grammar does not state', () => sameLength('"name":"city_local"', '"name":"city_locum"'), /frame is not the frame/],

@@ -57,11 +57,12 @@ import {
   KEY_PATTERN,
   nestedShapeOf,
   recordShapeOf,
-  SEMANTICS_SHAPE,
+  semanticsShapeOf,
   tableFor,
   TEXTURE_SET_ID_PATTERN,
+  TILE_GRAMMAR_ID,
   TILE_RECORD_KIND,
-  TILE_SHAPE,
+  tileShapeOf,
 } from './record-shapes.js';
 import type { FieldShape, GrammarTable, ProjectionName, RecordShape } from './record-shapes.js';
 import { GRAMMAR_TABLES } from './record-shapes.js';
@@ -367,9 +368,9 @@ export function validateRecord(
   return record as unknown as RecordPayload;
 }
 
-/** A grammar entry's declared semantics. */
+/** A grammar entry's declared semantics, against the shape that entry's own table states. */
 export function validateSemantics(table: GrammarTable, value: unknown, where: string): DeclaredSemantics {
-  checkNested(table, SEMANTICS_SHAPE, value, where);
+  checkNested(table, semanticsShapeOf(table), value, where);
   return value as DeclaredSemantics;
 }
 
@@ -433,6 +434,46 @@ export function validateExternal(
 }
 
 /**
+ * The table a tile record is read against, taken from the grammar pins that record itself states.
+ *
+ * THE TABLE CANNOT BE PICKED BEFORE THE RECORD IS READ, because the shape the record is checked
+ * against is the one its own version declares. So the pin is read first and structurally: the
+ * entry of `grammar_versions` naming the grammar that declares the tile record kind. Nothing else
+ * about the record is trusted until its fields have been checked against the table this returns.
+ *
+ * A VERSION NO TABLE STATES IS REFUSED HERE, rather than read against some other version's shape.
+ * That is the whole reason this is not `tables[0]`: while the list holds one table an index is
+ * right by accident, and the day it holds two every document would be checked against whichever
+ * sat first, with every bound value agreeing and nothing saying which version had been read.
+ */
+export function tileTableOf(tables: readonly GrammarTable[], value: unknown, where: string): GrammarTable {
+  const record = objectAt(value, where);
+  const fields = objectAt(record.fields, `${where}.fields`);
+  const at = `${where}.fields.grammar_versions`;
+  const stated: number[] = [];
+  arrayAt(fields.grammar_versions, at).forEach((item, index) => {
+    const pin = objectAt(item, `${at}[${index}]`);
+    if (pin.grammar_id !== TILE_GRAMMAR_ID) return;
+    stated.push(integerAt(pin.grammar_version, `${at}[${index}].grammar_version`));
+  });
+  if (stated.length === 0) {
+    fail(at, `names no pin for ${JSON.stringify(TILE_GRAMMAR_ID)}, whose version states the shape of the tile record itself`);
+  }
+  if (stated.length > 1) {
+    fail(at, `names ${stated.length} pins for ${JSON.stringify(TILE_GRAMMAR_ID)}, and the tile record is written in one version`);
+  }
+  const version = stated[0]!;
+  const table = tables.find(
+    (candidate) => candidate.grammar_id === TILE_GRAMMAR_ID && candidate.grammar_version === version,
+  );
+  if (table === undefined) {
+    const known = tables.filter((candidate) => candidate.grammar_id === TILE_GRAMMAR_ID).map((candidate) => candidate.grammar_version);
+    fail(at, `pins ${TILE_GRAMMAR_ID} version ${version}, and this tessellator reads ${JSON.stringify(known)}`);
+  }
+  return table;
+}
+
+/**
  * Read and validate a tile document from its canonical bytes. Returns the document unchanged in
  * shape, or throws `TileDocumentError` or `CanonicalJsonError` naming the first problem.
  */
@@ -443,8 +484,8 @@ export function readTileDocument(bytes: Uint8Array): TileDocument {
   if (document.profile !== TILE_DOCUMENT_PROFILE) {
     fail('tile document.profile', `is not ${JSON.stringify(TILE_DOCUMENT_PROFILE)}`);
   }
-  const tileTable = GRAMMAR_TABLES[0]!;
-  const tile = validateRecord(tileTable, document.tile, 'tile', TILE_SHAPE);
+  const tileTable = tileTableOf(GRAMMAR_TABLES, document.tile, 'tile');
+  const tile = validateRecord(tileTable, document.tile, 'tile', tileShapeOf(tileTable));
   const pins = tile.fields.grammar_versions as readonly JsonObject[];
   const grammarsIn = arrayAt(document.grammars, 'grammars');
   if (grammarsIn.length !== pins.length) {

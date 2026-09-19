@@ -88,6 +88,7 @@ import {
   statedIdentity,
   tableOf,
   TileDocumentError,
+  tileTableOf,
   validateExternal,
   validateRecord,
   validateSemantics,
@@ -102,7 +103,7 @@ import {
   MATERIAL_RECORD_KIND,
   recordShapeOf,
   tableFor,
-  TILE_SHAPE,
+  tileShapeOf,
 } from './record-shapes.js';
 import type { GrammarFrame, GrammarTable, ProjectionName } from './record-shapes.js';
 import type { Entry, MaterialRef, ProjectionMesh, TessellatedTile, Triple } from './tessellate.js';
@@ -694,7 +695,14 @@ function checkHeader(value: unknown): OwdHeader {
   if (canonicalJson(header.coordinates as CanonicalValue) !== canonicalJson(COORDINATES)) {
     fail('coordinates is not the statement this version writes');
   }
-  withRefusal(() => validateRecord(GRAMMAR_TABLES[0]!, header.tile, 'tile', TILE_SHAPE));
+  // The table this record is read against comes from the record's own pin, not from the first
+  // table this tessellator happens to hold: a container baked from a document of another grammar
+  // version must be refused for the version it states, not for a field the first table's shape
+  // does not know about.
+  withRefusal(() => {
+    const table = tileTableOf(GRAMMAR_TABLES, header.tile, 'tile');
+    validateRecord(table, header.tile, 'tile', tileShapeOf(table));
+  });
   hexAt(header.tile_inputs_digest, 'tile_inputs_digest');
 
   const pins = (header.tile as RecordPayload).fields.grammar_versions as readonly JsonObject[];

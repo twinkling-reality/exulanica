@@ -8,7 +8,7 @@
 export { BAKE_PARAMETERS, bakeTile, documentOf, verifyOwd } from './bake.js';
 export type { Bake, Sha256Hex } from './bake.js';
 export { CanonicalJsonError, canonicalBytes, canonicalJson } from './canonical-json.js';
-export { MEMBERSHIPS, readTileDocument, TILE_DOCUMENT_PROFILE, TileDocumentError } from './document.js';
+export { MEMBERSHIPS, readTileDocument, TILE_DOCUMENT_PROFILE, TileDocumentError, tileTableOf } from './document.js';
 export type { DeclaredSemantics, ExternalReference, GrammarEntry, Membership, RecordPayload, TileDocument } from './document.js';
 export {
   MATERIALISED_LOD,
@@ -49,8 +49,9 @@ export {
   MATERIAL_RECORD_KIND,
   PROJECTIONS,
   ShapeTableError,
+  TILE_GRAMMAR_ID,
   TILE_RECORD_KIND,
-  TILE_SHAPE,
+  tileShapeOf,
 } from './record-shapes.js';
 export type {
   FieldShape,

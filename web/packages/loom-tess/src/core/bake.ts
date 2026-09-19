@@ -12,8 +12,8 @@ import { readTileDocument, TILE_DOCUMENT_PROFILE, TileDocumentError } from './do
 import { MATERIALISED_LOD, MATERIALISED_PROJECTIONS, TESSELLATOR_SOURCE_VERSION } from './expand.js';
 import { COORDINATE_UNIT, decodeOwd, encodeOwd, OWD_CONTAINER, OwdError } from './owd.js';
 import type { DecodedOwd, OwdHeader, OwdRecord } from './owd.js';
-import { GRAMMAR_TABLES, TILE_SHAPE } from './record-shapes.js';
-import type { ProjectionName } from './record-shapes.js';
+import { GRAMMAR_TABLES, tileShapeOf } from './record-shapes.js';
+import type { GrammarTable, ProjectionName } from './record-shapes.js';
 import { digestEntries, documentRecords, recordBytes, tessellate } from './tessellate.js';
 import type { TessellatedTile } from './tessellate.js';
 import { TRIANGLE_DIGEST_PROFILE, trianglePreimage } from './triangle-digest.js';
@@ -30,22 +30,44 @@ export interface Bake {
   readonly tessellation: TessellatedTile;
 }
 
-function boundOf(name: string): number {
-  const field = TILE_SHAPE.fields.find((candidate) => candidate.name === name);
-  if (field === undefined) throw new RangeError(`the tile record has no ${name}`);
-  if (field.kind !== 'integer') throw new RangeError(`the tile record's ${name} is not an integer`);
-  if (field.minimum === undefined) throw new RangeError(`the tile record's ${name} is not fixed`);
-  if (field.minimum !== field.maximum) throw new RangeError(`the tile record's ${name} is not fixed`);
-  return field.minimum;
+/**
+ * A tile record field's fixed bound, which is one number for the bake stage however many grammar
+ * versions state it. Every version this tessellator reads must fix it to the same value: a tile
+ * size or halo radius is a parameter of the bake, and two versions disagreeing about one would
+ * make this parameter a statement about whichever table was read first.
+ */
+export function boundOf(tables: readonly GrammarTable[], name: string): number {
+  const bounds: number[] = [];
+  for (const table of tables) {
+    const field = tileShapeOf(table).fields.find((candidate) => candidate.name === name);
+    if (field === undefined) throw new RangeError(`the tile record of ${table.grammar_id} ${table.grammar_version} has no ${name}`);
+    if (field.kind !== 'integer') throw new RangeError(`the tile record's ${name} is not an integer`);
+    if (field.minimum === undefined) throw new RangeError(`the tile record's ${name} is not fixed`);
+    if (field.minimum !== field.maximum) throw new RangeError(`the tile record's ${name} is not fixed`);
+    if (!bounds.includes(field.minimum)) bounds.push(field.minimum);
+  }
+  if (bounds.length !== 1) throw new RangeError(`the grammars this tessellator reads fix ${name} at ${JSON.stringify(bounds)}, and a bake states one`);
+  return bounds[0]!;
 }
 
-/** Every record kind of every grammar version this tessellator reads, with its version. */
-function recordShapeVersions(): { [kind: string]: number } {
+/**
+ * Every record kind of every grammar version this tessellator reads, with its version.
+ *
+ * ONE VERSION PER KIND, AND A SECOND ONE IS REFUSED RATHER THAN OVERWRITTEN. This map keyed by
+ * kind cannot say that a kind is read at two versions, so the day two tables declare one kind
+ * differently it stops being able to state what it names, and a silent last-one-wins would put
+ * whichever table sat last into a bake parameter that every tile's key is built from.
+ */
+export function recordShapeVersions(tables: readonly GrammarTable[]): { [kind: string]: number } {
   const versions: { [kind: string]: number } = {};
-  for (const table of GRAMMAR_TABLES) {
+  for (const table of tables) {
     for (const shape of table.shapes.records) {
       if (shape.kind === undefined) throw new RangeError(`${shape.shape} is a record with no kind`);
       if (shape.version === undefined) throw new RangeError(`${shape.shape} is a record with no version`);
+      const already = versions[shape.kind];
+      if (already !== undefined && already !== shape.version) {
+        throw new RangeError(`${shape.kind} is read at versions ${already} and ${shape.version}, and this states one version a kind`);
+      }
       versions[shape.kind] = shape.version;
     }
   }
@@ -65,9 +87,9 @@ export const BAKE_PARAMETERS = {
   coordinate_unit: COORDINATE_UNIT,
   projections: [...MATERIALISED_PROJECTIONS],
   lod: MATERIALISED_LOD,
-  tile_size_mm: boundOf('tile_size_mm'),
-  halo_radius_mm: boundOf('halo_radius_mm'),
-  record_shapes: recordShapeVersions(),
+  tile_size_mm: boundOf(GRAMMAR_TABLES, 'tile_size_mm'),
+  halo_radius_mm: boundOf(GRAMMAR_TABLES, 'halo_radius_mm'),
+  record_shapes: recordShapeVersions(GRAMMAR_TABLES),
 } as const;
 
 /** Bake one tile document. Same bytes in, same bytes out, on any host that hashes correctly. */
