@@ -46,13 +46,17 @@ describe('pictures of a published set', () => {
    * bytes is synthetic; only their pairing is.
    */
   it('refuses a container that is not the one its entry pins', () => {
-    const [first, second] = [...manifest.values()];
-    const bytes = readPublished(`blobs/${second!.contentSha256}.ltex`);
+    // Two published sets, whichever two: taken by position but never trusted by position, so a
+    // catalog that grew or shrank fails here by name rather than pairing a set with itself.
+    const published = [...manifest.values()];
+    expect(published.length).toBeGreaterThan(1);
+    const [first, second] = published as [ManifestEntryRead, ManifestEntryRead];
+    expect(second.contentSha256).not.toBe(first.contentSha256);
+    const bytes = readPublished(`blobs/${second.contentSha256}.ltex`);
     // The control: those same bytes under their OWN entry are drawn without complaint, so the
     // refusal below is about the pairing and not about the bytes or about this fixture.
-    expect(() => publishedLook(bytes, second!, 1)).not.toThrow();
-    expect(second!.contentSha256).not.toBe(first!.contentSha256);
-    expect(() => publishedLook(bytes, first!, 1)).toThrow();
+    expect(() => publishedLook(bytes, second, 1)).not.toThrow();
+    expect(() => publishedLook(bytes, first, 1)).toThrow();
   });
 
   it('cover every profile and class pair the manifest publishes', () => {
