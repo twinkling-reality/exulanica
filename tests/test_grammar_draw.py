@@ -56,6 +56,7 @@ from exulanica.grammar.errors import (
 )
 from exulanica.grammar.grammars import builtin_registry
 from exulanica.grammar.grammars.city import CITY_STAGES
+from exulanica.grammar.grammars.city.descriptor import CITY_GRAMMAR_ID, CITY_GRAMMAR_VERSION
 from exulanica.grammar.grammars.city.facade import FACADE_RECORD_FIELDS, FacadeRecord
 from exulanica.grammar.grammars.city.material import require_texture_set
 from exulanica.grammar.grammars.city.tile import tile_inputs_digest
@@ -612,13 +613,19 @@ def test_the_city_declares_the_eleven_stages_in_order_each_versioned():
     )
 
 
-def test_only_city_version_2_is_registered():
+def test_only_the_current_city_version_is_registered():
+    """One city version is REGISTERED, the one this code describes, whatever versions it READS.
+
+    The registry is what a generator runs; the tessellator reads a superseded version too
+    (ADR-0024), and these are different questions. Named for the version rather than naming the
+    number, so it does not go stale at the next bump.
+    """
     keys = [(key.grammar_id, key.grammar_version) for key in builtin_registry().registered_keys()]
-    assert keys == [("box", 1), ("city", 2)]
+    assert keys == [("box", 1), ("city", CITY_GRAMMAR_VERSION)]
 
 
 def test_a_city_stage_with_a_generator_emits_records_and_every_other_says_it_has_none():
-    city = builtin_registry().get("city", 2)
+    city = builtin_registry().get(CITY_GRAMMAR_ID, CITY_GRAMMAR_VERSION)
     generation = generate(city, seed=SEED, subject_identity=IDENTITY, bindings=_CITY_BINDINGS)
     assert [emission.stage_id for emission in generation.emissions] == list(_CITY_STAGE_IDS)
     for stage, emission in zip(CITY_STAGES, generation.emissions, strict=True):
@@ -644,7 +651,11 @@ def test_a_city_stage_with_a_generator_emits_records_and_every_other_says_it_has
 
 def test_a_city_is_refused_when_nothing_states_the_side_of_the_road():
     with pytest.raises(InvalidParameterError):
-        generate(builtin_registry().get("city", 2), seed=SEED, subject_identity=IDENTITY)
+        generate(
+            builtin_registry().get(CITY_GRAMMAR_ID, CITY_GRAMMAR_VERSION),
+            seed=SEED,
+            subject_identity=IDENTITY,
+        )
 
 
 def test_every_city_stage_has_a_validator_for_a_fixture():

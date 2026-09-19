@@ -14,7 +14,9 @@ was never questioned, and neither can a rule.
 Recorded in `docs/adr/0024-declared-coordinate-quantum.md`.
 
 The quantum is one millimetre, declared in the container header and refused on mismatch by
-`checkHeader`. A tile document does not yet declare its unit, which ADR-0024 decides it must.
+`checkHeader`, and stated by a tile document in its tile record, closed to that one value by the
+grammar. A document written before the field existed is read at millimetres because the version it
+pins fixes the unit, never because a reader supplied one; a version no table states is refused.
 
 **Forcing condition:** a generated dimension whose millimetre rounding changes what a reader sees or
 measures. The lettering rule measures rounding as safe above about 100 mm. The first candidate below
