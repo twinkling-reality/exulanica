@@ -186,6 +186,34 @@ def test_the_harness_and_the_record_declare_the_same_targets_both_ways():
         assert entry["requiredParameters"] == target.required_parameters
 
 
+def _harness_conditions() -> set[str]:
+    """Every authentication condition the harness can actually name, read out of the harness."""
+    source = HARNESS.read_text()
+    found = set(re.findall(r"authenticationCondition = '([a-z-]+)'", source))
+    # Assert the parse found something before comparing it: an empty parse agrees with an empty
+    # expectation and this test would assert nothing at all. That is the fault this file has a rule
+    # about, and the targets parse above guards itself the same way.
+    assert len(found) >= 2, f"parsed {len(found)} conditions out of the harness"
+    return found
+
+
+def test_the_harness_and_the_record_name_the_same_conditions_both_ways():
+    """The list is described as closed, and until this nothing made it closed.
+
+    MEASURED 2026-09-18: appending a third member to ``AUTHENTICATION_CONDITIONS`` was noticed by
+    NOTHING over 230 tests across all three gate test files. The neighbouring test asserts a SUBSET
+    and says so in its own docstring, so a list that grows passes it. A record naming an unlisted
+    condition IS refused when it is verified, so the runtime check is real; what was missing was
+    anything that noticed the list itself growing.
+
+    Both directions, because each is a different broken thing. A condition the record may state and
+    the harness can never assign is one nothing can ever be scored under. A condition the harness can
+    assign and the record does not list would halt a COMPLETED run at verification, after the walk,
+    the captures and the keys, which is the most expensive moment to find out.
+    """
+    assert _harness_conditions() == set(AUTHENTICATION_CONDITIONS)
+
+
 def test_every_declared_title_is_one_the_product_states():
     """The titles the harness will compare against exist in the product's own source.
 
