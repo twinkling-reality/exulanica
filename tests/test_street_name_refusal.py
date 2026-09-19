@@ -64,10 +64,11 @@ def _catalogs_with_fewer_street_names(tmp_path: Path, keep: int) -> Path:
 def test_the_narrowest_reach_lays_at_least_as_many_streets_as_the_widest():
     """The two reaches are the ends of a range, and which end is which is load-bearing.
 
-    The coverage check above asks the vocabulary to name the MOST streets a shape can lay, so it
-    uses the narrowest reach; `street_name_shortfall` may refuse only what no shape could name,
-    so it uses the widest. If those were the other way round the check would under-ask and the
-    predicate would refuse cities that build.
+    ``test_the_vocabulary_covers_every_street_the_declared_space_can_ask_for`` asks the vocabulary
+    to name the MOST streets a shape can lay, so it uses the narrowest reach;
+    `street_name_shortfall` may refuse only what no shape could name, so it uses the widest. If
+    those were the other way round the check would under-ask and the predicate would refuse
+    cities that build.
     """
     narrow = generation_streets.narrowest_reach("local_street")
     wide = generation_streets.widest_reach("local_street")
@@ -84,19 +85,29 @@ def test_more_room_between_streets_never_lays_more_of_them():
     `street_name_shortfall` tells a caller with a derived value to pass the declared MAXIMUM,
     because that is the best case. That is only true if the count falls as the spacing grows, so
     it is measured over the declared range rather than argued.
+
+    EACH IS SWEPT SEPARATELY OVER ITS OWN DECLARED RANGE, holding the other at its minimum. The
+    advice is about either parameter alone, and sweeping the two together would test a third
+    thing while also taking `block_depth_mm` past the 200000 it declares.
     """
     parameters = {spec.name: spec for spec in CITY_SURFACE.parameters.parameters}
     span = parameters["city_extent_x_mm"].maximum
     reach = generation_streets.widest_reach("local_street")
-    lengths = range(
-        parameters["block_length_mm"].minimum, parameters["block_length_mm"].maximum + 1, 10_000
-    )
-    counts = [
-        sum(generation_streets.street_name_demand(span, span, length, length, reach).values())
-        for length in lengths
-    ]
-    assert counts == sorted(counts, reverse=True), counts
-    assert counts[0] > counts[-1], "the range does not move the count, so this proves nothing"
+    for swept, held in (
+        ("block_length_mm", "block_depth_mm"),
+        ("block_depth_mm", "block_length_mm"),
+    ):
+        fixed = parameters[held].minimum
+        counts = []
+        for value in range(parameters[swept].minimum, parameters[swept].maximum + 1, 10_000):
+            length, depth = (value, fixed) if swept == "block_length_mm" else (fixed, value)
+            counts.append(
+                sum(
+                    generation_streets.street_name_demand(span, span, length, depth, reach).values()
+                )
+            )
+        assert counts == sorted(counts, reverse=True), (swept, counts)
+        assert counts[0] > counts[-1], f"{swept} does not move the count, so this proves nothing"
 
 
 def test_the_predicate_answers_none_for_a_city_that_generates():

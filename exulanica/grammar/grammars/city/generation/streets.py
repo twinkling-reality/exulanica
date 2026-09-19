@@ -298,8 +298,10 @@ def _shortfall(
     high street and makes every other street local, so the larger subsets are a property of this
     function rather than of any world it can be handed. They are here because the demand is
     public and a caller passes its own, and because a version that lays an avenue would reach
-    them with nothing to say so. `tests/test_street_name_vocabulary.py` puts the question to the
-    function directly for that reason.
+    them with nothing to say so. The test
+    ``test_one_name_serving_two_hierarchies_is_spent_on_whichever_draws_it`` puts the question to
+    this function directly for that reason, named rather than located because a test moves
+    between files and its name does not.
     """
     names = street_names_by_hierarchy()
     vocabulary = catalog("street-name")
