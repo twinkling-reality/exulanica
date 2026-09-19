@@ -1,0 +1,55 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "commit_the_guard_was_read_from": "775d44f80b00e7250bca80292c762d516c0431de",
+    "condition": "A GUARD THAT RESOLVES A DOCUMENTATION PATH ON DISK MEASURES THE CHECKOUT AND NOT THE COMMIT. Two checkouts of one commit gave two different answers, and the difference was decided by files that are not in the commit.",
+    "date": "2026-09-19",
+    "per_checkout": {
+      "a worktree holding only what the commit holds": {
+        "distinct_documentation_paths_named": 772,
+        "head": "775d44f80b00e7250bca80292c762d516c0431de",
+        "markdown_documents_under_docs_in_the_tree": 110,
+        "markdown_documents_under_docs_on_disk": 110,
+        "unresolved_asking_the_disk": 38,
+        "unresolved_asking_the_tree": 38
+      },
+      "a worktree of the same commit carrying the operator's untracked documents too": {
+        "distinct_documentation_paths_named": 772,
+        "head": "775d44f80b00e7250bca80292c762d516c0431de",
+        "markdown_documents_under_docs_in_the_tree": 110,
+        "markdown_documents_under_docs_on_disk": 232,
+        "unresolved_asking_the_disk": 2,
+        "unresolved_asking_the_tree": 38
+      },
+      "the operator's own checkout, whose head is read here rather than assumed": {
+        "distinct_documentation_paths_named": 772,
+        "head": "775d44f80b00e7250bca80292c762d516c0431de",
+        "markdown_documents_under_docs_in_the_tree": 110,
+        "markdown_documents_under_docs_on_disk": 232,
+        "unresolved_asking_the_disk": 2,
+        "unresolved_asking_the_tree": 38
+      }
+    },
+    "what_changed": "Every rule in tests/test_documentation_links.py now resolves against git ls-files, and reads its corpus from there too, so the documents a rule checks and the paths it accepts come from the same place. The paths the repository names and does not hold are enumerated with a reason each, in two lists whose failures give opposite instructions: one is a document nobody wrote, the other a document deliberately withheld. scripts/generate_docs_index.py reads the same source for the same reason, and the catalog it renders is byte for byte the file already committed.",
+    "what_the_answer_depends_on": "All three hold the same commit, so their tracked files are identical and only their working directories differ, by the operator's own uncommitted documents. Each head is read here rather than assumed, because the operator's checkout gained eight commits while this was being measured and an earlier draft of this record compared two different commits without saying so. A figure attached to no commit has nothing to contradict it.",
+    "what_the_unresolved_paths_turned_out_to_be": {
+      "held_out_by_a_rule_in_the_tracked_gitignore": 18,
+      "held_out_only_by_the_operator_s_own_exclude_file": 18,
+      "how_they_were_classified": "each path was put to git twice, once for whether the tree holds it and once for which ignore rule excludes it, and the ignore rule was accepted as an explanation only where the file stating it is itself tracked",
+      "named_and_absent_everywhere": 12,
+      "note": "Not a mixture. Every path that the disk question could not resolve in a worktree and the tracked-tree question could is a file that exists and is deliberately not committed, so the pointer is dead for every reader who is not the operator, and none of them is link rot.",
+      "of_those_never_a_document_at_all": 6,
+      "renamed_or_mistyped": 0,
+      "tracked_but_resolved_wrongly": 0
+    },
+    "what_the_wrong_answer_cost": "The failure could be repaired in no checkout, so every lane running the full suite had to learn that one failure in this file is expected. On the day this was fixed the file gained two genuinely broken references, from a commit merged about an hour earlier, and they were found by this lane rebasing rather than by anybody reading the suite. Both name a path a test builds inside its own sandbox, so they are listed with that reason rather than repaired.",
+    "what_this_record_does_not_claim": [
+      "It does not claim the guard now finds more link rot. It finds the same rot and gives one answer for it instead of two.",
+      "It does not claim the repository should publish the documents it withholds. That is a decision for whoever withheld them; the record only states that the repository names them and a reader cannot follow them.",
+      "It does not measure the other suites that read the same untracked documents. Three of them do, and they were observed failing or skipping in a worktree for this reason, but nothing here was changed in them and no claim is made about what fixing them would cost."
+    ],
+    "what_was_measured": "tests/test_documentation_links.py as it stood at the commit above was loaded from that commit's own blob and run against three checkouts, asking both the question it asked, which is whether the path exists on disk, and the question a documentation link actually makes, which is whether the path is in the tree. Each checkout states its own head below, and the comparison that carries the finding is between the first two, which are the same commit and differ only in what is on the disk beside it.",
+    "where_the_rule_lives": "tests/test_documentation_links.py"
+  },
+  "record_sha256": "bd15328068ed24de881ab9701316bf31af460769c0eb27e67b512168781a5c8a"
+}

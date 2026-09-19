@@ -5,6 +5,15 @@ capability guides, and decision records so the catalog cannot drift from those
 families. Evaluation artifacts, briefs, records, and patches stay in the tree
 for digest and link tests; they are not a reading list.
 
+A catalog of a published repository lists what the repository holds, so the
+documents come from `git ls-files` and not from walking `docs/`. Walking the
+directory catalogued whatever happened to be on that disk, which meant the
+operator's own uncommitted working documents: MEASURED 2026-09-19 at 15e8198c,
+`docs/` held 232 markdown files in the main checkout and 110 in a worktree of
+the same commit. The catalog agreed only because ROOT_CATALOG_EXCLUDE named
+twelve of the uncommitted ones by hand, and the thirteenth would have broken
+the test in one checkout and not the other.
+
     uv run python scripts/generate_docs_index.py          # rewrite docs/all-documents.md
     uv run python scripts/generate_docs_index.py --check   # exit 1 if it is out of date
 """
@@ -13,6 +22,7 @@ from __future__ import annotations
 
 import argparse
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -25,7 +35,9 @@ SECTIONS: tuple[tuple[str, str, str], ...] = (
     ("adr", "Decision records", "Numbered, and the number is the identifier. Never renumbered."),
 )
 
-#: Dated logs, tickets, and run narratives. They remain in the tree; they are not the catalog.
+#: Dated logs, tickets, and run narratives, plus the two files that are not entries in their own
+#: catalog. Most of these are gitignored and so are already outside the tree this reads; they stay
+#: named here because that is a decision about the reading list and not about what git holds.
 ROOT_CATALOG_EXCLUDE = frozenset({
     "README.md",
     TARGET.name,
@@ -69,16 +81,27 @@ def summarise(path: Path) -> str:
     return (text[:137] + "...") if len(text) > 140 else text
 
 
-def documents(directory: str) -> list[Path]:
-    base = ROOT / "docs" / directory if directory else ROOT / "docs"
-    if not base.is_dir():
-        return []
-    if directory:
-        return sorted(p for p in base.rglob("*") if p.suffix in {".md", ".patch"} and p.is_file())
+def tracked_documents() -> list[str]:
+    """Every documentation file the repository holds, repo relative and sorted."""
+    listed = subprocess.run(
+        ["git", "ls-files", "-z", "--", "docs"], cwd=ROOT, check=True, capture_output=True
+    ).stdout.decode()
     return sorted(
-        p for p in base.glob("*")
-        if p.is_file() and p.suffix in {".md", ".patch"} and p.name not in ROOT_CATALOG_EXCLUDE
+        rel for rel in filter(None, listed.split("\0")) if rel.endswith((".md", ".patch"))
     )
+
+
+def documents(directory: str) -> list[Path]:
+    prefix = f"docs/{directory}/" if directory else "docs/"
+    found = []
+    for rel in tracked_documents():
+        if not rel.startswith(prefix):
+            continue
+        tail = rel[len(prefix):]
+        if not directory and ("/" in tail or tail in ROOT_CATALOG_EXCLUDE):
+            continue
+        found.append(ROOT / rel)
+    return found
 
 
 def render() -> str:
@@ -105,11 +128,11 @@ def render() -> str:
             label = path.stem if path.suffix == ".md" else path.name
             lines.append(f"- [{label}]({rel}) : {summarise(path)}")
         lines.append("")
+    filed = known | {"evaluation", "briefs", "records", "patches", "artifacts"}
     stray = [
-        p.relative_to(ROOT / "docs").as_posix()
-        for p in (ROOT / "docs").rglob("*.md")
-        if p.parent != ROOT / "docs"
-        and p.parts[len(ROOT.parts) + 1] not in known | {"evaluation", "briefs", "records", "patches", "artifacts"}
+        rel[len("docs/"):]
+        for rel in tracked_documents()
+        if rel.endswith(".md") and "/" in rel[len("docs/"):] and rel.split("/")[1] not in filed
     ]
     if stray:
         lines += ["## Filed nowhere the catalog knows about", "",
