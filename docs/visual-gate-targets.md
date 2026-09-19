@@ -744,6 +744,60 @@ fails; and **`practicalBrowserBudget` is the one I would watch**, because this t
 across the wire and decoded 149.6 MB of texture, where the fixture that passed moved a fraction of
 that. A key that passed on a fixture and fails on a street is the gate working.
 
+## A third authentication condition, proposed and not implemented
+
+**Nothing below is in the code.** The list and the harness's rule are untouched pending review, and
+the credential question underneath it is an operator decision rather than a lane one.
+
+**THE HALT THIS IS ABOUT**, which was predicted before the first corridor run and reached for the
+first time on the composed walk, after the walk and all three captures and before any key:
+
+    the authentication condition cannot be named: preview requests 6, graph read false,
+    anonymous status 401
+
+**THE RULE, WRITTEN OUT.** A run satisfies `preview-shell-credentialed-tiles` when ALL of:
+
+1. it made at least one `/preview-api/` request, so it IS a preview shell;
+2. every `/api/` response it was served with status 200 is under `/api/tiles`, so nothing outside
+   tiles was served to it;
+3. it asked `/api/graph` and was NOT served it, so the credential it holds does not carry the graph;
+4. an anonymous read of the API is refused, which is the same evidence `credentialed-api` rests on.
+
+**MEASURED, AND THE MEASUREMENT CHANGED THE RULE.** I drafted clause 3 as "it never reads the graph"
+and then looked:
+
+    GET /api/graph                403 Forbidden
+    GET /api/tiles?city_seed=...  200
+    GET /api/tiles/{id}/bytes     200, four times
+    anonymous read of the API     401
+
+**The page DOES ask for the graph and is refused.** Written from the draft, the condition would never
+have matched the page it was written for and the run would have halted again. And the pair is better
+evidence than the absence would have been: 401 to a caller with no credential and 403 to this
+caller's credential means the API distinguishes NO CREDENTIAL from A CREDENTIAL THAT DOES NOT CARRY
+THIS, which is the property an authentication condition exists to assert.
+
+**WHY NEITHER EXISTING CONDITION CAN BE WIDENED TO COVER IT.**
+
+- `credentialed-api` requires NO preview requests at all. That is what makes it mean "this is the
+  product shell". This page made six.
+- `vite-preview-api` requires NO `/api/` requests at all. That is what makes it mean "this page never
+  touched the product API". Melbourne's retained record was scored under it, so loosening it would
+  change what a retained record asserts, retroactively, about a run nobody can re-run.
+
+**IT COSTS NO NEW RECORD SHAPE.** Every fact the rule needs is already written: the record's
+`authentication` block carries the condition, the anonymous status, the API responses by route and
+status, and the preview requests. A reader can check the condition was named on evidence today.
+
+**AND THE GAP THAT IS NOT ABOUT CREDENTIALS AT ALL**, closed at 582eb60b before any of this is
+decided. `AUTHENTICATION_CONDITIONS` is described as a closed list, and it was closed by prose only:
+appending a third member was noticed by NOTHING over 230 tests across all three gate test files. The
+neighbouring test asserts a SUBSET and admits it in its own docstring. A record naming an unlisted
+condition IS refused when it is verified, so the runtime check was real; what was missing was
+anything that noticed the LIST growing. The harness's condition names are now held against the
+record's list both ways, and the exact break that nothing noticed is refused by the test that claims
+it, of 231 asked.
+
 ## What the first walk of a composed world did, measured
 
 The run at 4b2e02b0, served by `corridor-walk-gate` from this worktree, quiet slot then GPU slot.
