@@ -996,7 +996,8 @@ def test_a_world_the_wire_agrees_with_is_bound_with_what_each_container_was_for(
     assert "refused" not in read, read
     assert read["bound"]["opensOn"]["containerSha256"] == WORLD_DRAWN
     assert [one["containerSha256"] for one in read["bound"]["drawn"]] == [WORLD_DRAWN]
-    assert [one["containerSha256"] for one in read["bound"]["stoodOn"]] == [WORLD_DRAWN, WORLD_STOOD]
+    stood = [one["containerSha256"] for one in read["bound"]["stoodOn"]]
+    assert stood == [WORLD_DRAWN, WORLD_STOOD]
     assert read["bound"]["measuredBytes"] == read["bound"]["statedBytes"]
     assert read["bound"]["absent"] == [{"tileX": 1, "tileY": -1, "reason": "no_row"}]
 
