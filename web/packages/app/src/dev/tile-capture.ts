@@ -20,16 +20,62 @@
 
 import type { LoadedGeneratedTile } from '@exulanica/atlas-react/generated-tile';
 
+import { credentials, developmentToken } from '../config.js';
+
+/**
+ * The ONE path the probe below asks about, as a constant and never an argument.
+ *
+ * A hook that takes a path is an authenticated request proxy reachable from page context. A hook
+ * that probes one path is a probe: it answers exactly one question and can answer no other.
+ */
+const PROBE_PATH = '/graph';
+
 declare global {
   interface Window {
     __exulanicaTileCapture?: () => unknown;
     __exulanicaTileRouteObstructions?: () => unknown;
     __exulanicaTileUnavailableSurfaces?: () => unknown;
+    __exulanicaProbeProductApi?: () => Promise<unknown>;
   }
+}
+
+/**
+ * Ask the product API for one path WITH THIS PAGE'S OWN CREDENTIAL, and hand back the status alone.
+ *
+ * WHY THIS EXISTS, and it will not be obvious later: the visual gate records how a page proved who
+ * it was, and one clause of the condition this preview is scored under is that the product API was
+ * asked for something outside tiles AND REFUSED IT. The page asks for the graph only in some states,
+ * and not in the clean profile a gate run launches, so the evidence was absent exactly when it was
+ * needed.
+ *
+ * NOTHING REACHABLE FROM PAGE CONTEXT COULD ASK THIS QUESTION UNTIL THIS HOOK EXISTED. MEASURED
+ * 2026-09-19 from inside the page: a bare `fetch('/api/graph')` answers 401, and so does a bare
+ * fetch of `/api/tiles`, THE SAME ROUTE THIS PAGE WAS SERVED 200 ON IN THAT RUN. The credential is
+ * attached by the application's own request path and nothing ambient carries it, so a bare fetch
+ * answers a DIFFERENT QUESTION THAT LOOKS IDENTICAL: "asked and not served" is literally true of a
+ * 401, and a gate reading it would have scored a run on evidence about an anonymous request.
+ *
+ * WHAT IT RETURNS AND WHAT IT CANNOT. The status and the path, and nothing else: no body, no
+ * headers, and never the token. GET only, one constant path, no argument of any kind. It cannot be
+ * asked about another endpoint, so it is not a general capability wearing a narrow name.
+ */
+async function exposeProductApiProbe(): Promise<void> {
+  window.__exulanicaProbeProductApi = async () => {
+    const token = developmentToken();
+    if (token === null) {
+      return { path: `/api${PROBE_PATH}`, status: null, asked: false };
+    }
+    const response = await fetch(`${credentials(token).baseUrl}${PROBE_PATH}`, {
+      method: 'GET',
+      headers: { authorization: `Bearer ${token}` },
+    });
+    return { path: `/api${PROBE_PATH}`, status: response.status, asked: true };
+  };
 }
 
 export async function exposeTileCapture(preview: boolean, tile: LoadedGeneratedTile): Promise<void> {
   if (!import.meta.env.DEV || !preview) return;
+  await exposeProductApiProbe();
   const { beginTileCapture } = await import('@exulanica/atlas-react/generated-tile');
   window.__exulanicaTileCapture = beginTileCapture;
   // BOTH HALVES, because the runtime separates them: the rings it carries, and the regions it refused

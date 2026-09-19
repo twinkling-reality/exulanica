@@ -2373,6 +2373,45 @@ async function main() {
       `${a.target}|${a.type}|${a.source}|${a.line}`.localeCompare(`${b.target}|${b.type}|${b.source}|${b.line}`));
 
 
+    // ASK THE PRODUCT API ONE QUESTION, THROUGH THE PAGE, BEFORE READING THE TRAFFIC.
+    //
+    // One clause of the preview shell's condition is that the API was asked for something outside
+    // tiles and REFUSED it, which is what distinguishes a credential that does not carry the graph
+    // from a page that simply never asked. MEASURED 2026-09-19: the page asks only in some states
+    // and NOT in the clean profile a run launches, so the evidence was absent exactly when needed.
+    //
+    // THE GATE CAUSES THE QUESTION AND THE SERVER DECIDES THE ANSWER, which is the whole difference
+    // between probing and manufacturing: this cannot make the server return anything. The request
+    // goes out through the page's own credential path, so it lands in the page's traffic like any
+    // other and the condition below reads it there.
+    //
+    // A 401 MEANS THE PROBE WENT OUT WITHOUT THE CREDENTIAL, which is a fault in the probe and not
+    // in the page, and it is refused as such: "asked and not served" is literally true of a 401, so
+    // a probe that quietly went anonymous would satisfy the clause while proving nothing about the
+    // page's authority. That is the failure this whole mechanism exists to avoid, and it was the
+    // DEFAULT outcome of a bare fetch rather than an edge case.
+    let probe = null;
+    if (!scoresOwnedDistrict) {
+      probe = await session.evaluate(
+        '(async () => (await window.__exulanicaProbeProductApi?.()) ?? null)()',
+      );
+      if (probe === null) {
+        await halt(
+          'the page states no product API probe, so nothing can ask whether its credential is ' +
+          'refused outside tiles; the run cannot say how the page proved who it was',
+        );
+      }
+      if (probe.asked !== true) {
+        await halt(`the page holds no credential to probe ${probe.path} with, so it asked nothing`);
+      }
+      if (probe.status === 401) {
+        await halt(
+          `the probe of ${probe.path} was answered 401, so IT WENT OUT WITHOUT THE PAGE'S ` +
+          'CREDENTIAL: that measures an anonymous request, which is a fault in this probe rather ' +
+          'than in the page, and it would satisfy the clause while proving nothing',
+        );
+      }
+    }
     const requests = [...network.values()];
     const pathOf = (entry) => {
       try {
@@ -2407,6 +2446,11 @@ async function main() {
       anonymousGraphReadStatus: anonymousStatus,
       apiResponses,
       previewApiRequests: previewApi,
+      // WHO ASKED. The graph request in the traffic above is the GATE'S, made through the page so it
+      // carries the page's credential, not something the page did of its own accord. A reader a year
+      // from now must not conclude the page asks for the graph by itself, because in a clean profile
+      // it does not.
+      gateInitiatedProbe: probe === null ? null : { ...probe, gateInitiated: true },
     };
     if (authenticationCondition === null) {
       await halt(`the authentication condition cannot be named: preview requests ${previewApi.length}, graph read ${graphRead}, anonymous status ${anonymousStatus}`);
