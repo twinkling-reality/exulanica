@@ -125,7 +125,9 @@ def migrated_schema() -> Iterator[tuple]:
                 "not. The epistemic guard tests cannot run, and they are not optional here."
             )
         pytest.skip(f"set {env_name('TEST_DATABASE_URL')} to a scratch PostgreSQL database")
-    psycopg = pytest.importorskip("psycopg")
+    psycopg = pytest.importorskip(
+        "psycopg", reason="psycopg is a required dependency; run `uv sync`"
+    )
     if "test" not in url.rsplit("/", 1)[-1]:
         pytest.skip("refusing a database whose name does not contain 'test'")
 

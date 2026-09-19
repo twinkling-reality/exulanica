@@ -24,10 +24,15 @@ Each feature's documentation covers its capabilities, implementation status, and
 Requires Python 3.11, [uv](https://docs.astral.sh/uv/), Node.js 22 or newer, and pnpm 10.7.1.
 
 ```bash
-uv sync
+uv sync --extra reconstruction --extra segmentation --extra pose --extra server
 cp .env.example .env
 uv run pytest
 ```
+
+The four extras are the optional stacks the suite exercises: `reconstruction` (torch, numpy,
+OpenCV and MoGe depth), `segmentation` (SAM 2 and the detectors), `pose` (pycolmap) and `server`
+(uvicorn). A plain `uv sync` also gives a suite that runs; the tests belonging to a stack you did
+not install skip, and each says which extra it wants.
 
 The tests do not call external model services. Database-backed tests require PostgreSQL;
 see [development setup](docs/development-setup.md) for configuration and additional checks.

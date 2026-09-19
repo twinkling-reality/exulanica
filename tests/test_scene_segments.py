@@ -43,7 +43,9 @@ from test_scene_reconstruction_pipeline import (
 )
 from tests_support_api import EVERY_PERMISSION
 
-np = pytest.importorskip("numpy")
+np = pytest.importorskip(
+    "numpy", reason="numpy is absent; install it with `uv sync --extra reconstruction`"
+)
 
 PARAMS = STAGES["scene_segments"].params
 ACTOR = uuid.UUID("a244f9d0-9bd9-5f55-a133-2712cd05d720")
@@ -78,7 +80,9 @@ def _view(position, *, size=(1000, 800), focal=700.0):
 
 def test_the_exposed_projector_gives_arrays_the_values_it_gives_floats():
     """One projector: the lift's array call and the check's scalar call agree bit for bit."""
-    pytest.importorskip("scipy")
+    pytest.importorskip(
+        "scipy", reason="scipy is absent; install it with `uv sync --extra reconstruction`"
+    )
     view = _view((3.0, -1.0, -5.0))
     points = np.random.default_rng(7).uniform(-1, 1, (50, 3))
     camera = camera_point(view, (points[:, 0], points[:, 1], points[:, 2]))
@@ -286,7 +290,9 @@ def test_the_lift_refuses_a_pose_receipt_that_is_not_the_one_its_placement_is_bo
 
 
 def test_an_object_every_view_outlines_is_one_segment_and_the_wall_behind_it_is_not():
-    pytest.importorskip("scipy")
+    pytest.importorskip(
+        "scipy", reason="scipy is absent; install it with `uv sync --extra reconstruction`"
+    )
     views = _views()
     rng = np.random.default_rng(1)
     wall = np.stack(
@@ -314,7 +320,9 @@ def test_one_view_is_a_projection_and_not_a_vote():
     """Isolated from the majority rule: the other four views have a wall in front of the cube in
     their own maps, so the one view that outlines it is the only view that saw it, one of one. The
     minimum vote count is then the only thing that can refuse it, and it must."""
-    pytest.importorskip("scipy")
+    pytest.importorskip(
+        "scipy", reason="scipy is absent; install it with `uv sync --extra reconstruction`"
+    )
     views = _views()
     names = list(views)
     regions = [_region(names[0], _outline_of(views[names[0]], _corners((0, 0, 0))))]
@@ -325,7 +333,9 @@ def test_one_view_is_a_projection_and_not_a_vote():
 
 
 def test_two_objects_that_do_not_touch_are_two_segments_of_one_label():
-    pytest.importorskip("scipy")
+    pytest.importorskip(
+        "scipy", reason="scipy is absent; install it with `uv sync --extra reconstruction`"
+    )
     views = _views()
     left, right = (-1.5, 0.0, 0.0), (1.5, 0.0, 0.0)
     regions = [
@@ -342,7 +352,9 @@ def test_two_objects_that_do_not_touch_are_two_segments_of_one_label():
 
 
 def test_a_reviewed_person_takes_a_sample_an_object_ties_for():
-    pytest.importorskip("scipy")
+    pytest.importorskip(
+        "scipy", reason="scipy is absent; install it with `uv sync --extra reconstruction`"
+    )
     views = _views()
     regions = []
     for name, view in views.items():
@@ -359,7 +371,9 @@ def test_a_view_whose_own_map_puts_a_surface_in_front_does_not_count_as_seeing()
     """The depth test, isolated. Two views outline the cube and three do not. With no depth
     buffers the three count as seeing it, two of five is a minority, and nothing is lifted. Give
     the three a wall in front of the cube in their own maps and they did not see it: two of two."""
-    pytest.importorskip("scipy")
+    pytest.importorskip(
+        "scipy", reason="scipy is absent; install it with `uv sync --extra reconstruction`"
+    )
     views = _views()
     names = list(views)
     regions = [_region(name, _outline_of(views[name], _corners((0, 0, 0)))) for name in names[:2]]

@@ -455,8 +455,12 @@ def test_unsupported_runner_revision_is_a_tool_blocker(run):
 
 @_isolated_torch
 def test_actual_cpu_checkpoint_passes_existing_complete_state_validator(run):
-    torch = pytest.importorskip("torch")
-    pytest.importorskip("numpy")
+    torch = pytest.importorskip(
+        "torch", reason="torch is absent; install it with `uv sync --extra reconstruction`"
+    )
+    pytest.importorskip(
+        "numpy", reason="numpy is absent; install it with `uv sync --extra reconstruction`"
+    )
     from exulanica.reconstruction.gsplat_runner import save_checkpoint
 
     parameters = torch.nn.ParameterDict({"means": torch.nn.Parameter(torch.tensor([0.2]))})

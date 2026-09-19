@@ -227,7 +227,10 @@ def test_a_licence_that_drifted_from_the_manifest_refuses_to_load(tmp_path, monk
     readme = tmp_path / "README.md"
     readme.write_text("---\nlicense: cc-by-nc-4.0\n---\n", encoding="utf-8")
     monkeypatch.setattr("huggingface_hub.hf_hub_download", lambda *a, **k: str(readme))
-    pytest.importorskip("huggingface_hub")
+    pytest.importorskip(
+        "huggingface_hub",
+        reason="huggingface_hub is absent; install it with `uv sync --extra segmentation`",
+    )
     pin = LocalModelPin("test/model", "a" * 40, "apache-2.0")
     with pytest.raises(SegmenterUnavailable, match=r"cc-by-nc-4\.0"):
         segmentation_stage.verify_frontmatter_licence(pin)
@@ -311,8 +314,13 @@ def test_a_forward_pass_that_mps_refuses_moves_to_the_cpu_once():
 
 
 def test_a_mask_becomes_the_largest_contour_in_ppm():
-    np = pytest.importorskip("numpy")
-    pytest.importorskip("cv2")
+    np = pytest.importorskip(
+        "numpy", reason="numpy is absent; install it with `uv sync --extra segmentation`"
+    )
+    pytest.importorskip(
+        "cv2",
+        reason="OpenCV is absent; install it with `uv sync --extra segmentation`",
+    )
     policy = segmentation_stage.OutlinePolicy(
         simplify_millionths_of_diagonal=1_500, max_vertices=64
     )
@@ -670,7 +678,9 @@ def test_the_pinned_checkpoints_load_with_their_frontmatter_licences():
 @_isolated_torch
 def test_sam_masks_a_drawn_disk_from_a_box():
     local_segmenter = _local_segmenter()
-    np = pytest.importorskip("numpy")
+    np = pytest.importorskip(
+        "numpy", reason="numpy is absent; install it with `uv sync --extra segmentation`"
+    )
     image, box = _disk_photograph()
     policy = segmentation_stage._policies(STAGES["segmentation"].params)[1]
     [mask] = local_segmenter.segment(image, [box], policy)
