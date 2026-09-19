@@ -26,6 +26,7 @@
  */
 
 import { readFileSync } from 'node:fs';
+import { request as httpRequest } from 'node:http';
 import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { webcrypto } from 'node:crypto';
@@ -39,6 +40,44 @@ const token = process.env['EXULANICA_TILE_TOKEN'];
 const citySeed = process.env['EXULANICA_TILE_CITY'];
 const live = baseUrl !== undefined && token !== undefined && citySeed !== undefined;
 const TEXTURES = resolve('../assets/textures');
+
+/**
+ * ONE REQUEST THROUGH NODE'S OWN HTTP CLIENT, because the page's fetch will not make it.
+ *
+ * happy-dom enforces the same-origin policy on its `fetch`, and this test deliberately talks to a
+ * server on another origin: the page derives its base URL from `window.location`, which a test
+ * process does not share with a route. Going under the window rather than relaxing its policy keeps
+ * the relaxation out of every other test in this file's environment.
+ */
+async function overTheWire(url: string, init?: RequestInit): Promise<Response> {
+  const target = new URL(url);
+  const headers: Record<string, string> = {};
+  if (init?.headers !== undefined) new Headers(init.headers).forEach((value, key) => { headers[key] = value; });
+  return new Promise<Response>((resolve, reject) => {
+    const call = httpRequest({
+      hostname: target.hostname,
+      port: target.port,
+      path: `${target.pathname}${target.search}`,
+      method: init?.method ?? 'GET',
+      headers,
+    }, (response) => {
+      const chunks: Buffer[] = [];
+      response.on('data', (chunk: Buffer) => chunks.push(chunk));
+      response.on('error', reject);
+      response.on('end', () => {
+        const body = Buffer.concat(chunks);
+        const carried: [string, string][] = Object.entries(response.headers)
+          .map(([name, value]) => [name, Array.isArray(value) ? value.join(', ') : String(value ?? '')]);
+        resolve(new Response(new Uint8Array(body).buffer as ArrayBuffer, {
+          status: response.statusCode ?? 0,
+          headers: carried,
+        }));
+      });
+    });
+    call.on('error', reject);
+    call.end();
+  });
+}
 
 /** A file the development page asks for by URL, read from the repository instead. */
 function fileFor(url: string): Uint8Array | null {
@@ -62,15 +101,18 @@ describe.runIf(live)('the page against a running tile route', { timeout: 120_000
   beforeEach(() => {
     asked = [];
     vi.stubEnv('VITE_EXULANICA_TOKEN', token ?? '');
-    const real = globalThis.fetch.bind(globalThis);
     vi.stubGlobal('fetch', async (input: RequestInfo | URL, init?: RequestInit): Promise<Response> => {
       const url = String(input);
       const api = `${window.location.origin}/api`;
       if (url.startsWith(api)) {
         const onward = `${baseUrl ?? ''}${url.slice(api.length)}`;
+        // RECORDED HERE AND ONLY HERE, so `asked` is exactly what THE PAGE asked the route for. The
+        // test's own calls below go straight through unrecorded: mixing them in would put this
+        // file's requests into the record it then checks the page against.
         asked.push(onward);
-        return real(onward, init);
+        return overTheWire(onward, init);
       }
+      if (url.startsWith(baseUrl ?? '\u0000')) return overTheWire(url, init);
       const file = fileFor(url);
       if (file !== null) return new Response(file.slice().buffer as ArrayBuffer, { status: 200 });
       return new Response('not here', { status: 404 });
