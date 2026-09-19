@@ -85,6 +85,7 @@ __all__ = [
     "COMPOSITION",
     "CORRIDOR_BAR",
     "DIGEST_BOUND_PROFILE",
+    "JUDGEMENT_ANSWERS_PROFILE",
     "JUDGE_WORDS_DIRECTORY",
     "JUDGE_WORDS_PROFILE",
     "CarriedWords",
@@ -205,6 +206,12 @@ _ISO_TIME: Final = re.compile(r"^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}Z$")
 #: machine they were given on.
 JUDGE_WORDS_DIRECTORY: Final = ".exulanica/judge-words"
 JUDGE_WORDS_PROFILE: Final = "exulanica.visual-gate-judge-words/v1"
+
+#: What an asking session writes there: the judge's answers, before any record reads them. It
+#: holds words exactly as a companion does and is the reason the guard over that directory must
+#: know more than one shape. It lives here rather than in the script that reads it because two
+#: files needing the same profile string is how a directory comes to hold a shape nobody guards.
+JUDGEMENT_ANSWERS_PROFILE: Final = "exulanica.visual-gate-judgement/v3"
 
 #: A public string may not repeat this many consecutive words of a reply, unless the judge was
 #: shown those words in the ask itself. Four is too few: short runs of ordinary English, which

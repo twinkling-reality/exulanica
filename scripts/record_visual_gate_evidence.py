@@ -90,6 +90,7 @@ from exulanica.evaluation.gate_keys import (
     reason_follow_up,
 )
 from exulanica.evaluation.visual_gate import (
+    JUDGEMENT_ANSWERS_PROFILE,
     GateEvidenceError,
     _comparable,
     CarriedWords,
@@ -129,7 +130,7 @@ RUBRIC_COPY = RECONCILIATION_ARTIFACTS / "visual-gate-rubric.md"
 BASELINE = ROOT / "docs/evaluation/2026-09-15-flatiron-owned-district-baseline.json"
 ARTIFACTS = ROOT / "docs/evaluation/artifacts/2026-09-15-flatiron-owned-district-baseline"
 FORBIDDEN = ("/Users/", "Bearer ", "api-token")
-JUDGEMENT_PROFILE = "exulanica.visual-gate-judgement/v3"
+JUDGEMENT_PROFILE = JUDGEMENT_ANSWERS_PROFILE
 
 
 def _git(*arguments: str) -> str:
