@@ -561,10 +561,15 @@ export function checkedWalkWorld(statement, containers, reachWasStated) {
     opensOn: world.opensOn ?? null,
     drawn,
     stoodOn,
-    statedBytes: world.neighbourTransferredBytes,
-    measuredBytes,
+    // THE TWO BYTE FIGURES COUNT THE NEIGHBOURS ALONE, and `drawn` and `stoodOn` above count the
+    // whole world INCLUDING the tile the walk opens on. Naming them `statedBytes` and
+    // `measuredBytes` put a subset's figures under whole-world names, in the same object, under a
+    // `checkedAgainst` line that names the whole set. The page's own field was renamed for exactly
+    // this reason and the record's keys were left behind.
+    neighbourBytesStated: world.neighbourTransferredBytes,
+    neighbourBytesMeasured: measuredBytes,
     absent: world.absent ?? [],
-    checkedAgainst: 'the containers this run read from the wire',
+    checkedAgainst: 'the containers this run read from the wire, neighbours alone for the bytes',
   };
 }
 
