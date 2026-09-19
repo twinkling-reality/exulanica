@@ -371,7 +371,7 @@ def test_a_run_asking_for_a_different_walk_than_the_file_states_is_refused(tmp_p
 
 
 def test_a_repository_path_is_found_whatever_directory_the_harness_runs_from(tmp_path):
-    """`--walk docs/x.md` means the repository's, not the one under the directory it was started in.
+    """A walk named by a repository path is the repository's, not one under the start directory.
 
     These runs start in ``web/`` exactly as a real one does, so before the fix this looked for
     ``web/docs/...``, threw on the missing file and never reached a refusal at all. The assertion is

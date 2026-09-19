@@ -1,0 +1,37 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "carried_forward": "The harness now records both horizons as data beside each other, the ground radius the page states and the obstacle radius taken from the walked container's own tile_size_mm, so no later reader has to infer that the two differ.",
+    "corrects": {
+      "figure": "clearRunMm",
+      "note": "that record is retained unedited; this states what the figure does and does not cover",
+      "stated_at_commit": "0a122fd9",
+      "stated_in": "docs/visual-gate-targets.md, the section on the first walk of a composed world",
+      "value_mm": 294755
+    },
+    "date": "2026-09-18",
+    "finding": "A composed world supplies GROUND from its neighbouring tiles and not the OBSTACLES standing on it. Neighbours contribute their navigation envelope and not their records, so the route rule's obstruction rings come from the walked tile alone. clearRunMm is the distance to first contact against the rings the rule holds, bounded by the field; past the obstacle horizon it is therefore a distance nobody checked for obstructions, and reads as a clearance while being a statement about ground.",
+    "horizons": {
+      "ground_known_within_mm": 326337,
+      "ground_source": "the composed navigation world the page states",
+      "obstacle_known_within_mm": 64000,
+      "obstacle_source": "the walked container alone, whose header states tile_size_mm 128000",
+      "obstacles_are_known_as_far_as_the_ground": false,
+      "units": "integer millimetres; the ground radius is rounded from the metres the page states"
+    },
+    "kind": "correction",
+    "measured": {
+      "candidates_qualified_after_composition": 68,
+      "candidates_qualified_before_composition": 3,
+      "field_radius_after_composition_mm": 326337,
+      "field_radius_before_composition_mm": 94847,
+      "heading_millidegrees": 270000,
+      "route_obstacle_rings_after_composition": 311,
+      "route_obstacle_rings_before_composition": 311
+    },
+    "not_affected": "The walk itself. It ran from x 256000 to x 381000 in city millimetres, entirely within the walked tile, so the three captures and every measurement taken along the walked line stand. What is in question is the RANKING: 720 headings were ranked across a field whose obstacle set did not grow with it, so some of the 68 that qualified are clear only because nothing told the rule otherwise.",
+    "owner": "the route rule's inputs, not the gate harness",
+    "subject": "what clearRunMm measures in a composed world"
+  },
+  "record_sha256": "f84823e459efa2c57bfcebbeb8770d67b4642280622832d682e000ffce0cfdb6"
+}

@@ -1079,7 +1079,7 @@ async function main() {
   }
   if (options.walk !== '') {
     // RESOLVED AGAINST THE REPOSITORY, NOT AGAINST WHATEVER DIRECTORY THIS WAS STARTED IN. The
-    // harness is run from `web/`, so `--walk docs/x.md` used to be looked for at `web/docs/x.md` and
+    // harness is run from `web/`, so a walk named by a repository path was looked for under `web/`
     // a run died before it began. MEASURED 2026-09-18: that cost a corridor run, and the workaround
     // was an absolute path, which is the kind of thing that ends up in somebody's notes forever.
     // A path is a repository path here because every file this flag can name is a committed one.
