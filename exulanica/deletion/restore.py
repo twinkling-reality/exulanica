@@ -262,6 +262,13 @@ def replay(
         with database.session(workspace_id) as connection, connection.transaction():
             # These guards recover a blob address through capture, so a backup older than
             # that row cannot enforce either an interval redaction or a hash blocklist.
+            #
+            # A `scene_training` tombstone (migration 0082) gets no guard of this shape and
+            # cannot have one worth having. What its cascade reads is `scene_training_artifact`,
+            # so a backup older than those bindings replays a withdrawal that enqueues nothing,
+            # and that is INDISTINGUISHABLE from the legitimate case of a right whose run
+            # published nothing at all. A guard here would refuse a correct restore as often as
+            # an incomplete one, so the gap is named rather than guarded.
             if original["capture_id"] and (
                 original["scope"] == "interval" or original["blocklist_hash"]
             ):
