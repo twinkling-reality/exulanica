@@ -1,0 +1,512 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "generator": {
+      "arms": [
+        "rule",
+        "greedy-destination-bound"
+      ],
+      "script": "scripts/measure_society_choice.py",
+      "seeds": 4,
+      "ticks": 1440
+    },
+    "occupancy": {
+      "note": "headroom is every person-tick of destination occupancy that a perfect chooser could add and the deterministic chooser did not. It is not an estimate.",
+      "per_run": [
+        {
+          "arm": "rule",
+          "busiest_minus_quietest_person_ticks": 20,
+          "ceiling_person_ticks": 5760,
+          "choices_naming_a_destination": 1678,
+          "headroom_person_ticks": 116,
+          "headroom_share_of_person_ticks_milli": 1,
+          "held_person_ticks_total": 5644,
+          "seed_sha256": "6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b"
+        },
+        {
+          "arm": "rule",
+          "busiest_minus_quietest_person_ticks": 18,
+          "ceiling_person_ticks": 5760,
+          "choices_naming_a_destination": 1672,
+          "headroom_person_ticks": 115,
+          "headroom_share_of_person_ticks_milli": 1,
+          "held_person_ticks_total": 5645,
+          "seed_sha256": "0101010101010101010101010101010101010101010101010101010101010101"
+        },
+        {
+          "arm": "rule",
+          "busiest_minus_quietest_person_ticks": 18,
+          "ceiling_person_ticks": 5760,
+          "choices_naming_a_destination": 1675,
+          "headroom_person_ticks": 119,
+          "headroom_share_of_person_ticks_milli": 1,
+          "held_person_ticks_total": 5641,
+          "seed_sha256": "0202020202020202020202020202020202020202020202020202020202020202"
+        },
+        {
+          "arm": "rule",
+          "busiest_minus_quietest_person_ticks": 17,
+          "ceiling_person_ticks": 5760,
+          "choices_naming_a_destination": 1683,
+          "headroom_person_ticks": 116,
+          "headroom_share_of_person_ticks_milli": 1,
+          "held_person_ticks_total": 5644,
+          "seed_sha256": "0303030303030303030303030303030303030303030303030303030303030303"
+        },
+        {
+          "arm": "greedy-destination-bound",
+          "busiest_minus_quietest_person_ticks": 23,
+          "ceiling_person_ticks": 5760,
+          "choices_naming_a_destination": 1681,
+          "headroom_person_ticks": 111,
+          "headroom_share_of_person_ticks_milli": 1,
+          "held_person_ticks_total": 5649,
+          "seed_sha256": "6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b"
+        },
+        {
+          "arm": "greedy-destination-bound",
+          "busiest_minus_quietest_person_ticks": 22,
+          "ceiling_person_ticks": 5760,
+          "choices_naming_a_destination": 1675,
+          "headroom_person_ticks": 116,
+          "headroom_share_of_person_ticks_milli": 1,
+          "held_person_ticks_total": 5644,
+          "seed_sha256": "0101010101010101010101010101010101010101010101010101010101010101"
+        },
+        {
+          "arm": "greedy-destination-bound",
+          "busiest_minus_quietest_person_ticks": 20,
+          "ceiling_person_ticks": 5760,
+          "choices_naming_a_destination": 1679,
+          "headroom_person_ticks": 108,
+          "headroom_share_of_person_ticks_milli": 1,
+          "held_person_ticks_total": 5652,
+          "seed_sha256": "0202020202020202020202020202020202020202020202020202020202020202"
+        },
+        {
+          "arm": "greedy-destination-bound",
+          "busiest_minus_quietest_person_ticks": 20,
+          "ceiling_person_ticks": 5760,
+          "choices_naming_a_destination": 1677,
+          "headroom_person_ticks": 111,
+          "headroom_share_of_person_ticks_milli": 1,
+          "held_person_ticks_total": 5649,
+          "seed_sha256": "0303030303030303030303030303030303030303030303030303030303030303"
+        }
+      ]
+    },
+    "profile": "exulanica.society-choice-measurement/v1",
+    "runs": [
+      {
+        "arm": "rule",
+        "choices_asked": 21659,
+        "choices_below_threshold": 0,
+        "choices_by_destination": {
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159": 647,
+          "nyc-flatiron-owned-v1/rest:36000:140000": 328,
+          "nyc-flatiron-owned-v1/rest:40000:108000": 354,
+          "nyc-flatiron-owned-v1/rest:40000:64000": 349
+        },
+        "choices_fallen_through": 21659,
+        "choices_not_answered_by_the_rule": 0,
+        "choices_provider_silent": 0,
+        "choices_with_nothing_possible": 0,
+        "choices_without_a_destination": 19981,
+        "destination_capacity": {
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159": 1,
+          "nyc-flatiron-owned-v1/rest:36000:140000": 1,
+          "nyc-flatiron-owned-v1/rest:40000:108000": 1,
+          "nyc-flatiron-owned-v1/rest:40000:64000": 1
+        },
+        "destination_held_person_ticks": {
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159": 1397,
+          "nyc-flatiron-owned-v1/rest:36000:140000": 1417,
+          "nyc-flatiron-owned-v1/rest:40000:108000": 1417,
+          "nyc-flatiron-owned-v1/rest:40000:64000": 1413
+        },
+        "destination_held_person_ticks_total": 5644,
+        "destinations": [
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159",
+          "nyc-flatiron-owned-v1/rest:36000:140000",
+          "nyc-flatiron-owned-v1/rest:40000:108000",
+          "nyc-flatiron-owned-v1/rest:40000:64000"
+        ],
+        "distinct_positions_final_tick": 46,
+        "district_document_sha256": "17e54945c9065a4affe6192d4805313d8caa1e32377bc8dbb40249eb53d8847c",
+        "engine_profile": "exulanica-society/v4",
+        "final_state_sha256": "0ffe34cb4856a41f0d2599845dfe0dce8cd57317b3de12d1ed70f9e1248b3cc9",
+        "input_sha256": "78689c8633d2e9e22e96482b5866a8f65073be778ad423f906c4dcff4ce992b8",
+        "people": 46,
+        "people_who_ever_moved": 46,
+        "person_ticks": 66240,
+        "place_sha256": "d906e06a864879e5e5a6db59ff5e925a7324fdf26d15e50a0fc88f38826a7f30",
+        "population_rule": "place_sized",
+        "seed_sha256": "6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b",
+        "ticks": 1440,
+        "travel_mm_max": 16894066,
+        "travel_mm_median": 15962008,
+        "travel_mm_total": 730833538,
+        "wall_milliseconds": 27715
+      },
+      {
+        "arm": "rule",
+        "choices_asked": 21586,
+        "choices_below_threshold": 0,
+        "choices_by_destination": {
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159": 639,
+          "nyc-flatiron-owned-v1/rest:36000:140000": 332,
+          "nyc-flatiron-owned-v1/rest:40000:108000": 354,
+          "nyc-flatiron-owned-v1/rest:40000:64000": 347
+        },
+        "choices_fallen_through": 21586,
+        "choices_not_answered_by_the_rule": 0,
+        "choices_provider_silent": 0,
+        "choices_with_nothing_possible": 0,
+        "choices_without_a_destination": 19914,
+        "destination_capacity": {
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159": 1,
+          "nyc-flatiron-owned-v1/rest:36000:140000": 1,
+          "nyc-flatiron-owned-v1/rest:40000:108000": 1,
+          "nyc-flatiron-owned-v1/rest:40000:64000": 1
+        },
+        "destination_held_person_ticks": {
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159": 1398,
+          "nyc-flatiron-owned-v1/rest:36000:140000": 1415,
+          "nyc-flatiron-owned-v1/rest:40000:108000": 1416,
+          "nyc-flatiron-owned-v1/rest:40000:64000": 1416
+        },
+        "destination_held_person_ticks_total": 5645,
+        "destinations": [
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159",
+          "nyc-flatiron-owned-v1/rest:36000:140000",
+          "nyc-flatiron-owned-v1/rest:40000:108000",
+          "nyc-flatiron-owned-v1/rest:40000:64000"
+        ],
+        "distinct_positions_final_tick": 46,
+        "district_document_sha256": "17e54945c9065a4affe6192d4805313d8caa1e32377bc8dbb40249eb53d8847c",
+        "engine_profile": "exulanica-society/v4",
+        "final_state_sha256": "5ea05643eddd90e47ff1eaa655157d684b3880dac14f21985a57d96cfdf93a01",
+        "input_sha256": "78689c8633d2e9e22e96482b5866a8f65073be778ad423f906c4dcff4ce992b8",
+        "people": 46,
+        "people_who_ever_moved": 46,
+        "person_ticks": 66240,
+        "place_sha256": "d906e06a864879e5e5a6db59ff5e925a7324fdf26d15e50a0fc88f38826a7f30",
+        "population_rule": "place_sized",
+        "seed_sha256": "0101010101010101010101010101010101010101010101010101010101010101",
+        "ticks": 1440,
+        "travel_mm_max": 17079004,
+        "travel_mm_median": 15868752,
+        "travel_mm_total": 730457686,
+        "wall_milliseconds": 17939
+      },
+      {
+        "arm": "rule",
+        "choices_asked": 21550,
+        "choices_below_threshold": 0,
+        "choices_by_destination": {
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159": 645,
+          "nyc-flatiron-owned-v1/rest:36000:140000": 331,
+          "nyc-flatiron-owned-v1/rest:40000:108000": 354,
+          "nyc-flatiron-owned-v1/rest:40000:64000": 345
+        },
+        "choices_fallen_through": 21550,
+        "choices_not_answered_by_the_rule": 0,
+        "choices_provider_silent": 0,
+        "choices_with_nothing_possible": 0,
+        "choices_without_a_destination": 19875,
+        "destination_capacity": {
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159": 1,
+          "nyc-flatiron-owned-v1/rest:36000:140000": 1,
+          "nyc-flatiron-owned-v1/rest:40000:108000": 1,
+          "nyc-flatiron-owned-v1/rest:40000:64000": 1
+        },
+        "destination_held_person_ticks": {
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159": 1397,
+          "nyc-flatiron-owned-v1/rest:36000:140000": 1414,
+          "nyc-flatiron-owned-v1/rest:40000:108000": 1415,
+          "nyc-flatiron-owned-v1/rest:40000:64000": 1415
+        },
+        "destination_held_person_ticks_total": 5641,
+        "destinations": [
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159",
+          "nyc-flatiron-owned-v1/rest:36000:140000",
+          "nyc-flatiron-owned-v1/rest:40000:108000",
+          "nyc-flatiron-owned-v1/rest:40000:64000"
+        ],
+        "distinct_positions_final_tick": 46,
+        "district_document_sha256": "17e54945c9065a4affe6192d4805313d8caa1e32377bc8dbb40249eb53d8847c",
+        "engine_profile": "exulanica-society/v4",
+        "final_state_sha256": "a4498aab4962e139518b7697042072846b8d76e6efe33737b831fa92ffc18c61",
+        "input_sha256": "78689c8633d2e9e22e96482b5866a8f65073be778ad423f906c4dcff4ce992b8",
+        "people": 46,
+        "people_who_ever_moved": 46,
+        "person_ticks": 66240,
+        "place_sha256": "d906e06a864879e5e5a6db59ff5e925a7324fdf26d15e50a0fc88f38826a7f30",
+        "population_rule": "place_sized",
+        "seed_sha256": "0202020202020202020202020202020202020202020202020202020202020202",
+        "ticks": 1440,
+        "travel_mm_max": 17097800,
+        "travel_mm_median": 15722092,
+        "travel_mm_total": 724335714,
+        "wall_milliseconds": 21111
+      },
+      {
+        "arm": "rule",
+        "choices_asked": 21628,
+        "choices_below_threshold": 0,
+        "choices_by_destination": {
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159": 651,
+          "nyc-flatiron-owned-v1/rest:36000:140000": 330,
+          "nyc-flatiron-owned-v1/rest:40000:108000": 354,
+          "nyc-flatiron-owned-v1/rest:40000:64000": 348
+        },
+        "choices_fallen_through": 21628,
+        "choices_not_answered_by_the_rule": 0,
+        "choices_provider_silent": 0,
+        "choices_with_nothing_possible": 0,
+        "choices_without_a_destination": 19945,
+        "destination_capacity": {
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159": 1,
+          "nyc-flatiron-owned-v1/rest:36000:140000": 1,
+          "nyc-flatiron-owned-v1/rest:40000:108000": 1,
+          "nyc-flatiron-owned-v1/rest:40000:64000": 1
+        },
+        "destination_held_person_ticks": {
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159": 1399,
+          "nyc-flatiron-owned-v1/rest:36000:140000": 1416,
+          "nyc-flatiron-owned-v1/rest:40000:108000": 1413,
+          "nyc-flatiron-owned-v1/rest:40000:64000": 1416
+        },
+        "destination_held_person_ticks_total": 5644,
+        "destinations": [
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159",
+          "nyc-flatiron-owned-v1/rest:36000:140000",
+          "nyc-flatiron-owned-v1/rest:40000:108000",
+          "nyc-flatiron-owned-v1/rest:40000:64000"
+        ],
+        "distinct_positions_final_tick": 46,
+        "district_document_sha256": "17e54945c9065a4affe6192d4805313d8caa1e32377bc8dbb40249eb53d8847c",
+        "engine_profile": "exulanica-society/v4",
+        "final_state_sha256": "0c56962404daed47315b789ed12dbcad205b4e510b4d288c84c5264c8812a83e",
+        "input_sha256": "78689c8633d2e9e22e96482b5866a8f65073be778ad423f906c4dcff4ce992b8",
+        "people": 46,
+        "people_who_ever_moved": 46,
+        "person_ticks": 66240,
+        "place_sha256": "d906e06a864879e5e5a6db59ff5e925a7324fdf26d15e50a0fc88f38826a7f30",
+        "population_rule": "place_sized",
+        "seed_sha256": "0303030303030303030303030303030303030303030303030303030303030303",
+        "ticks": 1440,
+        "travel_mm_max": 16754128,
+        "travel_mm_median": 15940802,
+        "travel_mm_total": 731478746,
+        "wall_milliseconds": 47638
+      },
+      {
+        "arm": "greedy-destination-bound",
+        "choices_asked": 21649,
+        "choices_below_threshold": 0,
+        "choices_by_destination": {
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159": 649,
+          "nyc-flatiron-owned-v1/rest:36000:140000": 332,
+          "nyc-flatiron-owned-v1/rest:40000:108000": 354,
+          "nyc-flatiron-owned-v1/rest:40000:64000": 346
+        },
+        "choices_fallen_through": 19968,
+        "choices_not_answered_by_the_rule": 1681,
+        "choices_provider_silent": 0,
+        "choices_with_nothing_possible": 0,
+        "choices_without_a_destination": 19968,
+        "destination_capacity": {
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159": 1,
+          "nyc-flatiron-owned-v1/rest:36000:140000": 1,
+          "nyc-flatiron-owned-v1/rest:40000:108000": 1,
+          "nyc-flatiron-owned-v1/rest:40000:64000": 1
+        },
+        "destination_held_person_ticks": {
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159": 1396,
+          "nyc-flatiron-owned-v1/rest:36000:140000": 1419,
+          "nyc-flatiron-owned-v1/rest:40000:108000": 1416,
+          "nyc-flatiron-owned-v1/rest:40000:64000": 1418
+        },
+        "destination_held_person_ticks_total": 5649,
+        "destinations": [
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159",
+          "nyc-flatiron-owned-v1/rest:36000:140000",
+          "nyc-flatiron-owned-v1/rest:40000:108000",
+          "nyc-flatiron-owned-v1/rest:40000:64000"
+        ],
+        "distinct_positions_final_tick": 46,
+        "district_document_sha256": "17e54945c9065a4affe6192d4805313d8caa1e32377bc8dbb40249eb53d8847c",
+        "engine_profile": "exulanica-society/v4",
+        "final_state_sha256": "86d5d9e74d2d6e909775955367edfb9c63528cd1616bf1b840be9bcf1cb82e04",
+        "input_sha256": "78689c8633d2e9e22e96482b5866a8f65073be778ad423f906c4dcff4ce992b8",
+        "people": 46,
+        "people_who_ever_moved": 46,
+        "person_ticks": 66240,
+        "place_sha256": "d906e06a864879e5e5a6db59ff5e925a7324fdf26d15e50a0fc88f38826a7f30",
+        "population_rule": "place_sized",
+        "seed_sha256": "6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b6b",
+        "ticks": 1440,
+        "travel_mm_max": 16884932,
+        "travel_mm_median": 15881826,
+        "travel_mm_total": 727338368,
+        "wall_milliseconds": 25910
+      },
+      {
+        "arm": "greedy-destination-bound",
+        "choices_asked": 21549,
+        "choices_below_threshold": 0,
+        "choices_by_destination": {
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159": 646,
+          "nyc-flatiron-owned-v1/rest:36000:140000": 327,
+          "nyc-flatiron-owned-v1/rest:40000:108000": 354,
+          "nyc-flatiron-owned-v1/rest:40000:64000": 348
+        },
+        "choices_fallen_through": 19874,
+        "choices_not_answered_by_the_rule": 1675,
+        "choices_provider_silent": 0,
+        "choices_with_nothing_possible": 0,
+        "choices_without_a_destination": 19874,
+        "destination_capacity": {
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159": 1,
+          "nyc-flatiron-owned-v1/rest:36000:140000": 1,
+          "nyc-flatiron-owned-v1/rest:40000:108000": 1,
+          "nyc-flatiron-owned-v1/rest:40000:64000": 1
+        },
+        "destination_held_person_ticks": {
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159": 1395,
+          "nyc-flatiron-owned-v1/rest:36000:140000": 1417,
+          "nyc-flatiron-owned-v1/rest:40000:108000": 1416,
+          "nyc-flatiron-owned-v1/rest:40000:64000": 1416
+        },
+        "destination_held_person_ticks_total": 5644,
+        "destinations": [
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159",
+          "nyc-flatiron-owned-v1/rest:36000:140000",
+          "nyc-flatiron-owned-v1/rest:40000:108000",
+          "nyc-flatiron-owned-v1/rest:40000:64000"
+        ],
+        "distinct_positions_final_tick": 46,
+        "district_document_sha256": "17e54945c9065a4affe6192d4805313d8caa1e32377bc8dbb40249eb53d8847c",
+        "engine_profile": "exulanica-society/v4",
+        "final_state_sha256": "62e29f1a8f2789df8265f5de9e800fe6e03bfcf511731d5564a7f67234924a62",
+        "input_sha256": "78689c8633d2e9e22e96482b5866a8f65073be778ad423f906c4dcff4ce992b8",
+        "people": 46,
+        "people_who_ever_moved": 46,
+        "person_ticks": 66240,
+        "place_sha256": "d906e06a864879e5e5a6db59ff5e925a7324fdf26d15e50a0fc88f38826a7f30",
+        "population_rule": "place_sized",
+        "seed_sha256": "0101010101010101010101010101010101010101010101010101010101010101",
+        "ticks": 1440,
+        "travel_mm_max": 17319142,
+        "travel_mm_median": 15857870,
+        "travel_mm_total": 726835601,
+        "wall_milliseconds": 26329
+      },
+      {
+        "arm": "greedy-destination-bound",
+        "choices_asked": 21539,
+        "choices_below_threshold": 0,
+        "choices_by_destination": {
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159": 646,
+          "nyc-flatiron-owned-v1/rest:36000:140000": 330,
+          "nyc-flatiron-owned-v1/rest:40000:108000": 355,
+          "nyc-flatiron-owned-v1/rest:40000:64000": 348
+        },
+        "choices_fallen_through": 19860,
+        "choices_not_answered_by_the_rule": 1679,
+        "choices_provider_silent": 0,
+        "choices_with_nothing_possible": 0,
+        "choices_without_a_destination": 19860,
+        "destination_capacity": {
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159": 1,
+          "nyc-flatiron-owned-v1/rest:36000:140000": 1,
+          "nyc-flatiron-owned-v1/rest:40000:108000": 1,
+          "nyc-flatiron-owned-v1/rest:40000:64000": 1
+        },
+        "destination_held_person_ticks": {
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159": 1399,
+          "nyc-flatiron-owned-v1/rest:36000:140000": 1419,
+          "nyc-flatiron-owned-v1/rest:40000:108000": 1417,
+          "nyc-flatiron-owned-v1/rest:40000:64000": 1417
+        },
+        "destination_held_person_ticks_total": 5652,
+        "destinations": [
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159",
+          "nyc-flatiron-owned-v1/rest:36000:140000",
+          "nyc-flatiron-owned-v1/rest:40000:108000",
+          "nyc-flatiron-owned-v1/rest:40000:64000"
+        ],
+        "distinct_positions_final_tick": 46,
+        "district_document_sha256": "17e54945c9065a4affe6192d4805313d8caa1e32377bc8dbb40249eb53d8847c",
+        "engine_profile": "exulanica-society/v4",
+        "final_state_sha256": "ce2c20224aa436133c0ea3c162e2b7a97b554c7b1728292b95fae00b450cc4fe",
+        "input_sha256": "78689c8633d2e9e22e96482b5866a8f65073be778ad423f906c4dcff4ce992b8",
+        "people": 46,
+        "people_who_ever_moved": 46,
+        "person_ticks": 66240,
+        "place_sha256": "d906e06a864879e5e5a6db59ff5e925a7324fdf26d15e50a0fc88f38826a7f30",
+        "population_rule": "place_sized",
+        "seed_sha256": "0202020202020202020202020202020202020202020202020202020202020202",
+        "ticks": 1440,
+        "travel_mm_max": 16859012,
+        "travel_mm_median": 15942752,
+        "travel_mm_total": 732006164,
+        "wall_milliseconds": 41340
+      },
+      {
+        "arm": "greedy-destination-bound",
+        "choices_asked": 21628,
+        "choices_below_threshold": 0,
+        "choices_by_destination": {
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159": 648,
+          "nyc-flatiron-owned-v1/rest:36000:140000": 328,
+          "nyc-flatiron-owned-v1/rest:40000:108000": 354,
+          "nyc-flatiron-owned-v1/rest:40000:64000": 347
+        },
+        "choices_fallen_through": 19951,
+        "choices_not_answered_by_the_rule": 1677,
+        "choices_provider_silent": 0,
+        "choices_with_nothing_possible": 0,
+        "choices_without_a_destination": 19951,
+        "destination_capacity": {
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159": 1,
+          "nyc-flatiron-owned-v1/rest:36000:140000": 1,
+          "nyc-flatiron-owned-v1/rest:40000:108000": 1,
+          "nyc-flatiron-owned-v1/rest:40000:64000": 1
+        },
+        "destination_held_person_ticks": {
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159": 1399,
+          "nyc-flatiron-owned-v1/rest:36000:140000": 1419,
+          "nyc-flatiron-owned-v1/rest:40000:108000": 1416,
+          "nyc-flatiron-owned-v1/rest:40000:64000": 1415
+        },
+        "destination_held_person_ticks_total": 5649,
+        "destinations": [
+          "nyc-flatiron-owned-v1/entrance/doitt_id:507159",
+          "nyc-flatiron-owned-v1/rest:36000:140000",
+          "nyc-flatiron-owned-v1/rest:40000:108000",
+          "nyc-flatiron-owned-v1/rest:40000:64000"
+        ],
+        "distinct_positions_final_tick": 46,
+        "district_document_sha256": "17e54945c9065a4affe6192d4805313d8caa1e32377bc8dbb40249eb53d8847c",
+        "engine_profile": "exulanica-society/v4",
+        "final_state_sha256": "00395abbbb5ee8d548516535ed4a0559fed534b37302ce83f757347f085776a6",
+        "input_sha256": "78689c8633d2e9e22e96482b5866a8f65073be778ad423f906c4dcff4ce992b8",
+        "people": 46,
+        "people_who_ever_moved": 46,
+        "person_ticks": 66240,
+        "place_sha256": "d906e06a864879e5e5a6db59ff5e925a7324fdf26d15e50a0fc88f38826a7f30",
+        "population_rule": "place_sized",
+        "seed_sha256": "0303030303030303030303030303030303030303030303030303030303030303",
+        "ticks": 1440,
+        "travel_mm_max": 16921440,
+        "travel_mm_median": 15814406,
+        "travel_mm_total": 729145276,
+        "wall_milliseconds": 20116
+      }
+    ],
+    "subject": "what a better chooser could win on the v4 living society's four Flatiron destinations, main 15e8198c"
+  },
+  "record_sha256": "2cbeca092c5c19425cfe724969273e22dc84aeebd5ea2e57e99ac5824aa95baf"
+}

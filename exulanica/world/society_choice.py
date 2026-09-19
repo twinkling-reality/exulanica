@@ -53,6 +53,9 @@ __all__ = [
 ]
 
 #: What answered one choice. Recorded on every decision, so a record states who chose.
+#: ``RULE`` is the engine's own chooser and is the fallback of everything else here. Anything
+#: else is a name for whoever was asked first, and the counters partition by ``RULE`` against
+#: not-``RULE`` rather than by model against not-model, so a bound or an oracle counts honestly.
 RULE: Final = "deterministic_chooser"
 MODEL: Final = "model"
 
@@ -74,10 +77,10 @@ _SHOWN_OPTION_KEYS: Final = (
 
 @dataclass
 class ChoiceCounters:
-    """Five sets, counted separately. ``asked`` is ``model`` plus ``fallback``, and nothing else."""
+    """Sets counted apart. ``asked`` is ``not_the_rule`` plus ``fallback``, and nothing else."""
 
     asked: int = 0
-    model: int = 0
+    not_the_rule: int = 0
     fallback: int = 0
     below_threshold: int = 0
     provider_silent: int = 0
@@ -87,10 +90,10 @@ class ChoiceCounters:
 
     def record(self, decision: ChoiceDecision) -> None:
         self.asked += 1
-        if decision.decided_by == MODEL:
-            self.model += 1
-        else:
+        if decision.decided_by == RULE:
             self.fallback += 1
+        else:
+            self.not_the_rule += 1
         if decision.rejected_confidence_milli is not None:
             self.below_threshold += 1
         if decision.provider_silent:

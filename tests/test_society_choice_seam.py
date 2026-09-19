@@ -167,7 +167,7 @@ def test_the_rule_answers_every_choice_when_no_provider_is_configured():
     _run(60, DeterministicChoices(counters))
     assert counters.asked > 0
     assert counters.fallback == counters.asked
-    assert counters.model == 0
+    assert counters.not_the_rule == 0
     assert counters.below_threshold == 0
 
 
@@ -178,7 +178,7 @@ def test_a_provider_that_raises_changes_nothing_about_the_world():
     with_provider, _ = _run(60, ModelChoices(provider, 1, counters))
     without, _ = _run(60, DeterministicChoices())
     assert provider.calls > 0
-    assert counters.model == 0
+    assert counters.not_the_rule == 0
     assert counters.provider_silent == counters.asked
     assert society_state_sha256(_world(with_provider)) == society_state_sha256(_world(without))
 
@@ -207,8 +207,8 @@ def test_an_answer_above_the_bar_is_taken_and_moves_the_world():
     counters = ChoiceCounters()
     taken, _ = _run(60, ModelChoices(Answers(1000), 900, counters))
     ruled, _ = _run(60, DeterministicChoices())
-    assert counters.model > 0
-    assert counters.model + counters.fallback == counters.asked
+    assert counters.not_the_rule > 0
+    assert counters.not_the_rule + counters.fallback == counters.asked
     # If the stub answered with the rule's own pick this assertion could not fail, so the stub
     # answers with the last-ranked option instead and the states must differ.
     assert society_state_sha256(_world(taken)) != society_state_sha256(_world(ruled))
@@ -219,7 +219,7 @@ def test_an_answer_below_the_bar_falls_through_to_the_rule():
     below, _ = _run(60, ModelChoices(Answers(899), 900, counters))
     ruled, _ = _run(60, DeterministicChoices())
     assert counters.asked > 0
-    assert counters.model == 0
+    assert counters.not_the_rule == 0
     assert counters.below_threshold == counters.asked
     assert society_state_sha256(_world(below)) == society_state_sha256(_world(ruled))
 
@@ -229,7 +229,7 @@ def test_the_bar_starts_nearly_closed():
     counters = ChoiceCounters()
     _run(30, ModelChoices(Answers(999), 1000, counters))
     assert counters.asked > 0
-    assert counters.model == 0
+    assert counters.not_the_rule == 0
 
 
 def test_an_answer_outside_the_closed_set_is_refused_not_repaired():
@@ -237,7 +237,7 @@ def test_an_answer_outside_the_closed_set_is_refused_not_repaired():
     invented, _ = _run(30, ModelChoices(Invents(), 0, counters))
     ruled, _ = _run(30, DeterministicChoices())
     assert counters.asked > 0
-    assert counters.model == 0
+    assert counters.not_the_rule == 0
     assert society_state_sha256(_world(invented)) == society_state_sha256(_world(ruled))
 
 
@@ -338,9 +338,37 @@ def test_a_provider_is_shown_generated_world_state_and_nothing_else():
 def test_the_counters_name_five_different_sets():
     counters = ChoiceCounters()
     _run(40, ModelChoices(Answers(700), 600, counters))
-    assert counters.asked == counters.model + counters.fallback
+    assert counters.asked == counters.not_the_rule + counters.fallback
     assert counters.asked == (
         sum(counters.by_destination.values())
         + counters.without_destination
         + counters.nothing_possible
     )
+
+
+# --- what a better chooser could win, which is the experiment's premise ----------------------
+
+
+def test_the_four_flatiron_destinations_leave_almost_nothing_for_a_chooser_to_win():
+    """The premise, measured. This is the test that should fail when the premise reopens.
+
+    A destination whose visitor capacity is one can be held by one person in one tick, so
+    capacity times ticks is every person-tick of destination occupancy that exists to be won.
+    On the committed Flatiron place the deterministic chooser already takes about 98% of it, and
+    what is left is under one part in a thousand of the population's time. No chooser, model or
+    otherwise, can win what is not there.
+
+    If a lane gives this place more destinations or more room, the headroom grows and this test
+    fails. That is the point of it: the finding stops being true and somebody is told.
+    """
+    from scripts.measure_society_choice import measure, occupancy
+
+    run = measure("6b" * 32, 1440)
+    assert run["people"] == 46
+    assert len(run["destinations"]) == 4
+    assert set(run["destination_capacity"].values()) == {1}
+    row = occupancy([run])["per_run"][0]
+    assert row["ceiling_person_ticks"] == 4 * 1440
+    assert row["headroom_person_ticks"] < row["ceiling_person_ticks"] // 40
+    assert row["headroom_share_of_person_ticks_milli"] <= 1
+    assert run["distinct_positions_final_tick"] == run["people"]
