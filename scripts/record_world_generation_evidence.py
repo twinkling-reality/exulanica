@@ -250,6 +250,103 @@ def refusals(database: str) -> list[dict[str, object]]:
     return rows
 
 
+def tile_key_blindness() -> dict[str, object]:
+    """Does a tile's identity separate two worlds that differ only in their bindings?
+
+    Computed here rather than quoted, because it is the measurement that decides the seed being
+    derived and a record that only asserted it would be a second statement of a fact nobody could
+    recheck. The control is the double read: ``tile_inputs_digest`` is taken once off each
+    generated document's own tile record and once off a tile record rebuilt from the seed and
+    catalogs, so agreement says the reading is right rather than that one wrong value came back
+    twice.
+    """
+    from exulanica.grammar.grammars.city.catalogs import load_city_catalogs
+    from exulanica.grammar.grammars.city.generation.corridor import (
+        CORRIDOR_BINDINGS,
+        CORRIDOR_CITY_IDENTITY,
+        CORRIDOR_LOD,
+        CORRIDOR_SEED,
+        CORRIDOR_TILE,
+    )
+    from exulanica.grammar.grammars.city.generation.tiles import (
+        city_records,
+        generate_city,
+        tile_document,
+        tile_record,
+    )
+    from exulanica.grammar.grammars.city.tile import tile_inputs_digest
+    from exulanica.grammar.parameters import CascadeBinding
+    from exulanica.ingest.stages import STAGES, baked_tile_id
+
+    corridor_values = dict(CORRIDOR_BINDINGS[0].values)
+    other_values = {**corridor_values, "block_length_mm": 180_000}
+    catalogs = load_city_catalogs()
+    spec = STAGES["baked_tile"]
+    tile_x, tile_y = CORRIDOR_TILE
+    measured = []
+    for label, values in (("corridor", corridor_values), ("one binding changed", other_values)):
+        generation = generate_city(
+            seed=CORRIDOR_SEED,
+            subject_identity=CORRIDOR_CITY_IDENTITY,
+            bindings=(CascadeBinding.of("city", values),),
+        )
+        document = tile_document(
+            city_records(generation),
+            seed=CORRIDOR_SEED,
+            subject_identity=CORRIDOR_CITY_IDENTITY,
+            catalogs=catalogs,
+            tile_x=tile_x,
+            tile_y=tile_y,
+            lod=CORRIDOR_LOD,
+        )
+        rebuilt = tile_record(
+            seed=CORRIDOR_SEED, catalogs=catalogs, tile_x=tile_x, tile_y=tile_y, lod=CORRIDOR_LOD
+        )
+        measured.append(
+            {
+                "world": label,
+                "block_length_mm": values["block_length_mm"],
+                "output_digest": generation.receipt.output_digest,
+                "record_count": sum(len(e.records) for e in generation.emissions),
+                "tile_inputs_digest_from_the_document": tile_inputs_digest(document.tile),
+                "tile_inputs_digest_rebuilt_independently": tile_inputs_digest(rebuilt),
+                "baked_tile_id": str(baked_tile_id(spec, document.tile)),
+            }
+        )
+    first, second = measured
+    return {
+        "question": (
+            "Two cities, the corridor's seed and identity for both, one bound value different. Do "
+            "their tiles have different identities?"
+        ),
+        "shared_seed": CORRIDOR_SEED,
+        "shared_identity": CORRIDOR_CITY_IDENTITY,
+        "tile": [tile_x, tile_y],
+        "worlds": measured,
+        "the_worlds_differ": first["output_digest"] != second["output_digest"],
+        "the_record_counts_differ": first["record_count"] != second["record_count"],
+        "the_tile_inputs_digests_are_the_same": (
+            first["tile_inputs_digest_from_the_document"]
+            == second["tile_inputs_digest_from_the_document"]
+        ),
+        "the_baked_tile_ids_are_the_same": first["baked_tile_id"] == second["baked_tile_id"],
+        "the_control_agrees": all(
+            row["tile_inputs_digest_from_the_document"]
+            == row["tile_inputs_digest_rebuilt_independently"]
+            for row in measured
+        ),
+        "why_it_matters": (
+            "baked_tile.tile_inputs_digest is not null unique and baked_tile_id is the primary key, "
+            "and record_baked_tile_bake answers a stored row whose container_sha256 differs with "
+            "state = 'nondeterminism_detected'. So a caller who could CHOOSE a seed could mark a "
+            "tile nondeterministic with two perfectly deterministic bakes. TileRecord's shape states "
+            "the seed, the grammar pins, the catalog digest and the tile's own coordinate, and "
+            "neither the bindings nor the subject identity, so identity is a second axis with the "
+            "same blindness."
+        ),
+    }
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", required=True)
@@ -343,6 +440,7 @@ def main() -> int:
             "ONE LEVEL OF DETAIL. Nothing reduces detail by level, so the route accepts none and "
             "states the one it makes.",
         ],
+        "why_the_seed_is_derived_and_not_chosen": tile_key_blindness(),
         "the_refusals_over_http": {
             "why": (
                 "The cascade refuses an unknown parameter, an unknown level, a second binding at "
