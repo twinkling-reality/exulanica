@@ -1337,6 +1337,31 @@ def test_agreeing_with_a_proposal_that_is_not_pending_is_refused(deployment):
     assert "still be pending" in response.json()["detail"]
 
 
+def test_rejecting_against_a_proposal_that_is_not_pending_is_refused(deployment):
+    """The same server half, on the OTHER route that takes a proposal id.
+
+    The test above covers /identity/confirm and was the only one. Measured 2026-09-19: taking the
+    same check out of /identity/reject left all 466 tests in test_api.py and test_identity.py
+    passing, so a rule stated for "any mutation whose proposal id is not pending" was held at one
+    of the two routes that accept one.
+
+    /reject is also the route where the row is USED and not only checked: it carries the basis the
+    user was shown, which is what lets a later proposal built on genuinely different evidence ask
+    again. An unchecked reject files a considered no as an unprompted one and suppresses the pair.
+    """
+    response = deployment.as_owner(
+        "POST",
+        "/identity/reject",
+        json={
+            "occurrence_id": str(deployment.occurrence_id),
+            "entity_id": str(deployment.entity_id),
+            "proposal_id": str(uuid.uuid4()),
+        },
+    )
+    assert response.status_code == 409
+    assert "still be pending" in response.json()["detail"]
+
+
 def test_the_identity_ledger_is_readable(deployment):
     events = deployment.as_owner("GET", "/identity/events").json()
     assert [event["type"] for event in events][-2:] == ["entity_created", "link_confirmed"] or [
