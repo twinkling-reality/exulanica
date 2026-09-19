@@ -1907,8 +1907,12 @@ def _refused_record(
                 "No answer is reported. The file bound above holds what was given; this record "
                 "does not repeat it, because an answer obtained outside the rubric is not an "
                 "answer and reporting one would invite it to be read as the key.",
-                "The eight measured keys above are this run's and nothing else's. Two are false, "
-                "so the block cannot pass whatever the ninth key turns out to be.",
+                # Counted rather than written out. The record retained on 2026-09-19 says
+                # "The eight measured keys ... Two are false", which was true and was typed; the
+                # record is not edited for it, and no record written after this one types either.
+                f"The {len(mechanical)} measured keys above are this run's and nothing else's. "
+                f"{len(failed)} of them are false, so the block cannot pass whatever the ninth "
+                "key turns out to be.",
                 supplement["condition"],
                 "Nothing is claimed about any street beyond the walk this run made, which is the "
                 "walk the stated-walk document names and this record binds by digest.",
