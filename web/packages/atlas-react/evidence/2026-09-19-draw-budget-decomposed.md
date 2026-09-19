@@ -1,7 +1,7 @@
 # What a composed world's frame costs in draw calls, and why 179 against 87 is not a comparison
 
 Written 2026-09-19 by the draw budget lane on `lane/draw-budget` at `0a415394`, which is local main
-`0a415394`, in `/Users/glendonchin/dev/Technology/orimera-draw-budget`. Every figure below was
+`0a415394`. Every figure below was
 measured on that tree. No source file was changed to produce any of them.
 
 The lane was asked to fix `practicalBrowserBudget`, which fails on `maxDrawCalls` 179 against a

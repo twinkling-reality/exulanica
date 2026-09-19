@@ -270,7 +270,7 @@ recorded for the orchestrator and none is taken.
 Written because the session pauses here and the lane carries more measured detail than it has
 published. Everything above is measured; this section says what is missing.
 
-**THE TREE.** Branch `lane/what-holds-a-component-up` in worktree `orimera-component-support`,
+**THE TREE.** Branch `lane/what-holds-a-component-up`,
 rebased twice: first onto main `775d44f8`, then onto main `1f3697c1`. Nothing merged, nothing
 pushed, working tree clean. `web/packages/loom-gate/src/scene.ts` is restored and its digest re-read
 as `9366119258eabcb86ba848381fcaac68ee19d6ba098e61ad000d36c1e355e8e7`: the example cap was patched
