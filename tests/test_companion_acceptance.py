@@ -88,11 +88,16 @@ def test_the_frozen_input_evidence_is_local_only_and_says_so_on_every_run():
         f"{len(FROZEN_INPUT_EVIDENCE)} paths are gating this file's skips, not 3; "
         "shortening this list silences tests without anything saying so"
     )
-    tracked = subprocess.run(
+    listed = subprocess.run(
         ["git", "ls-files", "-z", "--", *FROZEN_INPUT_EVIDENCE],
-        cwd=ROOT, check=True, capture_output=True,
-    ).stdout.decode()
-    published = sorted(filter(None, tracked.split("\0")))
+        cwd=ROOT, check=False, capture_output=True,
+    )
+    if listed.returncode != 0:
+        # Not check=True. A tree unpacked from an archive has no git, and raising there would
+        # turn "this guard could not run" into a failure about the files it was asked about,
+        # which is the shape this lane spent its day removing.
+        pytest.skip("this checkout is not a git repository, so its tracked files cannot be listed")
+    published = sorted(filter(None, listed.stdout.decode().split("\0")))
     assert not published, (
         "these are in the repository now, so this file must read them rather than skip on "
         f"them, and the reason given above is no longer true: {published}"
