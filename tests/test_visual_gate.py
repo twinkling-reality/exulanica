@@ -1866,17 +1866,39 @@ def test_every_rubric_clause_a_refusal_rests_on_is_in_the_rubric(monkeypatch, tm
 
 @pytest.mark.parametrize("name", RECORD_JUDGEMENT_KEYS)
 def test_every_key_the_reader_names_is_a_key_it_actually_needs(monkeypatch, tmp_path, name):
-    """Remove one key from a complete judgement and the reader has to name it, not crash."""
+    """Remove one key from a complete judgement: the shape check names it, AND the reader needs it.
+
+    The second half is the one that matters. A list of key names checked only against itself is a
+    second statement of the reader's requirements that nothing holds to them, and this file's
+    subject is a rule written down twice that came to disagree with itself.
+    """
     writer, _ = _corridor_writer(monkeypatch, tmp_path)
-    document = json.loads(_corridor_judgement_file(tmp_path).read_text())
+    rubric = _RUBRIC.read_bytes()
+    whole = _corridor_judgement_file(tmp_path)
+    captures = {
+        entry["label"]: entry["captureSha256"]
+        for entry in json.loads(whole.read_text())["pictures"]
+    }
+    # The control: with nothing removed the pair below does not raise, so a raise means the
+    # missing key, not the fixture.
+    answers, _ = writer._judgement(whole, rubric)
+    value, _ = decide_judged(answers, rubric_sha256=VERSION_4.rubric_sha256, captures=captures)
+    assert value is True
+
+    document = json.loads(whole.read_text())
     if name in document:
         del document[name]
     else:
         del document["pictures"][0][name]
     path = tmp_path / "short.json"
     path.write_text(json.dumps(document), encoding="utf-8")
+
     said = writer._judgement_shape(json.loads(path.read_bytes()))
     assert any(name in line for line in said), said
+
+    with pytest.raises((SystemExit, GateEvidenceError, KeyError)):
+        answers, _ = writer._judgement(path, rubric)
+        decide_judged(answers, rubric_sha256=VERSION_4.rubric_sha256, captures=captures)
 
 
 def test_the_corridor_verb_refuses_a_store_record_that_binds_other_bytes(monkeypatch, tmp_path):
