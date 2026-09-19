@@ -2080,3 +2080,39 @@ def test_the_refused_record_says_which_pictures_the_judgement_was_about(monkeypa
         record["theRefusedJudgementWasAboutThesePictures"]["everyBoundCaptureIsNamedInTheJudgement"]
         is True
     )
+
+
+def test_the_corridor_verb_writes_the_same_bytes_twice(monkeypatch, tmp_path):
+    """DETERMINISM IS A NAMED PROPERTY OF THIS WRITER, not a step somebody happened to take.
+
+    A writer of digest-bound records that does not write the same bytes from the same inputs is a
+    contradiction in terms: its record_sha256 would fix a document the same run would not produce
+    again, and nothing bound to it could be re-derived. Two whole runs, into two document roots
+    that never meet, compared byte for byte.
+    """
+    first, first_root = _corridor_writer(monkeypatch, tmp_path / "first")
+    second, second_root = _corridor_writer(monkeypatch, tmp_path / "second")
+    run_path = _corridor_run(tmp_path)
+    judgement = _corridor_judgement_file(tmp_path)
+    for writer in (first, second):
+        assert _corridor(writer, run_path, judgement) == 0
+
+    written = []
+    for root in (first_root, second_root):
+        directory = root / "docs/evaluation/artifacts" / Path(_CORRIDOR_RECORD).stem
+        written.append(
+            {item.name: item.read_bytes() for item in sorted(directory.iterdir()) if item.is_file()}
+        )
+    assert written[0].keys() == written[1].keys() and len(written[0]) > 1
+    assert written[0] == written[1]
+    assert (first_root / _CORRIDOR_RECORD).read_bytes() == (
+        second_root / _CORRIDOR_RECORD
+    ).read_bytes()
+
+    # The control: the comparison is capable of disagreeing, so its agreement above is a result.
+    changed = json.loads((second_root / _CORRIDOR_RECORD).read_text())
+    changed["record"]["date"] = "2026-09-20"
+    (second_root / _CORRIDOR_RECORD).write_text(json.dumps(changed), encoding="utf-8")
+    assert (first_root / _CORRIDOR_RECORD).read_bytes() != (
+        second_root / _CORRIDOR_RECORD
+    ).read_bytes()
