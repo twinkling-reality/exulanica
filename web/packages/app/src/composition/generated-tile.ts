@@ -25,6 +25,15 @@ export const GENERATED_TILE_EVALUATION_ATTRIBUTE = 'data-generated-tile-evaluati
  */
 export const GENERATED_TILE_OPENING_ATTRIBUTE = 'data-generated-tile-opening';
 export const GENERATED_TILE_POSE_ATTRIBUTE = 'data-generated-tile-pose';
+/**
+ * WHAT THE WALK'S WORLD IS, AS DATA, for the same reason the opening pose is data: a check that had
+ * to parse a sentence would read a reworded line as something it is not, and a record binding
+ * several containers must be able to say which was DRAWN and which was only STOOD ON without
+ * depending on the wording of the statement beside it. `reach` is `stated` or `unstated`, because a
+ * world of one tile because nobody said how far the walk goes is a different fact from a world of
+ * one tile because there was nothing within reach.
+ */
+export const GENERATED_TILE_WORLD_ATTRIBUTE = 'data-generated-tile-world';
 
 /** Where a tile's container came from, said on screen so no picture of a walk can hide it. */
 export type TileProvenance =
@@ -86,6 +95,22 @@ function openingLine(opening: Opening): string {
 }
 
 /** The opening as data on the shell: what a check binds, beside the sentence a person reads. */
+function stateWorld(
+  env: AppEnvironment,
+  drawn: { readonly name: string; readonly containerSha256: string },
+  world: FetchedWalkWorld | null,
+): void {
+  env.shell.setAttribute(GENERATED_TILE_WORLD_ATTRIBUTE, JSON.stringify({
+    reach: world === null ? 'unstated' : 'stated',
+    drawnAndStoodOn: drawn,
+    stoodOnOnly: world === null ? [] : world.neighbours.map((neighbour) => ({
+      tile: neighbour.name, containerSha256: neighbour.containerSha256,
+    })),
+    transferredBytes: world === null ? 0 : world.transferredBytes,
+    absent: world === null ? [] : world.absent,
+  }));
+}
+
 function stateOpening(env: AppEnvironment, opening: Opening): void {
   env.shell.setAttribute(GENERATED_TILE_OPENING_ATTRIBUTE, opening.pose === null ? 'default' : 'stated');
   if (opening.pose === null) {
@@ -196,6 +221,9 @@ export async function prepareGeneratedTileEvaluation(env: AppEnvironment, name: 
   env.shell.querySelector('.generated-tile-evaluation')?.remove();
   const opening = openTile(tile, pose, tileToRenderer);
   env.shell.append(statement(tile, { kind: 'development', name, containerSha256 }, opening, null));
+  // A committed golden has no rows to compose a world from, so its world is this one tile and the
+  // attribute says the reach was never stated rather than leaving a reader to infer it.
+  stateWorld(env, { name: tile.name, containerSha256 }, null);
   stateOpening(env, opening);
   await (await import('../dev/tile-capture.js')).exposeTileCapture(env.preview, tile);
   return { ...tile, start: opening.start };
@@ -324,6 +352,7 @@ export async function prepareBakedTileWalk(env: AppEnvironment, request: BakedTi
   env.shell.append(statement(tile, {
     kind: 'route', bakedTileId, containerSha256: fetched.containerSha256, origin: fetched.origin,
   }, opening, world));
+  stateWorld(env, { name: tile.name, containerSha256: fetched.containerSha256 }, world);
   stateOpening(env, opening);
   await (await import('../dev/tile-capture.js')).exposeTileCapture(env.preview, tile);
   return { ...tile, start: opening.start };

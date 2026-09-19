@@ -18,6 +18,7 @@ import { bakedTileRequest } from '../src/config.js';
 import {
   GENERATED_TILE_OPENING_ATTRIBUTE,
   GENERATED_TILE_POSE_ATTRIBUTE,
+  GENERATED_TILE_WORLD_ATTRIBUTE,
   prepareBakedTileWalk,
   prepareGeneratedTileEvaluation,
   worldLine,
@@ -312,6 +313,22 @@ describe('walking a tile fetched from the product route', { timeout: 30_000 }, (
     const element = shell();
     await expect(prepareBakedTileWalk({ shell: element, preview: true } as unknown as AppEnvironment, request!))
       .rejects.toThrow(/asked for city a{64} and the container it was served belongs to/);
+  });
+
+  it('states the world as data on the shell, so a record binds what was drawn without parsing prose', async () => {
+    // The same argument the opening pose is data for. A record that grepped the statement would read
+    // a reworded line as a different world, and the thing it must never get wrong is which container
+    // drew the frames and which were only stood on.
+    const request = bakedTileRequest(`?preview=1&city=${CITY}&tile_x=0&tile_y=0`, true);
+    const element = shell();
+    await prepareBakedTileWalk({ shell: element, preview: true } as unknown as AppEnvironment, request!);
+    expect(JSON.parse(element.getAttribute(GENERATED_TILE_WORLD_ATTRIBUTE)!)).toEqual({
+      reach: 'unstated',
+      drawnAndStoodOn: { name: KEY, containerSha256: goldenSha256 },
+      stoodOnOnly: [],
+      transferredBytes: 0,
+      absent: [],
+    });
   });
 
   it('says which containers were drawn and which were only stood on, and names the squares with no ground', () => {
