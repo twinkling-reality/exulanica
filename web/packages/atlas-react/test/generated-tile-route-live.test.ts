@@ -274,9 +274,15 @@ describe.runIf(live)('against a running tile route', () => {
 
   it('answers an unknown key 404 unknown_reference', async () => {
     const refusal = await fetchBakedTile(access, { bakedTileId: '00000000-0000-4000-8000-000000000000', digest })
-      .then(() => null, (error: unknown) => error as TileRouteRefusal);
-    expect(refusal?.code).toBe('unknown_reference');
-    expect(refusal?.status).toBe(404);
+      .then(() => null, (error: unknown) => error);
+    // WHAT KIND OF FAILURE IT WAS, BEFORE WHAT THE ROUTE SAID. Reading `.code` straight off gives
+    // `undefined` for a route that answered something unexpected AND for a connection that never
+    // reached one, and those are not the same finding. This test flaked once on 2026-09-18 and the
+    // message said only "expected undefined", which cost a reproduction to tell the two apart.
+    expect(refusal, 'the route refused rather than the connection failing').toBeInstanceOf(TileRouteRefusal);
+    const named = refusal as TileRouteRefusal;
+    expect(named.code).toBe('unknown_reference');
+    expect(named.status).toBe(404);
   });
 
   it.runIf(permissionless !== undefined)('answers a permissionless credential 404 unknown_reference, as it answers an unknown key', async () => {
