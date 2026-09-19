@@ -1433,6 +1433,9 @@ async function main() {
           tileInputsDigest: header.tile_inputs_digest,
           citySeed: fields.city_seed,
           tile: { x: fields.tile_x, y: fields.tile_y, lod: fields.lod },
+          // The container's own statement of how far it reaches, which is what bounds the obstacles
+          // it carries records for.
+          tileSizeMm: fields.tile_size_mm ?? null,
           grammars: header.grammars.map((grammar) => ({
             id: grammar.grammar_id, version: grammar.grammar_version, descriptorSha256: grammar.descriptor_sha256,
           })),
@@ -1595,6 +1598,29 @@ async function main() {
         `the page's navigation world, radius ${bound.fieldRadius} about (${bound.centreX}, ${bound.centreZ})`,
       );
       observed.field = { ...bound, inscribedHalfSideM: half, bounds: field };
+      // THE TWO HORIZONS, STATED SIDE BY SIDE, because they are not the same radius and a reader
+      // who assumes they are reads a clear run as a clearance.
+      //
+      // MEASURED 2026-09-18: a composed world gives GROUND from its neighbours and NOT THE OBSTACLES
+      // STANDING ON IT. The neighbours contribute their navigation envelope and not their records,
+      // so `routeObstacleRings` was 311 before composition and 311 after, while the field's radius
+      // went from 94.847 m to 326.337 m. The rule then ranked 720 headings across a field three and
+      // a half times wider while seeing one tile's obstacles, and the heading it chose reported a
+      // clear run of 294,755 mm: PAST THE OBSTACLE HORIZON THAT FIGURE IS A DISTANCE NOBODY CHECKED
+      // FOR OBSTRUCTIONS. `candidatesQualified` rose from 3 to 68 on a world whose obstacle set
+      // never changed.
+      //
+      // The obstacle radius is the largest circle about the field centre that the WALKED tile
+      // covers, taken from that container's own `tile_size_mm` rather than written here. Stated as
+      // data so no reader has to infer that the two differ.
+      const walked = (containers ?? []).find((one) => one.tileSizeMm !== null);
+      observed.horizons = {
+        groundKnownWithinM: bound.fieldRadius,
+        obstacleKnownWithinM: walked === undefined ? null : walked.tileSizeMm / 2000,
+        obstacleSource: 'the walked container only, whose records state the rings',
+        obstaclesAreKnownAsFarAsTheGround:
+          walked !== undefined && walked.tileSizeMm / 2000 >= bound.fieldRadius,
+      };
     }
     // THE RULE RANKS, THE GROUND REFUSES. The rule's order is taken as it comes and nothing here
     // reorders it: the walk is the FIRST heading the rule prefers that the product can actually
@@ -2345,6 +2371,7 @@ async function main() {
         obstacles: prisms.length,
         routeRings: routeRings.length,
         routeRingsRefused: observed.routeObstacleRingsRefused ?? [],
+        horizons: observed.horizons ?? null,
         groundRefused,
         routeGround: observed.routeGround ?? null,
         // What each container was FOR, not merely that it was fetched.
