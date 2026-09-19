@@ -1149,30 +1149,6 @@ async function main() {
   const networkLogErrors = [];
   const navigations = [];
   session.on('Network.requestWillBeSent', (event) => {
-    // ASK FOR THE BODY BEFORE IT ARRIVES, not once the response is seen.
-    //
-    // MEASURED 2026-09-18, twice and differently. First: `Network.getResponseBody` for the
-    // corridor's 12.68 MB container is answered with about 16.9 MB of base64 in ONE message and
-    // Node's own WebSocket CLOSES rather than deliver it, and this Chrome has no
-    // `Network.takeResponseBodyAsStream` at all, so the body must be streamed. Then: opening that
-    // stream from the `responseReceived` handler LOST A RACE against the smallest of four
-    // containers, 2,481,736 bytes, which had "already finished loading" by the time the call was
-    // processed. A run before it had read all four and was simply lucky.
-    //
-    // Asked for here, the request cannot have finished yet, so there is no race to lose. It is still
-    // the SAME response, which is what the record depends on: a body fetched again is a second fetch
-    // and can differ from the one the page drew.
-    if (couldBeContainer(event.request.url)) {
-      streamed.set(event.requestId, { parts: [], refused: null });
-      session.send('Network.streamResourceContent', { requestId: event.requestId })
-        .then((result) => {
-          // Whatever had arrived before the stream opened goes in FRONT of the chunks that follow.
-          streamed.get(event.requestId).parts.unshift(Buffer.from(result.bufferedData ?? '', 'base64'));
-        })
-        .catch((error) => {
-          streamed.get(event.requestId).refused = String(error.message ?? error).slice(0, 200);
-        });
-    }
     network.set(event.requestId, {
       url: event.request.url,
       method: event.request.method,
@@ -1190,6 +1166,38 @@ async function main() {
       entry.status = event.response.status;
       entry.mimeType = event.response.mimeType;
     }
+  });
+  // HOLD EACH CONTAINER REQUEST FOR THE INSTANT IT TAKES TO ASK FOR ITS STREAM, then let it go.
+  //
+  // MEASURED 2026-09-18, three times and each one differently. `Network.getResponseBody` for a
+  // 12.68 MB container is answered with about 16.9 MB of base64 in ONE message and Node's own
+  // WebSocket closes rather than deliver it. This Chrome has no `Network.takeResponseBodyAsStream`.
+  // And opening the stream from an EVENT, whether `responseReceived` or `requestWillBeSent`, is a
+  // race against a localhost response that can finish inside the round trip: it lost on the smallest
+  // container of four, then on a larger one, and the run before those had read all four and was
+  // simply lucky.
+  //
+  // Paused, the request has not been sent, so there is no race to lose: measured 4 of 4 streams
+  // opened against 0 refused. THIS SUPPLIES NOTHING. The request is continued untouched and the
+  // bytes are still the ones the server sent to the page, which is what the record binds; a harness
+  // that fulfilled the response itself would be handing the page its own answer.
+  session.on('Fetch.requestPaused', (event) => {
+    const { requestId, networkId, request } = event;
+    (async () => {
+      try {
+        if (networkId !== undefined && couldBeContainer(request.url)) {
+          streamed.set(networkId, { parts: [], refused: null });
+          const opened = await session.send('Network.streamResourceContent', { requestId: networkId })
+            .catch((error) => ({ failed: String(error.message ?? error).slice(0, 200) }));
+          if (opened.failed !== undefined) streamed.get(networkId).refused = opened.failed;
+          else streamed.get(networkId).parts.push(Buffer.from(opened.bufferedData ?? '', 'base64'));
+        }
+      } finally {
+        // ALWAYS, and before anything else can go wrong: a paused request nobody continues is a
+        // page that never loads, and the gate would be reporting on a world it stopped itself.
+        await session.send('Fetch.continueRequest', { requestId }).catch(() => null);
+      }
+    })();
   });
   session.on('Network.dataReceived', (event) => {
     const entry = network.get(event.requestId);
@@ -1275,6 +1283,11 @@ async function main() {
     await session.send('Runtime.enable');
     await session.send('Log.enable');
     await session.send('Network.enable', { maxTotalBufferSize: 256_000_000, maxResourceBufferSize: 64_000_000 });
+    // Only the two shapes a container is served from are paused, so nothing else the page fetches is
+    // held up: this page moves about 200 MB across hundreds of responses.
+    await session.send('Fetch.enable', {
+      patterns: [{ urlPattern: '*/tiles/*', requestStage: 'Request' }, { urlPattern: '*.owd*', requestStage: 'Request' }],
+    });
     await session.send('Emulation.setDeviceMetricsOverride', {
       width: VIEWPORT.width, height: VIEWPORT.height, deviceScaleFactor: 1, mobile: false,
     });
