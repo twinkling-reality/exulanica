@@ -22,7 +22,7 @@
  */
 
 import { webcrypto } from 'node:crypto';
-import { describe, expect, it } from 'vitest';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { parseTextureSetManifest } from '@exulanica/atlas-core';
@@ -51,6 +51,18 @@ const notAContainer = process.env['EXULANICA_TILE_NOT_A_CONTAINER'];
 describe.runIf(live)('against a running tile route', () => {
   const access = { baseUrl: baseUrl ?? '', token: token ?? '' };
   const digest = webcrypto.subtle;
+
+  // AN ABSENT ROUTE IS NAMED, NOT SUFFERED. A connection refused surfaces from deep inside the
+  // loader and reads as a defect in the code under test; it is neither, and a lane lost time to
+  // exactly that when a server promised as standing had died with the session that started it.
+  beforeAll(async () => {
+    try {
+      await listBakedTiles(access, { citySeed: citySeed ?? '' });
+    } catch (error) {
+      if (error instanceof TileRouteRefusal) return;
+      throw new Error(`The tile route at ${baseUrl ?? ''} did not answer (${String(error)}). A tile route is not a handoverable resource: it belongs to the session that started it and dies with it. Start one from the corridor-api entry in orimera's .claude/launch.json (port 8000) and run this again.`);
+    }
+  });
 
   it('lists the city, fetches a container and finds it hashes to the digest its row records', async () => {
     const tiles = await listBakedTiles(access, { citySeed: citySeed ?? '' });

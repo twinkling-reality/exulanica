@@ -218,9 +218,18 @@ branch of the page's world attribute.
       stood on only 8f2188783a8f0347 tile (1,0), e59f6cf05d0ff4e0 tile (2,0)
       transferred 24,977,196, world 27,458,932, 4 route requests, 18 absent squares
 
-18 `no_row` squares rather than the 4 the corridor's middle tile gives, because a tile at the END of
-the row has more empty neighbourhood around it. None was hard-coded; each was checked against the
-route's own listing.
+**NAME THE POPULATION BESIDE THE NUMBER.** 18 absent squares here, 4 in the gate's record, and both
+are right: this run STOOD ON (0,0) WITH A REACH OF 128,000 taken from `tile_size_mm`, and the gate
+STOOD ON (2,0) WITH A REACH OF 131,000 from the route rule. An end tile has more empty neighbourhood
+around it than a middle one. Two correct counts set beside each other with nothing saying which set
+each counted is the third instance in two days, after 2,652 against 916 and 26,406,608 against
+39,089,436. None of the 18 was hard-coded; each was checked against the route's own listing.
+
+**RE-RUN ON THE REBASE ONTO MAIN 6d9e3a58**, which landed ten changed readers in `loom-tess` core
+including `decodeOwd`'s validation of a container's tile record, the call `tilePlacement` makes. Same
+standing tile, same reach, same figures to the triangle and the byte: 225,397 composed, 24,977,196
+transferred, 18 absent, 527 ms against 529. That merge was proved inert by digest on the conformance
+fixture; it is now proved inert against a live route.
 
 **THE ENVIRONMENT IS OWNED BY THE SESSION THAT STARTED IT.** The API and the gate's development
 server were handed over as "standing and free" and both were gone within about thirty minutes; the

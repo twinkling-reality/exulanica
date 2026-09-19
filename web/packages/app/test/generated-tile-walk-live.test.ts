@@ -30,7 +30,7 @@ import { request as httpRequest } from 'node:http';
 import { resolve } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { webcrypto } from 'node:crypto';
-import { fetchBakedTile, listBakedTiles, tilePlacement } from '@exulanica/atlas-react/generated-tile';
+import { TileRouteRefusal, fetchBakedTile, listBakedTiles, tilePlacement } from '@exulanica/atlas-react/generated-tile';
 import { bakedTileRequest } from '../src/config.js';
 import { GENERATED_TILE_WORLD_ATTRIBUTE, prepareBakedTileWalk } from '../src/composition/generated-tile.js';
 import type { AppEnvironment } from '../src/composition/session-state.js';
@@ -126,7 +126,12 @@ describe.runIf(live)('the page against a running tile route', { timeout: 120_000
   });
 
   it('composes a world of real neighbours and states it as data that matches what crossed the wire', async () => {
-    const tiles = await listBakedTiles(access, { citySeed: citySeed ?? '' });
+    // AN ABSENT ROUTE IS NAMED, NOT SUFFERED: a connection refused surfaces from inside the loader
+    // and reads as a defect in the code under test, which it is not.
+    const tiles = await listBakedTiles(access, { citySeed: citySeed ?? '' }).catch((error: unknown) => {
+      if (error instanceof TileRouteRefusal) throw error;
+      throw new Error(`The tile route at ${baseUrl ?? ''} did not answer (${String(error)}). A tile route is not a handoverable resource: it belongs to the session that started it and dies with it. Start one from the corridor-api entry in orimera's .claude/launch.json (port 8000) and run this again.`);
+    });
     const wanted = tiles.find((tile) => tile.state === 'baked');
     expect(wanted, `city ${citySeed ?? ''} has a baked tile`).toBeDefined();
     // ONE EXTRA FETCH OF THE TILE, on purpose: the reach must come from the container's own
