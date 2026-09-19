@@ -570,9 +570,11 @@ def test_no_rise_is_measured_across_missing_ground(tmp_path):
     Without this the gate would report the biggest number in sight as a step every time a route ran
     off the end of the ground, which is the case it meets most often.
     """
-    heights = [0.0] * 5 + [None] * 5 + [9.0] * 5
+    # It STARTS on missing ground, which is the case that separates this from arithmetic on NaN:
+    # a route beginning off the surface, then flat ground, then a hole, then a higher surface.
+    heights = [None, None] + [0.0] * 5 + [None] * 5 + [9.0] * 5
     rise = _steepest_rise(tmp_path, heights)
-    # The flat ground either side IS measured, at zero, because those samples are neighbours.
+    # The flat ground IS measured, at zero, because those samples are neighbours.
     assert rise["riseMm"] == 0.0
     # What must never appear is the 9 m between the two surfaces, which no walker ever climbs.
     assert rise["riseMm"] != 9000.0
@@ -580,8 +582,12 @@ def test_no_rise_is_measured_across_missing_ground(tmp_path):
 
 def test_a_drop_is_not_a_step_up(tmp_path):
     """A fall is not a climb. A route that only descends has a steepest rise of zero, not of 2 m."""
-    rise = _steepest_rise(tmp_path, [2.0, 1.0, 0.0])
-    assert rise["riseMm"] == -1000.0
+    # The drop must be LARGER than the rise, or the two answers coincide and this asserts nothing.
+    # Measured 2026-09-18: written first as [2, 1, 0], where a mutation that ranks by magnitude gives
+    # the same number, so the test passed against the defect it names.
+    rise = _steepest_rise(tmp_path, [0.0, 1.0, -10.0])
+    assert rise["riseMm"] == 1000.0
+    assert rise["atM"] == pytest.approx(0.005)
 
 
 def test_a_flat_route_is_not_the_same_as_nothing_to_measure(tmp_path):
