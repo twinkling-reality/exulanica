@@ -253,8 +253,10 @@ describe('the obstacles of a world of several tiles', () => {
    * WHAT THIS FILE CANNOT COVER, said here rather than left looking covered. The RUNTIME composing a
    * neighbour's records into the set is not exercised anywhere in this repository: it commits one
    * container, and a second tile's bytes would have to be baked, so a neighbour either duplicates
-   * this one (and is correctly deduplicated to nothing) or fails verification. The live route test
-   * is what exercises it, against a store that holds real neighbours.
+   * this one (and is correctly deduplicated to nothing) or fails verification. THE PAGE'S LIVE TEST
+   * is what exercises it, by reading the ring set off a LOADED TILE rather than by composing one
+   * itself: a test that composes rings itself proves the composer works and says nothing about
+   * whether the loader was given the neighbours.
    */
   it('keeps one copy of a building two tiles both state, and says nothing disagreed', () => {
     // The ordinary case: a tile's HALO copy and its neighbour's OWNED copy are the same bytes.

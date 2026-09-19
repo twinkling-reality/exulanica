@@ -148,7 +148,7 @@ describe.runIf(live)('the page against a running tile route', { timeout: 120_000
 
     const element = document.createElement('div');
     document.body.append(element);
-    await prepareBakedTileWalk({ shell: element, preview: true } as unknown as AppEnvironment, request!);
+    const loaded = await prepareBakedTileWalk({ shell: element, preview: true } as unknown as AppEnvironment, request!);
 
     const stated: {
       reach: string;
@@ -185,6 +185,17 @@ describe.runIf(live)('the page against a running tile route', { timeout: 120_000
     // The bytes the page says it moved for the neighbours are the neighbours' own recorded lengths.
     expect(stated.transferredBytes).toBe(stated.stoodOnOnly.reduce((total, tile) => total + rowFor(tile).containerBytes, 0));
 
+    // THE OBSTACLES OF THE WHOLE WORLD, through the runtime rather than by calling the composer
+    // directly. Nothing else exercises this wiring: a test that composes rings itself proves the
+    // composer works and says nothing about whether the loader was given the neighbours.
+    const statedBy = [...new Set(loaded.routeObstructions.stated.map((ring) => ring.statedBy))];
+    expect(statedBy, 'the drawn tile states rings').toContain(request!.kind === 'key' ? request!.bakedTileId : wanted!.bakedTileId);
+    for (const neighbour of stated.stoodOnOnly) {
+      expect(statedBy, `${neighbour.tile} states rings the drawn tile does not`).toContain(neighbour.tile);
+    }
+    // A halo copy agreeing with its owned original is asserted here too, on the real store.
+    expect(loaded.routeObstructions.disagreed).toEqual([]);
+
     // Absent squares, against the listing rather than hard-coded: the city's shape is the city's fact.
     for (const square of stated.absent) {
       const row = tiles.find((tile) => tile.tileX === square.tileX && tile.tileY === square.tileY && tile.lod === placement.lod);
@@ -200,6 +211,8 @@ describe.runIf(live)('the page against a running tile route', { timeout: 120_000
       ownContainerBytes: sized.bytes.length,
       worldBytes: stated.transferredBytes + sized.bytes.length,
       routeRequests: asked.length,
+      ringsStatedBy: statedBy,
+      rings: loaded.routeObstructions.obstacles.length,
     }, null, 1));
   });
 });
