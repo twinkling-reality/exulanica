@@ -515,3 +515,113 @@ container happens to sit first in the list the page fetched. THAT IS A POSITION 
 this change the list had one member so the position could not be wrong. It now has four. The gate's
 own document already says this key "measures one artefact"; `bound[0]` is the mechanism, and which
 artefact it names is now decided by fetch order. I do not own that file and have not changed it.
+
+## The gate on a composed world, measured
+
+Run 2026-09-19 on main `bd4db95a`. Nothing above this line was edited. Condition
+`preview-shell-credentialed-tiles`, target `generated-tile-evaluation`, walk
+`docs/visual-gate-corridor-walk.md` bound by digest `10783f8c…`, pose stated `256000,70300,1,0`,
+route heading 270000 millidegrees, four containers matched on the wire, 56 meshes read.
+
+**SIX OF EIGHT KEY PREDICTIONS HELD, WHICH IS TWO BETTER THAN THE LAST RUN, AND BOTH MISSES ARE
+WORTH MORE THAN THE SIX.**
+
+| key | predicted | measured |
+| --- | --- | --- |
+| continuousTexturedStreetAndFacades | TRUE | TRUE |
+| noCutsOrFloatingGeometry | FALSE | FALSE |
+| usefulEyeLevelMovement | FALSE | **TRUE** |
+| completeCapsuleClearanceVerification | TRUE | TRUE |
+| practicalBrowserBudget | TRUE | **FALSE** |
+| companionPresent, reticlePresent | TRUE | TRUE |
+| authenticatedShellAndAuthoredHandlersPreserved | TRUE | TRUE |
+| readsAsInhabitedStreet | not mine | awaiting the named judge |
+
+**MISS ONE: `practicalBrowserBudget`, AND I NAMED THE MECHANISM AND THEN PREDICTED THE WRONG
+VERDICT.** I wrote that `maxDrawCalls` was "the exposed one" because this change gives every tile
+its own root and its own batches, and then predicted TRUE anyway. Measured:
+
+    environmentTransferredBytes     12,683,297  against 28,247,006    passes, and is ONE container
+    drawnTriangles                     175,034  against    227,173    passes, PREDICTED EXACTLY
+    environmentDecodedTextureBytes 150,831,076  against 167,772,160   passes
+    maxDrawCalls                           179  against         87    FAILS, and is the sole cause
+
+179 against a Melbourne envelope of 87. Four tiles under four roots submit roughly four times one
+tile's batches, which is the thing I described and did not follow to its conclusion. **THIS IS THE
+FIRST KEY THIS CHANGE BREAKS AND IT IS A REAL COST, not an artefact of measurement.** A batch is per
+tile per texture set, and the sets are shared across tiles while the batches are not: the same 13
+sets are uploaded once and drawn four times. Whether that should be one batch per set across the
+world, at the price of rebuilding every vertex as an absolute metre rather than using the float
+payload each container already carries, is a design question this record does not settle.
+
+**MISS TWO: `usefulEyeLevelMovement` WENT TRUE AND I DO NOT KNOW WHY.** I predicted FALSE with
+`maxEyeHeightErrorMm` unchanged at 146, on the reasoning that the walk and the composed GROUND are
+the same as the last run and only the DRAWING changed. Measured 0, on the same walk, the same pose
+and the same 125,010 mm of displacement.
+
+    walkedDisplacementMm 125,010   maxLateralDeviationMm 0   recoveryEvents 0
+    maxEyeHeightErrorMm 0          maxSupportResampleDeltaMm 0   traceSamples 2,502
+
+  I HAVE NO MECHANISM FOR THIS AND AM NOT OFFERING ONE. Two things differ from the run that
+  measured 146: the containers moved from tessellator 19 to 20, and the neighbours are drawn.
+  The first is inert on geometry by the multiset check earlier in this record, which leaves the
+  second, and I cannot see how drawing changes a height read from the navigation surface. The arm
+  that would separate them is a run that COMPOSES four and DRAWS one, and the code no longer offers
+  it. Recorded as an open question rather than explained.
+
+**AND THE NUMBER I GOT WRONG IN THE WRONG DIRECTION.** `componentsDetachedFromSupport` was 773 on
+one drawn tile. I predicted 2,000 to 2,500, about three times, reasoning that three times the drawn
+geometry gives three times the detached components. MEASURED 322: drawing the neighbours MORE THAN
+HALVED IT. The reading that fits is that components which were detached because the geometry they
+continue into was not drawn are now joined to it, and that composition removes detachments faster
+than it adds them. That reading is a hypothesis fitted after the fact and it is written as one.
+
+The rest held: `capsuleTriangleContactSamples` 0 over 2,502 of 2,502 samples, so the neighbours'
+overhanging records at the walk's first 5,950 mm and last 3,000 mm registered no contact;
+`untexturedStreetAndFacadeTriangles` 0; `ringEdgesWithoutDrawnFacade` 0; `trianglesInsideBuildings`
+0; `routeSupportGapSamples` 0; `gpuErrors` and `pageErrors` 0.
+
+## What is in the three frames
+
+Captured by the harness, which hid `.generated-tile-evaluation` and `.scene-segments` before each
+one and recorded `furnitureHidden` per frame, so these carry no development caption. The Companion
+panel is open in all three, which the gate requires and which covers roughly a quarter of each.
+
+**START, at the tile's western edge.** A paved footway receding, its slab joints visible. Buildings
+close on the left with magenta hatched bands at shopfront level and pale panels between them. A line
+of street trees in leaf marching into the distance with furniture beneath them. Magenta on the right
+frontage too.
+
+**MIDPOINT.** The same street further along: footway, trees, buildings both sides, magenta bands.
+**THE UNAVAILABLE PATTERN'S OWN LETTERING IS LEGIBLE AND MIRRORED**, reading UNAVAILABLE right to
+left on the left-hand frontage. That is the pattern seen from its reverse face and it is not
+something this change introduced, but a judge will see it.
+
+**ENDPOINT, WHICH IS THE FRAME THIS LANE EXISTS FOR.** On 2026-09-18 this was empty sky over a bare
+ground plane with no buildings, no trees and no pavement. It is now a street: a pale building with
+arched openings and a magenta shopfront band on the left with a tree in full leaf casting a shadow
+across the pavement, the carriageway curving away to the right, more street trees receding, a red
+brick facade top right, and the footway running on under the camera.
+
+**AND THE THING I MUST NOT CLAIM.** I said earlier that no part of the frame is undrawn world. THAT
+IS NOT SOMETHING I CAN ESTABLISH BY LOOKING, and the 2026-09-18 report said exactly why: the far
+distance fades to a pale haze that cannot be distinguished from undrawn world by eye. What the data
+says instead: the drawn world spans x 0 to about 530,000 including the overhangs, the endpoint
+camera stands at 381,010 facing east, so there is drawn ground for about 149 m ahead of it and
+undrawn world beyond that. Whether the boundary falls inside the visible haze is not decidable from
+the picture, and the honest sentence is the one with the number in it.
+
+## What this record cannot state, and the run record cannot either
+
+**THE RUN RECORD DOES NOT SAY WHICH STORE IT READ FROM.** Its `servedBy` field carries what the
+runner was told, `stated: true, bound: false`, and there is no field anywhere in it for the store
+behind the API. So the record binds four container digests, the walk, the harness and the pose, and
+a reader in a month would take it for a product run. It is not one:
+
+  A RUN AGAINST A PRIVATE STORE IS A TRUE MEASUREMENT OF A COMPOSED WORLD AND IS NOT A MEASUREMENT
+  OF WHAT THE PRODUCT SERVES.
+
+The shared store still holds tessellator 19 and is still unreadable by the tree that serves it. The
+four containers this run scored were baked by this lane into a directory of its own, and the digests
+in its record are the ones predicted and measured earlier in this file. Nothing about that is
+visible from the run record alone, which is a gap in the harness and not in the run.
