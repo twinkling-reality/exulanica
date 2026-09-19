@@ -744,6 +744,69 @@ fails; and **`practicalBrowserBudget` is the one I would watch**, because this t
 across the wire and decoded 149.6 MB of texture, where the fixture that passed moved a fraction of
 that. A key that passed on a fixture and fails on a street is the gate working.
 
+## The first scored run of a real street, measured
+
+**The gate scored a generated street.** Eight mechanical keys measured, the ninth left for the named
+judge, three captures taken, and the condition that admitted it named in the record.
+
+    condition   preview-shell-credentialed-tiles
+    probe       { path: /api/graph, status: 403, asked: true, gateInitiated: true }
+    anonymous   401
+
+**SIX TRUE, TWO FALSE, AND I PREDICTED FOUR AND FOUR.** Four of my eight key predictions were wrong,
+which is the worst prediction record of any run in this document, and every one failed the same way:
+I reasoned from a quantity the key does not measure.
+
+    continuousTexturedStreetAndFacades             TRUE    I predicted FALSE
+    noCutsOrFloatingGeometry                       FALSE   I predicted FALSE
+    usefulEyeLevelMovement                         FALSE   I predicted TRUE
+    completeCapsuleClearanceVerification           TRUE    I predicted FALSE
+    practicalBrowserBudget                         TRUE    I predicted FALSE
+    companionPresent, reticlePresent               TRUE    I predicted TRUE
+    authenticatedShellAndAuthoredHandlersPreserved TRUE    I predicted TRUE
+    readsAsInhabitedStreet                         awaiting the named judge
+
+**WHY EACH MISS WAS THE SAME MISTAKE.**
+
+- **Texture.** I predicted failure from "86 surfaces state no material". The key counts
+  `untexturedStreetAndFacadeTriangles`, which is **0**. Surfaces stating no material and triangles
+  drawn untextured are different populations, and I substituted one for the other.
+- **Movement.** I predicted a pass because the walk finally exceeded the minimum, and it did:
+  `walkedDisplacementMm` is 125,010 against 120,000. It fails on `maxEyeHeightErrorMm` 146. I read
+  the key's name, remembered the distance, and never looked at what else it requires.
+- **Budget.** I predicted failure from the four containers' 39,089,436 bytes. The key reads
+  `environmentTransferredBytes`, which is **12,683,265**: THE ENVIRONMENT ARTIFACT ALONE, not the
+  walk's world. The neighbours a walk stands on are not in the budget this key measures.
+- **Capsule.** I predicted failure from the fixture's history. Measured: 2,502 of 2,502 samples
+  checked, 0 contacts of either kind.
+
+**The one failing key, and its single cause:** `componentsDetachedFromSupport` is **773**, against 62
+on the fixture. Nothing else in that key is non-zero: no support gaps, no ring edges without a drawn
+facade, no triangles inside buildings.
+
+**THE WORLD, BOUND AND CROSS-CHECKED IN THE SCORED RECORD.** Reach stated, the page's 26,406,608
+bytes for the three tiles it only stood on equal to what this run decoded for exactly those three,
+and each container named by what it was for.
+
+**THE TWO HORIZONS, AND THE PREDICTION THAT COULD NOT BE TESTED.** I predicted the obstacle reach
+would extend to about x 525,997 and the ungoverned stretch shrink to about 24,758 mm once the
+neighbours' obstacles were composed. **That composition is not on main**, so:
+
+    ground reaches x   89,245 to 550,755      four tiles
+    obstacles reach x 178,394 to 464,408      unchanged
+    rings                            311      unchanged
+    obstaclesCoverTheGround        false
+    ungoverned                    86,347 mm   unchanged
+
+The prediction is neither confirmed nor refused. It was made against a tree that does not exist yet,
+and saying so is the only honest reading.
+
+**AND THE RECORD ALMOST DID NOT SAY ANY OF IT.** The first scored record stated `horizons: null` and
+`walkWorld: null` while every halt record that evening had carried both, because a halt spreads what
+was observed and A SCORED RECORD IS WRITTEN FIELD BY FIELD: the builder enumerates what it carries,
+was handed both, and dropped them in silence. That is this project's most-repeated defect, in the
+first record it would have mattered in. Both are now carried and a test refuses their removal.
+
 ## The first scored run of a real street, predicted before the server was restarted
 
 The condition is on main and not on the branch that wrote it, so a run may now be scored. Committed
