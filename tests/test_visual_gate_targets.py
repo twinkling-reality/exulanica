@@ -535,6 +535,61 @@ def test_a_local_path_the_product_shows_does_not_reach_the_record(tmp_path):
     assert "<local-path>" in surface["text"]
 
 
+# -- a hole and a kerb are different sentences -----------------------------------------------------
+
+
+def _steepest_rise(tmp_path: Path, heights: list[object], spacing_m: float = 0.005) -> object:
+    """What the harness makes of a run of sampled heights. `None` in the list is the product's NaN."""
+    driver = tmp_path / "rise.mjs"
+    written = ", ".join("Number.NaN" if h is None else repr(float(h)) for h in heights)
+    driver.write_text(
+        f"const harness = await import({str(HARNESS)!r});\n"
+        f"const heights = [{written}];\n"
+        f"console.log(JSON.stringify({{ rise: harness.steepestRiseOf(heights, {spacing_m}) }}));\n"
+    )
+    result = _node(str(driver))
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout.strip().splitlines()[-1])["rise"]
+
+
+def test_a_kerb_is_reported_with_where_it_is(tmp_path):
+    """The hazard this exists for: a join that rises further than the world says it will climb.
+
+    MEASURED by the tess lane 2026-09-18: inside one tile, where terrain meets its street, a join
+    rises 192.987 mm against the 180 mm the world states. The figure below is that one.
+    """
+    heights = [0.0] * 10 + [0.192987] * 10
+    rise = _steepest_rise(tmp_path, heights)
+    assert rise["riseMm"] == 192.987
+    assert rise["atM"] == pytest.approx(0.05)
+
+
+def test_no_rise_is_measured_across_missing_ground(tmp_path):
+    """Two surfaces either side of a hole are not one step, and calling them one invents a kerb.
+
+    Without this the gate would report the biggest number in sight as a step every time a route ran
+    off the end of the ground, which is the case it meets most often.
+    """
+    heights = [0.0] * 5 + [None] * 5 + [9.0] * 5
+    rise = _steepest_rise(tmp_path, heights)
+    # The flat ground either side IS measured, at zero, because those samples are neighbours.
+    assert rise["riseMm"] == 0.0
+    # What must never appear is the 9 m between the two surfaces, which no walker ever climbs.
+    assert rise["riseMm"] != 9000.0
+
+
+def test_a_drop_is_not_a_step_up(tmp_path):
+    """A fall is not a climb. A route that only descends has a steepest rise of zero, not of 2 m."""
+    rise = _steepest_rise(tmp_path, [2.0, 1.0, 0.0])
+    assert rise["riseMm"] == -1000.0
+
+
+def test_a_flat_route_is_not_the_same_as_nothing_to_measure(tmp_path):
+    """Zero is a measurement; null means fewer than two adjacent samples had any surface at all."""
+    assert _steepest_rise(tmp_path, [1.0, 1.0, 1.0])["riseMm"] == 0.0
+    assert _steepest_rise(tmp_path, [None, 1.0, None]) is None
+
+
 HARNESS_TSCONFIG = ROOT / "web/tsconfig.scripts.json"
 
 

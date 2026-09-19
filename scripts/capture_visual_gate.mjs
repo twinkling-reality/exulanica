@@ -389,6 +389,34 @@ export async function productSurfaceOf(session) {
   return surface === null || surface.text === undefined ? surface : { ...surface, text: sanitize(surface.text) };
 }
 
+/**
+ * The steepest RISE between two adjacent supported samples, and how far along it is.
+ *
+ * A gate that only asks where support ENDS cannot tell a hole from a kerb. MEASURED by the tess lane
+ * 2026-09-18: inside one tile, where terrain meets its street, a join rises 192.987 mm over 189
+ * stations, against the 180 mm this world states it will climb. A walk that stops at a rise like that
+ * and a walk that stops at a hole are different sentences, and the heights to tell them apart are
+ * already in hand: this reads them rather than asking the page a second time.
+ *
+ * RISES ONLY, AND ONLY BETWEEN NEIGHBOURS. A drop is a fall and not a step, so it is not reported
+ * here; and no rise is computed ACROSS a gap, because the height either side of missing ground is
+ * two surfaces rather than one step, and calling that a step would invent a kerb where the ground
+ * merely stops. NaN is how the product says it has no surface at a point.
+ *
+ * Null when fewer than two adjacent samples are supported, which is not the same as a flat route:
+ * a flat route returns a rise of 0.
+ */
+export function steepestRiseOf(heights, spacingM) {
+  let steepest = null;
+  for (let step = 1; step < heights.length; step += 1) {
+    if (Number.isNaN(heights[step]) || Number.isNaN(heights[step - 1])) continue;
+    const rise = heights[step] - heights[step - 1];
+    if (steepest === null || rise > steepest.rise) steepest = { rise, atM: step * spacingM };
+  }
+  if (steepest === null) return null;
+  return { riseMm: Math.round(steepest.rise * 1e6) / 1000, atM: steepest.atM };
+}
+
 function listenerSource(normalized) {
   if (normalized.startsWith('web/packages/') || normalized.startsWith('web/node_modules/')) {
     return 'product';
@@ -1466,14 +1494,21 @@ async function main() {
         gaps += 1;
         if (firstGap === null) firstGap = step * GROUND_PROBE_SPACING_M;
       }
-      if (firstGap === null) return null;
+      // Measured for EVERY candidate, supported or not, because the rise is a fact about the line
+      // whether or not the ground also runs out later along it.
+      const steepestRise = steepestRiseOf(heights, GROUND_PROBE_SPACING_M);
+      if (firstGap === null) {
+        return { headingMillidegrees: candidate.headingMillidegrees, supported: true, steepestRise };
+      }
       const x = candidate.start[0] + candidate.forward[0] * firstGap;
       const z = candidate.start[1] + candidate.forward[1] * firstGap;
       const nearest = nearestRingTo(x, z);
       return {
         headingMillidegrees: candidate.headingMillidegrees,
+        supported: false,
         firstUnsupportedAtM: firstGap,
         unsupportedProbes: gaps,
+        steepestRise,
         // WHERE it runs out, and not only how far along. MEASURED 2026-09-18: three headings lost
         // support within the last 2.6 m of a 131 m route, and only the position said why: every one
         // of them was PAST THE TILE'S OWN EDGE. A distance along a heading cannot be compared with a
@@ -1484,13 +1519,15 @@ async function main() {
       };
     };
     let walkPlan = preferred;
+    let walkedGround = null;
     const groundRefused = [];
     if (!scoresOwnedDistrict) {
       walkPlan = null;
       for (const candidate of ranked) {
         const gap = await groundUnder(candidate);
-        if (gap === null) {
+        if (gap.supported) {
           walkPlan = candidate;
+          walkedGround = gap;
           break;
         }
         groundRefused.push(gap);
@@ -1503,6 +1540,10 @@ async function main() {
         preferredByTheRule: preferred.headingMillidegrees,
         refusedForNoGround: groundRefused,
         walked: walkPlan === null ? null : walkPlan.headingMillidegrees,
+        // The rise along the line actually walked, beside the rises of the ones refused, so a stall
+        // later in the run can be read against what this check already knew about that line.
+        walkedGround,
+        productMaximumStepHeight: observed.field?.maximumStepHeight ?? null,
       };
       if (walkPlan === null) {
         const first = groundRefused[0];
@@ -1517,7 +1558,12 @@ async function main() {
           '. The rule reads rings and the field and never asks what holds a body up, so a line it ' +
           'offers can cross ground that is not there. WHAT REMOVED THE SUPPORT IS NOT NAMED HERE: ' +
           'the position and the distance to the nearest ring are stated so a reader can tell a ' +
-          'clearance carve from ground that simply ends.',
+          'clearance carve from ground that simply ends.' +
+          (first.steepestRise === null ? '' : ` Along that line the ground also rises at most ` +
+            `${first.steepestRise.riseMm} mm between samples 5 mm apart, at ${first.steepestRise.atM} m` +
+            (observed.field?.maximumStepHeight === undefined ? ''
+              : `, against the ${observed.field.maximumStepHeight * 1000} mm this world states it will climb`) +
+            ', which is a separate fact from where the support ends.'),
         );
       }
       if (groundRefused.length > 0) {
