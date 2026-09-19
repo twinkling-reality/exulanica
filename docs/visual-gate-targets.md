@@ -744,6 +744,58 @@ fails; and **`practicalBrowserBudget` is the one I would watch**, because this t
 across the wire and decoded 149.6 MB of texture, where the fixture that passed moved a fraction of
 that. A key that passed on a fixture and fails on a street is the gate working.
 
+## What the walk from the tile's edge did, measured
+
+The run at a423835d, load 5.27 before and 5.26 after. Due east qualified, the rule chose it, and the
+product's own navigation surface refused it. **Five predictions held, one failed, and the one that
+failed is the finding.**
+
+**Held:** due east qualified, by the predicted 67 mm. The rule PREFERRED it, on the first criterion
+rather than a tie-break. Few headings qualified: **3**, inside the predicted 1 to 15 and under the
+predicted 10. None was a diagonal: all three are within one degree of east. `routeObstacleRings` came
+back **311 again, exactly**, from the same container, so the rings are a function of the bake.
+
+**FAILED: I predicted the first candidate would have ground and that none would be refused. ALL THREE
+WERE REFUSED**, and my reason for the prediction, that a line down a 16.2 m street runs metres from
+every ring, was CORRECT AND IRRELEVANT. The nearest ring is 4.2 m away. Distance from rings was never
+what mattered here.
+
+    heading   loses support at      position              nearest ring   unsupported
+    270000    128.405 m of 131      (384.405, -70.300)      4.205 m       520 probes
+    270500    129.245 m of 131      (385.240, -71.428)      4.394 m       352 probes
+    271000    129.845 m of 131      (385.825, -72.566)      4.737 m       232 probes
+
+**THE TILE'S EASTERN EDGE IS AT 384.000.** Every one of those positions is past it, and in every case
+the unsupported probe count is exactly the remainder of the route: 520 probes at 5 mm is 2.600 m and
+131 less 128.405 is 2.595. **SUPPORT DOES NOT RESUME. It ends.** This is not a hole in a street, it
+is the end of the ground.
+
+**And here is the structural fact underneath it, which no pose can escape:**
+
+    a tile is                                  128,000 mm across
+    the rule requires length plus margin       131,000 mm
+    so an east-west route inside ONE TILE can never have ground for its whole length
+
+The gate's field is the inscribed square of a field circle that reaches **3,067 mm beyond the tile**,
+and that overhang is precisely what lets the rule qualify a route running off the end of the loaded
+world. The rule reads rings and the field. Neither of those is the ground. This is the same 3,067 mm
+that made the earlier arithmetic four times too generous, arriving a second time in a different
+costume, and it is now the reason the street cannot be walked rather than a rounding error in a
+prediction.
+
+**A DEFECT OF MINE, CAUGHT BY ITS OWN NUMBERS.** The halt message I wrote for this case ended: "every
+line it offers can still cross ground the carve took away." IT NAMED THE CARVE, and this run's own
+figures put the nearest ring 4.2 m away, where the carve acts within about 344 mm. The message
+asserted a mechanism the measurement in the same sentence contradicted, and it would have sent the
+next reader hunting a clearance bug. Fixed at 83043847: the message now states the position and the
+distance to the nearest ring and NAMES NO CAUSE, and the record carries the point where support ends
+so a reader can tell a carve from ground that simply stops without redoing the trigonometry.
+
+**Not measured, and not to be inferred from this run:** `frontageBothSidesSamples`, every key, and the
+authentication condition, which has still never been reached. I predicted no key would be measured
+and was right for the wrong reason: I expected the authentication halt after three captures, and the
+run stopped before a single frame was taken.
+
 ## What the corridor run did, measured, once the gate could reach the street
 
 The run at cd1d4848, served by `corridor-walk-gate` from this worktree, quiet slot then GPU slot, load
