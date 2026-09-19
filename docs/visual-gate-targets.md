@@ -744,6 +744,56 @@ fails; and **`practicalBrowserBudget` is the one I would watch**, because this t
 across the wire and decoded 149.6 MB of texture, where the fixture that passed moved a fraction of
 that. A key that passed on a fixture and fails on a street is the gate working.
 
+## The first scored run of a real street, predicted before the server was restarted
+
+The condition is on main and not on the branch that wrote it, so a run may now be scored. Committed
+before the page was reloaded onto the merged tree.
+
+**THE OBSTACLE REACH, WHICH IS THE PREDICTION WITH A NUMBER IN IT.** The composed world now carries
+the neighbours' obstacles as well as their ground, so the stretch the rule ranks over while knowing
+of nothing standing should SHRINK:
+
+    before, obstacles from the walked container alone   x 178,394 to 464,408
+    ground, unchanged, four tiles                       x  89,245 to 550,755
+    ungoverned before                                      86,347 mm
+
+    PREDICTED after composing the neighbours' rings
+      east reach          about x 525,997, the figure the tess lane measured for (3,0)
+      ungoverned          about 24,758 mm, the last stretch no loaded tile covers at all
+      west reach          BELOW x 178,394, because tiles (1,0) and (0,0) lie west of the walk and
+                          (0,0) reaches from the world's own western edge
+
+**`routeObstacleRings` RISES FROM 311, AND BY LESS THAN THE SUM.** Rings are deduplicated by record
+digest, and a halo copy of a neighbour's building is the same record the neighbour states, so most of
+what composition adds is already described. The tess lane measured 700 counted separately against 418
+deduplicated over three tiles. Over four I predict **between 400 and 800, most likely 450 to 650**,
+and `disagreed` EMPTY: no record stated differently by two tiles.
+
+**THE EIGHT MECHANICAL KEYS, AND I EXPECT FOUR AND FOUR.** Run five scored five true and three false
+on the committed fixture. On a real street:
+
+- `usefulEyeLevelMovement` PASSES FOR THE FIRST TIME, because the walk completes 125,010 mm against
+  a minimum of 120,000. It has never passed on a generated target;
+- **`practicalBrowserBudget` FLIPS TO FALSE, and this is the prediction I care about.** It passed on
+  a fixture that moved a fraction of this. This tile moved 102,625,084 bytes across the wire and
+  decoded 149,596,816 bytes of texture, and the walk's world now fetches four containers totalling
+  39,089,436 bytes before any texture. A key that passes on a fixture and fails on a street is the
+  gate working, not a defect in the street;
+- `continuousTexturedStreetAndFacades` FAILS, on 86 surfaces stating no material and on facade
+  triangles that are zero by construction because the gate hands a generated target no prisms;
+- `noCutsOrFloatingGeometry` FAILS and `completeCapsuleClearanceVerification` FAILS, as on the
+  fixture;
+- `companionPresent`, `reticlePresent` and `authenticatedShellAndAuthoredHandlersPreserved` all
+  PASS, the last of them for the first time on this page, because the condition now names it.
+
+So **four true, four false**, against the fixture's five and three, with the movement key gained and
+the budget key lost.
+
+**AND THE NINTH KEY IS NOT PRODUCED, NOT DRAFTED AND NOT SIMULATED.** It is judged by a named human
+and that human is the operator. The endpoint capture will exist and goes to nobody: the composed
+world is walkable and now obstacle-aware past the edge, and STILL NOT DRAWN past it, so the endpoint
+camera faces undrawn world. That commitment is the orchestrator's and it stands.
+
 ## A third authentication condition, proposed and not implemented
 
 **Nothing below is in the code.** The list and the harness's rule are untouched pending review, and
