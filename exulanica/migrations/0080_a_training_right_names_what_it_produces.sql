@@ -437,8 +437,11 @@ for each row execute function tg_scene_training_artifact_binds();
 -- What a withdrawal reaches
 -- ------------------------------------------------------------------------------------------------
 -- THE DECISION, stated here because the brief that asked for this right said that choosing without
--- saying which is not choosing. Withdrawal REFUSES EVERY FURTHER READ OF THE ARTEFACT AT ONCE, and
--- the binding above records exactly which artefacts a destruction has to reach.
+-- saying which is not choosing. Withdrawal does three things, and this paragraph names all three so
+-- a reader looking for what withdrawal does is not left with the first of them. It CANCELS THE RUN,
+-- queued or running, through the trigger below. It REFUSES EVERY FURTHER READ OF THE ARTEFACT AT
+-- ONCE, through the predicate here. And the binding above records exactly which artefacts a
+-- destruction has to reach, so the fourth thing is possible for whoever builds it.
 --
 -- Why not "recorded as impossible": it would be false. exulanica/deletion/worker.py destroys bytes
 -- through an authorised purger and then asks the store to confirm they are gone, so this system CAN
