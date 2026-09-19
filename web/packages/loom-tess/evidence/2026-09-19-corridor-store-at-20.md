@@ -122,3 +122,104 @@ Items 1 to 4 and 7 and 8 from the containers' own headers, before and after. Ite
 absolute integer triangles of both projections, hashed twice per projection: once sorted, which is
 the multiset, and once in emission order, which is the sequence. Item 9 from the bake script's own
 second pass. Item 10 from the rows. Item 11 from each row's receipt.
+
+## Result: ten of eleven, and the eleventh is a fact about this format nobody had written down
+
+Measured 2026-09-19. Nothing above this line was edited.
+
+**WHERE THESE BYTES ARE, BECAUSE IT DECIDES WHAT THEY CAN SETTLE.** They are NOT in the store and no
+row names them. `scripts/bake_corridor_tiles.py` writes to a shared database and a shared store, and
+that is refused by this session's own permissions, so it has not run. What ran is the pure half of it,
+lifted into a directory of mine: the same `generate_city`, `tile_document`, `validate_city_document`
+and `check_city_reference_closure`, then the same `loom-tess` bake CLI the script shells out to, from
+the lane worktree at `lane/draw-neighbours`, whose `loom-tess` source is byte for byte main
+`bfa398cb`. So these containers answer every question about WHAT A REBAKE PRODUCES and none about
+what the store serves. The store still serves tessellator 19 and the corridor is still unreadable on
+main.
+
+**Two passes of all five, byte identical**, which is prediction 9 and the one the script's own second
+pass exists to check.
+
+| tile | bytes 19 to 20 | container | tile_inputs | render_batch | nav_envelope |
+| --- | ---: | --- | --- | --- | --- |
+| (0,0) | 2,481,736 to 2,481,768 | `acf1474b` to `21b31c9f` | `0ceea9ea` to `cd381483` | `151b3809` to `b00f0eb8` | `92311579` to `3ef97d7f` |
+| (1,0) | 12,294,368 to 12,294,448 | `8f218878` to `7ef4d85c` | `41c18dde` to `e54d25f9` | `4e029987` to `fbe4a342` | `77cfffff` to `6b020340` |
+| (2,0) | 12,682,828 to 12,682,860 | `e59f6cf0` to `ed9acb98` | `2ab27821` to `dfc3cf8b` | `fd4b6ebe` to `7122bd5e` | `35388d78` to `86677d13` |
+| (3,0) | 11,630,504 to 11,630,744 | `5b5225f2` to `47e6457e` | `737eaa6a` to `fe4c2067` | `bb7442bc` to `1ff91767` | `72ad87e5` to `dacc5a4b` |
+| (4,0) | 2,291,492 to 2,291,524 | `cb0de495` to `2676a397` | `fd6a37a8` to `4b0fdf16` | `5dd06e95` to `f5b00dc4` | `dd856f5e` to `abbf7af9` |
+
+**Items 1, 2, 3 and 4 hold on all five.** Every container digest moved, every `tile_inputs_digest`
+moved, and BOTH triangle digests moved on every tile. Item 4 was the one worth stating and it is the
+one to carry forward: the last corridor rebake's headline was that the navigation projection had not
+moved for a facade change across four versions, and it moved on all five this time. Not because any
+ground changed, which items 5 and 6 settle, but because a record's payload digest reaches every
+entry of every projection whatever that entry's state, and a facade's payload changed.
+
+**ITEM 5 HOLDS, WHICH IS THE FALSIFIABLE HALF. NOT ONE TRIANGLE MOVED.** Ten projections, each
+compared as the MULTISET of its absolute integer triangles, each triangle's three corners sorted and
+the whole set sorted before hashing so nothing about order can reach the comparison: identical on
+every one. Triangle and vertex counts are unchanged too, which is item 7.
+
+**Item 6 holds exactly as stated.** `render_batch`'s triangle SEQUENCE moved on all five and
+`nav_envelope`'s held on all five. Records sort by `(kind, sha256)`, so the facades reorder within
+their own kind and every triangle they draw travels with them; a facade contributes no triangle to
+`nav_envelope`, so the reordering is visible there in the entry list and not in the triangles.
+
+**ITEM 8 IS WRONG AND ITS CORRECTION IS THE ENTRY.** I predicted every container would grow by
+exactly 32 bytes. Measured: +32, +80, +32, +240, +32. Two tiles grew by seven and a half times the
+prediction and I would have had no account of it.
+
+Where it comes from, measured per header key rather than guessed:
+
+| tile | header grew | the `tile` record | `render_batch.entries` | `nav_envelope.entries` |
+| --- | ---: | ---: | ---: | ---: |
+| (0,0) | +31 | +31 | 0 | 0 |
+| (1,0) | +83 | +31 | +52 | 0 |
+| (2,0) | +38 | +31 | +7 | 0 |
+| (3,0) | +230 | +31 | +199 | 0 |
+| (4,0) | +31 | +31 | 0 | 0 |
+
+The tile record's new `coordinate_unit` costs +31, not +32, on every tile. EVERYTHING ELSE IS THE
+REORDERING SHOWING UP IN THE BYTE COUNT. `first_vertex` and `first_triangle` are CUMULATIVE offsets,
+and the header is JSON, so an integer's width is its number of decimal digits. Reordering the facades
+hands those running totals to different entries, and the total decimal width of the header changes by
+however the digits fall. It is zero on the two end tiles, which have the fewest facades, and 199
+bytes on (3,0). The difference between header growth and file growth is section alignment padding
+rounding differently underneath it: +1, -3, -6, +10, +1.
+
+  A SCHEMA CHANGE ON THIS FORMAT MOVES NO GEOMETRY, MOVES THE ORDER, AND THEREFORE MOVES THE FILE
+  SIZE BY AN AMOUNT NOBODY CAN PREDICT. The file already says the check that separates geometry from
+  order is the triangle multiset rather than the section digest. This is the third quantity in that
+  family and the least expected one: a byte count is the last place anybody looks for a consequence
+  of sort order, and "equal size is not equal content" already has an entry here from the other
+  direction.
+
+**Item 11 holds.** The undressed set is unchanged in kind and in count on every tile, compared by
+record kind AND surface role rather than by a total: `city.facade ground_band` 6, 88, 85, 82, 6, and
+`city.terrain terrain` 1 on each.
+
+**Item 10 is not tested and cannot be.** Nothing was recorded, so there are no rows, no new
+`baked_tile_id` values and no receipts. That half of the prediction waits on the bake that publishes.
+
+## The four facts the drawing path rests on, now measured at 20 on five tiles
+
+The same four measured on 2026-09-19 against the tessellator 19 store, re-run against these bytes.
+All four hold unchanged, and the third could not be checked at 20 before because no second tile at 20
+existed anywhere.
+
+1. **Each container states its own absolute `origin_mm`.** [0,0,-49], [110000,0,-49], [250000,0,-49],
+   [378050,0,-49] and [506783,0,-49]. Unchanged from 19 on the four that existed.
+2. **Every halo record is marked halo in `render_batch`** and every drawn entry belongs to an owned
+   record: 1058, 1475, 2076, 1447 and 1005 of each, no exceptions. This is enforced rather than
+   observed: `owd.ts` refuses any container whose entry state disagrees with its record's membership.
+3. **The drawn record sets are disjoint across ALL TEN PAIRS**, zero records drawn by two tiles, while
+   281 of (1,0)'s drawn records are carried by (2,0), 287 of (2,0)'s by (3,0) and 250 of (3,0)'s by
+   (4,0). The hazard is real and the containers themselves prevent it.
+4. **Thirteen texture sets cited by each tile and thirteen in the union of all five**, so drawing the
+   neighbours costs no fetch, no decode and no upload beyond what the tile alone already paid.
+
+**AND ONE THING THE FOUR TILES HID.** Tile (4,0) states `render_batch` origin [506783, 0, -49] and
+`nav_envelope` origin [512000, 0, -49]. THEY ARE NOT THE SAME TRIPLE. On the other four they agree
+exactly, and a reader who had seen only those would reasonably conclude a container has one origin.
+Each projection states its own, and code that places drawn geometry must take the origin of the
+projection it is drawing. Found by adding the fifth tile to a measurement that had four.
