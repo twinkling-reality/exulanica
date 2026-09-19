@@ -397,3 +397,64 @@ credential are the same reply from outside.
 A FRAME. Everything above is bytes, rows and a listing. No page has been opened, nothing has been
 drawn to a canvas, and what a composed world costs to RENDER is the third quantity this record has
 twice said nobody has measured. It stays unmeasured here.
+
+## The frame: what the camera sees at the tile edge, with the neighbours and without
+
+Driven 2026-09-19 on main `bd4db95a`, which carries both halves of this change, against the private
+server and store above. **The limit is unchanged and applies to every frame below: this is a true
+measurement of a composed world and is NOT a measurement of what the product serves.**
+
+**THE CONTROL AND THE TREATMENT ARE ONE POSE APART IN NOTHING BUT THE REACH.** Same tile, same
+stated pose `pose_x_mm=381000 pose_y_mm=70300 facing_dx=1 facing_dy=0`, which stands 3,000 mm inside
+tile (2,0)'s eastern edge at x 384,000 and looks east. The only difference is `walk_reach_mm`.
+
+    WITHOUT a reach    1 container. The page says "World: this one tile. The walk stated no reach,
+                       so no neighbouring ground was asked for and the ground ends at this tile's
+                       own edge." 311 route obstruction rings from 217 records.
+    WITH 131,000       4 containers, drawn and stood on: (2,0), (3,0), (1,0), (4,0), nearest first.
+                       26,216,716 bytes for the neighbours. 508 rings from 346 records.
+
+**WHAT IS IN THE CONTROL FRAME, in the same plain terms the gate used.** Pale sky over a bare pale
+ground plane, filling almost the whole frame. A sliver of magenta hatching at the lower right corner
+and a fragment of a building at the extreme left edge. NOTHING AHEAD. That is the endpoint frame
+this lane exists to fix, reproduced deliberately rather than remembered.
+
+**WHAT IS IN THE TREATMENT FRAME.** A street. Buildings on both sides receding into the distance: a
+pale arcaded facade with arched openings on the left, a red brick facade with windows on the right,
+and more building masses beyond them. A row of street trees in leaf down the middle distance. Paved
+footway and carriageway underfoot. The view recedes to a distant haze rather than stopping at an
+edge. **THE MAGENTA UNAVAILABLE HATCHING IS DRAWN ON BOTH SIDES AT GROUND BAND LEVEL**, in the
+neighbours as in the tile, which is the product saying honestly which surfaces no material record
+dresses. 86 surfaces of the drawn tile state it, and the panel says so.
+
+So the street continues past the tile edge, and the thing that was undrawn world is drawn.
+
+**AND A COUNT THAT DIFFERS FROM THE GATE'S FOR A REASON.** The gate's scored run composed FOUR
+containers from a reach of 131,000, and this same reach composed THREE at the walk's opening pose
+and FOUR at the edge pose. All three counts are right and they count different sets: a reach is
+measured from a STATED pose when there is one and from the whole square when there is not, so
+(0,0) is 134,000 mm from x 262,000 and out of reach, while from x 381,000 tile (4,0) comes in at
+exactly 131,000. Say the pose beside the count.
+
+## What a frame costs is STILL NOT MEASURED, and this is why
+
+**THE SCREENSHOTS ARE REAL RENDERS AND THEY ARE NOT FRAMES FROM A RUNNING LOOP.** The Browser pane
+this ran in reports `document.visibilityState` as `hidden` and throttles `requestAnimationFrame` to
+one callback a second. Instrumenting the WebGL context's `drawElements` and `drawArrays` counted
+ZERO draw calls across 21 such callbacks, so the engine is not drawing between captures; a
+screenshot forces a render by another path. Fronting the tab did not change either figure.
+
+    frames sampled        21          rAF interval median 1,007.7 ms, p95 1,008.5 ms
+    draw calls per frame   0          triangles per frame 0
+
+  A NUMBER FROM THIS INSTRUMENT WOULD HAVE BEEN ABOUT THE PANE AND NOT ABOUT THE WORLD, in the same
+  way the load timings earlier in this record were about `verifyOwd` and not about drawing. The
+  honest figure is the one that is not taken.
+
+What IS measurable without a running loop, because it is a property of the containers rather than of
+the renderer: TRIANGLES SUBMITTED. The tile alone draws 56,388. The four composed draw
+56,388 + 57,132 + 52,366 + 8,293 = **174,179**, which is 3.09 times as many. Bytes are already
+settled above and do not move: the neighbours cost no texture fetch.
+
+Measuring milliseconds per frame needs a visible surface and a loop somebody drives on purpose,
+which is what the visual gate's own harness is for.
