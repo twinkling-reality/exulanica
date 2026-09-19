@@ -336,3 +336,64 @@ check left the tile record's own `city_seed` field alone, for the reason
 The tile record's half of that rename is the thing to watch: when it lands it needs city grammar
 version 4, and a version bump alone moves every container digest again and makes everything above
 historical. This record will not say so on its own.
+
+## The corridor at tessellator 20, baked and served, against a store of this lane's own
+
+Run 2026-09-19 morning on `lane/draw-neighbours` rebased onto main `89dbdcd8`. The prediction above
+was committed before any of this and nothing above the result line has been edited since.
+
+**A RUN AGAINST A PRIVATE STORE IS A TRUE MEASUREMENT OF A COMPOSED WORLD AND IS NOT A MEASUREMENT
+OF WHAT THE PRODUCT SERVES.** The shared store is untouched and still holds tessellator 19, the
+corridor is still unreadable on main, and the publish that would change either is still unanswered.
+Every figure below is about a world this lane baked for itself.
+
+Nothing shared was used, and a private DATABASE on the shared server would not have been enough.
+`scripts/test_postgres.py` gives a whole private PostgreSQL server per worktree, and its own header
+records why the smaller units are not private: a schema shares advisory locks, A DATABASE SHARES
+ROLES CLUSTER-WIDE, measured at 40 failures in 80 runs of `provision_runtime_role` from two
+databases on one server, and a server shares checkpoints, measured at a `DROP DATABASE` waiting over
+six minutes. The server is keyed on `Path(__file__).parents[1]`, so it was started from THIS
+worktree's copy of the script: the main checkout's copy would have made a handle two sessions could
+hold.
+
+    server        a private one for this worktree, migrated through 0082, roles provisioned
+    store         a directory of this session's own
+    bake          scripts/bake_corridor_tiles.py, the repository's own publish path, unmodified
+
+**FIVE TILES, TWICE EACH, `identical` ON EVERY SECOND PASS**, which is what that script's second
+pass exists to check. Then served over the product route:
+
+    tile   container   render_batch   nav_envelope        bytes
+    (0,0)  21b31c9f    b00f0eb8       3ef97d7f        2,481,768
+    (1,0)  7ef4d85c    fbe4a342       6b020340       12,294,448
+    (2,0)  ed9acb98    7122bd5e       86677d13       12,682,860
+    (3,0)  47e6457e    1ff91767       dacc5a4b       11,630,744
+    (4,0)  2676a397    f5b00dc4       abbf7af9        2,291,524
+
+EVERY ONE OF THOSE FIFTEEN DIGESTS IS THE ONE THIS RECORD PREDICTED AND THEN MEASURED LAST NIGHT,
+from a bake into a scratch directory by the pure half of that script lifted out of it. So the two
+paths agree: the lifted generation on `bfa398cb` and the repository's own publish path on a tree
+rebased onto `89dbdcd8` produce the same bytes, container for container. That is the second time
+this corridor has been reached by two routes at once, and it is the check the 17 to 19 record called
+its strong one.
+
+**AND EQUAL SIZE IS NOT EQUAL CONTENT, so the sizes agreeing was not taken for the bytes agreeing.**
+The store is content addressed, so its filenames are the digests, and those were compared rather
+than the byte counts. This file already carries an entry about a container whose size was unchanged
+and whose digest was not.
+
+The route serves them: all five listed `baked` at level 0, under a token granted
+`tiles.materialise` and nothing else, minted for this session and held outside the repository.
+
+**A NOTE ON THE WIRE, because two requests were spent on it.** `GET /tiles` takes `city_seed` and
+there is no `/api` prefix. Both are deliberate and the route's own header says so: migration 0081
+renamed the column to `world_seed` and everything behind the wire with it, while the QUERY KEY stays
+`city_seed` because two web tests assert that literal URL and renaming it is a coordinated change.
+An unauthenticated or mistaken ask answers 404 rather than 401, so a wrong path and a missing
+credential are the same reply from outside.
+
+## What is still not measured
+
+A FRAME. Everything above is bytes, rows and a listing. No page has been opened, nothing has been
+drawn to a canvas, and what a composed world costs to RENDER is the third quantity this record has
+twice said nobody has measured. It stays unmeasured here.
