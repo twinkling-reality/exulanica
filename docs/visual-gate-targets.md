@@ -777,6 +777,14 @@ evidence than the absence would have been: 401 to a caller with no credential an
 caller's credential means the API distinguishes NO CREDENTIAL from A CREDENTIAL THAT DOES NOT CARRY
 THIS, which is the property an authentication condition exists to assert.
 
+**WHAT CLAUSE 3 DEPENDS ON, stated in the condition's own definition rather than discovered later.**
+It rests on the page's INCIDENTAL BEHAVIOUR: the page asks for the graph because that is what it
+does today, not because anything requires it to. If it ever stops asking, the property is still true
+and THE EVIDENCE FOR IT VANISHES, and a run then halts for a reason that looks nothing like its
+cause. It fails closed, which is the safe direction. The durable answer is for the harness to probe
+with the page's own credential rather than wait for the page to do it out of habit, and that is a
+credential question for the operator rather than one this lane can settle.
+
 **WHY NEITHER EXISTING CONDITION CAN BE WIDENED TO COVER IT.**
 
 - `credentialed-api` requires NO preview requests at all. That is what makes it mean "this is the
@@ -850,7 +858,19 @@ with composition and the obstacle set did not:
     routeObstacleRings          311             composed   311, unchanged
 
 The neighbours contribute their navigation envelope and not their records, so the rule now ranks 720
-headings across a field three and a half times wider WHILE SEEING OBSTACLES FROM ONE TILE ONLY. The
+headings across a field three and a half times wider WHILE SEEING OBSTACLES FROM ONE TILE ONLY.
+
+> **CORRECTED, and the correction is mine to carry.** "Obstacles from one tile only" is wrong, and so
+> was the 64,000 mm obstacle horizon I wrote from `tile_size_mm` into an append-only record on a
+> figure I was given. MEASURED SINCE, twice and independently, from the page's own hook and from the
+> harness in a walk: the 311 rings reach x 178,394 to 464,408 while the walked tile ends at 384,000,
+> so they extend about 80 m past its edge. The set is one tile's records PLUS THE HALO IT CARRIES FOR
+> CARVING, which nothing filters out. The defect survives and shrinks: the ground reaches x 550,755,
+> so the stretch the rule ranks over while knowing of nothing standing is about 86,347 mm at this
+> walk's eastern end, not most of a street. Superseded in
+> `docs/evaluation/2026-09-18-obstacle-reach-measured-from-the-rings.json`; the earlier record stands
+> unedited. The lesson is the count: 311 was stable across composition, and I read stability as
+> scope. The
 chosen heading reports a clear run of 294,755 mm, which reaches well into tile (3,0), through
 buildings the rule cannot see. **This walk is unaffected**: it ran from x 256,000 to 381,000 and never
 left tile (2,0). But `candidatesQualified` rose from 3 to 68 on a world whose obstacles did not

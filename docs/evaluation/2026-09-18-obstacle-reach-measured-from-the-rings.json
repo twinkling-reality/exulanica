@@ -1,0 +1,44 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "carried_forward": "The harness derives the obstacle reach from the extent of the rings themselves and never from a tile edge, and records it beside the ground reach with a stated flag for whether one covers the other. Deriving it from tile_size_mm was the same fault in a third costume, after a route window taken from a tile edge and a clear run taken from ground.",
+    "consequence": "The defect survives and shrinks. The route rule still ranks headings over ground where it knows of nothing standing, but the stretch is about 86,347 mm at the eastern end of this walk rather than most of a street. A clear run quoted past x 464408 is a distance nobody checked for obstructions.",
+    "date": "2026-09-18",
+    "kind": "correction",
+    "measured_by_this_lane": {
+      "ground_reaches_x_from_mm": 89245,
+      "ground_reaches_x_to_mm": 550755,
+      "how": "The rings the rule holds, read twice and independently: from the page's own routeObstructions hook in the browser, and from the harness during a walk. Both give the same extent.",
+      "obstacles_cover_the_ground": false,
+      "obstacles_reach_x_from_mm": 178394,
+      "obstacles_reach_x_to_mm": 464408,
+      "obstacles_reach_y_from_mm": 11420,
+      "obstacles_reach_y_to_mm": 116634,
+      "rings": 311,
+      "ungoverned_stretch_east_from_mm": 464408,
+      "ungoverned_stretch_east_mm": 86347,
+      "ungoverned_stretch_east_to_mm": 550755,
+      "walked_tile_x_from_mm": 256000,
+      "walked_tile_x_to_mm": 384000
+    },
+    "owner": "the route rule's inputs, not the gate harness",
+    "subject": "where the route rule can see obstacles, measured from the rings",
+    "supersedes": {
+      "figure": "obstacle_known_within_mm 64000",
+      "record": "docs/evaluation/2026-09-18-clear-run-measures-ground-not-clearance.json",
+      "why_it_was_wrong": "It was derived from the walked container's tile_size_mm, so it assumed the rings stop where the tile does. They do not. That earlier record is retained unedited and its other statements stand; this one replaces its obstacle reach and nothing else."
+    },
+    "told_not_measured_here": {
+      "and_the_stretch_no_loaded_tile_covers_at_all_mm": 24758,
+      "and_would_reach_x_to_mm": 525997,
+      "composing_the_eastern_neighbour_would_add_rings": 90,
+      "from_records_the_walked_tile_never_held": 1177,
+      "halo_rings": 171,
+      "owned_rings": 140,
+      "so_the_stretch_composing_could_govern_mm": 61589,
+      "source": "the tess lane, by way of the orchestrator"
+    },
+    "what_311_means": "A TRUE NUMBER THAT DOES NOT MEAN ONE TILE'S OBSTACLES. The rings reach about 77,600 mm west and about 80,400 mm east of the walked tile's own edges, and a tile's own records cannot lie that far outside it. The tess lane reports, and this lane has not read the code, that routeObstructionRings applies NO MEMBERSHIP FILTER: every header record carries a membership of owned or halo and the function reads neither, so the halo a tile carries for carving has been feeding the obstacle set all along. Of the 311, that lane counts 140 owned and 171 halo. The count being stable across composition is what made it look like a scope."
+  },
+  "record_sha256": "4202c5e246ede5ab5ea252651f462edb465997ceafb65dcdf0cfef5b0742782f"
+}
