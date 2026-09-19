@@ -84,7 +84,8 @@ def _document() -> dict[str, Any]:
 
 
 def _load(tmp_path: Path, document: dict[str, Any]) -> Grammar:
-    path = tmp_path / "city.v2.json"
+    # Named for the descriptor under test, so the copy declares the version its own name says.
+    path = tmp_path / CITY_DESCRIPTOR_PATH.name
     path.write_text(json.dumps(document), encoding="utf-8")
     return Grammar.from_descriptor(path, CITY_STAGES)
 

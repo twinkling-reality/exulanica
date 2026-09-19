@@ -26,9 +26,9 @@ identity, the subject kind, the owner identity and the ordinal. The owner and or
 kind are its shape's ``IdentityRule``; a side (``SIDE_CODES``) and a surface role
 (``SURFACE_ROLE_CODES``) stand in for ordinals by their append-only codes.
 
-**Parameters.** 72 are declared in ``city.v2.json``, each with a unit, a cascade level (city,
+**Parameters.** 91 are declared in ``city.v3.json``, each with a unit, a cascade level (city,
 district, block, lot, building, face), the one stage that reads it, a vocabulary and a basis.
-``driving_side`` is ``required``; the other 71 are ``derive``: unset, the reading stage derives a
+``driving_side`` is ``required``; the other 90 are ``derive``: unset, the reading stage derives a
 value per subject within the declared range and the record states it. A binding sets a parameter
 at its own level or a coarser one, one binding per level for the whole city, so a binding is a
 city-wide statement, never a per-subject one. Only ``city.facade`` carries its parameters as
@@ -101,7 +101,7 @@ of detail, the 128 m tile, the 64 m halo, the ownership and halo rules, and ``ed
 sorted) into that field; the empty subsequence is ``EMPTY_EDIT_DELTA_DIGEST``. ``baked_tile_id``
 is ``uuid5(ARTIFACT_NAMESPACE, "baked_tile:<version>:<params digest>:<tile_inputs_digest>")``.
 
-2. THE TESSELLATOR (``web/packages/loom-tess``, stage ``baked_tile`` version 3, tessellator 19)
+2. THE TESSELLATOR (``web/packages/loom-tess``, stage ``baked_tile`` version 3, tessellator 20)
 ===============================================================================
 
 **Container** ``owd/3``, magic ``OWD3``: canonical JSON header (tile record and inputs digest,
@@ -120,7 +120,7 @@ bake; the browser build is a preview held to the same triangle digest. Two bakes
 ``baked_tile_id`` that differ are a fault; the table that records that fault is migration 0072,
 this lane's.
 
-**What draws, measured from the corridor's own container ``e59f6cf05d...``, tessellator 19.** Of
+**What draws, measured from the corridor's own container ``e59f6cf05d...``.** Of
 tile (2, 0)'s 4,149 entries, 527 draw: 168 facades, 89 rooftop objects, 78 vitrines, 51 interior
 backings, 36 pieces of street furniture, 33 parcels, 32 massings, 30 street trees, 6 curb edges, 3
 street segments and the terrain. That is 1,637 surfaces, 1,551 of them dressed by a material

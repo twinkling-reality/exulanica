@@ -24,6 +24,16 @@ export type Sha256Hex = (bytes: Uint8Array) => Promise<string>;
 export interface Bake {
   /** The `.owd` bytes. Their SHA-256 is the artifact's content hash. */
   readonly container: Uint8Array;
+  /**
+   * The coordinate unit the DOCUMENT stated, or that its version fixes. Not this build's constant.
+   *
+   * The container header asserts a unit for the records it carries, and that assertion is true only
+   * because a bake refuses a document stating another one. Reporting what was read is what ties the
+   * two together: a bake that could not say which unit it had just read would be reporting a belief
+   * in the shape of a reading, and the day the refusal stopped being reached the header would go on
+   * asserting millimetres over records that were not.
+   */
+  readonly coordinateUnit: string;
   /** SHA-256 of the tile record's canonical payload: the tile's own stable key. */
   readonly tileInputsDigest: string;
   readonly triangleDigests: ReadonlyMap<ProjectionName, string>;
@@ -132,7 +142,8 @@ export async function bakeTile(documentBytes: Uint8Array, sha256: Sha256Hex): Pr
         + 'at another level is refused rather than drawn at this one',
     );
   }
-  checkCoordinateUnit(coordinateUnitOf(tileTableOf(GRAMMAR_TABLES, document.tile, 'tile'), document.tile));
+  const coordinateUnit = coordinateUnitOf(tileTableOf(GRAMMAR_TABLES, document.tile, 'tile'), document.tile);
+  checkCoordinateUnit(coordinateUnit);
   const recordDigests: string[] = [];
   for (const record of documentRecords(document)) recordDigests.push(await sha256(recordBytes(record.payload)));
   const tessellation = tessellate(document, recordDigests);
@@ -143,7 +154,7 @@ export async function bakeTile(documentBytes: Uint8Array, sha256: Sha256Hex): Pr
     triangleDigests.set(mesh.name, await sha256(preimage));
   }
   const container = encodeOwd(tessellation, { tileInputs: tileInputsDigest, triangles: triangleDigests });
-  return { container, tileInputsDigest, triangleDigests, tessellation };
+  return { container, coordinateUnit, tileInputsDigest, triangleDigests, tessellation };
 }
 
 /** The document's order within a membership list: kind, then version, then identity. */

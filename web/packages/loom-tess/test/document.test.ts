@@ -298,6 +298,15 @@ describe('the coordinate unit a tile document states (ADR-0024)', () => {
     expect(coordinateUnitOf(table, document.tile)).toBe('millimetre');
   });
 
+  it('reports the unit it read from every document it bakes, not the unit this build writes', async () => {
+    // THE CALL SITE, not the check. Breaking `checkCoordinateUnit` fails its own test whether or
+    // not a bake ever calls it, and no input can reach it with a foreign unit because the grammar's
+    // closed values refuse one first. So the bake has to SAY what it read, and these assert it for
+    // a document that states the unit and one whose version fixes it.
+    expect((await bakeTile(fixtureBytes(), nodeSha256)).coordinateUnit).toBe('millimetre');
+    expect((await bakeTile(v2Bytes(), nodeSha256)).coordinateUnit).toBe('millimetre');
+  });
+
   it('reads a version 3 document at the unit the document itself states', () => {
     const document = readTileDocument(fixtureBytes());
     expect(document.tile.version).toBe(3);
