@@ -1598,8 +1598,8 @@ async function main() {
         `the page's navigation world, radius ${bound.fieldRadius} about (${bound.centreX}, ${bound.centreZ})`,
       );
       observed.field = { ...bound, inscribedHalfSideM: half, bounds: field };
-      // THE TWO HORIZONS, STATED SIDE BY SIDE, because they are not the same radius and a reader
-      // who assumes they are reads a clear run as a clearance.
+      // THE TWO HORIZONS, STATED SIDE BY SIDE, because they are not the same reach and a reader who
+      // assumes they are reads a clear run as a clearance.
       //
       // MEASURED 2026-09-18: a composed world gives GROUND from its neighbours and NOT THE OBSTACLES
       // STANDING ON IT. The neighbours contribute their navigation envelope and not their records,
@@ -1610,16 +1610,46 @@ async function main() {
       // FOR OBSTRUCTIONS. `candidatesQualified` rose from 3 to 68 on a world whose obstacle set
       // never changed.
       //
-      // The obstacle radius is the largest circle about the field centre that the WALKED tile
-      // covers, taken from that container's own `tile_size_mm` rather than written here. Stated as
-      // data so no reader has to infer that the two differ.
-      const walked = (containers ?? []).find((one) => one.tileSizeMm !== null);
+      // THE OBSTACLE REACH IS MEASURED FROM THE RINGS THEMSELVES, never from a tile edge.
+      //
+      // MEASURED 2026-09-19, after this recorded the wrong quantity: the walked tile's 311 rings
+      // span x 178,394 to 464,408 in city millimetres while the tile itself ends at 384,000, so they
+      // reach about 80 m PAST it. A tile's own records cannot lie 80 m outside it, so the set is not
+      // "one tile's obstacles"; the tess lane reports, and this lane has not read, that
+      // `routeObstructionRings` applies no membership filter and the halo a tile carries for carving
+      // has been feeding the obstacle set all along. 311 is a true number that does not mean what a
+      // reader assumes.
+      //
+      // Deriving a horizon from `tile_size_mm` was the same fault in a third costume, after a route
+      // window taken from a tile edge and a clear run taken from ground. The extent of the rings the
+      // rule ACTUALLY HOLDS is the only honest statement of where it can see anything.
+      let obstacleBounds = null;
+      for (const { ring } of routeRings) {
+        for (const point of ring) {
+          const [x, z] = point;
+          obstacleBounds = obstacleBounds === null
+            ? { west: x, north: z, east: x, south: z }
+            : {
+              west: Math.min(obstacleBounds.west, x),
+              north: Math.min(obstacleBounds.north, z),
+              east: Math.max(obstacleBounds.east, x),
+              south: Math.max(obstacleBounds.south, z),
+            };
+        }
+      }
+      const [groundWest, groundNorth, groundEast, groundSouth] = field;
       observed.horizons = {
-        groundKnownWithinM: bound.fieldRadius,
-        obstacleKnownWithinM: walked === undefined ? null : walked.tileSizeMm / 2000,
-        obstacleSource: 'the walked container only, whose records state the rings',
-        obstaclesAreKnownAsFarAsTheGround:
-          walked !== undefined && walked.tileSizeMm / 2000 >= bound.fieldRadius,
+        frame: 'the renderer frame in metres, the same frame as field.bounds',
+        groundBounds: { west: groundWest, north: groundNorth, east: groundEast, south: groundSouth },
+        groundRadiusM: bound.fieldRadius,
+        obstacleBounds,
+        obstacleSource: 'the rings the rule holds, whatever records they came from',
+        rings: routeRings.length,
+        // The question a reader actually has: is there ground the rule can rank over and see nothing
+        // standing on? A `false` here is why a clear run past the obstacles is not a clearance.
+        obstaclesCoverTheGround: obstacleBounds !== null
+          && obstacleBounds.west <= groundWest && obstacleBounds.north <= groundNorth
+          && obstacleBounds.east >= groundEast && obstacleBounds.south >= groundSouth,
       };
     }
     // THE RULE RANKS, THE GROUND REFUSES. The rule's order is taken as it comes and nothing here
