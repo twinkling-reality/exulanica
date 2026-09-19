@@ -124,11 +124,17 @@ export const BAKE_PARAMETERS = {
  * first and a bake never reaches this. It costs one comparison and it will fire on the day
  * somebody builds the case that invalidates it, which is the point of writing it now.
  *
- * IT RETURNS THE UNIT SO THE CALL CANNOT BE DROPPED. No test can prove a bake calls this: the
- * grammar refuses a foreign unit before a bake reaches it, so removing the call changes no
- * observable behaviour and every test goes on passing. Deleting it was tried, and 83 tests passed.
- * Handing back the value the caller needs makes the compiler the thing that notices, which is the
- * only check here that does not depend on somebody remembering to write one.
+ * NOTHING PROVES A BAKE CALLS THIS, and that is stated rather than papered over. The grammar
+ * refuses a foreign unit before a bake reaches this, so removing the call changes no observable
+ * behaviour: deleting it was tried and 83 tests passed. Returning the unit rather than nothing was
+ * the second attempt, so the caller would need the value; that fails too, because `coordinateUnitOf`
+ * returns a string as well and the two are interchangeable to the compiler. A branded return type
+ * would settle it and is ceremony around a check that cannot fire.
+ *
+ * So the honest statement is the one a later reader needs: THE CALL IS NOT COVERED, its absence
+ * costs nothing while every version this tessellator reads admits one unit, and whoever adds a
+ * version that admits a second is the person who must check this path is still wired. The bake
+ * reports the unit it read, which is tested, so what IS covered is that the unit reaches the bake.
  */
 export function checkCoordinateUnit(unit: string): string {
   if (unit === COORDINATE_UNIT) return unit;

@@ -52,6 +52,33 @@ load over the real ones and callable in a test with a version that decides nothi
 fails exactly one test. The fix is committed as `9190daf2`, separately from the breaks, so the
 before and after are both on the record.
 
+## A call site nothing covers, and two attempts to cover it that failed
+
+Breaking `checkCoordinateUnit` fails its own test. THAT DOES NOT PROVE A BAKE CALLS IT, and deleting
+the call from `bakeTile` passed all 83 tests in the file. Found by breaking it rather than by
+reading, after the same shape had already been found twice in this lane.
+
+Why no test reaches it: a real bake fed `coordinate_unit: micrometre` is refused by the GRAMMAR's
+closed values first, `tile.fields.coordinate_unit: is not one of ["millimetre"]`, so no input can
+arrive at the build's own check with a unit to refuse. That probe is the cheap general move when a
+break of a guard fails nothing: feed a real input to the real entry point and read which refusal
+answers.
+
+Two attempts to make the call provable, both measured and both failed:
+
+1. **Have the bake report the unit it read.** It does, and that is worth keeping for its own sake,
+   but it proves `coordinateUnitOf` runs rather than that the check does: the reported value is
+   computed on the line before, so deleting the check leaves the report intact. 83 passed.
+2. **Have the check return the unit, so the caller needs its value.** Also fails: `coordinateUnitOf`
+   returns a string too, the two are interchangeable to the compiler, and typecheck exits 0 with the
+   call gone.
+
+A branded return type would settle it. It was not taken, because it is ceremony around a check that
+cannot fire, and a false sense of coverage is worse than a stated gap. THE GAP IS: the call is not
+covered, its absence costs nothing while every version this tessellator reads admits one unit, and
+whoever adds a version admitting a second must check this path is still wired. What IS covered is
+that the unit reaches the bake.
+
 ## What is vacuous today, said plainly
 
 The build's own quantum refusal (break 5) cannot fire through a bake on any shipped grammar. Every
