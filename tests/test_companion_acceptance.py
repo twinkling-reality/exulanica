@@ -42,10 +42,11 @@ def frozen_input() -> dict:
     ``retained_packet`` and ``recorder``, so the gate is on the only way in and a new test cannot
     forget it.
 
-    MEASURED 2026-09-19 in a fresh clone at f3a5d521: without this, 13 of the 21 tests in this file
-    FAILED and 6 ERRORED with a bare ``FileNotFoundError``, in every tree except the one checkout
-    where the campaign was run. That is the state the repository has been teaching lanes to read
-    past, and a skip naming the three files is what a reader can act on.
+    MEASURED 2026-09-19 by a full suite run in a fresh clone at f3a5d521: without this, 14 of the
+    21 tests in this file FAILED and 6 ERRORED with a bare ``FileNotFoundError``, and they were
+    THE ONLY RED IN 9,452 TESTS. Every tree except the one checkout where the campaign was run saw
+    them, which is the state the repository has been teaching lanes to read past. A skip naming
+    the three files is what a reader can act on instead.
 
     ``is_file`` rather than the index on purpose, and the difference is not pedantry. The
     documentation guard asks git, because a link is a claim about a commit. This asks the disk,
