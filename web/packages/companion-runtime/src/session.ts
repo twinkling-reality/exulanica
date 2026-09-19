@@ -337,9 +337,21 @@ export class CompanionSession {
   /**
    * Submit a multi-select set.
    *
-   * The selected options are merged into ONE draft, so the user confirms one thing once. Every
-   * option in the set is re-checked against `assertMultiSelectable`: the pool already refused to
-   * build a tier 2 option into a multi set, and this is the second place that has to be true.
+   * The selected options are merged into ONE draft, so the user confirms one thing once.
+   *
+   * THE `assertMultiSelectable` BELOW CANNOT CURRENTLY REFUSE ANYTHING, which is said here so
+   * the vacancy is visible rather than read as a guard holding something up. What refuses first
+   * is `validateTurn`, which puts every option of a multi set through the same assertion at
+   * generation; `#turn` has exactly one assignment, in `advance`, from `generateTurn`, and both
+   * of that function's exits validate. `prune` freezes each option, so a tier cannot be changed
+   * afterwards either. It was documented as the pool refusing first; the pool does not check
+   * modes at all.
+   *
+   * Measured 2026-09-19: deleting this line left all 2846 tests in `web/` passing, and replacing
+   * it with an unconditional throw failed exactly one, so the line runs on every submit and has
+   * never had anything to refuse. What would make it reachable is a second way to put a turn on
+   * a session, a restore, a replay, or a turn handed in by a caller, that does not go through
+   * `generateTurn`. It is kept for that day, and until then nothing here is evidence it fires.
    */
   submit(optionIds: readonly string[], nowMs: number): SelectionOutcome {
     const turn = this.#turn;

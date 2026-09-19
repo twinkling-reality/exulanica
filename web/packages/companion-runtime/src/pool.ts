@@ -495,6 +495,15 @@ export function prune(
     const tier = s.draft?.maxTier ?? 0;
     // Tier 3 may never reach the dialogue surface, in any phrasing (5.3). Throws, not filters:
     // a tier 3 option in a dialogue pool is a bug in the builder, not a runtime condition.
+    //
+    // IT CANNOT REFUSE ANYTHING TODAY, and that is a fact about this file rather than about the
+    // guard. `assertOfferable(_, 'dialogue')` refuses tier 3 only, tiers 0 to 2 all being
+    // offerable from here; `deriveTier` returns 3 only for a `delete`; and every
+    // `draftOperation` built below is `name`, `note`, `reject_inference` or `relate`. So it
+    // becomes live the day a spec here builds a delete, which is exactly the day it is wanted.
+    // Measured 2026-09-19: deleting this line left all 2846 tests in `web/` passing, and
+    // replacing it with an unconditional throw failed 29, so the line runs constantly and has
+    // never had anything to refuse.
     assertOfferable(tier, 'dialogue');
 
     options.push(

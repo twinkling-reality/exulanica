@@ -160,9 +160,16 @@ export class TierPolicyError extends Error {
  * The gate that keeps deletion out of the conversation.
  *
  * 5.3: "The Companion may never propose a deletion, in any phrasing, under any circumstance."
- * That sentence is only true if something throws, so this throws. It is called from the option
- * pool builder, from proposal drafting and from the initiative gate: three independent places a
- * tier 3 operation could otherwise leak into the dialogue.
+ * That sentence is only true if something throws, so this throws. It is called from TWO places:
+ * the option pool builder (`prune`) and turn validation (`validateTurn`).
+ *
+ * It said three until 2026-09-19, naming proposal drafting and the initiative gate, and neither
+ * of those calls it: the initiative gate reads `tierPolicy(...).offerableByInitiative` and
+ * drafting derives a tier without consulting a surface at all. So the count was wrong, the two
+ * places named were wrong, and the one place that does call it was not named. Counted across
+ * every package's `src`, and now pinned by 'states its own call sites' in the tests, because a
+ * justification that names a number is a second claim and this one drifted with nothing
+ * watching it.
  */
 export function assertOfferable(tier: ConsequenceTier, surface: ConfirmationSurface): void {
   const policy = tierPolicy(tier);

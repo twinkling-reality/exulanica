@@ -1,3 +1,4 @@
+import { readdir, readFile } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { ProposalGateError } from '@exulanica/graph-client/mutations';
 import { deriveTier } from '@exulanica/graph-client';
@@ -90,6 +91,146 @@ describe('tier 2 cannot be confirmed without its blast radius and its live previ
   it('refuses to put a tier 2 option in a multi-select set', () => {
     expect(() => assertMultiSelectable(1)).not.toThrow();
     expect(() => assertMultiSelectable(2)).toThrow(TierPolicyError);
+  });
+
+  it('rejects a multi-select set that somehow carries a tier 2 option', () => {
+    // The test above tests the function. This tests the only CALL of it that can refuse
+    // anything, in validateTurn. Measured 2026-09-19: deleting that line left every one of the
+    // 2846 tests in web/ passing, so 4.3's "never mix a tier 2 option into a multi-select set"
+    // was held in place by nothing. The pool refuses to build such a set, which is why the turn
+    // has to be hand-built here, the same way the tier 3 case below builds the turn the pool
+    // would never produce.
+    const mergeDraft = makeDraft({
+      draftId: 'draft-merge',
+      origin: 'user_choice',
+      rawUtterance: '',
+      subjectEntityId: 'ent-julie',
+      operations: [draftOperation('merge', ['a1'], ['i1'], {})],
+      provenanceSummaryKey: 'provenance.x',
+    });
+    // Derived, not declared: a merge is tier 2 because of what it is, not because this said so.
+    expect(mergeDraft.maxTier).toBe(2);
+    // Tier 2 IS offerable from the dialogue surface and this set does require a submit, so
+    // neither the tier 3 guard on the line above nor the submit rule can be what answers.
+    expect(() => assertOfferable(2, 'dialogue')).not.toThrow();
+    const turn: Turn = {
+      turnId: 'turn-multi',
+      intent: 'resolve_identity',
+      subjectEntityId: 'ent-julie',
+      subjectAnchorId: 'a1',
+      utteranceKey: 'utterance.resolveIdentity',
+      utterance: null,
+      evidence: [],
+      choiceSet: {
+        mode: 'multi',
+        submitRequired: true,
+        options: [
+          {
+            optionId: 'x:merge',
+            kind: 'multi_select',
+            textKey: 'option.mergeThesePeople',
+            phrasing: null,
+            available: true,
+            unavailableReasonKey: null,
+            tier: mergeDraft.maxTier,
+            draft: mergeDraft,
+            escape: null,
+          },
+        ],
+      },
+      freeTextAllowed: true,
+      escapes: [
+        {
+          optionId: 'escape:skip',
+          kind: 'escape',
+          textKey: 'escape.skip',
+          phrasing: null,
+          available: true,
+          unavailableReasonKey: null,
+          tier: 0,
+          draft: null,
+          escape: 'skip',
+        },
+      ],
+      stateVersion: 1,
+    };
+    expect(() => validateTurn(turn)).toThrow(TierPolicyError);
+  });
+});
+
+/**
+ * Calls of `name` in one source text, with comments removed first so a MENTION is not a call.
+ *
+ * Needed the moment it was written: the pool's own comment explains what
+ * `assertOfferable(_, 'dialogue')` refuses, and a scan of raw text counted that sentence as a
+ * second call site. The `[^:]` before `//` keeps a URL inside a string from being read as a
+ * comment and swallowing the rest of its line.
+ */
+function countCalls(text: string, name: string): number {
+  const code = text.replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:])\/\/.*$/gm, '$1');
+  const calls = [...code.matchAll(new RegExp(`(?<![.\\w])${name}\\(`, 'g'))].length;
+  return calls - (new RegExp(`export function ${name}\\(`).test(code) ? 1 : 0);
+}
+
+/** Every call of `name` across every package's `src`, by path, declaration not counted. */
+async function callSites(name: string): Promise<Record<string, number>> {
+  const root = new URL('../../', import.meta.url);
+  const found: Record<string, number> = {};
+  const walk = async (dir: URL): Promise<void> => {
+    for (const entry of await readdir(dir, { withFileTypes: true })) {
+      if (entry.name === 'node_modules' || entry.name === 'dist') continue;
+      const here = new URL(entry.name + (entry.isDirectory() ? '/' : ''), dir);
+      if (entry.isDirectory()) {
+        await walk(here);
+        continue;
+      }
+      const relative = here.pathname.slice(root.pathname.length);
+      if (!entry.name.endsWith('.ts') || !relative.includes('/src/')) continue;
+      const calls = countCalls(await readFile(here, 'utf8'), name);
+      if (calls > 0) found[relative] = calls;
+    }
+  };
+  await walk(root);
+  return found;
+}
+
+describe('the tier assertions state their own call sites', () => {
+  it('counts them from the source: a justification naming a number is a claim', async () => {
+    // `assertOfferable` documented itself as called from "three independent places", naming
+    // proposal drafting and the initiative gate. Counted 2026-09-19: two places, and neither of
+    // those two was one of them. Nothing asserted the count, so the prose and the code drifted
+    // with nothing watching. This is that assertion. When a call site is added or removed, fix
+    // the docstring in the same change rather than only the expectation here.
+    expect(await callSites('assertOfferable')).toEqual({
+      'companion-runtime/src/pool.ts': 1,
+      'companion-runtime/src/turn.ts': 1,
+    });
+    // session.ts's is the re-check on submit, which cannot refuse anything: validateTurn has
+    // already put the same option through the same assertion. turn.ts's is the live one.
+    expect(await callSites('assertMultiSelectable')).toEqual({
+      'companion-runtime/src/session.ts': 1,
+      'companion-runtime/src/turn.ts': 1,
+    });
+    // Called from another package entirely, which is why a search of this one reads as zero.
+    expect(await callSites('assertBatchable')).toEqual({ 'world-index/src/actions.ts': 1 });
+  });
+
+  it('is a scan that can fail, which is the only reason to believe the counts above', () => {
+    // The positive control, on the same axis as the negative result: a scan that matched nothing
+    // would return {} for all three above and read exactly like agreement.
+    expect(countCalls("assertOfferable(3, 'dialogue');\n", 'assertOfferable')).toBe(1);
+    const mention = "// what assertOfferable(3, 'dialogue') refuses\n";
+    expect(countCalls(mention, 'assertOfferable')).toBe(0);
+    expect(countCalls('/* calls assertOfferable(3) */\n', 'assertOfferable')).toBe(0);
+    const afterUrl = "const u = 'https://x'; assertOfferable(1, 'd');\n";
+    expect(countCalls(afterUrl, 'assertOfferable')).toBe(1);
+    expect(countCalls('thing.assertOfferable(1);\n', 'assertOfferable')).toBe(0);
+    expect(countCalls('assertOfferableTwice(1);\n', 'assertOfferable')).toBe(0);
+    expect(countCalls('export function assertOfferable(t) {}\n', 'assertOfferable')).toBe(0);
+  });
+
+  it('finds nothing for a name nothing calls, so an empty answer means absence', async () => {
+    expect(await callSites('assertNothingIsNamedThis')).toEqual({});
   });
 });
 
