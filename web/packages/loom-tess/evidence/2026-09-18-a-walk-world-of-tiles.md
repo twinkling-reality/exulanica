@@ -68,6 +68,13 @@ the composed world: each tile draws only what it owns, so the west tile's curb o
 edge was being compared against the east tile's bare ground under it. 207 was recognisable as a curb
 height from the extents, which is the only reason it was caught.
 
+**THE CATCH WAS LUCK WEARING THE CLOTHES OF A CHECK.** Nothing in the measurement would have
+disagreed with the wrong reading; a number happened to be recognisable to somebody who had printed a
+different table an hour before. A measurement whose only defence is that its author remembers a
+number is not defended. What defends this one is the control row, open ground with nothing joining
+reading 0.000 mm over 189 stations, which was added afterwards and is the reason the 49 mm means
+anything.
+
 ## What it costs
 
     tile      container      header      render    nav bin   nav tris
@@ -113,10 +120,41 @@ Ground across the seam, through the runtime's own code, in metres:
     y  64,000   west alone: 0     / null     composed: 0     / -0.033    (this is the piece working)
     y 115,250   west alone: 0     / null     composed: 0     / -0.049
 
+## Which tiles are fetched, and what that costs on the real corridor
+
+`walkWorldTiles` takes the list the route serves and the walk's start, and returns the tile the walk
+stands on, the tiles within the route's own reach, and EVERY SQUARE WITHIN REACH THE WORLD HAS NO
+GROUND FOR. The squares are enumerated rather than inferred from a shorter list, and the two kinds of
+absence are kept apart: `no_row` means the store knows nothing about that square, and any other
+reason is the row's own state, such as a bake fault. That is the difference between "the city is that
+size" and "the bake of that tile failed", and a walk must not read one as the other.
+
+From the gate's start at x 256,000 on tile (2,0), with reach 131,000:
+
+    stands on   (2,0)
+    neighbours  (1,0) at 0 mm, then (0,0) and (3,0) at 128,000, the tie broken by row then column
+    absent      (1,-1) (2,-1) (1,1) (2,1), all `no_row`: THE CORRIDOR IS ONE ROW
+
+WHOLE CONTAINERS ARE FETCHED, by decision, because nothing serves a container's sections and the
+route supports no ranges. The slim slice stays a measured proposal: 1,969,322 bytes against
+11,630,504 is a sixth of the transfer, and it needs its own contract and its own tests.
+
+**THE REACH IS A DISK AROUND THE START, AND THAT OVER-FETCHES.** Measured on the real containers:
+
+    the rule as stated    (2,0) + (1,0) + (0,0) + (3,0)   39,089,436 bytes
+    reach along the walk  (2,0) + (3,0)                   24,313,332 bytes
+
+Tile (0,0) is within 131,000 mm of the start and an eastbound walk can never reach it, so 14,776,104
+bytes, 38 percent, are fetched for ground nobody stands on. The disk is faithful to the sentence that
+was registered and it is a safe superset: it does not need the heading, so it cannot be wrong about
+one. A rule taking the reach along the walk's own stated pose and heading would fetch only what the
+route can touch. THAT IS A DECISION FOR WHOEVER OWNS THE BUDGET and it is named here with its number
+rather than taken quietly.
+
 ## What is not done
 
-- No neighbour is FETCHED by anything yet: `loadGeneratedTile` accepts neighbour containers and
-  verifies them, and choosing which tiles to ask the store for is not written.
+- Nothing CALLS `walkWorldTiles` or `fetchWalkWorld` yet: the page still loads one tile and does not
+  hand the neighbours it now knows how to choose and fetch to `loadGeneratedTile`.
 - Nothing serves a container's nav sections separately, so the 1,969,322 above is a measurement of
   what a slice would cost and not of a slice anybody can request today.
 - No neighbour is drawn, per the statement above.

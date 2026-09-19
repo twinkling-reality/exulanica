@@ -86,6 +86,8 @@ export {
   listBakedTiles,
   tileAt,
 } from './tile-route.js';
+export type { AbsentTile, FetchedWalkWorld, TileCoordinate, WalkWorldPlan } from './walk-world.js';
+export { fetchWalkWorld, tileName, walkWorldTiles } from './walk-world.js';
 export type { CapturedPose, TileCaptureSession } from './capture.js';
 export { beginTileCapture } from './capture.js';
 export type { ObstructionRings, RefusedObstructionRing, StatedObstructionRing } from './obstruction-rings.js';
