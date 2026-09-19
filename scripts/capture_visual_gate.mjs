@@ -1474,6 +1474,12 @@ async function main() {
         headingMillidegrees: candidate.headingMillidegrees,
         firstUnsupportedAtM: firstGap,
         unsupportedProbes: gaps,
+        // WHERE it runs out, and not only how far along. MEASURED 2026-09-18: three headings lost
+        // support within the last 2.6 m of a 131 m route, and only the position said why: every one
+        // of them was PAST THE TILE'S OWN EDGE. A distance along a heading cannot be compared with a
+        // tile boundary without doing the trigonometry by hand, which is how a reader ends up
+        // guessing at a mechanism instead of reading one.
+        at: { xM: Number(x.toFixed(4)), zM: Number(z.toFixed(4)) },
         nearestRouteRing: nearest === null ? null : { id: nearest.id, metres: Number(nearest.metres.toFixed(4)) },
       };
     };
@@ -1505,11 +1511,13 @@ async function main() {
           `refused by the product's own navigation surface, sampled every ` +
           `${GROUND_PROBE_SPACING_M * 1000} mm over ${walkedM} m. The one the rule preferred, ` +
           `${first.headingMillidegrees} millidegrees, loses support ${first.firstUnsupportedAtM.toFixed(3)} m ` +
-          `along` +
+          `along, at (${first.at.xM}, ${first.at.zM})` +
           (first.nearestRouteRing === null ? '' : `, ${first.nearestRouteRing.metres.toFixed(3)} m from a ring ` +
             `the rule qualifies past at ${THRESHOLDS.capsuleRadiusMm} mm`) +
-          '. The rule reads rings and the field and never asks what holds a body up, so every line it ' +
-          'offers can still cross ground the carve took away.',
+          '. The rule reads rings and the field and never asks what holds a body up, so a line it ' +
+          'offers can cross ground that is not there. WHAT REMOVED THE SUPPORT IS NOT NAMED HERE: ' +
+          'the position and the distance to the nearest ring are stated so a reader can tell a ' +
+          'clearance carve from ground that simply ends.',
         );
       }
       if (groundRefused.length > 0) {
