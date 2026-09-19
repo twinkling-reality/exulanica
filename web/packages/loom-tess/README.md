@@ -79,10 +79,18 @@ Core does not check the grammar's named rules, whether a ring is simple, whether
 resolve or identities derive, catalog keys or membership. The grammar's `validate_city_document`
 checks all of them, against the descriptor and catalogs the tile pins.
 
-`src/core/city-v2.ts` is the grammar's own table: `describe_shapes` over the city's record shapes
-(`tests/fixtures/city-v2/record-shapes.json`), and the descriptor's frame, contract measures and
-navigation table (each kind's ground, cover and obstruction, without the row's prose reason). It is
-generated, not transcribed:
+`src/core/city-v<N>.ts` is each grammar version's own table: `describe_shapes` over that version's
+record shapes, and its descriptor's frame, contract measures and navigation table (each kind's
+ground, cover and obstruction, without the row's prose reason). There is one per version this
+tessellator reads, and since ADR-0024 there are two: version 3 states a tile document's coordinate
+unit and version 2 does not, so a document is read against the shape the version IT PINS declares
+(`document.tileTableOf`) and never against whichever table sits first in the list.
+
+A superseded version's shapes are frozen beside its descriptor (`city-shapes.v2.json`), because
+`describe_shapes` runs over the Python code and the code describes one version. The current
+version's come from what the fixture builder last wrote. Which is which is decided by reading the
+grammar directory, and each pairing is checked against the tile record version its descriptor
+declares. The tables are generated, not transcribed:
 
 ```bash
 pnpm exec tsx packages/loom-tess/test/write-grammar-table.ts
