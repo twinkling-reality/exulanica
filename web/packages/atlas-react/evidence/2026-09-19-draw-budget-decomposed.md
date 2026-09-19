@@ -231,3 +231,39 @@ independent store, an independent database and an independent run, with `maxSupp
 it as an open question rather than taking the pass. IT IS NOT A FLUKE OF THAT RUN. It is still
 unexplained, nothing in this lane touches it, and a second observation is worth having beside the
 first.
+
+## The gate carries the same figures, from its own recorder, over the whole walk
+
+Added after the sections above, which were committed before this run and are unedited.
+
+`scripts/capture_visual_gate.mjs` now records the pass each draw belongs to and the triangles each
+pass rasterised, as evidence beside `decidingMax`. No key reads any of it. A second run of the same
+walk, same pose, same four containers, at `d1b9fb87` plus that one file:
+
+    decidingMax        179      productWindowMax 179, routeMax 179, over 4,986 rendered frames
+    routeMaxCounted    179      the harness's own count of the same frames, from the device
+    routeBusiestFrame  PrepassRT 39, ShadowMap2D_DEPTH 93, SceneColor 43, SsaoFinalTexture 2,
+                       SsaoTempTexture 1, WebglFramebuffer 1
+    rasterised         711,744  PrepassRT 164,502, ShadowMap2D_DEPTH 381,336, SceneColor 165,898
+
+**THE BUSIEST FRAME OF A 125 METRE WALK IS THE FRAME THE STANDALONE MEASUREMENT FOUND AT THE OPENING
+POSE**, target for target and triangle for triangle. Two instruments written separately, one driving
+its own browser and one inside the gate's, agreeing on every figure. And `routeMaxCounted` agrees
+with `routeMax`, which is the product's own field: the count added here is the same frame's draws
+and not a second opinion about them.
+
+All eight mechanical keys are what the first run measured, key for key, including the two that are
+false. Nothing in this lane moved a key.
+
+## Two halts worth writing down, because neither was a fault in the harness
+
+**The owned district halted on a credential and then on an empty world**, which is the section above.
+
+**The corridor halted once on a credential that could read too much.** Widening the token to
+`library.read` for the district attempt left the corridor run unable to name its own authentication
+condition: `preview requests 6, graph read true, anonymous status 401`, which matches no declared
+condition. THE HARNESS REFUSED TO SCORE A PAGE IT COULD NOT NAME THE CONDITIONS OF, which is what it
+should do, and the fix was to put the grant back to `world.read` and `tiles.materialise` so the run
+is the same condition as the first. Recorded because a lane widening a grant for an unrelated reason
+is an easy way to make a run incomparable to the one before it, and the only thing that caught it was
+the harness declining.
