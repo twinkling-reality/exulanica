@@ -29,12 +29,17 @@ them; the orchestrator verified the correction before this work started.
 
 ## The result
 
-**Prediction 1 held exactly.** `world-listing-before.log.txt` was taken at 0359dda3 on a clean
-tree and `world-listing-after.log.txt` at de34e1ca on a clean tree. `diff` reports FOUR lines,
-which is the two predicted lines on each side:
+**Prediction 1 held exactly.** `world-listing-before.log.txt` was taken on a clean tree carrying
+the old spelling and `world-listing-after.log.txt` on a clean tree carrying the new one. Each
+log's header records the commit it ran at; those commits are not named here, because a rebase
+rewrites them and a hash in prose is a claim that rots on the next one. WHAT IDENTIFIES EACH SIDE
+IS IN THE LOG ITSELF AND CANNOT ROT: the `listing method` line, which reads `tiles_of_city` on one
+and `tiles_of_world` on the other, and only one of those two methods exists on either tree.
+
+`diff` reports FOUR lines, which is the two predicted lines on each side:
 
     listing method  tiles_of_city   ->  tiles_of_world
-    commit          0359dda3        ->  de34e1ca
+    commit          <before>        ->  <after>
 
 Nothing else differs. All four counts came back as predicted: 4 tiles for the world under test out
 of 6 bakes recorded, 1 for another world, 3 narrowed to level of detail 0, 0 for a world nothing
@@ -52,7 +57,8 @@ through its real client over a real migrated schema.
 ## The falsification
 
 `docs/artifacts/world-identity/falsification-cases.json`, run with `scripts/falsify.py` from the
-committed tree de34e1ca. Six breaks, EACH APPLIED ALONE, each over both whole test files rather
+committed tree that first carried the rename, which is the commit this record's own predecessor
+introduces. Six breaks, EACH APPLIED ALONE, each over both whole test files rather
 than under a `-k` filter, each restored and the restored bytes compared by digest.
 
     the migration adds world_seed BESIDE city_seed instead of renaming it   REFUSED
@@ -109,6 +115,38 @@ is what a later commit has to change deliberately.
 
 The route was NOT made to accept both spellings. A parameter admitting two names is a gate that
 enumerates, and a reader here refuses an unrecognised name rather than widening to admit it.
+
+## The follow-up, classified by what each occurrence BINDS TO
+
+Not by file, because the file does not tell you when it moves. Four classes, and each moves at a
+different moment:
+
+    THE QUERY PARAMETER, read by a caller, moves when the wire is renamed
+      web/packages/atlas-react/src/playcanvas/generated-tile/tile-route.ts   builds ?city_seed=
+      web/packages/atlas-react/test/generated-tile-route.test.ts             asserts the literal URL
+      web/packages/app/test/generated-tile-walk.test.ts                      asserts the literal URL
+      tests/test_corridor_tile_route.py                                      holds both spellings
+      docs/generated-corridor-street.md:117                                  describes the route
+
+    THE RESPONSE KEY, written here and read by nobody, moves with the wire for coherence only
+      three appearances in web tests, all of them stubs BUILDING a fake response
+
+    THE CONTAINER'S OWN FIELD, moves at city grammar version 4 and at nothing else
+      web/packages/atlas-react/src/playcanvas/generated-tile/walk-world.ts   text('city_seed')
+      web/packages/loom-tess/src/core/city-v2.ts, city-v3.ts                 generated tables
+      web/packages/loom-tess/test/document.test.ts                           mutates the field
+      web/packages/loom-tess/test/fixtures/, app/src/dev/tiles/*.owd         committed documents
+      scripts/capture_visual_gate.mjs:1611                                   reads a container
+      exulanica/world/baked_tiles.py                                         reads the tile record
+
+    PURE TYPESCRIPT IDENTIFIERS, move whenever anybody is in the file
+      app/src/config.ts, app/src/composition/generated-tile.ts, tile-route.ts, and their tests
+
+`docs/generated-corridor-street.md:117` is in the first class and is deliberately left alone. It
+says the route lists "what is stored for one city" under `?city_seed=`, which is TRUE OF THE WIRE,
+and the wire is what it describes. Rewriting it to say "world" while the tile record still says
+city would put the seam in a THIRD place, and two places carrying a deliberate disagreement is
+already the most a reader should have to hold. It moves when the wire does, in the same commit.
 
 ## What is left, and it is not small
 

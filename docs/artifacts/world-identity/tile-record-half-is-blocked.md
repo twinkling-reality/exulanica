@@ -1,7 +1,7 @@
 # The tile record's half cannot land in Python alone, and the blocker is the version
 
 The rename's remaining half is `TileRecord.city_seed` to `world_seed` at city grammar version 4.
-This is what a Python-only attempt at it measured on 2026-09-19, from the committed tree bebaeb2e.
+This is what a Python-only attempt at it measured on 2026-09-19, from a committed and clean tree.
 It was measured rather than reasoned from the version 3 precedent, which was two commits: the
 Python grammar half at cd40963c and the web half at e7a24623 one commit later.
 
@@ -76,9 +76,9 @@ must answer that assertion rather than extend a list past it.
 
 ## The restore
 
-The break was applied from the committed tree bebaeb2e and undone with `git reset --hard` plus a
+The break was applied from a committed, clean tree and undone with `git reset --hard` plus a
 scoped `git clean`. The restored state was PRINTED rather than trusted: `git status` clean, HEAD
-bebaeb2e, `city.v4.json` gone, `tile-document.json` back to
+unmoved, `city.v4.json` gone, `tile-document.json` back to
 49be7eff98247649e1276b9c6ef5c441be9ad3289b220ba8135ce7e87aad8e77 and `record-shapes.json` back to
 35603f3d7e5831de00dcd2e0ce9deca98faf84354274253aa384d50a7cbcfdb5, and all three version constants
 back to 3.
