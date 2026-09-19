@@ -201,11 +201,46 @@ be (1,0) is the same edit that makes it not itself, so it is refused for not bak
 records. A container that is internally consistent and in the wrong place is covered separately, and
 the wording of a composed statement is covered by a unit test of the line itself.
 
+## Run against a real route, 2026-09-18 21:45
+
+Both live tests have now run against a standing API and both pass. This is the FIRST EXECUTION
+ANYWHERE of the composition against containers this repository did not make, and of the populated
+branch of the page's world attribute.
+
+    atlas-react, the fetch and the composition
+      standing on (0,0), reach 128,000, taken from that container's own tile_size_mm
+      neighbours tile (1,0) and tile (2,0); 18 absent squares, ALL no_row
+      triangles 7,122 alone, 225,397 composed, which is 7,122 + 121,530 + 96,745 exactly
+      transferred 24,977,196 for the neighbours, world 27,458,932, took 529 ms
+
+    app, the page and its data attribute
+      reach "stated"; drawn acf1474b71855749 at 2,481,736
+      stood on only 8f2188783a8f0347 tile (1,0), e59f6cf05d0ff4e0 tile (2,0)
+      transferred 24,977,196, world 27,458,932, 4 route requests, 18 absent squares
+
+18 `no_row` squares rather than the 4 the corridor's middle tile gives, because a tile at the END of
+the row has more empty neighbourhood around it. None was hard-coded; each was checked against the
+route's own listing.
+
+**THE ENVIRONMENT IS OWNED BY THE SESSION THAT STARTED IT.** The API and the gate's development
+server were handed over as "standing and free" and both were gone within about thirty minutes; the
+first run failed on ECONNREFUSED. The API was restarted through its own `corridor-api` launch entry
+so that it belonged to the session that needed it. A live test's dependency is not the server being
+up when the test was written.
+
+**TWO DEFECTS IN THE TEST HARNESS, both found by running and neither by reading.** The page test's
+own route calls were going through the stub it had installed for the page and answering 404. And
+happy-dom enforces the same-origin policy on its `fetch`, so a page test that deliberately talks to
+another origin has to go under the window through Node's HTTP client rather than relax the policy for
+every test sharing that environment.
+
 ## What is not done
 
-- NOTHING END TO END HAS EVER COMPOSED TWO REAL CONTAINERS THROUGH THE PAGE. The composition itself
-  is measured on the corridor's real tiles (2,0) and (3,0) through the runtime's own code, and the
-  page path is exercised as far as a refusal. A second baked container closes that gap.
+- The obstacle half. Neighbours give GROUND and not OBSTACLES: the route rule ranks headings across a
+  field three and a half times wider while seeing obstruction rings from one tile, so a clear run of
+  294,755 mm into a neighbour is clear because nothing told the rule otherwise. Their whole
+  containers are already fetched and verified, so their records are in hand; the rings must stay out
+  of the navigation world, for the reason written beside `polygonObstacles`.
 - Nothing serves a container's nav sections separately, so the 1,969,322 above is a measurement of
   what a slice would cost and not of a slice anybody can request today.
 - No neighbour is drawn, per the statement above.
