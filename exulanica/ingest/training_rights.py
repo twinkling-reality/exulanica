@@ -38,14 +38,21 @@ queued; and it refuses the artifact insert that would publish anything, so a rig
 when the job was queued but was withdrawn during the run stops the run publishing. A withdrawal
 landing mid run therefore costs the GPU seconds and leaves nothing behind.
 
-**What a withdrawal does, and what it does not do yet.** It refuses every further read at once,
-which is what :func:`require_artifact_training_right` enforces under the final read check, and it
-is recorded against every artefact the right permitted. It does NOT yet enqueue destruction. That
-reaches into the tombstone and purge-queue invariants of migrations 0013 and 0015 and is its own
-piece of work; :func:`artifact_training_sources` and ``scene_training_artifact`` are what that work
-will read. Destruction could not be synchronous in any case, since the purger is a separate process
-that correctly skips bytes another live capture still holds, so the immediate refusal is not a
-substitute for destruction but the thing that covers the interval before it lands.
+**What a withdrawal does, in four parts now rather than three.** It cancels the run, queued or
+running. It refuses every further read at once, which is what
+:func:`require_artifact_training_right` enforces under the final read check. It is recorded against
+every artefact the right permitted. And since migration 0082 it ENQUEUES DESTRUCTION: withdrawing
+writes a ``scene_training`` tombstone naming the photograph, whose cascade queues every artefact
+``scene_training_artifact`` binds to a right that was withdrawn, and
+:mod:`exulanica.deletion.worker` destroys those bytes through the one purge machinery.
+
+**The refusal is not made redundant by the destruction, and this is the part worth keeping.**
+Destruction cannot be synchronous: the purger is a separate process that correctly skips bytes
+another live capture still holds, so between a withdrawal committing and a purge completing there
+is an interval of unbounded and sometimes infinite length in which the artefact still exists. The
+refusal is what covers it. The photograph itself is NOT deleted, which is what the person asked for
+and is why the destruction needs a destroy question of its own: ``purge_releases_bytes`` answers
+false for a trained artefact while its capture is live.
 """
 
 from __future__ import annotations
@@ -233,9 +240,7 @@ def _row(row: dict[str, Any]) -> TrainingRightRow:
     )
 
 
-def training_right(
-    repository: IngestRepository, right_id: uuid.UUID
-) -> TrainingRightRow | None:
+def training_right(repository: IngestRepository, right_id: uuid.UUID) -> TrainingRightRow | None:
     """One right by id in this workspace, withdrawn or not, or None."""
     row = repository.connection.execute(
         f"select {_COLUMNS} from scene_training_right where workspace_id=%s and right_id=%s",

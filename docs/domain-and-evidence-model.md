@@ -1396,6 +1396,27 @@ create index on tombstone using gist (capture_id, interval_ns) where scope = 'in
 **DECISION (del-1).** Tombstones are **never deleted and never expire**. Deletion is monotonic. "Undo
 delete" is not offered; a short pre-tombstone grace period in the UI is offered instead.
 
+**ADDED 2026-09-19. A sixth scope, and it is the one that spares its own subject** (migration 0082).
+`tombstone_scope` gains `scene_training`, written by a trigger when an account holder withdraws the
+right that let a trainer read one of their photographs. The sentence it has to make true is: *a
+`scene_training` tombstone over a capture erases what was trained from that capture, and the capture
+itself survives by design.* Withdrawing permission to train is not asking for your photograph back,
+so this tombstone soft-deletes nothing, blocks no read of the capture, and enqueues only the
+artefacts `scene_training_artifact` binds to a right that was withdrawn.
+
+An erasure that spares its subject is not new: 0030's entity tombstone already destroys a person's
+derivatives while retaining the source photographs, and records `source_capture_policy: retained`.
+And widening the enum is on the rule 0024, 0038 and 0066 each declined to widen it under, rather
+than against it: that rule is that a tombstone erases personal data and an authored change that is
+not erasure goes in its own table, and a reconstruction of somebody's home, erased because they
+withdrew the right that permitted it, is erasure of personal data.
+
+It also needs its own destroy question. `purge_releases_bytes` answers FALSE for a trained artefact
+while its capture is live, because section 6.4's scene clause says a scene artefact none of whose
+members is deleted still holds its bytes. That clause is right for every other caller and wrong for
+the one erasure whose subject stays alive, so `scene_training_withdrawal_releases_artifact` is what
+a tombstone of this scope asks instead.
+
 ### 6.3 The gate is a trigger, in the writing transaction
 
 Application-level checks are not sufficient, because retries arrive from stale workers holding
