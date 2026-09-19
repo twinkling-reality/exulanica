@@ -4,7 +4,9 @@ from __future__ import annotations
 
 import copy
 import json
+import subprocess
 import uuid
+import warnings
 from dataclasses import replace
 
 import pytest
@@ -14,15 +16,95 @@ from exulanica.selection import Answer, AnswerClause, SelectionPlan, Session
 from exulanica.selection.packet import EvidenceItem, EvidencePacket, ValueReference
 from exulanica.selection.question import CallLog, answer_question, compose_answer
 from scripts.measure_companion_acceptance import (
+    FIRST_PLACE,
+    MATCHING,
+    ROOT,
+    WIRE,
     digest,
-    frozen_input,
     request_totals,
     score_comparison,
     score_observation,
     verify_input,
 )
+from scripts.measure_companion_acceptance import frozen_input as _frozen_input
 
 from model_fakes import chat_body
+
+#: The retained evidence every measurement in this file is frozen against, named by the script
+#: that reads it rather than retyped here, so a path that moves takes the skip reason with it.
+FROZEN_INPUT_EVIDENCE: tuple[str, ...] = (MATCHING, FIRST_PLACE, WIRE)
+
+
+def frozen_input() -> dict:
+    """The frozen input, or a skip naming exactly which retained files this tree does not hold.
+
+    Every test below reaches the retained evidence through this one function, directly or through
+    ``retained_packet`` and ``recorder``, so the gate is on the only way in and a new test cannot
+    forget it.
+
+    MEASURED 2026-09-19 in a fresh clone at f3a5d521: without this, 13 of the 21 tests in this file
+    FAILED and 6 ERRORED with a bare ``FileNotFoundError``, in every tree except the one checkout
+    where the campaign was run. That is the state the repository has been teaching lanes to read
+    past, and a skip naming the three files is what a reader can act on.
+
+    ``is_file`` rather than the index on purpose, and the difference is not pedantry. The
+    documentation guard asks git, because a link is a claim about a commit. This asks the disk,
+    because the question here is whether THIS RUN can read the bytes, and the operator's checkout
+    can while a clone cannot. The two questions have different right answers on the same tree, and
+    the test below pins the third fact that makes both true: the files are in no commit.
+    """
+    absent = [path for path in FROZEN_INPUT_EVIDENCE if not (ROOT / path).is_file()]
+    if absent:
+        pytest.skip(
+            "the retained Companion evidence these measurements are frozen against is not in "
+            "this tree: " + ", ".join(absent) + ". It is a local-only evaluation campaign over "
+            "the operator's own photographs, held out of a public repository on purpose, so a "
+            "clone cannot run these and is not missing a fixture it could fetch."
+        )
+    return _frozen_input()
+
+
+def test_the_frozen_input_evidence_is_local_only_and_says_so_on_every_run():
+    """The declaration behind the skip above, checked rather than asserted in prose.
+
+    Three things have to stay true together or the skip is hiding something. This test runs in
+    every tree, which is the point: a skip is silent, and the group of tests it silences here is
+    most of the file.
+
+    Direction one, and it is the publication alarm: these paths must be in no commit. If one
+    becomes tracked then it was published, the skip can never fire again, and the reason above
+    stops being true; this fails and the entry comes out rather than the sentence quietly aging.
+
+    Direction two: the list cannot shrink to nothing and keep passing. An empty tuple would make
+    every skip above unreachable and this check vacuous, so the count is pinned and moving it is a
+    deliberate edit.
+
+    Direction three: WHEN THE EVIDENCE IS ABSENT, SAY SO. ``warnings.warn`` rather than ``print``
+    for the reason ``tests/test_retained_evaluation_records.py`` gives: this project runs pytest
+    with ``-q``, which shows captured stdout only for failures, and nothing configures
+    ``filterwarnings``, so a warning can be neither hidden nor promoted into an error.
+    """
+    assert len(FROZEN_INPUT_EVIDENCE) == 3, (
+        f"{len(FROZEN_INPUT_EVIDENCE)} paths are gating this file's skips, not 3; "
+        "shortening this list silences tests without anything saying so"
+    )
+    tracked = subprocess.run(
+        ["git", "ls-files", "-z", "--", *FROZEN_INPUT_EVIDENCE],
+        cwd=ROOT, check=True, capture_output=True,
+    ).stdout.decode()
+    published = sorted(filter(None, tracked.split("\0")))
+    assert not published, (
+        "these are in the repository now, so this file must read them rather than skip on "
+        f"them, and the reason given above is no longer true: {published}"
+    )
+    absent = [path for path in FROZEN_INPUT_EVIDENCE if not (ROOT / path).is_file()]
+    if absent:
+        warnings.warn(
+            "Companion acceptance: the retained first-place evidence is not in this tree, so the "
+            "measurements frozen against it were skipped rather than run. Absent here: "
+            + ", ".join(absent),
+            stacklevel=1,
+        )
 
 
 def test_freeze_binds_actual_captions_digests_dates_and_holdouts():
