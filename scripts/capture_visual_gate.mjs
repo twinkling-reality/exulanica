@@ -605,6 +605,38 @@ export function checkedWalkWorld(statement, containers, reachWasStated) {
  * clause 2 and cannot be scored. THE RULE CERTIFIES THAT A RUN WAS CLEAN; IT CANNOT CERTIFY THAT THE
  * CREDENTIAL WAS NARROW.
  */
+/**
+ * Why a gate-initiated probe cannot be believed, or null when it can.
+ *
+ * SEPARATE FROM THE CONDITION ON PURPOSE. The condition judges what the page's traffic shows; this
+ * judges whether the PROBE itself asked the question it claims to have asked. A probe answered 401
+ * went out WITHOUT the page's credential, and "asked and not served" is literally true of a 401, so
+ * a condition reading that traffic would be satisfied by evidence about an anonymous request. That
+ * is a fault in the probe rather than in the page and the two must not read alike.
+ *
+ * A 200 IS NOT A REFUSAL HERE. It means the probe worked and the credential DOES carry the graph,
+ * which is a real measurement; the condition then refuses it, which is the condition's job.
+ *
+ * MEASURED 2026-09-19: a bare fetch from page context answers 401 even for `/api/tiles`, the route
+ * the page was served 200 on in the same run, so an unauthenticated probe is the DEFAULT outcome of
+ * getting this wrong rather than an edge case.
+ */
+export function probeRefusal(probe) {
+  if (probe === null || probe === undefined) {
+    return 'the page states no product API probe, so nothing can ask whether its credential is '
+      + 'refused outside tiles; the run cannot say how the page proved who it was';
+  }
+  if (probe.asked !== true) {
+    return `the page holds no credential to probe ${probe.path} with, so it asked nothing`;
+  }
+  if (probe.status === 401) {
+    return `the probe of ${probe.path} was answered 401, so IT WENT OUT WITHOUT THE PAGE'S `
+      + 'CREDENTIAL: that measures an anonymous request, which is a fault in this probe rather '
+      + 'than in the page, and it would satisfy the clause while proving nothing';
+  }
+  return null;
+}
+
 export function credentialDoesNotCarryTheGraph(api) {
   const graph = api.filter((one) => one.path === '/api/graph');
   return graph.length > 0 && !graph.some((one) => one.status === 200);
@@ -2402,22 +2434,8 @@ async function main() {
       probe = await session.evaluate(
         '(async () => (await window.__exulanicaProbeProductApi?.()) ?? null)()',
       );
-      if (probe === null) {
-        await halt(
-          'the page states no product API probe, so nothing can ask whether its credential is ' +
-          'refused outside tiles; the run cannot say how the page proved who it was',
-        );
-      }
-      if (probe.asked !== true) {
-        await halt(`the page holds no credential to probe ${probe.path} with, so it asked nothing`);
-      }
-      if (probe.status === 401) {
-        await halt(
-          `the probe of ${probe.path} was answered 401, so IT WENT OUT WITHOUT THE PAGE'S ` +
-          'CREDENTIAL: that measures an anonymous request, which is a fault in this probe rather ' +
-          'than in the page, and it would satisfy the clause while proving nothing',
-        );
-      }
+      const refusal = probeRefusal(probe);
+      if (refusal !== null) await halt(refusal);
     }
     const requests = [...network.values()];
     const pathOf = (entry) => {

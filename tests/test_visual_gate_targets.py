@@ -682,6 +682,57 @@ def _condition(tmp_path: Path, paths: list[dict], anonymous: int) -> object:
     return json.loads(result.stdout.strip().splitlines()[-1])["named"]
 
 
+def _probe_refusal(tmp_path: Path, probe: str) -> object:
+    """Why the harness would not believe this probe, or None."""
+    driver = tmp_path / "probe.mjs"
+    driver.write_text(
+        f"const harness = await import({str(HARNESS)!r});\n"
+        f"console.log(JSON.stringify({{ refusal: harness.probeRefusal({probe}) }}));\n"
+    )
+    result = _node(str(driver))
+    assert result.returncode == 0, result.stderr
+    return json.loads(result.stdout.strip().splitlines()[-1])["refusal"]
+
+
+def test_a_probe_answered_401_is_refused_as_a_probe_and_not_as_a_page(tmp_path):
+    """The failure this whole mechanism exists to prevent, and it was the DEFAULT outcome.
+
+    MEASURED 2026-09-19 from inside the page: a bare fetch answers 401 even for `/api/tiles`, the
+    route the page was served 200 on in the same run. So a probe written the obvious way goes out
+    anonymous. "Asked and not served" is literally true of a 401, so the condition would have been
+    SATISFIED on evidence about an anonymous request, and a run would have scored on it.
+
+    The message must say it is the PROBE that is at fault, because a page behaving oddly and a probe
+    that lost its credential are the two findings this whole thread was about.
+    """
+    refusal = _probe_refusal(tmp_path, '{ path: "/api/graph", status: 401, asked: true }')
+    assert refusal is not None
+    assert "401" in refusal and "WITHOUT THE PAGE'S CREDENTIAL" in refusal, refusal
+    assert "fault in this probe" in refusal, refusal
+
+
+def test_a_probe_that_was_refused_403_is_believed(tmp_path):
+    """The positive control for the refusal: the real answer must not be refused as a fault."""
+    assert _probe_refusal(tmp_path, '{ path: "/api/graph", status: 403, asked: true }') is None
+
+
+def test_a_served_probe_is_believed_and_left_for_the_condition_to_refuse(tmp_path):
+    """A 200 means the probe worked and the credential DOES carry the graph.
+
+    That is a real measurement, not a broken probe, and refusing it here would put the condition's
+    judgement in two places.
+    """
+    assert _probe_refusal(tmp_path, '{ path: "/api/graph", status: 200, asked: true }') is None
+
+
+def test_a_missing_or_credential_less_probe_is_refused(tmp_path):
+    """No hook at all, and a hook that had no credential to ask with, are different sentences."""
+    absent = _probe_refusal(tmp_path, "null")
+    assert absent is not None and "states no product API probe" in absent, absent
+    unasked = _probe_refusal(tmp_path, '{ path: "/api/graph", status: null, asked: false }')
+    assert unasked is not None and "asked nothing" in unasked, unasked
+
+
 def _corridor_traffic() -> list[dict[str, object]]:
     """The corridor page's own traffic, CAPTURED LIVE from the running page on 2026-09-18.
 
