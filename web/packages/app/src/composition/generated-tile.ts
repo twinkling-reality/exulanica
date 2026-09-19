@@ -124,8 +124,15 @@ interface StatedContainer {
  * `opensOn` IS THE FACT NEITHER SET CARRIES. A frame is OF a container and a pose is ON one, and a
  * reader should not have to take the first entry of a list, which is a position rather than an
  * identity.
+ *
+ * EXPORTED FOR THE SAME REASON `worldLine` IS, and the reason is a limit rather than a convenience.
+ * This repository commits ONE container, so no test that goes through the page can reach a world of
+ * several: a second tile's bytes would have to be baked, and a partition of the committed document
+ * shares its records with the golden, which this runtime rightly refuses as one record drawn twice.
+ * Every branch below that tells the two sets apart is therefore unreachable through the page, and a
+ * run of the real route is its only other exercise. Called directly, the branches can be reached.
  */
-function stateWorld(
+export function stateWorld(
   env: AppEnvironment,
   opensOn: StatedContainer,
   tile: LoadedGeneratedTile,

@@ -21,6 +21,7 @@ import {
   GENERATED_TILE_WORLD_ATTRIBUTE,
   prepareBakedTileWalk,
   prepareGeneratedTileEvaluation,
+  stateWorld,
   worldLine,
 } from '../src/composition/generated-tile.js';
 import type { LoadedGeneratedTile } from '@exulanica/atlas-react/generated-tile';
@@ -370,6 +371,50 @@ describe('walking a tile fetched from the product route', { timeout: 30_000 }, (
     ]));
     expect(partial).toContain('Drawn and stood on: the-drawn-tile, tile (1,0) aaaa1111.');
     expect(partial).toContain('STOOD ON AND NOT DRAWN: tile (3,0) bbbb2222.');
+  });
+
+  it('states the two sets from the runtime\'s account of the world, not from what this page fetched', () => {
+    // THE CASE THIS REPOSITORY CANNOT REACH THROUGH THE PAGE. One container is committed, so a walk
+    // driven end to end here always has a world of one tile and the two sets always coincide. Called
+    // directly, a world where they differ can be stated, which is the only place the branches that
+    // tell them apart are exercised at all.
+    const element = shell();
+    const opensOn = { tile: KEY, tileX: 0, tileY: 0, containerSha256: goldenSha256 };
+    const fetched = {
+      neighbours: [
+        { name: 'tile (1,0)', tileX: 1, tileY: 0, bytes: new Uint8Array(), containerSha256: 'aa'.repeat(32), transferredBytes: 7 },
+        { name: 'tile (2,0)', tileX: 2, tileY: 0, bytes: new Uint8Array(), containerSha256: 'bb'.repeat(32), transferredBytes: 9 },
+      ],
+      transferredBytes: 16,
+      absent: [],
+    };
+    stateWorld({ shell: element } as unknown as AppEnvironment, opensOn, {
+      name: KEY,
+      // The runtime drew two of the three and stood on all three: ground with no street, which is
+      // what a neighbour served its navigation sections alone would be.
+      worldTiles: [
+        { name: KEY, drawn: true, stoodOn: true },
+        { name: 'tile (1,0)', drawn: true, stoodOn: true },
+        { name: 'tile (2,0)', drawn: false, stoodOn: true },
+      ],
+    } as unknown as LoadedGeneratedTile, fetched as unknown as Parameters<typeof stateWorld>[3]);
+    const stated = JSON.parse(element.getAttribute(GENERATED_TILE_WORLD_ATTRIBUTE)!);
+    expect(stated.drawn.map((one: { tile: string }) => one.tile)).toEqual([KEY, 'tile (1,0)']);
+    expect(stated.stoodOn.map((one: { tile: string }) => one.tile)).toEqual([KEY, 'tile (1,0)', 'tile (2,0)']);
+    expect(stated.opensOn).toEqual(opensOn);
+    expect(stated.neighbourTransferredBytes).toBe(16);
+  });
+
+  it('refuses to state a world holding a container this page never fetched', () => {
+    // TWO ACCOUNTS OF ONE WORLD, held against each other. The runtime says what it drew and stood
+    // on; this page says what it fetched. A name in one and not the other is a world assembled out
+    // of something nobody asked for, and a record of it would name a container with no digest.
+    const element = shell();
+    expect(() => stateWorld({ shell: element } as unknown as AppEnvironment,
+      { tile: KEY, tileX: 0, tileY: 0, containerSha256: goldenSha256 },
+      { name: KEY, worldTiles: [{ name: KEY, drawn: true, stoodOn: true }, { name: 'tile (9,9)', drawn: true, stoodOn: true }] } as unknown as LoadedGeneratedTile,
+      { neighbours: [], transferredBytes: 0, absent: [] } as unknown as Parameters<typeof stateWorld>[3]))
+      .toThrow(/The runtime says its world holds tile \(9,9\), which this page did not fetch\./);
   });
 
   it('asks for no neighbour and says the world is one tile when the walk states no reach', async () => {
