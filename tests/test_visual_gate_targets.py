@@ -342,6 +342,21 @@ def test_a_run_asking_for_a_different_walk_than_the_file_states_is_refused(tmp_p
     assert "pose_x_mm" not in reason and "pose_y_mm" not in reason, reason
 
 
+def test_a_repository_path_is_found_whatever_directory_the_harness_runs_from(tmp_path):
+    """`--walk docs/x.md` means the repository's, not the one under the directory it was started in.
+
+    These runs start in ``web/`` exactly as a real one does, so before the fix this looked for
+    ``web/docs/...``, threw on the missing file and never reached a refusal at all. The assertion is
+    that the harness READ the file: it gets far enough to compare the stated walk with the URL, and
+    names the path relative to the repository.
+    """
+    stated = "docs/visual-gate-corridor-walk.md"
+    assert (ROOT / stated).exists(), "this lane's own stated walk is what the test resolves"
+    reason = _harness_halt(tmp_path, "?preview=1&tile=tile-conformance", walk=stated)
+    assert stated in reason, reason
+    assert "asks for a different walk" in reason, reason
+
+
 def test_a_walk_outside_the_repository_is_refused(tmp_path):
     outside = tmp_path / "somebody-elses-walk.md"
     outside.write_text("`?pose_x_mm=1&pose_y_mm=2&facing_dx=1&facing_dy=0`")
