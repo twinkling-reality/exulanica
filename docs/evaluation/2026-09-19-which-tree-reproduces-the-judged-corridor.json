@@ -1,0 +1,49 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "subject": "which trees reproduce the corridor world a human was shown",
+    "why_this_record_exists": "The retained records that bind this world's containers name no commit that reproduces them. The judgement-refused record names f201d482, which is the commit that WROTE the record, not the tree the world was baked at. So a change to a catalog the bake reads could, and did, remove main's ability to regenerate a judged world WITHOUT ANY RECORD SAYING SO.",
+    "condition": "A RECORD THAT BINDS A DIGEST MUST NAME THE TREE THAT REPRODUCES IT. Binding the bytes says what was made; naming the tree says who can check it.",
+    "the_world": {
+      "bound_container_sha256": [
+        "ed9acb98268d80fc7b0bf856b682c95c15f59e50bf9c70aef1c2258cd713e999",
+        "7ef4d85c1413f4cc0e6ac289a9e23634896658d2dc8ddf322f4f890c64029507",
+        "21b31c9f9ab9904104a319ddee8aaa5ea87f9cb361da39a793c48a123d0dace9",
+        "47e6457e74812f8f84f923a222bf70966cf26b8a513ebc1e86f02233fe61818c"
+      ],
+      "baked_at": "bd4db95a",
+      "bound_by": [
+        "docs/evaluation/2026-09-19-corridor-composed-world-private-store.json",
+        "docs/evaluation/2026-09-19-corridor-composed-world-judgement-refused.json"
+      ]
+    },
+    "reproduces_from": {
+      "measured_reproducing": {
+        "commit": "17ec085a1a731b1f2f74dbe66c46c2d4930a29f0",
+        "tile_0_0_document_sha256": "8d00b38441ff2e4750192c80e7790bf6079c667125cc75a5f95d818534cd0456",
+        "tile_inputs_digest": "cd381483fe2450a7e49d68b4d46b90acc17b2115dfe334a8604740735f67ccef",
+        "measured_by": "the walkable world lane, each arm refusing unless git rev-parse HEAD equalled the sha it was told"
+      },
+      "measured_not_reproducing": {
+        "commit": "6acaed3f6854b83fc1793270d5372465ed4f8e80",
+        "tile_0_0_document_sha256": "172538ffb707d2e2cf09d41b4ade9aa080f43aca18932f804465d24efaa0e80f",
+        "tile_inputs_digest": "ede167819e42dd5f0749c87878d73d53665e8be0ee7e7914d782bd4be091caec",
+        "street_names_shared_with_the_judged_world": 0
+      },
+      "the_boundary": {
+        "commit": "cf8723d37877a0b4096916a3cb304354375ae198",
+        "subject": "Compose the street-name catalog from authored elements and street types",
+        "parent_expected_to_reproduce": "e6eeaefb6817816f8e8b3997ba7cde8b61c4c469",
+        "how_established": "MEASURED at the two endpoints above. The boundary commit is INFERRED, not measured: it is the only commit between them that changes assets/catalogs/street-name.v1.json, which load_city_catalogs reads and catalog_digest covers. Its parent has not been baked."
+      }
+    },
+    "why_nothing_is_faulted": "Different catalog, different catalog_digest, therefore a different tile_inputs_digest and a different baked_tile_id. The two worlds take DIFFERENT KEYS and coexist. The collision hazard recorded in docs/artifacts/world-identity/bindings-are-not-in-the-tile-key.md needs the inputs to be EQUAL and the bytes to differ; here the inputs differ, which is the case the key exists to separate and does.",
+    "how_this_happened": "The orchestrator ruled that the catalog growth must ride with city grammar v4 and not land before the judge was re-asked, precisely to protect this property, AND THEN MERGED IT four hours later without recognising it as the thing it had parked. The lane obeyed the ruling for the clearance bound, which is on a branch that is red by design, and the catalog composition arrived in the same merge.",
+    "the_operator_decision": "Keep the catalog change and record the gap, taken 2026-09-19. The catalog growth took the world generation route from 15 of 40 specifications to 39 of 40; reverting would have restored reproducibility from main and cost that. The judged captures are committed and the re-judgement is unaffected either way.",
+    "what_is_not_established": [
+      "e6eeaefb has not been baked, so the boundary is inferred from which commit moves the assets.",
+      "No commit earlier than bd4db95a has been checked; the reproducing range's lower end is unknown."
+    ]
+  },
+  "record_sha256": "8bc65f6ef1c7dcd2d3bf61d3e4977ca6f77566fd69d3f87455988b934eec950d"
+}
