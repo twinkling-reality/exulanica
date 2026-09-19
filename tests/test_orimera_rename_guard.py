@@ -74,7 +74,7 @@ ALLOWED_PATHS: dict[str, str] = {
         "strips inherited ORIMERA_ variables so they cannot leak into a child"
     ),
     "tests/test_documentation_links.py": (
-        "skips the gitignored .orimera working area and records why"
+        "records why the gitignored .orimera working area is not a source of references"
     ),
     "tests/test_exulanica_identity.py": (
         "asserts that ORIMERA_ names, .orimera paths, orimera- CLIs, and "
