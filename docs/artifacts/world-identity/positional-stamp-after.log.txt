@@ -1,0 +1,32 @@
+# Does a producer stamp the value it names, or position zero of the admissible set?
+
+arm             after
+commit          e7123589
+tile.py before  9c6ed93c8db347686853140c6b753449fffd26c15d034f7f3cf1f37a02e10aa6
+anchors applied COORDINATE_UNITS, OWNERSHIP_RULES, HALO_RULES
+
+## unbroken
+  admissible_units       ['millimetre']
+  fixture_halo           extent_meets_grown_square
+  fixture_ownership      anchor_floor_division
+  fixture_unit           millimetre
+  generator_halo         extent_meets_grown_square
+  generator_ownership    anchor_floor_division
+  generator_unit         millimetre
+  module                 /Users/glendonchin/dev/Technology/exulanica-world-identity/exulanica/grammar/grammars/city/tile.py
+
+## with a second entry admitted, first in each tuple
+  admissible_units       ['nanolitre', 'millimetre']
+  fixture_halo           extent_meets_grown_square
+  fixture_ownership      anchor_floor_division
+  fixture_unit           millimetre
+  generator_halo         extent_meets_grown_square
+  generator_ownership    anchor_floor_division
+  generator_unit         millimetre
+  module                 /Users/glendonchin/dev/Technology/exulanica-world-identity/exulanica/grammar/grammars/city/tile.py
+
+## the restored tree, printed rather than trusted
+  tile.py after        9c6ed93c8db347686853140c6b753449fffd26c15d034f7f3cf1f37a02e10aa6
+  restored             True
+  git status           (clean)
+
