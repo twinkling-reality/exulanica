@@ -60,7 +60,7 @@ describe.runIf(live)('against a running tile route', () => {
       await listBakedTiles(access, { citySeed: citySeed ?? '' });
     } catch (error) {
       if (error instanceof TileRouteRefusal) return;
-      throw new Error(`The tile route at ${baseUrl ?? ''} did not answer (${String(error)}). A tile route is not a handoverable resource: it belongs to the session that started it and dies with it. Start one from the corridor-api entry in orimera's .claude/launch.json (port 8000) and run this again.`);
+      throw new Error(`The tile route at ${baseUrl ?? ''} did not answer (${String(error)}). A tile route is not a handoverable resource: it belongs to the session that started it and dies with it. Start one from the corridor-api entry in the main checkout's .claude/launch.json (port 8000) and run this again.`);
     }
   });
 

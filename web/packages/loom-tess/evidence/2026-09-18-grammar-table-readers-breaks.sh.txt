@@ -35,7 +35,7 @@ PY
     return 1
   fi
   print -r -- "tree while broken: $(git status --porcelain | tr '\n' ' ')"
-  local log=/private/tmp/claude-501/-Users-glendonchin-dev-Technology-orimera/45065fe9-6c90-424b-88a8-83d38894da72/scratchpad/break-$label.log.txt
+  local log=${TMPDIR:-/tmp}/break-$label.log.txt
   (cd $ROOT/web && pnpm exec vitest run packages/loom-tess) > $log 2>&1
   local rc=$?
   print -r -- "vitest exit $rc"
