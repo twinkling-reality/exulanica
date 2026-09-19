@@ -777,6 +777,30 @@ hole that was missed. Retyping 0.005 in a test would have made the test a copy o
 copy can never refuse anything. The two probes also had two separate copies of the same 0.005, and
 now share one.
 
+**AND THE REPLACEMENT QUIETLY LOST A PROPERTY THE THING IT REPLACED HAD.** The prose parser counted
+`passed|failed|errors?|xfailed|xpassed`, and its docstring said "deselected is deliberately not one
+of the words counted"; SKIPPED WAS NOT IN THAT LIST EITHER, and that exclusion was a decision. The
+plugin that replaced it read `session.testscollected`, which counts everything pytest gathered
+INCLUDING what then skipped without running. Measured on a file of two skipping tests:
+
+    pytest   2 skipped in 0.00s
+    plugin   {"collected": 2, "asked": 0}
+    before   NOTHING NOTICED over 2 tests          <- zero questions asked, reported as a measurement
+    after    ASKED NOTHING: no test answered, though 2 were collected and skipped
+
+So the more robust mechanism was, for one case, WRONG IN EXACTLY THE WAY THE TOOL EXISTS TO PREVENT.
+And this repository already held the other view: `tests/conftest.py` prints UNVERIFIED INVARIANT in
+red when the postgres tests skip, calling them the only executable proof of what the database
+guarantees, across 66 marked files. Two mechanisms in one repository disagreeing about what a skip
+means, with the newer one wrong.
+
+A test is now ASKED when it reported an outcome of its own: it failed in any phase, which is also how
+a setup error arrives, or it reached the call phase and passed. Both numbers are kept, because the
+GAP between collected and asked is itself the measurement that tells a reader the database was down
+rather than that a property is unpinned:
+
+    refused, but NOT by <the expected test>, of 2 asked (1 of 3 collected never answered)
+
 ## Why the neighbour fetch asks for a disk, and why that is not waste
 
 Recorded before the wiring lands, because the number invites the wrong edit. Fetching every tile
