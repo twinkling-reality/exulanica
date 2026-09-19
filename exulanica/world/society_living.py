@@ -29,7 +29,7 @@ from __future__ import annotations
 import json
 import uuid
 from collections.abc import Iterable, Sequence
-from functools import cache
+from functools import cache, partial
 from itertools import pairwise
 from typing import Any, Final
 
@@ -46,6 +46,13 @@ from exulanica.world.society_catalogs import (
     Activity,
     RoutineModel,
     load_routine_model,
+)
+from exulanica.world.society_choice import (
+    ChoiceQuestion,
+    ChoiceSource,
+    DeterministicChoices,
+    choice_question,
+    option_key,
 )
 from exulanica.world.society_place import (
     ceil_distance,
@@ -68,6 +75,8 @@ __all__ = [
 
 LIVING_PROFILE: Final = "exulanica-society/v4"
 TICK_SECONDS: Final = 60
+#: One row of the closed answer set: urgency, activity key, the activity, the pick, and why.
+_OptionRow = tuple[int, str, "Activity", dict, str]
 _WEATHER_UNAVAILABLE: Final = {
     "availability": "unavailable",
     "reason": "no weather source is connected to this society",
@@ -481,8 +490,15 @@ def advance_living_society(
     seed: str,
     places: Sequence[LivingPlace],
     routine: RoutineModel,
+    choices: ChoiceSource | None = None,
 ) -> tuple[dict[str, Any], tuple[SocietyEvent, ...]]:
-    """Consume the current place and every queued successor, then take one simulated minute."""
+    """Consume the current place and every queued successor, then take one simulated minute.
+
+    ``choices`` names who answers each inhabitant's next choice. Left unset it is the rule this
+    engine has always used, and the tick it produces is identical to the tick it produced before
+    the seam existed; ``tests/test_society_choice_seam.py`` holds that to a state digest.
+    """
+    choices = DeterministicChoices() if choices is None else choices
     _require(state.get("profile") == LIVING_PROFILE, "unsupported living society profile")
     _require(state["seed_sha256"] == seed, "society seed lineage mismatch")
     _require(state["routine"] == routine.binding(), "society was built under another routine")
@@ -541,6 +557,11 @@ def advance_living_society(
             "previous_state_sha256": previous_digest,
             "seed_sha256": seed,
         }
+        # Only a run that consulted something records who chose. A run on the rule alone writes
+        # the events it has always written, byte for byte, which is what lets every stored
+        # history keep verifying and what makes removing the experiment cost nothing.
+        if "decision" in detail:
+            document["decision"] = detail["decision"]
         identity = uuid.uuid5(
             SOCIETY_NAMESPACE,
             f"{state['society_id']}:{tick}:{order}:{society_state_sha256(document)}",
@@ -650,9 +671,14 @@ def advance_living_society(
             emit(person, "action_completed", "duration_elapsed", f"{activity.key}_completed", {})
             continue
         if person["route"] is None:
-            chosen = _choose(
+            pool = _options(
                 person, current, routine, seed, tick, minute, day, spot_holder, visitors
             )
+            decision = choices.decide(
+                partial(_question, person, pool, tick, minute, day),
+                partial(_from_options, pool),
+            )
+            chosen = decision.outcome
             if isinstance(chosen, str):
                 block(person, chosen)
                 continue
@@ -661,13 +687,10 @@ def advance_living_society(
             _take(person, target, spot_holder, visitors)
             _plan(person, current, activity, target, because)
             person["blocked_key"] = None
-            emit(
-                person,
-                "goal_selected",
-                person["goal"]["reason"],
-                "goal_selected",
-                {"because": because},
-            )
+            detail = {"because": because}
+            if choices.records:
+                detail["decision"] = decision.recorded()
+            emit(person, "goal_selected", person["goal"]["reason"], "goal_selected", detail)
         crossings = _walk(person, current, routine)
         if person["route"]["arrived"]:
             _arrive(person, current, routine, seed, tick, absolute)
@@ -754,12 +777,40 @@ def _take(person: dict, target: dict, spot_holder: dict, visitors: dict) -> None
         person["reservation"] = {"kind": kind, "id": target["destination_id"]}
 
 
+def _question(
+    person: dict, pool: list[_OptionRow], tick: int, minute: int, day: int
+) -> ChoiceQuestion:
+    """The closed answer set as a question. Built from the same rows the rule would pick from."""
+    options = tuple(
+        {
+            "option_key": option_key(pick),
+            "activity": key,
+            "destination_id": pick.get("destination_id"),
+            "spot_id": pick.get("spot_id"),
+            "cost_mm": pick.get("cost_mm"),
+            "load_milli": pick.get("load_milli"),
+            "urgency": urgency,
+            "because": because,
+            "outcome": (activity, pick, because),
+        }
+        for urgency, key, activity, pick, because in pool
+    )
+    return choice_question(
+        subject_ordinal=person["ordinal"],
+        tick=tick,
+        minute_of_day=minute,
+        day=day,
+        needs=person["needs"],
+        options=options,
+    )
+
+
 def _start_node(person: dict) -> str:
     loc = person["location"]
     return loc["node_id"] if loc["edge"] is None else loc["edge"]["to_node_id"]
 
 
-def _choose(
+def _options(
     person: dict,
     place: LivingPlace,
     routine: RoutineModel,
@@ -769,8 +820,13 @@ def _choose(
     day: int,
     spot_holder: dict,
     visitors: dict,
-) -> tuple[Activity, dict, str] | str:
-    """The most pressing reachable activity with room, or the reason nothing was possible.
+) -> list[_OptionRow]:
+    """Every activity this inhabitant can act on now, the pressing ones alone when any press.
+
+    This is the closed answer set, and it is a function of its own so that something other than
+    the rule in :func:`_from_options` can be offered the same rows. A set assembled separately
+    for a model would be a second source of truth for what was possible, which is the failure
+    this project names most.
 
     A pressing activity with nowhere to go is stepped over here, and :func:`_targets` now says
     why so that a successor profile can stop stepping over it. It cannot be said in v4: a goal's
@@ -784,6 +840,11 @@ def _choose(
     spent a simulated day unable to reach their workplace, their shift stepped over every tick,
     while every measure in :mod:`exulanica.world.society_metrics` reported a healthy society.
     :func:`_require_work_is_walkable` refuses that society at creation instead.
+
+    **The shortage is not handed to the seam either, and for the same reason.** Putting it into a
+    :class:`~exulanica.world.society_choice.ChoiceQuestion` would let a model answer on grounds
+    v4's own record cannot carry, and a decision that cannot be reproduced from the record is the
+    thing the seam exists to avoid. It arrives with that successor profile or not at all.
     """
     start = _start_node(person)
     paths = place.paths(start)
@@ -838,11 +899,32 @@ def _choose(
             )
         row = (urgency, key, activity, pick, because)
         (pressing if is_pressing else fallback).append(row)
-    pool = pressing or fallback
+    return pressing or fallback
+
+
+def _from_options(pool: list[_OptionRow]) -> tuple[Activity, dict, str] | str:
+    """The rule: the most pressing row, or the reason nothing was possible. Never randomised."""
     if not pool:
         return "no_reachable_place_with_room"
     _, _, activity, pick, because = max(pool, key=lambda row: (row[0], row[1]))
     return activity, pick, because
+
+
+def _choose(
+    person: dict,
+    place: LivingPlace,
+    routine: RoutineModel,
+    seed: str,
+    tick: int,
+    minute: int,
+    day: int,
+    spot_holder: dict,
+    visitors: dict,
+) -> tuple[Activity, dict, str] | str:
+    """The most pressing reachable activity with room, or the reason nothing was possible."""
+    return _from_options(
+        _options(person, place, routine, seed, tick, minute, day, spot_holder, visitors)
+    )
 
 
 def _targets(
