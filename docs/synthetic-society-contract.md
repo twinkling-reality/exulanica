@@ -598,6 +598,29 @@ positions go to inhabitants in seeded order. A role exists only where premises s
 inhabitant without one records the reason. No state field names a person: presentation is a role
 in a place, and names, if ever shown, belong to world style.
 
+**No inhabitant may be given a workplace it cannot walk to from where it lives**, and a place
+that would do so is refused at creation, naming how many pieces its walking graph is in and how
+many of its inhabitants are stranded. The rule is about the assignment and never about the
+graph's shape: a place may honestly be in pieces, an island is a place, and so is one tile cut
+out of a city whose joining corners lie outside it, which such a place already states in its own
+`unsupported`. What a society may not do is hand somebody a job across a cut and then say
+nothing, which is what it did until 2026-09-19: the shift found no reachable target, the choice
+stepped over it in silence, and on one corridor tile 37 of 64 inhabitants spent a simulated day
+unable to reach work while every run measurement reported a healthy society. `_targets` now says
+which shortage emptied its list, since nothing here offers it, the places that do are full, and
+no route reaches them are three findings with three fixes; no v4 transition consumes that reason,
+because a goal's `because` is canonical state and a change to a v4 transition is a new profile.
+
+**What a run reports.** Beside the population's own measurements, `measure_run` states what the
+place OFFERED: how many destinations it publishes, which needs its inhabitants can hold at all,
+and the place's own `unsupported` list, each read from the place rather than from the run, so
+that a place with nothing in it reports its emptiness instead of reporting zero of nothing. A
+place with nothing in it is legitimate and so is a society over one, which is why this reports
+and does not refuse; what neither should do is read as a busy street. One corridor tile publishes
+no destinations at all for ninety-nine inhabitants whose only modelled need is somewhere to walk,
+and they score perfectly on every other measure: they never collide, never exceed a capacity
+there is none of, and occupy as many distinct positions as there are people.
+
 **Choice and occupancy.** Each minute every need grows. An inhabitant with nothing in progress
 takes the most pressing reachable activity that has room: weighted need above its threshold, or
 a due shift, with a seeded per-inhabitant weight spread of a tenth. When nothing is pressing it
