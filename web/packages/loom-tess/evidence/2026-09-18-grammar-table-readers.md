@@ -1,8 +1,13 @@
 # The readers that took one answer out of the whole table list
 
-Measured 2026-09-18 on `lane/coordinate-unit`, cut from local main at `06d09267`. The change is
-`574a569a`, and the before-tree is `06d09267` checked out detached. Both trees ran with
-`web/node_modules` installed offline, so nothing here was measured against a missing toolchain.
+Measured 2026-09-18 on `lane/coordinate-unit`, cut from local main at `06d09267`. Both trees ran
+with `web/node_modules` installed offline, so nothing here was measured against a missing toolchain.
+
+Main moved while this lane was open, so the measurement was taken twice rather than relabelled. The
+first pass compared `06d09267` against the change at `574a569a`. Main then reached `4b237488`, whose
+four new commits touch nothing in this package but one evidence file, and after rebasing the lane
+to `bfd8924c` the same bake was taken again on both `4b237488` and `bfd8924c`. Every figure below is
+the same in all four readings. The digests in the table are quoted from the rebased pair.
 
 ## What was wrong
 
@@ -31,7 +36,7 @@ a version is held equal across every table before being stated once (`agreedAcro
 
 The conformance fixture baked in both trees through `packages/loom-tess/src/node/cli.ts`:
 
-| | before `06d09267` | after `574a569a` |
+| | before, main `4b237488` | after, lane `bfd8924c` |
 | --- | --- | --- |
 | container sha256 | `bd07246dbeb9b1116498a233ede7790da2cbcf8eeef1024b4e33682460f351c1` | same |
 | container bytes | 703556 | same |
@@ -46,7 +51,8 @@ moves it when one integer of the fixture moves, and it passes.
 
 ## Falsified: seven breaks, each alone, on a committed tree
 
-Each break was planted alone at `574a569a`, the WHOLE `packages/loom-tess` suite was run rather than
+Each break was planted alone at `574a569a`, the lane's pre-rebase head, the WHOLE
+`packages/loom-tess` suite was run rather than
 a filtered selection, the failing test names were read, and the tree was restored with
 `reset --hard` plus `clean` and the restored state printed. 278 tests in the package.
 
