@@ -13,6 +13,7 @@ import { bakeTile } from '@exulanica/loom-tess/core';
 import {
   BAKED_TILE_MEDIA_TYPE,
   TileRouteRefusal,
+  composedObstructionRings,
   fetchWalkWorld,
   tileName,
   tilePlacement,
@@ -217,5 +218,42 @@ describe('fetching a walk\'s world', () => {
       { status: 404, headers: { 'Content-Type': 'application/problem+json' } },
     )) as typeof globalThis.fetch;
     await expect(fetchWalkWorld(access(refusing), plan(rows), { digest, citySeed: FIXTURE_CITY })).rejects.toBeInstanceOf(TileRouteRefusal);
+  });
+});
+
+describe('the obstacles of a world of several tiles', () => {
+  /**
+   * A header carrying records and no usable grammar, so the records are compared and no ring is
+   * built from them. What is under test is the DEDUPLICATION and the disagreement it cannot resolve,
+   * both of which happen before any ring exists.
+   */
+  const stating = (tile: string, records: { kind: string; identity: string; sha256: string }[]) => ({
+    tile,
+    header: { grammars: [], records: records.map((record) => ({ ...record, grammar: 0, membership: 'halo', version: 2, fields: {} })) },
+  }) as unknown as Parameters<typeof composedObstructionRings>[0][number];
+
+  const massing = (identity: string, sha256: string) => ({ kind: 'city.massing', identity, sha256: sha256.padEnd(64, '0') });
+
+  it('keeps one copy of a building two tiles both state, and says nothing disagreed', () => {
+    // The ordinary case: a tile's HALO copy and its neighbour's OWNED copy are the same bytes.
+    const composed = composedObstructionRings([
+      stating('the tile', [massing('m1', 'aaaa'), massing('m2', 'bbbb')]),
+      stating('tile (1,0)', [massing('m1', 'aaaa'), massing('m3', 'cccc')]),
+    ]);
+    expect(composed.disagreed).toEqual([]);
+  });
+
+  it('reports a record two tiles state differently, rather than leaving both copies unexplained', () => {
+    // A HALO COPY IS A STAND-IN FOR A TILE YOU DO NOT HAVE. If one were ever written as a REDUCED
+    // form of its original, the digests would stop matching, both copies would enter the set, and a
+    // building described twice is the shape that once stopped a walker 344 mm from a bench. This is
+    // the only thing that can tell anyone it happened.
+    const composed = composedObstructionRings([
+      stating('the tile', [massing('m1', 'aaaa')]),
+      stating('tile (1,0)', [massing('m1', 'dddd')]),
+    ]);
+    expect(composed.disagreed).toEqual([
+      { kind: 'city.massing', identity: 'm1', kept: 'the tile', against: 'tile (1,0)' },
+    ]);
   });
 });
