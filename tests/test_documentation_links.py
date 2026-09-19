@@ -126,10 +126,6 @@ _OPERATOR_PROCESS: tuple[str, ...] = (
     "docs/goal-brief-2026-09-05-unblocked-backend-program.md",
     "docs/goal-brief-2026-09-08-remaining-work.md",
     "docs/judge-access.md",
-    "docs/patches/companion-memory-main.patch",
-    "docs/patches/companion-proposals-main.patch",
-    "docs/patches/companion-question-main.patch",
-    "docs/patches/manual-person-review-main.patch",
     "docs/phase-10-tickets.md",
     "docs/reconstruction-throughput.md",
     "docs/records/2026-09-08-asset-read-currency-investigation.md",
@@ -450,11 +446,15 @@ def test_the_lists_of_unresolved_references_have_not_grown_silently():
     template placeholders, one placeholder in a usage string, and two paths that tests build
     inside their own sandboxes.
 
+    MEASURED AGAIN 2026-09-19 after the four ``docs/patches`` diffs were published: 44, because
+    the operator process tuple lost those four. A number here falling is the shape this file
+    wants, and the commit that moves it says which documents arrived.
+
     Adding an entry means this repository names one more document it does not contain. That is a
     fact about the repository rather than about a test, so it is worth a line in whatever record
     the change belongs to, and the number here is edited deliberately in the same commit.
     """
-    assert (len(ALLOWED_DANGLING), len(_OPERATOR_PROCESS), len(_LOCAL_CAMPAIGN)) == (12, 18, 18)
+    assert (len(ALLOWED_DANGLING), len(_OPERATOR_PROCESS), len(_LOCAL_CAMPAIGN)) == (12, 14, 18)
     assert len(KEPT_OUT_OF_THE_REPOSITORY) == len(_OPERATOR_PROCESS) + len(_LOCAL_CAMPAIGN), (
         "a path is in both tuples, and dict.fromkeys silently kept one reason for it"
     )

@@ -109,7 +109,17 @@ CLAUDE.md
 # Operator process. Kept on disk for evidence tests. Not published.
 docs/briefs/
 docs/records/
-docs/patches/
+# The four named patches below ARE published, and the rule spells the directory's contents rather
+# than the directory because git does not descend into an excluded directory, so a `docs/patches/`
+# rule cannot be undone by a negation inside it. Each of the four is a plain diff against
+# web/packages/app/src/main.ts with no operator process in it, and one is named inside an immutable
+# evaluation record, which pins its path permanently: while it is absent that record is stranded
+# and cannot be repaired, because repairing it would change a digest other records bind.
+docs/patches/*
+!docs/patches/companion-memory-main.patch
+!docs/patches/companion-proposals-main.patch
+!docs/patches/companion-question-main.patch
+!docs/patches/manual-person-review-main.patch
 docs/first-place-2026-09-11.md
 docs/judge-access.md
 docs/naming.md

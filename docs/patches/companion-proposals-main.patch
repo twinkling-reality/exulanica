@@ -1,0 +1,59 @@
+The Companion appearance-proposal wiring for the composition root.
+
+`main.ts` is owned by several concurrent branches at once, so this branch ships its wiring here
+rather than editing the file, exactly as `companion-memory-main.patch` and
+`companion-question-main.patch` did before it.
+
+Applies to web/packages/app/src/main.ts at 27da4d5c513ff81a642828aff037090b83b98415.
+
+    git apply docs/patches/companion-proposals-main.patch
+
+Without it, `mountCompanion` still compiles and still runs. `proposeAppearance` is optional and
+absent means every utterance goes straight to `ask`, which is the behaviour the product had
+before this path existed. Absent is deliberately NOT the same as a function that answers
+"question" for everything: a registered no-op would make "this build cannot propose" and "this
+sentence was a question" the same observation, and neither the person nor a record could tell
+them apart.
+
+What it costs when it IS applied is one extraction call per utterance, including the ones that
+turn out to be questions. That is real and it is stated rather than hidden: the classifier is
+what decides what a sentence was, the browser cannot decide it, and the alternative is showing
+the style vocabulary to every question about a photograph.
+
+Verified applied on this branch: web typecheck, dependency-cruiser and vitest all pass with it.
+
+diff --git a/web/packages/app/src/main.ts b/web/packages/app/src/main.ts
+index 7dbda79..ee8980c 100644
+--- a/web/packages/app/src/main.ts
++++ b/web/packages/app/src/main.ts
+@@ -45,7 +45,7 @@ import { applicationTitle, developmentToken } from './config.js';
+ import { buildScene } from './scene.js';
+ import { buildAtlasCommands, type AtlasCommand } from './ui/atlas-commands.js';
+ import { buildWorldChrome } from './ui/world-chrome.js';
+-import { CompanionAskClient } from './companion-ask-api.js';
++import { CompanionAskClient, CompanionProposalClient } from './companion-ask-api.js';
+ import { CompanionMemoryClient, answerToRemember } from './companion-memory-api.js';
+ import type { PersistedMemory } from '@exulanica/companion-runtime';
+ import { buildDetail } from './ui/detail.js';
+@@ -271,6 +271,13 @@ async function mount(): Promise<void> {
+   // about the library, and this is the only place holding the credential it takes to ask one.
+   const companionAsk = new CompanionAskClient(currentCredentials);
+ 
++  // The one thing the Companion may DO, and it is still not a write. `POST /selection/appearance`
++  // reads an utterance as a bounded proposal drawn from the reviewed style catalogue; the world
++  // style authority is what turns one into a preview, and the person's own Apply is what commits
++  // it. Constructed here for the same reason as the two clients around it: this file holds the
++  // credential and nothing under it does.
++  const companionPropose = new CompanionProposalClient(currentCredentials);
++
+   // The durable half of the same conversation. Read once per mount, because a reload used to be
+   // amnesia: interaction-model.md 4.3 and 5.5 both say the Companion may never speak "within 7
+   // days of a Skip or 14 days of a Not sure on the same entity", and a window held in a page had
+@@ -294,6 +301,7 @@ async function mount(): Promise<void> {
+     engine: currentCompanion,
+     evidence: currentEvidence,
+     ask: (question) => companionAsk.ask(question),
++    proposeAppearance: (utterance) => companionPropose.propose(utterance),
+     persistedMemory,
+     rememberAnswer: async (answer) => {
+       await companionMemory.rememberAnswer(answerToRemember(answer));

@@ -1,0 +1,76 @@
+The Companion memory wiring for the composition root.
+
+`main.ts` is owned by several concurrent branches at once, so this branch ships its wiring here
+rather than editing the file, exactly as `companion-question-main.patch` did before it.
+
+Applies to web/packages/app/src/main.ts at c88202901ef5286ed9008eaed63cce6929af6c67.
+
+    git apply docs/patches/companion-memory-main.patch
+
+Without it, `mountCompanion` still compiles and still runs: `persistedMemory` and `rememberAnswer`
+are optional, and a host that has not opted in gets the behaviour it had, an empty memory and no
+write-back. That is deliberate rather than a courtesy. A default that half worked would be a
+Companion claiming to remember and quietly not.
+
+Verified applied on this branch: web typecheck, dependency-cruiser and vitest all pass with it,
+and section 7 of docs/companion-question.md is this patch applied and driven in a browser.
+
+diff --git a/web/packages/app/src/main.ts b/web/packages/app/src/main.ts
+index 95aaf68..05baefd 100644
+--- a/web/packages/app/src/main.ts
++++ b/web/packages/app/src/main.ts
+@@ -45,6 +45,8 @@ import { buildScene } from './scene.js';
+ import { buildAtlasCommands, type AtlasCommand } from './ui/atlas-commands.js';
+ import { buildWorldChrome } from './ui/world-chrome.js';
+ import { CompanionAskClient } from './companion-ask-api.js';
++import { CompanionMemoryClient, answerToRemember } from './companion-memory-api.js';
++import type { PersistedMemory } from '@exulanica/companion-runtime';
+ import { buildDetail } from './ui/detail.js';
+ import { buildEmptyWorld } from './ui/empty-world.js';
+ import { buildStartupState } from './ui/startup-state.js';
+@@ -266,12 +268,34 @@ async function mount(): Promise<void> {
+   // `askQuestion` is the read half: free text the parser cannot turn into a change is a question
+   // about the library, and this is the only place holding the credential it takes to ask one.
+   const companionAsk = new CompanionAskClient(currentCredentials);
++
++  // The durable half of the same conversation. Read once per mount, because a reload used to be
++  // amnesia: interaction-model.md 4.3 and 5.5 both say the Companion may never speak "within 7
++  // days of a Skip or 14 days of a Not sure on the same entity", and a window held in a page had
++  // never once survived one.
++  //
++  // A failed read is a Companion that has forgotten somebody, which is worse than one that never
++  // offered to remember, so it is said rather than swallowed. It is NOT allowed to stop the world
++  // from mounting: everything else on this page works without it.
++  const companionMemory = new CompanionMemoryClient(currentCredentials);
++  let persistedMemory: PersistedMemory | null = null;
++  let memoryLoadFailure: string | null = null;
++  try {
++    persistedMemory = await companionMemory.recent();
++  } catch (error) {
++    memoryLoadFailure = error instanceof Error ? error.message : String(error);
++  }
++
+   let writePath: MountedWritePath;
+   const companion = mountCompanion({
+     state,
+     engine: currentCompanion,
+     evidence: currentEvidence,
+     ask: (question) => companionAsk.ask(question),
++    persistedMemory,
++    rememberAnswer: async (answer) => {
++      await companionMemory.rememberAnswer(answerToRemember(answer));
++    },
+     stageParent: stage,
+     confirm: () => writePath.confirm,
+     reflectShell: () => reflectShell(),
+@@ -280,6 +304,10 @@ async function mount(): Promise<void> {
+       shellState.primary === 'options' || shellState.primary === 'controls',
+   });
+ 
++  if (memoryLoadFailure !== null) {
++    companion.panel.noteMemoryFailure('memory.notLoaded', memoryLoadFailure);
++  }
++
+   writePath = mountWritePath({
+     env,
+     state,
