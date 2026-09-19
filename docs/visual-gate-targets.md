@@ -744,6 +744,39 @@ fails; and **`practicalBrowserBudget` is the one I would watch**, because this t
 across the wire and decoded 149.6 MB of texture, where the fixture that passed moved a fraction of
 that. A key that passed on a fixture and fails on a street is the gate working.
 
+## Making the falsification rule a mechanism, and what it found in the first minute
+
+Two falsifications in one evening ASKED NOTHING and both reported success: one over a fixture whose
+values made the right answer and the wrong answer the same number, one over a `-k` expression that
+selected tests named after the code while the test that mattered was named after the property. Both
+runs were real. The tree was committed, the break was applied, pytest ran and passed.
+
+`scripts/falsify.py` refuses that result. It applies one break, names the tests it put the question
+to, and REFUSES TO REPORT A PASS WHEN THE SELECTION WAS ZERO. It restores from bytes it held rather
+than from git, and compares the digest afterwards, because a restore that cannot prove it restored is
+the same fault one layer down; anything a break leaves behind is NAMED rather than silently cleaned.
+Its three verdicts, each produced against a real case before this was written down:
+
+    REFUSED by test_a_drop_is_not_a_step_up, of 36 selected
+    NOTHING NOTICED over 35 tests, so the harness is the first suspect
+    ASKED NOTHING: no test was selected
+
+**AND IT CAUGHT ITS OWN FIRST VERSION.** Its counter looked for pytest's `=` banner, which this
+project never prints because `-q` is already in addopts, so it read every run as having selected zero
+and reported a genuine refusal as having asked nothing. The tool's whole purpose failing in its own
+first use is the sharpest argument for running it rather than reading it.
+
+**WHAT THE SECOND VERDICT FOUND, which is why this was worth building.** The break "coarsen the
+ground probe spacing" was noticed by NOTHING over 35 tests. That constant is the one whose coarseness
+already cost this project a run: at 0.25 m it reported "support for the next 10 m" over a 30 mm hole
+15 mm ahead of a stalled walker, and misdirected run three's diagnosis entirely. It had been fixed
+and never pinned, so it could have drifted back at any time without a single test objecting.
+
+It is now held to a RELATIONSHIP rather than to a number: at least two samples must land inside the
+hole that was missed. Retyping 0.005 in a test would have made the test a copy of the code, and a
+copy can never refuse anything. The two probes also had two separate copies of the same 0.005, and
+now share one.
+
 ## Why the neighbour fetch asks for a disk, and why that is not waste
 
 Recorded before the wiring lands, because the number invites the wrong edit. Fetching every tile
