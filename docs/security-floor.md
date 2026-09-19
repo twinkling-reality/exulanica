@@ -51,8 +51,10 @@ browser session holds `ACCOUNT_OWNER_PERMISSIONS`: `admission.read`, `admission.
 membership role, not assumed: a browser session exists only for an account membership, migration
 0058 allows one role, `owner`, and `AccountRepository.session` requires it.
 `tests/test_route_permissions.py` reads 0058's check and fails when a second role appears, until
-that role is given a grant of its own. `tiles.materialise` is withheld until the first tile route is
-declared and granted deliberately. An explicit Authorization header never falls back to the
+that role is given a grant of its own. `tiles.materialise` is withheld from a browser session, and
+that is now an open decision rather than a pending event: three routes require it, so a browser
+session cannot ask for a generated world or read a tile's bytes until somebody grants it here
+deliberately. An explicit Authorization header never falls back to the
 cookie. Rejected alternative: letting a browser session inherit whatever a bearer token would hold,
 which has no source to inherit from.
 
@@ -108,9 +110,16 @@ vocabulary does not load, and the API does not start.
 ## 2. Per-workspace tile quotas
 
 **What it enforces.** CLOSED. A workspace may have at most `tiles_limit` tiles materialised on
-demand. A request to a route whose declaration requires `tiles.materialise` is charged one tile
-before the route runs, and refused with `429 tile_quota_exceeded` when the charge would cross the
-ceiling. A workspace with no declared quota is refused with `429 tile_quota_undeclared`.
+demand. A request to a route whose declaration requires `tiles.materialise` is charged before the
+route runs, and refused with `429 tile_quota_exceeded` when the charge would cross the ceiling. A
+workspace with no declared quota is refused with `429 tile_quota_undeclared`.
+
+HOW MANY TILES ONE REQUEST COSTS IS THE ROUTE'S DECLARATION, NOT A CONSTANT. `authorise_route`
+charges `TILES_PER_REQUEST`, which is 1, for every such route except those listed in
+`SELF_CHARGING_TILE_ROUTES`, which charge their own and say why. `POST /world-generation/worlds`
+charges one tile per tile the specification covers, counted from the resolved extents before a
+record is made, because one request there can cover up to the 16 by 16 tiles the declared extent
+range allows and a flat charge of one would be wrong by the size of the world.
 
 - Declared per workspace in `workspace_tile_quota` (migration `0062_workspace_tile_quotas.sql`),
   under `enable` and `force row level security` with `ws_isolation`. `tiles_used` only rises; a

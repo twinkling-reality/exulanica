@@ -26,9 +26,12 @@ distinguished from writes, and the consequential writes are isolated so each has
 name: intake, deletion and withdrawal, person consent, admission, world write and operations.
 Two members are not a surface of their own. ``model.invoke`` sits beside a read on every route
 that may call a model, because those routes spend money and reach the network. ``tiles.materialise``
-is required by no route today, deliberately: no on-demand tile route ships until this floor
-exists, and when one does, declaring this permission is what meters it against
-:mod:`exulanica.api.quotas`.
+meters a route against :mod:`exulanica.api.quotas` by being declared on it, and declaring it is the
+only way a route is metered. Three routes hold it: the two ``/tiles`` reads, which serve bytes an
+offline bake already made, and ``POST /world-generation/worlds``, which is the first route whose
+cost scales with what the caller asked for and therefore the first that charges MORE than one tile.
+Both of those facts used to be one sentence saying the permission "is required by no route today",
+which had been false since the ``/tiles`` reads were declared.
 
 **Who holds what.** A bearer token holds exactly the permissions its grant in
 ``EXULANICA_API_TOKENS`` names. A browser session holds :data:`ACCOUNT_OWNER_PERMISSIONS`, because
@@ -208,8 +211,11 @@ _P = Permission
 
 #: What a browser session holds. A browser session exists only for an account membership whose
 #: role is ``owner``, the one role migration 0058 allows: the person whose workspace it is. Every
-#: permission except ``tiles.materialise``, which waits for the first tile route to be declared and
-#: is then granted here deliberately rather than inherited.
+#: permission except ``tiles.materialise``, which is withheld and is an OPEN DECISION rather than a
+#: pending event: three routes now require it, so the condition the old wording waited for has
+#: passed, and a browser session still cannot ask for a world or read a tile's bytes. Granting it
+#: lets a browser spend the workspace's tile ceiling, which is why it is granted here deliberately
+#: or not at all rather than inherited.
 ACCOUNT_OWNER_PERMISSIONS: Final[frozenset[Permission]] = frozenset(
     {
         _P.LIBRARY_READ,
