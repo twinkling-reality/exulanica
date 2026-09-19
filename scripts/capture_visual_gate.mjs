@@ -664,6 +664,66 @@ export function authenticationConditionOf(paths, anonymousStatus) {
   return null;
 }
 
+/**
+ * Development furniture that must not appear in a frame the judged key is decided on.
+ *
+ * MEASURED 2026-09-19 by opening all six frames: the retained baseline carries the Companion panel
+ * and nothing else, while every frame of a generated run carries these two as well. The evaluation
+ * panel reads "Development evaluation of generated tile ... NOT PART OF ANY WORLD" over the street
+ * being judged. Nobody chose that: the baseline is the product shell, which has no preview furniture
+ * to show, and the generated target is the development preview, which does.
+ *
+ * SIZE IS NOT THE TEST, KIND IS. The Companion covers MORE of the frame than the evaluation panel
+ * and it STAYS, because it is the product and a frame without it would not be a frame of this
+ * product. The panel differs in kind: it does not merely cover the street, IT MAKES A CLAIM ABOUT
+ * IT. Occlusion costs a judge information; a caption hands them a conclusion, and only the second
+ * contaminates the judgement.
+ *
+ * The instrument is altered here and never the subject. A page that stopped drawing its own panel
+ * while a capture was being taken would have acquired behaviour that exists only because something
+ * is watching, which is worse than a harness that hides furniture and says so in the record.
+ */
+const FURNITURE_HIDDEN_FOR_CAPTURE = Object.freeze(['.generated-tile-evaluation', '.scene-segments']);
+
+/**
+ * What a judge must be able to see, whatever anyone later adds to the list above.
+ *
+ * THE MAGENTA HATCHING IS NOT FURNITURE, IT IS THE WORLD. It is the product drawing, honestly, the
+ * surfaces it has no material for, and it is drawn in the canvas rather than in the document, so
+ * hiding any element that IS or CONTAINS the canvas would take it away along with the street.
+ *
+ * SOMEBODY WILL EVENTUALLY FIND THE MAGENTA UGLY AND REACH FOR IT. Hiding an honest absence so a
+ * frame photographs better is this project's standing rule against fallback imagery, pointed the
+ * other way: the forward version is a photo veil that reads as geometry, and the inverse is dressing
+ * an absence out of the picture. A judge decides whether a street reads as inhabited AS IT IS.
+ */
+const NEVER_HIDDEN_FOR_CAPTURE = Object.freeze(['#atlas', '#shell', '.reticle', '.companion-stage', '.companion-encounter']);
+
+/** Any selector that would take away something the judge must see, named rather than silently kept. */
+export function refusedFurniture(selectors, protectedSelectors = NEVER_HIDDEN_FOR_CAPTURE) {
+  return selectors.filter((selector) => protectedSelectors.some(
+    (kept) => selector === kept || selector.startsWith(`${kept} `) || selector.startsWith(`${kept}.`),
+  ));
+}
+
+/** Hide the named furniture, refusing anything that is or contains the world, and say what it did. */
+const HIDE_FURNITURE = `(selectors) => {
+  const canvas = document.getElementById('atlas');
+  const hidden = [];
+  const kept = [];
+  for (const selector of selectors) {
+    for (const element of document.querySelectorAll(selector)) {
+      if (canvas !== null && (element === canvas || element.contains(canvas))) {
+        kept.push(selector);
+        continue;
+      }
+      element.style.display = 'none';
+      hidden.push(selector);
+    }
+  }
+  return { hidden, keptBecauseTheyHoldTheWorld: kept, canvasStillDrawn: canvas !== null && canvas.getBoundingClientRect().width > 0 };
+}`;
+
 function listenerSource(normalized) {
   if (normalized.startsWith('web/packages/') || normalized.startsWith('web/node_modules/')) {
     return 'product';
@@ -2059,6 +2119,19 @@ async function main() {
     const capture = async (label) => {
       await settle();
       await summon(label);
+      // Hidden before every frame and NAMED IN EVERY FRAME'S RECORD, because a frame whose
+      // provenance does not say what was taken off the screen is a frame nobody can audit.
+      const refused = refusedFurniture(FURNITURE_HIDDEN_FOR_CAPTURE);
+      if (refused.length > 0) {
+        await halt(`the capture would hide ${refused.join(', ')}, which the judge must be able to see`);
+      }
+      const furniture = await session.call(
+        documentId, `function (selectors) { return (${HIDE_FURNITURE})(selectors); }`,
+        [FURNITURE_HIDDEN_FOR_CAPTURE.slice()],
+      );
+      if (!furniture.canvasStillDrawn) {
+        await halt('hiding the development furniture took the world with it');
+      }
       await session.call(bindingId, `function () { this.invalidate(); return true; }`);
       await sleep(500);
       for (let attempt = 0; attempt < 3; attempt += 1) {
@@ -2083,6 +2156,8 @@ async function main() {
           alongMetres: along(p1),
           stats,
           state,
+          // WHAT WAS TAKEN OFF THE SCREEN BEFORE THIS FRAME, per frame rather than once for the run.
+          furnitureHidden: furniture.hidden,
         });
         return;
       }

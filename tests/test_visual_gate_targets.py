@@ -677,6 +677,65 @@ def test_no_world_is_composed_around_the_committed_fixture(tmp_path):
     assert _reach(tmp_path, "?preview=1&city=abc&tile_x=2&tile_y=0", owned="true")["reach"] is None
 
 
+# -- what a judged frame may and may not carry -----------------------------------------------------
+
+
+def _furniture() -> tuple[list[str], list[str]]:
+    """The harness's own two lists, read out of the harness rather than retyped here."""
+    source = HARNESS.read_text()
+    pattern = r"const {name} = Object\.freeze\(\[(.*?)\]\)"
+    hidden = re.search(pattern.format(name="FURNITURE_HIDDEN_FOR_CAPTURE"), source, re.S)
+    kept = re.search(pattern.format(name="NEVER_HIDDEN_FOR_CAPTURE"), source, re.S)
+    assert hidden is not None and kept is not None, "the harness no longer declares both lists"
+    return (
+        re.findall(r"'([^']+)'", hidden.group(1)),
+        re.findall(r"'([^']+)'", kept.group(1)),
+    )
+
+
+def test_the_development_panel_and_its_card_are_hidden_from_a_judged_frame(tmp_path):
+    """The caption, not the occlusion.
+
+    MEASURED 2026-09-19 by opening all six frames: the retained baseline carries the Companion and
+    nothing else, while every generated frame also carries a panel reading "Development evaluation
+    of generated tile ... NOT PART OF ANY WORLD" over the street being judged. The Companion covers
+    MORE of the frame and stays, because it is the product; the panel differs in KIND, because it
+    does not merely cover the street, it makes a claim about it.
+    """
+    hidden, _ = _furniture()
+    assert ".generated-tile-evaluation" in hidden, hidden
+    assert ".scene-segments" in hidden, hidden
+
+
+def test_nothing_the_judge_must_see_can_be_hidden(tmp_path):
+    """The break that matters in a year, and the magenta is the reason.
+
+    THE HATCHING IS NOT FURNITURE, IT IS THE WORLD: the product drawing honestly the surfaces it
+    has no material for. It is drawn in the canvas, so anything hiding the canvas takes it away with
+    the street. Somebody will eventually find the magenta ugly and reach for it, and this is what
+    should stop them: hiding an honest absence so a frame photographs better is the fallback-imagery
+    rule pointed the other way.
+    """
+    hidden, kept = _furniture()
+    assert "#atlas" in kept and "#shell" in kept, kept
+    assert ".reticle" in kept and ".companion-stage" in kept, kept
+    driver = tmp_path / "furniture.mjs"
+    driver.write_text(
+        f"const harness = await import({str(HARNESS)!r});\n"
+        f"const refused = harness.refusedFurniture({json.dumps(hidden)}, {json.dumps(kept)});\n"
+        "const world = harness.refusedFurniture(['#atlas', '.generated-tile-evaluation'], "
+        f"{json.dumps(kept)});\n"
+        "console.log(JSON.stringify({ refused, world }));\n"
+    )
+    result = _node(str(driver))
+    assert result.returncode == 0, result.stderr
+    read = json.loads(result.stdout.strip().splitlines()[-1])
+    # What the harness hides today takes nothing the judge needs.
+    assert read["refused"] == [], read
+    # And a list that reached for the world would be refused by name rather than quietly obeyed.
+    assert read["world"] == ["#atlas"], read
+
+
 # -- how a page proved who it was --------------------------------------------------------------
 
 
