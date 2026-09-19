@@ -2397,6 +2397,17 @@ async function main() {
       requests.map((entry) => ({ path: pathOf(entry), status: entry.status })),
       anonymousStatus,
     );
+    // BOUND BEFORE THE CHECK, so a run that cannot name its condition still says what it saw.
+    // MEASURED 2026-09-19: a run halted here with three numbers in its message and NONE OF THE
+    // TRAFFIC in its record, while a positive control over traffic captured from the same page by
+    // hand had passed. The evidence that would say which clause failed existed only inside the
+    // process that refused.
+    observed.authentication = {
+      condition: authenticationCondition,
+      anonymousGraphReadStatus: anonymousStatus,
+      apiResponses,
+      previewApiRequests: previewApi,
+    };
     if (authenticationCondition === null) {
       await halt(`the authentication condition cannot be named: preview requests ${previewApi.length}, graph read ${graphRead}, anonymous status ${anonymousStatus}`);
     }
