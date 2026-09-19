@@ -129,11 +129,39 @@ class LivingPlace:
             {"nodes": document["nodes"], "edges": document["edges"]}
         )
         self._paths: dict[str, dict] = {}
+        self._pieces: dict[str, int] | None = None
 
     def paths(self, start: str) -> dict[str, tuple[int, tuple[str, ...]]]:
         if start not in self._paths:
             self._paths[start] = _paths(start, self.adjacent)
         return self._paths[start]
+
+    @property
+    def pieces(self) -> dict[str, int]:
+        """Which connected piece of the walking graph each node is in.
+
+        A place is allowed to be in pieces and says so: an island, or one tile of a city whose
+        joining corners lie outside it. This answers whether two nodes are in the same piece in
+        one pass over the graph, where asking :meth:`paths` once per person is a shortest-path
+        search per person and answers a question nobody asked.
+        """
+        if self._pieces is None:
+            found: dict[str, int] = {}
+            index = 0
+            for start in self.adjacent:
+                if start in found:
+                    continue
+                queue = [start]
+                found[start] = index
+                while queue:
+                    node = queue.pop()
+                    for other, _ in self.adjacent[node]:
+                        if other not in found:
+                            found[other] = index
+                            queue.append(other)
+                index += 1
+            self._pieces = found
+        return self._pieces
 
     def position(self, node_id: str) -> list[int]:
         return list(self.nodes[node_id]["position_mm"])
@@ -204,6 +232,34 @@ def _positions(place: LivingPlace, kind: str) -> list[tuple[str, int]]:
         count = dest["resident_capacity"] if kind == "home" else dest["staff_capacity"]
         rows.extend((dest_id, index) for index in range(count))
     return rows
+
+
+def _require_work_is_walkable(place: LivingPlace, inhabitants: list[dict[str, Any]]) -> None:
+    """No inhabitant may be given a workplace it cannot walk to from where it lives.
+
+    A place in pieces is not the fault: an island is a place, and so is one tile of a city whose
+    joining corners lie outside it, which such a place states in its own ``unsupported``. The
+    fault is a society handing somebody a job across a cut and then saying nothing. Measured on
+    the corridor's own tile before this check existed: three pieces of 172, 101 and 94 nodes, 37
+    of 64 inhabitants unable to reach their workplace, their shift silently skipped every tick
+    for a simulated day, and every measure in :mod:`exulanica.world.society_metrics` reporting a
+    healthy society. The numbers are in the refusal because the place is what has to change, and
+    a refusal naming only itself sends the reader back to measure what it already knew.
+    """
+    pieces = place.pieces
+    stranded = 0
+    for person in inhabitants:
+        if person["work"] is None:
+            continue
+        here = person["location"]["node_id"]
+        there = place.destinations[person["work"]["destination_id"]]["node_id"]
+        if here not in pieces or there not in pieces or pieces[here] != pieces[there]:
+            stranded += 1
+    _require(
+        not stranded,
+        f"this place's walking graph is in {len(set(pieces.values()))} pieces and {stranded} of "
+        f"{len(inhabitants)} inhabitants could not walk from where they live to their workplace",
+    )
 
 
 def initial_living_society(
@@ -351,6 +407,7 @@ def initial_living_society(
             )
         person["motion_path_mm"] = [list(person["position_mm"])]
         inhabitants.append(person)
+    _require_work_is_walkable(place, inhabitants)
     by_home: dict[str, list[str]] = {}
     for person in inhabitants:
         if person["home"]:
@@ -713,7 +770,21 @@ def _choose(
     spot_holder: dict,
     visitors: dict,
 ) -> tuple[Activity, dict, str] | str:
-    """The most pressing reachable activity with room, or the reason nothing was possible."""
+    """The most pressing reachable activity with room, or the reason nothing was possible.
+
+    A pressing activity with nowhere to go is stepped over here, and :func:`_targets` now says
+    why so that a successor profile can stop stepping over it. It cannot be said in v4: a goal's
+    ``because`` and a blocked action's reason are both canonical state, ``_replay_living``
+    recomputes every stored transition digest from genesis, and the pinned digests in
+    ``tests/test_society_living.py`` carry the rule in one line, that a change there is a new
+    profile. Measured either side: consuming the reason moves the tick-30 digest and leaves
+    behaviour identical over 240 ticks, while returning it moves nothing at all. So it is
+    returned and not yet used, and the consumer arrives with the profile that carries the city
+    place join. Until then the cost is visible: on the corridor's own tile 37 of 64 inhabitants
+    spent a simulated day unable to reach their workplace, their shift stepped over every tick,
+    while every measure in :mod:`exulanica.world.society_metrics` reported a healthy society.
+    :func:`_require_work_is_walkable` refuses that society at creation instead.
+    """
     start = _start_node(person)
     paths = place.paths(start)
     loc = person["location"]
@@ -743,7 +814,9 @@ def _choose(
             because = f"{need.label} at {value} of 1000"
             if not is_pressing:
                 because = f"nothing pressing; {because}"
-        targets = _targets(
+        # The shortage is deliberately discarded: see this function's docstring for which profile
+        # consumes it and why v4 cannot.
+        targets, _shortage = _targets(
             person, place, activity, paths, here_spot, here_dest, spot_holder, visitors
         )
         if not targets:
@@ -781,7 +854,14 @@ def _targets(
     here_dest: str | None,
     spot_holder: dict,
     visitors: dict,
-) -> list[dict]:
+) -> tuple[list[dict], str | None]:
+    """Every target this activity could take now, and when there are none, which shortage it is.
+
+    Nothing here offers it, the places that do are full, and no route reaches them are three
+    findings with three different fixes, and an empty list reports all three as one. The reason
+    is counted from the same pass that builds the rows, so it cannot describe a different walk
+    over the place than the one that found nothing.
+    """
     rows = []
 
     def route_cost(node_id: str) -> int | None:
@@ -791,13 +871,13 @@ def _targets(
     if activity.setting in ("home", "work"):
         held = person[activity.setting]
         if held is None:
-            return []
+            return [], f"this person has no {activity.setting}"
         dest = place.destinations.get(held["destination_id"])
         if dest is None:
-            return []
+            return [], f"the place no longer holds this person's {activity.setting}"
         cost = route_cost(dest["node_id"])
         if cost is None:
-            return []
+            return [], f"no route reaches this person's {activity.setting}"
         return [
             {
                 "destination_id": dest["destination_id"],
@@ -807,37 +887,59 @@ def _targets(
                 "cost_mm": cost,
                 "load_milli": 0,
             }
-        ]
+        ], None
     if activity.setting == "standing":
         pool = place.plain_spots or sorted(place.spots)
+        taken_spots = out_of_reach = already_here = 0
         for spot_id in pool:
-            if spot_id == here_spot or spot_id in spot_holder:
+            if spot_id == here_spot:
+                already_here += 1
+                continue
+            if spot_id in spot_holder:
+                taken_spots += 1
                 continue
             spot = place.spots[spot_id]
             cost = route_cost(spot["node_id"])
-            if cost is not None:
-                rows.append(
-                    {
-                        "destination_id": None,
-                        "spot_id": spot_id,
-                        "node_id": spot["node_id"],
-                        "kind": "spot",
-                        "cost_mm": cost,
-                        "load_milli": 0,
-                    }
-                )
-        return rows
+            if cost is None:
+                out_of_reach += 1
+                continue
+            rows.append(
+                {
+                    "destination_id": None,
+                    "spot_id": spot_id,
+                    "node_id": spot["node_id"],
+                    "kind": "spot",
+                    "cost_mm": cost,
+                    "load_milli": 0,
+                }
+            )
+        return rows, None if rows else _shortage(
+            "standing spot", out_of_reach, taken_spots, already_here
+        )
+    offered = out_of_reach = no_room = already_here = 0
     for dest_id, dest in sorted(place.destinations.items()):
-        if activity.affordance not in dest["affordances"] or dest_id == here_dest:
+        if activity.affordance not in dest["affordances"]:
+            continue
+        offered += 1
+        # Somewhere this person is already standing, and somewhere with no room, are both places
+        # that offer this: only the count of destinations OFFERING it may decide whether the
+        # place publishes any. A person in the only cafe wanting a meal is the first case, and
+        # reporting that as "nowhere here offers eating" is the collapse this function exists to
+        # stop, one level down from the empty list itself.
+        if dest_id == here_dest:
+            already_here += 1
             continue
         if not dest["visitor_capacity"]:
+            no_room += 1
             continue
         cost = route_cost(dest["node_id"])
         if cost is None:
+            out_of_reach += 1
             continue
         if dest["indoors"]:
             taken = visitors.get(dest_id, 0)
             if taken >= dest["visitor_capacity"]:
+                no_room += 1
                 continue
             rows.append(
                 {
@@ -851,19 +953,47 @@ def _targets(
             )
             continue
         free = [s for s in dest["spot_ids"] if s not in spot_holder and s != here_spot]
-        if free:
-            taken = sum(1 for s in dest["spot_ids"] if s in spot_holder)
-            rows.append(
-                {
-                    "destination_id": dest_id,
-                    "spot_id": free[0],
-                    "node_id": dest["node_id"],
-                    "kind": "spot",
-                    "cost_mm": cost,
-                    "load_milli": taken * 1000 // len(dest["spot_ids"]),
-                }
-            )
-    return rows
+        if not free:
+            no_room += 1
+            continue
+        taken = sum(1 for s in dest["spot_ids"] if s in spot_holder)
+        rows.append(
+            {
+                "destination_id": dest_id,
+                "spot_id": free[0],
+                "node_id": dest["node_id"],
+                "kind": "spot",
+                "cost_mm": cost,
+                "load_milli": taken * 1000 // len(dest["spot_ids"]),
+            }
+        )
+    if rows:
+        return rows, None
+    if not offered:
+        return [], f"this place publishes nowhere that offers {activity.affordance}"
+    return [], _shortage(
+        f"place that offers {activity.affordance}", out_of_reach, no_room, already_here
+    )
+
+
+def _shortage(what: str, out_of_reach: int, no_room: int, already_here: int = 0) -> str:
+    """Why no target of this kind is open, naming every cause that got this far.
+
+    Every non-zero count is stated, because a person kept indoors by a full street, one kept
+    indoors by a cut in the walking graph, and one standing in the only place that would have
+    served want three different things done, and a message naming only the largest cause sends
+    the reader to whichever happened to win.
+    """
+    causes = []
+    if out_of_reach:
+        causes.append(f"no route reaches {out_of_reach}")
+    if no_room:
+        causes.append(f"{no_room} {'has' if no_room == 1 else 'have'} no room")
+    if already_here:
+        causes.append(f"this person is already at {already_here}")
+    if not causes:
+        return f"this place publishes no {what}"
+    return f"no {what} is open to this person: {', '.join(causes)}"
 
 
 def _plan(

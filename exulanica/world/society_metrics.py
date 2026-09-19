@@ -5,6 +5,18 @@ many distinct positions the population occupies, how full each destination is ag
 capacity, what share of the population walked in a tick, and how time divides between
 activities. Nothing here feeds a transition.
 
+They do not decide it on their own, because a population with nowhere to go scores well on every
+one of them. One corridor tile publishes ZERO destinations for ninety-nine inhabitants whose only
+modelled need is somewhere to walk: they stroll between its one hundred and ninety-nine spots for
+ever, never collide, never exceed a capacity there is none of, and occupy as many distinct
+positions as there are people. So the place's own account of itself is reported beside the run,
+in ``offered``: how many destinations it publishes, which needs its population can hold at all,
+and what it states it cannot supply. A place with nothing in it is a legitimate place and a
+society over one is a legitimate society, which is why this reports rather than refuses; what
+neither should do is read as a busy street. The ``unsupported`` list is the producer's own
+honesty, carried into every society's state by ``LivingPlace.binding()`` since v4 and read back
+by nothing until this.
+
 Every measure here keys a person by their plan position, so two people at one plan point are one
 position, one collision and one stay. That holds while the place stands everybody on one level,
 and stops holding the moment it stands two people at two heights over one plan point: the
@@ -41,6 +53,9 @@ class RunMetrics:
     capacity: dict[str, int] = field(default_factory=dict)
     over_capacity: int = 0
     longest_outdoor_stay: int = 0
+    destinations_published: int = 0
+    needs_modelled: list[str] = field(default_factory=list)
+    unsupported: list[str] = field(default_factory=list)
 
     def summary(self) -> dict[str, Any]:
         total = max(1, self.ticks * self.population)
@@ -62,6 +77,11 @@ class RunMetrics:
             },
             "over_capacity_ticks": self.over_capacity,
             "longest_outdoor_stay_ticks": self.longest_outdoor_stay,
+            "offered": {
+                "destinations": self.destinations_published,
+                "needs_modelled": self.needs_modelled,
+                "unsupported": self.unsupported,
+            },
         }
 
 
@@ -80,12 +100,17 @@ def measure_run(states: Iterable[dict[str, Any]], place: dict[str, Any]) -> RunM
     destinations = {d["destination_id"]: d for d in place["destinations"] if d["enabled"]}
     for key, dest in destinations.items():
         metrics.capacity[key] = dest["visitor_capacity"]
+    # Read from the place rather than from the run: what a place offers is true of it before a
+    # single tick is advanced, and a run over an empty place would report it as zero of nothing.
+    metrics.destinations_published = len(destinations)
+    metrics.unsupported = list(place["unsupported"])
     spot_destinations = {s["spot_id"]: s["destination_ids"] for s in place["spots"]}
     stay: dict[str, tuple[tuple[int, int], int]] = {}
     for state in states:
         people = state["inhabitants"]
         metrics.ticks += 1
         metrics.population = len(people)
+        metrics.needs_modelled = sorted({need for p in people for need in p["needs"]})
         metrics.distinct_positions.append(len({tuple(p["position_mm"]) for p in people}))
         outside = [p for p in people if not p["location"]["indoors"]]
         metrics.outdoor.append(len(outside))

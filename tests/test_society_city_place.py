@@ -36,6 +36,7 @@ from exulanica.world.society_city_place import (
 )
 from exulanica.world.society_living import (
     LivingPlace,
+    _targets,
     advance_living_society,
     initial_living_society,
 )
@@ -639,3 +640,218 @@ def test_two_footways_meet_at_a_corner_only_while_their_surfaces_are_within_a_st
     # The lifted footway is still walked along; it is no longer walked onto.
     assert len(components(place)) > len(components(joined))
     validate_place(place, routine())
+
+
+def cut(place: dict, keep: str) -> dict:
+    """The same place with every footway edge but one kind removed, so its graph falls apart.
+
+    A tile of a real city arrives in pieces because the corners joining its streets lie outside
+    it, which no fixture here is small enough to reproduce honestly. Cutting the fixture's own
+    footway is the same shape: the premises, homes and shifts are untouched and only the walking
+    between them is gone.
+    """
+    copy = json.loads(json.dumps(place))
+    copy["edges"] = [edge for edge in copy["edges"] if edge["kind"] != keep]
+    return seal_place(copy)
+
+
+def test_a_society_is_refused_when_anyone_is_given_a_workplace_it_cannot_walk_to():
+    model = routine()
+    whole = document_place(busier_document())
+    # The intact place is the control: the same fixture, the same population, accepted.
+    intact = initial_living_society(
+        uuid.UUID(int=11), SEED, LivingPlace(whole, model), model, branch_id="b"
+    )
+    assert len(components(whole)) == 1
+    assert sum(1 for p in intact["inhabitants"] if p["work"]) == 3
+
+    broken = cut(whole, "footway")
+    place = LivingPlace(broken, model)
+    with pytest.raises(ValueError) as refusal:
+        initial_living_society(uuid.UUID(int=11), SEED, place, model, branch_id="b")
+    message = str(refusal.value)
+    # Every number in the refusal is counted again here from the place and from the society the
+    # intact arm built, so the sentence cannot drift away from what it describes.
+    assert f"graph is in {len(components(broken))} pieces" in message
+    stranded = sum(
+        1
+        for person in intact["inhabitants"]
+        if person["work"]
+        and place.pieces[place.destinations[person["work"]["destination_id"]]["node_id"]]
+        != place.pieces[person["location"]["node_id"]]
+    )
+    assert stranded and f"{stranded} of {len(intact['inhabitants'])} inhabitants" in message
+    assert "could not walk from where they live to their workplace" in message
+
+
+def test_a_place_in_pieces_is_allowed_where_nobody_has_to_cross_the_cut():
+    """An island is a place. The rule is about the assignment, never about the graph's shape."""
+    model = routine()
+    whole = document_place(fixture_document())
+    stranding = cut(whole, "footway")
+    with pytest.raises(ValueError, match="could not walk"):
+        initial_living_society(
+            uuid.UUID(int=12), SEED, LivingPlace(stranding, model), model, branch_id="b"
+        )
+    # The same cut place with nobody holding a job: in pieces, and accepted.
+    jobless = json.loads(json.dumps(stranding))
+    for destination in jobless["destinations"]:
+        destination["staff_capacity"] = 0
+        destination["role"] = None
+        destination["shift"] = None
+    place = LivingPlace(seal_place(jobless), model)
+    assert len(set(place.pieces.values())) > 1
+    state = initial_living_society(uuid.UUID(int=12), SEED, place, model, branch_id="b")
+    assert state["inhabitants"] and all(p["work"] is None for p in state["inhabitants"])
+
+
+def test_a_run_reports_what_its_place_offered_beside_what_its_people_did():
+    model = routine()
+    document = document_place(busier_document())
+    place = LivingPlace(document, model)
+    state = initial_living_society(uuid.UUID(int=13), SEED, place, model, branch_id="b")
+    states = []
+    for _ in range(20):
+        state, _ = advance_living_society(state, SEED, [place], model)
+        states.append(state)
+    offered = measure_run(states, document).summary()["offered"]
+    assert offered["destinations"] == sum(1 for d in document["destinations"] if d["enabled"])
+    assert offered["unsupported"] == document["unsupported"]
+    assert offered["needs_modelled"] == sorted(
+        {need for person in states[-1]["inhabitants"] for need in person["needs"]}
+    )
+
+    # A place is asked what it offers, not a run: with no states at all the offer still stands,
+    # which is what stops an empty place reporting zero of nothing.
+    empty = measure_run([], document).summary()["offered"]
+    assert empty["destinations"] == offered["destinations"]
+    assert empty["unsupported"] == offered["unsupported"]
+    assert empty["needs_modelled"] == []
+
+
+def test_an_activity_with_no_target_says_which_of_the_three_shortages_it_was():
+    """The value has no consumer in v4 on purpose; see :func:`_choose`. It is checked here.
+
+    An empty list of targets meant three different things at once: nothing here offers this, the
+    places that do are full, and no route reaches them. Three findings, three fixes, one silence.
+    """
+    model = routine()
+    document = document_place(busier_document())
+    place = LivingPlace(document, model)
+    state = initial_living_society(uuid.UUID(int=14), SEED, place, model, branch_id="b")
+    person = state["inhabitants"][0]
+    paths = place.paths(person["location"]["node_id"])
+    shop = model.activities["shop"]
+    rest = model.activities["rest"]
+
+    rows, shortage = _targets(person, place, shop, paths, None, None, {}, {})
+    assert rows and shortage is None
+
+    full = {d: place.destinations[d]["visitor_capacity"] for d in place.destinations}
+    rows, shortage = _targets(person, place, shop, paths, None, None, {}, full)
+    assert (
+        not rows and shortage == "no place that offers shop is open to this person: 2 have no room"
+    )
+
+    rows, shortage = _targets(person, place, shop, paths, None, None, {}, {})
+    assert rows, "the same call with room again, so the message above is about the room"
+    rows, shortage = _targets(person, place, shop, {}, None, None, {}, {})
+    assert not rows
+    assert shortage == "no place that offers shop is open to this person: no route reaches 2"
+
+    # An affordance the place publishes nowhere is a different sentence again.
+    without = json.loads(json.dumps(document))
+    for destination in without["destinations"]:
+        destination["affordances"] = [a for a in destination["affordances"] if a != "rest"]
+    bare = LivingPlace(seal_place(without), model)
+    rows, shortage = _targets(
+        person, bare, rest, bare.paths(person["location"]["node_id"]), None, None, {}, {}
+    )
+    assert not rows and shortage == "this place publishes nowhere that offers rest"
+
+
+def test_a_destination_with_no_room_is_not_reported_as_one_that_does_not_exist():
+    """A place that stands nobody publishes a street of them, which is not an empty street.
+
+    place_from_society_input gives every target a visitor capacity of min(rule, spots), so a
+    place whose navigation clearance is below the standing radius publishes destinations with
+    the affordance and no room at all. Counting those as "nothing here offers this" would be
+    the same two-findings-in-one-value fault one level down from the empty list itself.
+    """
+    model = routine()
+    document = document_place(busier_document())
+    roomless = json.loads(json.dumps(document))
+    for destination in roomless["destinations"]:
+        destination["visitor_capacity"] = 0
+        destination["spot_ids"] = []
+    for spot in roomless["spots"]:
+        spot["destination_ids"] = []
+    place = LivingPlace(seal_place(roomless), model)
+    state = initial_living_society(uuid.UUID(int=15), SEED, place, model, branch_id="b")
+    person = state["inhabitants"][0]
+    offering = sum(1 for d in place.destinations.values() if "shop" in d["affordances"])
+    rows, shortage = _targets(
+        person,
+        place,
+        model.activities["shop"],
+        place.paths(person["location"]["node_id"]),
+        None,
+        None,
+        {},
+        {},
+    )
+    assert offering, "the fixture must still publish somewhere that offers shopping"
+    assert not rows
+    assert shortage == f"no place that offers shop is open to this person: {offering} have no room"
+
+
+def test_standing_in_the_only_place_that_offers_it_is_not_nowhere_offering_it():
+    """The third cause, and the one that reads most like an empty world when it is not.
+
+    An inhabitant never chooses the destination it is already at, so the only place in reach that
+    would have served is skipped. Counting that skip as "this place offers none" would say a
+    street has no cafe to the one person standing in its cafe.
+    """
+    model = routine()
+    document = document_place(busier_document())
+    place = LivingPlace(document, model)
+    state = initial_living_society(uuid.UUID(int=16), SEED, place, model, branch_id="b")
+    person = state["inhabitants"][0]
+    paths = place.paths(person["location"]["node_id"])
+    visiting = [d for d, row in place.destinations.items() if "visit" in row["affordances"]]
+    assert len(visiting) == 1, "this fixture must offer visiting in exactly one place"
+    rows, shortage = _targets(person, place, model.activities["visit"], paths, None, None, {}, {})
+    assert rows and shortage is None
+    rows, shortage = _targets(
+        person, place, model.activities["visit"], paths, None, visiting[0], {}, {}
+    )
+    assert not rows
+    assert shortage == (
+        "no place that offers visit is open to this person: this person is already at 1"
+    )
+
+
+def test_the_spot_underfoot_is_counted_as_a_spot_and_not_as_an_empty_place():
+    """The same cause in the standing branch, where it is the last spot rather than the only one.
+
+    An inhabitant never walks to the spot it is standing on, so the spot underfoot is skipped. A
+    place whose every other spot is taken would otherwise say it publishes no standing spot,
+    which is false about a street the person is standing in.
+    """
+    model = routine()
+    document = document_place(busier_document())
+    place = LivingPlace(document, model)
+    state = initial_living_society(uuid.UUID(int=17), SEED, place, model, branch_id="b")
+    person = state["inhabitants"][0]
+    paths = place.paths(person["location"]["node_id"])
+    pool = place.plain_spots or sorted(place.spots)
+    underfoot = pool[0]
+    held = {spot: "somebody" for spot in pool if spot != underfoot}
+    rows, shortage = _targets(
+        person, place, model.activities["stroll"], paths, underfoot, None, held, {}
+    )
+    assert not rows
+    assert shortage == (
+        f"no standing spot is open to this person: {len(held)} have no room, "
+        "this person is already at 1"
+    )
