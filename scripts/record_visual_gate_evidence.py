@@ -1,6 +1,6 @@
 """Write the visual gate's digest-bound records from what was measured, and nothing else.
 
-Two verbs, because they bind different evidence:
+Three verbs, because they bind different evidence:
 
 ``reconciliation``
     Reads the three retained rejection records and their briefs, the version 4 reconciliation
@@ -22,6 +22,23 @@ Two verbs, because they bind different evidence:
     by the record builder against the rubric as it is on disk and the captures as they are bound,
     so every refusal the rubric names happens in one place.
 
+``corridor``
+    Reads one harness run of a generated tile, the named judge's answers and the captures, copies
+    the captures and the run's own measurements under ``docs/evaluation/artifacts/<record>/``,
+    binds each by byte size and SHA-256, re-decides every mechanical key from the measured
+    numbers, refuses to write when its decision and the harness's disagree, and writes the record
+    ``--record`` names. It also requires the record that states which STORE the run read, and
+    checks that record's bindings of the captures and the run against the files themselves, so
+    every digest is read twice by two paths that never met.
+
+    A JUDGEMENT THE RUBRIC DOES NOT ALLOW DOES NOT STOP THE WRITE; IT CHANGES WHAT IS WRITTEN. A
+    disagreement between this builder and the harness means one of them is wrong and neither may
+    be published, so nothing is written. A refused judgement is different: it is a measurement of
+    how the asking was done, and it is the one thing most worth writing down, because nothing else
+    keeps it from happening again. The record is then not a gate record: it carries no hardPass
+    block and no verdict, it reports no answer, and it binds the three pictures by digest so that
+    a later, proper ask can be shown to be about the same three.
+
 Every number in a record is read from a measurement file of the run it describes. None is copied
 from a previous document, and no credential is read, printed or written: the harness output never
 carries one, and this script refuses to write a record that contains a forbidden string.
@@ -37,9 +54,11 @@ import argparse
 import hashlib
 import json
 import os
+import re
 import shutil
 import subprocess
 import sys
+from collections.abc import Sequence
 from pathlib import Path
 from typing import Any
 
@@ -48,18 +67,27 @@ from psycopg.rows import dict_row
 
 from exulanica.canonical import canonical_json
 from exulanica.evaluation.gate_keys import (
+    ANSWER_OPTIONS,
+    ANSWER_REQUIREMENT,
     CANONICAL_SPELLINGS,
     CAPTURE_LABELS,
+    CARRIED_WORDS_NOTICE,
     GATE_KEY_SET_VERSION,
+    GENERATED_TILE_TARGET,
     JUDGED_KEY,
+    MELBOURNE_ENVELOPE,
+    NOT_ASKED,
     PICTURE_TITLES,
     RETAINED_RECORDS,
+    RUBRIC_GUIDANCE,
     RUBRIC_PATH,
+    RUBRIC_QUESTION,
     RUBRIC_V1,
     RUBRIC_VERSION,
     SUPERSEDED_VERSIONS,
     judge_prompt,
     key,
+    reason_follow_up,
 )
 from exulanica.evaluation.visual_gate import (
     GateEvidenceError,
@@ -70,8 +98,10 @@ from exulanica.evaluation.visual_gate import (
     decide_judged,
     calibration_words_file,
     decide_mechanical,
+    digest_bound,
     judge_words,
     judge_words_file,
+    judge_words_path,
     reconciliation_record,
     refuse_private_words,
     visual_gate_record,
@@ -124,6 +154,7 @@ def _write(
     replace: bool,
     private: list[str] | tuple[str, ...] = (),
     lines: list[str] | tuple[str, ...] = (),
+    shown: list[str] | tuple[str, ...] = (),
 ) -> None:
     if path.exists() and not replace:
         raise SystemExit(
@@ -135,7 +166,7 @@ def _write(
     try:
         # JSON quotes every key and value, so the quoted-part test, which the record builder has
         # already run on every string, would read keys such as "why" as quotations here.
-        refuse_private_words(text, private, lines=lines, quoted=False)
+        refuse_private_words(text, private, shown=shown, lines=lines, quoted=False)
     except GateEvidenceError as error:
         raise SystemExit(f"refusing to write {path.name}: {error}") from error
     path.write_text(text, encoding="utf-8")
@@ -1361,6 +1392,913 @@ def _observations(run: dict[str, Any]) -> list[str]:
     return observations
 
 
+# ---- corridor -------------------------------------------------------------------------------
+
+
+#: A corridor record, written when the judgement holds, and a record of one that does not. The
+#: second is NOT a gate record and carries no hardPass block: a refused judgement leaves the ninth
+#: key unscored, and eight keys under a nine-key name is a strict subset of the bar wearing its
+#: label. It carries the eight it has, each re-decided here, and says the ninth is unscored.
+CORRIDOR_PROFILE = "exulanica.visual-gate-corridor/v1"
+REFUSED_PROFILE = "exulanica.visual-gate-judgement-refused/v1"
+
+#: The keys ``_judgement`` reads. A file that records the answers and not the asks is missing most
+#: of the second list, and ``_judgement`` meets the absence as a KeyError rather than as a refusal
+#: somebody can act on. Named here so the refusal names all of them at once.
+#: tests/test_visual_gate.py removes each from a complete file and requires a refusal, so neither
+#: list can drift away from what the reader actually needs.
+JUDGEMENT_KEYS = ("profile", "judge", "judgedOn", "rubricSha256", "askedIn", "options", "pictures")
+ASKED_PICTURE_KEYS = ("label", "picture", "prompt", "captureSha256", "asked", "typedBy", "givenAt")
+
+#: Where a judgement file records what its session did that the rubric does not allow. ANY entry
+#: refuses the record, and the reason is not that the departure is written down: it is that the
+#: departure happened. A session that records nothing is the same judgement with the evidence of
+#: its own departure removed, so both are refused and only the honest one can say why.
+DEPARTURES_FIELD = "departuresFromProtocol"
+
+#: The rubric lines a refusal rests on, quoted. Every one is checked against the rubric on disk in
+#: the same command that writes it, so a clause nobody can find in the rubric stops the write
+#: rather than reaching a record. This is the pattern ``_rubric_binding`` uses for the same reason.
+REFUSAL_CLAUSES = (
+    (
+        "every picture is shown by itself",
+        "Pictures are never shown together",
+    ),
+    (
+        "the question is asked in the rubric's own words",
+        "The same question is asked of each picture, in these plain words, and is not paraphrased",
+    ),
+    (
+        "one follow-up, in the rubric's own words, and only for an answer that gave no reason",
+        "a follow-up for an answer that already gave its reason or one not asked in the words above",
+    ),
+    (
+        "a yes carries words given with it",
+        "A yes needs words given with it.",
+    ),
+    (
+        "a typed reply that is not an answer ends the judgement where it stands",
+        "A typed reply that is not an answer, and a skipped question, stop the judgement unscored.",
+    ),
+    (
+        "nothing is read out of the judge's words beyond the typed-reply rule",
+        "Nothing else is inferred from the judge's words, by a model or by anyone else.",
+    ),
+)
+
+
+def _flat(text: str) -> str:
+    """Text with its line wrapping folded away, the way a quote is compared to a document."""
+    return " ".join(text.split())
+
+
+def _shown_to_the_judge() -> set[str]:
+    """Every text this repository itself puts in front of the judge, folded for comparison."""
+    return {
+        _flat(text)
+        for text in (
+            RUBRIC_QUESTION,
+            RUBRIC_GUIDANCE,
+            ANSWER_REQUIREMENT,
+            CARRIED_WORDS_NOTICE,
+            NOT_ASKED,
+            *ANSWER_OPTIONS,
+            *PICTURE_TITLES.values(),
+            *(judge_prompt(label) for label in CAPTURE_LABELS),
+            *(reason_follow_up(answer) for answer in ("yes", "no")),
+        )
+    }
+
+
+def _strings(value: Any) -> list[str]:
+    """Every string a structure holds, at any depth."""
+    if isinstance(value, str):
+        return [value]
+    if isinstance(value, dict):
+        return [text for item in value.values() for text in _strings(item)]
+    if isinstance(value, list):
+        return [text for item in value for text in _strings(item)]
+    return []
+
+
+def _judgement_words(path: Path, rubric: bytes, carried: Sequence[str] = ()) -> list[str]:
+    """Every string in a judgement file a public record may not carry.
+
+    INVERTED ON PURPOSE. It collects by default and excludes only what this repository itself
+    wrote: a text the judge was shown, a line the rubric carries, a departure the session recorded
+    for this record to quote, and the strings the record is about to carry from ``asked_as``,
+    which the reader built and the caller passes in as ``carried`` rather than naming here by
+    field. A collector that instead named the fields holding the judge's words missed one on
+    2026-09-19, because that file spelled the field a fifth way, and an enumerated exclusion list
+    fails silently and in the unsafe direction. Over-collecting costs a refusal somebody can read;
+    under-collecting publishes a person's words.
+    """
+    document = json.loads(path.read_bytes())
+    allowed = (
+        _shown_to_the_judge()
+        | {_flat(item) for item in _departures(document)}
+        | {_flat(item) for item in carried}
+    )
+    rubric_text = _flat(rubric.decode("utf-8"))
+    collected: list[str] = []
+
+    def walk(value: Any) -> None:
+        if isinstance(value, str):
+            folded = _flat(value)
+            if len(folded.split()) < 3 or folded in allowed or folded in rubric_text:
+                return
+            collected.append(value)
+        elif isinstance(value, dict):
+            for item in value.values():
+                walk(item)
+        elif isinstance(value, list):
+            for item in value:
+                walk(item)
+
+    walk(document)
+    return collected
+
+
+def _rubric_clauses(rubric: bytes) -> list[dict[str, str]]:
+    """Every clause a refusal may rest on, each read back out of the rubric before it is used."""
+    text = _flat(rubric.decode("utf-8"))
+    clauses = []
+    for requires, quote in REFUSAL_CLAUSES:
+        if _flat(quote) not in text:
+            raise SystemExit(
+                f"{RUBRIC_PATH} does not carry {quote!r}. A refusal quotes the rubric it rests "
+                "on; nothing is written."
+            )
+        clauses.append({"requires": requires, "rubricSays": quote})
+    return clauses
+
+
+def _corridor_paths(record: str) -> tuple[Path, Path]:
+    """A corridor record's path and its artifact directory, refused outside docs/evaluation."""
+    path = (ROOT / record).resolve() if not Path(record).is_absolute() else Path(record).resolve()
+    try:
+        relative = path.relative_to(ROOT).as_posix()
+    except ValueError:
+        raise SystemExit(f"{record} is not under the document root") from None
+    if not relative.startswith("docs/evaluation/") or not relative.endswith(".json"):
+        raise SystemExit(f"{relative} is not a JSON record under docs/evaluation/")
+    if "/" in relative[len("docs/evaluation/") :]:
+        raise SystemExit(f"{relative} is not directly under docs/evaluation/")
+    return path, ROOT / "docs/evaluation/artifacts" / path.stem
+
+
+def _judgement_shape(given: Any) -> list[str]:
+    """Every key the reader needs that this file does not carry, named rather than counted."""
+    if not isinstance(given, dict):
+        return [f"the file holds a {type(given).__name__}, not a judgement"]
+    missing = [name for name in JUDGEMENT_KEYS if name not in given]
+    said = [f"the judgement carries no {name}" for name in missing]
+    pictures = given.get("pictures")
+    if not isinstance(pictures, list):
+        if "pictures" in given:
+            said.append("the judgement's pictures are not a list of pictures")
+        return said
+    for index, entry in enumerate(pictures):
+        where = f"pictures[{index}]"
+        if not isinstance(entry, dict):
+            said.append(f"{where} is not a picture")
+            continue
+        label = entry.get("label", where)
+        if entry.get("asked") is False:
+            continue
+        said += [
+            f"{label} carries no {name}" for name in ASKED_PICTURE_KEYS if name not in entry
+        ]
+    return said
+
+
+def _departures(given: Any) -> list[str]:
+    """Every departure from the rubric the file records, exactly as it records them."""
+    if not isinstance(given, dict):
+        return []
+    recorded = given.get(DEPARTURES_FIELD, [])
+    if isinstance(recorded, str):
+        return [recorded]
+    if not isinstance(recorded, list):
+        raise SystemExit(f"{DEPARTURES_FIELD} is a list of what the session did, or is absent")
+    return [str(item) for item in recorded]
+
+
+def _corridor_judgement(
+    path: Path, rubric: bytes, captures: dict[str, str], rubric_sha256: str
+) -> tuple[JudgedAnswers | None, dict[str, Any], list[str], list[str]]:
+    """The judge's answers, and every reason this file cannot become a record, named together.
+
+    Two kinds, kept apart because they are known in different ways. The REFUSALS are structural
+    and this file checks them: a key the reader needs and the file does not carry, a profile that
+    is not an answers file, and whatever the record builder says when it is handed what is there.
+    The DEPARTURES are prose the asking session wrote about itself, which nothing here can read;
+    each one stops the record until a person resolves it, and this file does not judge which of
+    them are still live.
+
+    Collected rather than raised one at a time. A refusal that stops at the first reason sends the
+    asking session back for a second refusal, and a judgement is asked of a person, so every round
+    trip costs somebody a conversation.
+    """
+    given = json.loads(path.read_bytes())
+    departures = _departures(given)
+    refusals = _judgement_shape(given)
+    if isinstance(given, dict) and given.get("profile") != JUDGEMENT_PROFILE:
+        refusals.append(
+            f"the file states profile {given.get('profile')!r} and the reader needs "
+            f"{JUDGEMENT_PROFILE!r}, which records what each picture was shown, who typed each "
+            "reply and when, and not only what was answered"
+        )
+    if refusals:
+        return None, {}, refusals, departures
+    try:
+        answers, asked_as = _judgement(path, rubric)
+    except SystemExit as error:
+        return None, {}, [str(error)], departures
+    try:
+        decide_judged(answers, rubric_sha256=rubric_sha256, captures=captures)
+    except GateEvidenceError as error:
+        return None, {}, [str(error)], departures
+    if departures:
+        return None, asked_as, [], departures
+    return answers, asked_as, [], []
+
+
+def _supplement(
+    path: str, run: dict[str, Any], captures: list[dict[str, Any]], run_file: dict[str, Any]
+) -> dict[str, Any]:
+    """The record that states the store this run read, checked against the run before it is bound.
+
+    It binds the captures and the run record by digest and this verb binds them from the files, so
+    every digest here is read twice by two paths that never met, and a disagreement stops the
+    write. That is the whole reason to ask for it rather than to quote its condition.
+    """
+    document = json.loads((ROOT / path).read_bytes())
+    stated = document.get("record_sha256")
+    recomputed = hashlib.sha256(canonical_json(document["record"])).hexdigest()
+    if stated != recomputed:
+        raise SystemExit(f"{path} states record_sha256 {stated} and its record hashes {recomputed}")
+    record = document["record"]
+    binds = record["binds"]
+    by_name = {item["name"]: item for item in binds["captures"]}
+    for capture, source in zip(captures, run["captures"], strict=True):
+        bound = by_name.get(source["file"])
+        if bound is None:
+            raise SystemExit(f"{path} binds no capture named {source['file']}")
+        if (bound["sha256"], bound["bytes"]) != (capture["sha256"], capture["byte_size"]):
+            raise SystemExit(
+                f"{path} binds {source['file']} as {bound['bytes']} bytes sha256 "
+                f"{bound['sha256']}, and the file copied here is {capture['byte_size']} bytes "
+                f"sha256 {capture['sha256']}"
+            )
+    bound_run = binds["run_record"]
+    if (bound_run["sha256"], bound_run["bytes"]) != (run_file["sha256"], run_file["byte_size"]):
+        raise SystemExit(
+            f"{path} binds a run record of {bound_run['bytes']} bytes sha256 "
+            f"{bound_run['sha256']}, and the run read here is {run_file['byte_size']} bytes "
+            f"sha256 {run_file['sha256']}"
+        )
+    if binds["keys"] != run["keys"]:
+        raise SystemExit(f"{path} binds a different key set than the run record states")
+    if binds["stated_walk"]["sha256"] != run["statedWalk"]["sha256"]:
+        raise SystemExit(f"{path} binds a different walk than the run record states")
+    return {
+        "path": path,
+        "record_sha256": recomputed,
+        "condition": record["condition"],
+        "store": record["store"],
+        "whyThisRecordExists": record["why_this_record_exists"],
+    }
+
+
+def _corridor_scored(run: dict[str, Any], measured_at: str) -> dict[str, Any]:
+    """What the run scored: the containers it read, and the committed code that drew and measured.
+
+    The containers are not files of this repository and are bound by the digests the run matched
+    on the wire. The renderer is committed and is held to HEAD; the measuring code is held to the
+    commit the run was measured at, and says whether it still stands at HEAD.
+    """
+    scored = run["scored"]
+    return {
+        "tile": scored["tile"],
+        "containers": scored["containers"],
+        "unavailableSurfacesByReason": scored["unavailableSurfacesByReason"],
+        "renderer": _unmodified(scored["renderer"]["path"], scored["renderer"]["sha256"], measured_at),
+        "measuredBy": [
+            _measured_file(item["path"], item["sha256"], measured_at)
+            for item in scored["measuredBy"]
+        ],
+        "statedWalk": _bind(ROOT / run["statedWalk"]["path"], **{
+            name: run["statedWalk"][name] for name in ("xMm", "yMm", "facingDx", "facingDy")
+        }),
+        "containersAreNotFilesOfThisRepository": (
+            "Each container was matched byte for byte on the wire and is bound by its sha256 and "
+            "its tile_inputs_digest. None is committed, and the store that served them is the one "
+            "the supplementary record names."
+        ),
+    }
+
+
+def _corridor_mechanical(run: dict[str, Any]) -> dict[str, Any]:
+    """The eight measured keys, each decided again here from the fields its definition names."""
+    decided = {}
+    for spelling in CANONICAL_SPELLINGS:
+        if spelling == JUDGED_KEY:
+            continue
+        item = key(spelling)
+        measured = run["mechanical"][spelling]
+        decided[spelling] = {
+            "measurement": item.measurement,
+            "decidedBy": {field: measured[field] for field in item.decided_by},
+            "harnessDecided": run["keys"][spelling],
+            "value": decide_mechanical(spelling, measured),
+        }
+    return decided
+
+
+def _re_ask() -> dict[str, Any]:
+    """What a fresh judgement of these three pictures has to be, read out of the writer itself.
+
+    Every entry below is the rubric quoted, a refusal this repository's own code makes, or a step
+    that follows from one of those and says so. Where the rubric is silent it says that too,
+    rather than filling the silence.
+    """
+    return {
+        "theAsk": {label: judge_prompt(label) for label in CAPTURE_LABELS},
+        "theFollowUp": {answer: reason_follow_up(answer) for answer in ("yes", "no")},
+        "theOrder": (
+            f"{', '.join(CAPTURE_LABELS)}, one at a time, each shown alone at full size under "
+            "its picture title, its question asked before the next picture is shown. The first "
+            "no makes the key false and the pictures after it are not asked."
+        ),
+        "theJudge": (
+            "The one person the rubric names, spelled as the rubric spells them. _judgement "
+            "refuses a judgement whose judge is not the name the rubric carries, and _require_name "
+            "refuses a role or a placeholder in that field."
+        ),
+        "theDate": (
+            "judgedOn is the date the judge answered, and _given_at refuses any reply whose "
+            "givenAt falls on another date. A judgement that runs across midnight in UTC is two "
+            "dates and the writer will refuse the second."
+        ),
+        "aNewSession": (
+            "FOLLOWS FROM THE RUBRIC RATHER THAN QUOTED FROM IT. The rubric says pictures are "
+            "never shown together. In a session where they have already been shown together that "
+            "cannot be made true again, so a fresh judgement is a fresh session. The rubric does "
+            "not say this, and it does not say the judge may not have seen the pictures before: "
+            "it constrains the ask, not the judge's memory, and it already contemplates asking a "
+            "judge again about a picture they have written about."
+        ),
+        "whatMayBeSaidToTheJudge": (
+            "WHERE THE RUBRIC IS SILENT, AND SAYING SO RATHER THAN FILLING IT. Inside the "
+            "judgement the rubric allows the picture, its title, the question, the guidance, the "
+            "requirement line, the two options and, when an answer arrives with no words, the one "
+            "follow-up. Nothing else, and no explanation of what a word means. It says nothing "
+            "about what a person may be told BEFORE a judgement begins. Telling the judge why "
+            "they are being asked again belongs there, before the first picture, and is not part "
+            "of any ask."
+        ),
+        "nothingAboveTheQuestion": (
+            "No line is shown above any question. The one line the rubric provides above a "
+            "question is the carried-words line, and it belongs only to words written under an "
+            "EARLIER rubric version; decide_judged refuses a notice with no carried words, and "
+            "refuses replies given under version 5 as carried words, so neither is available and "
+            "the ask is the question alone."
+        ),
+        "theEarlierRepliesAreNotCarriedWords": (
+            "They were given under rubric version 5, which is the current version. _carried "
+            "requires a superseded version and its digest, so the writer refuses them as carried "
+            "words. A fresh yes therefore needs words given with it, and no yes in the new "
+            "judgement can rest on anything the judge wrote before it."
+        ),
+        "everyReplyRecords": (
+            "who typed it, which must be the judge exactly as the rubric names them; when it "
+            "reached the asking session, as an ISO time in UTC on the stated date; what the "
+            "picture was shown as; and the exact text of the ask."
+        ),
+        "whenATypedReplyArrives": (
+            "If a reply arrives with no pick and the typed-reply rule does not read it as a no, "
+            "the judgement stops there, unscored. It is not re-asked. The stop is recorded and "
+            "nothing is scored from that session."
+        ),
+        "thePicturesAreTheseThree": (
+            "A fresh judgement of THIS run is about the three captures this record binds by "
+            "sha256 and byte size, which are committed under this record's artifacts directory. "
+            "A judgement about any other picture is refused by decide_judged."
+        ),
+    }
+
+
+def _names_the_captures(path: Path, captures: list[dict[str, Any]]) -> dict[str, Any]:
+    """Whether the judgement file names every capture this record binds, read without a schema.
+
+    Every 64-character hex string in the file, against the three digests computed from the copied
+    pictures. It asks one thing only: was the refused judgement about THESE pictures. A shape this
+    reader cannot parse still answers it, which is the point, since the file that prompted this
+    was one the reader could not parse.
+    """
+    found = set(re.findall(r"\b[0-9a-f]{64}\b", path.read_text(encoding="utf-8")))
+    named = {capture["label"]: capture["sha256"] in found for capture in captures}
+    return {
+        "everyBoundCaptureIsNamedInTheJudgement": all(named.values()),
+        "byPicture": named,
+        "howItIsChecked": (
+            "every 64-character hex string in the judgement file, against the SHA-256 of each "
+            "picture as it was copied here; no field name is assumed"
+        ),
+    }
+
+
+def _refused_record(
+    *,
+    date: str,
+    run: dict[str, Any],
+    refusals: list[str],
+    departures: list[str],
+    clauses: list[dict[str, str]],
+    captures: list[dict[str, Any]],
+    artifacts: list[dict[str, Any]],
+    judgement_file: dict[str, Any],
+    names_the_captures: dict[str, Any],
+    scored: dict[str, Any],
+    supplement: dict[str, Any],
+    blocker: dict[str, Any] | None,
+    rubric_sha256: str,
+    record_path: str,
+) -> dict[str, Any]:
+    """A record of a judgement the rubric does not allow, and of the run it was asked about."""
+    mechanical = _corridor_mechanical(run)
+    failed = sorted(spelling for spelling, item in mechanical.items() if not item["value"])
+    held = sorted(spelling for spelling, item in mechanical.items() if item["value"])
+    return digest_bound(
+        {
+            "profile": REFUSED_PROFILE,
+            "date": date,
+            "status": "judgement_refused",
+            "base": _git("rev-parse", "HEAD"),
+            "branch": _git("branch", "--show-current"),
+            "recordPath": record_path,
+            "target": run["target"],
+            "authenticationCondition": run["authentication"]["condition"],
+            "theGateDoesNotPass": (
+                "THIS RECORD SCORES NOTHING. The ninth key is unscored because the judgement was "
+                f"refused, and {len(failed)} of the {len(mechanical)} measured keys are false "
+                f"({', '.join(failed)}), so there is no verdict here and no hardPass block for "
+                "one to be read out of."
+            ),
+            "judgedKey": {
+                "key": JUDGED_KEY,
+                "state": "refused",
+                "value": None,
+                "rubric": RUBRIC_PATH,
+                "rubricVersion": RUBRIC_VERSION,
+                "rubricSha256": rubric_sha256,
+                "refusedBecause": refusals,
+                "departuresTheSessionRecorded": departures,
+                "whatADepartureDoes": (
+                    "Each line above stops this record. They are the asking session's own prose "
+                    "about what it did, and nothing here reads prose, so the writer does not "
+                    "judge which of them are still live: a person resolves each one. A session "
+                    "that recorded none would be the same judgement with the evidence of its own "
+                    "departure removed, and would be refused just the same, with nothing to say "
+                    "why."
+                ),
+                "theRubricSays": clauses,
+                "judgeWordsAreNotHere": (
+                    "The judge's words are not in this record and are not in this repository. "
+                    "The file that holds them is bound above by path, byte size and SHA-256, and "
+                    "git ignores the directory it lives in."
+                ),
+                "reAsk": _re_ask(),
+                **({} if blocker is None else {"andBeforeAnyReAskIsScored": blocker}),
+            },
+            "measuredKeys": mechanical,
+            "measuredKeysHeld": held,
+            "measuredKeysFailed": failed,
+            "recordBuilderAgreedWithHarnessOnEveryMeasuredKey": all(
+                item["value"] is item["harnessDecided"] for item in mechanical.values()
+            ),
+            "judgementFile": judgement_file,
+            "theRefusedJudgementWasAboutThesePictures": names_the_captures,
+            "route": _no_floats(run["route"]),
+            "calibration": {
+                "records": _corridor_predecessors(),
+                "note": (
+                    "The three retained rejections are local-only evidence this checkout does "
+                    "not hold. The chain reaches them through the Flatiron baseline, which bound "
+                    "them where they are."
+                ),
+            },
+            "captures": captures,
+            "artifacts": artifacts,
+            "scored": _no_floats(scored),
+            "privateStore": supplement,
+            "claimsNotMade": [
+                "No key value is claimed for readsAsInhabitedStreet. The judgement this record "
+                "describes was refused, so the key has never been scored for this run, and "
+                "nothing here says how it would be answered.",
+                "No answer is reported. The file bound above holds what was given; this record "
+                "does not repeat it, because an answer obtained outside the rubric is not an "
+                "answer and reporting one would invite it to be read as the key.",
+                "The eight measured keys above are this run's and nothing else's. Two are false, "
+                "so the block cannot pass whatever the ninth key turns out to be.",
+                supplement["condition"],
+                "Nothing is claimed about any street beyond the walk this run made, which is the "
+                "walk the stated-walk document names and this record binds by digest.",
+            ],
+        }
+    )
+
+
+def _comparison_blocker(baseline: dict[str, Any], rubric_sha256: str) -> dict[str, Any] | None:
+    """Whether the corridor bar can be read at all, decided from the two records themselves.
+
+    Both digests are read here: the baseline's from the baseline record, this one's from the
+    rubric on disk. Neither is quoted from anywhere.
+    """
+    answered = baseline["gate"]["keys"][JUDGED_KEY]["answeredAgainst"]
+    if answered["rubricSha256"] == rubric_sha256:
+        return None
+    return {
+        "finding": (
+            "NO CORRIDOR JUDGED UNDER THE CURRENT RUBRIC CAN BE READ AGAINST THIS BASELINE, for a "
+            "reason that has nothing to do with any corridor. The corridor bar reads a candidate "
+            "against the Flatiron baseline; _comparable in exulanica/evaluation/visual_gate.py "
+            "holds two records comparable only when their judged keys name one "
+            "answeredAgainst.rubricSha256; the baseline's judge answered under rubric version "
+            f"{answered['rubricVersion']} and every judgement given from now on is given under "
+            f"version {RUBRIC_VERSION}. The rubric itself says version {RUBRIC_VERSION} shows the "
+            "judge exactly what the version before it showed, which is the only reason a version "
+            f"{answered['rubricVersion']} answer is read under version {RUBRIC_VERSION} at all, "
+            "so the two records are answered against the same words and refused for differing in "
+            "a digest the rubric already reconciles."
+        ),
+        "baselineAnsweredAgainst": answered["rubricSha256"],
+        "baselineRubricVersion": answered["rubricVersion"],
+        "aFreshJudgementAnswersAgainst": rubric_sha256,
+        "freshRubricVersion": RUBRIC_VERSION,
+        "notDecidedHere": (
+            "Whether the comparison should read the rubric a record is WRITTEN with, or should "
+            "apply the same equivalence _answered_version applies, is a decision this script does "
+            "not make and this record does not make. It is stated so that a proper re-ask is not "
+            "asked for a second time before it is settled."
+        ),
+    }
+
+
+def _comparable_with_the_baseline(baseline: dict[str, Any], judged_detail: dict[str, Any]) -> None:
+    """Refuse a comparison the gate cannot make, and say what the two records disagree about.
+
+    FINDING, 2026-09-19. ``_comparable`` holds two records comparable only when their judged keys
+    name one ``answeredAgainst.rubricSha256``. The Flatiron baseline's judge answered under rubric
+    version 4 and every judgement given from now on is given under version 5, so no corridor can
+    be read against the baseline at all, whatever it measures. The rubric itself says version 5
+    shows the judge exactly what version 4 showed, and ``_answered_version`` accepts a version 4
+    answer under version 5 for that reason, so the two records ARE answered against the same words
+    and are refused for differing in a digest the rubric already reconciles. This file does not
+    decide that: it refuses, names it, and leaves it to whoever owns the comparison.
+    """
+    theirs = baseline["gate"]["keys"][JUDGED_KEY]["answeredAgainst"]["rubricSha256"]
+    ours = judged_detail["answeredAgainst"]["rubricSha256"]
+    if theirs == ours:
+        return
+    raise SystemExit(
+        "nothing is written. FINDING: the corridor bar reads a candidate against the Flatiron "
+        f"baseline, whose judge answered against rubric {theirs} (version "
+        f"{baseline['gate']['keys'][JUDGED_KEY]['answeredAgainst']['rubricVersion']}), and this "
+        f"judgement was given against rubric {ours} (version "
+        f"{judged_detail['answeredAgainst']['rubricVersion']}). "
+        "exulanica/evaluation/visual_gate.py _comparable requires one digest across the two, so "
+        "no corridor judged under the current rubric can be compared with this baseline, for a "
+        f"reason that has nothing to do with the corridor. {RUBRIC_PATH} says version "
+        f"{RUBRIC_VERSION} shows the judge exactly what the version before it showed, which is "
+        "why a judgement given under that version is read under this one at all. Whether the "
+        "comparison should read the rubric a record is WRITTEN with, or should apply the same "
+        "equivalence, is a decision this script does not make."
+    )
+
+
+def _corridor_predecessors() -> list[dict[str, str]]:
+    """The records a corridor is calibrated against, each bound by a digest recomputed here.
+
+    The three retained rejections are NOT among them, and their absence is the point: they are
+    local-only evidence that this checkout does not hold, so a record that bound them by reading
+    them could not be written here at all, and one that bound them from the digests
+    ``gate_keys`` carries would be quoting a constant rather than reading a file. The chain
+    reaches them through the Flatiron baseline, which bound them in a checkout that had them.
+    """
+    return [
+        _binding(_relative(RECONCILIATION)),
+        _binding(_relative(BASELINE)),
+        *(_binding(path) for path in reversed(EARLIER_RECONCILIATIONS)),
+    ]
+
+
+def _corridor_because(run: dict[str, Any], judged_detail: dict[str, Any]) -> dict[str, str]:
+    """One measured sentence per key, read from the fields that key's definition names."""
+    measured = run["measured"]
+    integrity = measured["integrity"]
+    walk = measured["walk"]
+    capsule = measured["capsule"]
+    budget = run["mechanical"]["practicalBrowserBudget"]
+    companion = run["mechanical"]["companionPresent"]
+    reticle = run["mechanical"]["reticlePresent"]
+    shell = run["mechanical"]["authenticatedShellAndAuthoredHandlersPreserved"]
+    textured = run["mechanical"]["continuousTexturedStreetAndFacades"]
+    return {
+        "continuousTexturedStreetAndFacades": (
+            f"{textured['streetAndFacadeTriangles']:,} walking-surface and facade triangles were "
+            f"drawn and {textured['untexturedStreetAndFacadeTriangles']:,} of them are untextured"
+        ),
+        JUDGED_KEY: _because_judged(judged_detail),
+        "noCutsOrFloatingGeometry": (
+            f"{integrity['componentsDetachedFromSupport']:,} drawn components have no chain of "
+            f"contact to the walking surface, {integrity['ringEdgesWithoutDrawnFacade']:,} ring "
+            f"edges have no drawn facade and {integrity['trianglesInsideBuildings']:,} drawn "
+            "triangles lie inside building volumes"
+        ),
+        "usefulEyeLevelMovement": (
+            f"the product's own movement carried the player {walk['walkedDisplacementMm']:,} mm "
+            f"with {walk['maxLateralDeviationMm']} mm lateral deviation, "
+            f"{walk['routeSupportGapSamples']} support gaps and a largest eye-height error of "
+            f"{walk['maxEyeHeightErrorMm']} mm over {walk['traceSamples']:,} samples"
+        ),
+        "completeCapsuleClearanceVerification": (
+            f"{capsule['capsuleSamplesChecked']:,} of {capsule['capsuleSamples']:,} samples were "
+            f"checked with {capsule['capsuleTriangleContactSamples']} triangle and "
+            f"{capsule['capsuleRingContactSamples']} ring contacts"
+        ),
+        "practicalBrowserBudget": (
+            f"{budget['environmentTransferredBytes']:,} environment bytes, "
+            f"{budget['drawnTriangles']:,} drawn triangles, "
+            f"{budget['environmentDecodedTextureBytes']:,} decoded environment texture bytes and "
+            f"{budget['maxDrawCalls']} draw calls against Melbourne's "
+            f"{MELBOURNE_ENVELOPE['maxDrawCalls']}, with {budget['gpuErrors']} GPU errors and "
+            f"{budget['pageErrors']} uncaught page exceptions"
+        ),
+        "companionPresent": (
+            f"the Companion was shown in {companion['capturesWithCompanionShown']} of "
+            f"{companion['captures']} captures"
+        ),
+        "reticlePresent": (
+            f"the reticle was drawn and centred in {reticle['capturesWithReticleCentred']} of "
+            f"{reticle['captures']} captures"
+        ),
+        "authenticatedShellAndAuthoredHandlersPreserved": (
+            f"{shell['capturesInProductShell']} of {shell['captures']} captures were taken in the "
+            f"product shell with a mounted world, {shell['foreignListeners']} listeners came from "
+            f"anywhere but the product's own modules, "
+            f"{shell['interactionsNotCarriedByProduct']} interactions were not carried by the "
+            f"product's own handlers and {shell['substitutedPages']} pages were substituted"
+        ),
+    }
+
+
+def corridor(arguments: argparse.Namespace) -> int:
+    """Score a corridor run against the judge's answers, or record why it could not be scored."""
+    record_path, artifacts_dir = _corridor_paths(arguments.record)
+    relative_record = _relative(record_path)
+    if record_path.exists() and not arguments.replace:
+        raise SystemExit(f"{relative_record} exists. A retained record is not rewritten.")
+    run_path = Path(arguments.run).resolve()
+    run = _load_run(run_path)
+    if run.get("target") != GENERATED_TILE_TARGET:
+        raise SystemExit(f"{run_path.name} scored {run.get('target')!r}, not a generated tile")
+    rubric, rubric_sha = _rubric()
+    clauses = _rubric_clauses(rubric)
+    measured_at = _git("rev-parse", "--verify", f"{arguments.measured_at}^{{commit}}")
+    scored = _corridor_scored(run, measured_at)
+
+    if artifacts_dir.exists():
+        if not arguments.replace:
+            raise SystemExit(f"{_relative(artifacts_dir)} exists; retained artifacts are not rewritten")
+        shutil.rmtree(artifacts_dir)
+    artifacts_dir.mkdir(parents=True)
+    run_dir = run_path.parent
+    captures = []
+    for index, capture in enumerate(run["captures"], start=1):
+        target = _copy(
+            run_dir / capture["file"],
+            artifacts_dir / f"capture-{index:02d}-route-{capture['label']}.png",
+        )
+        bound = _bind(target, label=capture["label"], pose=_pose(capture["pose"]))
+        if bound["sha256"] != capture["sha256"]:
+            raise SystemExit(f"{capture['file']} changed after the run")
+        captures.append(bound)
+    for name, document in (
+        ("browser-metrics.json", _browser_metrics(run)),
+        ("gate-measurements.json", _gate_measurements(run)),
+    ):
+        text = json.dumps(_no_floats(document), indent=2, ensure_ascii=False) + "\n"
+        _refuse_forbidden(text, name)
+        (artifacts_dir / name).write_text(text, encoding="utf-8")
+    _copy(
+        run_dir / run_path.name.replace("-run.json", "-trace.json"),
+        artifacts_dir / "route-trace.json",
+    )
+    # The supplementary record binds the harness run record by digest, so a copy of it has to
+    # outlive the directory it was written in or that binding resolves to nothing.
+    run_file = _bind(_copy(run_path, artifacts_dir / "run.json"), originalName=run_path.name)
+    artifacts = (
+        [_bind(RUBRIC_COPY)]
+        + [
+            _bind(artifacts_dir / name)
+            for name in ("browser-metrics.json", "gate-measurements.json", "route-trace.json")
+        ]
+        + [run_file]
+        + captures
+    )
+
+    supplement = _supplement(arguments.supplementary, run, captures, run_file)
+    judgement_path = Path(arguments.judgement).resolve()
+    judgement_bytes = judgement_path.read_bytes()
+    judgement_file = {
+        "path": judge_words_path(relative_record).rsplit("/", 1)[0] + f"/inputs/{judgement_path.name}",
+        "byte_size": len(judgement_bytes),
+        "sha256": hashlib.sha256(judgement_bytes).hexdigest(),
+        "tracked": False,
+        "holds": (
+            "the judge's answers exactly as given, words included. It is not committed and this "
+            "record carries its path, byte size and SHA-256 in its place."
+        ),
+    }
+    judged, asked_as, refusals, departures = _corridor_judgement(
+        judgement_path,
+        rubric,
+        {capture["label"]: capture["sha256"] for capture in captures},
+        rubric_sha,
+    )
+    private = _judgement_words(judgement_path, rubric, _strings(asked_as))
+
+    if judged is None:
+        document = _refused_record(
+            date=arguments.date,
+            run=run,
+            refusals=refusals,
+            departures=departures,
+            clauses=clauses,
+            captures=captures,
+            artifacts=artifacts,
+            judgement_file=judgement_file,
+            names_the_captures=_names_the_captures(judgement_path, captures),
+            scored=scored,
+            supplement=supplement,
+            blocker=_comparison_blocker(
+                json.loads(BASELINE.read_bytes())["record"], rubric_sha
+            ),
+            rubric_sha256=rubric_sha,
+            record_path=relative_record,
+        )
+        _write(
+            record_path,
+            document,
+            replace=arguments.replace,
+            private=private,
+            shown=sorted(_shown_to_the_judge()),
+        )
+        written = record_path.read_bytes()
+        print(f"{relative_record} {len(written)} bytes, sha256 "
+              f"{hashlib.sha256(written).hexdigest()}, record_sha256 {document['record_sha256']}, "
+              f"judged key REFUSED on {len(refusals)} counts and "
+              f"{len(departures)} recorded departures")
+        for refusal in refusals:
+            print(f"  refused: {refusal}")
+        for departure in departures:
+            print(f"  departure: {departure}")
+        return 1
+
+    judged_value, judged_detail = decide_judged(
+        judged,
+        rubric_sha256=rubric_sha,
+        captures={capture["label"]: capture["sha256"] for capture in captures},
+    )
+    evidence: dict[str, Any] = {
+        spelling: run["mechanical"][spelling]
+        for spelling in CANONICAL_SPELLINGS
+        if spelling != JUDGED_KEY
+    }
+    evidence[JUDGED_KEY] = judged
+    because = _corridor_because(run, judged_detail)
+    held = {
+        spelling: judged_value if spelling == JUDGED_KEY else run["keys"][spelling]
+        for spelling in CANONICAL_SPELLINGS
+    }
+    failed = [spelling for spelling in CANONICAL_SPELLINGS if not held[spelling]]
+    passed = [spelling for spelling in CANONICAL_SPELLINGS if held[spelling]]
+    body = "; ".join(f"{spelling}, because {because[spelling]}" for spelling in failed or passed)
+    reason = (
+        f"The corridor at tile {run['scored']['tile']['tileName']}, composed from "
+        f"{len(run['scored']['containers'])} containers and walked inside the product's own "
+        "preview shell, "
+        + (f"fails the reconciled block. It fails {body}." if failed else f"holds all nine keys: {body}.")
+    )
+    report = run["validationReport"]
+    measurement = report["measurement"]
+    baseline_document = json.loads(BASELINE.read_bytes())
+    _comparable_with_the_baseline(baseline_document["record"], judged_detail)
+    try:
+        document = visual_gate_record(
+            profile=CORRIDOR_PROFILE,
+            record_path=relative_record,
+            date=arguments.date,
+            status="corridor_measured",
+            base=_git("rev-parse", "HEAD"),
+            branch=_git("branch", "--show-current"),
+            target=GENERATED_TILE_TARGET,
+            predecessor_records=_corridor_predecessors(),
+            artifacts=artifacts,
+            captures=captures,
+            rubric_sha256=rubric_sha,
+            browser={
+                "engine": run["browser"]["engine"],
+                "viewport": run["browser"]["viewport"],
+                "gpu": report["runtime"]["gpu"],
+                "peakJsHeapMb": _decimal(report["runtime"]["peak_js_heap_mb"]),
+                "frames": measurement["frames"],
+                "frameP95Ms": _decimal(measurement["frameP95Ms"]),
+                "fpsP1Low": _decimal(measurement["fpsP1Low"]),
+                "maxDrawCalls": run["drawCalls"]["decidingMax"],
+                "drawCallSources": run["drawCalls"],
+                "gpuError": report["renderer"]["gpu_error"],
+                "pageErrors": run["errors"]["exceptions"],
+                "consoleErrors": run["errors"]["consoleErrors"],
+                "eyeHeightMetres": "1.62",
+                "measuredBy": "the product's own validation=1 recorder, read after its window closed",
+            },
+            evidence=evidence,
+            authentication_condition=run["authentication"]["condition"],
+            baseline=baseline_document["record"],
+            baseline_path=_relative(BASELINE),
+            reason=reason,
+            checks={
+                "harnessRuns": 1,
+                "recordBuilderAgreedWithHarnessOnEveryMechanicalKey": True,
+                "scoredRendererIdenticalToHead": True,
+                "privateStoreRecord": supplement["path"],
+            },
+            claims_not_made=[
+                supplement["condition"],
+                "The three retained rejections are not bound directly. They are local-only "
+                "evidence this checkout does not hold, and the Flatiron baseline above binds "
+                "them.",
+                "The containers this run read are not committed. They are bound by the sha256 "
+                "each was matched by on the wire, and by the supplementary record above.",
+                "Frame time, low-percentile frame rate and heap are measurements of this machine "
+                "in this run. They are reported and decide no key.",
+                _judged_claim(judged_detail),
+                "Nothing is claimed about any street beyond the walk this run made.",
+            ],
+            extra={
+                "scored": _no_floats(scored),
+                "route": _no_floats(run["route"]),
+                "movement": _no_floats(
+                    {"walk": run["measured"]["walk"], "harnessWrites": run["harnessWrites"]}
+                ),
+                "integrity": _no_floats(run["measured"]["integrity"]),
+                "capsule": _no_floats(run["measured"]["capsule"]),
+                "privateStore": supplement,
+                "judgement": {
+                    "judge": judged.judge,
+                    "judgedOn": judged.judged_on,
+                    "rubric": RUBRIC_PATH,
+                    "rubricVersion": RUBRIC_VERSION,
+                    "rubricCopy": _relative(RUBRIC_COPY),
+                    "answeredAgainst": judged_detail["answeredAgainst"],
+                    "answeredFrom": (
+                        "each capture above, shown alone at full size under its picture title and "
+                        "followed by its one question, in route order, stopping at the first no"
+                    ),
+                    "judgementFile": judgement_file,
+                    **asked_as,
+                },
+                "measuredUnder": {"keySet": run["keySet"], "commit": measured_at},
+            },
+        )
+    except GateEvidenceError as error:
+        shutil.rmtree(artifacts_dir, ignore_errors=True)
+        raise SystemExit(f"nothing is written: {error}") from error
+    companion_path, companion = judge_words_file(
+        relative_record, judged, judged_detail["answeredAgainst"]["rubricVersion"]
+    )
+    if document["record"]["judgeWords"]["sha256"] != hashlib.sha256(companion).hexdigest():
+        raise SystemExit("the private companion is not the one the record binds")
+    _write_private(companion_path, companion, replace=arguments.replace)
+    _write(
+        record_path,
+        document,
+        replace=arguments.replace,
+        private=private,
+        shown=sorted(_shown_to_the_judge()),
+    )
+    written = record_path.read_bytes()
+    print(
+        f"{relative_record} {len(written)} bytes, "
+        f"sha256 {hashlib.sha256(written).hexdigest()}, "
+        f"record_sha256 {document['record_sha256']}, verdict {document['record']['verdict']}"
+    )
+    return 0
+
+
 def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description=__doc__.split("\n\n")[0])
     verbs = parser.add_subparsers(dest="verb", required=True)
@@ -1393,6 +2331,25 @@ def main(argv: list[str] | None = None) -> int:
     )
     base.add_argument("--replace", action="store_true")
     base.set_defaults(handler=baseline)
+    corr = verbs.add_parser("corridor", help="score a corridor run, or record why it was not")
+    corr.add_argument("--date", required=True)
+    corr.add_argument("--run", required=True, help="the run's <label>-run.json")
+    corr.add_argument("--judgement", required=True, help="the named judge's answers")
+    corr.add_argument(
+        "--supplementary",
+        required=True,
+        help="the record that states the store this run read, relative to the document root",
+    )
+    corr.add_argument(
+        "--record", required=True, help="where the record is written, under docs/evaluation/"
+    )
+    corr.add_argument(
+        "--measured-at",
+        required=True,
+        help="the commit the run was measured at; the measuring code must match it",
+    )
+    corr.add_argument("--replace", action="store_true")
+    corr.set_defaults(handler=corridor)
     arguments = parser.parse_args(argv)
     return arguments.handler(arguments)
 

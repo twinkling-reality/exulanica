@@ -1,0 +1,647 @@
+{
+  "profile": "exulanica.visual-gate-browser-metrics/v1",
+  "engine": "Chrome/153.0.8010.50 over the Chrome DevTools Protocol, driven by scripts/capture_visual_gate.mjs (no Playwright)",
+  "viewport": [
+    1440,
+    900
+  ],
+  "deviceScaleFactor": 1,
+  "mountMs": 62217,
+  "productValidationReport": {
+    "profile": "exulanica.browser-reconstruction-validation/v1",
+    "measurement": {
+      "driver": "requestAnimationFrame",
+      "warmup_seconds": 2,
+      "duration_seconds": 60,
+      "first_meaningful_render_ms": "61905.9",
+      "time_to_full_detail_ms": null,
+      "geometry_load_ms": null,
+      "frames": 3601,
+      "frameMeanMs": "16.67",
+      "frameP50Ms": "16.7",
+      "frameP95Ms": "16.7",
+      "frameP99Ms": "16.8",
+      "framesOver16_7Ms": 633,
+      "frameOver16_7Fraction": "0.175785",
+      "fpsP1Low": "59.52",
+      "hidden_during_run": false
+    },
+    "runtime": {
+      "platform": "MacIntel",
+      "logical_cpu_count": 12,
+      "device_memory_gb": 16,
+      "gpu": "ANGLE (Apple, ANGLE Metal Renderer: Apple M3 Pro, Unspecified Version)",
+      "engine": "PlayCanvas 2.21.4",
+      "viewport_css_px": [
+        1440,
+        900
+      ],
+      "canvas_px": [
+        1440,
+        900
+      ],
+      "device_pixel_ratio": 1,
+      "peak_js_heap_mb": "502.76"
+    },
+    "renderer": {
+      "max_draw_calls": 179,
+      "gpu_error": 0,
+      "draw_submission_valid": false
+    },
+    "network": {
+      "transfer_bytes": 7218889,
+      "decoded_body_bytes": 7143889,
+      "resource_count": 250
+    },
+    "memoryWorkspace": {
+      "scene": null,
+      "uploadedPointMaps": 1,
+      "uploadedPoints": 190570,
+      "authenticatedNetworkBytes": 0
+    }
+  },
+  "environment": {
+    "requestPath": "/api/tiles/b078c978-4827-5531-b805-737154c2e77f/bytes",
+    "transferredBytes": 12683297,
+    "decodedBytes": 12682860,
+    "status": 200,
+    "sha256": "ed9acb98268d80fc7b0bf856b682c95c15f59e50bf9c70aef1c2258cd713e999",
+    "tileInputsDigest": "dfc3cf8b0cf19d62817a115f7fac99923787e08c98b05b0aebf15d0ecd3ce942",
+    "citySeed": "75832ac54dcfd499219752e6385149c73624b8c674f9ebb0c1fa0af2bb70b3d1",
+    "tile": {
+      "x": 2,
+      "y": 0,
+      "lod": 0
+    },
+    "tileSizeMm": 128000,
+    "grammars": [
+      {
+        "id": "city",
+        "version": 3,
+        "descriptorSha256": "e771deef96b49ba35f8a145acbd67dda4d939f93f7730a2b50da78e1727ab41f"
+      }
+    ],
+    "renderBatchTriangles": 56388
+  },
+  "scene": {
+    "meshes": [
+      {
+        "id": "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:unavailable-surfaces#0",
+        "cull": "none",
+        "hasUv": true,
+        "textureCount": 1,
+        "decodedTextureBytes": 87380,
+        "triangles": 1114
+      },
+      {
+        "id": "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.brick-running-bond#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 17924092,
+        "triangles": 4422
+      },
+      {
+        "id": "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.broadleaf-foliage#0",
+        "cull": "none",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 5341180,
+        "triangles": 6720
+      },
+      {
+        "id": "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.carriageway-asphalt#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 17924092,
+        "triangles": 12
+      },
+      {
+        "id": "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.cast-concrete#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 17924092,
+        "triangles": 13796
+      },
+      {
+        "id": "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.float-glazing#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 4,
+        "decodedTextureBytes": 12331688,
+        "triangles": 548
+      },
+      {
+        "id": "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.footway-paving#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 17924092,
+        "triangles": 346
+      },
+      {
+        "id": "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.kerb-stone#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 5341204,
+        "triangles": 1060
+      },
+      {
+        "id": "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.limestone-ashlar#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 17924092,
+        "triangles": 10362
+      },
+      {
+        "id": "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.painted-render#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 17924092,
+        "triangles": 5294
+      },
+      {
+        "id": "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.painted-timber#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 5341180,
+        "triangles": 322
+      },
+      {
+        "id": "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.storefront-metal#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 17924092,
+        "triangles": 11492
+      },
+      {
+        "id": "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.tree-bark#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 5341180,
+        "triangles": 840
+      },
+      {
+        "id": "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.tree-pit-soil#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 5341180,
+        "triangles": 60
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (1,0)/generated-tile:unavailable-surfaces#0",
+        "cull": "none",
+        "hasUv": true,
+        "textureCount": 1,
+        "decodedTextureBytes": 87380,
+        "triangles": 493
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (1,0)/generated-tile:cc0.brick-running-bond#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 17924092,
+        "triangles": 2384
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (1,0)/generated-tile:cc0.broadleaf-foliage#0",
+        "cull": "none",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 5341180,
+        "triangles": 8288
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (1,0)/generated-tile:cc0.carriageway-asphalt#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 17924092,
+        "triangles": 448
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (1,0)/generated-tile:cc0.cast-concrete#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 17924092,
+        "triangles": 12770
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (1,0)/generated-tile:cc0.float-glazing#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 4,
+        "decodedTextureBytes": 12331688,
+        "triangles": 418
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (1,0)/generated-tile:cc0.footway-paving#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 17924092,
+        "triangles": 428
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (1,0)/generated-tile:cc0.kerb-stone#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 5341204,
+        "triangles": 1468
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (1,0)/generated-tile:cc0.limestone-ashlar#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 17924092,
+        "triangles": 11807
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (1,0)/generated-tile:cc0.painted-render#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 17924092,
+        "triangles": 2946
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (1,0)/generated-tile:cc0.painted-timber#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 5341180,
+        "triangles": 284
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (1,0)/generated-tile:cc0.storefront-metal#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 17924092,
+        "triangles": 9522
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (1,0)/generated-tile:cc0.tree-bark#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 5341180,
+        "triangles": 1036
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (1,0)/generated-tile:cc0.tree-pit-soil#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 5341180,
+        "triangles": 74
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (0,0)/generated-tile:unavailable-surfaces#0",
+        "cull": "none",
+        "hasUv": true,
+        "textureCount": 1,
+        "decodedTextureBytes": 87380,
+        "triangles": 872
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (0,0)/generated-tile:cc0.brick-running-bond#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 17924092,
+        "triangles": 8
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (0,0)/generated-tile:cc0.broadleaf-foliage#0",
+        "cull": "none",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 5341180,
+        "triangles": 1120
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (0,0)/generated-tile:cc0.carriageway-asphalt#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 17924092,
+        "triangles": 512
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (0,0)/generated-tile:cc0.cast-concrete#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 17924092,
+        "triangles": 1644
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (0,0)/generated-tile:cc0.float-glazing#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 4,
+        "decodedTextureBytes": 12331688,
+        "triangles": 106
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (0,0)/generated-tile:cc0.footway-paving#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 17924092,
+        "triangles": 386
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (0,0)/generated-tile:cc0.kerb-stone#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 5341204,
+        "triangles": 1468
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (0,0)/generated-tile:cc0.limestone-ashlar#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 17924092,
+        "triangles": 1910
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (0,0)/generated-tile:cc0.painted-render#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 17924092,
+        "triangles": 66
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (0,0)/generated-tile:cc0.painted-timber#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 5341180,
+        "triangles": 30
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (0,0)/generated-tile:cc0.storefront-metal#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 17924092,
+        "triangles": 876
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (0,0)/generated-tile:cc0.tree-bark#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 5341180,
+        "triangles": 140
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (0,0)/generated-tile:cc0.tree-pit-soil#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 5341180,
+        "triangles": 10
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (3,0)/generated-tile:unavailable-surfaces#0",
+        "cull": "none",
+        "hasUv": true,
+        "textureCount": 1,
+        "decodedTextureBytes": 87380,
+        "triangles": 423
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (3,0)/generated-tile:cc0.brick-running-bond#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 17924092,
+        "triangles": 6456
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (3,0)/generated-tile:cc0.broadleaf-foliage#0",
+        "cull": "none",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 5341180,
+        "triangles": 9184
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (3,0)/generated-tile:cc0.carriageway-asphalt#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 17924092,
+        "triangles": 496
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (3,0)/generated-tile:cc0.cast-concrete#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 17924092,
+        "triangles": 13062
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (3,0)/generated-tile:cc0.float-glazing#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 4,
+        "decodedTextureBytes": 12331688,
+        "triangles": 418
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (3,0)/generated-tile:cc0.footway-paving#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 17924092,
+        "triangles": 499
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (3,0)/generated-tile:cc0.kerb-stone#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 5341204,
+        "triangles": 1660
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (3,0)/generated-tile:cc0.limestone-ashlar#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 17924092,
+        "triangles": 14935
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (3,0)/generated-tile:cc0.painted-render#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 17924092,
+        "triangles": 1443
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (3,0)/generated-tile:cc0.painted-timber#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 5341180,
+        "triangles": 310
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (3,0)/generated-tile:cc0.storefront-metal#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 17924092,
+        "triangles": 7016
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (3,0)/generated-tile:cc0.tree-bark#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 5341180,
+        "triangles": 1148
+      },
+      {
+        "id": "geographic-environment/generated-tile:tile (3,0)/generated-tile:cc0.tree-pit-soil#0",
+        "cull": "back",
+        "hasUv": true,
+        "textureCount": 5,
+        "decodedTextureBytes": 5341180,
+        "triangles": 82
+      }
+    ],
+    "skipped": {
+      "disabledOrHidden": 15,
+      "notInCameraLayers": 0,
+      "notTriangles": 0
+    },
+    "layerInventory": {
+      "renderComponentInstancesRead": 56,
+      "otherInstances": {
+        "triangles": 0,
+        "points": 0,
+        "lines": 0,
+        "other": 0
+      },
+      "gsplatComponents": 0
+    },
+    "renderOrigin": {
+      "x": 64,
+      "y": 0,
+      "z": 64
+    },
+    "environmentTextures": 41,
+    "environmentTextureBytes": 150831076,
+    "deviceTextureBytes": 186972780,
+    "deviceVram": {
+      "texShadow": 16777220,
+      "texAsset": 0,
+      "texLightmap": 0,
+      "tex": 186972780,
+      "vb": 24457360,
+      "ib": 1177476,
+      "ub": 4224,
+      "sb": 0
+    },
+    "supportQueries": 179779
+  },
+  "pageNetwork": {
+    "requests": 390,
+    "finishedRequests": 389,
+    "failedRequests": [],
+    "httpErrors": [
+      {
+        "url": "/preview-api/companion/memory/recent",
+        "status": 404
+      },
+      {
+        "url": "/preview-api/world/assets",
+        "status": 404
+      },
+      {
+        "url": "/preview-api/world/versions",
+        "status": 404
+      },
+      {
+        "url": "/api/graph",
+        "status": 403
+      }
+    ],
+    "transferredBytes": 149256297
+  },
+  "errors": {
+    "exceptions": [],
+    "consoleErrors": [],
+    "networkLogErrors": [
+      "network: Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "network: Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "network: Failed to load resource: the server responded with a status of 404 (Not Found)",
+      "network: Failed to load resource: the server responded with a status of 403 (Forbidden)"
+    ]
+  },
+  "authentication": {
+    "condition": "preview-shell-credentialed-tiles",
+    "anonymousGraphReadStatus": 401,
+    "apiResponses": {
+      "GET /api/tiles 200": 1,
+      "GET /api/tiles/{id}/bytes 200": 4,
+      "GET /api/graph 403": 1
+    },
+    "previewApiRequests": [
+      {
+        "url": "/preview-api/graph",
+        "status": 200
+      },
+      {
+        "url": "/preview-api/companion/memory/recent",
+        "status": 404
+      },
+      {
+        "url": "/preview-api/formation",
+        "status": 200
+      },
+      {
+        "url": "/preview-api/environment-resources/sources/9d152259-13d1-5025-8f72-8bcb639a6438/features",
+        "status": 200
+      },
+      {
+        "url": "/preview-api/world/assets",
+        "status": 404
+      },
+      {
+        "url": "/preview-api/world/versions",
+        "status": 404
+      }
+    ],
+    "gateInitiatedProbe": {
+      "path": "/api/graph",
+      "status": 403,
+      "asked": true,
+      "gateInitiated": true
+    }
+  }
+}

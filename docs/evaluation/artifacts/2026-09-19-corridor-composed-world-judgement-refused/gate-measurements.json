@@ -1,0 +1,1392 @@
+{
+  "profile": "exulanica.visual-gate-measurements/v1",
+  "keySet": "exulanica.visual-gate-keys/v5",
+  "route": {
+    "rule": {
+      "lengthMm": 125000,
+      "stopMarginMm": 6000,
+      "frontageSearchMm": 40000,
+      "headingStepMillidegrees": 500,
+      "frontageSampleSpacingMm": 1000
+    },
+    "field": {
+      "centreX": 320,
+      "centreZ": -64,
+      "fieldRadius": "326.33724886993826",
+      "recoveryRadius": "328.33724886993826",
+      "maximumStepHeight": "0.18",
+      "maximumSlopeDegrees": 12,
+      "surfaceSampleSpacing": "0.05",
+      "inscribedHalfSideM": "230.75528162969533",
+      "bounds": [
+        "89.24471837030467",
+        "-294.75528162969533",
+        "550.7552816296953",
+        "166.75528162969533"
+      ]
+    },
+    "startMm": [
+      256000,
+      -70300
+    ],
+    "headingMillidegrees": 270000,
+    "clearRunMm": 294755,
+    "frontageSamples": 126,
+    "frontageBothSidesSamples": 123,
+    "meanFrontageSkewMillionths": 6918,
+    "candidatesTried": 720,
+    "candidatesQualified": 60,
+    "candidatesWithFrontage": 60,
+    "obstacles": 0,
+    "routeRings": 508,
+    "routeRingsRefused": [],
+    "headingsRefusedForNoGround": 0,
+    "groundRefused": [],
+    "routeGround": {
+      "asked": true,
+      "probeSpacingM": "0.005",
+      "probesPerHeading": 26201,
+      "lengthM": 131,
+      "preferredByTheRule": 270000,
+      "refusedForNoGround": [],
+      "walked": 270000,
+      "walkedGround": {
+        "headingMillidegrees": 270000,
+        "supported": true,
+        "steepestRise": {
+          "riseMm": "0.2",
+          "atM": "3.15"
+        }
+      },
+      "productMaximumStepHeight": "0.18"
+    },
+    "horizons": {
+      "frame": "the renderer frame in metres, the same frame as field.bounds",
+      "groundBounds": {
+        "west": "89.24471837030467",
+        "north": "-294.75528162969533",
+        "east": "550.7552816296953",
+        "south": "166.75528162969533"
+      },
+      "groundRadiusM": "326.33724886993826",
+      "obstacleBounds": {
+        "west": "113.366",
+        "north": "-116.634",
+        "east": "525.997",
+        "south": "-11.42"
+      },
+      "obstacleSource": "the rings the rule holds, whatever records they came from",
+      "rings": 508,
+      "obstaclesCoverTheGround": false
+    },
+    "walkWorld": {
+      "reach": "stated",
+      "opensOn": {
+        "tile": "b078c978-4827-5531-b805-737154c2e77f",
+        "tileX": 2,
+        "tileY": 0,
+        "containerSha256": "ed9acb98268d80fc7b0bf856b682c95c15f59e50bf9c70aef1c2258cd713e999"
+      },
+      "drawn": [
+        {
+          "tile": "b078c978-4827-5531-b805-737154c2e77f",
+          "tileX": 2,
+          "tileY": 0,
+          "containerSha256": "ed9acb98268d80fc7b0bf856b682c95c15f59e50bf9c70aef1c2258cd713e999"
+        },
+        {
+          "tile": "tile (1,0)",
+          "tileX": 1,
+          "tileY": 0,
+          "containerSha256": "7ef4d85c1413f4cc0e6ac289a9e23634896658d2dc8ddf322f4f890c64029507"
+        },
+        {
+          "tile": "tile (0,0)",
+          "tileX": 0,
+          "tileY": 0,
+          "containerSha256": "21b31c9f9ab9904104a319ddee8aaa5ea87f9cb361da39a793c48a123d0dace9"
+        },
+        {
+          "tile": "tile (3,0)",
+          "tileX": 3,
+          "tileY": 0,
+          "containerSha256": "47e6457e74812f8f84f923a222bf70966cf26b8a513ebc1e86f02233fe61818c"
+        }
+      ],
+      "stoodOn": [
+        {
+          "tile": "b078c978-4827-5531-b805-737154c2e77f",
+          "tileX": 2,
+          "tileY": 0,
+          "containerSha256": "ed9acb98268d80fc7b0bf856b682c95c15f59e50bf9c70aef1c2258cd713e999"
+        },
+        {
+          "tile": "tile (1,0)",
+          "tileX": 1,
+          "tileY": 0,
+          "containerSha256": "7ef4d85c1413f4cc0e6ac289a9e23634896658d2dc8ddf322f4f890c64029507"
+        },
+        {
+          "tile": "tile (0,0)",
+          "tileX": 0,
+          "tileY": 0,
+          "containerSha256": "21b31c9f9ab9904104a319ddee8aaa5ea87f9cb361da39a793c48a123d0dace9"
+        },
+        {
+          "tile": "tile (3,0)",
+          "tileX": 3,
+          "tileY": 0,
+          "containerSha256": "47e6457e74812f8f84f923a222bf70966cf26b8a513ebc1e86f02233fe61818c"
+        }
+      ],
+      "statedBytes": 26406960,
+      "measuredBytes": 26406960,
+      "absent": [
+        {
+          "tileX": 1,
+          "tileY": -1,
+          "reason": "no_row"
+        },
+        {
+          "tileX": 2,
+          "tileY": -1,
+          "reason": "no_row"
+        },
+        {
+          "tileX": 1,
+          "tileY": 1,
+          "reason": "no_row"
+        },
+        {
+          "tileX": 2,
+          "tileY": 1,
+          "reason": "no_row"
+        }
+      ],
+      "checkedAgainst": "the containers this run read from the wire"
+    },
+    "fieldBoundsCm": null
+  },
+  "arrival": {
+    "x": 256,
+    "y": "1.7400009922217896",
+    "z": "-70.3",
+    "yaw": "-1.5707963267948966",
+    "pitch": 0,
+    "speed": 0,
+    "mode": "converse",
+    "conversationActive": false,
+    "enabled": true
+  },
+  "interactions": [
+    {
+      "kind": "summon-companion",
+      "key": "KeyX",
+      "at": "start",
+      "carriedByProduct": true
+    },
+    {
+      "kind": "dismiss-companion",
+      "key": "Escape",
+      "at": "start",
+      "carriedByProduct": true
+    },
+    {
+      "kind": "focus-world",
+      "input": "left click on the world canvas",
+      "at": "start",
+      "point": {
+        "x": 720,
+        "y": 450
+      },
+      "carriedByProduct": true
+    },
+    {
+      "kind": "walk",
+      "key": "KeyW",
+      "heldMs": 37872,
+      "autoRepeat": {
+        "delayMs": 250,
+        "intervalMs": 33,
+        "repeatedKeyDowns": 1140
+      },
+      "targetAlongMm": 62500,
+      "displacementMillimetres": 62505,
+      "carriedByProduct": true
+    },
+    {
+      "kind": "summon-companion",
+      "key": "KeyX",
+      "at": "midpoint",
+      "carriedByProduct": true
+    },
+    {
+      "kind": "dismiss-companion",
+      "key": "Escape",
+      "at": "midpoint",
+      "carriedByProduct": true
+    },
+    {
+      "kind": "walk",
+      "key": "KeyW",
+      "heldMs": 37873,
+      "autoRepeat": {
+        "delayMs": 250,
+        "intervalMs": 33,
+        "repeatedKeyDowns": 1140
+      },
+      "targetAlongMm": 125000,
+      "displacementMillimetres": 62505,
+      "carriedByProduct": true
+    },
+    {
+      "kind": "summon-companion",
+      "key": "KeyX",
+      "at": "endpoint",
+      "carriedByProduct": true
+    }
+  ],
+  "harnessWrites": [
+    {
+      "field": "controls.state.yaw",
+      "valueMicroradians": 4712389,
+      "why": "mouse look needs pointer movement under a held lock, which the harness does not synthesize; the heading is written once and no position is written"
+    }
+  ],
+  "harnessObservers": [
+    "one engine update listener that copies the controls state each frame while the walk runs",
+    "one engine frameend listener that keeps the largest per-frame draw call count from the start capture to the endpoint capture",
+    "one MutationObserver on the travel status that records failure messages while the walk runs"
+  ],
+  "measured": {
+    "drawnTriangles": 175034,
+    "drawnMeshes": 56,
+    "walkingTriangles": 7799,
+    "facadeTriangles": 0,
+    "untexturedWalkingTriangles": 0,
+    "untexturedFacadeTriangles": 0,
+    "classifiedByMesh": {
+      "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:unavailable-surfaces#0": {
+        "walking": 914,
+        "facade": 0,
+        "drawn": 1114
+      },
+      "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.brick-running-bond#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 4422
+      },
+      "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.broadleaf-foliage#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 6720
+      },
+      "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.carriageway-asphalt#0": {
+        "walking": 12,
+        "facade": 0,
+        "drawn": 12
+      },
+      "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.cast-concrete#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 13796
+      },
+      "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.float-glazing#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 548
+      },
+      "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.footway-paving#0": {
+        "walking": 265,
+        "facade": 0,
+        "drawn": 346
+      },
+      "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.kerb-stone#0": {
+        "walking": 536,
+        "facade": 0,
+        "drawn": 1060
+      },
+      "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.limestone-ashlar#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 10362
+      },
+      "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.painted-render#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 5294
+      },
+      "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.painted-timber#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 322
+      },
+      "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.storefront-metal#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 11492
+      },
+      "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.tree-bark#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 840
+      },
+      "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.tree-pit-soil#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 60
+      },
+      "geographic-environment/generated-tile:tile (1,0)/generated-tile:unavailable-surfaces#0": {
+        "walking": 263,
+        "facade": 0,
+        "drawn": 493
+      },
+      "geographic-environment/generated-tile:tile (1,0)/generated-tile:cc0.brick-running-bond#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 2384
+      },
+      "geographic-environment/generated-tile:tile (1,0)/generated-tile:cc0.broadleaf-foliage#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 8288
+      },
+      "geographic-environment/generated-tile:tile (1,0)/generated-tile:cc0.carriageway-asphalt#0": {
+        "walking": 439,
+        "facade": 0,
+        "drawn": 448
+      },
+      "geographic-environment/generated-tile:tile (1,0)/generated-tile:cc0.cast-concrete#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 12770
+      },
+      "geographic-environment/generated-tile:tile (1,0)/generated-tile:cc0.float-glazing#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 418
+      },
+      "geographic-environment/generated-tile:tile (1,0)/generated-tile:cc0.footway-paving#0": {
+        "walking": 341,
+        "facade": 0,
+        "drawn": 428
+      },
+      "geographic-environment/generated-tile:tile (1,0)/generated-tile:cc0.kerb-stone#0": {
+        "walking": 684,
+        "facade": 0,
+        "drawn": 1468
+      },
+      "geographic-environment/generated-tile:tile (1,0)/generated-tile:cc0.limestone-ashlar#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 11807
+      },
+      "geographic-environment/generated-tile:tile (1,0)/generated-tile:cc0.painted-render#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 2946
+      },
+      "geographic-environment/generated-tile:tile (1,0)/generated-tile:cc0.painted-timber#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 284
+      },
+      "geographic-environment/generated-tile:tile (1,0)/generated-tile:cc0.storefront-metal#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 9522
+      },
+      "geographic-environment/generated-tile:tile (1,0)/generated-tile:cc0.tree-bark#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 1036
+      },
+      "geographic-environment/generated-tile:tile (1,0)/generated-tile:cc0.tree-pit-soil#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 74
+      },
+      "geographic-environment/generated-tile:tile (0,0)/generated-tile:unavailable-surfaces#0": {
+        "walking": 766,
+        "facade": 0,
+        "drawn": 872
+      },
+      "geographic-environment/generated-tile:tile (0,0)/generated-tile:cc0.brick-running-bond#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 8
+      },
+      "geographic-environment/generated-tile:tile (0,0)/generated-tile:cc0.broadleaf-foliage#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 1120
+      },
+      "geographic-environment/generated-tile:tile (0,0)/generated-tile:cc0.carriageway-asphalt#0": {
+        "walking": 505,
+        "facade": 0,
+        "drawn": 512
+      },
+      "geographic-environment/generated-tile:tile (0,0)/generated-tile:cc0.cast-concrete#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 1644
+      },
+      "geographic-environment/generated-tile:tile (0,0)/generated-tile:cc0.float-glazing#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 106
+      },
+      "geographic-environment/generated-tile:tile (0,0)/generated-tile:cc0.footway-paving#0": {
+        "walking": 363,
+        "facade": 0,
+        "drawn": 386
+      },
+      "geographic-environment/generated-tile:tile (0,0)/generated-tile:cc0.kerb-stone#0": {
+        "walking": 724,
+        "facade": 0,
+        "drawn": 1468
+      },
+      "geographic-environment/generated-tile:tile (0,0)/generated-tile:cc0.limestone-ashlar#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 1910
+      },
+      "geographic-environment/generated-tile:tile (0,0)/generated-tile:cc0.painted-render#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 66
+      },
+      "geographic-environment/generated-tile:tile (0,0)/generated-tile:cc0.painted-timber#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 30
+      },
+      "geographic-environment/generated-tile:tile (0,0)/generated-tile:cc0.storefront-metal#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 876
+      },
+      "geographic-environment/generated-tile:tile (0,0)/generated-tile:cc0.tree-bark#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 140
+      },
+      "geographic-environment/generated-tile:tile (0,0)/generated-tile:cc0.tree-pit-soil#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 10
+      },
+      "geographic-environment/generated-tile:tile (3,0)/generated-tile:unavailable-surfaces#0": {
+        "walking": 229,
+        "facade": 0,
+        "drawn": 423
+      },
+      "geographic-environment/generated-tile:tile (3,0)/generated-tile:cc0.brick-running-bond#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 6456
+      },
+      "geographic-environment/generated-tile:tile (3,0)/generated-tile:cc0.broadleaf-foliage#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 9184
+      },
+      "geographic-environment/generated-tile:tile (3,0)/generated-tile:cc0.carriageway-asphalt#0": {
+        "walking": 491,
+        "facade": 0,
+        "drawn": 496
+      },
+      "geographic-environment/generated-tile:tile (3,0)/generated-tile:cc0.cast-concrete#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 13062
+      },
+      "geographic-environment/generated-tile:tile (3,0)/generated-tile:cc0.float-glazing#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 418
+      },
+      "geographic-environment/generated-tile:tile (3,0)/generated-tile:cc0.footway-paving#0": {
+        "walking": 427,
+        "facade": 0,
+        "drawn": 499
+      },
+      "geographic-environment/generated-tile:tile (3,0)/generated-tile:cc0.kerb-stone#0": {
+        "walking": 840,
+        "facade": 0,
+        "drawn": 1660
+      },
+      "geographic-environment/generated-tile:tile (3,0)/generated-tile:cc0.limestone-ashlar#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 14935
+      },
+      "geographic-environment/generated-tile:tile (3,0)/generated-tile:cc0.painted-render#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 1443
+      },
+      "geographic-environment/generated-tile:tile (3,0)/generated-tile:cc0.painted-timber#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 310
+      },
+      "geographic-environment/generated-tile:tile (3,0)/generated-tile:cc0.storefront-metal#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 7016
+      },
+      "geographic-environment/generated-tile:tile (3,0)/generated-tile:cc0.tree-bark#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 1148
+      },
+      "geographic-environment/generated-tile:tile (3,0)/generated-tile:cc0.tree-pit-soil#0": {
+        "walking": 0,
+        "facade": 0,
+        "drawn": 82
+      }
+    },
+    "texturedMeshes": 56,
+    "supportSamplesQueried": 179779,
+    "integrity": {
+      "components": 2243,
+      "supportComponents": 3,
+      "componentsDetachedFromSupport": 322,
+      "detachedTriangles": 11896,
+      "detachedByMesh": {
+        "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.cast-concrete#0": 52,
+        "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.storefront-metal#0": 71,
+        "geographic-environment/generated-tile:tile (1,0)/generated-tile:unavailable-surfaces#0": 6,
+        "geographic-environment/generated-tile:tile (1,0)/generated-tile:cc0.cast-concrete#0": 35,
+        "geographic-environment/generated-tile:tile (1,0)/generated-tile:cc0.storefront-metal#0": 71,
+        "geographic-environment/generated-tile:tile (0,0)/generated-tile:unavailable-surfaces#0": 6,
+        "geographic-environment/generated-tile:tile (0,0)/generated-tile:cc0.cast-concrete#0": 24,
+        "geographic-environment/generated-tile:tile (0,0)/generated-tile:cc0.storefront-metal#0": 16,
+        "geographic-environment/generated-tile:tile (3,0)/generated-tile:unavailable-surfaces#0": 6,
+        "geographic-environment/generated-tile:tile (3,0)/generated-tile:cc0.cast-concrete#0": 19,
+        "geographic-environment/generated-tile:tile (3,0)/generated-tile:cc0.storefront-metal#0": 33
+      },
+      "detachedExamples": [
+        {
+          "meshIds": [
+            "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.cast-concrete#0",
+            "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.storefront-metal#0"
+          ],
+          "triangles": 72,
+          "lowestMm": [
+            258950,
+            669,
+            -74826
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.cast-concrete#0"
+          ],
+          "triangles": 28,
+          "lowestMm": [
+            382400,
+            1035,
+            -35835
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.cast-concrete#0"
+          ],
+          "triangles": 28,
+          "lowestMm": [
+            382400,
+            1035,
+            -36485
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.cast-concrete#0"
+          ],
+          "triangles": 28,
+          "lowestMm": [
+            382400,
+            1035,
+            -37135
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.cast-concrete#0"
+          ],
+          "triangles": 28,
+          "lowestMm": [
+            382400,
+            1035,
+            -37785
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.cast-concrete#0"
+          ],
+          "triangles": 28,
+          "lowestMm": [
+            382400,
+            1035,
+            -54504
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.cast-concrete#0"
+          ],
+          "triangles": 28,
+          "lowestMm": [
+            382400,
+            1035,
+            -55154
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.cast-concrete#0"
+          ],
+          "triangles": 28,
+          "lowestMm": [
+            382400,
+            1035,
+            -55804
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.cast-concrete#0"
+          ],
+          "triangles": 36,
+          "lowestMm": [
+            313474,
+            1838,
+            -15400
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.cast-concrete#0"
+          ],
+          "triangles": 28,
+          "lowestMm": [
+            382400,
+            1035,
+            -46503
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.cast-concrete#0"
+          ],
+          "triangles": 28,
+          "lowestMm": [
+            382400,
+            1035,
+            -47153
+          ]
+        },
+        {
+          "meshIds": [
+            "geographic-environment/generated-tile:b078c978-4827-5531-b805-737154c2e77f/generated-tile:cc0.cast-concrete#0"
+          ],
+          "triangles": 28,
+          "lowestMm": [
+            382400,
+            1035,
+            -47803
+          ]
+        }
+      ],
+      "trianglesInsideBuildings": 0,
+      "componentsInsideBuildings": 0,
+      "insideByMesh": {},
+      "buildingsWithDrawnGeometryInside": [],
+      "ringEdges": 0,
+      "ringEdgesWithoutDrawnFacade": 0,
+      "ringEdgeExamples": []
+    },
+    "walk": {
+      "walkedDisplacementMm": 125010,
+      "walkedPathMm": 125010,
+      "maxLateralDeviationMm": 0,
+      "traceSamples": 2502,
+      "routeSupportGapSamples": 0,
+      "maxEyeHeightErrorMm": 0,
+      "maxSupportResampleDeltaMm": 0,
+      "eyeHeightAboveDrawnSupportMm": {
+        "minimum": 1620,
+        "maximum": 1620
+      }
+    },
+    "capsule": {
+      "capsuleSamples": 2502,
+      "capsuleSamplesChecked": 2502,
+      "capsuleTriangleContactSamples": 0,
+      "capsuleRingContactSamples": 0,
+      "minCapsuleTriangleClearanceMm": 979,
+      "minCapsuleRingClearanceMm": null,
+      "contactExamples": []
+    }
+  },
+  "observation": {
+    "captures": [
+      {
+        "label": "start",
+        "companionShown": true,
+        "reticleCentred": true,
+        "inProductShell": true
+      },
+      {
+        "label": "midpoint",
+        "companionShown": true,
+        "reticleCentred": true,
+        "inProductShell": true
+      },
+      {
+        "label": "endpoint",
+        "companionShown": true,
+        "reticleCentred": true,
+        "inProductShell": true
+      }
+    ],
+    "foreignListeners": 0,
+    "productWindowKeydownListeners": 5,
+    "interactionsNotCarriedByProduct": 0,
+    "substitutedPages": 0,
+    "recoveryEvents": 0,
+    "harnessPositionWrites": 0,
+    "environmentTransferredBytes": 12683297,
+    "environmentDecodedTextureBytes": 150831076,
+    "maxDrawCalls": 179,
+    "gpuErrors": 0,
+    "pageErrors": 0
+  },
+  "mechanical": {
+    "continuousTexturedStreetAndFacades": {
+      "streetAndFacadeTriangles": 7799,
+      "untexturedStreetAndFacadeTriangles": 0,
+      "routeSupportGapSamples": 0
+    },
+    "noCutsOrFloatingGeometry": {
+      "routeSupportGapSamples": 0,
+      "ringEdgesWithoutDrawnFacade": 0,
+      "componentsDetachedFromSupport": 322,
+      "trianglesInsideBuildings": 0
+    },
+    "usefulEyeLevelMovement": {
+      "walkedDisplacementMm": 125010,
+      "maxLateralDeviationMm": 0,
+      "recoveryEvents": 0,
+      "harnessPositionWrites": 0,
+      "traceSamples": 2502,
+      "routeSupportGapSamples": 0,
+      "maxEyeHeightErrorMm": 0,
+      "maxSupportResampleDeltaMm": 0
+    },
+    "completeCapsuleClearanceVerification": {
+      "capsuleSamples": 2502,
+      "capsuleSamplesChecked": 2502,
+      "capsuleTriangleContactSamples": 0,
+      "capsuleRingContactSamples": 0
+    },
+    "practicalBrowserBudget": {
+      "environmentTransferredBytes": 12683297,
+      "drawnTriangles": 175034,
+      "environmentDecodedTextureBytes": 150831076,
+      "maxDrawCalls": 179,
+      "gpuErrors": 0,
+      "pageErrors": 0
+    },
+    "companionPresent": {
+      "captures": 3,
+      "capturesWithCompanionShown": 3
+    },
+    "reticlePresent": {
+      "captures": 3,
+      "capturesWithReticleCentred": 3
+    },
+    "authenticatedShellAndAuthoredHandlersPreserved": {
+      "captures": 3,
+      "capturesInProductShell": 3,
+      "foreignListeners": 0,
+      "productWindowKeydownListeners": 5,
+      "interactionsNotCarriedByProduct": 0,
+      "substitutedPages": 0
+    }
+  },
+  "keys": {
+    "continuousTexturedStreetAndFacades": true,
+    "readsAsInhabitedStreet": "awaiting-named-judge",
+    "noCutsOrFloatingGeometry": false,
+    "usefulEyeLevelMovement": true,
+    "completeCapsuleClearanceVerification": true,
+    "practicalBrowserBudget": false,
+    "companionPresent": true,
+    "reticlePresent": true,
+    "authenticatedShellAndAuthoredHandlersPreserved": true
+  },
+  "listeners": {
+    "counts": {
+      "product": 30,
+      "dev-server": 1,
+      "foreign": 0
+    },
+    "productWindowKeydownListeners": 5,
+    "inventory": [
+      {
+        "target": "canvas",
+        "type": "camera-mode-change",
+        "source": "web/packages/app/src/composition/environment-selection.ts",
+        "kind": "product",
+        "line": 84
+      },
+      {
+        "target": "canvas",
+        "type": "contextmenu",
+        "source": "web/packages/atlas-react/src/playcanvas/controls.ts",
+        "kind": "product",
+        "line": 98
+      },
+      {
+        "target": "canvas",
+        "type": "mousedown",
+        "source": "web/packages/atlas-react/src/playcanvas/controls.ts",
+        "kind": "product",
+        "line": 89
+      },
+      {
+        "target": "canvas",
+        "type": "pointerup",
+        "source": "web/packages/app/src/composition/input-modes.ts",
+        "kind": "product",
+        "line": 91
+      },
+      {
+        "target": "canvas",
+        "type": "society-nearby-change",
+        "source": "web/packages/app/src/composition/environment-selection.ts",
+        "kind": "product",
+        "line": 311
+      },
+      {
+        "target": "canvas",
+        "type": "webglcontextlost",
+        "source": "web/packages/app/node_modules/.vite/deps/playcanvas.js",
+        "kind": "product",
+        "line": 24423
+      },
+      {
+        "target": "canvas",
+        "type": "webglcontextlost",
+        "source": "web/packages/app/src/composition/input-modes.ts",
+        "kind": "product",
+        "line": 99
+      },
+      {
+        "target": "canvas",
+        "type": "webglcontextrestored",
+        "source": "web/packages/app/node_modules/.vite/deps/playcanvas.js",
+        "kind": "product",
+        "line": 24427
+      },
+      {
+        "target": "document",
+        "type": "focusin",
+        "source": "web/packages/atlas-react/src/playcanvas/controls.ts",
+        "kind": "product",
+        "line": 126
+      },
+      {
+        "target": "document",
+        "type": "mousemove",
+        "source": "web/packages/atlas-react/src/playcanvas/controls.ts",
+        "kind": "product",
+        "line": 82
+      },
+      {
+        "target": "document",
+        "type": "pointerlockchange",
+        "source": "web/packages/app/src/composition/character.ts",
+        "kind": "product",
+        "line": 129
+      },
+      {
+        "target": "document",
+        "type": "pointerlockchange",
+        "source": "web/packages/app/src/ui/world-workspace.ts",
+        "kind": "product",
+        "line": 99
+      },
+      {
+        "target": "document",
+        "type": "pointerlockchange",
+        "source": "web/packages/atlas-react/src/playcanvas/controls.ts",
+        "kind": "product",
+        "line": 72
+      },
+      {
+        "target": "document",
+        "type": "visibilitychange",
+        "source": "web/packages/app/node_modules/.vite/deps/playcanvas.js",
+        "kind": "product",
+        "line": 82856
+      },
+      {
+        "target": "window",
+        "type": "beforeunload",
+        "source": "/@vite/client",
+        "kind": "dev-server",
+        "line": 855
+      },
+      {
+        "target": "window",
+        "type": "beforeunload",
+        "source": "web/packages/app/src/bootstrap.ts",
+        "kind": "product",
+        "line": 10
+      },
+      {
+        "target": "window",
+        "type": "blur",
+        "source": "web/packages/app/src/composition/input-modes.ts",
+        "kind": "product",
+        "line": 210
+      },
+      {
+        "target": "window",
+        "type": "blur",
+        "source": "web/packages/app/src/ui/companion-stage.ts",
+        "kind": "product",
+        "line": 49
+      },
+      {
+        "target": "window",
+        "type": "blur",
+        "source": "web/packages/atlas-react/src/playcanvas/controls.ts",
+        "kind": "product",
+        "line": 136
+      },
+      {
+        "target": "window",
+        "type": "keydown",
+        "source": "web/packages/app/src/composition/character.ts",
+        "kind": "product",
+        "line": 126
+      },
+      {
+        "target": "window",
+        "type": "keydown",
+        "source": "web/packages/app/src/composition/input-modes.ts",
+        "kind": "product",
+        "line": 111
+      },
+      {
+        "target": "window",
+        "type": "keydown",
+        "source": "web/packages/app/src/composition/objects.ts",
+        "kind": "product",
+        "line": 640
+      },
+      {
+        "target": "window",
+        "type": "keydown",
+        "source": "web/packages/app/src/ui/world-workspace.ts",
+        "kind": "product",
+        "line": 92
+      },
+      {
+        "target": "window",
+        "type": "keydown",
+        "source": "web/packages/atlas-react/src/playcanvas/controls.ts",
+        "kind": "product",
+        "line": 99
+      },
+      {
+        "target": "window",
+        "type": "keyup",
+        "source": "web/packages/app/src/composition/input-modes.ts",
+        "kind": "product",
+        "line": 205
+      },
+      {
+        "target": "window",
+        "type": "keyup",
+        "source": "web/packages/atlas-react/src/playcanvas/controls.ts",
+        "kind": "product",
+        "line": 135
+      },
+      {
+        "target": "window",
+        "type": "pagehide",
+        "source": "web/packages/app/src/main.ts",
+        "kind": "product",
+        "line": 53
+      },
+      {
+        "target": "window",
+        "type": "pageshow",
+        "source": "web/packages/app/src/bootstrap.ts",
+        "kind": "product",
+        "line": 13
+      },
+      {
+        "target": "window",
+        "type": "pointermove",
+        "source": "web/packages/app/src/ui/companion-stage.ts",
+        "kind": "product",
+        "line": 35
+      },
+      {
+        "target": "window",
+        "type": "popstate",
+        "source": "web/packages/app/src/composition/input-modes.ts",
+        "kind": "product",
+        "line": 213
+      },
+      {
+        "target": "window",
+        "type": "resize",
+        "source": "web/packages/app/src/atlas.ts",
+        "kind": "product",
+        "line": 35
+      }
+    ]
+  },
+  "authoredObjects": {
+    "objectIds": [],
+    "district": null
+  },
+  "captureStates": [
+    {
+      "label": "start",
+      "pose": {
+        "x": 256,
+        "y": "1.7400009922217896",
+        "z": "-70.3",
+        "yaw": "4.71238898038469",
+        "pitch": 0,
+        "speed": 0,
+        "mode": "converse",
+        "conversationActive": true,
+        "enabled": false
+      },
+      "stats": {
+        "drawCalls": 0,
+        "frame": 286
+      },
+      "alongMetres": 0,
+      "state": {
+        "locationPath": "/",
+        "title": "Exulanica: synthetic read-only development preview",
+        "shellAttributes": {
+          "id": "shell",
+          "data-mode": "converse",
+          "data-companion-side": "right",
+          "data-first-use": "arrival",
+          "data-welcome": "",
+          "data-vignette": "subtle",
+          "data-primary": "world",
+          "data-camera": "ground",
+          "data-generated-tile-evaluation": "b078c978-4827-5531-b805-737154c2e77f",
+          "data-generated-tile-world": "{\"reach\":\"stated\",\"opensOn\":{\"tile\":\"b078c978-4827-5531-b805-737154c2e77f\",\"tileX\":2,\"tileY\":0,\"containerSha256\":\"ed9acb98268d80fc7b0bf856b682c95c15f59e50bf9c70aef1c2258cd713e999\"},\"drawn\":[{\"tile\":\"b078c978-4827-5531-b805-737154c2e77f\",\"tileX\":2,\"tileY\":0,\"containerSha256\":\"ed9acb98268d80fc7b0bf856b682c95c15f59e50bf9c70aef1c2258cd713e999\"},{\"tile\":\"tile (1,0)\",\"tileX\":1,\"tileY\":0,\"containerSha256\":\"7ef4d85c1413f4cc0e6ac289a9e23634896658d2dc8ddf322f4f890c64029507\"},{\"tile\":\"tile (0,0)\",\"tileX\":0,\"tileY\":0,\"containerSha256\":\"21b31c9f9ab9904104a319ddee8aaa5ea87f9cb361da39a793c48a123d0dace9\"},{\"tile\":\"tile (3,0)\",\"tileX\":3,\"tileY\":0,\"containerSha256\":\"47e6457e74812f8f84f923a222bf70966cf26b8a513ebc1e86f02233fe61818c\"}],\"stoodOn\":[{\"tile\":\"b078c978-4827-5531-b805-737154c2e77f\",\"tileX\":2,\"tileY\":0,\"containerSha256\":\"ed9acb98268d80fc7b0bf856b682c95c15f59e50bf9c70aef1c2258cd713e999\"},{\"tile\":\"tile (1,0)\",\"tileX\":1,\"tileY\":0,\"containerSha256\":\"7ef4d85c1413f4cc0e6ac289a9e23634896658d2dc8ddf322f4f890c64029507\"},{\"tile\":\"tile (0,0)\",\"tileX\":0,\"tileY\":0,\"containerSha256\":\"21b31c9f9ab9904104a319ddee8aaa5ea87f9cb361da39a793c48a123d0dace9\"},{\"tile\":\"tile (3,0)\",\"tileX\":3,\"tileY\":0,\"containerSha256\":\"47e6457e74812f8f84f923a222bf70966cf26b8a513ebc1e86f02233fe61818c\"}],\"neighbourTransferredBytes\":26406960,\"absent\":[{\"tileX\":1,\"tileY\":-1,\"reason\":\"no_row\"},{\"tileX\":2,\"tileY\":-1,\"reason\":\"no_row\"},{\"tileX\":1,\"tileY\":1,\"reason\":\"no_row\"},{\"tileX\":2,\"tileY\":1,\"reason\":\"no_row\"}]}",
+          "data-generated-tile-opening": "stated",
+          "data-generated-tile-pose": "256000,70300,1,0",
+          "data-moving": "false",
+          "data-spatial": "between"
+        },
+        "atlasDataset": {
+          "engine": "PlayCanvas 2.21.4",
+          "worldProfile": "origin-landscape",
+          "worldTopology": "d327cbec4193317e",
+          "worldModules": "4",
+          "companionRenderer": "svg"
+        },
+        "refusals": [],
+        "reticle": {
+          "present": true,
+          "box": {
+            "x": 712,
+            "y": 442,
+            "width": 16,
+            "height": 16,
+            "display": "block",
+            "visibility": "visible",
+            "opacity": "0.2"
+          },
+          "centred": true
+        },
+        "companion": {
+          "stage": {
+            "renderer": "svg",
+            "state": "uncertain",
+            "shape": "circle",
+            "color": "ink",
+            "face": "neutral",
+            "ready": "true",
+            "shown": "true",
+            "box": {
+              "x": "876.8845825195312",
+              "y": "67.3283920288086",
+              "width": "92.70245361328125",
+              "height": "95.24222564697266",
+              "display": "block",
+              "visibility": "visible",
+              "opacity": 1
+            }
+          },
+          "encounter": {
+            "state": "open",
+            "box": {
+              "x": "858.6146240234375",
+              "y": 54,
+              "width": "509.3853759765625",
+              "height": "598.4375",
+              "display": "flex",
+              "visibility": "visible",
+              "opacity": 1
+            }
+          },
+          "shown": true
+        },
+        "inProductShell": true,
+        "worldMounted": true,
+        "credentialGate": false,
+        "emptyWorld": false,
+        "activeElement": "body",
+        "atlasFocused": false,
+        "typingTarget": false,
+        "heapBytes": 497668732,
+        "pointerLocked": false
+      }
+    },
+    {
+      "label": "midpoint",
+      "pose": {
+        "x": "318.5047102228963",
+        "y": "1.7658090626080942",
+        "z": "-70.3",
+        "yaw": "4.71238898038469",
+        "pitch": 0,
+        "speed": 0,
+        "mode": "converse",
+        "conversationActive": true,
+        "enabled": false
+      },
+      "stats": {
+        "drawCalls": 146,
+        "frame": 2692
+      },
+      "alongMetres": "62.50471022289628",
+      "state": {
+        "locationPath": "/",
+        "title": "Exulanica: synthetic read-only development preview",
+        "shellAttributes": {
+          "id": "shell",
+          "data-mode": "converse",
+          "data-companion-side": "right",
+          "data-first-use": "companion",
+          "data-welcome": "",
+          "data-vignette": "subtle",
+          "data-primary": "world",
+          "data-camera": "ground",
+          "data-generated-tile-evaluation": "b078c978-4827-5531-b805-737154c2e77f",
+          "data-generated-tile-world": "{\"reach\":\"stated\",\"opensOn\":{\"tile\":\"b078c978-4827-5531-b805-737154c2e77f\",\"tileX\":2,\"tileY\":0,\"containerSha256\":\"ed9acb98268d80fc7b0bf856b682c95c15f59e50bf9c70aef1c2258cd713e999\"},\"drawn\":[{\"tile\":\"b078c978-4827-5531-b805-737154c2e77f\",\"tileX\":2,\"tileY\":0,\"containerSha256\":\"ed9acb98268d80fc7b0bf856b682c95c15f59e50bf9c70aef1c2258cd713e999\"},{\"tile\":\"tile (1,0)\",\"tileX\":1,\"tileY\":0,\"containerSha256\":\"7ef4d85c1413f4cc0e6ac289a9e23634896658d2dc8ddf322f4f890c64029507\"},{\"tile\":\"tile (0,0)\",\"tileX\":0,\"tileY\":0,\"containerSha256\":\"21b31c9f9ab9904104a319ddee8aaa5ea87f9cb361da39a793c48a123d0dace9\"},{\"tile\":\"tile (3,0)\",\"tileX\":3,\"tileY\":0,\"containerSha256\":\"47e6457e74812f8f84f923a222bf70966cf26b8a513ebc1e86f02233fe61818c\"}],\"stoodOn\":[{\"tile\":\"b078c978-4827-5531-b805-737154c2e77f\",\"tileX\":2,\"tileY\":0,\"containerSha256\":\"ed9acb98268d80fc7b0bf856b682c95c15f59e50bf9c70aef1c2258cd713e999\"},{\"tile\":\"tile (1,0)\",\"tileX\":1,\"tileY\":0,\"containerSha256\":\"7ef4d85c1413f4cc0e6ac289a9e23634896658d2dc8ddf322f4f890c64029507\"},{\"tile\":\"tile (0,0)\",\"tileX\":0,\"tileY\":0,\"containerSha256\":\"21b31c9f9ab9904104a319ddee8aaa5ea87f9cb361da39a793c48a123d0dace9\"},{\"tile\":\"tile (3,0)\",\"tileX\":3,\"tileY\":0,\"containerSha256\":\"47e6457e74812f8f84f923a222bf70966cf26b8a513ebc1e86f02233fe61818c\"}],\"neighbourTransferredBytes\":26406960,\"absent\":[{\"tileX\":1,\"tileY\":-1,\"reason\":\"no_row\"},{\"tileX\":2,\"tileY\":-1,\"reason\":\"no_row\"},{\"tileX\":1,\"tileY\":1,\"reason\":\"no_row\"},{\"tileX\":2,\"tileY\":1,\"reason\":\"no_row\"}]}",
+          "data-generated-tile-opening": "stated",
+          "data-generated-tile-pose": "256000,70300,1,0",
+          "data-moving": "false",
+          "data-spatial": "between"
+        },
+        "atlasDataset": {
+          "engine": "PlayCanvas 2.21.4",
+          "worldProfile": "origin-landscape",
+          "worldTopology": "d327cbec4193317e",
+          "worldModules": "4",
+          "companionRenderer": "svg"
+        },
+        "refusals": [],
+        "reticle": {
+          "present": true,
+          "box": {
+            "x": 712,
+            "y": 442,
+            "width": 16,
+            "height": 16,
+            "display": "block",
+            "visibility": "visible",
+            "opacity": "0.2"
+          },
+          "centred": true
+        },
+        "companion": {
+          "stage": {
+            "renderer": "svg",
+            "state": "uncertain",
+            "shape": "circle",
+            "color": "ink",
+            "face": "neutral",
+            "ready": "true",
+            "shown": "true",
+            "box": {
+              "x": "876.8845825195312",
+              "y": "67.3283920288086",
+              "width": "92.70245361328125",
+              "height": "95.24222564697266",
+              "display": "block",
+              "visibility": "visible",
+              "opacity": 1
+            }
+          },
+          "encounter": {
+            "state": "open",
+            "box": {
+              "x": "858.6146240234375",
+              "y": 54,
+              "width": "509.3853759765625",
+              "height": "598.4375",
+              "display": "flex",
+              "visibility": "visible",
+              "opacity": 1
+            }
+          },
+          "shown": true
+        },
+        "inProductShell": true,
+        "worldMounted": true,
+        "credentialGate": false,
+        "emptyWorld": false,
+        "activeElement": "button",
+        "atlasFocused": false,
+        "typingTarget": false,
+        "heapBytes": 427608536,
+        "pointerLocked": false
+      }
+    },
+    {
+      "label": "endpoint",
+      "pose": {
+        "x": "381.0095912503946",
+        "y": "1.7576537366556204",
+        "z": "-70.3",
+        "yaw": "4.71238898038469",
+        "pitch": 0,
+        "speed": 0,
+        "mode": "converse",
+        "conversationActive": true,
+        "enabled": false
+      },
+      "stats": {
+        "drawCalls": 141,
+        "frame": 5091
+      },
+      "alongMetres": "125.00959125039458",
+      "state": {
+        "locationPath": "/",
+        "title": "Exulanica: synthetic read-only development preview",
+        "shellAttributes": {
+          "id": "shell",
+          "data-mode": "converse",
+          "data-companion-side": "right",
+          "data-first-use": "companion",
+          "data-welcome": "",
+          "data-vignette": "subtle",
+          "data-primary": "world",
+          "data-camera": "ground",
+          "data-generated-tile-evaluation": "b078c978-4827-5531-b805-737154c2e77f",
+          "data-generated-tile-world": "{\"reach\":\"stated\",\"opensOn\":{\"tile\":\"b078c978-4827-5531-b805-737154c2e77f\",\"tileX\":2,\"tileY\":0,\"containerSha256\":\"ed9acb98268d80fc7b0bf856b682c95c15f59e50bf9c70aef1c2258cd713e999\"},\"drawn\":[{\"tile\":\"b078c978-4827-5531-b805-737154c2e77f\",\"tileX\":2,\"tileY\":0,\"containerSha256\":\"ed9acb98268d80fc7b0bf856b682c95c15f59e50bf9c70aef1c2258cd713e999\"},{\"tile\":\"tile (1,0)\",\"tileX\":1,\"tileY\":0,\"containerSha256\":\"7ef4d85c1413f4cc0e6ac289a9e23634896658d2dc8ddf322f4f890c64029507\"},{\"tile\":\"tile (0,0)\",\"tileX\":0,\"tileY\":0,\"containerSha256\":\"21b31c9f9ab9904104a319ddee8aaa5ea87f9cb361da39a793c48a123d0dace9\"},{\"tile\":\"tile (3,0)\",\"tileX\":3,\"tileY\":0,\"containerSha256\":\"47e6457e74812f8f84f923a222bf70966cf26b8a513ebc1e86f02233fe61818c\"}],\"stoodOn\":[{\"tile\":\"b078c978-4827-5531-b805-737154c2e77f\",\"tileX\":2,\"tileY\":0,\"containerSha256\":\"ed9acb98268d80fc7b0bf856b682c95c15f59e50bf9c70aef1c2258cd713e999\"},{\"tile\":\"tile (1,0)\",\"tileX\":1,\"tileY\":0,\"containerSha256\":\"7ef4d85c1413f4cc0e6ac289a9e23634896658d2dc8ddf322f4f890c64029507\"},{\"tile\":\"tile (0,0)\",\"tileX\":0,\"tileY\":0,\"containerSha256\":\"21b31c9f9ab9904104a319ddee8aaa5ea87f9cb361da39a793c48a123d0dace9\"},{\"tile\":\"tile (3,0)\",\"tileX\":3,\"tileY\":0,\"containerSha256\":\"47e6457e74812f8f84f923a222bf70966cf26b8a513ebc1e86f02233fe61818c\"}],\"neighbourTransferredBytes\":26406960,\"absent\":[{\"tileX\":1,\"tileY\":-1,\"reason\":\"no_row\"},{\"tileX\":2,\"tileY\":-1,\"reason\":\"no_row\"},{\"tileX\":1,\"tileY\":1,\"reason\":\"no_row\"},{\"tileX\":2,\"tileY\":1,\"reason\":\"no_row\"}]}",
+          "data-generated-tile-opening": "stated",
+          "data-generated-tile-pose": "256000,70300,1,0",
+          "data-moving": "false",
+          "data-spatial": "between"
+        },
+        "atlasDataset": {
+          "engine": "PlayCanvas 2.21.4",
+          "worldProfile": "origin-landscape",
+          "worldTopology": "d327cbec4193317e",
+          "worldModules": "4",
+          "companionRenderer": "svg"
+        },
+        "refusals": [],
+        "reticle": {
+          "present": true,
+          "box": {
+            "x": 712,
+            "y": 442,
+            "width": 16,
+            "height": 16,
+            "display": "block",
+            "visibility": "visible",
+            "opacity": "0.2"
+          },
+          "centred": true
+        },
+        "companion": {
+          "stage": {
+            "renderer": "svg",
+            "state": "uncertain",
+            "shape": "circle",
+            "color": "ink",
+            "face": "neutral",
+            "ready": "true",
+            "shown": "true",
+            "box": {
+              "x": "876.8845825195312",
+              "y": "67.3283920288086",
+              "width": "92.70245361328125",
+              "height": "95.24222564697266",
+              "display": "block",
+              "visibility": "visible",
+              "opacity": 1
+            }
+          },
+          "encounter": {
+            "state": "open",
+            "box": {
+              "x": "858.6146240234375",
+              "y": 54,
+              "width": "509.3853759765625",
+              "height": "598.4375",
+              "display": "flex",
+              "visibility": "visible",
+              "opacity": 1
+            }
+          },
+          "shown": true
+        },
+        "inProductShell": true,
+        "worldMounted": true,
+        "credentialGate": false,
+        "emptyWorld": false,
+        "activeElement": "button",
+        "atlasFocused": false,
+        "typingTarget": false,
+        "heapBytes": 437309995,
+        "pointerLocked": false
+      }
+    }
+  ],
+  "trace": {
+    "frames": 4794,
+    "first": {
+      "x": 256,
+      "y": "1.7400009922217896",
+      "z": "-70.3",
+      "yaw": "4.71238898038469",
+      "pitch": 0,
+      "speed": 0
+    },
+    "last": {
+      "x": "381.0095912503946",
+      "y": "1.7576537366556204",
+      "z": "-70.3",
+      "yaw": "4.71238898038469",
+      "pitch": 0,
+      "speed": 0
+    },
+    "recoveryMessages": []
+  }
+}

@@ -9,12 +9,14 @@ carries their SHA-256 and byte count; a private companion holds them.
 
 from __future__ import annotations
 
+import argparse
 import copy
 import dataclasses
 import hashlib
 import importlib.util
 import json
 import re
+import shutil
 from pathlib import Path
 
 import pytest
@@ -28,6 +30,8 @@ from exulanica.evaluation.gate_keys import (
     CAPTURE_LABELS,
     CARRIED_WORDS_NOTICE,
     GATE_KEY_SET_VERSION,
+    JUDGED_KEY,
+    MELBOURNE_ENVELOPE,
     NOT_ASKED,
     OPTION_ANSWERS,
     PICTURE_TITLES,
@@ -1309,6 +1313,21 @@ def _writer(monkeypatch, root: Path):
     return module
 
 
+#: The record writer loaded once, for its own constants. A test that needs it pointed at a
+#: document root loads its own copy through _writer, which is what every writer test below does.
+_WRITER_CONSTANTS = importlib.util.module_from_spec(
+    importlib.util.spec_from_file_location(
+        "record_visual_gate_evidence_constants",
+        _ROOT / "scripts/record_visual_gate_evidence.py",
+    )
+)
+_WRITER_CONSTANTS.__loader__.exec_module(_WRITER_CONSTANTS)
+RECORD_JUDGEMENT_KEYS = (
+    *_WRITER_CONSTANTS.JUDGEMENT_KEYS,
+    *_WRITER_CONSTANTS.ASKED_PICTURE_KEYS,
+)
+
+
 def _scratch_root(tmp_path: Path, rubric: bytes, v3_measurements_unchanged: bool = True) -> Path:
     """A document root holding the rubric and stubs of the reconciliation chain, v5 at its head."""
     root = tmp_path / "root"
@@ -1641,3 +1660,353 @@ def test_the_retained_baseline_is_decided_again_from_its_private_companion():
     )
     assert value is record["hardPass"]["readsAsInhabitedStreet"]
     assert redecided == judged
+
+
+# ---- the corridor verb ------------------------------------------------------------------------
+#
+# The judgement given on 2026-09-19 was refused, so the verb's accepted path has no real input to
+# exercise it. These tests give it one: the real harness run, which the refusal record retains, and
+# a judgement whose words are INVENTED. No test here holds anything the judge wrote.
+
+_REFUSED_RECORD = "docs/evaluation/2026-09-19-corridor-composed-world-judgement-refused.json"
+_REFUSED_ARTIFACTS = (
+    _ROOT / "docs/evaluation/artifacts/2026-09-19-corridor-composed-world-judgement-refused"
+)
+_SUPPLEMENT = "docs/evaluation/2026-09-19-corridor-composed-world-private-store.json"
+_CORRIDOR_RECORD = "docs/evaluation/2026-09-19-corridor-under-test.json"
+#: Invented. Every word of it is mine, and none of it is any judge's.
+_INVENTED = "Invented placeholder words standing in for a reason nobody gave."
+
+
+def _corridor_writer(monkeypatch, tmp_path: Path):
+    """The writer pointed at a document root holding the real rubric, chain, baseline and store."""
+    root = tmp_path / "root"
+    (root / "docs/evaluation").mkdir(parents=True)
+    for name in ("visual-gate-rubric.md", "visual-gate-corridor-walk.md"):
+        shutil.copyfile(_ROOT / "docs" / name, root / "docs" / name)
+    for path in (_ROOT / "docs/evaluation").glob("*.json"):
+        shutil.copyfile(path, root / "docs/evaluation" / path.name)
+    copy = root / _V5_ARTIFACTS / "visual-gate-rubric.md"
+    copy.parent.mkdir(parents=True)
+    shutil.copyfile(_ROOT / _V5_ARTIFACTS / "visual-gate-rubric.md", copy)
+    writer = _writer(monkeypatch, root)
+    monkeypatch.setattr(writer, "BASELINE", root / _BASELINE_PATH)
+    return writer, root
+
+
+def _corridor_run(tmp_path: Path, **changes) -> Path:
+    """The real harness run the refusal record retains, laid out as the harness wrote it."""
+    run_dir = tmp_path / "run"
+    run_dir.mkdir()
+    run = json.loads((_REFUSED_ARTIFACTS / "run.json").read_bytes())
+    if changes:
+        # A changed run is different bytes, so the record that states its store has to bind those
+        # bytes; _rebind_supplement does that. An unchanged run is copied byte for byte, which is
+        # what makes the unchanged case a real check of the binding.
+        for name, value in changes.items():
+            run[name] = value
+        (run_dir / "composed-run.json").write_text(json.dumps(run), encoding="utf-8")
+    else:
+        shutil.copyfile(_REFUSED_ARTIFACTS / "run.json", run_dir / "composed-run.json")
+    shutil.copyfile(_REFUSED_ARTIFACTS / "route-trace.json", run_dir / "composed-trace.json")
+    for index, capture in enumerate(run["captures"], start=1):
+        shutil.copyfile(
+            _REFUSED_ARTIFACTS / f"capture-{index:02d}-route-{capture['label']}.png",
+            run_dir / capture["file"],
+        )
+    return run_dir / "composed-run.json"
+
+
+def _rebind_supplement(root: Path, run_path: Path) -> None:
+    """Point the store record at a run the test changed, so only the change under test differs."""
+    document = json.loads((root / _SUPPLEMENT).read_bytes())
+    data = run_path.read_bytes()
+    document["record"]["binds"]["run_record"] = {
+        "bytes": len(data),
+        "name": run_path.name,
+        "sha256": hashlib.sha256(data).hexdigest(),
+    }
+    document["record"]["binds"]["keys"] = json.loads(data)["keys"]
+    document["record_sha256"] = hashlib.sha256(canonical_json(document["record"])).hexdigest()
+    (root / _SUPPLEMENT).write_text(json.dumps(document), encoding="utf-8")
+
+
+def _corridor_judgement_file(tmp_path: Path, name: str = "judgement.json", **changes) -> Path:
+    """A judgement of the three real captures, picked yes three times, with invented words."""
+    run = json.loads((_REFUSED_ARTIFACTS / "run.json").read_bytes())
+    document = {
+        "profile": "exulanica.visual-gate-judgement/v3",
+        "judge": "Glendon",
+        "judgedOn": "2026-09-19",
+        "rubric": "docs/visual-gate-rubric.md",
+        # Version 4's digest, not the rubric on disk: see the comparability test below.
+        "rubricSha256": VERSION_4.rubric_sha256,
+        "askedIn": "a test of the writer; every word the judge is said to have typed is invented",
+        "options": list(ANSWER_OPTIONS),
+        "pictures": [
+            {
+                "label": capture["label"],
+                "picture": PICTURE_TITLES[capture["label"]],
+                "prompt": judge_prompt(capture["label"]),
+                "captureSha256": capture["sha256"],
+                "asked": True,
+                "picked": _YES,
+                "words": f"{_INVENTED} Picture {index}.",
+                "typedBy": "Glendon",
+                "givenAt": f"2026-09-19T08:3{index}:00Z",
+            }
+            for index, capture in enumerate(run["captures"])
+        ],
+    }
+    document.update(changes)
+    path = tmp_path / name
+    path.write_text(json.dumps(document), encoding="utf-8")
+    assert _INVENTED in path.read_text(encoding="utf-8")
+    return path
+
+
+def _corridor(writer, run: Path, judgement: Path, record: str = _CORRIDOR_RECORD, **changes):
+    arguments = argparse.Namespace(
+        date="2026-09-19",
+        run=str(run),
+        judgement=str(judgement),
+        supplementary=_SUPPLEMENT,
+        record=record,
+        measured_at="bd4db95a",
+        replace=False,
+    )
+    for name, value in changes.items():
+        setattr(arguments, name, value)
+    return writer.corridor(arguments)
+
+
+def _all_true(run: dict) -> dict:
+    """The same run with the two keys it fails measured as holding, harness and numbers together."""
+    mechanical = copy.deepcopy(run["mechanical"])
+    mechanical["noCutsOrFloatingGeometry"]["componentsDetachedFromSupport"] = 0
+    mechanical["practicalBrowserBudget"]["maxDrawCalls"] = MELBOURNE_ENVELOPE["maxDrawCalls"]
+    keys = {**run["keys"], "noCutsOrFloatingGeometry": True, "practicalBrowserBudget": True}
+    return {"mechanical": mechanical, "keys": keys}
+
+
+def test_the_corridor_verb_writes_a_gate_record_when_the_judgement_holds(monkeypatch, tmp_path):
+    writer, root = _corridor_writer(monkeypatch, tmp_path)
+    assert _corridor(writer, _corridor_run(tmp_path), _corridor_judgement_file(tmp_path)) == 0
+    document = json.loads((root / _CORRIDOR_RECORD).read_bytes())
+    record = document["record"]
+    assert record["profile"] == writer.CORRIDOR_PROFILE
+    assert record["target"] == "generated-tile-evaluation"
+    assert set(record["hardPass"]) == set(CANONICAL_SPELLINGS)
+    assert record["hardPass"][JUDGED_KEY] is True
+    assert record["gate"]["failedKeys"] == ["noCutsOrFloatingGeometry", "practicalBrowserBudget"]
+    assert record["verdict"] == "FAIL"
+    assert record["baselineComparison"]["beatsBaseline"] is False
+    assert record["baselineComparison"]["baselineHoldsEveryKey"] is False
+    assert document["record_sha256"] == hashlib.sha256(canonical_json(record)).hexdigest()
+    # The captures the judge answered about are bound, and they are the ones the run took.
+    run = json.loads((_REFUSED_ARTIFACTS / "run.json").read_bytes())
+    assert [capture["sha256"] for capture in record["captures"]] == [
+        capture["sha256"] for capture in run["captures"]
+    ]
+
+
+def test_the_corridor_verb_can_say_pass_so_the_bar_is_not_a_constant(monkeypatch, tmp_path):
+    writer, root = _corridor_writer(monkeypatch, tmp_path)
+    run = json.loads((_REFUSED_ARTIFACTS / "run.json").read_bytes())
+    run_path = _corridor_run(tmp_path, **_all_true(run))
+    _rebind_supplement(root, run_path)
+    assert _corridor(writer, run_path, _corridor_judgement_file(tmp_path)) == 0
+    record = json.loads((root / _CORRIDOR_RECORD).read_bytes())["record"]
+    assert all(record["hardPass"].values())
+    assert record["verdict"] == "PASS"
+    assert record["baselineComparison"]["beatsBaseline"] is True
+
+
+def test_the_corridor_verb_refuses_when_it_and_the_harness_disagree(monkeypatch, tmp_path):
+    writer, root = _corridor_writer(monkeypatch, tmp_path)
+    run = json.loads((_REFUSED_ARTIFACTS / "run.json").read_bytes())
+    keys = {**run["keys"], "usefulEyeLevelMovement": False}
+    with pytest.raises(SystemExit, match="the record builder decides"):
+        _corridor(writer, _corridor_run(tmp_path, keys=keys), _corridor_judgement_file(tmp_path))
+    assert not (root / _CORRIDOR_RECORD).exists()
+
+
+def test_a_judgement_the_rubric_does_not_allow_is_recorded_and_not_scored(monkeypatch, tmp_path):
+    writer, root = _corridor_writer(monkeypatch, tmp_path)
+    departures = ["Picture 2 was asked twice.", "The pictures were shown together first."]
+    judgement = _corridor_judgement_file(tmp_path, departuresFromProtocol=departures)
+    assert _corridor(writer, _corridor_run(tmp_path), judgement) == 1
+    record = json.loads((root / _CORRIDOR_RECORD).read_bytes())["record"]
+    assert record["profile"] == writer.REFUSED_PROFILE
+    assert record["judgedKey"]["state"] == "refused"
+    assert record["judgedKey"]["value"] is None
+    assert record["judgedKey"]["departuresTheSessionRecorded"] == departures
+    # It is not a gate record and nothing can read a verdict out of it.
+    assert "hardPass" not in record and "verdict" not in record and "gate" not in record
+    # It reports no answer: the words "yes" and "no" appear nowhere as an answer value.
+    assert "picked" not in json.dumps(record)
+    # And it binds the three pictures, which is what a proper re-ask has to be about.
+    assert len(record["captures"]) == 3
+    assert all(re.fullmatch(r"[0-9a-f]{64}", item["sha256"]) for item in record["captures"])
+
+
+def test_every_rubric_clause_a_refusal_rests_on_is_in_the_rubric(monkeypatch, tmp_path):
+    writer, root = _corridor_writer(monkeypatch, tmp_path)
+    rubric = _RUBRIC.read_bytes()
+    clauses = writer._rubric_clauses(rubric)
+    assert len(clauses) == len(writer.REFUSAL_CLAUSES)
+    flat = " ".join(rubric.decode("utf-8").split())
+    assert all(" ".join(item["rubricSays"].split()) in flat for item in clauses)
+    (root / "docs/visual-gate-rubric.md").write_bytes(
+        rubric.replace(b"Pictures are never shown together", b"Pictures may be shown together")
+    )
+    with pytest.raises(SystemExit, match="does not carry"):
+        writer._rubric_clauses((root / "docs/visual-gate-rubric.md").read_bytes())
+
+
+@pytest.mark.parametrize("name", RECORD_JUDGEMENT_KEYS)
+def test_every_key_the_reader_names_is_a_key_it_actually_needs(monkeypatch, tmp_path, name):
+    """Remove one key from a complete judgement and the reader has to name it, not crash."""
+    writer, _ = _corridor_writer(monkeypatch, tmp_path)
+    document = json.loads(_corridor_judgement_file(tmp_path).read_text())
+    if name in document:
+        del document[name]
+    else:
+        del document["pictures"][0][name]
+    path = tmp_path / "short.json"
+    path.write_text(json.dumps(document), encoding="utf-8")
+    said = writer._judgement_shape(json.loads(path.read_bytes()))
+    assert any(name in line for line in said), said
+
+
+def test_the_corridor_verb_refuses_a_store_record_that_binds_other_bytes(monkeypatch, tmp_path):
+    writer, root = _corridor_writer(monkeypatch, tmp_path)
+    document = json.loads((root / _SUPPLEMENT).read_bytes())
+    document["record"]["binds"]["captures"][0]["sha256"] = _SHA
+    document["record_sha256"] = hashlib.sha256(canonical_json(document["record"])).hexdigest()
+    (root / _SUPPLEMENT).write_text(json.dumps(document), encoding="utf-8")
+    with pytest.raises(SystemExit, match="the file copied here is"):
+        _corridor(writer, _corridor_run(tmp_path), _corridor_judgement_file(tmp_path))
+
+
+def test_the_corridor_verb_refuses_a_store_record_whose_digest_is_not_its_own(
+    monkeypatch, tmp_path
+):
+    writer, root = _corridor_writer(monkeypatch, tmp_path)
+    document = json.loads((root / _SUPPLEMENT).read_bytes())
+    document["record_sha256"] = _SHA
+    (root / _SUPPLEMENT).write_text(json.dumps(document), encoding="utf-8")
+    with pytest.raises(SystemExit, match="states record_sha256"):
+        _corridor(writer, _corridor_run(tmp_path), _corridor_judgement_file(tmp_path))
+
+
+def test_the_writer_refuses_a_record_carrying_words_it_was_told_are_private(monkeypatch, tmp_path):
+    """The private-words check, controlled with a string built here rather than found anywhere."""
+    writer, root = _corridor_writer(monkeypatch, tmp_path)
+    secret = "A sentence written in this test and nowhere else, to see the check fire."
+    target = root / "docs/evaluation/2026-09-19-control.json"
+    with pytest.raises(SystemExit, match="carries the judge's words"):
+        writer._write(target, {"note": secret}, replace=False, private=[secret])
+    assert not target.exists()
+    writer._write(target, {"note": "Something else entirely."}, replace=False, private=[secret])
+    assert json.loads(target.read_bytes()) == {"note": "Something else entirely."}
+
+
+def test_the_judgement_words_collector_keeps_what_it_does_not_recognise(monkeypatch, tmp_path):
+    """It collects by default: a reason under a field name nobody listed is still collected."""
+    writer, _ = _corridor_writer(monkeypatch, tmp_path)
+    rubric = _RUBRIC.read_bytes()
+    path = tmp_path / "oddly-spelled.json"
+    path.write_text(
+        json.dumps({"answers": [{"whyTheyPickedIt": _INVENTED}], "profile": "x"}),
+        encoding="utf-8",
+    )
+    assert writer._judgement_words(path, rubric) == [_INVENTED]
+    # And it does not collect what the judge was shown, which the record carries.
+    shown = tmp_path / "shown.json"
+    shown.write_text(json.dumps({"prompt": judge_prompt("start")}), encoding="utf-8")
+    assert writer._judgement_words(shown, rubric) == []
+
+
+def test_no_corridor_can_be_read_against_the_baseline_under_the_current_rubric(
+    monkeypatch, tmp_path
+):
+    """The finding the refusal record carries, asserted against the two records themselves."""
+    writer, root = _corridor_writer(monkeypatch, tmp_path)
+    baseline = json.loads((root / _BASELINE_PATH).read_bytes())["record"]
+    current = hashlib.sha256(_RUBRIC.read_bytes()).hexdigest()
+    blocker = writer._comparison_blocker(baseline, current)
+    assert blocker is not None
+    assert blocker["baselineAnsweredAgainst"] == VERSION_4.rubric_sha256
+    assert blocker["aFreshJudgementAnswersAgainst"] == current
+    # And the check is not a constant: two records answered against one rubric are comparable.
+    assert writer._comparison_blocker(baseline, VERSION_4.rubric_sha256) is None
+    # Which is what the verb refuses on, before anything is written.
+    judgement = _corridor_judgement_file(tmp_path, rubricSha256=current)
+    with pytest.raises(SystemExit, match="no corridor judged under the current rubric"):
+        _corridor(writer, _corridor_run(tmp_path), judgement)
+    assert not (root / _CORRIDOR_RECORD).exists()
+
+
+def test_the_re_ask_this_record_states_is_one_the_writer_would_accept(monkeypatch, tmp_path):
+    """Every ask the procedure states is fed back through the reader, which has to accept it."""
+    writer, _ = _corridor_writer(monkeypatch, tmp_path)
+    procedure = writer._re_ask()
+    run = json.loads((_REFUSED_ARTIFACTS / "run.json").read_bytes())
+    pictures = [
+        {
+            "label": capture["label"],
+            "picture": PICTURE_TITLES[capture["label"]],
+            "prompt": procedure["theAsk"][capture["label"]],
+            "captureSha256": capture["sha256"],
+            "asked": True,
+            "picked": _YES,
+            "words": None,
+            "typedBy": "Glendon",
+            "givenAt": f"2026-09-19T09:3{index}:00Z",
+            "followUp": {
+                "shown": procedure["theFollowUp"]["yes"],
+                "words": f"{_INVENTED} Picture {index}.",
+                "typedBy": "Glendon",
+                "givenAt": f"2026-09-19T09:3{index}:30Z",
+            },
+        }
+        for index, capture in enumerate(run["captures"])
+    ]
+    path = _corridor_judgement_file(tmp_path, name="re-ask.json", pictures=pictures)
+    answers, _ = writer._judgement(path, _RUBRIC.read_bytes())
+    value, _ = _decide(
+        answers,
+        rubric_sha256=hashlib.sha256(_RUBRIC.read_bytes()).hexdigest(),
+        captures={capture["label"]: capture["sha256"] for capture in run["captures"]},
+    )
+    assert value is True
+
+
+def test_the_refused_record_says_which_pictures_the_judgement_was_about(monkeypatch, tmp_path):
+    """And the check can say no, which is the only thing that makes its yes worth reading."""
+    writer, root = _corridor_writer(monkeypatch, tmp_path)
+    run_path = _corridor_run(tmp_path)
+    run = json.loads(run_path.read_bytes())
+    captures = [
+        {"label": capture["label"], "sha256": capture["sha256"]} for capture in run["captures"]
+    ]
+    about = _corridor_judgement_file(tmp_path, departuresFromProtocol=["Asked wrongly."])
+    named = writer._names_the_captures(about, captures)
+    assert named["everyBoundCaptureIsNamedInTheJudgement"] is True
+
+    document = json.loads(about.read_text())
+    document["pictures"][1]["captureSha256"] = _SHA
+    elsewhere = tmp_path / "about-another-picture.json"
+    elsewhere.write_text(json.dumps(document), encoding="utf-8")
+    named = writer._names_the_captures(elsewhere, captures)
+    assert named["everyBoundCaptureIsNamedInTheJudgement"] is False
+    assert named["byPicture"] == {"start": True, "midpoint": False, "endpoint": True}
+
+    # And the record carries the answer rather than the question.
+    assert _corridor(writer, run_path, about) == 1
+    record = json.loads((root / _CORRIDOR_RECORD).read_bytes())["record"]
+    assert (
+        record["theRefusedJudgementWasAboutThesePictures"]["everyBoundCaptureIsNamedInTheJudgement"]
+        is True
+    )
