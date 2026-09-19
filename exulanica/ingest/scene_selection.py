@@ -14,6 +14,7 @@ from exulanica.ingest.scene_splat import SceneSplatRequest
 from exulanica.ingest.scenes import SceneGroup
 from exulanica.ingest.source_inputs import decoded_source_declarations, training_decoded_lineage
 from exulanica.ingest.stages import stage
+from exulanica.ingest.training_rights import DESTINATION_INPUT, canonical_training_destination
 
 __all__ = [
     "ExactSetJobSelection",
@@ -95,6 +96,7 @@ def _enqueue_capture_set(
     capture_ids: list[uuid.UUID],
     selection_record: dict[str, object],
     splat_training: SceneSplatRequest | None = None,
+    training_destination: str | None = None,
 ) -> tuple[uuid.UUID, bool] | None:
     point_maps = repository.current_capture_artifacts(
         capture_ids=capture_ids,
@@ -175,6 +177,11 @@ def _enqueue_capture_set(
             training_decoded_lineage(decoded_sources), sources=tuple(source_hashes)
         )
         build_inputs["splat_training"] = splat_training.as_payload()
+        if training_destination is not None:
+            # Where the bytes go, stated by the job rather than discovered later. Migration 0080
+            # reads this and refuses a personal photograph's training run that states nothing,
+            # because a right names a destination and an unstated one can never match.
+            build_inputs[DESTINATION_INPUT] = canonical_training_destination(training_destination)
     return repository.enqueue_reconstruction_scene(
         capture_ids=capture_ids,
         selection_policy=selection_record,
@@ -192,6 +199,7 @@ def enqueue_exact_scene_reconstruction(
     purpose: str,
     authorized_at: dt.datetime,
     splat_training: SceneSplatRequest | None = None,
+    training_destination: str | None = None,
 ) -> ExactSetJobSelection | None:
     """Queue one operator-authorized ordered set behind the normal selection boundary.
 
@@ -237,7 +245,9 @@ def enqueue_exact_scene_reconstruction(
     }
     if splat_training is not None:
         splat_training.validate_sources(tuple(str(item["source_sha256"]) for item in members))
-    result = _enqueue_capture_set(repository, capture_ids, record, splat_training)
+    result = _enqueue_capture_set(
+        repository, capture_ids, record, splat_training, training_destination
+    )
     if result is None:
         return None
     job_id, inserted = result

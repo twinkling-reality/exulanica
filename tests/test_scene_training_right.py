@@ -165,6 +165,14 @@ def _publish(repository: IngestRepository, scene_id: uuid.UUID, kind: str) -> uu
     ).fetchone()["artifact_id"]
 
 
+def _job(repository: IngestRepository, job_id: uuid.UUID):
+    return repository.connection.execute(
+        "select status,failure_class,failure_message,claim_token,lease_expires_at "
+        "from reconstruction_scene_job where workspace_id=%s and job_id=%s",
+        (repository.workspace_id, job_id),
+    ).fetchone()
+
+
 def _queue_refusal(subject, **kwargs) -> str:
     # CheckViolation, not IntegrityConstraintViolation: psycopg makes them siblings under
     # IntegrityError, so naming the wrong one here would let the gate's refusal escape as a test
@@ -341,6 +349,47 @@ def test_a_withdrawal_during_the_run_stops_the_publication(repository, store):
         "select count(*) as n from artifact where workspace_id=%s and scene_id=%s",
         (repository.workspace_id, scene_id),
     ).fetchone()["n"] == 0
+
+
+def test_a_withdrawal_cancels_the_run_it_was_granted_for(repository, store):
+    """A withdrawal does not only refuse what comes back. It ENDS THE RUN.
+
+    Without this the photographs still reach the trainer: a job queued while the right stood is
+    claimed later, its bytes are staged and handed over, and only the publication is refused. The
+    bytes would already have gone to the GPU, which is the thing the standing instruction is about.
+
+    The job's state before the withdrawal is asserted, not assumed. The trigger only touches
+    queued, running and failed, so a test over a job in some other state would pass while measuring
+    nothing.
+    """
+    subject = admit_personal(repository, store, photo_bytes(), "cancelled.jpg")
+    right = _grant(subject)
+    job_id = _queue(subject)
+    before = _job(repository, job_id)
+    assert before["status"] in ("queued", "running"), before["status"]
+
+    withdraw_training_right(repository, right_id=right.right_id, withdrawn_by=ACCOUNT)
+
+    after = _job(repository, job_id)
+    assert after["status"] == "cancelled"
+    assert after["failure_class"] == "training_right_withdrawn"
+    assert "withdrawn" in after["failure_message"]
+    assert after["claim_token"] is None and after["lease_expires_at"] is None
+
+
+def test_a_withdrawal_leaves_another_scene_alone(repository, store):
+    """The control for the test above: cancelling every training job would also pass it."""
+    mine = admit_personal(repository, store, photo_bytes(), "mine.jpg")
+    theirs = admit_personal(repository, store, photo_bytes(size=(120, 80)), "theirs.jpg")
+    right = _grant(mine)
+    _grant(theirs)
+    my_job = _queue(mine)
+    their_job = _queue(theirs, subjects=[theirs])
+
+    withdraw_training_right(repository, right_id=right.right_id, withdrawn_by=ACCOUNT)
+
+    assert _job(repository, my_job)["status"] == "cancelled"
+    assert _job(repository, their_job)["status"] != "cancelled"
 
 
 def test_the_evaluation_bundle_of_a_rejected_run_is_refused_too(repository, store):

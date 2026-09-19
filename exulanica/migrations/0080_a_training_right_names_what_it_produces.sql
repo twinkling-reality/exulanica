@@ -311,24 +311,24 @@ begin
   if exists(select 1 from scene_training_right r where r.workspace_id=p_workspace
       and r.capture_id=p_capture and r.destination=v_destination
       and r.withdrawn_at is not null) then
-    return format('the training right for %I over this photograph was withdrawn',v_destination);
+    return format('the training right for %s over this photograph was withdrawn',v_destination);
   end if;
   if exists(select 1 from scene_training_right r where r.workspace_id=p_workspace
       and r.capture_id=p_capture and r.destination=v_destination
       and r.valid_until<=p_at) then
-    return format('the training right for %I over this photograph has expired',v_destination);
+    return format('the training right for %s over this photograph has expired',v_destination);
   end if;
   if exists(select 1 from scene_training_right r where r.workspace_id=p_workspace
       and r.capture_id=p_capture and r.destination=v_destination) then
-    return format('the training right for %I is not current: its personal authority lapsed, the '
+    return format('the training right for %s is not current: its personal authority lapsed, the '
       || 'photograph changed, or its term has not begun',v_destination);
   end if;
   if exists(select 1 from scene_training_right r where r.workspace_id=p_workspace
       and r.capture_id=p_capture) then
-    return format('this photograph''s training rights name another destination, not %I',
+    return format('this photograph''s training rights name another destination, not %s',
       v_destination);
   end if;
-  return format('no training right lets this photograph be trained at %I',v_destination);
+  return format('no training right lets this photograph be trained at %s',v_destination);
 end $fn$;
 
 -- ------------------------------------------------------------------------------------------------
@@ -483,6 +483,35 @@ language sql stable as $fn$
   where b.workspace_id=p_workspace and b.artifact_id=p_artifact
   order by b.capture_id;
 $fn$;
+
+-- A WITHDRAWAL CANCELS THE RUN, and this is what stops a photograph reaching a GPU after its
+-- owner has taken the right away. Without it, a job queued while the right stood is claimed later
+-- and its bytes are staged and handed to the trainer; the publication trigger would refuse what
+-- came back, but the photographs would already have gone. The shape is migration 0030's, which
+-- cancels a scene job when a confirmed person withdraws, with its own failure_class so a reader is
+-- never asked which of two causes a shared message meant. It reaches 'running' as well as 'queued',
+-- so the worker's own cancellation check ends a run in progress rather than letting it finish work
+-- nothing would accept.
+create function tg_scene_training_right_withdrawn() returns trigger language plpgsql as $fn$
+begin
+  if new.withdrawn_at is null then
+    return new;
+  end if;
+  update reconstruction_scene_job j
+     set status='cancelled', claim_token=null, claimed_by=null, lease_expires_at=null,
+         completed_at=coalesce(j.completed_at,new.withdrawn_at), updated_at=clock_timestamp(),
+         failure_class='training_right_withdrawn',
+         failure_message='a training right over one of this run''s photographs was withdrawn'
+   where j.workspace_id=new.workspace_id and j.status in ('queued','running','failed')
+     and j.build_inputs ? 'splat_training'
+     and exists (select 1 from reconstruction_scene_job_member m
+                  where m.workspace_id=j.workspace_id and m.job_id=j.job_id
+                    and m.capture_id=new.capture_id);
+  return new;
+end $fn$;
+create trigger tg_scene_training_right_withdrawn
+after update on scene_training_right
+for each row execute function tg_scene_training_right_withdrawn();
 
 comment on table scene_training_right is
   'Which of an account holder''s photographs a trainer may read, and where the bytes go.';

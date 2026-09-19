@@ -35,7 +35,7 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 from exulanica.canonical import canonical_json  # noqa: E402
 
-TESTS = "tests/test_scene_training_right.py"
+TESTS = ["tests/test_scene_training_right.py", "tests/test_scene_splat_pipeline.py"]
 SQL = "exulanica/migrations/0080_a_training_right_names_what_it_produces.sql"
 MODULE = "exulanica/ingest/training_rights.py"
 
@@ -112,6 +112,20 @@ BREAKS: list[tuple[str, str, str, str]] = [
         "  if v_destination is null then\n",
         "  if false then\n",
     ),
+    (
+        "a withdrawal does not cancel the run it was granted for",
+        SQL,
+        "create trigger tg_scene_training_right_withdrawn\nafter update on scene_training_right\n"
+        "for each row execute function tg_scene_training_right_withdrawn();",
+        "",
+    ),
+    (
+        "a queued run drops the destination its caller stated",
+        "exulanica/ingest/scene_selection.py",
+        "            build_inputs[DESTINATION_INPUT] = "
+        "canonical_training_destination(training_destination)",
+        "            pass",
+    ),
 ]
 
 SUMMARY = re.compile(r"(?:(\d+) failed, )?(\d+) passed")
@@ -142,7 +156,7 @@ def restore() -> str:
 def suite() -> tuple[int, int, list[str]]:
     """Run the whole file. Returns (failed, passed, the names of the tests that failed)."""
     result = subprocess.run(
-        [".venv/bin/python", "-m", "pytest", TESTS, "--tb=no", "-rf"],
+        [".venv/bin/python", "-m", "pytest", *TESTS, "--tb=no", "-rf"],
         cwd=ROOT,
         capture_output=True,
         text=True,
@@ -202,7 +216,7 @@ def main() -> None:
         "tested_head": head,
         "recorded_at": dt.datetime.now(dt.UTC).isoformat(),
         "acceptance": {
-            "selector": TESTS,
+            "selectors": TESTS,
             "passed": passed,
             "failed": failed,
             "database": "private per-worker PostgreSQL (EXULANICA_TEST_POSTGRES=private)",
@@ -220,7 +234,13 @@ def main() -> None:
         },
         "source_files": [
             file_record(ROOT / relative)
-            for relative in (SQL, MODULE, TESTS, "scripts/record_scene_training_right_evidence.py")
+            for relative in (
+                SQL,
+                MODULE,
+                *TESTS,
+                "exulanica/ingest/scene_selection.py",
+                "scripts/record_scene_training_right_evidence.py",
+            )
         ],
         "limits": [
             "No GPU run, no remote host contacted, no personal photograph trained on.",

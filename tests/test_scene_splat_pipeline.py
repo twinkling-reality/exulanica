@@ -926,6 +926,10 @@ def test_withdrawal_after_publication_removes_the_whole_trained_scene(repository
 MASK_ACTOR = uuid.UUID("00000000-0000-4000-8000-000000000001")
 MASK_REGION_KEY = (b"m" * 32).hex()
 MASK_SCOPE = {"purpose": "masked scene training regression"}
+#: Named as a rented machine rather than a loopback address, which migration 0080 refuses:
+#: a tunnel to a rented GPU presents itself at localhost and recording that would state the
+#: bytes never left this machine.
+MASK_TRAINING_DESTINATION = "rented-host:brev/l40s-regression"
 
 
 def _hide_a_person(repository, pipeline, capture_id):
@@ -964,6 +968,7 @@ def masked_queued(repository, tmp_path, *, masked=(0, 1), heldout_index=0):
     """
     from exulanica.ingest.person_review import review_list
     from exulanica.ingest.privacy import authorize_personal_capture, record_human_screening
+    from exulanica.ingest.training_rights import grant_training_right, rented_host
 
     store = LocalContentAddressedStore(tmp_path / "store")
     pipeline = PhotoIngestPipeline(repository, store, vision=CountingVisionModel())
@@ -1000,6 +1005,18 @@ def masked_queued(repository, tmp_path, *, masked=(0, 1), heldout_index=0):
         )
         assert screening.eligibility_state == "eligible", screening.eligibility_state
         screenings.append(screening)
+        # These members are PERSONAL, so since migration 0080 a training run over them needs a
+        # right naming where the bytes go. Before it, this fixture trained on personal photographs
+        # with nothing standing in the way, which is the gap that migration exists to close.
+        grant_training_right(
+            repository,
+            capture_id=capture_id,
+            authorization_id=authorization.authorization_id,
+            destination=MASK_TRAINING_DESTINATION,
+            granted_by=MASK_ACTOR,
+            purpose="masked scene training regression",
+            valid_until=dt.datetime.now(dt.UTC) + dt.timedelta(hours=1),
+        )
     masks = {}
     for index, blob in enumerate(blobs):
         mask = repository.current_capture_artifacts(
@@ -1024,6 +1041,7 @@ def masked_queued(repository, tmp_path, *, masked=(0, 1), heldout_index=0):
         purpose="masked scene training regression",
         authorized_at=dt.datetime.now(dt.UTC),
         splat_training=config,
+        training_destination=MASK_TRAINING_DESTINATION,
     )
     assert selected is not None
     return store, captures, selected, config, hashes, masks
