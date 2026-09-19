@@ -427,7 +427,9 @@ def _route_record(tmp_path: Path, tamper: str) -> dict[str, object]:
         "const plan = planRoute([0, 0], [wall(-5, -200, 200), wall(4, -200, -1)], [-500, -500, 500, 500]);\n"
         "const derived = plan.frontageBothSidesSamples > 0 ? plan.candidatesQualified : 0;\n"
         "const measured = { field: null, obstacles: 2, routeRings: 2, routeRingsRefused: [], "
-        "groundRefused: [], routeGround: null, fieldBoundsCm: null };\n"
+        "groundRefused: [], routeGround: null, fieldBoundsCm: null, "
+        "horizons: { obstacleBounds: null, groundRadiusM: 7 }, "
+        "walkWorld: { reach: 'stated', stoodOnOnly: [] } };\n"
         "try {\n"
         "  const record = harness.routeRecordOf(plan, measured);\n"
         f"  {tamper}\n"
@@ -467,6 +469,22 @@ def test_a_measured_count_overwritten_by_a_derived_one_is_refused(tmp_path):
     assert built["derived"] != built["plan"]["candidatesWithFrontage"], built
     assert "refused" in built, built
     assert "candidatesWithFrontage" in built["refused"], built
+
+
+def test_the_record_carries_what_the_builder_was_handed(tmp_path):
+    """This builder ENUMERATES what it carries, and an enumeration going silent is this project's
+    most-repeated defect.
+
+    MEASURED 2026-09-19: `horizons` and `walkWorld` were both passed to it and both dropped without
+    a word, so THE FIRST SCORED RECORD OF A REAL STREET stated `horizons: null` while every halt
+    record that evening carried them, because a halt spreads what was observed and a scored record
+    is written field by field.
+    """
+    built = _route_record(tmp_path, "")
+    assert "refused" not in built, built
+    record = built["record"]
+    assert record["horizons"] == {"obstacleBounds": None, "groundRadiusM": 7}, record
+    assert record["walkWorld"] == {"reach": "stated", "stoodOnOnly": []}, record
 
 
 def test_a_number_dropped_from_the_record_is_refused(tmp_path):

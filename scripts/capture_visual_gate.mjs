@@ -273,6 +273,13 @@ export function routeRecordOf(plan, measured) {
     headingsRefusedForNoGround: measured.groundRefused.length,
     groundRefused: measured.groundRefused,
     routeGround: measured.routeGround,
+    // HOW FAR THE GROUND IS KNOWN AND HOW FAR THE OBSTACLES ARE, side by side. MEASURED 2026-09-19:
+    // this builder ENUMERATES what it carries, so both of these were handed to it and dropped in
+    // silence, and the first scored record of a real street stated `horizons: null` while the halt
+    // records that spread `observed` had carried them all evening.
+    horizons: measured.horizons,
+    // What each container was FOR, not merely that it was fetched, and dropped the same way.
+    walkWorld: measured.walkWorld,
     fieldBoundsCm: measured.fieldBoundsCm,
   });
 }
@@ -2526,6 +2533,10 @@ async function main() {
         anonymousGraphReadStatus: anonymousStatus,
         apiResponses,
         previewApiRequests: previewApi,
+        // WHO ASKED. The graph request in the traffic above is the GATE'S, made through the page so
+        // it carries the page's credential. A reader must not conclude the page asked on its own,
+        // because in the clean profile a run launches, it does not.
+        gateInitiatedProbe: observed.authentication?.gateInitiatedProbe ?? null,
       },
       arrival,
       // The walk somebody stated in advance, with the file it was read from, or null when this
