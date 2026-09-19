@@ -10,11 +10,15 @@ import { publishedLook, publishedSets } from './published-look.js';
  *   pnpm texture-look --textures ../assets/textures --out /tmp/look
  *   pnpm texture-look --textures ../assets/textures --out /tmp/look --set cc0.road-paint-white
  *
- * Nothing is baked: each container is read from `blobs/` by the digest its manifest pins, so what
- * is drawn is what a reader reads. That is the difference from `--inspect` on the bake command,
- * which can only picture the bake it just did. Use this to look at a set that is already published,
- * including one whose maker has moved since, and to look at a class the contact sheet lays out in a
- * single row.
+ * Nothing is baked: each container is read from `blobs/` by the digest its manifest pins and then
+ * held to that entry by `checkTextureSet`, so what is drawn is what a reader reads. Until
+ * 2026-09-19 the digest was only the file name and nothing checked the bytes against it, which
+ * made that sentence false in the one way that matters: the description printed here came from the
+ * manifest and the pictures came from the file, with nothing holding the two together.
+ *
+ * That is the difference from `--inspect` on the bake command, which can only picture the bake it
+ * just did. Use this to look at a set that is already published, including one whose maker has
+ * moved since, and to look at a class the contact sheet lays out in a single row.
  *
  * The pictures are not pinned, not digested and not part of any bake: they depend on the zlib build
  * that wrote the PNGs, so they never belong in a published directory.
@@ -66,7 +70,7 @@ function main(): void {
     );
     const directory = join(args.out, setId);
     mkdirSync(directory, { recursive: true });
-    const pictures = publishedLook(container, args.tiles);
+    const pictures = publishedLook(container, entry, args.tiles);
     for (const [name, image] of pictures) {
       writeFileSync(join(directory, `${name}.png`), encodePng(image));
     }

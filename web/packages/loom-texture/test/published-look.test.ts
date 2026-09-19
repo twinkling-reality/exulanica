@@ -32,6 +32,29 @@ const pairOf = (entry: { containerProfile: string; materialClass: string }): str
   `${entry.containerProfile} ${entry.materialClass}`;
 
 describe('pictures of a published set', () => {
+  /**
+   * The CALL of `checkTextureSet`, not the check.
+   *
+   * `checkTextureSet` has its own cases in texture-set-cases.test.ts and had no caller in any
+   * product path: the look command read `blobs/<content_sha256>.ltex`, using the pinned digest as
+   * a file name and never as a digest. Measured 2026-09-19 by putting the road-paint container
+   * under the kerb's name: the command drew six pictures at 256 by 64, printed
+   * `cc0.kerb-stone opaque 1024x256` beside them, and exited 0.
+   *
+   * A published directory cannot produce this pairing, which is why the input is built here by
+   * handing one set's committed bytes to another set's entry. Two real sets, so nothing about the
+   * bytes is synthetic; only their pairing is.
+   */
+  it('refuses a container that is not the one its entry pins', () => {
+    const [first, second] = [...manifest.values()];
+    const bytes = readPublished(`blobs/${second!.contentSha256}.ltex`);
+    // The control: those same bytes under their OWN entry are drawn without complaint, so the
+    // refusal below is about the pairing and not about the bytes or about this fixture.
+    expect(() => publishedLook(bytes, second!, 1)).not.toThrow();
+    expect(second!.contentSha256).not.toBe(first!.contentSha256);
+    expect(() => publishedLook(bytes, first!, 1)).toThrow();
+  });
+
   it('cover every profile and class pair the manifest publishes', () => {
     const published = new Set([...manifest.values()].map(pairOf));
     expect([...published].filter((pair) => !(pair in EXTRA_CHANNEL)).sort()).toEqual([]);
@@ -51,7 +74,7 @@ describe('pictures of a published set', () => {
   for (const [pair, { setId, entry }] of representatives) {
     it(`${pair} is pictured as its class stores it, from ${setId}`, () => {
       const container = readPublished(`blobs/${entry.contentSha256}.ltex`);
-      const pictures = publishedLook(container, 2);
+      const pictures = publishedLook(container, entry, 2);
       const extra = EXTRA_CHANNEL[pairOf(entry)];
       const expected = [
         'base-colour-1to1',

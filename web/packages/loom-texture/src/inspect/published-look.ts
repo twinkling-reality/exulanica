@@ -1,4 +1,8 @@
-import { type ManifestEntryRead, readTextureManifest } from '../manifest-reader.js';
+import {
+  type ManifestEntryRead,
+  checkTextureSet,
+  readTextureManifest,
+} from '../manifest-reader.js';
 import { SRGB_TO_LINEAR, encodeChannel } from '../srgb.js';
 import { type Planes, planes } from './contact-sheet.js';
 import type { RgbImage } from './png.js';
@@ -56,8 +60,22 @@ function tiled(read: Planes, tiles: number, fill: (index: number, out: Uint8Arra
 /**
  * Every picture of one published set, by file name without an extension: its maps at one texel to
  * one pixel, and one lit composite per light over `tiles` by `tiles` tiles, so a repeat shows.
+ *
+ * The ENTRY is a parameter, not a convenience, and this is the reason. `checkTextureSet` held a
+ * container to its manifest entry and nothing in any product path called it: the look command read
+ * `blobs/<content_sha256>.ltex`, which uses the digest as a FILE NAME and never as a digest, and
+ * drew whatever it found. Measured 2026-09-19 by putting one set's container under another set's
+ * name: the command wrote six pictures 256 by 64, printed `cc0.kerb-stone opaque 1024x256` beside
+ * them, and exited 0, so the words came from the manifest and the pixels came from somewhere else.
+ * `checkTextureSet` refuses that input on its first check. Taking the entry here rather than in the
+ * command is what stops the next reader of a published set from forgetting it.
  */
-export function publishedLook(container: Uint8Array, tiles = 3): Map<string, RgbImage> {
+export function publishedLook(
+  container: Uint8Array,
+  entry: ManifestEntryRead,
+  tiles = 3,
+): Map<string, RgbImage> {
+  checkTextureSet(container, entry);
   const read = planes(container);
   const { baseColor, normal, orm, coverage, extra } = read;
   const pictures = new Map<string, RgbImage>();
