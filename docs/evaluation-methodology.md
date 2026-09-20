@@ -8,12 +8,10 @@ Status of this document: mixed. Every claim below carries exactly one label.
 - **ASSUMPTION** is unvalidated and names the experiment that settles it.
 - **OPEN** is unresolved. Nothing may be reported against an OPEN item until it is closed.
 
-Promoted from the reconciled research report (Part B9) and the `eval-deploy-demo` research stream,
-adapted to the corpus the project actually has. Where the research and the real corpus disagree, the
-adaptation is stated explicitly rather than smoothed over.
-
-This document specifies how Exulanica is measured. It contains no results. Results go in a separate
-document once the corpus is frozen and the harness runs.
+This document specifies how Exulanica is measured, adapted to the photograph corpus the product
+uses. Where an earlier video-corpus assumption and that corpus disagree, the adaptation is stated
+explicitly rather than smoothed over. It contains no results. Results go in a separate document
+once the corpus is frozen and the harness runs.
 
 ---
 
@@ -677,9 +675,9 @@ photographs and regions at the bottom, a 2.5D depth-card rung above it, a constr
 above that, and a full navigable splat only for OGC-1/room. Which rung is on screen changes the
 budget by an order of magnitude, so a single FPS number across rungs would be uninterpretable.
 
-**OPEN: the pass bar and the reference hardware.** The research proposed p95 frame time <= 22 ms,
+**OPEN: the pass bar and the reference hardware.** An earlier proposal used p95 frame time <= 22 ms,
 under 10% of frames over 16.7 ms, and peak resident asset bytes <= 600 MB at 1440x900. Every desktop
-rendering number in the research corpus is extrapolated from hardware the project does not have.
+rendering number from that proposal is extrapolated from hardware the project does not have.
 Settled by: measuring the source-first and splat rungs on the actual development machine and on one
 weak machine, then setting bars from those measurements. Until then, no rendering number is a target,
 only an observation.

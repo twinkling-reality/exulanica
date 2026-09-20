@@ -1,4 +1,14 @@
-"""Admitted reusable environment sources and derived assets."""
+"""Admitted reusable environment sources and derived assets.
+
+Admission validates container bytes, licence and provenance receipts
+(:mod:`exulanica.environment.admission`). The repository persists those resources and
+fails closed on withdrawal or digest mismatch (:mod:`exulanica.environment.repository`).
+Derived surfaces include the feature index, the Flatiron owned-district compiler, optional
+district interpretation recipes, scene-extraction candidates (preparation, never admission),
+and the NYC Building Footprints preparer.
+
+This package does not grant source-reuse rights, animation quality, or a runnable import.
+"""
 
 from exulanica.environment.admission import (
     MAX_ENVIRONMENT_PAYLOAD_BYTES,

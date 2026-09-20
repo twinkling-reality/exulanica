@@ -72,8 +72,9 @@ def get_services(request: Request) -> Services:
     return request.app.state.services
 
 
-#: What one request to a ``tiles.materialise`` route is charged. One tile per request, because the
-#: route that will carry it does not exist yet and a batch size is its decision to declare.
+#: Default charge for a ``tiles.materialise`` route that is not in
+#: :data:`~exulanica.api.permissions.SELF_CHARGING_TILE_ROUTES`. One tile per request; a route
+#: that charges by the world it specifies declares that count on its own entry.
 TILES_PER_REQUEST = 1
 
 #: Where :func:`authorise_route` leaves the session it has already held to this route's

@@ -11,9 +11,9 @@ installed nor approved):
 * The pair's value is the sum over lookups of the first glyph's x-advance adjustment.
 
 Anything this rule does not describe refuses the catalog rather than being approximated: a lookup
-that is not pair positioning, a value that moves anything but the first glyph's advance, a legacy
-``kern`` table, or a glyph in the set that GDEF calls a mark (a mark-skipping flag would change
-which glyphs pair).
+that is not pair positioning, a value that moves anything but the first glyph's advance, a
+``kern`` table rather than GPOS pair positioning, or a glyph in the set that GDEF calls a mark
+(a mark-skipping flag would change which glyphs pair).
 """
 
 from __future__ import annotations

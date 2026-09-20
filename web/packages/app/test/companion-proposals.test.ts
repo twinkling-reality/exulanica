@@ -196,7 +196,7 @@ describe('the appearance proposal client', () => {
     expect(outcome.proposal).toBeNull();
   });
 
-  it('says the most general true thing about a refusal this build has no words for', async () => {
+  it('says the most general true thing about a refusal this client has no words for', async () => {
     const fetch = vi.fn(async () =>
       json(wireProposal({ proposal: null, refusal: { code: 'invented_later', detail: 'x' } })),
     ) as unknown as typeof globalThis.fetch;

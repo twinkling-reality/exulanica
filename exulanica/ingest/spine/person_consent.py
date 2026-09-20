@@ -89,9 +89,8 @@ def insert_subject(
 ) -> uuid.UUID:
     """Create a person, or return the identical existing one.
 
-    ``entity_id`` is null for somebody nobody has named, which is the ordinary case and the one
-    the old yes-or-no gate could not represent: the two people at the edge of the bowl
-    photographs are real, are owed a decision, and have no name.
+    ``entity_id`` is null for somebody nobody has named, which is the ordinary case: a person
+    can be owed a decision and have no name.
     """
     scope.connection.execute(
         "insert into person_subject (subject_id,workspace_id,entity_id,created_by) "

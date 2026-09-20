@@ -1,12 +1,11 @@
 # License matrix
 
-Every dependency, model weight and hosted model the project's technology research encountered, with a ship or
+Every dependency, model weight and hosted model this matrix covers, with a ship or
 do-not-ship verdict for an Apache-2.0 repository.
 
 Status: **VERIFIED** where a primary source was read on **2026-08-27**, with the exceptions marked
-inline as DECISION, ASSUMPTION, DISPUTED, UNVERIFIED or OPEN. This document promotes Part E of the
-reconciled research plus the NVIDIA model and perception streams. It records no claim that was not
-already in the research.
+inline as DECISION, ASSUMPTION, DISPUTED, UNVERIFIED or OPEN. Verdicts stand on those primary
+sources.
 
 This is the highest legal-risk document in the repository. Two of its findings (the NVIDIA license
 distinction in section 2, and the trap list in section 4) are the difference between a valid
@@ -26,7 +25,7 @@ Apache-2.0 release and an invalid one.
 | **SEGREGATE** | Usable only as a clearly separated, separately noticed artifact, disclosed in the README and the accompanying notices |
 | **BLOCKED** | Do not touch |
 | **DISPUTED** | Primary sources contradict each other. Resolve before use |
-| **UNVERIFIED** | Nobody in the research corpus read the license. Not a verdict, an admission |
+| **UNVERIFIED** | The license was not read. Not a verdict, an admission |
 
 ### Standing rules
 
@@ -45,7 +44,7 @@ Apache-2.0 release and an invalid one.
 
 Where a row's source is given as a HuggingFace card, the retrieval URL was
 `https://huggingface.co/<id>/raw/main/README.md` or `https://huggingface.co/api/models/<id>`, read
-2026-08-27. Full URLs are given where the research recorded one.
+2026-08-27. Full URLs are given where a retrieval URL was recorded.
 
 ### Note on the audio rows
 
@@ -334,19 +333,19 @@ default code paths. Every one of these has a clean alternative that already exis
 
 ### 4a. UNRESOLVED: the Sortformer v2 license contradiction
 
-Two research streams read the same model and recorded different licenses. **This is preserved as
+Two independent readings of the same model recorded different licenses. **This is preserved as
 unresolved. Neither reading is confirmed.**
 
-| Stream | Reading | Supporting detail |
+| Reading | License recorded | Supporting detail |
 | --- | --- | --- |
-| `perception` | `nvidia/diar_streaming_sortformer_4spk-v2` is **cc-by-4.0**, not gated, last modified 2026-08-12 | Read the card's own frontmatter, reports the gated flag and a last-modified date, and reproduces v2's own DER table (CALLHOME 2spk 6.57%, 3spk 10.05%, DIHARD III full 18.91%) |
-| `nvidia-models` | The same model is **nvidia-open-model-license** | Reports DER numbers (CALLHOME 2spk 6.65, DIHARD III full 20.21) that in fact belong to **v2.1**, which suggests the two revisions were conflated |
+| First | `nvidia/diar_streaming_sortformer_4spk-v2` is **cc-by-4.0**, not gated, last modified 2026-08-12 | Read the card's own frontmatter, reports the gated flag and a last-modified date, and reproduces v2's own DER table (CALLHOME 2spk 6.57%, 3spk 10.05%, DIHARD III full 18.91%) |
+| Second | The same model is **nvidia-open-model-license** | Reports DER numbers (CALLHOME 2spk 6.65, DIHARD III full 20.21) that in fact belong to **v2.1**, which suggests the two revisions were conflated |
 
-The adversarial verifier checked **only v2.1** and confirmed it as `nvidia-open-model-license` with
+An independent check confirmed **only v2.1** as `nvidia-open-model-license` with
 DIHARD III (5 to 9 speakers) DER 41.42. It never checked v2.
 
-**Status: ASSUMPTION, leaning to `perception`.** `perception` is better sourced, but "better sourced"
-is not "verified", and the agreement or disagreement of streams is not evidence either way.
+**Status: ASSUMPTION, leaning to the first reading.** The first is better sourced, but "better sourced"
+is not "verified", and agreement or disagreement between readings is not evidence either way.
 
 **Why it matters.** The two revisions differ on whether the weights are commercially clean. Picking
 the wrong one silently changes the project's license posture, and under section 6 a
@@ -382,7 +381,7 @@ Source for the catalog column: <https://tokenfactory.nebius.com/api/public/model
 page, confirming it is one derived label rather than three readings.
 
 **Which source to trust: the HuggingFace card frontmatter.** The Nebius catalog `license` field is a
-derived label. The adversarial verifier independently confirmed that the three named documents are
+derived label. An independent check confirmed that the three named documents are
 genuinely different instruments with materially different terms (section 2).
 
 **DECISION.** `THIRD_PARTY_NOTICES.md` records the license read from the **raw HuggingFace YAML
@@ -403,7 +402,7 @@ the same `curl` used in section 4a against the Ultra card first.**
 ## 6. API-only use: what it does and does not cover
 
 The convenient claim is: "we only call an API, so weights licenses do not bind us." **That is
-partially true, and the research located exactly where the gap lands.**
+partially true, and the gap lands here.**
 
 **Where the claim holds.** Exulanica calls hosted weights over an inference API and vendors zero
 weights into the repository. Model weights accessed over an API are not a derivative work of
@@ -414,8 +413,8 @@ licensing blocker into a licensing footnote for the Token Factory calls.
 
 **Two corrections that narrow it.**
 
-1. **An API-only consumer is instead bound by the hosted endpoint's terms of service, which nobody in
-   the research corpus read. OPEN.** The Nebius Token Factory terms of service and acceptable use
+1. **An API-only consumer is instead bound by the hosted endpoint's terms of service, which have
+   not been retrieved. OPEN.** The Nebius Token Factory terms of service and acceptable use
    policy have not been retrieved. Read them before deployment.
 2. **The perception pipeline is not API-only.** The plan self-hosts detection, segmentation, face
    embedding and (if ever revived) ASR and diarization in containers on Nebius AI Cloud. **That is
@@ -454,9 +453,8 @@ gsplat (Apache-2.0), MoGe-2 (MIT).
 
 ## 7. THIRD_PARTY_NOTICES and the NOTICE-file obligations
 
-Naming note: the research drafts call this file `THIRD_PARTY_LICENSES.md`. This document uses
-`THIRD_PARTY_NOTICES.md`. It is one file under either name; pick one and use it consistently in the
-repository root.
+Naming note: this document uses `THIRD_PARTY_NOTICES.md`. Pick one filename and use it consistently
+in the repository root.
 
 ### 7.1 What `THIRD_PARTY_NOTICES.md` must contain
 
@@ -479,7 +477,7 @@ repository root.
    Nemotron Open Model License models, and "Licensed by NVIDIA Corporation under the NVIDIA Open
    Model Agreement." for Open Model Agreement models.
 6. **Honest disclosure of the residual dataset-provenance caveat**, rather than a claim that the
-   weights are fully clean. The defensible line, stated in the research: these artifacts carry
+   weights are fully clean. The defensible line: these artifacts carry
    **explicit permissive grants from their copyright holders**, unlike InsightFace, EdgeFace and
    AdaFace, which carry either an explicit non-commercial restriction or no grant at all. Grounding
    DINO's Cap4M training set is undisclosed web-crawled data whose terms IDEA-Research has never
@@ -497,7 +495,7 @@ leaves the obligation arguably unmet for a user-facing product.
 
 ### 7.3 Apache-2.0 NOTICE-file mechanics. OPEN.
 
-Two obligations are in play and **the research corpus never quoted the Apache-2.0 text itself**, so
+Two obligations are in play and **this document does not quote the Apache-2.0 text itself**, so
 the mechanics below are recorded as the operating rule and are **not** VERIFIED here:
 
 - **Inbound.** Where an Apache-2.0 dependency ships its own NOTICE file, its attribution notices
@@ -555,15 +553,10 @@ All cheap, and all of it should exist before the perception pipeline is written.
 
 ## 10. Provenance
 
-Promoted from `.exulanica/research/00-RECONCILED-REPORT.md` Part E, sections B4, B5, C-D1, C-D4, C-D9
-and C-D13; `.exulanica/research/nvidia-models.md` sections 1.1 and 1.2; `.exulanica/research/perception.md`
-sections 0, 1.2, 6.1, 6.1.1 and 9; `.exulanica/research/00-RISK-REGISTER.md` entries R-07, R-29, R-30,
-R-35, R-39 and R-67; and the primary catalog data in `.exulanica/research/nebius-raw-catalog.md` and
-`nebius-raw-models_info.json`.
-
-All primary sources retrieved **2026-08-27**. No claim in this document has been re-verified since.
-**No model identifier in this corpus has ever been invoked**, so every hosted-model row describes a
-catalog entry, not an observed response.
+Primary sources for the rows above were retrieved **2026-08-27**. No claim in this document has been
+re-verified since. **No model identifier in this corpus has ever been invoked**, so every hosted-model
+row describes a catalog entry, not an observed response. This matrix is the standing document; it
+does not require a private research tree.
 
 
 ## 11. HEIC decoder inspection and pin, 2026-09-12

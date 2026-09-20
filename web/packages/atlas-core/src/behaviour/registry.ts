@@ -16,7 +16,7 @@
  * **Everything fails closed, and the refusal carries words.** product-direction.md's first
  * milestone requires that unsupported behaviour "fails visibly", so `resolve` and `readParameters`
  * return a reason a status line can print rather than throwing or substituting a default. An
- * object whose behaviour this build cannot run is still a real object with verified geometry: the
+ * object whose behaviour this client cannot run is still a real object with verified geometry: the
  * caller is expected to draw it and report the refusal, not to hide the object behind it.
  *
  * **Parameter kinds mirror the server's three.** The contract says a parameter is "`integer` with
@@ -124,7 +124,7 @@ function freeze(source: BehaviourDefinition): BehaviourDefinition {
 
 const identify = (key: string, version: number): string => `${key}@${version}`;
 
-/** Immutable catalog of the behaviours this build can run, with a refusal for everything else. */
+/** Immutable catalog of the behaviours this client can run, with a refusal for everything else. */
 export class BehaviourRegistry {
   readonly definitions: readonly BehaviourDefinition[];
   readonly #byKey: ReadonlyMap<string, BehaviourDefinition>;
@@ -147,7 +147,7 @@ export class BehaviourRegistry {
   }
 
   /**
-   * Look one up, and say why when this build cannot run it.
+   * Look one up, and say why when this client cannot run it.
    *
    * The key and the VERSION are both part of the identity, because the server's registry is keyed
    * on both and a version bump is how a reviewed behaviour changes its parameters. Resolving
@@ -163,7 +163,7 @@ export class BehaviourRegistry {
     return Object.freeze({
       ok: false,
       reason:
-        `“${identify(behaviourKey, behaviourVersion)}” is not a behaviour this build can run. `
+        `“${identify(behaviourKey, behaviourVersion)}” is not a behaviour this client can run. `
         + `It runs ${supported || 'no behaviours'}.`,
     });
   }
@@ -173,7 +173,7 @@ export class BehaviourRegistry {
    *
    * An unknown parameter name, a wrong kind and an unknown choice are REFUSALS, matching the
    * server's own fail-closed list: a motion the author wrote as vertical must never quietly become
-   * horizontal, and a parameter this build ignores is a parameter whose effect nobody can see. An
+   * horizontal, and a parameter this client ignores is a parameter whose effect nobody can see. An
    * integer outside its declared bound is CLAMPED instead, and the names of what moved come back
    * so the confirmation surface can say what it changed before anything is written. A missing
    * parameter takes the declared default, which is what the registry rows carry them for.
@@ -241,7 +241,7 @@ export class BehaviourRegistry {
 }
 
 /**
- * What this build can run, copied from migration 0042's seeded row.
+ * What this client can run, copied from migration 0042's seeded row.
  *
  * The numbers are NOT decisions made here. They are the reviewed bounds, and the comment is the
  * whole reason this constant is allowed to exist: the server refuses anything outside them with

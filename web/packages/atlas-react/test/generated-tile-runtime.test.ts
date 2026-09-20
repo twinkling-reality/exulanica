@@ -47,7 +47,7 @@ const manifest = parseTextureSetManifest(new Uint8Array(readFileSync('../assets/
 const subtle = webcrypto.subtle as unknown as TextureSetDigest;
 const sha256 = async (bytes: Uint8Array): Promise<string> => createHash('sha256').update(bytes).digest('hex');
 const noSets = async (): Promise<Uint8Array> => { throw new Error('this test fetches no texture set'); };
-/** The capsule city version 2 states, for the hand-built envelopes below. */
+/** The capsule the grammar states, for the hand-built envelopes below. */
 const CITY_V2_CAPSULE: TileCapsule = { radiusM: 0.34, heightM: 1.9, eyeHeightM: 1.62 };
 
 let baked: Uint8Array;
@@ -192,7 +192,7 @@ describe('standing on the tile\'s own nav_envelope', () => {
     expect(navigation.collisionState.state).toBe('unavailable');
     expect(navigation.viewpointOnly).toBe(false);
     const world = navigation.world;
-    // The capsule is the one city version 2 states for the envelope's capsule clearance.
+    // The capsule is the one the grammar states for the envelope's capsule clearance.
     expect(navigation.capsule).toEqual(CITY_V2_CAPSULE);
     expect(world.eyeHeight).toBe(1.62);
     expect(world.cameraRadius).toBe(0.34);

@@ -1,7 +1,7 @@
 """Bounded natural-language proposals for authored environment edits.
 
 The model fills one field: an operation enum assembled from actions the authoritative
-client/server context can currently support. Identifiers, source bindings, transforms, origin
+client/server context supports. Identifiers, source bindings, transforms, origin
 roles, and base digests never enter model output. This module returns a proposal and performs no
 write.
 """

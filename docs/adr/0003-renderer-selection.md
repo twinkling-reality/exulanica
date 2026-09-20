@@ -1,4 +1,16 @@
-# ADR-0003: Browser renderer for the Atlas
+# PlayCanvas is the Atlas 3D renderer
+
+Status: PlayCanvas Engine 2.21.4 is the Atlas 3D renderer.
+
+The label ADR-0003 is only an identifier.
+
+**What this is.** The bake-off record that selected PlayCanvas Engine 2.21.4 for Atlas 3D.
+
+**Why it exists.** Renderer choice was open until matched-resolution measurement closed it.
+
+**What it still governs.** The production browser renderer. Three.js+Spark remains a measured
+alternative, not the shipping path. The living specification is
+[architecture-overview.md](../architecture-overview.md) section 1.1.
 
 - Status: **ACCEPTED, PlayCanvas Engine 2.21.4**. Resolved 2026-08-28 by matched-resolution
   measurement. See "Resolution" at the end of this document. The body below is preserved as the

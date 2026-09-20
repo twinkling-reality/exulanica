@@ -72,7 +72,7 @@ must not rewrite where it originated or imply a personal visit.
 The [unified world composition and retrieval contract](world-composition-contract.md)
 defines the required relationships, source-use rights, typed queries and edits,
 visual acceptance and implementation gaps. Future Earth, memory, creation, search
-and package briefs must follow that contract. This is the intended product, not a
+and package work must follow that contract. This is the intended product, not a
 claim that extraction, unified content search or general NLP scene editing already
 works. The World Memory Model is the system architecture and world representation;
 it does not imply an already-trained universal world-generation model.
@@ -494,20 +494,20 @@ A branch-only item is built on a branch and is absent from main.
 
 | System | Made of | On main | Absent from main |
 | --- | --- | --- | --- |
-| City vocabulary and validation | Record shapes, catalogs, validators | Version 2 built and generating: 28 record kinds, 91 parameters, 18 catalogs with 125 authored entries, tile documents with owned, halo and external references, and every one of the eleven stages writing records | Bake the generated street and score it |
+| City vocabulary and validation | Record shapes, catalogs, validators | Version 3 registered and generating: 28 record kinds, 91 parameters, 18 catalogs with 125 authored entries, tile documents with owned, halo and external references. Ten stages emit records; the registered tile stage is a record-shape contract | Bake the generated street and score it |
 | Vocabulary at scale | Model-drafted catalog entries, automatic checks, sampled review | Not implemented | Bulk drafting in the catalog schema, admitted by schema, consistency and statistics checks |
 | Admitted statistics | Licensed time-use, climate, commute and transit datasets | Not implemented | Admit datasets with licence checks; calibrate routines, weather and trips |
-| City generators | Grammar stages | None: every city stage declares its records and states that it is not implemented | The first generated street corridor, then districts |
+| City generators | Grammar stages | Ten stages emit records; the registered tile stage is an UnimplementedStage / record-shape contract. Tile documents are assembled by generation.tiles after generate() | The first generated street corridor, then districts |
 | Shapes | Tessellator and container | Version 1 container, triangle digest, render and navigation projections, deterministic bake stage | The version 2 reader (verification incomplete) and full expanders (building faces, kerbs, corners) |
 | Walking on generated tiles | Tile runtime | A development evaluation route draws one baked tile and stands the player on its navigation envelope; reachable from no person's world | Version 2 tiles, material classes and data view selection |
 | Surfaces | Texture makers and recipes | Eight published opaque sets pinned by migration 0065; a workspace's own recipes and private bakes with deletion (0066) | Glazing, foliage, bark, timber, fabric, road paint and sign panels as declared material classes |
 | Generated appearance | Generative models on exact structure | Not implemented | Model-made texture sets and structure-conditioned appearance research, published as versioned objects |
-| People | Society engine and routine catalogs | Persisted v2 and v3 societies; v3 records bounded model decisions. The v1 engine draws roles and names from short fixed lists | A v4 routine society (needs, activities, capacities, homes and workplaces from premises) exists on a branch and is absent from main |
-| Looks | Character catalogs | A procedural stand-in in the preview | Catalog-driven people looks, deterministic per inhabitant, on a branch and absent from main |
-| Traffic | Traffic engine and cited catalogs | Not implemented | A deterministic simulation with independent rule checks exists on a branch and is absent from main; trips are not generated from inhabitants |
+| People | Society engine and routine catalogs | Persisted v2, v3 and v4 societies. v3 records bounded model decisions. v4 is the living routine profile: needs, activities, capacities, and homes or workplaces from premises. The v1 engine draws roles and names from short fixed lists | Learned dynamics, natural conversation, and evolving social relationships |
+| Looks | Character catalogs | Catalog people for the player and inhabitants; version-scoped appearance history; a session-only development studio | Source-linked likeness, production family configuration, and movement or visual acceptance |
+| Traffic | Traffic engine and cited catalogs | Deterministic v1 engine on city v2 road records, with independent rule checks. No runtime, store or draw path runs it | Wire the engine to a runtime; generate trips from inhabitants |
 | Decision-makers | Rules, models, people | v3 accepts bounded model proposals and typed user actions; no other engine does | One decision interface for every inhabitant and vehicle, with model effort by level of detail |
 | Weather and time of day | Weather generator, solar position | Not implemented. The v1 society state stores a fixed clear weather value that nothing reads | A seeded weather generator calibrated to a climate profile, and daylight from solar position, read by people, lighting and traffic |
-| Work, goods and economy | Premises, roles, supply | Not implemented beyond the v1 role list | Roles and shifts from premises (v4, on a branch and absent from main), then goods, supply and deliveries |
+| Work, goods and economy | Premises, roles, supply | v4 records a home and workplace where the place's premises supply them; otherwise unavailable. The v1 role list remains the older engine's vocabulary | Goods, supply, deliveries, and shifts as a full economy |
 | Events | Mechanisms | Not implemented | Events produced by supply, relationships and weather, recorded as simulation events |
 | Transit service | Stops, routes, timetables | Not implemented | Stops, routes and boarding calibrated to admitted timetables, joint with people and traffic |
 | Relationships and memory | Society memory | v3 communicated beliefs, bounded | Remembered interactions that change later choices |
@@ -526,7 +526,7 @@ The inventory below identifies existing code and the extensions required by each
 | Authored objects and versions | Source snapshots, alternate-version lineage, object add/move/remove/undo, durable admitted environment instances and bounded motion; synthetic browser checks recorded below | Unified selection, environment-instance package projection and real-scene acceptance; arbitrary world branching is not established |
 | Earth and source admission | Bounded, versioned Flatiron source compiler and owned runtime path; visual validation remains incomplete | Additional admitted sources, reusable extraction/indexing, richer geographic interpretation and first-person coexistence |
 | Package | WMP 1.0 and opt-in authored-world extension describe existing state | Environment-instance and society projection, versioned geographic rights support, permitted asset resolution and an explicit runtime loader |
-| Simulation | Reviewed bounded object behaviors, persisted deterministic v2/v3 society, saved playback controls and typed user action requests over canonical targets; no learned or general simulation capability established. A v4 routine society and a deterministic traffic simulation exist on a branch and are absent from main. | Browser-directed actions, production worker/runtime configuration, richer affordances, calibrated learned decisions and fictional rules through measured scenarios |
+| Simulation | Reviewed bounded object behaviors, persisted deterministic v2/v3/v4 society, saved playback controls and typed user action requests over canonical targets; no learned or general simulation capability established. A deterministic traffic engine exists on main and is not run by any runtime. | Browser-directed actions, production worker/runtime configuration, richer affordances, calibrated learned decisions and fictional rules through measured scenarios |
 
 World Write receipts are not payload delivery. Package verification is not runnable import.
 Neither is evidence that a compatible simulation runtime exists.
@@ -545,7 +545,9 @@ authenticated persistence and deterministic replay are tested. Its model adapter
 against each inhabitant's available context and records stale or unavailable outcomes. Existing
 societies retain their original profile and history.
 
-The live browser uses v2. It can inspect persisted inhabitants and events and control
+The living-world composition path creates `exulanica-society/v4` societies. An existing
+society keeps its original profile. The generic society client still defaults to v2. The
+browser can inspect persisted inhabitants and events and control
 configured playback; its development path can also show an explicitly labeled recorded fixture.
 It does not issue the implemented directed-action requests. V3 browser interaction and live-model quality have not been
 validated. Recorded fact transmission does not establish natural conversation, evolving social
@@ -919,7 +921,7 @@ connects these milestones: permitted source admission and shared identity, durab
 composition with unified retrieval, natural-language structural creation, then
 compatible transfer and expansion. Frontend Earth rendering is one dependency;
 it does not complete extraction, searchable world integration or persistent edits.
-Each stage needs an exact scoped brief and measured acceptance, without changing
+Each stage needs a scoped acceptance criterion and measured evidence, without changing
 active tasks' ownership through roadmap prose.
 
 1. **Creative composition:** more editable assets, blending places into authored arrangements,
@@ -934,7 +936,7 @@ active tasks' ownership through roadmap prose.
    prototypes. Select a runtime only after those requirements are concrete. Validate physical behavior against explicit test scenarios.
 5. **Scene segments:** lift per-photograph people and object regions into per-entity 3D
    segments through the recovered cameras, show them in the scene, and name them there;
-   models and ownership in [briefs/2026-09-11-scene-segments.md](briefs/2026-09-11-scene-segments.md).
+   models and ownership in [scene-segments.md](scene-segments.md).
 6. **Developer interoperability:** document stable read/edit contracts, package compatibility,
    capability negotiation, and asset resolution. Prove a second tool can make an accepted change
    without depending on private interface state before claiming interoperability. Extend that proof

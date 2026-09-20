@@ -1,7 +1,6 @@
 """The corridor's mechanical gates, measured from the generated records and from nothing else.
 
-Each figure counts records; none reads a mesh, a renderer or a picture. The gates are the target
-architecture's, as the corridor brief states them for city version 2:
+Each figure counts records; none reads a mesh, a renderer or a picture. The gates are:
 
 * **Facade coverage.** Every building has a facade record on every edge of every tier.
 * **Ground band.** Every face that includes the ground storey has a band 4000 to 6000 mm tall.

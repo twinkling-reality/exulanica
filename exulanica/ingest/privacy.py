@@ -363,13 +363,12 @@ def _every_named_person_is_already_hidden(
 ) -> bool:
     """Whether the people this screening names as masked are ones the pipeline is already hiding.
 
-    This is the reconciliation the old blanket refusal made unnecessary, and it is the half that
-    must not relax. A reviewer naming somebody is a statement about the photograph; a masked
-    derivative is a fact about the bytes reconstruction will read. The two are written by
-    different actors at different times and they can disagree, and the direction that matters is
-    the reviewer seeing an arm at the edge of the frame that no detector proposed and no mask
-    covers. Crediting that screening would admit the photograph on the strength of a mask nobody
-    built, which is worse than the version 1 rule this replaced: version 1 at least refused it.
+    This is the half that must not relax. A reviewer naming somebody is a statement about the
+    photograph; a masked derivative is a fact about the bytes reconstruction will read. The two
+    are written by different actors at different times and they can disagree, and the direction
+    that matters is the reviewer seeing an arm at the edge of the frame that no detector
+    proposed and no mask covers. Crediting that screening would admit the photograph on the
+    strength of a mask nobody built.
 
     MEASURED 2026-09-07: the first version of this rule asked only whether the capture's own mask
     was current, and a photograph where the detector found nobody answered "nothing to hide, so

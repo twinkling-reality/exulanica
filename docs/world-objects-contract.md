@@ -3,9 +3,9 @@
 Status: **DECISION** and **IMPLEMENTED** for alternate world versions, authored object add/move/
 remove/undo, durable environment placement, the reviewed asset registry, and the bounded
 object-behaviour registry. Object rendering and bounded-motion controls have synthetic browser
-coverage, and the authored-world 1.0 package extension is built. Unified retrieval, the
+coverage, and the authored-world 1.0 package extension exists. Unified retrieval, the
 conversational authoring service, environment-instance package projection, and complete
-personal-scene visual acceptance remain open.
+personal-scene visual acceptance are not implemented.
 
 This is the fourth world plane under [ADR-0007](adr/0007-world-composition-and-customization.md).
 The three that exist are appearance ([world-style-backend.md](world-style-backend.md), migrations

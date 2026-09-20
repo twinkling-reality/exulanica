@@ -78,7 +78,7 @@ const CHUNK_JSON = 0x4e4f534a;
 const CHUNK_BIN = 0x004e4942;
 
 /**
- * Extensions whose decoder is fetched at load time rather than shipped in this build.
+ * Extensions whose decoder is fetched at load time rather than shipped in this client.
  *
  * Listed by name rather than caught by "anything unknown in `extensionsUsed`", because an
  * unrequired extension is by specification ignorable and refusing every one of them would refuse
@@ -171,13 +171,13 @@ export interface SceneObjectRuntimeOptions {
  *   relative to the page and runs the result in a Worker through `URL.createObjectURL`. That is
  *   an unverified EXECUTABLE fetched because of something written inside the container, which is
  *   a worse version of the fetch this whole boundary exists to prevent.
- * - any other `extensionsRequired`. A required extension this build has not reviewed either
+ * - any other `extensionsRequired`. A required extension this client has not reviewed either
  *   changes what the bytes mean or is dropped silently, and a silently dropped mesh renders an
  *   authored object as nothing at all rather than as a refusal.
  *
  * A data URI is not an external reference and would be safe to allow. It is refused anyway: a
  * self-contained GLB puts its buffer in the BIN chunk, so a data URI here means the container was
- * produced by a path this build has not seen, and admitting it would mean the byte count in the
+ * produced by a path this client has not seen, and admitting it would mean the byte count in the
  * registry row no longer bounds what gets decoded. The three reviewed assets
  * `exulanica.world.assets` generates carry no `uri`, no images and no extensions at all.
  */
@@ -247,7 +247,7 @@ export function validateGlbContainer(bytes: ArrayBuffer): GlbSummary {
     if (codecs.length > 0) {
       throw new TypeError(
         `This container is compressed with ${codecs.join(', ')}, which would fetch and run a `
-        + 'decoder this build has not verified.',
+        + 'decoder this client has not verified.',
       );
     }
   }
@@ -331,7 +331,7 @@ export async function fetchVerifiedObjectAsset(
   options: AuthenticatedAssetFetchOptions,
 ): Promise<ArrayBuffer> {
   if (reference.mediaType !== AUTHORED_OBJECT_MEDIA_TYPE) {
-    throw new TypeError(`“${String(reference.mediaType)}” is not a container this build can open`);
+    throw new TypeError(`“${String(reference.mediaType)}” is not a container this client can open`);
   }
   const path = objectAssetBytesPath(reference.assetKey);
   if (!safeObjectAssetPath(path)) {
@@ -623,9 +623,9 @@ export class SceneObjectRuntime {
   }
 
   /**
-   * Put a verified container in a region, and attach its behaviour if this build can run it.
+   * Put a verified container in a region, and attach its behaviour if this client can run it.
    *
-   * A behaviour this build cannot run does NOT stop the placement. The object is real, its
+   * A behaviour this client cannot run does NOT stop the placement. The object is real, its
    * geometry verified, and refusing to draw it because a motion could not be resolved would hide a
    * successful edit behind a failed one. It comes back as a notice instead, and the caller is
    * required by the milestone to put that notice on the status line.
@@ -763,7 +763,7 @@ export class SceneObjectRuntime {
     if (resident.motion === null) {
       return Object.freeze({
         ok: false as const,
-        reason: 'This object carries no motion this build can run, so there is nothing to start.',
+        reason: 'This object carries no motion this client can run, so there is nothing to start.',
       });
     }
     if (action === 'trigger') resident.motion.trigger();

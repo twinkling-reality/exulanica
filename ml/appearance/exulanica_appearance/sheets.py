@@ -107,7 +107,7 @@ def texture_pairs(
 ) -> list[Path]:
     """One sheet a target: the published set's colour, then each candidate's, and a tiled composite.
 
-    The left panel is what the procedural recipe paints today, read from the pinned container. Each
+    The left panel is what the procedural recipe paints, read from the pinned container. Each
     panel to its right is a generated base colour at the same size, labelled with its candidate,
     seed and measured seam ratio. Below each, the same map tiled ``tile`` by ``tile``, because
     repetition and seams are what a person sees on a wall and not in one square.

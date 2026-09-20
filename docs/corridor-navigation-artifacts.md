@@ -1,6 +1,6 @@
 # Corridor and navigation artifacts
 
-Status: **artifact, gate, and conservative runtime adapter implemented; real gate blocked**.
+Status: **artifact, gate, and conservative runtime adapter exist; the gate has not passed**.
 
 `exulanica.reconstruction.navigation` builds rung-2 artifacts only from ordered metric camera poses
 and independently measured navigation samples. Each sample records position, unit forward vector,

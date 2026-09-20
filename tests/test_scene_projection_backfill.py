@@ -1,6 +1,6 @@
 """The one-shot that gives an already published scene the projection it was published without.
 
-The scene worker writes a projection from now on. Every scene published before it did has none,
+The scene worker writes a projection with the pose, placement and gate receipts. Every scene published without that stage has none,
 and its first graph read in every fresh process still rebuilds the placement from every point map.
 These tests pin what the backfill writes, that it writes it once, and the two refusals that keep it
 from making a scene slower than it found it. The last group pins what it does with a projection that

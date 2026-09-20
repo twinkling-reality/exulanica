@@ -44,7 +44,7 @@ describe('the registry mirrors the one reviewed behaviour and refuses everything
     expect(definition.behaviourVersion).toBe(1);
     expect(definition.controls).toEqual(['trigger', 'stop', 'reset']);
     expect(definition.resetIsExact).toBe(true);
-    // Migration 0042, verbatim. If this fails, the server's registry moved and this build's copy
+    // Migration 0042, verbatim. If this fails, the server's registry moved and this client's copy
     // has to move with it.
     expect(definition.parameters).toEqual({
       travel_mm: { kind: 'integer', minimum: 100, maximum: 10_000, default: 1000 },
@@ -119,7 +119,7 @@ describe('parameters are read against the declared descriptors', () => {
   });
 
   it('refuses an unknown parameter name rather than ignoring it', () => {
-    // The server fails closed on an unknown parameter, and a parameter this build silently drops
+    // The server fails closed on an unknown parameter, and a parameter this client silently drops
     // is a parameter whose effect nobody can see.
     const result = read({ amplitude: 2 });
     expect(result.ok).toBe(false);

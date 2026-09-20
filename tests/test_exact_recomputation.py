@@ -122,13 +122,13 @@ def test_the_flag_is_a_claim_about_events_not_a_proof_of_reproduction():
     """`scene_pose` is the case that makes the distinction necessary rather than pedantic.
 
     It fixes COLMAP's `random_seed`, which is why a differing pose is worth an event. It also runs
-    RANSAC across threads, and until 2026-09-09 `exulanica/reconstruction/pycolmap_executor.py`
+    RANSAC across threads, and `exulanica/reconstruction/pycolmap_executor.py`
     said in as many words that the residual variation had not been measured. It has been measured
-    now, and the answer keeps the distinction rather than closing it: two runs of one manifest
+    (2026-09-09), and the answer keeps the distinction rather than closing it: two runs of one manifest
     register the same images and produce the same descriptors byte for byte, and still disagree on
     the sparse model, the point count and the recovered camera extent. So `scene_pose` is still
-    declared deterministic and is now KNOWN not to be exactly recomputable, which is a stronger
-    statement than the one this test used to protect and the same distinction.
+    declared deterministic and is KNOWN not to be exactly recomputable, which is a stronger
+    statement than an unmeasured residual and the same distinction.
 
     This asserts the executor still carries the measurement and still points at the record, because
     the failure this guards against is the sentence quietly becoming a claim of reproduction.

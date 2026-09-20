@@ -146,7 +146,7 @@ export class NativeCharacterRuntime {
   }
   setAppearance(subject:CharacterSubject,appearance:NativeCharacterAppearance):void{
     const resident=this.residents.get(characterSubjectKey(subject));
-    // A person waiting in far form wears the new appearance when it is next drawn in full.
+    // A person waiting in far form wears that appearance when it is next drawn in full.
     if(resident?.intent&&resident.status==='far'){resident.intent.appearance=appearance;return;}
     if(!resident?.actor)throw new Error('Native character is unavailable');
     if(!resident.authority||currentNativeAuthorityStatus(resident.authority)!=='ready'){this.release(resident);resident.status=resident.authority?currentNativeAuthorityStatus(resident.authority):'hidden';this.present(resident);throw new Error('Character authority changed');}

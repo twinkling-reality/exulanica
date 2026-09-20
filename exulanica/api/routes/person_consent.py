@@ -1,15 +1,15 @@
 """The reviewer's surface: what is in this photograph, and what has each person agreed to.
 
-This replaces the one question the old gate asked. Instead of attesting that a photograph contains
-nobody, a reviewer reads the proposed regions, confirms or corrects them, and records a decision
+This surface records per-person review decisions, not a single photograph-wide attestation.
+A reviewer reads the proposed regions, confirms or corrects them, and records a decision
 per person. Every write here is an immutable receipt naming the authenticated actor.
 
 **No request body may name an actor or an actor role.** The authenticated session owns every
 decision recorded through these routes, and they are all recorded as ``owner``. A body that could
 say ``actor_role: "subject"`` would let the account holder manufacture the photographed person's
 consent, which is precisely the thing the three-consent split exists to make impossible to fake.
-A genuine subject-facing route needs a credential this system does not yet issue, and it will be
-its own module when it does.
+A subject-facing route would need a credential this system does not issue. These routes record
+only the authenticated account holder's owner decisions.
 """
 
 from __future__ import annotations
@@ -102,7 +102,7 @@ def regions(
         # looked, and the review screen would have told the next reviewer exactly that about work
         # somebody had just finished. It also disagreed with the graph payload, which asks
         # `review_states_for_captures` over the raw table and answered `screened` for the same
-        # photograph. Both now ask the same question of the same rows: has anybody ever been
+        # photograph. Both ask the same question of the same rows: has anybody ever been
         # proposed or recorded here.
         "review_state": (
             "screened"

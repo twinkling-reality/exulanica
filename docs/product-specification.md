@@ -1,7 +1,7 @@
 # Product specification
 
 Authority: [product-direction.md](product-direction.md) owns product scope and delivery
-order. This page keeps research-backed limits and earlier decisions.
+order. This page keeps measured limits and earlier decisions.
 
 Status: mixed. Every claim carries exactly one label, per the convention in
 [README.md](README.md): **VERIFIED** (primary source URL and retrieval date), **DECISION** (with the
@@ -9,8 +9,7 @@ alternative rejected), **ASSUMPTION** (with the experiment that settles it), **O
 
 Retrieval date for every VERIFIED claim on this page: **2026-08-27**, except the two deprecation
 notices cited in section 8, which were re-read on **2026-08-28** and carry that date inline.
-Promoted from reconciled research dated 2026-08-27. Where that research recorded a
-disagreement as unresolved, it is preserved here as unresolved.
+Where a disagreement is unresolved, it is preserved here as unresolved.
 
 Companion document: [interaction-model.md](interaction-model.md) covers the spatial and interaction
 design. This page covers what the product is, what it does, and what it deliberately does not do.
@@ -69,16 +68,15 @@ demonstration, not an apology for a weak model.
 **DECISION.** The MVP corpus is a personal photograph library (a travel set). It is still images.
 There is no video and no audio track.
 
-Rejected alternative: a self-shot video corpus, which is what the research streams assumed
-throughout. Video would supply speech, speaker turns, temporal continuity within a scene, and dense
+Rejected alternative: a self-shot video corpus, which is what an earlier video-corpus design
+assumed throughout. Video would supply speech, speaker turns, temporal continuity within a scene, and dense
 multi-view frames for reconstruction. It was rejected because it requires shooting new material with
-consented participants inside a 64 day window (reconciled report Q-H3, Q-H7, named there as the item
-with the longest human lead time and no engineering recovery), and because it puts an entire
-self-hosted ASR and diarization workstream on the critical path (A1, R-02).
+consented participants (the longest human lead time, with no engineering recovery), and because it puts an entire
+self-hosted ASR and diarization workstream on the critical path.
 
 ### 2.2 Consequences that follow mechanically
 
-| Brief said | Corrected |
+| Earlier video-corpus claim | Photograph-corpus rule |
 | --- | --- |
 | Captures are phone and smart-glasses video | Captures are photographs. A capture is a set of stills, not a clip |
 | Recurrence spans people, **voices**, places, objects, **conversations**, events | Recurrence spans people, places, objects, events. Voices and conversations are deferred (2.3) |
@@ -87,7 +85,7 @@ self-hosted ASR and diarization workstream on the critical path (A1, R-02).
 
 ### 2.3 DEFERRED: recurring voices and recurring conversations
 
-This is the largest correction to the brief, and it is deferred for **two independent reasons**,
+This is the largest corpus correction, and it is deferred for **two independent reasons**,
 either of which alone would be sufficient.
 
 **Reason 1, no platform path. VERIFIED.** Nebius Token Factory has zero audio capability. The live
@@ -100,8 +98,7 @@ of exactly three part types: `text`, `image_url`, `video_url`. The model catalog
 https://api.tokenfactory.nebius.com/openapi.json ,
 https://tokenfactory.nebius.com/api/public/models_info ,
 https://docs.tokenfactory.nebius.com/llms.txt
-Found independently by three research streams and confirmed independently by adversarial verification
-using three methods. It is the most solid fact in the corpus.
+Confirmed by those primary sources, using three methods.
 
 **Reason 2, no source material. DECISION.** Photographs have no audio track. Even with a self-hosted
 ASR container on Nebius AI Cloud, there is nothing to transcribe.
@@ -112,8 +109,8 @@ What deferral means concretely:
   appears in the product, the demo, the README, the documentation, or any marketing surface.
 - The evidence spine keeps a `track` concept so that adding an audio track later is an extension
   rather than a rewrite (D3).
-- The unresolved Sortformer v2 license question (reconciled report C-D1: `cc-by-4.0` versus NVIDIA
-  Open Model License, unconfirmed by adversarial verification) is **not resolved by this deferral,
+- The unresolved Sortformer v2 license question (`cc-by-4.0` versus NVIDIA
+  Open Model License, still unconfirmed) is **not resolved by this deferral,
   only postponed.** It must be settled before any diarization code is written, whenever that happens.
 
 ### 2.4 What carries recurrence instead
@@ -137,7 +134,7 @@ settings screen.
 
 ## 3. The defining loop
 
-The brief's seven step loop, corrected. Steps in bold changed.
+The seven-step loop, with photograph-corpus corrections. Steps in bold changed.
 
 | # | Step | Status |
 | --- | --- | --- |
@@ -187,7 +184,7 @@ reconstruction telemetry.
 
 ### 4.1 The core walkthrough
 
-**DECISION**, adapted from the research's end to end path with the audio dependent steps removed.
+**DECISION**, the end-to-end path with the audio-dependent steps removed.
 The elapsed column indicates the pace a first-time user moves through the loop. It is not a budget
 for any particular recording, and nothing in the product depends on hitting these marks:
 
@@ -201,7 +198,7 @@ for any particular recording, and nothing in the product depends on hitting thes
 | 2:15 to 2:40 | An unanswerable question is asked; the system abstains and says why |
 | 2:40 to 3:00 | The opt-in public lookup is toggled on; the result renders in a visually separate panel that cannot be cited |
 
-**DECISION** on demo honesty, carried unchanged from the research: pre-ingested captures are
+**DECISION** on demo honesty: pre-ingested captures are
 acceptable and **must be disclosed on the page itself**. Explicitly unacceptable: a progress bar not
 driven by real job state, a spinner in front of a cached response, hardcoded answers, any query path
 that special cases the scripted questions, or claiming live reconstruction over a precomputed asset.
@@ -221,7 +218,7 @@ and the Atlas renders whichever rung the region actually earned.
 | 3, 2.5D point maps from single images | Per image monocular metric point maps, no poses required, placed at recovered poses where they exist and on a derived path where they do not | **No gate that can fail.** Monocular depth is defined for every image | A constellation of photographic panels with real depth relief and a few degrees of true parallax each. Every panel opens its source image |
 | 4, source first | Image thumbnails laid out by time and by semantic proximity. No geometry | Everything else failed, or the device is low power | A navigable spatial arrangement of evidence cards inside the same continuous Atlas. Cross-region continuity links still render |
 
-Two rules from the research, carried without softening:
+Two rules, carried without softening:
 
 - **Rung 4 must be complete and good before rung 1 is attempted.** It is the product floor and the
   only rung with a 100% success rate.
@@ -296,7 +293,7 @@ supportable phrase is "append-only by policy".
 
 ### 6.2 Citation: exact, and now genuinely exact
 
-The reconciled report demoted "every claim resolves to the *exact* moment" because word level speech
+"Every claim resolves to the *exact* moment" does not hold, because word level speech
 timestamps do not support it. **VERIFIED**: at a 200 ms collar with exact word match, WhisperX
 reaches 93.2% precision / **65.4% recall** on Switchboard and 84.1% / **60.3%** on AMI, meaning
 roughly 35 to 40% of words on conversational audio lack a correct-within-200 ms timestamp.
@@ -321,7 +318,7 @@ space region when a region matters.
 
 ### 6.3 Identity: proposals, never assertions
 
-Covered in 1.1 and 2.4. Four architectural guards from the research are load-bearing and are stated
+Covered in 1.1 and 2.4. Four architectural guards are load-bearing and are stated
 here because they are product constraints, not implementation details:
 
 1. No probe-image search endpoint exists at all.
@@ -333,9 +330,9 @@ here because they are product constraints, not implementation details:
 Guard 4 also defuses defamation by mismatch, which is a live risk at the accuracy levels in 1.1.
 
 **OPEN (Q-H4).** When may a biometric embedding exist for a person who has not consented? Three
-research streams produced three incompatible rules. The reconciled recommendation is the middle one
-(compute, propose, short time-to-live, persist only on confirmation), but this is a risk-appetite
-decision for the operator, not an engineering one. It gates the confirmation loop and therefore gates
+incompatible rules have been stated. The middle one
+(compute, propose, short time-to-live, persist only on confirmation) is the standing candidate,
+but this is a risk-appetite decision, not an engineering one. It gates the confirmation loop and therefore gates
 the defining loop's step 2 and step 3.
 
 ### 6.4 The public lookup is quarantined by construction
@@ -402,7 +399,7 @@ https://docs.tokenfactory.nebius.com/august-2026-deprecation-notice (both retrie
 | Role | Choice | Note |
 | --- | --- | --- |
 | Reasoning, Companion phrasing, cross-region reasoning | NVIDIA text Nemotron: `nvidia/Nemotron-3_5-Lightning`, with `nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B`, `nvidia/nemotron-3-super-120b-a12b` and `nvidia/Nemotron-3-Ultra-550b-a55b` as the declared alternates | All survive 2026-08-31. Satisfies the NVIDIA open model requirement |
-| Vision sensor over photographs | A non-NVIDIA Token Factory vision model. `MiniMaxAI/MiniMax-M3` is Nebius' named replacement for the removed `nvidia/Cosmos3-Super-Reasoner`; `openbmb/MiniCPM-V-4_5` is the reconciled report's Apache-2.0 candidate | Selection between the two is deferred to the technology document. **All NVIDIA multimodal models leave Serverless on 2026-08-31 and none may be depended on** |
+| Vision sensor over photographs | A non-NVIDIA Token Factory vision model. `MiniMaxAI/MiniMax-M3` is Nebius' named replacement for the removed `nvidia/Cosmos3-Super-Reasoner`; `openbmb/MiniCPM-V-4_5` is the Apache-2.0 candidate | Selection between the two is deferred to the technology document. **All NVIDIA multimodal models leave Serverless on 2026-08-31 and none may be depended on** |
 | Text embeddings | A Token Factory embedding model | Image embeddings do not exist on Token Factory and must be self-hosted |
 
 **DECISION** on deprecation survival, because the hosted demo must run unattended for roughly 46 days
@@ -421,7 +418,7 @@ structurally as above.
 
 | # | Assumption | Experiment that settles it |
 | --- | --- | --- |
-| A-28 | Reconstruction is legible enough that walking inside a region reads as a place. Named in the research as the highest-stakes assumption in the interaction stream | X-1, one day on real captures. If it fails, rung 3 carries the product |
+| A-28 | Reconstruction is legible enough that walking inside a region reads as a place. Highest-stakes interaction assumption | X-1, one day on real captures. If it fails, rung 3 carries the product |
 | A-29 | The pipeline emits real per-stage counters | Two hours of backend inspection. Do this first (5.3) |
 | A-18 | Single-signal cross-capture identity lands at Recall@1 40 to 65%. **Extrapolated, not measured. No recall number may appear in the README, the documentation or any marketing surface until it is measured** | X-6, one day |
 | A-31 | Evidence references resolve to the exact source asset in the browser | X-3. Simplified but not eliminated by the move to stills |
@@ -431,9 +428,9 @@ structurally as above.
 
 | # | Item | Why it is still open |
 | --- | --- | --- |
-| P-1 | The consent rule for biometric embeddings of unconsented people (Q-H4, 6.3) | Three streams, three incompatible rules. Operator risk decision |
+| P-1 | The consent rule for biometric embeddings of unconsented people (Q-H4, 6.3) | Three incompatible rules. Risk-appetite decision |
 | P-2 | Exact rung labels shown per region (5.2) | Copy not written. The constraint is fixed; the wording is not |
-| P-3 | Whether the corpus contains identifiable people who have not consented, and what that permits | Depends on P-1 and on the operator's own library. Not answerable from research |
+| P-3 | Whether the corpus contains identifiable people who have not consented, and what that permits | Depends on P-1 and on the account holder's library |
 
 ---
 

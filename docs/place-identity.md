@@ -1,21 +1,20 @@
 # One place across captures and time
 
-Design note, 2026-09-06, with the schema decision added 2026-09-07. **No real cross-capture
-alignment has run. The vocabulary and the tables below are decided and the geometry is measured
-against a synthetic fixture; nothing here is a measurement of two real captures.** Roadmap Phase 10
-capability 3, and experiment FR-2 made product.
+Status: **PLACE PLANE AND SYNTHETIC ALIGNMENT**. The vocabulary and tables are decided and the
+geometry is measured against a synthetic fixture. No joint reconstruction of two real captures
+has run.
 
-## What the product is missing
+## Scene and place
 
 Every reconstruction in this repository is a **scene**: one set of photographs, taken on one
-occasion, reconstructed into one recovered frame. Photograph a kitchen today and again in a month
-and the system holds two scenes that share a subject and share nothing else. Their coordinate
-frames are unrelated, their regions are separate, and no query can ask what changed.
+occasion, reconstructed into one recovered frame. Two captures of one kitchen are two scenes that
+share a subject and share nothing else. Their coordinate frames are unrelated, their regions are
+separate, and no query can ask what changed.
 
-That is the gap between a reconstruction pipeline and a memory. A generative world model reading
-this system should be able to ask for a place and get its history, not get whichever capture
-happened to be indexed. Persistence across time is the thing a stateless model most lacks and the
-thing this product exists to supply.
+A place is the join that supplies that history. A generative world model reading this system
+should be able to ask for a place and get its versions, not get whichever capture happened to be
+indexed. Persistence across time is the thing a stateless model most lacks and the thing this
+product exists to supply.
 
 ## The one hard constraint, stated first
 

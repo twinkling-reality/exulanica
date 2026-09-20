@@ -1,8 +1,8 @@
 """Shared core of the deterministic synthetic society: identity, draws, events and digests.
 
 Every profile builds on these. The v1 engine and the fixed tables its stored histories depend on
-live in ``exulanica.world.society_legacy``; the current profile is
-``exulanica.world.society_living``.
+live in ``exulanica.world.society_legacy``. The living society, profile ``exulanica-society/v4``,
+lives in ``exulanica.world.society_living``.
 """
 
 from __future__ import annotations

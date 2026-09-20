@@ -5,9 +5,9 @@ connection: "Turn generation and index rendering both run against a snapshot rat
 a live connection, because both must be reproducible in a test with no transport, and because
 ``stateVersion`` is what expires an update proposal."
 
-**What this endpoint returns and what it deliberately does not.** The web read model was designed
-against a fuller system than exists, and rather than filling its fields with plausible zeroes,
-this returns what the server actually knows and leaves the mapping to the client adapter, which
+**What this endpoint returns and what it deliberately does not.** The web read model asks for
+fields this server does not store. Rather than filling those fields with plausible zeroes,
+this returns what the server knows and leaves the mapping to the client adapter, which
 documents each gap in one auditable place. Two gaps are worth naming here because they are
 properties of the server rather than of the adapter:
 
@@ -26,8 +26,8 @@ properties of the server rather than of the adapter:
     snapshot is that its parts were true at one state version.
 *   **Nothing counts citing answers, because no answer is stored.** The field exists in the read
     model because a tier 3 confirmation must state how many existing answers lose their citation,
-    and that is a real requirement. It is not answerable yet, and a zero here would read as
-    "none" rather than as "not recorded".
+    and that is a real requirement. The server does not record that count, and a zero here would
+    read as "none" rather than as "not recorded".
 """
 
 from __future__ import annotations

@@ -1,3 +1,12 @@
+/**
+ * Authenticated society snapshot, events, and one deterministic step.
+ *
+ * Speaks `/world/versions/{id}/society` (`exulanica/api/routes/society.py`). `connect`
+ * reads an existing society or creates one; `advance` posts one step against the tick
+ * and digest the caller already holds. This module does not start playback or request
+ * a model decision.
+ */
+
 import { ApiError, Transport, type TransportOptions } from '@exulanica/graph-client';
 import type { OwnedSocietyState } from '@exulanica/atlas-react/playcanvas';
 

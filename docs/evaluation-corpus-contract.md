@@ -1,6 +1,7 @@
 # Evaluation corpus contract
 
-Status: **IMPLEMENTED INPUT BOUNDARY; REAL OGC-1 INPUTS NOT FOUND LOCALLY 2026-08-31**.
+Status: **EVALUATION INPUT BOUNDARY**. The repository holds synthetic contract fixtures. It does
+not hold an OGC-1 bundle.
 
 This contract is the boundary between private, user-authorised evaluation inputs and the code that
 measures them. It does not create a corpus, a consent record, a label, a split, or a result. The

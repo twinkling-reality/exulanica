@@ -234,8 +234,8 @@ class ExecutionView(BaseModel):
     ``docs/product-direction.md`` makes this a delivery gate rather than telemetry: the memory
     interaction must "record the executed model, task, latency and output", and "Nemotron use
     must be functional in that interaction if claimed, with the actual executed variant recorded
-    rather than inferred from configuration". Before this block the response carried no executed
-    identifier, no latency and no usage at all, so the claim could only be read off the manifest.
+    rather than inferred from configuration". This block carries the executed identifier, latency
+    and usage, so the claim is read from the response rather than off the manifest.
 
     ``calls`` lists the calls that RETURNED A RESULT, in order. Read it as exactly that and not
     as "every model this answer cost", because two cases separate the two:
@@ -611,7 +611,7 @@ def _execution(
 ) -> ExecutionView:
     """The executed half of one request, whichever path made it.
 
-    ``prompt_version`` is a parameter rather than the module constant because two paths now
+    ``prompt_version`` is a parameter rather than the module constant because two paths
     share this block and they are versioned separately. An appearance proposal composed under
     ``proposal-1`` reported as ``selection-3`` would be a record naming a prompt that had
     nothing to do with it, and both constants are inputs to the response cache key, so the two
@@ -806,8 +806,7 @@ class AppearanceView(BaseModel):
 
     ``classification`` is ``question`` far more often than it is anything else, and that case
     carries no proposal and NO REFUSAL. A question is not a failure of this path: it is the
-    path declining to take one, and the browser's next move is `POST /selection/ask`, exactly
-    as before this route existed.
+    path declining to take one, and the browser's next move is `POST /selection/ask`.
     """
 
     model_config = ConfigDict(extra="forbid")

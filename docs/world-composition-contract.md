@@ -1,6 +1,8 @@
 # Unified world composition and retrieval
 
 Status: **DECISION** for product and architecture direction; **PARTIAL** implementation.
+Existing API, schema, and package contracts describe the supported surface; this document
+does not extend them.
 The Iceland journey is the product example: import a permitted
 place, combine it with personal memories, and create a fantasy variation.
 

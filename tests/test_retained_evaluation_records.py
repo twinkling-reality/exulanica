@@ -283,9 +283,9 @@ def _readiness() -> dict:
 def test_the_readiness_audit_is_bound_to_the_campaign_it_followed():
     """WHICH record the audit follows, which is the half no universal rule can know.
 
-    This asserted only the sha256 arithmetic until 2026-09-07, so despite its name it would have
+    This asserted only the sha256 arithmetic, so despite its name it would have
     stayed green with the audit re-parented onto any other well-formed record in the folder. The
-    arithmetic now runs once for every record above; what is left here is the identity claim the
+    arithmetic runs once for every record above; what is left here is the identity claim the
     name always made: a readiness report that says it starts from the validation campaign has to
     start from the validation campaign, not from something more flattering.
     """

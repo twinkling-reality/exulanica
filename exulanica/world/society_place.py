@@ -5,8 +5,8 @@ millimetres, the spots where one person can stand, the destinations with their a
 capacities, the roles and homes its premises support, and what it cannot supply. Two producers
 exist. :func:`place_from_society_input` projects the persisted Flatiron society input exactly as
 it is, and ``exulanica.world.society_city_place`` derives a place from the city grammar's
-records. The society never reads either source directly, so a third producer (a district v2,
-a traffic-aware corridor) only has to publish this document.
+records. The society never reads either source directly, so another producer only has to
+publish this document.
 
 Nothing here invents a destination, a path or a job. A place that lacks something says so in
 ``unsupported``, and a population is sized to what the place can hold.
@@ -23,20 +23,19 @@ a person inside a tree and reports success. The height is its own field and neve
 component of
 ``position_mm``, because :func:`ceil_distance` is dimension agnostic: a third component would
 turn every edge length, route cost and place digest into a 3D one without a single check
-complaining. Plan distance stays the walking cost. A v1 place validates exactly as it did, and
-:func:`place_from_society_input` keeps publishing v1, because a society's state pins its place by
+complaining. Plan distance stays the walking cost. A v1 place validates without heights, and
+:func:`place_from_society_input` publishes v1, because a society's state pins its place by
 digest and a byte of movement there unbinds every stored society.
 
-**What a height cannot say, and what v3 owns.** A per-node height carries a surface, not a
-structure: it cannot state the step at a kerb, which is a discontinuity in the middle of an edge,
-nor the floor a person indoors stands on, nor the fall across a footway's width, nor the headroom
-above a walker. It carries no level identity either, so nothing here tells two places at one plan
-point on two decks apart. The spot rule below reads the stated height, so stacked spots are no
-longer one spot; but a walkway over a walkway needs a level identity stated here, and that is a
-v3 change. Whoever makes it should know what reads a plan position as though it were a place:
-``society_metrics`` refuses to measure a place that states any height at all, and
-``society_city_place`` joins corners, attaches doors and furniture to the nearest kerb point,
-indexes obstructions and merges one node per plan point all in plan alone.
+**What a height cannot say.** A per-node height carries a surface, not a structure: it cannot
+state the step at a kerb, which is a discontinuity in the middle of an edge, nor the floor a
+person indoors stands on, nor the fall across a footway's width, nor the headroom above a
+walker. It carries no level identity either, so nothing here tells two places at one plan
+    point on two decks apart. The spot rule below reads the stated height, so stacked spots are
+    distinct; a walkway over a walkway needs a level identity stated here. ``society_metrics``
+    refuses to measure a place that states any height at all. ``society_city_place`` joins
+    corners, attaches doors and furniture to the nearest kerb point, indexes obstructions and
+    merges one node per plan point, all in plan alone.
 """
 
 from __future__ import annotations

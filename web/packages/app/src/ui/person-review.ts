@@ -47,7 +47,7 @@ const STATE_COPY: Record<ReviewRegion['state'], string> = {
   unknown: 'Nobody has decided about this person. They are hidden.',
   present: 'Agreed to be recorded as present. Still hidden.',
   shown: 'Agreed to their likeness being shown.',
-  hidden: 'Agreed to their likeness, hidden for now.',
+  hidden: 'Agreed to their likeness, hidden.',
   withdrawn: 'Consent withdrawn. Hidden, and their geometry is rebuilt without them.',
 };
 

@@ -1,3 +1,11 @@
+/**
+ * Browser account session: the server-resolved HttpOnly cookie, and nothing stored here.
+ *
+ * `GET /api/auth/session` returns the membership, workspace, and CSRF token the cookie
+ * already holds. This module never writes credentials to storage. Cookie-authenticated
+ * writes still require that CSRF token and an exact origin.
+ */
+
 import { toApiError } from '@exulanica/graph-client';
 
 export interface BrowserAccountSession {

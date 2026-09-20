@@ -1,10 +1,9 @@
 # Generated appearance
 
-Status: TRACK A SESSION 1 RUN AND MEASURED 2026-09-17 (section 9). 64 model-made texture sets on
-exact structure, on one rented machine for 2.14 h and $5.63 at the day's listed rate; seams inside
+Status: Track A measured 64 model-made texture sets on exact structure (section 9). Seams sit inside
 the published sets' own range, structure edges kept, every picked tile looked at at 1:1. Nothing has
-been handed to the texture lane and no set is pinned. Track B has not run and is not approved at this
-prepaid balance. The code is `ml/appearance/` ([its README](../ml/appearance/README.md)).
+been handed to the texture lane and no set is pinned. Track B has not run. The code is
+`ml/appearance/` ([its README](../ml/appearance/README.md)).
 
 ## 1. In plain words
 
@@ -42,7 +41,7 @@ Structure is the truth; the model supplies appearance only.
 
 ## 3. Models
 
-Accepted by the orchestrator on 2026-09-17, each weights licence read from raw Hugging Face card data
+Each weights licence was read from raw Hugging Face card data
 at a pinned revision and held to [license-matrix.md](license-matrix.md) section 6 (self-hosted
 weights only under Apache-2.0, MIT, CC-BY-4.0, OpenMDW-1.1 or a public-domain dedication). The rows,
 revisions and lineage evidence are in section 12 of that document; the pinned file lists are the
@@ -154,7 +153,7 @@ Rules the readers hold:
   generation record carries that sentence verbatim.
 - **Spend is recorded as it happened.** A run's billed seconds are its interval, its cost is the
   listed rate times those seconds, and a run past its stop must say why. The provider's billing
-  page, read by the operator, is the only authoritative total.
+  page is the only authoritative total.
 
 Layers are stored zlib-compressed by the sha256 of their raw bytes, so the compressor never enters an
 identity. PNG is written for models and people and is never an identity, for the reason
@@ -181,8 +180,8 @@ The same rules measure the procedural look and every generated look, so the numb
 - **Invented geometry**, when a GPU is available: MoGe-2 re-estimates geometry from a generated
   frame and it is compared with the exact depth. A measurement, never a verdict.
 
-"Reads as an inhabited street" is the operator's judgement. No model answers, suggests or ranks it.
-Mechanical checks may reject a broken candidate before the operator looks, and that is all.
+"Reads as an inhabited street" is a named human judge's judgement. No model answers, suggests or ranks it.
+Mechanical checks may reject a broken candidate before that judge looks, and that is all.
 
 ### Baseline: the procedural look (bench look version 1, eight published sets)
 
@@ -217,29 +216,22 @@ the numbers are copied into `ml/appearance/evidence/baseline-measurements.log.tx
   Shadeform on Brev, listed at $2.63 an hour on 2026-09-17 (no stop; deleted after every run). Every
   candidate fits at bf16 except Wan A14B, which runs in fp8. Fallback: an H200 141 GB on Nebius at
   $5.40 an hour.
-- **Approved spend, corrected by the operator on 2026-09-17:** the prepaid balance is $40.31, not
-  the $150 first approved. Track A's smoke and session 1 go ahead (about $7.60 at the estimates)
-  under a hard ceiling of **$25 for all of this lane's Track A work**, retries and idle included. A
-  projected spend that would pass the ceiling stops the work: delete the machine and report instead.
-  `gpu_run.ceiling_seconds` turns a ceiling into whole billed seconds at the day's rate, floored, so
-  a run cannot pass it by a second: $25 at $2.63 an hour is 34,220 s.
-- **Track B is not approved at this balance.** Its video work (about 13 hours, roughly $34) needs a
-  fresh decision and probably a top-up, which the orchestrator puts to the operator with Track A's
-  results in hand. Nothing in Track B runs before then.
+- **A run has a hard ceiling.** A projected spend that would pass it stops the work: delete the
+  machine and report instead. `gpu_run.ceiling_seconds` turns a ceiling into whole billed seconds at
+  the day's rate, floored, so a run cannot pass it by a second: $25 at $2.63 an hour is 34,220 s.
+- **Track B has not run.**
 - **Every run is documented in the repository**, not only in the ignored evidence directory:
   `gpu_run.document_section` writes the dated section that is appended to
   [reference-gpu-compute.md](reference-gpu-compute.md) and committed. It names the provider and
   instance type, the rate read that day, the instance name, the creation, deadline and deletion
-  instants, the hours billed, the cost at the listed rate, what the run produced by digest, what it
-  taught including the false starts, that the operator accepted the provider's data-sharing consent,
-  and the prepaid balance before and after. The `appearance-gpu-run` record stays beside it as the
+  instants, the hours billed, the cost at the listed rate, what the run produced by digest, and
+  what it taught including the false starts. The `appearance-gpu-run` record stays beside it as the
   machine-readable evidence; the section is what a person reads later.
-- **Consent:** each deploy carries a data-sharing consent with the named provider. The operator
-  clicks it, and the lane messages the orchestrator before opening any deploy, every time, so that
-  click stays the only way a machine is created.
-- **The instance is announced twice:** its name, provider and hard deadline the moment it exists,
+- **Consent:** each deploy carries a data-sharing consent with the named provider. That consent
+  is accepted before a machine is created.
+- **The instance is recorded twice:** its name, provider and hard deadline the moment it exists,
   and again when it is deleted. Both instants and the name are in the run record and in the
-  committed ledger, because the orchestrator keeps a watchdog that outlives this session's.
+  committed ledger.
 - **The smoke job gates the session by machine-checkable conditions**
   (`exulanica.appearance-smoke-gate/v1`): both backends loaded, every output decoded at the size the
   job names, the seam ratio computed on each, seconds per image within 150 per cent of the estimate,
@@ -260,8 +252,8 @@ the numbers are copied into `ml/appearance/evidence/baseline-measurements.log.tx
 
 ## 8. Track A: what runs, and what it hands over
 
-The runner is `ml/appearance/exulanica_appearance/runner/`. It runs the same code on the operator's
-Mac with a stub model (`runner dry-run`) and in the container on the rented machine, so the order
+The runner is `ml/appearance/exulanica_appearance/runner/`. It runs the same code locally
+with a stub model (`runner dry-run`) and in the container on the rented machine, so the order
 below is exercised before any GPU is rented.
 
 1. **Staging, on the Mac.** `exulanica.appearance-staged-inputs/v1` is the only directory the
@@ -301,7 +293,7 @@ below is exercised before any GPU is rented.
    records what was looked at and what was found
    (`exulanica.appearance-third-party-look/v1`). A record whose crops do not cover a map, or whose
    finding is empty, is refused. Anything that might be a logo, lettering or a mark goes to the
-   orchestrator, and the operator decides.
+   a human reviewer, who decides.
 
 Seamless tiling is the lane's own, because no upstream method for these models is merged: before
 each denoising step the latent grid and the control latents are rolled by an offset derived from the
@@ -319,9 +311,8 @@ decode.
 
 One machine, 2026-09-17T21:57:29Z to 2026-09-18T00:05:56Z: MassedCompute RTX PRO 6000 Blackwell 96
 GB through Shadeform on Brev, name `exulanica-appearance-a1`, 7707 billed seconds (2.14 h), $5.63 at
-the day's listed rate, against this lane's $25 Track A ceiling. The dated section for the operator's
-GPU ledger is in `docs/reference-gpu-compute.md` (a local document in this repository, gitignored
-since b1444b6a), the machine-readable record is
+the day's listed rate. The dated ledger section is in `docs/reference-gpu-compute.md` (a local
+document in this repository, gitignored since b1444b6a), the machine-readable record is
 [`gpu-run-a1.json`](../ml/appearance/evidence/gpu-run-a1.json), and the whole session including its
 three false starts is in [the evidence log](../ml/appearance/evidence/track-a-session-1.log.txt).
 
@@ -381,13 +372,13 @@ schedule visited against 44 per cent expected by chance. The latents were not re
 statistics at each step remain unrecorded. That set is not offered while the defect
 stands.
 
-Nothing has been handed to the texture lane. Track B has not run and is not approved.
+Nothing has been handed to the texture lane. Track B has not run.
 
 ## 10. Not verified
 
 - Cosmos 3 transfer's memory and speed on a 96 GB card, and whether vLLM-Omni weights several
   controls at once for it: unpublished, and NVIDIA's documents disagree. It would be measured in
-  Track B's first hour, and Track B is not approved at this prepaid balance.
+  Track B's first hour, and Track B has not run.
 - Seamless tiling on transformer image models: no published method is merged upstream; the lane
   builds it (cyclic latent shift, circular VAE decode) and holds every set to the seam check.
 - Whether a generated look beats the procedural one on the bench says little about a whole street:

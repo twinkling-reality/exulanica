@@ -1,20 +1,21 @@
 # Asset-read currency
 
-Final acceptance at source head `03501cea376cf530c185e3b12a5fb0d8d8d7acdf` passed 2118 backend
-tests (3 skipped), Ruff, all 4 import contracts, web typecheck and boundaries, and 876 web tests.
-The locked pose/reconstruction environment was installed. Six negative controls failed at their
-own exact selectors. The [executed record](evaluation/2026-09-08-executed-asset-read-currency.json)
-binds the route-to-byte evidence; the [verification record](evaluation/2026-09-08-verification-asset-read-currency.json)
-records digest checks and the second unsuccessful recorder attempt without changing accepted records.
-Runtime source remains identical to that tested head. The recorder was subsequently corrected
-at `b845bad6cfc8962b1550fb03c6f73d7aabb3f88f` under the `520a192` evidence-repair approval.
-Independent integration caught personal checkout prefixes in retained command arguments because
-the original full gate ran before envelope generation. The two unpublished candidate envelopes
-were regenerated through the recorder with normalized command provenance, replaced hashes and
-the independent failure retained. Accepted historical records were preserved. Post-generation
-retained-record checks run after writing the candidate, including after dependent bindings.
-Migration 0041 was exercised only in disposable test schemas; retained database activation, merge
-and push remain unperformed.
+Status: **MIGRATION 0041 EXPLICIT-TIME ASSET-READ POLICY**. Original, crop and by-URI image
+delivery refuse current mask requirements, withdrawal and missing capture identity. Migration 0041
+was exercised in disposable test schemas. Retained database activation is not established. Masked
+splat production is not established.
+
+The [executed record](evaluation/2026-09-08-executed-asset-read-currency.json) binds the
+route-to-byte evidence at source head `03501cea376cf530c185e3b12a5fb0d8d8d7acdf`. The
+[verification record](evaluation/2026-09-08-verification-asset-read-currency.json) records digest
+checks and the second unsuccessful recorder attempt without changing accepted records. The
+recorder was corrected at `b845bad6cfc8962b1550fb03c6f73d7aabb3f88f` under the `520a192`
+evidence-repair approval. Independent integration caught personal checkout prefixes in retained
+command arguments because the original full gate ran before envelope generation. The two
+unpublished candidate envelopes were regenerated through the recorder with normalized command
+provenance, replaced hashes and the independent failure retained. Accepted historical records
+were preserved. Post-generation retained-record checks run after writing the candidate, including
+after dependent bindings.
 
 Migration 0041 implements the scope approved at `6270115`, with the single existing viewer-URL
 assertion update approved at `6d12621`. Original/crop/by-URI image delivery refuses current
@@ -23,7 +24,7 @@ bytes; no route substitutes a mask under an original digest. Image track identit
 when MIME metadata is missing. Ordinary non-image citations do not acquire geometry prerequisites.
 Viewer image references use `/masked`, including no-person captures.
 
-## Current read contract and lineage
+## Read contract and lineage
 
 `/masked` selects an exact current persisted derivative using 0040's input-digest matcher through
 0041's explicit-time read policy. Missing, obsolete or purged required masks refuse. World source

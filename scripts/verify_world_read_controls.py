@@ -151,9 +151,9 @@ CONTROLS = [
     (
         # The mutant that matters is the ORIGINAL defect: reading through artifact_current, whose
         # distinct-on key every generation for one scene shares, so all but one become invisible.
-        # An earlier version of this control removed the supersession filter instead and survived,
-        # correctly: that mutation makes the read more permissive and the test files nothing
-        # superseded, so nothing changes. The control now reinstates the actual defect.
+        # Removing the supersession filter instead survives, correctly: that mutation makes the
+        # read more permissive and the test files nothing superseded, so nothing changes. This
+        # control reinstates the actual defect.
         "every_generation_for_a_scene_stays_visible",
         "exulanica/graph/generated_geometry.py",
         "  from artifact a\n",

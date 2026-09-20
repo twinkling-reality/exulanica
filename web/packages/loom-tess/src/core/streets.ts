@@ -11,8 +11,8 @@
  * point's place against a line is `along` and `across` it, floored the same way (`measureAgainst`),
  * with `S = 10^6`.
  *
- * STRAIGHT ONLY, FOR NOW. A centreline or a kerb line of more than one piece, or a kerb line not
- * running with its centreline, needs `bent_street`, a rule not yet built, and draws nothing.
+ * STRAIGHT ONLY. A centreline or a kerb line of more than one piece, or a kerb line not
+ * running with its centreline, is the `bent_street` waiting state and draws nothing.
  *
  * THE SEGMENT.
  *   1. The strip runs where both kerb lines exist along the centreline. At each end, the kerb line

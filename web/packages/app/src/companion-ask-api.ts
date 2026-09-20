@@ -1,10 +1,9 @@
 /**
  * Asking the library a question in words, and getting back an answer that cites its evidence.
  *
- * This is the browser's half of `POST /selection/ask`, which existed and which no browser code
- * called. Every Companion utterance in the product was a string from the copy table; the answer
- * path was reachable only with a terminal. So this file is not a refactor of an existing call,
- * it is the first caller.
+ * This is the browser's half of `POST /selection/ask`. `main.ts` constructs the client and
+ * wires it to the Companion surface. Every write still goes through `ProposalGate`; this
+ * module only asks.
  *
  * **It reads and it cannot write.** There is no proposal here, no draft, no gate and no route to
  * one: `ProposalGate` lives behind `session.ts` and is never handed out, and nothing this module
@@ -674,7 +673,7 @@ export class CompanionProposalClient {
             },
       // An unrecognised code becomes `not_drafted` rather than being passed through, because
       // the surface picks a reviewed sentence by this value and a key nobody wrote renders as
-      // the key. A newer server naming a refusal this build has no words for should say the
+      // the key. A newer server naming a refusal this client has no words for should say the
       // most general true thing, not print an identifier at somebody.
       refusal:
         refusal === null || refusal === undefined
@@ -689,7 +688,7 @@ export class CompanionProposalClient {
   }
 }
 
-/** A code this build has words for, or the most general true thing it can say instead. */
+/** A code this client has words for, or the most general true thing it can say instead. */
 function knownRefusal(code: string): ProposalRefusalCode {
   return REFUSAL_CODES.find((known) => known === code) ?? 'not_drafted';
 }

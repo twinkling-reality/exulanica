@@ -1,8 +1,8 @@
 """Write the graph projection for scenes that published before the projection stage existed.
 
-A scene published from now on writes its own projection, inside the same atomic acceptance as its
-pose, placement and gate receipts (`exulanica/ingest/scene_reconstruction.py`). A scene published
-before that has none, so its first graph read in every fresh process still rebuilds the placement
+The scene worker writes a projection inside the same atomic acceptance as its pose, placement
+and gate receipts (`exulanica/ingest/scene_reconstruction.py`). A scene published without that
+stage has none, so its first graph read in every fresh process still rebuilds the placement
 from 780 MB of point maps and walks every point in Python. This is the one-shot that fixes those.
 
 It runs as the ordinary worker role, `exulanica_app`, against `EXULANICA_DATABASE_URL`, and writes

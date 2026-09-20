@@ -5,10 +5,9 @@ that synthetic behaviour predicts people.  It consumes two already validated soc
 baseline and a successor that adds exactly one reviewed rest target.  Both arms start from the
 same sealed checkpoint and use :func:`advance_living_society` for every follow-up transition.
 
-The first executable contract deliberately measures only facts carried by v4 states and events.
-The originally proposed work-shift denominator, an unreachable-goal count, and a record of wanting
-rest while every destination was full are not canonical v4 evidence, so results name them as
-unsupported instead of estimating them.
+Results measure only facts carried by v4 states and events. The work-shift denominator, an
+unreachable-goal count, and a record of wanting rest while every destination was full are not
+canonical v4 evidence, so results name them as unsupported instead of estimating them.
 """
 
 from __future__ import annotations
@@ -85,7 +84,7 @@ _UPSTREAM_REQUIREMENTS: Final = (
 )
 
 # Committed before any development outcome was observed. Repeating a digest is replay, not a new
-# sample. This wave may run development seeds only; the held-out tuple is retained but unexecuted.
+# sample. DEVELOPMENT_SEEDS is the development set; HELD_OUT_SEEDS is retained and unexecuted.
 DEVELOPMENT_SEEDS: Final = (
     "d72efdfb8c7801bd6da989751b1b593f1a7d2819791fa0736500119dada453a5",
     "34de30a0788e31f055e62871a5b538d8fb4565ed772816789852a30c2974135e",

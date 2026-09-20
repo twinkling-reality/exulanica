@@ -1,7 +1,7 @@
 # Runtime verification
 
-Status: VERIFIED by execution on 2026-08-27.
-Reproduce with `uv run scripts/verify_platform.py`.
+Status: VERIFIED by execution of `uv run scripts/verify_platform.py`.
+Reproduce with the same command.
 
 The archived responses hold account-identifying response headers, so they are stored in the
 gitignored internal workspace rather than committed. Every field that carries a finding is quoted
@@ -14,7 +14,9 @@ documentation. Where it contradicts an earlier document, this one wins.
 
 **VERIFIED.** A real call to `nvidia/Nemotron-3_5-Lightning` returned HTTP 200 in 0.52 s, and the
 response body echoes `"model": "nvidia/Nemotron-3_5-Lightning"`. The full body and all response
-headers are archived at `.exulanica/experiments/platform/x0a_nvidia_provenance.json`.
+headers are written to the local archive
+`.exulanica/experiments/platform/x0a_nvidia_provenance.json`. Findings used here are quoted in this
+document; that path is an archive location, not required reading.
 
 Per the project's own stop rule ("do not claim Nano Omni/Ultra use until the real model ID and
 runtime call are verified"), the project may truthfully state that it runs NVIDIA Nemotron on
@@ -95,8 +97,8 @@ The silent failure of `guided_json` is the dangerous one: it returns HTTP 200 wi
 prose answer, so a pipeline using it would appear to work while never enforcing a schema.
 
 **Decision: canonical memory state is only ever populated through
-`response_format: {type: "json_schema", strict: true}`,** which satisfies the brief's requirement
-that naked prose never enter canonical state.
+`response_format: {type: "json_schema", strict: true}`,** so that naked prose never enters
+canonical state.
 
 ## 7. Embeddings
 
@@ -110,28 +112,27 @@ the catalog offers no substitute.
 your balance", top up is a manual button, and no automatic top up is offered. The balance is money
 already paid in, and it is the only pool a run can draw on.
 
-Consequence: **Token Factory spend cannot exceed the balance.** The $1,709 figure carried in the
-project's earlier cost analysis was never a Token Factory risk; it was an idle GPU virtual machine on
-Nebius AI Cloud billed per hour. That is a different product and it is not provisioned.
+Consequence: **Token Factory spend cannot exceed the balance.** An idle GPU virtual machine on
+Nebius AI Cloud billed per hour is a different product and is not provisioned.
 
 Measured against the balance: the entire photo library costs under a dollar to ingest, and a
-Companion turn at 15K context costs roughly $0.001 on Lightning. Both sit far below the prepaid
-balance held for this work, and a runaway loop exhausts that balance rather than producing an
-unbounded bill.
+Companion turn at 15K context costs roughly $0.001 on Lightning. A runaway loop exhausts the prepaid
+balance rather than producing an unbounded bill.
 
 ## 9. Tavily verified, and the past-to-present boundary holds
 
 **VERIFIED by execution on 2026-08-27.** `POST https://api.tavily.com/search` returned HTTP 200 in
-2.26 s with three sourced results and a synthesised answer. Archived at
-`.exulanica/experiments/web-lookup/tavily_runtime_call.json`, request payload included.
+2.26 s with three sourced results and a synthesised answer. The request and response are written to
+the local archive `.exulanica/experiments/web-lookup/tavily_runtime_call.json`. Findings used here
+are quoted in this document; that path is an archive location, not required reading.
 
 Account state: **pay as you go is Disabled, and the credential draws on a fixed monthly credit
 allowance.** There is no uncapped spend path on this credential: when the allowance is spent, calls
 fail rather than billing on.
 
 The archived request is retained deliberately. It is the evidence that the payload carried public
-entity text only, with no private media, no person, no private location, and no transcript. The
-brief requires proving minimisation rather than asserting it, and the stored request is that proof.
+entity text only, with no private media, no person, no private location, and no transcript.
+Minimisation is proven by that stored request, not asserted.
 
 ### The demonstration beat this unlocks
 
@@ -145,7 +146,7 @@ on both sides:
 - **Then, from memory:** the original photograph, with its own evidence citation.
 - **Now, from the live web:** current access and cost, with publisher URLs and a retrieval date.
 
-This satisfies the brief's rule that Tavily results may never rewrite what happened in a memory. The
+Tavily results may never rewrite what happened in a memory. The
 two panels make separate claims from separate sources, and neither is permitted to overwrite the
 other.
 

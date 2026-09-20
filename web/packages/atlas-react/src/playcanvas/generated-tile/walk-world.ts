@@ -17,7 +17,7 @@
  * WHOLE CONTAINERS ARE FETCHED, and that is deliberate rather than settled. Only a neighbour's
  * `nav_envelope` is ever read, and measured on the corridor a neighbour's navigation is 1,969,322
  * bytes against 11,630,504 for its container, so a route that served sections would move a sixth of
- * the bytes. Nothing serves one today, so that is a proposal with its own contract and its own tests
+ * the bytes. Nothing serves a neighbour section, so a range-serving route is a separate contract with its own tests
  * and not a thing this module pretends to have. The route serves whole containers and supports no
  * ranges (`tile-route.ts`), and a whole neighbour is smaller than the tile a walk already loads.
  */
@@ -103,8 +103,8 @@ export function walkWorldTiles(
   const standing = standingOn;
   // WITHOUT A STATED POSE THE REACH IS TAKEN FROM THE WHOLE SQUARE, not from a guess at where the
   // walk will open. The opening pose of an unstated walk is this runtime's default and is decided
-  // after the world exists, so measuring from a point here would be measuring from something not yet
-  // chosen; a square is the superset of every point in it and so can only over-fetch, which is the
+  // after the world exists, so measuring from a point here would be measuring from a pose this
+  // function has not chosen; a square is the superset of every point in it and so can only over-fetch, which is the
   // safe direction. A stated pose is a fact the walk brought with it and is used exactly.
   const from = (tile: TileCoordinate): number => (startMm === undefined
     ? reachBetweenSquares(standing, tile, tileSizeMm)
@@ -244,7 +244,7 @@ export interface ComposedObstruction {
    * could not match them and both copies are in the set.
    *
    * A HALO COPY IS A STAND-IN FOR A TILE YOU DO NOT HAVE. When the neighbour loads, its owned copy
-   * supersedes the halo copy of the same building, and today the two agree byte for byte, which is
+   * supersedes the halo copy of the same building, and the two agree byte for byte, which is
    * what makes digest equality the right key. If a halo copy is ever written as a REDUCED form of
    * its original, digest equality stops firing and duplicates return SILENTLY, which is not inert: a
    * building described twice is the shape that once stopped a walker 344 mm from a bench. So the

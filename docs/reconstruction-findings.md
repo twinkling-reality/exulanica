@@ -1,7 +1,7 @@
 # Reconstruction findings
 
-Status: **Historical single-photograph findings plus a retained-bowl geometry observation.**
-Sections 1 through 7 retain their original 2026-09-02/03 scope; section 8 records the later scene. This is the findings
+Status: **Single-photograph findings on `glasshouse-courtyard.jpg` plus a retained-bowl geometry observation.**
+Sections 1 through 7 are that photograph; section 8 is the trained bowl. This is the findings
 document [architecture-overview.md](architecture-overview.md) section 8 reserves for "reconstruction
 rungs and their quality bar". It records what was measured, on what, with what caveat, so that a
 number in the code carries its provenance. Decisions drawn from these numbers live in the decision

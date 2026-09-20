@@ -1,9 +1,7 @@
 """How many rows are in one table, and which rows that number is counting.
 
-**This count is not workspace-scoped, and the name says so.** It used to be called ``count``,
-sitting on a class every one of whose other methods filters on ``workspace_id``, which invited
-exactly the wrong reading. Three measured facts, none of which the old name or docstring
-admitted:
+**This count is not workspace-scoped, and the name says so.** :func:`rows_in_schema` counts
+rows in this connection's schema. Three measured facts hold that reading:
 
 *   Four of the thirteen countable tables have no ``workspace_id`` column at all: ``blob``,
     ``media_track``, ``clock_anchor`` and ``pipeline_event``. A workspace-scoped count of them
@@ -12,8 +10,8 @@ admitted:
     on a scratch schema: two workspaces each wrote one capture, and the count returned 2 for
     both of them.
 *   Every caller is a test, and every test connects as the owner, who is a superuser. So the
-    schema-wide number is the number in the only context that asks for it. The old docstring
-    also claimed the CLI used this; no CLI ever called it.
+    schema-wide number is the number in the only context that asks for it. No CLI calls this
+    function.
 
 The honest statement is therefore the name: these are the rows in the table in this connection's
 schema. A connection that did not bypass row-level security would see fewer, and there is no

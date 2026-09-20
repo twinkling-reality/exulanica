@@ -226,7 +226,7 @@ export function createPointCloud(options: PointCloudOptions): PointCloud {
   // hypothetical, and the two totals are compared once per cloud.
   //
   // `verticesByteSize` and NOT `format.size`. The latter rounds every element up to four bytes,
-  // so it was already 20 when the container packed 18: it would have accepted the old layout and
+  // so it was already 20 when the container packed 18: it would have accepted the 18-byte packed layout and
   // is not the quantity that has to agree.
   if (format.verticesByteSize !== map.packedByteLength) {
     throw new RangeError(

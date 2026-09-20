@@ -1,7 +1,7 @@
 # Lettering
 
 Status: IMPLEMENTED for the four glyph catalogs, the conversion tool, the catalog reader and the
-layout rule in both languages, and their shared cases. NOTHING DRAWS A LETTER YET: no grammar field
+layout rule in both languages, and their shared cases. NOTHING DRAWS A LETTER: no grammar field
 carries a sign's typeface or cap height, no tess expander turns a placed sign into triangles, and no
 tile has been baked with lettering, so the appearance of raised letters on a fascia is UNVERIFIED.
 The kerning rule is UNVERIFIED against a shaper (section 4). The lettering fields the city grammar

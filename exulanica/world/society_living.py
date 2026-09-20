@@ -1,12 +1,13 @@
 """The living society, profile ``exulanica-society/v4``: routines over a place, with occupancy.
 
 V4 is a successor to the v2 purposeful policy, never a change to it. Each inhabitant carries the
-needs its place can relieve. Every simulated minute those needs grow at their catalogued rates,
-and an inhabitant with nothing in progress chooses the activity whose weighted need is most
-pressing among those it can actually reach and fit into. It then walks the place's navigation
-graph at its own speed and stays for the activity's duration. Every standing spot holds one
-person, every indoor destination holds its catalogued number of visitors, and every home and
-workplace position belongs to one inhabitant, so no rule can pile the population onto one point.
+needs its place can relieve. Every simulated minute those needs grow
+at their catalogued rates, and an inhabitant with nothing in progress chooses the activity whose
+weighted need is most pressing among those it can actually reach and fit into. It then walks the
+place's navigation graph at its own speed and stays for the activity's duration. Every standing
+spot holds one person, every indoor destination holds its catalogued number of visitors, and
+every home and workplace position belongs to one inhabitant, so no rule can pile the population
+onto one point.
 
 Three properties keep the population from settling into one state:
 
@@ -21,7 +22,7 @@ Three properties keep the population from settling into one state:
 Identity reuses the v1 uuid5 derivation; nothing here names a person. A role, home and workplace
 exist only where the place's premises supply them, and are otherwise recorded as unavailable.
 There is no clock, randomness or model output in a transition: every draw is the seeded SHA-256
-function the earlier profiles use, and every length is an integer number of millimetres.
+function in ``exulanica.world.society``, and every length is an integer number of millimetres.
 """
 
 from __future__ import annotations
@@ -249,7 +250,7 @@ def _require_work_is_walkable(place: LivingPlace, inhabitants: list[dict[str, An
     A place in pieces is not the fault: an island is a place, and so is one tile of a city whose
     joining corners lie outside it, which such a place states in its own ``unsupported``. The
     fault is a society handing somebody a job across a cut and then saying nothing. Measured on
-    the corridor's own tile before this check existed: three pieces of 172, 101 and 94 nodes, 37
+    the corridor's own tile: three pieces of 172, 101 and 94 nodes, 37
     of 64 inhabitants unable to reach their workplace, their shift silently skipped every tick
     for a simulated day, and every measure in :mod:`exulanica.world.society_metrics` reporting a
     healthy society. The numbers are in the refusal because the place is what has to change, and
@@ -494,9 +495,9 @@ def advance_living_society(
 ) -> tuple[dict[str, Any], tuple[SocietyEvent, ...]]:
     """Consume the current place and every queued successor, then take one simulated minute.
 
-    ``choices`` names who answers each inhabitant's next choice. Left unset it is the rule this
-    engine has always used, and the tick it produces is identical to the tick it produced before
-    the seam existed; ``tests/test_society_choice_seam.py`` holds that to a state digest.
+    ``choices`` names who answers each inhabitant's next choice. Left unset it is
+    ``DeterministicChoices``. ``tests/test_society_choice_seam.py`` holds the resulting tick to a
+    state digest.
     """
     choices = DeterministicChoices() if choices is None else choices
     _require(state.get("profile") == LIVING_PROFILE, "unsupported living society profile")
@@ -558,8 +559,8 @@ def advance_living_society(
             "seed_sha256": seed,
         }
         # Only a run that consulted something records who chose. A run on the rule alone writes
-        # the events it has always written, byte for byte, which is what lets every stored
-        # history keep verifying and what makes removing the experiment cost nothing.
+        # events without a decision field, byte for byte, which is what lets every stored
+        # history keep verifying.
         if "decision" in detail:
             document["decision"] = detail["decision"]
         identity = uuid.uuid5(
@@ -828,23 +829,19 @@ def _options(
     for a model would be a second source of truth for what was possible, which is the failure
     this project names most.
 
-    A pressing activity with nowhere to go is stepped over here, and :func:`_targets` now says
-    why so that a successor profile can stop stepping over it. It cannot be said in v4: a goal's
-    ``because`` and a blocked action's reason are both canonical state, ``_replay_living``
-    recomputes every stored transition digest from genesis, and the pinned digests in
-    ``tests/test_society_living.py`` carry the rule in one line, that a change there is a new
-    profile. Measured either side: consuming the reason moves the tick-30 digest and leaves
-    behaviour identical over 240 ticks, while returning it moves nothing at all. So it is
-    returned and not yet used, and the consumer arrives with the profile that carries the city
-    place join. Until then the cost is visible: on the corridor's own tile 37 of 64 inhabitants
-    spent a simulated day unable to reach their workplace, their shift stepped over every tick,
-    while every measure in :mod:`exulanica.world.society_metrics` reported a healthy society.
-    :func:`_require_work_is_walkable` refuses that society at creation instead.
+    A pressing activity with nowhere to go is stepped over here, and :func:`_targets` says
+    why. It cannot be said in v4: a goal's ``because`` and a blocked action's reason are both
+    canonical state, ``_replay_living`` recomputes every stored transition digest from genesis,
+    and the pinned digests in ``tests/test_society_living.py`` carry the rule in one line, that
+    a change there is a new profile. Measured either side: consuming the reason moves the
+    tick-30 digest and leaves behaviour identical over 240 ticks, while returning it moves
+    nothing at all. So it is returned and unused. v4 does not consume it.
+    :func:`_require_work_is_walkable` refuses that unwalkable-work society at creation instead.
 
     **The shortage is not handed to the seam either, and for the same reason.** Putting it into a
     :class:`~exulanica.world.society_choice.ChoiceQuestion` would let a model answer on grounds
     v4's own record cannot carry, and a decision that cannot be reproduced from the record is the
-    thing the seam exists to avoid. It arrives with that successor profile or not at all.
+    thing the seam exists to avoid. The shortage stays out of the question.
     """
     start = _start_node(person)
     paths = place.paths(start)
@@ -875,8 +872,7 @@ def _options(
             because = f"{need.label} at {value} of 1000"
             if not is_pressing:
                 because = f"nothing pressing; {because}"
-        # The shortage is deliberately discarded: see this function's docstring for which profile
-        # consumes it and why v4 cannot.
+        # The shortage is deliberately discarded: v4 cannot record it (see this function's docstring).
         targets, _shortage = _targets(
             person, place, activity, paths, here_spot, here_dest, spot_holder, visitors
         )

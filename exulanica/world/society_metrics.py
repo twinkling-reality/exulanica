@@ -14,8 +14,7 @@ in ``offered``: how many destinations it publishes, which needs its population c
 and what it states it cannot supply. A place with nothing in it is a legitimate place and a
 society over one is a legitimate society, which is why this reports rather than refuses; what
 neither should do is read as a busy street. The ``unsupported`` list is the producer's own
-honesty, carried into every society's state by ``LivingPlace.binding()`` since v4 and read back
-by nothing until this.
+honesty, carried into every society's state by ``LivingPlace.binding()`` and read here.
 
 Every measure here keys a person by their plan position, so two people at one plan point are one
 position, one collision and one stay. That holds while the place stands everybody on one level,
@@ -23,7 +22,7 @@ and stops holding the moment it stands two people at two heights over one plan p
 measures would go on reporting numbers that had quietly stopped meaning what they say, which is
 worse than no number. So such a place is refused rather than measured
 (:func:`exulanica.world.society_place.place_stacks_heights`); measuring it needs these keys to
-carry a level identity, which the place contract does not state yet. Stated heights alone are no
+carry a level identity, which the place contract does not state. Stated heights alone are no
 obstacle, since one level is one plan point per person.
 """
 

@@ -11,10 +11,10 @@
  * visual mapping all live in `@exulanica/formation`, which knows nothing about this application.
  * This module chooses which batch to watch and hands the events on.
  *
- * **The batch is found, not assumed.** There is no upload endpoint yet, so an intake starts from
- * the command line and this asks the API what there is to watch. That is a smaller lie than a
- * hard-coded id and a smaller one than a fabricated batch: the list is what the workspace
- * actually contains, and an empty list renders as "nothing is forming" rather than as a spinner.
+ * **The batch is found, not assumed.** `POST /intake` is the upload; this module lists the
+ * workspace's batches and watches one. A hard-coded id or a fabricated batch would be a
+ * smaller truth than the list: the list is what the workspace contains, and an empty list
+ * renders as "nothing is forming" rather than as a spinner.
  */
 
 import type { FormationState, StageEvent, StreamState } from '@exulanica/formation';

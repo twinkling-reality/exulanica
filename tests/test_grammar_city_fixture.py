@@ -763,7 +763,7 @@ def test_the_halo_rule_is_extent_based():
 def test_each_closed_field_this_fixture_stamps_is_the_value_it_names():
     """A producer names the value it writes; it does not take position zero of the admissible set.
 
-    THREE FIELDS OF THE TILE RECORD ARE CLOSED SETS, and until 2026-09-19 both producers in this
+    THREE FIELDS OF THE TILE RECORD ARE CLOSED SETS, and both producers in this
     repository stamped them with `SET[0]`. That is silent by construction: whatever comes out of
     position zero is a legal member of the set, so it validates, it is the right type, and every
     reader downstream succeeds on it. ADR-0024 contemplates a second coordinate unit, and on the

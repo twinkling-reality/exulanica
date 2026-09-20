@@ -58,8 +58,8 @@ function rotateBoneTowards(bone: pc.GraphNode, from: pc.Vec3, to: pc.Vec3, origi
 }
 
 function track(contact: Contact, height: number, deltaSeconds: number, scale: number): boolean {
-  // The lowest height seen recently is the ground for this point; it rises slowly so a sloped or
-  // re-posed body does not leave the point stuck below its new resting height.
+  // The lowest height in this contact's window is the ground for this point; it rises slowly so a sloped or
+  // re-posed body does not leave the point stuck below the resting height that follows.
   contact.floor = Number.isFinite(contact.floor) ? Math.min(contact.floor + deltaSeconds * 0.01, height) : height;
   return height < contact.floor + CONTACT_METRES * scale;
 }

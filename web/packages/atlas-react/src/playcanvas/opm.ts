@@ -12,7 +12,7 @@
  *
  * **This reads OPM/2 and refuses OPM/1 by name.** ADR-0010 D9 is refuse and regenerate: there is
  * no upgrade on read, and this reader is the one the app's loader hands bytes to, so the message
- * has to say what produces the new version rather than only that the old one is unsupported.
+ * has to say what produces OPM/2 rather than only that OPM/1 is unsupported.
  *
  * **The section list is authoritative, and that is the whole of ADR-0010 D2.** Every offset and
  * every stride below comes from the header. Under OPM/1 three sections were hardcoded here and
@@ -220,7 +220,7 @@ function validateHeader(header: OpmHeader): void {
     // the container version rides in the depth stage's params, so it is inside the idempotency
     // key, so re-running ingest writes a new artifact rather than rewriting this one.
     throw new Error(
-      `this is an OPM/${SUPERSEDED_VERSION} container and this build reads OPM/${VERSION}. `
+      `this is an OPM/${SUPERSEDED_VERSION} container and this client reads OPM/${VERSION}. `
         + 'There is no upgrade on read: re-run the depth stage over the source photograph, which '
         + 'regenerates the point map under a new idempotency key',
     );
@@ -274,7 +274,7 @@ function validateHeader(header: OpmHeader): void {
 /**
  * Every registered section's declared range, checked against the registry and not against a copy.
  *
- * **A section this build has never heard of is skipped rather than refused**, which is what makes
+ * **A section this client has never heard of is skipped rather than refused**, which is what makes
  * "a registered optional section is not a version bump" true: an older build has to keep reading
  * the sections it knows when a newer writer adds one. A known name with an unknown shape is a
  * different thing entirely, because a typed-array view is about to be built from it, and that is

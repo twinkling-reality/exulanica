@@ -17,8 +17,8 @@
  * a millimetre square fits in whose integer points all lie on one line, so no terrain with area fits
  * inside it. The rule chooses no gap, and enters coverings by less than a millimetre. Where a
  * covering is higher or lower than the terrain the sliver is hidden under or behind it. Where they
- * are coplanar, a parcel at grade, it may flicker in a band under a pixel; that is known and not yet
- * measured, a runtime depth matter to measure once such a covering is drawn.
+ * are coplanar, a parcel at grade, it may flicker in a band under a pixel; that is a known
+ * runtime depth matter, unmeasured until such a covering is drawn.
  *
  *   1. A cell is MET when its closed plan square and a closed covering triangle share a point. A
  *      cell no covering meets is drawn as the terrain grid draws it, and in the same order.

@@ -1,9 +1,9 @@
 """The seam where the living society's next action is chosen, and who is allowed to choose it.
 
-The engine has always chosen with one rule, ``society_living._choose``: the most pressing
-reachable activity with room. That rule is not replaced here and it is not optional. It is named
-as the fallback, and everything else in this module exists to let something else answer first and
-to record, per choice, whether it did.
+The engine chooses with one rule, ``society_living._choose``: the most pressing
+reachable activity with room. That rule is the fallback, and it is not optional. Everything else
+in this module exists to let something else answer first and to record, per choice, whether it
+did.
 
 Three things this module is built around, and each of them is a decision taken before it:
 
@@ -21,8 +21,8 @@ which is where an experiment starts; lowering it is how the model earns decision
 
 **Nothing may become load bearing on the model.** Every path through ``ModelChoices`` that does
 not produce an answer, including a provider that raises, ends at the same deterministic chooser,
-so a society whose provider is unreachable runs exactly as it runs today. ``tests`` proves that by
-running one with a provider that raises on every call.
+so a society whose provider is unreachable runs the same as a society with no provider.
+``tests`` proves that by running one with a provider that raises on every call.
 
 ``ChoiceCounters`` names different sets and never adds one into another. ``asked`` counts calls to
 this seam. ``not_the_rule`` and ``fallback`` partition it by who answered, and they partition on

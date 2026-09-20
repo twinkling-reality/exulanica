@@ -181,8 +181,8 @@ def test_the_validation_fold_is_never_fitted_on():
     fraction could not then be 1.0. No fitter can report both numbers at once except by having
     genuinely held the fold out.
 
-    (An earlier version of this test asserted, instead, that poisoning the fitted four fifths would
-    leave the validation fifth clean. That is false and the run said so: eighty percent of the data
+    (A test that asserted, instead, that poisoning the fitted four fifths would
+    leave the validation fifth clean is false, and the run said so: eighty percent of the data
     pulled nine units sideways moves the fit so far that the untouched fifth becomes the outlier.
     The measurement is kept below rather than deleted, because it is the honest description of what
     the fitter does under that input.)

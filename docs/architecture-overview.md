@@ -1,6 +1,6 @@
 # Architecture overview
 
-**Current direction, 2026-09-12:** read [product-direction.md](product-direction.md)
+**Product authority:** read [product-direction.md](product-direction.md)
 and [world-composition-contract.md](world-composition-contract.md) before using the
 historical architecture below. The intended system combines memories, permitted
 real-world selections and authored/fantasy variations in one interactive and
@@ -9,7 +9,7 @@ that renderer selection is open are historical. The composition contract identif
 unimplemented geography, retrieval and editing extensions; it does not change
 existing API or package compatibility by itself.
 
-**World-model authority, 2026-09-13:** read
+**World-memory authority:** read
 [world-memory-model.md](world-memory-model.md) for the canonical technical meaning
 of Personal World Memory Model. No renderer scene, mesh, splat, semantic graph,
 embedding, generated video or latent tensor is the whole world. Consequential state
@@ -17,7 +17,7 @@ is epistemically typed and addressable; task representations are derived artifac
 with declared preserved properties and permitted uses. The implementation
 is not a learned general predictive world model.
 
-**Architecture selection, 2026-09-13:** prioritize measured task quality, correctness,
+**Architecture selection:** prioritize measured task quality, correctness,
 efficiency and maintainability, with NVIDIA, Nebius and open-source infrastructure as
 preferred paths. Retain the modular monolith, PostgreSQL consistency domain, asynchronous
 workers and replaceable model/rendering boundaries until evidence justifies a change.
@@ -28,7 +28,7 @@ Expensive derived assets are retained and versioned independently of their rende
 See [model and service selection](model-and-service-selection.md#0-current-stack-and-selection-decision)
 for the implemented baseline and candidate comparisons.
 
-**Storage correction, 2026-09-13:** the running service uses a local content-addressed
+**Storage:** the running service uses a local content-addressed
 file store and PostgreSQL. Authenticated point-map, splat and authored-asset routes exist;
 this does not establish deployed object storage or production streaming. The Nebius
 deployment topology below remains a proposal. Personal world assets require authorized
@@ -36,7 +36,7 @@ access; its anonymous-read bucket proposal does not apply to personal data. Publ
 showcase assets require an explicit publication boundary. Reopening a world should reuse
 retained assets, while network transfer and rendering remain separate runtime costs.
 
-**Account and living-world correction, 2026-09-14:** optional Google OIDC now resolves
+**Accounts and society:** optional Google OIDC resolves
 application-owned users, actors and one current owned workspace before ordinary workspace
 authorization. Account tables are isolated behind a dedicated non-owner database role; browser
 cookies are revocable and cookie-authenticated writes require an in-memory CSRF token and exact
@@ -45,7 +45,7 @@ Google deployment or completed account-deletion lifecycle. Account-owned workspa
 feed derivative workers and, under a separate explicit host opt-in, the society playback worker.
 The host must still provide the reviewed district/runtime binding.
 
-The society path now has three separate authorities. Deterministic v2/v3 stepping owns canonical
+The society path has three separate authorities. Deterministic v2, v3 and v4 stepping owns canonical
 state and events. Persisted playback controls schedule that same step under bounded leases.
 Typed user action requests can constrain one inhabitant's next goal to a current canonical target;
 they carry no browser coordinates, do not advance time when recorded and are consumed with an exact
@@ -63,7 +63,7 @@ validated checkpoints and caller-supplied resource allowances without queueing w
 allocation. Both recheck current source authority and leave publication, execution and visual
 acceptance as separate gates.
 
-The browser now has native rigged-character and representation-inspection foundations. Native
+The browser has native rigged-character and representation-inspection foundations. Native
 characters preserve stable player/synthetic subject bindings, validate pinned assets and clips, and
 derive gait from resolved motion while retaining explicit fallback/withdrawal behavior. The generic
 representation lens operates only over declared compatible renderer draws and labels generated

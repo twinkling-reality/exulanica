@@ -84,7 +84,7 @@ def test_every_generated_tile_states_the_closed_values_the_generator_names(tile)
 
     `tests/test_grammar_city_fixture.py` asks the same question of the hand-written fixture. Both
     are needed and they are not one claim: the fixture and the generator are two producers, they
-    were both stamping these three fields by position until 2026-09-19, and a test over one says
+    were both stamping these three fields by position, and a test over one says
     nothing about the other. That docstring carries the reasoning and the limit.
     """
     stated = _documents()[tile].tile

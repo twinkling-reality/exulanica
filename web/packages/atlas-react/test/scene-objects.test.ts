@@ -111,7 +111,7 @@ const respond = (bytes: ArrayBuffer, status = 200) => vi.fn(async () =>
 const options = (fetchImpl: typeof globalThis.fetch) =>
   ({ baseUrl: 'https://exulanica.test', token: 'token', fetch: fetchImpl });
 
-describe('the reviewed assets this build will actually meet', () => {
+describe('the reviewed assets this client will actually meet', () => {
   it('accepts all three, and their bytes are the ones the published version names', () => {
     const published = new Map(publishedVersion.objects.map((object) =>
       [object.asset.asset_key, object.asset]));
@@ -155,7 +155,7 @@ describe('a container the glTF parser would complete over the network is refused
     ]) {
       expect(() => validateGlbContainer(glb({
         ...MINIMAL, extensionsUsed: [extension],
-      }, new Uint8Array(12)))).toThrow(/decoder this build has not verified/);
+      }, new Uint8Array(12)))).toThrow(/decoder this client has not verified/);
     }
   });
 
@@ -282,7 +282,7 @@ describe('bytes reach the decoder only authenticated, hashed and counted', () =>
     await expect(fetchVerifiedObjectAsset(
       ISLAND, reference(bytes, { mediaType: 'model/vnd.usdz+zip' }), new AbortController().signal,
       options(respond(bytes) as never),
-    )).rejects.toThrow(/not a container this build can open/);
+    )).rejects.toThrow(/not a container this client can open/);
   });
 
   it('refuses everything when the page cannot compute a hash at all', async () => {
@@ -537,7 +537,7 @@ describe('the runtime places, moves and animates what a surface already committe
     expect(drawn.scale).toEqual([2, 2, 2]);
   });
 
-  it('still places the object when its behaviour is one this build cannot run, and says why', async () => {
+  it('still places the object when its behaviour is one this client cannot run, and says why', async () => {
     const { runtime, root } = harness();
     const outcome = await runtime.place(
       placed({ behaviourKey: 'motion.orbit', behaviourVersion: 1, parameters: {} }),
@@ -600,7 +600,7 @@ describe('the runtime places, moves and animates what a surface already committe
     const { runtime } = harness();
     await runtime.place(placed(null), reviewedBytes('cc0.marker-cube'));
     expect(runtime.control('object:lantern', 'trigger'))
-      .toEqual({ ok: false, reason: expect.stringContaining('no motion this build can run') });
+      .toEqual({ ok: false, reason: expect.stringContaining('no motion this client can run') });
     expect(runtime.control('object:nine', 'trigger'))
       .toEqual({ ok: false, reason: expect.stringContaining('not in this world') });
   });

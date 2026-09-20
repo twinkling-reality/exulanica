@@ -128,7 +128,7 @@ function runtime() {
       return {
         objectId: object.objectId,
         motion: behaviour !== null && supported ? 'attached' as const : 'none' as const,
-        notices: supported ? [] : [`“${behaviour!.behaviourKey}@${behaviour!.behaviourVersion}” is not a behaviour this build can run.`],
+        notices: supported ? [] : [`“${behaviour!.behaviourKey}@${behaviour!.behaviourVersion}” is not a behaviour this client can run.`],
       };
     }),
     remove: vi.fn((id: string) => placed.delete(id)),
@@ -142,7 +142,7 @@ function runtime() {
       const held = placed.get(id);
       if (held === undefined) return { ok: false as const, reason: 'That object is not in this world.' };
       if (held.motion === 'none') {
-        return { ok: false as const, reason: 'This object carries no motion this build can run, so there is nothing to start.' };
+        return { ok: false as const, reason: 'This object carries no motion this client can run, so there is nothing to start.' };
       }
       placed.set(id, {
         ...held,
@@ -709,7 +709,7 @@ describe('running a motion writes nothing, and a refusal is visible', () => {
     expect(h.mounted.panel.root.textContent).toContain('Back exactly where it was placed');
   });
 
-  it('says why a behaviour this build cannot run did not start, and keeps saying it', async () => {
+  it('says why a behaviour this client cannot run did not start, and keeps saying it', async () => {
     const h = harness({
       initial: version({
         objects: [objectRecord({
@@ -721,7 +721,7 @@ describe('running a motion writes nothing, and a refusal is visible', () => {
     await h.mounted.begin();
     expect(h.mounted.panel.root.textContent).toContain('motion.orbit@1');
     expect(h.travel.some((e) => e.message.includes('motion.orbit') && e.kind === 'failure')).toBe(true);
-    expect(h.mounted.panel.root.textContent).toContain('motion this build cannot run');
+    expect(h.mounted.panel.root.textContent).toContain('motion this client cannot run');
     expect(button(h.mounted.panel.root, 'Start').disabled).toBe(true);
   });
 

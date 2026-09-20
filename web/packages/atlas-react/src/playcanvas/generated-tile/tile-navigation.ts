@@ -29,11 +29,11 @@ import type { CameraState } from '../controls.js';
  * any attempt to walk gets the app's own "no walkable surface" notice.
  *
  * THE PLAYER is the capsule the tile's grammar states for its envelope's `capsule_clearance`
- * (city version 2: 340 mm radius, 1900 mm tall, eye at 1620 mm), because that is the capsule the
+ * (340 mm radius, 1900 mm tall, eye at 1620 mm), because that is the capsule the
  * envelope was carved for; see {@link tileCapsule}. Support is resampled every 0.05 m along a move,
  * and the Atlas controller's own comfort limits apply (steps up to 0.18 m, slopes up to 12 degrees).
- * The capsule's height needs overhead clearance from `collision_proxy`, which no tile carries yet;
- * until it does, the world has no blockers and says so in `collisionState`.
+ * The capsule's height needs overhead clearance from `collision_proxy`, which no tile carries;
+ * without it, the world has no blockers and says so in `collisionState`.
  *
  * A WORLD IS MORE THAN ONE TILE, AND WALKABLE IS NOT DRAWN. A tile is 128,000 mm across and the
  * route rule asks for 125,000 plus a 6,000 stopping margin, so the ground a route needs does not fit

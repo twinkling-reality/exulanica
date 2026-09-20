@@ -4,11 +4,11 @@ This is the only module that names a grammar. The generic contract, the draw, th
 cascade and the catalog loader never import anything under this package, and a test holds them
 to that. A new grammar is a new module here and one ``register`` line below.
 
-* ``box`` makes a box. It exists to prove the contract is generic: it produces something that is
-  not architecture, through exactly the machinery the city uses, with no change to that
-  machinery.
-* ``city`` is the first and largest grammar. Its stages are record shapes and validators; none of
-  them generates anything yet, and each says so in its emission.
+* ``box`` makes a box. It shares no vocabulary with the city and uses the same descriptor,
+  cascade, draw, validation and receipt.
+* ``city`` is the registered city grammar. Ten of its stages emit records through
+  ``exulanica.grammar.grammars.city.generation``; the registered tile stage is a record-shape
+  contract.
 """
 
 from __future__ import annotations

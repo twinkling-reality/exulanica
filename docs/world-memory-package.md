@@ -1,6 +1,6 @@
 # World Memory Package v1
 
-Status: **BUILT AND EXIT-GATED**. The implementation profile is `exulanica-wmp-1.0`.
+Status: **PROFILE `exulanica-wmp-1.0`, EXIT-GATED**.
 
 **Creative-world state:** [product-direction.md](product-direction.md#package-and-api-boundaries)
 asks for authored state and behaviour references without changing the 1.0 profile. They are
@@ -132,7 +132,7 @@ commit; those command results, not this status sentence alone, are the exit gate
 
 ## Authored-world extension 1.0
 
-Status: **BUILT**, opt-in. Implementation: `exulanica/world_package/authored.py` (sections,
+Status: **OPT-IN EXTENSION `exulanica-wmp-ext-authored-world` 1.0**. Implementation: `exulanica/world_package/authored.py` (sections,
 verifier rules, loader report), `projector.py` (`_authored_world`), `package.py` (extension
 discovery and `import-check`). It carries the state [world-objects-contract.md](world-objects-contract.md)
 defines: alternate versions, their authored objects and source-element overrides, and the reviewed

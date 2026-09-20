@@ -1,20 +1,25 @@
-"""The city: the first and largest grammar, and one registered implementation among others.
+"""The city grammar this package registers.
 
-Version 2. Eleven stages, in the order they run: terrain, districts, streets, parcels, massing,
-facade, streetlife, vitrine, premises, material, tile. Material runs last but one, so every record
+Eleven stages, in the order they run: terrain, districts, streets, parcels, massing, facade,
+streetlife, vitrine, premises, material, tile. Material runs last but one, so every record
 whose surfaces it dresses already exists. Each has a version and record shapes whose
-validators hold every field, and ``city.v2.json`` states all of it as data: the frame, the stages
-and the record kinds each validates, 91 declared parameters and the representation contract of
-each admitted projection. **No stage has a generator**, so a city generated today is a receipt
-and eleven emissions that each say ``not_implemented`` with a reason, and nothing else.
+validators hold every field. The registered descriptor is ``city.v3.json``: the frame, the
+stages and the record kinds each validates, 91 declared parameters and the representation
+contract of each admitted projection. Ten stages have generators under
+:mod:`exulanica.grammar.grammars.city.generation`. The registered ``tile`` stage remains a
+record-shape and ownership contract (:data:`~exulanica.grammar.grammars.city.tile.STAGE` is an
+:class:`~exulanica.grammar.contract.UnimplementedStage`); tile documents are assembled after
+generation by :mod:`exulanica.grammar.grammars.city.generation.tiles`.
 
 The cascade is city, district, block, lot, building, face. Every parameter states the level it
 belongs to and the one stage that reads it; nearly all are derived per subject by that stage, and
 ``driving_side`` is required, because the side of the road is a convention a world states and
 nothing should choose it silently.
 
-Version 1 is retired: its descriptor stays beside this one as the source schema of the version 1
-to 2 parameter migration, ``city-migration.v2.json``, and nothing registers it.
+``city.v1.json`` and ``city.v2.json`` are the source schemas of the parameter migrations in
+:data:`~exulanica.grammar.grammars.city.descriptor.CITY_MIGRATION_PATHS`. Nothing registers them.
+A descriptor's bytes are what every document written against it pins by digest, so a superseded
+file is never edited.
 
 Vocabulary comes from the versioned catalogs under ``assets/catalogs``; see
 :mod:`exulanica.grammar.grammars.city.catalogs`. The record shapes and the rules every record

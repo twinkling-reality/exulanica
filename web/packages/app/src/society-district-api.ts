@@ -1,3 +1,11 @@
+/**
+ * Authenticated exact district presentation for the registered society frame.
+ *
+ * Speaks `GET /world/versions/{id}/society/district` (`exulanica/api/routes/society_district.py`).
+ * The renderer base already on screen must agree with the authenticated artifact; this
+ * client checks those bytes and does not re-serialize JSON as a pin.
+ */
+
 import { Transport, type TransportOptions } from '@exulanica/graph-client';
 import { districtCanonicalJson, parseDistrictInterpretation, parseOwnedDistrict,
   type DistrictInterpretation, type OwnedDistrict } from '@exulanica/atlas-core';

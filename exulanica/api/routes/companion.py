@@ -1,10 +1,9 @@
 """Durable Companion memory: read it back, correct it, delete it.
 
-The Companion's memory of what it asked, which escapes were taken and what was said has lived in
-one browser session and been lost on reload. `product-direction.md` makes the durable half a
-delivery gate on the Companion continuity row: "Persist approved memory, retrieve it across
-sessions, and support correction and deletion; this is not model weight training." These four
-routes are the retrieve, the correct and the delete; migration 0043 is the persist.
+`product-direction.md` makes the durable half a delivery gate on the Companion continuity row:
+"Persist approved memory, retrieve it across sessions, and support correction and deletion; this
+is not model weight training." These four routes are the retrieve, the correct and the delete;
+migration 0043 is the persist.
 
 **Nothing here is a write to the graph.** `interaction-model.md` 4.3 fixes that "NO FREE-TEXT
 ANSWER AND NO CHOICE EVER MUTATES THE GRAPH DIRECTLY", and a surface that stored conversation

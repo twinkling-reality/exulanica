@@ -1,6 +1,6 @@
 # Owned district and source admission
 
-Status: **IMPLEMENTED DATA PATH; VISUAL AND WORLD-MEMORY VALIDATION IN PROGRESS**.
+Status: **OWNED DISTRICT DATA PATH AND RENDERER**. Complete-district validation is not established.
 
 The bounded Flatiron district is Exulanica's first owned geographic environment. “Owned” means the
 runtime possesses a local, versioned artifact admitted for the declared operations. It does not

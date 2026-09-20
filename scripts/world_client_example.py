@@ -5,9 +5,9 @@
       --motion travel_mm=600,period_milliseconds=3000,axis=x,easing=smooth \
       --demonstrate-stale-base --transcript /tmp/world-client.json
 
-**Why this exists.** The product roadmap will not claim interoperability until a tool other
-than the browser makes an accepted change through the authenticated API without depending on
-private interface state. This is that tool, kept small enough to read in one sitting. It uses
+**Why this exists.** Interoperability is shown by a tool other than the browser making an
+accepted change through the authenticated API without depending on private interface state.
+This is that tool, kept small enough to read in one sitting. It uses
 the standard library and httpx and imports nothing from ``exulanica``; everything it knows
 comes from the HTTP contract in ``docs/world-objects-contract.md`` sections 5 to 7.
 

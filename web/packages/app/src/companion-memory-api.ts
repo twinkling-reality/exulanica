@@ -218,7 +218,7 @@ function escapeOf(kind: string): EscapeKind {
 }
 
 /**
- * The intent, taken as it arrived even when this build does not know the name.
+ * The intent, taken as it arrived even when this client does not know the name.
  *
  * Deliberately NOT refused, unlike the escape kind, and the asymmetry is worth stating. An intent
  * this client has never heard of cannot crash anything: `questionKey` is a string pair, and an
@@ -248,7 +248,7 @@ function answerOf(wire: WireAnswer): PersistedAnswer {
     askedAtMs: asMs(wire.asked_at, 'asked_at'),
     question: wire.question,
     answerText: wire.answer_text,
-    // An abstention code this build does not know is read as "answered", because the alternative
+    // An abstention code this client does not know is read as "answered", because the alternative
     // is worse: `abstention.<code>` has no sentence in the copy table, so an unmapped code would
     // put the raw identifier on the screen underneath somebody's answer.
     abstained: (ABSTENTIONS.includes(abstained ?? '') ? abstained : null) as AbstentionCode | null,
@@ -380,9 +380,9 @@ export class CompanionMemoryClient {
   /**
    * Say that an answer was wrong, and what stands instead.
    *
-   * Returns the NEW row rather than the corrected one. The old answer is still in the store and
-   * still says what it said; what changed is which of the two a reader is shown, and that is what
-   * `standingAnswers` resolves from the lineage the returned row names.
+   * Returns the correction row, not the superseded one. The superseded answer remains in the
+   * store and still says what it said; what changed is which of the two a reader is shown, and
+   * that is what `standingAnswers` resolves from the lineage the returned row names.
    */
   async correct(answerId: string, correction: CorrectionToRemember): Promise<PersistedAnswer> {
     return answerOf(await this.#post<WireAnswer>(
@@ -478,7 +478,7 @@ export function answerToRemember(answer: CompanionAnswer): AnswerToRemember {
  * The clause breakdown is a real loss and is stated rather than hidden. A restored answer is one
  * `historical` clause carrying the whole sentence, because what was stored is the paragraph the
  * person read. Storing the clauses would let the restored copy be re-validated later, which
- * nothing does today; storing the paragraph is what makes the restored answer say exactly what
+ * nothing does; storing the paragraph is what makes the restored answer say exactly what
  * the original said.
  */
 export function rememberedAsAnswer(remembered: PersistedAnswer): CompanionAnswer {

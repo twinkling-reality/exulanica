@@ -117,8 +117,6 @@ _WHY_OPERATOR_PROCESS = (
 
 #: Named by the tree, held out of it by .gitignore. The repository states this decision itself.
 _OPERATOR_PROCESS: tuple[str, ...] = (
-    "docs/briefs/2026-09-08-retained-activation.md",
-    "docs/briefs/2026-09-11-scene-segments.md",
     "docs/briefs/2026-09-12-helsinki-terminal-lod-successor.md",
     "docs/briefs/2026-09-12-helsinki-visual-feasibility.md",
     "docs/briefs/2026-09-12-melbourne-c4-29-visual-feasibility.md",
@@ -191,8 +189,8 @@ def _tracked() -> frozenset[str]:
     nobody committed would be measuring the author's desk: MEASURED 2026-09-09, `.orimera/` named
     three such paths and failed the merged suite. That half was already right. The other half is
     what a named path is allowed to resolve TO, and asking the disk there was wrong for the same
-    reason in the other direction. An earlier version of this file also carried a list of directory
-    names to skip; reading the index replaces it, because git lists none of them.
+    reason in the other direction. A skip-list of directory names is replaced by reading the
+    index, because git lists none of them.
     """
     listed = subprocess.run(
         ["git", "ls-files", "-z"], cwd=ROOT, check=True, capture_output=True
@@ -454,7 +452,7 @@ def test_the_lists_of_unresolved_references_have_not_grown_silently():
     fact about the repository rather than about a test, so it is worth a line in whatever record
     the change belongs to, and the number here is edited deliberately in the same commit.
     """
-    assert (len(ALLOWED_DANGLING), len(_OPERATOR_PROCESS), len(_LOCAL_CAMPAIGN)) == (12, 14, 18)
+    assert (len(ALLOWED_DANGLING), len(_OPERATOR_PROCESS), len(_LOCAL_CAMPAIGN)) == (12, 12, 18)
     assert len(KEPT_OUT_OF_THE_REPOSITORY) == len(_OPERATOR_PROCESS) + len(_LOCAL_CAMPAIGN), (
         "a path is in both tuples, and dict.fromkeys silently kept one reason for it"
     )

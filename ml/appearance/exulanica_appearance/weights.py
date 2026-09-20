@@ -63,7 +63,7 @@ _KEYS: Final = (
 )
 _CARD_KEYS: Final = ("license", "license_name", "license_link")
 #: Licences whose identifier is a standard one, so the identifier is the whole reading. Anything
-#: else (OpenMDW-1.1 today) is this lane's reading of a text, and the manifest carries that text's
+#: else (OpenMDW-1.1) is this lane's reading of a text, and the manifest carries that text's
 #: digest so a reader can check the words the reading was taken from.
 _STANDARD: Final = frozenset({"Apache-2.0", "MIT", "CC-BY-4.0", "CC0-1.0"})
 _REPOSITORY: Final = re.compile(r"[A-Za-z0-9][A-Za-z0-9._-]*/[A-Za-z0-9][A-Za-z0-9._-]*")

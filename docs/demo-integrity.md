@@ -1,6 +1,6 @@
 # Demonstration integrity
 
-Status: mixed, labelled per item. Audited against the repository on **2026-08-28**.
+Status: mixed, labelled per item.
 
 This document holds the rules a hosted demonstration of this project has to obey, and the design
 that makes obeying them possible: what may be precomputed and what has to run live for every

@@ -23,7 +23,7 @@ export interface CharacterSelection {
   readonly appearance: NativeCharacterAppearance;
 }
 
-/** Validate a stylized look list; only the development preview supplies one today. */
+/** Validate a stylized look list; only the development preview supplies one. */
 export function parseCharacterLooks(catalog: unknown): readonly CharacterLook[] {
   if (!Array.isArray(catalog) || catalog.length === 0) throw new Error('No character looks are available.');
   const ids = new Set<string>();

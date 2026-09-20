@@ -1,11 +1,11 @@
 # Character representation and movement
 
-Status: **CATALOG PEOPLE IMPLEMENTED FOR THE PLAYER AND INHABITANTS; SOURCE-LINKED
-LIKENESS OPEN**. This contract defines the shared character foundation for the player, synthetic
-inhabitants, and people observed in scenes. A committed catalog of fitted, textured people now
-supplies the player's default body, every inhabitant's look, the character studio and saved looks,
-with near and distant detail levels, planted feet and a measured frame budget. It does not establish
-likeness reconstruction, automatic rigging of new source material, or crowd collision avoidance.
+Status: **CATALOG PEOPLE FOR THE PLAYER AND INHABITANTS**. This contract defines the shared
+character foundation for the player, synthetic inhabitants, and people observed in scenes. A
+committed catalog of fitted, textured people supplies the player's default body, every
+inhabitant's look, the character studio and saved looks, with near and distant detail levels,
+planted feet and a measured frame budget. It does not establish likeness reconstruction,
+automatic rigging of new source material, or crowd collision avoidance.
 
 ## One foundation, distinct subjects
 
@@ -22,8 +22,9 @@ The shared foundation must support:
 - An optional abstract canvas with a featureless face and restrained surface treatment.
 - Authored and generated variations in height, build and palette with stable choices per subject.
   Variation must look designed, not like independently randomized body parts.
-- Future source-linked face textures, body geometry and proportions, with an abstract presentation
-  remaining a deliberate choice. A real face is not required for a complete character.
+- Source-linked face textures, body geometry and proportions, with an abstract presentation
+  remaining a deliberate choice. A real face is not required for a complete character. Those
+  source-linked bindings are not established.
 
 Appearance is independent of agency. Displaying a remembered person does not create an autonomous
 simulation of that person. An explicitly authored fictional derivative has its own simulation

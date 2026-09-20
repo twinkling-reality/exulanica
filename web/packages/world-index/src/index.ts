@@ -12,9 +12,8 @@
  * WHAT THIS PACKAGE IS, AND WHAT IT IS NOT. It is the view model and the interaction rules: the
  * facets and their URL encoding, the row projection with its epistemic marks, the fixed-order
  * entity detail, the action tiers, the review-queue preset and the mobile entry decision. It is
- * not markup. No view framework is a dependency of this workspace yet, and adding one is a
- * decision for whoever writes the binding; everything here is framework-free so that decision
- * stays open and so every rule above is testable without a DOM.
+ * not markup. This package has no view-framework dependency; everything here is
+ * framework-free so every rule above is testable without a DOM.
  *
  * The two places this package refuses to reimplement anything:
  *   - the four-band provenance panel comes from companion-runtime (5.2 is "one component with

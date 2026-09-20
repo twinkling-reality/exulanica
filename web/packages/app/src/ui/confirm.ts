@@ -84,7 +84,7 @@ export function buildConfirm(handlers: ConfirmHandlers): ConfirmPanel {
           summary.reversible
             ? options?.undoControlAvailable === true
               ? 'This writes a reversible event. Use “Take back the last change” in the object panel to undo it.'
-              : 'This writes a reversible event. This build does not yet expose the undo control.'
+              : 'This writes a reversible event. The object panel does not expose the undo control.'
             : 'This cannot be undone.',
         ]),
       );

@@ -642,7 +642,7 @@ same city, same tile coordinates, same pose:
 SAME ROW BOTH TIMES. **The container the page receives does not depend on the page at all**, which is
 a stronger statement than either refusal alone and stronger than the argument the second run was made
 to test. That 7ce4b90f is the OLDEST of seven bakes of this tile, at tessellator 5, was measured by
-the orchestrator against the store rather than by this lane.
+an independent store check rather than by this lane.
 
 **So the prediction's premise was right about the store and irrelevant to the page.** The prediction
 said the store's newest bake is 17 and this tree is 19; both true, and neither decided anything. The
@@ -909,15 +909,17 @@ on the committed fixture. On a real street:
 So **four true, four false**, against the fixture's five and three, with the movement key gained and
 the budget key lost.
 
-**AND THE NINTH KEY IS NOT PRODUCED, NOT DRAFTED AND NOT SIMULATED.** It is judged by a named human
-and that human is the operator. The endpoint capture will exist and goes to nobody: the composed
+**AND THE NINTH KEY IS NOT PRODUCED, NOT DRAFTED AND NOT SIMULATED.** It is judged by the named
+human judge. The endpoint capture will exist and goes to nobody: the composed
 world is walkable and now obstacle-aware past the edge, and STILL NOT DRAWN past it, so the endpoint
-camera faces undrawn world. That commitment is the orchestrator's and it stands.
+camera faces undrawn world. That commitment stands.
 
-## A third authentication condition, proposed and not implemented
+## A third authentication condition, `preview-shell-credentialed-tiles`
 
-**Nothing below is in the code.** The list and the harness's rule are untouched pending review, and
-the credential question underneath it is an operator decision rather than a lane one.
+`AUTHENTICATION_CONDITIONS` in `exulanica/evaluation/gate_keys.py` lists it.
+`authenticationConditionOf` in `scripts/capture_visual_gate.mjs` assigns it from one run's traffic.
+`tests/test_visual_gate_targets.py` assigns that name from corridor traffic. The credential question
+underneath it is a deployment decision this document does not settle.
 
 **THE HALT THIS IS ABOUT**, which was predicted before the first corridor run and reached for the
 first time on the composed walk, after the walk and all three captures and before any key:
@@ -953,7 +955,7 @@ does today, not because anything requires it to. If it ever stops asking, the pr
 and THE EVIDENCE FOR IT VANISHES, and a run then halts for a reason that looks nothing like its
 cause. It fails closed, which is the safe direction. The durable answer is for the harness to probe
 with the page's own credential rather than wait for the page to do it out of habit, and that is a
-credential question for the operator rather than one this lane can settle.
+credential question this document does not settle.
 
 **WHY NEITHER EXISTING CONDITION CAN BE WIDENED TO COVER IT.**
 
@@ -1044,7 +1046,7 @@ headings across a field three and a half times wider WHILE SEEING OBSTACLES FROM
 >
 > **Who measured which half.** The EXTENT is this lane's, taken twice: from the page's own hook and
 > from the harness during a walk. The MEMBERSHIP, 140 owned against 171 halo with no filter applied,
-> was reported by the tess lane and then verified independently by the orchestrator in the route
+> was reported from the tessellation records and then verified independently against the route
 > rings source. This lane has not read that code and does not restate it as its own measurement. The
 chosen heading reports a clear run of 294,755 mm, which reaches well into tile (3,0), through
 buildings the rule cannot see. **This walk is unaffected**: it ran from x 256,000 to 381,000 and never
@@ -1079,8 +1081,8 @@ that a second run of the same walk fetches **0 new bytes**, because a neighbour 
 digest its row names costs no request. I have NO prediction for the time; that is the number I said I
 would bring rather than guess at.
 
-**FOUR CONTAINERS, NOT FIVE.** I said five to the orchestrator earlier from my own assumption; the
-page's own statement says four, one drawn and stood on plus three stood on only. **Correcting my own
+**FOUR CONTAINERS, NOT FIVE.** An earlier count of five was an assumption; the
+page's own statement says four, one drawn and stood on plus three stood on only. **Correcting that
 number before the run rather than after it.**
 
 **THE WALK.** Due east should qualify again and the rule should prefer it, as it did at 270000
@@ -1527,7 +1529,7 @@ committed first.
   from the arrival pose clears the route length". That refusal is the rule working: the tile is
   smaller than the walk the gate measures;
 - the eight mechanical keys are therefore expected NOT to be reached. If the route is refused, the
-  brief's expectation that they FAIL on this tile stays untested, and that is a fact about the tile
+  expectation that they FAIL on this tile stays untested, and that is a fact about the tile
   being 128 m rather than about the keys.
 
 **The field a generated walk is bounded by** is read from the page for the first time in this run.

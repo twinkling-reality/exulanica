@@ -1,40 +1,48 @@
 # Should the visual gate accept a third way of proving who a page is?
 
-**The decision is yours. This lane does not make it, and the reason matters: the gate currently
-refuses to score this lane's run, and what is proposed is a rule the run would satisfy. However good
-the evidence, a lane that would benefit from a gate being widened must not be the lane that widens
-it.**
+Status: **NAMED CONDITION `preview-shell-credentialed-tiles`**.
+`AUTHENTICATION_CONDITIONS` in `exulanica/evaluation/gate_keys.py` lists it.
+`authenticationConditionOf` in `scripts/capture_visual_gate.mjs` assigns it from one run's traffic.
+This page is the case that proposed the rule. An operator decision admitted it. This scoring lane
+does not own later widening of the list.
 
-Nothing below is built. No code has changed.
+A lane that would benefit from a gate being widened must not be the lane that widens it. The lane
+stated the rule and held; the list grew by an operator decision, not by this lane.
 
-## What is happening now, in plain terms
+## The three named conditions
 
 The gate drives the real product through a real street, walks 125 metres of it, and takes the three
-photographs it scores. Then it stops, before scoring anything, and says:
+photographs it scores. It records how a page proved who it was before it scores what that page drew.
+The closed list names three ways. A page that matches none of them is refused rather than guessed.
+That refusal is the gate working, not a fault.
 
-    the authentication condition cannot be named
+The three it names:
 
-The gate insists on recording HOW A PAGE PROVED WHO IT WAS before it will score what that page drew.
-It knows two ways. This page uses a third, so the gate refuses rather than guess. That refusal is the
-gate working, not a fault.
+- **`credentialed-api`**, the product shell, which talks only to the real API and never to
+  development routes;
+- **`vite-preview-api`**, the development preview, which talks only to development routes and never
+  to the real API;
+- **`preview-shell-credentialed-tiles`**, a development preview that reads its street from the real
+  API, with a credential.
 
-The two it knows:
+This page is the third. It is not a hybrid by accident: a street lives in the store, and only the
+real API serves it.
 
-- **the product shell**, which talks only to the real API and never to development routes;
-- **the development preview**, which talks only to development routes and never to the real API.
+## The named rule
 
-This page is a development preview that reads its street from the real API, with a credential. It is
-neither, and it is not a hybrid by accident: a street lives in the store, and only the real API
-serves it.
+`authenticationConditionOf` names a run `preview-shell-credentialed-tiles` when **all five** of
+these are true of it:
 
-## The rule proposed, in the plain words the decision needs
+1. the page made at least one `/preview-api/` request, so it is the preview and not the product
+   shell;
+2. every `/api/` response served 200 was under `/api/tiles`, so nothing else was served to it;
+3. it asked `/api/graph` and was not served it, so the credential does not carry the graph;
+4. an anonymous read of the API is refused;
+5. at least one tile was actually served.
 
-A run would be accepted under a third condition when **all four** of these are true of it:
-
-1. the page used development routes at all, so it really is the preview and not the product shell;
-2. everything the real API actually gave it was a street tile, and nothing else;
-3. it asked the real API for something other than a tile and **was refused**;
-4. asking that same API with no credential at all is also refused.
+The first four are the approved clauses. The fifth is a narrowing in the harness: without it, clause
+2 is true of a page served nothing, so a condition named for credentialed tiles could be satisfied
+by a run that received none. Every run that passes five also passes the four.
 
 ## The evidence, measured on the run
 
@@ -63,7 +71,7 @@ The second one matters beyond today. **An earlier judged run is retained under i
 would quietly change what that retained record asserts about a run nobody can ever repeat. A record
 whose meaning can be edited afterwards is not a record.
 
-## The weak point in the proposal, stated rather than buried
+## The weak point in the named rule, stated rather than buried
 
 Clause 3 depends on the page **happening** to ask for something it is refused. Nothing requires it to
 keep doing that. If the page changes and stops asking, the underlying fact stays true while the
@@ -73,9 +81,10 @@ It fails in the safe direction: the gate refuses rather than accepts. The durabl
 gate to do the asking itself, with the page's credential, instead of waiting for the page to do it
 out of habit. That is a further credential question, not something this lane can settle.
 
-## What a NO costs
+## What refusing the condition would have cost
 
-The corridor street could not be scored through this page. Three other routes exist and only one of
+The operator admitted the condition, so a matching run can be scored. The costs below are the
+rejected alternative of leaving the list at two names. Three other routes existed and only one of
 them is real:
 
 - **Serve the street through the development routes instead of the real API.** The page would then
@@ -88,17 +97,17 @@ them is real:
 - **Score it through the product shell rather than the preview.** **Unverified by this lane**, and a
   different target with its own condition.
 
-If none of those happen, the gate can walk this street and can never score it, and the project's stop
-condition stays out of reach on this page.
+If the list had stayed at two names, the gate could walk this street and never score it, and the
+project's stop condition would stay out of reach on this page.
 
-## What a YES admits, stated at its widest
+## What the named condition admits, stated at its widest
 
-This is the part that is easy to skip. A decision to widen a gate should be made against the widest
-thing that fits through it afterwards, not against the one case in front of you today.
+A named condition should be read against the widest thing that fits through it, not against the one
+case in front of you.
 
-Accepting this rule admits **any** development preview page, for any world, any location, and any
-number of tiles, so long as the real API served it nothing but street tiles, refused it something
-else, and refuses anonymous callers. It is not limited to this street, this run, or this lane.
+The rule admits **any** development preview page, for any world, any location, and any
+number of tiles, so long as the real API served it nothing but street tiles, refused it the graph,
+and refuses anonymous callers. It is not limited to this street, this run, or this lane.
 
 **And it constrains what a page DID, not what its credential is ALLOWED to do.** A credential with
 far more authority than the page happens to exercise would pass this condition unchanged, because the
@@ -124,5 +133,6 @@ credential action rather than a gate rule, and it is not this lane's to take.
 
 - The gate refusing to score a page whose condition it cannot name: existing behaviour, working.
 - The rule's shape and its evidence: proposed by this lane, reviewed and approved in shape by the
-  orchestrator.
-- Whether a credentialed page may be scored at all: **yours**.
+  orchestrator, then admitted onto the closed list as `preview-shell-credentialed-tiles`.
+- Whether a credentialed page may be scored under that named condition: decided; the harness
+  assigns the name from the run's traffic.

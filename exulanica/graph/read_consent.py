@@ -1,12 +1,11 @@
 """The one place the World Read API asks whether a photograph may be shown.
 
-This module used to be a constants module that stood in for a layer being built elsewhere. That
-layer has merged, and the shape of the answer changed with it: a single sentence about a whole
-photograph became a list of people, each with three separate decisions and a withdrawal that
-reaches forward. What follows is the policy that reads those facts, and the reasoning is here
-rather than at the call site because there is exactly one call site and there must stay one.
+The shape of the answer is a list of people, each with three separate decisions and a
+withdrawal that reaches forward. What follows is the policy that reads those facts, and the
+reasoning is here rather than at the call site because there is exactly one call site and there
+must stay one.
 
-**What is now known, and it is more than before.** ``exulanica.graph.person_regions`` resolves,
+**What is known.** ``exulanica.graph.person_regions`` resolves,
 per photograph, the live person regions and the state each of them is in, and
 ``review_states_for_captures`` says whether anybody has looked at that photograph for people at
 all. Those are different facts and the second is the one default deny turns on: a photograph with

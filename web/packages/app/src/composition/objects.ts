@@ -23,9 +23,9 @@
  *
  * **Removal is reversible, and the panel says so, because the contract made it so.** A removal is
  * stored rather than executed: the row survives with `removed: true`, and undo "restores it rather
- * than resurrecting a new identity". An earlier draft of this file told people a removal could not
- * be undone, which was written against a guessed contract and would now be a false reversibility
- * claim in the one place `confirm.ts` says it is least acceptable to be wrong.
+ * than resurrecting a new identity". A sentence that said a removal could not be undone would be
+ * a false reversibility claim in the one place `confirm.ts` says it is least acceptable to be
+ * wrong.
  *
  * **A nudge is not a write until it is saved.** The arrow keys move the object in the world
  * immediately, because a move nobody can see is a move nobody can judge, and they send nothing.
@@ -346,7 +346,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       };
       const outcome = await runtime.place(placed, bytes);
       if (disposed || generation !== drawGeneration || version?.versionId !== versionId) return null;
-      // A behaviour this build cannot run and a clamped parameter are both refusals the visitor is
+      // A behaviour this client cannot run and a clamped parameter are both refusals the visitor is
       // owed. They stay on the object rather than only being announced, because the status line
       // moves on and the object stays.
       if (outcome.notices.length > 0) {

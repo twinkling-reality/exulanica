@@ -1,15 +1,13 @@
 # Scene segments
 
-Status: implemented 2026-09-11 on branch `codex/segments-backend`, backend half. The derivative
-worker's environment switch for the segmenter (section 4) and the automatic lifts at publication
-and after late masks (section 5) followed the same day. The frontend half (tinting, the segment
-list, click resolution) is a separate task that consumes the wire shape in section 6.
+Status: **SCENE SEGMENTS ON THE INGEST, LIFT AND READ PATH**. The derivative worker's environment
+switch for the segmenter (section 4) and the automatic lifts at publication and after late masks
+(section 5) are part of that path. The application tints segments, lists them and resolves a
+click to one from the wire shape in section 6.
 
-The brief is [briefs/2026-09-11-scene-segments.md](briefs/2026-09-11-scene-segments.md). Recognition
-used to stop at the photograph: the vision pass returns boxes, people get reviewed outlines, and
-the only bridge from geometry to data was click-to-evidence. This carries what the photographs
-found into the scene they reconstructed, as per-entity segments a renderer can tint and a click can
-resolve to.
+The vision pass returns boxes, people get reviewed outlines, and click-to-evidence is one bridge
+from geometry to data. This contract also carries what the photographs found into the scene they
+reconstructed, as per-entity segments a renderer can tint and a click can resolve to.
 
 ## 1. The two halves
 
@@ -17,7 +15,7 @@ resolve to.
 | --- | --- | --- |
 | Per photograph | `exulanica/ingest/stages/segmentation.py`, stage `segmentation` | one `object_mask_list` artifact per photograph, one `frame_region` span and one `object_present` inference per mask |
 | Per scene | `exulanica/ingest/scene_segments.py`, stage `scene_segments` | one `scene_segments` artifact per scene build, bound to everything it used |
-| Read | `exulanica/graph/reconstruction_scenes.py`, route `GET /scene-segments/{scene_id}` | the segments this reader can stand behind right now, under the geometry asset-read policy |
+| Read | `exulanica/graph/reconstruction_scenes.py`, route `GET /scene-segments/{scene_id}` | the segments this reader can stand behind under the geometry asset-read policy |
 
 ## 2. No migration, and why
 

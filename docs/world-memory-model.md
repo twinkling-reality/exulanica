@@ -1,6 +1,6 @@
 # The Exulanica world-memory model
 
-Status: **DECISION AND RESEARCH PROGRAM**. Existing evidence, graph, reconstruction,
+Status: **DECISION AND RESEARCH PROGRAM**. Evidence, graph, reconstruction,
 spatial-authority, authored-version, World Read, generated-receipt, and package contracts implement
 parts of this architecture. Exulanica does not claim a learned general world model, reliable
 physical prediction, autonomous open-world simulation, or complete object-level scene memory.
@@ -108,7 +108,9 @@ The model is a composition of planes, not a flattened universal scene blob.
 
 The planes may refer to the same stable entity or place. They may not borrow one another's truth
 status. A simulated visit does not become a memory. A generated back side does not become an
-observation. A user correction may supersede an inference without rewriting the original output.
+observation. Reconstruction does not admit generated completion of unobserved space as spatial
+state; that refusal is specified in [product-specification.md](product-specification.md) section 5.
+A user correction may supersede an inference without rewriting the original output.
 
 ### 3.1 Provenance class, content truth class, and world plane are different axes
 

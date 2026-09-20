@@ -52,7 +52,7 @@ export function proofTierForScene(scene: ReconstructionRungDisclosure): ProofTie
  *
  * A scene whose region cannot be resolved contributes nothing rather than a default: the binding
  * leaves an island the map omits uncoloured, and an uncoloured island is the honest state for a
- * region this build cannot connect to a scene at all.
+ * region this client cannot connect to a scene at all.
  *
  * When two current scenes name the same region, the drawn one wins. That is not a tie-break for
  * neatness: the not-drawn scene's tier is `unavailable`, and letting it overwrite the region that

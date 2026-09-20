@@ -1,19 +1,18 @@
 # Capture overlap and recovery state
 
-Status: 2026-09-16, recovery states shipped; the overlap verdict failed its held-out check.
+Status: **PLACE RECOVERY STATES**. Policy `exulanica.capture-overlap-policy/v1` failed its
+held-out check and is not authorised to refuse a set.
 
 The place record, its five recovery states and its read seam are in place (migration 0063,
-`exulanica/graph/places.py`). The overlap verdict (policy `exulanica.capture-overlap-policy/v1`) is
-cheap and deterministic, and it is **not reliable**. At its declared threshold it reproduces three
-of the four measured capture outcomes and refuses the set that registered 12 of 12. It is not
-monotone in spacing, and it **failed its held-out check**. It is therefore **not authorised to
-refuse a set**, and the read seam does not offer its sentences to a person.
+`exulanica/graph/places.py`). The overlap verdict is cheap and deterministic, and it is **not
+reliable**. At its declared threshold it reproduces three of the four measured capture outcomes
+and refuses the set that registered 12 of 12. It is not monotone in spacing. The read seam does
+not offer its sentences to a person.
 
 ## What a regular person gets
 
-Most photographs a person takes of something will not rebuild into a 3D place. Before this work,
-a set like that was an absence: the product had nothing to say about it. Now it is a room of its
-own photographs, with a sentence saying why it did not build and what to do next:
+Most photographs a person takes of something will not rebuild into a 3D place. A set like that is
+a room of its own photographs, with a sentence saying why it did not build and what to do next:
 
 > Your photographs are kept here as they are. A rebuild was tried and didn't make a 3D place. None
 > of the 6 photographs could be placed together. Walk around it and take one every few steps, so
@@ -23,11 +22,10 @@ That sentence is built from the real receipt of a real run over six real photogr
 never asks for a number of photographs, because the measurement below shows that overlap decides
 and count does not.
 
-The second half of the work was meant to tell the person this *before* anything is spent. That
-half exists, and it is cheap, but it is not good enough to speak to anyone. It would have turned
-away the one held-out set, which rebuilt and trained, and one of the four calibration sets, which
-rebuilt. Until a better policy passes a held-out set, its answer is recorded for evaluation and
-nobody is told it.
+The pre-run verdict exists, and it is cheap, but it is not good enough to speak to anyone. It
+would have turned away the one held-out set, which rebuilt and trained, and one of the four
+calibration sets, which rebuilt. A policy that has not passed a held-out set has its answer
+recorded for evaluation and nobody is told it.
 
 ## What a verdict is, and what it is not
 

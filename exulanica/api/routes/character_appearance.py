@@ -1,8 +1,8 @@
 """Authenticated version-scoped appearance; this is not an account-global profile API.
 
 Integration hook: optionally provide Services.character_appearance = CharacterAppearanceRuntime
-and include this router. Source authorization is host-owned and mandatory. The existing
-app.state.society_input_authorizer remains the authority for current synthetic society inputs.
+and include this router. Source authorization is host-owned and mandatory.
+``app.state.society_input_authorizer`` is the authority for current synthetic society inputs.
 """
 
 from __future__ import annotations

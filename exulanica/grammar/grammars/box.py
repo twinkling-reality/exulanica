@@ -1,9 +1,7 @@
-"""The box grammar: three integer extents, and the proof that the contract is generic.
+"""The box grammar: three integer extents.
 
-It makes an axis-aligned box and nothing else. It is here because a generator system that has
-only ever run one grammar has not shown it is a system: this one is not architecture, shares no
-vocabulary with the city, and goes through the same descriptor, cascade, draw, validation and
-receipt with no change to any of them.
+It makes an axis-aligned box and nothing else. It shares no vocabulary with the city and goes
+through the same descriptor, cascade, draw, validation and receipt.
 
 Its extent bounds, 1 to 10,000 mm, are authored for the proof and describe no real object. Its
 declared semantics admit it to no projection. An unset extent is drawn from the seed in

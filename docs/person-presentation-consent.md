@@ -1,12 +1,12 @@
 # Person regions, masking and presentation consent
 
-Design note, 2026-09-06. **Implemented and wired end to end, and exercised against a real
-database.** A detected person leaves a row, the row forces a masked derivative, reconstruction
-reads that derivative, the database refuses geometry over the original, and a reviewer can confirm
-who is present and record what each of them agreed to. Read "What exists" at the foot of this
-note for what is still missing, which is not nothing. Written after the first real reconstructions
-showed
-that the gate ("a named human states there are no visible people or sensitive person
+Status: **PERSON-REGION MASKING AND PRESENTATION CONSENT**. A detected person leaves a row, the
+row forces a masked derivative, reconstruction reads that derivative, the database refuses
+geometry over the original, and a reviewer can confirm who is present and record what each of
+them agreed to. Client draw predicates are unused. No retained collection has been screened
+through this path.
+
+The yes/no screening gate ("a named human states there are no visible people or sensitive person
 regions") is too coarse: the retained bowl photographs contain the arms, hands and clothing of
 diners at the frame edge, no faces, and the reviewer's statement said no visible people. The
 system needs an explicit list of person regions and a consent state per person, not a yes/no.

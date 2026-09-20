@@ -7,8 +7,7 @@ here rather than at each call site so that a new caller inherits it instead of r
 
 **Three consents, and they are genuinely separate.** Presence says a person was here. Naming says
 this person is Julie. Likeness says show this person's appearance. Granting one grants nothing
-else: a person may be present and named for years while never being visible, which is the case
-the old yes-or-no gate could not express and the reason this module exists.
+else: a person may be present and named for years while never being visible.
 
 **The reversible state is the only one that is viewer-side.** ``hidden`` means a person who did
 consent to likeness is not being shown at the moment, so their pixels are legitimately in the

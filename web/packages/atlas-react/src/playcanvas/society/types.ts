@@ -24,7 +24,7 @@ export interface SocietyInhabitantSnapshot {
   readonly id: string;
   readonly synthetic: true;
   readonly display_name?: string;
-  /** v1 and v2 carry a legacy label; v4 carries a role only where the place's premises supply one. */
+  /** v1 and v2 carry a label; v4 carries a role only where the place's premises supply one. */
   readonly role?: string | null;
   readonly role_reason?: string;
   readonly position_mm: readonly [number, number];
@@ -99,7 +99,7 @@ export interface CrowdPose {
 }
 
 /**
- * What the crowd needs of anything that draws one person. Two kinds satisfy it today: the abstract
+ * What the crowd needs of anything that draws one person. Two kinds satisfy it: the abstract
  * character in this folder, and the character lane's `inhabitantRenderable`, whose people are
  * composed from shared catalog containers. What the two do not share is optional here, and absence
  * means something in every case, stated per member: a reader must never read a missing member as

@@ -35,10 +35,10 @@ import { decodeOwd } from '<ROOT>/web/packages/loom-tess/src/core/owd.js';
 const owd = decodeOwd(new Uint8Array(readFileSync(process.argv[2]))) as any;
 
 // THE CONTAINER CARRIES ITS OWN RECORD LIST and every entry indexes THAT. Read it; do not rebuild
-// it from the document. Rebuilding was how this file worked until 2026-09-18: it merged the
-// document's owned and halo records and sorted them, which groups the kinds identically and so
-// gives correct counts BY KIND while assigning the wrong identity and the wrong membership inside
-// every kind. Following the container's own material pointer showed 2 of 1445 agreeing.
+// it from the document. Rebuilding merged the document's owned and halo records and sorted them,
+// which groups the kinds identically and so gives correct counts BY KIND while assigning the
+// wrong identity and the wrong membership inside every kind. Following the container's own
+// material pointer showed 2 of 1445 agreeing.
 const records = owd.header.records;
 
 process.stdout.write(JSON.stringify(Object.values<any>(owd.projections).map((projection: any) => ({

@@ -1,3 +1,11 @@
+/**
+ * @exulanica/loom-gate
+ *
+ * Visual-gate key vocabulary, thresholds, and mechanical decisions for a browser run.
+ * Numbers are pinned to the retained reconciliation record; this package restates them
+ * so a harness can decide without a Python process.
+ */
+
 export {
   AWAITING_JUDGE,
   CANONICAL_KEYS,

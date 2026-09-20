@@ -13,18 +13,17 @@ rendered and displayed with the rung it earned; it is never what a citation open
 
 **What is here.** A depth model behind a protocol, with MoGe-2 as the real implementation and a
 flat plane as the double; the point-map builder that drops what the model could not place; the
-``.opm`` writer the renderer already reads; the quality gate that decides between rung 3 and rung
-4 for one photograph; and the job controllers for the rungs above it, ``pose`` for camera
-recovery, ``splat`` for training and ``navigation`` for corridors.
+``.opm`` writer the renderer reads; the quality gate that decides between rung 3 and rung 4 for
+one photograph; and the job controllers for the rungs above it: ``pose`` for camera recovery,
+``splat`` for scene-specific Gaussian training, and ``navigation`` for corridors.
 
-**What "above rung 3" means here, precisely, because the distinction keeps being lost.** The
-controllers exist and are contract tested. ``pose`` now also has a backend that runs, the
-in-process ``pycolmap_executor``, so camera recovery is executable on an ordinary machine.
-``splat`` does not: it delegates to a reviewed container entrypoint that nobody has built, and
-gsplat is CUDA only, so no splat has ever been trained here. Nothing in ``exulanica.ingest`` calls
-any of the three, so no rung above 3 is published to the Atlas by any pipeline today. ``gate.py``
-decides rung 3 or rung 4 for a single photograph and is not the gate for the rungs above it;
-those are the quality receipts the controllers return.
+**What "above rung 3" means here.** The controllers exist and are contract tested. ``pose`` has
+an in-process ``pycolmap_executor``. ``splat`` invokes a digest-pinned execution image's reviewed
+``exulanica-gsplat-scene-v1`` entrypoint; it does not substitute upstream ``simple_trainer.py``.
+:mod:`exulanica.ingest.scene_reconstruction` calls ``pose`` and ``splat`` for a leased capture
+set. A trained splat's appearance receipt does not promote a recorded scene rung; scale and
+coverage gates remain separate. ``gate.py`` decides rung 3 or rung 4 for a single photograph and
+is not the gate for the rungs above it; those are the quality receipts the controllers return.
 """
 
 from __future__ import annotations

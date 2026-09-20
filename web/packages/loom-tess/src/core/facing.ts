@@ -19,8 +19,8 @@
  * is the grammar's own floored normal (`document._check_frontage_line`), with the direction scaled
  * first.
  *
- * Not yet wired into a bake. It changes no container until an expander calls it, which is a new
- * `TESSELLATOR_SOURCE_VERSION`.
+ * No expander in this package calls this rule. It changes no container until an expander
+ * imports it, which is a new `TESSELLATOR_SOURCE_VERSION`.
  */
 import { CITY_V2 } from './city-v2.js';
 import { absolute, add, floorDivide, floorSquareRoot, GeometryError, multiply, subtract } from './integer-math.js';

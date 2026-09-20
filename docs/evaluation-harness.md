@@ -1,13 +1,10 @@
 # Evaluation harness: clean replay and run archives
 
-Status: **REPLAY MECHANICS AND ARCHIVES IMPLEMENTED; REAL OGC-1 BASELINE AND THE PHASE 2 GATE
-REMAIN BLOCKED**.
+Status: **REPLAY AND ARCHIVE COMMANDS**. The named `phase_2_exit_gate` stays blocked without a
+real OGC-1 split bundle and a complete metric baseline.
 
-Two halves of one shipped command, merged 2026-09-09 from `evaluation-clean-replay.md` and
-`evaluation-run-archive.md`. They were separated only by history: both describe
-`exulanica-eval`, both turn on the same Phase 2 exit gate, and neither was linked from anywhere in
-the repository, so a reader had no way to find one from the other. Nothing below is edited except
-the headings.
+`exulanica-eval replay-bundle` admits a validated corpus into a clean database. `exulanica-eval`
+also writes and verifies a run archive. Both write the same `phase_2_exit_gate` object.
 
 ## 1. Clean replay
 

@@ -1,7 +1,7 @@
 # Platform findings: Nebius Token Factory, Nebius AI Cloud, NVIDIA models and Tavily
 
-Status: mixed, labelled per finding. Runtime observations were made on **2026-08-27**. Catalog and
-documentation observations were retrieved on **2026-08-27** unless a different date is given.
+Status: mixed, labelled per finding. Runtime observations come from `scripts/verify_platform.py`.
+Catalog and documentation observations cite a primary URL and a retrieval date on the finding.
 
 Every finding below is reproducible. Where a claim rests on a response the platform actually
 returned, the response is archived and the specific fields that carry the finding are quoted here.

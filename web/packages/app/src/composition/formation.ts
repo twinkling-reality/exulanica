@@ -1,9 +1,9 @@
 /**
  * What there is to watch forming, and the subscription that watches it.
  *
- * There is no upload endpoint yet, so an intake starts from the command line and this asks the
- * API rather than assuming: an empty list renders as nothing forming, which is a true statement,
- * and a fabricated batch would not be.
+ * `POST /intake` is the upload. This panel lists the workspace's batches rather than
+ * assuming one: an empty list renders as nothing forming, which is a true statement, and a
+ * fabricated batch would not be.
  *
  * The panel is built at one point in a mount and the watch starts at another, after the shell's
  * children have been replaced. `begin()` is that second point, kept as its own call so the

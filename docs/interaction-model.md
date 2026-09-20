@@ -5,7 +5,7 @@ Status: mixed. Every claim carries exactly one label, per the convention in
 alternative rejected), **ASSUMPTION** (with the experiment that settles it), **OPEN**.
 
 Retrieval date for every VERIFIED claim on this page: **2026-08-27**.
-Promoted from the reconciled research in `.exulanica/`. Scope, corpus and product claims live in
+Scope, corpus and product claims live in
 [product-specification.md](product-specification.md) and are not restated here.
 
 **Read section 2.1 first.** Two verified platform facts remove design freedom that a reader would

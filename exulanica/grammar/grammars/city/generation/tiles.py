@@ -17,8 +17,8 @@ tile carries, owned or halo: SHA-256 over the canonical JSON list of the edits' 
 lowercase hex, never sorted. An edit elsewhere in the city leaves the tile's key alone; an edit to
 a subject it carries, or the same edits in another order, moves it. The empty subsequence is
 :data:`~exulanica.grammar.grammars.city.tile.EMPTY_EDIT_DELTA_DIGEST`. What an edit and its digest
-are belongs to the edit log, which does not exist yet; this fixes only how a tile selects and folds
-them, the same fold ``exulanica.ingest.stages.edit_delta_digest_of`` states.
+are belongs to the edit log, which is not a module in this package; this fixes only how a tile
+selects and folds them, the same fold ``exulanica.ingest.stages.edit_delta_digest_of`` states.
 
 **Pieces no longer than 1 km** (:func:`check_piece_lengths`). The tessellator's facing rule scales
 a direction toward the grammar's direction bound, so every straight piece of a centreline, kerb

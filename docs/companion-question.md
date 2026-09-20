@@ -1,32 +1,22 @@
 # The Companion question path
 
-Status: built, covered by tests, and measured with real models on three passes. Section 6
-has what the first run measured against the retained bowl workspace and the record is
-`docs/evaluation/2026-09-09-companion-question.json`. Sections 9 to 12 are the second pass: the
-Companion's memory of all this is now durable, and the composer swap section 6.1 offered as a
-proposal has been measured again and made. That record is
-`docs/evaluation/2026-09-09-companion-memory.json`. Section 13 is the third pass and the first one
-that is not a read: the Companion can now PROPOSE a change to how the world looks, drawn from the
-reviewed style registry and applied by nobody but the person it is shown to. It was measured
-against the retained volcanic workspace, twice on two schemas, and those records are
-`docs/evaluation/2026-09-10-companion-proposals.json` and
-`docs/evaluation/2026-09-10-companion-proposals-on-the-copy.json`. Section 14 is a fourth pass
-over the prompts themselves: one of the three defects section 13 recorded is fixed and two are
-measured and refused. Section 15 is a fifth, over the drafting call rather than its wording: the
-token ceiling is measured and refused, and a repair the function promised and did not have is
-made. Those records are `docs/evaluation/2026-09-10-companion-prompts.json` and
+Status: **COMPANION QUESTION, MEMORY AND APPEARANCE-PROPOSAL PATH**. The composer reaches
+`POST /selection/ask`. Memory is durable. A proposal to change how the world looks is drawn from
+the reviewed style registry and applied only by the person it is shown to. Measured records:
+`docs/evaluation/2026-09-09-companion-question.json`,
+`docs/evaluation/2026-09-09-companion-memory.json`,
+`docs/evaluation/2026-09-10-companion-proposals.json`,
+`docs/evaluation/2026-09-10-companion-proposals-on-the-copy.json`,
+`docs/evaluation/2026-09-10-companion-prompts.json` and
 `docs/evaluation/2026-09-10-drafting-reliability.json`.
 
-`product-direction.md` makes this a delivery gate: "Ask about the selected place through the
+`product-direction.md` names the delivery gate: "Ask about the selected place through the
 actual Companion; ground the answer in available evidence and show missing information
 honestly", and the scheduling consequence is to "verify the existing runtime path and record the
 executed model, task, latency and output".
 
-Two words in that gate were doing all the work and neither was satisfied before this change.
-**Through the actual Companion**: no browser code called `POST /selection/ask`, so the answer
-path was reachable with a terminal and by nothing a person could press. **Record the executed
-model**: `AnswerView` carried no executed identifier, no latency and no usage, so the only way to
-say which model answered was to read the manifest, which says which model was asked.
+The browser path is `POST /selection/ask`. The answer names the executed model, latency and
+usage. The manifest names which model was asked.
 
 ## 1. The path, end to end
 
@@ -44,9 +34,8 @@ composer keystroke
   -> evidence.ts -> /evidence/{span}/masked
 ```
 
-The server half is unchanged in shape. `answer_question` still plans, validates, executes, builds
-a bounded packet, composes, validates the answer and repairs once. What is new is that it now
-records what each model call was and cost, and that a browser can reach it.
+`answer_question` plans, validates, executes, builds a bounded packet, composes, validates the
+answer and repairs once. It records what each model call was and cost. The browser reaches it.
 
 ## 2. What the answer path may and may not do
 

@@ -519,9 +519,9 @@ def test_a_photograph_becomes_pixels_in_exactly_one_module():
     ``from PIL import Image``,
     ``PILImage.open`` after ``from PIL import Image as PILImage``, a spelled-out
     ``PIL.Image.open``, ``pim.open`` after ``import PIL.Image as pim``, and a bare ``_open(...)``
-    after ``from PIL.Image import open as _open``. An earlier version of this sweep matched the
-    literal ``Image.open`` and nothing else, so the other four walked past it with the assertion
-    still green. Each of the four was planted in ``exulanica/`` in turn and each turns it red.
+    after ``from PIL.Image import open as _open``. Matching the literal ``Image.open`` and
+    nothing else lets the other four walk past it with the assertion still green. Each of the
+    four was planted in ``exulanica/`` in turn and each turns it red.
 
     **What it does not cover, said rather than implied.** Pillow has other doors into a decode:
     ``ImageFile.Parser``, ``Image.frombytes``, ``open`` reached through ``getattr`` or rebound at
@@ -778,10 +778,10 @@ def test_an_explicit_hash_blocklist_refuses_the_write_and_cancels_the_run(ingest
     """The other intent, and it needs its own explicit opt-in: never let this content back in.
 
     The store is checked as well as the database, and the bytes are genuinely purged first.
-    An earlier version of this test asserted only that the capture row rolled back, and the
+    Asserting only that the capture row rolled back would be a test of nothing: the
     fixture had already put the bytes in the store during the successful first ingest, so
     ``store.exists`` was True before the re-import and True after it and the assertion could
-    not have failed however the pipeline behaved. It was a test of nothing.
+    not have failed however the pipeline behaved.
     """
     repository, store, pipeline, path, first = ingested
     _capture, tombstone_id = _delete_capture(repository, reason="never again", blocklist_hash=True)

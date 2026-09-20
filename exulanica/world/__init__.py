@@ -1,4 +1,15 @@
-"""Protected topology, reviewed styles, immutable versions, and source availability."""
+"""Durable personal-world state: protected topology, reviewed styles, immutable versions, and source availability.
+
+Repositories own the PostgreSQL transactions. Document modules
+(:mod:`exulanica.world.objects`, :mod:`exulanica.world.structure`,
+:mod:`exulanica.world.environment_instances`, :mod:`exulanica.world.interaction`)
+are pure: an independent verifier can reproduce their documents without a database.
+
+This package's public exports are the style, object, structure, environment-instance,
+interaction, saved-entry, and shared society-core types. Scene tiles, character appearance,
+companion memory, and society stepping live in sibling modules and are imported by name, not
+through this package.
+"""
 
 from exulanica.world.assets import (
     CC0_LICENCE_ID,

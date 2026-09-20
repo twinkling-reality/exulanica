@@ -1,9 +1,8 @@
 # Atlas spatial architecture
 
-Status: **DECISION** for the long-term spatial grammar and engine boundaries; **ACTIVE
-IMPLEMENTATION** for the frontend/core work described in section 8. This record does not claim
-that backend persistence, reconstructed traversal artifacts, physical asset streaming, or
-full-library production scale are complete.
+Status: **DECISION** for the spatial grammar and engine boundaries. Section 8 describes the
+frontend/core work. This record does not claim that backend persistence, reconstructed traversal
+artifacts, physical asset streaming, or full-library production scale are complete.
 
 ## 1. World decision
 
@@ -249,7 +248,7 @@ behavior.
 
 ### Phase A: spatial authority
 
-**Frontend/core status: implemented; backend durability pending.**
+**Frontend/core status: implemented; backend durability is not present.**
 
 Define and persist `AtlasLayoutSnapshot`, region creation ordinals, authored/derived footprint data,
 safe entry poses, and layout migrations. `atlas-core` owns validation and deterministic transforms;
@@ -260,7 +259,7 @@ explicit layout migration.
 ### Phase B: neighborhoods and residency
 
 **Core planner/index status: implemented; physical streaming and production full-library adapter
-pending.**
+are not present.**
 
 Partition the full-library index into stable semantic neighborhoods, add sigils and adjacency, and
 implement a budgeted residency planner with target pinning and cancellation. `atlas-core` owns the
@@ -270,7 +269,7 @@ without loading every detailed asset or changing logical coordinates.
 
 ### Phase C: rung traversal
 
-**Status: foundational policies only; measured pipeline artifacts pending.**
+**Status: foundational policies only; measured pipeline artifacts are not present.**
 
 Ingest trusted nav surfaces for rung 1, trajectory corridors for rung 2, measured panel envelopes
 for rung 3, and real source media for rung 4. The reconstruction pipeline supplies measured
@@ -281,7 +280,7 @@ visual coverage agree under every rung fixture.
 ### Phase D: direct navigation and recovery
 
 **Frontend/core status: region and citation travel, reduced motion, Map targets, and recovery
-feedback implemented; residency-aware asynchronous arrival and far-field action cues pending.**
+feedback implemented; residency-aware asynchronous arrival and far-field action cues are not present.**
 
 Add Map/Index target travel, residency-aware safe-vantage resolution, reduced-motion transitions,
 soft far-field cues, and explicit last-safe recovery feedback. `atlas-core` owns target resolution
@@ -291,7 +290,7 @@ arrives at a validated pose or reports why it cannot.
 
 ### Phase E: scale and comfort hardening
 
-**Status: pending representative production assets and profiling.**
+**Status: representative production assets and profiling are not present.**
 
 Profile streaming churn, large-coordinate rebasing, collision broad phase, focus rays, frame pacing,
 and the authored daylight/contrast modes across representative large libraries. Exit criterion: movement and

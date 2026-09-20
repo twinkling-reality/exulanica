@@ -1,13 +1,10 @@
 # Production reconstruction scenes
 
-Status: **IMPLEMENTED and PostgreSQL-tested 2026-09-04; licensed benchmark admitted, reconstructed,
-measured in the browser, withdrawn, and purged through the production path**.
-
-This document is the operating contract for Exulanica's production rung-3 multi-photograph path.
-It covers scene selection, durable work, pose recovery, placement, graph delivery, rendering,
-deletion, and recovery. The completed ETH3D `pipes` run is one licensed indoor benchmark, not a
-representative real-corpus or personal-media acceptance gate. No consented personal capture set was
-admitted for this campaign.
+Status: **PRODUCTION RUNG-3 MULTI-PHOTOGRAPH PATH**. Scene selection, durable work, pose
+recovery, placement, graph delivery, rendering, deletion and recovery. The completed ETH3D
+`pipes` run is one licensed indoor benchmark, reconstructed, measured in the browser, withdrawn
+and purged through that path. It is not a representative real-corpus or personal-media
+acceptance gate. No consented personal capture set was admitted for that campaign.
 
 ## Verification baseline
 
@@ -24,14 +21,11 @@ uv run ruff check .
 uv run lint-imports
 ```
 
-The first full campaign run found four migration-test failures and one import-layer violation.
-The withdrawal exercise had been placed in `exulanica.evaluation` even though it composes World
-Memory Package projection and therefore belongs in the top-level orchestration layer. Commit
-`d60be1c` moved that workflow without changing its retained record. The migration failures exposed
-an unqualified ledger lookup: a fresh deployment schema could inherit a later search-path schema's
-`schema_migrations` table. Commit `ea70b80` qualified ledger reads and writes to the connection's
-current schema and added a decoy-ledger PostgreSQL regression. A deliberate reversal made that
-regression fail by reading the decoy before the correction was restored.
+The withdrawal workflow lives in the top-level orchestration layer because it composes World
+Memory Package projection. Commit `d60be1c` moved that workflow without changing its retained
+record. Ledger reads and writes qualify to the connection's current schema so a deployment schema
+cannot inherit another search-path schema's `schema_migrations` table. Commit `ea70b80` added a
+decoy-ledger PostgreSQL regression for that qualification.
 
 ## 1. Production flow
 

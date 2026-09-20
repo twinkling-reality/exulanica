@@ -8,9 +8,9 @@
  * **This file renders a label and does not compose one.** `formationLabel` in
  * `@exulanica/formation` already decides the stage name, the one factual sentence, the supporting
  * facts, whether elapsed time belongs on screen at all, and what to say when contact was lost.
- * An earlier version of this panel worked those out again from the raw state, which is two places
- * for the same rules to drift and one of them untested. Everything below writes out what the
- * label carries, in the order it carries it.
+ * Working those out again from the raw state would be two places for the same rules to drift
+ * and one of them untested. Everything below writes out what the label carries, in the order it
+ * carries it.
  *
  * **There is no bar and no percentage.** The label's supporting facts already print the pair the
  * pipeline counted. Turning that into a percentage would be turning a count into a fraction of a

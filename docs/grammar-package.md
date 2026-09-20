@@ -1,20 +1,20 @@
 # The generator system: `exulanica.grammar`
 
-Status: **CITY VOCABULARY VERSION 2 BUILT; EVERY CITY STAGE GENERATES**.
+Status: **CITY GRAMMAR VERSION 3 REGISTERED**. Ten stages emit records. The tile stage is a
+record-shape contract.
 
-`exulanica.grammar` is a generator system, not a city generator. It holds a generic contract
-(grammar id and version, a closed parameter schema, a parameter cascade, a seed, an output digest
-and declared semantics) and the grammars that implement it. The city is the first and largest
-grammar. A second grammar, `box`, ships beside it to prove that the contract carries something
-that is not architecture with no change to the contract.
+`exulanica.grammar` is a generator system. It holds a generic contract (grammar id and version, a
+closed parameter schema, a parameter cascade, a seed, an output digest and declared semantics)
+and the grammars that implement it. The city is the first and largest grammar. A second grammar,
+`box`, ships beside it and uses the same contract.
 
-The package produces **no mesh and no vertices**: every generated value is an integer record, and
-turning records into triangles is the tessellator's. City version 2 declares the whole vocabulary:
-28 record kinds with integer geometry, 91 declared parameters, four projection contracts, 18
-licensed catalogs, one identity rule and a hand-written fixture tile that exercises all of it.
-Every one of the eleven city stages has a generator: see
-[generated-corridor-street](generated-corridor-street.md) for the street they make together and
-what it measures.
+The package emits integer records, never meshes or vertices. Turning records into triangles is
+the tessellator's. A generator cannot construct a citation. The registered city descriptor is
+`city.v3.json`: 28 record kinds with integer geometry, 91 declared parameters (80 integer, 11
+choice), four projection contracts, licensed catalogs, and one identity rule.
+[generated-corridor-street](generated-corridor-street.md) records the street those stages make
+together and what it measures. `city.v1.json` and `city.v2.json` remain as pinned migration
+source schemas; they are not registered.
 
 ## 1. Where it sits, and why below `evidence`
 
@@ -222,22 +222,27 @@ other rule, refuses (`tests/test_grammar_city_records.py`).
 
 ## 7. The city stages
 
-City version 2 is registered; version 1 is retired, and its descriptor stays beside version 2 as
-the source of the version 1 to 2 migration.
+City grammar version 3 is registered (`city.v3.json`). `city.v1.json` and `city.v2.json` remain
+as pinned migration source schemas; they are not registered. Stage versions below are the
+`stage_version` values on that descriptor, not the grammar version. Ten stages emit records
+through `exulanica.grammar.grammars.city.generation`. The registered `tile` stage is an
+`UnimplementedStage`; tile documents are assembled after generation by
+`exulanica.grammar.grammars.city.generation.tiles`. Parameter counts are the 91 names in
+`city.v3.json`, grouped by the stage that reads each one.
 
-| Stage | Version | Record kinds | Parameters | Generator |
+| Stage | Stage version | Record kinds | Parameters | Generator |
 | --- | --- | --- | --- | --- |
-| `terrain` | 2 | `city.terrain` | 2 | none |
-| `districts` | 1 | `city.district` | 1 | none |
-| `streets` | 2 | `city.street_node`, `city.street`, `city.street_segment`, `city.block`, `city.curb_edge`, `city.crossing`, `city.lane`, `city.junction`, `city.junction_approach`, `city.lane_connection`, `city.signal`, `city.parking_space`, `city.road_marking` | 11 | none |
-| `parcels` | 2 | `city.parcel` | 4 | none |
-| `massing` | 2 | `city.massing`, `city.rooftop_object` | 13 | none |
-| `facade` | 2 | `city.facade`, `city.ground_bay`, `city.entrance` | 22 | none |
-| `material` | 2 | `city.surface_material` | 5 | none |
-| `streetlife` | 2 | `city.street_furniture`, `city.street_tree` | 5 | none |
-| `vitrine` | 2 | `city.vitrine` | 3 | none |
-| `premises` | 2 | `city.premises` | 3 | none |
-| `tile` | 2 | `city.tile` | 0 | none |
+| `terrain` | 2 | `city.terrain` | 4 | emits |
+| `districts` | 1 | `city.district` | 1 | emits |
+| `streets` | 2 | `city.street_node`, `city.street`, `city.street_segment`, `city.block`, `city.curb_edge`, `city.crossing`, `city.lane`, `city.junction`, `city.junction_approach`, `city.lane_connection`, `city.signal`, `city.parking_space`, `city.road_marking` | 13 | emits |
+| `parcels` | 2 | `city.parcel` | 4 | emits |
+| `massing` | 2 | `city.massing`, `city.rooftop_object` | 15 | emits |
+| `facade` | 2 | `city.facade`, `city.ground_bay`, `city.entrance` | 25 | emits |
+| `streetlife` | 2 | `city.street_furniture`, `city.street_tree` | 11 | emits |
+| `vitrine` | 2 | `city.vitrine`, `city.interior_backing` | 5 | emits |
+| `premises` | 2 | `city.premises` | 3 | emits |
+| `material` | 2 | `city.surface_material` | 10 | emits |
+| `tile` | 3 | `city.tile` | 0 | record-shape contract |
 
 The record shapes are in `exulanica/grammar/grammars/city/` (`common.py` holds what every record
 shares), and `tests/fixtures/city-v2/record-shapes.json` is the whole table as data.

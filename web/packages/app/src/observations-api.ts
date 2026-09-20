@@ -25,8 +25,8 @@
  * that never happens on this path.
  *
  * **Nothing here filters.** Every observation carries its photograph's consent state. CORRECTED
- * 2026-09-07: that state used to be `unavailable` on every observation, meaning no per-person
- * consent layer existed in this build. The layer has merged, so the value now describes the
+ * 2026-09-07: that state is no longer `unavailable` on every observation as if no per-person
+ * consent layer existed. The value describes the
  * PHOTOGRAPH: `unscreened` when nobody has looked at it for people, `recorded` when people are
  * located in it and carry receipts. Neither is a per-person state, and a filter still has nothing
  * to read: withholding a photograph because one person in it forbids it needs that person's state

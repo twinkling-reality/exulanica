@@ -79,10 +79,9 @@ export interface CompanionDependencies {
    * the Companion may DO, and it arrives here as a function for exactly the reason `ask` does:
    * the composition root is the only place that holds a credential.
    *
-   * **Optional, and a host that has not opted in behaves as it did.** Absent means every
-   * utterance goes straight to `ask`, which is what happened before this path existed. Not a
-   * registered function that returns "question" for everything: that would make "this build
-   * cannot propose" and "this sentence was a question" the same observation.
+   * **Optional.** Absent means every utterance goes straight to `ask`. Not a registered
+   * function that returns "question" for everything: that would make "this client cannot
+   * propose" and "this sentence was a question" the same observation.
    */
   readonly proposeAppearance?: (utterance: string) => Promise<CompanionProposal>;
   /** Retained for harness compatibility; the presence now docks directly into the encounter. */

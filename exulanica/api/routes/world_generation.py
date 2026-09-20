@@ -1,11 +1,10 @@
 """Asking for a world, and the refusal that is the point of asking.
 
-The parameter cascade in :mod:`exulanica.grammar.parameters` was finished and unreachable. It
-validated, it scoped, it refused four distinct mistakes by name, and outside the tests exactly one
-file originated a :class:`~exulanica.grammar.parameters.CascadeBinding`: the corridor's own
-specification. ``exulanica/grammar/migration.py`` constructs one too, but only by rewriting a
-binding it was handed, so it cannot originate one. The way to get a different city was to write a
-new Python file. This is the door.
+The parameter cascade in :mod:`exulanica.grammar.parameters` validates, scopes, and refuses four
+distinct mistakes by name, and outside the tests exactly one file originates a
+:class:`~exulanica.grammar.parameters.CascadeBinding`: the corridor's own specification.
+``exulanica/grammar/migration.py`` constructs one too, but only by rewriting a binding it was
+handed, so it cannot originate one. This route is the door.
 
 **Why this is not under ``/world``.** ``/world`` is the appearance API for the one world the
 product shows, and its own module says "There is no topology mutation endpoint". A style parameter
@@ -45,7 +44,7 @@ catalog digest and the tile's own coordinate and NOT the bindings. Since
 whose container differs with ``nondeterminism_detected``, a caller who could choose a seed could
 mark a tile nondeterministic with two perfectly deterministic bakes. Deriving the seed here stops
 that for callers who come through this route and NOT for anyone else, so the record's own blindness
-is filed separately as a finding for city grammar version 4 rather than treated as closed.
+is filed separately as a finding against ``TileRecord`` identity rather than treated as closed.
 
 **Every refusal the cascade makes arrives with its parameter and its reason.** That is this route's
 subject, not a side effect of it. :mod:`exulanica.api.app` maps the generator's error hierarchy on
@@ -72,13 +71,13 @@ would answer with tile records claiming a detail level nothing produced, so it a
 states the one it makes.
 
 **What this route does NOT promise, measured on 15e8198c.** A specification is not enough to make a
-world today, and this route will not hide that. With ``CORRIDOR_BINDINGS``, all eleven values, over
+world, and this route does not hide that. With ``CORRIDOR_BINDINGS``, all eleven values, over
 40 seeds, 15 GENERATED A WORLD: 17 exhausted the six ``local_street`` names in
 ``assets/catalogs/street-name.v1.json``, and 8 wrote a ``clearance_mm`` a rooftop placement
 legitimately kept and ``RooftopObjectRecord`` declares a maximum of 10000 for. Every layout value
 was bound identically in all 40, so what decides whether the world exists is a value some stage
 draws from the seed. The corridor is therefore a specification PLUS a seed that happened to work,
-which is why the answer to "can I just ask for a different city" was a new Python file.
+which is why a specification alone does not make a world.
 
 This route does not retry with another seed. Retrying would break the property that makes a stored
 specification unnecessary, that one specification is one world, and it would be choosing a value on
@@ -93,7 +92,7 @@ and not refunded when materialisation fails": charging less than a request can c
 request cross the ceiling, which is the one thing a ceiling prevents. The connection is in
 autocommit, so the charge stands even though the request ends in an exception, deliberately. A
 refusal the CASCADE makes spends nothing, because resolution happens first; a refusal a STAGE makes
-spends the world. So a ceiling of 400 tiles buys about fifteen attempts at a five-tile world today
+spends the world. So a ceiling of 400 tiles buys about fifteen attempts at a five-tile world
 and about six of them come back with a world. Both halves of that are held by tests.
 """
 
@@ -158,9 +157,9 @@ class WorldCoverage:
 
 
 #: A grammar with no entry here is refused rather than generated, because a world whose tiles
-#: cannot be counted cannot be metered, and an unmetered generation route is the compute amplifier
-#: ``exulanica.api.quotas`` was written ahead of. ``box`` has no entry and no tiles: it makes one
-#: box to prove the contract is generic, and it is not a world anybody walks.
+#: cannot be counted cannot be metered. ``exulanica.api.quotas`` meters this route. ``box`` has
+#: no entry and no tiles: it makes one box to prove the contract is generic, and it is not a
+#: world anybody walks.
 WORLD_COVERAGE: Final[Mapping[str, WorldCoverage]] = {
     "city": WorldCoverage(
         "city_extent_x_mm",

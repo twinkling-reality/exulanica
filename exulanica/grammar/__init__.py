@@ -13,17 +13,16 @@ truth status. Seeded is not sampled: every value a grammar emits is recomputable
 from the seed, the grammar version and the catalog digest, so nothing here is a model output and
 nothing here is an observation.
 
-**A generator system, not a city generator.** The modules at this level are the generic
-contract and know nothing about what any grammar makes: ``seed`` validates a seed, ``draw``
-holds the one draw, ``parameters`` the closed schema and the cascade, ``records`` the canonical
-form, ``contract`` the grammar, its stages and its receipt, ``registry`` the lookup, and
-``catalogs`` the versioned, licensed vocabulary files, and ``textures`` the published texture
-sets a vocabulary entry may pin. Grammars live under
-``exulanica.grammar.grammars`` and nothing at this level imports them. The city is the first and
-largest; the box exists to prove the contract carries something that is not architecture.
+**A generator system.** The modules at this level are the generic contract and know nothing
+about what any grammar makes: ``seed`` validates a seed, ``draw`` holds the one draw,
+``parameters`` the closed schema and the cascade, ``records`` the canonical form, ``contract``
+the grammar, its stages and its receipt, ``registry`` the lookup, ``catalogs`` the versioned,
+licensed vocabulary files, and ``textures`` the published texture sets a vocabulary entry may
+pin. Grammars live under ``exulanica.grammar.grammars`` and nothing at this level imports them.
 
-**What is not here yet.** No city stage generates anything; each emits ``not_implemented``. No
-geometry and no vertices are produced by this package at all. See ``docs/grammar-package.md``.
+**What this package emits.** Integer records, never meshes or vertices. Turning records into
+triangles is the tessellator's. City stages emit records through
+``exulanica.grammar.grammars.city.generation``. See ``docs/grammar-package.md``.
 """
 
 from __future__ import annotations

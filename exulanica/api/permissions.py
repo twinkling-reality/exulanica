@@ -30,8 +30,6 @@ meters a route against :mod:`exulanica.api.quotas` by being declared on it, and 
 only way a route is metered. Three routes hold it: the two ``/tiles`` reads, which serve bytes an
 offline bake already made, and ``POST /world-generation/worlds``, which is the first route whose
 cost scales with what the caller asked for and therefore the first that charges MORE than one tile.
-Both of those facts used to be one sentence saying the permission "is required by no route today",
-which had been false since the ``/tiles`` reads were declared.
 
 **Who holds what.** A bearer token holds exactly the permissions its grant in
 ``EXULANICA_API_TOKENS`` names. A browser session holds :data:`ACCOUNT_OWNER_PERMISSIONS`, because
@@ -148,10 +146,8 @@ SELF_CHARGING_TILE_ROUTES: Final[Mapping[tuple[str, str], str]] = MappingProxyTy
         ("POST", "/world-generation/worlds"): (
             "one request covers every tile of the world it specifies, up to the 16 by 16 the "
             "declared extent range allows, so it charges one tile per tile it covers, counted "
-            "from the resolved extents before a record is made. AN OPEN QUESTION RIDES WITH "
-            "THIS ENTRY: a route that BAKES a generated city does not exist yet, and when one "
-            "lands it has to decide whether it charges again for a tile whose generation was "
-            "already charged here. Deciding it now would be deciding it without the route"
+            "from the resolved extents before a record is made. A later bake of those same "
+            "tiles must declare whether it charges again for a tile already counted here."
         ),
     }
 )
@@ -211,9 +207,9 @@ _P = Permission
 
 #: What a browser session holds. A browser session exists only for an account membership whose
 #: role is ``owner``, the one role migration 0058 allows: the person whose workspace it is. Every
-#: permission except ``tiles.materialise``, which is withheld and is an OPEN DECISION rather than a
-#: pending event: three routes now require it, so the condition the old wording waited for has
-#: passed, and a browser session still cannot ask for a world or read a tile's bytes. Granting it
+#: permission except ``tiles.materialise``, which is withheld and is an OPEN DECISION: three
+#: routes require it, and a browser session still cannot ask for a world or read a tile's bytes.
+#: Granting it
 #: lets a browser spend the workspace's tile ceiling, which is why it is granted here deliberately
 #: or not at all rather than inherited.
 ACCOUNT_OWNER_PERMISSIONS: Final[frozenset[Permission]] = frozenset(

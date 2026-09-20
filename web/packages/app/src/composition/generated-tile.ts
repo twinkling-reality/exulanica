@@ -52,7 +52,7 @@ function provenanceLine(provenance: TileProvenance): string {
       + 'Texture sets: the committed library.';
   }
   return `Container: fetched from /tiles as ${provenance.bakedTileId} (${provenance.origin}), sha256 ${provenance.containerSha256}. `
-    + 'Texture sets: the committed library, because no route serves the published library yet.';
+    + 'Texture sets: the committed library; no route serves the published texture library.';
 }
 
 /**
@@ -108,7 +108,7 @@ interface StatedContainer {
  *
  * TWO SETS, AND THE READER TAKES THE DIFFERENCE. `drawn` is every container whose records reached
  * the frame and `stoodOn` is every container whose ground reached the walkable surface, each
- * including the tile the walk opens on. They hold the same containers today, because a walk draws
+ * including the tile the walk opens on. They hold the same containers, because a walk draws
  * every neighbour it fetches, and the empty difference is therefore something a reader COMPUTES
  * rather than a field somebody maintains.
  *
@@ -116,10 +116,10 @@ interface StatedContainer {
  * neighbours were composed and never drawn; the moment they are drawn, its own name states
  * something untrue, into an append-only record. Keeping it and leaving it always empty would have
  * been worse than renaming it: an empty list reads as a distinction that is tracked and came out
- * empty, rather than one that is vestigial. The difference will not stay empty for ever. A
- * neighbour served its navigation sections alone, measured at 1,969,322 bytes against 11,630,504
- * for its whole container, is ground with no street, and on that day `stoodOn` is a superset of
- * `drawn` and this shape says so with nothing renamed.
+ * empty, rather than one that is vestigial. The difference stays empty while every fetched
+ * neighbour is also drawn. A neighbour served its navigation sections alone, measured at
+ * 1,969,322 bytes against 11,630,504 for its whole container, is ground with no street, and
+ * then `stoodOn` is a superset of `drawn` and this shape says so with nothing renamed.
  *
  * `opensOn` IS THE FACT NEITHER SET CARRIES. A frame is OF a container and a pose is ON one, and a
  * reader should not have to take the first entry of a list, which is a position rather than an
@@ -311,7 +311,7 @@ const held = new Map<string, { readonly containerSha256: string; readonly bytes:
  * THE SPLIT, and it is a decision rather than an accident: the CONTAINER comes from `/tiles` with
  * this session's credential, because a generated tile is never committed to this repository, and the
  * TEXTURE SETS come from the committed library through this development page, because they are
- * committed and no route serves the published texture library yet. The statement on screen says so,
+ * committed and no route serves the published texture library. The statement on screen says so,
  * so no picture of this street implies a product path that does not exist.
  *
  * The credential is the development token and nothing else: with no token this refuses in plain

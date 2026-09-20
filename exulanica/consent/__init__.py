@@ -3,8 +3,8 @@
 A package of its own rather than a corner of :mod:`exulanica.identity`, because the two answer
 different questions. Identity asks who somebody is and requires a human to say so. Consent asks
 what may be done with their appearance, and its answer is no until a receipt says otherwise. A
-person can be perfectly identified and still never drawn, which is the case the old yes-or-no
-screening gate could not express and the reason this package exists.
+person can be perfectly identified and still never drawn. Screening that asked only whether
+a photograph contained nobody cannot express that split, which is why this package exists.
 
 Two modules, and the split is the whole design:
 

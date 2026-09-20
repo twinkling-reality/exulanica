@@ -271,10 +271,10 @@ def measure() -> int:
     ) as http:
         health = http.get("/readyz")
         (args.out / "readyz.json").write_text(json.dumps(health.json(), indent=2) + "\n")
-        # Read off the server rather than typed into this file. An earlier version carried the
-        # schema level as a literal "0038", which was true of the database it was written
-        # against and silently false of the next one. `/readyz` lists what is applied, so the
-        # record states what the instance actually had rather than what somebody remembered.
+        # Read off the server rather than typed into this file. A literal schema level such as
+        # "0038" is true of the database it was written against and silently false of the next
+        # one. `/readyz` lists what is applied, so the record states what the instance actually
+        # had rather than what somebody remembered.
         applied = (health.json().get("checks", {}).get("schema", {}) or {}).get("applied") or []
         schema_level = applied[-1] if applied else "unknown"
 

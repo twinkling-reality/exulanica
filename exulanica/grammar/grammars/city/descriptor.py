@@ -14,11 +14,11 @@ digest, so a superseded one is never edited.
 
 ``city-shapes.v2.json`` is here for the same reason, and is worth its own sentence because it is
 the one file in this package with no live producer. A descriptor states parameters; RECORD SHAPES
-come from :func:`exulanica.grammar.shapes.describe_shapes` over the current code, and the current
-code describes one version. Version 2's shape table is therefore frozen data, kept so the
-tessellator can go on reading documents written before version 3 (ADR-0024). It is not an
-unchecked copy: ``tests/test_grammar_descriptor.py`` holds it against the live table and admits
-exactly one difference, ``city.tile`` gaining ``coordinate_unit`` and a record version.
+come from :func:`exulanica.grammar.shapes.describe_shapes` over the registered grammar's code.
+``city-shapes.v2.json`` is frozen so the tessellator can read documents written against that
+descriptor (ADR-0024). It is not an unchecked copy: ``tests/test_grammar_descriptor.py`` holds
+it against the live table and admits exactly one difference, ``city.tile`` gaining
+``coordinate_unit`` and a record version.
 """
 
 from __future__ import annotations

@@ -1,3 +1,11 @@
+/**
+ * Authenticated saved playback controls for one society.
+ *
+ * Speaks `/world/versions/{id}/society/control` (`exulanica/api/routes/society_control.py`).
+ * Importing this client never starts a worker. `configure` writes mode and speed;
+ * `step` advances one leased tick bound to the displayed snapshot.
+ */
+
 import { Transport, type TransportOptions } from '@exulanica/graph-client';
 import { parseSociety, type SocietySnapshot } from './society-api.js';
 

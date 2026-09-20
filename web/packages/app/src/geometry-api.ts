@@ -183,7 +183,7 @@ export function regionsByCapture(
 }
 
 /**
- * The container this build can decode.
+ * The container this client can decode.
  *
  * `decodeOpm` refuses anything but version 2 by name, and ADR-0010 D9 is refuse and regenerate
  * with no upgrade on read. This constant and that decoder move together or a region silently
@@ -205,7 +205,7 @@ interface GeometryWire {
   readonly kind: string;
   readonly container: string | null;
   /**
-   * Open, not a union of the two states this build knows.
+   * Open, not a union of the two states this client knows.
    *
    * A closed union here would be validated in `parseGeometryList`, which throws for the whole
    * list, so one state added by a later server (D6's placement, D8's corridor) would take every
@@ -311,7 +311,7 @@ export class GeometryClient {
         continue;
       }
       if (descriptor.state !== 'available') {
-        // A state this build has never heard of, checked BEFORE the reference so that an
+        // A state this client has never heard of, checked BEFORE the reference so that an
         // unfamiliar state carrying no bytes is not mislabelled as missing ones. Reported for
         // this one descriptor and not thrown, because the wire will gain states as ADR-0009 D6
         // and D8 land, and a client that refused the whole list would lose every region's
@@ -384,7 +384,7 @@ export class GeometryClient {
         }
         // Everything the decoder throws lands here, and it is reported as a decode failure
         // rather than as a transport one: the bytes arrived and hashed correctly, so what
-        // failed is this build's ability to read them.
+        // failed is this client's ability to read them.
         report('undecodable', error instanceof Error ? error.message : 'The container did not decode.');
       }
     }
@@ -930,7 +930,7 @@ function parseGeometryList(value: unknown): readonly GeometryWire[] {
   return Object.freeze(value.map((item) => {
     const row = asRecord(item, 'geometry item');
     // Required to be a non-empty string and nothing more. Which states exist is the server's to
-    // extend; which ones this build can act on is the loader's to decide. See `GeometryWire`.
+    // extend; which ones this client can act on is the loader's to decide. See `GeometryWire`.
     const state = requiredText(row['state'], 'geometry state');
     const raw = row['reference'];
     let reference: GeometryWire['reference'] = null;

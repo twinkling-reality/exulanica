@@ -1,4 +1,19 @@
-# ADR-0009: How the ladder earns rungs 1 and 2, and what a posed rung 3 is
+# How a reconstructed place earns a quality level
+
+Status: A reconstructed place earns a quality level from the receipts it holds, not from a
+model inventing missing coverage.
+
+The label ADR-0009 is only an identifier.
+
+**What this is.** The record of how reconstructed places earn rungs 1 and 2, and what a posed
+rung 3 is, after the single-photograph producer.
+
+**Why it exists.** The four quality levels were defined before most of the producers existed.
+This record says which receipts a scene must hold before it may claim a higher level.
+
+**What it still governs.** Scene-gate composition, the rule that rung 2 does not require a
+splat, and the refusal to let a model-derived scale open the query path. The living
+specification is [product-specification.md](../product-specification.md) section 5.
 
 - Status: **ACCEPTED; production rung 3 implemented 2026-09-04.** D1, D4, D6, D9, D10, D11 and
   D12 run end to end through the normal ingest and separate scene-worker path. D2, D3, D5,

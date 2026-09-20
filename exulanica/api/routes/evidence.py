@@ -300,9 +300,9 @@ def _address(
     # IntegrityError when the row no longer hashes to its stored digest, and InvalidAddressError
     # when the row is not a well formed address at all. Both are integrity failures about every
     # citation naming this span, and app.py answers IntegrityError with a loud 500 rather than a
-    # 404. This used to catch BlobNotFoundError, which that function cannot raise: the clause
-    # was inert, and had it ever fired it would have turned the mismatch this docstring says
-    # must not be hidden into "no such evidence".
+    # 404. Catching BlobNotFoundError here would be inert: that function cannot raise it, and a
+    # catch that fired would turn the mismatch this docstring says must not be hidden into
+    # "no such evidence".
     address = address_from_span_row(row)
     return address, row["media_type"] or _MEDIA_TYPE_FALLBACK, _clock_headers(row)
 

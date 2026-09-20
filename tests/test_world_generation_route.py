@@ -201,10 +201,10 @@ def test_the_route_is_declared_metered_and_charges_its_own_tiles():
     """The permission and the self-charging entry are one decision and both halves are held.
 
     ``tiles.materialise`` alone would let :func:`authorise_route` charge ONE tile for a request
-    covering up to 256, because ``TILES_PER_REQUEST`` is 1 and its own comment says why: "the route
-    that will carry it does not exist yet and a batch size is its decision to declare". This is
-    that route, so it must ALSO be in ``SELF_CHARGING_TILE_ROUTES`` or the ceiling is wrong by the
-    size of the world. Asserting only the permission would leave the other half free to drift.
+    covering up to 256, because ``TILES_PER_REQUEST`` is the default charge for a metered route
+    that is not in ``SELF_CHARGING_TILE_ROUTES``. This route specifies a world of many tiles, so
+    it must ALSO be in ``SELF_CHARGING_TILE_ROUTES`` or the ceiling is wrong by the size of the
+    world. Asserting only the permission would leave the other half free to drift.
     """
     rule = ROUTE_RULES[("POST", WORLDS)]
     assert Permission.TILES_MATERIALISE in rule.permissions

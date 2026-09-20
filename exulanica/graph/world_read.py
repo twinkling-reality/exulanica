@@ -22,11 +22,11 @@ spans. That is invariant 2 in the shape a machine can check: a consumer looking 
 behind a claim will not find a point map offered as one. The evidence path is separate and goes
 through ``/evidence/{span_id}``, which is what the click-to-evidence work builds on.
 
-**Two addresses now, and a scene is still one of them.** The roadmap says "for an entity, a place
-and a time". A place that persists across captures exists as of ``docs/place-identity.md`` and
-:mod:`exulanica.graph.places`, so this bundle answers to two addresses: a reconstruction scene,
-which is one set of photographs of one place at one capture, and a place with a time, which
-resolves to the version of that place in force at that time and puts that scene's bundle in place.
+**Two addresses, and a scene is still one of them.** ``docs/place-identity.md`` and
+:mod:`exulanica.graph.places` define a place that persists across captures, so this bundle
+answers to two addresses: a reconstruction scene, which is one set of photographs of one place
+at one capture, and a place with a time, which resolves to the version of that place in force
+at that time and puts that scene's bundle in place.
 The scene address is unchanged in meaning, because a scene is still a real thing after it joins a
 place and its receipts are bound to inputs no place can be part of. What is still unaddressable is
 an **entity**: nothing routes from a person or an object to a bundle, and the ``addressing`` block

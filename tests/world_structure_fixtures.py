@@ -1,3 +1,9 @@
+"""Synthetic spatial-world candidates for world-structure tests.
+
+Factories build :class:`~exulanica.world.SpatialCandidate` documents and optional
+placement migrations. They are not loaded by the application.
+"""
+
 from __future__ import annotations
 
 import hashlib

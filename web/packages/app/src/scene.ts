@@ -250,7 +250,7 @@ export function buildScene(
 
   // Seeded per island, after the anchors are gathered, so the arrangement depends only on how
   // many there are and on their order. Sorted by id first: the graph returns occurrences in a
-  // stable order today, and depending on that rather than imposing one would make the layout of
+  // stable order, and depending on that rather than imposing one would make the layout of
   // a region an accident of a query plan.
   const placed = kept.map((record) => {
     const anchors = (anchorsByIsland.get(record.islandId) ?? []).sort((a, b) =>
@@ -298,7 +298,7 @@ export function buildScene(
        * nothing, and an owned district refuses to declare one, so this flag is the whole difference
        * between a landmark and a decoration.
        *
-       * The app names no located region today, so every region is unlocated and the world carries
+       * The app names no located region, so every region is unlocated and the world carries
        * no memory bodies at all. That is the intended reading, not a gap to paper over.
        */
       placementLocated: located(toIslandId(record.islandId)),

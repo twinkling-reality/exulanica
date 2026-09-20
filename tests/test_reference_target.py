@@ -58,7 +58,7 @@ def test_a_refusal_names_what_this_caller_may_reach_rather_than_the_other_path(
 ):
     """A read reaches the retained copy too, so it is not refused in the words of a write.
 
-    inspect_database is the reader, and until 2026-09-17 both paths raised the same sentence about
+    inspect_database is the reader, and both paths raised the same sentence about
     writes, which sent a reader looking for a permission it had never asked for.
     """
     with pytest.raises(ValueError) as exc:

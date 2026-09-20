@@ -183,7 +183,7 @@
 /*
  * A note on a row is always a refusal or a correction, never a caption.
  *
- * A behaviour this build cannot run, or a parameter that was clamped to its declared bound, is
+ * A behaviour this client cannot run, or a parameter that was clamped to its declared bound, is
  * shown on the object it belongs to rather than only in the one-line status, because the status
  * line moves on and the object stays.
  */

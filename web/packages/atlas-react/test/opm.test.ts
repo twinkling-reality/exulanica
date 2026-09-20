@@ -190,7 +190,7 @@ describe('the .opm loader', () => {
     expect(() => decodeOpm(one)).toThrow(/depth stage/);
   });
 
-  it('skips a section this build has never heard of rather than refusing the file', () => {
+  it('skips a section this client has never heard of rather than refusing the file', () => {
     // The whole of ADR-0010 D2: "a registered optional section is not a version bump" is only
     // true if an older reader keeps reading the sections it knows when a newer writer adds one.
     const map = decodeOpm(buildOpm({ count: 8, extra: [{ name: 'curvature', byteLength: 8 }] }));

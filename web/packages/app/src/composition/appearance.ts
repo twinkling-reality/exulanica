@@ -533,9 +533,9 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
  *
  * Returns false when it cannot, which is a refusal rather than a silent partial staging. The
  * panel builds its controls once, from the profile that was active when it was mounted, so a
- * proposal naming a different profile has no controls to move; today the reviewed registry
- * offers exactly one profile a new proposal may name, so that is a guard against a future
- * catalogue rather than a case anybody can reach.
+ * proposal naming a different profile has no controls to move; the reviewed registry
+ * offers exactly one profile a proposal may name, so that is a guard against a
+ * catalogue that names more than one rather than a case anybody can reach.
  *
  * The event dispatched per control is the one the panel listens for, which differs by kind: a
  * range and a colour report on `input` and everything else on `change`. Sending the wrong one

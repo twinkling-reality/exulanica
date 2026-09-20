@@ -1,4 +1,4 @@
-"""Measure synthetic declared-plan plumbing in a temporary schema of the sole test database.
+"""Measure synthetic declared-plan plumbing in a scratch schema of the sole test database.
 
 EXULANICA_TEST_DATABASE_URL=postgresql://localhost:5433/exulanica_spine_test \
   uv run python scripts/measure_gold_questions.py --corpus /tmp/generated --out /tmp/measurement

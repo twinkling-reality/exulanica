@@ -8,8 +8,8 @@ bearer in the header, and the content hash verified against the descriptor that 
 
 This module is the read half of that. Seven decisions in it are load bearing.
 
-**This list is the legacy unposed path and holds only point maps that are not members of a
-reconstruction scene.** The descriptor query inner-joins ``capture`` on ``source_blob_sha256``,
+**This list holds only point maps that are not members of a reconstruction scene.** The
+descriptor query inner-joins ``capture`` on ``source_blob_sha256``,
 which is the identity scheme ADR-0009 D9 says a pose receipt, splat and placement record have no
 home in: those are facts about N photographs and use a scene identity. Once a capture belongs to
 such a scene, ``GET /graph`` carries its exact digest-bound placement and this list must not offer

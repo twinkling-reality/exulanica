@@ -14,56 +14,56 @@ What the system is. Edited when the system changes.
 
 70 documents.
 
-- [architecture-overview](architecture-overview.md) : Current direction, 2026-09-12: read product-direction.md
-- [asset-read-currency](asset-read-currency.md) : Final acceptance at source head 03501cea376cf530c185e3b12a5fb0d8d8d7acdf passed 2118 backend
+- [architecture-overview](architecture-overview.md) : Product authority: read product-direction.md
+- [asset-read-currency](asset-read-currency.md) : MIGRATION 0041 EXPLICIT-TIME ASSET-READ POLICY. Original, crop and by-URI image
 - [atlas-frontend-integration](atlas-frontend-integration.md) : IMPLEMENTED for the global world-appearance lifecycle, production source-media
 - [atlas-reconstruction-inspection](atlas-reconstruction-inspection.md) : The production Atlas reads scene identity, ordered capture membership, quality gates
-- [atlas-spatial-architecture](atlas-spatial-architecture.md) : DECISION for the long-term spatial grammar and engine boundaries; ACTIVE
+- [atlas-spatial-architecture](atlas-spatial-architecture.md) : DECISION for the spatial grammar and engine boundaries. Section 8 describes the
 - [atlas-visual-language](atlas-visual-language.md) : DECISION and IMPLEMENTED for the new-user arrival, one source-first encounter, and
 - [atlas-world-customization-contract](atlas-world-customization-contract.md) : DECISION and IMPLEMENTED for global appearance customization. PostgreSQL appearance
-- [capture-overlap-and-recovery-state](capture-overlap-and-recovery-state.md) : 2026-09-16, recovery states shipped; the overlap verdict failed its held-out check
-- [character-representation-contract](character-representation-contract.md) : CATALOG PEOPLE IMPLEMENTED FOR THE PLAYER AND INHABITANTS; SOURCE-LINKED
-- [companion-question](companion-question.md) : built, covered by tests, and measured with real models on three passes. Section 6
-- [corridor-navigation-artifacts](corridor-navigation-artifacts.md) : artifact, gate, and conservative runtime adapter implemented; real gate blocked
-- [demo-integrity](demo-integrity.md) : mixed, labelled per item. Audited against the repository on 2026-08-28
-- [demo-runbook](demo-runbook.md) : mixed, labelled per item. Buildability audited against the repository on 2026-08-28
+- [capture-overlap-and-recovery-state](capture-overlap-and-recovery-state.md) : PLACE RECOVERY STATES. Policy exulanica.capture-overlap-policy/v1 failed its
+- [character-representation-contract](character-representation-contract.md) : CATALOG PEOPLE FOR THE PLAYER AND INHABITANTS. This contract defines the shared
+- [companion-question](companion-question.md) : COMPANION QUESTION, MEMORY AND APPEARANCE-PROPOSAL PATH. The composer reaches
+- [corridor-navigation-artifacts](corridor-navigation-artifacts.md) : artifact, gate, and conservative runtime adapter exist; the gate has not passed
+- [demo-integrity](demo-integrity.md) : mixed, labelled per item
+- [demo-runbook](demo-runbook.md) : DEMONSTRATION RUNBOOK. The API, application shell, production point-map delivery and
 - [deployment](deployment.md) : - Status: mixed, labelled per claim. See README.md(README.md) for the status convention
 - [derivative-worker-operations](derivative-worker-operations.md) : - Status: IMPLEMENTED, PostgreSQL-tested, and image-smoke-tested 2026-09-04
-- [development-setup](development-setup.md) : Commands and operational notes retained from the previous root README. Test counts and
+- [development-setup](development-setup.md) : Commands for installing extras, running the suite, starting the API, and configuring the local
 - [documentation-standard](documentation-standard.md) : Identify a thing by what it is, not by when you looked at it
 - [domain-and-evidence-model](domain-and-evidence-model.md) : mixed. Every claim below carries exactly one status label, and a claim that was rewritten
-- [evaluation-corpus-contract](evaluation-corpus-contract.md) : IMPLEMENTED INPUT BOUNDARY; REAL OGC-1 INPUTS NOT FOUND LOCALLY 2026-08-31
-- [evaluation-harness](evaluation-harness.md) : REPLAY MECHANICS AND ARCHIVES IMPLEMENTED; REAL OGC-1 BASELINE AND THE PHASE 2 GATE
+- [evaluation-corpus-contract](evaluation-corpus-contract.md) : EVALUATION INPUT BOUNDARY. The repository holds synthetic contract fixtures. It does
+- [evaluation-harness](evaluation-harness.md) : REPLAY AND ARCHIVE COMMANDS. The named phase2exitgate stays blocked without a
 - [evaluation-methodology](evaluation-methodology.md) : Status of this document: mixed. Every claim below carries exactly one label
 - [frontier-roadmap](frontier-roadmap.md) : engineering archive. product-direction.md owns product
-- [generated-appearance](generated-appearance.md) : TRACK A SESSION 1 RUN AND MEASURED 2026-09-17 (section 9). 64 model-made texture sets on
+- [generated-appearance](generated-appearance.md) : Track A measured 64 model-made texture sets on exact structure (section 9). Seams sit inside
 - [generated-corridor-street](generated-corridor-street.md) : GENERATED, VALIDATED AND GATED; NOT BAKED INTO THE STORE OR SCORED
-- [generated-tile-runtime](generated-tile-runtime.md) : IMPLEMENTED as a development evaluation only: the browser reads baked texture sets and
-- [grammar-package](grammar-package.md) : CITY VOCABULARY VERSION 2 BUILT; EVERY CITY STAGE GENERATES
-- [gsplat-scene-jobs](gsplat-scene-jobs.md) : Status 2026-09-05, evening: the runner image has been built from this recipe and executed on a
+- [generated-tile-runtime](generated-tile-runtime.md) : Development evaluation only: the browser reads baked texture sets and
+- [grammar-package](grammar-package.md) : CITY GRAMMAR VERSION 3 REGISTERED. Ten stages emit records. The tile stage is a
+- [gsplat-scene-jobs](gsplat-scene-jobs.md) : CONTENT-ADDRESSED GSPLAT CONTROLLER AND RESUMABLE TRAINER
 - [interaction-model](interaction-model.md) : mixed. Every claim carries exactly one label, per the convention in
 - [interaction-policy-backend](interaction-policy-backend.md) : IMPLEMENTED for the capability registry, immutable policy history, Settings and
 - [lettering](lettering.md) : IMPLEMENTED for the four glyph catalogs, the conversion tool, the catalog reader and the
 - [license-matrix](license-matrix.md) : VERIFIED where a primary source was read on 2026-08-27, with the exceptions marked
-- [model-and-service-selection](model-and-service-selection.md) : implementation reviewed 2026-09-14; model upgrades require task-specific evidence
-- [owned-district-and-admission](owned-district-and-admission.md) : IMPLEMENTED DATA PATH; VISUAL AND WORLD-MEMORY VALIDATION IN PROGRESS
-- [person-presentation-consent](person-presentation-consent.md) : Design note, 2026-09-06. Implemented and wired end to end, and exercised against a real
+- [model-and-service-selection](model-and-service-selection.md) : implemented stack; model upgrades require task-specific evidence
+- [owned-district-and-admission](owned-district-and-admission.md) : OWNED DISTRICT DATA PATH AND RENDERER. Complete-district validation is not established
+- [person-presentation-consent](person-presentation-consent.md) : PERSON-REGION MASKING AND PRESENTATION CONSENT. A detected person leaves a row, the
 - [personal-admission](personal-admission.md) : A personal photograph is admitted under account authority, screened for people, and read by a
 - [physical-streaming-runtime](physical-streaming-runtime.md) : Status, corrected 2026-09-13: RENDERER CONTRACT IMPLEMENTED; production streaming and
-- [place-identity](place-identity.md) : Design note, 2026-09-06, with the schema decision added 2026-09-07. No real cross-capture
-- [platform-findings](platform-findings.md) : mixed, labelled per finding. Runtime observations were made on 2026-08-27. Catalog and
+- [place-identity](place-identity.md) : PLACE PLANE AND SYNTHETIC ALIGNMENT. The vocabulary and tables are decided and the
+- [platform-findings](platform-findings.md) : mixed, labelled per finding. Runtime observations come from scripts/verifyplatform.py
 - [privacy-consent-threat-model](privacy-consent-threat-model.md) : mixed. Every claim below carries exactly one label: VERIFIED (primary source URL and
 - [product-direction](product-direction.md) : This roadmap defines delivery milestones and their acceptance criteria
 - [product-specification](product-specification.md) : mixed. Every claim carries exactly one label, per the convention in
-- [reconstruction-findings](reconstruction-findings.md) : Historical single-photograph findings plus a retained-bowl geometry observation
-- [reconstruction-quality-gate](reconstruction-quality-gate.md) : implemented; first benchmark-calibrated pose policy verified 2026-09-04
+- [reconstruction-findings](reconstruction-findings.md) : Single-photograph findings on glasshouse-courtyard.jpg plus a retained-bowl geometry observation
+- [reconstruction-quality-gate](reconstruction-quality-gate.md) : POINT-MAP VALIDATORS AND VERSION-2 POSE POLICY. The real-corpus quality gate is not
 - [representation-decisions](representation-decisions.md) : Every choice about how the world is represented, what each one assumes, and the condition that would
 - [retained-reference-workflow](retained-reference-workflow.md) : A real trained reconstruction is established for one collection and refused for the other
-- [runtime-verification](runtime-verification.md) : VERIFIED by execution on 2026-08-27
+- [runtime-verification](runtime-verification.md) : VERIFIED by execution of uv run scripts/verifyplatform.py
 - [saved-world-entry](saved-world-entry.md) : A saved world entry is the workspace-owned pointer a person uses to reopen an owned world. It
 - [scene-placement-alignment](scene-placement-alignment.md) : Implemented 2026-09-05. This corrects the identity-scale limitation documented in
-- [scene-reconstruction-operations](scene-reconstruction-operations.md) : IMPLEMENTED and PostgreSQL-tested 2026-09-04; licensed benchmark admitted, reconstructed
-- [scene-segments](scene-segments.md) : implemented 2026-09-11 on branch codex/segments-backend, backend half. The derivative
+- [scene-reconstruction-operations](scene-reconstruction-operations.md) : PRODUCTION RUNG-3 MULTI-PHOTOGRAPH PATH. Scene selection, durable work, pose
+- [scene-segments](scene-segments.md) : SCENE SEGMENTS ON THE INGEST, LIFT AND READ PATH. The derivative worker's environment
 - [scene-splat-publication](scene-splat-publication.md) : Implemented 2026-09-05. This is the normal production path from an admitted, exact capture set
 - [screening-currency](screening-currency.md) : Migration 0040 separates a historical review from permission for a new geometry operation
 - [security-floor](security-floor.md) : - Status: mixed, labelled per claim. See README.md(README.md) for the status convention
@@ -71,14 +71,14 @@ What the system is. Edited when the system changes.
 - [spatial-world-authority](spatial-world-authority.md) : IMPLEMENTED for canonical structural snapshots, reviewed preview/apply, protected-base
 - [synthetic-society-contract](synthetic-society-contract.md) : BOUNDED DETERMINISTIC SIMULATION; NOT A LEARNED SOCIETY MODEL
 - [texture-package](texture-package.md) : IMPLEMENTED for seventeen baked texture sets, their containers, the manifest, migrations
-- [traffic-contract](traffic-contract.md) : V1 IMPLEMENTED ON CITY V2 ROAD RECORDS; NOT YET RUN BY ANY RUNTIME, STORED OR DRAWN
+- [traffic-contract](traffic-contract.md) : TRAFFIC V1 ON CITY V2 ROAD RECORDS. No runtime stores or draws a run
 - [visual-gate-corridor-walk](visual-gate-corridor-walk.md) : The corridor lane's own walk is stated in docs/generated-corridor-street.md and is not touched by
 - [visual-gate-rubric](visual-gate-rubric.md) : version 5, fixed before any street geometry is generated and before any corridor is scored. Changing it needs a new reconciliation record...
 - [visual-gate-targets](visual-gate-targets.md) : The visual gate scores a page. A target says which page, and everything that makes two runs of
-- [visual-gate-third-authentication-condition](visual-gate-third-authentication-condition.md) : The decision is yours. This lane does not make it, and the reason matters: the gate currently
+- [visual-gate-third-authentication-condition](visual-gate-third-authentication-condition.md) : NAMED CONDITION preview-shell-credentialed-tiles
 - [world-composition-contract](world-composition-contract.md) : DECISION for product and architecture direction; PARTIAL implementation
-- [world-memory-model](world-memory-model.md) : DECISION AND RESEARCH PROGRAM. Existing evidence, graph, reconstruction
-- [world-memory-package](world-memory-package.md) : BUILT AND EXIT-GATED. The implementation profile is exulanica-wmp-1.0
+- [world-memory-model](world-memory-model.md) : DECISION AND RESEARCH PROGRAM. Evidence, graph, reconstruction
+- [world-memory-package](world-memory-package.md) : PROFILE exulanica-wmp-1.0, EXIT-GATED
 - [world-objects-contract](world-objects-contract.md) : DECISION and IMPLEMENTED for alternate world versions, authored object add/move/
 - [world-read-posed-views](world-read-posed-views.md) : Wire contract for posed image bytes. Written 2026-09-08; byte delivery is implemented
 - [world-read-recipient-evidence](world-read-recipient-evidence.md) : Wire contract, 2026-09-08. Owning-workspace reads only; release.state remains
@@ -104,13 +104,13 @@ Numbered, and the number is the identifier. Never renumbered.
 25 documents.
 
 - [0002-model-routing](adr/0002-model-routing.md) : - Status: Accepted
-- [0003-renderer-selection](adr/0003-renderer-selection.md) : - Status: ACCEPTED, PlayCanvas Engine 2.21.4. Resolved 2026-08-28 by matched-resolution
+- [0003-renderer-selection](adr/0003-renderer-selection.md) : PlayCanvas Engine 2.21.4 is the Atlas 3D renderer
 - [0004-exif-orientation-normalisation](adr/0004-exif-orientation-normalisation.md) : - Status: Accepted
 - [0005-unified-selection-model](adr/0005-unified-selection-model.md) : - Status: Accepted
 - [0006-desktop-viewport-boundary](adr/0006-desktop-viewport-boundary.md) : - Status: Accepted
 - [0007-world-composition-and-customization](adr/0007-world-composition-and-customization.md) : ACCEPTED AND IMPLEMENTED for reviewed structural composition authority and appearance
-- [0008-generated-geometry](adr/0008-generated-geometry.md) : - Status: ACCEPTED as a refusal with a stated path. The refusal holds. The admission
-- [0009-the-ladder-above-rung-3](adr/0009-the-ladder-above-rung-3.md) : - Status: ACCEPTED; production rung 3 implemented 2026-09-04. D1, D4, D6, D9, D10, D11 and
+- [0008-generated-geometry](adr/0008-generated-geometry.md) : Refused from reconstruction. A generative model must not invent the surfaces a camera
+- [0009-the-ladder-above-rung-3](adr/0009-the-ladder-above-rung-3.md) : A reconstructed place earns a quality level from the receipts it holds, not from a
 - [0010-opm-2](adr/0010-opm-2.md) : - Status: ACCEPTED and BUILT 2026-09-03. The coordinated pass is done across both writers
 - [0011-exulanica-namespace](adr/0011-exulanica-namespace.md) : - Status: ACCEPTED 2026-09-04. Mode A, a pre-release clean cutover
 - [0012-upright-display-space](adr/0012-upright-display-space.md) : - Status: Accepted

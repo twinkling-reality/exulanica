@@ -146,8 +146,8 @@ function whole(value: string | null, limit: number): number | null {
  * writing. The difference between the two is where the container comes from. A `tile` name is a
  * golden committed to this repository; a `city` and coordinate, or a `baked_tile` key, is a
  * container fetched from `/tiles` with this session's credential, because a baked corridor street
- * is never committed. The texture sets are the committed library either way, since no route serves
- * the published texture library yet.
+ * is never committed. The texture sets are the committed library either way; no route serves
+ * the published texture library.
  *
  * A key wins over a coordinate when a search carries both, so one reading is never ambiguous.
  */

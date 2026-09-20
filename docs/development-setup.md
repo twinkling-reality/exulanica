@@ -1,7 +1,7 @@
 # Development setup and operations
 
-Commands and operational notes retained from the previous root README. Test counts and
-measurement dates below are historical, not a fresh execution report.
+Commands for installing extras, running the suite, starting the API, and configuring the local
+store. Test counts and measurement dates below are historical, not a fresh execution report.
 
 ## Setup and running
 
@@ -220,8 +220,9 @@ pending migrations and provisions runtime roles; it is not a read-only check. Us
 for migrations and role provisioning. Configure `EXULANICA_APP_ROLE_PASSWORD`,
 `EXULANICA_EXECUTOR_ROLE_PASSWORD` and `EXULANICA_PURGE_ROLE_PASSWORD` when password authentication
 is used, then switch to the non-owner runtime URL below. See [deployment](deployment.md) for the
-full configuration. Existing retained databases require the separately reviewed backup and
-[activation procedure](briefs/2026-09-08-retained-activation.md), not an implicit startup upgrade.
+full configuration. Existing retained databases require a separately reviewed backup and
+activation path, not an implicit startup upgrade. That procedure is operator process and is not
+in this repository.
 
 Three environment variables, and the API refuses to start without the first two rather than
 defaulting to something:

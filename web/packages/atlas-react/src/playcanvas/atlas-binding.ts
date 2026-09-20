@@ -174,7 +174,7 @@ export type RepresentationSelectionReason = 'explicit' | 'unavailable' | 'unregi
  * atlas-core: which tier an island is at, which anchor has focus, what emphasis each anchor
  * carries, where an island sits. This module converts those answers into PlayCanvas objects and
  * nothing more. That split is what makes ADR-0003 a two-package decision rather than a front-end
- * rewrite, and it is worth being strict about: if a rule is being decided here, it is in the wrong
+ * rewrite, and it is worth being strict about: if a rule is decided here, it is in the wrong
  * package.
  */
 
@@ -296,7 +296,7 @@ const PROOF_LENS_OFF: ProofLensColor = Object.freeze([0, 0, 0, 0]);
  * a seventh of a second, did not help either. What the wait is actually for is the work-buffer
  * shader: installing the modifier rebuilds it, the link is deferred until first use, and until it
  * lands the refills run through the shader that has no lens in it. Nothing asks for another refill
- * when the new one is ready, so the window has to outlast the compile.
+ * when the replacement shader is ready, so the window has to outlast the compile.
  *
  * 2.5 s covers it on the real trained bowl on ANGLE Metal on 2026-09-06, where the tint was absent
  * at 1.8 s and present at 2.5 s. It is a bounded window per press of a button, and it costs
@@ -2508,7 +2508,7 @@ export class AtlasBinding {
       this.residencyState = plan.state;
       // Install pending ids before handing actions to an executor: an honest missing/unsupported
       // descriptor may settle synchronously, and settling against the previous state would leave
-      // the new request pending forever.
+      // the later request pending forever.
       this.onResidencyActions?.(plan.actions);
       if (this.onResidencyActions === null) {
         // Predecoded fixture mode has no I/O to await. Production installs a physical executor

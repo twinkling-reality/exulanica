@@ -1,13 +1,8 @@
 """The one data layer. PostgreSQL 18 with pgvector, and nothing beside it.
 
-There used to be two: the spine in ``exulanica/migrations/0001_spine.sql`` and a portable SQLite
-mirror that the ingest path actually wrote. The mirror existed because no PostgreSQL with
-pgvector was available when ingestion was written, and it was a fork waiting to happen: the
-epistemic guards that carry the product's central promise exist only in PostgreSQL, and a
-second schema is a second thing to keep true.
-
 This package holds what every caller of the spine needs and no caller should reimplement:
-opening a connection with a workspace attached, and applying the migration files.
+opening a connection with a workspace attached, and applying the migration files. The epistemic
+guards that carry the product's central promise exist only in PostgreSQL.
 """
 
 from exulanica.db.migrate import (

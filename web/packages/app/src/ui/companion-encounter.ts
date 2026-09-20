@@ -341,7 +341,7 @@ export function buildCompanionEncounter(
       mode = 'answer';
       root.setAttribute('data-answering', 'answered');
       // Marked, so the surface and a test can both tell an answer that was just composed from
-      // one that was read back. Nothing styles it differently today; what it buys is that
+      // one that was read back. Nothing styles it differently; what it buys is that
       // "is this a fresh answer" stops being a guess.
       root.setAttribute('data-remembered', 'true');
       reflect();

@@ -261,7 +261,7 @@ export class LayeredCharacterRenderable implements CharacterRenderable {
   ): void {
     if (visible !== this.visible) this.setVisible(visible);
     if (!visible) return;
-    // The legacy call passes the displacement that led here; rebuild the previous point from it.
+    // This call passes the displacement that led here; rebuild the previous point from it.
     if (this.previous === null && (dx !== 0 || dz !== 0)) this.previous = [state.x - dx, groundY, state.z - dz];
     this.pose({
       position: [state.x, groundY, state.z],

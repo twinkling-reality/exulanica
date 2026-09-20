@@ -1,6 +1,6 @@
 # Generated tile runtime
 
-Status: IMPLEMENTED as a development evaluation only: the browser reads baked texture sets and
+Status: Development evaluation only: the browser reads baked texture sets and
 baked `.owd` tiles, draws a tile's `render_batch` with physically based materials under one
 versioned look, and stands the player on its `nav_envelope`. No generated tile appears in any
 person's world, and none may until a superseding governance ADR is accepted in writing. A baked

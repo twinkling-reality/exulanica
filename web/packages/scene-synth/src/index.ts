@@ -1,3 +1,10 @@
+/**
+ * @exulanica/scene-synth
+ *
+ * Synthetic point maps from declared primitives, for renderer and reconstruction
+ * benches. The CLI writes OPM containers; nothing here is evidence.
+ */
+
 export type { Intrinsics } from './camera.js';
 export { intrinsics, pixelRay, resolutionFor } from './camera.js';
 export type { HonestyParams, KeepMask } from './honesty.js';

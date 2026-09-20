@@ -74,7 +74,7 @@ export interface PlacedObjectRow {
   readonly label: string;
   readonly regionLabel: string;
   /**
-   * `none` means the object carries no behaviour; `unsupported` means it carries one this build
+   * `none` means the object carries no behaviour; `unsupported` means it carries one this client
    * cannot run. The two are different facts and the panel says which.
    */
   readonly motion: 'running' | 'held' | 'at-rest' | 'none' | 'unsupported';
@@ -134,7 +134,7 @@ const MOTION_STATE_WORDS: Readonly<Record<PlacedObjectRow['motion'], string>> = 
   held: 'stopped part-way',
   'at-rest': 'still, where it was placed',
   none: 'no motion',
-  unsupported: 'motion this build cannot run',
+  unsupported: 'motion this client cannot run',
 });
 
 const AXIS_WORDS: Readonly<Record<string, string>> = Object.freeze({

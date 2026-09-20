@@ -1,29 +1,29 @@
 # Per-scene gsplat jobs
 
-Status 2026-09-05, evening: **the runner image has been built from this recipe and executed on a
-rented NVIDIA L40S; real CUDA training of the retained bowl collection ran through the normal scene
-worker.** The morning statement that no CUDA execution existed is superseded. The first real run
-found and fixed four trainer defects the CPU tests could not see: a Double seed scale beside Float
-means, a stderr digest that left the failure nameless, per-iteration JPEG decoding that held the GPU
-at 24 percent utilization, and glog's failure handler claiming the worker's SIGTERM after pycolmap
-was imported. A SIGTERM to the running trainer container produced a durable checkpoint at iteration
-3858 and exit 75, as designed. Measured speeds and costs are in
+Status: **CONTENT-ADDRESSED GSPLAT CONTROLLER AND RESUMABLE TRAINER**.
+`exulanica.reconstruction.splat` is the controller. `exulanica.reconstruction.gsplat_runner` is
+the trainer. CUDA training of the retained bowl collection ran through the scene worker on a
+rented NVIDIA L40S. Measured speeds and costs are in
 [the GPU compute note](reference-gpu-compute.md); the accepted-scene outcome is recorded in the
 evaluation record that accompanies the retained workflow, not asserted here.
 
-`exulanica.reconstruction.splat` remains the content-addressed controller for one scene-specific
-Gaussian optimization. The manifest pins the exact original source set, accepted pose-manifest
-digest, Exulanica revision, gsplat revision, execution image digest, requested GPU, dependency
-inventory, complete training/metric protocol, checkpoint interval, iteration and Gaussian caps,
-held-out policy, price rate, and quality thresholds. Changes to settings or metric definitions create
-a new build identity.
+The first CUDA run found and fixed four trainer defects the CPU tests could not see: a Double seed
+scale beside Float means, a stderr digest that left the failure nameless, per-iteration JPEG
+decoding that held the GPU at 24 percent utilization, and glog's failure handler claiming the
+worker's SIGTERM after pycolmap was imported. A SIGTERM to the running trainer container produced
+a durable checkpoint at iteration 3858 and exit 75, as designed.
 
-The previous statement that the resumable trainer was missing is superseded by
-`exulanica.reconstruction.gsplat_runner`. This is an independent single-GPU training loop using
-Apache-2.0 gsplat `v1.5.3`, commit `937e29912570c372bed6747a5c9bf85fed877bae`. It uses the actual
-gsplat differentiable rasterizer and MCMC strategy, torch Adam optimizers, and image losses. It does
-not use upstream `simple_trainer.py --ckpt`, which is an evaluation-only path. CUDA execution has
-now happened on real photographs; what remains open is recorded per scene in the evaluation records.
+The manifest pins the exact original source set, accepted pose-manifest digest, Exulanica revision,
+gsplat revision, execution image digest, requested GPU, dependency inventory, complete
+training/metric protocol, checkpoint interval, iteration and Gaussian caps, held-out policy, price
+rate, and quality thresholds. Changes to settings or metric definitions create a new build
+identity.
+
+The trainer is an independent single-GPU training loop using Apache-2.0 gsplat `v1.5.3`, commit
+`937e29912570c372bed6747a5c9bf85fed877bae`. It uses the actual gsplat differentiable rasterizer
+and MCMC strategy, torch Adam optimizers, and image losses. It does not use upstream
+`simple_trainer.py --ckpt`, which is an evaluation-only path. Per-scene outcomes live in the
+evaluation records.
 
 ## Input and coordinate contract
 

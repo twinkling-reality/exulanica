@@ -1,4 +1,14 @@
-"""World Memory Package v1 projection and independent verification."""
+"""World Memory Package v1 projection and independent verification.
+
+:mod:`exulanica.world_package.package` verifies a copied directory without a database.
+:func:`project_world_package` is loaded lazily because projection needs PostgreSQL;
+importing the verifier must not open one.
+
+The implementation profile is ``exulanica-wmp-1.0``. The optional authored-world
+extension and the separate training-dataset profile live beside it and do not change
+the 1.0 required paths. A signed package is not a live store, a consent grant, or an
+executable world. See ``docs/world-memory-package.md``.
+"""
 
 from typing import Any
 

@@ -527,10 +527,10 @@ def _surface(tmp_path: Path, shell_js: str) -> object:
     real page; a test that rebuilt that shape itself would be checking its own arithmetic. Only
     ``document`` is invented, because the one thing not available here is a browser.
 
-    A STUB BECAUSE THE FIXTURE IS TEMPORARY. This path was built against a live page that reliably
-    refused to start, and the tile route defect behind that page is being fixed. Once it is, nothing
-    here shows an error surface on demand, and a check whose only fixture has gone is a check nobody
-    will see refuse anything again.
+    THE PAGE IS STUBBED SO THE ERROR SURFACE CAN BE SHOWN ON DEMAND. This path was built against
+    a live page that reliably refused to start. A live page that starts has no error surface on
+    demand, and a check whose only fixture is that page is a check nobody will see refuse
+    anything again.
     """
     driver = tmp_path / "read-surface.mjs"
     driver.write_text(

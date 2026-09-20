@@ -1,8 +1,7 @@
 """The two-phase suite runner: which tests need the reference copy, and where each phase runs.
 
-These are the statements the repository has to carry, because until 2026-09-17 they lived in one
-machine's untracked wrapper: a fresh clone had three tests that failed for a reason nothing in the
-tree explained.
+These are the statements the repository has to carry. An untracked wrapper on one machine left
+a fresh clone with three tests that failed for a reason nothing in the tree explained.
 """
 
 from __future__ import annotations

@@ -8,12 +8,12 @@ running it:
     returns. A harness written that way silently leaves a schema behind, and the next run fails
     with "type assertion_kind already exists". So the schema is created inside a throwaway
     namespace and that namespace is dropped afterwards.
-*   **The target is PostgreSQL 18 with pgvector, and this harness now requires it.** An earlier
-    version substituted ``gen_random_uuid()`` for ``uuidv7()`` and ``bytea`` for
-    ``halfvec(4096)`` so that the suite could run on an older server. That made the suite green
-    while the vector path had never executed even once, and it hid a real defect: a test wrote
-    raw bytes into ``embedding.v`` and passed, because under the substitution the column was
-    ``bytea``. A wrong server is now a loud failure naming what is missing, not a silent fake.
+*   **The target is PostgreSQL 18 with pgvector, and this harness requires it.** Substituting
+    ``gen_random_uuid()`` for ``uuidv7()`` and ``bytea`` for ``halfvec(4096)`` so the suite
+    could run on an older server made the suite green while the vector path had never executed
+    even once, and it hid a real defect: a test wrote raw bytes into ``embedding.v`` and passed,
+    because under the substitution the column was ``bytea``. A wrong server is a loud failure
+    naming what is missing, not a silent fake.
 *   **Extensions are database-wide objects and ``create extension if not exists`` races.** Two
     connections applying the migration at once can both pass the existence check, and the loser
     gets ``duplicate key (extname)``. They are created here, once, in ``public``, under an

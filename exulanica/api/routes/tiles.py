@@ -133,7 +133,7 @@ def list_tiles(
     return JSONResponse(
         status_code=200,
         # Answered under the wire's spelling, which the module docstring argues and
-        # `tests/test_corridor_tile_route.py` holds. Nothing reads this key today.
+        # `tests/test_corridor_tile_route.py` holds. Nothing reads this key.
         content={"city_seed": world_seed, "tiles": [tile.document() for tile in tiles]},
         headers=_HEADERS,
     )

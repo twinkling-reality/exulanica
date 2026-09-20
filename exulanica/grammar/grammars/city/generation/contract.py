@@ -1,11 +1,10 @@
-"""The contract the city generators consume, written down before the first generator.
+"""The contract the city generators consume.
 
-Read from main at 2efdaedf on 2026-09-17, by reading the files named below rather than any
-report of them. Where this module and one of those files disagree, the file wins and this module
-is wrong; a generator never restates a number that a file already states, it imports or reads it.
+Where this module and a named file disagree, the file wins and this module is wrong; a
+generator never restates a number that a file already states, it imports or reads it.
 
-1. THE CITY GRAMMAR, VERSION 2 (``exulanica/grammar/grammars/city/``)
-=====================================================================
+1. THE CITY GRAMMAR (``exulanica/grammar/grammars/city/``)
+=========================================================
 
 **What a generator is.** A stage of ``CITY_GRAMMAR`` whose ``emit(context)`` returns a
 ``StageEmission`` with status ``emitted`` and records, each validated by the stage's own
@@ -272,7 +271,7 @@ inside a building volume, so everything behind glass must be closed.
   ``soil_band_edge_mm``, stated on a glazing surface and 0 on every other role, and
   ``glazing_soil_band_bottom_mm`` and ``glazing_soil_band_edge_mm`` are derived per building. The
   record version was amended in place rather than raised, which is honest only while nothing is
-  stored under it: the first bake recorded through migration 0072 freezes city version 2.
+  stored under it: the first bake recorded through migration 0072 pins that descriptor.
 * Still open: what lies behind glazing above the ground storey; the role-to-material-class table;
   ``city_reference_closure`` over a whole generated city; segment pieces no longer than 1 km.
 * A signal names traffic's signal-plan catalog by SHA-256, which the city grammar never reads, so

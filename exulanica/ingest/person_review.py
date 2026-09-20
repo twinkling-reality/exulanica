@@ -1,9 +1,7 @@
 """What a reviewer does to a person region, and what a person's decision is recorded as.
 
-The design note replaces one free-text sentence ("there are no visible people") with a confirmed
-region list and a state per person. This module is the writing half of that: it turns a reviewer's
-edits and a consent decision into the immutable receipts migration 0037 stores, and it refuses
-anything it cannot record honestly.
+This module turns a reviewer's edits and a consent decision into the immutable receipts
+migration 0037 stores, and it refuses anything it cannot record honestly.
 
 **The actor is never taken from the request.** Every function here takes the authenticated actor
 and writes it into the receipt. A body that could name its own actor would let the owner record a
@@ -12,10 +10,8 @@ and a note saying consent was given.
 
 **``actor_role`` is likewise not a parameter a caller chooses.** These functions record ``owner``,
 because the only credential this system has is the account holder's. The column admits
-``subject`` so that a genuine subject-facing route can be added later without a schema change, and
-nothing here may write that value: a receipt claiming to be the subject's own decision, written by
-the owner's token, would be worse than no receipt at all. Until that route exists the design note's
-own word for this layer is theater, and lying about the actor is how theater becomes fraud.
+``subject``, and nothing here may write that value: a receipt claiming to be the subject's own
+decision, written by the owner's token, would be worse than no receipt at all.
 
 **A detection is not an edit.** ``confirm``, ``add`` and ``delete`` all name the human who made
 them. The ``detected`` action belongs to the stage and cannot be written here.
@@ -98,9 +94,9 @@ def create_subject(
 ) -> uuid.UUID:
     """Create somebody a decision can be about.
 
-    ``entity_id`` stays null for a person nobody has named, which is the ordinary case and the one
-    the old gate could not express. Linking to an entity is how naming reaches an actual name, and
-    that link is a human act like every other one here.
+    ``entity_id`` stays null for a person nobody has named, which is the ordinary case.
+    Linking to an entity is how naming reaches an actual name, and that link is a human act
+    like every other one here.
     """
     subject_id = uuid.uuid4()
     repository.insert_person_subject(subject_id=subject_id, entity_id=entity_id, created_by=actor)

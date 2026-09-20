@@ -4,8 +4,8 @@ Status: engineering archive. [product-direction.md](product-direction.md) owns p
 scope and delivery order. This page keeps the earlier exit-gated engineering sequence
 and dependencies. It does not turn an assumption into a shipping claim.
 
-The composition contract and product roadmap were updated
-2026-09-12; read those first.
+Read [product-direction.md](product-direction.md) and
+[world-composition-contract.md](world-composition-contract.md) first.
 
 ## 1. North-star output
 
@@ -243,7 +243,7 @@ migration or public contract.
 
 ### Parallel frontend track: Exulanica public identity and landing system
 
-Status: **FIRST LANDING PASS BUILT 2026-09-04; broader public-surface rollout pending**.
+Status: **FIRST LANDING PASS EXISTS; broader public-surface rollout is not claimed**.
 
 Deliverables:
 
@@ -291,7 +291,7 @@ Exulanica. Historical compatibility remains only where ADR-0011 proved it is req
 
 ### Phase 0: evidence and adaptive-style foundation
 
-Status: **BUILT**.
+Status: **evidence spine, style versions, spatial core, and source-media metadata exist**.
 
 Delivered:
 
@@ -307,7 +307,7 @@ style writer cannot bypass the registry or protected topology digest.
 
 ### Phase 1: production asynchronous processing
 
-Status: **BUILT 2026-08-31**.
+Status: **derivative worker, non-owner runtime role, and reclaim gate exist**.
 
 Deliverables:
 
@@ -337,7 +337,7 @@ Operational behavior and the boundary of the guarantee are in
 
 ### Phase 2: real corpus and evaluation baseline
 
-Status: **the Phase 1 event schema is settled**.
+Status: **the derivative-worker event schema is settled**.
 
 Deliverables:
 
@@ -354,7 +354,7 @@ prove the blind split was not read by any training or tuning path.
 
 ### Phase 3: reconstruction ladder
 
-Status: **Production rung-3 path built 2026-09-04; representative real-corpus run blocked; rungs 1 and 2 without a production path**.
+Status: **Production rung-3 path exists; representative real-corpus run is blocked; rungs 1 and 2 have no production path**.
 
 #### Phase 3A: production rung 4 and rung 3
 
@@ -370,7 +370,7 @@ placement.
 
 #### Phase 3B: camera poses and scene grouping
 
-Implementation status: **BUILT 2026-09-04 for the production rung-3 path.** Normal scene grouping
+Implementation status: **production rung-3 path exists.** Normal scene grouping
 applies a versioned selection policy, queues an immutable exact member set, and a separate leased
 worker produces digest-bound pose, placement and gate receipts. The graph validates that chain and
 the renderer draws every available placed OPM/2 map. Registered and unregistered outcomes remain
@@ -415,7 +415,7 @@ renderer cannot expand the validated movement envelope.
 
 ### Phase 4: durable spatial world authority
 
-Status: **BUILT; no production snapshot materialized without authorised real inputs**.
+Status: **durable spatial authority exists; no production snapshot materialized without authorised real inputs**.
 
 Deliverables:
 
@@ -433,7 +433,7 @@ value.
 
 ### Phase 5: adaptive world and interaction state
 
-Status: **BUILT 2026-08-31; human/longitudinal evaluation blocked on real participants**.
+Status: **interaction-policy authority exists; human/longitudinal evaluation is blocked on real participants**.
 
 Deliverables:
 
@@ -476,7 +476,7 @@ No neural fine-tuning is required for this phase. Personalization is explicit, v
 
 ### Phase 6: physical streaming and rendering hardening
 
-Status: **RENDERER CONTRACT BUILT 2026-08-31; production publication and hardware gate blocked**.
+Status: **renderer contract exists; production publication and hardware gate are blocked**.
 
 Deliverables:
 
@@ -506,7 +506,7 @@ asset origin is available for the required large-world and network measurements.
 
 ### Phase 7: World Memory Package v1
 
-Status: **BUILT AND EXIT-GATED**. See `docs/world-memory-package.md` for the frozen v1 profile,
+Status: **profile `exulanica-wmp-1.0`, exit-gated**. See `docs/world-memory-package.md` for the frozen v1 profile,
 privacy boundary, commands, transaction semantics, and executable evidence.
 
 Deliverables:
@@ -528,7 +528,7 @@ has a new root whose diff names the removed and recomputed state.
 
 ### Phase 7B: training-use consent and consented dataset export
 
-Status: **PROPOSED 2026-09-06**, sequenced after the person-region masking and presentation
+Status: **training-use consent and dataset export, as a design**, sequenced after the person-region masking and presentation
 consent layer (`docs/person-presentation-consent.md`), which it depends on.
 
 Premise: labs building world models need real, diverse, rights-clean environments with camera
@@ -567,7 +567,7 @@ that makes the memory product work is at risk. Default off is not negotiable.
 
 ### Phase 8: end-to-end frontier demonstration
 
-Status: **IMPLEMENTED AND DEVELOPMENT-EXIT-GATED; AUTHORIZED PERSONAL-CORPUS RUN PENDING**. See
+Status: **development-exit-gated command exists; authorized personal-corpus run is not present**. See
 [`frontier-demonstration.md`](frontier-demonstration.md) for the strict manifest, destructive
 boundary, command, output contract, and executable evidence. The PostgreSQL acceptance run uses
 generated photographs and a counting model fake; it proves the orchestration mechanics and does
@@ -604,7 +604,7 @@ implementation.
 
 ### Phase 9: post-MVP learning research
 
-Status: **DEFERRED UNTIL EVALUATION JUSTIFIES IT**.
+Status: **no training task is on this sequence until evaluation names a failing metric and a consented dataset**.
 
 Possible work:
 
@@ -626,7 +626,7 @@ by default.
 
 ### Phase 10: the memory layer for world models
 
-Status: **DECIDED 2026-09-06, STARTING**. This phase turns the north-star positioning (a persistent,
+Status: **five memory-layer capabilities as interfaces and tiers**. This phase turns the north-star positioning (a persistent,
 real, per-entity world that generative world models read from and write to) into interfaces and
 tiers. It precedes Phase 7B, whose dataset export is this phase's read interface served as a file.
 

@@ -739,7 +739,7 @@ class AddObjectBody(EntryBoundEditBody):
     asset_sha256: str = Field(min_length=64, max_length=64)
     region_id: str = Field(min_length=1, max_length=500)
     transform: TransformBody
-    #: The person chooses. Product direction is explicit that the first slice asks rather than
+    #: The person chooses. Product direction is explicit that this surface asks rather than
     #: classifies, so there is no default and no inference from the asset.
     origin_role: Literal["fictional", "personal"]
     behaviour: BehaviourBody | None = None

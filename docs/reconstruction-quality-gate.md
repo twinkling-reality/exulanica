@@ -1,6 +1,8 @@
 # Reconstruction quality gate
 
-Status: **implemented; first benchmark-calibrated pose policy verified 2026-09-04**.
+Status: **POINT-MAP VALIDATORS AND VERSION-2 POSE POLICY**. The real-corpus quality gate is not
+established. `min_valid_fraction_milli` and `max_depth_step_milli` remain unvalidated stage
+parameters.
 
 `exulanica.reconstruction.validate_opm` validates every production point map before it is
 persisted. The PlayCanvas reader independently validates its untrusted byte boundary before it

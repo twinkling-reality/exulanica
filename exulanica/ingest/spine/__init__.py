@@ -1,10 +1,9 @@
 """The SQL the ingest path issues, one module per table's worth of queries.
 
-``exulanica/ingest/repository.py`` used to hold all of it: 730 lines and every statement the
-photograph path sends to the spine, from the stage registry to the row counts. The class is
-still there and still the only thing the ingest path imports, because the vocabulary the stages
-speak is a real thing and splitting it would push the SQL into nine callers. What moved is the
-SQL itself, so that a question about one table is answered by opening one file.
+The ingest path imports one facade, :class:`~exulanica.ingest.repository.IngestRepository`,
+because the vocabulary the stages speak is a real thing and splitting it would push the SQL
+into nine callers. The SQL itself lives here so that a question about one table is answered
+by opening one file.
 
 The modules, and the question each one answers:
 

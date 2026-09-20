@@ -53,7 +53,7 @@ class AbstractInhabitant implements CrowdRenderable {
     );
   }
 
-  /** Move the last skinned pose to the new ground contact; posing is where the CPU cost is. */
+  /** Move the last skinned pose to the updated ground contact; posing is where the CPU cost is. */
   follow(position: readonly [number, number, number]): void {
     if (!this.visible) return;
     this.avatar.root.setLocalPosition(position[0], position[1], position[2]);

@@ -16,10 +16,10 @@
  * quota, so a reload asks the list for a whole city in one request, compares each tile's
  * `container_sha256` against what is already held, and fetches a container only for a digest it does
  * not have. The route's `Cache-Control: private, no-cache` makes a browser revalidate every use, and
- * the route does not answer If-None-Match today, so a revalidation would cost the whole container;
- * comparing digests from the list costs one small request for the whole city instead. The request
- * still carries If-None-Match, so the day the route learns to answer 304 this module takes it for
- * free and nothing here has to change.
+ * the route answers If-None-Match with 304, so a revalidation of held bytes costs no container;
+ * comparing digests from the list still avoids a bytes request for a digest already held. The
+ * request carries If-None-Match, so a 304 from the route is taken for free and nothing here has to
+ * change.
  *
  * **A refusal never guesses why.** The route answers 404 `unknown_reference` both for a key it does
  * not hold and for a credential without `tiles.materialise`, on purpose, so that neither answer tells
@@ -256,7 +256,7 @@ export async function fetchBakedTile(
     Authorization: `Bearer ${access.token}`,
     Accept: BAKED_TILE_MEDIA_TYPE,
   };
-  // Free the day the route answers it, harmless until then.
+  // The route answers this with 304 and no body.
   if (held !== undefined) headers['If-None-Match'] = `"${held.containerSha256}"`;
   const response = await caller(access)(endpoint(access.baseUrl, `/tiles/${bakedTileId}/bytes`), { headers });
 

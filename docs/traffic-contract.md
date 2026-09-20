@@ -1,7 +1,6 @@
 # Traffic simulation
 
-Status: **V1 IMPLEMENTED ON CITY V2 ROAD RECORDS; NOT YET RUN BY ANY RUNTIME, STORED OR DRAWN**
-Updated 2026-09-17.
+Status: **TRAFFIC V1 ON CITY V2 ROAD RECORDS**. No runtime stores or draws a run.
 
 Cars, vans, buses and bicycles drive a generated city's streets second by second: they keep their lanes, stop at stop lines, take turns at junctions by the junction's rule,
 wait for people on crosswalks, and park. The same inputs always give the same bytes. This document

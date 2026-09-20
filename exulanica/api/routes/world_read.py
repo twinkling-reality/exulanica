@@ -247,14 +247,14 @@ def scene_observation_graph(
     and the read surface does not distinguish reasons a caller may not have.
 
     ``limit`` and ``after_point_id`` page the answer, and no limit means the whole graph, which is
-    what this route has always returned and what a client already reading it expects. The response
+    what this route returns and what a client reading it expects. The response
     says which one it got: MEASURED 2026-09-07 against the retained reference instance, the bowl
     scene's graph is 97,633,587 canonical bytes and the volcanic scene's is 1,179,240,157, so a
     caller who wants a page has to be able to ask for one, and a caller who gets a page has to be
     told so.
 
-    The inspector no longer reads this. It resolves one click at a time through ``/resolve``
-    below, because the volcanic scene's whole graph is more than a browser can hold as one string.
+    The inspector resolves one click at a time through ``/resolve`` below, because the volcanic
+    scene's whole graph is more than a browser can hold as one string.
     """
     return _observation_read(
         connection,
@@ -329,8 +329,8 @@ def scene_observation_resolve(
     The answer holds at most one point and that point's retained observations, so it is bounded
     by the scene's member count and not by its point count. MEASURED 2026-09-11 on the volcanic
     scene: the inspector's own centre-of-view click is 11,277 bytes, and the heaviest point any
-    click can select there, 78 retained photographs, is 92,547. The whole graph the inspector
-    used to read is 1,015,016,928.
+    click can select there, 78 retained photographs, is 92,547. The whole graph is
+    1,015,016,928.
     A miss is a 200 whose ``state`` says so, because nothing recorded near a click is an answer.
     ``exulanica/graph/observations.py`` holds the rest of the argument.
     """

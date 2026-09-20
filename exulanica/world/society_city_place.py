@@ -37,7 +37,7 @@ Standing spots keep two standing radii apart, and keep the nav envelope's capsul
 everything the navigation table says obstructs: a building's base ring, and each furniture or tree
 part whose bottom is below the capsule height, as a box in its object's frame. A seat is clear of
 every obstruction but its own bench. A footway station that fails either is walked through, not
-stood on. Walking lines are not yet routed round obstructions: the place counts every footway or
+stood on. Walking lines are not routed round obstructions: the place counts every footway or
 door piece that passes within a capsule radius of a low part, and says so. A premises unit whose
 use class the routine does not know is listed as unsupported, never guessed.
 """

@@ -167,7 +167,7 @@ function regionOf(value: unknown): SegmentRegion {
 function segmentOf(value: unknown): SceneSegment {
   const wire = record(value, 'segment');
   const kind = wire['kind'];
-  if (kind !== 'object' && kind !== 'person') throw unreadable('A segment is of a kind this build does not know.');
+  if (kind !== 'object' && kind !== 'person') throw unreadable('A segment is of a kind this client does not know.');
   const label = nullable(wire['label'], (text) => {
     if (typeof text !== 'string' || text.length === 0) throw unreadable('A segment label is not text.');
     return text;
@@ -217,7 +217,7 @@ function segmentOf(value: unknown): SceneSegment {
  *
  * Refuses rather than repairs. A segment list on a scene that is not `available`, an available one
  * with no grid, or a segment whose shape mixes a person and an object are all signs that the body
- * and this build disagree, and the honest consequence is no overlay rather than a partial one.
+ * and this client disagree, and the honest consequence is no overlay rather than a partial one.
  */
 export function parseSceneSegments(value: unknown, expectedSceneId?: string): SceneSegments {
   const wire = record(value, 'body');
@@ -230,7 +230,7 @@ export function parseSceneSegments(value: unknown, expectedSceneId?: string): Sc
   }
   const state = wire['state'];
   if (state !== 'available' && state !== 'stale' && state !== 'absent' && state !== 'unavailable') {
-    throw unreadable('The scene segments are in a state this build does not know.');
+    throw unreadable('The scene segments are in a state this client does not know.');
   }
   const grid = nullable(wire['grid'], (value) => {
     const held = record(value, 'grid');

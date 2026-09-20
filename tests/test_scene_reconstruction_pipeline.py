@@ -1143,9 +1143,9 @@ def _binary_values(value, path="memo"):
         ]
     # `dataclasses.fields` BEFORE `__dict__`, and this is the whole difference between a test that
     # can fail and one that cannot. Every dataclass on this path is `slots=True`, so it has no
-    # `__dict__` and no `_fields`. An earlier version of this walker fell through both and returned
-    # [], which meant it would have passed against the exact regression it names: a memo holding a
-    # `PlacementRecord` whose `PointMapInput.content` carried 780 MB of point maps.
+    # `__dict__` and no `_fields`. Falling through both and returning [] would pass against the
+    # exact regression this walker names: a memo holding a `PlacementRecord` whose
+    # `PointMapInput.content` carried 780 MB of point maps.
     if dataclasses.is_dataclass(value) and not isinstance(value, type):
         return [
             found

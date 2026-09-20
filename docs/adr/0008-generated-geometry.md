@@ -1,4 +1,25 @@
-# ADR-0008: Generatively completed geometry is not admitted to the reconstruction ladder
+# Generatively completed geometry is not admitted to the reconstruction ladder
+
+Status: Refused from reconstruction. A generative model must not invent the surfaces a camera
+never saw and treat them as reconstructed space.
+
+The label ADR-0008 is only an identifier.
+
+**What this is.** A recorded refusal: a generative model must not invent the surfaces a camera
+never saw and treat them as reconstructed space.
+
+**Why it exists.** A generated floor or unseen back, drawn as if it were captured, is the product
+claiming observation it does not have.
+
+**What it still governs.** Reconstruction, the point-map container, the scene graph, navigation,
+collision, unlabeled rendering, and the World Memory Package. Generated receipts may be stored as
+explicitly generated, non-citable metadata
+([ADR-0023](0023-epistemically-typed-world-memory.md)); generated geometry bytes remain unserved
+and undrawn until a later record supersedes this one.
+
+The living specification is [product-specification.md](../product-specification.md) section 5.
+The body below keeps the alternatives, licence grounds, and the admission checklist a later
+change must meet. It is not the document a newcomer should start with.
 
 - Status: **ACCEPTED as a refusal with a stated path.** The refusal holds. The admission
   checklist in section 4 is not scheduled and nothing in it is built. It exists so that admitting

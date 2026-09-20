@@ -3,9 +3,8 @@
  *
  * This speaks [docs/world-objects-contract.md](../../../../docs/world-objects-contract.md), which
  * is implemented: migration `0042_authored_world_objects.sql`, `exulanica/world/objects.py`, and
- * the `/world/versions` and `/world/assets` routes. An earlier draft of this module was written
- * against a guessed contract before that landed; every shape below now comes from the published
- * one, and `packages/graph-client/test/fixtures/world-objects.json` is a real `GET
+ * the `/world/versions` and `/world/assets` routes. Every shape below comes from that published
+ * contract, and `packages/graph-client/test/fixtures/world-objects.json` is a real `GET
  * /world/versions/{id}` body the tests parse.
  *
  * Four properties are worth naming, because each is a decision the contract made and this file
@@ -311,7 +310,7 @@ export class WorldObjectsClient {
   /**
    * Read the reviewed registry and one version together, or the newest version when none is named.
    *
-   * There is no version picker in this build. Opening the newest is a presentation decision and it
+   * There is no version picker on this surface. Opening the newest is a presentation decision and it
    * is made here rather than pretending the contract has a current pointer: it deliberately does
    * not, because "two alternate versions of one place could not coexist at all" is exactly the
    * limitation this plane exists to remove.
@@ -585,7 +584,7 @@ export function parseTransform(value: unknown): ObjectTransform {
   const row = record(value, 'object transform');
   return Object.freeze({
     // Carried on the wire so "a reader never has to know them from context". Read rather than
-    // assumed, and refused when they are not the ones this build converts.
+    // assumed, and refused when they are not the ones this client converts.
     coordinateSpace: text(row['coordinate_space'], 'transform coordinate space'),
     coordinateUnit: text(row['coordinate_unit'], 'transform coordinate unit'),
     xMm: integer(row['x_mm'], 'transform x_mm'),
@@ -723,7 +722,7 @@ export function objectWriteFailure(error: unknown): string {
   // out-of-range transform or a stray field produces, which makes it the most likely one to be
   // seen, so it is named here rather than left as the only refusal in this table with no words.
   if (error.code === `http_${error.status}` && error.status === 422) {
-    return 'The authority refused the shape of this edit. That is a fault in this build rather '
+    return 'The authority refused the shape of this edit. That is a fault in this client rather '
       + 'than something you did.';
   }
   switch (error.code) {

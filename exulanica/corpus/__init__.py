@@ -1,10 +1,10 @@
 """A synthetic photograph corpus, generated deterministically, labelled synthetic in its bytes.
 
 **What this is for.** Nothing about scene grouping, continuity, reconstruction or evaluation is
-real until a corpus exists, and `.exulanica/media/intake/` holds a README. This package produces
-one: eighty-odd JPEGs with genuine EXIF, arranged so that the properties the pipeline claims are
-actually exercised rather than assumed. It runs the real ingest path, not a fixture loader, so
-what it verifies is the code that will run on the real corpus when there is one.
+real until a corpus exists. This package produces one: eighty-odd JPEGs with genuine EXIF,
+arranged so that the properties the pipeline claims are actually exercised rather than assumed.
+It runs the real ingest path, not a fixture loader, so what it verifies is the code that runs
+on a photograph library.
 
 **What it is not.** It is not a stand-in for photographs of somebody's life, and it does not
 claim to be. The frames are projections of geometric arrangements. The coordinates are
