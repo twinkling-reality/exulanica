@@ -80,6 +80,19 @@ region shows the one covering the most of them, then trained geometry over point
 stay in the graph and the status list marked "Not drawn". An exact set whose members exceed the
 metadata group joins that group's island rather than splitting into standalone islands.
 
+Internal scene assembly and public delivery are separate authorization boundaries. When retained
+point-map bytes exist but no longer pass current screening or consent, the internal row retains its
+verified transform, marks the map `unavailable`, and carries no byte reference. `bytes_missing` is
+reserved for an absent stored object. Assembly rechecks point-map policy after every placement-memo
+lookup, and the geometry client can represent this explicit unavailable state without fetching it.
+
+Public `GET /graph` does not use those internal states to expose a partial scene. It evaluates the
+whole scene's bound inputs inside the snapshot and again immediately before return. If any bound
+input fails, it preserves the scene and member review identity but removes every placement,
+unposed point map, recovered camera and trained-geometry reference, then reports source photographs
+as the substrate. The ordinary `/geometry` route independently reapplies point-map policy before
+returning bytes.
+
 ## The proof lens, and click-to-evidence
 
 MEASURED 2026-09-06 on the retained real trained bowl at 1280x720
@@ -211,14 +224,42 @@ What moves how is stated per subject in the display record. District batches dis
 their surface as their points appear. Personal point maps and trained splats cannot fade
 their own look, so their points appear over it and the look leaves only at the points
 end. The owned district is registered as aggregate render batches, labelled **Grouped
-geometry, not separately extracted objects**, never as separate buildings.
+geometry, not separately extracted objects**, for the slider's actual surface samples. Its admitted
+buildings are also registered as metadata-only subjects with their own source identity and bounds.
+Those records own no draw and allocate no points; a selected building says that its geometry shares
+the aggregate district draw and has no per-feature point buffer.
+
+A resident authored object also becomes its own subject when its verified reviewed asset resolves
+to a supported static triangle hierarchy of no more than 32 renderer meshes and 250,000 source
+vertices in aggregate. Its stable object id owns the single subject and its embedded asset SHA-256
+names the geometry lineage. Each generated point draw remains under its renderer mesh node, while
+the object's root frame owns aggregate bounds, so nested node transforms, region placement,
+authored movement and residency agree without applying placement twice. These are presentation
+samples of the whole object's authored triangles, not measured source points, extracted semantic
+parts or observed segmentation. Authored meshes request eight times the descriptor's base
+surface-sampling density, currently 32 samples per square unit, before the same per-subject and
+global budgets scale the request; district meshes continue to use the descriptor density unchanged.
+Demand uses mesh-local triangle area: object and node scaling moves the attached samples with the
+surface but does not resample them to constant world-space density. Skinned, morphed, over-limit
+and otherwise unsupported objects
+keep their ordinary rendered form and state why the data view is unavailable; the view never
+selects one unnamed mesh and calls it the whole object. This is bounded reviewed-object coverage,
+not general imported-object support.
 
 **Boxes**, **Ids** and **Labels** draw only from a subject's own record: a box needs its
 own bounds, an id tag its own id and bounds, a label tag its own label and bounds.
 Anything without them gets no mark and a stated reason. Links join only subjects of the
-same scene. The overlays are not pickable; the panel's subject list is the selection, and
-the selected subject's box is highlighted. Withdrawn, unavailable or hidden subjects draw
-nothing at any slider position.
+same scene. The overlays are not pickable; the panel's subject list changes selection only after an
+explicit choice, and the selected subject's box is highlighted. Scene selection and an explicit
+admitted-building choice in the panel use the same provider feature identity. A render batch or
+artifact identity does not become semantic building context. Withdrawn or unavailable selected
+subjects clear that context and draw nothing; hidden subjects draw nothing at any slider position.
+
+The subject list can be filtered locally by its authorized label, stable subject identity, kind or
+origin. Filtering reads only the representation report already in the page and changes no renderer,
+permission, Companion context or authored state. An existing selection remains inspectable when it
+falls outside the filter and is listed separately from the match count. An empty result says that no
+subject matches; clearing the search restores the inventory without selecting anything.
 
 **Colour by** is where a subject came from (the closed origin set) or what it is (its own
 kind, never a guessed class), with a legend of only the colours in view. The

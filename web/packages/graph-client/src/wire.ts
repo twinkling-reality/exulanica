@@ -130,7 +130,7 @@ export interface ReconstructionScenePayload {
       readonly artifact_id: string;
       readonly content_sha256: string;
       readonly container: string | null;
-      readonly state: 'available' | 'bytes_missing';
+      readonly state: 'available' | 'bytes_missing' | 'unavailable';
       readonly reference: {
         readonly href: string;
         readonly authorization: 'workspace-bearer';
@@ -152,7 +152,7 @@ export interface ReconstructionScenePayload {
       readonly scene_from_opm_row_major: readonly number[];
       readonly local_units_to_scene_units: number;
       readonly scale_status: 'colmap-correspondence-fit';
-      readonly state: 'available' | 'bytes_missing';
+      readonly state: 'available' | 'bytes_missing' | 'unavailable';
       readonly reference: {
         readonly href: string;
         readonly authorization: 'workspace-bearer';

@@ -8,6 +8,10 @@ supported capabilities.
 
 Build your own world from your life, then change what's possible inside it.
 
+The product also makes persistent worlds a foundation for useful datasets, controlled experiments
+and applications. A person can build a project inside a world, build an application on its state
+and supported actions, or evaluate a model against reproducible scenarios drawn from it.
+
 Exulanica remains a Personal World Memory Model. Personal experiences supply meaningful places,
 people, objects, and context. Creation lets a person reshape that world, introduce fictional
 material, and combine it with their experiences. Simulation adds movement and interaction governed by physical or fictional rules.
@@ -109,6 +113,267 @@ distinguish proposals from running services. Measure storage, egress, build/infe
 simulation costs separately before selecting a hosted scale target. Reconstruction and asset
 creation use scheduled compute; a stored world does not require a permanently running GPU.
 
+## Living-world experience requirements
+
+The long-term product is a persistent personal world that a person can create, inspect and
+reshape with a Companion, populate with synthetic life, and use for projects and controlled
+experiments. Personal sources, permitted imports and synthetic creation are independent entry
+paths. Returning users open their saved world; users without one begin in an owned starter space.
+These are product requirements, not claims of complete implementation or visual acceptance.
+
+### Entry and first-world setup
+
+The intended entry experience keeps creation inside the world workspace. Returning users resume
+their saved world. A first-time user enters a minimal owned starter space, with one clear way to
+begin building and contextual help from the Companion. Naming is optional at entry and remains
+editable from inside the world. Uploading media, choosing a creation approach and reviewing a
+proposed change belong alongside the canvas, rather than in a mandatory introductory form.
+
+A starter space requires its own persistent authored identity and supported creation contract.
+It does not imply an observed place, completed reconstruction or generated environment. Personal
+media processing attaches explicit jobs and admitted results to that workspace. The interface
+shows actual progress and actionable failures where they occur; it does not promise a finished
+scene from a successful upload alone. Companion guidance uses supported tools and permissions,
+with direct controls available when no model is configured.
+
+Source-backed saved-world creation requires an existing composed personal-source topology. Signing in creates
+an owned workspace, and uploading preserves sources and processing receipts; neither operation
+creates that topology. Connecting ordinary reviewed-source intake to protected composition remains
+delivery work. The entry surface presents the useful next action in plain language. Source lineage,
+version reconciliation and capability limitations appear when they affect a decision, rather than
+as introductory engineering explanations.
+
+The first delivery slice creates a source-independent authored starter space with durable world
+identity, spatial state and appearance. It opens directly into the world canvas, with a small
+editable title, an Add photos control and the Companion. Photo review opens alongside that canvas.
+An introductory upload form or a persisted setup draft does not satisfy this experience.
+
+Creation and reopening preserve exact authored and appearance state. Later source attachment must
+preserve prior edits and explicitly represent how admitted content relates to the authored space.
+Companion naming and creation actions require typed operations with the same validation as direct
+controls. Acceptance covers an empty account entering its own space, a saved name and supported
+edit, exact reopening, and opening and closing photo intake without losing that world.
+
+Creation establishes a starting point. Continued usefulness comes from resuming a meaningful
+project, remembering its decisions, discovering consequences and investigating alternatives.
+The following requirements define that continuity:
+
+| Capability | Required experience |
+| --- | --- |
+| Functional objects | Objects expose supported actions and consequences. A usable chair has a sitting affordance; an operating shop has relevant hours, capacity and resources. Appearance and labels alone do not establish function. |
+| Time and change | People can revisit history, retain corrections, branch authored alternatives and compare simulated outcomes. A later observation, an imagined renovation and a simulation remain distinguishable even when they concern the same place. |
+| Uncertainty and correction | Ambiguous identity, incomplete geometry and competing interpretations remain inspectable. A correction updates affected representations without silently rewriting sources or unrelated state. Useful creation does not depend on perfect automatic extraction. |
+| Personal continuity | The Companion retains authorized project context, preferences, accepted decisions and unresolved questions. People can inspect, correct and delete that memory and control which changes the Companion may perform. |
+| Model interaction | A compatible model receives declared observations and proposes supported actions under explicit timing, validation and resource budgets. Generation, social planning, prediction and vehicle control have distinct capability requirements. |
+| Life between visits | A world declares whether simulation pauses, continues under a budget or advances through bounded catch-up. Returning users can inspect intervening events. Durable assets do not require repeated generation or continuous expensive inference. |
+| Ownership and collaboration | Visiting, editing, contributing content and running experiments have distinct permissions. Shared world content does not grant access to its private sources. Transfer declares which identities, assets, rules and history a receiver can use. |
+
+Society and experiment execution are optional capabilities over the shared identity, spatial,
+temporal, edit and event foundations. A personal studio, fictional garden and traffic experiment
+can require different capabilities without becoming unrelated world formats. Collaboration and
+scientific simulation do not become prerequisites for the saved-world experience.
+
+Controlled model evaluation belongs to the long-term product. Creative simulation explores
+consequences under declared rules. Scientific prediction additionally requires domain-specific
+calibration and validation against independent observations; believable inhabitants and detailed
+graphics do not establish that validity. Training requires a specified task, authorized data,
+feedback, held-out evaluation and measured benefit over an inference or deterministic baseline.
+
+A connected acceptance sequence creates a place, makes a consequential edit, shows an inhabitant
+responding through a declared affordance, and asks the Companion to explain the recorded cause.
+Inspection exposes the supporting state and events. Reopening preserves the result, and an
+alternative branch permits comparison without replacing the original history. A synthetic fixture
+can establish these mechanics; personal-source usefulness needs its own acceptance evidence.
+
+## Worlds as project foundations
+
+A world is both a place to inhabit and an environment to build with. The Companion helps a person
+define a project, select the relevant world content and supported capabilities, prepare changes,
+and inspect results. A project binds its work to explicit world versions, inputs and rules so that
+reopening, comparing and sharing results does not depend on one browser session. This is intended
+product scope; the API and package contracts determine which operations and outputs are supported.
+
+| Project use | Intended output | Required proof |
+| --- | --- | --- |
+| Build inside a world | An interactive place, activity or authored scenario with supported objects and behaviors | Accepted edits and behavior bindings survive reopening, and unsupported actions remain explicit |
+| Build on world state | An application or external tool that reads selected subjects and proposes authorized changes | An independent client uses the same identities and versions without relying on browser-private state |
+| Experiment with a world | Paired scenarios, recorded interventions and inspectable comparisons | Both runs bind exact starting conditions; controls, failures, raw outcomes and replay are retained |
+| Produce data from a world | Task-specific observations and annotations for permitted training or evaluation | Labels match the rendered observations, lineage and splits are explicit, and usefulness is measured on held-out cases |
+
+For example, a perception project can vary lighting, object placement and camera views in a
+declared scene, produce images with supported labels, and compare a detector across held-out
+conditions. A society project can change one supported amenity or rule and examine the recorded
+effects on synthetic inhabitants. These examples describe project capabilities to establish;
+they do not assert a delivered dataset generator, general rule editor or validated human-behavior
+predictor. The personal-world experience remains useful without running an experiment or training
+a model.
+
+### Project delivery sequence
+
+| Dependency order | Deliverable | Acceptance |
+| --- | --- | --- |
+| Saved world | Create or select a supported world, inspect it, make a supported edit and reopen it | World identity, authored state and source availability remain consistent across sessions |
+| Bounded project | Bind one supported interaction or controlled comparison to that saved state | Recorded inputs explain the result; a no-op control and invalid-input case test the claimed behavior |
+| Independent consumer | Read the supported state or result through an authenticated API or compatible export | A second client reproduces the declared interpretation and reports unsupported content |
+| Dataset workflow | Export one task-specific observation/annotation format for an external training or evaluation tool | Independent annotation checks and a held-out baseline comparison establish correctness and task benefit |
+
+These dependencies sequence the project capability without adding every output to the minimum
+release candidate. The saved-world and bounded-experiment implementations can advance independently
+where their contracts permit, then require a connected acceptance check. Dataset training and
+general simulation do not block personal-world entry. Model generation, reconstruction and policy
+providers remain replaceable; no single provider or downstream application defines the world format.
+
+## Modular simulation and scientific tooling
+
+Evaluate established simulation and geometry tools through replaceable adapters over world state.
+This is an evaluation and delivery program, not an implemented physics backend or a dependency of
+ordinary saved-world use. Preserve the modular monolith, existing job and storage boundaries, and
+the production renderer. A simulator consumes a bounded projection and returns validated results;
+it does not become the authority for personal evidence, permissions or persistent entity identity.
+
+### Candidate tools and adoption gates
+
+| Candidate | Role to evaluate | Adoption gate |
+| --- | --- | --- |
+| [NVIDIA Warp](https://github.com/NVIDIA/warp) | Accelerated geometry kernels and numerical simulation where profiling identifies a costly operation | Compare a pinned implementation with the existing or simplest suitable CPU baseline on correctness, memory, cold/warm latency and representative batch sizes |
+| [Newton](https://github.com/newton-physics/newton) | Physics-engine adapter for rigid bodies, contacts and supported articulated interactions | One bounded world project passes state mapping, contact/constraint checks, save/reopen and an independent result-consumer check; document supported solver features and numerical limits |
+| [OpenUSD](https://openusd.org/release/intro.html) | Optional scene and physics-description interchange with an external authoring or simulation tool | A named consumer preserves declared geometry, units, transforms and identity mappings; omissions and unsupported behavior are explicit |
+
+Warp provides compute primitives; Newton builds a physics engine on Warp. Evaluate Newton's
+maintained interfaces for engine-level tasks rather than adopting the deprecated `warp.sim`
+interface. Neither tool supplies personal memory, general segmentation or social intelligence.
+OpenUSD is a projection option, not a replacement for world authority or the World Memory Package;
+scene paths alone do not supply persistent Exulanica entity identifiers.
+
+Candidate evaluation pins the exact release, dependencies, license, hardware and solver settings.
+Warp's macOS execution uses the CPU rather than Metal acceleration, so local CPU results do not
+establish CUDA throughput. Heavy numerical work belongs in bounded jobs with reusable outputs;
+interactive views consume permitted state snapshots. GPU unavailability must leave the saved world
+usable and make the affected operation's availability explicit.
+
+### Delivery sequence and evidence
+
+| Dependency order | Deliverable | Acceptance |
+| --- | --- | --- |
+| Entity-owned representations | One authored object has owned geometry/point samples and a shared transform across normal and data views | Moving, selecting, removing and reopening preserve identity and sample ownership; generated samples retain their origin; geometry changes invalidate dependent representations |
+| Bounded physical project | A small rigid-body scene with explicit mass, collision shape, gravity, initial conditions and one supported intervention | Check a simple analytic case and contact behavior, repeat the run, retain failures and compare the intervention with its control; measured tolerances and resource budgets precede evaluation |
+| External consumer | Read the retained trajectory, entity mapping and run manifest through a supported API or projection | A separate client interprets the same results without browser-private state, reports losses and distinguishes playback from re-execution |
+| Scale and additional domains | Reuse assets and batch independent scenarios; consider articulated control, fluids or learned approximations where a project requires them | Profile preprocessing, transfer, stepping, storage and display separately; establish quality and recovery at increasing load before adding concurrency or a domain solver |
+
+The first physical project establishes one supported mechanism. Vehicle controllers, robotics,
+fluid dynamics and configurable fictional physics each need their own capability and validation
+scope. A gravity change can use a supported solver parameter; a request for an arbitrary physical
+law requires a compatible implementation. Differentiability alone does not establish useful model
+training or reliable gradients through every contact event.
+
+### Shared extension requirements
+
+The [simulation adapter boundary](world-memory-model.md#simulation-adapter-boundary) defines
+identity, units, clock mapping, authority and reproducibility requirements. Add three reusable
+capabilities alongside concrete projects rather than separate frameworks:
+
+| Capability | Purpose and evidence |
+| --- | --- |
+| Observation and action adapters | Declare what a controller can see and change, sensor timing, allowed rates and missing observations. Keep hidden evaluator state separate; validate actions before applying them. |
+| Scenario manifests and comparison harness | Bind world and asset digests, rule/solver versions, initial conditions, seeds, interventions, metrics and stopping conditions. Retain raw results and distinguish exact playback from numerical repeatability within declared tolerances. |
+| Bounded execution and caching | Reuse immutable prepared assets and outputs only when all material bindings and access checks agree. Bound active regions, simulation duration, memory and output size; cancellation and retries preserve run identity and visible failure state. |
+
+Mathematical research enters through a diagnosed task: specify assumptions, compare an established
+method, and measure correctness and cost before adoption. Use targeted invariant or formal checks
+where they protect consequential transformations; a proof about a model does not validate its
+fit to real people or physical observations. Additional perception models follow the existing
+[model-selection work](#required-model-selection-work). Specialized solver stacks, model training
+and distributed execution require demonstrated needs and their own evaluation rather than a
+blanket dependency expansion.
+
+## Performance and language evaluation
+
+Retain Python, TypeScript and SQL as the application foundation, with GLSL/WGSL for supported
+rendering work and compiled libraries behind existing interfaces. Language adoption is a measured
+engineering decision, not a feature milestone. This evaluation does not select a Rust component,
+custom CUDA kernel or application rewrite.
+
+### Representative-world performance milestone
+
+Establish a reproducible performance baseline after a connected saved-world interaction works and
+before expanding its supported scale. Use a permitted representative world plus deterministic
+scale fixtures with increasing visible objects, point counts, asset sizes and active population.
+Declare those dimensions, hardware, browser/runtime versions, quality settings, cold/warm cache
+conditions and target budgets before comparing implementations. Synthetic fixtures establish
+measured capacity for their workload, not general personal-world coverage.
+
+| Workload | Measurements and correctness checks |
+| --- | --- |
+| Open and revisit a saved world | Time to usable interaction, bytes transferred, decode/upload time, peak CPU/GPU memory and reuse of unchanged assets |
+| Inspect and edit moving objects | Frame-time distribution and stalls, selection/edit latency, draw calls, point preparation, stable identities and normal/point transform agreement |
+| Run and inspect a bounded scenario | Queue/preparation/step time, CPU/GPU utilization, result size, cancellation/recovery and the declared replay or numerical-repeatability guarantee |
+| Read or export a bounded projection | Query/validation/serialization time, transfer size, peak memory, exact identity/digest preservation and rejection of malformed input |
+
+Attribute time to algorithms, data copies, allocations, database access, network transfer and
+GPU work separately. Compare batching, caching, indexing and established compiled libraries
+before proposing a language change. Measure both the limiting operation and the complete user
+workflow; a faster kernel with expensive transfer or startup may leave the experience slower.
+
+### Implementation choices
+
+| Option | Scope and condition |
+| --- | --- |
+| GLSL/WGSL | Extend existing browser GPU work when rendering or compatible point/geometry processing is the measured limit. Verify supported browser paths, precision, resource release and visual correctness. |
+| Warp through Python | Evaluate compiled numerical work in the bounded physics project. Include preparation, compilation and CPU/GPU transfer costs in the comparison. |
+| Rust, optionally WebAssembly | Evaluate an isolated CPU-intensive or memory-sensitive component such as asset decoding, geometry preparation or portable validation when existing implementations miss declared budgets. Native and browser execution require separate measurements. |
+| Custom C++/CUDA | Use for a required native integration or a demonstrated gap that maintained libraries cannot meet. Specify the supported hardware and ongoing build/debug/dependency burden before adoption. |
+
+Promote an implementation only when it improves the declared workflow target while preserving
+quality, permissions, identity, failure behavior and resource bounds. Retain the baseline and
+comparison artifacts, portability results and maintenance rationale. Cross-language boundaries
+declare schemas, ownership, numeric precision and error semantics; canonical hashes and exact
+integer contracts must survive conversion without loss. Numerical simulation tolerances do not
+weaken exact storage or identity contracts. Keep replacements behind existing module, worker or
+artifact interfaces; a language change alone does not justify another service or world store.
+
+## Configurable world rules
+
+Fantasy creation includes architecture, appearance and the rules under which a world operates.
+A visual style does not silently select a calendar, physical law or social behavior. A person
+can combine compatible appearance and rule choices, with coherent presets providing starting
+points and supported parameters providing customization. Real-world statistics are one basis for
+rules; fictional worlds can use explicitly authored mechanisms instead.
+
+The intended rules are typed, versioned data bound to compatible runtime implementations.
+The customization surface has separate dimensions:
+
+| Dimension | Examples and consequences |
+| --- | --- |
+| Architecture and appearance | Building forms, materials, clothing and visual treatment. A form edit can affect navigation or affordances; changing a color does not implicitly change behavior. |
+| Calendar | Names and lengths of days, weeks, months and years; recurring occasions. Calendar changes can affect schedules that explicitly depend on those boundaries. |
+| World time and playback | World-time progression, pause and playback rate. Changing how quickly a run executes is distinct from changing the duration or meaning of a world day. |
+| Environment | Day/night cycles, seasons, weather and fictional celestial arrangements. A permanent-day world need not give its inhabitants perpetual wakefulness. |
+| Physical and fictional mechanisms | Gravity, traversal, growth, resource production or bounded fictional actions. Each requires an implementation that defines valid inputs, effects and interactions. |
+| Inhabitant and institutional rules | Sleep needs, work patterns, opening hours, transport and resource exchange, tied to the relevant world clock, environmental conditions or events. |
+
+Customization exposes supported parameters and validated combinations. A request for an unsupported
+mechanism produces an explicit capability gap, not a cosmetic substitute or a model-invented
+runtime behavior. The Companion can explain dependencies and prepare a reviewed proposal before
+applying a change. A broader vocabulary of rules extends through replaceable implementations;
+arbitrary executable rules are not implied by natural-language creation.
+
+For example, a world can request a thirty-hour day, a ten-day week and shops that open at dusk.
+Its calendar display, lighting and affected schedules must agree on the accepted definitions.
+If another edit removes dusk by making daylight permanent, the dependent opening rule needs an
+explicit replacement or a reported incompatibility. A moon count or calendar label alone cannot
+supply the missing environmental or behavioral mechanism.
+
+Rule changes name their effective simulation position and retain the version needed to replay
+earlier events. Changes that invalidate state require an explicit migration or an alternative
+branch. Rewinding playback does not erase recorded history. Personal capture dates and source
+chronology remain intact regardless of a world's fictional calendar. External models and package
+receivers must declare compatibility with the rules they consume.
+
+These requirements do not establish a configurable calendar, fictional physics engine or universal
+simulation runtime. Delivery proceeds through bounded compatible rule sets, with save/reopen,
+replay, dependency checks and visible behavior as acceptance criteria. They do not expand the
+release schedule into a requirement to implement every fictional mechanism.
+
 ## Relationship to the engineering roadmap
 
 This document supersedes narrower product definitions in product-specification.md and the
@@ -184,9 +449,11 @@ and borrows only their rhythms.
 **Rules** are versioned engines: grammar generators turn a seed into city records, the tessellator
 turns records into geometry, the society engine turns needs into actions and the traffic engine
 governs road lanes, signals and braking. A change to a rule is a later version, and earlier versions still
-replay. Rules model mechanisms, not scripts. Weather comes from a stochastic generator calibrated to
-a climate profile, and daylight from the sun's position; deliveries follow from shops running low;
-gatherings follow from relationships. Events are what those mechanisms produce, recorded as
+replay. Rules model mechanisms, not scripts. An Earth-like rule set derives weather from a
+stochastic generator calibrated to a climate profile and daylight from the sun's position.
+Fictional rule sets declare their environmental mechanisms and time dependencies explicitly.
+Deliveries follow from shops running low; gatherings follow from relationships.
+Events are what those mechanisms produce, recorded as
 simulation events, not entries in a list.
 
 **Generated instances** are the cities, streets, buildings, inhabitants and simulated days of a
@@ -670,7 +937,9 @@ active tasks' ownership through roadmap prose.
    models and ownership in [briefs/2026-09-11-scene-segments.md](briefs/2026-09-11-scene-segments.md).
 6. **Developer interoperability:** document stable read/edit contracts, package compatibility,
    capability negotiation, and asset resolution. Prove a second tool can make an accepted change
-   without depending on private interface state before claiming interoperability.
+   without depending on private interface state before claiming interoperability. Extend that proof
+   through the [project delivery sequence](#project-delivery-sequence) to reproducible comparisons
+   and task-specific datasets with independent consumers.
 
 ## Improvement over time and training boundaries
 
@@ -748,9 +1017,22 @@ The API should operate on a named world/version with authenticated reads and rev
 The existing World Read/Write routes are starting points, not a promise of the final route shape.
 Do not publish invented endpoints before implementing the contract.
 
+Project outputs use capability-declared projections: a scene asset, annotated dataset, experiment
+result and portable world snapshot serve different consumers. Each declares the source world and
+version, relevant rules and coordinate/time semantics, permitted uses, and information omitted or
+approximated. A geometry export does not transfer behavior or personal history. An external
+generator's returned geometry requires validation and explicit identity mapping before it can
+replace a representation of an existing subject. Bidirectional transfer is an acceptance claim
+only for the capabilities and formats demonstrated by both participants.
+
 ## Evaluation
 
 Evaluate whether a person recognizes the starting place, can make a meaningful creative change,
 and can resume working with the saved result. Verify that a second client reads the same world
 version and submits an accepted change. Each milestone should retain reproducible evidence for
 its acceptance criteria.
+
+For project capability, measure whether an independent builder can obtain a useful result with less
+setup or annotation work than a simpler baseline. Check result correctness, reproducibility and
+runtime cost alongside usability. A valid export alone does not demonstrate useful training data,
+and a synthetic benchmark result does not establish transfer to real-world conditions.

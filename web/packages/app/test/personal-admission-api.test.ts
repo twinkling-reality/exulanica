@@ -15,6 +15,7 @@ describe('original byte intake and dated admission', () => {
     const digests = await Promise.all(files.map(async f => sha256(await f.arrayBuffer())));
     const fetch = vi.fn(async (_url: string | URL | Request, init: RequestInit = {}) => {
       expect(init.headers).toEqual({ authorization: 'Bearer fixture-token' });
+      expect(init.credentials).toBe('include');
       const parts = (init.body as FormData).getAll('files') as File[];
       expect(await parts[0]!.arrayBuffer()).toEqual(await files[0]!.arrayBuffer());
       expect(await parts[1]!.arrayBuffer()).toEqual(await files[1]!.arrayBuffer());
@@ -28,6 +29,23 @@ describe('original byte intake and dated admission', () => {
       ['second', digests[1], 4], ['first', digests[0], 4],
     ]);
     expect(fetch.mock.calls[0]![0]).toBe('https://fixture.test/intake');
+  });
+  it('uses the account cookie and CSRF token without an empty bearer credential', async () => {
+    const file = new File([new Uint8Array([0xff, 0xd8, 0xff])], 'source.jpg', { type: 'image/jpeg' });
+    const digest = await sha256(await file.arrayBuffer());
+    const fetch = vi.fn(async (_url: string | URL | Request, init: RequestInit = {}) => {
+      expect(init.headers).toEqual({ 'x-csrf-token': 'csrf-fixture' });
+      expect(init.credentials).toBe('include');
+      return json({ batch_id: 'batch', queued_job_id: 'job', refused: [], accepted: [
+        { capture_id: 'capture', blob_sha256: digest, filename: 'source.jpg', status: 'ingested' },
+      ] });
+    });
+
+    const result = await new PersonalAdmissionApi({
+      baseUrl: 'https://fixture.test', token: '', csrfToken: 'csrf-fixture', fetch,
+    }).upload([file]);
+
+    expect(result.accepted[0]?.capture_id).toBe('capture');
   });
   it('shows rejected parts and refuses a receipt for different bytes', async () => {
     const file = new File(['not a photograph'], 'bad.jpg');

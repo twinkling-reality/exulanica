@@ -10,6 +10,8 @@ export interface LivingSocietyRecording {
   readonly societyId: string;
   readonly branchId: string;
   readonly districtId: string;
+  readonly inputSha256: string;
+  readonly routine: NonNullable<OwnedSocietyState['routine']>;
   readonly population: {
     readonly size: number;
     readonly limit: number;
@@ -37,6 +39,7 @@ export interface RosterEntry {
 export interface RecordedFrame {
   readonly tick: number;
   readonly minuteOfDay: number;
+  readonly day: number;
   readonly stateSha256: string;
   readonly inhabitants: readonly RecordedInhabitant[];
 }
@@ -68,6 +71,12 @@ const text = (value: unknown, where: string): string =>
   typeof value === 'string' && value.length > 0 ? value : fail(where);
 const whole = (value: unknown, where: string): number =>
   Number.isSafeInteger(value) ? value as number : fail(where);
+const boundedWhole = (value: unknown, minimum: number, maximum: number, where: string): number => {
+  const held = whole(value, where);
+  return held >= minimum && held <= maximum ? held : fail(where);
+};
+const digest = (value: unknown, where: string): string =>
+  typeof value === 'string' && /^[0-9a-f]{64}$/.test(value) ? value : fail(where);
 const point = (value: unknown, where: string): readonly [number, number] =>
   Array.isArray(value) && value.length === 2 && value.every(Number.isSafeInteger)
     ? value as unknown as readonly [number, number] : fail(where);
@@ -79,6 +88,18 @@ export function parseLivingSocietyRecording(value: unknown, districtDigest: stri
   if (row['district_document_sha256'] !== districtDigest) fail('it was recorded over another district');
   const population = object(row['population'], 'population');
   const place = object(row['place'], 'place');
+  const routine = object(row['routine'], 'routine');
+  const catalogVersions = Object.entries(object(routine['catalog_versions'], 'routine catalog versions'));
+  if (catalogVersions.length === 0 || catalogVersions.some(([key, version]) =>
+    !/^[a-z][a-z0-9_-]*$/.test(key) || whole(version, `routine catalog ${key}`) < 1)) {
+    fail('routine catalog versions');
+  }
+  const routineBinding = Object.freeze({
+    catalog_versions: Object.freeze(Object.fromEntries(
+      catalogVersions.sort(([left], [right]) => left.localeCompare(right)),
+    ) as Record<string, number>),
+    sha256: digest(routine['sha256'], 'routine digest'),
+  });
   const roster = (Array.isArray(row['roster']) ? row['roster'] : fail('roster')).map((raw, index) => {
     const entry = object(raw, `roster ${index}`);
     if (entry['synthetic'] !== true) fail('every inhabitant is synthetic');
@@ -98,8 +119,9 @@ export function parseLivingSocietyRecording(value: unknown, districtDigest: stri
     if (people.length !== roster.length) fail(`frame ${index} truncates the population`);
     return Object.freeze({
       tick: index,
-      minuteOfDay: whole(frame['minute_of_day'], `frame ${index} minute`),
-      stateSha256: /^[0-9a-f]{64}$/.test(String(frame['state_sha256'])) ? String(frame['state_sha256']) : fail(`frame ${index} digest`),
+      minuteOfDay: boundedWhole(frame['minute_of_day'], 0, 1_439, `frame ${index} minute`),
+      day: boundedWhole(frame['day'], 0, Number.MAX_SAFE_INTEGER, `frame ${index} day`),
+      stateSha256: digest(frame['state_sha256'], `frame ${index} digest`),
       inhabitants: people.map((person, n) => {
         const held = object(person, `frame ${index} inhabitant ${n}`);
         const path = (Array.isArray(held['motion_path_mm']) ? held['motion_path_mm'] : fail('motion path'))
@@ -117,6 +139,11 @@ export function parseLivingSocietyRecording(value: unknown, districtDigest: stri
     });
   });
   if (frames.length === 0) fail('no frames');
+  const firstAbsoluteMinute = frames[0]!.day * 1_440 + frames[0]!.minuteOfDay;
+  if (!Number.isSafeInteger(firstAbsoluteMinute) || frames.some((frame, index) =>
+    frame.day * 1_440 + frame.minuteOfDay !== firstAbsoluteMinute + index)) {
+    fail('frame clock is not contiguous');
+  }
   const events = new Map<string, RecordedEvent>();
   const bySubject = new Map<string, RecordedEvent[]>();
   const ids = new Set(roster.map((entry) => entry.id));
@@ -153,6 +180,8 @@ export function parseLivingSocietyRecording(value: unknown, districtDigest: stri
     societyId: text(row['society_id'], 'society id'),
     branchId: text(row['branch_id'], 'branch id'),
     districtId: text(row['district_id'], 'district id'),
+    inputSha256: digest(row['input_sha256'], 'input digest'),
+    routine: routineBinding,
     population: Object.freeze({
       size: roster.length,
       limit: whole(population['limit'], 'population limit'),
@@ -178,8 +207,11 @@ export function recordingState(recording: LivingSocietyRecording, index: number)
     profile: 'exulanica-society/v4',
     society_id: recording.societyId,
     branch_id: recording.branchId,
+    input_sha256: recording.inputSha256,
+    routine: recording.routine,
     tick: frame.tick,
     minute_of_day: frame.minuteOfDay,
+    day: frame.day,
     inhabitants: frame.inhabitants.map((person, n) => {
       const entry = recording.roster[n]!;
       const summary = recording.events.get(person.explanation_event_ids[0] ?? '')?.summary;

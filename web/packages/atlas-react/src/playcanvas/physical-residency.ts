@@ -351,13 +351,16 @@ export async function fetchAuthenticatedAsset(
   options: AuthenticatedAssetFetchOptions,
 ): Promise<AssetBytes> {
   const base = options.baseUrl.replace(/\/+$/, '');
-  const headers: Record<string, string> = { authorization: `Bearer ${options.token}` };
+  const headers: Record<string, string> = {};
+  // An explicit empty bearer is not the absence of a bearer. The API correctly refuses it and
+  // never falls back to an account cookie, so account sessions must omit this header entirely.
+  if (options.token) headers['authorization'] = `Bearer ${options.token}`;
   if (options.range !== undefined) {
     headers['range'] = `bytes=${options.range[0]}-${options.range[1]}`;
   }
   const response = await (options.fetch ?? globalThis.fetch.bind(globalThis))(
     `${base}${descriptor.path}`,
-    { method: 'GET', headers, signal },
+    { method: 'GET', headers, signal, credentials: 'include' },
   );
   if (!response.ok) throw new Error(`asset fetch failed with HTTP ${response.status}`);
   const bytes = await response.arrayBuffer();

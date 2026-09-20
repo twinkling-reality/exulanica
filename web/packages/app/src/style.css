@@ -356,6 +356,314 @@ body {
   cursor: default;
 }
 
+/* A saved-world threshold is a supported-action rail, not a credential gate. It emphasizes the
+ * one useful action available in a fresh workspace without implying that review already composes
+ * a world. The extra #shell specificity keeps the later redesign layer from turning the embedded
+ * intake back into its floating world inspector geometry. */
+#shell .gate.world-entry-gate {
+  --world-entry-width: 42rem;
+  display: block;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  padding-block: clamp(2rem, 7vh, 5rem);
+  padding-inline: max(1.25rem, calc((100vw - var(--world-entry-width)) / 2));
+  background: var(--ui-light-canvas);
+  color: var(--ui-light-ink);
+  text-align: left;
+}
+
+.world-entry-heading,
+.world-entry-list,
+.world-entry-start,
+.world-entry-create-existing {
+  width: min(100%, var(--world-entry-width));
+  margin-inline: auto;
+}
+
+.world-entry-heading {
+  display: grid;
+  gap: 0.6rem;
+}
+
+.world-entry-brand,
+.world-entry-introduction,
+.world-entry-step-label,
+.world-entry-create-note,
+.world-entry-create-existing :is(p, h2),
+.world-entry-reconcile p {
+  margin: 0;
+}
+
+.world-entry-brand,
+.world-entry-step-label {
+  color: var(--ui-light-focus);
+  font: 600 0.7rem/1.35 var(--ui-font-utility);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+#shell .world-entry-heading h1 {
+  max-width: 15ch;
+  font: 500 clamp(2.1rem, 6vw, 3.35rem)/1.02 var(--ui-font-display);
+  letter-spacing: -0.045em;
+}
+
+.world-entry-introduction {
+  max-width: 39rem;
+  color: var(--ui-light-ink-soft);
+  font-size: clamp(0.95rem, 1.5vw, 1.08rem);
+  line-height: 1.55;
+}
+
+.world-entry-status {
+  max-width: 39rem;
+  margin-top: 0.4rem;
+}
+
+.world-entry-start {
+  display: grid;
+  gap: 1.35rem;
+  margin-top: clamp(2rem, 5vh, 3.25rem);
+}
+
+.world-entry-current-action {
+  position: relative;
+  min-width: 0;
+  padding-left: 1.25rem;
+  border-left: 2px solid var(--ui-light-focus);
+}
+
+#shell .world-entry-create-existing h2 {
+  color: var(--ui-light-ink);
+  font: 600 clamp(1.15rem, 2vw, 1.35rem)/1.2 var(--ui-font-display);
+  letter-spacing: -0.02em;
+}
+
+#shell .world-entry-gate .world-entry-intake {
+  position: static;
+  inset: auto;
+  width: 100%;
+  max-height: none;
+  margin: 1rem 0 0;
+  padding: 0;
+  overflow: visible;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--ui-light-ink);
+  font-size: 0.88rem;
+  transform: none;
+}
+
+#shell .world-entry-gate .world-entry-intake > summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 3rem;
+  padding: 0.75rem 1rem;
+  border: 1px solid var(--ui-light-ink);
+  border-radius: var(--radius-control);
+  background: var(--ui-light-ink);
+  color: var(--ui-light-canvas);
+  font-size: 0.9rem;
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+}
+
+#shell .world-entry-gate .world-entry-intake > summary::-webkit-details-marker {
+  display: none;
+}
+
+#shell .world-entry-gate .world-entry-intake > summary::after {
+  content: 'Open';
+  color: color-mix(in srgb, var(--ui-light-canvas) 72%, transparent);
+  font: 500 0.7rem/1 var(--ui-font-utility);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+#shell .world-entry-gate .world-entry-intake[open] > summary::after {
+  content: 'Close';
+}
+
+#shell .world-entry-gate .world-entry-intake > fieldset {
+  margin: 0;
+  padding: 1.1rem 0 0;
+  border: 0;
+}
+
+#shell .world-entry-gate .world-entry-intake .intake-step {
+  border-color: color-mix(in srgb, var(--ui-light-ink-faint) 30%, transparent);
+  background: color-mix(in srgb, var(--ui-light-ink) 3%, var(--ui-light-canvas));
+}
+
+.world-entry-create {
+  display: grid;
+  gap: 1rem;
+}
+
+.world-entry-create-controls {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: end;
+  gap: 0.75rem;
+}
+
+.world-entry-name,
+.world-entry-fields label {
+  display: grid;
+  gap: 0.4rem;
+  min-width: 0;
+  color: var(--ui-light-ink-faint);
+  font-size: 0.76rem;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+}
+
+#shell .world-entry-gate :is(input[type='text'], select) {
+  width: 100%;
+  min-width: 0;
+  min-height: 3rem;
+  padding: 0.7rem 0.8rem;
+  border: 1px solid color-mix(in srgb, var(--ui-light-ink-faint) 48%, transparent);
+  border-radius: var(--radius-control);
+  background: var(--ui-light-canvas);
+  color: var(--ui-light-ink);
+  font-size: 0.92rem;
+}
+
+#shell .world-entry-gate .world-entry-primary {
+  min-height: 3rem;
+  padding: 0.7rem 1rem;
+  border: 1px solid var(--ui-light-ink);
+  border-radius: var(--radius-control);
+  background: var(--ui-light-ink);
+  color: var(--ui-light-canvas);
+  font-size: 0.88rem;
+  font-weight: 600;
+  white-space: normal;
+}
+
+#shell .world-entry-gate .world-entry-primary:hover:not(:disabled) {
+  background: var(--ui-light-ink-soft);
+}
+
+#shell .world-entry-gate .world-entry-secondary {
+  min-height: 3rem;
+  padding: 0.7rem 1rem;
+  border: 1px solid color-mix(in srgb, var(--ui-light-ink-faint) 48%, transparent);
+  border-radius: var(--radius-control);
+  background: transparent;
+  color: var(--ui-light-ink-soft);
+  font-size: 0.88rem;
+  font-weight: 600;
+  white-space: normal;
+}
+
+#shell .world-entry-gate .world-entry-secondary:hover:not(:disabled) {
+  border-color: var(--ui-light-ink);
+  background: color-mix(in srgb, var(--ui-light-ink) 4%, var(--ui-light-canvas));
+  color: var(--ui-light-ink);
+}
+
+#shell .world-entry-gate button:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.world-entry-list {
+  display: grid;
+  gap: 0.85rem;
+  margin-top: clamp(2rem, 5vh, 3rem);
+}
+
+.world-entry-item {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.world-entry-choice {
+  display: grid;
+  gap: 0.3rem;
+  width: 100%;
+  padding: 0.95rem 1rem;
+  border: 1px solid transparent;
+  border-radius: var(--radius-control);
+  background: var(--ui-light-ink);
+  color: var(--ui-light-canvas);
+  font: inherit;
+  text-align: left;
+}
+
+.world-entry-choice:not(:disabled) {
+  cursor: pointer;
+}
+
+.world-entry-choice:not(:disabled):hover {
+  border-color: color-mix(in srgb, var(--ui-light-canvas) 56%, transparent);
+}
+
+.world-entry-choice-title {
+  font-weight: 600;
+}
+
+.world-entry-choice-detail {
+  color: color-mix(in srgb, currentColor 78%, transparent);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+
+.world-entry-reconcile {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border-left: 2px solid var(--ui-light-focus);
+  background: color-mix(in srgb, var(--ui-light-ink) 4%, var(--ui-light-canvas));
+  color: var(--ui-light-ink-soft);
+  font-size: 0.86rem;
+}
+
+.world-entry-reconcile label {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+.world-entry-create-existing {
+  margin-top: clamp(2rem, 5vh, 3rem);
+  padding-left: 1rem;
+  border-left: 2px solid var(--ui-light-focus);
+}
+
+.world-entry-first-create {
+  padding: 1rem 0 0 1.25rem;
+  border-top: 1px solid color-mix(in srgb, var(--ui-light-ink-faint) 24%, transparent);
+}
+
+.world-entry-create-note {
+  max-width: 36rem;
+  color: var(--ui-light-ink-faint);
+  font-size: 0.84rem;
+  line-height: 1.5;
+}
+
+.world-entry-inline-status {
+  justify-self: start;
+}
+
+.world-entry-fields {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.85rem;
+  margin-top: 0.35rem;
+}
+
+.world-entry-fields label:last-child {
+  grid-column: 1 / -1;
+}
+
 .credential-operator {
   width: min(26.3rem, 82vw);
   color: var(--ui-light-ink-faint);
@@ -559,6 +867,26 @@ body {
 }
 
 @media (max-width: 32rem) {
+  #shell .gate.world-entry-gate {
+    padding: 1.5rem 1.1rem 2rem;
+  }
+
+  .world-entry-current-action {
+    padding-left: 0.9rem;
+  }
+
+  .world-entry-fields {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .world-entry-create-controls {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .world-entry-fields label:last-child {
+    grid-column: auto;
+  }
+
   .credential-gate {
     align-items: center;
     gap: 2rem;

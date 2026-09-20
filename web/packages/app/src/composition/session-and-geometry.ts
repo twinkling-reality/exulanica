@@ -13,6 +13,7 @@ import type {
   ReconstructionSceneRecord,
   RenderingSubstrate,
 } from '@exulanica/graph-client';
+import { ApiError } from '@exulanica/graph-client';
 import type { PlacedScenePointMap, PointMap } from '@exulanica/atlas-react/playcanvas';
 import {
   footprintRadiusOf,
@@ -44,9 +45,21 @@ import { SourceMediaClient } from '../source-media-api.js';
 import { el } from '../ui/dom.js';
 import type { ReconstructionRungDisclosure } from '../ui/status.js';
 import { WorldStyleClient } from '../world-style-api.js';
+import {
+  WorldEntryClient,
+  automaticWorldEntry,
+  type SavedWorldEntry,
+} from '../world-entry-api.js';
 import { describeWorldStyleFailure, preferencesForWorldVersion } from './appearance.js';
 import type { AppEnvironment, SessionState } from './session-state.js';
 import type { Credentials } from '../config.js';
+
+export class StarterWorldOpeningError extends Error {
+  constructor(cause: unknown) {
+    super(cause instanceof Error ? cause.message : 'The starter world request failed.');
+    this.name = 'StarterWorldOpeningError';
+  }
+}
 
 /**
  * Open the session and everything it authorizes, up to but not including a mount.
@@ -75,19 +88,30 @@ export async function openAppSession(
   state.companionEngine = opened.companion;
   if (env.preview) return;
 
-  state.worldStyles = new WorldStyleClient(state.credentials);
-  try {
-    state.worldStyleConnection = await state.worldStyles.connect();
-    state.preferences = preferencesForWorldVersion(
-      state.preferences,
-      state.worldStyleConnection.state.current,
-    );
-    state.worldStyleFailure = null;
-  } catch (error) {
-    state.worldStyleFailure = describeWorldStyleFailure(error);
-    state.worldStyleConnection = null;
-    state.worldStyles = null;
+  state.worldEntries = new WorldEntryClient(state.credentials);
+  state.savedWorldEntries = await state.worldEntries.entries();
+  if (state.savedWorldEntries.length === 0) {
+    try {
+      const starter = await state.worldEntries.ensureStarter('My world');
+      state.savedWorldEntries = Object.freeze([starter]);
+    } catch (error) {
+      if (!(error instanceof ApiError) || error.status !== 409) {
+        throw new StarterWorldOpeningError(error);
+      }
+      // A concurrent tab may have created a non-starter entry after the empty read. Re-read and
+      // let the ordinary saved-world chooser present that state instead of creating over it.
+      state.savedWorldEntries = await state.worldEntries.entries();
+    }
   }
+  state.activeWorldEntry = automaticWorldEntry(state.savedWorldEntries);
+  if (state.activeWorldEntry !== null) {
+    try {
+      await openWorldEntryContext(state, state.activeWorldEntry);
+    } catch {
+      state.activeWorldEntry = null;
+    }
+  }
+
   state.interactionPolicies = new InteractionPolicyClient(state.credentials);
   const startupNotices: string[] = [];
   try {
@@ -108,19 +132,98 @@ export async function openAppSession(
     state.interactionPolicies = null;
     startupNotices.push(`Saved interaction settings unavailable: ${error instanceof Error ? error.message : 'the request failed'}`);
   }
+  state.sourceMediaNotices = Object.freeze([
+    ...startupNotices,
+    ...state.sourceMediaNotices,
+  ]);
+}
+
+/** Connect the exact world and appearance versions named by a chosen durable entry. */
+export async function openWorldEntryContext(
+  state: SessionState,
+  entry: SavedWorldEntry,
+): Promise<void> {
+  if (state.credentials === null) throw new Error('The authenticated session is not open.');
+  if (entry.availability !== 'available') {
+    throw new Error(entry.unavailableReason === 'source_deleted'
+      ? 'This saved world is unavailable because its source material was deleted.'
+      : entry.unavailableReason === 'authored_version_changed'
+        ? 'This saved world changed elsewhere and must be reconciled before it can open.'
+        : 'This saved world is unavailable. Review its source material before opening it.');
+  }
+  state.activeWorldEntry = entry;
+
+  state.worldStyles = new WorldStyleClient({
+    ...state.credentials,
+    worldId: entry.worldId,
+    savedEntry: () => {
+      const active = state.activeWorldEntry;
+      if (active === null) throw new Error('The saved world entry is no longer active.');
+      return {
+        entryId: active.entryId,
+        revision: active.revision,
+        authoredStateSha256: active.authoredStateSha256,
+        authoredEditSeq: active.authoredEditSeq,
+        styleVersionId: active.styleVersionId,
+      };
+    },
+    onSavedEntryAdvanced: (version, base) => {
+      const active = state.activeWorldEntry;
+      if (active === null || active.entryId !== base.entryId || active.revision !== base.revision) {
+        state.sourceMediaNotices = Object.freeze([
+          'The appearance and resume point were saved, but this page must reload before another change.',
+          ...state.sourceMediaNotices,
+        ]);
+        return;
+      }
+      const updated = Object.freeze({
+        ...active,
+        styleVersionId: version.versionId,
+        revision: active.revision + 1,
+        updatedAt: new Date().toISOString(),
+      });
+      state.activeWorldEntry = updated;
+      state.savedWorldEntries = Object.freeze(state.savedWorldEntries.map((candidate) =>
+        candidate.entryId === updated.entryId ? updated : candidate));
+    },
+  });
+  try {
+    state.worldStyleConnection = await state.worldStyles.connect(entry.styleVersionId);
+    state.preferences = preferencesForWorldVersion(
+      state.preferences,
+      state.worldStyleConnection.state.current,
+    );
+    state.worldStyleFailure = null;
+  } catch (error) {
+    state.worldStyleFailure = describeWorldStyleFailure(error);
+    state.worldStyleConnection = null;
+    state.worldStyles = null;
+    state.activeWorldEntry = null;
+    throw new Error(`The saved appearance version could not be opened: ${state.worldStyleFailure}`);
+  }
   state.sourceMediaSession?.dispose();
   state.sourceMediaSession = null;
+  if (entry.sourceKind === 'authored') {
+    state.previewSourceMedia = new Map();
+    state.sourceMediaNotices = Object.freeze([]);
+    return;
+  }
   try {
     const profile = worldArtProfile(
       state.preferences.worldArtProfile,
       state.preferences.worldArtProfileVersion,
       state.preferences.worldStyleParameters,
     );
-    state.sourceMediaSession = await new SourceMediaClient(state.credentials).load(
+    state.sourceMediaSession = await new SourceMediaClient({
+      ...state.credentials, worldId: entry.worldId,
+    }).load(
       profile.palette.stoneShadow,
     );
     state.previewSourceMedia = state.sourceMediaSession.catalog;
-    state.sourceMediaNotices = Object.freeze([...startupNotices, ...state.sourceMediaSession.issues.map((issue) => {
+    state.sourceMediaNotices = Object.freeze([
+      'Your saved changes and appearance reopen exactly. The surrounding memory layout reflects '
+        + 'the latest source material you are allowed to view.',
+      ...state.sourceMediaSession.issues.map((issue) => {
       const issueState = issue.state === 'missing_evidence'
         ? 'Missing source evidence'
         : issue.state === 'unavailable_asset'
@@ -129,11 +232,11 @@ export async function openAppSession(
             ? 'Source not authorized'
             : 'Source loading error';
       return `${issueState}: ${issue.reason}`;
-    })]);
+      }),
+    ]);
   } catch (error) {
     state.previewSourceMedia = new Map();
     state.sourceMediaNotices = Object.freeze([
-      ...startupNotices,
       `Source media unavailable: ${error instanceof Error ? error.message : 'the request failed'}`,
     ]);
   }
@@ -335,6 +438,7 @@ export function geometryNoticesFor(issues: readonly GeometryIssue[]): readonly s
 /** What each geometry failure is called on screen. One phrase per state, and no state hidden. */
 const GEOMETRY_NOTICE: Record<GeometryIssueState, string> = {
   bytes_missing: 'Reconstruction bytes unavailable',
+  unavailable: 'Reconstruction withheld by current policy',
   unsupported_container: 'Reconstruction container unsupported',
   verification_failed: 'Reconstruction failed its digest check',
   unverifiable: 'Reconstruction could not be verified',

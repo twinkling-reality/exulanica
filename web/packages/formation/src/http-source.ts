@@ -4,10 +4,9 @@
  * **It is a `fetch` reader and not an `EventSource`, and that is forced rather than chosen.**
  * `source.ts` used to describe the implementation as a browser `EventSource` over a url, and
  * that cannot work here: `EventSource` sends no custom headers, so it cannot carry a bearer
- * token, and the only ways to make it authenticate are to put the credential in the query string
- * or to move authentication into a cookie. The first puts the key to somebody's photograph
- * library into every proxy log between here and the server, and `graph-client`'s transport says
- * so in as many words. The second is a session mechanism this API does not have.
+ * token. A bearer credential in the query string would put the key to somebody's photograph
+ * library into every proxy log between here and the server. Browser account sessions can use an
+ * HttpOnly cookie, but this reader must also preserve header authentication for workspace clients.
  *
  * What is lost by not using `EventSource` is its automatic reconnect, and that turns out to be
  * worth losing: this holds the resume token itself, so a reconnect resumes from the last event
@@ -49,7 +48,10 @@ export interface StreamResponse {
 
 export type StreamFetch = (
   url: string,
-  init: { readonly headers: Readonly<Record<string, string>> },
+  init: {
+    readonly headers: Readonly<Record<string, string>>;
+    readonly credentials: 'include';
+  },
 ) => Promise<StreamResponse>;
 
 export interface HttpFormationOptions {
@@ -105,11 +107,12 @@ export class HttpFormationEventSource implements FormationEventSource {
       const query = token === null ? '' : `?since=${encodeURIComponent(token)}`;
       let response: StreamResponse;
       try {
+        const headers: Record<string, string> = { accept: 'text/event-stream' };
+        // An explicit empty bearer prevents the API from falling back to its account cookie.
+        if (options.token) headers['authorization'] = `Bearer ${options.token}`;
         response = await options.fetch(`${options.baseUrl}/formation/${captureId}${query}`, {
-          headers: {
-            authorization: `Bearer ${options.token}`,
-            accept: 'text/event-stream',
-          },
+          headers,
+          credentials: 'include',
         });
       } catch {
         return retry();

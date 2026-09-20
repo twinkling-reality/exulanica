@@ -163,6 +163,14 @@ export class WorldObjectsContractError extends Error {
   }
 }
 
+export interface SavedEntryWriteBinding {
+  readonly entryId: string;
+  readonly revision: number;
+  readonly authoredVersionId: string;
+  readonly authoredStateSha256: string;
+  readonly authoredEditSeq: number;
+}
+
 export type ObjectWriteResult =
   | { readonly kind: 'recorded'; readonly version: AlternateVersion }
   /** The base this edit was made against has moved. The current state is here; ask again. */
@@ -232,6 +240,13 @@ const wireTransform = (value: TransformInput): Readonly<Record<string, number>> 
 
 export class WorldObjectsClient {
   readonly #transport: Transport;
+  readonly #worldId: string | undefined;
+  readonly #defaultVersionId: string | undefined;
+  readonly #onVersionChange: ((version: AlternateVersion) => Promise<void>) | undefined;
+  readonly #savedEntry: (() => SavedEntryWriteBinding) | undefined;
+  readonly #onSavedEntryAdvanced:
+    | ((version: AlternateVersion, base: SavedEntryWriteBinding) => Promise<void>)
+    | undefined;
   #assets: readonly ReviewedAsset[] = Object.freeze([]);
   #version: AlternateVersion | null = null;
   /**
@@ -242,8 +257,22 @@ export class WorldObjectsClient {
    */
   #queue: Promise<void> = Promise.resolve();
 
-  constructor(options: TransportOptions) {
+  constructor(options: TransportOptions & {
+    readonly worldId?: string;
+    readonly defaultVersionId?: string;
+    readonly onVersionChange?: (version: AlternateVersion) => Promise<void>;
+    readonly savedEntry?: () => SavedEntryWriteBinding;
+    readonly onSavedEntryAdvanced?: (
+      version: AlternateVersion,
+      base: SavedEntryWriteBinding,
+    ) => Promise<void>;
+  }) {
     this.#transport = new Transport(options);
+    this.#worldId = options.worldId;
+    this.#defaultVersionId = options.defaultVersionId;
+    this.#onVersionChange = options.onVersionChange;
+    this.#savedEntry = options.savedEntry;
+    this.#onSavedEntryAdvanced = options.onSavedEntryAdvanced;
   }
 
   assets(): readonly ReviewedAsset[] {
@@ -256,21 +285,27 @@ export class WorldObjectsClient {
 
   /** Every alternate version in this workspace, newest first. */
   async versions(): Promise<readonly AlternateVersion[]> {
-    const body = await this.#transport.getJson<unknown>('/world/versions');
+    const body = await this.#transport.getJson<unknown>(this.#path('/world/versions'));
     return Object.freeze(array(body, 'alternate version list').map(parseVersion));
   }
 
   async reviewedAssets(): Promise<readonly ReviewedAsset[]> {
-    const body = await this.#transport.getJson<unknown>('/world/assets');
+    const body = await this.#transport.getJson<unknown>(this.#path('/world/assets'));
     this.#assets = Object.freeze(array(body, 'reviewed asset list').map(parseAsset));
     return this.#assets;
   }
 
   async readVersion(versionId: string): Promise<AlternateVersion> {
-    this.#version = parseVersion(
-      await this.#transport.getJson<unknown>(`/world/versions/${encodeURIComponent(versionId)}`),
-    );
+    this.#version = await this.#fetchVersion(versionId);
     return this.#version;
+  }
+
+  async #fetchVersion(versionId: string): Promise<AlternateVersion> {
+    return parseVersion(
+      await this.#transport.getJson<unknown>(
+        this.#path(`/world/versions/${encodeURIComponent(versionId)}`),
+      ),
+    );
   }
 
   /**
@@ -285,27 +320,56 @@ export class WorldObjectsClient {
     readonly assets: readonly ReviewedAsset[];
     readonly version: AlternateVersion | null;
   }> {
+    const expected = this.#savedEntry?.();
+    const selectedVersionId = versionId ?? this.#defaultVersionId ?? expected?.authoredVersionId;
     const [assets, version] = await Promise.all([
       this.reviewedAssets(),
-      versionId === undefined
+      selectedVersionId === undefined
         ? this.versions().then((all) => all[0] ?? null)
-        : this.readVersion(versionId),
+        : this.#fetchVersion(selectedVersionId),
     ]);
+    if (expected !== undefined) {
+      const active = this.#savedEntry?.();
+      const cursorStayedActive = active !== undefined
+        && active.entryId === expected.entryId
+        && active.revision === expected.revision
+        && active.authoredVersionId === expected.authoredVersionId
+        && active.authoredStateSha256 === expected.authoredStateSha256
+        && active.authoredEditSeq === expected.authoredEditSeq;
+      const versionMatches = version !== null
+        && version.versionId === expected.authoredVersionId
+        && version.stateSha256 === expected.authoredStateSha256
+        && version.editSeq === expected.authoredEditSeq
+        && !version.sourceInvalidated;
+      if (!cursorStayedActive || !versionMatches) {
+        this.#version = null;
+        throw new WorldObjectsContractError(
+          'saved_entry_reconciliation_required',
+          'This saved world changed elsewhere or its source became unavailable. Reload to compare '
+            + 'the latest changes before opening or editing it.',
+        );
+      }
+    }
     this.#version = version;
     return Object.freeze({ assets, version });
   }
 
   /** Read the topology base before the person confirms opening an alternate version. */
   async bootstrapBase(): Promise<string> {
-    const current = record(await this.#transport.getJson<unknown>('/world/styles/current'), 'world style state');
+    const current = record(
+      await this.#transport.getJson<unknown>(this.#path('/world/styles/current')),
+      'world style state',
+    );
     return text(current['current_topology_digest'], 'topology digest');
   }
 
   /** Bootstrap preserves the source slots; only the reviewed topology base is submitted. */
   async bootstrapVersion(baseTopologyDigest: string): Promise<string> {
-    const opened = record(await this.#transport.postJson<unknown>('/world/versions/bootstrap', {
+    const opened = record(await this.#transport.postJson<unknown>(
+      this.#path('/world/versions/bootstrap'), {
       base_topology_digest: text(baseTopologyDigest, 'topology digest'),
-    }), 'opened alternate version');
+      },
+    ), 'opened alternate version');
     return text(opened['version_id'], 'version id');
   }
 
@@ -319,7 +383,10 @@ export class WorldObjectsClient {
     if (input.sourceSnapshotId !== undefined) body['source_snapshot_id'] = input.sourceSnapshotId;
     if (input.parentVersionId !== undefined) body['parent_version_id'] = input.parentVersionId;
     if (input.styleVersionId !== undefined) body['style_version_id'] = input.styleVersionId;
-    this.#version = parseVersion(await this.#transport.postJson<unknown>('/world/versions', body));
+    this.#version = parseVersion(
+      await this.#transport.postJson<unknown>(this.#path('/world/versions'), body),
+    );
+    await this.#onVersionChange?.(this.#version);
     return this.#version;
   }
 
@@ -368,13 +435,15 @@ export class WorldObjectsClient {
    */
   async assetBytes(asset: ReviewedAsset, signal?: AbortSignal): Promise<ArrayBuffer> {
     void signal;
-    const response = await this.#transport.getBytes(assetBytesPath(asset.assetKey));
+    const response = await this.#transport.getBytes(this.#path(assetBytesPath(asset.assetKey)));
     return response.arrayBuffer();
   }
 
   /** The licence text those bytes are published under. */
   async assetLicence(asset: ReviewedAsset): Promise<string> {
-    const response = await this.#transport.getBytes(`${assetPath(asset.assetKey)}/licence`);
+    const response = await this.#transport.getBytes(
+      this.#path(`${assetPath(asset.assetKey)}/licence`),
+    );
     return response.text();
   }
 
@@ -393,17 +462,36 @@ export class WorldObjectsClient {
     body: Readonly<Record<string, unknown>>,
   ): Promise<ObjectWriteResult> {
     const run = async (): Promise<ObjectWriteResult> => {
+      const savedEntry = this.#savedEntry?.();
       try {
-        const version = parseVersion(await this.#transport.postJson<unknown>(path, {
+        const version = parseVersion(await this.#transport.postJson<unknown>(this.#path(path), {
           ...body,
           base_state_sha256: base.stateSha256,
+          ...(savedEntry === undefined ? {} : {
+            saved_entry: {
+              entry_id: savedEntry.entryId,
+              base_revision: savedEntry.revision,
+              authored_state_sha256: savedEntry.authoredStateSha256,
+              authored_edit_seq: savedEntry.authoredEditSeq,
+            },
+          }),
         }));
         this.#version = version;
+        await this.#onVersionChange?.(version);
+        if (savedEntry !== undefined) {
+          await this.#onSavedEntryAdvanced?.(version, savedEntry);
+        }
         return Object.freeze({ kind: 'recorded' as const, version });
       } catch (error) {
         if (error instanceof ApiError && error.code === 'stale_object_base') {
           const current = await this.readVersion(base.versionId);
           return Object.freeze({ kind: 'stale' as const, current });
+        }
+        if (error instanceof ApiError && error.code === 'stale_saved_world_entry') {
+          throw new WorldObjectsContractError(
+            'saved_entry_conflict',
+            'This saved world changed elsewhere. The edit was not recorded. Reload before trying again.',
+          );
         }
         throw error;
       }
@@ -411,6 +499,11 @@ export class WorldObjectsClient {
     const result = this.#queue.then(run, run);
     this.#queue = result.then(() => undefined, () => undefined);
     return result;
+  }
+
+  #path(path: string): string {
+    if (this.#worldId === undefined) return path;
+    return `${path}${path.includes('?') ? '&' : '?'}world_id=${encodeURIComponent(this.#worldId)}`;
   }
 }
 

@@ -7,7 +7,8 @@
  * same pixels.
  */
 
-export type PrimarySurface = 'world' | 'menu' | 'index' | 'options' | 'controls' | 'character';
+export type PrimarySurface =
+  | 'world' | 'menu' | 'index' | 'options' | 'controls' | 'character' | 'experiment' | 'photos';
 export type CameraPresentation = 'ground' | 'map';
 
 export interface WorldSurfaceContext {
@@ -29,6 +30,8 @@ export type WorldShellEvent =
   | { readonly type: 'toggle-map' }
   | { readonly type: 'toggle-options' }
   | { readonly type: 'toggle-controls' }
+  | { readonly type: 'toggle-experiment' }
+  | { readonly type: 'toggle-photos' }
   | { readonly type: 'show-index' }
   | { readonly type: 'show-world' }
   | { readonly type: 'show-detail'; readonly id: string }
@@ -90,6 +93,14 @@ export function updateWorldShell(
       if (state.primary === 'controls') return restoreSurface(state);
       if (state.primary === 'options') return Object.freeze({ ...state, primary: 'controls' });
       return openTemporarySurface(state, { primary: 'controls', camera: 'ground', detailId: null });
+    case 'toggle-experiment':
+      return state.primary === 'experiment'
+        ? restoreSurface(state)
+        : openTemporarySurface(state, { primary: 'experiment', camera: 'ground', detailId: null });
+    case 'toggle-photos':
+      return state.primary === 'photos'
+        ? restoreSurface(state)
+        : openTemporarySurface(state, { primary: 'photos', camera: 'ground', detailId: null });
     case 'show-world':
       return initialWorldShell();
     case 'show-index':

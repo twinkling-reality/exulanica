@@ -1227,6 +1227,87 @@ def test_a_repeated_graph_read_reuses_the_validated_placement_without_refetching
     assert second == first
 
 
+@pytest.mark.parametrize("registered", [3, 0], ids=["posed", "unposed"])
+def test_scene_delivery_rechecks_current_point_permission_after_a_warm_placement_memo(
+    repository, tmp_path, monkeypatch, registered
+):
+    """A cached transform never caches permission or advertises a byte route that will refuse.
+
+    The database predicate's superseded-policy refusal is covered by
+    ``test_world_read_bundle.py``. This test owns the reader boundary: the same predicate is
+    evaluated after a placement-memo hit, and one refused artifact does not erase the allowed
+    controls beside it.
+    """
+    clear_placement_memo()
+    store, _captures, point_artifacts, _job_id = _queued_scene(repository, tmp_path)
+    claimed = repository.claim_reconstruction_scene(worker="memo-permission", lease_seconds=60)
+    assert claimed is not None
+    assert _processor(repository, store, tmp_path, FakeColmap(registered=registered)).process(
+        claimed
+    )
+
+    refused: set[uuid.UUID] = set()
+
+    def allows(_connection, _workspace, artifact_id, _at):
+        return artifact_id not in refused
+
+    monkeypatch.setattr("exulanica.graph.reconstruction_scenes.point_allowed", allows)
+    before = read_snapshot(
+        repository.connection, repository.workspace_id, store
+    ).reconstruction_scenes[0]
+    assert placement_memo_size() == 1
+    memo_keys = set(_memo)
+    if registered:
+        assert all(
+            member.placement is not None and member.placement.state == "available"
+            for member in before.members
+        )
+    else:
+        assert all(
+            member.unposed_point_map is not None and member.unposed_point_map.state == "available"
+            for member in before.members
+        )
+
+    refused.add(point_artifacts[0])
+    partial = read_snapshot(
+        repository.connection, repository.workspace_id, store
+    ).reconstruction_scenes[0]
+    assert set(_memo) == memo_keys, "permission changed without invalidating immutable placement"
+    first = partial.members[0]
+    withheld = first.placement if registered else first.unposed_point_map
+    assert withheld is not None and withheld.state == "unavailable"
+    assert withheld.reference is None
+    allowed = [
+        member.placement if registered else member.unposed_point_map
+        for member in partial.members[1:]
+    ]
+    assert all(item is not None and item.state == "available" for item in allowed)
+    assert partial.rendering_substrate == (
+        "posed_point_maps" if registered else "unposed_point_maps"
+    )
+
+    refused.update(point_artifacts)
+    after = read_snapshot(
+        repository.connection, repository.workspace_id, store
+    ).reconstruction_scenes[0]
+    assert set(_memo) == memo_keys
+    withheld = [
+        member.placement if registered else member.unposed_point_map for member in after.members
+    ]
+    assert all(
+        item is not None and item.state == "unavailable" and item.reference is None
+        for item in withheld
+    )
+    assert after.placement_state == ("unavailable" if registered else "none_placed")
+    assert after.rendering_substrate == "source_photographs"
+    assert after.displayed_rung == 4
+    assert any("Current access policy withholds" in reason for reason in after.display_reasons)
+    if registered:
+        assert not any(
+            "No verified posed point map bytes" in reason for reason in after.display_reasons
+        )
+
+
 def test_the_placement_memo_never_holds_the_point_map_bytes_it_was_built_from(repository, tmp_path):
     """A memoised entry must never carry the bytes it was built from.
 

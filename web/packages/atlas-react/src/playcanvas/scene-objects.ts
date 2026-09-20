@@ -140,6 +140,21 @@ export interface ObjectPlacementOutcome {
   readonly notices: readonly string[];
 }
 
+/** A data-view capability borrowed from one resident object's already verified renderer draw. */
+export type ObjectRepresentationRegistration =
+  | { readonly ok: true; readonly release: () => void }
+  | { readonly ok: false; readonly reason: string };
+
+export interface SceneObjectRuntimeOptions {
+  /** Registration is optional: failure removes only the data-view capability, never the object. */
+  readonly registerRepresentation?: (
+    object: PlacedAuthoredObject,
+    entity: pc.Entity,
+  ) => ObjectRepresentationRegistration;
+  /** Request a frame after a resident object's visible runtime state changes. */
+  readonly invalidate?: () => void;
+}
+
 // -- verification ------------------------------------------------------------------------------
 
 /**
@@ -544,6 +559,8 @@ interface Resident {
   /** Authored translation in millimetres. Held so reset can restore it without arithmetic. */
   readonly authoredMm: readonly [number, number, number];
   readonly motion: BoundedMotion | null;
+  /** Restores borrowed materials and releases point allocations before the entity is destroyed. */
+  readonly releaseRepresentation: (() => void) | null;
 }
 
 /**
@@ -559,10 +576,16 @@ export class SceneObjectRuntime {
   readonly #roots: ReadonlyMap<IslandId, pc.Entity>;
   readonly #regionOverrides = new Map<IslandId, pc.Entity>();
   #frameRevision = 0;
+  #placementRevision = 0;
+  readonly #objectRevisions = new Map<string, number>();
   readonly #resident = new Map<string, Resident>();
   #destroyed = false;
 
-  constructor(app: pc.AppBase, roots: ReadonlyMap<IslandId, pc.Entity>) {
+  constructor(
+    app: pc.AppBase,
+    roots: ReadonlyMap<IslandId, pc.Entity>,
+    private readonly options: SceneObjectRuntimeOptions = {},
+  ) {
     this.#app = app;
     this.#roots = roots;
   }
@@ -573,6 +596,11 @@ export class SceneObjectRuntime {
 
   has(objectId: string): boolean {
     return this.#resident.has(objectId);
+  }
+
+  /** True only while at least one bounded behaviour needs another rendered frame. */
+  get animating(): boolean {
+    return [...this.#resident.values()].some(resident => resident.motion?.state === 'running');
   }
 
   /** A verified authored district frame applies only to objects, never source geometry. */
@@ -609,7 +637,10 @@ export class SceneObjectRuntime {
     if (root === undefined) {
       throw new TypeError('That region is not drawn in this world, so nothing can be placed in it');
     }
-    this.remove(object.objectId);
+    const placementRevision = this.#placementRevision;
+    const objectRevision = (this.#objectRevisions.get(object.objectId) ?? 0) + 1;
+    this.#objectRevisions.set(object.objectId, objectRevision);
+    if (this.#removeResident(object.objectId)) this.options.invalidate?.();
 
     const notices: string[] = [];
     let motion: BoundedMotion | null = null;
@@ -635,8 +666,10 @@ export class SceneObjectRuntime {
     const asset = await createObjectContainerAsset(this.#app, object.asset.assetKey, bytes);
     let entity: pc.Entity | undefined;
     try {
-      if (this.#destroyed || frameRevision !== this.#frameRevision) {
-        throw new Error('The authored region changed while its asset was loading');
+      if (this.#destroyed || frameRevision !== this.#frameRevision
+        || placementRevision !== this.#placementRevision
+        || objectRevision !== this.#objectRevisions.get(object.objectId)) {
+        throw new Error('This authored-object placement was superseded while its asset was loading');
       }
       const resource = asset.resource as pc.ContainerResource;
       entity = resource.instantiateRenderEntity({});
@@ -647,7 +680,22 @@ export class SceneObjectRuntime {
       const authoredMm = translationOf(object.transform);
       applyRegionPose(entity, object.transform, authoredMm);
       root.addChild(entity);
-      this.#resident.set(object.objectId, { object, asset, entity, authoredMm, motion });
+      let releaseRepresentation: (() => void) | null = null;
+      try {
+        const registration = this.options.registerRepresentation?.(object, entity);
+        if (registration?.ok === true) releaseRepresentation = registration.release;
+        else if (registration?.ok === false) notices.push(registration.reason);
+      } catch (error) {
+        notices.push(
+          error instanceof Error
+            ? `World to data is unavailable for this object: ${error.message}`
+            : 'World to data is unavailable for this object.',
+        );
+      }
+      this.#resident.set(object.objectId, {
+        object, asset, entity, authoredMm, motion, releaseRepresentation,
+      });
+      this.options.invalidate?.();
     } catch (error) {
       entity?.destroy();
       asset.unload();
@@ -675,15 +723,32 @@ export class SceneObjectRuntime {
     };
     this.#resident.set(objectId, next);
     applyRegionPose(next.entity, transform, authoredMm);
+    this.options.invalidate?.();
     return true;
   }
 
   remove(objectId: string): boolean {
-    const resident = this.#resident.get(objectId);
-    if (resident === undefined) return false;
-    this.#resident.delete(objectId);
-    this.#dispose(resident);
-    return true;
+    this.#objectRevisions.set(objectId, (this.#objectRevisions.get(objectId) ?? 0) + 1);
+    const removed = this.#removeResident(objectId);
+    if (removed) this.options.invalidate?.();
+    return removed;
+  }
+
+  /** Cancel every pending decode and release every resident before an authority redraw. */
+  clear(): void {
+    if (this.#destroyed) return;
+    this.cancelPending();
+    const residents = [...this.#resident.values()];
+    this.#resident.clear();
+    for (const resident of residents) this.#dispose(resident);
+    if (residents.length > 0) this.options.invalidate?.();
+  }
+
+  /** Invalidate in-flight decodes without disturbing residents that are already current. */
+  cancelPending(): void {
+    if (this.#destroyed) return;
+    this.#placementRevision += 1;
+    this.#objectRevisions.clear();
   }
 
   /**
@@ -711,6 +776,7 @@ export class SceneObjectRuntime {
       resident.object.transform,
       motionTransform(resident.authoredMm, resident.motion.offset),
     );
+    this.options.invalidate?.();
     return Object.freeze({ ok: true as const });
   }
 
@@ -738,26 +804,40 @@ export class SceneObjectRuntime {
    * avoid. On the Map vantage nothing region-local is drawn at all.
    */
   setResidency(allocated: ReadonlyMap<IslandId, string>, map: boolean): void {
+    let changed = false;
     for (const resident of this.#resident.values()) {
       const districtRoot = this.#regionOverrides.get(resident.object.islandId);
-      resident.entity.enabled = !map && (districtRoot !== undefined
+      const enabled = !map && (districtRoot !== undefined
         ? districtRoot.enabled : (allocated.get(resident.object.islandId) ?? 'stub') !== 'stub');
+      changed ||= resident.entity.enabled !== enabled;
+      resident.entity.enabled = enabled;
     }
+    if (changed) this.options.invalidate?.();
   }
 
   destroy(): void {
     if (this.#destroyed) return;
     this.#destroyed = true;
     this.#frameRevision += 1;
+    this.#placementRevision += 1;
     this.#regionOverrides.clear();
     for (const resident of this.#resident.values()) this.#dispose(resident);
     this.#resident.clear();
   }
 
   #dispose(resident: Resident): void {
+    resident.releaseRepresentation?.();
     resident.entity.destroy();
     resident.asset.unload();
     this.#app.assets.remove(resident.asset);
+  }
+
+  #removeResident(objectId: string): boolean {
+    const resident = this.#resident.get(objectId);
+    if (resident === undefined) return false;
+    this.#resident.delete(objectId);
+    this.#dispose(resident);
+    return true;
   }
 }
 

@@ -354,7 +354,7 @@ export interface ReconstructionPointMapRecord {
   readonly sceneFromOpmRowMajor: readonly number[];
   readonly localUnitsToSceneUnits: number;
   readonly scaleStatus: 'colmap-correspondence-fit';
-  readonly state: 'available' | 'bytes_missing';
+  readonly state: 'available' | 'bytes_missing' | 'unavailable';
   readonly reference: {
     readonly href: string;
     readonly authorization: 'workspace-bearer';
@@ -371,7 +371,7 @@ export interface UnposedPointMapRecord {
   readonly artifactId: string;
   readonly contentSha256: string;
   readonly container: string | null;
-  readonly state: 'available' | 'bytes_missing';
+  readonly state: 'available' | 'bytes_missing' | 'unavailable';
   readonly reference: {
     readonly href: string;
     readonly authorization: 'workspace-bearer';

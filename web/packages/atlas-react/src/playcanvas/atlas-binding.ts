@@ -81,6 +81,7 @@ import {
   INITIAL_RENDER_ORIGIN,
   renderOriginForNeighborhood,
   frameFraction,
+  districtRepresentationSubjects,
   validateRepresentationSubject,
   DEFAULT_FOCUS_CONFIG,
 } from '@exulanica/atlas-core';
@@ -130,7 +131,11 @@ import {
 import { defaultSemanticsFor } from './semantics.js';
 import { sceneInspectionViews, calibratedCameraFrustum, type SceneInspectionView, type RecoveredSceneCamera } from './scene-inspection.js';
 import { PROOF_LENS_SPLAT_MODIFIER, createSceneSplatAsset, type TrainedSceneGeometry } from './scene-splats.js';
-import { SceneObjectRuntime } from './scene-objects.js';
+import {
+  SceneObjectRuntime,
+  type ObjectRepresentationRegistration,
+  type PlacedAuthoredObject,
+} from './scene-objects.js';
 import {
   opmPointInScene,
   type PlacedScenePointMap,
@@ -140,18 +145,23 @@ import {
 import {
   RepresentationRuntime,
   type RepresentationDraw,
+  type RepresentationMetadata,
   type RepresentationReport,
 } from './representation-runtime.js';
 import {
+  MAX_STATIC_MESHES_PER_REPRESENTATION,
   meshLocalExtent,
   type ExternalRepresentationEntry,
   representationParentVisible,
   representationWorldBounds,
   retainedPointAllocation,
+  staticMeshGroupRepresentation,
   staticMeshRepresentation,
 } from './representation-binding.js';
 import { DataViewOverlay } from './data-view/overlay.js';
 import type { DataViewOverlayPlan } from './data-view/overlay-plan.js';
+
+export type RepresentationSelectionReason = 'explicit' | 'unavailable' | 'unregistered';
 
 /**
  * The PlayCanvas binding for the Atlas.
@@ -294,6 +304,8 @@ const PROOF_LENS_OFF: ProofLensColor = Object.freeze([0, 0, 0, 0]);
  * nothing while the panel says the tier out loud.
  */
 const PROOF_LENS_SETTLE_SECONDS = 2.5;
+/** Authored triangle samples retain object structure without changing district sampling density. */
+const AUTHORED_MESH_SAMPLE_DENSITY_SCALE = 8;
 
 /**
  * A trained region is all or nothing: one gsplat asset, identical at every drawn stage. The flat
@@ -341,6 +353,8 @@ export interface AtlasBindingOptions {
   readonly canvas: HTMLCanvasElement;
   readonly overlayParent: HTMLElement;
   readonly scene: AtlasScene;
+  /** Source-independent authored ground. It is a region, never a capture-backed Atlas island. */
+  readonly authoredRegion?: AuthoredRegion;
   /** Legacy unposed point maps, one per island. Islands with no map render as anchors only. */
   readonly pointMaps: ReadonlyMap<IslandId, PointMap>;
   /** Every map in a posed reconstruction scene. Supersedes pointMaps when supplied. */
@@ -392,6 +406,27 @@ export interface AtlasBindingOptions {
   readonly generatedTile?: GeneratedTileMount;
   /** Optional current rights/record refinements for known renderer subjects. */
   readonly representationSubjects?: readonly RepresentationSubject[];
+}
+
+export interface AuthoredRegion {
+  readonly regionId: IslandId;
+  readonly module: {
+    readonly key: 'region.authored-ground';
+    readonly version: 1;
+  };
+  readonly ground: {
+    readonly kind: 'flat';
+    readonly halfWidthMm: number;
+    readonly halfDepthMm: number;
+    readonly elevationMm: number;
+  };
+  /** Ground-contact pose in the authored region frame, in fixed-point wire units. */
+  readonly spawn: {
+    readonly xMm: number;
+    readonly yMm: number;
+    readonly zMm: number;
+    readonly yawMicroradians: number;
+  };
 }
 
 export interface FrameReport {
@@ -497,6 +532,10 @@ export class AtlasBinding {
   private readonly representationDefaults = new Map<string, RepresentationSubject>();
   private readonly representationOverrides = new Map<string, RepresentationSubject>();
   private readonly representationFrames = new Map<string, pc.GraphNode>();
+  private readonly representationSelectionObservers = new Set<(
+    subjectId: string | null,
+    reason: RepresentationSelectionReason,
+  ) => void>();
 
   private tierState: TierState = EMPTY_TIER_STATE;
   private focusState: FocusState = INITIAL_FOCUS_STATE;
@@ -559,10 +598,39 @@ export class AtlasBinding {
   onMemoryLayerChange: ((visible: boolean) => void) | null = null;
   onRepresentationChange: ((report: RepresentationReport) => void) | null = null;
 
-  private publishRepresentation(): RepresentationReport {
-    const report = this.representation.update();
+  private publishRepresentationReport(
+    selected: string | null,
+    report: RepresentationReport,
+  ): RepresentationReport {
+    if (report.selection !== selected) {
+      const reason = selected !== null && report.subjects.some(entry =>
+        entry.subject.subjectId === selected && entry.subject.availability !== 'available')
+        ? 'unavailable' : 'unregistered';
+      this.publishRepresentationSelection(report.selection, reason);
+    }
     this.onRepresentationChange?.(report);
     return report;
+  }
+
+  private publishRepresentation(): RepresentationReport {
+    const selected = this.representation.report.selection;
+    return this.publishRepresentationReport(selected, this.representation.update());
+  }
+
+  private publishRepresentationSelection(
+    subjectId: string | null,
+    reason: RepresentationSelectionReason,
+  ): void {
+    for (const observer of this.representationSelectionObservers) observer(subjectId, reason);
+  }
+
+  /** Observe explicit selection and authority-driven clearing without owning the data-view panel. */
+  observeRepresentationSelection(observer: (
+    subjectId: string | null,
+    reason: RepresentationSelectionReason,
+  ) => void): () => void {
+    this.representationSelectionObservers.add(observer);
+    return () => { this.representationSelectionObservers.delete(observer); };
   }
 
   /** Called by the physical residency executor after its checked publish or terminal fallback. */
@@ -638,7 +706,11 @@ export class AtlasBinding {
     this.recoveredCameras = recoveredCameras;
     this.navigationWorld = navigationWorld;
     this.field = field;
-    this.objects = new SceneObjectRuntime(app, objectRoots);
+    this.objects = new SceneObjectRuntime(app, objectRoots, {
+      registerRepresentation: (object, entity) =>
+        this.registerAuthoredObjectRepresentation(object, entity),
+      invalidate: () => this.invalidate(),
+    });
     this.segmentOverlay = new SegmentOverlayRuntime(islands, trainedScenes, () => playcanvasSegmentEngine(app), {
       lensPrepared: (entity) => this.proofLensSplatsPrepared.has(entity),
       // The same window the lens holds, on the same clock, closed by the same `settleProofLens`.
@@ -698,6 +770,10 @@ export class AtlasBinding {
     const initialArtProfile = options.artProfile ?? DEFAULT_WORLD_ART_PROFILE;
     if (options.ownedDistrict !== undefined && options.generatedTile !== undefined) {
       throw new TypeError('A generated tile replaces the owned district; pass one or the other');
+    }
+    if (options.authoredRegion !== undefined &&
+        (options.ownedDistrict !== undefined || options.generatedTile !== undefined)) {
+      throw new TypeError('An authored starter region cannot replace geographic ground');
     }
     const cityActive = options.ownedDistrict !== undefined || options.generatedTile !== undefined ||
       (options.googleTiles?.enabled === true && options.googleTiles.apiKey.length > 0);
@@ -793,10 +869,20 @@ export class AtlasBinding {
     app.root.addChild(environmentRoot);
     const renderRoot = new pc.Entity('atlas-render-origin');
     app.root.addChild(renderRoot);
+    const authoredSurface = options.authoredRegion === undefined ? undefined : Object.freeze({
+      sample: (x: number, z: number) =>
+        Math.abs(x) <= options.authoredRegion!.ground.halfWidthMm / 1000 &&
+        Math.abs(z) <= options.authoredRegion!.ground.halfDepthMm / 1000
+          ? Object.freeze({
+              height: options.authoredRegion!.ground.elevationMm / 1000,
+              normal: Object.freeze({ x: 0, y: 1, z: 0 }),
+            })
+          : null,
+    });
     const navigationWorld = options.generatedTile !== undefined
       ? options.generatedTile.navigationWorld
       : options.ownedDistrict === undefined
-      ? buildNavigationWorld(options.scene)
+      ? buildNavigationWorld(options.scene, authoredSurface)
       // The district owns the ground and the blockers; the scene owns where the memories are. Both
       // are already drawn in the same coordinate space, so withholding the regions from the
       // navigation world did not keep them apart, it only made them unreachable.
@@ -938,6 +1024,12 @@ export class AtlasBinding {
     const trainedScenes: Array<AtlasBinding['trainedScenes'][number]> = [];
 
     const objectRoots = new Map<IslandId, pc.Entity>();
+    if (options.authoredRegion !== undefined) {
+      const root = new pc.Entity(`authored-region:${options.authoredRegion.regionId}`);
+      root.setLocalPosition(0, options.authoredRegion.ground.elevationMm / 1000, 0);
+      renderRoot.addChild(root);
+      objectRoots.set(options.authoredRegion.regionId, root);
+    }
     for (const island of options.scene.islands) {
       const islandEntity = new pc.Entity(`island:${island.islandId}`);
       applyPlacement(islandEntity, island);
@@ -1006,6 +1098,14 @@ export class AtlasBinding {
       ? { ...options.generatedTile.start }
       : options.ownedDistrict !== undefined
       ? ownedDistrictCameraState(navigationWorld, options.ownedDistrict.document)
+      : options.authoredRegion !== undefined
+        ? {
+            x: options.authoredRegion.spawn.xMm / 1000,
+            y: options.authoredRegion.spawn.yMm / 1000 + navigationWorld.eyeHeight,
+            z: options.authoredRegion.spawn.zMm / 1000,
+            yaw: options.authoredRegion.spawn.yawMicroradians / 1_000_000,
+            pitch: 0,
+          }
       : cityActive
         ? cityCameraState('overview')
         : initialAtlasCameraState(options.scene, navigationWorld);
@@ -1103,14 +1203,126 @@ export class AtlasBinding {
     return this.representationOverrides.get(fallback.subjectId) ?? fallback;
   }
 
+  /**
+   * Borrow one authored object's whole renderer draw without inventing submesh ownership.
+   *
+   * A bounded static hierarchy stays one authored subject. Its renderer nodes retain their own
+   * transforms, while the object-root frame owns aggregate bounds. Skinned and morphing draws stay
+   * unsupported because generated static samples would stop agreeing with the visible surface.
+   * The ordinary authored object remains drawn in every refusal case.
+   */
+  private registerAuthoredObjectRepresentation(
+    object: PlacedAuthoredObject,
+    entity: pc.Entity,
+  ): ObjectRepresentationRegistration {
+    const instances = (entity.findComponents('render') as pc.RenderComponent[])
+      .flatMap(render => render.meshInstances);
+    if (instances.length === 0) {
+      return Object.freeze({
+        ok: false as const,
+        reason: 'World to data is unavailable for this object because its reviewed asset has no supported renderer mesh.',
+      });
+    }
+    if (instances.length > MAX_STATIC_MESHES_PER_REPRESENTATION) {
+      return Object.freeze({
+        ok: false as const,
+        reason: `World to data is unavailable for this object because its reviewed asset has ${instances.length} renderer meshes; the bounded whole-object limit is ${MAX_STATIC_MESHES_PER_REPRESENTATION}.`,
+      });
+    }
+    if (instances.some(instance => instance.skinInstance != null || instance.morphInstance != null)) {
+      return Object.freeze({
+        ok: false as const,
+        reason: 'World to data is unavailable for this object because skinned or morphing meshes do not have a supported static surface sample.',
+      });
+    }
+    let subject: RepresentationSubject;
+    const current = () => this.representationSubject(subject);
+    const representationStyle = this.representation.style;
+    const authoredMeshStyle = Object.freeze({
+      ...representationStyle,
+      points: Object.freeze({
+        ...representationStyle.points,
+        densityPerSquareMetre:
+          representationStyle.points.densityPerSquareMetre * AUTHORED_MESH_SAMPLE_DENSITY_SCALE,
+      }),
+    });
+    const group = staticMeshGroupRepresentation(
+      this.device, entity, instances, current, authoredMeshStyle,
+    );
+    if (group === null) {
+      return Object.freeze({
+        ok: false as const,
+        reason: 'World to data is unavailable for this object because its static triangle hierarchy exceeds the bounded source size or has no finite surface and extent.',
+      });
+    }
+    const frameId = `authored-object:${object.objectId}:object-local`;
+    subject = Object.freeze({
+      subjectId: object.objectId,
+      subjectKind: 'object',
+      sceneId: null,
+      frameId,
+      origin: 'authored',
+      sourceRefs: Object.freeze([object.asset.contentSha256]),
+      availability: 'available',
+      rendered: true,
+      // These are deterministic presentation samples of the authored triangles, not measurements.
+      points: 'mesh-surface-samples',
+      compatibleBlend: true,
+      bounds: Object.freeze({
+        frameId,
+        units: 'scene-units',
+        origin: 'authored',
+        basis: 'authored-bounds',
+        min: group.extent.min,
+        max: group.extent.max,
+      }),
+      label: object.asset.assetKey,
+      dataAvailable: true,
+      unavailableReason: 'Generated whole-object surface samples from static renderer triangles; not observed measurements, semantic parts or segmentation.',
+    });
+    try {
+      return Object.freeze({
+        ok: true as const,
+        release: this.registerRepresentationSubjects(entity, [{ subject, draw: group.draw }]),
+      });
+    } catch (error) {
+      return Object.freeze({
+        ok: false as const,
+        reason: error instanceof Error
+          ? `World to data is unavailable for this object: ${error.message}`
+          : 'World to data is unavailable for this object because its mesh is not supported.',
+      });
+    }
+  }
+
+  private rememberRepresentationSubject(subject: RepresentationSubject): () => RepresentationSubject {
+    if (this.representationDefaults.has(subject.subjectId)) {
+      throw new TypeError(`Duplicate representation subject ${subject.subjectId}`);
+    }
+    this.representationDefaults.set(subject.subjectId, Object.freeze(subject));
+    return () => this.representationSubject(subject);
+  }
+
+  private registerOwnedDistrictMetadata(sourceDisplayAllowed: boolean): void {
+    if (this.ownedDistrict === null) return;
+    const root = this.ownedDistrict.root;
+    for (const subject of districtRepresentationSubjects(
+      this.ownedDistrict.district,
+      sourceDisplayAllowed ? 'available' : 'unavailable',
+    )) {
+      const current = this.rememberRepresentationSubject(subject);
+      this.representationFrames.set(subject.subjectId, root);
+      const metadata: RepresentationMetadata = {
+        currentSubject: current,
+        parentVisible: () => representationParentVisible(root),
+      };
+      this.representation.registerMetadata(metadata);
+    }
+  }
+
   private initializeRepresentation(subjects: readonly RepresentationSubject[]): void {
-    const remember = (subject: RepresentationSubject): (() => RepresentationSubject) => {
-      if (this.representationDefaults.has(subject.subjectId)) {
-        throw new TypeError(`Duplicate representation subject ${subject.subjectId}`);
-      }
-      this.representationDefaults.set(subject.subjectId, Object.freeze(subject));
-      return () => this.representationSubject(subject);
-    };
+    const remember = (subject: RepresentationSubject): (() => RepresentationSubject) =>
+      this.rememberRepresentationSubject(subject);
 
     for (const visual of this.islands) {
       const { min, max } = visual.pointMap.map.header.bounds;
@@ -1228,6 +1440,7 @@ export class AtlasBinding {
       let ordinal = 0;
       const districtFrame = `${district.frame?.name ?? district.district_id}:render-metres`;
       const rootWorld = this.ownedDistrict.root.getWorldTransform().data;
+      this.registerOwnedDistrictMetadata(sourceDisplayAllowed);
       for (const render of this.ownedDistrict.root.findComponents('render') as pc.RenderComponent[]) {
         for (const instance of render.meshInstances) {
           const subjectId = `${district.district_id}:render-group:${render.entity.name}:${ordinal}`;
@@ -1359,8 +1572,8 @@ export class AtlasBinding {
         }
         this.representationDefaults.set(id, fixed);
         this.representationFrames.set(id, node);
-        this.representation.register(draw);
         registered.push(id);
+        this.representation.register(draw);
       }
     } catch (error) {
       release();
@@ -1422,8 +1635,8 @@ export class AtlasBinding {
 
   /** Presentation-only. Camera, inspection, picking, clocks, collision and navigation are untouched. */
   setRepresentationIntent(intent: RepresentationIntent): RepresentationReport {
-    const report = this.representation.setIntent(intent);
-    this.onRepresentationChange?.(report);
+    const selected = this.representation.report.selection;
+    const report = this.publishRepresentationReport(selected, this.representation.setIntent(intent));
     this.invalidate();
     return report;
   }
@@ -1432,7 +1645,9 @@ export class AtlasBinding {
 
   /** Highlight one subject in the data view, or none. The world selection and camera stay put. */
   setRepresentationSelection(subjectId: string | null): RepresentationReport {
+    const selected = this.representation.report.selection;
     const report = this.representation.setSelection(subjectId);
+    if (report.selection !== selected) this.publishRepresentationSelection(report.selection, 'explicit');
     this.onRepresentationChange?.(report);
     this.invalidate();
     return report;
@@ -1520,8 +1735,8 @@ export class AtlasBinding {
     this.field.setTheme(theme);
     this.composedWorld.setTheme(theme);
     for (const visual of this.islands) visual.cloud.setTheme(theme);
-    const report = this.representation.refresh();
-    this.onRepresentationChange?.(report);
+    const selected = this.representation.report.selection;
+    this.publishRepresentationReport(selected, this.representation.refresh());
   }
 
   setReducedMotion(reduced: boolean): void {
@@ -1546,7 +1761,7 @@ export class AtlasBinding {
     const s = this.controls.state;
     const r = this.renderedPose;
     return shouldDrawFrame({
-      dirty: this.dirty || (this.ownedDistrict?.societyAnimating ?? false) || (this.playerCameraMode==='third-person' && !this.reducedMotion),
+      dirty: this.dirty || this.objects.animating || (this.ownedDistrict?.societyAnimating ?? false) || (this.playerCameraMode==='third-person' && !this.reducedMotion),
       navigating: this.navigationTransition !== null,
       poseChanged:
         s.x !== r.x || s.y !== r.y || s.z !== r.z ||
@@ -2456,6 +2671,10 @@ export class AtlasBinding {
     if (canvas instanceof HTMLCanvasElement) {
       for (const key of ['cameraMode','ownedGeometryBytes','characterTextureBytes','actualDrawCalls','playerPosition','displayCameraPosition','societyRendered','societyNearby']) delete canvas.dataset[key];
     }
+    // Authored objects own borrowed representation handles. Release them while the registry is
+    // live so points, cloned materials and selection are restored through the ordinary path.
+    this.objects.destroy();
+    this.representationSelectionObservers.clear();
     this.representation.destroy();
     this.nativeCharacters?.destroy();
     this.playerAvatar?.destroy();
@@ -2472,7 +2691,6 @@ export class AtlasBinding {
     this.composedWorld.destroy();
     this.regionMass.destroy();
     this.regionRelief.destroy();
-    this.objects.destroy();
     this.segmentOverlay.destroy();
     for (const visual of this.islands) visual.cloud.destroy();
     for (const visual of this.trainedScenes) {

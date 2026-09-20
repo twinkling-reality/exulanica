@@ -60,9 +60,13 @@ export class PersonalAdmissionApi {
       form.append('files', file, file.name);
     }
     // Transport is JSON-only. Multipart must let the browser supply its boundary.
+    const headers: Record<string, string> = {};
+    // Empty bearer authorization blocks the API's account-cookie fallback.
+    if (this.options.token) headers['authorization'] = `Bearer ${this.options.token}`;
+    if (this.options.csrfToken) headers['x-csrf-token'] = this.options.csrfToken;
     const response = await (this.options.fetch ?? globalThis.fetch)(
       `${this.options.baseUrl.replace(/\/+$/, '')}/intake`, {
-        method: 'POST', headers: { authorization: `Bearer ${this.options.token}` },
+        method: 'POST', headers, credentials: 'include',
         body: form, signal: AbortSignal.timeout(120_000),
       });
     if (!response.ok) throw await toApiError(response);

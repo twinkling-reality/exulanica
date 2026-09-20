@@ -162,6 +162,25 @@ Time is at least bitemporal:
 Authored and simulated branches add a third coordinate: the world/version in which the condition
 holds. No query may silently collapse those axes.
 
+### World time and fictional calendars
+
+The [configurable world rules](product-direction.md#configurable-world-rules) require a separate
+simulation chronology. Canonical event ordering, elapsed world time, calendar presentation and
+playback pacing are distinct quantities. Their mappings and any changes to them need explicit
+versioned definitions. A fictional calendar does not reinterpret observation or transaction time.
+
+Schedule and environmental rules declare which quantity or event they depend on: elapsed time,
+calendar boundaries, daylight or another supported condition. Changing day length, a calendar
+boundary or the existence of sunset therefore requires checking affected rules. It must not
+silently reinterpret stored timestamps or invent events that were never simulated.
+
+Rule changes bind an effective simulation position, base state and rule version. Replay retains
+the definitions and recorded model decisions that produced the events. An incompatible change
+requires a declared state migration or branch; a playback rewind leaves historical events intact.
+World reads, model adapters and package projections must declare the temporal semantics they
+support. This is an architecture requirement, not a claim that the runtime supports arbitrary
+calendars or nonuniform time across regions.
+
 ## 5. Materialization and representation contracts
 
 Every derived spatial or visual artifact declares a machine-readable representation contract:
@@ -245,6 +264,38 @@ Exulanica earns a **predictive world-model** claim only after it demonstrates al
 
 A scripted schedule, plausible animation, or LLM narration does not meet this bar.
 
+### Simulation adapter boundary
+
+The [modular simulation program](product-direction.md#modular-simulation-and-scientific-tooling)
+evaluates external numerical backends. The following are requirements for such adapters, not a
+claim that a general physics interface is implemented. Extend existing version, job, artifact and
+authorization contracts instead of creating a parallel world store.
+
+An adapter declares its capability/version and supported state, observation and action schemas.
+Its input binds the source world/branch, exact state and asset digests, stable entity/part mappings,
+coordinate frames, units, collision approximations, material parameters and missing properties.
+Visual appearance alone cannot establish mass, friction or collision suitability. Guessed physical
+properties remain explicit assumptions. Solver-local indices map to world identities without
+becoming those identities.
+
+Clock mapping distinguishes solver step duration, elapsed world time, calendar presentation,
+controller/sensor rates and display interpolation. Supported rules determine the mapping; a
+fictional calendar does not silently change a solver's physical units. Each mutable field has one
+declared authority at an execution boundary, with explicit handoff or coupling for multiple
+subsystems. A social action proposes a physical interaction only through supported affordances;
+two runtimes must not independently overwrite the same pose.
+
+Retain inputs, implementation and environment versions, seed, numerical settings, checkpoints,
+outputs and failures within declared resource limits. Exact playback reproduces retained state;
+re-execution declares whether it promises identical results or measured numerical tolerances.
+Changing hardware, solver or precision requires checking that promise. Numerical repeatability
+and scientific validity are separate properties.
+
+Results enter a simulated branch through validation against their base state and current rights.
+They do not overwrite source evidence or a world edited after the run began. Cached assets and
+results retain lineage and access checks, including source withdrawal. Unsupported rules, stale
+bases and incomplete runs remain explicit outcomes; partial output is not a completed experiment.
+
 ## 8. Read, write, inspect, and train
 
 ### World Read
@@ -291,6 +342,31 @@ evaluation exclusions. It should export representation contracts and provenance 
 Private world state never silently updates shared weights. A learned artifact derived from private
 state needs its own deletion, retention, export, and model-unlearning position; if those cannot be
 stated honestly, that training path is refused.
+
+### Project projections and external consumers
+
+The [project foundation requirements](product-direction.md#worlds-as-project-foundations) use the
+same world authorities for interactive applications, controlled comparisons and task-specific data.
+A project identifies the world versions, subjects, input and rule bindings, permitted operations
+and outputs needed for its task. This is an architectural requirement, not a separate universal
+project store or an assertion that every projection has an implemented endpoint.
+
+External consumers receive a bounded projection whose contract declares preserved identities,
+coordinate and time semantics, source lineage, capabilities and losses. A geometry consumer need
+not execute society rules; a detector dataset need not contain private project history. Generated
+material returned by a provider enters through validated publication and identity mapping rather
+than silently becoming authoritative state. Importing and exporting visual assets does not by
+itself establish transfer of rules, memory or executable behavior.
+
+For synthetic observation datasets, scene identity alone does not establish correct annotations.
+The projection must bind the camera, world state, renderer and annotation method. It must define
+visible versus occluded extents and distinguish supported object labels from aggregate geometry
+or unknown content. Training and evaluation splits must separate the appropriate source worlds,
+scenarios or trajectories to prevent adjacent views of one scene from masquerading as independent
+held-out examples. Consumer-side checks must test annotation correctness and declared omissions.
+Task benefit requires comparison with a relevant baseline; real-world usefulness requires
+independent real-world evaluation. These requirements extend the training boundary above without
+changing the implemented package inventory below.
 
 ### 8.1 Current export coverage
 

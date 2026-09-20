@@ -71,6 +71,21 @@ function checkbox(label: string): { readonly root: HTMLLabelElement; readonly in
   return { root: el('label', { class: 'representation-toggle' }, [input, el('span', { text: label })]), input };
 }
 
+function subjectMatches(entry: Entry, query: string): boolean {
+  const words = query.trim().toLocaleLowerCase().split(/\s+/).filter(Boolean);
+  if (words.length === 0) return true;
+  const { subject } = entry;
+  const searchable = [
+    subject.label,
+    subject.subjectId,
+    subject.subjectKind,
+    subject.origin,
+    subject.record?.kind,
+  ].filter((value): value is string => value !== null && value !== undefined)
+    .join(' ').toLocaleLowerCase();
+  return words.every(word => searchable.includes(word));
+}
+
 /** A read-only lens on actual renderer capabilities. It never requests or changes source data. */
 export function buildRepresentationInspector(getBinding: () => Binding | null) {
   const root = el('details', { class: 'representation-inspector' });
@@ -88,6 +103,13 @@ export function buildRepresentationInspector(getBinding: () => Binding | null) {
   const visualization = checkbox('Visualization look (dashes)');
   const legend = el('ul', { class: 'representation-legend', 'aria-label': 'Point colours in this view' });
   const styleLine = el('p', { class: 'representation-style' });
+  const search = el('input', {
+    type: 'search',
+    placeholder: 'Name, identity, kind or origin',
+    autocomplete: 'off',
+    disabled: true,
+  });
+  const searchStatus = el('p', { class: 'representation-search-status', role: 'status' });
   const subjects = el('select', { 'aria-label': 'Inspect a displayed geometry group', disabled: true });
   const description = el('p', { class: 'representation-description' });
   const record = el('pre', { class: 'representation-record' });
@@ -105,15 +127,18 @@ export function buildRepresentationInspector(getBinding: () => Binding | null) {
       el('label', {}, [el('span', { text: 'Colour by' }), colour]),
       visualization.root, legend, styleLine,
     ]),
+    el('label', {}, [el('span', { text: 'Search displayed subjects' }), search]),
+    searchStatus,
     el('label', {}, [el('span', { text: 'Inspect geometry' }), subjects]), description, data,
   );
   let current: Report | null = null;
   let inventoryKey = '';
   let legendKey = '';
   let timer: ReturnType<typeof setInterval> | null = null;
+  let selectionRefusal: string | null = null;
 
   function selectedEntry(): Entry | undefined {
-    return current?.subjects.find(item => item.subject.subjectId === subjects.value
+    return current?.subjects.find(item => item.subject.subjectId === current?.selection
       && item.subject.availability === 'available');
   }
   function showRecord() {
@@ -124,13 +149,16 @@ export function buildRepresentationInspector(getBinding: () => Binding | null) {
     const intent = current!.intent;
     const refusals = (getBinding()?.representationOverlayPlan?.refusals ?? [])
       .filter(item => item.subjectId === subject.subjectId);
+    const reasons = [...resolved.reasons];
+    if (subject.points === null && subject.unavailableReason !== null
+      && !reasons.includes(subject.unavailableReason)) reasons.push(subject.unavailableReason);
     description.textContent = [
       resolved.pointLabel ?? 'Surface only',
       ORIGIN_WORDS[subject.origin] ?? subject.origin,
       subject.subjectKind === 'geometry-group' ? 'Grouped geometry, not separately extracted objects'
         : subject.record?.kind ?? subject.subjectKind,
       BLEND_WORDS[resolved.blend],
-      ...resolved.reasons,
+      ...reasons,
       ...refusals.map(item => `No ${item.overlay === 'id' ? 'id tag' : item.overlay === 'label' ? 'label tag' : item.overlay}: ${item.reason}`),
     ].join(' · ');
     const style = current!.style ?? { id: DATA_VIEW_STYLE.id, version: DATA_VIEW_STYLE.version };
@@ -172,6 +200,15 @@ export function buildRepresentationInspector(getBinding: () => Binding | null) {
   function refresh() {
     const binding = getBinding();
     current = binding?.representationReport ?? null;
+    if (current?.selection !== null && current?.selection !== undefined) selectionRefusal = null;
+    const inventory = current?.subjects ?? [];
+    const query = search.value.trim();
+    const matches = inventory.filter(item => subjectMatches(item, query));
+    const selected = current?.selection;
+    const selectedOutside = query === '' ? undefined : inventory.find(item =>
+      item.subject.subjectId === selected
+      && item.subject.availability === 'available'
+      && !matches.includes(item));
     const entries = current?.subjects.filter(item => item.subject.availability === 'available') ?? [];
     const spatial = entries.filter(item => item.subject.rendered && item.subject.points !== null);
     const visibleSpatial = spatial.filter(item => item.resolved.geometryVisible);
@@ -182,7 +219,7 @@ export function buildRepresentationInspector(getBinding: () => Binding | null) {
     const budget = current?.pointBudget;
     const drawn = current?.allocatedPoints ?? 0;
     const pending = current?.pendingSubjects ?? 0;
-    status.textContent = spatial.length === 0
+    const representationStatus = spatial.length === 0
       ? 'No switchable surface and point pair is available in this view.'
       : [
         `${visibleSpatial.length} of ${spatial.length} supported geometry groups are visible in this view.`,
@@ -191,6 +228,9 @@ export function buildRepresentationInspector(getBinding: () => Binding | null) {
           ? [`${drawn.toLocaleString('en-GB')} points prepared of a ${budget.toLocaleString('en-GB')} point budget.`] : []),
         ...(pending > 0 ? ['Preparing more points.'] : []),
       ].join(' ');
+    status.textContent = selectionRefusal === null
+      ? representationStatus
+      : `${selectionRefusal} ${representationStatus}`;
     const controls = entries.length === 0 || intent === undefined;
     for (const [toggle, on] of [
       [boxes, intent?.boxes], [ids, intent?.ids], [labels, intent?.labels],
@@ -204,20 +244,42 @@ export function buildRepresentationInspector(getBinding: () => Binding | null) {
     const style = current?.style ?? { id: DATA_VIEW_STYLE.id, version: DATA_VIEW_STYLE.version };
     styleLine.textContent = `Look ${style.id}, version ${style.version}. ${PRESENTATION}`;
     showLegend(entries, intent?.colour ?? 'origin');
-    const key = JSON.stringify(entries.map(item => [item.subject.subjectId, item.subject.label]));
+    search.disabled = inventory.length === 0;
+    searchStatus.textContent = query === ''
+      ? `${inventory.length} ${inventory.length === 1 ? 'subject' : 'subjects'} in this view.`
+      : matches.length === 0
+        ? `No subjects match “${query}”.${selectedOutside === undefined
+          ? ' Clear the search to see every subject.'
+          : ' The selected subject remains inspectable outside this filter and is not included in the match count.'}`
+        : `${matches.length} of ${inventory.length} subjects match “${query}”.${selectedOutside === undefined
+          ? ''
+          : ' The selected subject remains inspectable outside this filter and is not included in the match count.'}`;
+    const shown = selectedOutside === undefined ? matches : [selectedOutside, ...matches];
+    const key = JSON.stringify([query, selected, shown.map(item => [
+      item.subject.subjectId,
+      item.subject.label,
+      item.subject.subjectKind,
+      item.subject.origin,
+      item.subject.record?.kind,
+      item.subject.availability,
+      item.subject.unavailableReason,
+    ])]);
     if (key !== inventoryKey) {
-      const selected = subjects.value;
       inventoryKey = key;
-      subjects.replaceChildren(...entries.map(item => el('option', {
-        value: item.subject.subjectId,
-        text: item.subject.label ?? item.subject.subjectId,
-      })));
-      subjects.value = entries.some(item => item.subject.subjectId === selected)
-        ? selected
-        : (entries.find(item => item.resolved.geometryVisible) ?? entries[0])?.subject.subjectId ?? '';
-      if (root.open) select();
+      subjects.replaceChildren(
+        el('option', { value: '', text: 'No subject selected' }),
+        ...shown.map(item => el('option', {
+          value: item.subject.subjectId,
+          text: `${item.subject.label ?? item.subject.subjectId}${item === selectedOutside
+            ? ' (selected, outside search)'
+            : item.subject.availability === 'available' ? '' : ' (unavailable)'}`,
+          disabled: item.subject.availability !== 'available',
+        })),
+      );
     }
-    subjects.disabled = entries.length === 0;
+    subjects.value = selected !== null && selected !== undefined
+      && entries.some(item => item.subject.subjectId === selected) ? selected : '';
+    subjects.disabled = inventory.length === 0;
     showRecord();
   }
   function change(changes: Partial<RepresentationIntent>) {
@@ -229,8 +291,22 @@ export function buildRepresentationInspector(getBinding: () => Binding | null) {
   function select() {
     const binding = getBinding();
     const id = subjects.value === '' ? null : subjects.value;
-    if (binding?.setRepresentationSelection === undefined || binding.representationReport.selection === id) return;
-    binding.setRepresentationSelection(id);
+    if (binding?.setRepresentationSelection === undefined) return;
+    try {
+      if (binding.representationReport.selection !== id) binding.setRepresentationSelection(id);
+      selectionRefusal = null;
+    } catch (error) {
+      if (!(error instanceof TypeError)
+        || !/^(Unknown|Unavailable) representation subject /.test(error.message)) throw error;
+      selectionRefusal = 'That subject is no longer available. No subject is selected.';
+      subjects.value = '';
+      try {
+        if (binding.representationReport.selection !== null) binding.setRepresentationSelection(null);
+      } catch (clearError) {
+        if (!(clearError instanceof TypeError)
+          || !/^(Unknown|Unavailable) representation subject /.test(clearError.message)) throw clearError;
+      }
+    }
   }
   slider.addEventListener('input', () => {
     if (slider.disabled) return;
@@ -243,19 +319,16 @@ export function buildRepresentationInspector(getBinding: () => Binding | null) {
     binary: visualization.input.checked ? 'visualization' : 'off',
   }));
   colour.addEventListener('change', () => change({ colour: colour.value === 'kind' ? 'kind' : 'origin' }));
+  search.addEventListener('input', refresh);
   subjects.addEventListener('change', () => { select(); refresh(); });
   root.addEventListener('toggle', () => {
     if (timer !== null) clearInterval(timer);
     timer = null;
     if (root.open) {
       refresh();
-      select();
       timer = setInterval(() => {
         if (root.closest('[hidden]') === null) refresh();
       }, 250);
-    } else {
-      // The highlight belongs to this panel's list; closing the panel lets it go.
-      getBinding()?.setRepresentationSelection?.(null);
     }
   });
   return { root, refresh, dispose() { if (timer !== null) clearInterval(timer); timer = null; } };

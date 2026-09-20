@@ -6,13 +6,13 @@ and fails if this file disagrees with the catalog rules.
 This catalog lists living contracts, capability guides, and decision records.
 Start from [README.md](README.md).
 
-**98 documents** in the public catalog.
+**100 documents** in the public catalog.
 
 ## Living contracts and reference
 
 What the system is. Edited when the system changes.
 
-68 documents.
+70 documents.
 
 - [architecture-overview](architecture-overview.md) : Current direction, 2026-09-12: read product-direction.md
 - [asset-read-currency](asset-read-currency.md) : Final acceptance at source head 03501cea376cf530c185e3b12a5fb0d8d8d7acdf passed 2118 backend
@@ -60,12 +60,14 @@ What the system is. Edited when the system changes.
 - [representation-decisions](representation-decisions.md) : Every choice about how the world is represented, what each one assumes, and the condition that would
 - [retained-reference-workflow](retained-reference-workflow.md) : A real trained reconstruction is established for one collection and refused for the other
 - [runtime-verification](runtime-verification.md) : VERIFIED by execution on 2026-08-27
+- [saved-world-entry](saved-world-entry.md) : A saved world entry is the workspace-owned pointer a person uses to reopen an owned world. It
 - [scene-placement-alignment](scene-placement-alignment.md) : Implemented 2026-09-05. This corrects the identity-scale limitation documented in
 - [scene-reconstruction-operations](scene-reconstruction-operations.md) : IMPLEMENTED and PostgreSQL-tested 2026-09-04; licensed benchmark admitted, reconstructed
 - [scene-segments](scene-segments.md) : implemented 2026-09-11 on branch codex/segments-backend, backend half. The derivative
 - [scene-splat-publication](scene-splat-publication.md) : Implemented 2026-09-05. This is the normal production path from an admitted, exact capture set
 - [screening-currency](screening-currency.md) : Migration 0040 separates a historical review from permission for a new geometry operation
 - [security-floor](security-floor.md) : - Status: mixed, labelled per claim. See README.md(README.md) for the status convention
+- [society-experiments](society-experiments.md) : The society experiment surface records controlled comparisons over an existing
 - [spatial-world-authority](spatial-world-authority.md) : IMPLEMENTED for canonical structural snapshots, reviewed preview/apply, protected-base
 - [synthetic-society-contract](synthetic-society-contract.md) : BOUNDED DETERMINISTIC SIMULATION; NOT A LEARNED SOCIETY MODEL
 - [texture-package](texture-package.md) : IMPLEMENTED for seventeen baked texture sets, their containers, the manifest, migrations

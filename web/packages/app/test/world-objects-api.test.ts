@@ -214,6 +214,27 @@ describe('the published version body, as the fixture publishes it', () => {
   });
 });
 
+describe('named saved-world binding', () => {
+  it('reads the explicitly pinned version and never asks for the newest one', async () => {
+    const urls: URL[] = [];
+    const fetch = vi.fn(async (input: string | URL | Request) => {
+      const url = new URL(String(input));
+      urls.push(url);
+      if (url.pathname === '/world/assets') return Response.json(registryRows());
+      if (url.pathname === `/world/versions/${VERSION_ID}`) return Response.json(FIXTURE);
+      throw new Error(`unexpected inferred read ${url.pathname}`);
+    });
+    const subject = new WorldObjectsClient({
+      baseUrl: 'https://exulanica.test', token: 'private', fetch,
+      worldId: 'world:family-garden', defaultVersionId: VERSION_ID,
+    });
+    expect((await subject.connect()).version?.versionId).toBe(VERSION_ID);
+    expect(urls.map((url) => url.searchParams.get('world_id')))
+      .toEqual(['world:family-garden', 'world:family-garden']);
+    expect(urls.some((url) => url.pathname === '/world/versions')).toBe(false);
+  });
+});
+
 describe('a transform is bounded before it costs a round trip', () => {
   it('accepts the fixture’s own transform', () => {
     expect(() => assertTransform(transform())).not.toThrow();
@@ -325,6 +346,124 @@ describe('the client reads both routes and writes through one queue', () => {
     // One POST and no follow-up GET of the version.
     expect(calls.filter((call) => call.method === 'GET' && call.path.includes('/versions/')))
       .toHaveLength(0);
+  });
+
+  it('reports the accepted branch head so the saved entry can advance its digest cursor', async () => {
+    const moved = { ...clone(FIXTURE), edit_seq: 6, state_sha256: 'c'.repeat(64) };
+    const { fetchImpl } = transport({ [ASSETS]: registryRows(), [VERSIONS]: [FIXTURE], [ADD]: moved });
+    const onVersionChange = vi.fn(async () => undefined);
+    const subject = new WorldObjectsClient({
+      baseUrl: 'https://exulanica.test', token: 'token', fetch: fetchImpl,
+      onVersionChange,
+    });
+    const { version } = await subject.connect();
+    await subject.place(version as AlternateVersion, {
+      objectId: 'object:new', assetSha256: 'b'.repeat(64), regionId: 'region-a',
+      transform: transform(), originRole: 'fictional', behaviour: null,
+    });
+    expect(onVersionChange).toHaveBeenCalledWith(expect.objectContaining({
+      versionId: VERSION_ID, editSeq: 6, stateSha256: 'c'.repeat(64),
+    }));
+  });
+
+  it('binds a write to the observed entry cursor and advances local state only after acceptance', async () => {
+    const moved = { ...clone(FIXTURE), edit_seq: 6, state_sha256: 'c'.repeat(64) };
+    const { fetchImpl, calls } = transport({
+      [ASSETS]: registryRows(), [VERSION]: FIXTURE, [ADD]: moved,
+    });
+    const binding = {
+      entryId: '11111111-1111-4111-8111-111111111111',
+      revision: 3,
+      authoredVersionId: VERSION_ID,
+      authoredStateSha256: String(FIXTURE['state_sha256']),
+      authoredEditSeq: Number(FIXTURE['edit_seq']),
+    };
+    const onSavedEntryAdvanced = vi.fn(async () => undefined);
+    const subject = new WorldObjectsClient({
+      baseUrl: 'https://exulanica.test', token: 'token', fetch: fetchImpl,
+      savedEntry: () => binding,
+      onSavedEntryAdvanced,
+    });
+    const { version } = await subject.connect();
+    await subject.place(version as AlternateVersion, {
+      objectId: 'object:new', assetSha256: 'b'.repeat(64), regionId: 'region-a',
+      transform: transform(), originRole: 'fictional', behaviour: null,
+    });
+    const write = calls.find((call) => call.method === 'POST')!;
+    expect(write.body).toMatchObject({
+      saved_entry: {
+        entry_id: binding.entryId,
+        base_revision: 3,
+        authored_state_sha256: binding.authoredStateSha256,
+        authored_edit_seq: binding.authoredEditSeq,
+      },
+    });
+    expect(onSavedEntryAdvanced).toHaveBeenCalledWith(
+      expect.objectContaining({ stateSha256: 'c'.repeat(64), editSeq: 6 }),
+      binding,
+    );
+  });
+
+  it('refuses a delayed version response that no longer matches the saved entry cursor', async () => {
+    let release!: (response: Response) => void;
+    const heldVersion = new Promise<Response>((resolve) => { release = resolve; });
+    const fetchImpl = vi.fn(async (url: string | URL | Request) => {
+      const path = new URL(String(url)).pathname;
+      if (path === '/world/assets') {
+        return new Response(JSON.stringify(registryRows()), {
+          status: 200, headers: { 'content-type': 'application/json' },
+        });
+      }
+      if (path === `/world/versions/${VERSION_ID}`) return heldVersion;
+      return new Response(null, { status: 404 });
+    });
+    const binding = {
+      entryId: '11111111-1111-4111-8111-111111111111',
+      revision: 3,
+      authoredVersionId: VERSION_ID,
+      authoredStateSha256: String(FIXTURE['state_sha256']),
+      authoredEditSeq: Number(FIXTURE['edit_seq']),
+    };
+    const subject = new WorldObjectsClient({
+      baseUrl: 'https://exulanica.test', token: 'token', fetch: fetchImpl,
+      defaultVersionId: VERSION_ID, savedEntry: () => binding,
+    });
+
+    const opening = subject.connect();
+    await vi.waitFor(() => expect(fetchImpl).toHaveBeenCalledTimes(2));
+    release(new Response(JSON.stringify({
+      ...clone(FIXTURE), edit_seq: binding.authoredEditSeq + 1, state_sha256: 'c'.repeat(64),
+    }), { status: 200, headers: { 'content-type': 'application/json' } }));
+
+    await expect(opening).rejects.toMatchObject({
+      code: 'saved_entry_reconciliation_required',
+    });
+    expect(subject.version()).toBeNull();
+  });
+
+  it.each([
+    ['version identity', { version_id: 'other-version' }],
+    ['state digest', { state_sha256: 'c'.repeat(64) }],
+    ['edit sequence', { edit_seq: Number(FIXTURE['edit_seq']) + 1 }],
+    ['source authority', { source_invalidated: true }],
+  ])('refuses a saved entry whose returned %s changed', async (_label, changed) => {
+    const returned = { ...clone(FIXTURE), ...changed };
+    const binding = {
+      entryId: '11111111-1111-4111-8111-111111111111',
+      revision: 3,
+      authoredVersionId: VERSION_ID,
+      authoredStateSha256: String(FIXTURE['state_sha256']),
+      authoredEditSeq: Number(FIXTURE['edit_seq']),
+    };
+    const { fetchImpl } = transport({ [ASSETS]: registryRows(), [VERSION]: returned });
+    const subject = new WorldObjectsClient({
+      baseUrl: 'https://exulanica.test', token: 'token', fetch: fetchImpl,
+      defaultVersionId: VERSION_ID, savedEntry: () => binding,
+    });
+    await expect(subject.connect()).rejects.toMatchObject({
+      code: 'saved_entry_reconciliation_required',
+    });
+    expect(subject.version()).toBeNull();
   });
 
   it('refuses a malformed transform before it reaches the network', async () => {

@@ -145,6 +145,14 @@ export interface WorldStyleConnection {
   readonly versions: readonly WorldStyleVersionRecord[];
 }
 
+export interface SavedStyleEntryBinding {
+  readonly entryId: string;
+  readonly revision: number;
+  readonly authoredStateSha256: string;
+  readonly authoredEditSeq: number;
+  readonly styleVersionId: string;
+}
+
 export type WorldStyleApplyResult =
   | { readonly kind: 'applied'; readonly version: WorldStyleVersionRecord }
   | { readonly kind: 'stale-recovered'; readonly preview: ActiveWorldStylePreview };
@@ -162,17 +170,50 @@ export class WorldStyleContractError extends Error {
 
 type IdFactory = () => string;
 
+function savedEntryBody(
+  entry: SavedStyleEntryBinding | undefined,
+): Readonly<Record<string, unknown>> {
+  if (entry === undefined) return Object.freeze({});
+  return Object.freeze({
+    saved_entry: {
+      entry_id: entry.entryId,
+      base_revision: entry.revision,
+      authored_state_sha256: entry.authoredStateSha256,
+      authored_edit_seq: entry.authoredEditSeq,
+      style_version_id: entry.styleVersionId,
+    },
+  });
+}
+
 export class WorldStyleClient {
   readonly #transport: Transport;
   readonly #ids: IdFactory;
+  readonly #worldId: string | undefined;
+  readonly #savedEntry: (() => SavedStyleEntryBinding) | undefined;
+  readonly #onSavedEntryAdvanced:
+    | ((version: WorldStyleVersionRecord, base: SavedStyleEntryBinding) => void)
+    | undefined;
   #state: WorldStyleState | null = null;
   #versions: readonly WorldStyleVersionRecord[] = Object.freeze([]);
   #active: ActiveWorldStylePreview | null = null;
   #previewQueue: Promise<void> = Promise.resolve();
+  #displayedVersionId: string | null = null;
+  #requiresReconciliation = false;
 
-  constructor(options: TransportOptions & { readonly ids?: IdFactory }) {
+  constructor(options: TransportOptions & {
+    readonly ids?: IdFactory;
+    readonly worldId?: string;
+    readonly savedEntry?: () => SavedStyleEntryBinding;
+    readonly onSavedEntryAdvanced?: (
+      version: WorldStyleVersionRecord,
+      base: SavedStyleEntryBinding,
+    ) => void;
+  }) {
     this.#transport = new Transport(options);
     this.#ids = options.ids ?? (() => globalThis.crypto.randomUUID());
+    this.#worldId = options.worldId;
+    this.#savedEntry = options.savedEntry;
+    this.#onSavedEntryAdvanced = options.onSavedEntryAdvanced;
   }
 
   state(): WorldStyleState | null {
@@ -187,27 +228,47 @@ export class WorldStyleClient {
     return this.#active;
   }
 
-  async connect(): Promise<WorldStyleConnection> {
+  async connect(selectedVersionId?: string): Promise<WorldStyleConnection> {
     const [catalog, state, versions] = await Promise.all([
-      this.#transport.getJson<unknown>('/world/styles/catalog'),
-      this.#transport.getJson<unknown>('/world/styles/current'),
-      this.#transport.getJson<unknown>('/world/styles/versions'),
+      this.#transport.getJson<unknown>(this.#path('/world/styles/catalog')),
+      this.#transport.getJson<unknown>(this.#path('/world/styles/current')),
+      this.#transport.getJson<unknown>(this.#path('/world/styles/versions')),
     ]);
     validateCatalog(catalog);
     this.#state = parseState(state);
     this.#versions = parseVersions(versions);
-    return Object.freeze({ state: this.#state, versions: this.#versions });
+    const selected = selectedVersionId === undefined
+      ? this.#state.current
+      : this.#versions.find((version) => version.versionId === selectedVersionId);
+    if (selected === undefined) {
+      throw new WorldStyleContractError(
+        'unknown_reference', `Saved style version ${selectedVersionId} is unavailable.`,
+      );
+    }
+    this.#displayedVersionId = selected.versionId;
+    this.#requiresReconciliation = selected.versionId !== this.#state.current.versionId;
+    return Object.freeze({
+      state: Object.freeze({
+        currentTopologyDigest: this.#state.currentTopologyDigest,
+        current: selected,
+      }),
+      versions: this.#versions,
+    });
   }
 
   async refresh(): Promise<WorldStyleState> {
-    const state = parseState(await this.#transport.getJson<unknown>('/world/styles/current'));
+    const state = parseState(
+      await this.#transport.getJson<unknown>(this.#path('/world/styles/current')),
+    );
     this.#state = state;
+    this.#requiresReconciliation = this.#displayedVersionId !== null
+      && this.#displayedVersionId !== state.current.versionId;
     return state;
   }
 
   async refreshVersions(): Promise<readonly WorldStyleVersionRecord[]> {
     this.#versions = parseVersions(
-      await this.#transport.getJson<unknown>('/world/styles/versions'),
+      await this.#transport.getJson<unknown>(this.#path('/world/styles/versions')),
     );
     return this.#versions;
   }
@@ -257,7 +318,7 @@ export class WorldStyleClient {
 
   async inspectProposal(proposalId: string): Promise<WorldStyleProposalRecord> {
     return parseProposal(await this.#transport.getJson<unknown>(
-      `/world/styles/proposals/${encodeURIComponent(proposalId)}`,
+      this.#path(`/world/styles/proposals/${encodeURIComponent(proposalId)}`),
     ));
   }
 
@@ -271,7 +332,7 @@ export class WorldStyleClient {
     if (active === null) return;
     try {
       await this.#transport.delete(
-        `/world/styles/previews/${encodeURIComponent(active.preview.previewId)}`,
+        this.#path(`/world/styles/previews/${encodeURIComponent(active.preview.previewId)}`),
       );
     } catch (error) {
       if (!(error instanceof ApiError) || error.code !== 'invalid_preview_state') throw error;
@@ -284,12 +345,14 @@ export class WorldStyleClient {
     if (active === null) {
       throw new WorldStyleContractError('missing_preview', 'There is no reviewed world preview to apply.');
     }
+    const savedEntry = this.#savedEntry?.();
     try {
       const version = parseVersion(await this.#transport.postJson<unknown>(
-        `/world/styles/previews/${encodeURIComponent(active.preview.previewId)}/apply`,
+        this.#path(`/world/styles/previews/${encodeURIComponent(active.preview.previewId)}/apply`),
         {
           baseStyleVersionId: active.baseStyleVersionId,
           baseTopologyDigest: active.baseTopologyDigest,
+          ...savedEntryBody(savedEntry),
         },
       ));
       this.#active = null;
@@ -298,8 +361,17 @@ export class WorldStyleClient {
         current: version,
       });
       this.#versions = appendVersion(this.#versions, version);
+      this.#displayedVersionId = version.versionId;
+      this.#requiresReconciliation = false;
+      if (savedEntry !== undefined) this.#onSavedEntryAdvanced?.(version, savedEntry);
       return Object.freeze({ kind: 'applied', version });
     } catch (error) {
+      if (error instanceof ApiError && error.code === 'stale_saved_world_entry') {
+        throw new WorldStyleContractError(
+          'saved_entry_conflict',
+          'This saved world changed elsewhere. The appearance was not saved. Reload before trying again.',
+        );
+      }
       if (!(error instanceof ApiError) || error.code !== 'stale_style_version') throw error;
       await this.refresh();
       const recovered = await this.#createPreview({
@@ -313,15 +385,17 @@ export class WorldStyleClient {
 
   async rollback(targetVersionId: string): Promise<WorldStyleRollbackResult> {
     const state = this.#requireState();
+    const savedEntry = this.#savedEntry?.();
     try {
       const version = parseVersion(await this.#transport.postJson<unknown>(
-        '/world/styles/rollback',
+        this.#path('/world/styles/rollback'),
         {
           targetVersionId,
           baseStyleVersionId: state.current.versionId,
           baseTopologyDigest: state.currentTopologyDigest,
           origin: 'settings',
           originReference: 'appearance-history',
+          ...savedEntryBody(savedEntry),
         },
       ));
       this.#state = Object.freeze({
@@ -329,14 +403,29 @@ export class WorldStyleClient {
         current: version,
       });
       this.#versions = appendVersion(this.#versions, version);
+      this.#displayedVersionId = version.versionId;
+      this.#requiresReconciliation = false;
+      if (savedEntry !== undefined) this.#onSavedEntryAdvanced?.(version, savedEntry);
       return Object.freeze({ kind: 'applied', version });
     } catch (error) {
+      if (error instanceof ApiError && error.code === 'stale_saved_world_entry') {
+        throw new WorldStyleContractError(
+          'saved_entry_conflict',
+          'This saved world changed elsewhere. The restored appearance was not saved. Reload before trying again.',
+        );
+      }
       if (!(error instanceof ApiError) || error.code !== 'stale_style_version') throw error;
       return Object.freeze({ kind: 'stale', state: await this.refresh() });
     }
   }
 
   async #replacePreview(request: PreviewRequest): Promise<ActiveWorldStylePreview> {
+    if (this.#requiresReconciliation) {
+      throw new WorldStyleContractError(
+        'saved_style_reconciliation_required',
+        'Restore this saved appearance before changing it, because another appearance is active.',
+      );
+    }
     await this.#discardActiveNow();
     try {
       const active = await this.#createPreview(request, false);
@@ -374,7 +463,7 @@ export class WorldStyleClient {
       ? { kind: 'global' as const }
       : { kind: 'region' as const, islandId: request.scope.islandId };
     const preview = parsePreview(await this.#transport.postJson<unknown>(
-      '/world/styles/previews',
+      this.#path('/world/styles/previews'),
       {
         proposalId,
         origin: request.origin,
@@ -403,6 +492,11 @@ export class WorldStyleClient {
       throw new WorldStyleContractError('not_connected', 'World style authority is not connected.');
     }
     return this.#state;
+  }
+
+  #path(path: string): string {
+    if (this.#worldId === undefined) return path;
+    return `${path}${path.includes('?') ? '&' : '?'}world_id=${encodeURIComponent(this.#worldId)}`;
   }
 }
 

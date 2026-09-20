@@ -167,11 +167,14 @@ describe('Options', () => {
         refinesProposalId: 'proposal-0',
       },
     });
-    expect(view.root.textContent).toContain('Current revision 1 · v1');
+    expect(view.root.querySelector('.world-style-version')?.textContent)
+      .toBe('Current revision 1');
     expect(view.root.textContent).toContain('settings by actor-1');
     expect(view.root.textContent).toContain('companion proposal ready for review');
     expect(view.root.textContent).toContain('2 provenance references');
-    expect(view.root.textContent).toContain('Refines proposal-0');
+    expect(view.root.textContent).toContain('Refines an earlier proposal');
+    expect(view.root.querySelector('.world-style-proposal-review')?.textContent)
+      .not.toContain('proposal-0');
 
     const history = view.root.querySelector<HTMLSelectElement>('[aria-label="World design history"]')!;
     history.value = 'v0';

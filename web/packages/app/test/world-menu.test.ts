@@ -7,7 +7,8 @@ describe('World menu', () => {
     const onResume = vi.fn();
     const onCommand = vi.fn();
     const onWorld = vi.fn();
-    const menu = buildWorldMenu({ preview: true, onResume, onWorld, onCommand });
+    const onExperiment = vi.fn();
+    const menu = buildWorldMenu({ preview: true, onResume, onWorld, onExperiment, onCommand });
     document.body.append(menu.root);
     menu.setVisible(true);
 
@@ -18,12 +19,24 @@ describe('World menu', () => {
     menu.root.querySelector<HTMLButtonElement>('[data-command=world]')!.click();
     expect(onWorld).toHaveBeenCalledOnce();
     menu.root.querySelector<HTMLButtonElement>('[data-command=character]')!.click();
+    menu.root.querySelector<HTMLButtonElement>('[data-command=experiment]')!.click();
     menu.root.querySelector<HTMLButtonElement>('[data-command=controls]')!.click();
     menu.root.querySelector<HTMLButtonElement>('.world-menu-rail-action')!.click();
 
     expect(onCommand).toHaveBeenNthCalledWith(1, 'character');
     expect(onCommand).toHaveBeenNthCalledWith(2, 'controls');
+    expect(onExperiment).toHaveBeenCalledOnce();
     expect(onResume).toHaveBeenCalledOnce();
+  });
+
+  it('does not offer recorded results without an active saved-world binding', () => {
+    const menu = buildWorldMenu({
+      preview: true,
+      onResume: vi.fn(),
+      onWorld: vi.fn(),
+      onCommand: vi.fn(),
+    });
+    expect(menu.root.querySelector('[data-command=experiment]')).toBeNull();
   });
 
   it('is hidden and inert outside the menu state', () => {

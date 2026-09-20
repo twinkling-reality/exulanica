@@ -18,6 +18,10 @@ fixtures/
 # bytes. `scene-objects.test.ts` asserts their digests against world-objects.json, so a generator
 # change fails here loudly instead of drifting.
 !packages/graph-client/test/fixtures/*.glb
+# The compact producer result binds the browser reader to the Python experiment contract.
+!packages/app/test/fixtures/
+packages/app/test/fixtures/*
+!packages/app/test/fixtures/society-experiment-compact-result.json
 bakeoff-results/
 # Wrangler's per-project state directory. Deploying the landing package creates it in
 # packages/landing, and it was untracked and unignored: empty it is invisible to `git status`, so

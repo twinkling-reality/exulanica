@@ -363,6 +363,9 @@ ROUTE_RULES: Final[Mapping[tuple[str, str], Public | Authentication | Requires]]
             _P.OPERATIONS_WRITE
         ),
         # -- the authored world, read ------------------------------------------------------
+        ("GET", "/world-entries"): _WORLD_READ,
+        ("GET", "/world-entries/candidates"): _WORLD_READ,
+        ("GET", "/world-entries/{entry_id}"): _WORLD_READ,
         ("GET", "/world/assets"): _WORLD_READ,
         ("GET", "/world/assets/{asset_key}"): _WORLD_READ,
         ("GET", "/world/assets/{asset_key}/bytes"): _WORLD_READ,
@@ -389,6 +392,12 @@ ROUTE_RULES: Final[Mapping[tuple[str, str], Public | Authentication | Requires]]
         ("GET", "/world/versions/{version_id}/society/actions"): _WORLD_READ,
         ("GET", "/world/versions/{version_id}/society/actions/{request_id}"): _WORLD_READ,
         ("GET", "/world/versions/{version_id}/society/decisions/{request_id}"): _WORLD_READ,
+        ("GET", "/world/versions/{version_id}/society/experiments/{experiment_id}"): _WORLD_READ,
+        (
+            "GET",
+            "/world/versions/{version_id}/society/experiments/{experiment_id}/attempts/"
+            "{attempt_id}",
+        ): _WORLD_READ,
         ("GET", _APPEARANCE): _WORLD_READ,
         ("GET", _APPEARANCE + "/history"): _WORLD_READ,
         ("GET", _APPEARANCE + "/families"): _WORLD_READ,
@@ -408,6 +417,9 @@ ROUTE_RULES: Final[Mapping[tuple[str, str], Public | Authentication | Requires]]
         ("GET", "/materials/recipes/{recipe_id}/bake"): _WORLD_READ,
         ("GET", "/materials/recipes/{recipe_id}/bake/bytes"): _WORLD_READ,
         # -- the authored world, write -----------------------------------------------------
+        ("POST", "/world-entries"): _WORLD_WRITE,
+        ("POST", "/world-entries/starter"): _WORLD_WRITE,
+        ("PUT", "/world-entries/{entry_id}"): _WORLD_WRITE,
         ("POST", "/world/styles/previews"): _WORLD_WRITE,
         ("DELETE", "/world/styles/previews/{preview_id}"): _WORLD_WRITE,
         ("POST", "/world/styles/previews/{preview_id}/apply"): _WORLD_WRITE,
@@ -435,6 +447,11 @@ ROUTE_RULES: Final[Mapping[tuple[str, str], Public | Authentication | Requires]]
         ("PUT", "/world/versions/{version_id}/society/control"): _WORLD_WRITE,
         ("POST", "/world/versions/{version_id}/society/control/steps"): _WORLD_WRITE,
         ("POST", "/world/versions/{version_id}/society/actions"): _WORLD_WRITE,
+        ("POST", "/world/versions/{version_id}/society/experiments"): _WORLD_WRITE,
+        (
+            "POST",
+            "/world/versions/{version_id}/society/experiments/{experiment_id}/attempts",
+        ): _WORLD_WRITE,
         ("PUT", _APPEARANCE): _WORLD_WRITE,
         ("POST", _APPEARANCE + "/reset"): _WORLD_WRITE,
         # A bake request is a compute amplifier, bounded per workspace by migration 0066's quota.

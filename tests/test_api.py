@@ -79,6 +79,12 @@ def test_account_routes_are_unavailable_without_configured_accounts(deployment, 
 #: A request body for every authenticated route, so the sweep can actually call it. A route
 #: missing from here and from PUBLIC_ROUTES fails `test_every_route_is_covered_by_this_file`.
 ROUTE_PROBES: dict[tuple[str, str], dict] = {
+    ("GET", "/world-entries"): {},
+    ("GET", "/world-entries/candidates"): {},
+    ("POST", "/world-entries"): {"json": {}},
+    ("POST", "/world-entries/starter"): {"json": {}},
+    ("GET", "/world-entries/{entry_id}"): {},
+    ("PUT", "/world-entries/{entry_id}"): {"json": {}},
     ("GET", "/world/versions/{version_id}/society/control"): {},
     ("PUT", "/world/versions/{version_id}/society/control"): {
         "json": {"base_revision": 0, "mode": "paused", "speed": 1}
@@ -138,6 +144,16 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
             "intent": {"kind": "go_to", "target_id": "fixture:target"},
         }
     },
+    ("POST", "/world/versions/{version_id}/society/experiments"): {"json": {}},
+    ("GET", "/world/versions/{version_id}/society/experiments/{experiment_id}"): {},
+    (
+        "POST",
+        "/world/versions/{version_id}/society/experiments/{experiment_id}/attempts",
+    ): {"json": {}},
+    (
+        "GET",
+        "/world/versions/{version_id}/society/experiments/{experiment_id}/attempts/{attempt_id}",
+    ): {},
     ("GET", "/world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance"): {},
     ("PUT", "/world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance"): {
         "json": {}

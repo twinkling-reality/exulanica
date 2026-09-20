@@ -47,6 +47,13 @@ export interface RepresentationDraw {
   refresh?(): void;
   restore(): void;
 }
+/** A spatial record the data view may inspect without taking ownership of its aggregate draw. */
+export interface RepresentationMetadata {
+  currentSubject(): RepresentationSubject;
+  parentVisible(): boolean;
+  /** Mark caller-owned metadata as changed before the next resolution. */
+  refresh?(): void;
+}
 export interface RepresentationEntryReport {
   readonly subject: RepresentationSubject;
   readonly resolved: RepresentationResolution;
@@ -67,13 +74,18 @@ export interface RepresentationReport {
   readonly selection: string | null;
   readonly style: { readonly id: string; readonly version: number };
 }
-interface Held { draw: RepresentationDraw; points: RepresentationPointAllocation | null; look: string }
+type Held =
+  | { kind: 'draw'; source: RepresentationDraw; points: RepresentationPointAllocation | null; look: string }
+  | { kind: 'metadata'; source: RepresentationMetadata; points: null; look: '' };
 
 /**
  * Points prepared per update. The first slide away from the rendered end samples and uploads
  * every subject's points; spreading that over a few frames keeps the slider responsive.
  */
 export const REPRESENTATION_POINTS_PER_UPDATE = 262_144;
+/** Borrowed GPU draws stay tightly bounded; metadata has no point or renderer allocation. */
+export const REPRESENTATION_DRAW_LIMIT = 256;
+export const REPRESENTATION_METADATA_LIMIT = 4_096;
 
 export interface RepresentationRuntimeOptions {
   readonly style?: DataViewStyle;
@@ -93,6 +105,8 @@ export class RepresentationRuntime {
   #destroyed = false;
   #points = 0;
   #bytes = 0;
+  #draws = 0;
+  #metadata = 0;
   #report: RepresentationReport;
 
   constructor(
@@ -134,22 +148,36 @@ export class RepresentationRuntime {
   }
 
   register(draw: RepresentationDraw): void {
-    if (this.#destroyed) throw new Error('Representation runtime is destroyed');
-    const subject = draw.currentSubject();
-    resolveRepresentation(this.#intent, subject);
-    this.assertStyleAccepts(subject);
-    if (!this.#held.has(subject.subjectId) && this.#held.size >= 256) {
+    const subject = this.#accepted(draw);
+    if (this.#held.get(subject.subjectId)?.kind !== 'draw' && this.#draws >= REPRESENTATION_DRAW_LIMIT) {
       throw new RangeError('Representation registry is limited to 256 borrowed draws');
     }
     this.unregister(subject.subjectId);
-    this.#held.set(subject.subjectId, { draw, points: null, look: '' });
+    this.#held.set(subject.subjectId, { kind: 'draw', source: draw, points: null, look: '' });
+    this.#draws += 1;
+    this.#plan = null;
+  }
+  /** Register an inspectable bounded record without borrowing, hiding or sampling its draw. */
+  registerMetadata(metadata: RepresentationMetadata): void {
+    const subject = this.#accepted(metadata);
+    if (!subject.rendered || subject.points !== null || subject.compatibleBlend || subject.bounds === null) {
+      throw new TypeError('Representation metadata requires rendered bounds and no isolated point form');
+    }
+    if (this.#held.get(subject.subjectId)?.kind !== 'metadata'
+      && this.#metadata >= REPRESENTATION_METADATA_LIMIT) {
+      throw new RangeError(`Representation registry is limited to ${REPRESENTATION_METADATA_LIMIT} metadata records`);
+    }
+    this.unregister(subject.subjectId);
+    this.#held.set(subject.subjectId, { kind: 'metadata', source: metadata, points: null, look: '' });
+    this.#metadata += 1;
     this.#plan = null;
   }
   unregister(subjectId: string): void {
     const held = this.#held.get(subjectId);
     if (!held) return;
     this.#release(held);
-    held.draw.restore();
+    if (held.kind === 'draw') { held.source.restore(); this.#draws -= 1; }
+    else this.#metadata -= 1;
     this.#held.delete(subjectId);
     this.#plan = null;
     if (this.#selection === subjectId) this.#selection = null;
@@ -163,12 +191,15 @@ export class RepresentationRuntime {
   setSelection(subjectId: string | null): RepresentationReport {
     if (this.#destroyed) return this.#report;
     if (subjectId !== null && !this.#held.has(subjectId)) throw new TypeError(`Unknown representation subject ${subjectId}`);
+    if (subjectId !== null && this.#held.get(subjectId)!.source.currentSubject().availability !== 'available') {
+      throw new TypeError(`Unavailable representation subject ${subjectId}`);
+    }
     this.#selection = subjectId;
     return this.update();
   }
   refresh(): RepresentationReport {
     if (this.#destroyed) return this.#report;
-    for (const held of this.#held.values()) held.draw.refresh?.();
+    for (const held of this.#held.values()) held.source.refresh?.();
     return this.update();
   }
   /** Re-evaluate rights and existing parent visibility before each frame's draws. */
@@ -179,14 +210,17 @@ export class RepresentationRuntime {
     let allowance = this.#perUpdate;
     let pending = 0;
     for (const [subjectId, held] of this.#held) {
-      let subject = held.draw.currentSubject();
-      if (subject.subjectId !== subjectId) throw new TypeError('Borrowed subject identity changed');
-      const visible = held.draw.parentVisible();
-      if (subject.availability !== 'available') this.#release(held);
+      let subject = held.source.currentSubject();
+      if (subject.subjectId !== subjectId) throw new TypeError('Representation subject identity changed');
+      const visible = held.source.parentVisible();
+      if (subject.availability !== 'available') {
+        this.#release(held);
+        if (this.#selection === subjectId) this.#selection = null;
+      }
       const requested = resolveRepresentation(this.#intent, subject, visible);
       const planned = plan.get(subjectId) ?? 0;
-      if (requested.pointWeight > 0
-        && subject.points !== null && held.points === null && held.draw.setExistingPointWeight === undefined) {
+      if (held.kind === 'draw' && requested.pointWeight > 0
+        && subject.points !== null && held.points === null && held.source.setExistingPointWeight === undefined) {
         const limit = Math.min(planned, this.#perSubject, this.#pointBudget - this.#points);
         let reason: string | null = null;
         if (planned < 1) reason = 'This draw has nothing to sample.';
@@ -195,7 +229,7 @@ export class RepresentationRuntime {
           reason = 'Points for this subject are still being prepared.';
           pending += 1;
         } else {
-          const points = held.draw.createPoints(limit);
+          const points = held.source.createPoints(limit);
           allowance -= limit;
           if (points !== null) {
             if (!Number.isSafeInteger(points.pointCount) || points.pointCount < 1 || points.pointCount > limit
@@ -215,8 +249,10 @@ export class RepresentationRuntime {
         }
       }
       const resolved = resolveRepresentation(this.#intent, subject, visible);
-      held.draw.setRenderedWeight(resolved.renderedWeight);
-      held.draw.setExistingPointWeight?.(resolved.pointWeight);
+      if (held.kind === 'draw') {
+        held.source.setRenderedWeight(resolved.renderedWeight);
+        held.source.setExistingPointWeight?.(resolved.pointWeight);
+      }
       if (held.points !== null) {
         const look = this.#look(resolved);
         const signature = `${look.colour}|${look.treatment}|${look.gain}`;
@@ -254,9 +290,10 @@ export class RepresentationRuntime {
     const demands = new Map<string, number>();
     let total = 0;
     for (const [subjectId, held] of this.#held) {
-      const subject = held.draw.currentSubject();
-      if (subject.points === null || held.draw.setExistingPointWeight !== undefined) continue;
-      const raw = held.draw.pointDemand?.() ?? this.#perSubject;
+      if (held.kind === 'metadata') continue;
+      const subject = held.source.currentSubject();
+      if (subject.points === null || held.source.setExistingPointWeight !== undefined) continue;
+      const raw = held.source.pointDemand?.() ?? this.#perSubject;
       const demand = Number.isFinite(raw) && raw > 0 ? raw : 0;
       demands.set(subjectId, demand);
       total += demand;
@@ -273,6 +310,13 @@ export class RepresentationRuntime {
     if (held.points === null) return;
     this.#points -= held.points.pointCount; this.#bytes -= held.points.byteLength;
     held.points.destroy(); held.points = null; held.look = '';
+  }
+  #accepted(source: RepresentationDraw | RepresentationMetadata): RepresentationSubject {
+    if (this.#destroyed) throw new Error('Representation runtime is destroyed');
+    const subject = source.currentSubject();
+    resolveRepresentation(this.#intent, subject);
+    this.assertStyleAccepts(subject);
+    return subject;
   }
   #snapshot(subjects: readonly RepresentationEntryReport[], pendingSubjects: number): RepresentationReport {
     return Object.freeze({

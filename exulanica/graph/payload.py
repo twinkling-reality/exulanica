@@ -174,7 +174,10 @@ class ScenePointMapPlacementRow(BaseModel):
     scene_from_opm_row_major: list[float]
     local_units_to_scene_units: float
     scale_status: Literal["colmap-correspondence-fit"]
-    state: Literal["available", "bytes_missing"]
+    #: ``unavailable`` means the bytes exist but current policy refuses their delivery. It must
+    #: stay distinct from ``bytes_missing`` so graph metadata never advertises a dead reference or
+    #: tells a viewer that retained bytes disappeared when their authorization changed.
+    state: Literal["available", "bytes_missing", "unavailable"]
     reference: SceneGeometryReferenceRow | None
 
 
@@ -215,7 +218,7 @@ class SceneUnposedPointMapRow(BaseModel):
     artifact_id: uuid.UUID
     content_sha256: str
     container: str | None
-    state: Literal["available", "bytes_missing"]
+    state: Literal["available", "bytes_missing", "unavailable"]
     reference: SceneGeometryReferenceRow | None
     #: Without a default, following this file's rule. Null when the viewer may currently see no
     #: image of this photograph, in which case the depth is drawn in its own colours.

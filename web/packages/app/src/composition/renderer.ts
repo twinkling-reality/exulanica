@@ -13,7 +13,7 @@
 
 import type { RenderingSubstrate } from '@exulanica/graph-client';
 import type { GraphSnapshot } from '@exulanica/graph-client';
-import type { AtlasScene } from '@exulanica/atlas-core';
+import { islandId as toIslandId, type AtlasScene } from '@exulanica/atlas-core';
 import { worldArtProfile } from '@exulanica/presentation';
 
 import { mountAtlas } from '../atlas.js';
@@ -100,7 +100,9 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
       : import.meta.env.DEV && bakedTile !== null
         ? await (await import('./generated-tile.js')).prepareBakedTileWalk(env, bakedTile)
         : undefined;
-    const district = generatedTile === undefined ? await ownedDistrict({ preview: env.preview }) : undefined;
+    const district = generatedTile === undefined && state.activeWorldEntry === null
+      ? await ownedDistrict({ preview: env.preview })
+      : undefined;
     state.atlas = await mountAtlas(env.canvas, deps.stage, deps.scene, (report) => {
       resolveFirstFrame?.();
       resolveFirstFrame = null;
@@ -159,6 +161,17 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
       reducedMotion: env.systemReducedMotion.matches,
       ...(district === undefined ? {} : { ownedDistrict: district }),
       ...(generatedTile === undefined ? {} : { generatedTile }),
+      ...(state.activeWorldEntry?.authoredScene === null ||
+          state.activeWorldEntry?.authoredScene === undefined
+        ? {}
+        : {
+            authoredRegion: {
+              regionId: toIslandId(state.activeWorldEntry.authoredScene.region.regionId),
+              module: state.activeWorldEntry.authoredScene.region.module,
+              ground: state.activeWorldEntry.authoredScene.region.ground,
+              spawn: state.activeWorldEntry.authoredScene.region.spawn,
+            },
+          }),
     }, env.browserMeasurement === null ? undefined : (binding) => {
       env.browserMeasurement!.observeBinding(binding, {
         scenes: current.reconstructionScenes ?? [],

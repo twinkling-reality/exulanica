@@ -60,14 +60,25 @@ export interface SocietyInhabitantSnapshot {
   readonly explanation?: { readonly summary: string; readonly event_ids: readonly string[] };
 }
 
+/** The exact versioned routine catalogs and digest recorded by a v4 society state. */
+export interface SocietyRoutineBinding {
+  readonly catalog_versions: Readonly<Record<string, number>>;
+  readonly sha256: string;
+}
+
 export interface OwnedSocietyState {
   readonly profile?: SocietyProfile;
   readonly society_id?: string;
   readonly branch_id?: string;
   readonly input_seq?: number;
   readonly input_sha256?: string;
+  readonly routine?: SocietyRoutineBinding;
   readonly tick: number;
+  /** V4 simulated duration of one tick. Absent profiles do not imply zero. */
+  readonly tick_seconds?: number;
+  readonly start_minute_of_day?: number;
   readonly minute_of_day?: number;
+  readonly day?: number;
   readonly inhabitants: readonly SocietyInhabitantSnapshot[];
 }
 

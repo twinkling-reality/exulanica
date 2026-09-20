@@ -11,6 +11,7 @@ export function buildWorldMenu(options: {
   readonly preview: boolean;
   readonly onResume: () => void;
   readonly onWorld: () => void;
+  readonly onExperiment?: () => void;
   readonly onCommand: (command: AtlasCommand) => void;
 }): WorldMenu {
   const root = el('section', {
@@ -23,7 +24,7 @@ export function buildWorldMenu(options: {
   let activate = (action: () => void): void => action();
 
   const entry = (
-    command: AtlasCommand | 'world',
+    command: AtlasCommand | 'world' | 'experiment',
     label: string,
     detail: string,
     key: string,
@@ -38,9 +39,11 @@ export function buildWorldMenu(options: {
       el('span', { class: 'world-menu-entry-detail', text: detail }),
       el('kbd', { text: key }),
     ]);
-    button.addEventListener('click', () => activate(
-      command === 'world' ? options.onWorld : () => options.onCommand(command),
-    ));
+    button.addEventListener('click', () => activate(command === 'world'
+      ? options.onWorld
+      : command === 'experiment'
+        ? options.onExperiment!
+        : () => options.onCommand(command)));
     return button;
   };
 
@@ -54,6 +57,9 @@ export function buildWorldMenu(options: {
     entry('character', 'Character', 'Appearance and identity', 'K', 'world-menu-character'),
     entry('index', 'Library', 'People, places, and sources', 'I', 'world-menu-library'),
     entry('map', 'Map', 'Regions and orientation', 'M', 'world-menu-map'),
+    ...(options.onExperiment === undefined ? [] : [
+      entry('experiment', 'Recorded comparison', 'Read one existing society attempt', '', 'world-menu-experiment'),
+    ]),
     entry('companion', 'Companion', 'Call the Unnamed Companion', 'X', 'world-menu-companion'),
     entry('options', 'Customize world', 'Light, material, and atmosphere', 'O', 'world-menu-customize'),
     entry('controls', 'Settings', 'Display, accessibility, movement, and controls', '?', 'world-menu-settings'),

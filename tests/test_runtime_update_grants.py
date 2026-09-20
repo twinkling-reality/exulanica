@@ -67,6 +67,10 @@ RUNTIME_UPDATES: dict[str, str] = {
     "world_alternate_environment_instance": "an instance moves and is removed",
     "world_alternate_object": "an object moves, changes and is removed",
     "world_alternate_version": "a version records its state digest and edit sequence, under a lock",
+    "saved_world_entry": (
+        "saved-world creation and explicit reconciliation move its authored/style pointers; "
+        "accepted authored and style edits advance the same resume cursor under a lock"
+    ),
     "world_interaction_policy_preview": "a preview is applied, discarded or made stale",
     "world_interaction_policy_proposal": "a proposal is applied, discarded or made stale",
     "world_interaction_policy_state": "the current policy version moves, under a lock",

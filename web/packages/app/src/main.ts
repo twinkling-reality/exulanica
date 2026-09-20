@@ -34,7 +34,11 @@
 
 import { ApiError } from '@exulanica/graph-client';
 import { readBrowserAccount, type BrowserAccountState } from './account-session.js';
-import { anchorId as toAnchorId, islandId as toIslandId } from '@exulanica/atlas-core';
+import {
+  anchorId as toAnchorId,
+  islandId as toIslandId,
+  makeScene,
+} from '@exulanica/atlas-core';
 import { FACET_KEYS, encodeFacets, type IndexFacets } from '@exulanica/world-index';
 import {
   applicationTitle,
@@ -45,6 +49,7 @@ import { buildScene } from './scene.js';
 import type { AtlasCommand } from './ui/atlas-commands.js';
 import { buildWorldChrome } from './ui/world-chrome.js';
 import { buildWorldMenu } from './ui/world-menu.js';
+import { buildWorldIdentity } from './ui/world-identity.js';
 import {
   CompanionAskClient,
   CompanionProposalClient,
@@ -68,7 +73,9 @@ import { mountPersonalIntake } from './composition/personal-intake.js';
 import { mountCharacter } from './composition/character.js';
 import { mountAppearance } from './composition/appearance.js';
 import { mountObjects } from './composition/objects.js';
+import { buildWorldEntrySurface } from './composition/world-entry.js';
 import { mountEnvironmentSelection } from './composition/environment-selection.js';
+import { mountSocietyExperimentResult } from './composition/society-experiment-result.js';
 import { createSegmentSession, mountSegments, segmentsFirst } from './composition/segments.js';
 import { mountWritePath, type MountedWritePath } from './composition/write-path.js';
 import { disposeCompanionStage, mountCompanion } from './composition/companion.js';
@@ -82,9 +89,16 @@ import {
 import {
   mountSessionGeometry,
   openAppSession,
+  openWorldEntryContext,
   reconstructionsOf,
+  StarterWorldOpeningError,
 } from './composition/session-and-geometry.js';
 import { createAppEnvironment, createSessionState } from './composition/session-state.js';
+import {
+  WorldObjectsClient,
+  type AlternateVersion,
+  type SavedEntryWriteBinding,
+} from './world-objects-api.js';
 
 const env = createAppEnvironment();
 const state = createSessionState();
@@ -94,6 +108,7 @@ const { shell, canvas, systemAppearance, systemReducedMotion, preview, previewAr
 window.addEventListener('pagehide', () => {
   state.disposeCharacter?.();
   state.disposeObjects?.();
+  state.disposeSocietyExperiment?.();
   state.disposeEnvironmentSelection?.();
   state.personalIntake.dispose?.();
   disposeCompanionStage(state);
@@ -216,8 +231,108 @@ function askForAccess(accountState: 'signed-out' | 'unavailable'): void {
 }
 
 async function start(token: string, csrfToken?: string): Promise<void> {
-  await openAppSession(env, state, token, csrfToken);
+  try {
+    await openAppSession(env, state, token, csrfToken);
+  } catch (error) {
+    if (!(error instanceof StarterWorldOpeningError)) throw error;
+    showWorldOpeningFailure(error, () => start(token, csrfToken));
+    return;
+  }
+  if (!preview && state.activeWorldEntry === null) {
+    await mountWorldEntry();
+    return;
+  }
   await mount();
+}
+
+function showWorldOpeningFailure(error: StarterWorldOpeningError, retry: () => Promise<void>): void {
+  canvas.hidden = true;
+  shell.setAttribute('data-world-state', 'entry');
+  const status = el('p', { class: 'gate-failure', role: 'status', text: error.message });
+  const button = el('button', { type: 'button', class: 'world-entry-primary', text: 'Try again' });
+  button.addEventListener('click', () => {
+    button.disabled = true;
+    status.textContent = 'Opening your world…';
+    void retry().catch((next: unknown) => {
+      button.disabled = false;
+      status.textContent = next instanceof Error ? next.message : 'The world could not be opened.';
+    });
+  });
+  replace(shell, [el('main', { class: 'gate world-entry-gate' }, [
+    el('header', { class: 'world-entry-heading' }, [
+      el('p', { class: 'world-entry-brand', text: 'Exulanica' }),
+      el('h1', { text: 'Your world could not open' }),
+      el('p', {
+        class: 'world-entry-introduction',
+        text: 'Your signed-in session is still available. Try opening your world again.',
+      }),
+      status,
+      button,
+    ]),
+  ])]);
+  shell.removeAttribute('aria-busy');
+}
+
+async function mountWorldEntry(): Promise<void> {
+  const entries = state.worldEntries;
+  if (entries === null) return;
+  canvas.hidden = true;
+  shell.setAttribute('data-world-state', 'entry');
+  const open = async (entry: typeof state.savedWorldEntries[number]): Promise<void> => {
+    await openWorldEntryContext(state, entry);
+    shell.removeAttribute('data-world-state');
+    await mount();
+  };
+  replace(shell, [buildWorldEntrySurface({
+    entries: state.savedWorldEntries,
+    open,
+    adoptLatest: async (entry) => {
+      const adopted = await entries.adoptLatestAuthored(entry);
+      state.savedWorldEntries = Object.freeze(state.savedWorldEntries.map((candidate) =>
+        candidate.entryId === adopted.entryId ? adopted : candidate));
+      await open(adopted);
+    },
+  })]);
+  shell.removeAttribute('aria-busy');
+}
+
+function activeEntryWriteBinding(): SavedEntryWriteBinding {
+  const active = state.activeWorldEntry;
+  if (active === null) throw new Error('The saved world entry is no longer active.');
+  return {
+    entryId: active.entryId,
+    revision: active.revision,
+    authoredVersionId: active.authoredVersionId,
+    authoredStateSha256: active.authoredStateSha256,
+    authoredEditSeq: active.authoredEditSeq,
+  };
+}
+
+async function recordAuthoredEntryAdvance(
+  version: AlternateVersion,
+  base: SavedEntryWriteBinding,
+): Promise<void> {
+  const active = state.activeWorldEntry;
+  if (active === null || active.entryId !== base.entryId || active.revision !== base.revision) {
+    state.sourceMediaNotices = Object.freeze([
+      'The edit and resume point were saved, but this page must reload before another change.',
+      ...state.sourceMediaNotices,
+    ]);
+    return;
+  }
+  const updated = Object.freeze({
+    ...active,
+    authoredVersionId: version.versionId,
+    authoredStateSha256: version.stateSha256,
+    authoredEditSeq: version.editSeq,
+    currentAuthoredStateSha256: version.stateSha256,
+    currentAuthoredEditSeq: version.editSeq,
+    revision: active.revision + 1,
+    updatedAt: new Date().toISOString(),
+  });
+  state.activeWorldEntry = updated;
+  state.savedWorldEntries = Object.freeze(state.savedWorldEntries.map((entry) =>
+    entry.entryId === updated.entryId ? updated : entry));
 }
 async function mount(): Promise<void> {
   shell.setAttribute('data-booting', '');
@@ -230,6 +345,8 @@ async function mount(): Promise<void> {
   state.disposeCharacter = null;
   state.disposeObjects?.();
   state.disposeObjects = null;
+  state.disposeSocietyExperiment?.();
+  state.disposeSocietyExperiment = null;
   const current = state.snapshot;
   const currentSession = state.session;
   const currentEvidence = state.evidence;
@@ -266,7 +383,7 @@ async function mount(): Promise<void> {
     reloadSnapshot: () => currentSession.snapshot(),
     refreshWorld: async () => { state.snapshot = await currentSession.snapshot(); await mount(); },
   });
-  const emptyWorld = buildEmptyWorld(current);
+  const emptyWorld = state.activeWorldEntry === null ? buildEmptyWorld(current) : null;
   if (emptyWorld !== null) {
     // An in-session withdrawal can arrive after a populated world was mounted. Stop every owner
     // of that field before replacing its DOM so neither geometry nor input remains live offscreen.
@@ -286,13 +403,19 @@ async function mount(): Promise<void> {
   canvas.hidden = false;
   shell.removeAttribute('data-world-state');
 
-  const built = buildScene(
-    current,
-    1,
-    new Map(),
-    new Map(),
-    reconstructionsOf(state, state.pointMaps, state.placedPointMaps),
-  );
+  const built = state.activeWorldEntry?.sourceKind === 'authored'
+    ? {
+        scene: makeScene([], 1, current.stateVersion),
+        omitted: Object.freeze([]),
+        undrawable: new Map(),
+      }
+    : buildScene(
+        current,
+        1,
+        new Map(),
+        new Map(),
+        reconstructionsOf(state, state.pointMaps, state.placedPointMaps),
+      );
   // A graph write remounts every surface. Stop the previous field before replacing its node, or
   // its frame loop and observers would survive invisibly for the rest of the session.
   disposeCompanionStage(state);
@@ -390,7 +513,8 @@ async function mount(): Promise<void> {
     onAnswered: finishFirstUse,
     isSystemSurfaceOpen: () =>
       shellState.primary === 'menu' || shellState.primary === 'options' ||
-      shellState.primary === 'controls' || shellState.primary === 'character',
+      shellState.primary === 'controls' || shellState.primary === 'character' ||
+      shellState.primary === 'experiment' || shellState.primary === 'photos',
   });
 
   if (memoryLoadFailure !== null) {
@@ -416,7 +540,27 @@ async function mount(): Promise<void> {
     env,
     state,
     credentials: currentCredentials,
+    ...(state.activeWorldEntry === null ? {} : {
+      client: new WorldObjectsClient({
+        ...currentCredentials,
+        worldId: state.activeWorldEntry.worldId,
+        defaultVersionId: state.activeWorldEntry.authoredVersionId,
+        savedEntry: activeEntryWriteBinding,
+        onSavedEntryAdvanced: recordAuthoredEntryAdvance,
+      }),
+    }),
     scene: built.scene,
+    ...(state.activeWorldEntry?.authoredScene === null ||
+        state.activeWorldEntry?.authoredScene === undefined
+      ? {}
+      : {
+          authoredRegion: {
+            regionId: state.activeWorldEntry.authoredScene.region.regionId,
+            halfWidthMm: state.activeWorldEntry.authoredScene.region.ground.halfWidthMm,
+            halfDepthMm: state.activeWorldEntry.authoredScene.region.ground.halfDepthMm,
+            elevationMm: state.activeWorldEntry.authoredScene.region.ground.elevationMm,
+          },
+        }),
     showTravelStatus: (message, kind) => showTravelStatus(message, kind),
     isWorldPrimary: () => shellState.primary === 'world',
     onAuthoredEdit: (versionId) => environmentSelection.afterAuthoredEdit(versionId),
@@ -429,6 +573,15 @@ async function mount(): Promise<void> {
     env,
     state,
     credentials: currentCredentials,
+    ...(state.activeWorldEntry === null ? {} : {
+      worldClient: new WorldObjectsClient({
+        ...currentCredentials,
+        worldId: state.activeWorldEntry.worldId,
+        defaultVersionId: state.activeWorldEntry.authoredVersionId,
+        savedEntry: activeEntryWriteBinding,
+        onSavedEntryAdvanced: recordAuthoredEntryAdvance,
+      }),
+    }),
     scene: built.scene,
     showStatus: (message, kind) => showTravelStatus(message, kind),
     ...(env.preview ? { admissionId: PREVIEW_NYC_OPEN_DATA_ADMISSION_ID } : {}),
@@ -436,7 +589,7 @@ async function mount(): Promise<void> {
     onPanelOpen: () => { companion.dismiss(); objects.close(); character.reach(); },
     onObjects: () => objects.toggle(),
     onDistrictPlacementChange: () => {
-      if (environmentSelection.districtPlacement() !== null) void objects.begin();
+      void objects.begin();
     },
   });
   state.disposeEnvironmentSelection = () => environmentSelection.dispose();
@@ -571,6 +724,22 @@ async function mount(): Promise<void> {
   // its nodes into, which is a different job from being the canvas.
   const formation = mountFormation({ state, credentials: currentCredentials });
   const chrome = buildWorldChrome(shell);
+  const worldIdentity = state.activeWorldEntry === null ? null : buildWorldIdentity({
+    entry: state.activeWorldEntry,
+    personalIntake: intake.root,
+    rename: async (title) => {
+      const client = state.worldEntries;
+      const active = state.activeWorldEntry;
+      if (client === null || active === null) throw new Error('The saved world is not connected.');
+      const updated = await client.rename(active, title);
+      state.activeWorldEntry = updated;
+      state.savedWorldEntries = Object.freeze(state.savedWorldEntries.map((entry) =>
+        entry.entryId === updated.entryId ? updated : entry));
+      return updated;
+    },
+    onOpenPhotos: () => dispatchShell({ type: 'toggle-photos' }),
+    onClosePhotos: () => dispatchShell({ type: 'toggle-photos' }),
+  });
   const handleAtlasCommand = (command: AtlasCommand): void => {
     environmentSelection.closePanels();
     objects.close();
@@ -593,8 +762,19 @@ async function mount(): Promise<void> {
       dispatchShell({ type: 'toggle-menu' });
       environmentSelection.openPanel('details');
     },
+    ...(state.activeWorldEntry === null ? {} : {
+      onExperiment: () => dispatchShell({ type: 'toggle-experiment' }),
+    }),
     onCommand: handleAtlasCommand,
   });
+  const societyExperiment = state.activeWorldEntry === null ? null : mountSocietyExperimentResult({
+    getVersionId: () => state.activeWorldEntry?.authoredVersionId ?? null,
+    credentials: currentCredentials,
+    onClose: () => dispatchShell({ type: 'toggle-experiment' }),
+  });
+  state.disposeSocietyExperiment = societyExperiment === null
+    ? null
+    : () => societyExperiment.dispose();
   const character = mountCharacter({ env, state, onClose: () => dispatchShell({ type: 'toggle-character' }) });
   state.disposeCharacter = () => character.dispose();
   const mapPeek = new MapPeek({
@@ -658,13 +838,10 @@ async function mount(): Promise<void> {
     showWorld: () => dispatchShell({ type: 'show-world' }),
     showTravelStatus,
   });
-  worldIndex.root.append(intake.root);
-  intake.root.addEventListener('toggle', () => {
-    if (intake.root.open && shellState.detailId !== null) dispatchShell({ type: 'close-detail' });
-  });
   replace(shell, [
     stage,
     chrome.reticle,
+    ...(worldIdentity === null ? [] : [worldIdentity.root, worldIdentity.photosDrawer]),
     worldIndex.root,
     detail.root,
     formation.root,
@@ -674,6 +851,7 @@ async function mount(): Promise<void> {
     objects.confirm.root,
     environmentSelection.root,
     worldMenu.root,
+    ...(societyExperiment === null ? [] : [societyExperiment.root]),
     mapCaption,
     travelStatus,
     minimap.root,
@@ -703,8 +881,11 @@ async function mount(): Promise<void> {
     appearance.options.setVisible(shellState.primary === 'options');
     appearance.settings.setVisible(shellState.primary === 'controls');
     worldMenu.setVisible(shellState.primary === 'menu');
+    societyExperiment?.setVisible(shellState.primary === 'experiment');
+    worldIdentity?.setPhotosVisible(shellState.primary === 'photos');
     const systemSurfaceOpen = shellState.primary === 'menu' || shellState.primary === 'options' ||
-      shellState.primary === 'controls' || shellState.primary === 'character';
+      shellState.primary === 'controls' || shellState.primary === 'character' ||
+      shellState.primary === 'experiment' || shellState.primary === 'photos';
     const modalBackground = [
       stage,
       worldIndex.root,
@@ -714,6 +895,7 @@ async function mount(): Promise<void> {
       writePath.confirm.root,
       mapCaption,
       travelStatus,
+      ...(worldIdentity === null ? [] : [worldIdentity.root]),
     ];
     // On close, release the command bar before the dialog restores focus to its trigger. On open,
     // move focus into the dialog before making that same trigger inert.
@@ -811,7 +993,7 @@ async function mount(): Promise<void> {
   renderer.reportPlacementDisagreement();
 
   // After the renderer, because every object it draws needs a binding to draw into.
-  void objects.begin();
+  void objects.begin(state.activeWorldEntry?.authoredVersionId);
   if (!geographicDistrict) void segments.begin();
 
   await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));

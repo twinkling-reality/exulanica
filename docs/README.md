@@ -17,6 +17,17 @@ implementation. [product-specification.md](product-specification.md)
 sections 1 to 4 and 11 retain research-backed limits. Those pages are subordinate
 to the roadmap.
 
+The [worlds as project foundations](product-direction.md#worlds-as-project-foundations) requirements
+cover building within a world, applications using its state, controlled experiments, and useful
+datasets. Their delivery sequence starts with saved-world continuity and requires independent
+consumer evidence for each supported output; it does not imply a universal runnable export.
+The [modular simulation program](product-direction.md#modular-simulation-and-scientific-tooling)
+defines Warp, Newton and OpenUSD evaluation gates, a bounded physical project and shared adapter
+requirements. These are delivery targets, not integrated simulation or interchange capabilities.
+The [performance and language evaluation](product-direction.md#performance-and-language-evaluation)
+milestone defines representative workloads and the evidence required for specialized GPU or native
+components while retaining the application language foundation.
+
 **World-memory architecture.** [world-memory-model.md](world-memory-model.md) defines
 what Personal World Memory Model means technically: epistemically typed, temporal,
 branching state with multiple task-specific representations. It also defines the
@@ -47,6 +58,7 @@ client code: it records platform behaviour that otherwise causes silent bugs.
 - [World Memory Package](world-memory-package.md)
 - [Owned district and source admission](owned-district-and-admission.md)
 - [Synthetic society contract](synthetic-society-contract.md)
+- [Society experiments](society-experiments.md)
 - [Character representation and movement](character-representation-contract.md)
 
 ## Capability status
@@ -73,9 +85,11 @@ These are the living specifications. Edit them when the system changes.
 | [world-memory-model.md](world-memory-model.md) | Canonical world-memory architecture and research program |
 | [world-composition-contract.md](world-composition-contract.md) | Memories, imported geography, and authored variations |
 | [world-objects-contract.md](world-objects-contract.md) | Alternate versions and authored objects |
+| [saved-world-entry.md](saved-world-entry.md) | Durable personal-world selection and exact version reopening |
 | [world-memory-package.md](world-memory-package.md) | Portable signed world snapshot |
 | [owned-district-and-admission.md](owned-district-and-admission.md) | Licensed geographic source, interpretation, and renderer boundary |
 | [synthetic-society-contract.md](synthetic-society-contract.md) | Synthetic identity, replay, retrieval, and representation limits |
+| [society-experiments.md](society-experiments.md) | Controlled society definition, attempt, and compact result API |
 | [character-representation-contract.md](character-representation-contract.md) | Shared human form, identity bindings, appearance and movement quality |
 | [personal-admission.md](personal-admission.md) | `POST /intake` and screening |
 | [privacy-consent-threat-model.md](privacy-consent-threat-model.md) | Consent, deletion, and threat model |

@@ -318,7 +318,7 @@ function sceneRecord(
 function unposedSceneRecord(
   contentSha256: string,
   byteSize: number,
-  unposedState: 'available' | 'bytes_missing' = 'available',
+  unposedState: 'available' | 'bytes_missing' | 'unavailable' = 'available',
 ): ReconstructionSceneRecord {
   const posed = sceneRecord(contentSha256, byteSize);
   return {
@@ -338,7 +338,7 @@ function unposedSceneRecord(
         contentSha256: member.placement!.contentSha256,
         container: 'opm/2',
         state: index === 0 ? unposedState : 'available',
-        reference: index === 0 && unposedState === 'bytes_missing' ? null : member.placement!.reference,
+        reference: index === 0 && unposedState !== 'available' ? null : member.placement!.reference,
       },
     })),
   };
@@ -470,6 +470,45 @@ describe('production reconstruction geometry', () => {
     expect(session.placedPointMaps).toHaveLength(1);
     expect(session.issues.map((issue) => [issue.captureId, issue.state])).toEqual([[CAPTURE_A, 'bytes_missing']]);
     expect(session.renderingByScene.get('scene-1')).toBe('unposed_point_maps');
+  });
+
+  it('does not request point maps the scene says current policy withholds', async () => {
+    const bytes = buildOpm();
+    const digest = await sha256(bytes);
+    const { fetch, requests } = serve([], bytes);
+    const posed = sceneRecord(digest, bytes.byteLength);
+    const withheldPosed: ReconstructionSceneRecord = {
+      ...posed,
+      placementState: 'unavailable',
+      renderingSubstrate: 'source_photographs',
+      displayedRung: 4,
+      members: posed.members.map((member) => ({
+        ...member,
+        placement: { ...member.placement!, state: 'unavailable', reference: null },
+      })),
+    };
+    const unposed = unposedSceneRecord(digest, bytes.byteLength);
+    const withheldUnposed: ReconstructionSceneRecord = {
+      ...unposed,
+      renderingSubstrate: 'source_photographs',
+      displayedRung: 4,
+      members: unposed.members.map((member) => ({
+        ...member,
+        unposedPointMap: { ...member.unposedPointMap!, state: 'unavailable', reference: null },
+      })),
+    };
+
+    const client = new GeometryClient({
+      baseUrl: 'https://exulanica.test/api', token: 'private-token', fetch,
+    });
+    const posedSession = await client.loadScenes([withheldPosed], regions);
+    const unposedSession = await client.loadScenes([withheldUnposed], regions);
+
+    expect(requests).toEqual([]);
+    expect(posedSession.placedPointMaps).toEqual([]);
+    expect(unposedSession.placedPointMaps).toEqual([]);
+    expect(posedSession.issues.map((issue) => issue.state)).toEqual(['unavailable', 'unavailable']);
+    expect(unposedSession.issues.map((issue) => issue.state)).toEqual(['unavailable', 'unavailable']);
   });
 
   it('never fans unposed depth into a scene that placed anything', async () => {

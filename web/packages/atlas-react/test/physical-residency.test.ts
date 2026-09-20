@@ -142,7 +142,19 @@ describe('authenticated asset range observation', () => {
     expect(fetch.mock.calls[0]![1]?.headers).toMatchObject({
       authorization: 'Bearer private-token', range: 'bytes=0-3',
     });
+    expect(fetch.mock.calls[0]![1]?.credentials).toBe('include');
     expect(result).toMatchObject({ rangeOutcome: 'partial', acceptRanges: true });
+  });
+
+  it('uses the account cookie without sending an explicit empty bearer', async () => {
+    const fetch = vi.fn(async (_url: string | URL | Request, _init?: RequestInit) =>
+      new Response(new Uint8Array([1, 2, 3, 4]), { status: 200 }));
+    await fetchAuthenticatedAsset(descriptor(), new AbortController().signal, {
+      baseUrl: 'https://exulanica.test/api', token: '',
+      fetch: fetch as typeof globalThis.fetch,
+    });
+    expect(fetch.mock.calls[0]![1]?.headers).toEqual({});
+    expect(fetch.mock.calls[0]![1]?.credentials).toBe('include');
   });
 
   it('reports a server that ignored Range instead of claiming streaming', async () => {

@@ -15,6 +15,13 @@ describe('the Atlas shell', () => {
     expect(updateWorldShell(menu, { type: 'toggle-menu' })).toEqual(initialWorldShell());
   });
 
+  it('opens a recorded comparison as a temporary menu destination', () => {
+    const menu = updateWorldShell(initialWorldShell(), { type: 'toggle-menu' });
+    const experiment = updateWorldShell(menu, { type: 'toggle-experiment' });
+    expect(experiment.primary).toBe('experiment');
+    expect(updateWorldShell(experiment, { type: 'toggle-experiment' })).toEqual(menu);
+  });
+
   it('allows one primary surface and clears Index detail when switching', () => {
     const index = updateWorldShell(initialWorldShell(), { type: 'toggle-index' });
     const detail = updateWorldShell(index, { type: 'show-detail', id: 'entity-1' });
@@ -61,6 +68,12 @@ describe('the Atlas shell', () => {
     expect(character.primary).toBe('character');
     expect(character.detailId).toBeNull();
     expect(updateWorldShell(character, { type: 'toggle-character' })).toEqual(detail);
+  });
+
+  it('opens Add photos over the current world and returns to that exact context', () => {
+    const photos = updateWorldShell(initialWorldShell(), { type: 'toggle-photos' });
+    expect(photos).toMatchObject({ primary: 'photos', camera: 'ground', detailId: null });
+    expect(updateWorldShell(photos, { type: 'toggle-photos' })).toEqual(initialWorldShell());
   });
 
   it('has an unconditional complete-Index recovery transition for renderer loss', () => {

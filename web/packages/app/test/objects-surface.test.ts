@@ -114,6 +114,8 @@ function runtime() {
   const placed = new Map<string, { pose: unknown; motion: string }>();
   return {
     get objectIds() { return [...placed.keys()]; },
+    clear: vi.fn(() => { placed.clear(); }),
+    cancelPending: vi.fn(),
     motionStateOf: (id: string) => placed.get(id)?.motion ?? null,
     place: vi.fn(async (object: { objectId: string; behaviour: unknown; transform: unknown }) => {
       const behaviour = object.behaviour as { behaviourKey: string; behaviourVersion: number } | null;
@@ -190,21 +192,47 @@ function harness(
     readonly footprint?: number;
     readonly awayBy?: number;
     readonly initial?: AlternateVersion;
+    readonly representationSubjects?: readonly string[];
   } = {},
   previewMode = false,
 ) {
   const objects = runtime();
   const authority = script(over.initial ?? version());
+  const representationObservers = new Set<(subjectId: string | null, reason: string) => void>();
+  const representationReport = {
+    subjects: (over.representationSubjects ?? []).map(subjectId => ({
+      subject: { subjectId, availability: 'available' },
+    })),
+    selection: null as string | null,
+  };
+  const binding = {
+    objects,
+    // A third-person camera is behind the player, outside this region's placement reach.
+    cameraPose: () => ({ position: atlasVec3(12, 3, 12), forward: atlasVec3(-1, 0, -1) }),
+    playerPose: () => ({ position: atlasVec3(0, 1.6, 0), forward: atlasVec3(0, 0, -1) }),
+    engageFocusedAnchor: () => null,
+    table: { atlasPositions: new Float32Array([0, 0, 0]) },
+    representationReport,
+    setRepresentationSelection: vi.fn((subjectId: string | null) => {
+      representationReport.selection = subjectId;
+      for (const observer of representationObservers) observer(subjectId, 'explicit');
+      return representationReport;
+    }),
+    observeRepresentationSelection: vi.fn((observer: (subjectId: string | null, reason: string) => void) => {
+      representationObservers.add(observer);
+      return () => { representationObservers.delete(observer); };
+    }),
+  };
+  const clearObjects = objects.clear.getMockImplementation()!;
+  objects.clear.mockImplementation(() => {
+    clearObjects();
+    if (representationReport.selection === null) return;
+    representationReport.selection = null;
+    for (const observer of representationObservers) observer(null, 'unregistered');
+  });
   const state = {
     atlas: {
-      binding: {
-        objects,
-        // A third-person camera is behind the player, outside this region's placement reach.
-        cameraPose: () => ({ position: atlasVec3(12, 3, 12), forward: atlasVec3(-1, 0, -1) }),
-        playerPose: () => ({ position: atlasVec3(0, 1.6, 0), forward: atlasVec3(0, 0, -1) }),
-        engageFocusedAnchor: () => null,
-        table: { atlasPositions: new Float32Array([0, 0, 0]) },
-      },
+      binding,
     },
     displayFrames: new Map(),
     placedPointMaps: [{ islandId: REGION, sceneId: SCENE }],
@@ -229,7 +257,7 @@ function harness(
   });
   mounts.push(mounted);
   document.body.append(mounted.panel.root, mounted.confirm.root);
-  return { mounted, objects, authority, travel, state };
+  return { mounted, objects, authority, travel, state, binding, representationObservers };
 }
 
 const button = (root: HTMLElement, label: string): HTMLButtonElement => {
@@ -787,6 +815,180 @@ describe('teardown', () => {
     await beginning;
     expect(h.objects.place).not.toHaveBeenCalled();
     expect(h.mounted.panel.root.textContent).not.toContain('Marker pillar');
+  });
+
+  it('discards a pending object load when a newer version omits that object', async () => {
+    let resolveBytes!: (bytes: ArrayBuffer) => void;
+    const bytes = new Promise<ArrayBuffer>(done => { resolveBytes = done; });
+    const first = version({ versionId: 'version-one', objects: [objectRecord()] });
+    const second = version({ versionId: 'version-two', objects: [] });
+    const client = {
+      connect: vi.fn(async (versionId?: string) => ({
+        assets: [asset()], version: versionId === 'version-two' ? second : first,
+      })),
+    } as unknown as WorldObjectsClient;
+    const h = harness({ client, loadBytes: vi.fn(() => bytes) });
+    const oldRead = h.mounted.begin('version-one');
+    await vi.waitFor(() => expect(h.objects.place).not.toHaveBeenCalled());
+    await h.mounted.begin('version-two');
+    resolveBytes(new ArrayBuffer(784));
+    await oldRead;
+    expect(h.objects.place).not.toHaveBeenCalled();
+    expect(h.objects.objectIds).toEqual([]);
+    expect(h.mounted.panel.root.querySelector('.object-placement-item')).toBeNull();
+  });
+
+  it('keeps the newer begin request when overlapping authority reads finish out of order', async () => {
+    const resolvers = new Map<string, (answer: { assets: ReviewedAsset[]; version: AlternateVersion }) => void>();
+    const client = {
+      connect: vi.fn((versionId: string) => new Promise(resolve => { resolvers.set(versionId, resolve); })),
+    } as unknown as WorldObjectsClient;
+    const h = harness({ client });
+    const older = h.mounted.begin('older');
+    const newer = h.mounted.begin('newer');
+    resolvers.get('newer')!({ assets: [asset()], version: version({ versionId: 'newer', objects: [] }) });
+    await newer;
+    resolvers.get('older')!({
+      assets: [asset()], version: version({ versionId: 'older', objects: [objectRecord()] }),
+    });
+    await older;
+    expect(h.objects.place).not.toHaveBeenCalled();
+    expect(h.objects.objectIds).toEqual([]);
+    expect(h.mounted.panel.root.querySelector('.object-placement-item')).toBeNull();
+  });
+
+  it('clears the admitted object view when a district refresh finds a saved-entry mismatch', async () => {
+    const exact = version({ objects: [objectRecord()] });
+    const client = {
+      connect: vi.fn()
+        .mockResolvedValueOnce({ assets: [asset()], version: exact })
+        .mockRejectedValueOnce(new Error(
+          'This saved world changed elsewhere. Reload to compare the latest changes before opening it.',
+        )),
+    } as unknown as WorldObjectsClient;
+    const h = harness({ client });
+    await h.mounted.begin();
+    expect(h.objects.objectIds).toEqual(['object:lantern']);
+
+    // The district-placement callback in main invokes this same no-argument begin path.
+    await h.mounted.begin();
+
+    expect(h.objects.objectIds).toEqual([]);
+    expect(h.mounted.panel.root.querySelector('.object-placement-item')).toBeNull();
+    expect(h.mounted.panel.root.textContent).toContain('Reload to compare the latest changes');
+  });
+});
+
+describe('object and data-view selection share one supported identity', () => {
+  it('reflects selection both ways, clears cross-context selection, and releases the observer', async () => {
+    const h = harness({
+      initial: version({ objects: [objectRecord()] }),
+      representationSubjects: ['object:lantern', 'doitt_id:other'],
+    });
+    await h.mounted.begin();
+    button(h.mounted.panel.root, 'Marker pillar').click();
+    expect(h.binding.representationReport.selection).toBe('object:lantern');
+
+    h.binding.setRepresentationSelection('doitt_id:other');
+    expect(h.mounted.panel.root.querySelector('[data-selected="yes"]')).toBeNull();
+    h.binding.setRepresentationSelection('object:lantern');
+    expect(h.mounted.panel.root.querySelector('[data-selected="yes"]')).not.toBeNull();
+
+    expect(h.representationObservers.size).toBe(1);
+    h.mounted.dispose();
+    expect(h.representationObservers.size).toBe(0);
+  });
+
+  it('clears another highlighted subject when the chosen object has no point capability', async () => {
+    const h = harness({
+      initial: version({ objects: [objectRecord()] }),
+      representationSubjects: ['doitt_id:other'],
+    });
+    await h.mounted.begin();
+    h.binding.setRepresentationSelection('doitt_id:other');
+    button(h.mounted.panel.root, 'Marker pillar').click();
+    expect(h.binding.representationReport.selection).toBeNull();
+    expect(h.mounted.panel.root.querySelector('[data-selected="yes"]')).not.toBeNull();
+  });
+
+  it('preserves a supported selection across a confirmed move redraw', async () => {
+    const h = harness({
+      initial: version({ objects: [objectRecord()], edits: [edit(1, 'add_object')] }),
+      representationSubjects: ['object:lantern'],
+    });
+    await h.mounted.begin();
+    h.mounted.panel.setVisible(true);
+    button(h.mounted.panel.root, 'Marker pillar').click();
+    arrow('ArrowLeft');
+    button(h.mounted.panel.root, 'Save this position').click();
+    button(h.mounted.confirm.root, 'Confirm').click();
+
+    await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['move']));
+    await vi.waitFor(() => expect(h.mounted.confirm.root.hidden).toBe(true));
+    expect(h.binding.representationReport.selection).toBe('object:lantern');
+    expect(h.mounted.panel.root.querySelector('[data-selected="yes"]')).not.toBeNull();
+  });
+
+  it('does not restore an object over a later data-view choice during redraw', async () => {
+    let loadCount = 0;
+    let resolveRedraw!: (bytes: ArrayBuffer) => void;
+    const redrawBytes = new Promise<ArrayBuffer>(resolve => { resolveRedraw = resolve; });
+    const h = harness({
+      initial: version({ objects: [objectRecord()], edits: [edit(1, 'add_object')] }),
+      representationSubjects: ['object:lantern', 'doitt_id:other'],
+      loadBytes: vi.fn(() => ++loadCount === 1 ? Promise.resolve(new ArrayBuffer(784)) : redrawBytes),
+    });
+    await h.mounted.begin();
+    h.mounted.panel.setVisible(true);
+    button(h.mounted.panel.root, 'Marker pillar').click();
+    arrow('ArrowLeft');
+    button(h.mounted.panel.root, 'Save this position').click();
+    button(h.mounted.confirm.root, 'Confirm').click();
+    await vi.waitFor(() => expect(loadCount).toBe(2));
+
+    h.binding.setRepresentationSelection('doitt_id:other');
+    resolveRedraw(new ArrayBuffer(784));
+    await vi.waitFor(() => expect(h.mounted.confirm.root.hidden).toBe(true));
+    expect(h.binding.representationReport.selection).toBe('doitt_id:other');
+    expect(h.mounted.panel.root.querySelector('[data-selected="yes"]')).toBeNull();
+  });
+
+  it('clears selection on confirmed removal, authority withdrawal and version switch', async () => {
+    const initial = version({ versionId: 'version-one', objects: [objectRecord()] });
+    const removed = version({
+      versionId: 'version-one',
+      objects: [objectRecord({ removed: true })],
+      edits: [edit(1, 'remove')],
+    });
+    const h = harness({ initial, representationSubjects: ['object:lantern'] });
+    await h.mounted.begin('version-one');
+    button(h.mounted.panel.root, 'Marker pillar').click();
+    h.authority.answerWith({ kind: 'recorded', version: removed });
+    button(h.mounted.panel.root, 'Remove').click();
+    button(h.mounted.confirm.root, 'Confirm').click();
+    await vi.waitFor(() => expect(h.mounted.confirm.root.hidden).toBe(true));
+    expect(h.binding.representationReport.selection).toBeNull();
+    expect(h.mounted.panel.root.querySelector('[data-selected="yes"]')).toBeNull();
+
+    const withdrawn = harness({ initial, representationSubjects: ['object:lantern'] });
+    await withdrawn.mounted.begin('version-one');
+    button(withdrawn.mounted.panel.root, 'Marker pillar').click();
+    withdrawn.binding.representationReport.selection = null;
+    for (const observer of withdrawn.representationObservers) observer(null, 'unavailable');
+    expect(withdrawn.mounted.panel.root.querySelector('[data-selected="yes"]')).toBeNull();
+
+    const switched = version({ versionId: 'version-two', objects: [objectRecord()] });
+    const client = {
+      connect: vi.fn(async (versionId: string) => ({
+        assets: [asset()], version: versionId === 'version-two' ? switched : initial,
+      })),
+    } as unknown as WorldObjectsClient;
+    const changed = harness({ client, representationSubjects: ['object:lantern'] });
+    await changed.mounted.begin('version-one');
+    button(changed.mounted.panel.root, 'Marker pillar').click();
+    await changed.mounted.begin('version-two');
+    expect(changed.binding.representationReport.selection).toBeNull();
+    expect(changed.mounted.panel.root.querySelector('[data-selected="yes"]')).toBeNull();
   });
 });
 

@@ -1,8 +1,11 @@
 // @vitest-environment happy-dom
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import {
   DATA_VIEW_STYLE,
   DEFAULT_REPRESENTATION_INTENT,
+  districtRepresentationSubjects,
+  parseOwnedDistrict,
   resolveRepresentation,
   type RepresentationIntent,
   type RepresentationSubject,
@@ -24,16 +27,19 @@ const scene: RepresentationSubject = {
 
 function entries(intent: RepresentationIntent, subjects: readonly RepresentationSubject[]) {
   return subjects.map(item => ({ subject: item, resolved: resolveRepresentation(intent, item),
-    allocatedPoints: 4096, plannedPoints: 5000 }));
+    allocatedPoints: item.points === null ? 0 : 4096, plannedPoints: item.points === null ? 0 : 5000 }));
 }
 
-function setup(subjects: readonly RepresentationSubject[] = [subject]) {
+function setup(
+  subjects: readonly RepresentationSubject[] = [subject],
+  initialSelection: string | null = subjects[0]?.subjectId ?? null,
+) {
   const binding = {
     representationReport: {
       intent: DEFAULT_REPRESENTATION_INTENT,
       subjects: entries(DEFAULT_REPRESENTATION_INTENT, subjects),
       allocatedPoints: 4096, pointBudget: 1_048_576, pendingSubjects: 0,
-      selection: null as string | null,
+      selection: initialSelection,
       style: { id: DATA_VIEW_STYLE.id, version: DATA_VIEW_STYLE.version },
     },
     representationOverlayPlan: { refusals: [{ subjectId: 'geometry-1', overlay: 'box', reason: 'No bounds of its own.' }] },
@@ -53,6 +59,12 @@ function setup(subjects: readonly RepresentationSubject[] = [subject]) {
 }
 
 const toggles = (root: HTMLElement) => [...root.querySelectorAll<HTMLInputElement>('.representation-toggle input')];
+const search = (root: HTMLElement, query: string) => {
+  const input = root.querySelector<HTMLInputElement>('input[type=search]')!;
+  input.value = query;
+  input.dispatchEvent(new Event('input'));
+  return input;
+};
 
 describe('world representation inspector', () => {
   it('changes only spatial intent and describes sampled geometry honestly', () => {
@@ -129,12 +141,16 @@ describe('world representation inspector', () => {
     view.dispose();
   });
 
-  it('highlights the listed subject while the panel is open and lets it go when closed', () => {
-    const { binding, view } = setup([subject, scene]);
+  it('selects only on an explicit list choice and preserves that selection when the panel closes', () => {
+    const { binding, view } = setup([subject, scene], null);
     view.root.open = true;
     view.root.dispatchEvent(new Event('toggle'));
-    expect(binding.setRepresentationSelection).toHaveBeenLastCalledWith('geometry-1');
+    expect(binding.setRepresentationSelection).not.toHaveBeenCalled();
     const list = view.root.querySelector<HTMLSelectElement>('select[aria-label="Inspect a displayed geometry group"]')!;
+    expect(list.value).toBe('');
+    expect(list.options[0]!.textContent).toBe('No subject selected');
+    list.value = 'geometry-1'; list.dispatchEvent(new Event('change'));
+    expect(binding.setRepresentationSelection).toHaveBeenLastCalledWith('geometry-1');
     list.value = 'scene-1'; list.dispatchEvent(new Event('change'));
     expect(binding.setRepresentationSelection).toHaveBeenLastCalledWith('scene-1');
     expect(JSON.parse(view.root.querySelector('pre')!.textContent!).blend).toBe('overlay');
@@ -142,7 +158,103 @@ describe('world representation inspector', () => {
       .toContain('Points appear over its own look');
     view.root.open = false;
     view.root.dispatchEvent(new Event('toggle'));
-    expect(binding.setRepresentationSelection).toHaveBeenLastCalledWith(null);
+    expect(binding.representationReport.selection).toBe('scene-1');
+    expect(binding.setRepresentationSelection).not.toHaveBeenCalledWith(null);
+    view.dispose();
+  });
+
+  it('reflects a scene selection without treating it as a new explicit list choice', () => {
+    const { binding, view } = setup([subject, scene]);
+    binding.setRepresentationSelection('scene-1');
+    view.refresh();
+    const list = view.root.querySelector<HTMLSelectElement>('select[aria-label="Inspect a displayed geometry group"]')!;
+    expect(list.value).toBe('scene-1');
+    view.dispose();
+  });
+
+  it('searches the full retained district by name, identity, kind and origin without selecting', () => {
+    const district = parseOwnedDistrict(JSON.parse(readFileSync(
+      `${process.cwd()}/../assets/owned-world/flatiron/flatiron-owned-district.json`, 'utf8',
+    )));
+    const retained = districtRepresentationSubjects(district);
+    expect(retained).toHaveLength(400);
+    const { binding, view } = setup(retained, null);
+    const list = view.root.querySelector<HTMLSelectElement>('select[aria-label="Inspect a displayed geometry group"]')!;
+
+    const input = search(view.root, 'Flatiron Building');
+    expect(input.closest('label')?.textContent).toContain('Search displayed subjects');
+    expect(view.root.querySelector('.representation-search-status')!.textContent)
+      .toBe('1 of 400 subjects match “Flatiron Building”.');
+    expect([...list.options].map(option => option.textContent))
+      .toEqual(['No subject selected', 'Flatiron Building']);
+    expect(binding.setRepresentationSelection).not.toHaveBeenCalled();
+
+    search(view.root, 'doitt_id:507159');
+    expect(list.options[1]!.value).toBe('doitt_id:507159');
+    expect(binding.setRepresentationSelection).not.toHaveBeenCalled();
+
+    search(view.root, 'external object');
+    expect(view.root.querySelector('.representation-search-status')!.textContent)
+      .toBe('400 of 400 subjects match “external object”.');
+    expect(list.options).toHaveLength(401);
+    view.dispose();
+  });
+
+  it('keeps an existing selection inspectable outside matches and never searches source references', () => {
+    const { binding, view } = setup([subject, scene], 'scene-1');
+    const list = view.root.querySelector<HTMLSelectElement>('select[aria-label="Inspect a displayed geometry group"]')!;
+    const before = binding.setRepresentationSelection.mock.calls.length;
+
+    search(view.root, 'Buildings');
+    expect(binding.setRepresentationSelection).toHaveBeenCalledTimes(before);
+    expect(binding.representationReport.selection).toBe('scene-1');
+    expect(list.value).toBe('scene-1');
+    expect(list.options[1]!.textContent).toBe('scene-1 (selected, outside search)');
+    expect(view.root.querySelector('.representation-search-status')!.textContent)
+      .toContain('1 of 2 subjects match “Buildings”. The selected subject remains inspectable outside this filter');
+    expect(JSON.parse(view.root.querySelector('pre')!.textContent!).id).toBe('scene-1');
+
+    search(view.root, 'source-1');
+    expect(view.root.querySelector('.representation-search-status')!.textContent)
+      .toContain('No subjects match “source-1”. The selected subject remains inspectable outside this filter');
+    expect(binding.representationReport.selection).toBe('scene-1');
+
+    search(view.root, '');
+    view.root.open = true; view.root.dispatchEvent(new Event('toggle'));
+    view.root.open = false; view.root.dispatchEvent(new Event('toggle'));
+    expect(binding.setRepresentationSelection).toHaveBeenCalledTimes(before);
+    expect(binding.representationReport.selection).toBe('scene-1');
+    view.dispose();
+  });
+
+  it('does not resurrect a withdrawn selection while a filter is active', () => {
+    const { binding, view } = setup([subject, scene], 'geometry-1');
+    search(view.root, 'Buildings');
+    const before = binding.setRepresentationSelection.mock.calls.length;
+    const withdrawn = { ...subject, availability: 'withdrawn' as const };
+    binding.representationReport = {
+      ...binding.representationReport,
+      selection: null,
+      subjects: [
+        { subject: withdrawn, resolved: resolveRepresentation(DEFAULT_REPRESENTATION_INTENT, withdrawn),
+          allocatedPoints: 0, plannedPoints: 0 },
+        binding.representationReport.subjects[1]!,
+      ],
+    };
+    view.refresh();
+
+    const list = view.root.querySelector<HTMLSelectElement>('select[aria-label="Inspect a displayed geometry group"]')!;
+    expect(binding.setRepresentationSelection).toHaveBeenCalledTimes(before);
+    expect(binding.representationReport.selection).toBeNull();
+    expect(list.value).toBe('');
+    expect(list.options[1]!.textContent).toBe('Buildings (unavailable)');
+    expect(list.options[1]!.disabled).toBe(true);
+    expect(view.root.querySelector('pre')!.textContent).toBe('');
+
+    search(view.root, '');
+    view.root.open = true; view.root.dispatchEvent(new Event('toggle'));
+    expect(binding.representationReport.selection).toBeNull();
+    expect(binding.setRepresentationSelection).toHaveBeenCalledTimes(before);
     view.dispose();
   });
 
@@ -153,10 +265,47 @@ describe('world representation inspector', () => {
       resolved: resolveRepresentation(DEFAULT_REPRESENTATION_INTENT, withdrawn), allocatedPoints: 0, plannedPoints: 0 }];
     view.refresh();
     expect(view.root.querySelector('pre')!.textContent).toBe('');
-    expect(view.root.querySelector<HTMLSelectElement>('select[aria-label="Inspect a displayed geometry group"]')!.options.length).toBe(0);
+    const list = view.root.querySelector<HTMLSelectElement>('select[aria-label="Inspect a displayed geometry group"]')!;
+    expect(list.options).toHaveLength(2);
+    expect(list.options[1]!.textContent).toBe('Buildings (unavailable)');
+    expect(list.options[1]!.disabled).toBe(true);
     expect(view.root.querySelector<HTMLInputElement>('input[type=range]')!.disabled).toBe(true);
     for (const input of toggles(view.root)) expect(input.disabled).toBe(true);
     expect(view.root.querySelectorAll('.representation-legend li')).toHaveLength(0);
+    view.dispose();
+  });
+
+  it('refuses a stale list choice without throwing and clears the previous selection', () => {
+    const { binding, view } = setup([subject, scene], 'scene-1');
+    const list = view.root.querySelector<HTMLSelectElement>('select[aria-label="Inspect a displayed geometry group"]')!;
+    const withdrawn = { ...subject, availability: 'withdrawn' as const };
+    binding.representationReport.subjects = [
+      { subject: withdrawn, resolved: resolveRepresentation(DEFAULT_REPRESENTATION_INTENT, withdrawn),
+        allocatedPoints: 0, plannedPoints: 0 },
+      binding.representationReport.subjects[1]!,
+    ];
+    binding.setRepresentationSelection.mockImplementation((id: string | null) => {
+      const selected = binding.representationReport.subjects
+        .find(item => item.subject.subjectId === id)?.subject;
+      if (selected !== undefined && selected.availability !== 'available') {
+        throw new TypeError(`Unavailable representation subject ${id}`);
+      }
+      binding.representationReport = { ...binding.representationReport, selection: id };
+      return binding.representationReport;
+    });
+
+    // The inventory changed between refreshes, so the still-enabled option is a real UI race.
+    list.value = 'geometry-1';
+    expect(() => list.dispatchEvent(new Event('change'))).not.toThrow();
+
+    expect(binding.setRepresentationSelection).toHaveBeenNthCalledWith(1, 'geometry-1');
+    expect(binding.setRepresentationSelection).toHaveBeenNthCalledWith(2, null);
+    expect(binding.representationReport.selection).toBeNull();
+    expect(list.value).toBe('');
+    expect(list.options[1]!.textContent).toBe('Buildings (unavailable)');
+    expect(list.options[1]!.disabled).toBe(true);
+    expect(view.root.querySelector('[role=status]')!.textContent)
+      .toContain('That subject is no longer available. No subject is selected.');
     view.dispose();
   });
 
@@ -168,6 +317,26 @@ describe('world representation inspector', () => {
     view.refresh();
     expect(view.root.querySelector<HTMLInputElement>('input[type=range]')!.disabled).toBe(true);
     expect(view.root.textContent).toContain('No switchable surface');
+    expect(view.root.querySelector('.representation-description')!.textContent)
+      .toContain('Surface only');
+    view.dispose();
+  });
+
+  it('states the missing isolated point form even at the rendered endpoint', () => {
+    const metadata: RepresentationSubject = {
+      ...subject, subjectId: 'doitt_id:2327', subjectKind: 'object', origin: 'external',
+      points: null, compatibleBlend: false,
+      bounds: { frameId: 'district-1', units: 'metres', origin: 'external', basis: 'source-bounds',
+        min: [0, 0, 0], max: [1, 2, 3] },
+      label: 'Source building',
+      unavailableReason: 'Building geometry shares an aggregate district draw; no per-feature point buffer.',
+    };
+    const { binding, view } = setup([metadata]);
+    binding.setRepresentationSelection(metadata.subjectId);
+    view.refresh();
+    expect(view.root.querySelector('.representation-description')!.textContent)
+      .toContain('no per-feature point buffer');
+    expect(JSON.parse(view.root.querySelector('pre')!.textContent!).displayed_points).toBe(0);
     view.dispose();
   });
 });

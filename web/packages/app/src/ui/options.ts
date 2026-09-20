@@ -637,9 +637,9 @@ export function buildOptions(callbacks: OptionsCallbacks): OptionsView {
     setWorldAuthority(value) {
       worldAuthority.textContent = value.detail;
       worldAuthority.dataset['state'] = value.state;
-      worldVersion.textContent = value.revision === undefined || value.currentVersionId === undefined
+      worldVersion.textContent = value.revision === undefined
         ? ''
-        : `Current revision ${value.revision} · ${value.currentVersionId}`;
+        : `Current revision ${value.revision}`;
       worldProvenance.textContent = [
         value.provenance,
         ...(value.warnings ?? []),
@@ -668,7 +668,7 @@ export function buildOptions(callbacks: OptionsCallbacks): OptionsView {
       if (value.proposal !== undefined) {
         const refinement = value.proposal.refinesProposalId === null
           ? 'Original proposal'
-          : `Refines ${value.proposal.refinesProposalId}`;
+          : 'Refines an earlier proposal';
         proposalReview.replaceChildren(
           el('strong', { text: `${value.proposal.origin} proposal ready for review` }),
           el('span', {

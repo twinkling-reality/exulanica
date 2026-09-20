@@ -131,17 +131,56 @@ describe('living society snapshots', () => {
     society_id: 'society', version_id: 'branch', branch_id: 'branch', place_id: 'place', population_size: 2,
     current_tick: 3, state_sha256: 'a'.repeat(64), input_seq: 1, input_sha256: 'b'.repeat(64),
     state: {profile: 'exulanica-society/v4', society_id: 'society', branch_id: 'branch', tick: 3, input_seq: 1,
-      input_sha256: 'b'.repeat(64), clock: {start_minute_of_day: 480, minute_of_day: 483, day: 0},
+      input_sha256: 'b'.repeat(64), tick_seconds: 60,
+      routine: {catalog_versions: {
+        'society-activity': 1, 'society-capacity': 1, 'society-need': 1,
+        'society-policy': 1, 'society-use-class': 1,
+      }, sha256: '5ed1a63d6589763693bec365d41f46b00de3a6ee8b9c25fa0cd35e2381f10931'},
+      clock: {start_minute_of_day: 480, minute_of_day: 483, day: 0},
       population: {size: 2}, inhabitants: people},
   });
-  it('presents roles, indoor presence, speed and the simulated clock from canonical fields', () => {
+  it('presents roles, routine, input and exact simulated clock bindings from canonical fields', () => {
     const snapshot = parseSociety(row([person(0), person(1)]));
     expect(snapshot.populationSize).toBe(2);
-    expect(snapshot.state.minute_of_day).toBe(483);
+    expect(snapshot.state).toMatchObject({
+      input_seq: 1,
+      input_sha256: 'b'.repeat(64),
+      tick: 3,
+      tick_seconds: 60,
+      start_minute_of_day: 480,
+      minute_of_day: 483,
+      day: 0,
+      routine: {catalog_versions: {
+        'society-activity': 1, 'society-capacity': 1, 'society-need': 1,
+        'society-policy': 1, 'society-use-class': 1,
+      }, sha256: '5ed1a63d6589763693bec365d41f46b00de3a6ee8b9c25fa0cd35e2381f10931'},
+    });
     expect(snapshot.state.inhabitants.map((p) => [p.role, p.indoors, p.walk_speed_mm_per_tick])).toEqual([
       [null, false, 70000], ['baker', true, 70000],
     ]);
     expect(snapshot.state.inhabitants[0]!.goal).toEqual({activity: 'stroll', destination_id: null, because: 'leisure at 300 of 1000'});
+  });
+  it('shows a canonical day rollover without reinterpreting another timestamp', () => {
+    const document = row([person(0), person(1)]);
+    document.current_tick = 2;
+    document.state.tick = 2;
+    document.state.clock = {start_minute_of_day: 1439, minute_of_day: 1, day: 1};
+    expect(parseSociety(document).state).toMatchObject({
+      tick: 2, start_minute_of_day: 1439, minute_of_day: 1, day: 1,
+    });
+  });
+  it('refuses malformed or inconsistent authoritative routine and clock fields', () => {
+    const altered = (change: (document: ReturnType<typeof row>) => void) => {
+      const document = row([person(0), person(1)]);
+      change(document);
+      expect(() => parseSociety(document)).toThrow(/living society/);
+    };
+    altered(document => { document.state.tick_seconds = 30; });
+    altered(document => { document.state.routine.sha256 = 'bad'; });
+    altered(document => { document.state.routine.catalog_versions['society-activity'] = 0; });
+    altered(document => { document.state.clock.minute_of_day = 484; });
+    altered(document => { document.state.clock.day = 1; });
+    altered(document => { document.state.clock.start_minute_of_day = 1_440; });
   });
   it('refuses names, truncation, detached motion and foreign branches', () => {
     expect(() => parseSociety(row([person(0, {display_name: 'Emi Fox'}), person(1)]))).toThrow(/living society/);

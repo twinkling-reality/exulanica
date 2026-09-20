@@ -88,6 +88,12 @@ from exulanica.world.objects import (
 )
 from exulanica.world.registry import STYLE_REGISTRY, StyleRegistry
 from exulanica.world.repository import WorldStyleRepository
+from exulanica.world.saved_entries import (
+    SavedWorldCandidate,
+    SavedWorldEntry,
+    SavedWorldEntryRepository,
+    StaleSavedWorldEntry,
+)
 from exulanica.world.society import (
     SOCIETY_ENGINE_VERSION,
     SOCIETY_POPULATION,
@@ -153,6 +159,9 @@ __all__ = [
     "ProtectedTopologyConflict",
     "ReviewedAsset",
     "ReviewedAssetRow",
+    "SavedWorldCandidate",
+    "SavedWorldEntry",
+    "SavedWorldEntryRepository",
     "SocietyRepository",
     "SourceAnchor",
     "SourceMediaState",
@@ -162,6 +171,7 @@ __all__ = [
     "SpatialSnapshot",
     "StaleInteractionPolicy",
     "StaleObjectBase",
+    "StaleSavedWorldEntry",
     "StaleSocietyState",
     "StaleStructuralBase",
     "StaleStyleVersion",

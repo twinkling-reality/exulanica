@@ -500,11 +500,48 @@ def test_trained_and_embedded_geometry_require_recorded_current_inputs(delivery,
         assert d.get(route).status_code == 404, route
     graph = d.get("/graph").json()
     selected = next(s for s in graph["reconstruction_scenes"] if s["scene_id"] == scene)
+    review_member_ids = [member["capture_id"] for member in selected["members"]]
     assert selected["trained_geometry"] is None
     assert all(
         m["placement"] is None and m["recovered_camera"] is None for m in selected["members"]
     )
     assert d.get("/person-regions/" + str(capture)).status_code == 200
+
+    # One denied bound point map withholds the whole scene above. Denying every remaining map
+    # keeps the same review identity and member inventory, and still exposes no partial geometry.
+    remaining = sorted(
+        {
+            uuid.UUID(material["capture_id"])
+            for material in materials
+            if uuid.UUID(material["capture_id"]) != capture
+        },
+        key=str,
+    )
+    assert remaining
+    for index, denied_capture in enumerate(remaining, start=1):
+        record_region_edits(
+            c.repo,
+            capture_id=denied_capture,
+            actor=ACTOR,
+            edits=[
+                {
+                    "action": "add",
+                    "region_key": f"{index:02x}" * 32,
+                    "silhouette": {
+                        "kind": "polygon",
+                        "points": [[0, 0], [400000, 0], [400000, 400000], [0, 400000]],
+                    },
+                }
+            ],
+        )
+    graph = d.get("/graph").json()
+    all_denied = next(s for s in graph["reconstruction_scenes"] if s["scene_id"] == scene)
+    assert [member["capture_id"] for member in all_denied["members"]] == review_member_ids
+    assert all_denied["trained_geometry"] is None
+    assert all(
+        member["placement"] is None and member["recovered_camera"] is None
+        for member in all_denied["members"]
+    )
 
     # The real mask stage can now rebuild the photograph, but the old trained artifact
     # and the embedded observations still carry their original input lineage.

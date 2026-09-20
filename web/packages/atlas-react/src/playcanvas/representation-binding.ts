@@ -21,6 +21,8 @@ export interface ExternalRepresentationEntry {
 
 /** Triangle sampling reads the whole mesh on the CPU, so it stays bounded by source size. */
 const MAX_SOURCE_VERTICES = 250_000;
+/** One whole-object representation stays bounded even when a container has many static parts. */
+export const MAX_STATIC_MESHES_PER_REPRESENTATION = 32;
 /** Address sampling only selects existing points, so a retained buffer may be much larger. */
 export const MAX_RETAINED_POINTS = 16_777_216;
 
@@ -109,6 +111,173 @@ export function staticMeshRepresentation(
       clone?.destroy(); clone = null;
     },
   };
+}
+
+function groupedPointAllocation(
+  allocations: readonly RepresentationPointAllocation[],
+): RepresentationPointAllocation {
+  let destroyed = false;
+  return {
+    pointCount: allocations.reduce((sum, allocation) => sum + allocation.pointCount, 0),
+    byteLength: allocations.reduce((sum, allocation) => sum + allocation.byteLength, 0),
+    setWeight(weight) {
+      if (destroyed) return;
+      for (const allocation of allocations) allocation.setWeight(weight);
+    },
+    setLook(look) {
+      if (destroyed) return;
+      for (const allocation of allocations) allocation.setLook?.(look);
+    },
+    destroy() {
+      if (destroyed) return;
+      destroyed = true;
+      for (const allocation of allocations) allocation.destroy();
+    },
+  };
+}
+
+/**
+ * One subject over several static draws. Samples stay under each draw's own node, but allocation,
+ * appearance and cleanup stay object-wide. No draw becomes a semantic part or separate subject.
+ */
+export function staticMeshRepresentationGroup(
+  draws: readonly RepresentationDraw[],
+  currentSubject: () => RepresentationSubject,
+  parentVisible: () => boolean,
+): RepresentationDraw | null {
+  if (draws.length < 1 || draws.length > MAX_STATIC_MESHES_PER_REPRESENTATION) return null;
+  const demands = draws.map(draw => draw.pointDemand?.() ?? 0);
+  if (demands.some(demand => !Number.isFinite(demand) || demand <= 0)) {
+    for (const draw of draws) draw.restore();
+    return null;
+  }
+  const totalDemand = demands.reduce((sum, demand) => sum + demand, 0);
+  return {
+    currentSubject,
+    parentVisible,
+    setRenderedWeight(weight) {
+      for (const draw of draws) draw.setRenderedWeight(weight);
+    },
+    // The density request may be below one for tiny meshes. Keep one possible sample per member so
+    // a whole-object representation does not become partial merely because its parts are small.
+    pointDemand() { return Math.max(draws.length, totalDemand); },
+    createPoints(limit) {
+      // Every renderer mesh belongs to the whole object. A budget too small to represent each
+      // member refuses points rather than silently turning the object into a partial sample.
+      if (!Number.isSafeInteger(limit) || limit < draws.length) return null;
+      const remaining = limit - draws.length;
+      const counts = demands.map(demand => 1 + Math.floor(remaining * demand / totalDemand));
+      const spare = limit - counts.reduce((sum, count) => sum + count, 0);
+      const remainders = demands.map((demand, index) => ({
+        index,
+        remainder: remaining * demand / totalDemand - Math.floor(remaining * demand / totalDemand),
+      })).sort((a, b) => b.remainder - a.remainder || a.index - b.index);
+      for (let i = 0; i < spare; i += 1) {
+        const index = remainders[i]!.index;
+        counts[index] = (counts[index] ?? 0) + 1;
+      }
+
+      const allocations: RepresentationPointAllocation[] = [];
+      try {
+        for (let i = 0; i < draws.length; i += 1) {
+          const allocation = draws[i]!.createPoints(counts[i]!);
+          if (allocation === null) {
+            for (const prepared of allocations) prepared.destroy();
+            return null;
+          }
+          allocations.push(allocation);
+        }
+        return groupedPointAllocation(allocations);
+      } catch (error) {
+        for (const allocation of allocations) allocation.destroy();
+        throw error;
+      }
+    },
+    refresh() {
+      for (const draw of draws) draw.refresh?.();
+    },
+    restore() {
+      for (const draw of draws) draw.restore();
+    },
+  };
+}
+
+export interface StaticMeshGroupRepresentation {
+  readonly draw: RepresentationDraw;
+  /** Bounds in the supplied object root's local frame, before authored placement is applied. */
+  readonly extent: {
+    readonly min: readonly [number, number, number];
+    readonly max: readonly [number, number, number];
+  };
+}
+
+/**
+ * Borrow a bounded static mesh hierarchy as one object representation.
+ *
+ * The root inverse removes authored placement before each mesh-local box is transformed, so nested
+ * rotations and non-uniform scales contribute to object-local bounds without applying placement
+ * twice. Points remain local to each renderer node and therefore follow the same hierarchy.
+ */
+export function staticMeshGroupRepresentation(
+  device: pc.GraphicsDevice,
+  root: pc.GraphNode,
+  instances: readonly pc.MeshInstance[],
+  currentSubject: () => RepresentationSubject,
+  style: DataViewStyle = DATA_VIEW_STYLE,
+): StaticMeshGroupRepresentation | null {
+  if (instances.length < 1 || instances.length > MAX_STATIC_MESHES_PER_REPRESENTATION) return null;
+  const totalVertices = instances.reduce(
+    (sum, instance) => sum + (instance.mesh.vertexBuffer?.numVertices ?? MAX_SOURCE_VERTICES + 1),
+    0,
+  );
+  if (!Number.isSafeInteger(totalVertices) || totalVertices > MAX_SOURCE_VERTICES) return null;
+
+  const draws: RepresentationDraw[] = [];
+  for (const instance of instances) {
+    const draw = staticMeshRepresentation(device, instance, currentSubject, undefined, style);
+    if (draw === null) {
+      for (const accepted of draws) accepted.restore();
+      return null;
+    }
+    draws.push(draw);
+  }
+  const grouped = staticMeshRepresentationGroup(
+    draws, currentSubject, () => representationParentVisible(root),
+  );
+  if (grouped === null) return null;
+
+  const rootInverse = new pc.Mat4().copy(root.getWorldTransform()).invert();
+  if (![...rootInverse.data].every(Number.isFinite)) { grouped.restore(); return null; }
+  const local = new pc.Mat4();
+  const corner = new pc.Vec3();
+  const transformed = new pc.Vec3();
+  const min = new pc.Vec3(Infinity, Infinity, Infinity);
+  const max = new pc.Vec3(-Infinity, -Infinity, -Infinity);
+  for (const instance of instances) {
+    const extent = meshLocalExtent(instance.mesh);
+    if (extent === null) { grouped.restore(); return null; }
+    local.mul2(rootInverse, instance.node.getWorldTransform());
+    if (![...local.data].every(Number.isFinite)) { grouped.restore(); return null; }
+    for (const x of [extent.min[0], extent.max[0]]) {
+      for (const y of [extent.min[1], extent.max[1]]) {
+        for (const z of [extent.min[2], extent.max[2]]) {
+          local.transformPoint(corner.set(x, y, z), transformed);
+          min.x = Math.min(min.x, transformed.x); min.y = Math.min(min.y, transformed.y);
+          min.z = Math.min(min.z, transformed.z); max.x = Math.max(max.x, transformed.x);
+          max.y = Math.max(max.y, transformed.y); max.z = Math.max(max.z, transformed.z);
+        }
+      }
+    }
+  }
+  const values = [min.x, min.y, min.z, max.x, max.y, max.z];
+  if (!values.every(Number.isFinite)) { grouped.restore(); return null; }
+  return Object.freeze({
+    draw: grouped,
+    extent: Object.freeze({
+      min: Object.freeze([min.x, min.y, min.z]) as readonly [number, number, number],
+      max: Object.freeze([max.x, max.y, max.z]) as readonly [number, number, number],
+    }),
+  });
 }
 
 /** The summed area of a triangle list, in the mesh's own squared units. */

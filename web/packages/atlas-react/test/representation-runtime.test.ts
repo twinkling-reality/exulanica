@@ -11,6 +11,7 @@ import {
 import {
   RepresentationRuntime,
   type RepresentationDraw,
+  type RepresentationMetadata,
   type RepresentationPointAllocation,
   type RepresentationPointLook,
 } from '../src/playcanvas/representation-runtime.js';
@@ -52,6 +53,22 @@ class Draw implements RepresentationDraw {
     return allocation;
   }
   restore(): void { this.restores += 1; }
+}
+
+class Metadata implements RepresentationMetadata {
+  subject: RepresentationSubject;
+  visible = true;
+  constructor(id: string) {
+    this.subject = {
+      ...available(id), subjectKind: 'object', origin: 'external', points: null,
+      compatibleBlend: false, label: 'Source building', unavailableReason:
+        'Building geometry shares an aggregate district draw; no per-feature point buffer.',
+      bounds: { frameId: `frame:${id}`, units: 'metres', origin: 'external',
+        basis: 'source-bounds', min: [0, 0, 0], max: [2, 3, 4] },
+    };
+  }
+  currentSubject(): RepresentationSubject { return this.subject; }
+  parentVisible(): boolean { return this.visible; }
 }
 
 describe('bounded representation runtime', () => {
@@ -111,6 +128,39 @@ describe('bounded representation runtime', () => {
     expect(replacement.limits).toEqual([3]);
     expect(report.allocatedPoints).toBe(6);
     expect(one.allocations[0]!.destroyed).toBe(1);
+  });
+
+  it('registers bounded metadata without allocating points or controlling the aggregate draw', () => {
+    const runtime = new RepresentationRuntime(8, 4);
+    const metadata = new Metadata('doitt_id:2327');
+    runtime.registerMetadata(metadata);
+    let report = runtime.setIntent({
+      ...DEFAULT_REPRESENTATION_INTENT, pointMix: 1, boxes: true, ids: true, labels: true,
+    });
+    expect(report).toMatchObject({
+      allocatedPoints: 0, allocatedBytes: 0,
+      subjects: [{ allocatedPoints: 0, plannedPoints: 0, resolved: {
+        renderedWeight: 1, pointWeight: 0, boxes: true, ids: true, labels: true,
+      } }],
+    });
+    expect(report.subjects[0]!.resolved.reasons).toContain(
+      'Building geometry shares an aggregate district draw; no per-feature point buffer.',
+    );
+    report = runtime.setSelection('doitt_id:2327');
+    expect(report.selection).toBe('doitt_id:2327');
+    metadata.subject = { ...metadata.subject, availability: 'withdrawn' };
+    report = runtime.update();
+    expect(report.selection).toBeNull();
+    expect(report.subjects[0]!.resolved.geometryVisible).toBe(false);
+  });
+
+  it('refuses metadata that could masquerade as an isolated draw or has no spatial bounds', () => {
+    const runtime = new RepresentationRuntime(8, 4);
+    const metadata = new Metadata('doitt_id:2327');
+    metadata.subject = { ...metadata.subject, points: 'mesh-vertices', compatibleBlend: true };
+    expect(() => runtime.registerMetadata(metadata)).toThrow('no isolated point form');
+    metadata.subject = { ...metadata.subject, points: null, compatibleBlend: false, bounds: null };
+    expect(() => runtime.registerMetadata(metadata)).toThrow('rendered bounds');
   });
 
   it('scales every demand by one factor and never beyond a subject\'s cap', () => {

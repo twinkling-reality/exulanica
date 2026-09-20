@@ -52,6 +52,7 @@ import {
 
 export type GeometryIssueState =
   | 'bytes_missing'
+  | 'unavailable'
   | 'unsupported_container'
   | 'verification_failed'
   | 'unverifiable'
@@ -542,6 +543,10 @@ export class GeometryClient {
           report('unplaced', 'This reconstruction has no validated alignment to the recovered cameras.');
           continue;
         }
+        if (placement.state === 'unavailable') {
+          report('unavailable', 'Current access policy withholds this placed point map.');
+          continue;
+        }
         if (placement.state !== 'available' || placement.reference === null) {
           report('bytes_missing', 'The placed point map is recorded and its bytes are unavailable.');
           continue;
@@ -617,6 +622,10 @@ export class GeometryClient {
         };
         if (islandId === null || scene.islandId !== islandId) {
           report('no_region', 'The reconstruction scene no longer resolves to one complete region in this graph.');
+          continue;
+        }
+        if (unposed.state === 'unavailable') {
+          report('unavailable', 'Current access policy withholds this photograph\u2019s depth.');
           continue;
         }
         if (unposed.state !== 'available' || unposed.reference === null) {

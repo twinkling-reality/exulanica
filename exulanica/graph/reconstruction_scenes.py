@@ -25,7 +25,7 @@ import psycopg
 from exulanica.epistemics.vocabulary import RECONSTRUCTION_SCENE_RUNG_PREDICATE
 from exulanica.errors import BlobNotFoundError, IntegrityError
 from exulanica.evidence.blob import BlobId
-from exulanica.graph.asset_read_policy import evaluation_time, image_source
+from exulanica.graph.asset_read_policy import evaluation_time, image_source, point_allowed
 from exulanica.graph.generated_geometry import generated_geometry_rows
 from exulanica.graph.geometry import POINT_MAP_KIND
 from exulanica.graph.payload import (
@@ -637,12 +637,18 @@ def _scene_row(
     excluded = outcome.excluded
     output_members: list[ReconstructionSceneMemberRow] = []
     available_count = 0
+    withheld_count = 0
     unposed_count = 0
+    unposed_withheld_count = 0
     # The pose recovered no photograph at all. Not "nothing was placed": a pose that registered
     # members can still place none, because the gate refused it or its point-map bytes are gone,
     # and those keep their recorded meaning.
     nothing_registered = not any(member.registered for member in members)
-    viewed_at = evaluation_time(connection) if nothing_registered else None
+    # Permission is deliberately outside the placement memo. A retained transform can remain
+    # current while its point-map screening, capture or person consent stops authorising delivery.
+    # Evaluate one fresh read time for this response, exactly as the ordinary geometry descriptor
+    # list does, and never let the memo retain an earlier permission answer.
+    viewed_at = evaluation_time(connection)
     for member in members:
         capture_ref = str(member.capture_id)
         recovered_camera = (
@@ -654,11 +660,13 @@ def _scene_row(
                 _unposed_point_map(
                     connection, workspace, viewed_at, references, artifacts, capture_ref, store
                 )
-                if viewed_at is not None
+                if nothing_registered
                 else None
             )
             if unposed is not None and unposed.state == "available":
                 unposed_count += 1
+            elif unposed is not None and unposed.state == "unavailable":
+                unposed_withheld_count += 1
             output_members.append(
                 ReconstructionSceneMemberRow(
                     capture_id=member.capture_id,
@@ -675,9 +683,18 @@ def _scene_row(
             continue
         artifact = artifacts[capture_ref]
         digest = BlobId.from_hex(placed_member.point_map_content_sha256)
-        available = store.exists(digest)
+        present = store.exists(digest)
+        allowed = point_allowed(
+            connection,
+            workspace,
+            uuid.UUID(placed_member.point_map_artifact_ref),
+            viewed_at,
+        )
+        available = present and allowed
         if available:
             available_count += 1
+        elif present:
+            withheld_count += 1
         output_members.append(
             ReconstructionSceneMemberRow(
                 capture_id=member.capture_id,
@@ -690,7 +707,9 @@ def _scene_row(
                     scene_from_opm_row_major=list(placed_member.scene_from_opm),
                     local_units_to_scene_units=placed_member.local_units_to_scene_units,
                     scale_status=placed_member.scale_status,
-                    state="available" if available else "bytes_missing",
+                    state=(
+                        "available" if available else "unavailable" if present else "bytes_missing"
+                    ),
                     reference=(
                         SceneGeometryReferenceRow(
                             href=f"/geometry/{placed_member.point_map_artifact_ref}",
@@ -712,15 +731,17 @@ def _scene_row(
 
     placed_count = sum(member.registered for member in members)
     if available_count == placed_count and available_count > 0:
-        placement_state: Literal["available", "partial", "none_placed", "bytes_missing"] = (
-            "available"
-        )
+        placement_state: Literal[
+            "available", "partial", "none_placed", "bytes_missing", "unavailable"
+        ] = "available"
     elif available_count > 0:
         placement_state = "partial"
     elif nothing_registered:
         # The pose recovered no photograph, which is a fact about the pose and not about storage:
         # every point map can be present and verified while none of them has a position.
         placement_state = "none_placed"
+    elif withheld_count > 0:
+        placement_state = "unavailable"
     else:
         placement_state = "bytes_missing"
     substrate: Literal[
@@ -752,11 +773,21 @@ def _scene_row(
         display_reasons.append(
             "Some posed point maps are unavailable; the remaining verified maps are displayed."
         )
+    elif placement_state == "unavailable":
+        display_reasons.append(
+            "Current access policy withholds the posed point maps, so source photographs are "
+            "displayed."
+        )
     if available_count and claim.rung is not None and claim.rung < 3:
         display_reasons.append(
             "This client displays posed point maps and has no supported rung-1 or rung-2 substrate."
         )
-    if not available_count and not unposed_count:
+    if not available_count and not unposed_count and unposed_withheld_count:
+        display_reasons.append(
+            "Current access policy withholds each photograph's depth, so source photographs are "
+            "displayed."
+        )
+    elif not available_count and not unposed_count and not withheld_count:
         display_reasons.append(
             "No photograph's depth is available to show, so source photographs are displayed."
             if nothing_registered
@@ -1232,7 +1263,9 @@ def _unposed_point_map(
     artifact = artifacts.get(capture_ref)
     if reference is None or artifact is None:
         return None
-    available = store.exists(BlobId.from_hex(reference.content_sha256))
+    present = store.exists(BlobId.from_hex(reference.content_sha256))
+    allowed = point_allowed(connection, workspace, uuid.UUID(reference.artifact_ref), viewed_at)
+    available = present and allowed
     photograph = (
         _viewer_photograph(connection, workspace, capture_ref, viewed_at) if available else None
     )
@@ -1240,7 +1273,7 @@ def _unposed_point_map(
         artifact_id=uuid.UUID(reference.artifact_ref),
         content_sha256=reference.content_sha256,
         container=artifact["container"],
-        state="available" if available else "bytes_missing",
+        state="available" if available else "unavailable" if present else "bytes_missing",
         reference=(
             SceneGeometryReferenceRow(
                 href=f"/geometry/{reference.artifact_ref}",

@@ -56,6 +56,8 @@ export interface AppearanceDependencies {
   readonly onShowControls: () => void;
   readonly onCloseControls: () => void;
   readonly onShowCustomize: () => void;
+  /** Advance the active saved entry only after the style authority accepted a version. */
+  readonly onStyleSaved?: (version: WorldStyleVersionRecord) => Promise<void>;
 }
 
 export interface MountedAppearance {
@@ -308,6 +310,7 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
         presentWorldStyleAuthority(
           optionsView, state.worldStyleConnection, state.worldStyleFailure, null,
         );
+        await deps.onStyleSaved?.(result.version);
         optionsView.reportWorldLifecycle('saved');
         reportProposalOutcome(
           active, 'accepted', `Applied as revision ${result.version.revision}.`,
@@ -344,6 +347,7 @@ export function mountAppearance(deps: AppearanceDependencies): MountedAppearance
           );
           return null;
         }
+        await deps.onStyleSaved?.(result.version);
         optionsView.reportWorldLifecycle('saved', `Restored as revision ${result.version.revision}.`);
         return preferencesForWorldVersion(state.preferences, result.version);
       } catch (error) {
@@ -665,11 +669,14 @@ function presentWorldStyleAuthority(
   const provenance = current.provenance === null
     ? 'Authored initial version'
     : [
-        `${current.provenance.origin} by ${current.provenance.actor}`,
-        current.provenance.originReference,
+        current.provenance.origin === 'settings'
+          ? 'Saved from Customize'
+          : current.provenance.origin === 'companion'
+            ? 'Saved from a Companion proposal'
+            : 'Saved from a reviewed appearance choice',
         current.modelId,
         current.promptVersion,
-        current.refinesProposalId === null ? null : `refines ${current.refinesProposalId}`,
+        current.refinesProposalId === null ? null : 'Refines an earlier proposal',
       ].filter((item): item is string => item !== null).join(' · ');
   view.setWorldAuthority({
     state: 'ready',

@@ -1,10 +1,19 @@
 // @vitest-environment happy-dom
 
 import { describe, expect, it, vi } from 'vitest';
-import type { AtlasScene } from '@exulanica/atlas-core';
+import {
+  DEFAULT_REPRESENTATION_INTENT,
+  resolveRepresentation,
+  type AtlasScene,
+  type RepresentationIntent,
+  type RepresentationSubject,
+} from '@exulanica/atlas-core';
 import { mountEnvironmentSelection } from '../src/composition/environment-selection.js';
 import type { EnvironmentCatalog } from '../src/environment-selection-api.js';
-import type { AlternateVersion } from '../src/world-objects-api.js';
+import {
+  WorldObjectsContractError,
+  type AlternateVersion,
+} from '../src/world-objects-api.js';
 import type { AppEnvironment, SessionState } from '../src/composition/session-state.js';
 import type { SocietyPlaybackControl } from '../src/society-control-api.js';
 
@@ -17,8 +26,9 @@ vi.mock('@exulanica/atlas-react/playcanvas', async (importOriginal) => ({
 
 function deferred<T>() {
   let resolve!: (value: T) => void;
-  const promise = new Promise<T>((done) => { resolve = done; });
-  return { promise, resolve };
+  let reject!: (reason: unknown) => void;
+  const promise = new Promise<T>((done, fail) => { resolve = done; reject = fail; });
+  return { promise, resolve, reject };
 }
 
 const version = {
@@ -73,6 +83,156 @@ const catalog = {
 } satisfies EnvironmentCatalog;
 
 describe('mounted NYC semantic selection lifecycle', () => {
+  it('keeps scene and explicit data-view building selection on the same admitted feature', async () => {
+    const controls = {
+      state: { x: 12, y: 1.68, z: -4 },
+      onInteract: null as (() => void) | null,
+    };
+    const metadata: RepresentationSubject = {
+      subjectId: 'doitt_id:2327', subjectKind: 'object', sceneId: null,
+      frameId: 'flatiron:render-metres', origin: 'external', sourceRefs: ['2'.repeat(64)],
+      availability: 'available', rendered: true, points: null, compatibleBlend: false,
+      bounds: { frameId: 'flatiron:render-metres', units: 'metres', origin: 'external',
+        basis: 'source-bounds', min: [0, 0, 0], max: [10, 20, 10] },
+      label: 'Source building', dataAvailable: true,
+      unavailableReason: 'Building geometry shares an aggregate district draw; no per-feature point buffer.',
+    };
+    const group: RepresentationSubject = {
+      ...metadata, subjectId: 'flatiron:render-group:buildings:0', subjectKind: 'geometry-group',
+      origin: 'generated', points: 'mesh-surface-samples', compatibleBlend: true,
+      bounds: { ...metadata.bounds!, origin: 'generated', basis: 'generated-extent' },
+      label: 'buildings', unavailableReason: 'Aggregate generated surface samples.',
+    };
+    const unavailableMetadata: RepresentationSubject = {
+      ...metadata,
+      subjectId: 'doitt_id:9999',
+      availability: 'withdrawn',
+      label: 'Unavailable source building',
+    };
+    const secondFeature = {
+      ...catalog.features[0]!,
+      id: 'fedcba9876543210fedcba9876543210',
+      providerFeatureId: unavailableMetadata.subjectId,
+      name: 'Unavailable source building',
+    };
+    const heldCatalog = { ...catalog, features: [...catalog.features, secondFeature] };
+    const observers = new Set<(
+      subjectId: string | null,
+      reason: 'explicit' | 'unavailable' | 'unregistered',
+    ) => void>();
+    const report = (
+      intent: RepresentationIntent,
+      selection: string | null,
+      heldSubjects: readonly RepresentationSubject[] = [metadata, unavailableMetadata, group],
+    ) => ({
+      intent,
+      subjects: heldSubjects.map(subject => ({
+        subject, resolved: resolveRepresentation(intent, subject), allocatedPoints: 0, plannedPoints: 0,
+      })),
+      allocatedPoints: 0, pointBudget: 1_048_576, pendingSubjects: 0, selection,
+    });
+    const binding = {
+      controls,
+      camera: { forward: { x: 0, y: 0, z: -1 } },
+      device: {}, environmentRoot: {}, renderRoot: {}, invalidate: vi.fn(),
+      ownedDistrict: null, generatedTile: null,
+      representationReport: report(DEFAULT_REPRESENTATION_INTENT, null),
+      representationOverlayPlan: { refusals: [] },
+      setRepresentationIntent: vi.fn((intent: RepresentationIntent) => {
+        binding.representationReport = report(intent, binding.representationReport.selection);
+        return binding.representationReport;
+      }),
+      setRepresentationSelection: vi.fn((subjectId: string | null) => {
+        binding.representationReport = report(binding.representationReport.intent, subjectId);
+        for (const observer of observers) observer(subjectId, 'explicit');
+        return binding.representationReport;
+      }),
+      observeRepresentationSelection: vi.fn((observer: (
+        subjectId: string | null,
+        reason: 'explicit' | 'unavailable' | 'unregistered',
+      ) => void) => {
+        observers.add(observer);
+        return () => { observers.delete(observer); };
+      }),
+      memoryLayerVisible: false,
+      onMemoryLayerChange: null,
+    };
+    const selectedContexts: unknown[] = [];
+    let localized: readonly { readonly providerFeatureId: string }[] = [];
+    let picked = 0;
+    const mounted = mountEnvironmentSelection({
+      env: {} as AppEnvironment,
+      state: { atlas: { binding } } as unknown as SessionState,
+      scene: { islands: [{ islandId: 'region-a' }] } as unknown as AtlasScene,
+      credentials: { baseUrl: 'https://example.test', token: 'token' },
+      showStatus: vi.fn(), admissionId: '12345678-1234-4123-8123-123456789abc',
+      environmentClient: { catalog: vi.fn(async () => heldCatalog) } as never,
+      worldClient: { connect: vi.fn(async () => ({ assets: [], version })) } as never,
+      onSelect: context => { selectedContexts.push(context); },
+      createOverlay: features => {
+        localized = features;
+        return { pick: () => features[picked]!, destroy: vi.fn() };
+      },
+    });
+    await mounted.begin();
+
+    const cameraBefore = { ...controls.state };
+    controls.onInteract?.();
+    expect(localized[0]!.providerFeatureId).toBe(metadata.subjectId);
+    expect(binding.setRepresentationSelection).toHaveBeenLastCalledWith(metadata.subjectId);
+    expect(binding.representationReport.selection).toBe(metadata.subjectId);
+    expect(selectedContexts.at(-1)).toEqual({ admissionId: 'admission', featureId: catalog.features[0]!.id });
+
+    picked = 1;
+    controls.onInteract?.();
+    expect(binding.representationReport.selection).toBe(metadata.subjectId);
+    expect(selectedContexts.at(-1)).toEqual({ admissionId: 'admission', featureId: catalog.features[0]!.id });
+    picked = 0;
+
+    const list = mounted.root.querySelector<HTMLSelectElement>(
+      'select[aria-label="Inspect a displayed geometry group"]',
+    )!;
+    const panel = list.closest('details')!;
+    panel.open = true;
+    panel.dispatchEvent(new Event('toggle'));
+    expect(list.value).toBe(metadata.subjectId);
+    expect(mounted.root.textContent).toContain('no per-feature point buffer');
+
+    const slider = panel.querySelector<HTMLInputElement>('input[type=range]')!;
+    slider.value = '75';
+    slider.dispatchEvent(new Event('input'));
+    expect(binding.representationReport.selection).toBe(metadata.subjectId);
+    expect(controls.state).toEqual(cameraBefore);
+
+    list.value = group.subjectId;
+    list.dispatchEvent(new Event('change'));
+    expect(binding.representationReport.selection).toBe(group.subjectId);
+    expect(selectedContexts.at(-1)).toBeNull();
+    expect(mounted.root.textContent).toContain('does not become city context');
+
+    binding.setRepresentationSelection(metadata.subjectId);
+    expect(selectedContexts.at(-1)).toEqual({ admissionId: 'admission', featureId: catalog.features[0]!.id });
+    for (const observer of observers) observer('unknown:subject', 'explicit');
+    expect(selectedContexts.at(-1)).toBeNull();
+    expect(mounted.root.textContent).toContain('does not become city context');
+
+    binding.setRepresentationSelection(metadata.subjectId);
+    const withdrawn = { ...metadata, availability: 'withdrawn' as const };
+    binding.representationReport = report(binding.representationReport.intent, null, [withdrawn, group]);
+    for (const observer of observers) observer(null, 'unavailable');
+    expect(selectedContexts.at(-1)).toBeNull();
+    expect(mounted.root.textContent).toContain('authority changed');
+
+    controls.onInteract?.();
+    expect(selectedContexts.at(-1)).toBeNull();
+    expect(mounted.root.textContent).toContain('authority changed');
+    for (const observer of observers) observer(metadata.subjectId, 'explicit');
+    expect(selectedContexts.at(-1)).toBeNull();
+    expect(mounted.root.textContent).toContain('authority changed');
+    mounted.dispose();
+    expect(observers.size).toBe(0);
+  });
+
   it('uses canonical controls coordinates, attaches once, and restores the exact handler', async () => {
     const prior = vi.fn();
     const controls = {
@@ -127,6 +287,33 @@ describe('mounted NYC semantic selection lifecycle', () => {
     expect(controls.onInteract).toBe(prior);
     await expect(mounted.begin()).rejects.toThrow(/disposed/);
     expect(createOverlay).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps source inspection read-only when the saved authored cursor needs reconciliation', async () => {
+    const binding = {
+      controls: { state: { x: 0, y: 1.62, z: 0 }, onInteract: null },
+      camera: { forward: { x: 0, y: 0, z: -1 } },
+      device: {}, environmentRoot: {}, renderRoot: {}, invalidate: vi.fn(),
+    };
+    const mounted = mountEnvironmentSelection({
+      env: {} as AppEnvironment,
+      state: { atlas: { binding } } as unknown as SessionState,
+      scene: { islands: [{ islandId: 'region-a' }] } as unknown as AtlasScene,
+      credentials: { baseUrl: 'https://example.test', token: 'token' },
+      showStatus: vi.fn(), admissionId: '12345678-1234-4123-8123-123456789abc',
+      environmentClient: { catalog: vi.fn(async () => catalog) } as never,
+      worldClient: { connect: vi.fn(async () => { throw new Error(
+        'This saved world changed elsewhere. Reload to compare the latest changes before opening it.',
+      ); }) } as never,
+      createOverlay: () => ({ pick: () => null, destroy: vi.fn() }),
+    });
+
+    await mounted.begin();
+
+    expect(mounted.root.dataset['state']).toBe('ready');
+    expect(mounted.root.textContent).toContain('Editing this saved world is unavailable');
+    expect(mounted.root.textContent).toContain('Reload to compare the latest changes');
+    mounted.dispose();
   });
 
   it('draws NYC footprint lines only when neither an owned district nor a generated tile is in the world', async () => {
@@ -497,7 +684,11 @@ describe('mounted NYC semantic selection lifecycle', () => {
 });
 
 import { ApiError } from '@exulanica/graph-client';
+import { readFileSync } from 'node:fs';
 import { parseSociety, type SocietySnapshot } from '../src/society-api.js';
+const producerLivingResponse = JSON.parse(readFileSync(
+  `${process.cwd()}/packages/app/test/living-v4-grid-response.json`, 'utf8',
+)) as { readonly fixture_provenance: { readonly canonical_state_sha256: string } };
 function liveSnapshot(tick = 0): SocietySnapshot {
   return parseSociety({ society_id:'society', version_id:'version',branch_id:'version',place_id:'place',population_size:100,current_tick:tick,
     state_sha256:String(tick + 1).repeat(64),input_seq:1,input_sha256:'b'.repeat(64),
@@ -506,15 +697,21 @@ function liveSnapshot(tick = 0): SocietySnapshot {
         action:{kind:'idle',status:'active',target_id:null,remaining_ticks:0,reason:'awaiting_goal'},
         explanation:{summary:tick?'The target was removed.':'Awaiting a goal.',event_ids:tick?['event','outside-window']:[]}}))}});
 }
-function liveMount(preview = false) {
+function livingSnapshot(): SocietySnapshot { return parseSociety(producerLivingResponse); }
+function liveMount(preview = false, living = false) {
   const canvas = document.createElement('canvas');
   const controls = {state:{x:0,y:1.68,z:0},onInteract:null as (()=>void)|null};
+  const snapshot = living ? livingSnapshot : liveSnapshot;
+  const initialSnapshot = snapshot();
+  const inhabitantId = initialSnapshot.state.inhabitants[0]!.id;
+  const connectedCatalog = living ? { ...catalog, placeId: initialSnapshot.placeId } : catalog;
+  const connectedVersion = living ? { ...version, versionId: initialSnapshot.versionId } : version;
   const district = {district:{name:'Test district',sidewalks:[]},setAuthoredInstances:vi.fn(),setSociety:vi.fn(()=>24),clearSociety:vi.fn(),
-    visibleInhabitantIds:['person-0'],drawnInhabitantCount:1,pickInhabitant:()=> 'person-0',revealInhabitant:vi.fn(),inhabitantRepresentation:()=>undefined,coincidentInhabitants:()=>['person-0'],
+    visibleInhabitantIds:[inhabitantId],drawnInhabitantCount:1,pickInhabitant:()=> inhabitantId,revealInhabitant:vi.fn(),inhabitantRepresentation:()=>undefined,coincidentInhabitants:()=>[inhabitantId],
     inhabitantDetail:()=>'near',societyCounts:{population:128,outdoors:128,indoors:0,near:1,far:0,drawn:1}};
   const binding = {controls,ownedDistrict:district,camera:{forward:{x:0,y:0,z:1}},invalidate:vi.fn(),setDistrictObjectFrame:vi.fn()};
-  const client = {connect:vi.fn(async()=>liveSnapshot()),read:vi.fn(async()=>liveSnapshot(1)),advance:vi.fn(async(_snapshot:SocietySnapshot)=>liveSnapshot(1)),events:vi.fn(async()=>[
-    {event_id:'event',subject_id:'person-0',tick:1,event_kind:'replanned',document_sha256:'c'.repeat(64),document:{synthetic:true,summary:'Recorded target removal.',reason:'target_disabled_or_removed'}}])};
+  const client = {connect:vi.fn(async()=>snapshot()),read:vi.fn(async()=>snapshot(1)),advance:vi.fn(async(_snapshot:SocietySnapshot)=>snapshot(1)),events:vi.fn(async()=>[
+    {event_id:'event',subject_id:inhabitantId,tick:1,event_kind:'replanned',document_sha256:'c'.repeat(64),document:{synthetic:true,summary:'Recorded target removal.',reason:'target_disabled_or_removed'}}])};
   let playback: SocietyPlaybackControl = {
     societyId:'society',versionId:'version',persisted:true,revision:0,mode:'paused',speed:1,
     tickIntervalMs:1000,currentTick:0,stateSha256:'1'.repeat(64),nextDueAt:null,reason:null,
@@ -531,15 +728,17 @@ function liveMount(preview = false) {
       return {control:playback,society};
     }),
   };
-  const districtClient = {read:vi.fn(async()=>({placement:{versionId:'version',regionId:'registered-region',translationMm:[0,0,0],boundsMm:[0,0,100000,100000]},baseArtifactSha256:'b'.repeat(64),interpretationArtifactSha256:'c'.repeat(64)}))};
+  const districtResult = {placement:{versionId:connectedVersion.versionId,regionId:'registered-region',translationMm:[0,0,0],boundsMm:[0,0,100000,100000]},baseArtifactSha256:'b'.repeat(64),interpretationArtifactSha256:'c'.repeat(64)};
+  const districtClient = {read:vi.fn(async()=>districtResult)};
   const onDistrictPlacementChange=vi.fn();
-  const environment = {catalog:vi.fn(async()=>catalog),apply:vi.fn(async()=>({kind:'recorded',version:{...version,editSeq:1}}))};
+  const environment = {catalog:vi.fn(async()=>connectedCatalog),apply:vi.fn(async()=>({kind:'recorded',version:{...connectedVersion,editSeq:1}}))};
+  const worldClient = {connect:vi.fn(async()=>({assets:[],version:{...connectedVersion,edits:[{kind:'add_object',editId:'prior',undoneEditId:null}]}}))};
   const mount = mountEnvironmentSelection({env:{canvas,preview} as AppEnvironment,state:{atlas:{binding}} as unknown as SessionState,
     scene:{islands:[{islandId:'region'}]} as unknown as AtlasScene,credentials:{baseUrl:'https://api.test',token:'test'},showStatus:vi.fn(),admissionId:'admission',
-    environmentClient:environment as never,worldClient:{connect:vi.fn(async()=>({assets:[],version:{...version,edits:[{kind:'add_object',editId:'prior',undoneEditId:null}]}}))} as never,societyClient:client as never,societyControlClient:societyControlClient as never,societyDistrictClient:districtClient as never,onDistrictPlacementChange,
+    environmentClient:environment as never,worldClient:worldClient as never,societyClient:client as never,societyControlClient:societyControlClient as never,societyDistrictClient:districtClient as never,onDistrictPlacementChange,
     createOverlay:()=>({pick:()=>null,destroy:vi.fn()})});
   const button = (label:string)=>[...mount.root.querySelectorAll('button')].find(b=>b.textContent===label)!;
-  return {mount,client,societyControlClient,district,canvas,controls,button,environment,districtClient,binding,onDistrictPlacementChange};
+  return {mount,client,societyControlClient,district,canvas,controls,button,environment,districtClient,districtResult,worldClient,binding,onDistrictPlacementChange};
 }
 
 describe('persisted living world controls',()=>{
@@ -558,6 +757,24 @@ describe('persisted living world controls',()=>{
     controls.onInteract?.();
     expect(mount.root.textContent).toContain('Recorded target removal.');
     expect(mount.root.textContent).toContain('Referenced events unavailable in the latest event window: outside-window');
+    expect(mount.root.textContent).toContain(`Sequence 1 · ${'b'.repeat(64)}`);
+    expect(mount.root.textContent).toContain('Simulation clockUnavailable');
+    expect(mount.root.textContent).toContain('Routine catalogsUnavailable');
+    mount.dispose();
+  });
+  it('renders exact Python-produced v4 routine, input, tick, day and bounded event coverage',async()=>{
+    expect(producerLivingResponse.fixture_provenance.canonical_state_sha256)
+      .toBe('2305146307c266433a8c20912b85a040bcb1eaa5dc6a2bf6962211f1a531a52f');
+    const {mount,controls}=liveMount(false,true);await mount.begin();controls.onInteract?.();
+    expect(mount.root.textContent).toContain('society-activity v1, society-capacity v1, society-need v1, society-policy v1, society-use-class v1');
+    expect(mount.root.textContent).toContain('5ed1a63d6589763693bec365d41f46b00de3a6ee8b9c25fa0cd35e2381f10931');
+    expect(mount.root.textContent).toContain('Sequence 1 · f5396475c3196031391c8dd1cfb0772071c2710c490ed48202393896807b7aa6');
+    expect(mount.root.textContent).toContain('Simulation tick1');
+    expect(mount.root.textContent).toContain('Day 0 · 08:01');
+    expect(mount.root.textContent).toContain('60 simulated seconds per tick');
+    expect(mount.root.textContent).toContain('Latest bounded persisted event window');
+    expect(mount.root.textContent).toContain('be802169-d4f0-5e83-a02d-a49d8138c14e');
+    expect(mount.root.textContent).toContain('does not verify replay or send them to Companion');
     mount.dispose();
   });
   it('refreshes only the exact version after an authored object change, without advancing',async()=>{
@@ -606,6 +823,126 @@ describe('authorized district placement lifecycle',()=>{
     button('Advance one minute').click();await vi.waitFor(()=>expect(mount.districtPlacement()).toBeNull());
     expect(client.advance).not.toHaveBeenCalled();expect(binding.setDistrictObjectFrame).toHaveBeenLastCalledWith(null);
     expect(canvas.dataset.societyTick).toBeUndefined();expect(button('Advance one minute').disabled).toBe(true);
+    mount.dispose();
+  });
+  it('clears the frame and authored controls when the branch already drifted',async()=>{
+    const {mount,worldClient,binding,button,client,onDistrictPlacementChange}=liveMount();await mount.begin();
+    worldClient.connect.mockRejectedValueOnce(new WorldObjectsContractError(
+      'saved_entry_reconciliation_required',
+      'This saved world changed elsewhere. Reload to compare the latest changes before opening it.',
+    ));
+    button('Advance one minute').click();
+    await vi.waitFor(()=>expect(mount.districtPlacement()).toBeNull());
+    expect(binding.setDistrictObjectFrame).toHaveBeenLastCalledWith(null);
+    expect(onDistrictPlacementChange).toHaveBeenCalledTimes(2);
+    expect(client.advance).not.toHaveBeenCalled();
+    expect(mount.root.textContent).toContain('Editing this saved world is unavailable');
+    expect(mount.root.textContent).toContain('Reload to compare the latest changes');
+    mount.dispose();
+  });
+  it('does not apply a delayed district response after the saved branch advances',async()=>{
+    const {mount,districtClient,districtResult,worldClient,binding,button,client}=liveMount();await mount.begin();
+    const held=deferred<typeof districtResult>();
+    districtClient.read.mockReturnValueOnce(held.promise);
+    button('Advance one minute').click();
+    await vi.waitFor(()=>expect(districtClient.read).toHaveBeenCalledTimes(2));
+    worldClient.connect.mockRejectedValueOnce(new WorldObjectsContractError(
+      'saved_entry_reconciliation_required',
+      'This saved world changed elsewhere. Reload to compare the latest changes before opening it.',
+    ));
+    held.resolve(districtResult);
+    await vi.waitFor(()=>expect(mount.districtPlacement()).toBeNull());
+    expect(binding.setDistrictObjectFrame).toHaveBeenLastCalledWith(null);
+    expect(client.advance).not.toHaveBeenCalled();
+    mount.dispose();
+  });
+  it('accepts a district refresh after the saved cursor advances atomically',async()=>{
+    const {mount,worldClient}=liveMount();await mount.begin();
+    worldClient.connect.mockResolvedValue({
+      assets:[],version:{...version,stateSha256:'d'.repeat(64),editSeq:1},
+    });
+    await mount.afterAuthoredEdit(version.versionId);
+    expect(mount.districtPlacement()?.regionId).toBe('registered-region');
+    expect(mount.root.textContent).not.toContain('Editing this saved world is unavailable');
+    mount.dispose();
+  });
+  it('invalidates an old district result when a bound save advances mid-read',async()=>{
+    const {mount,districtClient,districtResult,worldClient,binding}=liveMount();await mount.begin();
+    const oldResult={...districtResult,placement:{...districtResult.placement,translationMm:[111,0,0]}};
+    const newResult={...districtResult,placement:{...districtResult.placement,translationMm:[222,0,0]}};
+    const held=deferred<typeof oldResult>();
+    districtClient.read.mockReturnValueOnce(held.promise);
+
+    const refreshing=mount.afterAuthoredEdit(version.versionId);
+    await vi.waitFor(()=>expect(districtClient.read).toHaveBeenCalledTimes(2));
+    worldClient.connect.mockResolvedValue({
+      assets:[],version:{...version,stateSha256:'d'.repeat(64),editSeq:1},
+    });
+    held.resolve(oldResult);
+    await refreshing;
+
+    expect(binding.setDistrictObjectFrame).not.toHaveBeenCalledWith({
+      regionId:'registered-region',translationMm:[111,0,0],
+    });
+    districtClient.read.mockResolvedValueOnce(newResult);
+    await mount.afterAuthoredEdit(version.versionId);
+    expect(binding.setDistrictObjectFrame).toHaveBeenLastCalledWith({
+      regionId:'registered-region',translationMm:[222,0,0],
+    });
+    mount.dispose();
+  });
+  it('revokes authored controls when the district read exposes source invalidation',async()=>{
+    const {mount,districtClient,worldClient,binding,button,client,onDistrictPlacementChange}=liveMount();await mount.begin();
+    districtClient.read.mockRejectedValueOnce(new ApiError(
+      424,'unavailable_society_input','the authored source is invalidated',
+    ));
+    worldClient.connect
+      .mockResolvedValueOnce({assets:[],version})
+      .mockRejectedValueOnce(new WorldObjectsContractError(
+        'saved_entry_reconciliation_required',
+        'This saved world changed elsewhere or its source became unavailable. Reload to compare the latest changes.',
+      ));
+
+    button('Advance one minute').click();
+    await vi.waitFor(()=>expect(mount.districtPlacement()).toBeNull());
+
+    expect(binding.setDistrictObjectFrame).toHaveBeenLastCalledWith(null);
+    expect(onDistrictPlacementChange).toHaveBeenCalledTimes(2);
+    expect(client.advance).not.toHaveBeenCalled();
+    expect(mount.root.textContent).toContain('Editing this saved world is unavailable');
+    expect(mount.root.textContent).toContain('source became unavailable');
+    mount.dispose();
+  });
+  it('does not let a stale rejected revalidation clear a newer district refresh',async()=>{
+    const {mount,districtClient,districtResult,worldClient,binding}=liveMount();await mount.begin();
+    const held=deferred<Awaited<ReturnType<typeof worldClient.connect>>>();
+    const validationStarted=deferred<void>();
+    const newerResult={...districtResult,placement:{...districtResult.placement,translationMm:[333,0,0]}};
+    districtClient.read.mockRejectedValueOnce(new ApiError(
+      424,'unavailable_society_input','the authored source is invalidated',
+    ));
+    worldClient.connect
+      .mockResolvedValueOnce({assets:[],version})
+      .mockImplementationOnce(()=>{validationStarted.resolve();return held.promise;});
+
+    const stale=mount.afterAuthoredEdit(version.versionId);
+    await validationStarted.promise;
+    districtClient.read.mockResolvedValueOnce(newerResult);
+    await mount.afterAuthoredEdit(version.versionId);
+    expect(binding.setDistrictObjectFrame).toHaveBeenLastCalledWith({
+      regionId:'registered-region',translationMm:[333,0,0],
+    });
+
+    held.reject(new WorldObjectsContractError(
+      'saved_entry_reconciliation_required',
+      'This saved world changed elsewhere. Reload to compare the latest changes before opening it.',
+    ));
+    await stale;
+
+    expect(binding.setDistrictObjectFrame).toHaveBeenLastCalledWith({
+      regionId:'registered-region',translationMm:[333,0,0],
+    });
+    expect(mount.root.textContent).not.toContain('Editing this saved world is unavailable');
     mount.dispose();
   });
   it('can reauthorize frame and state after a prior society authorization failure',async()=>{

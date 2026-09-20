@@ -21,6 +21,7 @@ import {
   type AuthoredObjectAssetReference,
   type PlacedAuthoredObject,
   type RegionPose,
+  type SceneObjectRuntimeOptions,
 } from '../src/playcanvas/scene-objects.js';
 
 /**
@@ -456,7 +457,7 @@ function fakeEntity(): FakeEntity {
   return entity;
 }
 
-function harness() {
+function harness(options: SceneObjectRuntimeOptions = {}) {
   const drawn = fakeEntity();
   const root = fakeEntity();
   const registry = { fire: vi.fn(), _loader: { clearCache: vi.fn() } };
@@ -469,8 +470,31 @@ function harness() {
     }),
   };
   const roots = new Map<IslandId, pc.Entity>([[ISLAND, root as unknown as pc.Entity]]);
-  const runtime = new SceneObjectRuntime({ assets } as unknown as pc.AppBase, roots);
+  const runtime = new SceneObjectRuntime({ assets } as unknown as pc.AppBase, roots, options);
   return { runtime, drawn, root, assets };
+}
+
+function deferredHarness(options: SceneObjectRuntimeOptions = {}) {
+  const root = fakeEntity();
+  const registry = { fire: vi.fn(), _loader: { clearCache: vi.fn() } };
+  const pending: pc.Asset[] = [];
+  const assets = {
+    add: vi.fn((asset: pc.Asset) => { (asset as { registry: unknown }).registry = registry; }),
+    remove: vi.fn(),
+    load: vi.fn((asset: pc.Asset) => { pending.push(asset); }),
+  };
+  const runtime = new SceneObjectRuntime(
+    { assets } as unknown as pc.AppBase,
+    new Map<IslandId, pc.Entity>([[ISLAND, root as unknown as pc.Entity]]),
+    options,
+  );
+  const resolve = (index: number, entity = fakeEntity()) => {
+    const asset = pending[index]!;
+    asset.resource = { instantiateRenderEntity: () => entity, destroy: vi.fn() } as never;
+    asset.fire('load', asset);
+    return entity;
+  };
+  return { runtime, root, assets, pending, resolve };
 }
 
 const POSE: RegionPose = Object.freeze({
@@ -643,5 +667,88 @@ describe('the runtime places, moves and animates what a surface already committe
     await runtime.place(placed(null), reviewedBytes('cc0.marker-cube'));
     expect(runtime.objectIds).toEqual(['object:lantern']);
     expect(root.addChild).toHaveBeenCalledTimes(2);
+  });
+
+  it('keeps the newest same-id placement whichever deferred decode finishes first', async () => {
+    for (const order of [[1, 0], [0, 1]] as const) {
+      const h = deferredHarness();
+      const first = h.runtime.place(placed(null), reviewedBytes('cc0.marker-cube'));
+      const second = h.runtime.place({
+        ...placed(null),
+        transform: { ...POSE, xMm: 9000 },
+      }, reviewedBytes('cc0.marker-cube'));
+      const entities = [fakeEntity(), fakeEntity()];
+      h.resolve(order[0], entities[order[0]]);
+      if (order[0] === 0) await expect(first).rejects.toThrow(/superseded/);
+      else await expect(second).resolves.toMatchObject({ objectId: 'object:lantern' });
+      h.resolve(order[1], entities[order[1]]);
+      if (order[1] === 0) await expect(first).rejects.toThrow(/superseded/);
+      else await expect(second).resolves.toMatchObject({ objectId: 'object:lantern' });
+      expect(h.runtime.objectIds).toEqual(['object:lantern']);
+      expect(h.root.addChild).toHaveBeenCalledTimes(1);
+      expect((h.root.addChild as ReturnType<typeof vi.fn>).mock.calls[0]![0]).toBe(entities[1]);
+      expect(entities[1]!.position[0]).toBe(9);
+      h.runtime.destroy();
+    }
+  });
+
+  it('cancels pending-only placement on remove, authority clear, region change and destroy', async () => {
+    for (const cancel of ['remove', 'clear', 'region', 'destroy'] as const) {
+      const h = deferredHarness();
+      const loading = h.runtime.place(placed(null), reviewedBytes('cc0.marker-cube'));
+      if (cancel === 'remove') expect(h.runtime.remove('object:lantern')).toBe(false);
+      else if (cancel === 'clear') h.runtime.clear();
+      else if (cancel === 'region') h.runtime.setRegionOverride(ISLAND, fakeEntity() as unknown as pc.Entity);
+      else h.runtime.destroy();
+      const late = h.resolve(0);
+      await expect(loading).rejects.toThrow(/superseded/);
+      expect(h.root.addChild).not.toHaveBeenCalled();
+      expect(late.destroy).not.toHaveBeenCalled();
+      expect(h.assets.remove).toHaveBeenCalledTimes(1);
+      if (cancel !== 'destroy') h.runtime.destroy();
+    }
+  });
+
+  it('releases representation before entity destruction and keeps refusal local to data view', async () => {
+    const order: string[] = [];
+    const accepted = harness({
+      registerRepresentation: (_object, entity) => ({
+        ok: true,
+        release: () => {
+          expect(entity.destroy).not.toHaveBeenCalled();
+          order.push('release');
+        },
+      }),
+    });
+    (accepted.drawn.destroy as ReturnType<typeof vi.fn>).mockImplementation(() => { order.push('destroy'); });
+    await accepted.runtime.place(placed(null), reviewedBytes('cc0.marker-cube'));
+    accepted.runtime.remove('object:lantern');
+    expect(order).toEqual(['release', 'destroy']);
+
+    const refused = harness({
+      registerRepresentation: () => ({ ok: false, reason: 'No isolated static triangle mesh.' }),
+    });
+    const outcome = await refused.runtime.place(placed(null), reviewedBytes('cc0.marker-cube'));
+    expect(outcome.notices).toEqual(['No isolated static triangle mesh.']);
+    expect(refused.root.addChild).toHaveBeenCalledWith(refused.drawn);
+    expect(refused.runtime.objectIds).toEqual(['object:lantern']);
+  });
+
+  it('invalidates visible changes and requests frames only while bounded motion runs', async () => {
+    const invalidate = vi.fn();
+    const { runtime } = harness({ invalidate });
+    await runtime.place(placed(boundedPath()), reviewedBytes('cc0.marker-cube'));
+    expect(invalidate).toHaveBeenCalledTimes(1);
+    expect(runtime.animating).toBe(false);
+    runtime.control('object:lantern', 'trigger');
+    expect(runtime.animating).toBe(true);
+    runtime.update(0.5);
+    expect(runtime.animating).toBe(true);
+    runtime.control('object:lantern', 'stop');
+    expect(runtime.animating).toBe(false);
+    runtime.control('object:lantern', 'reset');
+    expect(runtime.animating).toBe(false);
+    runtime.setTransform('object:lantern', { ...POSE, xMm: 2000 });
+    expect(invalidate).toHaveBeenCalledTimes(5);
   });
 });

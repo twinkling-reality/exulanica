@@ -10,7 +10,7 @@ from __future__ import annotations
 import datetime as dt
 import re
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Callable, Mapping, Sequence
 from dataclasses import replace
 from typing import Any, Final
 
@@ -355,10 +355,14 @@ class WorldStyleRepository:
         base_style_version_id: uuid.UUID,
         base_topology_digest: str,
         applied_by: uuid.UUID,
+        before_write: Callable[[], None] | None = None,
+        after_write: Callable[[StyleVersion], None] | None = None,
     ) -> StyleVersion:
         failure: Exception | None = None
         applied: StyleVersion | None = None
         with self.connection.transaction():
+            if before_write is not None:
+                before_write()
             state = self._require_state(for_update=True)
             preview = self._preview_row(preview_id, for_update=True)
             if preview["status"] != "open":
@@ -470,6 +474,8 @@ class WorldStyleRepository:
                     details={"applied_by": str(applied_by)},
                 )
                 applied = self._row_to_version(row)
+                if after_write is not None:
+                    after_write(applied)
         if failure is not None:
             raise failure
         assert applied is not None
@@ -510,6 +516,8 @@ class WorldStyleRepository:
         base_style_version_id: uuid.UUID,
         base_topology_digest: str,
         provenance: ProposalProvenance,
+        before_write: Callable[[], None] | None = None,
+        after_write: Callable[[StyleVersion], None] | None = None,
     ) -> StyleVersion:
         if provenance.origin is ProposalOrigin.COMPANION:
             raise InvalidStyleData(
@@ -517,6 +525,8 @@ class WorldStyleRepository:
             )
         self._validate_provenance(provenance)
         with self.connection.transaction():
+            if before_write is not None:
+                before_write()
             state = self._require_state(for_update=True)
             self._check_concurrency(state, base_style_version_id, base_topology_digest)
             current = self._version_by_id(state["current_style_version_id"])
@@ -577,7 +587,10 @@ class WorldStyleRepository:
                     "omitted_regions": sorted(set(target.region_styles) - current_regions),
                 },
             )
-            return self._row_to_version(row)
+            version = self._row_to_version(row)
+            if after_write is not None:
+                after_write(version)
+            return version
 
     # -- source media -------------------------------------------------------------------
 

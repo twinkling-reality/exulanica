@@ -162,6 +162,7 @@ export type { ClaimResult } from './probes.js';
 export { probeAll, probeGlobalSort, probeSplatBudget, probeWebGpu } from './probes.js';
 
 export type {
+  AuthoredRegion,
   AtlasBindingOptions,
   FrameReport,
   IslandVisual,

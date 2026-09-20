@@ -113,6 +113,84 @@ function connectedFetch(handler?: (
 }
 
 describe('world style API boundary', () => {
+  it('commits appearance through the observed saved-entry cursor without a second pointer write', async () => {
+    let appliedBody: Record<string, unknown> | null = null;
+    const fetch = connectedFetch((url, init) => {
+      if (url.pathname.endsWith('/world/styles/previews') && init.method === 'POST') {
+        return json(preview('preview-1', '11111111-1111-4111-8111-111111111111'));
+      }
+      if (url.pathname.endsWith('/apply') && init.method === 'POST') {
+        appliedBody = JSON.parse(String(init.body)) as Record<string, unknown>;
+        return json(version('v1', 1, 0.4));
+      }
+      return undefined;
+    });
+    const savedEntry = {
+      entryId: '22222222-2222-4222-8222-222222222222',
+      revision: 4,
+      authoredStateSha256: 'a'.repeat(64),
+      authoredEditSeq: 7,
+      styleVersionId: 'v0',
+    };
+    const onSavedEntryAdvanced = vi.fn();
+    const client = new WorldStyleClient({
+      baseUrl: 'https://exulanica.test/api', token: 'private', fetch,
+      ids: () => '11111111-1111-4111-8111-111111111111',
+      savedEntry: () => savedEntry,
+      onSavedEntryAdvanced,
+    });
+    await client.connect();
+    await client.previewSettings({
+      profileId: 'origin-landscape', profileVersion: 1, parameters: { vitality: 0.4 },
+    });
+    await client.applyActive();
+    expect(appliedBody).toMatchObject({
+      saved_entry: {
+        entry_id: savedEntry.entryId,
+        base_revision: 4,
+        authored_state_sha256: savedEntry.authoredStateSha256,
+        authored_edit_seq: 7,
+        style_version_id: 'v0',
+      },
+    });
+    expect(onSavedEntryAdvanced).toHaveBeenCalledWith(
+      expect.objectContaining({ versionId: 'v1' }), savedEntry,
+    );
+  });
+
+  it('renders the pinned historical style while retaining the live authority base for edits', async () => {
+    const urls: URL[] = [];
+    const bodies: Record<string, unknown>[] = [];
+    const fetch = connectedFetch((url, init) => {
+      urls.push(url);
+      if (url.pathname.endsWith('/world/styles/current')) return json(state('v2', 2, 0.9));
+      if (url.pathname.endsWith('/world/styles/versions')) {
+        return json([version('v0', 0), version('v1', 1, 0.4), version('v2', 2, 0.9)]);
+      }
+      if (url.pathname.endsWith('/world/styles/rollback') && init.method === 'POST') {
+        bodies.push(JSON.parse(String(init.body)) as Record<string, unknown>);
+        return json(version('v3', 3, 0.4));
+      }
+      return undefined;
+    });
+    const client = new WorldStyleClient({
+      baseUrl: 'https://exulanica.test/api', token: 'private', fetch,
+      worldId: 'world:family-garden',
+    });
+    const opened = await client.connect('v1');
+    expect(opened.state.current.versionId).toBe('v1');
+    expect(client.state()?.current.versionId).toBe('v2');
+    await expect(client.previewSettings({
+      profileId: 'origin-landscape', profileVersion: 1, parameters: { vitality: 0.5 },
+    })).rejects.toMatchObject({ code: 'saved_style_reconciliation_required' });
+    expect(bodies).toEqual([]);
+    const restored = await client.rollback('v1');
+    expect(restored).toMatchObject({ kind: 'applied', version: { versionId: 'v3' } });
+    expect(bodies).toEqual([expect.objectContaining({
+      targetVersionId: 'v1', baseStyleVersionId: 'v2',
+    })]);
+    expect(urls.every((url) => url.searchParams.get('world_id') === 'world:family-garden')).toBe(true);
+  });
   it('joins the exact reviewed catalog and completes a preview/apply/discard lifecycle', async () => {
     const bodies: Record<string, unknown>[] = [];
     const methods: string[] = [];

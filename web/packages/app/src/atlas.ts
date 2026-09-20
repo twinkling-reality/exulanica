@@ -33,6 +33,7 @@ import type {
   WorldStyleParameters,
 } from '@exulanica/presentation';
 import type {
+  AuthoredRegion,
   FrameReport,
   PlacementCheck,
   PointMap,
@@ -78,6 +79,7 @@ export async function mountAtlas(
     };
     /** Development evaluation only; see `composition/generated-tile.ts`. */
     readonly generatedTile?: GeneratedTileMount;
+    readonly authoredRegion?: AuthoredRegion;
   },
   beforeStart?: (binding: AtlasBinding) => void,
 ): Promise<MountedAtlas> {
@@ -98,6 +100,9 @@ export async function mountAtlas(
     ...(presentation?.generatedTile === undefined
       ? {}
       : { generatedTile: presentation.generatedTile }),
+    ...(presentation?.authoredRegion === undefined
+      ? {}
+      : { authoredRegion: presentation.authoredRegion }),
     ...(presentation === undefined
       ? {}
       : {

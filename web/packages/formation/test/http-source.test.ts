@@ -44,12 +44,12 @@ function responseOf(...chunks: string[]): StreamResponse {
   };
 }
 
-function collect(fetch: StreamFetch, from: string | null = null) {
+function collect(fetch: StreamFetch, from: string | null = null, token = 'secret-token') {
   const events: StageEvent[] = [];
   const states: StreamState[] = [];
   const source = new HttpFormationEventSource({
     baseUrl: '/api',
-    token: 'secret-token',
+    token,
     fetch,
     retryMs: 1,
     // Retries are scheduled through an injected function that runs nothing, so a test never waits
@@ -64,9 +64,9 @@ const flush = () => new Promise((resolve) => setTimeout(resolve, 0));
 
 describe('the formation transport', () => {
   it('sends the token in a header and never in the url', async () => {
-    let seen: { url: string; headers: Record<string, string> } | null = null;
+    let seen: { url: string; headers: Record<string, string>; credentials: string } | null = null;
     const { stop } = collect(async (url, init) => {
-      seen = { url, headers: { ...init.headers } };
+      seen = { url, headers: { ...init.headers }, credentials: init.credentials };
       return responseOf();
     });
     await flush();
@@ -75,6 +75,20 @@ describe('the formation transport', () => {
     expect(seen!.headers['authorization']).toBe('Bearer secret-token');
     expect(seen!.url).not.toContain('secret-token');
     expect(seen!.headers['accept']).toBe('text/event-stream');
+    expect(seen!.credentials).toBe('include');
+  });
+
+  it('uses the account cookie without sending an empty bearer credential', async () => {
+    let seen: { headers: Record<string, string>; credentials: string } | null = null;
+    const { stop } = collect(async (_url, init) => {
+      seen = { headers: { ...init.headers }, credentials: init.credentials };
+      return responseOf();
+    }, null, '');
+    await flush();
+    stop();
+
+    expect(seen!.headers).toEqual({ accept: 'text/event-stream' });
+    expect(seen!.credentials).toBe('include');
   });
 
   it('resumes from the token the reducer last saw', async () => {

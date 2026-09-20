@@ -1,0 +1,165 @@
+{
+  "branch_id": "branch",
+  "current_tick": 1,
+  "fixture_provenance": {
+    "canonical_state_sha256": "2305146307c266433a8c20912b85a040bcb1eaa5dc6a2bf6962211f1a531a52f",
+    "grid_fixture": "tests/society_living_fixtures.py::grid_place",
+    "producer": "initial_living_society + advance_living_society",
+    "routine": "load_routine_model()",
+    "seed_fixture": "SEEDS[0]",
+    "transitions": 1
+  },
+  "input_seq": 1,
+  "input_sha256": "f5396475c3196031391c8dd1cfb0772071c2710c490ed48202393896807b7aa6",
+  "place_id": "synthetic-grid",
+  "population_size": 1,
+  "society_id": "66141bb5-f75c-50e0-9a6a-8037e722f103",
+  "state": {
+    "branch_id": "branch",
+    "clock": {
+      "day": 0,
+      "minute_of_day": 481,
+      "start_minute_of_day": 480
+    },
+    "environment": {
+      "resources": {
+        "availability": "unavailable",
+        "reason": "no resource source is connected to this society"
+      },
+      "weather": {
+        "availability": "unavailable",
+        "reason": "no weather source is connected to this society"
+      }
+    },
+    "inhabitants": [
+      {
+        "action": {
+          "destination_id": "district:marker:visit",
+          "kind": "visit",
+          "reason": "arrived",
+          "remaining_ticks": 1,
+          "status": "active"
+        },
+        "blocked_key": null,
+        "explanation": {
+          "event_ids": [
+            "be802169-d4f0-5e83-a02d-a49d8138c14e"
+          ],
+          "summary": "A person (simulated): action started; arrived."
+        },
+        "goal": {
+          "activity": "visit",
+          "because": "leisure at 449 of 1000",
+          "destination_id": "district:marker:visit",
+          "need": "leisure",
+          "node_id": "walk:01:01",
+          "reason": "most_pressing_need",
+          "shift_day": null,
+          "spot_id": "walk:01:01"
+        },
+        "home": null,
+        "id": "f2343140-4293-5eb0-b94b-d26c426ef252",
+        "last_completed": null,
+        "last_shift_day": null,
+        "location": {
+          "destination_id": "district:marker:visit",
+          "edge": null,
+          "indoors": false,
+          "node_id": "walk:01:01",
+          "spot_id": "walk:01:01"
+        },
+        "memory": [
+          "d6ed4e13-d870-5fd1-bdee-78949ff1833e",
+          "be802169-d4f0-5e83-a02d-a49d8138c14e"
+        ],
+        "motion_path_mm": [
+          [
+            20000,
+            4000
+          ],
+          [
+            16000,
+            4000
+          ],
+          [
+            12000,
+            4000
+          ],
+          [
+            8000,
+            4000
+          ],
+          [
+            4000,
+            4000
+          ]
+        ],
+        "needs": {
+          "fatigue": 370,
+          "leisure": 449
+        },
+        "ordinal": 0,
+        "position_mm": [
+          4000,
+          4000
+        ],
+        "reservation": {
+          "id": "walk:01:01",
+          "kind": "spot"
+        },
+        "role": null,
+        "role_reason": "place_publishes_no_premises",
+        "route": null,
+        "synthetic": true,
+        "walk_speed_mm_per_tick": 83085,
+        "work": null
+      }
+    ],
+    "input_seq": 1,
+    "input_sha256": "f5396475c3196031391c8dd1cfb0772071c2710c490ed48202393896807b7aa6",
+    "place": {
+      "capacity": 60,
+      "input_seq": 1,
+      "input_sha256": "f5396475c3196031391c8dd1cfb0772071c2710c490ed48202393896807b7aa6",
+      "place_id": "synthetic-grid",
+      "place_sha256": "0050fcac2954881359af490f77982c854e07e47f9fe3f451b57995a8996419bc",
+      "unsupported": [
+        "district interpretation: walkable graph spans 36000 mm by 20000 mm (60 nodes); routes outside it are not published",
+        "homes (the society input publishes no dwellings)",
+        "premises, roles and workplaces (the society input publishes no premises records)",
+        "street names (the society input publishes none)",
+        "street segments and carriageway crossings (the society input publishes neither)"
+      ]
+    },
+    "population": {
+      "capacity": 60,
+      "limit": 54,
+      "reason": "No homes are published, so the population fills the catalogued share of the place's standing spots and indoor visitor places.",
+      "requested": 1,
+      "rule": "requested",
+      "size": 1,
+      "supported_needs": [
+        "fatigue",
+        "leisure"
+      ]
+    },
+    "profile": "exulanica-society/v4",
+    "relationships": [],
+    "routine": {
+      "catalog_versions": {
+        "society-activity": 1,
+        "society-capacity": 1,
+        "society-need": 1,
+        "society-policy": 1,
+        "society-use-class": 1
+      },
+      "sha256": "5ed1a63d6589763693bec365d41f46b00de3a6ee8b9c25fa0cd35e2381f10931"
+    },
+    "seed_sha256": "0101010101010101010101010101010101010101010101010101010101010101",
+    "society_id": "66141bb5-f75c-50e0-9a6a-8037e722f103",
+    "tick": 1,
+    "tick_seconds": 60
+  },
+  "state_sha256": "2305146307c266433a8c20912b85a040bcb1eaa5dc6a2bf6962211f1a531a52f",
+  "version_id": "branch"
+}

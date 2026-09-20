@@ -42,6 +42,7 @@ import { createLivingWorldInspector } from '../ui/living-world-inspector.js';
 import {
   OBJECT_ROLE_LABELS,
   WorldObjectsClient,
+  WorldObjectsContractError,
   objectWriteFailure,
   type AlternateVersion,
   type ObjectRole,
@@ -247,7 +248,10 @@ export function mountEnvironmentSelection(
   let districtFailure = 'Authorized district placement is not connected.';
   let catalog: EnvironmentCatalog | null = null;
   let current: AlternateVersion | null = null;
+  let authoredWorldFailure: string | null = null;
   let chosen: NYCLocalFeature | null = null;
+  let admittedFeaturesByProvider = new Map<string, NYCLocalFeature>();
+  let releaseRepresentationSelection: (() => void) | null = null;
   let proposal: EnvironmentProposal | null = null;
   let contextEpoch = 0;
   let requestPending = false;
@@ -305,6 +309,7 @@ export function mountEnvironmentSelection(
     selectedInhabitant = null;
     chosen = null;
     deps.onSelect?.(null);
+    setRepresentationHighlight(null);
     place.disabled = true; modify.disabled = true; remove.disabled = true;
     invalidateProposal('Select a source building before previewing an authored placement.');
     const destination = doc.navigation.destinations.find(d => d.subject_id === subject.subject_id);
@@ -366,6 +371,7 @@ export function mountEnvironmentSelection(
     selectedInhabitant = id;
     chosen = null;
     deps.onSelect?.(null);
+    setRepresentationHighlight(null);
     place.disabled = true; modify.disabled = true; remove.disabled = true;
     invalidateProposal('Select an authored object before editing.');
     selected.textContent = 'Selected synthetic inhabitant';
@@ -378,6 +384,9 @@ export function mountEnvironmentSelection(
       ? liveInspection.events.map(event => `Tick ${event.tick}: ${event.document.summary} [${event.event_id}]`).join(' ')
         + (liveInspection.missingEventIds.length ? ` Referenced events unavailable in the latest event window: ${liveInspection.missingEventIds.join(', ')}.` : '')
       : '';
+    const inputBinding = state.input_sha256 === undefined
+      ? 'Unavailable'
+      : `${state.input_seq === undefined ? 'Sequence unavailable' : `Sequence ${state.input_seq}`} · ${state.input_sha256}`;
     const nativeCharacter = representation ? deps.state.atlas?.binding.nativeCharacters?.inspect(representation.subject) : null;
     inspector.show({
       subject: id,
@@ -392,8 +401,13 @@ export function mountEnvironmentSelection(
         ['Recorded event details', eventText || (liveSociety?.view.eventsAvailable ? 'No event references for this activity.' : 'Event documents unavailable in this view.')],
         ['Event references', v2 ? inhabitant.explanation?.event_ids.join(', ') || 'No recorded event references' : 'Unavailable'],
         ['Producer', state.profile ?? 'Static preview fixture'],
-        ['Branch / time', `${society?.versionId ?? 'Preview, not persisted'} · tick ${state.tick}`],
-        ['Input', state.input_sha256 ?? 'Unavailable'],
+        ['Authored branch', state.branch_id ?? society?.versionId ?? 'Unavailable'],
+        ['Simulation tick', String(state.tick)],
+        ['Simulation clock', 'Unavailable'],
+        ['Tick duration', 'Unavailable'],
+        ['Routine catalogs', 'Unavailable'],
+        ['Routine digest', 'Unavailable'],
+        ['Input binding', inputBinding],
         ['Permitted use', 'Inspect simulation state; not historical evidence'],
         ['Shared position', `${deps.state.atlas?.binding.ownedDistrict?.coincidentInhabitants(inhabitant.id).length ?? 1} inhabitants at this position, all drawn where the simulation placed them.`],
         ...characterDisplayDetails(nativeCharacter, representation?.representationId, NEAR_CHARACTER_BUDGET),
@@ -425,6 +439,25 @@ export function mountEnvironmentSelection(
       .filter((event) => event.tick <= state.tick).slice(-6)
       .map((event) => `Tick ${event.tick}: ${event.summary} [${event.eventId}]`).join(' ');
     const needs = Object.entries(inhabitant.needs ?? {}).map(([key, value]) => `${key} ${value}`).join(', ');
+    const routineVersions = state.routine === undefined
+      ? 'Unavailable'
+      : Object.entries(state.routine.catalog_versions)
+        .map(([catalog, version]) => `${catalog} v${version}`).join(', ');
+    const inputBinding = state.input_sha256 === undefined
+      ? 'Unavailable'
+      : `${state.input_seq === undefined ? 'Sequence unavailable' : `Sequence ${state.input_seq}`} · ${state.input_sha256}`;
+    const eventCoverage = liveSociety !== null
+      ? !liveSociety.view.eventsAvailable
+        ? 'Persisted event documents are unavailable in this view.'
+        : live?.missingEventIds.length
+          ? `Latest bounded persisted event window; referenced events absent from it: ${live.missingEventIds.join(', ')}.`
+          : 'Latest bounded persisted event window; all current references are present. Earlier history may be absent.'
+      : recording !== null
+        ? `Recorded preview window, ticks 0 through ${recording.frames.at(-1)!.tick}; not persisted and not complete history.`
+        : 'No event document source is connected to this preview or legacy state.';
+    const simulationClock = state.day === undefined || state.minute_of_day === undefined
+      ? 'Unavailable'
+      : `Day ${state.day} · ${clockText(state.minute_of_day)}`;
     inspector.show({
       subject: inhabitant.id,
       title: inhabitantLabel(inhabitant),
@@ -439,10 +472,19 @@ export function mountEnvironmentSelection(
         ['Current activity', action ? `${activityLabel(action.kind)} · ${action.status}: ${action.reason.replaceAll('_', ' ')}` : 'Unavailable'],
         ['Destination', goal ? where(goal.destination_id) : 'None chosen'],
         ['Needs (of 1000)', needs || 'Unavailable'],
-        ['Recorded events', history || 'No recorded events yet.'],
+        ['Recorded events', history || 'No events are present in the available window.'],
+        ['Event coverage', eventCoverage],
         ['Event references', inhabitant.explanation?.event_ids.join(', ') || 'No recorded event references'],
         ['Producer', `${state.profile} · ${deps.env.preview ? 'recorded by the real engine' : 'persisted'}`],
-        ['Branch / time', `${society?.versionId ?? 'Preview, not persisted'} · tick ${state.tick}${state.minute_of_day === undefined ? '' : ` · ${clockText(state.minute_of_day)}`}`],
+        ['Authored branch', state.branch_id ?? society?.versionId ?? 'Unavailable'],
+        ['Simulation tick', String(state.tick)],
+        ['Simulation clock', simulationClock],
+        ['Tick duration', state.tick_seconds === undefined
+          ? 'Unavailable' : `${state.tick_seconds} simulated seconds per tick`],
+        ['Routine catalogs', routineVersions],
+        ['Routine digest', state.routine?.sha256 ?? 'Unavailable'],
+        ['Input binding', inputBinding],
+        ['Inspection scope', 'These bindings identify the displayed state. This view does not verify replay or send them to Companion.'],
         ['Population', recording ? `${recording.population.size} of ${recording.population.capacity} places this district can hold. ${recording.population.reason}` : `${state.inhabitants.length} inhabitants`],
         ['Permitted use', 'Inspect simulation state; not historical evidence'],
         ['Shared position', `${runtime?.coincidentInhabitants(inhabitant.id).length ?? 1} inhabitants at this position`],
@@ -542,10 +584,15 @@ export function mountEnvironmentSelection(
   function reportSelection(feature: NYCLocalFeature, reveal = true): void {
     if (reveal) workspace.inspect();
     selectedInhabitant = null;
+    if (representationAvailability(feature.providerFeatureId) === 'unavailable') {
+      representation.refresh();
+      return;
+    }
     if (chosen?.id !== feature.id) {
       invalidateProposal('The selection changed. Request a fresh proposal.');
     }
     chosen = feature;
+    setRepresentationHighlight(feature.providerFeatureId);
     if (catalog !== null) {
       deps.onSelect?.({ admissionId: catalog.admissionId, featureId: feature.id });
     }
@@ -583,12 +630,78 @@ export function mountEnvironmentSelection(
     modify.disabled = remove.disabled;
   }
 
+  function setRepresentationHighlight(
+    subjectId: string | null,
+  ): 'selected' | 'unregistered' | 'unavailable' {
+    const binding = deps.state.atlas?.binding;
+    if (binding?.setRepresentationSelection === undefined) return 'unregistered';
+    if (subjectId !== null) {
+      const availability = representationAvailability(subjectId);
+      if (availability !== 'available') return availability;
+    }
+    if (binding.representationReport.selection !== subjectId) {
+      binding.setRepresentationSelection(subjectId);
+    }
+    representation.refresh();
+    return 'selected';
+  }
+
+  function representationAvailability(
+    subjectId: string,
+  ): 'available' | 'unregistered' | 'unavailable' {
+    const binding = deps.state.atlas?.binding;
+    if (binding?.setRepresentationSelection === undefined) return 'unregistered';
+    const registered = binding.representationReport.subjects.find(
+      entry => entry.subject.subjectId === subjectId,
+    );
+    if (registered === undefined) return 'unregistered';
+    return registered.subject.availability === 'available' ? 'available' : 'unavailable';
+  }
+
+  function reflectRepresentationSelection(
+    subjectId: string | null,
+    selectionReason: 'explicit' | 'unavailable' | 'unregistered',
+  ): void {
+    const feature = subjectId === null ? undefined : admittedFeaturesByProvider.get(subjectId);
+    if (feature !== undefined) {
+      if (chosen?.id !== feature.id) reportSelection(feature);
+      else representation.refresh();
+      return;
+    }
+    const authorityCleared = subjectId === null && selectionReason !== 'explicit';
+    if (chosen !== null) invalidateProposal(subjectId === null
+      ? authorityCleared
+        ? 'The selected source building is no longer available.'
+        : 'The source-building selection was cleared.'
+      : 'The data-view selection is not an admitted source building.');
+    chosen = null;
+    deps.onSelect?.(null);
+    place.disabled = true;
+    modify.disabled = true;
+    remove.disabled = true;
+    inspector.clear();
+    selected.textContent = subjectId === null
+      ? authorityCleared
+        ? 'Selected source-backed building is unavailable.'
+        : 'No source-backed building is selected.'
+      : 'Another data-view subject is selected; no admitted building context.';
+    reason.textContent = subjectId === null
+      ? authorityCleared
+        ? 'Its overlay and semantic context were cleared when its current authority changed.'
+        : 'Select an available source building to inspect or reuse it.'
+      : 'This subject keeps the context of the surface that owns it and does not become city context.';
+    representation.refresh();
+  }
+
   function reflectVersion(): void {
     const undone = new Set(current?.edits
       .map((edit) => edit.undoneEditId)
       .filter((id): id is string => id !== null) ?? []);
     editDetails.hidden = current === null;
     authoringAvailability.hidden = current !== null;
+    if (current === null && authoredWorldFailure !== null) {
+      authoringAvailability.textContent = `Editing this saved world is unavailable. ${authoredWorldFailure}`;
+    }
     undo.disabled = current === null || !current.edits.some((edit) =>
       edit.kind !== 'undo' && !undone.has(edit.editId));
     if (chosen !== null) reportSelection(chosen, false);
@@ -883,26 +996,50 @@ export function mountEnvironmentSelection(
     }
   }
 
-  function clearDistrict(): void {
+  function clearDistrict(notifyObjects = false): void {
     const hadFrame = districtView !== null;
     districtView = null;
     if (hadFrame) deps.state.atlas?.binding.setDistrictObjectFrame(null);
-    if (hadFrame && phase !== 'disposed') deps.onDistrictPlacementChange?.();
+    if ((hadFrame || notifyObjects) && phase !== 'disposed') deps.onDistrictPlacementChange?.();
   }
 
   async function refreshDistrict(): Promise<boolean> {
     const atlas = deps.state.atlas?.binding;
     if (phase === 'disposed' || deps.env.preview || !current || !catalog || !atlas?.ownedDistrict) return false;
     const epoch = ++districtEpoch;
-    const version = current;
     advanceSociety.disabled = true;
     refreshSociety.disabled = true;
     try {
+      const requested = current;
+      const admittedBefore = (await worldClient.connect(requested.versionId)).version;
+      if ((phase as string) === 'disposed' || epoch !== districtEpoch
+        || current?.versionId !== requested.versionId
+        || current.stateSha256 !== requested.stateSha256
+        || current.editSeq !== requested.editSeq) return false;
+      if (admittedBefore === null) throw new Error('The saved authored version is unavailable.');
+      current = admittedBefore;
+      authoredWorldFailure = null;
+      const version = admittedBefore;
       const result = await districtClient.read({
         worldId: version.worldId, versionId: version.versionId, sourceSnapshotId: version.sourceSnapshotId,
         placeId: catalog.placeId, renderedBase: atlas.ownedDistrict.district,
       });
-      if ((phase as string) === 'disposed' || epoch !== districtEpoch || current?.versionId !== version.versionId) return false;
+      if ((phase as string) === 'disposed' || epoch !== districtEpoch
+        || current?.versionId !== version.versionId
+        || current.stateSha256 !== version.stateSha256
+        || current.editSeq !== version.editSeq) return false;
+      const admittedAfter = (await worldClient.connect(version.versionId)).version;
+      if ((phase as string) === 'disposed' || epoch !== districtEpoch
+        || current?.versionId !== version.versionId
+        || current.stateSha256 !== version.stateSha256
+        || current.editSeq !== version.editSeq) return false;
+      if (admittedAfter === null) throw new Error('The saved authored version is unavailable.');
+      const cursorUnchanged = admittedAfter.versionId === version.versionId
+        && admittedAfter.stateSha256 === version.stateSha256
+        && admittedAfter.editSeq === version.editSeq;
+      current = admittedAfter;
+      authoredWorldFailure = null;
+      if (!cursorUnchanged) return false;
       const changed = !districtView || JSON.stringify(result.placement) !== JSON.stringify(districtView.placement)
         || result.baseArtifactSha256 !== districtView.baseArtifactSha256 || result.interpretationArtifactSha256 !== districtView.interpretationArtifactSha256;
       districtView = result;
@@ -914,8 +1051,32 @@ export function mountEnvironmentSelection(
       return true;
     } catch (error) {
       if ((phase as string) === 'disposed' || epoch !== districtEpoch) return false;
-      clearDistrict();
-      districtFailure = `Authorized district placement unavailable. ${error instanceof Error ? error.message : 'The request failed.'}`;
+      let authorityError: unknown = error;
+      let needsReconciliation = error instanceof WorldObjectsContractError
+        && error.code === 'saved_entry_reconciliation_required';
+      if (!needsReconciliation && current !== null) {
+        const held = current;
+        try {
+          await worldClient.connect(held.versionId);
+        } catch (validationError) {
+          if (validationError instanceof WorldObjectsContractError
+            && validationError.code === 'saved_entry_reconciliation_required') {
+            authorityError = validationError;
+            needsReconciliation = true;
+          }
+        }
+        if ((phase as string) === 'disposed' || epoch !== districtEpoch
+          || current?.versionId !== held.versionId
+          || current.stateSha256 !== held.stateSha256
+          || current.editSeq !== held.editSeq) return false;
+      }
+      if (needsReconciliation) {
+        current = null;
+        authoredWorldFailure = objectWriteFailure(authorityError);
+        reflectVersion();
+      }
+      clearDistrict(needsReconciliation);
+      districtFailure = `Authorized district placement unavailable. ${authorityError instanceof Error ? authorityError.message : 'The request failed.'}`;
       atlas.ownedDistrict.clearSociety();
       renderedSnapshot = null;
       return false;
@@ -982,10 +1143,12 @@ export function mountEnvironmentSelection(
       catalog = await environmentClient.catalog(admissionId);
       try {
         current = (await worldClient.connect()).version;
-      } catch {
+        authoredWorldFailure = null;
+      } catch (error) {
         // Semantic city reading remains available in the read-only development preview and
         // whenever authored-world state is temporarily unavailable.
         current = null;
+        authoredWorldFailure = objectWriteFailure(error);
       }
       if (phase === 'disposed') return;
       const features = localizeNYCFeatures(
@@ -993,6 +1156,15 @@ export function mountEnvironmentSelection(
         catalog.coordinateScale,
         NYC_REFERENCE_FRAME,
       );
+      admittedFeaturesByProvider = new Map(features.map(feature => [feature.providerFeatureId, feature]));
+      releaseRepresentationSelection?.();
+      releaseRepresentationSelection = atlas.observeRepresentationSelection?.(
+        reflectRepresentationSelection,
+      ) ?? null;
+      const initialRepresentationSelection = atlas.representationReport?.selection ?? null;
+      if (releaseRepresentationSelection !== null && initialRepresentationSelection !== null) {
+        reflectRepresentationSelection(initialRepresentationSelection, 'explicit');
+      }
       overlay = deps.createOverlay?.(features)
         ?? (atlas.ownedDistrict != null || atlas.generatedTile != null
           ? { pick: () => null, destroy: () => undefined }
@@ -1100,6 +1272,8 @@ export function mountEnvironmentSelection(
     dispose: () => {
       workspace.dispose();
       representation.dispose();
+      releaseRepresentationSelection?.();
+      releaseRepresentationSelection = null;
       if (phase === 'disposed') return;
       contextEpoch += 1;
       requestPending = false;
@@ -1134,6 +1308,7 @@ export function mountEnvironmentSelection(
       }
       overlay?.destroy();
       overlay = null;
+      admittedFeaturesByProvider.clear();
       deps.onSelect?.(null);
       root.remove();
     },

@@ -1,6 +1,10 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as pc from 'playcanvas';
-import { DEFAULT_REPRESENTATION_INTENT, type RepresentationSubject } from '@exulanica/atlas-core';
+import {
+  DEFAULT_REPRESENTATION_INTENT,
+  type OwnedDistrict,
+  type RepresentationSubject,
+} from '@exulanica/atlas-core';
 import { AtlasBinding } from '../../src/playcanvas/atlas-binding.js';
 import {
   RepresentationRuntime,
@@ -21,7 +25,7 @@ class OwnDraw implements RepresentationDraw {
   rendered: number[] = [];
   restores = 0;
   allocations: { weights: number[]; destroyed: number }[] = [];
-  constructor(readonly subject: RepresentationSubject) {}
+  constructor(public subject: RepresentationSubject) {}
   currentSubject(): RepresentationSubject { return this.subject; }
   parentVisible(): boolean { return true; }
   setRenderedWeight(weight: number): void { this.rendered.push(weight); }
@@ -43,6 +47,7 @@ function binding(): AtlasBinding {
     representationDefaults: new Map(),
     representationOverrides: new Map(),
     representationFrames: new Map(),
+    representationSelectionObservers: new Set(),
     ownedDistrict: null,
     onRepresentationChange: null,
     device: {},
@@ -52,6 +57,68 @@ function binding(): AtlasBinding {
 }
 
 describe('external representation subjects', () => {
+  it('notifies selection clearing when intent or refresh discovers changed availability', () => {
+    const atlas = binding();
+    const draw = new OwnDraw(record('dynamic'));
+    atlas.representation.register(draw);
+    atlas.representation.update();
+    const observed = vi.fn();
+    atlas.observeRepresentationSelection(observed);
+
+    atlas.setRepresentationSelection('dynamic');
+    observed.mockClear();
+    draw.subject = { ...draw.subject, availability: 'withdrawn' };
+    atlas.setRepresentationIntent({ ...DEFAULT_REPRESENTATION_INTENT, pointMix: 0.5 });
+    expect(observed).toHaveBeenLastCalledWith(null, 'unavailable');
+
+    draw.subject = record('dynamic');
+    atlas.representation.update();
+    atlas.setRepresentationSelection('dynamic');
+    observed.mockClear();
+    draw.subject = { ...draw.subject, availability: 'unavailable' };
+    Object.assign(atlas as unknown as Record<string, unknown>, {
+      motes: { setTheme: vi.fn() }, field: { setTheme: vi.fn() },
+      composedWorld: { setTheme: vi.fn() }, islands: [],
+    });
+    atlas.setTheme({} as never);
+    expect(observed).toHaveBeenLastCalledWith(null, 'unavailable');
+  });
+
+  it('registers each owned-district building as metadata and clears selection on withdrawal', () => {
+    const atlas = binding();
+    const root = new pc.GraphNode('owned-district');
+    const district = {
+      profile: 'exulanica.owned-district/v1', district_id: 'flatiron', name: 'Flatiron', seed: 1,
+      bounds_cm: [0, 0, 10_000, 10_000], materials: [], sidewalks: [],
+      frame: { name: 'flatiron-local-mm' },
+      source_records: [{ sha256: 'a'.repeat(64), operation_rights: { display: true } }],
+      buildings: [{ id: 'doitt_id:2327', name: 'Source building', bbox_cm: [100, 200, 500, 800],
+        height_cm: 1200, render_batch_id: 0 }],
+    } as unknown as OwnedDistrict;
+    Object.assign(atlas as unknown as Record<string, unknown>, {
+      ownedDistrict: { district, root },
+      invalidate: vi.fn(),
+    });
+    (atlas as unknown as { registerOwnedDistrictMetadata(sourceDisplayAllowed: boolean): void })
+      .registerOwnedDistrictMetadata(true);
+    let report = atlas.setRepresentationIntent({
+      ...DEFAULT_REPRESENTATION_INTENT, pointMix: 1, boxes: true, ids: true, labels: true,
+    });
+    expect(report).toMatchObject({
+      allocatedPoints: 0,
+      subjects: [{ subject: { subjectId: 'doitt_id:2327', points: null },
+        allocatedPoints: 0, plannedPoints: 0 }],
+    });
+    const observed = vi.fn();
+    atlas.observeRepresentationSelection(observed);
+    atlas.setRepresentationSelection('doitt_id:2327');
+    expect(observed).toHaveBeenLastCalledWith('doitt_id:2327', 'explicit');
+    report = atlas.setRepresentationSubjects([{ ...report.subjects[0]!.subject, availability: 'withdrawn' }]);
+    expect(report.selection).toBeNull();
+    expect(report.subjects[0]!.resolved.geometryVisible).toBe(false);
+    expect(observed).toHaveBeenLastCalledWith(null, 'unavailable');
+  });
+
   it('registers a caller\'s own draw under the same rules, and places its box through the node', () => {
     const atlas = binding();
     const node = new pc.GraphNode('tile');
@@ -108,5 +175,28 @@ describe('external representation subjects', () => {
     node.destroy();
     expect(draw.restores).toBe(1);
     expect(atlas.representationReport.subjects).toHaveLength(0);
+  });
+
+  it('rolls back default and frame bookkeeping when registry insertion throws', () => {
+    const atlas = binding();
+    const node = new pc.GraphNode('authored-object');
+    const draw = new OwnDraw(record('object:rollback', {
+      origin: 'authored',
+      bounds: {
+        frameId: 'tile:0:0:render-metres', units: 'metres', origin: 'authored',
+        basis: 'authored-bounds', min: [0, 0, 0], max: [1, 1, 1],
+      },
+    }));
+    const failed = vi.spyOn(atlas.representation, 'register')
+      .mockImplementationOnce(() => { throw new RangeError('full'); });
+    expect(() => atlas.registerRepresentationSubjects(node, [{ subject: draw.subject, draw }]))
+      .toThrow('full');
+    failed.mockRestore();
+    expect(() => atlas.setRepresentationSubjects([draw.subject]))
+      .toThrow('Unknown representation subject object:rollback');
+
+    const release = atlas.registerRepresentationSubjects(node, [{ subject: draw.subject, draw }]);
+    expect(atlas.representationReport.subjects[0]!.subject.subjectId).toBe('object:rollback');
+    release();
   });
 });

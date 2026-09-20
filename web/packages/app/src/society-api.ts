@@ -20,8 +20,26 @@ const record = (value: unknown): Readonly<Record<string, unknown>> => {
 
 const textValue = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
 const integer = (value: unknown, minimum = 0): value is number => Number.isSafeInteger(value) && (value as number) >= minimum;
+const boundedInteger = (value: unknown, minimum: number, maximum: number): value is number =>
+  integer(value, minimum) && (value as number) <= maximum;
 const digest = (value: unknown): value is string => typeof value === 'string' && /^[0-9a-f]{64}$/.test(value);
 const point = (value: unknown): value is readonly [number, number] => Array.isArray(value) && value.length === 2 && value.every(Number.isSafeInteger);
+const MINUTES_PER_DAY = 1_440;
+const LIVING_TICK_SECONDS = 60;
+
+function routineBinding(value: unknown): NonNullable<OwnedSocietyState['routine']> {
+  const routine = record(value);
+  const versions = record(routine['catalog_versions']);
+  const entries = Object.entries(versions);
+  if (entries.length === 0 || !digest(routine['sha256']) || entries.some(([key, version]) =>
+    !/^[a-z][a-z0-9_-]*$/.test(key) || !integer(version, 1))) {
+    throw new Error('Invalid living society routine');
+  }
+  return Object.freeze({
+    catalog_versions: Object.freeze(Object.fromEntries(entries.sort(([left], [right]) => left.localeCompare(right))) as Record<string, number>),
+    sha256: routine['sha256'],
+  });
+}
 
 /**
  * A persisted v4 state in the shape the renderer and inspector read. Roles, indoor presence,
@@ -30,12 +48,21 @@ const point = (value: unknown): value is readonly [number, number] => Array.isAr
 function livingPresentation(row: Readonly<Record<string, unknown>>, state: Readonly<Record<string, unknown>>): OwnedSocietyState {
   const population = record(state['population']);
   const clock = record(state['clock']);
+  const routine = routineBinding(state['routine']);
   const inhabitants = state['inhabitants'];
   if (!integer(row['population_size'], 1) || !Array.isArray(inhabitants) || inhabitants.length !== row['population_size'] ||
-      population['size'] !== row['population_size'] || !integer(clock['minute_of_day']) ||
+      population['size'] !== row['population_size'] ||
+      state['tick_seconds'] !== LIVING_TICK_SECONDS ||
+      !boundedInteger(clock['start_minute_of_day'], 0, MINUTES_PER_DAY - 1) ||
+      !boundedInteger(clock['minute_of_day'], 0, MINUTES_PER_DAY - 1) || !integer(clock['day']) ||
       state['society_id'] !== row['society_id'] || state['branch_id'] !== row['version_id'] ||
       row['branch_id'] !== state['branch_id'] || !integer(state['input_seq'], 1) || row['input_seq'] !== state['input_seq'] ||
       !digest(state['input_sha256']) || row['input_sha256'] !== state['input_sha256']) throw new Error('Invalid living society state');
+  const absoluteMinute = (clock['start_minute_of_day'] as number) + (state['tick'] as number);
+  if (!Number.isSafeInteger(absoluteMinute) || clock['minute_of_day'] !== absoluteMinute % MINUTES_PER_DAY ||
+      clock['day'] !== Math.floor(absoluteMinute / MINUTES_PER_DAY)) {
+    throw new Error('Invalid living society clock');
+  }
   const ids = new Set<string>();
   const people = inhabitants.map((value) => {
     const person = record(value);
@@ -82,8 +109,12 @@ function livingPresentation(row: Readonly<Record<string, unknown>>, state: Reado
     branch_id: state['branch_id'] as string,
     input_seq: state['input_seq'] as number,
     input_sha256: state['input_sha256'] as string,
+    routine,
     tick: state['tick'] as number,
+    tick_seconds: state['tick_seconds'] as number,
+    start_minute_of_day: clock['start_minute_of_day'] as number,
     minute_of_day: clock['minute_of_day'] as number,
+    day: clock['day'] as number,
     inhabitants: people,
   };
 }

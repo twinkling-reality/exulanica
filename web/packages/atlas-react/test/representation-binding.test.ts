@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import * as pc from 'playcanvas';
 import {
   MAX_RETAINED_POINTS,
@@ -9,6 +9,7 @@ import {
   sampledMeshPositions,
   sampledMeshSurfacePositions,
   staticMeshRepresentation,
+  staticMeshRepresentationGroup,
 } from '../src/playcanvas/representation-binding.js';
 import { AtlasBinding } from '../src/playcanvas/atlas-binding.js';
 import { RepresentationRuntime } from '../src/playcanvas/representation-runtime.js';
@@ -137,6 +138,31 @@ describe('PlayCanvas representation binding', () => {
     } as unknown as pc.MeshInstance;
     const draw = staticMeshRepresentation({} as pc.GraphicsDevice, instance, () => subject)!;
     expect(draw.pointDemand!()).toBeCloseTo(10 * DATA_VIEW_STYLE.points.densityPerSquareMetre);
+  });
+
+  it('keeps one object-wide point allowance and rolls back a partial group allocation', () => {
+    const destroyed = vi.fn();
+    const first = {
+      currentSubject: () => subject, parentVisible: () => true,
+      setRenderedWeight: vi.fn(), pointDemand: () => 3,
+      createPoints: vi.fn(() => ({
+        pointCount: 3, byteLength: 120, setWeight: vi.fn(), destroy: destroyed,
+      })),
+      restore: vi.fn(),
+    };
+    const second = {
+      currentSubject: () => subject, parentVisible: () => true,
+      setRenderedWeight: vi.fn(), pointDemand: () => 1,
+      createPoints: vi.fn(() => null), restore: vi.fn(),
+    };
+    const group = staticMeshRepresentationGroup(
+      [first, second], () => subject, () => true,
+    )!;
+    expect(group.pointDemand!()).toBe(4);
+    expect(group.createPoints(4)).toBeNull();
+    expect(first.createPoints).toHaveBeenCalledWith(3);
+    expect(second.createPoints).toHaveBeenCalledWith(1);
+    expect(destroyed).toHaveBeenCalledTimes(1);
   });
 
   it('refuses skinned, morphing, non-standard and oversized draws', () => {

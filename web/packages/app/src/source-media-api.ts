@@ -46,14 +46,17 @@ interface SourceMediaWire {
 
 export class SourceMediaClient {
   readonly #transport: Transport;
+  readonly #worldId: string | undefined;
   readonly #createObjectUrl: (blob: Blob) => string;
   readonly #revokeObjectUrl: (url: string) => void;
 
   constructor(options: TransportOptions & {
+    readonly worldId?: string;
     readonly createObjectURL?: (blob: Blob) => string;
     readonly revokeObjectURL?: (url: string) => void;
   }) {
     this.#transport = new Transport(options);
+    this.#worldId = options.worldId;
     this.#createObjectUrl = options.createObjectURL ?? URL.createObjectURL.bind(URL);
     this.#revokeObjectUrl = options.revokeObjectURL ?? URL.revokeObjectURL.bind(URL);
   }
@@ -62,7 +65,10 @@ export class SourceMediaClient {
     const inventory = parseInventory(await this.#transport.getJson<unknown>('/graph/sources'));
     let topology: readonly SourceMediaWire[];
     try {
-      topology = parseSourceList(await this.#transport.getJson<unknown>('/world/source-media'));
+      topology = parseSourceList(await this.#transport.getJson<unknown>(
+        '/world/source-media',
+        this.#worldId === undefined ? undefined : { world_id: this.#worldId },
+      ));
     } catch (error) {
       if (!(error instanceof ApiError) || error.code !== 'world_not_configured') throw error;
       topology = [];

@@ -45,6 +45,7 @@ import type { SourceMediaSession } from '../source-media-api.js';
 import type { CompanionStage } from '../ui/companion-stage.js';
 import type { ReconstructionRungDisclosure } from '../ui/status.js';
 import type { WorldStyleClient, WorldStyleConnection } from '../world-style-api.js';
+import type { SavedWorldEntry, WorldEntryClient } from '../world-entry-api.js';
 import type { Credentials } from '../config.js';
 
 /** What the document and the URL settled before a session existed. Never written by a mount. */
@@ -79,6 +80,7 @@ export interface SessionState {
   characterGestures: boolean;
   disposeCharacter: (() => void) | null;
   disposeObjects: (() => void) | null;
+  disposeSocietyExperiment: (() => void) | null;
   personalIntake: PersonalIntakeSession;
   credentials: Credentials | null;
   session: Session | null;
@@ -153,6 +155,9 @@ export interface SessionState {
   interactionPolicies: InteractionPolicyClient | null;
   sourceMediaSession: SourceMediaSession | null;
   previewSourceMedia: SourceMediaCatalog | undefined;
+  worldEntries: WorldEntryClient | null;
+  savedWorldEntries: readonly SavedWorldEntry[];
+  activeWorldEntry: SavedWorldEntry | null;
 
   // -- what the visitor has chosen ------------------------------------------------------------
   preferences: AtlasPreferences;
@@ -200,6 +205,7 @@ export function createSessionState(): SessionState {
     characterGestures: true,
     disposeCharacter: null,
     disposeObjects: null,
+    disposeSocietyExperiment: null,
     personalIntake: createPersonalIntakeSession(),
     credentials: null,
     session: null,
@@ -240,6 +246,9 @@ export function createSessionState(): SessionState {
     interactionPolicies: null,
     sourceMediaSession: null,
     previewSourceMedia: undefined,
+    worldEntries: null,
+    savedWorldEntries: Object.freeze([]),
+    activeWorldEntry: null,
 
     preferences: readPreferences(window.localStorage),
     indexFacets: decodeFacets(window.location.search),

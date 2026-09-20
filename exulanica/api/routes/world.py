@@ -12,7 +12,7 @@ import uuid
 from collections.abc import Callable
 from typing import Annotated, Final, Literal, TypeAlias
 
-from fastapi import APIRouter, Depends, Path, Request, Response
+from fastapi import APIRouter, Depends, Path, Query, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import (
     AliasChoices,
@@ -37,6 +37,7 @@ from exulanica.api.services import Services
 from exulanica.evidence.blob import BlobId
 from exulanica.store.base import ContentAddressedStore
 from exulanica.world import (
+    DEFAULT_WORLD_ID,
     GLB_MEDIA_TYPE,
     MAX_SCALE_MILLI,
     MAX_YAW_MICRORADIANS,
@@ -59,8 +60,10 @@ from exulanica.world import (
     ProposalOrigin,
     ProposalProvenance,
     ReviewedAssetRow,
+    SavedWorldEntryRepository,
     SourceAnchor,
     StaleObjectBase,
+    StaleSavedWorldEntry,
     StaleStructuralBase,
     StyleProposal,
     StyleProposalRecord,
@@ -173,6 +176,19 @@ class PreviewBody(BaseModel):
     ] = None
 
 
+class SavedEntryAdvanceBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    entry_id: uuid.UUID
+    base_revision: int = Field(ge=1)
+    authored_state_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    authored_edit_seq: int = Field(ge=0)
+
+
+class SavedEntryStyleAdvanceBody(SavedEntryAdvanceBody):
+    style_version_id: uuid.UUID
+
+
 class ApplyBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -188,6 +204,10 @@ class ApplyBody(BaseModel):
             validation_alias=AliasChoices("base_topology_digest", "baseTopologyDigest"),
         ),
     ]
+    saved_entry: Annotated[
+        SavedEntryStyleAdvanceBody | None,
+        Field(validation_alias=AliasChoices("saved_entry", "savedEntry")),
+    ] = None
 
 
 class RollbackBody(ApplyBody):
@@ -321,13 +341,19 @@ class SourceMediaView(BaseModel):
 
 
 def read_repository(
-    connection: ReadOnlyConnection, session: CurrentSession
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+    world_id: Annotated[str, Query(min_length=1, max_length=200)] = DEFAULT_WORLD_ID,
 ) -> WorldStyleRepository:
-    return WorldStyleRepository(connection, session.workspace_id)
+    return WorldStyleRepository(connection, session.workspace_id, world_id=world_id)
 
 
-def write_repository(connection: ScopedConnection, session: CurrentSession) -> WorldStyleRepository:
-    return WorldStyleRepository(connection, session.workspace_id)
+def write_repository(
+    connection: ScopedConnection,
+    session: CurrentSession,
+    world_id: Annotated[str, Query(min_length=1, max_length=200)] = DEFAULT_WORLD_ID,
+) -> WorldStyleRepository:
+    return WorldStyleRepository(connection, session.workspace_id, world_id=world_id)
 
 
 ReadWorld = Annotated[WorldStyleRepository, Depends(read_repository)]
@@ -407,14 +433,18 @@ def apply(
     body: ApplyBody,
     repository: WriteWorld,
     session: CurrentSession,
-) -> StyleVersionView:
-    return _version_view(
-        repository.apply(
+) -> StyleVersionView | JSONResponse:
+    return _commit_style(
+        repository,
+        body.saved_entry,
+        lambda before, after: repository.apply(
             preview_id,
             base_style_version_id=body.base_style_version_id,
             base_topology_digest=body.base_topology_digest,
             applied_by=session.actor,
-        )
+            before_write=before,
+            after_write=after,
+        ),
     )
 
 
@@ -439,15 +469,61 @@ def discard(
 )
 def rollback(
     body: RollbackBody, repository: WriteWorld, session: CurrentSession
-) -> StyleVersionView:
-    return _version_view(
-        repository.rollback(
+) -> StyleVersionView | JSONResponse:
+    return _commit_style(
+        repository,
+        body.saved_entry,
+        lambda before, after: repository.rollback(
             body.target_version_id,
             base_style_version_id=body.base_style_version_id,
             base_topology_digest=body.base_topology_digest,
             provenance=ProposalProvenance(body.origin, session.actor, body.origin_reference),
-        )
+            before_write=before,
+            after_write=after,
+        ),
     )
+
+
+def _commit_style(
+    repository: WorldStyleRepository,
+    saved_entry: SavedEntryStyleAdvanceBody | None,
+    operation: Callable[
+        [Callable[[], None] | None, Callable[[StyleVersion], None] | None], StyleVersion
+    ],
+) -> StyleVersionView | JSONResponse:
+    """Commit a style and its saved resume pointer together when an entry is bound."""
+
+    entries = SavedWorldEntryRepository(repository.connection, repository.workspace_id)
+    before: Callable[[], None] | None = None
+    after: Callable[[StyleVersion], None] | None = None
+    if saved_entry is not None:
+
+        def before() -> None:
+            entries.lock_style_advance_base(
+                saved_entry.entry_id,
+                base_revision=saved_entry.base_revision,
+                world_id=repository.world_id,
+                authored_state_sha256=saved_entry.authored_state_sha256,
+                authored_edit_seq=saved_entry.authored_edit_seq,
+                style_version_id=saved_entry.style_version_id,
+            )
+
+        def after(version: StyleVersion) -> None:
+            entries.advance_style_locked(
+                saved_entry.entry_id,
+                base_revision=saved_entry.base_revision,
+                world_id=repository.world_id,
+                style_version_id=version.version_id,
+            )
+
+    try:
+        version = operation(before, after)
+    except StaleSavedWorldEntry as exc:
+        return JSONResponse(
+            status_code=409,
+            content={"code": "stale_saved_world_entry", "detail": str(exc)},
+        )
+    return _version_view(version)
 
 
 @router.get(
@@ -649,10 +725,14 @@ class CreateVersionBody(BaseModel):
     style_version_id: uuid.UUID | None = None
 
 
-class AddObjectBody(BaseModel):
+class EntryBoundEditBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    base_state_sha256: str = Field(min_length=64, max_length=64)
+    base_state_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    saved_entry: SavedEntryAdvanceBody | None = None
+
+
+class AddObjectBody(EntryBoundEditBody):
     object_id: str = Field(min_length=1, max_length=200)
     #: By content digest, not by reviewed name. A key is a pointer that could be repointed; the
     #: digest is the bytes, and it is what the version's state digest covers.
@@ -697,10 +777,7 @@ class EnvironmentSelectionBody(BaseModel):
         return EnvironmentSelection(self.kind, self.feature_id, self.render_batch_id)
 
 
-class AddEnvironmentBody(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    base_state_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+class AddEnvironmentBody(EntryBoundEditBody):
     instance_id: str = Field(min_length=1, max_length=200)
     admission_id: uuid.UUID
     render_asset_id: uuid.UUID
@@ -712,17 +789,12 @@ class AddEnvironmentBody(BaseModel):
     origin_role: Literal["fictional", "personal"]
 
 
-class MoveObjectBody(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    base_state_sha256: str = Field(min_length=64, max_length=64)
+class MoveObjectBody(EntryBoundEditBody):
     transform: TransformBody
 
 
-class BaseStateBody(BaseModel):
-    model_config = ConfigDict(extra="forbid")
-
-    base_state_sha256: str = Field(min_length=64, max_length=64)
+class BaseStateBody(EntryBoundEditBody):
+    pass
 
 
 class ReviewedAssetView(BaseModel):
@@ -828,8 +900,11 @@ def object_read_repository(
     connection: ReadOnlyConnection,
     session: CurrentSession,
     services: Annotated[Services, Depends(get_services)],
+    world_id: Annotated[str, Query(min_length=1, max_length=200)] = DEFAULT_WORLD_ID,
 ) -> WorldObjectRepository:
-    return WorldObjectRepository(connection, session.workspace_id, store=services.store)
+    return WorldObjectRepository(
+        connection, session.workspace_id, world_id=world_id, store=services.store
+    )
 
 
 def object_write_repository(
@@ -837,11 +912,13 @@ def object_write_repository(
     session: CurrentSession,
     services: Annotated[Services, Depends(get_services)],
     request: Request,
+    world_id: Annotated[str, Query(min_length=1, max_length=200)] = DEFAULT_WORLD_ID,
 ) -> WorldObjectRepository:
     observer = getattr(request.app.state, "society_authored_edit", None)
     return WorldObjectRepository(
         connection,
         session.workspace_id,
+        world_id=world_id,
         store=services.store,
         on_edit=(
             None
@@ -867,6 +944,7 @@ _OBJECT_PROBLEMS: Final[tuple[tuple[type[Exception], int, str], ...]] = (
     (InvalidStructuralData, 422, "invalid_structural_data"),
     (StaleStructuralBase, 409, "stale_structural_base"),
     (StaleObjectBase, 409, "stale_object_base"),
+    (StaleSavedWorldEntry, 409, "stale_saved_world_entry"),
     (InvalidObjectState, 409, "invalid_object_state"),
     (InvalidatedSourceVersion, 409, "invalidated_source_version"),
 )
@@ -1129,6 +1207,7 @@ def bootstrap_alternate_version(
     body: BootstrapWorldBody,
     connection: ScopedConnection,
     session: CurrentSession,
+    world_id: Annotated[str, Query(min_length=1, max_length=200)] = DEFAULT_WORLD_ID,
 ) -> Response | BootstrapWorldView:
     try:
         return BootstrapWorldView(
@@ -1136,6 +1215,7 @@ def bootstrap_alternate_version(
                 connection,
                 workspace_id=session.workspace_id,
                 actor=session.actor,
+                world_id=world_id,
                 base_topology_digest=body.base_topology_digest,
                 title=body.title,
             )
@@ -1193,6 +1273,9 @@ def add_environment_instance(
             base_state_sha256=body.base_state_sha256,
             actor=session.actor,
         ),
+        saved_entry=body.saved_entry,
+        authored_version_id=version_id,
+        mutation_base_state_sha256=body.base_state_sha256,
     )
 
 
@@ -1219,6 +1302,9 @@ def move_environment_instance(
             base_state_sha256=body.base_state_sha256,
             actor=session.actor,
         ),
+        saved_entry=body.saved_entry,
+        authored_version_id=version_id,
+        mutation_base_state_sha256=body.base_state_sha256,
     )
 
 
@@ -1244,6 +1330,9 @@ def remove_environment_instance(
             base_state_sha256=body.base_state_sha256,
             actor=session.actor,
         ),
+        saved_entry=body.saved_entry,
+        authored_version_id=version_id,
+        mutation_base_state_sha256=body.base_state_sha256,
     )
 
 
@@ -1265,6 +1354,9 @@ def undo_environment_edit(
         lambda: repository.undo(
             version_id, base_state_sha256=body.base_state_sha256, actor=session.actor
         ),
+        saved_entry=body.saved_entry,
+        authored_version_id=version_id,
+        mutation_base_state_sha256=body.base_state_sha256,
     )
 
 
@@ -1295,6 +1387,9 @@ def add_authored_object(
         lambda: repository.add_object(
             version_id, obj, base_state_sha256=body.base_state_sha256, actor=session.actor
         ),
+        saved_entry=body.saved_entry,
+        authored_version_id=version_id,
+        mutation_base_state_sha256=body.base_state_sha256,
     )
 
 
@@ -1321,6 +1416,9 @@ def move_authored_object(
             base_state_sha256=body.base_state_sha256,
             actor=session.actor,
         ),
+        saved_entry=body.saved_entry,
+        authored_version_id=version_id,
+        mutation_base_state_sha256=body.base_state_sha256,
     )
 
 
@@ -1343,6 +1441,9 @@ def remove_authored_object(
         lambda: repository.remove_object(
             version_id, object_id, base_state_sha256=body.base_state_sha256, actor=session.actor
         ),
+        saved_entry=body.saved_entry,
+        authored_version_id=version_id,
+        mutation_base_state_sha256=body.base_state_sha256,
     )
 
 
@@ -1364,6 +1465,9 @@ def undo_authored_edit(
         lambda: repository.undo(
             version_id, base_state_sha256=body.base_state_sha256, actor=session.actor
         ),
+        saved_entry=body.saved_entry,
+        authored_version_id=version_id,
+        mutation_base_state_sha256=body.base_state_sha256,
     )
 
 
@@ -1371,6 +1475,10 @@ def _edit(
     request: Request,
     repository: WorldObjectRepository,
     operation: Callable[[], AlternateVersion],
+    *,
+    saved_entry: SavedEntryAdvanceBody | None = None,
+    authored_version_id: uuid.UUID,
+    mutation_base_state_sha256: str,
 ) -> Response | AlternateVersionView:
     """Run one mutation and answer with the whole version, or with this surface's problem shape.
 
@@ -1379,7 +1487,28 @@ def _edit(
     for another writer to move the base first.
     """
     try:
-        version = operation()
+        with repository.connection.transaction():
+            entries = SavedWorldEntryRepository(repository.connection, repository.workspace_id)
+            if saved_entry is not None:
+                entries.lock_authored_advance_base(
+                    saved_entry.entry_id,
+                    base_revision=saved_entry.base_revision,
+                    world_id=repository.world_id,
+                    authored_version_id=authored_version_id,
+                    authored_state_sha256=saved_entry.authored_state_sha256,
+                    authored_edit_seq=saved_entry.authored_edit_seq,
+                    mutation_base_state_sha256=mutation_base_state_sha256,
+                )
+            version = operation()
+            if saved_entry is not None:
+                entries.advance_authored_locked(
+                    saved_entry.entry_id,
+                    base_revision=saved_entry.base_revision,
+                    world_id=repository.world_id,
+                    authored_version_id=version.version_id,
+                    result_state_sha256=version.state_sha256,
+                    result_edit_seq=version.edit_seq,
+                )
     except Exception as exc:
         problem = _object_problem(exc)
         if problem is None:
