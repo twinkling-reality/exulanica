@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { WorldEntryClient, automaticWorldEntry } from '../src/world-entry-api.js';
+import {
+  WorldEntryClient,
+  automaticWorldEntry,
+  requireMetadataOnlyEntryUpdate,
+} from '../src/world-entry-api.js';
 
 const wire = (overrides: Record<string, unknown> = {}) => ({
   entry_id: '11111111-1111-4111-8111-111111111111',
@@ -18,13 +22,49 @@ const wire = (overrides: Record<string, unknown> = {}) => ({
   revision: 1,
   availability: 'available',
   unavailable_reason: null,
+  source_attachments: [],
   created_by: '44444444-4444-4444-8444-444444444444',
   created_at: '2026-09-19T12:00:00Z',
   updated_at: '2026-09-19T12:00:00Z',
   ...overrides,
 });
 
+const attachmentWire = (overrides: Record<string, unknown> = {}) => ({
+  attachment_id: '66666666-6666-4666-8666-666666666666',
+  operation_id: '77777777-7777-4777-8777-777777777777',
+  capture_id: '88888888-8888-4888-8888-888888888888',
+  evidence_span_id: '99999999-9999-4999-8999-999999999999',
+  source_sha256: 'd'.repeat(64),
+  authorization_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+  screening_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+  role: 'reference',
+  attached_entry_revision: 2,
+  attached_by: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+  attached_at: '2026-09-20T12:00:00Z',
+  availability: 'available',
+  unavailable_reason: null,
+  viewer_sha256: 'e'.repeat(64),
+  evidence_path: '/evidence/99999999-9999-4999-8999-999999999999/masked',
+  ...overrides,
+});
+
 describe('saved world entry client', () => {
+  it('accepts reference metadata refreshes but refuses older or changed scene cursors', () => {
+    const active = parseFixture();
+    const metadata = {
+      ...active, title: 'Renamed elsewhere', revision: 2,
+      sourceAttachments: active.sourceAttachments,
+    };
+    expect(requireMetadataOnlyEntryUpdate(active, metadata)).toBe(metadata);
+    expect(() => requireMetadataOnlyEntryUpdate(active, {
+      ...active, revision: 2, authoredStateSha256: 'f'.repeat(64),
+    })).toThrow('changed beyond its reference metadata');
+    expect(() => requireMetadataOnlyEntryUpdate({ ...active, revision: 3 }, {
+      ...active, revision: 2,
+    })).toThrow('older saved world response');
+    expect(active.authoredStateSha256).toBe('a'.repeat(64));
+  });
+
   it('automatically resumes only one available returning-user entry', async () => {
     const fetch = vi.fn(async () => Response.json([wire()]));
     const entries = await new WorldEntryClient({
@@ -174,6 +214,75 @@ describe('saved world entry client', () => {
     });
   });
 
+  it('attaches selected reviewed references through the complete entry cursor', async () => {
+    let submitted: Record<string, unknown> | null = null;
+    const attachment = attachmentWire();
+    const fetch = vi.fn(async (input: string | URL | Request, init: RequestInit = {}) => {
+      expect(new URL(String(input)).pathname).toBe(
+        '/world-entries/11111111-1111-4111-8111-111111111111/source-attachments',
+      );
+      submitted = JSON.parse(String(init.body)) as Record<string, unknown>;
+      return Response.json(wire({ revision: 2, source_attachments: [attachment] }));
+    });
+    const base = parseFixture();
+    const updated = await new WorldEntryClient({
+      baseUrl: 'https://exulanica.test', token: 'private', fetch,
+    }).attachSources({
+      entryId: base.entryId,
+      operationId: attachment.operation_id,
+      baseRevision: base.revision,
+      authoredVersionId: base.authoredVersionId,
+      authoredStateSha256: base.authoredStateSha256,
+      authoredEditSeq: base.authoredEditSeq,
+      styleVersionId: base.styleVersionId,
+      sources: [{
+        captureId: attachment.capture_id,
+        evidenceSpanId: attachment.evidence_span_id,
+      }],
+    });
+    expect(submitted).toEqual({
+      operation_id: attachment.operation_id,
+      base_revision: base.revision,
+      authored_version_id: base.authoredVersionId,
+      authored_state_sha256: base.authoredStateSha256,
+      authored_edit_seq: base.authoredEditSeq,
+      style_version_id: base.styleVersionId,
+      sources: [{
+        capture_id: attachment.capture_id,
+        evidence_span_id: attachment.evidence_span_id,
+      }],
+    });
+    expect(updated).toMatchObject({
+      revision: 2,
+      sourceAttachments: [{
+        attachmentId: attachment.attachment_id,
+        sourceSha256: attachment.source_sha256,
+        viewerSha256: attachment.viewer_sha256,
+        availability: 'available',
+      }],
+    });
+  });
+
+  it('keeps the entry available when one attached reference becomes unavailable', async () => {
+    const fetch = vi.fn(async () => Response.json([wire({
+      source_attachments: [attachmentWire({
+        availability: 'unavailable',
+        unavailable_reason: 'authorization_expired',
+        viewer_sha256: null,
+        evidence_path: null,
+      })],
+    })]));
+    const entry = (await new WorldEntryClient({
+      baseUrl: 'https://exulanica.test', token: 'private', fetch,
+    }).entries())[0]!;
+    expect(entry.availability).toBe('available');
+    expect(entry.sourceAttachments[0]).toMatchObject({
+      availability: 'unavailable', unavailableReason: 'authorization_expired',
+      viewerSha256: null, evidencePath: null,
+    });
+    expect(automaticWorldEntry([entry])).toBe(entry);
+  });
+
   it('refuses a second tab that saves from the revision both tabs originally opened', async () => {
     let revision = 1;
     const fetch = vi.fn(async (_input: string | URL | Request, init: RequestInit = {}) => {
@@ -262,6 +371,7 @@ function parseFixture() {
     revision: 1,
     availability: 'available' as const,
     unavailableReason: null,
+    sourceAttachments: [],
     createdAt: '2026-09-19T12:00:00Z',
     updatedAt: '2026-09-19T12:00:00Z',
   };

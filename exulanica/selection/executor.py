@@ -346,7 +346,7 @@ select 'authored_environment_instance','authored','environment_instance',i.origi
     on p.workspace_id=i.workspace_id and p.publication_id=i.publication_id
   left join derived_environment_asset idx
     on idx.workspace_id=p.workspace_id and idx.asset_id=p.index_asset_id
- where i.workspace_id=%(workspace)s and not i.removed
+ where i.workspace_id=%(workspace)s and not i.removed and not i.addition_undone
    and s.withdrawn_at is null and render.withdrawn_at is null
    and s.place_id=i.source_place_id
    and s.source_sha256=i.source_sha256 and s.receipt_sha256=i.source_receipt_sha256

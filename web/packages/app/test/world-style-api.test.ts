@@ -163,9 +163,17 @@ describe('world style API boundary', () => {
     const bodies: Record<string, unknown>[] = [];
     const fetch = connectedFetch((url, init) => {
       urls.push(url);
-      if (url.pathname.endsWith('/world/styles/current')) return json(state('v2', 2, 0.9));
+      if (url.pathname.endsWith('/world/styles/current')) return json({
+        ...state('v2', 2, 0.9),
+        current_topology_digest: 'topology-live',
+        current: { ...version('v2', 2, 0.9), topology_digest: 'topology-live' },
+      });
       if (url.pathname.endsWith('/world/styles/versions')) {
-        return json([version('v0', 0), version('v1', 1, 0.4), version('v2', 2, 0.9)]);
+        return json([
+          version('v0', 0),
+          { ...version('v1', 1, 0.4), topology_digest: 'topology-saved' },
+          { ...version('v2', 2, 0.9), topology_digest: 'topology-live' },
+        ]);
       }
       if (url.pathname.endsWith('/world/styles/rollback') && init.method === 'POST') {
         bodies.push(JSON.parse(String(init.body)) as Record<string, unknown>);
@@ -179,6 +187,8 @@ describe('world style API boundary', () => {
     });
     const opened = await client.connect('v1');
     expect(opened.state.current.versionId).toBe('v1');
+    expect(opened.state.currentTopologyDigest).toBe('topology-saved');
+    expect(client.state()?.currentTopologyDigest).toBe('topology-live');
     expect(client.state()?.current.versionId).toBe('v2');
     await expect(client.previewSettings({
       profileId: 'origin-landscape', profileVersion: 1, parameters: { vitality: 0.5 },

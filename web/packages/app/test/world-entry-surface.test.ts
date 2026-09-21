@@ -22,6 +22,7 @@ const entry = (overrides: Partial<SavedWorldEntry> = {}): SavedWorldEntry => ({
   revision: 2,
   availability: 'available',
   unavailableReason: null,
+  sourceAttachments: [],
   createdAt: '2026-09-19T12:00:00Z',
   updatedAt: '2026-09-19T12:01:00Z',
   ...overrides,

@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { Turn, TurnOption } from '@exulanica/companion-runtime';
+import { AskUnavailable, type CompanionAnswer } from '../src/companion-ask-api.js';
 import { buildCompanionPanel } from '../src/ui/companion-panel.js';
 
 /**
@@ -225,6 +226,109 @@ describe('the exchange stays subordinate to the Companion presence', () => {
   });
 });
 
+describe('a source-independent starter turn', () => {
+  it('shows factual starter guidance, supported creation, and the real question path', () => {
+    let addedObjects = 0;
+    let addedPhotos = 0;
+    const said: string[] = [];
+    const panel = buildCompanionPanel({ ...NOOP, onSay: (text) => said.push(text) }, {
+      starterActions: {
+        onAddObject: () => (addedObjects += 1),
+        onAddPhotos: () => (addedPhotos += 1),
+      },
+    });
+    panel.setState('open');
+    panel.render(turn({
+      intent: 'acknowledge',
+      utteranceKey: 'utterance.acknowledge',
+      utterance: 'Noted.',
+      choiceSet: null,
+    }));
+
+    expect(panel.root.textContent).toContain('Start building');
+    expect(panel.root.textContent).toContain('Add an object to your world');
+    expect(panel.root.querySelector('.companion-speaker')).toBeNull();
+    expect(panel.root.textContent).not.toContain('Noted.');
+    expect(panel.root.textContent).not.toContain('Not sure');
+    expect(panel.root.textContent).not.toContain('Wrong question');
+    const actions = panel.root.querySelectorAll<HTMLButtonElement>(
+      '.companion-starter-actions button',
+    );
+    actions[0]?.click();
+    actions[1]?.click();
+    expect([addedObjects, addedPhotos]).toEqual([1, 1]);
+
+    const input = panel.root.querySelector<HTMLInputElement>('.companion-reply-input')!;
+    expect(input.placeholder).toBe('Ask about your sources');
+    input.value = 'What sources are available?';
+    input.closest('form')?.dispatchEvent(new Event('submit', {
+      bubbles: true, cancelable: true,
+    }));
+    expect(said).toEqual(['What sources are available?']);
+  });
+
+  it('shows a remembered answer before returning to starter guidance', () => {
+    const panel = buildCompanionPanel(NOOP, {
+      starterActions: { onAddObject: () => undefined, onAddPhotos: () => undefined },
+    });
+    panel.setState('open');
+    panel.render(turn({
+      intent: 'acknowledge', utterance: 'Noted.', choiceSet: null,
+    }));
+    const remembered: CompanionAnswer = {
+      question: 'What did I ask last time?',
+      clauses: [{ text: 'You asked about your available sources.', type: 'meta', citations: [] }],
+      text: 'You asked about your available sources.',
+      abstained: null,
+      deterministic: true,
+      repaired: false,
+      evidence: [],
+      provenance: {
+        composed: 'none', servedModel: null, plannedBy: null, latencyMs: 0,
+        usedFallback: false,
+      },
+      promptVersion: 'remembered-test',
+      calls: [],
+    };
+
+    panel.restoreAnswer(remembered);
+    expect(panel.root.textContent).toContain('You asked about your available sources.');
+    expect(panel.root.textContent).not.toContain('Start building');
+    panel.root.querySelector<HTMLButtonElement>('.companion-answer-back')?.click();
+    expect(panel.root.textContent).toContain('Start building');
+  });
+
+  it('keeps real failures visible and rebuilds one clean action set after dismissal', () => {
+    let addedObjects = 0;
+    const panel = buildCompanionPanel(NOOP, {
+      starterActions: {
+        onAddObject: () => (addedObjects += 1),
+        onAddPhotos: () => undefined,
+      },
+    });
+    const acknowledge = turn({
+      intent: 'acknowledge', utterance: 'Noted.', choiceSet: null,
+    });
+    panel.noteMemoryFailure('memory.notLoaded', 'The memory service did not respond.');
+    panel.setState('open');
+    panel.render(acknowledge);
+    expect(panel.root.textContent).toContain('The memory service did not respond.');
+
+    panel.askStarted('What sources are available?');
+    panel.reportAskFailure(new AskUnavailable('no_model', 'No model is configured.'));
+    expect(panel.root.textContent).toContain('No model is configured.');
+    expect(panel.root.querySelectorAll('.companion-starter-actions button')).toHaveLength(2);
+
+    panel.setState('summon');
+    panel.setState('open');
+    panel.render(acknowledge);
+    expect(panel.root.querySelectorAll('.companion-starter-actions button')).toHaveLength(2);
+    expect(panel.root.querySelectorAll('.companion-composer')).toHaveLength(1);
+    panel.root.querySelector<HTMLButtonElement>('.companion-starter-actions button')?.click();
+    expect(addedObjects).toBe(1);
+  });
+});
+
 describe('a multi select cannot commit by clicking', () => {
   it('requires an explicit submit', () => {
     const picked: string[][] = [];
@@ -275,19 +379,24 @@ describe('confirmation suspends duplicate answer controls', () => {
 });
 
 describe('nothing stands on screen until it is called', () => {
-  it('uses the existing prompt surface for first-use meaning and action', () => {
-    const panel = buildCompanionPanel(NOOP);
+  it('uses an explicit first-use action without relying on pointer lock', () => {
+    const onFirstUseAction = vi.fn();
+    const panel = buildCompanionPanel(NOOP, { onFirstUseAction });
     panel.setFirstUsePrompt({
       statement: 'Atlas arranges your memories as a world.',
-      actions: [{ label: 'Click to enter' }],
+      actions: [{ label: 'Start building', activate: 'summon-companion' }],
     });
     expect(panel.root.hasAttribute('data-first-use')).toBe(true);
     expect(panel.root.querySelector('.companion-prompt-statement')?.textContent).toContain(
       'memories as a world',
     );
     expect(panel.root.querySelector('.companion-prompt-actions')?.textContent).toContain(
-      'Click to enter',
+      'Start building',
     );
+    panel.root.querySelector<HTMLButtonElement>('.companion-prompt-button')?.click();
+    expect(onFirstUseAction).toHaveBeenCalledWith({
+      label: 'Start building', activate: 'summon-companion',
+    });
     expect(panel.root.querySelector('.companion-speech')).toBeNull();
   });
 

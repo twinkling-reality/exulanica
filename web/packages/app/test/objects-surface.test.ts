@@ -310,7 +310,7 @@ describe('authorized district placement', () => {
     button(h.mounted.confirm.root, 'Confirm').click();
     await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['place']));
     const request = h.authority.calls.find(call => call.name === 'place')!.args[1] as {transform: unknown};
-    expect(request.transform).toMatchObject({xMm: -10000, yMm: -3000, zMm: 4500});
+    expect(request.transform).toMatchObject({xMm: -10000, yMm: -3000, zMm: 3500});
   });
 
   it('refuses an unavailable binding, a different version and a target beyond the district', async () => {
@@ -397,7 +397,7 @@ describe('nothing reaches the authority without a confirmation', () => {
     const pose = request['transform'] as Record<string, number>;
     expect(pose['xMm']).toBe(0);
     expect(pose['yMm']).toBe(0);
-    expect(pose['zMm']).toBeCloseTo(-2500, 0);
+    expect(pose['zMm']).toBeCloseTo(-3500, 0);
     expect(pose['scaleMilli']).toBe(1000);
     for (const value of Object.values(pose)) expect(Number.isSafeInteger(value)).toBe(true);
   });

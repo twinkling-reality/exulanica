@@ -6,6 +6,8 @@ export type FirstUseMode = 'traverse' | 'converse';
 export interface FirstUsePromptAction {
   readonly label: string;
   readonly key?: string;
+  /** A real surface action. Key-labelled entries remain orientation, never simulated controls. */
+  readonly activate?: 'summon-companion';
 }
 
 export interface FirstUsePrompt {
@@ -63,7 +65,10 @@ export function createFirstUseGuidance(storage: FirstUseStorage): FirstUseGuidan
       if (showingArrival && mode === 'converse') {
         return Object.freeze({
           statement: 'Welcome to Exulanica',
-          actions: Object.freeze([{ label: 'Click to enter' }]),
+          actions: Object.freeze([{
+            label: 'Start building',
+            activate: 'summon-companion' as const,
+          }]),
         });
       }
       if (phase === 'complete') return null;

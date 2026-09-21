@@ -70,6 +70,7 @@ import { applyDocumentAppearance, applyDocumentWorldStyle } from './theme.js';
 import { worldArtProfile } from '@exulanica/presentation';
 import { initialWorldShell, updateWorldShell, type WorldShellEvent } from './world-shell.js';
 import { mountPersonalIntake } from './composition/personal-intake.js';
+import { requireMetadataOnlyEntryUpdate } from './world-entry-api.js';
 import { mountCharacter } from './composition/character.js';
 import { mountAppearance } from './composition/appearance.js';
 import { mountObjects } from './composition/objects.js';
@@ -361,6 +362,7 @@ async function mount(): Promise<void> {
   ) {
     return;
   }
+  const isAuthoredStarter = state.activeWorldEntry?.authoredScene != null;
   state.disposeEnvironmentSelection?.();
   state.disposeEnvironmentSelection = null;
 
@@ -376,12 +378,37 @@ async function mount(): Promise<void> {
   // would open every refresh by asking the question the user just answered.
   currentCompanion.observeSnapshot(current);
 
+  const retainActiveEntry = (updated: NonNullable<typeof state.activeWorldEntry>) => {
+    const active = state.activeWorldEntry;
+    if (active === null) {
+      throw new Error('The saved world entry is no longer active.');
+    }
+    const retained = requireMetadataOnlyEntryUpdate(active, updated);
+    state.activeWorldEntry = retained;
+    state.savedWorldEntries = Object.freeze(state.savedWorldEntries.map((candidate) =>
+      candidate.entryId === retained.entryId ? retained : candidate));
+    return retained;
+  };
+
   const intake = mountPersonalIntake({
     preview,
     credentials: currentCredentials, session: state.personalIntake, snapshot: current,
     media: state.previewSourceMedia,
     reloadSnapshot: () => currentSession.snapshot(),
     refreshWorld: async () => { state.snapshot = await currentSession.snapshot(); await mount(); },
+    ...(state.activeWorldEntry === null ? {} : {
+      getEntry: () => state.activeWorldEntry,
+      attachSources: async (request) => {
+        const client = state.worldEntries;
+        if (client === null) throw new Error('The saved world is not connected.');
+        return retainActiveEntry(await client.attachSources(request));
+      },
+      refreshEntry: async (entryId) => {
+        const client = state.worldEntries;
+        if (client === null) throw new Error('The saved world is not connected.');
+        return retainActiveEntry(await client.entry(entryId));
+      },
+    }),
   });
   const emptyWorld = state.activeWorldEntry === null ? buildEmptyWorld(current) : null;
   if (emptyWorld !== null) {
@@ -394,7 +421,8 @@ async function mount(): Promise<void> {
     canvas.hidden = true;
     shell.setAttribute('data-world-state', 'empty');
     replace(shell, [emptyWorld, intake.root]);
-    intake.root.open = true;
+    const photoWorkflow = intake.root.querySelector<HTMLDetailsElement>('.photo-review-workflow');
+    if (photoWorkflow !== null) photoWorkflow.open = true;
     void intake.begin();
     shell.removeAttribute('aria-busy');
     shell.removeAttribute('data-booting');
@@ -461,7 +489,10 @@ async function mount(): Promise<void> {
   let inputMode: FirstUseMode = 'converse';
   let reflectFirstUse = (): void => undefined;
   const finishFirstUse = (): void => {
-    if (firstUse.complete()) reflectFirstUse();
+    firstUse.complete();
+    // `complete` also clears the per-page arrival prompt. That can change while the durable phase
+    // is already complete, so reflection cannot depend only on the phase changing.
+    reflectFirstUse();
   };
 
   // The Companion. The controller holds the turn, the panel renders it, and the confirmation
@@ -497,6 +528,11 @@ async function mount(): Promise<void> {
   }
 
   let writePath: MountedWritePath;
+  // The Companion mounts before the object and photo surfaces it can open. These callbacks are
+  // assigned before any of the detached controls enter the document.
+  let openStarterObjects = (): void => undefined;
+  let openStarterPhotos = (): void => undefined;
+  let runFirstUseAction = (): void => undefined;
   const companion = mountCompanion({
     state,
     onOpen: () => { environmentSelection.closePanels(); objects.close(); character.reach(); },
@@ -515,7 +551,20 @@ async function mount(): Promise<void> {
       shellState.primary === 'menu' || shellState.primary === 'options' ||
       shellState.primary === 'controls' || shellState.primary === 'character' ||
       shellState.primary === 'experiment' || shellState.primary === 'photos',
+    onFirstUseAction: (action) => {
+      if (action.activate === 'summon-companion') runFirstUseAction();
+    },
+    ...(isAuthoredStarter ? {
+      starterActions: {
+        onAddObject: () => openStarterObjects(),
+        onAddPhotos: () => openStarterPhotos(),
+      },
+    } : {}),
   });
+  runFirstUseAction = (): void => {
+    finishFirstUse();
+    companion.summon();
+  };
 
   if (memoryLoadFailure !== null) {
     companion.panel.noteMemoryFailure('memory.notLoaded', memoryLoadFailure);
@@ -594,9 +643,9 @@ async function mount(): Promise<void> {
   });
   state.disposeEnvironmentSelection = () => environmentSelection.dispose();
 
-  // Scene segments. Mounted after the write path because naming a segment stages on that path and
-  // shows its confirmation panel; it reads `state.atlas` late and applies its overlay in `begin`.
-  const segments = mountSegments({
+  // Scene segments belong to source-backed geometry. The authored starter descriptor declares no
+  // source dependencies or reconstructed scene, so it mounts no panel and makes no segment request.
+  const segments = isAuthoredStarter ? null : mountSegments({
     env,
     state,
     snapshot: current,
@@ -737,9 +786,27 @@ async function mount(): Promise<void> {
         entry.entryId === updated.entryId ? updated : entry));
       return updated;
     },
+    onOpenWorld: () => {
+      companion.dismiss();
+      environmentSelection.closePanels();
+      objects.close();
+      dispatchShell({ type: 'toggle-menu' });
+    },
+    onAddObject: () => {
+      companion.dismiss();
+      environmentSelection.closePanels();
+      dispatchShell({ type: 'show-world' });
+      objects.toggle();
+    },
     onOpenPhotos: () => dispatchShell({ type: 'toggle-photos' }),
     onClosePhotos: () => dispatchShell({ type: 'toggle-photos' }),
   });
+  openStarterObjects = () => {
+    environmentSelection.closePanels();
+    dispatchShell({ type: 'show-world' });
+    objects.toggle();
+  };
+  openStarterPhotos = () => dispatchShell({ type: 'toggle-photos' });
   const handleAtlasCommand = (command: AtlasCommand): void => {
     environmentSelection.closePanels();
     objects.close();
@@ -861,7 +928,7 @@ async function mount(): Promise<void> {
     character.gestureRoot,
     viewportBoundary,
     status.inspectorRoot,
-    segments.root,
+    ...(segments === null ? [] : [segments.root]),
     retainedLoading,
   ]);
   void intake.begin();
@@ -953,7 +1020,7 @@ async function mount(): Promise<void> {
   const geographicDistrict = renderer.atlas.binding.ownedDistrict !== null ||
     renderer.atlas.binding.googleTiles !== null;
   void character.attach(renderer.atlas.binding);
-  if (geographicDistrict) {
+  if (geographicDistrict && segments !== null) {
     segments.root.hidden = true;
     segments.root.style.display = 'none';
   }
@@ -970,7 +1037,9 @@ async function mount(): Promise<void> {
     atlas: renderer.atlas,
     companion,
     // A click in the inspector asks for a segment before it asks for evidence.
-    status: segmentsFirst(status, (clientX, clientY) => segments.resolveAt(clientX, clientY)),
+    status: segments === null
+      ? status
+      : segmentsFirst(status, (clientX, clientY) => segments.resolveAt(clientX, clientY)),
     chrome,
     worldIndex,
     detail,
@@ -994,7 +1063,7 @@ async function mount(): Promise<void> {
 
   // After the renderer, because every object it draws needs a binding to draw into.
   void objects.begin(state.activeWorldEntry?.authoredVersionId);
-  if (!geographicDistrict) void segments.begin();
+  if (!geographicDistrict) void segments?.begin();
 
   await new Promise<void>((resolve) => window.requestAnimationFrame(() => resolve()));
   retainedLoading.remove();

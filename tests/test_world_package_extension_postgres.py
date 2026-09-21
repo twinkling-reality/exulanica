@@ -186,6 +186,72 @@ def test_one_version_one_object_round_trips_through_a_signed_package(repository,
     assert full["extensions"][0]["load"] == "loaded"
 
 
+def test_undone_addition_is_history_without_canonical_or_exported_object(repository, tmp_path):
+    structures = WorldStructureRepository(repository.connection, repository.workspace_id)
+    snapshot = _apply(structures, structural_candidate())
+    objects = WorldObjectRepository(repository.connection, repository.workspace_id)
+    version = objects.create_version(
+        source_snapshot_id=snapshot.snapshot_id, title="Empty again", created_by=uuid.uuid4()
+    )
+    empty = version.state_sha256
+    version = objects.add_object(
+        version.version_id,
+        AuthoredObject(
+            object_id="object:lantern",
+            asset_sha256=CUBE,
+            region_id="region-a",
+            transform=Transform(1_200, 0, -450, 785_398, 1_000),
+            origin=ObjectOrigin("authored", "fictional"),
+        ),
+        base_state_sha256=empty,
+        actor=uuid.uuid4(),
+    )
+    version = objects.undo(
+        version.version_id, base_state_sha256=version.state_sha256, actor=uuid.uuid4()
+    )
+    assert version.objects == () and version.state_sha256 == empty
+
+    result = _export(repository, tmp_path / "undone-add.wmp", extensions=[authored.EXTENSION_KEY])
+    world = verify_package(result.output).extensions[0].authored_world
+    packaged = next(item for item in world.versions if item["title"] == "Empty again")
+    assert packaged["delta"]["objects"] == []
+    assert packaged["state_sha256"] == empty
+    assert [edit["kind"] for edit in packaged["edits"]] == ["add_object", "undo"]
+
+
+def test_undone_override_is_history_without_canonical_or_exported_override(repository, tmp_path):
+    structures = WorldStructureRepository(repository.connection, repository.workspace_id)
+    snapshot = _apply(structures, structural_candidate())
+    objects = WorldObjectRepository(repository.connection, repository.workspace_id)
+    version = objects.create_version(
+        source_snapshot_id=snapshot.snapshot_id,
+        title="Unchanged structure",
+        created_by=uuid.uuid4(),
+    )
+    empty = version.state_sha256
+    version = objects.set_element_override(
+        version.version_id,
+        ElementOverride("element:region-b:root", suppressed=True),
+        base_state_sha256=empty,
+        actor=uuid.uuid4(),
+    )
+    version = objects.undo(
+        version.version_id, base_state_sha256=version.state_sha256, actor=uuid.uuid4()
+    )
+    assert version.element_overrides == () and version.state_sha256 == empty
+
+    result = _export(
+        repository,
+        tmp_path / "undone-override.wmp",
+        extensions=[authored.EXTENSION_KEY],
+    )
+    world = verify_package(result.output).extensions[0].authored_world
+    packaged = next(item for item in world.versions if item["title"] == "Unchanged structure")
+    assert packaged["delta"]["element_overrides"] == []
+    assert packaged["state_sha256"] == empty
+    assert [edit["kind"] for edit in packaged["edits"]] == ["suppress_element", "undo"]
+
+
 def test_a_branch_and_a_source_override_resolve_inside_the_package(repository, tmp_path: Path):
     objects, _snapshot, version = _one_version_one_object(repository)
     child = objects.create_version(

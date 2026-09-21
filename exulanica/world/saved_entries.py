@@ -9,12 +9,28 @@ from typing import Final, Literal
 
 import psycopg
 
-from exulanica.world.errors import UnknownWorldResource
+from exulanica.canonical import sha256_of_canonical
+from exulanica.epistemics.source_images import selected_image
+from exulanica.errors import BlobNotFoundError, IntegrityError
+from exulanica.evidence.blob import BlobId
+from exulanica.store.base import ContentAddressedStore
+from exulanica.world.errors import InvalidStyleData, UnknownWorldResource
+from exulanica.world.repository import WorldStyleRepository
+from exulanica.world.style_structure import (
+    AuthoredVersionRef,
+    CompatibilityIntent,
+    StructuralSnapshotRef,
+    StyleVersionRef,
+    raise_for_incompatible_structure_style,
+)
 
 __all__ = [
     "SavedWorldCandidate",
     "SavedWorldEntry",
     "SavedWorldEntryRepository",
+    "SavedWorldSourceAttachment",
+    "SourceAttachmentOperationConflict",
+    "SourceAttachmentSelection",
     "StaleSavedWorldEntry",
 ]
 
@@ -23,6 +39,35 @@ _WORKSPACE_LOCK_SEED: Final = 880_024
 
 class StaleSavedWorldEntry(Exception):
     """The caller tried to replace an entry revision it did not read."""
+
+
+class SourceAttachmentOperationConflict(Exception):
+    """An attachment operation id was reused for a different exact request."""
+
+
+@dataclass(frozen=True, slots=True)
+class SourceAttachmentSelection:
+    capture_id: uuid.UUID
+    evidence_span_id: uuid.UUID
+
+
+@dataclass(frozen=True, slots=True)
+class SavedWorldSourceAttachment:
+    attachment_id: uuid.UUID
+    operation_id: uuid.UUID
+    capture_id: uuid.UUID
+    evidence_span_id: uuid.UUID
+    source_sha256: str
+    authorization_id: uuid.UUID
+    screening_id: uuid.UUID
+    role: Literal["reference"]
+    attached_entry_revision: int
+    attached_by: uuid.UUID
+    attached_at: dt.datetime
+    availability: Literal["available", "unavailable"]
+    unavailable_reason: str | None
+    viewer_sha256: str | None
+    evidence_path: str | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -58,6 +103,7 @@ class SavedWorldEntry:
     revision: int
     availability: Literal["available", "unavailable"]
     unavailable_reason: str | None
+    source_attachments: tuple[SavedWorldSourceAttachment, ...]
     created_by: uuid.UUID
     created_at: dt.datetime
     updated_at: dt.datetime
@@ -66,9 +112,15 @@ class SavedWorldEntry:
 class SavedWorldEntryRepository:
     """Read and update saved entries through one workspace-scoped connection."""
 
-    def __init__(self, connection: psycopg.Connection, workspace_id: uuid.UUID) -> None:
+    def __init__(
+        self,
+        connection: psycopg.Connection,
+        workspace_id: uuid.UUID,
+        store: ContentAddressedStore | None = None,
+    ) -> None:
         self.connection = connection
         self.workspace_id = workspace_id
+        self.store = store
 
     def entries(self) -> tuple[SavedWorldEntry, ...]:
         rows = self.connection.execute(
@@ -263,6 +315,229 @@ class SavedWorldEntryRepository:
                 ),
             )
         return self.entry(entry_id)
+
+    def attach_sources(
+        self,
+        entry_id: uuid.UUID,
+        *,
+        operation_id: uuid.UUID,
+        base_revision: int,
+        authored_version_id: uuid.UUID,
+        authored_state_sha256: str,
+        authored_edit_seq: int,
+        style_version_id: uuid.UUID,
+        sources: tuple[SourceAttachmentSelection, ...],
+        attached_by: uuid.UUID,
+    ) -> SavedWorldEntry:
+        """Append exact reviewed references while preserving the complete saved scene cursor."""
+
+        if not 1 <= len(sources) <= 200:
+            raise ValueError("attach between 1 and 200 source photographs")
+        identities = [(source.capture_id, source.evidence_span_id) for source in sources]
+        if len(set(identities)) != len(identities):
+            raise ValueError("each source photograph and evidence span must be unique")
+        if len({source.capture_id for source in sources}) != len(sources):
+            raise ValueError("a capture can be attached only once in one operation")
+        request_sha256 = sha256_of_canonical(
+            {
+                "entry_id": str(entry_id),
+                "operation_id": str(operation_id),
+                "base_revision": base_revision,
+                "authored_version_id": str(authored_version_id),
+                "authored_state_sha256": authored_state_sha256,
+                "authored_edit_seq": authored_edit_seq,
+                "style_version_id": str(style_version_id),
+                "sources": [
+                    {
+                        "capture_id": str(source.capture_id),
+                        "evidence_span_id": str(source.evidence_span_id),
+                    }
+                    for source in sources
+                ],
+                "attached_by": str(attached_by),
+            }
+        )
+        with self.connection.transaction():
+            self._lock_workspace()
+            row = self.connection.execute(
+                "select e.world_id,e.revision,e.authored_version_id,e.authored_state_sha256,"
+                "e.authored_edit_seq,e.style_version_id,"
+                "exists(select 1 from world_structure_invalidation i "
+                "join world_alternate_version v on v.workspace_id=e.workspace_id "
+                "and v.world_id=e.world_id and v.version_id=e.authored_version_id "
+                "where i.workspace_id=e.workspace_id and i.world_id=e.world_id "
+                "and i.snapshot_id=v.source_snapshot_id) as source_invalidated "
+                "from saved_world_entry e where e.workspace_id=%s and e.entry_id=%s for update",
+                (self.workspace_id, entry_id),
+            ).fetchone()
+            if row is None:
+                raise UnknownWorldResource("no such saved world entry")
+            prior = self.connection.execute(
+                "select entry_id,request_sha256 from saved_world_source_attachment_operation "
+                "where workspace_id=%s and operation_id=%s",
+                (self.workspace_id, operation_id),
+            ).fetchone()
+            if prior is not None:
+                if (
+                    prior["entry_id"] != entry_id
+                    or bytes(prior["request_sha256"]) != request_sha256
+                ):
+                    raise SourceAttachmentOperationConflict(
+                        "operation_id already names a different source attachment request"
+                    )
+                return self.entry(entry_id)
+            exact_cursor = (
+                row["revision"] == base_revision
+                and row["authored_version_id"] == authored_version_id
+                and row["authored_state_sha256"] == authored_state_sha256
+                and row["authored_edit_seq"] == authored_edit_seq
+                and row["style_version_id"] == style_version_id
+            )
+            if not exact_cursor:
+                raise StaleSavedWorldEntry(
+                    "the saved world resume point changed before its sources were attached"
+                )
+            if row["source_invalidated"]:
+                raise ValueError("sources cannot be attached to an unavailable saved world")
+            authored = self.connection.execute(
+                "select state_sha256,edit_seq,source_snapshot_id from world_alternate_version "
+                "where workspace_id=%s and world_id=%s and version_id=%s for update",
+                (self.workspace_id, row["world_id"], authored_version_id),
+            ).fetchone()
+            if authored is None:
+                raise UnknownWorldResource("no such authored world version")
+            if (
+                authored["state_sha256"] != authored_state_sha256
+                or authored["edit_seq"] != authored_edit_seq
+            ):
+                raise StaleSavedWorldEntry(
+                    "the authored world changed before its sources were attached"
+                )
+            style = self.connection.execute(
+                "select 1 from world_style_version where workspace_id=%s and world_id=%s "
+                "and version_id=%s for update",
+                (self.workspace_id, row["world_id"], style_version_id),
+            ).fetchone()
+            if style is None:
+                raise UnknownWorldResource("no such world style version")
+            try:
+                raise_for_incompatible_structure_style(
+                    WorldStyleRepository(
+                        self.connection, self.workspace_id, world_id=row["world_id"]
+                    ).classify_structure_style_compatibility(
+                        intent=CompatibilityIntent.ATTACH,
+                        style=StyleVersionRef(style_version_id),
+                        authored=AuthoredVersionRef(authored_version_id),
+                        snapshot=StructuralSnapshotRef(authored["source_snapshot_id"]),
+                    )
+                )
+            except InvalidStyleData as exc:
+                raise ValueError(str(exc)) from exc
+            duplicate = self.connection.execute(
+                "select capture_id from saved_world_source_attachment "
+                "where workspace_id=%s and entry_id=%s and capture_id=any(%s)",
+                (self.workspace_id, entry_id, [source.capture_id for source in sources]),
+            ).fetchone()
+            if duplicate is not None:
+                raise ValueError("a selected photograph is already attached to this saved world")
+
+            resolved = [self._resolve_attachment(source, attached_by) for source in sources]
+            result_revision = base_revision + 1
+            self.connection.execute(
+                "insert into saved_world_source_attachment_operation "
+                "(workspace_id,operation_id,entry_id,request_sha256,base_entry_revision,"
+                "result_entry_revision,authored_version_id,authored_state_sha256,"
+                "authored_edit_seq,style_version_id,created_by) "
+                "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                (
+                    self.workspace_id,
+                    operation_id,
+                    entry_id,
+                    request_sha256,
+                    base_revision,
+                    result_revision,
+                    authored_version_id,
+                    authored_state_sha256,
+                    authored_edit_seq,
+                    style_version_id,
+                    attached_by,
+                ),
+            )
+            for source, authority in zip(sources, resolved, strict=True):
+                self.connection.execute(
+                    "insert into saved_world_source_attachment "
+                    "(workspace_id,entry_id,operation_id,capture_id,evidence_span_id,"
+                    "source_sha256,authorization_id,screening_id,attached_entry_revision,"
+                    "attached_by) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                    (
+                        self.workspace_id,
+                        entry_id,
+                        operation_id,
+                        source.capture_id,
+                        source.evidence_span_id,
+                        authority["source_sha256"],
+                        authority["authorization_id"],
+                        authority["screening_id"],
+                        result_revision,
+                        attached_by,
+                    ),
+                )
+            updated = self.connection.execute(
+                "update saved_world_entry set revision=revision+1,updated_at=now() "
+                "where workspace_id=%s and entry_id=%s and revision=%s returning entry_id",
+                (self.workspace_id, entry_id, base_revision),
+            ).fetchone()
+            if updated is None:
+                raise StaleSavedWorldEntry(
+                    "the saved world resume point changed before its sources were attached"
+                )
+        return self.entry(entry_id)
+
+    def _resolve_attachment(
+        self, source: SourceAttachmentSelection, attached_by: uuid.UUID
+    ) -> dict[str, object]:
+        row = self.connection.execute(
+            "select c.blob_sha256 as source_sha256,a.authorization_id,p.screening_id,"
+            "statement_timestamp() as evaluated_at "
+            "from capture c join evidence_span s on s.workspace_id=c.workspace_id "
+            "and s.span_id=%s and s.blob_sha256=c.blob_sha256 "
+            "and s.modality='still_image' and s.track_key='img' "
+            "and s.t_start_ns=0 and s.t_end_ns=1 and s.region is null and s.text_anchor is null "
+            "join blob b on b.blob_sha256=c.blob_sha256 and b.media_type like 'image/%%' "
+            "join capture_reconstruction_authorization a on a.workspace_id=c.workspace_id "
+            "and a.capture_id=c.capture_id and a.source_sha256=c.blob_sha256 "
+            "and a.corpus_class='personal' and a.authorized_by=%s "
+            "join reconstruction_privacy_screening p on p.workspace_id=c.workspace_id "
+            "and p.authorization_id=a.authorization_id and p.capture_id=c.capture_id "
+            "and p.source_sha256=c.blob_sha256 and p.screening_method='human_review' "
+            "and p.eligibility_state='eligible' and p.reviewed_by is not null "
+            "where c.workspace_id=%s and c.capture_id=%s and c.deleted_at is null "
+            "and not tombstone_blocks_capture(c.workspace_id,c.capture_id) "
+            "and not tombstone_blocks_span(c.workspace_id,s.blob_sha256,s.track_key,"
+            "s.t_start_ns,s.t_end_ns) "
+            "and privacy_screening_allows_capture(c.workspace_id,c.capture_id,p.screening_id) "
+            "order by p.screened_at desc,p.screening_id,a.authorized_at desc,a.authorization_id "
+            "limit 1",
+            (
+                source.evidence_span_id,
+                attached_by,
+                self.workspace_id,
+                source.capture_id,
+            ),
+        ).fetchone()
+        if row is None:
+            raise ValueError(
+                "source attachment requires an exact current human-reviewed personal photograph"
+            )
+        selected = selected_image(
+            self.connection,
+            self.workspace_id,
+            bytes(row["source_sha256"]),
+            row["evaluated_at"],
+        )
+        if selected is None or self.store is None or not self.store.exists(BlobId(selected.sha256)):
+            raise ValueError("current authorized viewer bytes are unavailable for a source")
+        return row
 
     def lock_authored_advance_base(
         self,
@@ -521,8 +796,7 @@ class SavedWorldEntryRepository:
             "and s.snapshot_id=v.source_snapshot_id where e.workspace_id=%s"
         )
 
-    @staticmethod
-    def _entry(row: dict[str, object]) -> SavedWorldEntry:
+    def _entry(self, row: dict[str, object]) -> SavedWorldEntry:
         from exulanica.world.starter import authored_starter_scene
 
         source_invalidated = bool(row["source_invalidated"])
@@ -567,7 +841,101 @@ class SavedWorldEntryRepository:
                 if authored_changed
                 else None
             ),
+            source_attachments=self._attachments(row["entry_id"]),
             created_by=row["created_by"],
             created_at=row["created_at"],
             updated_at=row["updated_at"],
         )
+
+    def _attachments(self, entry_id: uuid.UUID) -> tuple[SavedWorldSourceAttachment, ...]:
+        rows = self.connection.execute(
+            "select a.*,c.blob_sha256 as current_source_sha256,c.deleted_at,"
+            "auth.capture_id as authorized_capture_id,auth.source_sha256 as authorized_sha256,"
+            "auth.authorized_by,"
+            "auth.corpus_class,auth.valid_until as authorization_valid_until,"
+            "p.authorization_id as screened_authorization_id,p.capture_id as screened_capture_id,"
+            "p.source_sha256 as screened_sha256,p.screening_method,p.reviewed_by,"
+            "p.eligibility_state,"
+            "p.valid_until as screening_valid_until,"
+            "statement_timestamp() as evaluated_at,"
+            "asset_capture_live(a.workspace_id,a.capture_id,statement_timestamp()) as source_live,"
+            "not tombstone_blocks_span(a.workspace_id,s.blob_sha256,s.track_key,"
+            "s.t_start_ns,s.t_end_ns) as span_live "
+            "from saved_world_source_attachment a "
+            "join capture c on c.workspace_id=a.workspace_id and c.capture_id=a.capture_id "
+            "join evidence_span s on s.workspace_id=a.workspace_id "
+            "and s.span_id=a.evidence_span_id "
+            "join capture_reconstruction_authorization auth on auth.workspace_id=a.workspace_id "
+            "and auth.authorization_id=a.authorization_id "
+            "join reconstruction_privacy_screening p on p.workspace_id=a.workspace_id "
+            "and p.screening_id=a.screening_id "
+            "where a.workspace_id=%s and a.entry_id=%s "
+            "order by a.attached_at,a.attachment_id",
+            (self.workspace_id, entry_id),
+        ).fetchall()
+        attachments = []
+        for row in rows:
+            at = row["evaluated_at"]
+            source_matches = (
+                row["current_source_sha256"] == row["source_sha256"]
+                and row["authorized_capture_id"] == row["capture_id"]
+                and row["authorized_sha256"] == row["source_sha256"]
+                and row["authorized_by"] == row["attached_by"]
+                and row["screened_authorization_id"] == row["authorization_id"]
+                and row["screened_capture_id"] == row["capture_id"]
+                and row["screened_sha256"] == row["source_sha256"]
+                and row["corpus_class"] == "personal"
+                and row["screening_method"] == "human_review"
+                and row["reviewed_by"] is not None
+                and row["eligibility_state"] == "eligible"
+            )
+            reason = None
+            selected = None
+            if not row["source_live"] or not row["span_live"] or not source_matches:
+                reason = "source_unavailable"
+            elif row["authorization_valid_until"] is not None and row[
+                "authorization_valid_until"
+            ] <= at:
+                reason = "authorization_expired"
+            elif row["screening_valid_until"] is not None and row["screening_valid_until"] <= at:
+                reason = "screening_expired"
+            else:
+                try:
+                    selected = selected_image(
+                        self.connection, self.workspace_id, bytes(row["source_sha256"]), at
+                    )
+                    viewer_exists = (
+                        selected is not None
+                        and self.store is not None
+                        and self.store.exists(BlobId(selected.sha256))
+                    )
+                except (ValueError, BlobNotFoundError, IntegrityError, OSError):
+                    # A malformed or ambiguous optional viewer lineage withholds this reference.
+                    # It does not make the independently authored world impossible to reopen.
+                    selected = None
+                    viewer_exists = False
+                if not viewer_exists:
+                    reason = "viewer_unavailable"
+            available = reason is None and selected is not None
+            attachments.append(
+                SavedWorldSourceAttachment(
+                    attachment_id=row["attachment_id"],
+                    operation_id=row["operation_id"],
+                    capture_id=row["capture_id"],
+                    evidence_span_id=row["evidence_span_id"],
+                    source_sha256=bytes(row["source_sha256"]).hex(),
+                    authorization_id=row["authorization_id"],
+                    screening_id=row["screening_id"],
+                    role="reference",
+                    attached_entry_revision=row["attached_entry_revision"],
+                    attached_by=row["attached_by"],
+                    attached_at=row["attached_at"],
+                    availability="available" if available else "unavailable",
+                    unavailable_reason=None if available else reason,
+                    viewer_sha256=selected.sha256.hex() if available else None,
+                    evidence_path=(
+                        f"/evidence/{row['evidence_span_id']}/masked" if available else None
+                    ),
+                )
+            )
+        return tuple(attachments)

@@ -22,6 +22,7 @@ const entry = (title = 'My world', revision = 1): SavedWorldEntry => ({
   currentAuthoredStateSha256: 'a'.repeat(64), currentAuthoredEditSeq: 0,
   styleVersionId: '33333333-3333-4333-8333-333333333333', revision,
   availability: 'available', unavailableReason: null,
+  sourceAttachments: [],
   createdAt: '2026-09-20T12:00:00Z', updatedAt: '2026-09-20T12:00:00Z',
 });
 
@@ -30,9 +31,11 @@ describe('world identity controls', () => {
     const intake = document.createElement('details');
     intake.append(document.createElement('summary'));
     const rename = vi.fn(async (title: string) => entry(title, 2));
+    const onOpenWorld = vi.fn();
+    const onAddObject = vi.fn();
     const onOpenPhotos = vi.fn();
     const identity = buildWorldIdentity({
-      entry: entry(), personalIntake: intake, rename, onOpenPhotos,
+      entry: entry(), personalIntake: intake, rename, onOpenWorld, onAddObject, onOpenPhotos,
       onClosePhotos: vi.fn(),
     });
     const input = identity.root.querySelector('input') as HTMLInputElement;
@@ -44,6 +47,10 @@ describe('world identity controls', () => {
     expect(rename).toHaveBeenCalledWith('Quiet garden');
     expect(input.value).toBe('Quiet garden');
 
+    (identity.root.querySelector('.world-open-menu') as HTMLButtonElement).click();
+    expect(onOpenWorld).toHaveBeenCalledOnce();
+    (identity.root.querySelector('.world-add-object') as HTMLButtonElement).click();
+    expect(onAddObject).toHaveBeenCalledOnce();
     (identity.root.querySelector('.world-add-photos') as HTMLButtonElement).click();
     expect(onOpenPhotos).toHaveBeenCalledOnce();
     identity.setPhotosVisible(true);

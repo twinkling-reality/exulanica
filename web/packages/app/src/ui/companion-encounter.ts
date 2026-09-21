@@ -3,11 +3,12 @@ import type { AskUnavailable, CompanionAnswer } from '../companion-ask-api.js';
 import {
   buildCompanionChoiceRail,
   type CompanionChoiceHandlers,
+  type CompanionStarterActions,
 } from './companion-choice-rail.js';
 import type { CompanionPlacement } from './companion-placement.js';
 import { buildCompanionSpeech } from './companion-speech.js';
 import { el, replace } from './dom.js';
-import type { FirstUsePrompt } from './first-use-guidance.js';
+import type { FirstUsePrompt, FirstUsePromptAction } from './first-use-guidance.js';
 import { createModalFocus } from './modal-focus.js';
 
 export type CompanionHandlers = CompanionChoiceHandlers;
@@ -19,9 +20,13 @@ export type PanelMode = 'turn' | 'asking' | 'answer' | 'failed';
 
 export interface CompanionEncounterOptions {
   readonly speakerName?: string;
+  /** Source-independent starter actions shown instead of a content-free acknowledge turn. */
+  readonly starterActions?: CompanionStarterActions;
   /** The live presence renderer, visually docked here while retaining its own state owner. */
   readonly presence?: HTMLElement;
   readonly onDismiss?: () => void;
+  /** Executes the explicit first-use control without fabricating pointer-lock state. */
+  readonly onFirstUseAction?: (action: FirstUsePromptAction) => void;
   /**
    * An answer has been taken by this surface. Fired once per arriving answer, AFTER it is drawn.
    *
@@ -182,6 +187,22 @@ export function buildCompanionEncounter(
     }
   };
 
+  const promptAction = (action: FirstUsePromptAction): HTMLElement => {
+    if (action.activate === undefined) {
+      return el('span', { class: 'companion-prompt-action' }, [
+        ...(action.key === undefined ? [] : [el('b', { text: action.key })]),
+        action.label,
+      ]);
+    }
+    const button = el('button', {
+      type: 'button',
+      class: 'companion-prompt-action companion-prompt-button',
+      text: action.label,
+    });
+    button.addEventListener('click', () => options.onFirstUseAction?.(action));
+    return button;
+  };
+
   function renderPrompt(): void {
     root.toggleAttribute('data-first-use', firstUsePrompt !== null);
     if (firstUsePrompt !== null) {
@@ -190,11 +211,8 @@ export function buildCompanionEncounter(
       draw([
         el('p', { class: 'companion-prompt' }, [
           el('span', { class: 'companion-prompt-statement', text: firstUsePrompt.statement }),
-          el('span', { class: 'companion-prompt-actions' }, firstUsePrompt.actions.map((action) =>
-            el('span', { class: 'companion-prompt-action' }, [
-              ...(action.key === undefined ? [] : [el('b', { text: action.key })]),
-              action.label,
-            ]))),
+          el('span', { class: 'companion-prompt-actions' },
+            firstUsePrompt.actions.map(promptAction)),
         ]),
       ]);
       return;
@@ -210,6 +228,15 @@ export function buildCompanionEncounter(
 
   function renderTurn(turn: Turn): void {
     mode = 'turn';
+    if (turn.intent === 'acknowledge' && options.starterActions !== undefined) {
+      speech.renderGuidance(
+        'Start building',
+        'Add an object to your world, or bring in photos to review.',
+      );
+      choices.renderStarter(options.starterActions);
+      draw([toolbar, speech.root, choices.root]);
+      return;
+    }
     speech.render(turn);
     choices.render(turn);
     draw([toolbar, speech.root, choices.root]);
@@ -231,10 +258,21 @@ export function buildCompanionEncounter(
   function renderFailure(failure: AskUnavailable): void {
     mode = 'failed';
     speech.reportAskFailure(failure);
-    // The rail comes back with the turn's own choices, so a question that failed leaves the
-    // person exactly where they were rather than in a dead end.
-    if (lastTurn !== null) choices.render(lastTurn);
+    // The rail comes back with the turn's available routes, so a question that failed leaves the
+    // person exactly where they were rather than in a dead end. A starter returns to its direct
+    // actions instead of exposing the acknowledge turn's unrelated uncertainty escapes.
+    if (lastTurn?.intent === 'acknowledge' && options.starterActions !== undefined) {
+      choices.renderStarter(options.starterActions);
+    } else if (lastTurn !== null) {
+      choices.render(lastTurn);
+    }
     draw(lastTurn === null ? [toolbar, speech.root] : [toolbar, speech.root, choices.root]);
+  }
+
+  function appendMemoryNotice(): void {
+    if (memoryNotice !== null) {
+      speech.noteMemoryFailure(memoryNotice.reasonKey, memoryNotice.detail);
+    }
   }
 
   /**
@@ -261,7 +299,7 @@ export function buildCompanionEncounter(
     }
     // Appended after the face is drawn, and re-appended on every draw because each of the four
     // render paths replaces the speech band's children. One notice per render, never a stack.
-    if (memoryNotice !== null) speech.noteMemoryFailure(memoryNotice.reasonKey, memoryNotice.detail);
+    appendMemoryNotice();
   }
 
   function backToQuestion(): void {
@@ -321,7 +359,10 @@ export function buildCompanionEncounter(
       // away while the person was still looking at it.
       if (state === 'open' && mode !== 'turn') return;
       if (turn === null || state !== 'open') renderPrompt();
-      else renderTurn(turn);
+      else {
+        renderTurn(turn);
+        appendMemoryNotice();
+      }
     },
     reportRefusal(reasonKey) {
       speech.reportRefusal(reasonKey);

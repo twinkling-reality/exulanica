@@ -35,16 +35,22 @@ describe('production source media boundary', () => {
     const requests: { path: string; init: RequestInit }[] = [];
     const revoke = vi.fn();
     const fetch = vi.fn(async (input: string | URL | Request, init: RequestInit = {}) => {
-      const path = new URL(String(input)).pathname;
+      const url = new URL(String(input));
+      const path = url.pathname;
       requests.push({ path, init });
       if (path.endsWith('/graph/sources')) return json([]);
-      if (path.endsWith('/world/source-media')) return json([source()]);
+      if (path.endsWith('/world/source-media')) {
+        expect(url.searchParams.get('world_id')).toBe('world:saved');
+        expect(url.searchParams.get('source_snapshot_id')).toBe('snapshot-saved');
+        return json([source()]);
+      }
       return new Response(new Uint8Array([0xff, 0xd8]), {
         status: 200, headers: { 'content-type': 'image/jpeg' },
       });
     });
     const client = new SourceMediaClient({
       baseUrl: 'https://exulanica.test/api', token: 'private-token', fetch,
+      worldId: 'world:saved', sourceSnapshotId: 'snapshot-saved',
       createObjectURL: () => 'blob:source-1', revokeObjectURL: revoke,
     });
     const session = await client.load('#7c71b5');
@@ -120,6 +126,13 @@ describe('production source media boundary', () => {
     });
     await expect(client.load('#7c71b5')).rejects.toThrow('network offline');
   });
+
+  it('refuses two competing topology addresses', () => {
+    expect(() => new SourceMediaClient({
+      baseUrl: 'https://exulanica.test/api', token: 't', fetch: vi.fn(),
+      topologyDigest: 'topology-a', sourceSnapshotId: 'snapshot-a',
+    })).toThrow('one topology address');
+  });
 });
 
 const imageBytes = new Uint8Array([0xff, 0xd8]);
@@ -135,6 +148,25 @@ async function admitted(overrides: Record<string, unknown> = {}) {
 }
 
 describe('admitted sources before composition', () => {
+  it('loads review inventory without requesting composed-world topology', async () => {
+    const row = await admitted();
+    const fetch = vi.fn(async (input: string | URL | Request) => {
+      const path = new URL(String(input)).pathname;
+      if (path.endsWith('/graph/sources')) return json([row]);
+      if (path.endsWith('/evidence/span-1/masked')) {
+        return new Response(imageBytes, { headers: { 'content-type': 'image/jpeg' } });
+      }
+      throw new Error(`Unexpected request: ${path}`);
+    });
+    const session = await new SourceMediaClient({
+      baseUrl: 'https://example.test/api', token: 'review-token', fetch,
+      createObjectURL: () => 'blob:review', revokeObjectURL: vi.fn(),
+    }).load('blue', { includeWorldTopology: false });
+    expect(session.catalog.get('capture-1')?.available).toBe(true);
+    expect(fetch).toHaveBeenCalledTimes(2);
+    session.dispose();
+  });
+
   it('loads authenticated inventory without a world and clears every URL at session disposal', async () => {
     const row = await admitted();
     const revoke = vi.fn();

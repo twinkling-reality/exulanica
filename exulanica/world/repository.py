@@ -21,6 +21,7 @@ from exulanica.errors import BlobNotFoundError, IntegrityError
 from exulanica.evidence import BlobId
 from exulanica.store.base import ContentAddressedStore
 from exulanica.world.errors import (
+    InvalidatedSourceVersion,
     InvalidPreviewState,
     InvalidStyleData,
     ProtectedTopologyConflict,
@@ -45,6 +46,18 @@ from exulanica.world.models import (
     WorldSourceMedia,
 )
 from exulanica.world.registry import STYLE_REGISTRY, StyleRegistry
+from exulanica.world.style_structure import (
+    AuthoredVersionRef,
+    CompatibilityIntent,
+    ComposedTopologyRef,
+    SourceAttachmentRef,
+    StructuralSnapshotRef,
+    StructureStyleCompatibility,
+    StyleStructureFacts,
+    StyleVersionRef,
+    classify_structure_style_compatibility,
+    raise_for_incompatible_structure_style,
+)
 
 __all__ = ["WorldStyleRepository"]
 
@@ -75,13 +88,28 @@ class WorldStyleRepository:
         This method is intentionally not exposed by the HTTP router.  It is the seam a reviewed
         world-composition workflow calls after its reachability and evidence checks.  Reusing a
         digest for different regions or source bindings is refused rather than overwritten.
+        Classification runs before history insert; a refuse writes nothing.
         """
         with self.connection.transaction():
-            self.register_topology_history(contract)
+            self.connection.execute(
+                "select pg_advisory_xact_lock(hashtextextended(%s::text,%s))",
+                (self.workspace_id, 880_024),
+            )
             state = self._state(for_update=True)
+            style_ref = (
+                None if state is None else StyleVersionRef(state["current_style_version_id"])
+            )
+            decision = self._require_structure_style_compatibility(
+                intent=CompatibilityIntent.REGISTER_TOPOLOGY,
+                style=style_ref,
+                composed=ComposedTopologyRef(contract.topology_digest),
+                proposed=contract,
+            )
+            if decision.outcome != "compatible":
+                raise ProtectedTopologyConflict(decision.token.replace("_", " "))
+            self.register_topology_history(contract)
             if state is None:
                 default = self.registry.default_reference
-                self._validate_reference_compatibility(default, contract.topology_digest)
                 binding, capability_mapping = self._binding_for_reference(default)
                 row = self.connection.execute(
                     "insert into world_style_version "
@@ -135,7 +163,8 @@ class WorldStyleRepository:
 
         Structural bootstrap uses this for the snapshot's digest-bound foreign key while
         retaining the exact composed contract as current. Ordinary composition calls
-        register_topology, which shares this writer before activating the result.
+        register_topology, which classifies first and shares this writer only after a
+        compatible decision.
         """
         self._validate_topology_contract(contract)
         with self.connection.transaction():
@@ -281,25 +310,21 @@ class WorldStyleRepository:
                 state["current_topology_digest"],
             )
             reference: StyleReference | None = None
-            if proposal.base_style_version_id != current.version_id:
-                rejected = StaleStyleVersion(
-                    f"proposal targets {proposal.base_style_version_id}; current style is "
-                    f"{current.version_id}"
+            try:
+                self._check_concurrency(
+                    proposal.base_style_version_id, proposal.base_topology_digest
                 )
-            elif proposal.base_topology_digest != state["current_topology_digest"]:
-                rejected = ProtectedTopologyConflict(
-                    "the protected topology changed after this proposal was created"
-                )
-            else:
-                try:
-                    self._validate_refinement(proposal)
-                    self._validate_scope(proposal, state["current_topology_digest"])
-                    reference = self.registry.validate_reference(proposal.profile)
-                    self._validate_reference_compatibility(
-                        reference, state["current_topology_digest"]
-                    )
-                except InvalidStyleData as exc:
-                    rejected = exc
+                self._validate_refinement(proposal)
+                self._validate_scope(proposal, state["current_topology_digest"])
+                reference = self.registry.validate_reference(proposal.profile)
+                self._validate_reference_compatibility(reference, state["current_topology_digest"])
+            except (
+                InvalidStyleData,
+                ProtectedTopologyConflict,
+                StaleStyleVersion,
+                UnknownWorldResource,
+            ) as exc:
+                rejected = exc
 
             status = (
                 "stale"
@@ -370,21 +395,23 @@ class WorldStyleRepository:
                     f"world preview {preview_id} is {preview['status']}, not open"
                 )
             provenance = _provenance_from_row(preview)
-            if (
-                base_style_version_id != state["current_style_version_id"]
-                or preview["base_style_version_id"] != state["current_style_version_id"]
-            ):
-                failure = StaleStyleVersion(
-                    f"preview targets {preview['base_style_version_id']}; current style is "
-                    f"{state['current_style_version_id']}"
-                )
-            elif (
-                base_topology_digest != state["current_topology_digest"]
-                or preview["base_topology_digest"] != state["current_topology_digest"]
-            ):
-                failure = ProtectedTopologyConflict(
-                    "the protected topology changed after this preview was created"
-                )
+            try:
+                self._check_concurrency(base_style_version_id, base_topology_digest)
+                if (
+                    preview["base_style_version_id"] != base_style_version_id
+                    or preview["base_topology_digest"] != base_topology_digest
+                ):
+                    self._check_concurrency(
+                        preview["base_style_version_id"],
+                        preview["base_topology_digest"],
+                    )
+            except (
+                InvalidStyleData,
+                ProtectedTopologyConflict,
+                StaleStyleVersion,
+                UnknownWorldResource,
+            ) as exc:
+                failure = exc
             if failure is not None:
                 self._close_stale(preview, provenance, failure)
             else:
@@ -528,7 +555,7 @@ class WorldStyleRepository:
             if before_write is not None:
                 before_write()
             state = self._require_state(for_update=True)
-            self._check_concurrency(state, base_style_version_id, base_topology_digest)
+            self._check_concurrency(base_style_version_id, base_topology_digest)
             current = self._version_by_id(state["current_style_version_id"])
             target = self._raw_version_by_id(target_version_id)
             current_regions = {
@@ -594,16 +621,27 @@ class WorldStyleRepository:
 
     # -- source media -------------------------------------------------------------------
 
-    def source_media(self, store: ContentAddressedStore) -> tuple[WorldSourceMedia, ...]:
-        state = self._require_state()
-        rows = self._source_rows(state["current_topology_digest"])
+    def source_media(
+        self,
+        store: ContentAddressedStore,
+        *,
+        topology_digest: str | None = None,
+        source_snapshot_id: uuid.UUID | None = None,
+    ) -> tuple[WorldSourceMedia, ...]:
+        digest = self._source_topology_digest(topology_digest, source_snapshot_id)
+        rows = self._source_rows(digest)
         return tuple(self._source_from_row(row, store) for row in rows)
 
     def require_source_media(
-        self, source_id: uuid.UUID, store: ContentAddressedStore
+        self,
+        source_id: uuid.UUID,
+        store: ContentAddressedStore,
+        *,
+        topology_digest: str | None = None,
+        source_snapshot_id: uuid.UUID | None = None,
     ) -> WorldSourceMedia:
-        state = self._require_state()
-        rows = self._source_rows(state["current_topology_digest"], source_id=source_id)
+        digest = self._source_topology_digest(topology_digest, source_snapshot_id)
+        rows = self._source_rows(digest, source_id=source_id)
         if not rows:
             raise UnknownWorldResource("no such world source slot")
         source = self._source_from_row(rows[0], store)
@@ -912,19 +950,14 @@ class WorldStyleRepository:
 
     def _check_concurrency(
         self,
-        state: Mapping[str, Any],
         base_style_version_id: uuid.UUID,
         base_topology_digest: str,
-    ) -> None:
-        if base_style_version_id != state["current_style_version_id"]:
-            raise StaleStyleVersion(
-                f"request targets {base_style_version_id}; current style is "
-                f"{state['current_style_version_id']}"
-            )
-        if base_topology_digest != state["current_topology_digest"]:
-            raise ProtectedTopologyConflict(
-                "the protected topology changed after this request was created"
-            )
+    ) -> StructureStyleCompatibility:
+        return self._require_structure_style_compatibility(
+            intent=CompatibilityIntent.APPEARANCE_WRITE,
+            style=StyleVersionRef(base_style_version_id),
+            composed=ComposedTopologyRef(base_topology_digest),
+        )
 
     def _validate_scope(self, proposal: StyleProposal, topology_digest: str) -> None:
         if proposal.scope.kind == "global":
@@ -940,6 +973,220 @@ class WorldStyleRepository:
         ).fetchone()
         if row is None:
             raise InvalidStyleData(f"unknown region scope {proposal.scope.region_id}")
+
+    def classify_structure_style_compatibility(
+        self,
+        *,
+        intent: CompatibilityIntent,
+        style: StyleVersionRef | None = None,
+        composed: ComposedTopologyRef | None = None,
+        snapshot: StructuralSnapshotRef | None = None,
+        authored: AuthoredVersionRef | None = None,
+        attachments: tuple[SourceAttachmentRef, ...] = (),
+        proposed: TopologyContract | None = None,
+        conflicting_addresses: bool = False,
+    ) -> StructureStyleCompatibility:
+        """Classify typed plane identities. This method writes nothing."""
+
+        return classify_structure_style_compatibility(
+            self._structure_style_facts(
+                intent=intent,
+                style=style,
+                composed=composed,
+                snapshot=snapshot,
+                authored=authored,
+                attachments=attachments,
+                proposed=proposed,
+                conflicting_addresses=conflicting_addresses,
+            )
+        )
+
+    def _require_structure_style_compatibility(
+        self,
+        *,
+        intent: CompatibilityIntent,
+        style: StyleVersionRef | None = None,
+        composed: ComposedTopologyRef | None = None,
+        snapshot: StructuralSnapshotRef | None = None,
+        authored: AuthoredVersionRef | None = None,
+        attachments: tuple[SourceAttachmentRef, ...] = (),
+        proposed: TopologyContract | None = None,
+        conflicting_addresses: bool = False,
+    ) -> StructureStyleCompatibility:
+        decision = self.classify_structure_style_compatibility(
+            intent=intent,
+            style=style,
+            composed=composed,
+            snapshot=snapshot,
+            authored=authored,
+            attachments=attachments,
+            proposed=proposed,
+            conflicting_addresses=conflicting_addresses,
+        )
+        raise_for_incompatible_structure_style(decision)
+        return decision
+
+    def _structure_style_facts(
+        self,
+        *,
+        intent: CompatibilityIntent,
+        style: StyleVersionRef | None,
+        composed: ComposedTopologyRef | None,
+        snapshot: StructuralSnapshotRef | None,
+        authored: AuthoredVersionRef | None,
+        attachments: tuple[SourceAttachmentRef, ...],
+        proposed: TopologyContract | None,
+        conflicting_addresses: bool,
+    ) -> StyleStructureFacts:
+        state = self._state()
+        live_style_version_id = None if state is None else state["current_style_version_id"]
+        live_composed_digest = None if state is None else str(state["current_topology_digest"])
+        live_key = None
+        if live_composed_digest is not None:
+            live_contract = self.connection.execute(
+                "select compatibility_key from world_topology_contract where workspace_id=%s "
+                "and world_id=%s and topology_digest=%s",
+                (self.workspace_id, self.world_id, live_composed_digest),
+            ).fetchone()
+            if live_contract is not None:
+                live_key = live_contract["compatibility_key"]
+
+        named_style_version_id = None if style is None else style.version_id
+        named_style_known = True
+        named_style_is_current = False
+        named_style_bound_digest = None
+        named_style_key = None
+        if style is not None:
+            row = self.connection.execute(
+                "select version_id,topology_digest,global_profile_id,global_profile_version "
+                "from world_style_version where workspace_id=%s and world_id=%s "
+                "and version_id=%s",
+                (self.workspace_id, self.world_id, style.version_id),
+            ).fetchone()
+            if row is None:
+                named_style_known = False
+            else:
+                named_style_is_current = row["version_id"] == live_style_version_id
+                named_style_bound_digest = row["topology_digest"]
+                profile = self.registry.profiles.get(
+                    (row["global_profile_id"], row["global_profile_version"])
+                )
+                if profile is not None:
+                    named_style_key = profile.compatibility_key
+        elif intent is CompatibilityIntent.REGISTER_TOPOLOGY and state is None:
+            # First register binds the default profile. Classify that family before history insert.
+            named_style_key = self.registry.profiles[self.registry.default_key].compatibility_key
+
+        named_snapshot_id = None if snapshot is None else snapshot.snapshot_id
+        named_snapshot_known = True
+        named_snapshot_topology = None
+        if snapshot is not None:
+            snap = self.connection.execute(
+                "select topology_sha256 from world_structure_snapshot where workspace_id=%s "
+                "and world_id=%s and snapshot_id=%s",
+                (self.workspace_id, self.world_id, snapshot.snapshot_id),
+            ).fetchone()
+            if snap is None:
+                named_snapshot_known = False
+            else:
+                named_snapshot_topology = snap["topology_sha256"]
+
+        named_authored_id = None if authored is None else authored.version_id
+        named_authored_known = True
+        authored_source = None
+        if authored is not None:
+            version = self.connection.execute(
+                "select source_snapshot_id from world_alternate_version "
+                "where workspace_id=%s and world_id=%s and version_id=%s",
+                (self.workspace_id, self.world_id, authored.version_id),
+            ).fetchone()
+            if version is None:
+                named_authored_known = False
+            else:
+                authored_source = version["source_snapshot_id"]
+
+        attachments_named = bool(attachments)
+        attachments_known = True
+        attachments_expired = False
+        if attachments:
+            ids = [item.attachment_id for item in attachments]
+            rows = self.connection.execute(
+                "select a.attachment_id,auth.valid_until as authorization_valid_until,"
+                "p.valid_until as screening_valid_until,statement_timestamp() as evaluated_at "
+                "from saved_world_source_attachment a "
+                "join capture_reconstruction_authorization auth "
+                "on auth.workspace_id=a.workspace_id and auth.authorization_id=a.authorization_id "
+                "join reconstruction_privacy_screening p "
+                "on p.workspace_id=a.workspace_id and p.screening_id=a.screening_id "
+                "where a.workspace_id=%s and a.attachment_id=any(%s)",
+                (self.workspace_id, ids),
+            ).fetchall()
+            found = {row["attachment_id"] for row in rows}
+            if found != set(ids):
+                attachments_known = False
+            for row in rows:
+                at = row["evaluated_at"]
+                if (
+                    row["authorization_valid_until"] is not None
+                    and row["authorization_valid_until"] <= at
+                ) or (
+                    row["screening_valid_until"] is not None and row["screening_valid_until"] <= at
+                ):
+                    attachments_expired = True
+
+        return StyleStructureFacts(
+            intent=intent,
+            world_id=self.world_id,
+            live_style_version_id=live_style_version_id,
+            live_composed_digest=live_composed_digest,
+            live_composed_compatibility_key=live_key,
+            named_style_version_id=named_style_version_id,
+            named_style_known=named_style_known,
+            named_style_is_current=named_style_is_current,
+            named_style_bound_digest=named_style_bound_digest,
+            named_style_compatibility_key=named_style_key,
+            named_composed_digest=None if composed is None else composed.digest,
+            named_snapshot_id=named_snapshot_id,
+            named_snapshot_known=named_snapshot_known,
+            named_snapshot_topology_sha256=named_snapshot_topology,
+            named_authored_version_id=named_authored_id,
+            named_authored_known=named_authored_known,
+            authored_source_snapshot_id=authored_source,
+            proposed_digest=None if proposed is None else proposed.topology_digest,
+            proposed_compatibility_key=(None if proposed is None else proposed.compatibility_key),
+            proposed_has_sourced_slots=(
+                False
+                if proposed is None
+                else any(
+                    slot.evidence_span_id is not None or slot.missing_reason is not None
+                    for slot in proposed.source_slots
+                )
+            ),
+            attachments_named=attachments_named,
+            attachments_known=attachments_known,
+            attachments_expired=attachments_expired,
+            conflicting_addresses=conflicting_addresses,
+            starter_world=(
+                self._starter_world_fact()
+                if intent is CompatibilityIntent.REGISTER_TOPOLOGY
+                else None
+            ),
+        )
+
+    def _starter_world_fact(self) -> bool | None:
+        """Prefer the current snapshot composer key; otherwise leave the world_id scheme."""
+
+        snapshot = self.connection.execute(
+            "select s.composer_key from world_structure_state st "
+            "join world_structure_snapshot s on s.workspace_id=st.workspace_id "
+            "and s.world_id=st.world_id and s.snapshot_id=st.current_snapshot_id "
+            "where st.workspace_id=%s and st.world_id=%s",
+            (self.workspace_id, self.world_id),
+        ).fetchone()
+        if snapshot is not None:
+            # Stored starter composer key; same value as starter.AUTHORED_STARTER_COMPOSER.
+            return snapshot["composer_key"] == "authored-starter-world"
+        return None
 
     def _validate_reference_compatibility(
         self, reference: StyleReference, topology_digest: str
@@ -1173,6 +1420,43 @@ class WorldStyleRepository:
             params,
         ).fetchall()
 
+    def _source_topology_digest(
+        self,
+        requested: str | None,
+        source_snapshot_id: uuid.UUID | None,
+    ) -> str:
+        if requested is not None and source_snapshot_id is not None:
+            self._require_structure_style_compatibility(
+                intent=CompatibilityIntent.CLASSIFY,
+                composed=ComposedTopologyRef(requested),
+                snapshot=StructuralSnapshotRef(source_snapshot_id),
+                conflicting_addresses=True,
+            )
+        if source_snapshot_id is not None:
+            snapshot = self.connection.execute(
+                "select s.topology_sha256,exists(select 1 from world_structure_invalidation i "
+                "where i.workspace_id=s.workspace_id and i.world_id=s.world_id "
+                "and i.snapshot_id=s.snapshot_id) as invalidated "
+                "from world_structure_snapshot s where s.workspace_id=%s "
+                "and s.world_id=%s and s.snapshot_id=%s",
+                (self.workspace_id, self.world_id, source_snapshot_id),
+            ).fetchone()
+            if snapshot is None:
+                raise UnknownWorldResource("no such world structure snapshot")
+            if snapshot["invalidated"]:
+                raise InvalidatedSourceVersion("the source snapshot was invalidated")
+            return str(snapshot["topology_sha256"])
+        if requested is None:
+            return str(self._require_state()["current_topology_digest"])
+        known = self.connection.execute(
+            "select 1 from world_topology_contract where workspace_id=%s "
+            "and world_id=%s and topology_digest=%s",
+            (self.workspace_id, self.world_id, requested),
+        ).fetchone()
+        if known is None:
+            raise UnknownWorldResource("no such world topology")
+        return requested
+
     @staticmethod
     def _source_from_row(row: Mapping[str, Any], store: ContentAddressedStore) -> WorldSourceMedia:
         state = SourceMediaState.AVAILABLE
@@ -1279,4 +1563,6 @@ def _error_code(error: Exception) -> str:
         return "stale_style_version"
     if isinstance(error, ProtectedTopologyConflict):
         return "protected_topology_conflict"
+    if isinstance(error, UnknownWorldResource):
+        return "unknown_reference"
     return "invalid_style_data"

@@ -211,6 +211,119 @@ export interface WorldField {
   destroy(): void;
 }
 
+/** Exact visible support authored by a source-independent region descriptor. */
+export interface AuthoredGroundSupport {
+  readonly halfWidth: number;
+  readonly halfDepth: number;
+  readonly elevation: number;
+}
+
+export interface MeshGeometryData {
+  readonly positions: readonly number[];
+  readonly normals: readonly number[];
+  readonly indices: readonly number[];
+}
+
+export interface AuthoredGroundGeometry {
+  readonly surface: MeshGeometryData;
+  readonly boundary: MeshGeometryData;
+}
+
+/**
+ * Build the finite support stated by an authored-region descriptor.
+ *
+ * The upper face ends at the exact authored bounds. A narrow top rim and vertical fascia make
+ * that limit readable from inside the region and in Map, without inventing scenery beyond it.
+ */
+export function authoredGroundGeometry(support: AuthoredGroundSupport): AuthoredGroundGeometry {
+  const { halfWidth, halfDepth, elevation } = support;
+  if (
+    !Number.isFinite(halfWidth) || halfWidth <= 0 ||
+    !Number.isFinite(halfDepth) || halfDepth <= 0 ||
+    !Number.isFinite(elevation)
+  ) throw new Error('authored ground support must have finite positive extents and elevation');
+
+  const rimWidth = Math.min(0.32, halfWidth / 6, halfDepth / 6);
+  const innerWidth = halfWidth - rimWidth;
+  const innerDepth = halfDepth - rimWidth;
+  const surface = Object.freeze({
+    positions: Object.freeze([
+      -innerWidth, elevation, -innerDepth,
+      innerWidth, elevation, -innerDepth,
+      innerWidth, elevation, innerDepth,
+      -innerWidth, elevation, innerDepth,
+    ]),
+    normals: Object.freeze([
+      0, 1, 0,
+      0, 1, 0,
+      0, 1, 0,
+      0, 1, 0,
+    ]),
+    indices: Object.freeze([0, 2, 1, 0, 3, 2]),
+  });
+
+  const fasciaBottom = elevation - Math.min(0.22, Math.min(halfWidth, halfDepth) / 12);
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const indices: number[] = [];
+  const quad = (
+    a: readonly [number, number, number],
+    b: readonly [number, number, number],
+    c: readonly [number, number, number],
+    d: readonly [number, number, number],
+    normal: readonly [number, number, number],
+  ): void => {
+    const offset = positions.length / 3;
+    positions.push(...a, ...b, ...c, ...d);
+    for (let index = 0; index < 4; index += 1) normals.push(...normal);
+    indices.push(offset, offset + 2, offset + 1, offset, offset + 3, offset + 2);
+  };
+
+  // Top rim, ordered as four non-overlapping strips inside the authored rectangle.
+  quad(
+    [-halfWidth, elevation, -halfDepth], [halfWidth, elevation, -halfDepth],
+    [halfWidth, elevation, -innerDepth], [-halfWidth, elevation, -innerDepth], [0, 1, 0],
+  );
+  quad(
+    [-halfWidth, elevation, innerDepth], [halfWidth, elevation, innerDepth],
+    [halfWidth, elevation, halfDepth], [-halfWidth, elevation, halfDepth], [0, 1, 0],
+  );
+  quad(
+    [-halfWidth, elevation, -innerDepth], [-innerWidth, elevation, -innerDepth],
+    [-innerWidth, elevation, innerDepth], [-halfWidth, elevation, innerDepth], [0, 1, 0],
+  );
+  quad(
+    [innerWidth, elevation, -innerDepth], [halfWidth, elevation, -innerDepth],
+    [halfWidth, elevation, innerDepth], [innerWidth, elevation, innerDepth], [0, 1, 0],
+  );
+  // Vertical fascia uses the same structural material as the rim and exposes the finite support.
+  quad(
+    [-halfWidth, fasciaBottom, -halfDepth], [halfWidth, fasciaBottom, -halfDepth],
+    [halfWidth, elevation, -halfDepth], [-halfWidth, elevation, -halfDepth], [0, 0, -1],
+  );
+  quad(
+    [halfWidth, fasciaBottom, halfDepth], [-halfWidth, fasciaBottom, halfDepth],
+    [-halfWidth, elevation, halfDepth], [halfWidth, elevation, halfDepth], [0, 0, 1],
+  );
+  quad(
+    [-halfWidth, fasciaBottom, halfDepth], [-halfWidth, fasciaBottom, -halfDepth],
+    [-halfWidth, elevation, -halfDepth], [-halfWidth, elevation, halfDepth], [-1, 0, 0],
+  );
+  quad(
+    [halfWidth, fasciaBottom, -halfDepth], [halfWidth, fasciaBottom, halfDepth],
+    [halfWidth, elevation, halfDepth], [halfWidth, elevation, -halfDepth], [1, 0, 0],
+  );
+
+  return Object.freeze({
+    surface,
+    boundary: Object.freeze({
+      positions: Object.freeze(positions),
+      normals: Object.freeze(normals),
+      indices: Object.freeze(indices),
+    }),
+  });
+}
+
 export function worldFieldBufferShape(world: NavigationWorld): {
   readonly regionCapacity: number;
   readonly traceCapacity: number;
@@ -262,6 +375,39 @@ function createLandscapeMesh(
   return pc.Mesh.fromGeometry(device, geometry);
 }
 
+function createMesh(device: pc.GraphicsDevice, data: MeshGeometryData): pc.Mesh {
+  const geometry = new pc.Geometry();
+  geometry.positions = [...data.positions];
+  geometry.normals = [...data.normals];
+  geometry.indices = [...data.indices];
+  return pc.Mesh.fromGeometry(device, geometry);
+}
+
+interface AuthoredGroundMaterial {
+  readonly material: pc.StandardMaterial;
+  applyProfile(profile: WorldArtProfile): void;
+}
+
+function authoredGroundMaterial(profile: WorldArtProfile, boundary: boolean): AuthoredGroundMaterial {
+  const material = new pc.StandardMaterial();
+  material.useLighting = true;
+  material.useFog = true;
+  material.metalness = 0;
+  material.gloss = boundary ? 0.08 : 0.14;
+  const apply = (next: WorldArtProfile): void => {
+    const [r, g, b] = unitRgb(
+      boundary ? worldSilhouetteTone(next.palette) : next.palette.terrain,
+    );
+    material.diffuse.set(r, g, b);
+    const [er, eg, eb] = unitRgb(boundary ? next.palette.stoneShadow : next.palette.terrainLift);
+    material.emissive.set(er, eg, eb);
+    material.emissiveIntensity = boundary ? 0.025 : 0.045;
+    material.update();
+  };
+  apply(profile);
+  return Object.freeze({ material, applyProfile: apply });
+}
+
 /** A continuous low-frequency field: ground, soft region bodies, and confirmed semantic traces. */
 export function createWorldField(
   device: pc.GraphicsDevice,
@@ -269,6 +415,7 @@ export function createWorldField(
   initialProfile: WorldArtProfile = ORIGIN_LANDSCAPE,
   theme: PresentationTheme = DAWN_THEME,
   initiallyReducedMotion = false,
+  authoredSupport?: AuthoredGroundSupport,
 ): WorldField {
   const entity = new pc.Entity('atlas-world-field');
   const buffers = worldFieldBufferShape(world);
@@ -278,7 +425,12 @@ export function createWorldField(
   // 220 segments is ~193k triangles for a surface whose relief, contours, regions and traces are
   // all computed per pixel. The mesh only has to carry the height field well enough that the
   // silhouette and the horizon read correctly, and 96 does that at a fifth of the geometry.
-  const mesh = createLandscapeMesh(device, world, visualHalfExtent, 96);
+  const authoredGeometry = authoredSupport === undefined
+    ? null
+    : authoredGroundGeometry(authoredSupport);
+  const mesh = authoredGeometry === null
+    ? createLandscapeMesh(device, world, visualHalfExtent, 96)
+    : createMesh(device, authoredGeometry.surface);
   const material = new pc.ShaderMaterial({
     uniqueName: `exulanica-grounded-world-field:${buffers.regionCapacity}:${buffers.traceCapacity}`,
     attributes: { aPosition: pc.SEMANTIC_POSITION, aNormal: pc.SEMANTIC_NORMAL },
@@ -288,6 +440,15 @@ export function createWorldField(
   material.cull = pc.CULLFACE_NONE;
   material.depthWrite = true;
   material.blendType = pc.BLEND_NONE;
+  const authoredMaterial = authoredSupport === undefined
+    ? null
+    : authoredGroundMaterial(initialProfile, false);
+  const boundaryMesh = authoredGeometry === null
+    ? null
+    : createMesh(device, authoredGeometry.boundary);
+  const boundaryMaterial = authoredSupport === undefined
+    ? null
+    : authoredGroundMaterial(initialProfile, true);
 
   const regions = new Float32Array(buffers.regionCapacity * 4);
   for (let i = 0; i < world.regions.length; i += 1) {
@@ -325,6 +486,11 @@ export function createWorldField(
   let reducedMotion = initiallyReducedMotion;
   const setProfile = (profile: WorldArtProfile): void => {
     idleCycleMs = profile.ui.motion.idleCycleMs;
+    if (authoredMaterial !== null && boundaryMaterial !== null) {
+      authoredMaterial.applyProfile(profile);
+      boundaryMaterial.applyProfile(profile);
+      return;
+    }
     material.setParameter('uGround', new Float32Array(unitRgb(profile.palette.terrain)));
     material.setParameter('uSurface', new Float32Array(unitRgb(profile.palette.terrainLift)));
     material.setParameter('uAtmosphere', new Float32Array(unitRgb(profile.palette.haze)));
@@ -337,14 +503,26 @@ export function createWorldField(
   };
   setProfile(initialProfile);
 
-  entity.setPosition(world.centre.x, -0.035, world.centre.z);
-  const fieldInstance = new pc.MeshInstance(mesh, material, entity);
+  const fieldCentre = authoredSupport === undefined
+    ? { x: world.centre.x, z: world.centre.z }
+    : { x: 0, z: 0 };
+  entity.setPosition(fieldCentre.x, authoredSupport === undefined ? -0.035 : 0, fieldCentre.z);
+  const fieldInstance = new pc.MeshInstance(mesh, authoredMaterial?.material ?? material, entity);
   fieldInstance.castShadow = false;
-  fieldInstance.receiveShadow = false;
-  entity.addComponent('render', { meshInstances: [fieldInstance] });
+  fieldInstance.receiveShadow = authoredSupport !== undefined;
+  const boundaryInstance = boundaryMesh === null || boundaryMaterial === null
+    ? null
+    : new pc.MeshInstance(boundaryMesh, boundaryMaterial.material, entity);
+  if (boundaryInstance !== null) {
+    boundaryInstance.castShadow = false;
+    boundaryInstance.receiveShadow = true;
+  }
+  entity.addComponent('render', {
+    meshInstances: boundaryInstance === null ? [fieldInstance] : [fieldInstance, boundaryInstance],
+  });
   if (entity.render !== undefined && entity.render !== null) {
     entity.render.castShadows = false;
-    entity.render.receiveShadows = false;
+    entity.render.receiveShadows = authoredSupport !== undefined;
   }
 
   const marker = new pc.Entity('atlas-map-user-marker');
@@ -398,25 +576,36 @@ export function createWorldField(
     setProfile,
     setMapGroundPose(pose) {
       marker.enabled = pose !== null;
-      material.setParameter('uMapMode', pose === null ? 0 : 1);
+      if (authoredSupport === undefined) material.setParameter('uMapMode', pose === null ? 0 : 1);
       if (pose === null) return;
-      marker.setPosition(pose.position.x - world.centre.x, 0.09, pose.position.z - world.centre.z);
+      marker.setPosition(
+        pose.position.x - fieldCentre.x,
+        (authoredSupport?.elevation ?? 0) + 0.09,
+        pose.position.z - fieldCentre.z,
+      );
       marker.setEulerAngles(0, (pose.yaw * 180) / Math.PI, 0);
     },
     setRenderOrigin(x, z) {
-      material.setParameter('uRenderOrigin', new Float32Array([x, z]));
+      if (authoredSupport === undefined) {
+        material.setParameter('uRenderOrigin', new Float32Array([x, z]));
+      }
     },
     setReducedMotion(reduced) {
       reducedMotion = reduced;
     },
     update(nowMs) {
-      material.setParameter('uTime', worldMotionSeconds(nowMs, idleCycleMs, reducedMotion));
+      if (authoredSupport === undefined) {
+        material.setParameter('uTime', worldMotionSeconds(nowMs, idleCycleMs, reducedMotion));
+      }
     },
     destroy() {
       markerMesh.destroy();
       bodyMesh.destroy();
       mesh.destroy();
+      boundaryMesh?.destroy();
       material.destroy();
+      authoredMaterial?.material.destroy();
+      boundaryMaterial?.material.destroy();
       markerMaterial.destroy();
       bodyMaterial.destroy();
     },

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import datetime as dt
 import uuid
 from concurrent.futures import ThreadPoolExecutor
 from contextlib import ExitStack
@@ -12,7 +13,12 @@ from time import monotonic, sleep
 
 import psycopg
 import pytest
+from exulanica.errors import BlobNotFoundError, IntegrityError
+from exulanica.evidence.blob import BlobId
+from exulanica.ingest.pipeline import PhotoIngestPipeline
+from exulanica.ingest.privacy import authorize_personal_capture, record_human_screening
 from exulanica.world import (
+    ProtectedTopologyConflict,
     SavedWorldEntryRepository,
     StaleSavedWorldEntry,
     Transform,
@@ -22,6 +28,7 @@ from exulanica.world import (
 )
 from exulanica.world.starter import authored_starter_candidate
 
+from conftest import photo_bytes
 from test_world_objects_api import STRANGER_TOKEN, ObjectsApi
 from test_world_objects_api import objects_api as imported_objects_api  # noqa: F401
 
@@ -54,6 +61,371 @@ def _create_starter(api: ObjectsApi, title: str = "My world"):
     response = api.post("/world-entries/starter", {"title": title})
     assert response.status_code == 200, response.text
     return response.json()
+
+
+def _reviewed_source(
+    repository,
+    objects_api,
+    *,
+    reviewed=True,
+    expired=False,
+    valid_for_seconds=None,
+    minute=0,
+):
+    data = photo_bytes(when=f"2026:09:20 12:{minute:02d}:00")
+    intake = PhotoIngestPipeline(repository, objects_api.store).ingest_intake(
+        data, filename=f"source-{minute}.jpg"
+    )
+    assert intake.capture_id is not None, intake.error
+    now = repository.connection.execute("select clock_timestamp() as at").fetchone()["at"]
+    start = now - dt.timedelta(hours=2 if expired else 1)
+    end = (
+        now - dt.timedelta(hours=1)
+        if expired
+        else now + dt.timedelta(seconds=valid_for_seconds)
+        if valid_for_seconds is not None
+        else now + dt.timedelta(hours=1)
+    )
+    authority = authorize_personal_capture(
+        repository,
+        capture_id=intake.capture_id,
+        actor=objects_api.actor,
+        account_authority_basis="Synthetic test fixture owned by the test actor",
+        authorization_scope={"purpose": "saved-world reference attachment test"},
+        purpose="saved-world reference attachment test",
+        authorized_at=start,
+        valid_until=end,
+    )
+    screening = None
+    if reviewed:
+        screening = record_human_screening(
+            repository,
+            authorization_id=authority.authorization_id,
+            reviewed_by=objects_api.actor,
+            sensitive_regions=[],
+            screened_at=start + dt.timedelta(minutes=1),
+            valid_until=end,
+        )
+    span = repository.connection.execute(
+        "select span_id from evidence_span where workspace_id=%s and blob_sha256=%s "
+        "and modality='still_image' and track_key='img' and t_start_ns=0 and t_end_ns=1 "
+        "and region is null and text_anchor is null order by span_id limit 1",
+        (repository.workspace_id, BlobId.of_bytes(data).digest),
+    ).fetchone()
+    assert span is not None
+    return {
+        "capture_id": str(intake.capture_id),
+        "evidence_span_id": str(span["span_id"]),
+        "source_sha256": BlobId.of_bytes(data).hex,
+        "authorization_id": str(authority.authorization_id),
+        "screening_id": None if screening is None else str(screening.screening_id),
+        "payload": data,
+    }
+
+
+def _attachment_body(entry, source, operation_id=None):
+    return {
+        "operation_id": str(operation_id or uuid.uuid4()),
+        "base_revision": entry["revision"],
+        "authored_version_id": entry["authored_version_id"],
+        "authored_state_sha256": entry["authored_state_sha256"],
+        "authored_edit_seq": entry["authored_edit_seq"],
+        "style_version_id": entry["style_version_id"],
+        "sources": [
+            {
+                "capture_id": source["capture_id"],
+                "evidence_span_id": source["evidence_span_id"],
+            }
+        ],
+    }
+
+
+def test_reviewed_photo_attachment_preserves_scene_cursor_replays_and_keeps_undo(
+    objects_api, repository
+):
+    entry = _create_starter(objects_api)
+    version = objects_api.get(
+        f"/world/versions/{entry['authored_version_id']}?world_id={entry['world_id']}"
+    ).json()
+    added = objects_api.post(
+        f"/world/versions/{entry['authored_version_id']}/objects?world_id={entry['world_id']}",
+        {
+            "base_state_sha256": version["state_sha256"],
+            "object_id": "object:before-attachment",
+            "asset_sha256": "b41289ac10548cf698d46a15206caa8e744b0b800f4ac29260c99f18d8b831d9",
+            "region_id": "region:starter",
+            "transform": {
+                "x_mm": 1_200,
+                "y_mm": 0,
+                "z_mm": -450,
+                "yaw_microradians": 0,
+                "scale_milli": 1_000,
+            },
+            "origin_role": "fictional",
+            "saved_entry": {
+                "entry_id": entry["entry_id"],
+                "base_revision": entry["revision"],
+                "authored_state_sha256": entry["authored_state_sha256"],
+                "authored_edit_seq": entry["authored_edit_seq"],
+            },
+        },
+    )
+    assert added.status_code == 201, added.text
+    before = objects_api.get(f"/world-entries/{entry['entry_id']}").json()
+    source = _reviewed_source(repository, objects_api)
+    body = _attachment_body(before, source)
+
+    response = objects_api.post(
+        f"/world-entries/{entry['entry_id']}/source-attachments", body
+    )
+    assert response.status_code == 200, response.text
+    attached = response.json()
+    assert attached["revision"] == before["revision"] + 1
+    for key in (
+        "source_kind",
+        "source_snapshot_id",
+        "source_snapshot_sha256",
+        "authored_version_id",
+        "authored_state_sha256",
+        "authored_edit_seq",
+        "style_version_id",
+        "authored_scene",
+        "availability",
+    ):
+        assert attached[key] == before[key], key
+    member = attached["source_attachments"][0]
+    assert member["operation_id"] == body["operation_id"]
+    assert member["capture_id"] == source["capture_id"]
+    assert member["evidence_span_id"] == source["evidence_span_id"]
+    assert member["source_sha256"] == source["source_sha256"]
+    assert member["authorization_id"] == source["authorization_id"]
+    assert member["screening_id"] == source["screening_id"]
+    assert member["role"] == "reference"
+    assert member["attached_entry_revision"] == attached["revision"]
+    assert member["availability"] == "available"
+    assert member["viewer_sha256"] == source["source_sha256"]
+    assert member["evidence_path"] == f"/evidence/{source['evidence_span_id']}/masked"
+
+    metadata_only = SavedWorldEntryRepository(
+        repository.connection, repository.workspace_id
+    ).entry(uuid.UUID(entry["entry_id"]))
+    assert metadata_only.source_attachments[0].availability == "unavailable"
+    assert metadata_only.source_attachments[0].unavailable_reason == "viewer_unavailable"
+    assert metadata_only.source_attachments[0].viewer_sha256 is None
+    assert metadata_only.source_attachments[0].evidence_path is None
+
+    replayed = objects_api.post(
+        f"/world-entries/{entry['entry_id']}/source-attachments", body
+    )
+    assert replayed.status_code == 200, replayed.text
+    assert replayed.json() == attached
+    assert objects_api.get(f"/world-entries/{entry['entry_id']}").json() == attached
+
+    undone = objects_api.post(
+        f"/world/versions/{entry['authored_version_id']}/objects/undo"
+        f"?world_id={entry['world_id']}",
+        {
+            "base_state_sha256": attached["authored_state_sha256"],
+            "saved_entry": {
+                "entry_id": entry["entry_id"],
+                "base_revision": attached["revision"],
+                "authored_state_sha256": attached["authored_state_sha256"],
+                "authored_edit_seq": attached["authored_edit_seq"],
+            },
+        },
+    )
+    assert undone.status_code == 200, undone.text
+    after_undo = objects_api.get(f"/world-entries/{entry['entry_id']}").json()
+    assert after_undo["source_attachments"] == attached["source_attachments"]
+    assert undone.json()["objects"] == []
+    assert [edit["kind"] for edit in undone.json()["edits"]] == ["add_object", "undo"]
+
+
+def test_attachment_batch_is_atomic_and_rejects_stale_or_changed_operation(
+    objects_api, repository
+):
+    entry = _create_starter(objects_api)
+    good = _reviewed_source(repository, objects_api, minute=1)
+    unreviewed = _reviewed_source(repository, objects_api, reviewed=False, minute=2)
+    expired = _reviewed_source(repository, objects_api, expired=True, minute=4)
+    mismatched = _attachment_body(entry, good)
+    mismatched["sources"][0]["evidence_span_id"] = unreviewed["evidence_span_id"]
+    mismatch = objects_api.post(
+        f"/world-entries/{entry['entry_id']}/source-attachments", mismatched
+    )
+    assert mismatch.status_code == 422
+
+    expired_response = objects_api.post(
+        f"/world-entries/{entry['entry_id']}/source-attachments",
+        _attachment_body(entry, expired),
+    )
+    assert expired_response.status_code == 422
+
+    body = _attachment_body(entry, good)
+    body["sources"].append(
+        {
+            "capture_id": unreviewed["capture_id"],
+            "evidence_span_id": unreviewed["evidence_span_id"],
+        }
+    )
+    refused = objects_api.post(
+        f"/world-entries/{entry['entry_id']}/source-attachments", body
+    )
+    assert refused.status_code == 422, refused.text
+    assert refused.json()["code"] == "invalid_source_attachment"
+    unchanged = objects_api.get(f"/world-entries/{entry['entry_id']}").json()
+    assert unchanged["revision"] == entry["revision"]
+    assert unchanged["source_attachments"] == []
+
+    foreign = objects_api.stranger_post(
+        f"/world-entries/{entry['entry_id']}/source-attachments",
+        _attachment_body(entry, good),
+    )
+    assert foreign.status_code == 404
+    assert foreign.json()["code"] == "unknown_reference"
+
+    body = _attachment_body(entry, good)
+    accepted = objects_api.post(
+        f"/world-entries/{entry['entry_id']}/source-attachments", body
+    )
+    assert accepted.status_code == 200, accepted.text
+    stale = _attachment_body(entry, unreviewed)
+    stale_response = objects_api.post(
+        f"/world-entries/{entry['entry_id']}/source-attachments", stale
+    )
+    assert stale_response.status_code == 409
+    assert stale_response.json()["code"] == "stale_saved_world_entry"
+
+    changed = deepcopy(body)
+    changed["sources"][0]["evidence_span_id"] = unreviewed["evidence_span_id"]
+    conflict = objects_api.post(
+        f"/world-entries/{entry['entry_id']}/source-attachments", changed
+    )
+    assert conflict.status_code == 409
+    assert conflict.json()["code"] == "source_attachment_operation_conflict"
+    reread = objects_api.get(f"/world-entries/{entry['entry_id']}").json()
+    assert len(reread["source_attachments"]) == 1
+
+
+def test_attachment_refuses_authored_drift_even_when_entry_revision_did_not_move(
+    objects_api, repository
+):
+    entry = _create_starter(objects_api)
+    source = _reviewed_source(repository, objects_api, minute=5)
+    version = objects_api.get(
+        f"/world/versions/{entry['authored_version_id']}?world_id={entry['world_id']}"
+    ).json()
+    changed = objects_api.post(
+        f"/world/versions/{entry['authored_version_id']}/objects?world_id={entry['world_id']}",
+        {
+            "base_state_sha256": version["state_sha256"],
+            "object_id": "object:unbound-drift",
+            "asset_sha256": "b41289ac10548cf698d46a15206caa8e744b0b800f4ac29260c99f18d8b831d9",
+            "region_id": "region:starter",
+            "transform": {
+                "x_mm": 0,
+                "y_mm": 0,
+                "z_mm": 0,
+                "yaw_microradians": 0,
+                "scale_milli": 1_000,
+            },
+            "origin_role": "fictional",
+        },
+    )
+    assert changed.status_code == 201, changed.text
+    drifted = objects_api.get(f"/world-entries/{entry['entry_id']}").json()
+    assert drifted["revision"] == entry["revision"]
+    assert drifted["unavailable_reason"] == "authored_version_changed"
+
+    refused = objects_api.post(
+        f"/world-entries/{entry['entry_id']}/source-attachments",
+        _attachment_body(entry, source),
+    )
+    assert refused.status_code == 409
+    assert refused.json()["code"] == "stale_saved_world_entry"
+    rows = repository.connection.execute(
+        "select count(*) as n from saved_world_source_attachment where workspace_id=%s",
+        (repository.workspace_id,),
+    ).fetchone()
+    assert rows["n"] == 0
+
+
+def test_attachment_authority_expiry_withholds_only_viewer_capabilities(objects_api, repository):
+    entry = _create_starter(objects_api)
+    source = _reviewed_source(
+        repository, objects_api, valid_for_seconds=5, minute=6
+    )
+    attached = objects_api.post(
+        f"/world-entries/{entry['entry_id']}/source-attachments",
+        _attachment_body(entry, source),
+    )
+    assert attached.status_code == 200, attached.text
+    expiry = repository.connection.execute(
+        "select valid_until from capture_reconstruction_authorization "
+        "where workspace_id=%s and authorization_id=%s",
+        (repository.workspace_id, uuid.UUID(source["authorization_id"])),
+    ).fetchone()["valid_until"]
+    repository.connection.execute(
+        "select pg_sleep(greatest(0,extract(epoch from (%s-clock_timestamp())))+0.05)",
+        (expiry,),
+    )
+
+    reopened = objects_api.get(f"/world-entries/{entry['entry_id']}").json()
+    assert reopened["availability"] == "available"
+    assert reopened["source_attachments"][0]["unavailable_reason"] == "authorization_expired"
+    assert reopened["source_attachments"][0]["viewer_sha256"] is None
+    assert reopened["source_attachments"][0]["evidence_path"] is None
+
+
+def test_attachment_unavailability_never_hides_the_authored_world(
+    objects_api, repository, monkeypatch
+):
+    entry = _create_starter(objects_api)
+    source = _reviewed_source(repository, objects_api, minute=3)
+    attached = objects_api.post(
+        f"/world-entries/{entry['entry_id']}/source-attachments",
+        _attachment_body(entry, source),
+    ).json()
+    blob = BlobId.from_hex(source["source_sha256"])
+    (objects_api.store.root / objects_api.store.key_for(blob)).unlink()
+    missing = objects_api.get(f"/world-entries/{entry['entry_id']}").json()
+    assert missing["availability"] == "available"
+    assert missing["authored_scene"] == attached["authored_scene"]
+    assert missing["source_attachments"][0]["availability"] == "unavailable"
+    assert missing["source_attachments"][0]["unavailable_reason"] == "viewer_unavailable"
+    assert missing["source_attachments"][0]["viewer_sha256"] is None
+    assert missing["source_attachments"][0]["evidence_path"] is None
+
+    objects_api.store.put_bytes(source["payload"])
+    for failure in (
+        ValueError("ambiguous decoded lineage"),
+        BlobNotFoundError("selected blob disappeared"),
+        IntegrityError("selected blob failed its digest"),
+        OSError("selected blob cannot be inspected"),
+    ):
+        with monkeypatch.context() as corrupt_lineage:
+            corrupt_lineage.setattr(
+                "exulanica.world.saved_entries.selected_image",
+                lambda *_args, error=failure, **_kwargs: (_ for _ in ()).throw(error),
+            )
+            corrupt = objects_api.get(f"/world-entries/{entry['entry_id']}").json()
+        assert corrupt["availability"] == "available"
+        assert corrupt["source_attachments"][0]["availability"] == "unavailable"
+        assert corrupt["source_attachments"][0]["unavailable_reason"] == "viewer_unavailable"
+        assert corrupt["source_attachments"][0]["viewer_sha256"] is None
+        assert corrupt["source_attachments"][0]["evidence_path"] is None
+
+    repository.insert_tombstone(
+        scope="capture",
+        capture_id=uuid.UUID(source["capture_id"]),
+        requested_by=objects_api.actor,
+    )
+    withdrawn = objects_api.get(f"/world-entries/{entry['entry_id']}").json()
+    assert withdrawn["availability"] == "available"
+    assert withdrawn["source_attachments"][0]["unavailable_reason"] == "source_unavailable"
+    assert withdrawn["source_attachments"][0]["source_sha256"] == source["source_sha256"]
+    assert withdrawn["source_attachments"][0]["authorization_id"] == source["authorization_id"]
+    assert withdrawn["source_attachments"][0]["screening_id"] == source["screening_id"]
 
 
 def test_starter_creation_is_real_source_independent_and_exactly_idempotent(
@@ -204,39 +576,19 @@ def test_authored_entry_refuses_a_spoofed_starter_snapshot_without_changing_its_
     topology["elements"][0]["module"]["key"] = "region.spoofed-ground"
     candidate = replace(original, topology=topology)
     preview = structures.preview(candidate, proposed_by=objects_api.actor)
-    snapshot = structures.apply(
-        preview.preview_id,
-        base_snapshot_id=current.snapshot_id,
-        base_graph_sha256=current.candidate.graph_sha256,
-        base_reconstruction_sha256=current.candidate.reconstruction_sha256,
-        committed_by=objects_api.actor,
-    )
-    alternate = WorldObjectRepository(
-        repository.connection, repository.workspace_id, world_id=entry["world_id"]
-    ).create_version(
-        source_snapshot_id=snapshot.snapshot_id,
-        title="Wrong origin",
-        style_version_id=uuid.UUID(entry["style_version_id"]),
-        created_by=objects_api.actor,
-    )
-    repository.connection.commit()
-
-    refused = objects_api.client.put(
-        f"/world-entries/{entry['entry_id']}",
-        headers=objects_api.headers,
-        json={
-            "base_revision": entry["revision"],
-            "authored_version_id": str(alternate.version_id),
-            "expected_authored_state_sha256": alternate.state_sha256,
-            "expected_authored_edit_seq": alternate.edit_seq,
-            "style_version_id": entry["style_version_id"],
-        },
-    )
-    assert refused.status_code == 422
-    assert refused.json()["code"] == "invalid_saved_world_entry"
+    with pytest.raises(ProtectedTopologyConflict, match="starter overlay"):
+        structures.apply(
+            preview.preview_id,
+            base_snapshot_id=current.snapshot_id,
+            base_graph_sha256=current.candidate.graph_sha256,
+            base_reconstruction_sha256=current.candidate.reconstruction_sha256,
+            committed_by=objects_api.actor,
+        )
     unchanged = objects_api.get(f"/world-entries/{entry['entry_id']}").json()
     assert unchanged["authored_version_id"] == entry["authored_version_id"]
     assert unchanged["revision"] == entry["revision"]
+    assert unchanged["source_snapshot_id"] == entry["source_snapshot_id"]
+    assert structures.current().snapshot_id == current.snapshot_id
 
 
 def test_entry_reopens_exact_versions_and_rejects_stale_save(objects_api, repository):

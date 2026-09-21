@@ -1,11 +1,11 @@
 # Authored world versions and created objects
 
 Status: **DECISION** and **IMPLEMENTED** for alternate world versions, authored object add/move/
-remove/undo, durable environment placement, the reviewed asset registry, and the bounded
-object-behaviour registry. Object rendering and bounded-motion controls have synthetic browser
-coverage, and the authored-world 1.0 package extension exists. Unified retrieval, the
-conversational authoring service, environment-instance package projection, and complete
-personal-scene visual acceptance are not implemented.
+remove/undo, durable environment placement, the reviewed asset registry, the bounded
+object-behaviour registry, and the opt-in environment-instances 1.0 package extension. Object
+rendering and bounded-motion controls have synthetic browser coverage, and the authored-world
+1.0 package extension exists. Unified retrieval, the conversational authoring service, and
+complete personal-scene visual acceptance are not implemented.
 
 This is the fourth world plane under [ADR-0007](adr/0007-world-composition-and-customization.md).
 The three that exist are appearance ([world-style-backend.md](world-style-backend.md), migrations
@@ -120,8 +120,8 @@ The delta has four parts, and the version stores all four:
 
 | Part | Storage | Public mutation route |
 | --- | --- | --- |
-| Additions | `world_alternate_object` rows with `removed = false` | Yes |
-| Removals | authored objects with `removed = true`; source elements in `world_alternate_element_override` with `suppressed = true` | Authored objects yes; source elements no |
+| Additions | `world_alternate_object` rows with `removed = false` and `addition_undone = false` | Yes |
+| Removals | authored objects with `removed = true` and `addition_undone = false`; source elements in `world_alternate_element_override` with `suppressed = true` | Authored objects yes; source elements no |
 | Transforms | the fixed-point transform on an authored object; a replacement transform on a source element override | Authored objects yes; source elements no |
 | Appearance references | `style_version_id` on the version | At creation only |
 
@@ -154,6 +154,13 @@ is a property of the edit rather than of the object, and it lives on the edit ro
 
 The asset reference is a content digest, never a name and never a URL. `region_id` must be a region
 of the source snapshot's topology, and the transform is **region-local**.
+
+Reviewed GLBs that declare no materials receive a renderer-owned matte material derived from the
+world's appearance palette. Appearance preview, apply and discard update this fallback; declared
+asset materials remain unchanged. This presentation rule does not rewrite asset bytes, digests or
+normals. Unaimed ground placement starts 3.5 metres ahead of the visitor so the reviewed marker's
+ground contact remains visible at the supported minimum field of view. Existing saved transforms
+stay fixed, and the browser's region bounds still constrain new placements.
 
 That frame is a deliberate difference from the structural plane, and it is the one place this
 contract does not simply copy it. `world/placement.json` poses every element in a single shared
@@ -300,18 +307,30 @@ which is what makes undo a stored fact rather than a client's memory of one.
 
 It reverses **the newest edit that no undo already names**, so a person who made three edits can
 take all three back. Reversing "the newest edit" instead would refuse the second undo, because by
-then the newest edit is an undo, and a control that works once is not an undo. Every edit kind is
-reversible, including the two element-override kinds; an earlier version reversed object edits
-only, which let one override sit at the head of the log and block undo for the whole version
-permanently.
+then the newest edit is an undo, and a control that works once is not an undo. The repository
+defines inverses for object, element-override and environment edits. The ordinary runtime can
+reverse these edits without deletion authority. Tests exercise that restricted role, including
+replacement and restoration of element overrides and environment addition, movement and removal.
 
 Undo is still not redo. An undo edit is never itself a candidate. When every edit has been
 reversed, a further undo is refused with `invalid_object_state`, as it is on a version with no
 edits at all.
 
-One case does remove a row: undoing an `add_object` deletes the `world_alternate_object` row,
-because the state that edit was made against did not contain the object. The **edit log** is
-append-only and enforced so by trigger; the materialised delta is current state and is not.
+Undoing an `add_object` retains its projection row with `addition_undone = true`, because the
+ordinary runtime has no deletion authority. Canonical reads and authored-world package export
+omit that row, restoring the exact state before the addition. Its `last_edit_id` names the actual
+undo edit. A later addition may reuse that object ID through a constrained update that clears the
+flag; an ordinary removed object remains a distinct, stored removal. The **edit log** remains
+append-only and enforced so by trigger.
+
+Element overrides and environment additions use the same explicit retained-projection flag.
+Canonical reads, supported package projections and environment selection omit undone additions.
+Replacing an override updates its projection and appends history. Reusing an undone environment
+ID revalidates current source authority and exact lineage; undo never restores withdrawn source
+permission. Ordinary environment movement and removal retain immutable source bindings.
+Environment composition history is exported by the environment-instances package extension, not
+by authored-world 1.0. Live undo and selection behavior do not grant source-use rights in that
+package.
 
 **Reopening** is a read. Every value in this contract is a database row, so closing the session,
 reconnecting, and reading `GET /world/versions/{id}` returns the same objects, the same transforms
@@ -445,11 +464,14 @@ and region references, checks asset and behavior declarations, and withholds ver
 snapshot deletion invalidated. `import-check` reports receiver capabilities; it does not load the
 world.
 
-The canonical contract, layout, compatibility behavior, and tests are in
+The canonical contract, layout, compatibility behavior, and tests for objects, overrides and
+schema-version-1 deltas are in
 [World Memory Package: Authored-world extension 1.0](world-memory-package.md#authored-world-extension-10).
-That extension predates durable `environment_instances` in delta schema v2 and does not export
-them. Society state is also outside it. Either addition requires a separately versioned extension
-change and an explicit receiver contract; neither may be inferred from the signed authored object
+That extension does not export `environment_instances` and does not emit schema version 2.
+Environment-inclusive state is
+[World Memory Package: Environment-instances extension 1.0](world-memory-package.md#environment-instances-extension-10).
+Society state is outside both. A receiver without the environment-instances capability must
+omit those versions and must not infer objects from authored-world 1.0 as the whole authored
 state.
 
 ## 9. Verification
@@ -505,11 +527,15 @@ current composed digest remain unchanged, including across a retry with the orig
 The preservation option on structural apply refuses any candidate other than the exact plain
 composition of the current contract and refuses a non-initial snapshot.
 
-This is authored gallery layout, not reconstruction. Regions and their destinations are ten metres
-apart along x; each region's source cards share its x coordinate and are spaced two metres along z.
-World-owned sources start at the world origin. Cards claim no collision geometry. The layout adds
-no measured or semantic fact about a photograph. Authored objects remain region-local deltas against
-the immutable snapshot, so a subsequent source re-compose leaves them intact.
+`composed.py` writes every sourced element and required destination as explicitly unplaced. It
+does not invent gallery spacing, collision, or a measured place. That unplaced layout is not a
+reconstruction and is not reviewed-source materialization. Authored objects remain region-local
+deltas against the immutable snapshot, so a subsequent source re-compose leaves them intact.
+
+Style bound to composed topology T1 meeting structural snapshot T2 is classified by
+`classify_structure_style_compatibility`. The same `compatibility_key` is family binding only.
+Hex equality between T1 and T2 is not the reason for compatibility. An existing current snapshot
+is never replaced. Bootstrap reuse reports snapshot regions, not a later composed region's list.
 
 The response contains `snapshot` (`applied` or `reused`), `snapshot_id`, `regions`, `version`
 (`created` or `reused`), `version_id` and `state_sha256`. An existing current snapshot is never
@@ -581,9 +607,11 @@ reports `withdrawn` and remains unavailable for rendering. This permits history 
 turning undo into renewed source authorization.
 
 The browser reads and draws available environment instances through the existing owned-district
-binding. Unified Selection, Companion editing, WMP projection, extraction, retained-database writes
-and real-scene visual validation are outside the implemented environment-instance scope. The
-existing reviewed CC0 asset registry and its byte semantics are unchanged.
+binding. Package projection of those instances is the opt-in
+`exulanica-wmp-ext-environment-instances` 1.0 extension. Unified Selection, Companion editing,
+extraction, retained-database writes and real-scene visual validation remain outside the
+implemented environment-instance scope. The existing reviewed CC0 asset registry and its byte
+semantics are unchanged.
 
 
 ## Bounded scene-extraction preparation

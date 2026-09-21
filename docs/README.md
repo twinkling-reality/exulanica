@@ -79,7 +79,7 @@ README. It does not promote delivery-roadmap items to shipped claims.
 
 | Surface | In the tree | Not established |
 | --- | --- | --- |
-| World Memory Package | Ordinary profile `exulanica-wmp-1.0`; opt-in training profile `exulanica-wmp-training-1.1` | A general learned simulation runtime; a complete society or environment-instance projection |
+| World Memory Package | Ordinary profile `exulanica-wmp-1.0`; opt-in authored-world 1.0 and environment-instances 1.0 extensions; opt-in training profile `exulanica-wmp-training-1.1` | A general learned simulation runtime; a complete society projection |
 | World Read / Write | Scene and place bundles; generation receipts | Unified authorized search across memories, imported geography, and authored versions |
 | Authored objects | Add, move, remove, undo, and alternate versions, with code and synthetic checks | Real-scene acceptance; arbitrary world branching |
 | Accounts | Optional Google account sessions, account-owned workspaces, authenticated district reads | Configured live-provider deployment and a completed account-deletion lifecycle |
@@ -147,8 +147,8 @@ Documents are filed by how they change over time.
 **Where a new document goes**, first yes wins:
 
 1. Dispatch brief, handoff, procurement, or personal-run note? Write it under
-   `.exulanica/briefs/` and do not `git add` it. Existing notes may still sit under
-   `.orimera/briefs/`; do not move that tree. These notes are not part of the public reading
+   `.exulanica/briefs/` and do not `git add` it. Keep existing private note directories
+   at their recorded paths. These notes are not part of the public reading
    surface. Public documents do not link to `docs/briefs/` as if a clone contained those files.
 2. Machine-readable evidence with a digest? A script may write `evaluation/` on
    disk. Do not hand-edit a record. Do not `git add` a new campaign unless it

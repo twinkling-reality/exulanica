@@ -10,6 +10,7 @@ import pytest
 from exulanica.api.app import create_app
 from exulanica.api.authorisation import load_token_directory
 from exulanica.api.services import Services
+from exulanica.db.roles import RUNTIME_ROLE, provision_runtime_role
 from exulanica.environment import (
     DerivedEnvironmentAsset,
     EnvironmentFeatureInput,
@@ -70,6 +71,7 @@ from conftest import (
     TEST_MAX_CALLS,
     CountingVisionModel,
     ingest_observed,
+    scratch_role_database,
     write_photo,
 )
 from model_fakes import FakeTransport, chat_body
@@ -329,6 +331,119 @@ def test_move_changes_only_destination_then_remove_and_undo_restore_it(composed)
     )
     assert not version.environment_instances[0].removed
     assert version.state_sha256 == moved
+
+
+def test_runtime_role_undo_retains_environment_history_without_delete(
+    composed, repository, spine_schema
+) -> None:
+    empty = composed.version.state_sha256
+    repository.connection.commit()
+    provision_runtime_role(repository.connection)
+    repository.connection.commit()
+
+    with scratch_role_database(spine_schema[1], RUNTIME_ROLE).session(
+        repository.workspace_id
+    ) as connection:
+        runtime = WorldObjectRepository(
+            connection, repository.workspace_id, store=composed.store
+        )
+        assert connection.execute(
+            "select has_table_privilege(current_user,'world_alternate_environment_instance',"
+            "'DELETE') as allowed"
+        ).fetchone()["allowed"] is False
+        placed = runtime.add_environment(
+            composed.version.version_id,
+            composed.placement("environment:reusable"),
+            base_state_sha256=empty,
+            actor=uuid.uuid4(),
+        )
+        undone = runtime.undo(
+            composed.version.version_id,
+            base_state_sha256=placed.state_sha256,
+            actor=uuid.uuid4(),
+        )
+        assert undone.environment_instances == ()
+        assert undone.state_sha256 == empty
+        retained = connection.execute(
+            "select removed,addition_undone,created_edit_id,last_edit_id "
+            "from world_alternate_environment_instance where workspace_id=%s and world_id=%s "
+            "and version_id=%s and instance_id=%s",
+            (
+                repository.workspace_id,
+                runtime.world_id,
+                composed.version.version_id,
+                "environment:reusable",
+            ),
+        ).fetchone()
+        assert retained["removed"] is retained["addition_undone"] is True
+        assert retained["created_edit_id"] == placed.edits[-1].edit_id
+        assert retained["last_edit_id"] == undone.edits[-1].edit_id
+
+        child = runtime.create_version(
+            parent_version_id=composed.version.version_id,
+            title="No hidden environment",
+            created_by=uuid.uuid4(),
+        )
+        assert child.environment_instances == ()
+        assert child.state_sha256 == empty
+
+        readded = runtime.add_environment(
+            composed.version.version_id,
+            composed.placement("environment:reusable"),
+            base_state_sha256=undone.state_sha256,
+            actor=uuid.uuid4(),
+        )
+        assert len(readded.environment_instances) == 1
+        assert connection.execute(
+            "select count(*) as n from world_alternate_environment_instance "
+            "where workspace_id=%s and world_id=%s and version_id=%s",
+            (repository.workspace_id, runtime.world_id, composed.version.version_id),
+        ).fetchone()["n"] == 1
+        projection = connection.execute(
+            "select addition_undone,created_edit_id,last_edit_id "
+            "from world_alternate_environment_instance where workspace_id=%s and world_id=%s "
+            "and version_id=%s and instance_id=%s",
+            (
+                repository.workspace_id,
+                runtime.world_id,
+                composed.version.version_id,
+                "environment:reusable",
+            ),
+        ).fetchone()
+        assert projection == {
+            "addition_undone": False,
+            "created_edit_id": readded.edits[-1].edit_id,
+            "last_edit_id": readded.edits[-1].edit_id,
+        }
+
+        removed = runtime.remove_environment(
+            composed.version.version_id,
+            "environment:reusable",
+            base_state_sha256=readded.state_sha256,
+            actor=uuid.uuid4(),
+        )
+        restored = runtime.undo(
+            composed.version.version_id,
+            base_state_sha256=removed.state_sha256,
+            actor=uuid.uuid4(),
+        )
+        assert restored.environment_instances == readded.environment_instances
+        projection = connection.execute(
+            "select removed,addition_undone,last_edit_id "
+            "from world_alternate_environment_instance where workspace_id=%s and world_id=%s "
+            "and version_id=%s and instance_id=%s",
+            (
+                repository.workspace_id,
+                runtime.world_id,
+                composed.version.version_id,
+                "environment:reusable",
+            ),
+        ).fetchone()
+        assert projection == {
+            "removed": False,
+            "addition_undone": False,
+            "last_edit_id": restored.edits[-1].edit_id,
+        }
 
 
 def test_two_clients_reject_the_stale_environment_base(composed, spine_schema) -> None:
@@ -1097,6 +1212,26 @@ def test_broad_related_place_selection_unions_memories_imports_and_authored_vers
     assert all(
         any(value.startswith("admission:") for value in item.lineage_ids) for item in authored
     )
+
+
+def test_undone_environment_addition_is_absent_from_related_selection(memory_place) -> None:
+    _confirm_bridge(memory_place)
+    version = _add(
+        memory_place.composed,
+        memory_place.composed.placement("environment:temporary"),
+    )
+    version = memory_place.composed.worlds.undo(
+        version.version_id, base_state_sha256=version.state_sha256, actor=uuid.uuid4()
+    )
+    memory_place.composed.version = version
+
+    result = memory_place.run()
+    assert all(item.result_kind != "authored_environment_instance" for item in result.content)
+    assert {item.result_kind for item in result.content} == {
+        "memory_capture",
+        "admitted_environment_source",
+        "admitted_environment_feature",
+    }
 
 
 def test_memories_only_excludes_imports_and_fantasy_and_never_infers_a_visit(

@@ -1,4 +1,5 @@
-"""Durable personal-world state: protected topology, reviewed styles, immutable versions, and source availability.
+"""Durable personal-world state: protected topology, reviewed styles, immutable versions,
+and source availability.
 
 Repositories own the PostgreSQL transactions. Document modules
 (:mod:`exulanica.world.objects`, :mod:`exulanica.world.structure`,
@@ -103,6 +104,9 @@ from exulanica.world.saved_entries import (
     SavedWorldCandidate,
     SavedWorldEntry,
     SavedWorldEntryRepository,
+    SavedWorldSourceAttachment,
+    SourceAttachmentOperationConflict,
+    SourceAttachmentSelection,
     StaleSavedWorldEntry,
 )
 from exulanica.world.society import (
@@ -120,6 +124,18 @@ from exulanica.world.structure import (
     SpatialSnapshot,
 )
 from exulanica.world.structure_repository import WorldStructureRepository
+from exulanica.world.style_structure import (
+    AuthoredVersionRef,
+    CompatibilityIntent,
+    ComposedTopologyRef,
+    SourceAttachmentRef,
+    StructuralSnapshotRef,
+    StructureStyleCompatibility,
+    StyleStructureFacts,
+    StyleVersionRef,
+    classify_structure_style_compatibility,
+    raise_for_incompatible_structure_style,
+)
 
 __all__ = [
     "CC0_LICENCE_ID",
@@ -136,6 +152,9 @@ __all__ = [
     "STYLE_REGISTRY",
     "AlternateVersion",
     "AuthoredObject",
+    "AuthoredVersionRef",
+    "CompatibilityIntent",
+    "ComposedTopologyRef",
     "ElementOverride",
     "EnvironmentBindingDrift",
     "EnvironmentCompositionDenied",
@@ -173,8 +192,12 @@ __all__ = [
     "SavedWorldCandidate",
     "SavedWorldEntry",
     "SavedWorldEntryRepository",
+    "SavedWorldSourceAttachment",
     "SocietyRepository",
     "SourceAnchor",
+    "SourceAttachmentOperationConflict",
+    "SourceAttachmentRef",
+    "SourceAttachmentSelection",
     "SourceMediaState",
     "SpatialCandidate",
     "SpatialDigests",
@@ -186,13 +209,17 @@ __all__ = [
     "StaleSocietyState",
     "StaleStructuralBase",
     "StaleStyleVersion",
+    "StructuralSnapshotRef",
+    "StructureStyleCompatibility",
     "StylePreview",
     "StyleProposal",
     "StyleProposalRecord",
     "StyleReference",
     "StyleRegistry",
     "StyleScope",
+    "StyleStructureFacts",
     "StyleVersion",
+    "StyleVersionRef",
     "TopologyContract",
     "TopologySourceSlot",
     "Transform",
@@ -207,10 +234,12 @@ __all__ = [
     "WorldStructureRepository",
     "WorldStyleRepository",
     "canonical_delta_document",
+    "classify_structure_style_compatibility",
     "delta_sha256",
     "environment_instance_document",
     "object_document",
     "override_document",
+    "raise_for_incompatible_structure_style",
     "reviewed_assets",
     "seed_reviewed_assets",
     "validate_behaviour",

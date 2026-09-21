@@ -1086,10 +1086,10 @@ create policy ws_isolation on evidence_span
 ```
 
 The implemented migration applies that pair to every workspace-scoped table in a loop, to the
-partitioned `embedding` parent so partitions inherit it, and a tenant-scoped variant to
-`consent_record`. `using` alone filters reads; without `with check` a session can still **write** a
-row belonging to another workspace, which is the half of isolation that matters for a write path
-guarded by triggers.
+partitioned `embedding` parent so partitions inherit it, and to `consent_record` by comparing
+`tenant_id` (the isolation column 0001 gave that table) to `current_workspace()`. `using` alone
+filters reads; without `with check` a session can still **write** a row belonging to another
+workspace, which is the half of isolation that matters for a write path guarded by triggers.
 
 **VERIFIED.** `ENABLE ROW LEVEL SECURITY` gives default-deny. **Table owners bypass RLS unless `FORCE
 ROW LEVEL SECURITY` is set**, and "Superusers and roles with the `BYPASSRLS` attribute always bypass the

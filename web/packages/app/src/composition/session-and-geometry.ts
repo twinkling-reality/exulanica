@@ -215,7 +215,9 @@ export async function openWorldEntryContext(
       state.preferences.worldStyleParameters,
     );
     state.sourceMediaSession = await new SourceMediaClient({
-      ...state.credentials, worldId: entry.worldId,
+      ...state.credentials,
+      worldId: entry.worldId,
+      sourceSnapshotId: entry.sourceSnapshotId,
     }).load(
       profile.palette.stoneShadow,
     );

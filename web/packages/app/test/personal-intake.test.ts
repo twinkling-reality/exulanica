@@ -1,20 +1,28 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { adaptSnapshot } from '@exulanica/graph-client';
+import { ApiError, adaptSnapshot } from '@exulanica/graph-client';
 import { initialFormationState } from '@exulanica/formation';
 import { mountPersonalIntake, createPersonalIntakeSession } from '../src/composition/personal-intake.js';
 import { sha256, HUMAN_ATTESTATION } from '../src/personal-admission-api.js';
+import type {
+  SavedWorldEntry,
+  SavedWorldSourceAttachment,
+  SourceAttachmentRequest,
+} from '../src/world-entry-api.js';
 
-const mocks = vi.hoisted(() => ({ watch: vi.fn(), disposeMedia: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  watch: vi.fn(), disposeMedia: vi.fn(), media: new Map<string, unknown>(),
+}));
 vi.mock('../src/formation.js', () => ({ listBatches: async () => [], watchBatch: (...args: unknown[]) => mocks.watch(...args) }));
 vi.mock('../src/source-media-api.js', () => ({ SourceMediaClient: class {
-  async load() { return { catalog: new Map(), issues: [], dispose: mocks.disposeMedia }; }
+  async load() { return { catalog: mocks.media, issues: [], dispose: mocks.disposeMedia }; }
 } }));
 const ids = ['11111111-1111-4111-8111-111111111111', '22222222-2222-4222-8222-222222222222'];
 const key = 'a'.repeat(64), subject = '33333333-3333-4333-8333-333333333333';
 const json = (body: unknown) => new Response(JSON.stringify(body));
 function fixture(count = 2) {
   let uploaded = false, linked = false, interrupted = false;
+  let viewerAvailable = false;
   let regions = true;
   const posts: { path: string; body: any }[] = [];
   const savedRequests: any[] = [];
@@ -24,8 +32,11 @@ function fixture(count = 2) {
   const snapshot = () => adaptSnapshot({ state_version: 1, entities: [], occurrences: [], proposals: [],
     scene_groups: [], reconstruction_scenes: [], never_same: [], deleted_entity_ids: [],
     review_sources: uploaded ? captureIds.map((id, i) => ({ kind: 'admitted_capture' as const, capture_id: id,
-      evidence_span_id: `span-${i}`, captured_at: null, media_type: 'image/jpeg', state: 'unavailable_asset' as const,
-      reason: 'Fixture viewer unavailable', evidence_path: null, content_sha256: null,
+      evidence_span_id: `span-${i}`, captured_at: null, media_type: 'image/jpeg',
+      state: viewerAvailable ? 'available' as const : 'unavailable_asset' as const,
+      reason: viewerAvailable ? null : 'Fixture viewer unavailable',
+      evidence_path: viewerAvailable ? `/evidence/span-${i}/masked` : null,
+      content_sha256: viewerAvailable ? 'd'.repeat(64) : null,
       person_review_state: 'screened' as const, person_regions: [],
     })) : [],
   });
@@ -57,19 +68,312 @@ function fixture(count = 2) {
         subject_id: linked ? subject : null, state: 'unknown', masked: true, name_permitted: false }] : [] });
     throw new Error(`Unexpected fixture request: ${path}`);
   });
-  const make = (session = createPersonalIntakeSession()) => mountPersonalIntake({
+  const make = (
+    session = createPersonalIntakeSession(),
+    overrides: Partial<Parameters<typeof mountPersonalIntake>[0]> = {},
+  ) => mountPersonalIntake({
     credentials: { baseUrl: 'https://fixture.test', token: 'fixture-token', fetch }, session,
     snapshot: snapshot(), media: undefined, reloadSnapshot: async () => snapshot(),
     refreshWorld: vi.fn(async () => undefined), storage: window.sessionStorage,
+    ...overrides,
   });
-  return { files, posts, make, captureIds, savedRequests, setUploaded: () => { uploaded = true; }, noRegions: () => { regions = false; } };
+  return {
+    files, posts, make, captureIds, savedRequests,
+    setUploaded: () => { uploaded = true; },
+    seedReviewed: (ineligible: readonly string[] = []) => {
+      uploaded = true;
+      viewerAvailable = true;
+      savedRequests.push({
+        request_id: 'reviewed-request', operation: 'review', batch_id: 'reviewed',
+        queued_job_id: 'reviewed-job', receipts: captureIds.map((capture_id) => ({
+          capture_id, authorization_id: 'current-auth', screening_id: 'current-screen',
+          eligibility_state: ineligible.includes(capture_id) ? 'detection-only' : 'eligible',
+        })),
+      });
+    },
+    noRegions: () => { regions = false; },
+  };
 }
 function button(root: HTMLElement, text: string) { return [...root.querySelectorAll('button')].find(b => b.textContent === text)!; }
 function input(root: HTMLElement, label: string) { return root.querySelector(`[aria-label="${label}"]`) as HTMLInputElement; }
+function attachButton(root: HTMLElement) {
+  return root.querySelector<HTMLButtonElement>('.photo-attach-action')!;
+}
 const settle = async (root: HTMLElement) => { await vi.waitFor(() => expect(root.querySelector('fieldset')!.disabled).toBe(false)); };
-afterEach(() => { document.body.replaceChildren(); window.sessionStorage.clear(); vi.clearAllMocks(); });
+afterEach(() => {
+  document.body.replaceChildren();
+  window.sessionStorage.clear();
+  mocks.media.clear();
+  vi.clearAllMocks();
+});
+
+const ownedEntry = (
+  sourceAttachments: readonly SavedWorldSourceAttachment[] = [],
+  revision = 1,
+): SavedWorldEntry => ({
+  entryId: '99999999-9999-4999-8999-999999999999',
+  worldId: 'world:authored:starter', title: 'My world', sourceKind: 'authored',
+  sourceSnapshotId: '88888888-8888-4888-8888-888888888888',
+  sourceSnapshotSha256: 'c'.repeat(64),
+  authoredScene: {
+    schemaVersion: 1, kind: 'authored-starter', region: {
+      regionId: 'region:starter', origin: 'authored',
+      module: { key: 'region.authored-ground', version: 1 },
+      ground: { kind: 'flat', halfWidthMm: 12000, halfDepthMm: 12000, elevationMm: 0 },
+      spawn: { xMm: 0, yMm: 0, zMm: 4000, yawMicroradians: 0 },
+    },
+  },
+  authoredVersionId: '77777777-7777-4777-8777-777777777777',
+  authoredStateSha256: 'a'.repeat(64), authoredEditSeq: 0,
+  currentAuthoredStateSha256: 'a'.repeat(64), currentAuthoredEditSeq: 0,
+  styleVersionId: '66666666-6666-4666-8666-666666666666', revision,
+  availability: 'available', unavailableReason: null, sourceAttachments,
+  createdAt: '2026-09-20T12:00:00Z', updatedAt: '2026-09-20T12:00:00Z',
+});
 
 describe('mounted personal intake with scripted transport (not real-photo acceptance)', () => {
+  it('attaches only an explicitly selected eligible reference and retains the exact interrupted request', async () => {
+    const f = fixture();
+    f.seedReviewed();
+    let activeEntry = ownedEntry();
+    const failedAttach = vi.fn(async (_request: SourceAttachmentRequest) => {
+      throw new Error('Attachment response interrupted');
+    });
+    let mounted = f.make(createPersonalIntakeSession(), {
+      getEntry: () => activeEntry,
+      attachSources: failedAttach,
+    });
+    document.body.append(mounted.root);
+    await mounted.begin();
+    expect(mounted.root.querySelector('.photo-collection')).not.toBeNull();
+    expect(mounted.root.textContent).toContain('No reference photos yet');
+    expect(attachButton(mounted.root).disabled).toBe(true);
+    const selected = input(mounted.root, 'Include photograph 1 in this admission');
+    selected.checked = true;
+    selected.dispatchEvent(new Event('change'));
+    expect(attachButton(mounted.root).textContent).toBe('Attach 1 selected photo');
+    attachButton(mounted.root).click();
+    await settle(mounted.root);
+    expect(failedAttach).toHaveBeenCalledOnce();
+    const retained = failedAttach.mock.calls[0]![0];
+    expect(retained).toMatchObject({
+      entryId: ownedEntry().entryId,
+      baseRevision: 1,
+      authoredVersionId: ownedEntry().authoredVersionId,
+      authoredStateSha256: ownedEntry().authoredStateSha256,
+      authoredEditSeq: 0,
+      styleVersionId: ownedEntry().styleVersionId,
+      sources: [{ captureId: f.captureIds[0], evidenceSpanId: 'span-0' }],
+    });
+    expect(retained.operationId).toMatch(/^[0-9a-f-]{36}$/);
+    expect(button(mounted.root, 'Retry exact interrupted attachment').hidden).toBe(false);
+
+    mounted.dispose();
+    mounted.root.remove();
+    const otherEntry = {
+      ...ownedEntry(), entryId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+    };
+    mounted = f.make(createPersonalIntakeSession(), { getEntry: () => otherEntry });
+    document.body.append(mounted.root);
+    await mounted.begin();
+    expect(button(mounted.root, 'Retry exact interrupted attachment').hidden).toBe(true);
+    mounted.dispose();
+    mounted.root.remove();
+
+    const attachment: SavedWorldSourceAttachment = {
+      attachmentId: '55555555-5555-4555-8555-555555555555',
+      operationId: retained.operationId,
+      captureId: f.captureIds[0]!, evidenceSpanId: 'span-0',
+      sourceSha256: 'f'.repeat(64),
+      authorizationId: '44444444-4444-4444-8444-444444444444',
+      screeningId: '33333333-3333-4333-8333-333333333333',
+      role: 'reference', attachedEntryRevision: 2,
+      attachedBy: '22222222-2222-4222-8222-222222222222',
+      attachedAt: '2026-09-20T12:01:00Z', availability: 'available',
+      unavailableReason: null, viewerSha256: 'e'.repeat(64),
+      evidencePath: '/evidence/span-0/masked',
+    };
+    const retriedAttach = vi.fn(async () => {
+      activeEntry = ownedEntry([attachment], 2);
+      return activeEntry;
+    });
+    mocks.media.set('span-0', {
+      evidenceRef: 'span-0', title: 'Reviewed source', capturedLabel: 'Capture date unavailable',
+      url: 'blob:authorized-viewer', available: true, accent: '#777777',
+      alt: 'Authorized reviewed source',
+    });
+    mounted = f.make(createPersonalIntakeSession(), {
+      getEntry: () => activeEntry,
+      attachSources: retriedAttach,
+    });
+    document.body.append(mounted.root);
+    await mounted.begin();
+    button(mounted.root, 'Retry exact interrupted attachment').click();
+    await settle(mounted.root);
+    expect(retriedAttach).toHaveBeenCalledWith(retained);
+    expect(mounted.root.textContent).toContain('attached as project references');
+    expect(mounted.root.textContent).toContain('Reference photograph 1');
+    expect(mounted.root.querySelector('.photo-reference-count')?.textContent).toBe('1 photo');
+    expect(attachButton(mounted.root).textContent).toBe('Selected photos already attached');
+    expect(attachButton(mounted.root).disabled).toBe(true);
+    expect(mounted.root.textContent).toContain(`original SHA-256 ${attachment.sourceSha256}`);
+    expect(mounted.root.querySelector<HTMLImageElement>(
+      '[aria-label="Attached reference photographs"] img',
+    )?.src).toBe('blob:authorized-viewer');
+    mounted.dispose();
+  });
+
+  it('reads the live same-page entry cursor when the explicit attachment is submitted', async () => {
+    const f = fixture();
+    f.seedReviewed();
+    let activeEntry = ownedEntry();
+    const attachSources = vi.fn(async (_request: SourceAttachmentRequest) => ({
+      ...activeEntry, revision: activeEntry.revision + 1,
+    }));
+    const mounted = f.make(createPersonalIntakeSession(), {
+      getEntry: () => activeEntry,
+      attachSources,
+    });
+    document.body.append(mounted.root);
+    await mounted.begin();
+    const selected = input(mounted.root, 'Include photograph 1 in this admission');
+    selected.checked = true;
+    selected.dispatchEvent(new Event('change'));
+    activeEntry = {
+      ...activeEntry,
+      title: 'Renamed in this page',
+      revision: 2,
+      authoredStateSha256: 'b'.repeat(64),
+      authoredEditSeq: 1,
+      currentAuthoredStateSha256: 'b'.repeat(64),
+      currentAuthoredEditSeq: 1,
+    };
+    attachButton(mounted.root).click();
+    await settle(mounted.root);
+    expect(attachSources).toHaveBeenCalledWith(expect.objectContaining({
+      baseRevision: 2,
+      authoredStateSha256: 'b'.repeat(64),
+      authoredEditSeq: 1,
+    }));
+    mounted.dispose();
+  });
+
+  it('refuses a mixed selection instead of silently dropping unattachable photographs', async () => {
+    const f = fixture();
+    f.seedReviewed([f.captureIds[1]!]);
+    const attachSources = vi.fn(async () => ownedEntry());
+    const activeEntry = ownedEntry([], 2);
+    const mounted = f.make(createPersonalIntakeSession(), {
+      getEntry: () => activeEntry, attachSources,
+    });
+    document.body.append(mounted.root);
+    await mounted.begin();
+    for (const index of [1, 2]) {
+      const selected = input(mounted.root, `Include photograph ${index} in this admission`);
+      selected.checked = true;
+      selected.dispatchEvent(new Event('change'));
+    }
+    expect(mounted.root.textContent).toContain('1 needs completed review or current viewer access');
+    attachButton(mounted.root).click();
+    await settle(mounted.root);
+    expect(attachSources).not.toHaveBeenCalled();
+    expect(mounted.root.textContent).toContain('nothing was attached');
+    mounted.dispose();
+  });
+
+  it('marks an already attached selection as part of this world and offers no duplicate action', async () => {
+    const f = fixture();
+    f.seedReviewed();
+    const alreadyAttached: SavedWorldSourceAttachment = {
+      attachmentId: '55555555-5555-4555-8555-555555555555',
+      operationId: '44444444-4444-4444-8444-444444444444',
+      captureId: f.captureIds[1]!, evidenceSpanId: 'span-1', sourceSha256: 'f'.repeat(64),
+      authorizationId: '33333333-3333-4333-8333-333333333333',
+      screeningId: '22222222-2222-4222-8222-222222222222', role: 'reference',
+      attachedEntryRevision: 2, attachedBy: '11111111-1111-4111-8111-111111111111',
+      attachedAt: '2026-09-20T12:01:00Z', availability: 'available',
+      unavailableReason: null, viewerSha256: 'e'.repeat(64),
+      evidencePath: '/evidence/span-1/masked',
+    };
+    const attachSources = vi.fn(async () => ownedEntry());
+    const mounted = f.make(createPersonalIntakeSession(), {
+      getEntry: () => ownedEntry([alreadyAttached], 2), attachSources,
+    });
+    document.body.append(mounted.root);
+    await mounted.begin();
+    const selected = input(mounted.root, 'Include photograph 2 in this admission');
+    selected.checked = true;
+    selected.dispatchEvent(new Event('change'));
+    expect(mounted.root.textContent).toContain('1 already in this world');
+    expect(attachButton(mounted.root).textContent).toBe('Selected photos already attached');
+    expect(attachButton(mounted.root).disabled).toBe(true);
+    expect(attachSources).not.toHaveBeenCalled();
+    mounted.dispose();
+  });
+
+  it('refreshes a stale entry cursor and makes the explicit attachment action available again', async () => {
+    const f = fixture();
+    f.seedReviewed();
+    let activeEntry = ownedEntry();
+    const refreshEntry = vi.fn(async () => {
+      activeEntry = ownedEntry([], 2);
+      return activeEntry;
+    });
+    const mounted = f.make(createPersonalIntakeSession(), {
+      getEntry: () => activeEntry,
+      attachSources: vi.fn(async () => {
+        throw new ApiError(409, 'stale_saved_world_entry', 'changed elsewhere');
+      }),
+      refreshEntry,
+    });
+    document.body.append(mounted.root);
+    await mounted.begin();
+    const selected = input(mounted.root, 'Include photograph 1 in this admission');
+    selected.checked = true;
+    selected.dispatchEvent(new Event('change'));
+    attachButton(mounted.root).click();
+    await settle(mounted.root);
+    expect(refreshEntry).toHaveBeenCalledWith(ownedEntry().entryId);
+    expect(mounted.root.textContent).toContain('world changed before the references were attached');
+    expect(button(mounted.root, 'Retry exact interrupted attachment').hidden).toBe(true);
+    expect(attachButton(mounted.root).disabled).toBe(false);
+    mounted.dispose();
+  });
+
+  it('reopens an unavailable reference without blocking the saved world workflow', async () => {
+    const f = fixture();
+    f.seedReviewed();
+    const unavailable: SavedWorldSourceAttachment = {
+      attachmentId: '55555555-5555-4555-8555-555555555555',
+      operationId: '44444444-4444-4444-8444-444444444444',
+      captureId: f.captureIds[0]!, evidenceSpanId: 'span-0', sourceSha256: 'f'.repeat(64),
+      authorizationId: '33333333-3333-4333-8333-333333333333',
+      screeningId: '22222222-2222-4222-8222-222222222222', role: 'reference',
+      attachedEntryRevision: 2, attachedBy: '11111111-1111-4111-8111-111111111111',
+      attachedAt: '2026-09-20T12:01:00Z', availability: 'unavailable',
+      unavailableReason: 'authorization_expired', viewerSha256: null, evidencePath: null,
+    };
+    let activeEntry = ownedEntry([{ ...unavailable,
+      availability: 'available', unavailableReason: null,
+      viewerSha256: 'e'.repeat(64), evidencePath: '/evidence/span-0/masked',
+    }], 2);
+    const refreshEntry = vi.fn(async () => {
+      activeEntry = ownedEntry([unavailable], 2);
+      return activeEntry;
+    });
+    const mounted = f.make(createPersonalIntakeSession(), {
+      getEntry: () => activeEntry, refreshEntry,
+    });
+    document.body.append(mounted.root);
+    await mounted.begin();
+    expect(mounted.root.textContent).toContain('Reference photograph 1');
+    expect(mounted.root.textContent).toContain('Authorization expired');
+    expect(mounted.root.querySelector('[aria-label="Attached reference photographs"] img')).toBeNull();
+    expect(mounted.root.querySelector('fieldset')?.disabled).toBe(false);
+    expect(refreshEntry).toHaveBeenCalled();
+    mounted.dispose();
+  });
+
   it('shows proposals and a rejection, restores an interrupted exact request, links across photos and records explicit review', async () => {
     mocks.watch.mockImplementation(() => vi.fn());
     const f = fixture();
@@ -222,13 +526,14 @@ it('keeps preview intake read-only and closes its reading workflow with Escape',
     media: undefined, reloadSnapshot: vi.fn(), refreshWorld: vi.fn(),
   });
   document.body.replaceChildren(mounted.root);
-  mounted.root.open = true;
+  const workflow = mounted.root.querySelector<HTMLDetailsElement>('.photo-review-workflow')!;
+  workflow.open = true;
   await mounted.begin();
   expect(fetch).not.toHaveBeenCalled();
   expect(mounted.root.querySelector('fieldset')?.disabled).toBe(true);
   expect(mounted.root.textContent).toContain('require an authenticated workspace');
-  mounted.root.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
-  expect(mounted.root.open).toBe(false);
-  expect(document.activeElement).toBe(mounted.root.querySelector('summary'));
+  workflow.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+  expect(workflow.open).toBe(false);
+  expect(document.activeElement).toBe(workflow.querySelector(':scope > summary'));
   mounted.dispose();
 });

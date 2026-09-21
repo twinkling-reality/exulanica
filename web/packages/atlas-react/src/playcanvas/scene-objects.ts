@@ -57,14 +57,26 @@ import {
   type IslandId,
   type IslandPlacement,
 } from '@exulanica/atlas-core';
+import {
+  ORIGIN_LANDSCAPE,
+  unitRgb,
+  worldSilhouetteTone,
+  type WorldArtProfile,
+} from '@exulanica/presentation';
 
 import { fetchAuthenticatedAsset, type AuthenticatedAssetFetchOptions } from './physical-residency.js';
 
 /** The only media type an authored object may name. A file extension is not a media type. */
 export const AUTHORED_OBJECT_MEDIA_TYPE = 'model/gltf-binary';
 
-/** How far in front of the visitor a placement lands when no anchor is engaged, in millimetres. */
-export const DEFAULT_PLACEMENT_DISTANCE_MM = 2500;
+/**
+ * How far in front of the visitor a placement lands when no anchor is engaged, in millimetres.
+ *
+ * At the supported 60 degree vertical field of view, a ground contact 2.5 metres from the
+ * 1.62-metre eye line falls below the viewport. Three and a half metres keeps that contact inside
+ * the lower third with enough room for the half-metre reviewed marker cube.
+ */
+export const DEFAULT_PLACEMENT_DISTANCE_MM = 3500;
 
 /** The contract's fixed-point scales, in one place so nothing has to remember them twice. */
 export const MM_PER_METRE = 1000;
@@ -129,6 +141,8 @@ export interface GlbSummary {
   readonly meshCount: number;
   readonly nodeCount: number;
   readonly imageCount: number;
+  /** Zero means PlayCanvas would substitute its metallic default material. */
+  readonly materialCount: number;
 }
 
 export type BehaviourControl = 'trigger' | 'stop' | 'reset';
@@ -153,6 +167,8 @@ export interface SceneObjectRuntimeOptions {
   ) => ObjectRepresentationRegistration;
   /** Request a frame after a resident object's visible runtime state changes. */
   readonly invalidate?: () => void;
+  /** The world's current saved or previewed appearance. */
+  readonly artProfile?: WorldArtProfile;
 }
 
 // -- verification ------------------------------------------------------------------------------
@@ -297,6 +313,7 @@ export function validateGlbContainer(bytes: ArrayBuffer): GlbSummary {
     meshCount: list('meshes').length,
     nodeCount: list('nodes').length,
     imageCount: images.length,
+    materialCount: list('materials').length,
   });
 }
 
@@ -579,6 +596,7 @@ export class SceneObjectRuntime {
   #placementRevision = 0;
   readonly #objectRevisions = new Map<string, number>();
   readonly #resident = new Map<string, Resident>();
+  readonly #materiallessFallback = new pc.StandardMaterial();
   #destroyed = false;
 
   constructor(
@@ -588,6 +606,13 @@ export class SceneObjectRuntime {
   ) {
     this.#app = app;
     this.#roots = roots;
+    this.#materiallessFallback.name = 'authored-object:materialless-fallback';
+    this.#materiallessFallback.useLighting = true;
+    this.#materiallessFallback.useFog = true;
+    this.#materiallessFallback.useMetalness = true;
+    this.#materiallessFallback.metalness = 0;
+    this.#materiallessFallback.gloss = 0.16;
+    this.setProfile(options.artProfile ?? ORIGIN_LANDSCAPE);
   }
 
   get objectIds(): readonly string[] {
@@ -601,6 +626,16 @@ export class SceneObjectRuntime {
   /** True only while at least one bounded behaviour needs another rendered frame. */
   get animating(): boolean {
     return [...this.#resident.values()].some(resident => resident.motion?.state === 'running');
+  }
+
+  /** Keep material-less reviewed geometry inside the same saved appearance lifecycle as the world. */
+  setProfile(profile: WorldArtProfile): void {
+    const [r, g, b] = unitRgb(worldSilhouetteTone(profile.palette));
+    this.#materiallessFallback.diffuse.set(r, g, b);
+    this.#materiallessFallback.ambient.set(r, g, b);
+    this.#materiallessFallback.emissive.set(r, g, b);
+    this.#materiallessFallback.emissiveIntensity = 0.035;
+    this.#materiallessFallback.update();
   }
 
   /** A verified authored district frame applies only to objects, never source geometry. */
@@ -663,6 +698,7 @@ export class SceneObjectRuntime {
       }
     }
 
+    const summary = validateGlbContainer(bytes);
     const asset = await createObjectContainerAsset(this.#app, object.asset.assetKey, bytes);
     let entity: pc.Entity | undefined;
     try {
@@ -675,6 +711,11 @@ export class SceneObjectRuntime {
       entity = resource.instantiateRenderEntity({});
       if (entity === null || entity === undefined) {
         throw new TypeError('This container holds nothing that can be drawn');
+      }
+      if (summary.materialCount === 0) {
+        for (const render of entity.findComponents('render') as pc.RenderComponent[]) {
+          for (const instance of render.meshInstances) instance.material = this.#materiallessFallback;
+        }
       }
       entity.name = `authored-object:${object.objectId}`;
       const authoredMm = translationOf(object.transform);
@@ -823,6 +864,7 @@ export class SceneObjectRuntime {
     this.#regionOverrides.clear();
     for (const resident of this.#resident.values()) this.#dispose(resident);
     this.#resident.clear();
+    this.#materiallessFallback.destroy();
   }
 
   #dispose(resident: Resident): void {

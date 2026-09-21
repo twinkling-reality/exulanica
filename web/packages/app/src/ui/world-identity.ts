@@ -13,6 +13,8 @@ export function buildWorldIdentity(deps: {
   readonly entry: SavedWorldEntry;
   readonly personalIntake: HTMLElement;
   readonly rename: (title: string) => Promise<SavedWorldEntry>;
+  readonly onOpenWorld: () => void;
+  readonly onAddObject: () => void;
   readonly onOpenPhotos: () => void;
   readonly onClosePhotos: () => void;
 }): WorldIdentity {
@@ -29,13 +31,20 @@ export function buildWorldIdentity(deps: {
   const photos = el('button', {
     type: 'button', class: 'world-add-photos', text: 'Add photos',
   });
+  const addObject = el('button', {
+    type: 'button', class: 'world-add-object', text: 'Add object',
+  });
+  const world = el('button', {
+    type: 'button', class: 'world-open-menu', text: 'World',
+    'aria-label': 'Open World menu',
+  });
   const root = el('aside', { class: 'world-identity', 'aria-label': 'World controls' }, [
     form,
+    world,
+    addObject,
     photos,
   ]);
 
-  const intakeSummary = deps.personalIntake.querySelector(':scope > summary');
-  if (intakeSummary !== null) intakeSummary.textContent = 'Upload and review photos';
   const close = el('button', {
     type: 'button', class: 'photos-drawer-close', 'aria-label': 'Close Add photos', text: 'Close',
   });
@@ -87,6 +96,8 @@ export function buildWorldIdentity(deps: {
       reflect();
     });
   });
+  world.addEventListener('click', deps.onOpenWorld);
+  addObject.addEventListener('click', deps.onAddObject);
   photos.addEventListener('click', deps.onOpenPhotos);
   close.addEventListener('click', deps.onClosePhotos);
   reflect();
@@ -104,7 +115,9 @@ export function buildWorldIdentity(deps: {
       photosDrawer.hidden = !visible;
       photos.setAttribute('aria-expanded', visible ? 'true' : 'false');
       if (visible) {
-        const focusable = photosDrawer.querySelector<HTMLElement>('summary, button, input, select');
+        const focusable = deps.personalIntake.querySelector<HTMLElement>(
+          '.photo-review-workflow > summary',
+        );
         focusable?.focus({ preventScroll: true });
       }
     },

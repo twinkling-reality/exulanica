@@ -220,8 +220,10 @@ feature into an alternate version with a region-local transform, source binding 
 state. Placement changes where an admitted asset appears in an authored world; it does not rewrite
 its source location.
 
-The current authored-world package extension does not export these environment instances.
-Selection across imported geography, personal memory and authored versions remains partial.
+The authored-world 1.0 package extension does not export these environment instances. The
+environment-instances 1.0 extension does, without granting source-use rights or embedding
+source bytes. Selection across imported geography, personal memory and authored versions
+remains partial.
 
 ## Validation
 

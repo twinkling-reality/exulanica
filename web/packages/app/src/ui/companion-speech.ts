@@ -14,6 +14,8 @@ export interface CompanionSpeechOptions {
 export interface CompanionSpeech {
   readonly root: HTMLElement;
   render(turn: Turn): void;
+  /** Factual host guidance, visually in the speech band but attributed to no speaker. */
+  renderGuidance(title: string, detail: string): void;
   reportRefusal(reasonKey: string): void;
   /** The question is with the library. Says so, and says nothing about what it will find. */
   renderAsking(question: string): void;
@@ -124,6 +126,7 @@ export function buildCompanionSpeech(options: CompanionSpeechOptions): Companion
   });
 
   const renderTurn = (turn: Turn): void => {
+    root.setAttribute('aria-labelledby', 'companion-speaker-name');
     const content: (Node | string)[] = [
       el('h2', {
         id: 'companion-speaker-name',
@@ -147,6 +150,7 @@ export function buildCompanionSpeech(options: CompanionSpeechOptions): Companion
    * silence an abstention is, and a line saying which model answered.
    */
   const renderAnswer = (answer: CompanionAnswer): void => {
+    root.setAttribute('aria-labelledby', 'companion-speaker-name');
     lastQuestion = answer.question;
     const content: (Node | string)[] = [
       speaker(),
@@ -186,7 +190,19 @@ export function buildCompanionSpeech(options: CompanionSpeechOptions): Companion
       root.removeAttribute('data-abstained');
       renderTurn(turn);
     },
+    renderGuidance(title, detail) {
+      root.dataset['mode'] = 'guidance';
+      root.removeAttribute('data-abstained');
+      root.setAttribute('aria-labelledby', 'companion-starter-title');
+      replace(root, [
+        el('h2', {
+          id: 'companion-starter-title', class: 'companion-starter-title', text: title,
+        }),
+        el('p', { class: 'companion-starter-copy', text: detail }),
+      ]);
+    },
     renderAsking(question) {
+      root.setAttribute('aria-labelledby', 'companion-speaker-name');
       lastQuestion = question;
       root.dataset['mode'] = 'asking';
       root.removeAttribute('data-abstained');
@@ -198,6 +214,7 @@ export function buildCompanionSpeech(options: CompanionSpeechOptions): Companion
     },
     renderAnswer,
     reportAskFailure(failure) {
+      root.setAttribute('aria-labelledby', 'companion-speaker-name');
       // The working line is REPLACED rather than appended to. Leaving "Looking through your
       // library" above "the question did not reach the library" would leave a sentence on the
       // screen that is no longer true.

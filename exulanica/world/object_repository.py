@@ -229,7 +229,7 @@ class WorldObjectRepository:
             for obj in objects:
                 self._insert_object(version_id, obj, self._object_edit_ids(parent_version_id, obj))
             for override in overrides:
-                self._insert_override(
+                self._write_override(
                     version_id, override, self._override_edit_id(parent_version_id, override)
                 )
             for instance in environments:
@@ -599,9 +599,10 @@ class WorldObjectRepository:
         current = self._require_object(version_id, object_id)
         if before is None:
             self.connection.execute(
-                "delete from world_alternate_object where workspace_id=%s and world_id=%s "
-                "and version_id=%s and object_id=%s",
-                (self.workspace_id, self.world_id, version_id, object_id),
+                "update world_alternate_object set removed=true,last_edit_id=%s,"
+                "addition_undone=true "
+                "where workspace_id=%s and world_id=%s and version_id=%s and object_id=%s",
+                (edit_id, self.workspace_id, self.world_id, version_id, object_id),
             )
             return object_document(current), None
         self._restore_object(version_id, before, edit_id)
@@ -618,14 +619,15 @@ class WorldObjectRepository:
     ) -> tuple[Mapping[str, Any] | None, Mapping[str, Any] | None]:
         existing = {o.element_id: o for o in self._overrides(version_id)}
         current = existing.get(element_id)
-        self.connection.execute(
-            "delete from world_alternate_element_override where workspace_id=%s "
-            "and world_id=%s and version_id=%s and element_id=%s",
-            (self.workspace_id, self.world_id, version_id, element_id),
-        )
         if before is None:
+            self.connection.execute(
+                "update world_alternate_element_override "
+                "set addition_undone=true,last_edit_id=%s where workspace_id=%s "
+                "and world_id=%s and version_id=%s and element_id=%s",
+                (edit_id, self.workspace_id, self.world_id, version_id, element_id),
+            )
             return (None if current is None else override_document(current)), None
-        self._insert_override(version_id, _override_from_document(before), edit_id)
+        self._write_override(version_id, _override_from_document(before), edit_id)
         return (
             None if current is None else override_document(current),
             override_document({o.element_id: o for o in self._overrides(version_id)}[element_id]),
@@ -642,9 +644,10 @@ class WorldObjectRepository:
         current = self._require_environment(version_id, instance_id)
         if before is None:
             self.connection.execute(
-                "delete from world_alternate_environment_instance "
+                "update world_alternate_environment_instance "
+                "set removed=true,addition_undone=true,last_edit_id=%s "
                 "where workspace_id=%s and world_id=%s and version_id=%s and instance_id=%s",
-                (self.workspace_id, self.world_id, version_id, instance_id),
+                (edit_id, self.workspace_id, self.world_id, version_id, instance_id),
             )
             return environment_instance_document(current), None
         self._restore_environment(version_id, before, edit_id)
@@ -682,12 +685,7 @@ class WorldObjectRepository:
             edit_id = uuid.uuid4()
             existing = {o.element_id: o for o in self._overrides(version_id)}
             before = existing.get(override.element_id)
-            self.connection.execute(
-                "delete from world_alternate_element_override where workspace_id=%s "
-                "and world_id=%s and version_id=%s and element_id=%s",
-                (self.workspace_id, self.world_id, version_id, override.element_id),
-            )
-            self._insert_override(version_id, override, edit_id)
+            self._write_override(version_id, override, edit_id)
             self._append_edit(
                 row,
                 edit_id=edit_id,
@@ -815,12 +813,22 @@ class WorldObjectRepository:
     ) -> None:
         created_edit_id, last_edit_id = edit_ids
         behaviour = obj.behaviour
-        self.connection.execute(
+        written = self.connection.execute(
             "insert into world_alternate_object (workspace_id,world_id,version_id,object_id,"
             "asset_sha256,region_id,x_mm,y_mm,z_mm,yaw_microradians,scale_milli,origin_kind,"
             "origin_role,behaviour_key,behaviour_version,behaviour_parameters,removed,"
-            "created_edit_id,last_edit_id) "
-            "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+            "created_edit_id,last_edit_id,addition_undone) "
+            "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,false) "
+            "on conflict (workspace_id,world_id,version_id,object_id) do update set "
+            "asset_sha256=excluded.asset_sha256,region_id=excluded.region_id,x_mm=excluded.x_mm,"
+            "y_mm=excluded.y_mm,z_mm=excluded.z_mm,yaw_microradians=excluded.yaw_microradians,"
+            "scale_milli=excluded.scale_milli,origin_kind=excluded.origin_kind,"
+            "origin_role=excluded.origin_role,behaviour_key=excluded.behaviour_key,"
+            "behaviour_version=excluded.behaviour_version,"
+            "behaviour_parameters=excluded.behaviour_parameters,removed=excluded.removed,"
+            "created_edit_id=excluded.created_edit_id,last_edit_id=excluded.last_edit_id,"
+            "addition_undone=false where world_alternate_object.addition_undone "
+            "returning object_id",
             (
                 self.workspace_id,
                 self.world_id,
@@ -842,7 +850,9 @@ class WorldObjectRepository:
                 created_edit_id,
                 last_edit_id,
             ),
-        )
+        ).fetchone()
+        if written is None:
+            raise InvalidObjectState(f"{obj.object_id} already exists in this version")
 
     def _restore_object(
         self, version_id: uuid.UUID, document: Mapping[str, Any], edit_id: uuid.UUID
@@ -861,7 +871,8 @@ class WorldObjectRepository:
         self.connection.execute(
             "update world_alternate_object set asset_sha256=%s,region_id=%s,x_mm=%s,y_mm=%s,"
             "z_mm=%s,yaw_microradians=%s,scale_milli=%s,origin_role=%s,behaviour_key=%s,"
-            "behaviour_version=%s,behaviour_parameters=%s,removed=%s,last_edit_id=%s "
+            "behaviour_version=%s,behaviour_parameters=%s,removed=%s,last_edit_id=%s,"
+            "addition_undone=false "
             "where workspace_id=%s and world_id=%s and version_id=%s and object_id=%s",
             (
                 obj.asset_sha256,
@@ -893,7 +904,7 @@ class WorldObjectRepository:
         source = instance.source
         selection = source.selection
         created_edit_id, last_edit_id = edit_ids
-        self.connection.execute(
+        written = self.connection.execute(
             """
             insert into world_alternate_environment_instance(
               workspace_id,world_id,version_id,instance_id,admission_id,render_asset_id,
@@ -901,10 +912,31 @@ class WorldObjectRepository:
               source_receipt_sha256,render_sha256,render_receipt_sha256,index_sha256,
               index_receipt_sha256,publication_receipt_sha256,source_place_id,source_frame,
               source_bounds,source_anchor,region_id,x_mm,y_mm,z_mm,yaw_microradians,scale_milli,
-              origin_kind,origin_role,removed,created_edit_id,last_edit_id)
+              origin_kind,origin_role,removed,created_edit_id,last_edit_id,addition_undone)
             values(
               %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
-              %s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+              %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,false)
+            on conflict (workspace_id,world_id,version_id,instance_id) do update set
+              admission_id=excluded.admission_id,render_asset_id=excluded.render_asset_id,
+              publication_id=excluded.publication_id,selection_kind=excluded.selection_kind,
+              feature_id=excluded.feature_id,render_batch_id=excluded.render_batch_id,
+              source_sha256=excluded.source_sha256,
+              source_receipt_sha256=excluded.source_receipt_sha256,
+              render_sha256=excluded.render_sha256,
+              render_receipt_sha256=excluded.render_receipt_sha256,
+              index_sha256=excluded.index_sha256,
+              index_receipt_sha256=excluded.index_receipt_sha256,
+              publication_receipt_sha256=excluded.publication_receipt_sha256,
+              source_place_id=excluded.source_place_id,source_frame=excluded.source_frame,
+              source_bounds=excluded.source_bounds,source_anchor=excluded.source_anchor,
+              region_id=excluded.region_id,x_mm=excluded.x_mm,y_mm=excluded.y_mm,
+              z_mm=excluded.z_mm,yaw_microradians=excluded.yaw_microradians,
+              scale_milli=excluded.scale_milli,origin_kind=excluded.origin_kind,
+              origin_role=excluded.origin_role,removed=excluded.removed,
+              created_edit_id=excluded.created_edit_id,last_edit_id=excluded.last_edit_id,
+              addition_undone=false
+            where world_alternate_environment_instance.addition_undone
+            returning instance_id
             """,
             (
                 self.workspace_id,
@@ -944,7 +976,9 @@ class WorldObjectRepository:
                 created_edit_id,
                 last_edit_id,
             ),
-        )
+        ).fetchone()
+        if written is None:
+            raise InvalidEnvironmentState(f"{instance.instance_id} already exists in this version")
 
     def _restore_environment(
         self, version_id: uuid.UUID, document: Mapping[str, Any], edit_id: uuid.UUID
@@ -960,7 +994,7 @@ class WorldObjectRepository:
         self.connection.execute(
             "update world_alternate_environment_instance "
             "set region_id=%s,x_mm=%s,y_mm=%s,z_mm=%s,yaw_microradians=%s,scale_milli=%s,"
-            "removed=%s,last_edit_id=%s "
+            "removed=%s,last_edit_id=%s,addition_undone=false "
             "where workspace_id=%s and world_id=%s and version_id=%s and instance_id=%s",
             (
                 document["region_id"],
@@ -978,14 +1012,19 @@ class WorldObjectRepository:
             ),
         )
 
-    def _insert_override(
+    def _write_override(
         self, version_id: uuid.UUID, override: ElementOverride, edit_id: uuid.UUID
     ) -> None:
         transform = override.transform
         self.connection.execute(
             "insert into world_alternate_element_override (workspace_id,world_id,version_id,"
-            "element_id,suppressed,x_mm,y_mm,z_mm,yaw_microradians,scale_milli,last_edit_id) "
-            "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+            "element_id,suppressed,x_mm,y_mm,z_mm,yaw_microradians,scale_milli,last_edit_id,"
+            "addition_undone) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,false) "
+            "on conflict (workspace_id,world_id,version_id,element_id) do update set "
+            "suppressed=excluded.suppressed,x_mm=excluded.x_mm,y_mm=excluded.y_mm,"
+            "z_mm=excluded.z_mm,yaw_microradians=excluded.yaw_microradians,"
+            "scale_milli=excluded.scale_milli,last_edit_id=excluded.last_edit_id,"
+            "addition_undone=false",
             (
                 self.workspace_id,
                 self.world_id,
@@ -1023,6 +1062,7 @@ class WorldObjectRepository:
             "select object_id,asset_sha256,region_id,x_mm,y_mm,z_mm,yaw_microradians,scale_milli,"
             "origin_kind,origin_role,behaviour_key,behaviour_version,behaviour_parameters,removed "
             "from world_alternate_object where workspace_id=%s and world_id=%s and version_id=%s "
+            "and not addition_undone "
             "order by object_id",
             (self.workspace_id, self.world_id, version_id),
         ).fetchall()
@@ -1055,7 +1095,8 @@ class WorldObjectRepository:
         rows = self.connection.execute(
             "select element_id,suppressed,x_mm,y_mm,z_mm,yaw_microradians,scale_milli "
             "from world_alternate_element_override "
-            "where workspace_id=%s and world_id=%s and version_id=%s order by element_id",
+            "where workspace_id=%s and world_id=%s and version_id=%s "
+            "and not addition_undone order by element_id",
             (self.workspace_id, self.world_id, version_id),
         ).fetchall()
         return tuple(
@@ -1088,6 +1129,7 @@ class WorldObjectRepository:
                    origin_kind,origin_role,removed
               from world_alternate_environment_instance
              where workspace_id=%s and world_id=%s and version_id=%s
+               and not addition_undone
              order by instance_id
             """,
             (self.workspace_id, self.world_id, version_id),

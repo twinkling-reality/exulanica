@@ -108,6 +108,9 @@ rollback uses the live authority base to append that restoration; edits never ap
 newer appearance.
 
 The browser passes `world_id` to style, source-media, bootstrap, object, and reviewed-object reads.
+Source-media reads also carry the entry’s exact `source_snapshot_id`, preserving its source
+context after the global topology pointer moves. Historical style display uses the selected
+style’s topology while reconciliation and writes retain the live authority base.
 Authored object composition receives `authored_version_id` explicitly. The entry surface never
 uses `WorldObjectsClient.connect()` without a pinned version.
 
@@ -124,10 +127,64 @@ The browser mounts the authored descriptor as a first-class region and ground. I
 a graph island, capture, evidence card, or reconstructed surface for it. Personal entries return
 `authored_scene: null`; their current graph and reconstruction limitations remain visible.
 
-Personal source admission does not mutate or rebase a starter snapshot. A future attachment flow
-must explicitly create the required structural or authored state, preserve the old version, and
-advance the saved entry under its revision check. Upload completion alone is never a topology
-write.
+The authored floor uses the descriptor's exact horizontal bounds and elevation. Its perimeter
+marks the supported walking area, and its surface receives object shadows and follows the saved
+appearance palette. Photo-derived scene-segment controls are absent from source-independent
+starters. In-world controls expose the World menu, object placement and photo review alongside
+the editable title. When the starter's Companion has no substantive turn, it presents creation
+guidance and the ordinary question control rather than an acknowledgement of an unstated exchange.
+The arrival prompt provides a Start building button that opens this guidance without requiring
+pointer lock. Opening photo review reads the workspace's authorized source inventory independently
+of composed-world topology.
+
+Personal source admission does not mutate or rebase a starter snapshot. Reference attachment
+records the relationship described below. Attachment is not a topology write and does not compose
+photographs into snapshots or style. `classify_structure_style_compatibility` is the closed
+check on ATTACH: the call names the saved style, authored version, and source snapshot and
+returns `attachment_membership_only`. It does not pass attachment identities, so it does not
+classify sourced activation, historical write bases, or expired compose inputs. Attach
+admission refuses expired sources before membership is written. Reviewed-source composition
+into geometry is absent. Upload completion alone is never a topology write.
+
+## Reference photographs
+
+A saved world can retain reviewed personal photographs as project references. Attachment is an
+explicit action after source admission and human review. It does not place a photograph in the
+scene, reconstruct geometry, or change the starter's source-independent origin.
+
+`POST /world-entries/{entry_id}/source-attachments` accepts an `operation_id`, `base_revision`,
+`authored_version_id`, `authored_state_sha256`, `authored_edit_seq`, `style_version_id`, and between
+1 and 200 unique `sources` containing `capture_id` and `evidence_span_id`. The server resolves the
+exact original digest, current personal authorization and eligible human screening. The route
+requires both `world.write` and `admission.read`.
+
+The transaction compares the complete entry cursor and the live authored state, validates every
+selected source, appends immutable operation and membership records, and increments only the
+entry revision. An invalid member or stale cursor refuses the whole operation. An exact retry
+with the same operation identity returns the current entry without adding membership or advancing
+the revision again; reuse with different request content is a conflict.
+
+Attachment preserves source snapshot identity and digest, authored version and edit sequence,
+object state and undo history, protected topology, and saved style. It increments only the
+entry revision and appends membership records. Entry reads include
+`source_attachments` with their original lineage and current availability. The photo drawer
+reopens this collection using authorized viewer bytes. Browser retry state is scoped to the
+specific entry; a refresh may update reference metadata but cannot adopt a changed scene or style
+under the existing canvas.
+
+The photo drawer presents this world's reference collection and attachment status immediately.
+Upload and human review remain in a separate expandable workflow. Already-attached selections
+are identified as part of the world and do not offer duplicate attachment; a selection containing
+new sources without completed review or current viewer access is refused atomically.
+
+Deleted sources, expired authorization or screening, and unavailable viewer bytes affect the
+individual reference. They do not make the independently authored world unavailable. Unavailable
+references retain lineage but return no viewer digest or evidence path. Genuine structural source
+dependencies continue to use snapshot invalidation.
+
+Each membership pins its original authorization and screening, and a capture can belong to an
+entry only once. Detach and provenance rebind operations are not supported. Recording newer
+receipts does not replace an expired membership's lineage or reactivate that membership.
 
 ## HTTP surface
 
@@ -139,6 +196,7 @@ write.
 | `POST` | `/world-entries/starter` | Atomically create or exactly reuse the source-independent authored starter |
 | `GET` | `/world-entries/{entry_id}` | One entry, with cross-workspace IDs answered as absent |
 | `PUT` | `/world-entries/{entry_id}` | Compare and advance the exact version references |
+| `POST` | `/world-entries/{entry_id}/source-attachments` | Attach reviewed reference photographs while preserving the world cursor |
 
 ## Verification
 
@@ -149,6 +207,11 @@ reference refusal, and cross-workspace non-disclosure against PostgreSQL. Browse
 `world-objects-api.test.ts`, and `world-style-api.test.ts` verify explicit recovery, bound writes,
 creation, appearance save/reload, named-world propagation, and the absence of newest-version
 inference.
+
+Reference-attachment coverage includes atomic mixed-source refusal, exact retry and operation
+identity conflicts, live authored-cursor drift, preserved object undo, authorization and screening
+expiry, source deletion, and unavailable viewer bytes. Browser component tests cover entry-scoped
+retry, same-scene metadata refresh, response ordering, and explicit refusal of ineligible selections.
 
 ## Starter placement boundary
 

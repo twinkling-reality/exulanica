@@ -47,31 +47,51 @@ interface SourceMediaWire {
 export class SourceMediaClient {
   readonly #transport: Transport;
   readonly #worldId: string | undefined;
+  readonly #topologyDigest: string | undefined;
+  readonly #sourceSnapshotId: string | undefined;
   readonly #createObjectUrl: (blob: Blob) => string;
   readonly #revokeObjectUrl: (url: string) => void;
 
   constructor(options: TransportOptions & {
     readonly worldId?: string;
+    readonly topologyDigest?: string;
+    readonly sourceSnapshotId?: string;
     readonly createObjectURL?: (blob: Blob) => string;
     readonly revokeObjectURL?: (url: string) => void;
   }) {
     this.#transport = new Transport(options);
     this.#worldId = options.worldId;
+    this.#topologyDigest = options.topologyDigest;
+    this.#sourceSnapshotId = options.sourceSnapshotId;
+    if (this.#topologyDigest !== undefined && this.#sourceSnapshotId !== undefined) {
+      throw new TypeError('Source media accepts one topology address.');
+    }
     this.#createObjectUrl = options.createObjectURL ?? URL.createObjectURL.bind(URL);
     this.#revokeObjectUrl = options.revokeObjectURL ?? URL.revokeObjectURL.bind(URL);
   }
 
-  async load(accent: string): Promise<SourceMediaSession> {
+  async load(
+    accent: string,
+    options: { readonly includeWorldTopology?: boolean } = {},
+  ): Promise<SourceMediaSession> {
     const inventory = parseInventory(await this.#transport.getJson<unknown>('/graph/sources'));
-    let topology: readonly SourceMediaWire[];
-    try {
-      topology = parseSourceList(await this.#transport.getJson<unknown>(
-        '/world/source-media',
-        this.#worldId === undefined ? undefined : { world_id: this.#worldId },
-      ));
-    } catch (error) {
-      if (!(error instanceof ApiError) || error.code !== 'world_not_configured') throw error;
-      topology = [];
+    let topology: readonly SourceMediaWire[] = [];
+    if (options.includeWorldTopology !== false) {
+      try {
+        topology = parseSourceList(await this.#transport.getJson<unknown>(
+          '/world/source-media',
+          this.#worldId === undefined && this.#topologyDigest === undefined
+            && this.#sourceSnapshotId === undefined ? undefined : {
+            ...(this.#worldId === undefined ? {} : { world_id: this.#worldId }),
+            ...(this.#topologyDigest === undefined
+              ? {} : { topology_digest: this.#topologyDigest }),
+            ...(this.#sourceSnapshotId === undefined
+              ? {} : { source_snapshot_id: this.#sourceSnapshotId }),
+          },
+        ));
+      } catch (error) {
+        if (!(error instanceof ApiError) || error.code !== 'world_not_configured') throw error;
+      }
     }
     // Inventory permission wins for shared evidence; topology retains its own slot aliases.
     const byEvidence = new Map(inventory.map((source) => [source.evidenceSpanId, source]));

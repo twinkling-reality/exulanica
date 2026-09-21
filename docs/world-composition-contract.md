@@ -69,6 +69,13 @@ existing authority, transactional writes, dependency invalidation and replaceabl
 renderer/model interfaces. Shared public place definitions must not expose private
 associations, trip history or derived personal content across workspaces.
 
+[Saved-world reference attachments](saved-world-entry.md#reference-photographs) provide a durable
+relationship between an owned project and reviewed personal photographs. They retain exact source
+and admission lineage without changing structural snapshots, authored edit history or appearance.
+This relationship is a source collection for the project; it does not implement extraction,
+reconstruction or placement. Optional reference availability remains separate from the invalidation
+of sources that actually determine a structural snapshot.
+
 A rendered representation must declare which properties it preserves and which
 operations it supports. Visual fidelity does not authorize collision; a semantic
 graph does not establish free space; an embedding does not establish identity; and
@@ -209,10 +216,11 @@ At the reviewed main source d32d0e7c1013f3ce2d569adce59133896575a6a7:
   structural creation, blending or arbitrary asset generation.
 - `exulanica/ingest/scene_segments.py` and the scene-segments route support lifted
   scene segmentation; segment availability is not complete-object extraction.
-- [WMP](world-memory-package.md) has an authored-world extension, but portable
-  Earth selection/anchor/rights semantics need a separately versioned extension
-  and receiver capability tests. Do not silently alter WMP 1.0 or imply that its
-  signature supplies missing asset bytes or runtime behavior.
+- [WMP](world-memory-package.md) has authored-world and environment-instances
+  extensions. Portable Earth selection, anchor and source-use-rights semantics
+  still need a separately versioned extension and receiver capability tests. Do
+  not silently alter WMP 1.0 or imply that its signature supplies missing asset
+  bytes, source-use rights or runtime behavior.
 
 Implement in dependency order, with exact file ownership and evidence per stage:
 
@@ -256,3 +264,18 @@ Prove all of the following before calling that slice complete:
   quality and actual geometry delivery are assessed separately from API success.
 - Package claims state supported extensions, available asset references and
   receiver capabilities; no unsupported runnable-world or unrestricted-export claim.
+
+Saved-world source reads are snapshot-addressed: reopening resolves source media through the
+entry’s stored structural snapshot, independently of the global topology pointer. Attachment
+membership is a project-reference write. It does not compose geometry, activate sourced topology
+on an authored starter, or rewrite style.
+
+Structural snapshots and composed style versions are different planes. Compatibility is the
+decision of `classify_structure_style_compatibility`, which takes typed plane identities and
+returns `compatible`, `preview_required`, or `refuse`. `compatibility_key` is profile-family
+binding only. Digest-string equality across planes is not the reason for compatibility; live
+typed identities may still agree when hex strings collide. `preview_required` /
+`style_topology_drift` is a CLASSIFY-family result. Family-matched digest change on
+`register_topology` is the composer handoff. COMPOSE tokens are latent; there is no compose
+write. Historical style may be displayed; appearance writes and rollback use the live
+composed digest. Reviewed-source composition into geometry is absent.

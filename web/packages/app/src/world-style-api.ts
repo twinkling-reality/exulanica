@@ -249,7 +249,7 @@ export class WorldStyleClient {
     this.#requiresReconciliation = selected.versionId !== this.#state.current.versionId;
     return Object.freeze({
       state: Object.freeze({
-        currentTopologyDigest: this.#state.currentTopologyDigest,
+        currentTopologyDigest: selected.topologyDigest,
         current: selected,
       }),
       versions: this.#versions,

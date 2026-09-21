@@ -710,6 +710,7 @@ export class AtlasBinding {
       registerRepresentation: (object, entity) =>
         this.registerAuthoredObjectRepresentation(object, entity),
       invalidate: () => this.invalidate(),
+      artProfile: initialProfile,
     });
     this.segmentOverlay = new SegmentOverlayRuntime(islands, trainedScenes, () => playcanvasSegmentEngine(app), {
       lensPrepared: (entity) => this.proofLensSplatsPrepared.has(entity),
@@ -967,6 +968,13 @@ export class AtlasBinding {
       initialArtProfile,
       theme,
       options.reducedMotion ?? false,
+      options.authoredRegion === undefined
+        ? undefined
+        : Object.freeze({
+            halfWidth: options.authoredRegion.ground.halfWidthMm / 1000,
+            halfDepth: options.authoredRegion.ground.halfDepthMm / 1000,
+            elevation: options.authoredRegion.ground.elevationMm / 1000,
+          }),
     );
     if (options.ownedDistrict !== undefined || options.generatedTile !== undefined) field.entity.enabled = false;
     renderRoot.addChild(field.entity);
@@ -1802,6 +1810,7 @@ export class AtlasBinding {
     this.regionMass.applyProfile(profile);
     this.regionRelief.applyProfile(profile);
     this.field.setProfile(profile);
+    this.objects.setProfile(profile);
     this.setClearColours(profile);
     if (this.camera.camera !== undefined && this.camera.camera !== null) {
       this.camera.camera.clearColor.copy(

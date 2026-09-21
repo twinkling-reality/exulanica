@@ -27,12 +27,15 @@ function arrowIcon(): SVGSVGElement {
   return svg;
 }
 
-export function buildCompanionComposer(onSay: (text: string) => void): CompanionComposer {
+export function buildCompanionComposer(
+  onSay: (text: string) => void,
+  options: { readonly ariaLabel?: string; readonly placeholder?: string } = {},
+): CompanionComposer {
   const input = el('input', {
     type: 'text',
     class: 'companion-reply-input',
-    'aria-label': 'Reply in your own words',
-    placeholder: 'Your reply',
+    'aria-label': options.ariaLabel ?? 'Reply in your own words',
+    placeholder: options.placeholder ?? 'Your reply',
     autocomplete: 'off',
   });
   const send = el('button', {

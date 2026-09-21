@@ -12,7 +12,7 @@ import uuid
 from collections.abc import Callable
 from typing import Annotated, Final, Literal, TypeAlias
 
-from fastapi import APIRouter, Depends, Path, Query, Request, Response
+from fastapi import APIRouter, Depends, HTTPException, Path, Query, Request, Response
 from fastapi.responses import JSONResponse
 from pydantic import (
     AliasChoices,
@@ -532,11 +532,29 @@ def _commit_style(
     summary="Protected topology source slots with honest availability states.",
 )
 def source_media(
-    repository: ReadWorld, services: Annotated[Services, Depends(get_services)]
-) -> list[SourceMediaView]:
+    repository: ReadWorld,
+    services: Annotated[Services, Depends(get_services)],
+    topology_digest: Annotated[str | None, Query(min_length=1, max_length=256)] = None,
+    source_snapshot_id: Annotated[uuid.UUID | None, Query()] = None,
+) -> list[SourceMediaView] | JSONResponse:
+    if topology_digest is not None and source_snapshot_id is not None:
+        raise HTTPException(status_code=422, detail="source media accepts one topology address")
     # `Services` is supplied below through an explicit dependency override; keeping it out of
     # the repository means the persistence layer cannot fetch arbitrary URLs or own bytes.
-    return [_source_view(source) for source in repository.source_media(services.store)]
+    try:
+        return [
+            _source_view(source)
+            for source in repository.source_media(
+                services.store,
+                topology_digest=topology_digest,
+                source_snapshot_id=source_snapshot_id,
+            )
+        ]
+    except InvalidatedSourceVersion as exc:
+        return JSONResponse(
+            status_code=409,
+            content={"code": "invalidated_source_version", "detail": str(exc)},
+        )
 
 
 @router.get(
@@ -548,8 +566,25 @@ def require_source_media(
     source_id: Annotated[uuid.UUID, Path()],
     repository: ReadWorld,
     services: Annotated[Services, Depends(get_services)],
-) -> SourceMediaView:
-    return _source_view(repository.require_source_media(source_id, services.store))
+    topology_digest: Annotated[str | None, Query(min_length=1, max_length=256)] = None,
+    source_snapshot_id: Annotated[uuid.UUID | None, Query()] = None,
+) -> SourceMediaView | JSONResponse:
+    if topology_digest is not None and source_snapshot_id is not None:
+        raise HTTPException(status_code=422, detail="source media accepts one topology address")
+    try:
+        return _source_view(
+            repository.require_source_media(
+                source_id,
+                services.store,
+                topology_digest=topology_digest,
+                source_snapshot_id=source_snapshot_id,
+            )
+        )
+    except InvalidatedSourceVersion as exc:
+        return JSONResponse(
+            status_code=409,
+            content={"code": "invalidated_source_version", "detail": str(exc)},
+        )
 
 
 def _reference(body: StyleReferenceBody) -> StyleReference:

@@ -11,6 +11,7 @@ import uuid
 
 import psycopg
 import pytest
+from exulanica.db.roles import RUNTIME_ROLE, provision_runtime_role
 from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.ingest.spine.scope import WorkspaceScope
 from exulanica.store.local import LocalContentAddressedStore
@@ -36,7 +37,7 @@ from exulanica.world import (
     seed_reviewed_assets,
 )
 
-from conftest import write_photo
+from conftest import scratch_role_database, write_photo
 from pg_harness import open_scratch_connection
 from world_structure_fixtures import structural_candidate
 
@@ -358,6 +359,158 @@ def test_undo_of_an_addition_leaves_the_version_empty_again(world):
     )
     assert version.objects == ()
     assert version.state_sha256 == empty
+
+
+def test_runtime_role_undo_retains_history_without_delete_privilege(
+    world, repository, spine_schema
+):
+    """The deployed writer can undo an addition while DELETE remains unavailable."""
+    objects, snapshot, _ = world
+    version = objects.create_version(
+        source_snapshot_id=snapshot.snapshot_id, title="Study", created_by=uuid.uuid4()
+    )
+    empty = version.state_sha256
+    repository.connection.commit()
+    provision_runtime_role(repository.connection)
+    repository.connection.commit()
+
+    with scratch_role_database(spine_schema[1], RUNTIME_ROLE).session(
+        repository.workspace_id
+    ) as connection:
+        runtime = WorldObjectRepository(connection, repository.workspace_id)
+        assert connection.execute(
+            "select has_table_privilege(current_user,'world_alternate_object','DELETE') as allowed"
+        ).fetchone()["allowed"] is False
+        placed = add(runtime, version)
+        undone = runtime.undo(
+            version.version_id,
+            base_state_sha256=placed.state_sha256,
+            actor=uuid.uuid4(),
+        )
+        assert undone.objects == ()
+        assert undone.state_sha256 == empty
+        retained = connection.execute(
+            "select removed,addition_undone,created_edit_id,last_edit_id "
+            "from world_alternate_object where workspace_id=%s and world_id=%s "
+            "and version_id=%s and object_id=%s",
+            (repository.workspace_id, runtime.world_id, version.version_id, "object:lantern"),
+        ).fetchone()
+        assert retained["removed"] is retained["addition_undone"] is True
+        assert retained["created_edit_id"] == placed.edits[-1].edit_id
+        assert retained["last_edit_id"] == undone.edits[-1].edit_id
+
+        readded = add(runtime, undone)
+        assert [item.object_id for item in readded.objects] == ["object:lantern"]
+        assert connection.execute(
+            "select count(*) as n from world_alternate_object where workspace_id=%s "
+            "and world_id=%s and version_id=%s",
+            (repository.workspace_id, runtime.world_id, version.version_id),
+        ).fetchone()["n"] == 1
+
+        removed = runtime.remove_object(
+            version.version_id,
+            "object:lantern",
+            base_state_sha256=readded.state_sha256,
+            actor=uuid.uuid4(),
+        )
+        assert removed.objects[0].removed is True
+        projection = connection.execute(
+            "select addition_undone,last_edit_id from world_alternate_object "
+            "where workspace_id=%s and world_id=%s and version_id=%s and object_id=%s",
+            (repository.workspace_id, runtime.world_id, version.version_id, "object:lantern"),
+        ).fetchone()
+        assert projection == {
+            "addition_undone": False,
+            "last_edit_id": removed.edits[-1].edit_id,
+        }
+        restored = runtime.undo(
+            version.version_id,
+            base_state_sha256=removed.state_sha256,
+            actor=uuid.uuid4(),
+        )
+        assert restored.objects[0].removed is False
+        assert restored.state_sha256 == readded.state_sha256
+
+
+def test_runtime_role_undo_retains_element_override_projection_without_delete(
+    world, repository, spine_schema
+):
+    objects, snapshot, _ = world
+    version = objects.create_version(
+        source_snapshot_id=snapshot.snapshot_id, title="Override study", created_by=uuid.uuid4()
+    )
+    empty = version.state_sha256
+    repository.connection.commit()
+    provision_runtime_role(repository.connection)
+    repository.connection.commit()
+
+    with scratch_role_database(spine_schema[1], RUNTIME_ROLE).session(
+        repository.workspace_id
+    ) as connection:
+        runtime = WorldObjectRepository(connection, repository.workspace_id)
+        assert connection.execute(
+            "select has_table_privilege(current_user,'world_alternate_element_override',"
+            "'DELETE') as allowed"
+        ).fetchone()["allowed"] is False
+        element_id = "element:region-b:root"
+        placed = runtime.set_element_override(
+            version.version_id,
+            ElementOverride(element_id, suppressed=True),
+            base_state_sha256=empty,
+            actor=uuid.uuid4(),
+        )
+        undone = runtime.undo(
+            version.version_id, base_state_sha256=placed.state_sha256, actor=uuid.uuid4()
+        )
+        assert undone.element_overrides == ()
+        assert undone.state_sha256 == empty
+        retained = connection.execute(
+            "select addition_undone,last_edit_id from world_alternate_element_override "
+            "where workspace_id=%s and world_id=%s and version_id=%s and element_id=%s",
+            (repository.workspace_id, runtime.world_id, version.version_id, element_id),
+        ).fetchone()
+        assert retained == {"addition_undone": True, "last_edit_id": undone.edits[-1].edit_id}
+
+        child = runtime.create_version(
+            parent_version_id=version.version_id,
+            title="No hidden override",
+            created_by=uuid.uuid4(),
+        )
+        assert child.element_overrides == ()
+        assert child.state_sha256 == empty
+
+        readded = runtime.set_element_override(
+            version.version_id,
+            ElementOverride(element_id, suppressed=True),
+            base_state_sha256=undone.state_sha256,
+            actor=uuid.uuid4(),
+        )
+        assert len(readded.element_overrides) == 1
+        assert connection.execute(
+            "select count(*) as n from world_alternate_element_override where workspace_id=%s "
+            "and world_id=%s and version_id=%s",
+            (repository.workspace_id, runtime.world_id, version.version_id),
+        ).fetchone()["n"] == 1
+
+        replaced = runtime.set_element_override(
+            version.version_id,
+            ElementOverride(element_id, suppressed=False, transform=transform(x_mm=5_000)),
+            base_state_sha256=readded.state_sha256,
+            actor=uuid.uuid4(),
+        )
+        restored = runtime.undo(
+            version.version_id, base_state_sha256=replaced.state_sha256, actor=uuid.uuid4()
+        )
+        assert restored.element_overrides == readded.element_overrides
+        projection = connection.execute(
+            "select addition_undone,last_edit_id from world_alternate_element_override "
+            "where workspace_id=%s and world_id=%s and version_id=%s and element_id=%s",
+            (repository.workspace_id, runtime.world_id, version.version_id, element_id),
+        ).fetchone()
+        assert projection == {
+            "addition_undone": False,
+            "last_edit_id": restored.edits[-1].edit_id,
+        }
 
 
 def test_undo_with_nothing_to_undo_is_refused(world):

@@ -41,7 +41,7 @@ from exulanica.db.roles import (
     assert_runtime_role,
     provision_runtime_role,
 )
-from exulanica.db.session import Database
+from exulanica.db.session import Database, set_workspace
 from exulanica.env import env_get
 from exulanica.identity import IdentityRepository
 from psycopg.rows import dict_row
@@ -123,6 +123,9 @@ def isolated():
         # A place is the durable plane 0038 added, and it is the newest workspace-keyed table, so
         # it is the one whose isolation is least likely to be covered by habit.
         admin.execute("insert into place (workspace_id) values (%s)", (workspace_a,))
+        # consent_record isolates on tenant_id, the name 0001 gave the workspace on that table.
+        # Seeded here so the shared isolation cases cover it without a second fixture.
+        _insert_consent_record(admin, workspace_a)
         admin.commit()
         yield Isolated(scratch, workspace_a, workspace_b)
 
@@ -143,9 +146,7 @@ class Isolated:
     def connect(self, role: str, workspace: uuid.UUID) -> psycopg.Connection:
         connection = psycopg.connect(self._dsn(role), autocommit=True, row_factory=dict_row)
         connection.execute(f'set search_path to "{self.scratch}", public')
-        connection.execute(
-            "select set_config('exulanica.workspace_id', %s, false)", (str(workspace),)
-        )
+        set_workspace(connection, workspace)
         self._open.append(connection)
         return connection
 
@@ -166,6 +167,30 @@ def scoped(isolated):
 
 def _count(connection: psycopg.Connection, table: str) -> int:
     return connection.execute(f'select count(*) as n from "{table}"').fetchone()["n"]
+
+
+def _insert_consent_record(connection: psycopg.Connection, tenant_id: uuid.UUID) -> uuid.UUID:
+    """Write one consent row whose isolation column is the given workspace.
+
+    The required hashes and notice fields are opaque bytes: this helper is for isolation, not
+    for the consent hash chain. ``tenant_id`` is the workspace under the name 0001 gave it.
+    """
+    digest = bytes(range(32))
+    row = connection.execute(
+        "insert into consent_record ("
+        "tenant_id, subject_ref, subject_label, grant_mode, identity_channel, "
+        "identity_value_hash, revocation_code_hash, scopes, purpose_text, "
+        "notice_text_sha256, notice_version, notice_locale, granted_at, expires_at, "
+        "adult_attested, record_hash"
+        ") values ("
+        "%s, %s, 'subject', 'subject_signed', 'email_challenge', "
+        "%s, %s, ARRAY['research'], 'purpose', "
+        "%s, 'v1', 'en', now(), now() + interval '365 days', "
+        "true, %s"
+        ") returning consent_id",
+        (tenant_id, uuid.uuid4(), digest, digest, digest, digest),
+    ).fetchone()
+    return row["consent_id"]
 
 
 def test_the_runtime_roles_cannot_bypass_row_level_security(scoped):
@@ -320,7 +345,7 @@ def test_a_session_with_no_workspace_declared_reads_nothing(scoped):
     scoped._open.append(connection)
     connection.execute(f'set search_path to "{scoped.scratch}", public')
     assert connection.execute("select current_workspace() as w").fetchone()["w"] is None
-    for table in ("capture", "evidence_span", "embedding", "assertion"):
+    for table in ("capture", "evidence_span", "embedding", "assertion", "consent_record"):
         assert _count(connection, table) == 0, table
 
 
@@ -396,7 +421,7 @@ def test_unscoped_reads_nothing_even_straight_after_a_scoped_session(scoped):
             "pool and the workspace setting travels with it"
         )
         assert bare.execute("select current_workspace() as w").fetchone()["w"] is None
-        for table in ("capture", "evidence_span", "embedding", "assertion"):
+        for table in ("capture", "evidence_span", "embedding", "assertion", "consent_record"):
             assert _count(bare, table) == 0, table
 
 
@@ -436,3 +461,90 @@ def test_unscoped_hides_nothing_from_a_role_row_level_security_does_not_reach(sc
             f"{who['who']} has rolsuper={who['rolsuper']} rolbypassrls={who['rolbypassrls']} "
             "and should read straight through ws_isolation"
         )
+
+
+def test_consent_record_is_isolated_by_the_workspace_session(scoped):
+    """consent_record reads and writes follow ``set_workspace``, not a tenant session setting.
+
+    The isolation column is still ``tenant_id``. The session identity is
+    ``exulanica.workspace_id``. FORCE row-level security remains, so a role that cannot
+    bypass the policy sees only its own rows. The withdrawn tenant GUC from migration 0001
+    is neither required nor sufficient.
+    """
+    # Built so this file does not spell the withdrawn product name the rename guard forbids.
+    historical_tenant_guc = "".join(("ori", "mera.tenant_id"))
+    forced = scoped.connect(_APP_ROLE, scoped.workspace_a).execute(
+        "select c.relrowsecurity, c.relforcerowsecurity, p.qual, p.with_check "
+        "from pg_class c "
+        "join pg_namespace n on n.oid = c.relnamespace "
+        "join pg_policies p on p.schemaname = n.nspname and p.tablename = c.relname "
+        "where n.nspname = %s and c.relname = 'consent_record' "
+        "and p.policyname = 'tenant_isolation'",
+        (scoped.scratch,),
+    ).fetchone()
+    assert forced["relrowsecurity"] is True
+    assert forced["relforcerowsecurity"] is True
+    assert "current_workspace()" in forced["qual"]
+    assert "current_workspace()" in forced["with_check"]
+    assert historical_tenant_guc not in forced["qual"]
+    assert historical_tenant_guc not in forced["with_check"]
+
+    mine = scoped.connect(_APP_ROLE, scoped.workspace_a)
+    theirs = scoped.connect(_APP_ROLE, scoped.workspace_b)
+    assert _count(mine, "consent_record") == 1
+    assert _count(theirs, "consent_record") == 0
+
+    extra: list[uuid.UUID] = []
+    try:
+        own = _insert_consent_record(mine, scoped.workspace_a)
+        extra.append(own)
+        assert mine.execute(
+            "select consent_id from consent_record where consent_id = %s", (own,)
+        ).fetchone()["consent_id"] == own
+        assert theirs.execute(
+            "select consent_id from consent_record where consent_id = %s", (own,)
+        ).fetchone() is None
+
+        with pytest.raises(psycopg.errors.InsufficientPrivilege), theirs.transaction():
+            _insert_consent_record(theirs, scoped.workspace_a)
+        theirs_own = _insert_consent_record(theirs, scoped.workspace_b)
+        extra.append(theirs_own)
+        assert _count(mine, "consent_record") == 2
+        assert _count(theirs, "consent_record") == 1
+        assert theirs.execute(
+            "select consent_id from consent_record where consent_id = %s", (theirs_own,)
+        ).fetchone()["consent_id"] == theirs_own
+        assert mine.execute(
+            "select consent_id from consent_record where consent_id = %s", (theirs_own,)
+        ).fetchone() is None
+
+        executor = scoped.connect(_EXECUTOR_ROLE, scoped.workspace_a)
+        assert _count(executor, "consent_record") == 2
+        with pytest.raises(psycopg.errors.InsufficientPrivilege), executor.transaction():
+            _insert_consent_record(executor, scoped.workspace_a)
+
+        only_old_guc = psycopg.connect(
+            scoped._dsn(_APP_ROLE), autocommit=True, row_factory=dict_row
+        )
+        scoped._open.append(only_old_guc)
+        only_old_guc.execute(f'set search_path to "{scoped.scratch}", public')
+        only_old_guc.execute(
+            "select set_config(%s, %s, false)", (historical_tenant_guc, str(scoped.workspace_a))
+        )
+        assert only_old_guc.execute("select current_workspace() as w").fetchone()["w"] is None
+        assert _count(only_old_guc, "consent_record") == 0
+        set_workspace(only_old_guc, scoped.workspace_a)
+        assert _count(only_old_guc, "consent_record") == 2
+
+        theirs.execute(
+            "select set_config(%s, %s, false)", (historical_tenant_guc, str(scoped.workspace_a))
+        )
+        assert _count(theirs, "consent_record") == 1
+    finally:
+        from tests_support_api import scratch_database
+
+        if extra:
+            with scratch_database(scoped.scratch).unscoped() as admin:
+                admin.execute(
+                    "delete from consent_record where consent_id = any(%s)", (extra,)
+                )

@@ -378,7 +378,7 @@ Export is intentionally partial and capability-declared:
 | --- | --- |
 | Evidence descriptors, semantic graph, reconstruction descriptors, structure, appearance, interaction, provenance | WMP 1.0 |
 | Alternate versions, authored objects, reviewed assets and behaviors | Optional authored-world 1.0 extension |
-| Durable environment instances | Not exported; authored delta schema v2 needs a versioned extension update |
+| Durable environment instances | Optional environment-instances 1.0 extension; not present in authored-world 1.0 |
 | Owned-district source/interpretation | Not exported as a reusable district contract |
 | Society state and simulation events | Not exported |
 | Raw private media | Excluded by default |

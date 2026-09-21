@@ -118,6 +118,8 @@ INSERT_ONLY_TABLES: Final = (
     "society_experiment_attempt",
     "society_experiment_checkpoint",
     "society_experiment_outcome",
+    "saved_world_source_attachment_operation",
+    "saved_world_source_attachment",
 )
 
 #: The vocabulary is administered, not generated. Without revoking this the role could insert a

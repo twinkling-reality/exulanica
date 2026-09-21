@@ -31,6 +31,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import (
 from exulanica.canonical import canonical_json
 from exulanica.errors import ExulanicaError
 from exulanica.materials.workspace import WORKSPACE_LICENCE_ID
+from exulanica.world_package import environments as environment_ext
 from exulanica.world_package.authored import (
     EXTENSION_KEY,
     EXTENSION_NAME,
@@ -179,6 +180,7 @@ class ExtensionFinding:
     rules_checked: bool
     required_loader_capabilities: tuple[str, ...]
     authored_world: AuthoredWorld | None = None
+    environment_instances: environment_ext.EnvironmentInstances | None = None
 
     def as_dict(self) -> dict[str, Any]:
         return {
@@ -539,6 +541,32 @@ def _verify_extensions(
                     authored_world=world,
                 )
             )
+        elif (name, version) == (
+            environment_ext.EXTENSION_NAME,
+            environment_ext.EXTENSION_VERSION,
+        ):
+            if directory != environment_ext.EXTENSION_KEY:
+                raise PackageError(
+                    f"{name}@{version} must sit at extensions/{environment_ext.EXTENSION_KEY}"
+                )
+            try:
+                world = environment_ext.verify_environment_instances(files, paths)
+            except ExtensionError as error:
+                raise PackageError(str(error)) from error
+            except (KeyError, TypeError, AttributeError, ValueError) as error:
+                raise PackageError(f"extensions/{directory} is malformed: {error!r}") from error
+            findings.append(
+                ExtensionFinding(
+                    extension=name,
+                    extension_version=version,
+                    directory=f"extensions/{directory}",
+                    rules_checked=True,
+                    required_loader_capabilities=tuple(
+                        world.declaration["required_loader_capabilities"]
+                    ),
+                    environment_instances=world,
+                )
+            )
         else:
             findings.append(
                 ExtensionFinding(
@@ -602,7 +630,8 @@ def import_check_package(
 
     ``loader_capabilities`` is the receiving loader's declaration, in one vocabulary:
     ``style-profile:<id>@<version>``, ``interaction:<key>@<version>``, ``wmp-extension:<name>@
-    <version>``, ``asset-resolution:...``, ``asset-media:<media type>`` and ``behaviour:<key>@
+    <version>``, ``asset-resolution:...``, ``asset-media:<media type>``,
+    ``environment-source:sha256-content-address`` and ``behaviour:<key>@
     <version>``. The two older keyword sets are the same declarations without their prefix and
     are merged in. The answer is a comparison of that declaration with what the signed content
     requires; nothing here runs a loader, and a declared capability remains the loader's claim.
@@ -634,6 +663,8 @@ def import_check_package(
     for finding in verification.extensions:
         if finding.authored_world is not None:
             detail = loader_report(finding.authored_world, declared)
+        elif finding.environment_instances is not None:
+            detail = environment_ext.loader_report(finding.environment_instances, declared)
         else:
             unsupported = sorted(set(finding.required_loader_capabilities) - declared)
             detail = {
@@ -670,6 +701,8 @@ def import_check_package(
         for item in extension_reports:
             item.update(
                 {
+                    "instances_not_drawable": [],
+                    "instances_unavailable": [],
                     "load": "indeterminate: the loader declared no capabilities",
                     "not_loaded": None,
                     "objects_not_drawable": [],

@@ -220,10 +220,11 @@ REACHED_TABLES: Final[Mapping[str, str]] = {
         "   where p.workspace_id = %(workspace_id)s and e.stage_key is not null)"
     ),
     "consent_record": (
-        # `tenant_id` is the workspace under migration 0001's original name, and its policy still
-        # reads the `orimera.tenant_id` setting rather than the `exulanica.workspace_id` one.
-        # Filtering on the column rather than relying on the policy is what makes that difference
-        # harmless here.
+        # `tenant_id` is the workspace under migration 0001's original column name. Isolation
+        # compares that column to current_workspace() (`exulanica.workspace_id`). The seed still
+        # filters on the column so a copy cannot pull another workspace's consent rows even if
+        # a later policy rewrite is incomplete. The historical `orimera.tenant_id` setting is
+        # not the session identity.
         "t.tenant_id = %(workspace_id)s"
     ),
 }

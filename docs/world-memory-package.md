@@ -3,11 +3,15 @@
 Status: **PROFILE `exulanica-wmp-1.0`, EXIT-GATED**.
 
 **Creative-world state:** [product-direction.md](product-direction.md#package-and-api-boundaries)
-asks for authored state and behaviour references without changing the 1.0 profile. They are
-carried by an optional, separately versioned extension, `exulanica-wmp-ext-authored-world` 1.0,
-specified in [its own section below](#authored-world-extension-10). The 1.0 profile, its eighteen
-required paths and its signature payload are unchanged, and a package written without the
-extension is byte for byte what the projector wrote before the extension existed.
+asks for authored state and behaviour references without changing the 1.0 profile. Objects,
+overrides and schema-version-1 deltas are carried by an optional, separately versioned
+extension, `exulanica-wmp-ext-authored-world` 1.0, specified in
+[its own section below](#authored-world-extension-10). Environment-inclusive authored state
+is a second optional extension, `exulanica-wmp-ext-environment-instances` 1.0, specified in
+[Environment-instances extension 1.0](#environment-instances-extension-10). The 1.0 profile,
+its eighteen required paths and its signature payload are unchanged, and a package written
+without either extension is byte for byte what the projector wrote before the extensions
+existed.
 
 The World Memory Package (WMP) is a signed projection of one PostgreSQL snapshot. It is not the
 live store, a backup, a consent grant, or an executable world. An exported copy cannot be recalled.
@@ -16,10 +20,11 @@ was removed or recomputed.
 
 **Composition extension:** [world-composition-contract.md](world-composition-contract.md)
 defines imported geography, selected subsets, place relationships, source-use
-rights and authored placement. These are not part of WMP 1.0 or the
-authored-world extension. Scope a versioned contract and verifier/receiver
-capabilities first; a signed package does not grant source reuse rights, carry
-missing asset bytes or establish a runnable import.
+rights and authored placement. Source-use rights, reusable geographic selection
+and a runnable import are not part of WMP 1.0, authored-world 1.0, or
+environment-instances 1.0. Durable authored environment placements are the
+environment-instances extension. A signed package does not grant source reuse
+rights, carry missing asset bytes or establish a runnable import.
 
 ## Standards and compatibility boundary
 
@@ -99,6 +104,7 @@ explicitly.
 ```text
 exulanica-wmp project --workspace UUID --actor UUID --private-key KEY --output DIRECTORY
                       [--extension authored-world-1.0]
+                      [--extension environment-instances-1.0]
 exulanica-wmp verify DIRECTORY
 exulanica-wmp inspect DIRECTORY
 exulanica-wmp diff BEFORE_DIRECTORY AFTER_DIRECTORY
@@ -189,13 +195,15 @@ The export receipt's `export_policy` records the extension; the package root doe
 - **Asset bytes and runtime code.** An asset is a digest an authorized resolver supplies; a
   behaviour is an identifier with bounded parameters. Embedding reviewed CC0 bytes would be a new,
   separately versioned opt-in, and this version refuses any file it does not name.
-- **Environment instances and society.** The extension was frozen against authored delta schema
+- **Environment instances and society.** The extension is frozen against authored delta schema
   version 1. Durable `environment_instances` select schema version 2 and are not projected by
-  `exulanica/world_package/authored.py`. Deterministic society state and events are also absent.
-  A receiver therefore cannot reconstruct an imported district placement or resume its synthetic
-  society from this extension. Either capability requires a separately versioned extension update,
-  verifier rules, loader declarations, and source-rights behavior; it is never inferred from the
-  presence of authored objects.
+  `exulanica/world_package/authored.py`. A version whose live state includes those instances, or
+  whose edit chain names an environment edit, is absent from this directory. Projecting
+  `authored-world-1.0` alone then refuses; the environment-instances extension below is the
+  export of that state. Deterministic society state and events are also absent. A receiver
+  therefore cannot reconstruct an imported district placement or resume its synthetic society
+  from this extension. Those capabilities are never inferred from the presence of authored
+  objects.
 
 ### Verifier rules
 
@@ -286,6 +294,123 @@ same proof on the reference copy: a package projected from the version the secon
 verified by this code and by the verifier at 90edb49, checked against four loader declarations, and
 the same snapshot projected without the extension by this code and by the 90edb49 projector,
 byte-identical in every file including the signature.
+
+## Environment-instances extension 1.0
+
+Status: **OPT-IN EXTENSION `exulanica-wmp-ext-environment-instances` 1.0**. Implementation:
+`exulanica/world_package/environments.py` (sections, verifier rules, loader report),
+`projector.py` (`_environment_instances`), `package.py` (extension discovery and
+`import-check`). It carries the environment-inclusive authored state
+[world-objects-contract.md](world-objects-contract.md) section 11 defines: alternate versions
+whose current delta includes `environment_instances`, or whose edit chain names an environment
+edit, together with the objects and overrides those versions still hold.
+
+### Why a second extension
+
+Authored-world 1.0 required paths, schema version 1, and edit kinds are a closed contract. Live
+state that includes environment instances selects schema version 2 and appends
+`add_environment`, `move_environment` and `remove_environment` edits. Emitting that document
+under `extensions/authored-world-1.0` would make a verifier that knows authored-world 1.0
+refuse a sound package, or would teach that verifier a schema the 1.0 name never admitted.
+An optional directory under `extensions/` does neither. The profile version in the manifest
+and the signature stays `exulanica-wmp-1.0`. A verifier that predates this extension still
+verifies a 1.0 package, including one that also carries authored-world 1.0.
+
+### Layout
+
+Exactly four canonical JSON files under `extensions/environment-instances-1.0/`; any other file
+there is refused.
+
+| File | Holds |
+| --- | --- |
+| `extension.json` | Name `exulanica-wmp-ext-environment-instances`, version `1.0`, base profile `exulanica-wmp-1.0`, section paths, counts, `required_loader_capabilities`, and the fixed statements that asset bytes, environment source bytes and runtime code are not embedded, that source-use rights are not granted, that availability is not in `state_sha256`, and that a receiver without this capability must omit these versions rather than infer objects from authored-world 1.0 |
+| `versions.json` | Every exported environment-bearing version: the same envelope fields authored-world 1.0 uses, the environment-inclusive `delta`, `environment_availability` beside that delta, and the edit chain including environment kinds; plus `source_snapshots` and a `withheld` count |
+| `assets.json` | The reviewed object assets those versions name, in the same digest-only form as authored-world 1.0 |
+| `behaviours.json` | The reviewed behaviours those objects name |
+
+`delta` is the document `exulanica.world.objects.canonical_delta_document` builds when
+environment instances are supplied. Schema version 2 and `environment_instances` appear only
+when at least one instance remains after omitting undone additions. Schema version 1 is the
+current state of a version whose environment additions were all undone; its edit chain still
+names those edits, which is why the version sits here and not under authored-world 1.0.
+`state_sha256` is the SHA-256 of that document under the canonical JSON rule, the same token
+`GET /world/versions` returns. Availability is a parallel array of `instance_id` and one of
+`available`, `unavailable_bytes`, `withdrawn`, `binding_drift`, or `unknown`. It is not hashed.
+
+Source identifiers inside the canonical instance (`admission_id`, `place_id`, render
+`asset_id`, publication id) remain the live UUID strings, because they participate in
+`state_sha256`. Envelope ids (`version_id`, `edit_id`, `source_snapshot_id`) stay
+`urn:exulanica:wmp:<kind>:<sha256>`.
+
+The extension is added only when `project` is given `--extension environment-instances-1.0`.
+With it, the eighteen 1.0 payloads are unchanged except `ro-crate-metadata.json`, which gains
+the four files in `hasPart`, one `Profile` node for the extension, and a `conformsTo` on
+`extension.json`. The crate root still conforms to the 1.0 profile alone.
+
+### What is exported and omitted
+
+| Exported | Omitted |
+| --- | --- |
+| Environment-bearing versions, their environment-inclusive delta, and their edit chain | Versions whose live state and edit chain are schema version 1 only; those stay in authored-world 1.0 when that extension is requested |
+| Current environment instances after `addition_undone` is applied | Undone environment additions, as authored-world 1.0 omits an undone object |
+| Honest availability for each exported instance | A fabricated `available` when bytes were not inspected (`unknown`) or when the pinned source is withdrawn, missing, or drifted |
+| Reviewed object asset and behaviour descriptors those versions name | Asset bytes, environment source, render and index bytes, runtime code |
+| A withheld count for invalidated sources | Versions whose source snapshot carries a `world_structure_invalidation` row; they are counted and not named |
+| | Actors, `created_by`, and each edit's `actor` |
+| | Source-use rights, a compose grant, or a claim that the receiver may reuse the pinned geography |
+| | Deterministic society state and events |
+
+Projecting `--extension authored-world-1.0` alone refuses when a kept version belongs in this
+extension. It does not write schema version 2 under the 1.0 name, and it does not export a 1.0
+directory that looks complete while dropping those versions.
+
+### Verifier rules
+
+A verifier that knows the extension refuses the package, even though its signature is sound,
+when: the directory does not hold exactly the four files; a section has an unknown profile, a
+missing or extra field, or items out of sorted order; `state_sha256` does not re-derive from
+the environment-inclusive delta; schema version 2 has an empty `environment_instances` array,
+or schema version 1 carries that field; an instance or object names a region its source
+snapshot lacks, a non-authored origin, or a transform outside the fixed-point contract; an
+instance source binding is malformed; `environment_availability` does not name exactly the
+exported instances in the same order, or uses a state outside the five honest values; an
+object names an asset or behaviour the sections do not list; an override names an element its
+source lacks; a parent is missing, on another source, or cyclic; the edit chain is not
+contiguous, an environment edit lacks `environment_instance_id`, a 1.0 edit kind carries that
+field, or the chain does not end at the exported state; the source snapshot marked `current`
+disagrees with `world/structure.json` or `world/topology.json`; the sections list assets,
+behaviours or snapshots nothing references; or `extension.json` does not match what the
+sections require. The digest is re-derived with the canonical JSON rule alone.
+
+A verifier that does not know this extension still verifies the 1.0 profile and any
+authored-world 1.0 directory it does know. This directory is then named as not checked.
+
+### Loader capabilities and `import-check`
+
+| Capability | Required when |
+| --- | --- |
+| `wmp-extension:exulanica-wmp-ext-environment-instances@1.0` | the extension is present |
+| `environment-source:sha256-content-address` | any environment instance that is not removed exists |
+| `asset-resolution:sha256-content-address` | any object that is not removed exists |
+| `asset-media:model/gltf-binary` | such an object's asset has that media type |
+| `behaviour:motion.bounded-path@1` | such an object carries that behaviour |
+
+A removed instance or object requires nothing. Availability is not a capability: a withdrawn
+or unavailable instance stays named. A loader without this extension capability gets
+`load: "not loaded"` and a warning that names how many versions and present environment
+instances it leaves behind, and that it must not infer objects from authored-world 1.0 as the
+whole authored state. `import-check` runs no loader and does not write a live world.
+
+### Compatibility evidence
+
+`tests/test_world_package_extension.py` still verifies
+`tests/fixtures/wmp-1.0-before-authored-world` unchanged and still rebuilds that package byte
+for byte. `tests/test_world_package_environment.py` checks that schema version 2 is refused
+under authored-world 1.0, that this extension re-derives an environment-inclusive digest
+without the product domain types, and that a loader without the capability is told to omit
+rather than infer. `tests/test_world_package_environment_postgres.py` round-trips a live
+environment instance, omits an undone addition, states withdrawn and unavailable honestly, and
+refuses an authored-world-1.0-only export of a version that has environments.
 
 ## Explicit training dataset profile
 

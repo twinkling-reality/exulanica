@@ -58,6 +58,20 @@
   font-size: 11px;
 }
 
+#shell .companion-encounter[data-first-use] .companion-prompt-button {
+  min-height: 34px;
+  padding: 6px 11px;
+  color: var(--ui-companion-text);
+  background: color-mix(in srgb, var(--ui-companion-text) 8%, transparent);
+  border: 1px solid color-mix(in srgb, var(--ui-companion-text) 30%, transparent);
+  border-radius: var(--radius-label);
+  cursor: pointer;
+}
+
+#shell .companion-encounter[data-first-use] .companion-prompt-button:hover {
+  background: color-mix(in srgb, var(--ui-companion-text) 14%, transparent);
+}
+
 #shell .companion-encounter[data-first-use] .companion-prompt b {
   display: inline-block;
   min-width: 20px;
@@ -236,6 +250,21 @@
   letter-spacing: -0.012em;
 }
 
+#shell .companion-encounter[data-state='open'] .companion-starter-title {
+  margin: 0 0 7px;
+  color: var(--accent);
+  font: 600 10px/1.2 var(--ui-font-utility);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+#shell .companion-encounter[data-state='open'] .companion-starter-copy {
+  margin: 0;
+  color: var(--ink);
+  font: 420 17px/1.55 var(--ui-font-body);
+  letter-spacing: -0.012em;
+}
+
 #shell .companion-speech ul,
 #shell .companion-choice-rail ul,
 #shell .companion-choice-rail ol {
@@ -268,6 +297,11 @@
 }
 
 #shell .companion-encounter[data-state='open'] .companion-choices {
+  display: grid;
+  gap: 6px;
+}
+
+#shell .companion-encounter[data-state='open'] .companion-starter-actions {
   display: grid;
   gap: 6px;
 }

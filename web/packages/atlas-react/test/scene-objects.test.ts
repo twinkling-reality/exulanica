@@ -3,8 +3,10 @@ import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type * as pc from 'playcanvas';
 import { atlasVec3, placement, type IslandId } from '@exulanica/atlas-core';
+import { SURVEY_RELIEF, unitRgb, worldSilhouetteTone } from '@exulanica/presentation';
 import {
   AUTHORED_OBJECT_MEDIA_TYPE,
+  DEFAULT_PLACEMENT_DISTANCE_MM,
   MICRORADIANS_PER_RADIAN,
   SCALE_MILLI_UNIT,
   SceneObjectRuntime,
@@ -121,6 +123,7 @@ describe('the reviewed assets this client will actually meet', () => {
       expect(summary.meshCount).toBeGreaterThan(0);
       // No textures at all, so nothing in them can reach for an image.
       expect(summary.imageCount).toBe(0);
+      expect(summary.materialCount).toBe(0);
       const row = published.get(key);
       if (row !== undefined) {
         expect(sha(bytes)).toBe(row.content_sha256);
@@ -373,6 +376,14 @@ describe('placement is region-local fixed point', () => {
     expect(pose.scaleMilli).toBe(SCALE_MILLI_UNIT);
   });
 
+  it('keeps the ground contact inside the supported minimum field of view', () => {
+    const eyeHeightMm = 1620;
+    const minimumVerticalFieldOfView = 60 * (Math.PI / 180);
+    expect(Math.atan2(eyeHeightMm, DEFAULT_PLACEMENT_DISTANCE_MM))
+      .toBeLessThan(minimumVerticalFieldOfView / 2);
+    expect(DEFAULT_PLACEMENT_DISTANCE_MM).toBe(3500);
+  });
+
   it('keeps yaw non-negative and inside one turn, as the transform bound requires', () => {
     expect(yawMicroradiansOf(0)).toBe(0);
     expect(yawMicroradiansOf(Number.NaN)).toBe(0);
@@ -439,6 +450,7 @@ interface FakeEntity {
   setLocalEulerAngles: (x: number, y: number, z: number) => void;
   setLocalScale: (x: number, y: number, z: number) => void;
   addChild: (child: unknown) => void;
+  findComponents: (type: string) => unknown[];
 }
 
 function fakeEntity(): FakeEntity {
@@ -453,6 +465,7 @@ function fakeEntity(): FakeEntity {
     setLocalEulerAngles: (x, y, z) => { entity.euler[0] = x; entity.euler[1] = y; entity.euler[2] = z; },
     setLocalScale: (x, y, z) => { entity.scale[0] = x; entity.scale[1] = y; entity.scale[2] = z; },
     addChild: vi.fn(),
+    findComponents: vi.fn(() => []),
   };
   return entity;
 }
@@ -525,6 +538,38 @@ describe('the runtime places, moves and animates what a surface already committe
     expect(drawn.position).toEqual([1.2, 0, -0.45]);
     expect(drawn.scale).toEqual([1, 1, 1]);
     expect(runtime.motionStateOf('object:lantern')).toBe('at-rest');
+  });
+
+  it('gives only material-less geometry a matte fallback that follows world appearance', async () => {
+    const materialless = harness();
+    const instance = { material: { name: 'engine-default' } };
+    (materialless.drawn.findComponents as ReturnType<typeof vi.fn>)
+      .mockReturnValue([{ meshInstances: [instance] }]);
+    await materialless.runtime.place(placed(null), reviewedBytes('cc0.marker-cube'));
+
+    const fallback = instance.material as unknown as pc.StandardMaterial;
+    expect(fallback.name).toBe('authored-object:materialless-fallback');
+    expect(fallback.metalness).toBe(0);
+    materialless.runtime.setProfile(SURVEY_RELIEF);
+    const expected = unitRgb(worldSilhouetteTone(SURVEY_RELIEF.palette));
+    expect([fallback.diffuse.r, fallback.diffuse.g, fallback.diffuse.b]).toEqual(expected);
+    const destroyFallback = vi.spyOn(fallback, 'destroy');
+    materialless.runtime.destroy();
+    expect(destroyFallback).toHaveBeenCalledOnce();
+
+    const declared = harness();
+    const ownMaterial = { name: 'asset-authored-material' };
+    const ownInstance = { material: ownMaterial };
+    (declared.drawn.findComponents as ReturnType<typeof vi.fn>)
+      .mockReturnValue([{ meshInstances: [ownInstance] }]);
+    const bytes = glb({
+      ...MINIMAL,
+      materials: [{ pbrMetallicRoughness: { baseColorFactor: [0.8, 0.2, 0.1, 1] } }],
+      meshes: [{ primitives: [{ attributes: { POSITION: 0 }, material: 0 }] }],
+    }, new Uint8Array(12));
+    await declared.runtime.place({ ...placed(null), asset: reference(bytes) }, bytes);
+    expect(ownInstance.material).toBe(ownMaterial);
+    declared.runtime.destroy();
   });
 
   it('applies yaw and scale from the fixed-point fields', async () => {

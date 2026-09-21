@@ -595,10 +595,10 @@ def test_the_prose_count_of_workspace_isolated_tables_matches_the_schema():
     prose drifts every time a migration adds a table, so it is measured against a live schema
     here rather than remembered in three places.
 
-    The count is of tables keyed on ``current_workspace()`` rather than of forced tables,
-    because those are two different numbers: ``consent_record`` is forced and keyed on the
-    tenant, so it is named below rather than folded into a total that would then mean neither
-    thing. Partitions are excluded for the same reason: ``embedding_ws_*`` is created per
+    The count is of tables keyed on ``current_workspace()`` rather than of forced tables
+    imagined as a different set. ``consent_record`` is forced too, and its policy compares
+    ``tenant_id`` (the isolation column 0001 gave that table) to ``current_workspace()``, so
+    it is in the same total. Partitions are excluded: ``embedding_ws_*`` is created per
     workspace, so counting relations would make the number a function of how many workspaces
     happened to exist when it was taken.
     """
@@ -614,7 +614,7 @@ def test_the_prose_count_of_workspace_isolated_tables_matches_the_schema():
 
     workspace_keyed = sorted({name for name, qual in forced if "current_workspace()" in qual})
     others = sorted({name for name, _ in forced} - set(workspace_keyed))
-    assert others == ["consent_record"], (
+    assert others == [], (
         f"{others} are under FORCE row-level security and not keyed on current_workspace(). "
         "The count below is of the workspace-keyed tables, so a new table in this list is a "
         "table the sentence in three docstrings does not describe."

@@ -19,8 +19,49 @@ export interface SavedWorldEntry {
   readonly revision: number;
   readonly availability: 'available' | 'unavailable';
   readonly unavailableReason: 'source_deleted' | string | null;
+  readonly sourceAttachments: readonly SavedWorldSourceAttachment[];
   readonly createdAt: string;
   readonly updatedAt: string;
+}
+
+/** An entry-scoped reference photograph. It is lineage, not scene topology or reconstruction. */
+export interface SavedWorldSourceAttachment {
+  readonly attachmentId: string;
+  readonly operationId: string;
+  readonly captureId: string;
+  readonly evidenceSpanId: string;
+  readonly sourceSha256: string;
+  readonly authorizationId: string;
+  readonly screeningId: string;
+  readonly role: 'reference';
+  readonly attachedEntryRevision: number;
+  readonly attachedBy: string;
+  readonly attachedAt: string;
+  readonly availability: 'available' | 'unavailable';
+  readonly unavailableReason:
+    | 'source_unavailable'
+    | 'authorization_expired'
+    | 'screening_expired'
+    | 'viewer_unavailable'
+    | null;
+  /** Digest of the currently authorized viewer representation, never the original source digest. */
+  readonly viewerSha256: string | null;
+  readonly evidencePath: string | null;
+}
+
+/** The complete entry cursor and selected references retained for exact retry. */
+export interface SourceAttachmentRequest {
+  readonly entryId: string;
+  readonly operationId: string;
+  readonly baseRevision: number;
+  readonly authoredVersionId: string;
+  readonly authoredStateSha256: string;
+  readonly authoredEditSeq: number;
+  readonly styleVersionId: string;
+  readonly sources: readonly {
+    readonly captureId: string;
+    readonly evidenceSpanId: string;
+  }[];
 }
 
 /** The bounded, source-independent region pinned by an authored starter entry. */
@@ -62,6 +103,42 @@ export function automaticWorldEntry(
   entries: readonly SavedWorldEntry[],
 ): SavedWorldEntry | null {
   return entries.length === 1 && entries[0]?.availability === 'available' ? entries[0] : null;
+}
+
+/**
+ * Accept an entry refresh that changes only entry metadata or reference availability.
+ * Rendering cursors require a full world reopen and may never be adopted under the live canvas.
+ */
+export function requireMetadataOnlyEntryUpdate(
+  active: SavedWorldEntry,
+  updated: SavedWorldEntry,
+): SavedWorldEntry {
+  if (active.entryId !== updated.entryId) {
+    throw new Error('The saved world entry is no longer active.');
+  }
+  if (updated.revision < active.revision) {
+    throw new Error('An older saved world response cannot replace the active entry.');
+  }
+  const sameWorldCursor =
+    active.worldId === updated.worldId &&
+    active.sourceKind === updated.sourceKind &&
+    active.sourceSnapshotId === updated.sourceSnapshotId &&
+    active.sourceSnapshotSha256 === updated.sourceSnapshotSha256 &&
+    active.authoredVersionId === updated.authoredVersionId &&
+    active.authoredStateSha256 === updated.authoredStateSha256 &&
+    active.authoredEditSeq === updated.authoredEditSeq &&
+    active.currentAuthoredStateSha256 === updated.currentAuthoredStateSha256 &&
+    active.currentAuthoredEditSeq === updated.currentAuthoredEditSeq &&
+    active.styleVersionId === updated.styleVersionId &&
+    active.availability === updated.availability &&
+    active.unavailableReason === updated.unavailableReason &&
+    JSON.stringify(active.authoredScene) === JSON.stringify(updated.authoredScene);
+  if (!sameWorldCursor) {
+    throw new Error(
+      'This saved world changed beyond its reference metadata. Reload the world before editing it.',
+    );
+  }
+  return updated;
 }
 
 export class WorldEntryClient {
@@ -188,6 +265,33 @@ export class WorldEntryClient {
     ));
   }
 
+  /** Attach reviewed photographs as references without moving any world or appearance cursor. */
+  async attachSources(request: SourceAttachmentRequest): Promise<SavedWorldEntry> {
+    if (request.sources.length < 1 || request.sources.length > 200) {
+      throw new TypeError('Select between 1 and 200 reviewed photographs to attach.');
+    }
+    const unique = new Set(request.sources.map((source) =>
+      `${source.captureId}:${source.evidenceSpanId}`));
+    if (unique.size !== request.sources.length) {
+      throw new TypeError('Each reviewed photograph can be attached only once per request.');
+    }
+    return parseEntry(await this.#transport.postJson<unknown>(
+      `/world-entries/${encodeURIComponent(request.entryId)}/source-attachments`,
+      {
+        operation_id: request.operationId,
+        base_revision: request.baseRevision,
+        authored_version_id: request.authoredVersionId,
+        authored_state_sha256: request.authoredStateSha256,
+        authored_edit_seq: request.authoredEditSeq,
+        style_version_id: request.styleVersionId,
+        sources: request.sources.map((source) => ({
+          capture_id: source.captureId,
+          evidence_span_id: source.evidenceSpanId,
+        })),
+      },
+    ));
+  }
+
   /** Adopt only the exact current branch state returned with this entry read. */
   adoptLatestAuthored(base: SavedWorldEntry): Promise<SavedWorldEntry> {
     return this.saveVersion(base, {
@@ -210,6 +314,10 @@ function parseEntry(value: unknown): SavedWorldEntry {
     throw new TypeError('The server returned an unknown world availability.');
   }
   const authoredScene = parseAuthoredScene(row['authored_scene']);
+  const sourceAttachments = row['source_attachments'];
+  if (!Array.isArray(sourceAttachments)) {
+    throw new TypeError('The server returned invalid saved world source attachments.');
+  }
   if (sourceKind === 'authored' && authoredScene === null) {
     throw new TypeError('An authored world entry did not include its pinned authored scene.');
   }
@@ -237,8 +345,57 @@ function parseEntry(value: unknown): SavedWorldEntry {
     revision: integer(row['revision'], 'entry revision'),
     availability,
     unavailableReason: optionalText(row['unavailable_reason'], 'unavailable reason'),
+    sourceAttachments: Object.freeze(sourceAttachments.map(parseSourceAttachment)),
     createdAt: text(row['created_at'], 'created time'),
     updatedAt: text(row['updated_at'], 'updated time'),
+  });
+}
+
+function parseSourceAttachment(value: unknown): SavedWorldSourceAttachment {
+  const row = record(value, 'saved world source attachment');
+  const role = row['role'];
+  const availability = row['availability'];
+  const unavailableReason = optionalText(
+    row['unavailable_reason'], 'source attachment unavailable reason',
+  );
+  const reasons = new Set([
+    'source_unavailable', 'authorization_expired', 'screening_expired', 'viewer_unavailable',
+  ]);
+  if (role !== 'reference') throw new TypeError('The server returned an unknown attachment role.');
+  if (availability !== 'available' && availability !== 'unavailable') {
+    throw new TypeError('The server returned an unknown source attachment availability.');
+  }
+  if (
+    (unavailableReason !== null && !reasons.has(unavailableReason)) ||
+    (availability === 'available' && unavailableReason !== null) ||
+    (availability === 'unavailable' && unavailableReason === null)
+  ) {
+    throw new TypeError('The server returned an invalid source attachment availability reason.');
+  }
+  const viewerSha256 = optionalSha256(row['viewer_sha256'], 'viewer digest');
+  const evidencePath = optionalText(row['evidence_path'], 'attachment evidence path');
+  if (
+    (availability === 'available' && (viewerSha256 === null || evidencePath === null)) ||
+    (availability === 'unavailable' && (viewerSha256 !== null || evidencePath !== null))
+  ) {
+    throw new TypeError('The source attachment viewer fields disagree with its availability.');
+  }
+  return Object.freeze({
+    attachmentId: text(row['attachment_id'], 'attachment ID'),
+    operationId: text(row['operation_id'], 'attachment operation ID'),
+    captureId: text(row['capture_id'], 'attachment capture ID'),
+    evidenceSpanId: text(row['evidence_span_id'], 'attachment evidence span ID'),
+    sourceSha256: sha256(row['source_sha256'], 'original source digest'),
+    authorizationId: text(row['authorization_id'], 'attachment authorization ID'),
+    screeningId: text(row['screening_id'], 'attachment screening ID'),
+    role,
+    attachedEntryRevision: integer(row['attached_entry_revision'], 'attached entry revision'),
+    attachedBy: text(row['attached_by'], 'attachment actor'),
+    attachedAt: text(row['attached_at'], 'attachment time'),
+    availability,
+    unavailableReason: unavailableReason as SavedWorldSourceAttachment['unavailableReason'],
+    viewerSha256,
+    evidencePath,
   });
 }
 
@@ -313,4 +470,8 @@ function sha256(value: unknown, name: string): string {
   const parsed = text(value, name);
   if (!/^[0-9a-f]{64}$/.test(parsed)) throw new TypeError(`Invalid ${name}.`);
   return parsed;
+}
+
+function optionalSha256(value: unknown, name: string): string | null {
+  return value === null ? null : sha256(value, name);
 }

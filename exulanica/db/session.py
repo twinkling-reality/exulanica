@@ -2,13 +2,14 @@
 
 Neither setting is optional, and neither is a convenience.
 
-*   **``exulanica.workspace_id``.** 114 tables are under FORCE row-level security keyed on
-    ``current_workspace()``, whose policy is ``workspace_id = current_workspace()`` and which
-    reads exactly this setting. One more, ``consent_record``, is forced too and keyed on the
-    tenant instead, which is why the number here counts the workspace-keyed ones rather than the
-    forced ones. "One more" rather than an ordinal, because the ordinal read "twenty-third"
-    beside a count of forty-eight and had read that way through several migrations: only the
-    count is measured, by
+*   **``exulanica.workspace_id``.** 117 tables are under FORCE row-level security keyed on
+    ``current_workspace()``, whose policy compares the row's isolation column to
+    ``current_workspace()`` and which reads exactly this setting. Most of those columns are
+    ``workspace_id``. ``consent_record`` compares ``tenant_id``, the name migration 0001 gave
+    the workspace on that table, to the same session workspace. There is no separate tenant
+    session setting. "One hundred and seventeen" rather than an ordinal, because an ordinal
+    beside a count that later migrations move is a sentence that goes stale: only the count is
+    measured, by
     ``test_the_prose_count_of_workspace_isolated_tables_matches_the_schema`` against a live
     schema, and it reads nothing at all out of a word. A session that does not declare a
     workspace therefore reads nothing and writes nothing: every SELECT returns empty and every

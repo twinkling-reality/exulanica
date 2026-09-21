@@ -15,6 +15,8 @@ export interface CompanionChoiceHandlers {
 export interface CompanionChoiceRail {
   readonly root: HTMLElement;
   render(turn: Turn): void;
+  /** Direct starter-world actions plus the ordinary read-only question path. */
+  renderStarter(actions: CompanionStarterActions): void;
   /**
    * What a person can do with an answer: open what it cited, or ask something else.
    *
@@ -26,6 +28,11 @@ export interface CompanionChoiceRail {
   pressNumber(index: number): boolean;
   /** Whether the current turn cites anything, so `E` knows if it has a job. */
   openEvidence(): boolean;
+}
+
+export interface CompanionStarterActions {
+  readonly onAddObject: () => void;
+  readonly onAddPhotos: () => void;
 }
 
 function optionLabel(option: TurnOption): string {
@@ -245,9 +252,31 @@ export function buildCompanionChoiceRail(
     replace(root, content);
   }
 
+  function renderStarter(actions: CompanionStarterActions): void {
+    lastTurn = null;
+    composer = buildCompanionComposer(handlers.onSay, {
+      ariaLabel: 'Ask about your sources',
+      placeholder: 'Ask about your sources',
+    });
+    const direct = el('div', { class: 'companion-starter-actions' }, [
+      el('button', {
+        type: 'button', class: 'companion-choice', text: 'Add an object',
+      }),
+      el('button', {
+        type: 'button', class: 'companion-choice', text: 'Add photos',
+      }),
+    ]);
+    const buttons = direct.querySelectorAll<HTMLButtonElement>('button');
+    buttons[0]?.addEventListener('click', actions.onAddObject);
+    buttons[1]?.addEventListener('click', actions.onAddPhotos);
+    composer.reveal();
+    replace(root, [direct, composer.root]);
+  }
+
   return {
     root,
     render,
+    renderStarter,
     renderAnswer,
     openEvidence() {
       const action = root.querySelector<HTMLButtonElement>(

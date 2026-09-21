@@ -19,6 +19,8 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from psycopg.rows import dict_row
 
 from exulanica.epistemics.vocabulary import RECONSTRUCTION_SCENE_RUNG_PREDICATE
+from exulanica.store.base import ContentAddressedStore
+from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.objects import (
     AuthoredObject,
     ElementOverride,
@@ -28,7 +30,7 @@ from exulanica.world.objects import (
     canonical_delta_document,
     delta_sha256,
 )
-from exulanica.world_package import authored
+from exulanica.world_package import authored, environments
 from exulanica.world_package.package import (
     MANIFEST_PATH,
     PROFILE_ID,
@@ -98,6 +100,7 @@ def project_world_package(
     evaluation_reports: Sequence[Path] = (),
     after_snapshot_hook: Callable[[], None] | None = None,
     extensions: Sequence[str] = (),
+    store: ContentAddressedStore | None = None,
 ) -> ProjectionResult:
     """Project, sign, receipt, and atomically publish one consistent database snapshot.
 
@@ -105,12 +108,14 @@ def project_world_package(
     first query has established a REPEATABLE READ snapshot and before any component rows are
     read; production callers leave it unset.
 
-    ``extensions`` is opt-in and names ``authored-world-1.0`` or nothing. Without it the output
-    is byte for byte what this projector wrote before the extension existed; with it the eighteen
-    1.0 payloads are unchanged except ``ro-crate-metadata.json``, which inventories the added
-    files, and the manifest and signature that cover them.
+    ``extensions`` is opt-in and names ``authored-world-1.0``, ``environment-instances-1.0``,
+    both, or nothing. Without an extension the output is byte for byte what this projector wrote
+    before either extension existed. ``authored-world-1.0`` still writes schema version 1 only.
+    A version whose live state includes environment instances or environment edits is not written
+    under that name; projecting that extension alone then refuses rather than pretending the 1.0
+    package is complete. ``store`` is used only to state environment availability honestly.
     """
-    unknown = sorted(set(extensions) - {authored.EXTENSION_KEY})
+    unknown = sorted(set(extensions) - {authored.EXTENSION_KEY, environments.EXTENSION_KEY})
     if unknown:
         raise PackageError(f"unknown package extension: {unknown}")
     if connection.info.transaction_status.name != "IDLE":
@@ -143,18 +148,48 @@ def project_world_package(
                     evaluation_reports=evaluation_reports,
                     parent_merkle_root_sha256=parent_merkle_root_sha256,
                 )
-                if authored.EXTENSION_KEY in extensions:
+                if authored.EXTENSION_KEY in extensions or environments.EXTENSION_KEY in extensions:
                     # Read inside the same REPEATABLE READ snapshot as every 1.0 component, so
                     # the current source snapshot the extension names is the one the package
                     # describes in world/structure.json.
-                    components.update(
-                        _authored_world(
-                            cursor,
-                            world_id,
-                            workspace_id=workspace_id,
-                            current_snapshot_id=pointers["structure_snapshot_id"],
+                    authored_ids, env_ids, authored_withheld, env_withheld = (
+                        _extension_version_sets(
+                            cursor, world_id, workspace_id=workspace_id
                         )
                     )
+                    if env_ids and environments.EXTENSION_KEY not in extensions:
+                        raise PackageError(
+                            "authored-world-1.0 cannot export versions whose state includes "
+                            "environment instances or environment edits; request "
+                            f"{environments.EXTENSION_KEY} rather than omit them or emit "
+                            "schema version 2 under the 1.0 extension name"
+                        )
+                    if authored.EXTENSION_KEY in extensions:
+                        authored_kwargs: dict[str, Any] = {}
+                        if environments.EXTENSION_KEY in extensions:
+                            authored_kwargs["version_ids"] = authored_ids
+                            authored_kwargs["withheld_count"] = authored_withheld
+                        components.update(
+                            _authored_world(
+                                cursor,
+                                world_id,
+                                workspace_id=workspace_id,
+                                current_snapshot_id=pointers["structure_snapshot_id"],
+                                **authored_kwargs,
+                            )
+                        )
+                    if environments.EXTENSION_KEY in extensions:
+                        components.update(
+                            _environment_instances(
+                                cursor,
+                                world_id,
+                                workspace_id=workspace_id,
+                                current_snapshot_id=pointers["structure_snapshot_id"],
+                                version_ids=env_ids,
+                                withheld_count=env_withheld,
+                                store=store,
+                            )
+                        )
                 files = _crate_files(components)
                 for path, data in files.items():
                     if path.endswith(".json"):
@@ -941,6 +976,8 @@ def _authored_world(
     *,
     workspace_id: uuid.UUID,
     current_snapshot_id: uuid.UUID | None,
+    version_ids: Sequence[uuid.UUID] | None = None,
+    withheld_count: int | None = None,
 ) -> dict[str, Any]:
     """Project alternate versions, their deltas and edit chains, and what they reference.
 
@@ -977,6 +1014,9 @@ def _authored_world(
         (workspace_id, world_id),
     ).fetchall()
     kept = [row for row in rows if row["source_snapshot_id"] not in invalidated]
+    if version_ids is not None:
+        allowed = set(version_ids)
+        kept = [row for row in kept if row["version_id"] in allowed]
     kept_ids = [row["version_id"] for row in kept]
     objects: dict[uuid.UUID, list[AuthoredObject]] = {}
     for row in cursor.execute(
@@ -984,6 +1024,7 @@ def _authored_world(
         "scale_milli,origin_kind,origin_role,behaviour_key,behaviour_version,"
         "behaviour_parameters,removed from world_alternate_object "
         "where workspace_id=%s and world_id=%s and version_id=any(%s) "
+        "and not addition_undone "
         "order by version_id,object_id",
         (workspace_id, world_id, kept_ids),
     ).fetchall():
@@ -1011,6 +1052,7 @@ def _authored_world(
         "select version_id,element_id,suppressed,x_mm,y_mm,z_mm,yaw_microradians,scale_milli "
         "from world_alternate_element_override "
         "where workspace_id=%s and world_id=%s and version_id=any(%s) "
+        "and not addition_undone "
         "order by version_id,element_id",
         (workspace_id, world_id, kept_ids),
     ).fetchall():
@@ -1142,8 +1184,253 @@ def _authored_world(
         source_snapshots=snapshots,
         assets=assets,
         behaviours=behaviours,
-        withheld_versions=len(rows) - len(kept),
+        withheld_versions=(
+            withheld_count if withheld_count is not None else len(rows) - len(kept)
+        ),
     )
+
+
+def _extension_version_sets(
+    cursor: psycopg.Cursor, world_id: str, *, workspace_id: uuid.UUID
+) -> tuple[tuple[uuid.UUID, ...], tuple[uuid.UUID, ...], int, int]:
+    """Split live versions between authored-world 1.0 and the environment-instances extension.
+
+    A version whose current delta includes environment instances, or whose edit chain names an
+    environment edit, cannot be written under authored-world 1.0: that extension's verifier
+    requires schema version 1 and refuses environment edit kinds. Invalidated sources stay
+    withheld from the extension that would otherwise have exported them.
+    """
+    invalidated = {
+        row["snapshot_id"]
+        for row in cursor.execute(
+            "select distinct snapshot_id from world_structure_invalidation "
+            "where workspace_id=%s and world_id=%s",
+            (workspace_id, world_id),
+        ).fetchall()
+    }
+    env_bearing = {
+        row["version_id"]
+        for row in cursor.execute(
+            "select version_id from world_alternate_environment_instance "
+            "where workspace_id=%s and world_id=%s and not addition_undone "
+            "union "
+            "select version_id from world_alternate_version_edit "
+            "where workspace_id=%s and world_id=%s "
+            "and (kind in ('add_environment','move_environment','remove_environment') "
+            "or environment_instance_id is not null)",
+            (workspace_id, world_id, workspace_id, world_id),
+        ).fetchall()
+    }
+    rows = cursor.execute(
+        "select version_id,source_snapshot_id from world_alternate_version "
+        "where workspace_id=%s and world_id=%s",
+        (workspace_id, world_id),
+    ).fetchall()
+    authored_ids: list[uuid.UUID] = []
+    env_ids: list[uuid.UUID] = []
+    authored_withheld = 0
+    env_withheld = 0
+    for row in rows:
+        env = row["version_id"] in env_bearing
+        if row["source_snapshot_id"] in invalidated:
+            if env:
+                env_withheld += 1
+            else:
+                authored_withheld += 1
+            continue
+        if env:
+            env_ids.append(row["version_id"])
+        else:
+            authored_ids.append(row["version_id"])
+    return tuple(authored_ids), tuple(env_ids), authored_withheld, env_withheld
+
+
+def _environment_instances(
+    cursor: psycopg.Cursor,
+    world_id: str,
+    *,
+    workspace_id: uuid.UUID,
+    current_snapshot_id: uuid.UUID | None,
+    version_ids: Sequence[uuid.UUID],
+    withheld_count: int,
+    store: ContentAddressedStore | None,
+) -> dict[str, Any]:
+    """Project environment-inclusive authored state for the environment-instances extension.
+
+    The delta is :func:`exulanica.world.objects.canonical_delta_document` with environment
+    instances, so ``state_sha256`` is the live version token. Availability is read from the
+    same repository path the HTTP surface uses and is stored beside the instance, not in the
+    digest. Source identifiers stay the live UUID strings because they participate in that
+    digest; envelope ids remain WMP URNs.
+    """
+    rows = cursor.execute(
+        "select version_id,source_snapshot_id,parent_version_id,title,style_version_id,"
+        "state_sha256,edit_seq,created_at from world_alternate_version "
+        "where workspace_id=%s and world_id=%s and version_id=any(%s) order by version_id",
+        (workspace_id, world_id, list(version_ids)),
+    ).fetchall()
+    worlds = WorldObjectRepository(
+        cursor.connection, workspace_id, world_id=world_id, store=store
+    )
+    edits: dict[uuid.UUID, list[dict[str, Any]]] = {}
+    for row in cursor.execute(
+        "select version_id,edit_id,edit_seq,kind,object_id,element_id,environment_instance_id,"
+        "undone_edit_id,base_state_sha256,result_state_sha256,recorded_at "
+        "from world_alternate_version_edit "
+        "where workspace_id=%s and world_id=%s and version_id=any(%s) "
+        "order by version_id,edit_seq",
+        (workspace_id, world_id, list(version_ids)),
+    ).fetchall():
+        edits.setdefault(row["version_id"], []).append(
+            {
+                "base_state_sha256": row["base_state_sha256"],
+                "edit_id": _urn("alternate-edit", row["edit_id"]),
+                "edit_seq": row["edit_seq"],
+                "element_id": row["element_id"],
+                "environment_instance_id": row["environment_instance_id"],
+                "kind": row["kind"],
+                "object_id": row["object_id"],
+                "recorded_at": row["recorded_at"],
+                "result_state_sha256": row["result_state_sha256"],
+                "undone_edit_id": _optional_urn("alternate-edit", row["undone_edit_id"]),
+            }
+        )
+
+    versions: list[dict[str, Any]] = []
+    every_object = []
+    for row in rows:
+        stored = worlds.version(row["version_id"])
+        digest = delta_sha256(
+            stored.objects, stored.element_overrides, stored.environment_instances
+        )
+        if digest != row["state_sha256"]:
+            raise PackageError(
+                "an alternate version's stored state token does not describe its "
+                "environment-inclusive delta inside the export snapshot"
+            )
+        every_object.extend(stored.objects)
+        versions.append(
+            {
+                "created_at": row["created_at"],
+                "delta": canonical_delta_document(
+                    stored.objects, stored.element_overrides, stored.environment_instances
+                ),
+                "edit_seq": row["edit_seq"],
+                "edits": edits.get(row["version_id"], []),
+                "environment_availability": [
+                    {
+                        "availability": instance.availability,
+                        "instance_id": instance.instance_id,
+                    }
+                    for instance in stored.environment_instances
+                ],
+                "origin": "authored",
+                "parent_version_id": _optional_urn("alternate-version", row["parent_version_id"]),
+                "source_snapshot_id": _urn("structure", row["source_snapshot_id"]),
+                "state_sha256": row["state_sha256"],
+                "style_version_id": _optional_urn("style", row["style_version_id"]),
+                "title": row["title"],
+                "version_id": _urn("alternate-version", row["version_id"]),
+            }
+        )
+
+    snapshots = _source_snapshots(
+        cursor,
+        world_id,
+        workspace_id=workspace_id,
+        current_snapshot_id=current_snapshot_id,
+        sources=sorted({row["source_snapshot_id"] for row in rows}),
+    )
+    assets, behaviours = _reviewed_references(cursor, every_object)
+    return environments.build_sections(
+        versions=versions,
+        source_snapshots=snapshots,
+        assets=assets,
+        behaviours=behaviours,
+        withheld_versions=withheld_count,
+    )
+
+
+def _source_snapshots(
+    cursor: psycopg.Cursor,
+    world_id: str,
+    *,
+    workspace_id: uuid.UUID,
+    current_snapshot_id: uuid.UUID | None,
+    sources: Sequence[uuid.UUID],
+) -> list[dict[str, Any]]:
+    regions: dict[uuid.UUID, list[str]] = {}
+    for row in cursor.execute(
+        "select snapshot_id,region_id from world_structure_snapshot_region "
+        "where workspace_id=%s and world_id=%s and snapshot_id=any(%s)",
+        (workspace_id, world_id, list(sources)),
+    ).fetchall():
+        regions.setdefault(row["snapshot_id"], []).append(row["region_id"])
+    elements: dict[uuid.UUID, list[str]] = {}
+    for row in cursor.execute(
+        "select snapshot_id,element_id from world_structure_snapshot_element "
+        "where workspace_id=%s and world_id=%s and snapshot_id=any(%s)",
+        (workspace_id, world_id, list(sources)),
+    ).fetchall():
+        elements.setdefault(row["snapshot_id"], []).append(row["element_id"])
+    return [
+        {
+            "current": row["snapshot_id"] == current_snapshot_id,
+            "element_ids": sorted(elements.get(row["snapshot_id"], [])),
+            "region_ids": sorted(regions.get(row["snapshot_id"], [])),
+            "snapshot_id": _urn("structure", row["snapshot_id"]),
+            "snapshot_sha256": row["snapshot_sha256"],
+        }
+        for row in cursor.execute(
+            "select snapshot_id,snapshot_sha256 from world_structure_snapshot "
+            "where workspace_id=%s and world_id=%s and snapshot_id=any(%s)",
+            (workspace_id, world_id, list(sources)),
+        ).fetchall()
+    ]
+
+
+def _reviewed_references(
+    cursor: psycopg.Cursor, objects: Sequence[AuthoredObject]
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
+    digests = sorted({obj.asset_sha256 for obj in objects})
+    assets = [
+        {
+            "asset_key": row["asset_key"],
+            "byte_size": row["byte_size"],
+            "content_sha256": row["content_sha256"],
+            "licence_id": row["licence_id"],
+            "licence_sha256": row["licence_sha256"],
+            "media_type": row["media_type"],
+            "ni_uri": authored.ni_uri(row["content_sha256"]),
+            "retrieval": authored.ASSET_RETRIEVAL,
+            "summary": row["summary"],
+            "title": row["title"],
+        }
+        for row in cursor.execute(
+            "select asset_key,title,summary,media_type,content_sha256,byte_size,licence_id,"
+            "licence_sha256 from world_reviewed_asset where content_sha256=any(%s)",
+            (digests,),
+        ).fetchall()
+    ]
+    named = {
+        (obj.behaviour.behaviour_key, obj.behaviour.behaviour_version)
+        for obj in objects
+        if obj.behaviour is not None
+    }
+    behaviours = [
+        {
+            "behaviour_key": row["behaviour_key"],
+            "behaviour_version": row["behaviour_version"],
+            "parameters": row["parameters"],
+            "summary": row["summary"],
+        }
+        for row in cursor.execute(
+            "select behaviour_key,behaviour_version,summary,parameters "
+            "from world_object_behaviour_registry"
+        ).fetchall()
+        if (row["behaviour_key"], row["behaviour_version"]) in named
+    ]
+    return assets, behaviours
 
 
 def _fixed_point(row: Mapping[str, Any]) -> Transform:
@@ -1239,6 +1526,24 @@ def _crate_files(components: Mapping[str, Any]) -> dict[str, bytes]:
         for node in graph:
             if node["@id"] == authored.DECLARATION_PATH:
                 node["conformsTo"] = {"@id": authored.EXTENSION_PROFILE_ID}
+    if environments.DECLARATION_PATH in files:
+        graph.insert(
+            5 if authored.DECLARATION_PATH in files else 4,
+            {
+                "@id": environments.EXTENSION_PROFILE_ID,
+                "@type": ["CreativeWork", "Profile"],
+                "description": (
+                    "An optional, separately versioned extension to World Memory Package 1.0 "
+                    "carrying environment-inclusive authored state and environment instance "
+                    "availability."
+                ),
+                "name": "Exulanica WMP environment-instances extension 1.0",
+                "version": environments.EXTENSION_VERSION,
+            },
+        )
+        for node in graph:
+            if node["@id"] == environments.DECLARATION_PATH:
+                node["conformsTo"] = {"@id": environments.EXTENSION_PROFILE_ID}
     files["ro-crate-metadata.json"] = canonical_file(
         {"@context": "https://w3id.org/ro/crate/1.2/context", "@graph": graph}
     )

@@ -30,6 +30,8 @@ import { buildCompanionEncounter, type CompanionEncounter } from '../ui/companio
 import { resolveCompanionPlacement } from '../ui/companion-placement.js';
 import { buildCompanionStage, type CompanionStage } from '../ui/companion-stage.js';
 import type { ConfirmPanel } from '../ui/confirm.js';
+import type { CompanionStarterActions } from '../ui/companion-choice-rail.js';
+import type { FirstUsePromptAction } from '../ui/first-use-guidance.js';
 import type { SessionState } from './session-state.js';
 
 export interface CompanionDependencies {
@@ -99,6 +101,10 @@ export interface CompanionDependencies {
   readonly onAnswered: () => void;
   /** A system surface must not summon the Companion out from behind itself. */
   readonly isSystemSurfaceOpen: () => boolean;
+  /** Supported starter-world actions shown when the graph has no question to ask. */
+  readonly starterActions?: CompanionStarterActions;
+  /** Explicit first-use actions that do not depend on the renderer acquiring pointer lock. */
+  readonly onFirstUseAction?: (action: FirstUsePromptAction) => void;
 }
 
 export interface MountedCompanion {
@@ -342,6 +348,15 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
      * problem and not theirs to wait on.
      */
     onDismiss: () => dismiss(),
+    ...(deps.onFirstUseAction === undefined ? {} : {
+      onFirstUseAction: deps.onFirstUseAction,
+    }),
+    ...(deps.starterActions === undefined ? {} : {
+      starterActions: {
+        onAddObject: () => { dismiss(); deps.starterActions?.onAddObject(); },
+        onAddPhotos: () => { dismiss(); deps.starterActions?.onAddPhotos(); },
+      },
+    }),
     onAnswerShown: (answer) => {
       const remember = deps.rememberAnswer;
       if (remember === undefined) return;

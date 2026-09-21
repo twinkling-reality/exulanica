@@ -24,8 +24,10 @@ from exulanica.world import (
     TopologyContract,
     TopologySourceSlot,
     UnavailableAsset,
+    UnknownWorldResource,
     WorldStyleRepository,
 )
+from exulanica.world.bootstrap import bootstrap_world
 
 from conftest import write_photo
 
@@ -347,6 +349,56 @@ def test_missing_source_evidence_is_a_state_and_requiring_it_is_an_asset_error(
     assert metadata.evidence_path is None
     with pytest.raises(UnavailableAsset):
         styles.require_source_media(source_id, store)
+
+
+def test_source_media_can_read_the_exact_saved_snapshot_after_the_global_pointer_moves(
+    repository, tmp_path
+):
+    first_id = uuid.uuid4()
+    second_id = uuid.uuid4()
+    styles = WorldStyleRepository(repository.connection, repository.workspace_id)
+    styles.register_topology(
+        topology(
+            sources=(TopologySourceSlot(
+                source_id=first_id,
+                region_id="region-a",
+                slot_key="saved-source",
+                evidence_span_id=None,
+                missing_reason="saved source is absent",
+            ),)
+        )
+    )
+    opened = bootstrap_world(
+        repository.connection,
+        workspace_id=repository.workspace_id,
+        actor=uuid.uuid4(),
+        base_topology_digest="topology-a",
+    )
+    styles.register_topology(
+        topology(
+            "topology-b",
+            sources=(TopologySourceSlot(
+                source_id=second_id,
+                region_id="region-a",
+                slot_key="current-source",
+                evidence_span_id=None,
+                missing_reason="current source is absent",
+            ),),
+        )
+    )
+    store = LocalContentAddressedStore(tmp_path / "blobs")
+
+    assert [source.source_id for source in styles.source_media(store)] == [second_id]
+    assert [
+        source.source_id
+        for source in styles.source_media(
+            store, source_snapshot_id=uuid.UUID(opened["snapshot_id"])
+        )
+    ] == [first_id]
+    with pytest.raises(UnknownWorldResource):
+        WorldStyleRepository(
+            repository.connection, repository.workspace_id, world_id="world:other"
+        ).source_media(store, source_snapshot_id=uuid.UUID(opened["snapshot_id"]))
 
 
 def test_available_source_metadata_comes_only_from_authorised_local_evidence(

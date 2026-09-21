@@ -108,6 +108,12 @@ an evidence span from the same workspace or a non-empty reason that evidence is 
 database enforces the workspace and span together with a composite foreign key, and FORCE row-level
 security applies to every source query.
 
+Source-media list and single-source reads accept either `source_snapshot_id` or
+`topology_digest`. Snapshot addresses resolve the exact structural topology within the
+requested workspace and world. Unknown addresses return 404; invalidated snapshots return
+409; supplying both addresses returns 422. Omitting both preserves current-topology reads.
+Saved-world reopening supplies its stored snapshot ID rather than following the global pointer.
+
 `GET /world/source-media` reports one of three explicit states:
 
 - `available`: authorised evidence metadata exists, its capture is live, the blob is not purged,
@@ -123,6 +129,64 @@ Requiring one source through
 `GET /world/source-media/{source_id}` returns `unavailable_asset` rather than inventing media.
 Unknown and cross-workspace source IDs return the identical `unknown_reference` response.
 
+## Structural and composed style compatibility
+
+`WorldStyleRepository.classify_structure_style_compatibility` is the plane-typed authority.
+It writes nothing. Appearance preview, apply, rollback, topology registration, bootstrap, and
+saved-world source attachment call it as a closed check.
+
+`compatibility_key` binds a reviewed profile family to a topology family. Matching keys are
+necessary for family binding and insufficient for structure/style identity. Live composed
+topology digests are appearance compare-and-swap tokens. Structural `source_snapshot_id`
+values are authored-write tokens. Hexadecimal equality across those planes is not the reason
+for compatibility. Live typed identities may still agree when hex strings collide.
+
+Appearance preview, apply, and rollback classify the offered write bases after locking the
+live pointers. A write-base style that has never existed in this world is
+`unknown_reference`. `historical_style_write_base` and
+`historical_style_topology_apply_base` are the compare-and-swap refusals when the named
+identity exists but is not current. `register_topology` classifies before it inserts
+history, including the first register: with no live style, the default profile family is
+the named family. `preview_required` / `style_topology_drift` is a CLASSIFY-family result;
+family-matched digest change on `register_topology` is the composer handoff. COMPOSE tokens
+are latent: there is no compose write. Attach admission refuses expired sources before
+membership is written; that is not a stored-member COMPOSE pin.
+
+Starter refuse uses a stored origin when one exists: the current snapshot's starter composer
+key. When no snapshot exists, `world:authored:` is the stored starter `world_id` scheme, not
+a heuristic over arbitrary strings. The saved entry `source_kind` column is not a
+classifier input.
+
+| Named planes | Outcome | Token |
+| --- | --- | --- |
+| Live style version and live composed digest, optional authored `source_snapshot_id` | **compatible** | `live_authorities_agree` |
+| Attachment membership naming the saved style, authored version, and source snapshot | **compatible** | `attachment_membership_only` |
+| `register_topology` family-matched digest change on a non-starter | **compatible** | `register_topology` |
+| Bootstrap against the live composed digest with no current snapshot | **compatible** | `bootstrap_initial` |
+| Bootstrap against the live composed digest and the existing current snapshot | **compatible** | `bootstrap_reuse` |
+| Same profile family, style bound to a different composed digest than the live pointer (CLASSIFY) | **preview_required** | `style_topology_drift` |
+| Historical style version used as an appearance write base | **refuse** | `historical_style_write_base` |
+| Historical or selected style topology used as an apply or preview CAS token | **refuse** | `historical_style_topology_apply_base` |
+| `register_topology` on a starter world with sourced slots | **refuse** | `starter_sourced_activation` |
+| `register_topology` replacing a starter world's live composed digest | **refuse** | `starter_overlay` |
+| Attachment rows offered as COMPOSE inputs (latent; no compose write) | **refuse** | `attachment_is_not_composition` |
+| Expired attachments offered as COMPOSE facts (latent; no compose write) | **refuse** | `expired_source_not_composable` |
+| Composed digest string equal to a structural topology digest used as identity, without live typed-identity agreement | **refuse** | `cross_plane_digest_equality` |
+| Snapshot and composed digest supplied as one source-media address | **refuse** | `conflicting_plane_addresses` |
+| Profile family keys differ | **refuse** | `profile_family_incompatible` |
+| Unknown or cross-world snapshot, style, authored version, or attachment | **refuse** | `unknown_reference` |
+
+Historical style may be displayed. Rollback copies historical values into a new version against
+the live composed digest and the live style version. It does not write onto the historical
+version or that version's bound topology.
+
+Digests that may differ: structural snapshot digest, structural topology digest, composed
+topology digest, and a style version's bound topology digest. None of those may be substituted
+for another. Dual compare-and-swap remains: appearance writes compare live style version and
+live composed digest; authored writes compare `source_snapshot_id` and the authored cursor.
+
+Reviewed-source composition into geometry is absent. There is no public materialization route.
+
 ## HTTP surface
 
 All routes require a bearer token.
@@ -137,7 +201,7 @@ All routes require a bearer token.
 | `POST` | `/world/styles/previews/{id}/apply` | Compare both bases and atomically apply |
 | `DELETE` | `/world/styles/previews/{id}` | Atomically discard without changing current style |
 | `POST` | `/world/styles/rollback` | Append a version matching historical style values |
-| `GET` | `/world/source-media` | Honest current-topology source states |
+| `GET` | `/world/source-media` | Honest source states at the requested topology |
 | `GET` | `/world/source-media/{id}` | Require one source to be locally available |
 
 The domain problem codes are intentionally distinct:
@@ -145,11 +209,11 @@ The domain problem codes are intentionally distinct:
 | HTTP | Code | Recovery |
 | --- | --- | --- |
 | `422` | `invalid_style_data` | Correct the profile, manifest-backed parameter, scope, or provenance |
-| `409` | `stale_style_version` | Read current state and create a new proposal |
+| `409` | `stale_style_version` | Read current state and create a new proposal. A historical style write base maps here; a UUID that never existed in this world does not |
 | `409` | `protected_topology_conflict` | Recompose/review against the conflicting topology; never force appearance over it |
 | `424` | `unavailable_asset` | Render the recorded honest fallback/state or restore authorised bytes |
 | `409` | `invalid_preview_state` | Do not reapply a closed preview |
-| `404` | `unknown_reference` | Treat absent and cross-workspace IDs identically |
+| `404` | `unknown_reference` | Treat absent and cross-workspace IDs identically, including an unknown style write base |
 
 ## Verification
 
@@ -157,5 +221,10 @@ The domain problem codes are intentionally distinct:
 commit and rejects unknown modules/capabilities and executable/remote payload channels.
 `tests/test_world_style_postgres.py` executes preview isolation, competing-writer exclusion,
 topology invalidation, immutable rollback, three-origin audit provenance, and source states against
-PostgreSQL 18. `tests/test_world_api.py` holds the route shapes, problem codes, actor derivation, and
+PostgreSQL 18. `tests/test_style_structure_compatibility.py` pins the plane-typed classifier,
+including colliding hex with the live-authorities override, starter sourced activation,
+historical write bases on the write path, and latent COMPOSE tokens.
+`tests/test_world_api.py` holds the route shapes, problem codes (unknown
+write-base style is `404 unknown_reference`; a historical style that exists but
+is not current is `409 stale_style_version`), actor derivation, and
 cross-workspace source behavior.

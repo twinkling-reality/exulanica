@@ -20,7 +20,7 @@ describe('first-use Atlas guidance', () => {
     expect(guidance.phase()).toBe('arrival');
     expect(guidance.prompt('converse')).toEqual({
       statement: 'Welcome to Exulanica',
-      actions: [{ label: 'Click to enter' }],
+      actions: [{ label: 'Start building', activate: 'summon-companion' }],
     });
   });
 
@@ -59,7 +59,7 @@ describe('first-use Atlas guidance', () => {
     expect(nextVisit.phase()).toBe('complete');
     expect(nextVisit.prompt('converse')).toEqual({
       statement: 'Welcome to Exulanica',
-      actions: [{ label: 'Click to enter' }],
+      actions: [{ label: 'Start building', activate: 'summon-companion' }],
     });
     nextVisit.observeMode('traverse');
     expect(nextVisit.prompt('converse')).toBeNull();

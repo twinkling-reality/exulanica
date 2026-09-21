@@ -65,8 +65,9 @@ identity substitution, tick reset or history rewrite occurs.
 V1 initialization and successful transitions remain byte-compatible, pinned by deterministic digest
 vectors. V1's home/work nodes are labels; its motion ignores them and has no obstacle or arrival
 semantics. Replay now additionally checks every persisted v1 event against regenerated events.
-Unknown engine/input profiles are refused. WMP 1.0 and the authored-world 1.0 extension still omit
-society and its input/event history; they cannot resume this simulation.
+Unknown engine/input profiles are refused. WMP 1.0, the authored-world 1.0 extension and the
+environment-instances 1.0 extension still omit society and its input/event history; they
+cannot resume this simulation.
 
 ## V2 input authority
 

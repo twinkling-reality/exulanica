@@ -9,11 +9,17 @@ import psycopg
 
 from exulanica.canonical import sha256_of_canonical
 from exulanica.world.composed import composed_candidate
-from exulanica.world.errors import InvalidatedSourceVersion, ProtectedTopologyConflict
+from exulanica.world.errors import InvalidatedSourceVersion
 from exulanica.world.models import DEFAULT_WORLD_ID
 from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.repository import WorldStyleRepository
 from exulanica.world.structure_repository import WorldStructureRepository
+from exulanica.world.style_structure import (
+    CompatibilityIntent,
+    ComposedTopologyRef,
+    StructuralSnapshotRef,
+    raise_for_incompatible_structure_style,
+)
 
 
 def bootstrap_world(
@@ -32,10 +38,15 @@ def bootstrap_world(
         )
         styles = WorldStyleRepository(connection, workspace_id, world_id=world_id)
         contract = styles.current_topology_contract()
-        if contract.topology_digest != base_topology_digest:
-            raise ProtectedTopologyConflict("the composed topology changed; read it again")
         structures = WorldStructureRepository(connection, workspace_id, world_id=world_id)
         snapshot = structures.current()
+        raise_for_incompatible_structure_style(
+            styles.classify_structure_style_compatibility(
+                intent=CompatibilityIntent.BOOTSTRAP,
+                composed=ComposedTopologyRef(base_topology_digest),
+                snapshot=None if snapshot is None else StructuralSnapshotRef(snapshot.snapshot_id),
+            )
+        )
         composed = "reused"
         if snapshot is None:
             candidate = composed_candidate(
@@ -79,7 +90,7 @@ def bootstrap_world(
         return {
             "snapshot": composed,
             "snapshot_id": str(snapshot.snapshot_id),
-            "regions": list(contract.region_ids),
+            "regions": [region["region_id"] for region in snapshot.candidate.topology["regions"]],
             "version": "reused" if existing else "created",
             "version_id": str(version.version_id),
             "state_sha256": version.state_sha256,

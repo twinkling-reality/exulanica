@@ -13,6 +13,7 @@ from exulanica.api.services import Services
 from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.world import TopologyContract, TopologySourceSlot, WorldStyleRepository
+from exulanica.world.bootstrap import bootstrap_world
 from fastapi.testclient import TestClient
 
 from conftest import write_photo
@@ -360,8 +361,24 @@ def test_style_topology_and_asset_failures_have_distinct_problem_codes(world_api
     response = world_api.post("/world/styles/previews", unknown_version)
     assert (response.status_code, response.json()["code"]) == (422, "invalid_style_data")
 
-    stale = world_api.preview_body(base_style_version_id=str(uuid.uuid4()))
-    response = world_api.post("/world/styles/previews", stale)
+    unknown_base = world_api.preview_body(base_style_version_id=str(uuid.uuid4()))
+    response = world_api.post("/world/styles/previews", unknown_base)
+    assert (response.status_code, response.json()["code"]) == (404, "unknown_reference")
+
+    preview = world_api.post("/world/styles/previews", world_api.preview_body())
+    assert preview.status_code == 201, preview.text
+    applied = world_api.post(
+        f"/world/styles/previews/{preview.json()['preview_id']}/apply",
+        {
+            "base_style_version_id": current["current"]["version_id"],
+            "base_topology_digest": current["current_topology_digest"],
+        },
+    )
+    assert applied.status_code == 200, applied.text
+    historical = world_api.preview_body(
+        base_style_version_id=current["current"]["version_id"]
+    )
+    response = world_api.post("/world/styles/previews", historical)
     assert (response.status_code, response.json()["code"]) == (409, "stale_style_version")
 
     topology = world_api.preview_body(base_topology_digest="old-topology")
@@ -376,6 +393,7 @@ def test_style_topology_and_asset_failures_have_distinct_problem_codes(world_api
 
     unknown = world_api.get(f"/world/source-media/{uuid.uuid4()}")
     assert (unknown.status_code, unknown.json()["code"]) == (404, "unknown_reference")
+    assert world_api.current()["current"]["revision"] == 1
     assert current["current"]["revision"] == 0
 
 
@@ -402,6 +420,44 @@ def test_source_listing_preserves_missing_evidence_instead_of_inventing_an_asset
             "capture_ids": [],
         }
     ]
+
+
+def test_source_listing_accepts_one_explicit_topology_address(world_api):
+    exact = world_api.get("/world/source-media?topology_digest=api-topology")
+    assert exact.status_code == 200
+    unknown = world_api.get("/world/source-media?topology_digest=other-topology")
+    assert (unknown.status_code, unknown.json()["code"]) == (404, "unknown_reference")
+    conflicting = world_api.get(
+        f"/world/source-media?topology_digest=api-topology&source_snapshot_id={uuid.uuid4()}"
+    )
+    assert conflicting.status_code == 422
+
+
+def test_invalidated_snapshot_source_reads_are_explicit_for_list_and_single(
+    world_api, repository
+):
+    opened = bootstrap_world(
+        repository.connection,
+        workspace_id=repository.workspace_id,
+        actor=world_api.actor,
+        base_topology_digest="api-topology",
+    )
+    tombstone = repository.connection.execute(
+        "insert into tombstone (workspace_id,scope,requested_by,reason) "
+        "values (%s,'workspace',%s,'test invalidation') returning tombstone_id",
+        (repository.workspace_id, world_api.actor),
+    ).fetchone()
+    assert tombstone is not None
+    query = f"source_snapshot_id={opened['snapshot_id']}"
+    for path in (
+        f"/world/source-media?{query}",
+        f"/world/source-media/{world_api.source_id}?{query}",
+    ):
+        response = world_api.get(path)
+        assert (response.status_code, response.json()["code"]) == (
+            409,
+            "invalidated_source_version",
+        )
 
 
 def test_source_metadata_is_workspace_authorised_without_becoming_an_existence_oracle(world_api):

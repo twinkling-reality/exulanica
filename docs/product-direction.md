@@ -143,6 +143,13 @@ delivery work. The entry surface presents the useful next action in plain langua
 version reconciliation and capability limitations appear when they affect a decision, rather than
 as introductory engineering explanations.
 
+Reviewed photographs can be explicitly attached to a saved world as persistent project references.
+This membership preserves the world's authored edits, undo history and appearance, and reopens in
+the photo drawer. Individual unavailable references do not prevent an authored starter from opening.
+Reference attachment does not produce reconstruction, place source geometry or materialize protected
+topology; those connections remain delivery work. The exact boundary is specified in
+[saved-world-entry.md](saved-world-entry.md#reference-photographs).
+
 The first delivery slice creates a source-independent authored starter space with durable world
 identity, spatial state and appearance. It opens directly into the world canvas, with a small
 editable title, an Add photos control and the Companion. Photo review opens alongside that canvas.
@@ -523,9 +530,9 @@ The inventory below identifies existing code and the extensions required by each
 | Appearance and language | Reviewed appearance capabilities and bounded conversational preview/apply/rollback proposals | General structural edits, geometry blending and generated-asset creation through typed operations |
 | Character appearance | Authenticated version-scoped recipes with save/reset history and current source checks; validated native GLB/rig playback and a session-only development studio | Connect the studio to authenticated history, configure production families, validate visual/movement quality and define explicit cross-version inheritance |
 | World Read and Selection | Scene/place reads and capture/entity Selection with place, time and text constraints | Unified authorized reads/queries for memories, imported geography, assets and authored versions with explainable matches |
-| Authored objects and versions | Source snapshots, alternate-version lineage, object add/move/remove/undo, durable admitted environment instances and bounded motion; synthetic browser checks recorded below | Unified selection, environment-instance package projection and real-scene acceptance; arbitrary world branching is not established |
+| Authored objects and versions | Source snapshots, alternate-version lineage, object add/move/remove/undo, durable admitted environment instances and bounded motion; synthetic browser checks recorded below | Unified selection and real-scene acceptance; arbitrary world branching is not established |
 | Earth and source admission | Bounded, versioned Flatiron source compiler and owned runtime path; visual validation remains incomplete | Additional admitted sources, reusable extraction/indexing, richer geographic interpretation and first-person coexistence |
-| Package | WMP 1.0 and opt-in authored-world extension describe existing state | Environment-instance and society projection, versioned geographic rights support, permitted asset resolution and an explicit runtime loader |
+| Package | WMP 1.0, opt-in authored-world 1.0, and opt-in environment-instances 1.0 describe existing state | Society projection, versioned geographic rights support, permitted asset resolution and an explicit runtime loader |
 | Simulation | Reviewed bounded object behaviors, persisted deterministic v2/v3/v4 society, saved playback controls and typed user action requests over canonical targets; no learned or general simulation capability established. A deterministic traffic engine exists on main and is not run by any runtime. | Browser-directed actions, production worker/runtime configuration, richer affordances, calibrated learned decisions and fictional rules through measured scenarios |
 
 World Write receipts are not payload delivery. Package verification is not runnable import.

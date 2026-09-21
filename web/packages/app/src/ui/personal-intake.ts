@@ -3,13 +3,46 @@ import { HUMAN_ATTESTATION } from '../personal-admission-api.js';
 
 /** Sequential reading groups; callbacks and server receipts still own progress. */
 export function buildPersonalIntake() {
-  const root = el('details', { class: 'reconstruction-inspector personal-intake' });
+  const root = el('section', {
+    class: 'reconstruction-inspector personal-intake',
+    'aria-label': 'World photos',
+  });
   root.style.overflowWrap = 'anywhere';
-  const entry = el('summary', { text: 'Upload and review photographs' });
-  root.append(entry);
-  root.addEventListener('keydown', event => {
-    if (event.key !== 'Escape' || !root.open || event.target instanceof HTMLSelectElement) return;
-    event.preventDefault(); event.stopImmediatePropagation(); root.open = false; entry.focus();
+  const status = el('p', { role: 'status', 'aria-live': 'polite' });
+  const attachedReferences = el('div', {
+    class: 'photo-reference-grid', 'aria-label': 'Attached reference photographs',
+  });
+  const referenceCount = el('span', { class: 'photo-reference-count', text: '0 photos' });
+  const attachmentStatus = el('p', {
+    class: 'photo-attachment-status', role: 'status', 'aria-live': 'polite',
+  });
+  const worldAction = el('button', {
+    type: 'button', class: 'photo-attach-action', text: 'Refresh world after processing',
+  });
+  const retryAttachment = el('button', {
+    type: 'button', class: 'photo-attachment-retry', text: 'Retry exact interrupted attachment',
+  });
+  retryAttachment.hidden = true;
+  const collection = el('section', { class: 'photo-collection', 'aria-labelledby': 'photo-collection-title' }, [
+    el('header', { class: 'photo-collection-header' }, [
+      el('div', {}, [
+        el('p', { class: 'overlay-kicker', text: 'This world' }),
+        el('h3', { id: 'photo-collection-title', text: 'Reference photos' }),
+      ]),
+      referenceCount,
+    ]),
+    el('p', { class: 'photo-collection-intro', text:
+      'Keep reviewed photos with this project as references. Attaching a photo does not create scene geometry.' }),
+    attachedReferences,
+    attachmentStatus,
+    el('div', { class: 'photo-collection-actions' }, [worldAction, retryAttachment]),
+  ]);
+  const workflow = el('details', { class: 'photo-review-workflow' });
+  const entry = el('summary', { text: 'Add or review photos' });
+  workflow.append(entry);
+  workflow.addEventListener('keydown', event => {
+    if (event.key !== 'Escape' || !workflow.open || event.target instanceof HTMLSelectElement) return;
+    event.preventDefault(); event.stopImmediatePropagation(); workflow.open = false; entry.focus();
   });
   const controls = el('fieldset');
   controls.style.minWidth = '0';
@@ -21,7 +54,6 @@ export function buildPersonalIntake() {
     ]));
   }
   step('1. Choose original photographs', true);
-  const status = el('p', { role: 'status', 'aria-live': 'polite' });
   function field(label: string, type = 'text'): HTMLInputElement {
     const input = el('input', { type, 'aria-label': label });
     const wrapper = el('label', {}, [label, input]);
@@ -84,9 +116,10 @@ export function buildPersonalIntake() {
     + 'Inspect and review every selected original before checking it.' }));
   const attestation = field(HUMAN_ATTESTATION, 'checkbox');
   const complete = button('Record human review and request eligible depth');
-  const refreshWorld = button('Refresh world after processing');
-  root.append(status, controls);
+  workflow.append(controls);
+  root.append(collection, status, workflow);
   return { root, controls, status, files, upload, inventory, members, purpose, authority, validUntil, detect,
     retry, retryReview, receipts, progress, reload, source, review, linkedSubject, selection, link,
-    reviewChoice, reviewer, attestation, complete, refreshWorld, originals };
+    reviewChoice, reviewer, attestation, complete, attachedReferences, referenceCount,
+    attachmentStatus, worldAction, retryAttachment, originals, workflow };
 }

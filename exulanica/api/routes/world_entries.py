@@ -6,16 +6,24 @@ import datetime as dt
 import uuid
 from typing import Annotated, Literal
 
-from fastapi import APIRouter, Path
+from fastapi import APIRouter, Depends, Path
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from exulanica.api.dependencies import CurrentSession, ReadOnlyConnection, ScopedConnection
+from exulanica.api.dependencies import (
+    CurrentSession,
+    ReadOnlyConnection,
+    ScopedConnection,
+    get_services,
+)
+from exulanica.api.services import Services
 from exulanica.world import (
     InvalidStructuralData,
     SavedWorldCandidate,
     SavedWorldEntry,
     SavedWorldEntryRepository,
+    SourceAttachmentOperationConflict,
+    SourceAttachmentSelection,
     StaleSavedWorldEntry,
 )
 from exulanica.world.starter import AuthoredStarterScene
@@ -85,6 +93,7 @@ class SavedWorldEntryView(BaseModel):
     revision: int
     availability: Literal["available", "unavailable"]
     unavailable_reason: str | None
+    source_attachments: list[SavedWorldSourceAttachmentView]
     created_by: uuid.UUID
     created_at: dt.datetime
     updated_at: dt.datetime
@@ -117,6 +126,50 @@ class UpdateSavedWorldEntryBody(BaseModel):
     title: Annotated[str | None, Field(min_length=1, max_length=200)] = None
 
 
+class SourceAttachmentSelectionBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    capture_id: uuid.UUID
+    evidence_span_id: uuid.UUID
+
+
+class AttachSavedWorldSourcesBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    operation_id: uuid.UUID
+    base_revision: Annotated[int, Field(ge=1)]
+    authored_version_id: uuid.UUID
+    authored_state_sha256: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
+    authored_edit_seq: Annotated[int, Field(ge=0)]
+    style_version_id: uuid.UUID
+    sources: Annotated[list[SourceAttachmentSelectionBody], Field(min_length=1, max_length=200)]
+
+
+class SavedWorldSourceAttachmentView(BaseModel):
+    model_config = ConfigDict(extra="forbid", from_attributes=True)
+
+    attachment_id: uuid.UUID
+    operation_id: uuid.UUID
+    capture_id: uuid.UUID
+    evidence_span_id: uuid.UUID
+    source_sha256: str
+    authorization_id: uuid.UUID
+    screening_id: uuid.UUID
+    role: Literal["reference"]
+    attached_entry_revision: int
+    attached_by: uuid.UUID
+    attached_at: dt.datetime
+    availability: Literal["available", "unavailable"]
+    unavailable_reason: Literal[
+        "source_unavailable",
+        "authorization_expired",
+        "screening_expired",
+        "viewer_unavailable",
+    ] | None
+    viewer_sha256: str | None
+    evidence_path: str | None
+
+
 class SavedWorldStyleCandidateView(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -138,6 +191,10 @@ def _view(entry: SavedWorldEntry) -> SavedWorldEntryView:
     values = {field: getattr(entry, field) for field in SavedWorldEntryView.model_fields}
     if isinstance(entry.authored_scene, AuthoredStarterScene):
         values["authored_scene"] = AuthoredStarterSceneView.model_validate(entry.authored_scene)
+    values["source_attachments"] = [
+        SavedWorldSourceAttachmentView.model_validate(attachment)
+        for attachment in entry.source_attachments
+    ]
     return SavedWorldEntryView(**values)
 
 
@@ -155,10 +212,16 @@ def _candidate_view(candidate: SavedWorldCandidate) -> SavedWorldCandidateView:
 
 
 @router.get("", response_model=list[SavedWorldEntryView])
-def entries(connection: ReadOnlyConnection, session: CurrentSession) -> list[SavedWorldEntryView]:
+def entries(
+    connection: ReadOnlyConnection,
+    session: CurrentSession,
+    services: Annotated[Services, Depends(get_services)],
+) -> list[SavedWorldEntryView]:
     return [
         _view(entry)
-        for entry in SavedWorldEntryRepository(connection, session.workspace_id).entries()
+        for entry in SavedWorldEntryRepository(
+            connection, session.workspace_id, services.store
+        ).entries()
     ]
 
 
@@ -177,9 +240,12 @@ def create_starter_entry(
     body: CreateStarterWorldBody,
     connection: ScopedConnection,
     session: CurrentSession,
+    services: Annotated[Services, Depends(get_services)],
 ) -> SavedWorldEntryView | JSONResponse:
     try:
-        created = SavedWorldEntryRepository(connection, session.workspace_id).create_starter(
+        created = SavedWorldEntryRepository(
+            connection, session.workspace_id, services.store
+        ).create_starter(
             title=body.title,
             created_by=session.actor,
         )
@@ -196,9 +262,12 @@ def create_entry(
     body: CreateSavedWorldEntryBody,
     connection: ScopedConnection,
     session: CurrentSession,
+    services: Annotated[Services, Depends(get_services)],
 ) -> SavedWorldEntryView | JSONResponse:
     try:
-        created = SavedWorldEntryRepository(connection, session.workspace_id).create(
+        created = SavedWorldEntryRepository(
+            connection, session.workspace_id, services.store
+        ).create(
             world_id=body.world_id,
             title=body.title,
             authored_version_id=body.authored_version_id,
@@ -218,8 +287,11 @@ def entry(
     entry_id: Annotated[uuid.UUID, Path()],
     connection: ReadOnlyConnection,
     session: CurrentSession,
+    services: Annotated[Services, Depends(get_services)],
 ) -> SavedWorldEntryView:
-    return _view(SavedWorldEntryRepository(connection, session.workspace_id).entry(entry_id))
+    return _view(
+        SavedWorldEntryRepository(connection, session.workspace_id, services.store).entry(entry_id)
+    )
 
 
 @router.put("/{entry_id}", response_model=SavedWorldEntryView)
@@ -228,9 +300,12 @@ def update_entry(
     body: UpdateSavedWorldEntryBody,
     connection: ScopedConnection,
     session: CurrentSession,
+    services: Annotated[Services, Depends(get_services)],
 ) -> SavedWorldEntryView | JSONResponse:
     try:
-        updated = SavedWorldEntryRepository(connection, session.workspace_id).update(
+        updated = SavedWorldEntryRepository(
+            connection, session.workspace_id, services.store
+        ).update(
             entry_id,
             base_revision=body.base_revision,
             authored_version_id=body.authored_version_id,
@@ -250,3 +325,49 @@ def update_entry(
             content={"code": "invalid_saved_world_entry", "detail": str(exc)},
         )
     return _view(updated)
+
+
+@router.post("/{entry_id}/source-attachments", response_model=SavedWorldEntryView)
+def attach_sources(
+    entry_id: Annotated[uuid.UUID, Path()],
+    body: AttachSavedWorldSourcesBody,
+    connection: ScopedConnection,
+    session: CurrentSession,
+    services: Annotated[Services, Depends(get_services)],
+) -> SavedWorldEntryView | JSONResponse:
+    try:
+        attached = SavedWorldEntryRepository(
+            connection, session.workspace_id, services.store
+        ).attach_sources(
+            entry_id,
+            operation_id=body.operation_id,
+            base_revision=body.base_revision,
+            authored_version_id=body.authored_version_id,
+            authored_state_sha256=body.authored_state_sha256,
+            authored_edit_seq=body.authored_edit_seq,
+            style_version_id=body.style_version_id,
+            sources=tuple(
+                SourceAttachmentSelection(
+                    capture_id=source.capture_id,
+                    evidence_span_id=source.evidence_span_id,
+                )
+                for source in body.sources
+            ),
+            attached_by=session.actor,
+        )
+    except SourceAttachmentOperationConflict as exc:
+        return JSONResponse(
+            status_code=409,
+            content={"code": "source_attachment_operation_conflict", "detail": str(exc)},
+        )
+    except StaleSavedWorldEntry as exc:
+        return JSONResponse(
+            status_code=409,
+            content={"code": "stale_saved_world_entry", "detail": str(exc)},
+        )
+    except (InvalidStructuralData, ValueError) as exc:
+        return JSONResponse(
+            status_code=422,
+            content={"code": "invalid_source_attachment", "detail": str(exc)},
+        )
+    return _view(attached)

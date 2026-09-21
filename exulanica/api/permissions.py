@@ -415,6 +415,9 @@ ROUTE_RULES: Final[Mapping[tuple[str, str], Public | Authentication | Requires]]
         # -- the authored world, write -----------------------------------------------------
         ("POST", "/world-entries"): _WORLD_WRITE,
         ("POST", "/world-entries/starter"): _WORLD_WRITE,
+        ("POST", "/world-entries/{entry_id}/source-attachments"): _requires(
+            _P.WORLD_WRITE, _P.ADMISSION_READ
+        ),
         ("PUT", "/world-entries/{entry_id}"): _WORLD_WRITE,
         ("POST", "/world/styles/previews"): _WORLD_WRITE,
         ("DELETE", "/world/styles/previews/{preview_id}"): _WORLD_WRITE,
