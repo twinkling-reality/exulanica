@@ -147,7 +147,8 @@ Reviewed photographs can be explicitly attached to a saved world as persistent p
 This membership preserves the world's authored edits, undo history and appearance, and reopens in
 the photo drawer. Individual unavailable references do not prevent an authored starter from opening.
 Reference attachment does not produce reconstruction, place source geometry or materialize protected
-topology; those connections remain delivery work. The exact boundary is specified in
+topology; those connections remain delivery work. A later admission receipt does not rewrite or
+reactivate an expired reference membership. The exact boundary is specified in
 [saved-world-entry.md](saved-world-entry.md#reference-photographs).
 
 The first delivery slice creates a source-independent authored starter space with durable world

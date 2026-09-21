@@ -182,9 +182,36 @@ individual reference. They do not make the independently authored world unavaila
 references retain lineage but return no viewer digest or evidence path. Genuine structural source
 dependencies continue to use snapshot invalidation.
 
-Each membership pins its original authorization and screening, and a capture can belong to an
-entry only once. Detach and provenance rebind operations are not supported. Recording newer
-receipts does not replace an expired membership's lineage or reactivate that membership.
+Migration `0086_saved_world_source_attachments.sql` stores one membership row per capture on an
+entry (`unique (workspace_id, entry_id, capture_id)`). Operation and membership tables are
+append-only: triggers refuse `UPDATE` and `DELETE`, and the application roles have `INSERT` and
+`SELECT` only. Each membership pins the authorization and screening resolved at attach time.
+Reads evaluate those pinned receipts. They do not select a later authorization or screening for
+the same capture.
+
+That stored uniqueness and append-only shape is the same provenance discipline
+[world-objects-contract.md](world-objects-contract.md) uses for reviewed-asset import receipts:
+an existing key's provenance cannot be rebound in place. Rebind is a later membership with a new
+`operation_id` after a new human review, not an `UPDATE` of the first row. The 0086 unique names
+every historical row, so a second membership for the same capture cannot be inserted while that
+row exists. Detach-event rows and current-membership uniqueness are not in that migration.
+
+| Event | What it is | What it is not |
+| --- | --- | --- |
+| Attach | A new `operation_id` plus membership rows that pin the current reviewed personal authorization and screening, while the authored cursor, style, snapshot, and undo history stay exactly as read | A topology write, a clone of a personal snapshot over the starter, geometry, or materialization of protected composition |
+| Detach | A later unavailability event that names an existing membership so the reference is no longer part of the current collection | `DELETE` of the membership or operation row; hiding or substituting the independently authored world |
+| Rebind | A later attach-shaped membership with a new `operation_id` after a new human review of the same capture | `UPDATE` of the prior row's `authorization_id` or `screening_id`; reuse of the prior `operation_id` with different receipts |
+| Later authorization or screening receipt | Additional admission history on the capture | Reactivation of an expired membership; replacement of pinned lineage; an implicit rebind |
+| Expired, deleted, or unreadable reference | Individual `source_attachments[]` unavailability with retained lineage | World `availability: unavailable`; snapshot invalidation |
+
+`POST /world-entries/{entry_id}/source-attachments` is attach. It refuses a capture that already
+has a membership row, including after that membership's pinned receipts expire and after a later
+eligible receipt exists. Exact retry of the same `operation_id` and request body returns the
+current entry. A different body on that `operation_id` is `source_attachment_operation_conflict`.
+
+The public HTTP surface does not delete a membership row or patch pinned authorization or
+screening. Detach and rebind are membership events. They are not public `DELETE` or `PATCH`
+routes.
 
 ## HTTP surface
 
@@ -210,8 +237,9 @@ inference.
 
 Reference-attachment coverage includes atomic mixed-source refusal, exact retry and operation
 identity conflicts, live authored-cursor drift, preserved object undo, authorization and screening
-expiry, source deletion, and unavailable viewer bytes. Browser component tests cover entry-scoped
-retry, same-scene metadata refresh, response ordering, and explicit refusal of ineligible selections.
+expiry, a later admission receipt that does not reactivate an expired membership, source deletion,
+and unavailable viewer bytes. Browser component tests cover entry-scoped retry, same-scene
+metadata refresh, response ordering, and explicit refusal of ineligible selections.
 
 ## Starter placement boundary
 

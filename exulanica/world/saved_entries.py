@@ -329,7 +329,11 @@ class SavedWorldEntryRepository:
         sources: tuple[SourceAttachmentSelection, ...],
         attached_by: uuid.UUID,
     ) -> SavedWorldEntry:
-        """Append exact reviewed references while preserving the complete saved scene cursor."""
+        """Append exact reviewed references while preserving the complete saved scene cursor.
+
+        A later authorization or screening receipt is not a rebind. A capture that already
+        has a membership row is refused, including after those pinned receipts expire.
+        """
 
         if not 1 <= len(sources) <= 200:
             raise ValueError("attach between 1 and 200 source photographs")
@@ -433,6 +437,7 @@ class SavedWorldEntryRepository:
                 )
             except InvalidStyleData as exc:
                 raise ValueError(str(exc)) from exc
+            # Unique (workspace, entry, capture): a later receipt does not replace this row.
             duplicate = self.connection.execute(
                 "select capture_id from saved_world_source_attachment "
                 "where workspace_id=%s and entry_id=%s and capture_id=any(%s)",
@@ -848,6 +853,7 @@ class SavedWorldEntryRepository:
         )
 
     def _attachments(self, entry_id: uuid.UUID) -> tuple[SavedWorldSourceAttachment, ...]:
+        # Availability is the pinned authorization and screening, not the newest receipts.
         rows = self.connection.execute(
             "select a.*,c.blob_sha256 as current_source_sha256,c.deleted_at,"
             "auth.capture_id as authorized_capture_id,auth.source_sha256 as authorized_sha256,"

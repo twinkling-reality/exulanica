@@ -140,6 +140,34 @@ def _attachment_body(entry, source, operation_id=None):
     }
 
 
+def _renew_reviewed_source(repository, objects_api, source, *, valid_for_seconds=3600):
+    now = repository.connection.execute("select clock_timestamp() as at").fetchone()["at"]
+    start = now - dt.timedelta(minutes=1)
+    end = now + dt.timedelta(seconds=valid_for_seconds)
+    authority = authorize_personal_capture(
+        repository,
+        capture_id=uuid.UUID(source["capture_id"]),
+        actor=objects_api.actor,
+        account_authority_basis="Synthetic test fixture owned by the test actor",
+        authorization_scope={"purpose": "saved-world reference attachment renewal"},
+        purpose="saved-world reference attachment renewal",
+        authorized_at=start,
+        valid_until=end,
+    )
+    screening = record_human_screening(
+        repository,
+        authorization_id=authority.authorization_id,
+        reviewed_by=objects_api.actor,
+        sensitive_regions=[],
+        screened_at=start + dt.timedelta(seconds=30),
+        valid_until=end,
+    )
+    renewed = dict(source)
+    renewed["authorization_id"] = str(authority.authorization_id)
+    renewed["screening_id"] = str(screening.screening_id)
+    return renewed
+
+
 def test_reviewed_photo_attachment_preserves_scene_cursor_replays_and_keeps_undo(
     objects_api, repository
 ):
@@ -375,6 +403,62 @@ def test_attachment_authority_expiry_withholds_only_viewer_capabilities(objects_
     assert reopened["source_attachments"][0]["unavailable_reason"] == "authorization_expired"
     assert reopened["source_attachments"][0]["viewer_sha256"] is None
     assert reopened["source_attachments"][0]["evidence_path"] is None
+
+
+def test_newer_receipt_does_not_rebind_expired_membership(objects_api, repository):
+    entry = _create_starter(objects_api)
+    source = _reviewed_source(
+        repository, objects_api, valid_for_seconds=5, minute=8
+    )
+    attached = objects_api.post(
+        f"/world-entries/{entry['entry_id']}/source-attachments",
+        _attachment_body(entry, source),
+    )
+    assert attached.status_code == 200, attached.text
+    member = attached.json()["source_attachments"][0]
+    expiry = repository.connection.execute(
+        "select valid_until from capture_reconstruction_authorization "
+        "where workspace_id=%s and authorization_id=%s",
+        (repository.workspace_id, uuid.UUID(source["authorization_id"])),
+    ).fetchone()["valid_until"]
+    repository.connection.execute(
+        "select pg_sleep(greatest(0,extract(epoch from (%s-clock_timestamp())))+0.05)",
+        (expiry,),
+    )
+
+    renewed = _renew_reviewed_source(repository, objects_api, source)
+    assert renewed["authorization_id"] != source["authorization_id"]
+    assert renewed["screening_id"] != source["screening_id"]
+
+    reopened = objects_api.get(f"/world-entries/{entry['entry_id']}").json()
+    assert reopened["availability"] == "available"
+    assert reopened["revision"] == attached.json()["revision"]
+    assert reopened["source_attachments"][0]["attachment_id"] == member["attachment_id"]
+    assert reopened["source_attachments"][0]["operation_id"] == member["operation_id"]
+    assert reopened["source_attachments"][0]["authorization_id"] == source["authorization_id"]
+    assert reopened["source_attachments"][0]["screening_id"] == source["screening_id"]
+    assert reopened["source_attachments"][0]["unavailable_reason"] == "authorization_expired"
+    assert reopened["source_attachments"][0]["viewer_sha256"] is None
+    assert reopened["source_attachments"][0]["evidence_path"] is None
+
+    refused = objects_api.post(
+        f"/world-entries/{entry['entry_id']}/source-attachments",
+        _attachment_body(reopened, renewed),
+    )
+    assert refused.status_code == 422, refused.text
+    assert refused.json()["code"] == "invalid_source_attachment"
+    reread = objects_api.get(f"/world-entries/{entry['entry_id']}").json()
+    assert reread["source_attachments"] == reopened["source_attachments"]
+    assert reread["revision"] == attached.json()["revision"]
+    rows = repository.connection.execute(
+        "select authorization_id,screening_id,operation_id from saved_world_source_attachment "
+        "where workspace_id=%s and entry_id=%s",
+        (repository.workspace_id, uuid.UUID(entry["entry_id"])),
+    ).fetchall()
+    assert len(rows) == 1
+    assert str(rows[0]["authorization_id"]) == source["authorization_id"]
+    assert str(rows[0]["screening_id"]) == source["screening_id"]
+    assert str(rows[0]["operation_id"]) == member["operation_id"]
 
 
 def test_attachment_unavailability_never_hides_the_authored_world(

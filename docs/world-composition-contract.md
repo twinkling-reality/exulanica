@@ -73,8 +73,11 @@ associations, trip history or derived personal content across workspaces.
 relationship between an owned project and reviewed personal photographs. They retain exact source
 and admission lineage without changing structural snapshots, authored edit history or appearance.
 This relationship is a source collection for the project; it does not implement extraction,
-reconstruction or placement. Optional reference availability remains separate from the invalidation
-of sources that actually determine a structural snapshot.
+reconstruction or placement. Membership is append-only: detach is a later unavailability event,
+and rebind is a later membership after a new review, not an in-place rewrite of the pinned
+authorization or screening. A later admission receipt does not reactivate an expired membership.
+Optional reference availability remains separate from the invalidation of sources that actually
+determine a structural snapshot.
 
 A rendered representation must declare which properties it preserves and which
 operations it supports. Visual fidelity does not authorize collision; a semantic
