@@ -80,7 +80,7 @@ README. It does not promote delivery-roadmap items to shipped claims.
 | Surface | In the tree | Not established |
 | --- | --- | --- |
 | World Memory Package | Ordinary profile `exulanica-wmp-1.0`; opt-in authored-world 1.0 and environment-instances 1.0 extensions; opt-in training profile `exulanica-wmp-training-1.1` | A general learned simulation runtime; a complete society projection |
-| World Read / Write | Scene and place bundles; generation receipts | Unified authorized search across memories, imported geography, and authored versions |
+| World Read / Write | Scene and place bundles; generation receipts; `Intent.CONTENT` over confirmed-place memories, admitted environment sources and features, and authored environment instances | The Iceland-class personal journey; authored objects as a CONTENT kind; people, capture-time, processing-state, or semantic-text filters on CONTENT |
 | Authored objects | Add, move, remove, undo, and alternate versions, with code and synthetic checks | Real-scene acceptance; arbitrary world branching |
 | Accounts | Optional Google account sessions, account-owned workspaces, authenticated district reads | Configured live-provider deployment and a completed account-deletion lifecycle |
 | Society | Persisted deterministic v2, v3, and v4 profiles; composition default `exulanica.society-composition/v1`; typed `go_to` and `perform` HTTP requests | Learned dynamics; natural social behavior; browser controls that issue those directed-action requests; production worker configuration |

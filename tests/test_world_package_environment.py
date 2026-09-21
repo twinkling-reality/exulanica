@@ -238,6 +238,119 @@ def test_a_loader_with_the_environment_capability_loads_and_names_unavailable_in
     ]
 
 
+def _export_row(
+    version_id: str,
+    *,
+    parent: str | None = None,
+    environment_bearing: bool = False,
+    source_invalidated: bool = False,
+) -> environments.ExportVersion:
+    return environments.ExportVersion(
+        version_id=version_id,
+        parent_version_id=parent,
+        environment_bearing=environment_bearing,
+        source_invalidated=source_invalidated,
+    )
+
+
+def test_partition_keeps_schema_v1_siblings_in_authored_world_and_closes_parent_child_lineage():
+    parent, child, sibling, native, pulled, unrelated = (
+        "parent",
+        "child",
+        "sibling",
+        "env-parent",
+        "pulled-child",
+        "unrelated",
+    )
+    authored_ids, env_ids, authored_withheld, env_withheld = environments.partition_export_versions(
+        (
+            _export_row(parent),
+            _export_row(child, parent=parent, environment_bearing=True),
+            _export_row(sibling),
+            _export_row(native, environment_bearing=True),
+            _export_row(pulled, parent=native),
+            _export_row(unrelated, environment_bearing=True, source_invalidated=True),
+            _export_row("gone", source_invalidated=True),
+        )
+    )
+    assert authored_ids == (parent, sibling)
+    assert env_ids == (parent, child, native, pulled)
+    assert authored_withheld == 1
+    assert env_withheld == 1
+
+
+def test_partition_omits_authored_ids_when_every_kept_version_is_environment_bearing():
+    authored_ids, env_ids, authored_withheld, env_withheld = environments.partition_export_versions(
+        (_export_row("only", environment_bearing=True),)
+    )
+    assert authored_ids == ()
+    assert env_ids == ("only",)
+    assert authored_withheld == env_withheld == 0
+
+
+def _lineage_sections() -> dict[str, object]:
+    child_sections = _environment_sections()
+    [child] = copy.deepcopy(child_sections[environments.VERSIONS_PATH]["items"])
+    structure = json.loads((GOLDEN / "world/structure.json").read_bytes())
+    topology = json.loads((GOLDEN / "world/topology.json").read_bytes())
+    parent_id = _urn("alternate-version", "ancestor")
+    parent = {
+        "created_at": "2026-09-21T09:00:00Z",
+        "delta": copy.deepcopy(authored.EMPTY_DELTA),
+        "edit_seq": 0,
+        "edits": [],
+        "environment_availability": [],
+        "origin": "authored",
+        "parent_version_id": None,
+        "source_snapshot_id": structure["lineage"]["snapshot_id"],
+        "state_sha256": authored.EMPTY_DELTA_SHA256,
+        "style_version_id": None,
+        "title": "Empty parent",
+        "version_id": parent_id,
+    }
+    child["parent_version_id"] = parent_id
+    return environments.build_sections(
+        versions=[parent, child],
+        source_snapshots=[
+            {
+                "current": True,
+                "element_ids": sorted(e["element_id"] for e in topology["elements"]),
+                "region_ids": sorted(r["region_id"] for r in topology["regions"]),
+                "snapshot_id": structure["lineage"]["snapshot_id"],
+                "snapshot_sha256": structure["digests"]["snapshot_sha256"],
+            }
+        ],
+        assets=[],
+        behaviours=[],
+        withheld_versions=0,
+    )
+
+
+def test_a_schema_v1_ancestor_and_environment_child_verify_together(tmp_path: Path):
+    components = _golden_components()
+    components.update(copy.deepcopy(_lineage_sections()))
+    report = verify_package(_write_signed(tmp_path / "lineage", components))
+    [finding] = report.extensions
+    by_id = {item["version_id"]: item for item in finding.environment_instances.versions}
+    parent = by_id[_urn("alternate-version", "ancestor")]
+    child = by_id[_urn("alternate-version", "env")]
+    assert parent["delta"]["schema_version"] == 1
+    assert "environment_instances" not in parent["delta"]
+    assert child["parent_version_id"] == parent["version_id"]
+    assert child["delta"]["schema_version"] == 2
+
+
+def test_a_child_without_its_parent_in_the_environment_directory_is_refused(tmp_path: Path):
+    components = _golden_components()
+    components.update(copy.deepcopy(_environment_sections()))
+    components[environments.VERSIONS_PATH]["items"][0]["parent_version_id"] = _urn(
+        "alternate-version", "missing-parent"
+    )
+    package = _write_signed(tmp_path / "orphan", components)
+    with pytest.raises(PackageError, match="names a parent not in this package"):
+        verify_package(package)
+
+
 def test_a_signed_but_inconsistent_environment_digest_is_refused(tmp_path: Path):
     def mutate(components: dict[str, object]) -> None:
         components[environments.VERSIONS_PATH]["items"][0]["delta"]["environment_instances"][0][

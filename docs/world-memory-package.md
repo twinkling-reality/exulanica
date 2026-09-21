@@ -198,12 +198,14 @@ The export receipt's `export_policy` records the extension; the package root doe
 - **Environment instances and society.** The extension is frozen against authored delta schema
   version 1. Durable `environment_instances` select schema version 2 and are not projected by
   `exulanica/world_package/authored.py`. A version whose live state includes those instances, or
-  whose edit chain names an environment edit, is absent from this directory. Projecting
-  `authored-world-1.0` alone then refuses; the environment-instances extension below is the
-  export of that state. Deterministic society state and events are also absent. A receiver
-  therefore cannot reconstruct an imported district placement or resume its synthetic society
-  from this extension. Those capabilities are never inferred from the presence of authored
-  objects.
+  whose edit chain names an environment edit, is absent from this directory. A schema-v1
+  descendant of such a version is absent too: the parent cannot be written here, and a parent
+  pointer must resolve in this directory. Projecting `authored-world-1.0` alone then refuses;
+  the environment-instances extension below is the export of that state. Dual export does not
+  write this directory with zero versions while those versions live next door. Deterministic
+  society state and events are also absent. A receiver therefore cannot reconstruct an imported
+  district placement or resume its synthetic society from this extension. Those capabilities
+  are never inferred from the presence of authored objects.
 
 ### Verifier rules
 
@@ -298,12 +300,14 @@ byte-identical in every file including the signature.
 ## Environment-instances extension 1.0
 
 Status: **OPT-IN EXTENSION `exulanica-wmp-ext-environment-instances` 1.0**. Implementation:
-`exulanica/world_package/environments.py` (sections, verifier rules, loader report),
-`projector.py` (`_environment_instances`), `package.py` (extension discovery and
+`exulanica/world_package/environments.py` (sections, verifier rules, loader report, lineage
+partition), `projector.py` (`_environment_instances`), `package.py` (extension discovery and
 `import-check`). It carries the environment-inclusive authored state
 [world-objects-contract.md](world-objects-contract.md) section 11 defines: alternate versions
 whose current delta includes `environment_instances`, or whose edit chain names an environment
-edit, together with the objects and overrides those versions still hold.
+edit, together with the objects and overrides those versions still hold, the schema-v1
+ancestors those parent pointers require, and schema-v1 descendants that cannot live in
+authored-world 1.0 because an ancestor is environment-bearing.
 
 ### Why a second extension
 
@@ -324,7 +328,7 @@ there is refused.
 | File | Holds |
 | --- | --- |
 | `extension.json` | Name `exulanica-wmp-ext-environment-instances`, version `1.0`, base profile `exulanica-wmp-1.0`, section paths, counts, `required_loader_capabilities`, and the fixed statements that asset bytes, environment source bytes and runtime code are not embedded, that source-use rights are not granted, that availability is not in `state_sha256`, and that a receiver without this capability must omit these versions rather than infer objects from authored-world 1.0 |
-| `versions.json` | Every exported environment-bearing version: the same envelope fields authored-world 1.0 uses, the environment-inclusive `delta`, `environment_availability` beside that delta, and the edit chain including environment kinds; plus `source_snapshots` and a `withheld` count |
+| `versions.json` | Every exported environment-bearing version, plus the schema-v1 ancestors those parent pointers require and the schema-v1 descendants that cannot live in authored-world 1.0: the authored-world 1.0 envelope fields, the honest `delta` (environment-inclusive when instances remain), `environment_availability` beside that delta, and the edit chain, where environment kinds add `environment_instance_id`; plus `source_snapshots` and a `withheld` count |
 | `assets.json` | The reviewed object assets those versions name, in the same digest-only form as authored-world 1.0 |
 | `behaviours.json` | The reviewed behaviours those objects name |
 
@@ -351,7 +355,9 @@ the four files in `hasPart`, one `Profile` node for the extension, and a `confor
 
 | Exported | Omitted |
 | --- | --- |
-| Environment-bearing versions, their environment-inclusive delta, and their edit chain | Versions whose live state and edit chain are schema version 1 only; those stay in authored-world 1.0 when that extension is requested |
+| Environment-bearing versions, their environment-inclusive delta, and their edit chain | Versions whose live state, edit chain, and ancestor chain are schema version 1 only; those stay in authored-world 1.0 when that extension is requested |
+| Schema-v1 ancestors a parent pointer in this directory needs, with their honest schema-v1 delta | A rewrite of those ancestors as schema version 2 |
+| Schema-v1 descendants whose parent is environment-bearing | Those descendants under authored-world 1.0, where the parent cannot be written |
 | Current environment instances after `addition_undone` is applied | Undone environment additions, as authored-world 1.0 omits an undone object |
 | Honest availability for each exported instance | A fabricated `available` when bytes were not inspected (`unknown`) or when the pinned source is withdrawn, missing, or drifted |
 | Reviewed object asset and behaviour descriptors those versions name | Asset bytes, environment source, render and index bytes, runtime code |
@@ -362,7 +368,13 @@ the four files in `hasPart`, one `Profile` node for the extension, and a `confor
 
 Projecting `--extension authored-world-1.0` alone refuses when a kept version belongs in this
 extension. It does not write schema version 2 under the 1.0 name, and it does not export a 1.0
-directory that looks complete while dropping those versions.
+directory that looks complete while dropping those versions. Dual export writes this directory
+as a lineage-closed set: a `parent_version_id` resolves here, either because the parent is
+environment-bearing or because a schema-v1 ancestor was copied in. Authored-world 1.0 still
+holds that ancestor when the ancestor's own chain is schema version 1, so the 1.0 subset stays
+complete. Dual export omits the authored-world directory when every kept version belongs here
+and nothing honest remains to declare there; an empty 1.0 directory would look like a complete
+world with no alternate versions.
 
 ### Verifier rules
 
@@ -407,10 +419,15 @@ whole authored state. `import-check` runs no loader and does not write a live wo
 `tests/fixtures/wmp-1.0-before-authored-world` unchanged and still rebuilds that package byte
 for byte. `tests/test_world_package_environment.py` checks that schema version 2 is refused
 under authored-world 1.0, that this extension re-derives an environment-inclusive digest
-without the product domain types, and that a loader without the capability is told to omit
-rather than infer. `tests/test_world_package_environment_postgres.py` round-trips a live
-environment instance, omits an undone addition, states withdrawn and unavailable honestly, and
-refuses an authored-world-1.0-only export of a version that has environments.
+without the product domain types, that a schema-v1 ancestor and environment-bearing child
+verify together, that a child whose parent is absent from this directory is refused, and that
+a loader without the capability is told to omit rather than infer.
+`tests/test_world_package_environment_postgres.py` round-trips a live environment instance,
+omits an undone addition, states withdrawn and unavailable honestly, refuses an
+authored-world-1.0-only export of a version that has environments, verifies a parent in
+authored-world 1.0 whose child later gained an environment, includes that parent in an
+environment-only cut, verifies a schema-v1 child whose parent stayed environment-bearing
+after undo, and omits an empty authored-world directory when every kept version belongs here.
 
 ## Explicit training dataset profile
 

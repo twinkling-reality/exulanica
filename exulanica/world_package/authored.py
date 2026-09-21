@@ -9,10 +9,13 @@ additionally checks the rules below. ``tests/test_world_package_verifier.py`` al
 fact this depends on, that an unlisted path rides along with 1.0 verification untouched.
 
 **What the extension carries.** Every alternate version whose source snapshot is not invalidated
-by deletion, its canonical delta (authored objects and source-element overrides, byte for byte
-the document whose SHA-256 is the version's ``state_sha256``), its edit chain without actors,
-the reviewed asset descriptors those objects name by digest, and the reviewed behaviour
-descriptors they name by key and version. It carries no asset bytes and no runtime code: an asset
+by deletion and whose ancestor chain is schema version 1 only, its canonical delta (authored
+objects and source-element overrides, byte for byte the document whose SHA-256 is the version's
+``state_sha256``), its edit chain without actors, the reviewed asset descriptors those objects
+name by digest, and the reviewed behaviour descriptors they name by key and version. A version
+whose live state includes environment instances, whose edit chain names an environment edit, or
+whose parent is such a version, is absent: those parent pointers belong in
+``extensions/environment-instances-1.0``. It carries no asset bytes and no runtime code: an asset
 is a digest an authorized resolver must supply, and a behaviour is an identifier with bounded
 parameters that a runtime either supports or must visibly refuse.
 

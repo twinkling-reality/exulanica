@@ -113,7 +113,11 @@ def project_world_package(
     before either extension existed. ``authored-world-1.0`` still writes schema version 1 only.
     A version whose live state includes environment instances or environment edits is not written
     under that name; projecting that extension alone then refuses rather than pretending the 1.0
-    package is complete. ``store`` is used only to state environment availability honestly.
+    package is complete. The environment-instances directory is lineage-closed: it includes the
+    schema-v1 ancestors a parent pointer needs, and it takes a schema-v1 descendant whose parent
+    stayed environment-bearing. Dual export does not write an authored-world directory that lists
+    zero versions while those versions live next door. ``store`` is used only to state
+    environment availability honestly.
     """
     unknown = sorted(set(extensions) - {authored.EXTENSION_KEY, environments.EXTENSION_KEY})
     if unknown:
@@ -164,7 +168,14 @@ def project_world_package(
                             f"{environments.EXTENSION_KEY} rather than omit them or emit "
                             "schema version 2 under the 1.0 extension name"
                         )
-                    if authored.EXTENSION_KEY in extensions:
+                    published_extensions: list[str] = []
+                    omit_empty_authored = (
+                        authored.EXTENSION_KEY in extensions
+                        and not authored_ids
+                        and authored_withheld == 0
+                        and bool(env_ids)
+                    )
+                    if authored.EXTENSION_KEY in extensions and not omit_empty_authored:
                         authored_kwargs: dict[str, Any] = {}
                         if environments.EXTENSION_KEY in extensions:
                             authored_kwargs["version_ids"] = authored_ids
@@ -178,6 +189,7 @@ def project_world_package(
                                 **authored_kwargs,
                             )
                         )
+                        published_extensions.append(authored.EXTENSION_KEY)
                     if environments.EXTENSION_KEY in extensions:
                         components.update(
                             _environment_instances(
@@ -190,6 +202,8 @@ def project_world_package(
                                 store=store,
                             )
                         )
+                        published_extensions.append(environments.EXTENSION_KEY)
+                    extensions = published_extensions
                 files = _crate_files(components)
                 for path, data in files.items():
                     if path.endswith(".json"):
@@ -1197,8 +1211,9 @@ def _extension_version_sets(
 
     A version whose current delta includes environment instances, or whose edit chain names an
     environment edit, cannot be written under authored-world 1.0: that extension's verifier
-    requires schema version 1 and refuses environment edit kinds. Invalidated sources stay
-    withheld from the extension that would otherwise have exported them.
+    requires schema version 1 and refuses environment edit kinds. The environment-instances
+    set is then closed under parent pointers so a published crate verifies. Invalidated sources
+    stay withheld from the extension that would otherwise have exported them.
     """
     invalidated = {
         row["snapshot_id"]
@@ -1222,27 +1237,27 @@ def _extension_version_sets(
         ).fetchall()
     }
     rows = cursor.execute(
-        "select version_id,source_snapshot_id from world_alternate_version "
-        "where workspace_id=%s and world_id=%s",
+        "select version_id,source_snapshot_id,parent_version_id from world_alternate_version "
+        "where workspace_id=%s and world_id=%s order by version_id",
         (workspace_id, world_id),
     ).fetchall()
-    authored_ids: list[uuid.UUID] = []
-    env_ids: list[uuid.UUID] = []
-    authored_withheld = 0
-    env_withheld = 0
-    for row in rows:
-        env = row["version_id"] in env_bearing
-        if row["source_snapshot_id"] in invalidated:
-            if env:
-                env_withheld += 1
-            else:
-                authored_withheld += 1
-            continue
-        if env:
-            env_ids.append(row["version_id"])
-        else:
-            authored_ids.append(row["version_id"])
-    return tuple(authored_ids), tuple(env_ids), authored_withheld, env_withheld
+    authored_ids, env_ids, authored_withheld, env_withheld = environments.partition_export_versions(
+        tuple(
+            environments.ExportVersion(
+                version_id=row["version_id"],
+                parent_version_id=row["parent_version_id"],
+                environment_bearing=row["version_id"] in env_bearing,
+                source_invalidated=row["source_snapshot_id"] in invalidated,
+            )
+            for row in rows
+        )
+    )
+    return (
+        tuple(authored_ids),
+        tuple(env_ids),
+        authored_withheld,
+        env_withheld,
+    )
 
 
 def _environment_instances(

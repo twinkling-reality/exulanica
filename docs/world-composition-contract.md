@@ -60,8 +60,8 @@ existing authority boundary. Exact schema and API changes need scoped briefs.
 | Source and asset | Provider/original identity, revision or observation time, content digest where available, permitted operations and derivation lineage | Evidence/artifact machinery exists; external Earth asset admission and operation-specific rights need contracts |
 | Place and entity | Stable identity, supported names, aliases and explicit geographic containment/association | Place/entity links exist; canonical external geography resolution and containment across content kinds are not established |
 | Selection and segment | Geographic boundary, existing feature ID, or supported 3D subset tied to source revision and extraction method | Photo masks and lifted scene voxels exist; reusable Earth extraction and complete editable objects do not |
-| Authored instance | Source asset reference, owning world/version, local transform, role and modification history | Region-local authored objects and alternate versions exist; persistent Earth/environment anchors and extracted-content references need extensions |
-| Search projection | Authorized content references with result kind, match reason, place relationship, time and lineage | Capture/entity Selection exists; unified retrieval over imported assets, scenes and authored versions is missing |
+| Authored instance | Source asset reference, owning world/version, local transform, role and modification history | Region-local authored objects, alternate versions, and backend durable placement of exact admitted environment assets or indexed features with persistent geographic anchors exist. Arbitrary Earth extraction and rendering remain outside that contract |
+| Search projection | Authorized content references with result kind, match reason, place relationship, time and lineage | `Intent.CONTENT` in [plan.py](../exulanica/selection/plan.py) and [executor.py](../exulanica/selection/executor.py) projects those references for the kinds in [Unified queries and filters](#unified-queries-and-filters). Capture and entity Selection remain the photograph path. Authored objects, reconstructed scenes, and the Iceland-class journey are not part of that projection |
 | Rendered representation | Geometry/materials, levels of detail, collision and current residency derived from those records | PlayCanvas and asset runtimes exist; detailed Earth integration remains unaccepted |
 
 The table names responsibilities, not new SQL tables or wire field names. Preserve
@@ -128,30 +128,68 @@ works.
 
 ## Unified queries and filters
 
-Extend the existing typed Selection mechanism, authorized read projections and
-Companion planning path; do not add a parallel Earth-only search or let a model
-write SQL. Resolve place names to permitted identities. Geographic containment,
-source lineage and supported entity links establish relationships; embeddings can
-help discover or rank content but cannot establish that a person visited Iceland.
+`Intent.CONTENT` is the typed Selection for place-related content. It uses the
+existing Selection mechanism, authorized read projections and Companion planning
+path. It does not add a parallel Earth-only search or let a model write SQL.
+Resolve place names to permitted identities. Geographic containment, source
+lineage and supported entity links establish relationships. Embeddings can help
+discover or rank capture content but cannot establish that a person visited
+Iceland, and CONTENT refuses a semantic-text field.
 
-For the reference example, the intended results are:
+A CONTENT plan requires a place selector and a content selector. It refuses
+entity, time, and capture filters, and it refuses `semantic_query`. Capture and
+entity intents remain the photograph and who-is-here path; they still accept
+those dimensions.
 
-| Request | Intended selection semantics |
+`ContentScope.RELATED` unions the kinds below over a confirmed place-entity
+bridge. `ContentScope.MEMORIES_ONLY` returns only confirmed memory captures at
+the named place entity and does not traverse the canonical place.
+
+| `result_kind` | `origin_kind` | `content_kind` | `place_relationship` | `match_reason` | `personal_visit_evidence` |
+| --- | --- | --- | --- | --- | --- |
+| `memory_capture` | `personal` | `capture` | `captured_at` | `confirmed_memory_place` | true |
+| `admitted_environment_source` | `imported` | `environment_source` | `admitted_for` | `canonical_place_bridge` | false |
+| `admitted_environment_feature` | `imported` | `environment_feature` | `admitted_for` | `canonical_place_bridge` | false |
+| `authored_environment_instance` | `authored` | `environment_instance` | `derived_from` | `authored_from_canonical_place` | false |
+| `synthetic_inhabitant` | `simulated` | `inhabitant` | `simulated_at` | `scheduled_presence` | false |
+| `simulation_event` | `simulated` | `event` | `simulated_at` | `recorded_simulation_event` | false |
+
+Those kinds are the literals [executor.py](../exulanica/selection/executor.py)
+selects. Society inhabitant and event rows appear when the society is the v1
+engine or its input history is authorized. That projection is not a living-world
+loop.
+
+An undone environment addition is absent. A revoked or never-confirmed bridge
+leaves imported and authored environment rows out of the union; memory captures
+at the place entity remain. Withdrawn source or asset metadata does not appear
+in results or counts. An authorized row whose bytes are missing is labeled
+`unavailable_bytes` when a store is supplied. Pages are bounded keysets;
+distinct captures and authored environment instances are not collapsed.
+
+Authored objects from [world-objects-contract.md](world-objects-contract.md) are
+not a CONTENT kind. Reconstructed scenes and lifted scene segments are not
+CONTENT kinds.
+
+For the reference example, the request shapes and what CONTENT does:
+
+| Request | CONTENT behavior |
 | --- | --- |
-| Everything related to Iceland | Broad union of authorized imported geography, personal memories and derived/inspired creations; retain each match reason and content kind |
-| My memories from Iceland | Supported personal capture/place associations; exclude imported content and fictional derivations as evidence of a visit |
-| Iceland landscapes I brought into this world | Imported selections associated with Iceland and actually referenced by the chosen authored version |
-| My fantasy versions of Iceland | Authored/generated lineage or explicit inspiration associations, labeled as such |
-| Iceland memories with a named person from a chosen year | Combine authorized person/place/time constraints using the shared filter semantics |
+| Everything related to Iceland | `related` union of the kinds above at the confirmed place |
+| My memories from Iceland | `memories_only`; imported, authored, and simulated rows excluded |
+| Iceland landscapes I brought into this world | No isolated scope; imported kinds appear only inside `related` |
+| My fantasy versions of Iceland | No isolated scope; authored environment instances carry `authored_role`; authored objects do not appear |
+| Iceland memories with a named person from a chosen year | Refused: entity and time filters do not apply |
 
-Include origin/content kind, supported place association, world/version, people,
-time, object type and availability as explicit filters when implemented. Define
-time/filter applicability per kind rather than silently reusing capture dates for
-imports. An unavailable asset may have an authorized metadata result without
-being renderable; withdrawn/private metadata must not leak in results or counts.
-Broad results need bounded paging and deduplication without erasing distinct
-captures or authored variations. The bounded capture/entity result model
-does not provide this cross-content result contract.
+The Iceland-class journey (permitted import, personal memory scene, fantasy
+variation, and that query set as a completed personal demonstration) is the
+product example, not a completed demonstration. Visual acceptance is a separate
+assessment and is not a retrieval claim.
+
+Origin, content kind, supported place association, world/version, match reason,
+lineage and availability are fields on each CONTENT row. People, capture time,
+processing state and semantic text are not CONTENT filters. Time-filter
+applicability is defined per intent rather than silently reusing capture dates
+for imports.
 
 ## Natural-language editing
 
@@ -204,21 +242,28 @@ promise uniform global or street-level coverage from a city-specific sample.
 
 ## Existing implementation and staged delivery
 
-At the reviewed main source d32d0e7c1013f3ce2d569adce59133896575a6a7:
+What the tree implements, and what this contract names as absent from the completed journey:
+
 - [Authored objects and alternate versions](world-objects-contract.md) support
   bounded editing and history. Migration 0050 also supports backend-only durable placement of
   exact admitted environment assets or indexed features with persistent geographic anchors,
   availability states and the same version history. Arbitrary Earth extraction and rendering
   remain outside that contract.
-- `exulanica/selection/plan.py` and `executor.py` resolve captures/entities through
-  place/entity/time/text constraints, not the unified content kinds above.
+- `Intent.CONTENT` in `exulanica/selection/plan.py` and `executor.py` returns the
+  kinds in [Unified queries and filters](#unified-queries-and-filters) over a
+  confirmed place. Capture and entity intents still resolve photographs and
+  entities through place, entity, time and text constraints.
 - `exulanica/selection/proposal.py` drafts bounded appearance proposals, not general
   structural creation, blending or arbitrary asset generation.
 - `exulanica/ingest/scene_segments.py` and the scene-segments route support lifted
   scene segmentation; segment availability is not complete-object extraction.
 - [WMP](world-memory-package.md) has authored-world and environment-instances
-  extensions. Portable Earth selection, anchor and source-use-rights semantics
-  still need a separately versioned extension and receiver capability tests. Do
+  extensions. Dual export is lineage-closed: a parent pointer resolves in the
+  directory that holds the child, schema-v1 ancestors may appear in both
+  directories, the environment directory verifies alone, and dual export omits
+  an authored-world directory when every kept version is environment-bearing.
+  Portable Earth selection, source-use-rights semantics and a runnable import
+  are not part of WMP 1.0, authored-world 1.0, or environment-instances 1.0. Do
   not silently alter WMP 1.0 or imply that its signature supplies missing asset
   bytes, source-use rights or runtime behavior.
 
@@ -229,8 +274,12 @@ Implement in dependency order, with exact file ownership and evidence per stage:
    define the versioned environment/asset contract and detailed rendering target.
 2. **Durable composition and retrieval.** Place that selection with a personal
    scene in an authored version, save/reload/undo, and query their shared place
-   identity with distinct origin and match reasons. Establish typed cross-content
-   results, permissions, withdrawal and asset availability behavior together.
+   identity with distinct origin and match reasons. `Intent.CONTENT` unions the
+   kinds named above over a confirmed place bridge, with memories-only
+   exclusion, paging, withdrawal hiding and byte-availability labels. This stage
+   names, and CONTENT does not provide, the Iceland-class personal journey,
+   authored objects as a CONTENT kind, and isolated imported-only, fantasy-only,
+   or person/time request shapes.
 3. **Assisted structural creation.** Execute one natural-language compound edit,
    including a real geometric or generated addition; preview/apply/undo with
    measurable asset quality, existing interactions and retained lineage.

@@ -516,6 +516,60 @@ def test_a_plan_that_is_not_a_plan_is_refused(payload):
     assert rejected.value.code is RejectionCode.MALFORMED_PLAN
 
 
+@pytest.mark.parametrize(
+    "payload",
+    [
+        {
+            "intent": "content",
+            "place": {"ids": ["00000000-0000-0000-0000-000000000001"]},
+        },
+        {
+            "intent": "content",
+            "content": {"scope": "related"},
+        },
+        {
+            "intent": "content",
+            "place": {"ids": ["00000000-0000-0000-0000-000000000001"]},
+            "content": {"scope": "related"},
+            "semantic_query": "waterfall",
+        },
+        {
+            "intent": "content",
+            "place": {"ids": ["00000000-0000-0000-0000-000000000001"]},
+            "content": {"scope": "related"},
+            "entities": {"ids": ["00000000-0000-0000-0000-000000000002"], "mode": "any"},
+        },
+        {
+            "intent": "content",
+            "place": {"ids": ["00000000-0000-0000-0000-000000000001"]},
+            "content": {"scope": "related"},
+            "time": [{"start": "2026-03-04T00:00:00Z", "end": "2026-03-05T00:00:00Z"}],
+        },
+        {
+            "intent": "content",
+            "place": {"ids": ["00000000-0000-0000-0000-000000000001"]},
+            "content": {"scope": "related"},
+            "capture": {"processing_states": ["complete"]},
+        },
+        {"intent": "captures", "content": {"scope": "related"}},
+    ],
+    ids=[
+        "content-missing-selector",
+        "content-missing-place",
+        "content-semantic-text",
+        "content-entity-filter",
+        "content-time-filter",
+        "content-capture-filter",
+        "captures-with-content",
+    ],
+)
+def test_content_intent_refuses_semantic_text_and_capture_filters(payload):
+    """CONTENT is place membership. Entity, time, capture, and semantic text refuse."""
+    with pytest.raises(SelectionRejected) as rejected:
+        parse(payload)
+    assert rejected.value.code is RejectionCode.MALFORMED_PLAN
+
+
 def test_the_plan_has_no_field_that_could_name_a_table_or_a_workspace():
     """Structural, and the reason model-generated SQL was rejected as a design.
 

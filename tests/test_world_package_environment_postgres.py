@@ -227,6 +227,154 @@ def test_dual_export_keeps_schema_v1_in_authored_world_and_environments_in_the_o
     ]
 
 
+def _parent_then_environment_child(repository, tmp_path: Path):
+    composed = _composed_over(repository, tmp_path, structural_candidate())
+    parent = composed.version
+    child = composed.worlds.create_version(
+        parent_version_id=parent.version_id,
+        title="Child plaza",
+        created_by=uuid.uuid4(),
+    )
+    child = composed.worlds.add_environment(
+        child.version_id,
+        composed.placement("environment:plaza"),
+        base_state_sha256=child.state_sha256,
+        actor=uuid.uuid4(),
+    )
+    return composed, parent, child
+
+
+def test_dual_export_of_an_authored_parent_and_environment_child_verifies(
+    repository, tmp_path: Path
+):
+    composed, parent, child = _parent_then_environment_child(repository, tmp_path)
+    result = _export(
+        repository,
+        tmp_path / "parent-child-dual.wmp",
+        extensions=[authored.EXTENSION_KEY, environments.EXTENSION_KEY],
+        store=composed.store,
+    )
+    report = verify_package(result.output)
+    by_name = {finding.extension: finding for finding in report.extensions}
+    authored_world = by_name[authored.EXTENSION_NAME].authored_world
+    env_world = by_name[environments.EXTENSION_NAME].environment_instances
+    parent_urn = _urn("alternate-version", parent.version_id)
+    child_urn = _urn("alternate-version", child.version_id)
+    authored_by_id = {item["version_id"]: item for item in authored_world.versions}
+    env_by_id = {item["version_id"]: item for item in env_world.versions}
+    assert set(authored_by_id) == {parent_urn}
+    assert set(env_by_id) == {parent_urn, child_urn}
+    assert authored_by_id[parent_urn]["delta"]["schema_version"] == 1
+    assert "environment_instances" not in authored_by_id[parent_urn]["delta"]
+    assert env_by_id[parent_urn]["delta"]["schema_version"] == 1
+    assert "environment_instances" not in env_by_id[parent_urn]["delta"]
+    assert env_by_id[child_urn]["parent_version_id"] == parent_urn
+    assert env_by_id[child_urn]["delta"]["schema_version"] == 2
+    exported = env_by_id[child_urn]["delta"]["environment_instances"]
+    assert [item["instance_id"] for item in exported] == ["environment:plaza"]
+
+
+def test_environment_only_export_includes_the_authored_parent_the_child_names(
+    repository, tmp_path: Path
+):
+    composed, parent, child = _parent_then_environment_child(repository, tmp_path)
+    result = _export(
+        repository,
+        tmp_path / "parent-child-env.wmp",
+        extensions=[environments.EXTENSION_KEY],
+        store=composed.store,
+    )
+    assert not (result.output / authored.EXTENSION_DIR).exists()
+    world = verify_package(result.output).extensions[0].environment_instances
+    by_id = {item["version_id"]: item for item in world.versions}
+    parent_urn = _urn("alternate-version", parent.version_id)
+    child_urn = _urn("alternate-version", child.version_id)
+    assert set(by_id) == {parent_urn, child_urn}
+    assert by_id[parent_urn]["delta"]["schema_version"] == 1
+    assert by_id[child_urn]["parent_version_id"] == parent_urn
+    assert by_id[child_urn]["delta"]["schema_version"] == 2
+
+
+def test_dual_export_of_a_child_whose_parent_stayed_environment_bearing_after_undo_verifies(
+    repository, tmp_path: Path
+):
+    composed = _composed_over(repository, tmp_path, structural_candidate())
+    parent = _add(composed, composed.placement("environment:temporary"))
+    parent = composed.worlds.undo(
+        parent.version_id, base_state_sha256=parent.state_sha256, actor=uuid.uuid4()
+    )
+    assert parent.environment_instances == ()
+    child = composed.worlds.create_version(
+        parent_version_id=parent.version_id,
+        title="Schema v1 child",
+        created_by=uuid.uuid4(),
+    )
+    lantern = composed.worlds.create_version(
+        source_snapshot_id=parent.source_snapshot_id,
+        title="Lantern only",
+        created_by=uuid.uuid4(),
+    )
+    lantern = composed.worlds.add_object(
+        lantern.version_id,
+        AuthoredObject(
+            object_id="object:lantern",
+            asset_sha256=CUBE,
+            region_id="region-a",
+            transform=Transform(1_200, 0, -450, 0, 1_000),
+            origin=ObjectOrigin("authored", "fictional"),
+        ),
+        base_state_sha256=lantern.state_sha256,
+        actor=uuid.uuid4(),
+    )
+    result = _export(
+        repository,
+        tmp_path / "undone-parent-child.wmp",
+        extensions=[authored.EXTENSION_KEY, environments.EXTENSION_KEY],
+        store=composed.store,
+    )
+    report = verify_package(result.output)
+    by_name = {finding.extension: finding for finding in report.extensions}
+    authored_ids = {
+        item["version_id"] for item in by_name[authored.EXTENSION_NAME].authored_world.versions
+    }
+    env_by_id = {
+        item["version_id"]: item
+        for item in by_name[environments.EXTENSION_NAME].environment_instances.versions
+    }
+    parent_urn = _urn("alternate-version", parent.version_id)
+    child_urn = _urn("alternate-version", child.version_id)
+    assert authored_ids == {_urn("alternate-version", lantern.version_id)}
+    assert set(env_by_id) == {parent_urn, child_urn}
+    assert env_by_id[parent_urn]["delta"]["schema_version"] == 1
+    assert [edit["kind"] for edit in env_by_id[parent_urn]["edits"]] == [
+        "add_environment",
+        "undo",
+    ]
+    assert env_by_id[child_urn]["parent_version_id"] == parent_urn
+    assert env_by_id[child_urn]["delta"]["schema_version"] == 1
+    assert "environment_instances" not in env_by_id[child_urn]["delta"]
+
+
+def test_dual_export_omits_authored_world_when_every_kept_version_is_environment_bearing(
+    repository, tmp_path: Path
+):
+    composed = _composed_over(repository, tmp_path, structural_candidate())
+    _add(composed, composed.placement("environment:plaza"))
+    result = _export(
+        repository,
+        tmp_path / "all-env-dual.wmp",
+        extensions=[authored.EXTENSION_KEY, environments.EXTENSION_KEY],
+        store=composed.store,
+    )
+    assert not (result.output / authored.EXTENSION_DIR).exists()
+    assert authored.EXTENSION_KEY not in result.extensions
+    assert result.extensions == (environments.EXTENSION_KEY,)
+    report = verify_package(result.output)
+    assert [finding.extension for finding in report.extensions] == [environments.EXTENSION_NAME]
+    [packaged] = report.extensions[0].environment_instances.versions
+    assert packaged["delta"]["schema_version"] == 2
+
+
 def test_a_1_0_package_payload_is_unchanged_when_only_the_environment_extension_is_added(
     repository, tmp_path: Path
 ):

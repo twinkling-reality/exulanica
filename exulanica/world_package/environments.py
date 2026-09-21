@@ -12,18 +12,28 @@ checks the signature, and reports the directory as not checked.
 
 **What the extension carries.** Every alternate version whose current delta includes environment
 instances, or whose edit chain names an environment edit, provided its source snapshot is not
-invalidated by deletion. The exported ``delta`` is the environment-inclusive document the product
-digests: schema version 2 with ``environment_instances`` when any instance remains, schema version
-1 when the current state has none. ``state_sha256`` re-derives from that document. Availability is
-stated beside each instance and is not in the digest. Undone additions are omitted from the delta
-the same way authored-world 1.0 omits an undone object. Asset bytes, environment source bytes, and
-runtime code are not embedded. A signed package does not grant compose, export, or reuse rights
-on a pinned source.
+invalidated by deletion; every kept ancestor a parent pointer in that set needs; and every kept
+descendant that cannot live in authored-world 1.0 because an ancestor is environment-bearing.
+The directory is lineage-closed: a ``parent_version_id`` resolves here. A schema-v1 ancestor is
+exported with its honest schema-v1 delta, not rewritten as schema version 2. The exported
+``delta`` is the environment-inclusive document the product digests: schema version 2 with
+``environment_instances`` when any instance remains, schema version 1 when the current state has
+none. ``state_sha256`` re-derives from that document. Availability is stated beside each instance
+and is not in the digest. Undone additions are omitted from the delta the same way authored-world
+1.0 omits an undone object. Asset bytes, environment source bytes, and runtime code are not
+embedded. A signed package does not grant compose, export, or reuse rights on a pinned source.
 
-**What stays out of authored-world 1.0.** A version this extension exports is absent from
-``extensions/authored-world-1.0``. A receiver that only declares authored-world 1.0 must treat
-those versions as omitted, not infer objects from the 1.0 directory as the whole authored state.
-Projecting ``authored-world-1.0`` alone refuses when such a version would otherwise be kept.
+**What stays out of authored-world 1.0.** An environment-bearing version is absent from
+``extensions/authored-world-1.0``. A schema-v1 descendant of such a version is absent there too,
+because that parent cannot be written under the 1.0 name and a parent pointer must resolve in
+the same directory. A schema-v1 ancestor required by an environment-bearing child remains in
+authored-world 1.0 when that extension is requested, so 1.0 stays a complete schema-v1 subset,
+and is also copied here so this directory verifies alone. A receiver that only declares
+authored-world 1.0 must treat the versions that live only here as omitted, not infer objects
+from the 1.0 directory as the whole authored state. Projecting ``authored-world-1.0`` alone
+refuses when an environment-bearing version would otherwise be kept. Dual export does not write
+an authored-world directory that lists zero versions while this directory holds the versions
+that were moved.
 
 **What is pure here.** This module imports nothing that opens a database. The digest is
 re-derived with :func:`exulanica.canonical.canonical_json` alone.
@@ -137,6 +147,81 @@ class EnvironmentInstances:
     behaviours: Mapping[tuple[str, int], Mapping[str, Any]]
     source_snapshots: Mapping[str, Mapping[str, Any]]
     withheld_versions: int
+
+
+@dataclass(frozen=True, slots=True)
+class ExportVersion:
+    """One live alternate version, enough to place it in a lineage-closed export."""
+
+    version_id: object
+    parent_version_id: object | None
+    environment_bearing: bool
+    source_invalidated: bool
+
+
+def partition_export_versions(
+    versions: Sequence[ExportVersion],
+) -> tuple[tuple[object, ...], tuple[object, ...], int, int]:
+    """Split versions between authored-world 1.0 and this extension without breaking lineage.
+
+    ``environment_ids`` is lineage-closed: every kept environment-bearing version, every kept
+    ancestor a parent pointer in that set needs, and every kept descendant that cannot live in
+    authored-world 1.0 because an ancestor is environment-bearing. Schema version 2 is never
+    assigned here; a schema-v1 ancestor keeps its honest document when the projector writes it.
+
+    ``authored_ids`` is the kept schema-v1 subset whose ancestor chain is also schema-v1. Those
+    versions may also appear in ``environment_ids`` when a descendant needs them as a parent.
+    Invalidated sources are counted on the side that would have exported them and are not named.
+    """
+    by_id = {item.version_id: item for item in versions}
+    authored_withheld = 0
+    environment_withheld = 0
+    kept: list[ExportVersion] = []
+    for item in versions:
+        if item.source_invalidated:
+            if item.environment_bearing:
+                environment_withheld += 1
+            else:
+                authored_withheld += 1
+            continue
+        kept.append(item)
+    kept_ids = {item.version_id for item in kept}
+    environment_native = {item.version_id for item in kept if item.environment_bearing}
+
+    def kept_ancestors(version_id: object) -> set[object]:
+        found: set[object] = set()
+        seen = {version_id}
+        cursor = by_id[version_id].parent_version_id
+        while cursor is not None and cursor not in seen:
+            seen.add(cursor)
+            if cursor in kept_ids:
+                found.add(cursor)
+            parent = by_id.get(cursor)
+            if parent is None:
+                break
+            cursor = parent.parent_version_id
+        return found
+
+    environment_ids = set(environment_native)
+    for native_id in environment_native:
+        environment_ids.update(kept_ancestors(native_id))
+    for item in kept:
+        if item.version_id not in environment_ids and (
+            kept_ancestors(item.version_id) & environment_native
+        ):
+            environment_ids.add(item.version_id)
+    authored_ids = tuple(
+        item.version_id
+        for item in kept
+        if not item.environment_bearing
+        and not (kept_ancestors(item.version_id) & environment_native)
+    )
+    return (
+        authored_ids,
+        tuple(item.version_id for item in kept if item.version_id in environment_ids),
+        authored_withheld,
+        environment_withheld,
+    )
 
 
 def required_loader_capabilities(

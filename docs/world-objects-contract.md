@@ -470,6 +470,9 @@ schema-version-1 deltas are in
 That extension does not export `environment_instances` and does not emit schema version 2.
 Environment-inclusive state is
 [World Memory Package: Environment-instances extension 1.0](world-memory-package.md#environment-instances-extension-10).
+That directory is lineage-closed: a parent pointer resolves there, schema-v1 ancestors keep
+their honest schema-v1 delta and may appear in both directories, and a schema-v1 descendant
+of an environment-bearing parent is exported there rather than under authored-world 1.0.
 Society state is outside both. A receiver without the environment-instances capability must
 omit those versions and must not infer objects from authored-world 1.0 as the whole authored
 state.
