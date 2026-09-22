@@ -117,7 +117,28 @@ export interface SourceAttachmentRequest {
   }[];
 }
 
-/** The bounded, source-independent region pinned by an authored starter entry. */
+/**
+ * The ground an authored region states.
+ *
+ * `flat` is a ground whose horizontal extent is a real property of the place: the perimeter is
+ * where the described surface actually stops. `endless` states that there is no such perimeter and
+ * therefore carries none. How far a person can walk across an endless ground is a limit of this
+ * renderer, not of the world, and it is stated by the binding that has it rather than by a stored
+ * descriptor that every world created today would keep.
+ */
+export type AuthoredGround =
+  | {
+      readonly kind: 'flat';
+      readonly halfWidthMm: number;
+      readonly halfDepthMm: number;
+      readonly elevationMm: number;
+    }
+  | {
+      readonly kind: 'endless';
+      readonly elevationMm: number;
+    };
+
+/** The source-independent region pinned by an authored starter entry. */
 export interface AuthoredStarterScene {
   readonly schemaVersion: 1;
   readonly kind: 'authored-starter';
@@ -126,14 +147,9 @@ export interface AuthoredStarterScene {
     readonly origin: 'authored';
     readonly module: {
       readonly key: 'region.authored-ground';
-      readonly version: 1;
+      readonly version: 1 | 2;
     };
-    readonly ground: {
-      readonly kind: 'flat';
-      readonly halfWidthMm: number;
-      readonly halfDepthMm: number;
-      readonly elevationMm: number;
-    };
+    readonly ground: AuthoredGround;
     readonly spawn: {
       readonly xMm: number;
       readonly yMm: number;
@@ -537,6 +553,18 @@ function parsePreviousAttachment(value: unknown): SavedWorldPreviousSourceAttach
   });
 }
 
+/**
+ * The ground module version and the ground kind are one fact, so neither is read alone.
+ *
+ * Version 1 is a 24 metre rectangle and version 2 states no extent at all. A descriptor that named
+ * one version and the other's ground would be a server this browser cannot read, and reading the
+ * kind without the version would let a future version's meaning be inferred from a word.
+ */
+const AUTHORED_GROUND_KIND_BY_MODULE_VERSION = new Map<number, 'flat' | 'endless'>([
+  [1, 'flat'],
+  [2, 'endless'],
+]);
+
 function parseAuthoredScene(value: unknown): AuthoredStarterScene | null {
   if (value === null) return null;
   const scene = record(value, 'authored scene');
@@ -545,23 +573,37 @@ function parseAuthoredScene(value: unknown): AuthoredStarterScene | null {
   }
   const region = record(scene['region'], 'authored region');
   const module = record(region['module'], 'authored region module');
-  const ground = record(region['ground'], 'authored region ground');
+  const groundRow = record(region['ground'], 'authored region ground');
   const spawn = record(region['spawn'], 'authored region spawn');
+  const moduleVersion = module['version'];
+  const expectedKind = typeof moduleVersion === 'number'
+    ? AUTHORED_GROUND_KIND_BY_MODULE_VERSION.get(moduleVersion)
+    : undefined;
   if (
     region['region_id'] !== 'region:starter' || region['origin'] !== 'authored' ||
-    module['key'] !== 'region.authored-ground' || module['version'] !== 1 ||
-    ground['kind'] !== 'flat'
+    module['key'] !== 'region.authored-ground' || expectedKind === undefined ||
+    groundRow['kind'] !== expectedKind
   ) {
     throw new TypeError('The server returned an unsupported authored starter region.');
   }
-  const halfWidthMm = positiveInteger(ground['half_width_mm'], 'authored ground half width');
-  const halfDepthMm = positiveInteger(ground['half_depth_mm'], 'authored ground half depth');
-  const elevationMm = integer(ground['elevation_mm'], 'authored ground elevation');
   const xMm = integer(spawn['x_mm'], 'authored spawn x');
   const yMm = integer(spawn['y_mm'], 'authored spawn y');
   const zMm = integer(spawn['z_mm'], 'authored spawn z');
   const yawMicroradians = integer(spawn['yaw_microradians'], 'authored spawn yaw');
-  if (Math.abs(xMm) > halfWidthMm || Math.abs(zMm) > halfDepthMm) {
+  const ground = parseAuthoredGround(groundRow, expectedKind);
+  /*
+   * The spawn has to be a place on the ground the same descriptor states.
+   *
+   * On a bounded ground that is the rectangle. On an endless ground there is no rectangle to be
+   * outside of, so the refusal moves to the only thing that can still be wrong about the pair: an
+   * endless ground that carries an extent is a descriptor two halves of the server disagree about,
+   * and `parseAuthoredGround` refuses it. Dropping the check entirely would leave a line that can
+   * no longer answer anything.
+   */
+  if (
+    ground.kind === 'flat' &&
+    (Math.abs(xMm) > ground.halfWidthMm || Math.abs(zMm) > ground.halfDepthMm)
+  ) {
     throw new TypeError('The authored starter spawn is outside its ground.');
   }
   return Object.freeze({
@@ -570,10 +612,32 @@ function parseAuthoredScene(value: unknown): AuthoredStarterScene | null {
     region: Object.freeze({
       regionId: 'region:starter',
       origin: 'authored',
-      module: Object.freeze({ key: 'region.authored-ground', version: 1 }),
-      ground: Object.freeze({ kind: 'flat', halfWidthMm, halfDepthMm, elevationMm }),
+      module: Object.freeze({
+        key: 'region.authored-ground',
+        version: moduleVersion as 1 | 2,
+      }),
+      ground,
       spawn: Object.freeze({ xMm, yMm, zMm, yawMicroradians }),
     }),
+  });
+}
+
+function parseAuthoredGround(
+  ground: Record<string, unknown>,
+  kind: 'flat' | 'endless',
+): AuthoredGround {
+  const elevationMm = integer(ground['elevation_mm'], 'authored ground elevation');
+  if (kind === 'endless') {
+    if ('half_width_mm' in ground || 'half_depth_mm' in ground) {
+      throw new TypeError('An endless authored ground cannot declare a horizontal extent.');
+    }
+    return Object.freeze({ kind: 'endless', elevationMm });
+  }
+  return Object.freeze({
+    kind: 'flat',
+    halfWidthMm: positiveInteger(ground['half_width_mm'], 'authored ground half width'),
+    halfDepthMm: positiveInteger(ground['half_depth_mm'], 'authored ground half depth'),
+    elevationMm,
   });
 }
 

@@ -533,13 +533,8 @@ def test_starter_creation_is_real_source_independent_and_exactly_idempotent(
         "region": {
             "region_id": "region:starter",
             "origin": "authored",
-            "module": {"key": "region.authored-ground", "version": 1},
-            "ground": {
-                "kind": "flat",
-                "half_width_mm": 12_000,
-                "half_depth_mm": 12_000,
-                "elevation_mm": 0,
-            },
+            "module": {"key": "region.authored-ground", "version": 2},
+            "ground": {"kind": "endless", "elevation_mm": 0},
             "spawn": {
                 "x_mm": 0,
                 "y_mm": 0,

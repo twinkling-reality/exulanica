@@ -141,6 +141,94 @@ describe('saved world entry client', () => {
     });
   });
 
+  it('creates the starter with a ground that states it has no extent, and carries none', async () => {
+    const fetch = vi.fn(async () => Response.json(wire({
+      source_kind: 'authored',
+      authored_scene: {
+        schema_version: 1,
+        kind: 'authored-starter',
+        region: {
+          region_id: 'region:starter',
+          origin: 'authored',
+          module: { key: 'region.authored-ground', version: 2 },
+          ground: { kind: 'endless', elevation_mm: 0 },
+          spawn: { x_mm: 0, y_mm: 0, z_mm: 4000, yaw_microradians: 0 },
+        },
+      },
+    })));
+    const entry = await new WorldEntryClient({
+      baseUrl: 'https://exulanica.test', token: 'private', fetch,
+    }).ensureStarter('My world');
+    expect(entry.authoredScene?.region.module.version).toBe(2);
+    expect(entry.authoredScene?.region.ground).toEqual({ kind: 'endless', elevationMm: 0 });
+    expect(entry.authoredScene?.region.spawn).toMatchObject({ zMm: 4000 });
+  });
+
+  /*
+   * The ground module version and the ground kind are one fact.
+   *
+   * Version 1 is a 24 metre rectangle and version 2 states no extent. Reading either alone would
+   * let a server whose halves disagree be drawn as though they agreed, and on a ground with no
+   * rectangle the spawn-containment refusal has nothing left to compare, so this is the check
+   * that replaces it rather than a check that was added beside it.
+   */
+  it.each([
+    ['a ground kind its module version does not state',
+      { key: 'region.authored-ground', version: 2 },
+      { kind: 'flat', half_width_mm: 12000, half_depth_mm: 12000, elevation_mm: 0 },
+      'unsupported authored starter region'],
+    ['an endless ground under the bounded module version',
+      { key: 'region.authored-ground', version: 1 },
+      { kind: 'endless', elevation_mm: 0 },
+      'unsupported authored starter region'],
+    ['a module version this browser has no ground for',
+      { key: 'region.authored-ground', version: 3 },
+      { kind: 'endless', elevation_mm: 0 },
+      'unsupported authored starter region'],
+    ['an endless ground that declares a horizontal extent anyway',
+      { key: 'region.authored-ground', version: 2 },
+      { kind: 'endless', elevation_mm: 0, half_width_mm: 12000 },
+      'cannot declare a horizontal extent'],
+  ])('refuses %s', async (_name, module, ground, message) => {
+    const fetch = vi.fn(async () => Response.json([wire({
+      source_kind: 'authored',
+      authored_scene: {
+        schema_version: 1,
+        kind: 'authored-starter',
+        region: {
+          region_id: 'region:starter',
+          origin: 'authored',
+          module,
+          ground,
+          spawn: { x_mm: 0, y_mm: 0, z_mm: 4000, yaw_microradians: 0 },
+        },
+      },
+    })]));
+    await expect(new WorldEntryClient({
+      baseUrl: 'https://exulanica.test', token: 'private', fetch,
+    }).entries()).rejects.toThrow(message);
+  });
+
+  it('still refuses a spawn outside a ground that really does have edges', async () => {
+    const fetch = vi.fn(async () => Response.json([wire({
+      source_kind: 'authored',
+      authored_scene: {
+        schema_version: 1,
+        kind: 'authored-starter',
+        region: {
+          region_id: 'region:starter',
+          origin: 'authored',
+          module: { key: 'region.authored-ground', version: 1 },
+          ground: { kind: 'flat', half_width_mm: 12000, half_depth_mm: 12000, elevation_mm: 0 },
+          spawn: { x_mm: 0, y_mm: 0, z_mm: 12001, yaw_microradians: 0 },
+        },
+      },
+    })]));
+    await expect(new WorldEntryClient({
+      baseUrl: 'https://exulanica.test', token: 'private', fetch,
+    }).entries()).rejects.toThrow('spawn is outside its ground');
+  });
+
   it('refuses an authored entry whose pinned scene is missing', async () => {
     const fetch = vi.fn(async () => Response.json([wire({
       source_kind: 'authored', authored_scene: null,

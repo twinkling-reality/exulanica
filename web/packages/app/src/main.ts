@@ -612,9 +612,7 @@ async function mount(): Promise<void> {
       : {
           authoredRegion: {
             regionId: state.activeWorldEntry.authoredScene.region.regionId,
-            halfWidthMm: state.activeWorldEntry.authoredScene.region.ground.halfWidthMm,
-            halfDepthMm: state.activeWorldEntry.authoredScene.region.ground.halfDepthMm,
-            elevationMm: state.activeWorldEntry.authoredScene.region.ground.elevationMm,
+            ...state.activeWorldEntry.authoredScene.region.ground,
           },
         }),
     showTravelStatus: (message, kind) => showTravelStatus(message, kind),

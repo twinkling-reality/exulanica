@@ -25,19 +25,25 @@ from exulanica.world.structure_repository import WorldStructureRepository
 AUTHORED_STARTER_COMPOSER: Final = "authored-starter-world"
 AUTHORED_STARTER_COMPOSER_VERSION: Final = 1
 AUTHORED_GROUND_MODULE: Final = "region.authored-ground"
-AUTHORED_GROUND_MODULE_VERSION: Final = 1
+AUTHORED_GROUND_MODULE_VERSION: Final = 2
 AUTHORED_GROUND_RECIPE: Final = "region.authored-starter"
-AUTHORED_GROUND_STREAMING_KEY: Final = "builtin:region.authored-ground@1"
+AUTHORED_GROUND_STREAMING_KEY: Final = "builtin:region.authored-ground@2"
 AUTHORED_STARTER_REGION_ID: Final = "region:starter"
 AUTHORED_STARTER_ELEMENT_ID: Final = "element:starter-ground"
 AUTHORED_STARTER_DESTINATION_ID: Final = "destination:region:starter"
-AUTHORED_GROUND_HALF_WIDTH_MM: Final = 12_000
-AUTHORED_GROUND_HALF_DEPTH_MM: Final = 12_000
 AUTHORED_GROUND_ELEVATION_MM: Final = 0
 AUTHORED_SPAWN_X_MM: Final = 0
 AUTHORED_SPAWN_Y_MM: Final = 0
 AUTHORED_SPAWN_Z_MM: Final = 4_000
 AUTHORED_SPAWN_YAW_MICRORADIANS: Final = 0
+
+# Version 1 stated a 24 metre by 24 metre rectangle. The constants stay because entries created
+# against that module version keep it: a stored descriptor is read at the version it was written
+# at, and nothing here migrates one.
+AUTHORED_GROUND_V1_MODULE_VERSION: Final = 1
+AUTHORED_GROUND_V1_STREAMING_KEY: Final = "builtin:region.authored-ground@1"
+AUTHORED_GROUND_V1_HALF_WIDTH_MM: Final = 12_000
+AUTHORED_GROUND_V1_HALF_DEPTH_MM: Final = 12_000
 
 _EMPTY_GRAPH_SHA256: Final = sha256_of_canonical(
     {"schema_version": 1, "plane": "graph", "observations": []}
@@ -48,11 +54,31 @@ _EMPTY_RECONSTRUCTION_SHA256: Final = sha256_of_canonical(
 
 
 @dataclass(frozen=True, slots=True)
-class AuthoredGround:
+class BoundedAuthoredGround:
+    """A ground whose horizontal extent is a real property of the place it describes."""
+
     kind: Literal["flat"]
     half_width_mm: int
     half_depth_mm: int
     elevation_mm: int
+
+
+@dataclass(frozen=True, slots=True)
+class EndlessAuthoredGround:
+    """A flat plane that states it has no horizontal extent, so it carries none.
+
+    A starter world is empty space to build in. It has no edge to describe, so a descriptor that
+    named one would be authoring a wall rather than recording a fact. How far a renderer can
+    actually carry a person across such a plane is a property of that renderer, not of the world,
+    and it belongs where it is measured rather than in a stored descriptor that every world born
+    today would keep for good.
+    """
+
+    kind: Literal["endless"]
+    elevation_mm: int
+
+
+AuthoredGround = BoundedAuthoredGround | EndlessAuthoredGround
 
 
 @dataclass(frozen=True, slots=True)
@@ -88,6 +114,24 @@ class AuthoredStarterScene:
 def authored_starter_candidate(world_id: str) -> SpatialCandidate:
     """Return the canonical source-independent initial structural world."""
 
+    return _authored_starter_candidate(
+        world_id,
+        module_version=AUTHORED_GROUND_MODULE_VERSION,
+        streaming_key=AUTHORED_GROUND_STREAMING_KEY,
+    )
+
+
+def _authored_starter_candidate(
+    world_id: str, *, module_version: int, streaming_key: str
+) -> SpatialCandidate:
+    """Build one ground module version's exact snapshot.
+
+    Every supported version is built here, from one body, because the versions differ only in which
+    module the element names. `tests/test_authored_starter_scene.py` pins the canonical digest of
+    each one, so a change to this body that would move a version already written to a database
+    fails rather than making existing entries unreadable.
+    """
+
     topology = {
         "schema_version": 1,
         "world_id": world_id,
@@ -98,7 +142,7 @@ def authored_starter_candidate(world_id: str) -> SpatialCandidate:
                 "owner": {"kind": "region", "id": AUTHORED_STARTER_REGION_ID},
                 "module": {
                     "key": AUTHORED_GROUND_MODULE,
-                    "version": AUTHORED_GROUND_MODULE_VERSION,
+                    "version": module_version,
                     "requested_key": AUTHORED_GROUND_MODULE,
                 },
                 "lineage": {
@@ -109,7 +153,7 @@ def authored_starter_candidate(world_id: str) -> SpatialCandidate:
                 "collision": {"kind": "none"},
                 "evidence": {"kind": "none"},
                 "attachment": None,
-                "streaming_key": AUTHORED_GROUND_STREAMING_KEY,
+                "streaming_key": streaming_key,
             }
         ],
         "navigation": {
@@ -173,6 +217,35 @@ def authored_starter_candidate(world_id: str) -> SpatialCandidate:
     )
 
 
+def authored_ground_for_module_version(module_version: int) -> AuthoredGround:
+    """The ground one module version states. Version 1 has edges; version 2 states it has none."""
+
+    if module_version == AUTHORED_GROUND_V1_MODULE_VERSION:
+        return BoundedAuthoredGround(
+            "flat",
+            AUTHORED_GROUND_V1_HALF_WIDTH_MM,
+            AUTHORED_GROUND_V1_HALF_DEPTH_MM,
+            AUTHORED_GROUND_ELEVATION_MM,
+        )
+    if module_version == AUTHORED_GROUND_MODULE_VERSION:
+        return EndlessAuthoredGround("endless", AUTHORED_GROUND_ELEVATION_MM)
+    raise InvalidStructuralData("unknown authored ground module version")
+
+
+def _supported_starter_candidates(world_id: str) -> tuple[tuple[int, SpatialCandidate], ...]:
+    return (
+        (
+            AUTHORED_GROUND_V1_MODULE_VERSION,
+            _authored_starter_candidate(
+                world_id,
+                module_version=AUTHORED_GROUND_V1_MODULE_VERSION,
+                streaming_key=AUTHORED_GROUND_V1_STREAMING_KEY,
+            ),
+        ),
+        (AUTHORED_GROUND_MODULE_VERSION, authored_starter_candidate(world_id)),
+    )
+
+
 def authored_starter_scene(
     *,
     composer_key: str,
@@ -180,36 +253,43 @@ def authored_starter_scene(
     topology: Mapping[str, Any],
     placement: Mapping[str, Any],
 ) -> AuthoredStarterScene:
-    """Validate and project the exact built-in starter snapshot for a renderer."""
+    """Validate and project the exact built-in starter snapshot for a renderer.
+
+    A snapshot is read at the ground module version it was written at. The stored snapshot is
+    matched against every supported version rather than asked which version it claims, so a
+    descriptor cannot select its own validation.
+    """
 
     if (
         composer_key != AUTHORED_STARTER_COMPOSER
         or composer_version != AUTHORED_STARTER_COMPOSER_VERSION
     ):
         raise InvalidStructuralData("the authored entry does not name the starter composer")
-    expected = authored_starter_candidate(str(topology.get("world_id", "")))
-    if dict(topology) != dict(expected.topology) or dict(placement) != dict(expected.placement):
-        raise InvalidStructuralData("the authored starter snapshot does not match module version 1")
-    return AuthoredStarterScene(
-        schema_version=1,
-        kind="authored-starter",
-        region=AuthoredRegion(
-            region_id=AUTHORED_STARTER_REGION_ID,
-            origin="authored",
-            module=AuthoredModule(AUTHORED_GROUND_MODULE, AUTHORED_GROUND_MODULE_VERSION),
-            ground=AuthoredGround(
-                "flat",
-                AUTHORED_GROUND_HALF_WIDTH_MM,
-                AUTHORED_GROUND_HALF_DEPTH_MM,
-                AUTHORED_GROUND_ELEVATION_MM,
-            ),
-            spawn=AuthoredSpawn(
-                AUTHORED_SPAWN_X_MM,
-                AUTHORED_SPAWN_Y_MM,
-                AUTHORED_SPAWN_Z_MM,
-                AUTHORED_SPAWN_YAW_MICRORADIANS,
-            ),
-        ),
+    stored_topology = dict(topology)
+    stored_placement = dict(placement)
+    world_id = str(stored_topology.get("world_id", ""))
+    for module_version, candidate in _supported_starter_candidates(world_id):
+        expected_topology = dict(candidate.topology)
+        expected_placement = dict(candidate.placement)
+        if stored_topology == expected_topology and stored_placement == expected_placement:
+            return AuthoredStarterScene(
+                schema_version=1,
+                kind="authored-starter",
+                region=AuthoredRegion(
+                    region_id=AUTHORED_STARTER_REGION_ID,
+                    origin="authored",
+                    module=AuthoredModule(AUTHORED_GROUND_MODULE, module_version),
+                    ground=authored_ground_for_module_version(module_version),
+                    spawn=AuthoredSpawn(
+                        AUTHORED_SPAWN_X_MM,
+                        AUTHORED_SPAWN_Y_MM,
+                        AUTHORED_SPAWN_Z_MM,
+                        AUTHORED_SPAWN_YAW_MICRORADIANS,
+                    ),
+                ),
+            )
+    raise InvalidStructuralData(
+        "the authored starter snapshot does not match a supported ground module version"
     )
 
 

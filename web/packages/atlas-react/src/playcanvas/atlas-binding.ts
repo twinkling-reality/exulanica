@@ -15,6 +15,7 @@ import type {
   LocalVec3,
   IslandId,
   MapPresentationState,
+  NavigationSurface,
   NavigationWorld,
   NeighborhoodId,
   NeighborhoodIndex,
@@ -49,6 +50,7 @@ import {
   atlasMapPose,
   atlasVec3,
   buildAnchorTable,
+  RECOVERY_MARGIN_AU,
   buildNeighborhoodIndex,
   buildNavigationWorld,
   navigationRegionForIsland,
@@ -449,18 +451,49 @@ export interface AtlasBindingOptions {
   readonly representationSubjects?: readonly RepresentationSubject[];
 }
 
+/**
+ * How far this renderer carries a person across a ground that states no extent.
+ *
+ * MEASURED, not chosen. A position reaches the GPU as a 32-bit float, and the render origin only
+ * moves when the active neighborhood changes, which in a world whose scene holds no regions never
+ * happens. So the whole walk is drawn at its true distance from the world origin, and the smallest
+ * position change the pipeline can represent is the float32 step at that distance: 0.12 mm at
+ * 2 km, 0.98 mm at 8.192 km, 1.95 mm at 16.4 km. 8192 metres is the farthest distance at which the
+ * drawn position still resolves the millimetre, which is the unit every stored coordinate in this
+ * product is written in, so it is the farthest distance at which the renderer can still put a
+ * person exactly where the world says they are.
+ *
+ * It is a property of this renderer and not of the world. A descriptor states that its ground has
+ * no edge; this states how much of that ground the current pipeline can honestly draw, and it
+ * moves when the pipeline does, with no stored world changing and nothing to migrate.
+ */
+export const AUTHORED_ENDLESS_GROUND_SUPPORTED_RADIUS_M = 8192;
+
+/**
+ * The ground an authored region states.
+ *
+ * `flat` describes a surface whose perimeter is a real edge, such as a place rebuilt from
+ * photographs. `endless` states there is no perimeter, so it carries no extent to read.
+ */
+export type AuthoredGround =
+  | {
+      readonly kind: 'flat';
+      readonly halfWidthMm: number;
+      readonly halfDepthMm: number;
+      readonly elevationMm: number;
+    }
+  | {
+      readonly kind: 'endless';
+      readonly elevationMm: number;
+    };
+
 export interface AuthoredRegion {
   readonly regionId: IslandId;
   readonly module: {
     readonly key: 'region.authored-ground';
-    readonly version: 1;
+    readonly version: 1 | 2;
   };
-  readonly ground: {
-    readonly kind: 'flat';
-    readonly halfWidthMm: number;
-    readonly halfDepthMm: number;
-    readonly elevationMm: number;
-  };
+  readonly ground: AuthoredGround;
   /** Ground-contact pose in the authored region frame, in fixed-point wire units. */
   readonly spawn: {
     readonly xMm: number;
@@ -468,6 +501,49 @@ export interface AuthoredRegion {
     readonly zMm: number;
     readonly yawMicroradians: number;
   };
+}
+
+/** Where an authored ground has a walking surface, in metres, for the navigation contract. */
+export function authoredGroundSurface(ground: AuthoredGround): NavigationSurface {
+  const elevation = ground.elevationMm / 1000;
+  const sample = Object.freeze({
+    height: elevation,
+    normal: Object.freeze({ x: 0, y: 1, z: 0 }),
+  });
+  if (ground.kind === 'endless') {
+    const radius = AUTHORED_ENDLESS_GROUND_SUPPORTED_RADIUS_M;
+    return Object.freeze({
+      sample: (x: number, z: number) => (Math.hypot(x, z) <= radius ? sample : null),
+    });
+  }
+  const halfWidth = ground.halfWidthMm / 1000;
+  const halfDepth = ground.halfDepthMm / 1000;
+  return Object.freeze({
+    sample: (x: number, z: number) =>
+      Math.abs(x) <= halfWidth && Math.abs(z) <= halfDepth ? sample : null,
+  });
+}
+
+/**
+ * The walkable field an endless authored ground admits.
+ *
+ * `buildNavigationWorld` sizes its field from the scene's regions, and a starter world has none,
+ * so it lands on its 90 metre floor. That floor was the second wall standing behind the first: a
+ * sampler with no rectangle still leaves a person compressed at 90 metres and returned at 138.
+ *
+ * Both radii sit INSIDE the distance the surface answers for, by the same margin the resident
+ * field already puts between its soft band and its hard envelope. A walk is therefore returned
+ * while there is still described ground underneath it, which is what makes the refusal honest:
+ * the field this renderer can carry ran out, not the ground. Every position movement can reach,
+ * including the compressed overshoot, is a position the surface answers.
+ */
+export function endlessAuthoredNavigation(world: NavigationWorld): NavigationWorld {
+  const recoveryRadius = AUTHORED_ENDLESS_GROUND_SUPPORTED_RADIUS_M - RECOVERY_MARGIN_AU;
+  return Object.freeze({
+    ...world,
+    fieldRadius: recoveryRadius - RECOVERY_MARGIN_AU,
+    recoveryRadius,
+  });
 }
 
 export interface FrameReport {
@@ -911,20 +987,16 @@ export class AtlasBinding {
     app.root.addChild(environmentRoot);
     const renderRoot = new pc.Entity('atlas-render-origin');
     app.root.addChild(renderRoot);
-    const authoredSurface = options.authoredRegion === undefined ? undefined : Object.freeze({
-      sample: (x: number, z: number) =>
-        Math.abs(x) <= options.authoredRegion!.ground.halfWidthMm / 1000 &&
-        Math.abs(z) <= options.authoredRegion!.ground.halfDepthMm / 1000
-          ? Object.freeze({
-              height: options.authoredRegion!.ground.elevationMm / 1000,
-              normal: Object.freeze({ x: 0, y: 1, z: 0 }),
-            })
-          : null,
-    });
+    const authoredGround = options.authoredRegion?.ground;
+    const authoredSurface = authoredGround === undefined
+      ? undefined
+      : authoredGroundSurface(authoredGround);
     const navigationWorld = options.generatedTile !== undefined
       ? options.generatedTile.navigationWorld
       : options.ownedDistrict === undefined
-      ? buildNavigationWorld(options.scene, authoredSurface)
+      ? authoredGround?.kind === 'endless'
+        ? endlessAuthoredNavigation(buildNavigationWorld(options.scene, authoredSurface))
+        : buildNavigationWorld(options.scene, authoredSurface)
       // The district owns the ground and the blockers; the scene owns where the memories are. Both
       // are already drawn in the same coordinate space, so withholding the regions from the
       // navigation world did not keep them apart, it only made them unreachable.
@@ -1009,12 +1081,19 @@ export class AtlasBinding {
       initialArtProfile,
       theme,
       options.reducedMotion ?? false,
-      options.authoredRegion === undefined
+      /*
+       * The world field draws an authored ground from an exact rectangle, and a ground with no
+       * extent has none to give it. Rather than invent one, an endless ground takes the field's
+       * own continuous surface, which is built by sampling the navigation surface above and so
+       * runs flat and unbroken to well past the distance this renderer supports. Giving that
+       * ground its own appearance is the world field's own work.
+       */
+      authoredGround === undefined || authoredGround.kind === 'endless'
         ? undefined
         : Object.freeze({
-            halfWidth: options.authoredRegion.ground.halfWidthMm / 1000,
-            halfDepth: options.authoredRegion.ground.halfDepthMm / 1000,
-            elevation: options.authoredRegion.ground.elevationMm / 1000,
+            halfWidth: authoredGround.halfWidthMm / 1000,
+            halfDepth: authoredGround.halfDepthMm / 1000,
+            elevation: authoredGround.elevationMm / 1000,
           }),
     );
     if (options.ownedDistrict !== undefined || options.generatedTile !== undefined) field.entity.enabled = false;

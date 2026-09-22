@@ -64,12 +64,74 @@ an unavailable entry, or a personal entry conflicts rather than replacing or sel
 Renaming remains an explicit entry update.
 
 The starter has its own `world:authored:<uuid>` identity. Its structural snapshot contains one
-`region:starter` region and the built-in `region.authored-ground` module version 1. The module is a
-24 metre by 24 metre flat authored surface at elevation zero. Its body spawn is four metres from
-the region origin. The element uses `evidence: {kind: none}`, the topology has no source slots or
-dependencies, and the graph and reconstruction digests cover versioned documents that explicitly
-state that there are no observed inputs. The module recipe and `builtin:` streaming key identify a
-procedural renderer contract, not a capture, reconstruction, or generated asset.
+`region:starter` region and the built-in `region.authored-ground` module version 2. Its body spawn
+is four metres from the region origin. The element uses `evidence: {kind: none}`, the topology has
+no source slots or dependencies, and the graph and reconstruction digests cover versioned documents
+that explicitly state that there are no observed inputs. The module recipe and `builtin:` streaming
+key identify a procedural renderer contract, not a capture, reconstruction, or generated asset.
+
+### The ground a starter states
+
+The module states a ground, and a ground states a `kind`. There are two, and a snapshot carries
+exactly the one its module version states:
+
+| Module version | Streaming key | Ground | Extents |
+| --- | --- | --- | --- |
+| 1 | `builtin:region.authored-ground@1` | `kind: flat` | `half_width_mm` and `half_depth_mm`, both 12000 |
+| 2 | `builtin:region.authored-ground@2` | `kind: endless` | none; the shape carries no extent field |
+
+`flat` describes a surface whose perimeter is a real edge, which is what a place rebuilt from
+photographs has. `endless` states a flat plane at the stated elevation with no perimeter at all. A
+starter world is empty space to build in, so it has no edge to describe and version 2 states none:
+a descriptor that named a size would be authoring a wall, and every world created under it would
+keep that wall for as long as it existed.
+
+The two versions are different stored bytes and both are read. A snapshot is matched against every
+supported version rather than asked which version it claims, so a stored descriptor cannot select
+its own validation, and a snapshot matching none of them is an error rather than a default. A world
+created under version 1 keeps its 24 metre by 24 metre ground, keeps refusing placement outside it,
+and is not migrated. Changing which version an existing world states would be a separate decision
+about that world, not a consequence of the module gaining a version.
+
+### How far an endless ground actually holds
+
+No extent is stored, because the limit is not a property of the world. It is a property of the
+renderer drawing it, and the browser binding states it as
+`AUTHORED_ENDLESS_GROUND_SUPPORTED_RADIUS_M`, currently **8192 metres**. It moves when the renderer
+does, and no stored world changes when it does.
+
+The number is measured, not chosen. A position reaches the GPU as a 32-bit float. The render origin
+rebases only when the active neighborhood changes, neighborhoods are built from the scene's regions,
+and a starter world's scene has none, so the whole walk is drawn at its true distance from the world
+origin. The gap between one representable position and the next is then the float32 step at that
+distance: 0.0019 mm at 24 metres, 0.061 mm at 1 kilometre, 0.49 mm at 8 kilometres, 0.98 mm at
+8192 metres, and 1.95 mm at 16384 metres. 8192 metres is the farthest distance at which a drawn
+position still resolves the millimetre, which is the unit every stored coordinate in this product
+is written in.
+
+Beyond it nothing is invented. The walking surface answers everywhere inside that radius, on a
+circle so that no direction runs further than another, and answers nowhere outside it. Walking is
+held inside the surface by two margins: the last 96 metres resist, as the resident field's soft
+band does, and a step that would pass 8144 metres returns the person to where they last stood with
+`recovery_reason: outside-field`. The refusal says the field ran out rather than that the ground
+did, because on a ground that states it has no edge, running out of ground is the wrong account of
+what happened. Every position movement can reach, including the compressed overshoot, is a position
+the surface answers for.
+
+`web/packages/atlas-react/test/endless-authored-ground.test.ts` measures all of it: the float32
+step is read out of the bits rather than restated, the render origin is shown not to move in a
+scene with no regions, and the walk is run through the world's own movement resolver one 23
+millimetre frame at a time, from the origin to 8 kilometres, without a recovery.
+
+### The spawn on a ground with no extents
+
+The browser refuses a descriptor whose spawn is outside its own ground. On a bounded ground that is
+the declared rectangle. An endless ground has no rectangle, so there is no containment left to
+check, and the refusal moves rather than being deleted: the ground module version and the ground
+kind are read as one fact, and a version 2 module carrying a `flat` ground, a version 1 module
+carrying an `endless` one, or an endless ground carrying `half_width_mm` or `half_depth_mm` at all
+are each refused as a descriptor this browser cannot read. Nothing is left that passes because it
+has nothing to compare.
 
 The development demonstration remains a separate, identified preview. It is never saved as an
 owned entry. Opening an entry omits the bundled Flatiron demonstration district.
@@ -132,9 +194,13 @@ The browser mounts the authored descriptor as a first-class region and ground. I
 a graph island, capture, evidence card, or reconstructed surface for it. Personal entries return
 `authored_scene: null`; their current graph and reconstruction limitations remain visible.
 
-The authored floor uses the descriptor's exact horizontal bounds and elevation. Its perimeter
-marks the supported walking area, and its surface receives object shadows and follows the saved
-appearance palette. Photo-derived scene-segment controls are absent from source-independent
+A bounded authored floor uses the descriptor's exact horizontal bounds and elevation, its
+perimeter marks the supported walking area, and it receives object shadows. An endless ground
+states no perimeter to draw, so it takes the world field's own continuous surface, which runs flat
+and unbroken well past the distance the renderer supports. That surface receives no object shadows
+and is drawn 35 millimetres below the authored elevation, so an object placed on an endless ground
+casts no shadow onto it; giving that ground an appearance of its own is the world field's work and
+is not done yet. Both surfaces follow the saved appearance palette. Photo-derived scene-segment controls are absent from source-independent
 starters. In-world controls expose the World menu, object placement and photo review alongside
 the editable title. When the starter's Companion has no substantive turn, it presents creation
 guidance and the ordinary question control rather than an acknowledgement of an unstated exchange.
@@ -335,6 +401,11 @@ cannot be restored over them; recovery is a restore from backup.
 
 ## Verification
 
+`tests/test_authored_starter_scene.py` pins the exact bytes each ground module version commits,
+version 1's taken from the tree that created the worlds already holding it, and checks that a
+snapshot written at either version reads back as that version's own ground, that an unsupported
+version is refused, and that a snapshot the module did not write is refused at both versions.
+
 `tests/test_saved_world_entries_api.py` executes exact reopen, cursor adoption races, atomic
 authored and appearance advancement, refusal of a bound appearance edit while the saved style
 is historical, rollback that restores that appearance onto the live authority, transaction
@@ -343,7 +414,11 @@ non-disclosure against PostgreSQL. Browser tests in
 `web/packages/app/test/world-entry-api.test.ts`, `world-entry-surface.test.ts`,
 `world-objects-api.test.ts`, and `world-style-api.test.ts` verify explicit recovery, bound writes,
 creation, appearance save/reload, named-world propagation, and the absence of newest-version
-inference.
+inference. `world-entry-api.test.ts` also refuses every descriptor whose ground kind and ground
+module version disagree, and every endless ground that declares an extent.
+`web/packages/atlas-react/test/endless-authored-ground.test.ts` measures the walking surface, the
+field an endless ground admits and the walk itself; `objects-surface.test.ts` covers placement and
+drawing on both grounds, including that the object bound and the walking surface are one number.
 
 Reference-attachment coverage includes atomic mixed-source refusal, exact retry and operation
 identity conflicts, live authored-cursor drift, preserved object undo, authorization and screening
@@ -375,7 +450,12 @@ request bodies and the removed-reference parse.
 
 ## Starter placement boundary
 
-The browser constrains starter object placement and movement to the declared authored ground and
-refuses to draw saved objects outside that supported area. The general authored-object API retains
-its existing region ownership and transform validation; it does not enforce the starter ground's
-finite horizontal bounds. This browser constraint is not a server-side spatial admission guarantee.
+The browser constrains starter object placement and movement to the ground the descriptor states,
+and refuses to draw saved objects outside that supported area. On a bounded ground that is the
+declared rectangle. On an endless ground it is the same radius the walking surface answers for, so
+an object can never be saved somewhere a person could not stand: both read one constant. The
+region's placement reach follows the same rule, and stays a finite number on an endless ground for
+the same reason, so a refusal can still name a distance.
+
+The general authored-object API retains its existing region ownership and transform validation; it
+enforces neither bound. This browser constraint is not a server-side spatial admission guarantee.

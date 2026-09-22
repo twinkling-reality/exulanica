@@ -4,6 +4,10 @@ import {
   atlasVec3, islandId, localVec3, makeIsland, placement, sceneDisplayFrame,
 } from '@exulanica/atlas-core';
 import { ApiError } from '@exulanica/graph-client';
+import {
+  AUTHORED_ENDLESS_GROUND_SUPPORTED_RADIUS_M,
+  authoredGroundSurface,
+} from '@exulanica/atlas-react/playcanvas';
 import { COMPOSITION_BLOCKED_REASONS } from '../src/composition-preview-api.js';
 import { mountObjects, type MountedObjects, type ObjectsDependencies } from '../src/composition/objects.js';
 import type { AppEnvironment, SessionState } from '../src/composition/session-state.js';
@@ -905,7 +909,7 @@ describe('adding goes through the server’s preview, then the same request is a
 
 describe('an authored starter keeps additions on its declared ground', () => {
   const starter = {
-    regionId: 'region:starter', halfWidthMm: 12_000, halfDepthMm: 12_000, elevationMm: 0,
+    regionId: 'region:starter', kind: 'flat', halfWidthMm: 12_000, halfDepthMm: 12_000, elevationMm: 0,
   } as const;
 
   it('previews and applies a spot on the ground in the starter region', async () => {
@@ -980,6 +984,85 @@ describe('an authored starter keeps additions on its declared ground', () => {
     await h.mounted.begin();
     expect(h.objects.objectIds).toEqual([]);
     expect(h.travel.some((item) => item.message.includes('outside this world’s authored ground'))).toBe(true);
+  });
+});
+
+/**
+ * A ground with no extent, at the surface that puts things on it.
+ *
+ * The bounded case above is version 1 of the ground module and keeps its rectangle. This is
+ * version 2, which states there is no rectangle, so the only limit left is how far this renderer
+ * can still draw a position. Both remain browser constraints; the authored-object API validates
+ * region ownership and transforms and enforces neither.
+ */
+describe('an authored starter with no edge keeps additions where it can still draw them', () => {
+  const endless = { regionId: 'region:starter', kind: 'endless', elevationMm: 0 } as const;
+  const supportedMm = AUTHORED_ENDLESS_GROUND_SUPPORTED_RADIUS_M * 1000;
+
+  it('adds an object a hundred metres out, where the bounded ground refused at twelve', async () => {
+    const h = harness({ authoredRegion: endless, standAt: [0, 1.6, -100] });
+    h.state.placedPointMaps = [];
+    await h.mounted.begin();
+    h.mounted.panel.setVisible(true);
+    await place(h);
+    expect(h.mounted.panel.root.textContent).not.toContain('outside this world’s authored ground');
+    await verdictReady(h);
+    const previewed = h.authority.calls.find((call) => call.name === 'preview')!.args[1] as AppliedBody;
+    expect(previewed.placement.region_id).toBe('region:starter');
+    expect(previewed.placement.transform).toMatchObject({ x_mm: 0, y_mm: 0, z_mm: -103_500 });
+  });
+
+  it('refuses a spot past the distance this renderer can still draw, before asking the server', async () => {
+    const h = harness({
+      authoredRegion: endless,
+      standAt: [AUTHORED_ENDLESS_GROUND_SUPPORTED_RADIUS_M + 10, 1.6, 0],
+    });
+    h.state.placedPointMaps = [];
+    await h.mounted.begin();
+    h.mounted.panel.setVisible(true);
+    await place(h);
+    expect(h.mounted.panel.root.textContent).toContain('outside this world’s authored ground');
+    expect(h.mounted.confirm.root.hidden).toBe(true);
+    expect(h.authority.calls.filter((call) => call.name === 'preview')).toEqual([]);
+    expect(writes(h.authority.calls)).toEqual([]);
+  });
+
+  it('draws a saved object well past the old rectangle and refuses one past the support', async () => {
+    const far = (xMm: number) => objectRecord({
+      regionId: 'region:starter',
+      transform: Object.freeze({
+        coordinateSpace: 'region_local', coordinateUnit: 'millimetre',
+        xMm, yMm: 0, zMm: 0, yawMicroradians: 0, scaleMilli: 1000,
+      }),
+    });
+
+    const drawn = harness({
+      authoredRegion: endless,
+      initial: version({ objects: [far(100_000)] }),
+    });
+    drawn.state.placedPointMaps = [];
+    await drawn.mounted.begin();
+    expect(drawn.objects.objectIds).toEqual(['object:lantern']);
+
+    const refused = harness({
+      authoredRegion: endless,
+      initial: version({ objects: [far(supportedMm + 1)] }),
+    });
+    refused.state.placedPointMaps = [];
+    await refused.mounted.begin();
+    expect(refused.objects.objectIds).toEqual([]);
+    expect(refused.travel.some(
+      (item) => item.message.includes('outside this world’s authored ground'),
+    )).toBe(true);
+  });
+
+  it('measures the same ground the person walks on: the placement bound is the walking radius', () => {
+    // Two surfaces under one walker is a recurring defect in this product. This asserts the one
+    // number rather than a copy of it: the object bound and the walking surface come from the
+    // same constant, so an object can never be saved somewhere the ground does not answer.
+    const surface = authoredGroundSurface({ kind: 'endless', elevationMm: 0 });
+    expect(surface.sample(AUTHORED_ENDLESS_GROUND_SUPPORTED_RADIUS_M, 0)).not.toBeNull();
+    expect(surface.sample(AUTHORED_ENDLESS_GROUND_SUPPORTED_RADIUS_M + 1, 0)).toBeNull();
   });
 });
 

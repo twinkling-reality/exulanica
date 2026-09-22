@@ -62,6 +62,7 @@ import {
 import { tierPolicy } from '@exulanica/companion-runtime';
 import type { ConfirmationBand, ConfirmationSummary } from '@exulanica/companion-runtime';
 import {
+  AUTHORED_ENDLESS_GROUND_SUPPORTED_RADIUS_M,
   DEFAULT_PLACEMENT_DISTANCE_MM,
   MM_PER_METRE,
   fetchVerifiedObjectAsset,
@@ -70,6 +71,7 @@ import {
   placementPoseAtAtlasPoint,
   placementPoseBeforeVisitor,
   regionPointFromAtlas,
+  type AuthoredGround,
   type PlacedAuthoredObject,
   type RegionPose,
 } from '@exulanica/atlas-react/playcanvas';
@@ -126,12 +128,14 @@ export interface DistrictObjectPlacement {
   readonly boundsMm: readonly [number, number, number, number];
 }
 
-export interface AuthoredObjectRegion {
-  readonly regionId: string;
-  readonly halfWidthMm: number;
-  readonly halfDepthMm: number;
-  readonly elevationMm: number;
-}
+/**
+ * The authored region this world places objects on, and the ground it states.
+ *
+ * The ground is passed through from the descriptor rather than reduced to numbers here, because a
+ * ground that states it has no extent has no numbers to reduce to and the difference is the whole
+ * question this surface has to answer.
+ */
+export type AuthoredObjectRegion = { readonly regionId: string } & AuthoredGround;
 
 interface ObjectRegion {
   readonly regionId: IslandId;
@@ -545,15 +549,38 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       placement: {
         position: atlasVec3(0, region.elevationMm / MM_PER_METRE, 0), yaw: 0, scale: 1,
       },
-      footprintRadiusLocal: Math.min(region.halfWidthMm, region.halfDepthMm) / MM_PER_METRE,
+      /*
+       * How far from the region origin somebody still counts as standing at this region.
+       *
+       * For a bounded ground that is the inscribed circle of its rectangle. For a ground with no
+       * extent it is the distance the renderer supports, because there is no nearer place the
+       * region stops being under your feet. The value stays finite either way: it is compared
+       * against real distances, and an infinity would be a number no refusal could read back.
+       */
+      footprintRadiusLocal: region.kind === 'endless'
+        ? AUTHORED_ENDLESS_GROUND_SUPPORTED_RADIUS_M
+        : Math.min(region.halfWidthMm, region.halfDepthMm) / MM_PER_METRE,
       sceneId: 'authored-starter',
     };
   }
 
+  /**
+   * Whether this world will draw and save an object at that spot on its authored ground.
+   *
+   * A bounded ground answers with its own declared rectangle: outside it there is no described
+   * surface. An endless ground has no rectangle, so the only honest limit left is how far this
+   * renderer can still draw a position, which is what
+   * `AUTHORED_ENDLESS_GROUND_SUPPORTED_RADIUS_M` states and what the walking surface uses too.
+   * Both remain a browser constraint. `docs/saved-world-entry.md` says so: the general authored
+   * object API validates region ownership and transforms and enforces neither bound.
+   */
   function authoredContains(xMm: number, zMm: number): boolean {
     const region = deps.authoredRegion;
-    return region !== undefined && Math.abs(xMm) <= region.halfWidthMm &&
-      Math.abs(zMm) <= region.halfDepthMm;
+    if (region === undefined) return false;
+    if (region.kind === 'endless') {
+      return Math.hypot(xMm, zMm) <= AUTHORED_ENDLESS_GROUND_SUPPORTED_RADIUS_M * MM_PER_METRE;
+    }
+    return Math.abs(xMm) <= region.halfWidthMm && Math.abs(zMm) <= region.halfDepthMm;
   }
 
   function currentDistrict(): DistrictObjectPlacement | null {

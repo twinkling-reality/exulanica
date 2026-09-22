@@ -43,13 +43,28 @@ class AuthoredModuleView(BaseModel):
     version: int
 
 
-class AuthoredGroundView(BaseModel):
+class BoundedAuthoredGroundView(BaseModel):
     model_config = ConfigDict(extra="forbid", from_attributes=True)
 
     kind: Literal["flat"]
     half_width_mm: int
     half_depth_mm: int
     elevation_mm: int
+
+
+class EndlessAuthoredGroundView(BaseModel):
+    model_config = ConfigDict(extra="forbid", from_attributes=True)
+
+    kind: Literal["endless"]
+    elevation_mm: int
+
+
+# Two shapes rather than one with optional extents. An endless ground has no horizontal extent, so
+# the wire shape it is serialised into has nowhere to put one, and a reader cannot mistake an
+# absent extent for an unread one.
+AuthoredGroundView = Annotated[
+    BoundedAuthoredGroundView | EndlessAuthoredGroundView, Field(discriminator="kind")
+]
 
 
 class AuthoredSpawnView(BaseModel):

@@ -170,6 +170,7 @@ export type { ClaimResult } from './probes.js';
 export { probeAll, probeGlobalSort, probeSplatBudget, probeWebGpu } from './probes.js';
 
 export type {
+  AuthoredGround,
   AuthoredRegion,
   AtlasBindingOptions,
   FrameReport,
@@ -178,7 +179,10 @@ export type {
   ProofLensColor,
 } from './atlas-binding.js';
 export {
+  AUTHORED_ENDLESS_GROUND_SUPPORTED_RADIUS_M,
   AtlasBinding,
+  authoredGroundSurface,
+  endlessAuthoredNavigation,
   placedCatalogObjectSubject,
   mapCameraState,
   ownedDistrictCameraState,
