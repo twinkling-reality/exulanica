@@ -85,6 +85,7 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
     ("POST", "/world-entries/starter"): {"json": {}},
     ("GET", "/world-entries/{entry_id}"): {},
     ("PUT", "/world-entries/{entry_id}"): {"json": {}},
+    ("POST", "/world-entries/{entry_id}/source-attachments"): {"json": {}},
     ("GET", "/world/versions/{version_id}/society/control"): {},
     ("PUT", "/world/versions/{version_id}/society/control"): {
         "json": {"base_revision": 0, "mode": "paused", "speed": 1}
