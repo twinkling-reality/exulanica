@@ -80,14 +80,15 @@ def _generic_sources() -> list[Path]:
     return [path for path in _sources() if not path.is_relative_to(_GRAMMARS)]
 
 
-def _lint_imports() -> subprocess.CompletedProcess[str]:
+def _lint_imports(cwd: Path = ROOT) -> subprocess.CompletedProcess[str]:
     executable = shutil.which("lint-imports", path=str(Path(sys.executable).parent))
     assert executable is not None, "lint-imports is not installed next to this interpreter"
-    # The cache is disabled so a module written a moment ago is seen, and the terminal is wide
-    # so a contract name is never wrapped across two lines of output.
+    # lint-imports puts its working directory first on the path, so run from a copy it analyses
+    # the copy. The cache is disabled so a module written a moment ago is seen, and the terminal
+    # is wide so a contract name is never wrapped across two lines of output.
     return subprocess.run(
         [executable, "--no-cache", "--no-logo"],
-        cwd=ROOT,
+        cwd=cwd,
         capture_output=True,
         text=True,
         timeout=300,
@@ -186,18 +187,32 @@ def test_lint_imports_is_green():
         ("psycopg", PURE_CORE_CONTRACT),
     ],
 )
-def test_the_negative_control_breaks_the_contract(imported, contract):
-    """A violating import in the grammar package fails the build and names the rule it broke."""
-    module = _PACKAGE / f"{NEGATIVE_CONTROL_PREFIX}{imported.replace('.', '_')}.py"
-    # Exclusive create: a file left by a killed run is a failure to report, not one to overwrite.
+def test_the_negative_control_breaks_the_contract(imported, contract, tmp_path: Path):
+    """A violating import in the grammar package fails the build and names the rule it broke.
+
+    Planted in a private copy of the package, never in the source tree. Planted in the tree, the
+    module was visible to every other test for as long as lint-imports ran, and under parallel
+    workers a test walking ``exulanica/`` listed it and then failed reading it once it was
+    deleted. The copy is the pattern tests/test_traffic_layering.py already uses.
+    """
+    copy_root = tmp_path / "checkout"
+    shutil.copytree(
+        ROOT / "exulanica",
+        copy_root / "exulanica",
+        ignore=shutil.ignore_patterns("__pycache__"),
+    )
+    shutil.copy2(ROOT / "pyproject.toml", copy_root / "pyproject.toml")
+    name = f"{NEGATIVE_CONTROL_PREFIX}{imported.replace('.', '_')}"
+    module = copy_root / "exulanica" / "grammar" / f"{name}.py"
     with module.open("x", encoding="utf-8") as handle:
-        handle.write(f"import {imported}  # a deliberate violation, deleted by the test\n")
-    try:
-        result = _lint_imports()
-    finally:
-        module.unlink()
+        handle.write(f"import {imported}  # a deliberate violation in a throwaway copy\n")
+    result = _lint_imports(copy_root)
     assert result.returncode != 0, result.stdout + result.stderr
     assert _contract_lines(result.stdout).get(contract) == "BROKEN", result.stdout
+    # The chain starts at the planted module, which exists only in the copy, so this also proves
+    # that the copy was what lint-imports analysed rather than the installed package.
+    assert f"exulanica.grammar.{name} -> {imported} (l.1)" in result.stdout, result.stdout
+    assert not list(_PACKAGE.glob(f"{NEGATIVE_CONTROL_PREFIX}*"))
 
 
 def test_no_negative_control_module_is_left_anywhere():
