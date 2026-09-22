@@ -1,13 +1,14 @@
 """Frozen v1 encoding: the fixed tables stored v1, v2 and v3 societies were generated from.
 
-Stored histories replay from this module. The names, roles, ``home:{n}``/``work:{n}`` labels, the
-fixed weather and resources blocks and the plus or minus 300 m position bound are not vocabulary
-or world facts. They are part of the byte contract of societies that already exist: v1 genesis
-and transitions, and v2 and v3 genesis through :func:`initial_society`, hash them, and
-``tests/test_society_legacy.py`` pins those digests. Changing any value here changes every
-replay. ``exulanica-society/v4`` in ``exulanica.world.society_living`` uses none of them: its
-roles, homes and workplaces come from the place's premises or are recorded as unavailable, and
-its positions always lie on the place's navigation graph.
+Nothing new may use this module. The names, roles, ``home:{n}``/``work:{n}`` labels, the fixed
+weather and resources blocks and the plus or minus 300 m position bound are not vocabulary or
+world facts. They are part of the byte contract of societies that already exist: v1 genesis and
+transitions, and v2 and v3 genesis through :func:`initial_society`, hash them, and
+``tests/test_society_legacy.py`` pins those digests. They exist only so stored histories replay.
+Changing any value here changes every replay. The current profile, ``exulanica-society/v4`` in
+``exulanica.world.society_living``, uses none of them: its roles, homes and workplaces come from
+the place's premises or are recorded as unavailable, and its positions always lie on the place's
+navigation graph.
 """
 
 from __future__ import annotations
