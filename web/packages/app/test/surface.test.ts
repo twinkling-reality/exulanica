@@ -291,7 +291,7 @@ describe('the Map orientation caption', () => {
       undrawable: new Map([['voice', 7]]),
     });
     const warnings = [...bar.querySelectorAll('.status-warning')].map((n) => n.textContent ?? '');
-    expect(warnings).toEqual(['3 regions and 7 detections not shown in the Atlas.']);
+    expect(warnings).toEqual(['3 regions and 7 detections not shown in your world.']);
   });
 
   it('states authenticated source failures without substituting media', () => {

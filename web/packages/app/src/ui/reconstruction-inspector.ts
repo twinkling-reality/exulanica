@@ -106,7 +106,7 @@ export function buildReconstructionInspector(options: {
   const select = el('select', { 'aria-label': 'Inspection viewpoint' });
   const previous = el('button', { type: 'button', text: 'Previous view' });
   const next = el('button', { type: 'button', text: 'Next view' });
-  const back = el('button', { type: 'button', text: 'Return to Atlas' });
+  const back = el('button', { type: 'button', text: 'Return to your world' });
   const state = el('p', { role: 'status', 'aria-live': 'polite' });
   const source = el('details', { class: 'reconstruction-inspector-source' });
   const sourceBody = el('div');
@@ -159,7 +159,7 @@ export function buildReconstructionInspector(options: {
     const view = views[index];
     if (view === undefined) return;
     if (view.kind !== 'source-only' && !options.onView(sceneId, view.id)) {
-      state.textContent = 'This view is unavailable. Return to Atlas to use its source photographs.';
+      state.textContent = 'This view is unavailable. Return to your world to use its source photographs.';
       source.hidden = true;
       return;
     }

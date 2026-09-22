@@ -113,8 +113,14 @@ export async function openAppSession(
   if (state.activeWorldEntry !== null) {
     try {
       await openWorldEntryContext(state, state.activeWorldEntry);
-    } catch {
+    } catch (error) {
+      // KEEP WHY, AND KEEP THE ERROR. A lone available world is opened here, so this failure is
+      // the only reason a person with exactly one world sees anything but their world. Discarding
+      // it put them in front of a list of one with nothing said. The error is retained rather
+      // than a sentence made from it, because what a person should be told is a decision for the
+      // surface that has to fit it on a screen, not for the code that caught it.
       state.activeWorldEntry = null;
+      state.worldEntryError = error;
     }
   }
 
@@ -205,7 +211,12 @@ export async function openWorldEntryContext(
     state.worldStyleConnection = null;
     state.worldStyles = null;
     state.activeWorldEntry = null;
-    throw new Error(`The saved appearance version could not be opened: ${state.worldStyleFailure}`);
+    // `cause` so a caller can still see what actually failed. Without it the only thing left is
+    // this sentence, and a full-page screen cannot tell a dropped connection from a refusal.
+    throw new Error(
+      `The saved appearance version could not be opened: ${state.worldStyleFailure}`,
+      { cause: error },
+    );
   }
   state.sourceMediaSession?.dispose();
   state.sourceMediaSession = null;

@@ -76,7 +76,7 @@ export function buildDetail(
       show([
         el('p', {
           class: 'detail-empty',
-          text: 'Pick something on the left, or aim at an anchor in the Atlas.',
+          text: 'Pick something on the left, or aim at an anchor in your world.',
         }),
       ]);
     },
@@ -307,7 +307,7 @@ function citationList(
     const locate = el('button', {
       type: 'button',
       class: 'citation-locate',
-      text: 'Locate in Atlas',
+      text: 'Locate in world',
     });
     locate.addEventListener('click', () => handlers.onLocate(citation.anchorId, citation.islandId));
     figure.append(el('div', { class: 'citation-actions' }, [locate, open]), caption);

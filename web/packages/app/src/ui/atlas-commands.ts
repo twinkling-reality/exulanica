@@ -43,7 +43,7 @@ export function buildAtlasCommands(onCommand: (command: AtlasCommand) => void): 
     ['controls', 'Settings', '?'],
   ];
   const buttons = new Map<AtlasCommand, HTMLButtonElement>();
-  const root = el('nav', { class: 'atlas-commands', 'aria-label': 'Atlas commands' });
+  const root = el('nav', { class: 'atlas-commands', 'aria-label': 'World commands' });
   for (const [command, label, key] of entries) {
     const button = el('button', {
       type: 'button',

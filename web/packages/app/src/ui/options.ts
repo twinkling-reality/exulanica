@@ -159,7 +159,7 @@ export function buildOptions(callbacks: OptionsCallbacks): OptionsView {
   const close = el('button', {
     type: 'button',
     class: 'overlay-close command-action',
-    'aria-label': 'Return to Atlas',
+    'aria-label': 'Return to your world',
   }, commandAction('O', 'Return'));
 
   const contrast = el('select', { 'aria-label': 'Contrast' }, [
@@ -524,7 +524,7 @@ export function buildOptions(callbacks: OptionsCallbacks): OptionsView {
   root.append(
     el('header', { class: 'overlay-head' }, [
       el('div', {}, [
-        el('p', { class: 'overlay-kicker', text: 'Atlas system' }),
+        el('p', { class: 'overlay-kicker', text: 'System' }),
         el('h1', { id: 'options-title', text: 'Customize' }),
       ]),
       close,
@@ -562,7 +562,7 @@ export function buildOptions(callbacks: OptionsCallbacks): OptionsView {
       ]),
       el('p', {
         class: 'world-style-future',
-        text: 'Companion designs can be reviewed here when an upstream proposal service supplies bounded profile values. Atlas does not generate recipes or execute model output in the browser.',
+        text: 'Companion designs can be reviewed here when an upstream proposal service supplies bounded profile values. Exulanica does not generate recipes or execute model output in the browser.',
       }),
       proposalReview,
       el('div', { class: 'world-style-source-action' }, [readSource, readSourceNote]),

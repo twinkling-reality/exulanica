@@ -9,7 +9,7 @@ describe('reconstruction camera register', () => {
     expect(sourceCaption('Source 01a0722d 8c7b 791e b304 ee9c31019f1c', 'Photograph 2')).toBe('Photograph 2');
     expect(sourceCaption('Volcanic rock', 'Photograph 1')).toBe('Volcanic rock');
     const panel = buildReconstructionInspector({ onView: () => true, onReturn: vi.fn() });
-    expect(panel.root.querySelector('header button')!.textContent).toBe('Return to Atlas');
+    expect(panel.root.querySelector('header button')!.textContent).toBe('Return to your world');
   });
   it('opens original evidence in source-only fallback without pretending to move a recovered camera', () => {
     const onView = vi.fn(() => false);
@@ -67,7 +67,7 @@ describe('reconstruction camera register', () => {
     panel.open('scene', [{ id: 'missing', kind: 'source-camera', label: 'Source camera 1', source: null }]);
     expect(panel.root.textContent).toContain('This view is unavailable');
     expect(panel.root.querySelector('img')).toBeNull();
-    expect(panel.root.textContent).toContain('Return to Atlas');
+    expect(panel.root.textContent).toContain('Return to your world');
   });
 
   it('offers inspection only when this session loaded reconstruction', () => {

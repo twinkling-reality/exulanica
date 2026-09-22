@@ -91,8 +91,31 @@ describe('what somebody sees before their world is on the screen', () => {
       '#shell[data-booting] > :not(.gate):not(.startup-thinking)',
     );
     expect(css).toContain('#shell[data-booting] > .startup-thinking');
-    expect(bootstrap).toContain("mark.className = 'startup-mark'");
+    // The pre-module screen is read as source because importing it would run it, and running it
+    // fetches `main.js`, which is the whole application. What is asserted is what it may depend
+    // on and what it says, which is all this file exists to keep true.
+    // DEPENDENCY-FREE. It is the only code that runs before `main.js` is fetched, so it is the
+    // only code that can speak when that fetch fails, and anything it imported would be gone too.
+    const staticImports = [...bootstrap.matchAll(/^import .*$/gmu)].map((match) => match[0]);
+    expect(staticImports.filter((line) => !line.endsWith(".css';"))).toEqual([]);
     expect(bootstrap).not.toContain("from './ui/startup-state");
+    // ONE LABEL, and the words `buildThinkingStatus` opens with, so the handover from this file
+    // to the application changes nothing on the screen.
+    expect(bootstrap).toContain("label.className = 'startup-thinking-label'");
+    expect(bootstrap).toContain("label.textContent = 'Opening your world'");
+    expect(buildStartupState().querySelector('.startup-thinking-label')?.textContent)
+      .toBe('Opening your world');
+    expect(bootstrap).not.toContain('startup-thinking-detail');
+    // NO MARK. The application draws one from `thinking-orbs`, inside the bundle this screen
+    // covers the absence of, so a second one here would be replaced milliseconds later and an
+    // arriving person would watch two different loading screens rather than one.
+    expect(bootstrap).not.toContain('startup-mark');
+    expect(css).not.toContain('.startup-mark');
+    // ONE SENTENCE AND ONE ACTION, wearing the same pill as every other refusal, and naming the
+    // product rather than the runtime behind it.
+    expect(bootstrap).toContain("title.textContent = 'Exulanica could not start'");
+    expect(bootstrap).toContain("action.className = 'gate-action'");
+    expect(bootstrap).not.toMatch(/\bAtlas\b/u);
 
     const shell = document.createElement('div');
     shell.id = 'shell';

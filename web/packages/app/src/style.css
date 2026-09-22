@@ -108,15 +108,6 @@ body {
   transition: opacity var(--motion-standard) var(--motion-easing);
 }
 
-/* A graph with no live regions has no Atlas scene. This is a complete state rather than an
- * error overlay: the renderer is disposed and the retained-source boundary is stated without
- * implying that source retention and live reconstruction are the same policy. */
-/*
- * The empty-world surface is a `gate`, and carries this class only so the selectors that name it
- * keep working. It had a gradient, its own padding and an 18-character heading measure, which is
- * three ways for one full-page state to drift away from the others.
- */
-
 #shell[data-mode='traverse'][data-moving='true'][data-vignette='subtle']::after { opacity: 0.28; }
 #shell[data-mode='traverse'][data-moving='true'][data-vignette='strong']::after { opacity: 0.52; }
 
@@ -800,29 +791,6 @@ body {
   display: block;
 }
 
-.startup-mark {
-  position: relative;
-  flex: 0 0 auto;
-  width: 2.9rem;
-  height: 2.9rem;
-  border: 1px solid color-mix(in srgb, var(--ui-light-ink) 18%, transparent);
-  border-radius: 42% 58% 54% 46%;
-  animation: startup-mark-turn var(--motion-working-cycle) linear infinite;
-}
-
-.startup-mark::after {
-  content: '';
-  position: absolute;
-  inset: 0.62rem;
-  border: 1px solid color-mix(in srgb, var(--ui-light-ink) 52%, transparent);
-  border-right-color: transparent;
-  border-radius: 50%;
-}
-
-@keyframes startup-mark-turn {
-  to { rotate: 1turn; }
-}
-
 .startup-thinking-copy {
   display: grid;
   gap: 0.32rem;
@@ -925,10 +893,6 @@ body {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .startup-mark {
-    animation: none;
-  }
-
   .startup-thinking-label {
     background: none;
     color: var(--ui-light-ink);
@@ -1925,7 +1889,7 @@ kbd {
     visibility: hidden;
   }
 
-  #shell > :not(.viewport-boundary):not(.gate):not(.startup-thinking):not(.reconstruction-loading):not(.atlas-empty) {
+  #shell > :not(.viewport-boundary):not(.gate):not(.startup-thinking):not(.reconstruction-loading) {
     display: none !important;
   }
 

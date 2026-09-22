@@ -58,8 +58,11 @@ import {
 import { CompanionMemoryClient, answerToRemember } from './companion-memory-api.js';
 import type { PersistedMemory } from '@exulanica/companion-runtime';
 import { buildDetail } from './ui/detail.js';
-import { buildEmptyWorld } from './ui/empty-world.js';
-import { buildStartupState } from './ui/startup-state.js';
+import {
+  buildStartupState,
+  buildWorldOpeningFailure,
+  worldOpeningReason,
+} from './ui/startup-state.js';
 import { el, replace } from './ui/dom.js';
 import { createFirstUseGuidance, type FirstUseMode } from './ui/first-use-guidance.js';
 import { buildWorldIndex } from './ui/world-index.js';
@@ -186,7 +189,7 @@ function askForAccess(accountState: 'signed-out' | 'unavailable'): void {
   const submit = el('button', {
     type: 'submit',
     class: 'credential-submit',
-    'aria-label': 'Open Atlas',
+    'aria-label': 'Enter Exulanica',
     disabled: true,
   }, [el('span', { 'aria-hidden': 'true', text: '→' })]);
   input.addEventListener('input', () => {
@@ -236,58 +239,90 @@ async function start(token: string, csrfToken?: string): Promise<void> {
     await openAppSession(env, state, token, csrfToken);
   } catch (error) {
     if (!(error instanceof StarterWorldOpeningError)) throw error;
-    showWorldOpeningFailure(error, () => start(token, csrfToken));
+    showWorldOpeningFailure(worldOpeningReason(error), () => start(token, csrfToken));
     return;
   }
   if (!preview && state.activeWorldEntry === null) {
-    await mountWorldEntry();
+    await mountNoWorld({ retry: () => start(token, csrfToken) });
     return;
   }
   await mount();
 }
 
-function showWorldOpeningFailure(error: StarterWorldOpeningError, retry: () => Promise<void>): void {
-  canvas.hidden = true;
-  shell.setAttribute('data-world-state', 'entry');
-  const status = el('p', { class: 'gate-failure', role: 'status', text: error.message });
-  const button = el('button', { type: 'button', class: 'world-entry-primary', text: 'Try again' });
-  button.addEventListener('click', () => {
-    button.disabled = true;
-    status.textContent = 'Opening your world…';
-    void retry().catch((next: unknown) => {
-      button.disabled = false;
-      status.textContent = next instanceof Error ? next.message : 'The world could not be opened.';
-    });
-  });
-  replace(shell, [el('main', { class: 'gate world-entry-gate' }, [
-    el('header', { class: 'world-entry-heading' }, [
-      el('p', { class: 'world-entry-brand', text: 'Exulanica' }),
-      el('h1', { text: 'Your world could not open' }),
-      el('p', {
-        class: 'world-entry-introduction',
-        text: 'Your signed-in session is still available. Try opening your world again.',
-      }),
-      status,
-      button,
-    ]),
-  ])]);
-  shell.removeAttribute('aria-busy');
+/**
+ * The no-world states, told apart by whether the person has anything to decide.
+ *
+ * A LIST OF ONE IS NOT A CHOICE. Every one of these used to reach the saved-world chooser, so a
+ * person whose only world failed to load its appearance was shown "Choose a saved world" over a
+ * list containing that world, with nothing saying anything had gone wrong. Nothing in the
+ * product gives a workspace a second world, so the chooser's own subject never occurred and the
+ * only state it ever actually showed was the one it did not describe.
+ */
+async function mountNoWorld(deps: {
+  readonly retry: () => Promise<void>;
+  /**
+   * Re-read the saved worlds before deciding. Start-up has just read them and must not ask
+   * twice; arriving here from a mounted world means whatever removed that world happened while
+   * this page was open, so the list held in memory is what it was before that.
+   */
+  readonly refresh?: boolean;
+}): Promise<void> {
+  const client = state.worldEntries;
+  if (deps.refresh === true && client !== null) {
+    try {
+      state.savedWorldEntries = await client.entries();
+      state.worldEntryError = null;
+    } catch (error: unknown) {
+      state.worldEntryError = error;
+    }
+  }
+  if (state.savedWorldEntries.length > 1) {
+    await mountWorldEntry();
+    return;
+  }
+  const only = state.savedWorldEntries[0] ?? null;
+  // A world whose source material is gone cannot be opened by trying again, and a world that
+  // changed elsewhere needs the acknowledgement the list carries. Neither is a Try again.
+  if (only !== null && only.availability !== 'available') {
+    if (only.unavailableReason === 'authored_version_changed') {
+      await mountWorldEntry();
+      return;
+    }
+    showWorldOpeningFailure(
+      'Its source material was deleted. The saved record remains, but it cannot be opened.', null,
+    );
+    return;
+  }
+  showWorldOpeningFailure(worldOpeningReason(state.worldEntryError), deps.retry);
 }
 
+function showWorldOpeningFailure(
+  reason: string | null, retry: (() => Promise<void>) | null,
+): void {
+  canvas.hidden = true;
+  shell.setAttribute('data-world-state', 'entry');
+  replace(shell, [buildWorldOpeningFailure({ reason, retry })]);
+  shell.removeAttribute('aria-busy');
+  shell.removeAttribute('data-booting');
+}
+
+/** Show the list. Only `mountNoWorld` calls this, and only when there is a choice to make. */
 async function mountWorldEntry(): Promise<void> {
   const entries = state.worldEntries;
-  if (entries === null) return;
   canvas.hidden = true;
   shell.setAttribute('data-world-state', 'entry');
   const open = async (entry: typeof state.savedWorldEntries[number]): Promise<void> => {
     await openWorldEntryContext(state, entry);
+    state.worldEntryError = null;
     shell.removeAttribute('data-world-state');
     await mount();
   };
   replace(shell, [buildWorldEntrySurface({
     entries: state.savedWorldEntries,
     open,
+    arrivalFailure: worldOpeningReason(state.worldEntryError),
     adoptLatest: async (entry) => {
+      if (entries === null) throw new Error('The saved world is not connected.');
       const adopted = await entries.adoptLatestAuthored(entry);
       state.savedWorldEntries = Object.freeze(state.savedWorldEntries.map((candidate) =>
         candidate.entryId === adopted.entryId ? adopted : candidate));
@@ -308,6 +343,16 @@ function activeEntryWriteBinding(): SavedEntryWriteBinding {
     authoredEditSeq: active.authoredEditSeq,
   };
 }
+
+/**
+ * What a mounted world draws from the saved entry and must redraw when the entry moves.
+ *
+ * The first-use greeting asks the entry whether the world has been built in. Nothing asked it
+ * again after a placement, so a person who had just put a pillar in front of themselves was
+ * still told "Nothing is in it yet" until something unrelated happened to redraw the prompt.
+ * `mount` sets this; between mounts there is nothing drawn to redraw.
+ */
+let afterEntryAdvanced = (): void => undefined;
 
 async function recordAuthoredEntryAdvance(
   version: AlternateVersion,
@@ -334,6 +379,7 @@ async function recordAuthoredEntryAdvance(
   state.activeWorldEntry = updated;
   state.savedWorldEntries = Object.freeze(state.savedWorldEntries.map((entry) =>
     entry.entryId === updated.entryId ? updated : entry));
+  afterEntryAdvanced();
 }
 async function mount(): Promise<void> {
   shell.setAttribute('data-booting', '');
@@ -365,6 +411,28 @@ async function mount(): Promise<void> {
   const isAuthoredStarter = state.activeWorldEntry?.authoredScene != null;
   state.disposeEnvironmentSelection?.();
   state.disposeEnvironmentSelection = null;
+
+  if (state.activeWorldEntry === null && current.islands.length === 0) {
+    // Nothing to draw and no entry to draw it from. Stop every owner of the previous field
+    // before replacing its DOM, or its frame loop and observers survive invisibly, and go to
+    // the same saved-world surface start-up uses. A second full-page no-world screen said the
+    // same thing in a different voice, and which one a person got depended on where their world
+    // went. Nothing below this point is built, because all of it needs a world.
+    disposeCompanionStage(state);
+    disposeFormationWatch(state);
+    disposeMountListeners(state);
+    disposeRenderer(state);
+    await mountNoWorld({
+      refresh: true,
+      retry: async () => {
+        const session = state.session;
+        if (session !== null) state.snapshot = await session.snapshot();
+        await mount();
+      },
+    });
+    shell.removeAttribute('data-booting');
+    return;
+  }
 
   // Geometry, re-read here rather than once at start-up. See `loadGeometry`: the list is what
   // carries a deletion to the renderer, and the bytes are not re-fetched. The preview fills the
@@ -410,24 +478,6 @@ async function mount(): Promise<void> {
       },
     }),
   });
-  const emptyWorld = state.activeWorldEntry === null ? buildEmptyWorld(current) : null;
-  if (emptyWorld !== null) {
-    // An in-session withdrawal can arrive after a populated world was mounted. Stop every owner
-    // of that field before replacing its DOM so neither geometry nor input remains live offscreen.
-    disposeCompanionStage(state);
-    disposeFormationWatch(state);
-    disposeMountListeners(state);
-    disposeRenderer(state);
-    canvas.hidden = true;
-    shell.setAttribute('data-world-state', 'empty');
-    replace(shell, [emptyWorld, intake.root]);
-    const photoWorkflow = intake.root.querySelector<HTMLDetailsElement>('.photo-review-workflow');
-    if (photoWorkflow !== null) photoWorkflow.open = true;
-    void intake.begin();
-    shell.removeAttribute('aria-busy');
-    shell.removeAttribute('data-booting');
-    return;
-  }
   canvas.hidden = false;
   shell.removeAttribute('data-world-state');
 
@@ -495,6 +545,7 @@ async function mount(): Promise<void> {
   });
   let inputMode: FirstUseMode = 'converse';
   let reflectFirstUse = (): void => undefined;
+  afterEntryAdvanced = () => reflectFirstUse();
   const finishFirstUse = (): void => {
     firstUse.complete();
     // `complete` also clears the per-page arrival prompt. That can change while the durable phase
@@ -698,7 +749,7 @@ async function mount(): Promise<void> {
     onLocate: (targetAnchorId, targetIslandId) => {
       const binding = state.atlas?.binding;
       if (binding === undefined) {
-        showTravelStatus('The Atlas is still forming. Try again in a moment.', 'failure');
+        showTravelStatus('Your world is still forming. Try again in a moment.', 'failure');
         return;
       }
       const resolution = targetAnchorId === null
@@ -706,7 +757,7 @@ async function mount(): Promise<void> {
         : binding.navigateToAnchor(toAnchorId(targetAnchorId), travelUsesReducedMotion());
       if (!resolution.ok) {
         const message = {
-          'unknown-target': 'That source is not in this Atlas.',
+          'unknown-target': 'That source is not in this world.',
           'outside-resident-field': 'That region is outside the resident field.',
           'unlocated-placement': 'That source has no known place in this district yet, so there is nowhere here to arrive.',
           'no-safe-surface': 'No safe arrival point is available near that source. Open Map to approach its region.',
@@ -870,9 +921,9 @@ async function mount(): Promise<void> {
   mapReturn.addEventListener('click', () => handleAtlasCommand('map'));
   const mapCaption = el('section', {
     class: 'map-caption',
-    'aria-label': 'Atlas Map orientation',
+    'aria-label': 'Map orientation',
   }, [
-    el('strong', { text: 'Atlas Map' }),
+    el('strong', { text: 'Map' }),
     el('span', { text: MAP_ORIENTATION_CAPTION }),
     mapReturn,
   ]);
@@ -881,12 +932,14 @@ async function mount(): Promise<void> {
     class: 'viewport-boundary',
     'aria-labelledby': 'viewport-boundary-title',
   }, [
-    el('p', { class: 'overlay-kicker', text: 'Atlas boundary' }),
-    el('h1', { id: 'viewport-boundary-title', text: 'A wider view is required' }),
+    el('p', { class: 'overlay-kicker', text: 'Window size' }),
+    el('h1', { id: 'viewport-boundary-title', text: 'This window is too narrow' }),
+    // Not "at least 60rem". A rem is the threshold this file's media query is written in, and
+    // nobody reading this can measure one; what they can do is drag the edge until it opens.
     el('p', {
       text:
-        'This Atlas prototype is designed for laptop and desktop windows. ' +
-        'Widen this window to at least 60rem to continue.',
+        'Exulanica is designed for laptop and desktop windows. '
+        + 'Widen this window to continue.',
     }),
   ]);
   let status: MountedStatusAndInspector;

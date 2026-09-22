@@ -167,6 +167,11 @@ export interface SessionState {
   worldEntries: WorldEntryClient | null;
   savedWorldEntries: readonly SavedWorldEntry[];
   activeWorldEntry: SavedWorldEntry | null;
+  /**
+   * What was thrown when the one available saved world would not open, kept whole so the surface
+   * that has to explain it can tell a dropped connection from a refusal.
+   */
+  worldEntryError: unknown;
 
   // -- what the visitor has chosen ------------------------------------------------------------
   preferences: AtlasPreferences;
@@ -259,6 +264,7 @@ export function createSessionState(): SessionState {
     worldEntries: null,
     savedWorldEntries: Object.freeze([]),
     activeWorldEntry: null,
+    worldEntryError: null,
 
     preferences: readPreferences(window.localStorage),
     indexFacets: decodeFacets(window.location.search),

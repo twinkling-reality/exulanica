@@ -35,7 +35,7 @@ const controlRows: readonly (readonly [string, string])[] = [
   ['X · Right click', 'Call the Companion'],
   ['H', 'Open the World hub'],
   ['I', 'Open Index'],
-  ['M', 'Tap for the Atlas Map, hold to look and drop back'],
+  ['M', 'Tap for the Map, hold to look and drop back'],
   ['O', 'Open Customize'],
   ['?', 'Open Settings'],
   ['Escape', 'Release the mouse, dismiss, or step back'],
@@ -65,7 +65,7 @@ export function buildControlsGuide(options: ControlsGuideOptions): ControlsGuide
   root.hidden = true;
 
   const close = el('button', {
-    type: 'button', class: 'overlay-close command-action', 'aria-label': 'Return to Atlas',
+    type: 'button', class: 'overlay-close command-action', 'aria-label': 'Return to your world',
   }, commandAction('?', 'Dismiss'));
   close.addEventListener('click', options.onClose);
   const customize = el(
@@ -155,7 +155,7 @@ export function buildControlsGuide(options: ControlsGuideOptions): ControlsGuide
     ]),
   ]);
   const controlsPage = page('controls', 'Controls', [
-    el('p', { class: 'settings-page-intro', text: 'The same commands remain available in every Atlas destination.' }),
+    el('p', { class: 'settings-page-intro', text: 'The same commands remain available everywhere in your world.' }),
     el('dl', { class: 'settings-control-list' }, controlRows.flatMap(([key, meaning]) => [
       el('dt', {}, [el('kbd', { text: key })]),
       el('dd', { text: meaning }),

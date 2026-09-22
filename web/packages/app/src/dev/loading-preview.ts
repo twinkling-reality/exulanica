@@ -14,9 +14,7 @@ import '../style.css';
 import '../appearance.css';
 import '../unified-interface.css';
 import '../ui/redesign.css';
-import type { GraphSnapshot } from '@exulanica/graph-client';
-import { buildEmptyWorld } from '../ui/empty-world.js';
-import { buildStartupState } from '../ui/startup-state.js';
+import { buildStartupState, buildWorldOpeningFailure } from '../ui/startup-state.js';
 import { buildThinkingStatus } from '../ui/thinking-status.js';
 
 /** Every state the orb component offers, so the one the loading screen uses can be chosen by eye. */
@@ -33,8 +31,17 @@ const STATES: Readonly<Record<string, () => HTMLElement>> = Object.freeze({
   // A sample of the one case that shows a second line: an error the product did not recognise,
   // rendering its own message. The text below is this page's example, not product copy.
   other: () => buildStartupState(new Error('The world topology is not configured.')),
-  // The authenticated state in which the graph has no live region to render.
-  'empty world': () => buildEmptyWorld({ islands: [] } as unknown as GraphSnapshot)!,
+  // What a person with one saved world sees when it does not open. The reason below is this
+  // page's example, not product copy: the product shows whatever the server said.
+  'no world': () => buildWorldOpeningFailure({
+    reason: 'The server did not answer.',
+    retry: async () => undefined,
+  }),
+  // The same state when trying again cannot work.
+  'no world, final': () => buildWorldOpeningFailure({
+    reason: 'Its source material was deleted. The saved record remains, but it cannot be opened.',
+    retry: null,
+  }),
 });
 
 const parameters = new URL(window.location.href).searchParams;

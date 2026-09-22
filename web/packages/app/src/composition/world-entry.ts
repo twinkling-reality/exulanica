@@ -1,33 +1,50 @@
-/** Recovery and explicit choice when a saved world cannot resume automatically. */
+/** Choosing between saved worlds. The one-world states live in `ui/startup-state.ts`. */
 
 import { ApiError } from '@exulanica/graph-client';
 import type { SavedWorldEntry } from '../world-entry-api.js';
 import { el } from '../ui/dom.js';
 
-export function buildWorldEntrySurface(deps: {
+export interface WorldEntrySurface {
   readonly entries: readonly SavedWorldEntry[];
   readonly open: (entry: SavedWorldEntry) => Promise<void>;
   readonly adoptLatest: (entry: SavedWorldEntry) => Promise<void>;
-}): HTMLElement {
+  /**
+   * Why no world opened by itself, when that is known. A person reaching a list has a choice to
+   * make either way, so this is a line above the list rather than the subject of the screen.
+   */
+  readonly arrivalFailure?: string | null;
+}
+
+/**
+ * Pick between saved worlds. Only ever built for a real choice, which means more than one.
+ *
+ * `main.ts` sends a session with one world, or none, to {@link buildWorldOpeningFailure}
+ * instead. This surface carries a reading column, a list and a reconciliation control, and none
+ * of that is an honest frame for "the one world you have did not load its appearance".
+ *
+ * NO TRY AGAIN BUTTON. A reload returns to exactly this screen, because more than one saved
+ * world means the choice is still required. Pressing a world is the action, and pressing it
+ * reports its own failure in the status line.
+ */
+export function buildWorldEntrySurface(deps: WorldEntrySurface): HTMLElement {
+  const arrivalFailure = deps.arrivalFailure ?? null;
   const status = el('p', {
     class: 'gate-failure world-entry-status', role: 'status', 'aria-live': 'polite',
   });
-  status.hidden = true;
+  status.hidden = arrivalFailure === null;
+  if (arrivalFailure !== null) status.textContent = arrivalFailure;
+
   const root = el('main', { class: 'gate world-entry-gate' }, [
     el('header', { class: 'world-entry-heading' }, [
       el('p', { class: 'world-entry-brand', text: 'Exulanica' }),
-      el('h1', { text: deps.entries.length === 0 ? 'Your world did not open' : 'Choose a saved world' }),
+      el('h1', { text: 'Choose a saved world' }),
       el('p', {
         class: 'world-entry-introduction',
-        text: deps.entries.length === 0
-          ? 'Nothing was created. Reload to try opening your world again.'
-          : 'Open a saved world exactly where you left it.',
+        text: 'Open a saved world exactly where you left it.',
       }),
       status,
     ]),
   ]);
-
-  if (deps.entries.length === 0) return root;
   const list = el('section', { class: 'world-entry-list', 'aria-label': 'Saved worlds' });
   for (const entry of deps.entries) {
     const item = el('article', { class: 'world-entry-item' });

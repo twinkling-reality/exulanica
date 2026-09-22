@@ -191,7 +191,7 @@ export function buildStatus(input: StatusInput): HTMLElement {
     bar.append(
       el('p', {
         class: 'status-warning',
-        text: `${missing.join(' and ')} not shown in the Atlas.`,
+        text: `${missing.join(' and ')} not shown in your world.`,
       }),
     );
   }
