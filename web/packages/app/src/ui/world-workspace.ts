@@ -95,8 +95,20 @@ export function buildWorldWorkspace(parts: {
   }, [heading]);
   let welcomeVisible = true;
   let placeReady = false;
+  let arrivalPlayed = false;
+  /**
+   * The world's name, once, and never over somebody being spoken to.
+   *
+   * First-use guidance owns the arriving moment. While it has anything on the screen, the shell
+   * carries a phase other than `done`, and this title waits rather than animating underneath it.
+   */
+  const guidancePending = (): boolean => {
+    const phase = root.closest('#shell')?.getAttribute('data-first-use') ?? null;
+    return phase !== null && phase !== 'done';
+  };
   const showArrival = () => {
-    if (welcomeVisible || !placeReady) return;
+    if (arrivalPlayed || welcomeVisible || !placeReady || guidancePending()) return;
+    arrivalPlayed = true;
     arrival.removeAttribute('data-shown');
     void arrival.offsetWidth;
     arrival.setAttribute('data-shown', '');
@@ -120,8 +132,9 @@ export function buildWorldWorkspace(parts: {
       showArrival();
     },
     setWelcomeVisible(visible: boolean) {
-      if (welcomeVisible === visible) return;
       welcomeVisible = visible;
+      // Re-checked on every call rather than on a change, because the thing this waits for is the
+      // guidance phase, which moves without this flag moving with it.
       if (visible) arrival.removeAttribute('data-shown');
       else showArrival();
     },

@@ -111,44 +111,11 @@ body {
 /* A graph with no live regions has no Atlas scene. This is a complete state rather than an
  * error overlay: the renderer is disposed and the retained-source boundary is stated without
  * implying that source retention and live reconstruction are the same policy. */
-.atlas-empty {
-  position: fixed;
-  inset: 0;
-  display: grid;
-  place-content: center;
-  justify-items: center;
-  gap: 0.7rem;
-  padding: max(2rem, 8vw);
-  text-align: center;
-  background:
-    radial-gradient(circle at 50% 42%, color-mix(in srgb, var(--raised) 56%, transparent), transparent 42%),
-    var(--ground);
-}
-
-.atlas-empty-kicker,
-.atlas-empty-note,
-.atlas-empty h1 {
-  margin: 0;
-}
-
-.atlas-empty-kicker {
-  color: var(--ink-faint);
-  font-size: 0.72rem;
-  font-weight: 500;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-}
-
-.atlas-empty h1 {
-  max-width: 18ch;
-  font: 500 clamp(1.8rem, 4vw, 3.4rem)/1.05 var(--ui-font-display);
-  letter-spacing: -0.025em;
-}
-
-.atlas-empty-note {
-  max-width: 46rem;
-  color: var(--ink-faint);
-}
+/*
+ * The empty-world surface is a `gate`, and carries this class only so the selectors that name it
+ * keep working. It had a gradient, its own padding and an 18-character heading measure, which is
+ * three ways for one full-page state to drift away from the others.
+ */
 
 #shell[data-mode='traverse'][data-moving='true'][data-vignette='subtle']::after { opacity: 0.28; }
 #shell[data-mode='traverse'][data-moving='true'][data-vignette='strong']::after { opacity: 0.52; }
@@ -404,7 +371,7 @@ body {
 
 #shell .world-entry-heading h1 {
   max-width: 15ch;
-  font: 500 clamp(2.1rem, 6vw, 3.35rem)/1.02 var(--ui-font-display);
+  font: 300 clamp(2.1rem, 6vw, 3.35rem)/1.02 var(--ui-font-display);
   letter-spacing: -0.045em;
 }
 
@@ -435,7 +402,7 @@ body {
 
 #shell .world-entry-create-existing h2 {
   color: var(--ui-light-ink);
-  font: 600 clamp(1.15rem, 2vw, 1.35rem)/1.2 var(--ui-font-display);
+  font: 300 clamp(1.15rem, 2vw, 1.35rem)/1.2 var(--ui-font-display);
   letter-spacing: -0.02em;
 }
 
@@ -704,6 +671,38 @@ body {
   margin: 0;
   color: var(--error);
   font-size: 0.84rem;
+}
+
+/*
+ * The one action a full-page state offers.
+ *
+ * Same pill, height and tones as the sign-in control, so a refusal and the sign-in screen read as
+ * one product. Before this, a failure screen's button was whatever the browser draws by default.
+ */
+.gate-action {
+  --credential-control-height: 2.65rem;
+  display: grid;
+  place-items: center;
+  height: var(--credential-control-height);
+  padding: 0 1.5rem;
+  box-sizing: border-box;
+  color: var(--ui-light-canvas);
+  background: var(--ui-light-ink);
+  border: 0;
+  border-radius: var(--radius-pill);
+  font: inherit;
+  font-size: 0.88rem;
+  cursor: pointer;
+  transition: transform var(--motion-standard) var(--motion-easing);
+}
+
+.gate-action:hover {
+  transform: scale(1.03);
+}
+
+.gate-action:focus-visible {
+  outline: 2px solid var(--ui-light-ink);
+  outline-offset: 3px;
 }
 
 .credential-entry {
@@ -1176,7 +1175,7 @@ button.ghost {
 .detail-title {
   margin: 0;
   font-size: 1.25rem;
-  font-weight: 500;
+  font-weight: 300;
 }
 
 .detail-section h2,
@@ -1457,7 +1456,7 @@ button.ghost {
 }
 .reconstruction-availability h2 {
   margin: 0;
-  font: 500 1.65rem/1.15 var(--ui-font-display);
+  font: 300 1.65rem/1.15 var(--ui-font-display);
   max-width: 20ch;
 }
 .reconstruction-availability .reconstruction-availability-kicker {

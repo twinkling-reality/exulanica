@@ -39,8 +39,9 @@ function animateOrb(canvas: HTMLCanvasElement, state: OrbState): void {
 }
 
 export function buildThinkingStatus(
-  label = 'Opening Atlas',
-  detail = 'Loading your world and its verified sources…',
+  label = 'Opening your world',
+  detail = '',
+  state: OrbState = 'connecting',
 ): HTMLElement {
   const canvas = el('canvas', {
     class: 'thinking-orb',
@@ -53,9 +54,11 @@ export function buildThinkingStatus(
     canvas,
     el('div', { class: 'startup-thinking-copy' }, [
       el('p', { class: 'startup-thinking-label', text: label }),
-      el('p', { class: 'startup-thinking-detail', text: detail }),
+      // A second line only when there is something true to say. The one this replaces described
+      // machinery to somebody who has not added a photograph yet.
+      ...(detail === '' ? [] : [el('p', { class: 'startup-thinking-detail', text: detail })]),
     ]),
   ]);
-  animateOrb(canvas, 'shaping');
+  animateOrb(canvas, state);
   return status;
 }

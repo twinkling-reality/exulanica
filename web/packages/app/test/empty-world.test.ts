@@ -31,8 +31,17 @@ describe('the empty authenticated world', () => {
 
     expect(view).not.toBeNull();
     expect(view?.matches('[role="status"][data-empty-world]')).toBe(true);
-    expect(view?.querySelector('h1')?.textContent).toBe('No live memories are available');
-    expect(view?.textContent).toContain('Source files retained by policy remain outside the Atlas');
+    // main.ts shows this only when no world opened, so that is what it says.
+    expect(view?.querySelector('h1')?.textContent).toBe('Your world did not open');
+    // The same surface as the sign-in screen and a refusal, so the three cannot drift apart.
+    expect(view?.classList.contains('gate')).toBe(true);
+    // One sentence. The photo panel mounted underneath this surface is what somebody does next,
+    // so nothing here repeats it, and nothing explains storage policy to somebody with no photos.
+    expect(view?.querySelectorAll('p, h1')).toHaveLength(1);
+    // frontier-roadmap.md: a public surface names the product, never the runtime behind it.
+    expect(view?.textContent ?? '').not.toMatch(/\bAtlas\b/u);
+    // It never says or implies that anything of theirs was destroyed.
+    expect(view?.textContent ?? '').not.toMatch(/deleted|removed|destroyed|erased|lost/iu);
   });
 
   it('leaves every non-empty graph to the Atlas renderer', () => {

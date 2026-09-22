@@ -485,7 +485,14 @@ async function mount(): Promise<void> {
     }
   };
 
-  const firstUse = createFirstUseGuidance(window.localStorage);
+  const firstUse = createFirstUseGuidance(window.localStorage, {
+    // A person who has already built in this world is not new, whatever this device remembers.
+    worldHasContent: () => {
+      const entry = state.activeWorldEntry;
+      return entry !== null &&
+        (entry.currentAuthoredEditSeq > 0 || entry.sourceAttachments.length > 0);
+    },
+  });
   let inputMode: FirstUseMode = 'converse';
   let reflectFirstUse = (): void => undefined;
   const finishFirstUse = (): void => {
@@ -856,8 +863,7 @@ async function mount(): Promise<void> {
     const prompt = firstUse.prompt(inputMode);
     companion.panel.setFirstUsePrompt(prompt);
     shell.dataset['firstUse'] = firstUse.phase();
-    const welcomeVisible =
-      inputMode === 'converse' && prompt?.statement === 'Welcome to Exulanica';
+    const welcomeVisible = inputMode === 'converse' && prompt?.kind === 'welcome';
     shell.toggleAttribute('data-welcome', welcomeVisible);
     environmentSelection.setWelcomeVisible(welcomeVisible);
   };

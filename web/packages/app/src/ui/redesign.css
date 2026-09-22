@@ -1,7 +1,6 @@
 /* Application surfaces stay legible independently of physical world materials. */
 @keyframes world-tool-arrive { from { opacity: .4; translate: 0 7px; } to { opacity: 1; translate: 0 0; } }
 #shell {
-  --ui-font-display: 'Avenir Next', 'Trebuchet MS', sans-serif;
   --ui-font-body: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
   --ui-font-utility: var(--ui-font-body); --companion-utility-font: var(--ui-font-body);
   --ink: #202a2f; --ink-soft: #4e5d64; --ink-faint: #66747a;
@@ -57,7 +56,7 @@
 .world-heading { box-sizing: border-box; padding: 13px 15px 14px; background: color-mix(in srgb, var(--atlas-plane) 91%, transparent); border: 1px solid color-mix(in srgb, var(--edge) 76%, transparent); border-radius: 8px; box-shadow: var(--app-shadow); backdrop-filter: blur(16px); }
 .world-heading-meta { display: flex; align-items: center; gap: 7px; min-height: 18px; margin-bottom: 7px; }
 .world-brand { font: 650 10px/1.4 var(--ui-font-body); color: var(--accent); letter-spacing: .11em; text-transform: uppercase; }
-#shell .world-heading h2 { margin: 0; max-width: 18ch; font: 600 21px/1.12 var(--ui-font-display); letter-spacing: -.035em; }
+#shell .world-heading h2 { margin: 0; max-width: 18ch; font: 300 21px/1.12 var(--ui-font-display); letter-spacing: -.035em; }
 .world-source-label, #shell .world-heading .living-world-fixture { width: max-content; margin: 0; padding: 2px 6px; border: 1px solid var(--edge); border-radius: 999px; color: var(--ink-soft); background: color-mix(in srgb, var(--surface) 72%, transparent); font: 600 9px/1.35 var(--ui-font-body); letter-spacing: .03em; }
 .world-local-nav { display: none; gap: 4px; width: max-content; padding: 4px; border: 1px solid color-mix(in srgb, var(--edge) 76%, transparent); border-radius: 8px; background: color-mix(in srgb, var(--atlas-plane) 91%, transparent); box-shadow: var(--app-shadow); backdrop-filter: blur(16px); }
 .world-workspace[data-panel] .world-local-nav { position: fixed; display: flex; top: 5vh; right: 5vw; z-index: 14; transform: perspective(1400px) rotateY(-4deg); transform-origin: right center; }
@@ -67,7 +66,7 @@
 #shell .world-workspace button:disabled { color: var(--ink-faint); background: var(--surface); opacity: .75; }
 .world-panel { position: fixed; right: 5vw; top: 12vh; bottom: 8vh; z-index: 12; width: min(430px, 42vw); overflow-y: auto; overscroll-behavior: contain; box-sizing: border-box; padding: 22px; color: var(--ink); background: color-mix(in srgb, var(--raised) 68%, transparent); border: 1px solid var(--edge); border-radius: 4px; box-shadow: var(--app-shadow); backdrop-filter: blur(22px) saturate(106%); transform: perspective(1400px) rotateY(-4deg); transform-origin: right center; }
 #shell .world-panel-heading { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 22px; }
-#shell .world-panel-heading h2 { margin: 0; font: 600 21px/1.2 var(--ui-font-display); letter-spacing: -.025em; }
+#shell .world-panel-heading h2 { margin: 0; font: 300 21px/1.2 var(--ui-font-display); letter-spacing: -.025em; }
 #shell .world-panel-close { font-size: 12px; min-height: 34px; padding: 7px 10px; }
 #shell .world-panel p { margin: 0 0 16px; font-size: 13px; line-height: 1.6; }
 #shell .world-panel :is(select, input[type='text']) { width: 100%; box-sizing: border-box; min-height: 42px; border: 1px solid var(--edge); border-radius: 4px; padding: 10px; color: var(--ink); background: var(--raised); font-size: 13px; }
@@ -76,7 +75,7 @@
 #shell .world-panel-camera { display: flex; flex-wrap: wrap; gap: 6px; margin: 18px 0; padding: 12px 0; border-block: 1px solid var(--edge); }
 #shell .world-help { margin-top: 20px; color: var(--ink-soft); }
 #shell .world-preview-notice { padding: 10px 12px; border: 1px solid var(--edge); background: var(--surface); color: var(--ink-soft); font-size: 12px; }
-#shell .living-world-inspector h3 { font: 600 26px/1.2 var(--ui-font-display); margin: 4px 0 14px; letter-spacing: -.03em; }
+#shell .living-world-inspector h3 { font: 300 26px/1.2 var(--ui-font-display); margin: 4px 0 14px; letter-spacing: -.03em; }
 #shell .living-world-inspector .living-world-activity { padding: 14px; background: var(--surface); border-radius: 4px; color: var(--ink); }
 #shell .living-world-inspector dd { font-size: 12px; }
 #shell .atlas-commands { top: 24px; right: 28px; gap: 4px; padding: 6px; border-radius: 4px; background: var(--atlas-plane); box-shadow: var(--app-shadow); }
@@ -90,7 +89,7 @@
 #shell .held-plate, #shell .atlas-instrument, #shell .settings-view { background: var(--atlas-plane); border: 1px solid var(--edge); border-radius: 4px; box-shadow: var(--app-shadow); }
 #shell[data-primary='index'] .index-workspace { top: 100px; bottom: 70px; left: 28px; right: 28px; width: auto; max-width: none; height: auto; max-height: none; transform: none; grid-template-rows: auto auto minmax(0, 1fr) auto auto; }
 #shell .index-workspace .index-head { padding: 24px 28px 14px; }
-#shell .index-head h1 { font: 600 30px/1.2 var(--ui-font-display); letter-spacing: -.035em; }
+#shell .index-head h1 { font: 300 30px/1.2 var(--ui-font-display); letter-spacing: -.035em; }
 #shell .index-workspace .index-facets { display: flex; grid-column: 1 / -1; grid-row: 2; gap: 20px; padding: 0 28px 16px; align-items: start; overflow: visible; }
 #shell .index-workspace .index-search-wrap { display: block; width: min(440px, 65%); }
 #shell .index-workspace .rail-search { display: block; height: 42px; border: 1px solid var(--edge); border-radius: 4px; background: var(--raised); padding: 0 14px; font-size: 14px; }
@@ -107,7 +106,7 @@
 #shell .personal-intake input:not([type='checkbox']), #shell .personal-intake select { padding: 10px; border: 1px solid var(--edge); background: var(--raised); border-radius: 4px; margin-top: 6px; }
 #shell .personal-intake button { margin: 8px 8px 8px 0; padding: 10px 14px; border-radius: 4px; }
 #shell .settings-view.system-overlay, #shell .atlas-instrument.options-view.system-overlay { top: 100px; bottom: 48px; max-height: calc(100dvh - 148px); }
-#shell .settings-page-head h2 { font-weight: 600; font-size: 28px; }
+#shell .settings-page-head h2 { font-weight: 300; font-size: 28px; }
 #shell .setting-row { padding: 16px; border-radius: 4px; }
 #shell .setting-row select { border-radius: 4px; min-height: 42px; background: var(--raised); }
 #shell .map-caption { top: 240px; left: 28px; width: 280px; box-sizing: border-box; border: 1px solid var(--edge); border-radius: 4px; background: var(--atlas-plane); }
@@ -179,7 +178,7 @@
 #shell .personal-intake .intake-step { margin-bottom: 12px; background: var(--raised); border: 1px solid var(--edge); border-radius: 4px; }
 #shell .personal-intake .intake-step > summary { padding: 16px; font-size: 15px; color: var(--ink); }
 #shell .intake-step-content { max-width: 880px; padding: 0 20px 20px; font-size: 14px; line-height: 1.6; }
-#shell .intake-step-content > h2 { font: 600 22px/1.2 var(--ui-font-display); }
+#shell .intake-step-content > h2 { font: 300 22px/1.2 var(--ui-font-display); }
 #shell .intake-step-content :is(input, select) { box-sizing: border-box; max-width: 100%; min-height: 40px; }
 #shell .intake-step-content input[type='checkbox'] { min-height: 0; }
 #shell .intake-step-content button { min-height: 42px; white-space: normal; }
@@ -190,11 +189,11 @@
   border-radius: 4px; box-shadow: var(--app-shadow); transform: none; z-index: 40;
 }
 #shell :is(.reconstruction-inspector, .object-placement, .detail) :is(button, select) { color: var(--ink); background: var(--raised); border: 1px solid var(--edge); border-radius: 4px; min-height: 38px; padding: 9px 12px; font-size: 13px; }
-#shell :is(.reconstruction-inspector, .object-placement, .detail) :is(h1, h2) { font-family: var(--ui-font-display); font-size: 24px; font-weight: 600; letter-spacing: -.03em; }
+#shell :is(.reconstruction-inspector, .object-placement, .detail) :is(h1, h2) { font-family: var(--ui-font-display); font-size: 24px; font-weight: 300; letter-spacing: -.03em; }
 #shell :is(.reconstruction-inspector, .object-placement, .detail) p { font-size: 13px; line-height: 1.6; }
 #shell .object-placement-form { gap: 16px; padding-block: 18px; }
 #shell .confirm { position: fixed; inset: 100px 28px auto auto; width: min(480px, calc(100vw - 56px)); max-height: calc(100dvh - 180px); overflow-y: auto; box-sizing: border-box; transform: none; translate: none; padding: 26px; z-index: 90; border: 1px solid var(--edge); border-radius: 4px; background: var(--atlas-plane); color: var(--ink); box-shadow: var(--app-shadow); }
-#shell .confirm h2 { font: 600 26px/1.2 var(--ui-font-display); }
+#shell .confirm h2 { font: 300 26px/1.2 var(--ui-font-display); }
 #shell .confirm p { font-size: 14px; line-height: 1.6; }
 #shell .confirm button { padding: 11px 18px; min-height: 42px; border-radius: 4px; }
 @keyframes world-arrival-title {
@@ -324,7 +323,7 @@
   border-bottom: 1px solid var(--edge);
 }
 #shell .photos-drawer-header :is(p, h2) { margin: 0; }
-#shell .photos-drawer-header h2 { font: 600 26px/1.15 var(--ui-font-display); }
+#shell .photos-drawer-header h2 { font: 300 26px/1.15 var(--ui-font-display); }
 #shell .photos-drawer-close { min-height: 36px; padding: 7px 11px; }
 #shell .photos-drawer > .personal-intake {
   position: static;
@@ -356,7 +355,7 @@
 #shell .photo-collection-header :is(p, h3) { margin: 0; }
 #shell .photo-collection-header h3 {
   margin-top: 3px;
-  font: 500 20px/1.2 var(--ui-font-display);
+  font: 300 20px/1.2 var(--ui-font-display);
   letter-spacing: -.02em;
 }
 #shell .photo-reference-count {

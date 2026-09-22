@@ -392,6 +392,7 @@ describe('nothing stands on screen until it is called', () => {
     const onFirstUseAction = vi.fn();
     const panel = buildCompanionPanel(NOOP, { onFirstUseAction });
     panel.setFirstUsePrompt({
+      kind: 'welcome',
       statement: 'Atlas arranges your memories as a world.',
       actions: [{ label: 'Start building', activate: 'summon-companion' }],
     });
@@ -412,6 +413,7 @@ describe('nothing stands on screen until it is called', () => {
   it('renders the unnamed Companion call as one compact instruction', () => {
     const panel = buildCompanionPanel(NOOP);
     panel.setFirstUsePrompt({
+      kind: 'orientation',
       statement: 'Press',
       actions: [{ key: 'X', label: 'to call Unnamed Companion' }],
       compact: true,
@@ -441,6 +443,7 @@ describe('nothing stands on screen until it is called', () => {
     const panel = buildCompanionPanel(NOOP);
     panel.setState('summon');
     panel.setFirstUsePrompt({
+      kind: 'orientation',
       statement: 'Move through this memory.',
       actions: [{ key: 'X', label: 'Companion' }],
     });

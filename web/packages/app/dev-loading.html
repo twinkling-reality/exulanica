@@ -1,0 +1,39 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="robots" content="noindex, nofollow" />
+    <title>Loading states (development)</title>
+    <script>
+      document.documentElement.dataset.theme = 'dawn';
+      const url = new URL(window.location.href);
+      document.documentElement.dataset.contrast = url.searchParams.get('contrast') === 'high' ? 'high' : 'standard';
+      document.documentElement.dataset.transparency = url.searchParams.get('transparency') === 'reduced' ? 'reduced' : 'layered';
+      document.documentElement.style.colorScheme = 'light';
+    </script>
+    <style>
+      /* The only markup this page adds. Everything below it is the product's own. */
+      #dev-switch {
+        position: fixed;
+        z-index: 99999;
+        inset: auto 0 0 0;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 6px;
+        padding: 8px 10px;
+        background: #11181bee;
+        font: 12px/1.4 system-ui, sans-serif;
+      }
+      #dev-switch a { padding: 4px 9px; color: #dfe6e4; text-decoration: none; border: 1px solid #ffffff33; border-radius: 999px; }
+      #dev-switch a[aria-current] { color: #11181b; background: #eef2f0; }
+      #dev-switch span { margin-right: auto; padding: 4px 0; color: #8b9a96; }
+    </style>
+  </head>
+  <body>
+    <canvas id="atlas" aria-hidden="true" hidden></canvas>
+    <div id="shell"></div>
+    <nav id="dev-switch" aria-label="Loading states"></nav>
+    <script type="module" src="/src/dev/loading-preview.ts"></script>
+  </body>
+</html>

@@ -1,6 +1,9 @@
-export const FIRST_USE_GUIDANCE_KEY = 'exulanica.atlas.first-use.v2';
+export const FIRST_USE_GUIDANCE_KEY = 'exulanica.atlas.first-use.v3';
 
-export type FirstUsePhase = 'arrival' | 'traversal' | 'companion' | 'complete';
+/** What the retired four-state orientation wrote. A device that finished it is not greeted again. */
+export const RETIRED_FIRST_USE_GUIDANCE_KEY = 'exulanica.atlas.first-use.v2';
+
+export type FirstUsePhase = 'new' | 'greeted' | 'done';
 export type FirstUseMode = 'traverse' | 'converse';
 
 export interface FirstUsePromptAction {
@@ -11,6 +14,15 @@ export interface FirstUsePromptAction {
 }
 
 export interface FirstUsePrompt {
+  /**
+   * What this prompt is.
+   *
+   * The host used to recognise the welcome by comparing its exact sentence, which made the words
+   * load-bearing: rewriting them silently changed behaviour elsewhere on the screen. Required,
+   * because a prompt without one would make that check silently false again, which is exactly how
+   * the reload defect this replaces stayed hidden.
+   */
+  readonly kind: 'welcome' | 'orientation';
   readonly statement: string;
   readonly actions: readonly FirstUsePromptAction[];
   readonly compact?: boolean;
@@ -21,6 +33,15 @@ interface FirstUseStorage {
   setItem(key: string, value: string): void;
 }
 
+export interface FirstUseGuidanceOptions {
+  /**
+   * Whether the server says this world has been built in: an authored edit or an attached
+   * photograph. Device storage cannot answer it, because the same person on a new device is not
+   * a new person, and this is the difference between greeting somebody and talking over them.
+   */
+  readonly worldHasContent?: () => boolean;
+}
+
 export interface FirstUseGuidance {
   phase(): FirstUsePhase;
   prompt(mode: FirstUseMode): FirstUsePrompt | null;
@@ -29,24 +50,38 @@ export interface FirstUseGuidance {
   complete(): boolean;
 }
 
-const PHASES = new Set<FirstUsePhase>(['arrival', 'traversal', 'companion', 'complete']);
+const PHASES = new Set<string>(['new', 'greeted', 'done']);
 
 function readPhase(storage: FirstUseStorage): FirstUsePhase {
   try {
-    const stored = storage.getItem(FIRST_USE_GUIDANCE_KEY) as FirstUsePhase | null;
-    return stored !== null && PHASES.has(stored) ? stored : 'arrival';
+    const stored = storage.getItem(FIRST_USE_GUIDANCE_KEY);
+    if (stored !== null && PHASES.has(stored)) return stored as FirstUsePhase;
+    return storage.getItem(RETIRED_FIRST_USE_GUIDANCE_KEY) === 'complete' ? 'done' : 'new';
   } catch {
-    return 'arrival';
+    return 'new';
   }
 }
 
 /**
- * A four-state orientation, not a tour. Progress follows demonstrated actions and is saved on the
- * device; there are no timers, route locks, invented completion metrics, or graph writes.
+ * Everything the product says to somebody who has just arrived, under three rules.
+ *
+ * ONE VOICE. Guidance speaks through the Companion's surface. Chrome labels what it does and
+ * says nothing else.
+ *
+ * ONE THING AT A TIME. At most one prompt exists, so nothing has to compete for the same moment.
+ * The previous version could offer a welcome, a Companion invitation and a movement list as three
+ * different states of the same card, and the world title animated underneath all of them.
+ *
+ * IT FOLLOWS WHAT SOMEBODY DID. Arriving earns a greeting, entering the world earns a word about
+ * moving, and moving ends it. Each happens once. Progress is saved on the device and there are no
+ * timers, route locks, invented completion metrics, or graph writes.
  */
-export function createFirstUseGuidance(storage: FirstUseStorage): FirstUseGuidance {
+export function createFirstUseGuidance(
+  storage: FirstUseStorage,
+  options: FirstUseGuidanceOptions = {},
+): FirstUseGuidance {
   let phase = readPhase(storage);
-  let showingArrival = true;
+  const worldHasContent = options.worldHasContent ?? ((): boolean => false);
 
   const setPhase = (next: FirstUsePhase): boolean => {
     if (phase === next) return false;
@@ -59,57 +94,43 @@ export function createFirstUseGuidance(storage: FirstUseStorage): FirstUseGuidan
     return true;
   };
 
+  const welcome: FirstUsePrompt = Object.freeze({
+    kind: 'welcome',
+    statement: 'This is your world. Nothing is in it yet.',
+    actions: Object.freeze([
+      { label: 'Start building', activate: 'summon-companion' as const },
+      { key: 'Esc', label: 'Dismiss' },
+    ]),
+  });
+
+  const orientation: FirstUsePrompt = Object.freeze({
+    kind: 'orientation',
+    statement: 'Look around with the mouse.',
+    actions: Object.freeze([
+      { key: 'W A S D', label: 'Walk' },
+      { key: 'X', label: 'Call your Companion' },
+      { key: 'Esc', label: 'Dismiss' },
+    ]),
+  });
+
   return {
     phase: () => phase,
     prompt(mode) {
-      if (showingArrival && mode === 'converse') {
-        return Object.freeze({
-          statement: 'Welcome to Exulanica',
-          actions: Object.freeze([{
-            label: 'Start building',
-            activate: 'summon-companion' as const,
-          }]),
-        });
-      }
-      if (phase === 'complete') return null;
-      if (phase === 'companion') {
-        return Object.freeze({
-          statement: 'Welcome to Exulanica',
-          actions: Object.freeze([
-            { key: 'X', label: 'Call your Unnamed Companion' },
-            { key: 'Esc', label: 'Dismiss' },
-          ]),
-        });
-      }
-      if (mode === 'converse') return null;
-      if (phase === 'traversal') {
-        return Object.freeze({
-          statement: 'Welcome to Exulanica',
-          actions: Object.freeze([
-            { key: 'W A S D', label: 'Move' },
-            { key: 'X', label: 'Call your Unnamed Companion' },
-            { key: 'Esc', label: 'Dismiss' },
-          ]),
-        });
-      }
-      return Object.freeze({
-        statement: 'Welcome to Exulanica',
-        actions: Object.freeze([
-          { key: 'X', label: 'Call your Unnamed Companion' },
-          { key: 'Esc', label: 'Dismiss' },
-        ]),
-      });
+      if (phase === 'done') return null;
+      // Somebody whose world already holds something is not new, whatever this device remembers.
+      if (mode === 'converse') return phase === 'new' && !worldHasContent() ? welcome : null;
+      return orientation;
     },
     observeMode(mode) {
-      if (mode === 'traverse') showingArrival = false;
-      return mode === 'traverse' && phase === 'arrival' ? setPhase('traversal') : false;
+      // Entering the world answers the greeting: it is no longer a thing waiting to be read.
+      return mode === 'traverse' && phase === 'new' ? setPhase('greeted') : false;
     },
     observeMovement() {
-      return phase === 'arrival' || phase === 'traversal' ? setPhase('companion') : false;
+      // Moving is what the orientation asked for, so there is nothing left to say.
+      return setPhase('done');
     },
     complete() {
-      showingArrival = false;
-      return setPhase('complete');
+      return setPhase('done');
     },
   };
 }
