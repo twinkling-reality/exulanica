@@ -459,6 +459,33 @@ export function regionPointFromAtlas(
   ] as [number, number, number]);
 }
 
+/**
+ * The inverse of {@link regionPointFromAtlas}: region-local millimetres as an atlas-space point.
+ *
+ * Used to draw a supplied place pose on the ground field without inventing a second pose model.
+ */
+export function atlasPointFromRegion(
+  placement: IslandPlacement,
+  regionMm: readonly [number, number, number],
+): readonly [number, number, number] {
+  const scale = placement.scale;
+  if (!Number.isFinite(scale) || Math.abs(scale) < 1e-9) {
+    throw new TypeError('A region placement must have a non-zero scale');
+  }
+  const lx = regionMm[0] / MM_PER_METRE;
+  const ly = regionMm[1] / MM_PER_METRE;
+  const lz = regionMm[2] / MM_PER_METRE;
+  const c = Math.cos(placement.yaw);
+  const s = Math.sin(placement.yaw);
+  const dx = c * lx + s * lz;
+  const dz = -s * lx + c * lz;
+  return Object.freeze([
+    placement.position.x + scale * dx,
+    placement.position.y + scale * ly,
+    placement.position.z + scale * dz,
+  ] as [number, number, number]);
+}
+
 /** Yaw is stored as a non-negative microradian angle, so a westward facing wraps rather than signs. */
 export function yawMicroradiansOf(radians: number): number {
   if (!Number.isFinite(radians)) return 0;

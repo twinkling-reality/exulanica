@@ -205,6 +205,13 @@ export interface WorldField {
   setTheme(theme: PresentationTheme): void;
   setProfile(profile: WorldArtProfile): void;
   setMapGroundPose(pose: NavigationPose | null): void;
+  /**
+   * Show or clear the placement confirm landing on the authored walking face.
+   *
+   * Distinct from {@link setMapGroundPose}: that marker is the visitor’s Map attention.
+   * This one is the already-computed place pose held through confirmation before commit.
+   */
+  setPlacementLandingPose(pose: NavigationPose | null): void;
   setRenderOrigin(x: number, z: number): void;
   setReducedMotion(reduced: boolean): void;
   update(nowMs: number): void;
@@ -218,6 +225,18 @@ export interface AuthoredGroundSupport {
   readonly elevation: number;
 }
 
+/**
+ * Metres between scale marks on an authored walking face.
+ *
+ * One metre is a body-scale interval a person can count against the player figure and against
+ * placed objects. It is not scenery: the marks stay inside the walking face and invent nothing
+ * beyond the authored rectangle.
+ */
+export const AUTHORED_GROUND_SCALE_SPACING_M = 1;
+
+/** How far above the walking elevation the scale marks sit, so they do not z-fight the surface. */
+const AUTHORED_GROUND_SCALE_LIFT_M = 0.008;
+
 export interface MeshGeometryData {
   readonly positions: readonly number[];
   readonly normals: readonly number[];
@@ -227,6 +246,100 @@ export interface MeshGeometryData {
 export interface AuthoredGroundGeometry {
   readonly surface: MeshGeometryData;
   readonly boundary: MeshGeometryData;
+  /** Metre-spaced marks and origin axes on the walking face. */
+  readonly scaleCue: MeshGeometryData;
+}
+
+function authoredRimWidth(halfWidth: number, halfDepth: number): number {
+  return Math.min(0.32, halfWidth / 6, halfDepth / 6);
+}
+
+/**
+ * Metre marks and stronger origin axes on the inner walking face.
+ *
+ * Regular strips give readable size. The axes through the region origin give orientation without
+ * inventing a compass rose or any mark outside the authored support.
+ */
+export function authoredGroundScaleCue(
+  support: AuthoredGroundSupport,
+  rimWidth = authoredRimWidth(support.halfWidth, support.halfDepth),
+): MeshGeometryData {
+  const { halfWidth, halfDepth, elevation } = support;
+  if (
+    !Number.isFinite(halfWidth) || halfWidth <= 0 ||
+    !Number.isFinite(halfDepth) || halfDepth <= 0 ||
+    !Number.isFinite(elevation) ||
+    !Number.isFinite(rimWidth) || rimWidth < 0
+  ) throw new Error('authored ground support must have finite positive extents and elevation');
+
+  const innerWidth = halfWidth - rimWidth;
+  const innerDepth = halfDepth - rimWidth;
+  if (!(innerWidth > AUTHORED_GROUND_SCALE_SPACING_M) || !(innerDepth > AUTHORED_GROUND_SCALE_SPACING_M)) {
+    return Object.freeze({
+      positions: Object.freeze([] as number[]),
+      normals: Object.freeze([] as number[]),
+      indices: Object.freeze([] as number[]),
+    });
+  }
+
+  const y = elevation + AUTHORED_GROUND_SCALE_LIFT_M;
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const indices: number[] = [];
+  const strip = (
+    a: readonly [number, number, number],
+    b: readonly [number, number, number],
+    c: readonly [number, number, number],
+    d: readonly [number, number, number],
+  ): void => {
+    const offset = positions.length / 3;
+    positions.push(...a, ...b, ...c, ...d);
+    for (let index = 0; index < 4; index += 1) normals.push(0, 1, 0);
+    indices.push(offset, offset + 2, offset + 1, offset, offset + 3, offset + 2);
+  };
+
+  const halfMark = 0.018;
+  const halfAxis = 0.04;
+  const maxX = Math.floor(innerWidth / AUTHORED_GROUND_SCALE_SPACING_M) * AUTHORED_GROUND_SCALE_SPACING_M;
+  const maxZ = Math.floor(innerDepth / AUTHORED_GROUND_SCALE_SPACING_M) * AUTHORED_GROUND_SCALE_SPACING_M;
+
+  for (
+    let x = -maxX;
+    x <= maxX + AUTHORED_GROUND_SCALE_SPACING_M * 0.5;
+    x += AUTHORED_GROUND_SCALE_SPACING_M
+  ) {
+    const half = Math.abs(x) < 1e-9 ? halfAxis : halfMark;
+    const left = Math.max(-innerWidth, x - half);
+    const right = Math.min(innerWidth, x + half);
+    if (!(right > left)) continue;
+    strip(
+      [left, y, -innerDepth], [right, y, -innerDepth],
+      [right, y, innerDepth], [left, y, innerDepth],
+    );
+  }
+  for (
+    let z = -maxZ;
+    z <= maxZ + AUTHORED_GROUND_SCALE_SPACING_M * 0.5;
+    z += AUTHORED_GROUND_SCALE_SPACING_M
+  ) {
+    // The origin axes are already drawn by the x-pass. Skip the z = 0 strip so the crossing
+    // stays a single readable mark rather than a stacked double thickness.
+    if (Math.abs(z) < 1e-9) continue;
+    const half = halfMark;
+    const near = Math.max(-innerDepth, z - half);
+    const far = Math.min(innerDepth, z + half);
+    if (!(far > near)) continue;
+    strip(
+      [-innerWidth, y, near], [innerWidth, y, near],
+      [innerWidth, y, far], [-innerWidth, y, far],
+    );
+  }
+
+  return Object.freeze({
+    positions: Object.freeze(positions),
+    normals: Object.freeze(normals),
+    indices: Object.freeze(indices),
+  });
 }
 
 /**
@@ -234,6 +347,7 @@ export interface AuthoredGroundGeometry {
  *
  * The upper face ends at the exact authored bounds. A narrow top rim and vertical fascia make
  * that limit readable from inside the region and in Map, without inventing scenery beyond it.
+ * Metre marks on the walking face give a body-scale size cue and origin orientation.
  */
 export function authoredGroundGeometry(support: AuthoredGroundSupport): AuthoredGroundGeometry {
   const { halfWidth, halfDepth, elevation } = support;
@@ -243,7 +357,7 @@ export function authoredGroundGeometry(support: AuthoredGroundSupport): Authored
     !Number.isFinite(elevation)
   ) throw new Error('authored ground support must have finite positive extents and elevation');
 
-  const rimWidth = Math.min(0.32, halfWidth / 6, halfDepth / 6);
+  const rimWidth = authoredRimWidth(halfWidth, halfDepth);
   const innerWidth = halfWidth - rimWidth;
   const innerDepth = halfDepth - rimWidth;
   const surface = Object.freeze({
@@ -321,6 +435,7 @@ export function authoredGroundGeometry(support: AuthoredGroundSupport): Authored
       normals: Object.freeze(normals),
       indices: Object.freeze(indices),
     }),
+    scaleCue: authoredGroundScaleCue(support, rimWidth),
   });
 }
 
@@ -383,25 +498,60 @@ function createMesh(device: pc.GraphicsDevice, data: MeshGeometryData): pc.Mesh 
   return pc.Mesh.fromGeometry(device, geometry);
 }
 
+type AuthoredGroundMaterialKind = 'surface' | 'boundary' | 'scaleCue';
+
 interface AuthoredGroundMaterial {
   readonly material: pc.StandardMaterial;
   applyProfile(profile: WorldArtProfile): void;
 }
 
-function authoredGroundMaterial(profile: WorldArtProfile, boundary: boolean): AuthoredGroundMaterial {
+/**
+ * Lit walking face and rim, or unlit metre marks.
+ *
+ * The surface stays lit and shadow-receiving so placed objects separate from the floor. The rim
+ * takes the silhouette tone so the finite support reads against both sky clear-colour and the
+ * walking face. Scale marks stay unlit from the ink tone so metre spacing remains countable under
+ * any sun angle.
+ */
+function authoredGroundMaterial(
+  profile: WorldArtProfile,
+  kind: AuthoredGroundMaterialKind,
+): AuthoredGroundMaterial {
   const material = new pc.StandardMaterial();
-  material.useLighting = true;
   material.useFog = true;
   material.metalness = 0;
-  material.gloss = boundary ? 0.08 : 0.14;
+  if (kind === 'scaleCue') {
+    material.useLighting = false;
+    material.gloss = 0;
+    material.blendType = pc.BLEND_NORMAL;
+    material.opacity = 0.88;
+    material.depthWrite = false;
+  } else {
+    material.useLighting = true;
+    // A slightly glossier walking face catches directional light; the rim stays matte so the
+    // perimeter reads as structure rather than a second shine competing with objects.
+    material.gloss = kind === 'boundary' ? 0.06 : 0.22;
+  }
   const apply = (next: WorldArtProfile): void => {
-    const [r, g, b] = unitRgb(
-      boundary ? worldSilhouetteTone(next.palette) : next.palette.terrain,
-    );
-    material.diffuse.set(r, g, b);
-    const [er, eg, eb] = unitRgb(boundary ? next.palette.stoneShadow : next.palette.terrainLift);
-    material.emissive.set(er, eg, eb);
-    material.emissiveIntensity = boundary ? 0.025 : 0.045;
+    if (kind === 'scaleCue') {
+      const [r, g, b] = unitRgb(worldSilhouetteTone(next.palette));
+      material.diffuse.set(r, g, b);
+      material.emissive.set(r, g, b);
+      material.emissiveIntensity = 0.92;
+    } else if (kind === 'boundary') {
+      const [r, g, b] = unitRgb(worldSilhouetteTone(next.palette));
+      material.diffuse.set(r, g, b);
+      const [er, eg, eb] = unitRgb(next.palette.stoneShadow);
+      material.emissive.set(er, eg, eb);
+      material.emissiveIntensity = 0.03;
+    } else {
+      const [r, g, b] = unitRgb(next.palette.terrain);
+      material.diffuse.set(r, g, b);
+      // Keep emissive low so directional shadows from objects stay the dominant ground cue.
+      const [er, eg, eb] = unitRgb(next.palette.terrainLift);
+      material.emissive.set(er, eg, eb);
+      material.emissiveIntensity = 0.018;
+    }
     material.update();
   };
   apply(profile);
@@ -442,13 +592,19 @@ export function createWorldField(
   material.blendType = pc.BLEND_NONE;
   const authoredMaterial = authoredSupport === undefined
     ? null
-    : authoredGroundMaterial(initialProfile, false);
+    : authoredGroundMaterial(initialProfile, 'surface');
   const boundaryMesh = authoredGeometry === null
     ? null
     : createMesh(device, authoredGeometry.boundary);
   const boundaryMaterial = authoredSupport === undefined
     ? null
-    : authoredGroundMaterial(initialProfile, true);
+    : authoredGroundMaterial(initialProfile, 'boundary');
+  const scaleCueMesh = authoredGeometry === null || authoredGeometry.scaleCue.indices.length === 0
+    ? null
+    : createMesh(device, authoredGeometry.scaleCue);
+  const scaleCueMaterial = authoredSupport === undefined || scaleCueMesh === null
+    ? null
+    : authoredGroundMaterial(initialProfile, 'scaleCue');
 
   const regions = new Float32Array(buffers.regionCapacity * 4);
   for (let i = 0; i < world.regions.length; i += 1) {
@@ -489,6 +645,7 @@ export function createWorldField(
     if (authoredMaterial !== null && boundaryMaterial !== null) {
       authoredMaterial.applyProfile(profile);
       boundaryMaterial.applyProfile(profile);
+      scaleCueMaterial?.applyProfile(profile);
       return;
     }
     material.setParameter('uGround', new Float32Array(unitRgb(profile.palette.terrain)));
@@ -517,13 +674,26 @@ export function createWorldField(
     boundaryInstance.castShadow = false;
     boundaryInstance.receiveShadow = true;
   }
+  const scaleCueInstance = scaleCueMesh === null || scaleCueMaterial === null
+    ? null
+    : new pc.MeshInstance(scaleCueMesh, scaleCueMaterial.material, entity);
+  if (scaleCueInstance !== null) {
+    scaleCueInstance.castShadow = false;
+    scaleCueInstance.receiveShadow = false;
+  }
+  const authoredInstances = [fieldInstance];
+  if (boundaryInstance !== null) authoredInstances.push(boundaryInstance);
+  if (scaleCueInstance !== null) authoredInstances.push(scaleCueInstance);
   entity.addComponent('render', {
-    meshInstances: boundaryInstance === null ? [fieldInstance] : [fieldInstance, boundaryInstance],
+    meshInstances: authoredInstances,
   });
   if (entity.render !== undefined && entity.render !== null) {
     entity.render.castShadows = false;
     entity.render.receiveShadows = authoredSupport !== undefined;
   }
+  // The render component's receiveShadows flag re-enables every instance; keep the scale marks
+  // free of object shadows so metre spacing stays countable.
+  if (scaleCueInstance !== null) scaleCueInstance.receiveShadow = false;
 
   const marker = new pc.Entity('atlas-map-user-marker');
   const markerGeometry = new pc.Geometry();
@@ -534,7 +704,8 @@ export function createWorldField(
   markerMaterial.useLighting = false;
   markerMaterial.cull = pc.CULLFACE_NONE;
   markerMaterial.emissiveIntensity = 1;
-  markerMaterial.opacity = 0.24;
+  // Map pose reads against the authored floor marks; keep it stronger than a decorative wash.
+  markerMaterial.opacity = authoredSupport === undefined ? 0.24 : 0.55;
   markerMaterial.blendType = pc.BLEND_NORMAL;
   markerMaterial.depthWrite = false;
 
@@ -568,10 +739,41 @@ export function createWorldField(
   marker.enabled = false;
   entity.addChild(marker);
 
+  // Placement confirm landing: a compact diamond + forward notch. Shape and accent colour keep it
+  // apart from the Map triangle (`atlas-map-user-marker`), which uses the focus tone.
+  const landing = new pc.Entity('atlas-placement-landing-marker');
+  const landingGeometry = new pc.Geometry();
+  landingGeometry.positions = [
+    0, 0, -0.42, -0.28, 0, 0, 0, 0, 0.42, 0.28, 0, 0,
+    0, 0, -0.58, -0.1, 0, -0.42, 0.1, 0, -0.42,
+  ];
+  landingGeometry.indices = [0, 1, 2, 0, 2, 3, 4, 5, 6];
+  const landingMesh = pc.Mesh.fromGeometry(device, landingGeometry);
+  const landingMaterial = new pc.StandardMaterial();
+  landingMaterial.useLighting = false;
+  landingMaterial.cull = pc.CULLFACE_NONE;
+  landingMaterial.emissiveIntensity = 1;
+  landingMaterial.opacity = authoredSupport === undefined ? 0.4 : 0.78;
+  landingMaterial.blendType = pc.BLEND_NORMAL;
+  landingMaterial.depthWrite = false;
+  const setLandingTheme = (next: PresentationTheme): void => {
+    const [r, g, b] = unitRgb(next.accent);
+    landingMaterial.diffuse.set(r, g, b);
+    landingMaterial.emissive.set(r, g, b);
+    landingMaterial.update();
+  };
+  setLandingTheme(theme);
+  landing.addComponent('render', {
+    meshInstances: [new pc.MeshInstance(landingMesh, landingMaterial, landing)],
+  });
+  landing.enabled = false;
+  entity.addChild(landing);
+
   return {
     entity,
     setTheme(next) {
       setMarkerTheme(next);
+      setLandingTheme(next);
     },
     setProfile,
     setMapGroundPose(pose) {
@@ -584,6 +786,16 @@ export function createWorldField(
         pose.position.z - fieldCentre.z,
       );
       marker.setEulerAngles(0, (pose.yaw * 180) / Math.PI, 0);
+    },
+    setPlacementLandingPose(pose) {
+      landing.enabled = pose !== null;
+      if (pose === null) return;
+      landing.setPosition(
+        pose.position.x - fieldCentre.x,
+        (authoredSupport?.elevation ?? 0) + 0.05,
+        pose.position.z - fieldCentre.z,
+      );
+      landing.setEulerAngles(0, (pose.yaw * 180) / Math.PI, 0);
     },
     setRenderOrigin(x, z) {
       if (authoredSupport === undefined) {
@@ -601,13 +813,17 @@ export function createWorldField(
     destroy() {
       markerMesh.destroy();
       bodyMesh.destroy();
+      landingMesh.destroy();
       mesh.destroy();
       boundaryMesh?.destroy();
+      scaleCueMesh?.destroy();
       material.destroy();
       authoredMaterial?.material.destroy();
       boundaryMaterial?.material.destroy();
+      scaleCueMaterial?.material.destroy();
       markerMaterial.destroy();
       bodyMaterial.destroy();
+      landingMaterial.destroy();
     },
   };
 }

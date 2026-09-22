@@ -57,6 +57,7 @@ import { tierPolicy } from '@exulanica/companion-runtime';
 import type { ConfirmationBand, ConfirmationSummary } from '@exulanica/companion-runtime';
 import {
   DEFAULT_PLACEMENT_DISTANCE_MM,
+  MICRORADIANS_PER_RADIAN,
   MM_PER_METRE,
   fetchVerifiedObjectAsset,
   nudgedPose,
@@ -185,7 +186,11 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
 
   const confirm = buildConfirm({
     onConfirm: () => void commit(),
-    onCancel: () => { pending = null; confirm.hide(); },
+    onCancel: () => {
+      pending = null;
+      clearPlacementLandingMark();
+      confirm.hide();
+    },
   });
 
   const integerParameter = (name: string): { min: number; max: number; fallback: number } => {
@@ -579,6 +584,48 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     return placementPoseBeforeVisitor(region.placement, pose, DEFAULT_PLACEMENT_DISTANCE_MM, ground);
   }
 
+  /**
+   * Draw the place pose already held for confirmation on the authored ground.
+   *
+   * Uses the same `RegionPose` that `client.place` will commit. The field mark is the existing
+   * ground API’s placement landing, not the Map visitor triangle.
+   *
+   * Conversion mirrors `atlasPointFromRegion` inline so this surface can call the ground mark
+   * without depending on a package-boundary rebuild of atlas-react for the inverse helper alone.
+   */
+  function showPlacementLandingMark(region: ObjectRegion, pose: RegionPose): void {
+    const field = state.atlas?.binding.field as
+      | { setPlacementLandingPose?: (pose: {
+          readonly position: ReturnType<typeof atlasVec3>;
+          readonly yaw: number;
+          readonly pitch: number;
+        } | null) => void }
+      | undefined;
+    if (field?.setPlacementLandingPose === undefined) return;
+    const scale = region.placement.scale;
+    const lx = pose.xMm / MM_PER_METRE;
+    const ly = pose.yMm / MM_PER_METRE;
+    const lz = pose.zMm / MM_PER_METRE;
+    const c = Math.cos(region.placement.yaw);
+    const s = Math.sin(region.placement.yaw);
+    field.setPlacementLandingPose({
+      position: atlasVec3(
+        region.placement.position.x + scale * (c * lx + s * lz),
+        region.placement.position.y + scale * ly,
+        region.placement.position.z + scale * (-s * lx + c * lz),
+      ),
+      yaw: region.placement.yaw + pose.yawMicroradians / MICRORADIANS_PER_RADIAN,
+      pitch: 0,
+    });
+  }
+
+  function clearPlacementLandingMark(): void {
+    const field = state.atlas?.binding.field as
+      | { setPlacementLandingPose?: (pose: null) => void }
+      | undefined;
+    field?.setPlacementLandingPose?.(null);
+  }
+
   // -- proposing -----------------------------------------------------------------------------------
 
   async function proposeBootstrap(): Promise<void> {
@@ -678,6 +725,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     // beside the edit sequence keeps it unique without a clock or a random source.
     const objectId = `object-${version.editSeq + 1}-${(issued += 1)}`;
 
+    showPlacementLandingMark(region, pose);
     stage({
       kind: 'place',
       describe:
@@ -796,6 +844,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     pending = next;
     issued += 1;
     deps.hideWritePathConfirm();
+    if (next.kind !== 'place') clearPlacementLandingMark();
     confirm.show(`world-object-${issued}`, summaryFor(next), next.describe, {
       undoControlAvailable: client !== null && next.reversible
         && (next.kind === 'place' || next.kind === 'move' || next.kind === 'remove'),
@@ -806,6 +855,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     const running = pending;
     if (running === null) return;
     pending = null;
+    clearPlacementLandingMark();
     panel.setBusy(true);
     try {
       await running.run();
@@ -1174,6 +1224,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       listeners.abort();
       releaseRepresentationSelection?.();
       releaseRepresentationSelection = null;
+      clearPlacementLandingMark();
       state.atlas?.binding.objects.cancelPending();
       pending = null;
     },

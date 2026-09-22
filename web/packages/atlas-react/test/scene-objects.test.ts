@@ -10,6 +10,7 @@ import {
   MICRORADIANS_PER_RADIAN,
   SCALE_MILLI_UNIT,
   SceneObjectRuntime,
+  atlasPointFromRegion,
   createObjectContainerAsset,
   fetchVerifiedObjectAsset,
   nudgedPose,
@@ -360,6 +361,18 @@ describe('placement is region-local fixed point', () => {
     expect(local[0]).toBeCloseTo(1000, 6);
     expect(local[1]).toBeCloseTo(0, 6);
     expect(local[2]).toBeCloseTo(0, 6);
+  });
+
+  it('round-trips region millimetres back to atlas metres for a supplied landing mark', () => {
+    const turned = placement(atlasVec3(10, 0, -4), Math.PI / 2, 2);
+    const atlas = atlasPointFromRegion(turned, [1000, 0, 0]);
+    expect(atlas[0]).toBeCloseTo(10, 6);
+    expect(atlas[1]).toBeCloseTo(0, 6);
+    expect(atlas[2]).toBeCloseTo(-6, 6);
+    const back = regionPointFromAtlas(turned, atlas);
+    expect(back[0]).toBeCloseTo(1000, 6);
+    expect(back[1]).toBeCloseTo(0, 6);
+    expect(back[2]).toBeCloseTo(0, 6);
   });
 
   it('produces whole millimetres, microradians and thousandths', () => {

@@ -222,6 +222,9 @@ function harness(
       representationObservers.add(observer);
       return () => { representationObservers.delete(observer); };
     }),
+    field: {
+      setPlacementLandingPose: vi.fn(),
+    },
   };
   const clearObjects = objects.clear.getMockImplementation()!;
   objects.clear.mockImplementation(() => {
@@ -377,6 +380,47 @@ describe('nothing reaches the authority without a confirmation', () => {
     expect(h.mounted.confirm.root.hidden).toBe(false);
     expect(h.mounted.confirm.root.textContent).toContain('Before anything is written');
     expect(h.mounted.confirm.root.textContent).toContain('Marker pillar');
+    expect(writes(h.authority.calls)).toEqual([]);
+  });
+
+  it('marks the placementPoseBeforeVisitor landing on the ground during confirm, then commits with client.place', async () => {
+    const h = harness();
+    await h.mounted.begin();
+    const setLanding = h.binding.field.setPlacementLandingPose as ReturnType<typeof vi.fn>;
+    expect(setLanding).not.toHaveBeenCalled();
+
+    await place(h);
+    expect(h.mounted.confirm.root.hidden).toBe(false);
+    expect(setLanding).toHaveBeenCalledTimes(1);
+    const landing = setLanding.mock.calls[0]![0] as {
+      position: { x: number; y: number; z: number };
+      yaw: number;
+    };
+    // Same step `placementPoseBeforeVisitor` returns for the harness player looking down -Z.
+    expect(landing.position.x).toBeCloseTo(0, 5);
+    expect(landing.position.z).toBeCloseTo(-3.5, 5);
+    expect(Number.isFinite(landing.yaw)).toBe(true);
+
+    button(h.mounted.confirm.root, 'Confirm').click();
+    await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['place']));
+    expect(setLanding).toHaveBeenLastCalledWith(null);
+    const request = h.authority.calls.find((c) => c.name === 'place')!.args[1] as {
+      transform: { xMm: number; zMm: number };
+    };
+    expect(request.transform.xMm).toBe(0);
+    expect(request.transform.zMm).toBeCloseTo(-3500, 0);
+  });
+
+  it('clears the placement landing mark when confirmation is cancelled', async () => {
+    const h = harness();
+    await h.mounted.begin();
+    const setLanding = h.binding.field.setPlacementLandingPose as ReturnType<typeof vi.fn>;
+    await place(h);
+    expect(setLanding).toHaveBeenCalledWith(expect.objectContaining({
+      position: expect.objectContaining({ z: expect.closeTo(-3.5, 5) }),
+    }));
+    button(h.mounted.confirm.root, 'Cancel').click();
+    expect(setLanding).toHaveBeenLastCalledWith(null);
     expect(writes(h.authority.calls)).toEqual([]);
   });
 

@@ -36,6 +36,7 @@ export {
   fetchVerifiedObjectAsset,
   nudgedPose,
   objectAssetBytesPath,
+  atlasPointFromRegion,
   placementPoseAtAtlasPoint,
   placementPoseBeforeVisitor,
   regionPointFromAtlas,
@@ -153,7 +154,13 @@ export { MapRegionOverlay } from './map-region-overlay.js';
 export type { RegionRelief, ReliefCell } from './region-relief.js';
 export { createRegionRelief, sampleRelief } from './region-relief.js';
 
-export { worldFieldBufferShape } from './world-field.js';
+export { worldFieldBufferShape, AUTHORED_GROUND_SCALE_SPACING_M } from './world-field.js';
+export type {
+  AuthoredGroundGeometry,
+  AuthoredGroundSupport,
+  MeshGeometryData,
+} from './world-field.js';
+export { authoredGroundGeometry, authoredGroundScaleCue } from './world-field.js';
 
 export type { ComposedWorld } from './composed-world.js';
 export { createComposedWorld } from './composed-world.js';

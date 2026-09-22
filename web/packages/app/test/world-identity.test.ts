@@ -3,6 +3,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { buildWorldIdentity } from '../src/ui/world-identity.js';
 import type { SavedWorldEntry } from '../src/world-entry-api.js';
+import { initialWorldShell, updateWorldShell } from '../src/world-shell.js';
 
 const entry = (title = 'My world', revision = 1): SavedWorldEntry => ({
   entryId: '11111111-1111-4111-8111-111111111111',
@@ -56,5 +57,30 @@ describe('world identity controls', () => {
     identity.setPhotosVisible(true);
     expect(identity.photosDrawer.hidden).toBe(false);
     expect(identity.photosDrawer.contains(intake)).toBe(true);
+  });
+
+  it('returns from the photo workspace to the world canvas with an explicit destination label', () => {
+    const intake = document.createElement('details');
+    intake.append(document.createElement('summary'));
+    let shell = updateWorldShell(initialWorldShell(), { type: 'toggle-photos' });
+    expect(shell.primary).toBe('photos');
+    const identity = buildWorldIdentity({
+      entry: entry('My first world'),
+      personalIntake: intake,
+      rename: async (title) => entry(title),
+      onOpenWorld: () => undefined,
+      onAddObject: () => undefined,
+      onOpenPhotos: () => undefined,
+      onClosePhotos: () => {
+        shell = updateWorldShell(shell, { type: 'toggle-photos' });
+      },
+    });
+    identity.setPhotosVisible(true);
+    const close = identity.photosDrawer.querySelector('.photos-drawer-close') as HTMLButtonElement;
+    expect(close.textContent).toBe('Return to world');
+    expect(close.getAttribute('aria-label')).toBe('Return to world');
+    close.click();
+    expect(shell.primary).toBe('world');
+    expect(shell.returnStack).toEqual([]);
   });
 });

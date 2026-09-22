@@ -46,7 +46,8 @@ export function buildWorldIdentity(deps: {
   ]);
 
   const close = el('button', {
-    type: 'button', class: 'photos-drawer-close', 'aria-label': 'Close Add photos', text: 'Close',
+    type: 'button', class: 'photos-drawer-close',
+    'aria-label': 'Return to world', text: 'Return to world',
   });
   const photosDrawer = el('section', {
     class: 'photos-drawer', 'aria-labelledby': 'photos-drawer-title', hidden: true,
