@@ -11,6 +11,7 @@ from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 
 from exulanica.db.session import set_workspace
+from exulanica.world.models import DEFAULT_WORLD_ID
 from exulanica.world.society import (
     StaleSocietyState,
     UnavailableSocietyInput,
@@ -41,11 +42,13 @@ class SocietyControlRepository:
         connection: psycopg.Connection,
         workspace_id: uuid.UUID,
         *,
+        world_id: str = DEFAULT_WORLD_ID,
         input_authorizer: Callable[[uuid.UUID, dict], None] | None = None,
         base_tick_interval_ms: int = 1000,
     ) -> None:
         validate_settings("paused", 1, base_tick_interval_ms)
         self.connection, self.workspace_id = connection, workspace_id
+        self.world_id = world_id
         self.input_authorizer = input_authorizer
         self.base_tick_interval_ms = base_tick_interval_ms
         connection.row_factory = dict_row
@@ -55,6 +58,7 @@ class SocietyControlRepository:
         return SocietyRepository(
             self.connection,
             self.workspace_id,
+            world_id=self.world_id,
             input_authorizer=(
                 None
                 if self.input_authorizer is None or actor is None

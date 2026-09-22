@@ -15,13 +15,33 @@ from exulanica.world.society import (
     SocietyEvent,
     society_state_sha256,
 )
-from exulanica.world.society_input_policy import LOCAL_INPUT, validate_local_affordances
+from exulanica.world.society_input_policy import (
+    AUTHORED_GROUND_INPUT,
+    LOCAL_FAILURE_INPUTS,
+    LOCAL_INPUT,
+    validate_local_affordances,
+)
 from exulanica.world.society_legacy import initial_society
 
 PURPOSEFUL_PROFILE = "exulanica-society/v2"
 INPUT_PROFILE = "exulanica.society-input/v1"
 MOVEMENT_BUDGET_MM = 60_000
 DURATIONS = {"visit": 1, "rest": 3}
+#: Every input profile the policy consumes, and the navigation and frame each one declares.
+#: A district projection states the geodetic origin its millimetres are measured from; a saved
+#: world's authored ground has no surveyed origin and states none rather than inventing one.
+DISTRICT_INPUTS = (INPUT_PROFILE, LOCAL_INPUT)
+NAVIGATION_PROFILES = {
+    INPUT_PROFILE: "bounded-sidewalk-graph/v1",
+    LOCAL_INPUT: "bounded-sidewalk-graph/v1",
+    AUTHORED_GROUND_INPUT: "authored-ground-lattice/v1",
+}
+FRAME_NAMES = {
+    INPUT_PROFILE: "flatiron-local-mm",
+    LOCAL_INPUT: "flatiron-local-mm",
+    AUTHORED_GROUND_INPUT: "authored-ground-local-mm",
+}
+CLEARANCE_MM = 450
 
 
 def _integer(value: Any, minimum: int, maximum: int) -> bool:
@@ -67,35 +87,36 @@ def _validate_society_input(document: dict[str, Any]) -> None:
         "document_sha256",
     }
     _require(isinstance(document, dict), "invalid society input fields")
-    if document.get("profile") == LOCAL_INPUT:
+    if document.get("profile") in LOCAL_FAILURE_INPUTS:
         fields.add("unavailable_affordances")
     _require(set(document) == fields, "invalid society input fields")
-    _require(
-        document["profile"] in (INPUT_PROFILE, LOCAL_INPUT), "unsupported society input profile"
-    )
+    profile = document["profile"]
+    _require(profile in NAVIGATION_PROFILES, "unsupported society input profile")
     _require(_integer(document["input_seq"], 1, 2**53 - 1), "invalid input sequence")
     _require(all(_text(document[k]) for k in ("world_id", "district_id")), "invalid input scope")
     _require(str(uuid.UUID(document["version_id"])) == document["version_id"], "invalid version ID")
     for key in ("district_document_sha256", "base_artifact_sha256", "document_sha256"):
         _require(_digest(document[key]), f"invalid {key}")
     frame = document["frame"]
+    surveyed = profile in DISTRICT_INPUTS
+    expected = {"name", "axis_order", "horizontal_unit", "altitude_reference"}
+    if surveyed:
+        expected = expected | {"origin_crs84_e7"}
+    _require(isinstance(frame, dict) and set(frame) == expected, "invalid frame")
     _require(
-        isinstance(frame, dict)
-        and set(frame)
-        == {"name", "origin_crs84_e7", "axis_order", "horizontal_unit", "altitude_reference"},
-        "invalid frame",
-    )
-    _require(
-        frame["name"] == "flatiron-local-mm"
+        frame["name"] == FRAME_NAMES[profile]
         and frame["axis_order"] == ["east", "south"]
         and frame["horizontal_unit"] == "millimetre"
         and frame["altitude_reference"] == "authored-flat-ground",
         "unsupported frame",
     )
     _require(
-        isinstance(frame["origin_crs84_e7"], list)
-        and len(frame["origin_crs84_e7"]) == 2
-        and all(_integer(v, -1800000000, 1800000000) for v in frame["origin_crs84_e7"]),
+        not surveyed
+        or (
+            isinstance(frame["origin_crs84_e7"], list)
+            and len(frame["origin_crs84_e7"]) == 2
+            and all(_integer(v, -1800000000, 1800000000) for v in frame["origin_crs84_e7"])
+        ),
         "invalid frame origin",
     )
     authored = document["authored_state"]
@@ -113,14 +134,19 @@ def _validate_society_input(document: dict[str, Any]) -> None:
         "availability requires an explicit reason",
     )
     nav = document["navigation"]
+    navigation_fields = {
+        "profile",
+        "clearance_mm",
+        "nodes",
+        "edges",
+        "destinations",
+        "unavailable_reason",
+    }
+    if profile == AUTHORED_GROUND_INPUT:
+        navigation_fields.add("walkable_area")
+    _require(isinstance(nav, dict) and set(nav) == navigation_fields, "invalid navigation fields")
     _require(
-        isinstance(nav, dict)
-        and set(nav)
-        == {"profile", "clearance_mm", "nodes", "edges", "destinations", "unavailable_reason"},
-        "invalid navigation fields",
-    )
-    _require(
-        nav["profile"] == "bounded-sidewalk-graph/v1" and nav["clearance_mm"] == 450,
+        nav["profile"] == NAVIGATION_PROFILES[profile] and nav["clearance_mm"] == CLEARANCE_MM,
         "unsupported navigation profile",
     )
     _require(
@@ -146,6 +172,8 @@ def _validate_society_input(document: dict[str, Any]) -> None:
         _require(node["node_id"] not in nodes, "duplicate node")
         nodes[node["node_id"]] = node
     _require(list(nodes) == sorted(nodes), "nodes must be sorted")
+    if profile == AUTHORED_GROUND_INPUT:
+        _validate_walkable_area(nav["walkable_area"], nodes.values(), nav["clearance_mm"])
     _require(isinstance(nav["edges"], list) and len(nav["edges"]) <= 65536, "edge bound exceeded")
     edge_ids = []
     pairs = set()
@@ -240,7 +268,7 @@ def _validate_society_input(document: dict[str, Any]) -> None:
         )
         target_ids.append(target["target_id"])
     _require(target_ids == sorted(set(target_ids)), "targets must be unique and sorted")
-    if document["profile"] == LOCAL_INPUT:
+    if profile in LOCAL_FAILURE_INPUTS:
         validate_local_affordances(document, DURATIONS)
     refs = document["dependency_refs"]
     _require(isinstance(refs, list) and len(refs) <= 8192, "dependency bound exceeded")
@@ -257,6 +285,35 @@ def _validate_society_input(document: dict[str, Any]) -> None:
     _require(input_sha256(document) == document["document_sha256"], "society input digest mismatch")
 
 
+def _validate_walkable_area(area: Any, nodes: Any, clearance_mm: int) -> None:
+    """A saved world's input states the area it routes across, and routes nowhere else.
+
+    ``source`` says whether the ground stated that extent or the society declared it because the
+    ground states none. Every node sits a full clearance inside the area, so a stored input cannot
+    carry a route the area it names would not have produced.
+    """
+    _require(
+        isinstance(area, dict)
+        and set(area) == {"source", "centre_mm", "half_width_mm", "half_depth_mm"}
+        and area["source"] in ("ground", "declared")
+        and isinstance(area["centre_mm"], list)
+        and len(area["centre_mm"]) == 2
+        and all(_integer(v, -(10**9), 10**9) for v in area["centre_mm"])
+        and _integer(area["half_width_mm"], 1, 10**9)
+        and _integer(area["half_depth_mm"], 1, 10**9),
+        "invalid walkable area",
+    )
+    cx, cz = area["centre_mm"]
+    width = area["half_width_mm"] - clearance_mm
+    depth = area["half_depth_mm"] - clearance_mm
+    for node in nodes:
+        x_mm, z_mm = node["position_mm"]
+        _require(
+            abs(x_mm - cx) <= width and abs(z_mm - cz) <= depth,
+            "a route node lies outside the stated walkable area",
+        )
+
+
 def validate_society_input(document: dict[str, Any]) -> None:
     try:
         _validate_society_input(document)
@@ -269,6 +326,13 @@ def validate_input_successor(previous: dict[str, Any], current: dict[str, Any]) 
     _require(current["input_seq"] == previous["input_seq"] + 1, "input sequence gap")
     for key in ("world_id", "version_id", "district_id", "frame", "base_artifact_sha256"):
         _require(current[key] == previous[key], f"input changed immutable {key}")
+    if current["profile"] == AUTHORED_GROUND_INPUT:
+        # A society's area is part of what the society is, like its seed. An edit changes what is
+        # in the area, never where the area is.
+        _require(
+            current["navigation"]["walkable_area"] == previous["navigation"]["walkable_area"],
+            "input changed immutable walkable_area",
+        )
     old, new = previous["authored_state"], current["authored_state"]
     _require(new["edit_seq"] >= old["edit_seq"], "authored edit order regressed")
     _require(

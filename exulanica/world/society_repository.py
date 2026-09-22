@@ -28,6 +28,7 @@ from exulanica.world.society_actions import (
     validate_action_request,
 )
 from exulanica.world.society_decisions import validate_decision_receipt
+from exulanica.world.society_input_policy import AUTHORED_GROUND_INPUT
 from exulanica.world.society_legacy import advance_society, initial_society
 from exulanica.world.society_living import (
     LIVING_PROFILE,
@@ -115,6 +116,13 @@ class SocietyRepository:
             elif profile in INPUT_PROFILES:
                 if initial_input is None:
                     raise UnavailableSocietyInput("v2 requires a server-authorized initial input")
+                if profile == LIVING_PROFILE and initial_input["profile"] == AUTHORED_GROUND_INPUT:
+                    # The living society reads streets, occupancy and stated surface heights out
+                    # of its place. A saved world's ground states a flat rectangle and none of
+                    # those, so this refuses rather than publishing a place of empty answers.
+                    raise ValueError(
+                        "the living society has no place contract for an authored ground"
+                    )
                 self._validate_scope(version_id, initial_input)
                 self._authorize(initial_input)
                 if profile == LIVING_PROFILE:

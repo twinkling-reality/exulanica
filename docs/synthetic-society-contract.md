@@ -36,6 +36,9 @@ Implementation:
   `exulanica/world/society_place.py`, the generated-city place `exulanica/world/society_city_place.py`
   and run measurements `exulanica/world/society_metrics.py`;
 - purposeful policy and input validation: `exulanica/world/society_planner.py`;
+- the authored-object projection shared by every composition:
+  `exulanica/world/society_composition.py`, and the saved-world projection over a world's own
+  declared ground: `exulanica/world/society_authored_ground.py`;
 - bounded observations and communication: `exulanica/world/society_social.py`;
 - persistence and compare-and-swap: `exulanica/world/society_repository.py`;
 - typed user action policy and persistence: `exulanica/world/society_actions.py` and
@@ -77,7 +80,9 @@ from browser request JSON. Inputs contain:
 
 - `input_seq`, beginning at 1, independent of simulation ticks;
 - `world_id`, authored `version_id`, `district_id`, district interpretation and base artifact digests;
-- the explicit `flatiron-local-mm` frame, east/south axes and integer millimetres;
+- the frame the input profile declares, east/south axes and integer millimetres: `flatiron-local-mm`
+  with its surveyed origin for a district projection, `authored-ground-local-mm` with no surveyed
+  origin for a saved world's own ground (below);
 - `authored_state: {edit_seq, delta_sha256}`;
 - `bounded-sidewalk-graph/v1` nodes, undirected edges, destinations and unavailable reason;
 - targets with stable `target_id`, spatial `subject_id`, `node_id`, `affordance`, `duration_ticks`,
@@ -174,6 +179,104 @@ same authored edit cursor/delta digest while increasing `input_seq`. Replay ther
 earlier global pause and the later locally degraded input exactly. Local records are available in the
 stored input document for authorized adapters; no new browser endpoint is introduced.
 
+## A saved world's own ground
+
+A world a person saved has no district. Its spatial authority is the flat authored ground its own
+structural snapshot states: one authored region, an elevation, a spawn point and, depending on
+the ground module version, either a horizontal extent or an explicit statement that it has none.
+`exulanica.society-composition/authored-ground-v1` projects that ground, and the reviewed objects
+the person placed on it, into `exulanica.society-input/authored-ground-v1`, which the same v2
+policy, persistence and replay consume unchanged. There is no second engine and no second
+affordance vocabulary: `visit` and `rest` remain the only two activities, and the reviewed
+footprint, collision and reach table is the one the district projection already uses.
+
+Where inhabitants walk is the society's walkable area, and it is kept apart from what the ground
+is, because the ground module no longer always states an edge.
+
+- Ground module version 1 states a 24 m square. The society reads that extent and its input marks
+  the area `source: "ground"`.
+- Ground module version 2, which every new starter uses, states an endless plane with no extent.
+  There is nothing to read, and a route graph over the whole plane a renderer can carry a person
+  across would be tens of millions of nodes. The society therefore declares its own area: a square
+  of 12,000 mm half extent about the region origin, marked `source: "declared"`. The declaration
+  lives only in the society's inputs. The stored world keeps its endless ground; nothing writes an
+  edge into it.
+
+The declared figure keeps the lattice at 121 nodes, which holds one tick of 128 inhabitants near a
+tenth of a second, and it equals the only bounded starter ground the product has shipped, so an
+old and a new starter give a society the same lattice and the same node identities. An object
+placed outside the area is still in the world and still drawn; the society records its activity
+in `unavailable_affordances` as `authored_affordance_unreachable` rather than stretching its area
+to meet it. The area is part of what a society is, like its seed: an edit changes what is inside
+it and never where it is, and an input that moves it is refused as a successor.
+
+What the projection reads and what it declares are kept apart, because only one of them is a fact
+about the person's world.
+
+- Read from the world: the region identity, the ground module version, kind and elevation, the
+  bounded extent where the module states one, the element the ground belongs to, the structural
+  snapshot digest, and every accepted authored object's asset, region, transform, origin and
+  removal. A snapshot that is not the built-in authored starter at a supported module version is
+  refused with the reason, and so is a ground kind the projection has no rule for, rather than
+  guessed at.
+- Declared by the profile: the walkable area on a ground that states none, and a route lattice at
+  two metre spacing over the area, inset by the navigation clearance. A flat rectangle has no
+  paths of its own, so a graph over it is a discretisation this profile fixes, not a shape measured
+  from anything. Two metres keeps every point of the area within 1,415 mm of a node, inside the
+  reviewed object reach, and keeps a 24 m area at 121 nodes and 220 edges. The spacing and the
+  declared extent are part of the profile, so changing either changes every input digest.
+
+The authored input's `navigation` carries `walkable_area`: `source`, `centre_mm`, `half_width_mm`
+and `half_depth_mm`. Validation refuses a node that lies outside the stated area by less than the
+clearance, so a stored input cannot route where the area it names would not have produced a node.
+
+The input keeps the shape every profile shares. `district_id` is the authored region's identity
+(`authored:region:starter`), `district_document_sha256` is the digest of the ground descriptor
+the projection read (which carries the ground kind and the walkable area with its source, and no
+ground extent for an endless ground), and `base_artifact_sha256` is the structural snapshot's own
+digest. The frame
+is `authored-ground-local-mm`, east/south integer millimetres about the region origin, and it
+states no `origin_crs84_e7`: a saved world was never surveyed anywhere, and a coordinate reference
+origin would be a claim about the Earth that nothing measured.
+
+`navigation.destinations` is empty. A ground declares somewhere to stand, not something to do, and
+calling the spawn point a visit would invent an affordance the world never declared. Every target
+in a saved world comes from a reviewed object with an affordance, so a starter with nothing in it
+has a walkable area and nothing to do in it, and society creation refuses with
+`initial society requires reachable targets` until the person puts something there.
+
+The profile records local failures, like `exulanica.society-composition/v2`: an object with no
+reachable access node loses its own activity to `unavailable_affordances` and takes nothing else
+with it. An object off the declared ground plane, in another region, carrying a behaviour, rotated
+or scaled, or of an unsupported origin still makes the whole input unavailable with its object
+named. So does an area smaller than the navigation clearance
+(`walkable_area_smaller_than_clearance`), a version whose snapshot is not the registered one
+(`authored_ground_snapshot_mismatch`), an invalidated source and a structural override. An
+unavailable input carries no nodes, edges, destinations, targets or local records.
+
+A depth estimate placed from the person's own photograph takes part in the authored state digest
+and in nothing else. It is personal evidence drawn in the world; it is neither ground to stand on,
+an obstacle nor an activity, so the society's area, lattice and targets are the same with or
+without it.
+
+Registration is explicit and scoped, and it is not something saving a world does. A host registers
+`AuthoredWorldSocietyBinding` rows naming a workspace, saved world, authored version, that
+version's structural snapshot, the authored region and the workspace place identity the society
+row binds. `EXULANICA_SOCIETY_AUTHORED_WORLDS` names a
+`exulanica.society-authored-worlds/v1` JSON file of them; absent, no saved world holds inhabitants
+and `/readyz` says so. A version is registered as a district or as an authored world, never both,
+and registering one supplies no bytes: an instance whose blob store lacks a reviewed asset composes
+an unavailable input that says so. `GET /world/versions/{id}/society/district` answers 404 for a
+saved world, because there is no district to present.
+
+`exulanica-society/v2` and `exulanica-society/v3` consume an authored ground, and typed directed
+actions work over it. `exulanica-society/v4` refuses one: the living society reads streets,
+occupancy and stated surface heights out of its place contract, and a flat authored rectangle
+states none of them, so creation says that rather than publishing a place of empty answers.
+
+Migration 0094 admits the third input profile and applies the bounded, availability-consistent
+local-record rule 0057 wrote for `exulanica.society-input/v2` to it unchanged.
+
 ## Authored edits and inability to act
 
 Each relevant accepted authored edit appends a full immutable input snapshot in its transaction,
@@ -227,6 +330,11 @@ replay and must be reported.
 Existing authenticated society create/read/step/events/replay routes remain. Creation optionally
 selects `profile: exulanica-society/v2` or `exulanica-society/v3`; omission keeps v1. Step bodies still contain only
 `base_tick` and `base_state_sha256`. Extra authoritative input JSON is rejected.
+
+Every society, action and playback route takes the saved world as a `world_id` query parameter,
+defaulting to the default world, exactly as the world object routes do. The repositories scope
+their reads to workspace, world and version together, so a version that does not belong to the
+named world reads as an unavailable version rather than reaching another world's society.
 
 The application supplies `society_initial_input(connection, session, version_id, place_id, region_id)`
 and `society_input_authorizer(connection, session, document)` on application state. The repository

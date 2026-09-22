@@ -4,24 +4,37 @@ from __future__ import annotations
 
 LEGACY_COMPOSITION = "exulanica.society-composition/v1"
 LOCAL_COMPOSITION = "exulanica.society-composition/v2"
+#: The projection of a saved world that has no district: its walkable area is the authored
+#: ground the world's own structural snapshot declares, and every activity comes from a
+#: reviewed object the person placed in it.
+AUTHORED_GROUND_COMPOSITION = "exulanica.society-composition/authored-ground-v1"
 LEGACY_INPUT = "exulanica.society-input/v1"
 LOCAL_INPUT = "exulanica.society-input/v2"
+AUTHORED_GROUND_INPUT = "exulanica.society-input/authored-ground-v1"
 UNREACHABLE = "authored_affordance_unreachable"
+
+_PAIRS = (
+    (LEGACY_COMPOSITION, LEGACY_INPUT),
+    (LOCAL_COMPOSITION, LOCAL_INPUT),
+    (AUTHORED_GROUND_COMPOSITION, AUTHORED_GROUND_INPUT),
+)
+#: Compositions that record a known unreachable authored activity against that activity alone,
+#: type-check authored transforms strictly, and publish an ``unavailable_affordances`` list.
+LOCAL_FAILURE_COMPOSITIONS = (LOCAL_COMPOSITION, AUTHORED_GROUND_COMPOSITION)
+LOCAL_FAILURE_INPUTS = (LOCAL_INPUT, AUTHORED_GROUND_INPUT)
 
 
 def input_profile(composition: str) -> str:
-    if composition == LEGACY_COMPOSITION:
-        return LEGACY_INPUT
-    if composition == LOCAL_COMPOSITION:
-        return LOCAL_INPUT
+    for policy, profile in _PAIRS:
+        if composition == policy:
+            return profile
     raise ValueError("unsupported society composition policy")
 
 
 def composition_profile(profile: str) -> str:
-    if profile == LEGACY_INPUT:
-        return LEGACY_COMPOSITION
-    if profile == LOCAL_INPUT:
-        return LOCAL_COMPOSITION
+    for policy, value in _PAIRS:
+        if profile == value:
+            return policy
     raise ValueError("unsupported society input profile")
 
 

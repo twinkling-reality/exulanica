@@ -24,6 +24,7 @@ rather than a thing that would need to be discovered.
 
 from __future__ import annotations
 
+import json
 import os
 import uuid
 from collections.abc import Mapping
@@ -34,7 +35,7 @@ from typing import TYPE_CHECKING, Final
 from exulanica.api.account_runtime import AccountRuntime, load_account_runtime
 from exulanica.api.authorisation import API_TOKENS_ENV, TokenDirectory, load_token_directory
 from exulanica.api.society_control_worker import SocietyControlWorker
-from exulanica.api.society_runtime import SocietyRuntime
+from exulanica.api.society_runtime import AuthoredWorldSocietyBinding, SocietyRuntime
 from exulanica.db.session import DATABASE_URL_ENV, Database
 from exulanica.env import env_get, env_name, resolve_data_dir
 from exulanica.epistemics.caption_embeddings import CaptionEmbeddingPass
@@ -47,6 +48,7 @@ from exulanica.store.base import ContentAddressedStore
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.store.namespaces import BLOB_NAMESPACE, material_stores, tile_store
 from exulanica.world.material_recipes import MaterialRuntime
+from exulanica.world.society_composition import REVIEWED_REACH_MM, reviewed_affordance_registry
 from exulanica.world.texture_assets import load_material_catalog
 
 if TYPE_CHECKING:
@@ -57,6 +59,7 @@ __all__ = [
     "DATA_DIR_ENV",
     "DERIVATIVE_WORKER_ENV",
     "READONLY_DATABASE_URL_ENV",
+    "SOCIETY_AUTHORED_WORLDS_ENV",
     "SOCIETY_CONTROL_WORKER_ENV",
     "Services",
     "build_services",
@@ -77,6 +80,16 @@ DERIVATIVE_WORKER_ENV: Final = env_name("DERIVATIVE_WORKER")
 #: Account-wide society playback remains off unless the host opts in. Static
 #: ``society_control_workspaces`` remain an independent, narrower enablement path.
 SOCIETY_CONTROL_WORKER_ENV: Final = env_name("SOCIETY_CONTROL_WORKER")
+
+#: A JSON file naming the saved worlds this instance will let hold inhabitants. Absent, no
+#: saved world holds one and creating a society in one answers 424 with the reason. A saved
+#: world is never registered by default: a society is a simulation running inside somebody's
+#: own world, and turning it on is the host's decision rather than a consequence of saving.
+SOCIETY_AUTHORED_WORLDS_ENV: Final = env_name("SOCIETY_AUTHORED_WORLDS")
+
+#: The registration file's own profile, so a file written for a later shape is refused here
+#: rather than half-read.
+AUTHORED_WORLDS_PROFILE: Final = "exulanica.society-authored-worlds/v1"
 
 
 @dataclass(frozen=True, slots=True)
@@ -183,6 +196,13 @@ class Services:
                 "the character catalog is not readable here, so saving a look answers 424 and a "
                 "person's chosen look lasts only as long as their browser keeps it."
             )
+        if self.society_runtime is None:
+            notes.append(
+                f"{SOCIETY_AUTHORED_WORLDS_ENV} names no registration file, so no saved world "
+                "holds inhabitants here and creating a society in one answers 424. Nothing "
+                "already saved is affected: a society is a simulation started on top of a "
+                "world, never part of the world itself."
+            )
         if self.runs_derivative_worker:
             notes.append(
                 "the derivative worker runs no depth model, so an uploaded photograph is a rung "
@@ -278,11 +298,45 @@ def build_services(
         materials=_material_runtime(data_dir, environ),
         character_appearance=_character_appearance_runtime(store, environ),
         tiles=tile_store(data_dir),
+        society_runtime=_authored_world_society_runtime(store, environ),
         runs_derivative_worker=_enabled(env_get("DERIVATIVE_WORKER", environ)),
         runs_society_control_worker=_explicitly_enabled(env_get("SOCIETY_CONTROL_WORKER", environ)),
         restore_state_path=(
             Path(value) if (value := env_get("RESTORE_STATE_PATH", environ)) else None
         ),
+    )
+
+
+def _authored_world_society_runtime(
+    store: ContentAddressedStore, environ: Mapping[str, str]
+) -> SocietyRuntime | None:
+    """The saved worlds this instance will let hold inhabitants, or None when none were named.
+
+    ``EXULANICA_SOCIETY_AUTHORED_WORLDS`` names a JSON file of explicit registrations. Each
+    names a workspace, a saved world, its authored version, that version's structural snapshot,
+    the authored region of that snapshot and the workspace place identity the society row binds.
+    Nothing is inferred: a file that names a world whose snapshot is not an authored starter, or
+    whose region is not that snapshot's own, fails at the first request with the reason rather
+    than composing something else.
+
+    A missing file is an absence and ``warnings`` says so. A file that is present and malformed
+    stops startup, because an instance that silently serves no society after being told to serve
+    one is the failure this refuses to become.
+    """
+    path = env_get("SOCIETY_AUTHORED_WORLDS", environ)
+    if not path:
+        return None
+    document = json.loads(Path(path).read_bytes())
+    if not isinstance(document, dict) or document.get("profile") != AUTHORED_WORLDS_PROFILE:
+        raise ValueError(
+            f"{SOCIETY_AUTHORED_WORLDS_ENV} must name a {AUTHORED_WORLDS_PROFILE} file"
+        )
+    reach_mm = document.get("reach_mm", REVIEWED_REACH_MM)
+    bindings = [AuthoredWorldSocietyBinding.model_validate(row) for row in document["worlds"]]
+    return SocietyRuntime(
+        store=store,
+        authored_bindings=bindings,
+        reviewed_affordances=reviewed_affordance_registry(reach_mm),
     )
 
 

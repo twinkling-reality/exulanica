@@ -408,6 +408,19 @@ isolated account role. Account-wide society playback can use the same current-me
 under a separate explicit host opt-in and with a reviewed society runtime; a browser session is not
 worker authority.
 
+A world a person saved can now hold a society through the server. A saved world has no district.
+Where its ground states an extent the society walks that extent; where the ground is an endless
+plane, as every new starter's is, the society declares a bounded area of its own and says in its
+record that it declared it, without writing an edge into the world. Its destinations are the
+reviewed objects the person placed on it; a starter with nothing in it has somewhere to stand and
+nothing to do, and says so rather than inventing a destination. The whole
+walk runs through product routes: furnish the world, create the society, direct one inhabitant to
+rest, advance one simulated minute, and read the same record back after the process restarts.
+Holding inhabitants is an explicit per-world host registration and never a consequence of saving:
+an instance that registers none answers 424 with the reason, and `/readyz` says so. The browser
+still loads inhabitants only with the owned district, so nobody sees one in their own world yet.
+See the [society contract](synthetic-society-contract.md#a-saved-worlds-own-ground).
+
 Society playback now has persisted play/pause, speed settings and pause-aware explicit steps,
 with exclusive worker leases, bounded catch-up and recovery receipts. Simulation events determine
 state; browser frames do not create canonical ticks. Automatic playback accepts current-authorized

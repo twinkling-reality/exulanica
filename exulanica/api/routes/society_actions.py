@@ -11,11 +11,15 @@ from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
 from exulanica.api.dependencies import CurrentSession, ScopedConnection
+from exulanica.world.models import DEFAULT_WORLD_ID
 from exulanica.world.society import UnavailableSocietyInput
 from exulanica.world.society_action_repository import SocietyActionRepository
 from exulanica.world.society_actions import ActionIntent
 
 router = APIRouter(prefix="/world/versions/{version_id}/society/actions", tags=["society"])
+
+#: Which saved world the authored version belongs to; see ``routes/society.py``.
+WorldId = Annotated[str, Query(min_length=1, max_length=200)]
 
 
 class GoToIntent(BaseModel):
@@ -39,12 +43,16 @@ class SocietyActionBody(BaseModel):
 
 
 def repository(
-    connection: ScopedConnection, session: CurrentSession, request: Request
+    connection: ScopedConnection,
+    session: CurrentSession,
+    request: Request,
+    world_id: str = DEFAULT_WORLD_ID,
 ) -> SocietyActionRepository:
     authorizer = getattr(request.app.state, "society_input_authorizer", None)
     return SocietyActionRepository(
         connection,
         session.workspace_id,
+        world_id=world_id,
         input_authorizer=(
             None if authorizer is None else lambda doc: authorizer(connection, session, doc)
         ),
@@ -71,10 +79,11 @@ def record_action(
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
+    world_id: WorldId = DEFAULT_WORLD_ID,
 ) -> Any:
     intent = ActionIntent(**body.intent.model_dump())
     return call(
-        lambda: repository(connection, session, request).create(
+        lambda: repository(connection, session, request, world_id).create(
             version_id,
             request_id=body.idempotency_key,
             requested_by=session.actor,
@@ -92,11 +101,14 @@ def action_events(
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
+    world_id: WorldId = DEFAULT_WORLD_ID,
     limit: Annotated[int, Query(ge=1, le=128)] = 64,
 ) -> Any:
     return call(
         lambda: {
-            "events": repository(connection, session, request).history(version_id, limit=limit)
+            "events": repository(connection, session, request, world_id).history(
+                version_id, limit=limit
+            )
         }
     )
 
@@ -108,5 +120,8 @@ def read_action(
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
+    world_id: WorldId = DEFAULT_WORLD_ID,
 ) -> Any:
-    return call(lambda: repository(connection, session, request).read(version_id, request_id))
+    return call(
+        lambda: repository(connection, session, request, world_id).read(version_id, request_id)
+    )

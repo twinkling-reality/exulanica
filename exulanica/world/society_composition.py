@@ -7,6 +7,7 @@ world layer below environment and avoids a second polygon/collision implementati
 from __future__ import annotations
 
 import hashlib
+import uuid
 from collections.abc import Callable, Mapping, Sequence
 from copy import deepcopy
 from typing import Any
@@ -15,8 +16,10 @@ from exulanica.world.assets import reviewed_assets
 from exulanica.world.objects import AlternateVersion, delta_sha256, object_document
 from exulanica.world.society import society_state_sha256
 from exulanica.world.society_input_policy import (
+    AUTHORED_GROUND_COMPOSITION,
     LEGACY_COMPOSITION,
     LOCAL_COMPOSITION,
+    LOCAL_FAILURE_COMPOSITIONS,
     UNREACHABLE,
     input_profile,
 )
@@ -26,11 +29,20 @@ COMPOSITION_PROFILE = LEGACY_COMPOSITION
 Point = tuple[int, int]
 Supports = Callable[[Point, Point, int], Sequence[str]]
 SegmentBlocked = Callable[[Point, Point, list[Point], int], bool]
+#: An accepted authored object, its reviewed affordance assignment and its composed centre.
+ComposedObject = tuple[Any, dict[str, Any], Point]
+#: One object's closed collision ring in composed millimetres.
+Obstacle = tuple[str, list[Point]]
 _REVIEWED = {
     "cc0.marker-cube": ("visit", [250, 250], True),
     "cc0.marker-pillar": ("visit", [125, 125], True),
     "cc0.marker-plate": ("rest", [500, 500], False),
 }
+#: How far from an object's centre an inhabitant may stand and still use it: an arm's length
+#: plus a step, the same for all three reviewed markers because none of them is larger than the
+#: step. It is a reviewed figure rather than a fixed one, so a host may state its own within the
+#: bounds the registry validation already enforces.
+REVIEWED_REACH_MM = 1_500
 
 
 def _registration_reason(
@@ -80,7 +92,7 @@ def _registration_reason(
     return None
 
 
-def _validate_registry(mapping: Mapping[str, dict[str, Any]]) -> None:
+def validate_reviewed_affordances(mapping: Mapping[str, dict[str, Any]]) -> None:
     actual = {asset.asset_key: asset.content_sha256 for asset in reviewed_assets()}
     expected_fields = {
         "asset_key",
@@ -134,6 +146,8 @@ def build_society_input(
     Malformed binding/digest/registry data raises ValueError rather than publishing a false receipt.
     """
     profile = input_profile(composition_profile)
+    if composition_profile == AUTHORED_GROUND_COMPOSITION:
+        raise ValueError("an authored ground has no district interpretation to compose")
     if interpretation.get("profile") != "exulanica.district-interpretation/v1":
         raise ValueError("unsupported district interpretation profile")
     if hashlib.sha256(base_bytes).hexdigest() != interpretation["base_artifact_sha256"]:
@@ -154,7 +168,7 @@ def build_society_input(
         != version.state_sha256
     ):
         raise ValueError("authored delta digest mismatch")
-    _validate_registry(reviewed_affordances)
+    validate_reviewed_affordances(reviewed_affordances)
     if availability not in ("available", "unavailable"):
         raise ValueError("invalid current availability")
     if (availability == "available") != (unavailable_reason is None):
@@ -171,190 +185,38 @@ def build_society_input(
         reason = reason or "unsupported_environment_composition"
     refs = deepcopy(list(dependency_refs))
     refs.extend(
-        [
-            {
-                "kind": "society_composition_policy",
-                "identity": composition_profile,
-                "sha256": society_state_sha256({"profile": composition_profile}),
-            },
-            {
-                "kind": "society_frame_registration",
-                "identity": str(version.version_id),
-                "sha256": society_state_sha256(
-                    dict(registration) if registration is not None else None
-                ),
-            },
-            {
-                "kind": "society_affordance_registry",
-                "identity": composition_profile,
-                "sha256": society_state_sha256(dict(reviewed_affordances)),
-            },
-        ]
-    )
-    # Complete authored object documents bind origin.role and transform even though the frozen
-    # target shape carries only origin='authored'. No personal meaning is inferred from assets.
-    for obj in sorted(version.objects, key=lambda value: value.object_id):
-        reviewed = reviewed_affordances.get(obj.asset_sha256)
-        if not obj.removed and reviewed is not None:
-            refs.append(
-                {
-                    "kind": "reviewed_asset",
-                    "identity": reviewed["asset_key"],
-                    "sha256": obj.asset_sha256,
-                }
-            )
-        refs.append(
-            {
-                "kind": "authored_object",
-                "identity": f"{version.version_id}:{obj.object_id}",
-                "sha256": society_state_sha256(object_document(obj)),
-            }
+        policy_dependency_refs(
+            composition_profile=composition_profile,
+            version_id=version.version_id,
+            registration=registration,
+            reviewed_affordances=reviewed_affordances,
         )
+    )
+    refs.extend(object_dependency_refs(version, reviewed_affordances))
 
-    objects = []
-    obstacles: list[tuple[str, list[Point]]] = []
+    objects: list[ComposedObject] = []
+    obstacles: list[Obstacle] = []
+    targets: list[dict[str, Any]] = []
+    unavailable_affordances: list[dict[str, Any]] = []
     if reason is None:
         assert registration is not None
-        tx, ty, tz = registration["translation_mm"]
-        for obj in sorted(version.objects, key=lambda value: value.object_id):
-            if obj.removed:
-                continue
-            reviewed = reviewed_affordances.get(obj.asset_sha256)
-            if obj.region_id != registration["region_id"]:
-                reason = f"unregistered_object_region:{obj.object_id}"
-            elif reviewed is None:
-                reason = f"unknown_active_asset:{obj.object_id}"
-            elif obj.behaviour is not None:
-                reason = f"unsupported_active_behaviour:{obj.object_id}"
-            elif obj.origin.kind != "authored" or obj.origin.role not in ("fictional", "personal"):
-                reason = f"unsupported_object_origin:{obj.object_id}"
-            elif (
-                composition_profile == LOCAL_COMPOSITION
-                and any(
-                    type(value) is not int or abs(value) > 10**9
-                    for value in (
-                        obj.transform.x_mm,
-                        obj.transform.y_mm,
-                        obj.transform.z_mm,
-                        obj.transform.yaw_microradians,
-                        obj.transform.scale_milli,
-                    )
-                )
-            ) or (
-                obj.transform.yaw_microradians != 0
-                or obj.transform.scale_milli != 1000
-                or obj.transform.y_mm + ty != 0
-            ):
-                reason = f"unsupported_object_transform:{obj.object_id}"
-            if reason:
-                break
-            assert reviewed is not None
-            center = (obj.transform.x_mm + tx, obj.transform.z_mm + tz)
-            objects.append((obj, reviewed, center))
-            if reviewed["blocks_navigation"]:
-                hx, hz = reviewed["footprint_half_extents_mm"]
-                x, z = center
-                obstacles.append(
-                    (
-                        obj.object_id,
-                        [
-                            (x - hx, z - hz),
-                            (x + hx, z - hz),
-                            (x + hx, z + hz),
-                            (x - hx, z + hz),
-                            (x - hx, z - hz),
-                        ],
-                    )
-                )
-
-    targets = []
-    unavailable_affordances = []
+        objects, obstacles, reason = composed_objects(
+            version,
+            reviewed_affordances,
+            region_id=registration["region_id"],
+            translation_mm=registration["translation_mm"],
+            composition_profile=composition_profile,
+        )
     if reason is None:
-        clearance = nav["clearance_mm"]
-
-        def clear(a: Point, b: Point, excluded: str | None = None) -> bool:
-            return bool(supports(a, b, clearance)) and not any(
-                segment_blocked(a, b, ring, clearance)
-                for identity, ring in obstacles
-                if identity != excluded
-            )
-
-        nav["nodes"] = [
-            n for n in nav["nodes"] if clear(tuple(n["position_mm"]), tuple(n["position_mm"]))
-        ]
-        nodes = {n["node_id"]: n for n in nav["nodes"]}
-        nav["edges"] = [
-            e
-            for e in nav["edges"]
-            if e["from_node_id"] in nodes
-            and e["to_node_id"] in nodes
-            and clear(
-                tuple(nodes[e["from_node_id"]]["position_mm"]),
-                tuple(nodes[e["to_node_id"]]["position_mm"]),
-            )
-        ]
-        nav["destinations"] = [d for d in nav["destinations"] if d["node_id"] in nodes]
-        for dest in nav["destinations"]:
-            targets.append(
-                {
-                    "target_id": dest["destination_id"],
-                    "subject_id": dest["subject_id"],
-                    "node_id": dest["node_id"],
-                    "affordance": dest["affordance"],
-                    "duration_ticks": dest["duration_ticks"],
-                    "origin": "district",
-                    "object_id": None,
-                    "version_id": str(version.version_id),
-                    "enabled": True,
-                }
-            )
-        connected = {e[key] for e in nav["edges"] for key in ("from_node_id", "to_node_id")}
-        for obj, reviewed, center in objects:
-            candidates = []
-            for node in nav["nodes"]:
-                point = tuple(node["position_mm"])
-                squared = (point[0] - center[0]) ** 2 + (point[1] - center[1]) ** 2
-                # This is bounded object-use reach from an existing access node, NOT a new
-                # movement edge, and never a change to object/player/inhabitant placement.
-                if (
-                    node["node_id"] in connected
-                    and squared <= reviewed["reach_mm"] ** 2
-                    and clear(point, center, excluded=obj.object_id)
-                ):
-                    candidates.append((squared, node["node_id"]))
-            if not candidates:
-                if composition_profile == LOCAL_COMPOSITION:
-                    subject_id = f"authored:{version.version_id}:{obj.object_id}"
-                    unavailable_affordances.append(
-                        {
-                            "target_id": f"{subject_id}:{reviewed['affordance']}",
-                            "subject_id": subject_id,
-                            "object_id": obj.object_id,
-                            "version_id": str(version.version_id),
-                            "affordance": reviewed["affordance"],
-                            "reason": UNREACHABLE,
-                        }
-                    )
-                    continue
-                reason = f"authored_affordance_unreachable:{obj.object_id}"
-                break
-            node_id = min(candidates)[1]
-            subject_id = f"authored:{version.version_id}:{obj.object_id}"
-            targets.append(
-                {
-                    "target_id": f"{subject_id}:{reviewed['affordance']}",
-                    "subject_id": subject_id,
-                    "node_id": node_id,
-                    "affordance": reviewed["affordance"],
-                    "duration_ticks": reviewed["duration_ticks"],
-                    "origin": "authored",
-                    "object_id": obj.object_id,
-                    "version_id": str(version.version_id),
-                    "enabled": True,
-                }
-            )
-        if not nav["nodes"]:
-            reason = reason or "authored_obstacles_block_navigation"
+        targets, unavailable_affordances, reason = affordance_targets(
+            nav,
+            objects,
+            obstacles,
+            version_id=version.version_id,
+            composition_profile=composition_profile,
+            supports=supports,
+            segment_blocked=segment_blocked,
+        )
     if reason is not None:
         # An unknown obstacle/frame is not permission to keep using the uncomposed base graph.
         nav.update(nodes=[], edges=[], destinations=[], unavailable_reason=reason)
@@ -387,3 +249,260 @@ def build_society_input(
     document["document_sha256"] = input_sha256(document)
     validate_society_input(document)
     return document
+
+
+def composed_objects(
+    version: AlternateVersion,
+    reviewed_affordances: Mapping[str, dict[str, Any]],
+    *,
+    region_id: str,
+    translation_mm: Sequence[int],
+    composition_profile: str,
+) -> tuple[list[ComposedObject], list[Obstacle], str | None]:
+    """Project accepted authored objects onto the composed ground plane, or say why not.
+
+    ``translation_mm`` is the registered frame offset. Its vertical component states where that
+    plane sits, so an object anywhere else is refused rather than floated onto it. Returns the
+    usable objects with their composed centres, their collision rings, and the first refusal.
+    """
+    objects: list[ComposedObject] = []
+    obstacles: list[Obstacle] = []
+    reason: str | None = None
+    tx, ty, tz = translation_mm
+    for obj in sorted(version.objects, key=lambda value: value.object_id):
+        if obj.removed:
+            continue
+        reviewed = reviewed_affordances.get(obj.asset_sha256)
+        if obj.region_id != region_id:
+            reason = f"unregistered_object_region:{obj.object_id}"
+        elif reviewed is None:
+            reason = f"unknown_active_asset:{obj.object_id}"
+        elif obj.behaviour is not None:
+            reason = f"unsupported_active_behaviour:{obj.object_id}"
+        elif obj.origin.kind != "authored" or obj.origin.role not in ("fictional", "personal"):
+            reason = f"unsupported_object_origin:{obj.object_id}"
+        elif (
+            composition_profile in LOCAL_FAILURE_COMPOSITIONS
+            and any(
+                type(value) is not int or abs(value) > 10**9
+                for value in (
+                    obj.transform.x_mm,
+                    obj.transform.y_mm,
+                    obj.transform.z_mm,
+                    obj.transform.yaw_microradians,
+                    obj.transform.scale_milli,
+                )
+            )
+        ) or (
+            obj.transform.yaw_microradians != 0
+            or obj.transform.scale_milli != 1000
+            or obj.transform.y_mm + ty != 0
+        ):
+            reason = f"unsupported_object_transform:{obj.object_id}"
+        if reason:
+            break
+        assert reviewed is not None
+        center = (obj.transform.x_mm + tx, obj.transform.z_mm + tz)
+        objects.append((obj, reviewed, center))
+        if reviewed["blocks_navigation"]:
+            hx, hz = reviewed["footprint_half_extents_mm"]
+            x, z = center
+            obstacles.append(
+                (
+                    obj.object_id,
+                    [
+                        (x - hx, z - hz),
+                        (x + hx, z - hz),
+                        (x + hx, z + hz),
+                        (x - hx, z + hz),
+                        (x - hx, z - hz),
+                    ],
+                )
+            )
+    return objects, obstacles, reason
+
+
+def affordance_targets(
+    nav: dict[str, Any],
+    objects: Sequence[ComposedObject],
+    obstacles: Sequence[Obstacle],
+    *,
+    version_id: uuid.UUID,
+    composition_profile: str,
+    supports: Supports,
+    segment_blocked: SegmentBlocked,
+) -> tuple[list[dict[str, Any]], list[dict[str, Any]], str | None]:
+    """Prune ``nav`` against the composed obstacles and bind each activity to an access node.
+
+    ``nav`` is mutated in place: a node, edge or declared destination the composed obstacles no
+    longer leave usable is dropped rather than kept as a route nobody can walk.
+    """
+    targets: list[dict[str, Any]] = []
+    unavailable_affordances: list[dict[str, Any]] = []
+    reason: str | None = None
+    clearance = nav["clearance_mm"]
+
+    def clear(a: Point, b: Point, excluded: str | None = None) -> bool:
+        return bool(supports(a, b, clearance)) and not any(
+            segment_blocked(a, b, ring, clearance)
+            for identity, ring in obstacles
+            if identity != excluded
+        )
+
+    nav["nodes"] = [
+        n for n in nav["nodes"] if clear(tuple(n["position_mm"]), tuple(n["position_mm"]))
+    ]
+    nodes = {n["node_id"]: n for n in nav["nodes"]}
+    nav["edges"] = [
+        e
+        for e in nav["edges"]
+        if e["from_node_id"] in nodes
+        and e["to_node_id"] in nodes
+        and clear(
+            tuple(nodes[e["from_node_id"]]["position_mm"]),
+            tuple(nodes[e["to_node_id"]]["position_mm"]),
+        )
+    ]
+    nav["destinations"] = [d for d in nav["destinations"] if d["node_id"] in nodes]
+    for dest in nav["destinations"]:
+        targets.append(
+            {
+                "target_id": dest["destination_id"],
+                "subject_id": dest["subject_id"],
+                "node_id": dest["node_id"],
+                "affordance": dest["affordance"],
+                "duration_ticks": dest["duration_ticks"],
+                "origin": "district",
+                "object_id": None,
+                "version_id": str(version_id),
+                "enabled": True,
+            }
+        )
+    connected = {e[key] for e in nav["edges"] for key in ("from_node_id", "to_node_id")}
+    for obj, reviewed, center in objects:
+        candidates = []
+        for node in nav["nodes"]:
+            point = tuple(node["position_mm"])
+            squared = (point[0] - center[0]) ** 2 + (point[1] - center[1]) ** 2
+            # This is bounded object-use reach from an existing access node, NOT a new
+            # movement edge, and never a change to object/player/inhabitant placement.
+            if (
+                node["node_id"] in connected
+                and squared <= reviewed["reach_mm"] ** 2
+                and clear(point, center, excluded=obj.object_id)
+            ):
+                candidates.append((squared, node["node_id"]))
+        if not candidates:
+            if composition_profile in LOCAL_FAILURE_COMPOSITIONS:
+                subject_id = f"authored:{version_id}:{obj.object_id}"
+                unavailable_affordances.append(
+                    {
+                        "target_id": f"{subject_id}:{reviewed['affordance']}",
+                        "subject_id": subject_id,
+                        "object_id": obj.object_id,
+                        "version_id": str(version_id),
+                        "affordance": reviewed["affordance"],
+                        "reason": UNREACHABLE,
+                    }
+                )
+                continue
+            reason = f"authored_affordance_unreachable:{obj.object_id}"
+            break
+        node_id = min(candidates)[1]
+        subject_id = f"authored:{version_id}:{obj.object_id}"
+        targets.append(
+            {
+                "target_id": f"{subject_id}:{reviewed['affordance']}",
+                "subject_id": subject_id,
+                "node_id": node_id,
+                "affordance": reviewed["affordance"],
+                "duration_ticks": reviewed["duration_ticks"],
+                "origin": "authored",
+                "object_id": obj.object_id,
+                "version_id": str(version_id),
+                "enabled": True,
+            }
+        )
+    if not nav["nodes"]:
+        reason = reason or "authored_obstacles_block_navigation"
+    return targets, unavailable_affordances, reason
+
+
+def policy_dependency_refs(
+    *,
+    composition_profile: str,
+    version_id: uuid.UUID,
+    registration: Mapping[str, Any] | None,
+    reviewed_affordances: Mapping[str, dict[str, Any]],
+) -> list[dict[str, str]]:
+    """The three references that bind a projection to the policy and registration that made it."""
+    return [
+        {
+            "kind": "society_composition_policy",
+            "identity": composition_profile,
+            "sha256": society_state_sha256({"profile": composition_profile}),
+        },
+        {
+            "kind": "society_frame_registration",
+            "identity": str(version_id),
+            "sha256": society_state_sha256(
+                dict(registration) if registration is not None else None
+            ),
+        },
+        {
+            "kind": "society_affordance_registry",
+            "identity": composition_profile,
+            "sha256": society_state_sha256(dict(reviewed_affordances)),
+        },
+    ]
+
+
+def object_dependency_refs(
+    version: AlternateVersion, reviewed_affordances: Mapping[str, dict[str, Any]]
+) -> list[dict[str, str]]:
+    """Bind every authored object in the version, and the reviewed asset each active one uses.
+
+    Complete authored object documents bind origin.role and transform even though the frozen
+    target shape carries only origin='authored'. No personal meaning is inferred from assets.
+    """
+    refs: list[dict[str, str]] = []
+    for obj in sorted(version.objects, key=lambda value: value.object_id):
+        reviewed = reviewed_affordances.get(obj.asset_sha256)
+        if not obj.removed and reviewed is not None:
+            refs.append(
+                {
+                    "kind": "reviewed_asset",
+                    "identity": reviewed["asset_key"],
+                    "sha256": obj.asset_sha256,
+                }
+            )
+        refs.append(
+            {
+                "kind": "authored_object",
+                "identity": f"{version.version_id}:{obj.object_id}",
+                "sha256": society_state_sha256(object_document(obj)),
+            }
+        )
+    return refs
+
+
+def reviewed_affordance_registry(reach_mm: int = REVIEWED_REACH_MM) -> dict[str, dict[str, Any]]:
+    """The whole reviewed catalog as an affordance registry, keyed by asset content digest.
+
+    A host that has made no narrower choice registers this. It adds no asset and no activity:
+    every entry comes from the reviewed catalog and the reviewed footprint/action table above,
+    and the durations are the policy's own.
+    """
+    registry = {
+        asset.content_sha256: {
+            "asset_key": asset.asset_key,
+            "affordance": _REVIEWED[asset.asset_key][0],
+            "duration_ticks": DURATIONS[_REVIEWED[asset.asset_key][0]],
+            "footprint_half_extents_mm": list(_REVIEWED[asset.asset_key][1]),
+            "blocks_navigation": _REVIEWED[asset.asset_key][2],
+            "reach_mm": reach_mm,
+        }
+        for asset in reviewed_assets()
+    }
+    validate_reviewed_affordances(registry)
+    return registry

@@ -9,6 +9,7 @@ from fastapi import Request
 
 from exulanica.api.dependencies import get_services
 from exulanica.selection.validation import Session
+from exulanica.world.models import DEFAULT_WORLD_ID
 from exulanica.world.society import UnavailableSocietyInput
 from exulanica.world.society_decision_repository import SocietyDecisionRepository
 from exulanica.world.society_repository import SocietyRepository
@@ -19,6 +20,7 @@ def request_decision(
     session: Session,
     version_id: uuid.UUID,
     *,
+    world_id: str = DEFAULT_WORLD_ID,
     request_id: uuid.UUID,
     subject_id: uuid.UUID,
     base_tick: int,
@@ -33,6 +35,7 @@ def request_decision(
             SocietyRepository(
                 connection,
                 session.workspace_id,
+                world_id=world_id,
                 input_authorizer=None
                 if authorizer is None
                 else lambda doc: authorizer(connection, session, doc),
