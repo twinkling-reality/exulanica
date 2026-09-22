@@ -2,7 +2,14 @@ import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type * as pc from 'playcanvas';
-import { atlasVec3, placement, type IslandId } from '@exulanica/atlas-core';
+import {
+  DEFAULT_REPRESENTATION_INTENT,
+  atlasVec3,
+  placement,
+  resolveRepresentation,
+  validateRepresentationSubject,
+  type IslandId,
+} from '@exulanica/atlas-core';
 import { SURVEY_RELIEF, unitRgb, worldSilhouetteTone } from '@exulanica/presentation';
 import {
   AUTHORED_OBJECT_MEDIA_TYPE,
@@ -15,6 +22,7 @@ import {
   fetchVerifiedObjectAsset,
   nudgedPose,
   objectAssetBytesPath,
+  placementLandingPose,
   placementPoseAtAtlasPoint,
   placementPoseBeforeVisitor,
   regionPointFromAtlas,
@@ -26,6 +34,7 @@ import {
   type RegionPose,
   type SceneObjectRuntimeOptions,
 } from '../src/playcanvas/scene-objects.js';
+import { placedCatalogObjectSubject } from '../src/playcanvas/atlas-binding.js';
 
 /**
  * The authored-object boundary, from the outside.
@@ -375,6 +384,23 @@ describe('placement is region-local fixed point', () => {
     expect(back[2]).toBeCloseTo(0, 6);
   });
 
+  it('lands the confirm mark where a turned, scaled region will draw the pose, facing its way', () => {
+    const turned = placement(atlasVec3(10, 0, -4), Math.PI / 2, 2);
+    const landing = placementLandingPose(turned, {
+      xMm: 1000, yMm: 0, zMm: 0, yawMicroradians: yawMicroradiansOf(Math.PI / 4), scaleMilli: 1000,
+    });
+    // One metre along local +X, turned a quarter to -Z and doubled, from the region's offset.
+    expect(landing.position.x).toBeCloseTo(10, 6);
+    expect(landing.position.y).toBeCloseTo(0, 6);
+    expect(landing.position.z).toBeCloseTo(-6, 6);
+    // The region's quarter turn plus the pose's eighth.
+    expect(landing.yaw).toBeCloseTo((3 * Math.PI) / 4, 6);
+    expect(landing.pitch).toBe(0);
+    const back = regionPointFromAtlas(turned, [landing.position.x, landing.position.y, landing.position.z]);
+    expect(back[0]).toBeCloseTo(1000, 6);
+    expect(back[2]).toBeCloseTo(0, 6);
+  });
+
   it('produces whole millimetres, microradians and thousandths', () => {
     const pose = placementPoseBeforeVisitor(
       region,
@@ -539,6 +565,23 @@ const boundedPath = (over: Record<string, unknown> = {}) => ({
   behaviourKey: 'motion.bounded-path',
   behaviourVersion: 1,
   parameters: { axis: 'y', easing: 'smooth', travel_mm: 1000, period_milliseconds: 4000, ...over },
+});
+
+describe('a placed catalog object is inspected as what it is', () => {
+  it('claims a display record and its reviewed-asset identity, and no source records', () => {
+    const subject = placedCatalogObjectSubject(placed(null), {
+      min: [-0.25, 0, -0.25], max: [0.25, 0.5, 0.25],
+    });
+    validateRepresentationSubject(subject);
+    expect(subject.origin).toBe('authored');
+    expect(subject.subjectKind).toBe('object');
+    expect(subject.label).toBe(placed(null).asset.assetKey);
+    expect(subject.sourceRefs).toEqual([placed(null).asset.contentSha256]);
+    expect(subject.dataAvailable).toBe(false);
+    const resolved = resolveRepresentation({ ...DEFAULT_REPRESENTATION_INTENT, data: true }, subject);
+    expect(resolved.data).toBe(false);
+    expect(resolved.reasons).toContain('Selected source records are unavailable.');
+  });
 });
 
 describe('the runtime places, moves and animates what a surface already committed', () => {

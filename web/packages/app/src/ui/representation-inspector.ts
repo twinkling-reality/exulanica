@@ -7,6 +7,12 @@ import {
   type RepresentationSubject,
 } from '@exulanica/atlas-core';
 import { el } from './dom.js';
+import {
+  representationAvailabilityLines,
+  representationAvailabilitySentence,
+  starterGroundAvailabilityLines,
+  type RepresentationAvailabilityLine,
+} from './representation-availability.js';
 import './representation-inspector.css';
 
 interface Entry {
@@ -30,6 +36,15 @@ interface Binding {
   setRepresentationIntent(intent: RepresentationIntent): Report;
   setRepresentationSelection?(subjectId: string | null): Report;
   readonly representationOverlayPlan?: { readonly refusals: readonly Refusal[] } | null;
+}
+
+/** Optional starter-ground facts when no data-view subject is selected. */
+export interface RepresentationInspectorOptions {
+  /**
+   * When the authored starter is the current subject, report whether its ground is already drawn.
+   * Return null when the active world is not that starter.
+   */
+  readonly starterGround?: () => { readonly renderedInView: boolean } | null;
 }
 
 const ORIGIN_WORDS: Readonly<Record<string, string>> = {
@@ -86,8 +101,19 @@ function subjectMatches(entry: Entry, query: string): boolean {
   return words.every(word => searchable.includes(word));
 }
 
+function availabilityItems(lines: readonly RepresentationAvailabilityLine[]): HTMLLIElement[] {
+  return lines.map(item => el('li', {
+    'data-kind': item.kind,
+    'data-state': item.state,
+    text: representationAvailabilitySentence(item),
+  }));
+}
+
 /** A read-only lens on actual renderer capabilities. It never requests or changes source data. */
-export function buildRepresentationInspector(getBinding: () => Binding | null) {
+export function buildRepresentationInspector(
+  getBinding: () => Binding | null,
+  options: RepresentationInspectorOptions = {},
+) {
   const root = el('details', { class: 'representation-inspector' });
   const slider = el('input', { type: 'range', min: '0', max: '100', step: '1', value: '0',
     'aria-label': 'Rendered world to points', disabled: true });
@@ -111,6 +137,14 @@ export function buildRepresentationInspector(getBinding: () => Binding | null) {
   });
   const searchStatus = el('p', { class: 'representation-search-status', role: 'status' });
   const subjects = el('select', { 'aria-label': 'Inspect a displayed geometry group', disabled: true });
+  const availabilityHeading = el('p', {
+    class: 'representation-availability-heading',
+    text: 'Representation availability',
+  });
+  const availability = el('ul', {
+    class: 'representation-availability',
+    'aria-label': 'Representation availability',
+  });
   const description = el('p', { class: 'representation-description' });
   const record = el('pre', { class: 'representation-record' });
   const data = el('details', {}, [el('summary', { text: 'Display record' }), record]);
@@ -129,7 +163,8 @@ export function buildRepresentationInspector(getBinding: () => Binding | null) {
     ]),
     el('label', {}, [el('span', { text: 'Search displayed subjects' }), search]),
     searchStatus,
-    el('label', {}, [el('span', { text: 'Inspect geometry' }), subjects]), description, data,
+    el('label', {}, [el('span', { text: 'Inspect geometry' }), subjects]),
+    availabilityHeading, availability, description, data,
   );
   let current: Report | null = null;
   let inventoryKey = '';
@@ -141,7 +176,27 @@ export function buildRepresentationInspector(getBinding: () => Binding | null) {
     return current?.subjects.find(item => item.subject.subjectId === current?.selection
       && item.subject.availability === 'available');
   }
+  function showAvailability() {
+    const entry = selectedEntry();
+    if (entry !== undefined) {
+      availabilityHeading.hidden = false;
+      availability.hidden = false;
+      availability.replaceChildren(...availabilityItems(representationAvailabilityLines(entry.subject)));
+      return;
+    }
+    const starter = options.starterGround?.() ?? null;
+    if (starter !== null && (current?.selection === null || current?.selection === undefined)) {
+      availabilityHeading.hidden = false;
+      availability.hidden = false;
+      availability.replaceChildren(...availabilityItems(starterGroundAvailabilityLines(starter.renderedInView)));
+      return;
+    }
+    availabilityHeading.hidden = true;
+    availability.hidden = true;
+    availability.replaceChildren();
+  }
   function showRecord() {
+    showAvailability();
     const entry = selectedEntry();
     data.hidden = entry === undefined;
     if (entry === undefined) { description.textContent = ''; record.textContent = ''; return; }

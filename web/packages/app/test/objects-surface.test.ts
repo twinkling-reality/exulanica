@@ -3,9 +3,11 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   atlasVec3, islandId, localVec3, makeIsland, placement, sceneDisplayFrame,
 } from '@exulanica/atlas-core';
+import { ApiError } from '@exulanica/graph-client';
+import { COMPOSITION_BLOCKED_REASONS } from '../src/composition-preview-api.js';
 import { mountObjects, type MountedObjects, type ObjectsDependencies } from '../src/composition/objects.js';
 import type { AppEnvironment, SessionState } from '../src/composition/session-state.js';
-import { WorldObjectsClient } from '../src/world-objects-api.js';
+import { WorldObjectsClient, WorldObjectsContractError } from '../src/world-objects-api.js';
 import type {
   AlternateVersion, AuthoredObject, ReviewedAsset,
 } from '../src/world-objects-api.js';
@@ -154,14 +156,50 @@ function runtime() {
   };
 }
 
+/** A composition preview body, in the wire shape the server answers with. Ready unless told. */
+type WireBody = {
+  readonly source: { readonly asset_key: string };
+  readonly placement: { readonly subject_id: string } | null;
+};
+function previewAnswer(
+  base: AlternateVersion,
+  body: WireBody,
+  blockedReason: string | null = null,
+  over: Record<string, unknown> = {},
+): Record<string, unknown> {
+  return {
+    availability: blockedReason === null ? 'ready' : 'blocked',
+    blocked_reason: blockedReason,
+    blocked_detail: blockedReason === null ? null : 'The server said why in its own words.',
+    source: {
+      kind: 'reviewed_asset', asset_key: body.source.asset_key,
+      content_sha256: blockedReason === null ? 'b'.repeat(64) : null,
+      bytes: blockedReason === null ? 'available' : null,
+    },
+    version: {
+      authored_version_id: base.versionId, world_id: base.worldId,
+      state_sha256: base.stateSha256, edit_seq: base.editSeq,
+      source_snapshot_id: base.sourceSnapshotId, style_version_id: null,
+    },
+    would_change: {
+      kind: 'add_object',
+      subject_id: body.placement?.subject_id ?? null,
+      document: blockedReason === null ? { object_id: body.placement?.subject_id } : null,
+      preserves: ['source_snapshot_id', 'style_version_id', 'other_subjects', 'prior_edits'],
+    },
+    ...over,
+  };
+}
+
 /** The authority, scripted: it records every call and answers whatever the test queued. */
 function script(initial: AlternateVersion = version()) {
   const calls: { name: string; args: unknown[] }[] = [];
   let current = initial;
   let answer: unknown = null;
+  let verdict: ((base: AlternateVersion, body: WireBody) => unknown) | Error | null = null;
   const record = (name: string) => (...args: unknown[]) => {
     calls.push({ name, args });
-    if (answer instanceof Error) { const thrown = answer; answer = null; throw thrown; }
+    if (answer instanceof Error) { const thrown = answer; answer = null; return Promise.reject(thrown); }
     const queued = answer;
     answer = null;
     return Promise.resolve(queued ?? { kind: 'recorded', version: current });
@@ -169,12 +207,26 @@ function script(initial: AlternateVersion = version()) {
   return {
     calls,
     answerWith(next: unknown) { answer = next; },
+    /** The next preview answer: a verdict built from the request, or a thrown failure. */
+    previewWith(next: ((base: AlternateVersion, body: WireBody) => unknown) | Error) { verdict = next; },
+    setCurrent(next: AlternateVersion) { current = next; },
     client: {
       connect: vi.fn(async () => {
         calls.push({ name: 'connect', args: [] });
         return { assets: [asset()], version: current };
       }),
-      readVersion: vi.fn(async () => current),
+      readVersion: vi.fn(async () => {
+        calls.push({ name: 'readVersion', args: [] });
+        return current;
+      }),
+      compositionPreview: vi.fn(async (base: AlternateVersion, body: WireBody) => {
+        calls.push({ name: 'preview', args: [base, body] });
+        const next = verdict;
+        verdict = null;
+        if (next instanceof Error) throw next;
+        return next === null ? previewAnswer(base, body) : next(base, body);
+      }),
+      compositionApply: record('apply'),
       place: record('place'),
       move: record('move'),
       remove: record('remove'),
@@ -193,6 +245,8 @@ function harness(
     readonly awayBy?: number;
     readonly initial?: AlternateVersion;
     readonly representationSubjects?: readonly string[];
+    /** Where the visitor stands, in atlas metres, looking down -Z. */
+    readonly standAt?: readonly [number, number, number];
   } = {},
   previewMode = false,
 ) {
@@ -209,7 +263,10 @@ function harness(
     objects,
     // A third-person camera is behind the player, outside this region's placement reach.
     cameraPose: () => ({ position: atlasVec3(12, 3, 12), forward: atlasVec3(-1, 0, -1) }),
-    playerPose: () => ({ position: atlasVec3(0, 1.6, 0), forward: atlasVec3(0, 0, -1) }),
+    playerPose: () => ({
+      position: atlasVec3(...(over.standAt ?? [0, 1.6, 0])),
+      forward: atlasVec3(0, 0, -1),
+    }),
     engageFocusedAnchor: () => null,
     table: { atlasPositions: new Float32Array([0, 0, 0]) },
     representationReport,
@@ -271,9 +328,46 @@ const button = (root: HTMLElement, label: string): HTMLButtonElement => {
   return found as HTMLButtonElement;
 };
 
+/** Every write. `place` is here so a regression to the direct object route would show. */
 const writes = (calls: { name: string }[]): string[] =>
-  calls.filter((call) => ['place', 'move', 'remove', 'undo'].includes(call.name))
+  calls.filter((call) => ['apply', 'place', 'move', 'remove', 'undo'].includes(call.name))
     .map((call) => call.name);
+
+type AppliedBody = {
+  readonly source: Record<string, unknown>;
+  readonly placement: {
+    readonly subject_id: string;
+    readonly region_id: string;
+    readonly transform: Record<string, number>;
+    readonly origin_role: string;
+    readonly behaviour: unknown;
+  };
+};
+
+/** The body the one apply call carried. */
+const applied = (calls: { name: string; args: unknown[] }[]): AppliedBody =>
+  calls.find((call) => call.name === 'apply')!.args[1] as AppliedBody;
+
+const confirmButton = (h: { mounted: MountedObjects }): HTMLButtonElement =>
+  button(h.mounted.confirm.root, 'Confirm');
+
+/** Wait for the server's ready verdict and the Confirm it releases. */
+async function verdictReady(h: { mounted: MountedObjects }): Promise<void> {
+  await vi.waitFor(() => {
+    expect(h.mounted.confirm.root.querySelector('.composition-verdict')?.getAttribute('data-state'))
+      .toBe('ready');
+    expect(confirmButton(h).disabled).toBe(false);
+  });
+}
+
+/** The words a person reads in the verdict, without the folded-away details. */
+function visibleVerdict(root: HTMLElement): string {
+  const verdict = root.querySelector<HTMLElement>('.composition-verdict');
+  if (verdict === null) return '';
+  const copy = verdict.cloneNode(true) as HTMLElement;
+  for (const details of copy.querySelectorAll('details')) details.remove();
+  return copy.textContent ?? '';
+}
 
 const arrow = (code: string) => {
   window.dispatchEvent(new KeyboardEvent('keydown', { code, bubbles: true, cancelable: true }));
@@ -310,10 +404,11 @@ describe('authorized district placement', () => {
     await h.mounted.begin();
     await place(h);
     expect(h.mounted.confirm.root.textContent).toContain('district’s authored ground');
-    button(h.mounted.confirm.root, 'Confirm').click();
-    await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['place']));
-    const request = h.authority.calls.find(call => call.name === 'place')!.args[1] as {transform: unknown};
-    expect(request.transform).toMatchObject({xMm: -10000, yMm: -3000, zMm: 3500});
+    await verdictReady(h);
+    confirmButton(h).click();
+    await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['apply']));
+    expect(applied(h.authority.calls).placement.transform)
+      .toMatchObject({ x_mm: -10000, y_mm: -3000, z_mm: 3500 });
   });
 
   it('refuses an unavailable binding, a different version and a target beyond the district', async () => {
@@ -350,8 +445,9 @@ describe('authorized district placement', () => {
     h.state.placedPointMaps = [];
     await h.mounted.begin();
     await place(h);
+    await verdictReady(h);
     binding = null;
-    button(h.mounted.confirm.root, 'Confirm').click();
+    confirmButton(h).click();
     await vi.waitFor(() => expect(h.mounted.confirm.root.textContent).toContain('district binding changed'));
     expect(writes(h.authority.calls)).toEqual([]);
   });
@@ -364,10 +460,11 @@ describe('nothing reaches the authority without a confirmation', () => {
     await h.mounted.begin();
     await place(h);
     expect(onAuthoredEdit).not.toHaveBeenCalled();
-    button(h.mounted.confirm.root, 'Confirm').click();
+    await verdictReady(h);
+    confirmButton(h).click();
     await vi.waitFor(() => expect(onAuthoredEdit).toHaveBeenCalledWith(version().versionId));
     await vi.waitFor(() => expect(h.mounted.confirm.root.hidden).toBe(true));
-    expect(writes(h.authority.calls)).toEqual(['place']);
+    expect(writes(h.authority.calls)).toEqual(['apply']);
     expect(h.travel.some(item => item.message.includes('Your change was saved.'))).toBe(true);
   });
 
@@ -383,7 +480,7 @@ describe('nothing reaches the authority without a confirmation', () => {
     expect(writes(h.authority.calls)).toEqual([]);
   });
 
-  it('marks the placementPoseBeforeVisitor landing on the ground during confirm, then commits with client.place', async () => {
+  it('marks the placementPoseBeforeVisitor landing on the ground during confirm, then applies that pose', async () => {
     const h = harness();
     await h.mounted.begin();
     const setLanding = h.binding.field.setPlacementLandingPose as ReturnType<typeof vi.fn>;
@@ -401,14 +498,13 @@ describe('nothing reaches the authority without a confirmation', () => {
     expect(landing.position.z).toBeCloseTo(-3.5, 5);
     expect(Number.isFinite(landing.yaw)).toBe(true);
 
-    button(h.mounted.confirm.root, 'Confirm').click();
-    await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['place']));
+    await verdictReady(h);
+    confirmButton(h).click();
+    await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['apply']));
     expect(setLanding).toHaveBeenLastCalledWith(null);
-    const request = h.authority.calls.find((c) => c.name === 'place')!.args[1] as {
-      transform: { xMm: number; zMm: number };
-    };
-    expect(request.transform.xMm).toBe(0);
-    expect(request.transform.zMm).toBeCloseTo(-3500, 0);
+    const request = applied(h.authority.calls);
+    expect(request.placement.transform['x_mm']).toBe(0);
+    expect(request.placement.transform['z_mm']).toBeCloseTo(-3500, 0);
   });
 
   it('clears the placement landing mark when confirmation is cancelled', async () => {
@@ -428,21 +524,23 @@ describe('nothing reaches the authority without a confirmation', () => {
     const h = harness();
     await h.mounted.begin();
     await place(h);
-    button(h.mounted.confirm.root, 'Confirm').click();
-    await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['place']));
+    await verdictReady(h);
+    confirmButton(h).click();
+    await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['apply']));
 
-    const request = h.authority.calls.find((c) => c.name === 'place')!.args[1] as Record<string, unknown>;
-    expect(request['assetSha256']).toBe('b'.repeat(64));
-    expect(request['regionId']).toBe(String(REGION));
-    expect(request['originRole']).toBe('fictional');
-    expect(request['behaviour']).toBeNull();
-    expect(String(request['objectId'])).toMatch(/^object-/);
+    const request = applied(h.authority.calls);
+    // The source is named by reviewed key; the server resolves its digest and bytes.
+    expect(request.source).toEqual({ kind: 'reviewed_asset', asset_key: 'cc0.marker-pillar' });
+    expect(request.placement.region_id).toBe(String(REGION));
+    expect(request.placement.origin_role).toBe('fictional');
+    expect(request.placement.behaviour).toBeNull();
+    expect(request.placement.subject_id).toMatch(/^object-/);
     // Region-local millimetres, a step ahead of a visitor looking down region -Z.
-    const pose = request['transform'] as Record<string, number>;
-    expect(pose['xMm']).toBe(0);
-    expect(pose['yMm']).toBe(0);
-    expect(pose['zMm']).toBeCloseTo(-3500, 0);
-    expect(pose['scaleMilli']).toBe(1000);
+    const pose = request.placement.transform;
+    expect(pose['x_mm']).toBe(0);
+    expect(pose['y_mm']).toBe(0);
+    expect(pose['z_mm']).toBeCloseTo(-3500, 0);
+    expect(pose['scale_milli']).toBe(1000);
     for (const value of Object.values(pose)) expect(Number.isSafeInteger(value)).toBe(true);
   });
 
@@ -462,12 +560,12 @@ describe('nothing reaches the authority without a confirmation', () => {
     await h.mounted.begin();
     await place(h, true);
     expect(h.mounted.confirm.root.textContent).toContain('travelling');
-    button(h.mounted.confirm.root, 'Confirm').click();
-    await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['place']));
-    const request = h.authority.calls.find((c) => c.name === 'place')!.args[1] as Record<string, unknown>;
-    expect(request['behaviour']).toEqual({
-      behaviourKey: 'motion.bounded-path',
-      behaviourVersion: 1,
+    await verdictReady(h);
+    confirmButton(h).click();
+    await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['apply']));
+    expect(applied(h.authority.calls).placement.behaviour).toEqual({
+      behaviour_key: 'motion.bounded-path',
+      behaviour_version: 1,
       // The registry's own defaults, in the registry's own units.
       parameters: { axis: 'x', easing: 'smooth', travel_mm: 1000, period_milliseconds: 4000 },
     });
@@ -536,6 +634,355 @@ describe('nothing reaches the authority without a confirmation', () => {
   });
 });
 
+describe('adding goes through the server’s preview, then the same request is applied', () => {
+  const refusedVerdict = async (h: { mounted: MountedObjects }): Promise<HTMLElement> => {
+    await vi.waitFor(() => expect(
+      h.mounted.confirm.root.querySelector('.composition-verdict')?.getAttribute('data-state'),
+    ).toBe('refused'));
+    return h.mounted.confirm.root.querySelector<HTMLElement>('.composition-verdict')!;
+  };
+
+  it('holds Confirm until the server says ready, and applies exactly what it previewed', async () => {
+    let answer!: (value: unknown) => void;
+    const h = harness();
+    await h.mounted.begin();
+    h.authority.previewWith((base, body) => new Promise((resolve) => {
+      answer = () => resolve(previewAnswer(base, body));
+    }));
+    await place(h);
+    expect(h.mounted.confirm.root.textContent).toContain('Checking with the world');
+    expect(confirmButton(h).disabled).toBe(true);
+    confirmButton(h).click();
+    // Even a Confirm forced open before the verdict arrives sends nothing.
+    confirmButton(h).disabled = false;
+    confirmButton(h).click();
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    expect(writes(h.authority.calls)).toEqual([]);
+
+    answer(undefined);
+    await verdictReady(h);
+    expect(visibleVerdict(h.mounted.confirm.root)).toContain(
+      'Ready to add. “Marker pillar” will stand where the mark shows.',
+    );
+    // Said only because the server listed what apply leaves as it is.
+    expect(visibleVerdict(h.mounted.confirm.root)).toContain('Everything else in this world stays as it is.');
+    expect(writes(h.authority.calls)).toEqual([]);
+
+    confirmButton(h).click();
+    await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['apply']));
+    const previewed = h.authority.calls.find((call) => call.name === 'preview')!;
+    const apply = h.authority.calls.find((call) => call.name === 'apply')!;
+    expect(apply.args[1]).toEqual(previewed.args[1]);
+    expect(apply.args[0]).toBe(previewed.args[0]);
+    expect((apply.args[0] as AlternateVersion).stateSha256).toBe(STATE);
+  });
+
+  it('says what happened and what to do for every blocked code, with the code only in the details', async () => {
+    const sentences = new Set<string>();
+    for (const code of COMPOSITION_BLOCKED_REASONS) {
+      const h = harness();
+      await h.mounted.begin();
+      h.authority.previewWith((base, body) => previewAnswer(base, body, code));
+      await place(h);
+      const verdict = await refusedVerdict(h);
+      const visible = visibleVerdict(h.mounted.confirm.root);
+      expect(visible, code).not.toContain(code);
+      expect(visible, code).not.toMatch(/[a-z]_[a-z]/);
+      expect(verdict.querySelector('details')?.textContent, code).toContain(code);
+      expect(confirmButton(h).disabled, code).toBe(true);
+      confirmButton(h).click();
+      sentences.add(verdict.querySelector('.composition-verdict-sentence')!.textContent ?? '');
+      expect(writes(h.authority.calls), code).toEqual([]);
+      h.mounted.dispose();
+    }
+    // Every code has its own sentence rather than one generic refusal.
+    expect(sentences.size).toBe(COMPOSITION_BLOCKED_REASONS.length);
+  });
+
+  it('gives a code it does not know a generic sentence and keeps that code in the details', async () => {
+    const h = harness();
+    await h.mounted.begin();
+    h.authority.previewWith((base, body) => previewAnswer(base, body, 'a_code_from_later'));
+    await place(h);
+    const verdict = await refusedVerdict(h);
+    expect(visibleVerdict(h.mounted.confirm.root)).toContain('does not recognise');
+    expect(visibleVerdict(h.mounted.confirm.root)).not.toContain('a_code_from_later');
+    expect(verdict.querySelector('details')?.textContent).toContain('a_code_from_later');
+    expect(confirmButton(h).disabled).toBe(true);
+  });
+
+  it('reads a stale base again, draws the current world, and checks again only when asked', async () => {
+    const moved = version({
+      stateSha256: 'd'.repeat(64),
+      editSeq: 1,
+      objects: [objectRecord()],
+      edits: [edit(1, 'add_object')],
+    });
+    const h = harness();
+    await h.mounted.begin();
+    h.authority.setCurrent(moved);
+    h.authority.previewWith((base, body) => previewAnswer(base, body, 'stale_base', {
+      version: {
+        authored_version_id: base.versionId, world_id: base.worldId,
+        state_sha256: moved.stateSha256, edit_seq: 1,
+        source_snapshot_id: base.sourceSnapshotId, style_version_id: null,
+      },
+    }));
+    await place(h);
+    await refusedVerdict(h);
+    await vi.waitFor(() => expect(h.objects.objectIds).toEqual(['object:lantern']));
+    expect(h.authority.calls.filter((call) => call.name === 'preview')).toHaveLength(1);
+
+    button(h.mounted.confirm.root, 'Check again').click();
+    await verdictReady(h);
+    const previews = h.authority.calls.filter((call) => call.name === 'preview');
+    expect(previews).toHaveLength(2);
+    expect((previews[1]!.args[0] as AlternateVersion).stateSha256).toBe('d'.repeat(64));
+    const second = previews[1]!.args[1] as AppliedBody;
+    expect(second.placement.subject_id).toMatch(/^object-2-/);
+    confirmButton(h).click();
+    await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['apply']));
+    expect((applied(h.authority.calls) as AppliedBody).placement.subject_id)
+      .toBe(second.placement.subject_id);
+  });
+
+  it('leaves the world unchanged and says why when apply is refused', async () => {
+    const h = harness();
+    await h.mounted.begin();
+    await place(h);
+    await verdictReady(h);
+    const drawsBefore = h.objects.clear.mock.calls.length;
+    h.authority.answerWith(new ApiError(409, 'composition_blocked', 'asset_bytes_unavailable'));
+    confirmButton(h).click();
+    await vi.waitFor(() =>
+      expect(h.mounted.confirm.root.textContent).toContain('Nothing was written'));
+    expect(h.mounted.confirm.root.textContent).toContain('missing from storage');
+    expect(h.mounted.confirm.root.querySelector('details')?.textContent)
+      .toContain('asset_bytes_unavailable');
+    expect(h.mounted.confirm.root.querySelector('.confirm-refused')?.textContent)
+      .not.toContain('asset_bytes_unavailable');
+    expect(h.objects.clear.mock.calls.length).toBe(drawsBefore);
+    expect(h.objects.objectIds).toEqual([]);
+    expect(writes(h.authority.calls)).toEqual(['apply']);
+    expect(button(h.mounted.panel.root, 'Take back the last change').disabled).toBe(true);
+  });
+
+  it('offers a stale apply back as a fresh check against the world read again', async () => {
+    const moved = version({ stateSha256: 'e'.repeat(64), editSeq: 4 });
+    const h = harness();
+    await h.mounted.begin();
+    await place(h);
+    await verdictReady(h);
+    h.authority.answerWith({ kind: 'stale', current: moved });
+    confirmButton(h).click();
+    await vi.waitFor(() =>
+      expect(h.mounted.confirm.root.textContent).toContain('This world changed after it was last read'));
+    button(h.mounted.confirm.root, 'Check again').click();
+    await verdictReady(h);
+    const previews = h.authority.calls.filter((call) => call.name === 'preview');
+    expect((previews.at(-1)!.args[0] as AlternateVersion).stateSha256).toBe('e'.repeat(64));
+    expect(writes(h.authority.calls)).toEqual(['apply']);
+  });
+
+  it('draws what the returned version holds, and takes it back through the version undo', async () => {
+    const added = version({
+      stateSha256: 'f'.repeat(64),
+      editSeq: 1,
+      objects: [objectRecord()],
+      edits: [edit(1, 'add_object')],
+    });
+    const h = harness();
+    await h.mounted.begin();
+    h.mounted.panel.setVisible(true);
+    await place(h);
+    await verdictReady(h);
+    h.authority.answerWith({ kind: 'recorded', version: added });
+    confirmButton(h).click();
+    await vi.waitFor(() => expect(h.objects.objectIds).toEqual(['object:lantern']));
+    await vi.waitFor(() => expect(h.mounted.confirm.root.hidden).toBe(true));
+    expect(h.mounted.panel.root.textContent).toContain('Added.');
+
+    const undo = button(h.mounted.panel.root, 'Take back the last change');
+    expect(undo.disabled).toBe(false);
+    undo.click();
+    expect(h.mounted.confirm.root.textContent).toContain('an object you added');
+    h.authority.answerWith({
+      kind: 'recorded',
+      version: version({
+        stateSha256: STATE,
+        editSeq: 2,
+        edits: [edit(1, 'add_object'), edit(2, 'undo', { editId: 'edit-2', undoneEditId: 'edit-1' })],
+      }),
+    });
+    confirmButton(h).click();
+    await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['apply', 'undo']));
+    expect(h.authority.calls.find((call) => call.name === 'undo')!.args[0]).toBe(added);
+    await vi.waitFor(() => expect(h.objects.objectIds).toEqual([]));
+    expect(button(h.mounted.panel.root, 'Take back the last change').disabled).toBe(true);
+  });
+
+  it('says it is not known whether an apply was recorded when its answer is lost', async () => {
+    const h = harness();
+    await h.mounted.begin();
+    await place(h);
+    await verdictReady(h);
+    h.authority.answerWith(new TypeError('Failed to fetch'));
+    confirmButton(h).click();
+    await vi.waitFor(() =>
+      expect(h.mounted.confirm.root.textContent).toContain('not known whether this was added'));
+    expect(h.mounted.confirm.root.textContent).toContain('Not confirmed');
+    expect(h.mounted.confirm.root.textContent).not.toContain('Nothing was written');
+    expect(() => button(h.mounted.confirm.root, 'Check again')).toThrow();
+  });
+
+  it('asks for a reload, not a retry, when the saved world moved elsewhere', async () => {
+    const h = harness();
+    await h.mounted.begin();
+    await place(h);
+    await verdictReady(h);
+    h.authority.answerWith(new WorldObjectsContractError(
+      'saved_entry_conflict',
+      'This saved world changed elsewhere. The edit was not recorded. Reload before trying again.',
+    ));
+    confirmButton(h).click();
+    await vi.waitFor(() =>
+      expect(h.mounted.confirm.root.textContent).toContain('changed elsewhere'));
+    expect(h.mounted.confirm.root.textContent).toContain('Reload the world');
+    expect(() => button(h.mounted.confirm.root, 'Check again')).toThrow();
+  });
+
+  it('does not take a ready answer about a different subject or base as this placement’s verdict', async () => {
+    for (const over of [
+      (base: AlternateVersion, body: WireBody) => previewAnswer(base, body, null, {
+        would_change: { kind: 'add_object', subject_id: 'object:someone-else', document: {}, preserves: [] },
+      }),
+      (base: AlternateVersion, body: WireBody) => previewAnswer(base, body, null, {
+        version: {
+          authored_version_id: base.versionId, world_id: base.worldId,
+          state_sha256: '0'.repeat(64), edit_seq: 9,
+          source_snapshot_id: base.sourceSnapshotId, style_version_id: null,
+        },
+      }),
+    ]) {
+      const h = harness();
+      await h.mounted.begin();
+      h.authority.previewWith(over);
+      await place(h);
+      await refusedVerdict(h);
+      expect(visibleVerdict(h.mounted.confirm.root)).toContain('different change');
+      expect(confirmButton(h).disabled).toBe(true);
+      h.mounted.dispose();
+    }
+  });
+
+  it('ignores a verdict that arrives after the placement was cancelled', async () => {
+    let answer!: () => void;
+    const h = harness();
+    await h.mounted.begin();
+    h.authority.previewWith((base, body) => new Promise((resolve) => {
+      answer = () => resolve(previewAnswer(base, body));
+    }));
+    await place(h);
+    button(h.mounted.confirm.root, 'Cancel').click();
+    answer();
+    await new Promise((resolve) => { setTimeout(resolve, 0); });
+    expect(h.mounted.confirm.root.hidden).toBe(true);
+    expect(writes(h.authority.calls)).toEqual([]);
+  });
+
+  it('says the check could not be made when the preview request fails, and offers it again', async () => {
+    const h = harness();
+    await h.mounted.begin();
+    h.authority.previewWith(new TypeError('Failed to fetch'));
+    await place(h);
+    await refusedVerdict(h);
+    expect(visibleVerdict(h.mounted.confirm.root)).toContain('could not be reached');
+    button(h.mounted.confirm.root, 'Check again').click();
+    await verdictReady(h);
+    expect(writes(h.authority.calls)).toEqual([]);
+  });
+});
+
+describe('an authored starter keeps additions on its declared ground', () => {
+  const starter = {
+    regionId: 'region:starter', halfWidthMm: 12_000, halfDepthMm: 12_000, elevationMm: 0,
+  } as const;
+
+  it('previews and applies a spot on the ground in the starter region', async () => {
+    const h = harness({ authoredRegion: starter });
+    h.state.placedPointMaps = [];
+    await h.mounted.begin();
+    await place(h);
+    expect(h.mounted.confirm.root.textContent).toContain('this world’s authored ground');
+    await verdictReady(h);
+    const previewed = h.authority.calls.find((call) => call.name === 'preview')!.args[1] as AppliedBody;
+    expect(previewed.placement.region_id).toBe('region:starter');
+    expect(previewed.placement.transform).toMatchObject({ x_mm: 0, y_mm: 0, z_mm: -3500 });
+    confirmButton(h).click();
+    await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['apply']));
+  });
+
+  it('refuses a spot past the edge of the ground before asking the server anything', async () => {
+    const h = harness({ authoredRegion: starter, standAt: [0, 1.6, -10] });
+    h.state.placedPointMaps = [];
+    await h.mounted.begin();
+    h.mounted.panel.setVisible(true);
+    await place(h);
+    expect(h.mounted.panel.root.textContent).toContain('outside this world’s authored ground');
+    expect(h.mounted.confirm.root.hidden).toBe(true);
+    expect(h.authority.calls.filter((call) => call.name === 'preview')).toEqual([]);
+    expect(writes(h.authority.calls)).toEqual([]);
+  });
+
+  it('never shows the person a region id, in the confirmation or in the list', async () => {
+    const h = harness({ authoredRegion: starter });
+    h.state.placedPointMaps = [];
+    await h.mounted.begin();
+    h.mounted.panel.setVisible(true);
+    await place(h);
+    expect(h.mounted.confirm.root.textContent)
+      .toContain('Add “Marker pillar” where the mark shows, standing on this world’s authored ground.');
+    expect(h.mounted.confirm.root.textContent).not.toContain('region');
+    await verdictReady(h);
+    h.authority.answerWith({
+      kind: 'recorded',
+      version: version({
+        stateSha256: 'f'.repeat(64), editSeq: 1,
+        objects: [objectRecord({ regionId: 'region:starter' })],
+        edits: [edit(1, 'add_object')],
+      }),
+    });
+    confirmButton(h).click();
+    await vi.waitFor(() => expect(h.objects.objectIds).toEqual(['object:lantern']));
+    const list = h.mounted.panel.root.querySelector('.object-placement-list')!.textContent ?? '';
+    expect(list).toContain('Marker pillar');
+    expect(list).not.toContain('region');
+
+    // A photographed region's id is no more a place name than the starter's.
+    const photographed = harness({ initial: version({ objects: [objectRecord()], edits: [edit(1, 'add_object')] }) });
+    await photographed.mounted.begin();
+    expect(photographed.mounted.panel.root.querySelector('.object-placement-list')!.textContent)
+      .not.toContain(String(REGION));
+  });
+
+  it('does not draw a saved object that stands outside the ground', async () => {
+    const h = harness({
+      authoredRegion: starter,
+      initial: version({ objects: [objectRecord({
+        regionId: 'region:starter',
+        transform: Object.freeze({
+          coordinateSpace: 'region_local', coordinateUnit: 'millimetre',
+          xMm: 20_000, yMm: 0, zMm: 0, yawMicroradians: 0, scaleMilli: 1000,
+        }),
+      })] }),
+    });
+    h.state.placedPointMaps = [];
+    await h.mounted.begin();
+    expect(h.objects.objectIds).toEqual([]);
+    expect(h.travel.some((item) => item.message.includes('outside this world’s authored ground'))).toBe(true);
+  });
+});
+
 describe('a placement that cannot land honestly is refused, not faked', () => {
   it('refuses when the visitor is not standing in a region with reconstructed ground', async () => {
     const h = harness({ footprint: 2, awayBy: 500 });
@@ -564,11 +1011,11 @@ describe('a placement that cannot land honestly is refused, not faked', () => {
     await place(h);
     expect(h.mounted.confirm.root.textContent).toContain('standing at your feet');
     expect(h.mounted.confirm.root.textContent).toContain('no recovered cameras');
-    button(h.mounted.confirm.root, 'Confirm').click();
-    await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['place']));
-    const pose = (h.authority.calls.find((c) => c.name === 'place')!.args[1] as Record<string, unknown>)['transform'] as Record<string, number>;
+    await verdictReady(h);
+    confirmButton(h).click();
+    await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['apply']));
     // Eye at 1.6 m, so feet at 0 mm.
-    expect(pose['yMm']).toBe(0);
+    expect(applied(h.authority.calls).placement.transform['y_mm']).toBe(0);
   });
 
   it('claims measured ground only when the frame was derived from cameras', async () => {
@@ -664,6 +1111,34 @@ describe('a nudge is shown at once and written once', () => {
     expect(h.mounted.panel.visible()).toBe(true);
     arrow('KeyP');
     expect(h.mounted.panel.visible()).toBe(false);
+  });
+});
+
+describe('the add-object hint follows what the server holds', () => {
+  it('offers the add-object hint only while the version it read holds no objects', async () => {
+    const hint = (h: ReturnType<typeof harness>) =>
+      h.travel.filter((item) => item.message === 'Press P to add an object to this world.');
+
+    const empty = harness();
+    await empty.mounted.begin();
+    expect(hint(empty)).toHaveLength(1);
+
+    const furnished = harness({
+      initial: version({ objects: [objectRecord()], edits: [edit(1, 'add_object')] }),
+    });
+    await furnished.mounted.begin();
+    expect(furnished.objects.objectIds).toEqual(['object:lantern']);
+    expect(hint(furnished)).toEqual([]);
+    // Read again, as a reload does: still no hint.
+    await furnished.mounted.begin();
+    expect(hint(furnished)).toEqual([]);
+
+    // Everything taken out again is a world with nothing added, and the hint returns.
+    const emptied = harness({
+      initial: version({ objects: [objectRecord({ removed: true })], edits: [edit(1, 'add_object')] }),
+    });
+    await emptied.mounted.begin();
+    expect(hint(emptied)).toHaveLength(1);
   });
 });
 

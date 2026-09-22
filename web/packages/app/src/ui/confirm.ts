@@ -27,17 +27,45 @@ export interface ConfirmHandlers {
   onVisibilityChange?(visible: boolean): void;
 }
 
+export interface ConfirmShowOptions {
+  readonly undoControlAvailable: boolean;
+  /**
+   * An element the caller keeps current, shown above the actions: the authority's own verdict on
+   * this proposal, for a write that asks the authority before it is confirmed.
+   */
+  readonly verdict?: HTMLElement;
+  /** False holds Confirm disabled until {@link ConfirmPanel.setConfirmable} releases it. */
+  readonly confirmable?: boolean;
+}
+
+export interface ConfirmFailureOptions {
+  /** The heading. Defaults to saying nothing was written, which must then be true. */
+  readonly title?: string;
+  /** What the person can do next. */
+  readonly next?: string;
+  /** Folded-away particulars such as a raw code. */
+  readonly details?: HTMLElement | null;
+  /** A person-driven retry beside Close. */
+  readonly retry?: { readonly label: string; run(): void };
+}
+
 export interface ConfirmPanel {
   readonly root: HTMLElement;
   /** Render a staged proposal for reading. Shows the panel; writes nothing. */
   show(proposalId: string, summary: ConfirmationSummary, utterance: string,
-    options?: { readonly undoControlAvailable: boolean }): void;
+    options?: ConfirmShowOptions): void;
   /** Report what happened to a commit, in the words the failure used. */
-  reportFailure(reason: string): void;
+  reportFailure(reason: string, options?: ConfirmFailureOptions): void;
   hide(): void;
 }
 
-export function buildConfirm(handlers: ConfirmHandlers): ConfirmPanel {
+/** The panel {@link buildConfirm} makes: it can also hold Confirm until a verdict releases it. */
+export interface GatedConfirmPanel extends ConfirmPanel {
+  /** Allow or withhold Confirm on the proposal being shown. */
+  setConfirmable(confirmable: boolean): void;
+}
+
+export function buildConfirm(handlers: ConfirmHandlers): GatedConfirmPanel {
   const root = el('aside', {
     class: 'confirm',
     role: 'dialog',
@@ -63,10 +91,14 @@ export function buildConfirm(handlers: ConfirmHandlers): ConfirmPanel {
     handlers.onVisibilityChange?.(false);
   };
 
+  let confirmButton: HTMLButtonElement | null = null;
+
   return {
     root,
     show(proposalId, summary, utterance, options) {
       const confirm = el('button', { type: 'button', class: 'primary', text: 'Confirm' });
+      confirmButton = confirm;
+      confirm.disabled = options?.confirmable === false;
       const cancel = el('button', { type: 'button', class: 'ghost', text: 'Cancel' });
       confirm.addEventListener('click', () => handlers.onConfirm(proposalId));
       cancel.addEventListener('click', () => handlers.onCancel(proposalId));
@@ -107,23 +139,37 @@ export function buildConfirm(handlers: ConfirmHandlers): ConfirmPanel {
         );
       }
 
+      if (options?.verdict !== undefined) children.push(options.verdict);
       children.push(el('div', { class: 'confirm-actions' }, [confirm, cancel]));
       replace(root, children);
       reveal();
-      confirm.focus();
+      // A held Confirm cannot take focus; Cancel is then the one action available.
+      (confirm.disabled ? cancel : confirm).focus();
     },
-    reportFailure(reason) {
-      replace(root, [
-        el('h2', { id: 'confirm-title', text: 'Nothing was written' }),
+    setConfirmable(confirmable) {
+      if (confirmButton === null || !confirmButton.isConnected) return;
+      confirmButton.disabled = !confirmable;
+    },
+    reportFailure(reason, options) {
+      confirmButton = null;
+      const close = el('button', { type: 'button', class: 'ghost', text: 'Close' });
+      close.addEventListener('click', conceal);
+      const actions: HTMLElement[] = [];
+      if (options?.retry !== undefined) {
+        const retry = options.retry;
+        const again = el('button', { type: 'button', class: 'primary', text: retry.label });
+        again.addEventListener('click', () => retry.run());
+        actions.push(again);
+      }
+      actions.push(close);
+      const children: HTMLElement[] = [
+        el('h2', { id: 'confirm-title', text: options?.title ?? 'Nothing was written' }),
         el('p', { class: 'confirm-refused', text: reason }),
-        el('div', { class: 'confirm-actions' }, [
-          (() => {
-            const close = el('button', { type: 'button', class: 'ghost', text: 'Close' });
-            close.addEventListener('click', conceal);
-            return close;
-          })(),
-        ]),
-      ]);
+      ];
+      if (options?.next !== undefined) children.push(el('p', { class: 'confirm-next', text: options.next }));
+      if (options?.details != null) children.push(options.details);
+      children.push(el('div', { class: 'confirm-actions' }, actions));
+      replace(root, children);
       reveal();
     },
     hide: conceal,

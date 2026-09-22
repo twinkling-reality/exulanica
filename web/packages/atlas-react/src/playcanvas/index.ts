@@ -37,6 +37,7 @@ export {
   nudgedPose,
   objectAssetBytesPath,
   atlasPointFromRegion,
+  placementLandingPose,
   placementPoseAtAtlasPoint,
   placementPoseBeforeVisitor,
   regionPointFromAtlas,
@@ -178,6 +179,7 @@ export type {
 } from './atlas-binding.js';
 export {
   AtlasBinding,
+  placedCatalogObjectSubject,
   mapCameraState,
   ownedDistrictCameraState,
   ownedDistrictOverviewCameraState,

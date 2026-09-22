@@ -228,7 +228,14 @@ export function mountEnvironmentSelection(
     el('p', { text: 'Play, pause, change speed, or advance one simulated minute. Authored edits affect the next step. Restoring objects retains earlier simulation history.' }),
     playbackMode, playbackSpeed, advanceSociety, refreshSociety,
   ]);
-  const representation = buildRepresentationInspector(() => deps.state.atlas?.binding ?? null);
+  const representation = buildRepresentationInspector(() => deps.state.atlas?.binding ?? null, {
+    starterGround: () => {
+      const scene = deps.state.activeWorldEntry?.authoredScene;
+      if (scene === null || scene === undefined) return null;
+      // Rendered only when the atlas has mounted the authored region that draws this ground.
+      return { renderedInView: deps.state.atlas != null };
+    },
+  });
   workspace.details.append(representation.root, liveControls);
 
   const authoringAvailability = el('p', { role: 'status', text: deps.env.preview

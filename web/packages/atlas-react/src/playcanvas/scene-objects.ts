@@ -51,11 +51,13 @@ import * as pc from 'playcanvas';
 import {
   BEHAVIOUR_REGISTRY,
   BoundedMotion,
+  atlasVec3,
   boundedPathOf,
   motionTransform,
   type CameraPose,
   type IslandId,
   type IslandPlacement,
+  type NavigationPose,
 } from '@exulanica/atlas-core';
 import {
   ORIGIN_LANDSCAPE,
@@ -484,6 +486,25 @@ export function atlasPointFromRegion(
     placement.position.y + scale * ly,
     placement.position.z + scale * dz,
   ] as [number, number, number]);
+}
+
+/**
+ * The ground landing mark for a region pose that is held for confirmation and not yet saved.
+ *
+ * The position is {@link atlasPointFromRegion} of the pose and the facing is the region's yaw plus
+ * the pose's own, which is how the runtime composes a placed object's root under its region. The
+ * mark therefore stands where the object will, facing the way it will.
+ */
+export function placementLandingPose(
+  placement: IslandPlacement,
+  pose: RegionPose,
+): NavigationPose {
+  const [x, y, z] = atlasPointFromRegion(placement, [pose.xMm, pose.yMm, pose.zMm]);
+  return Object.freeze({
+    position: atlasVec3(x, y, z),
+    yaw: placement.yaw + pose.yawMicroradians / MICRORADIANS_PER_RADIAN,
+    pitch: 0,
+  });
 }
 
 /** Yaw is stored as a non-negative microradian angle, so a westward facing wraps rather than signs. */

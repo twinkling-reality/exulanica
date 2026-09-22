@@ -72,7 +72,6 @@ export interface MotionBounds {
 export interface PlacedObjectRow {
   readonly objectId: string;
   readonly label: string;
-  readonly regionLabel: string;
   /**
    * `none` means the object carries no behaviour; `unsupported` means it carries one this client
    * cannot run. The two are different facts and the panel says which.
@@ -340,7 +339,6 @@ export function buildObjectPlacement(
           'aria-pressed': selected ? 'true' : 'false',
         }, [
           el('strong', { text: row.label }),
-          el('span', { class: 'object-placement-where', text: row.regionLabel }),
           el('span', { class: 'object-placement-motion', text: MOTION_STATE_WORDS[row.motion] }),
         ]);
         choose.addEventListener('click', () => handlers.onSelect(row.objectId));

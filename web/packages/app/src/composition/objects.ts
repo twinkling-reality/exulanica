@@ -12,6 +12,12 @@
  * stop at `confirm.show(...)` and are sent only from the panel's own confirm handler. That is the
  * invariant `write-path.ts` states for the graph, held here for a different authority.
  *
+ * **Adding is asked before it is confirmed.** A placement is a composition: the confirmation shows
+ * the landing mark and the server's own preview verdict for that exact pose and base, and Confirm
+ * stays held until the verdict is ready. Apply sends the same request, so the server resolves the
+ * same thing again and writes it, or refuses by code and the world is unchanged. Nothing on this
+ * side asserts that a source is permitted, stored or current; the server says so or it is not so.
+ *
  * **This surface builds its OWN confirmation panel, and that is deliberate.** `write-path.ts`
  * binds its panel's `onConfirm` to `session.commit`, the graph's mutation gate; an object write is
  * not a graph proposal and routing it through that panel would call the wrong authority with an id
@@ -57,10 +63,10 @@ import { tierPolicy } from '@exulanica/companion-runtime';
 import type { ConfirmationBand, ConfirmationSummary } from '@exulanica/companion-runtime';
 import {
   DEFAULT_PLACEMENT_DISTANCE_MM,
-  MICRORADIANS_PER_RADIAN,
   MM_PER_METRE,
   fetchVerifiedObjectAsset,
   nudgedPose,
+  placementLandingPose,
   placementPoseAtAtlasPoint,
   placementPoseBeforeVisitor,
   regionPointFromAtlas,
@@ -68,7 +74,23 @@ import {
   type RegionPose,
 } from '@exulanica/atlas-react/playcanvas';
 
-import { buildConfirm, type ConfirmPanel } from '../ui/confirm.js';
+import {
+  applyComposition,
+  previewComposition,
+  type CompositionApplyRequest,
+  type CompositionPreview,
+} from '../composition-preview-api.js';
+import {
+  buildCompositionVerdict,
+  compositionDetails,
+  describeReady,
+  explainBlockedReason,
+  explainCompositionFailure,
+  explainPreview,
+  type CompositionExplanation,
+  type CompositionVerdictView,
+} from '../ui/composition-preview.js';
+import { buildConfirm, type GatedConfirmPanel } from '../ui/confirm.js';
 import {
   buildObjectPlacement,
   type BehaviourControlKey,
@@ -84,7 +106,9 @@ import {
   objectWriteFailure,
   type AlternateVersion,
   type AuthoredObject,
+  type ObjectBehaviour,
   type ObjectRole,
+  type ObjectWriteResult,
   type ReviewedAsset,
 } from '../world-objects-api.js';
 import type { AppEnvironment, SessionState } from './session-state.js';
@@ -142,7 +166,7 @@ export interface ObjectsDependencies {
 
 export interface MountedObjects {
   readonly panel: ObjectPlacementPanel;
-  readonly confirm: ConfirmPanel;
+  readonly confirm: GatedConfirmPanel;
   toggle(): void;
   close(): void;
   /** Read the authority and draw what it holds. Awaited by tests; fire and forget in the app. */
@@ -154,8 +178,27 @@ interface Pending {
   readonly kind: 'place' | 'move' | 'remove' | 'undo' | 'bootstrap';
   readonly describe: string;
   readonly reversible: boolean;
-  run(): Promise<void>;
+  /** The server's verdict on a placement. Confirm is held until it is ready. */
+  readonly verdict?: CompositionVerdictView;
+  /** `reported` when the run has already put its outcome in the confirmation surface. */
+  run(): Promise<void | 'reported'>;
+  /** How a thrown failure is said, when the default words are not the right ones. */
+  failed?(error: unknown): void;
 }
+
+/** One placement as the person chose it, kept so it can be checked again against a newer base. */
+interface PlacementPlan {
+  readonly asset: ReviewedAsset;
+  readonly role: ObjectRole;
+  readonly region: ObjectRegion;
+  readonly pose: RegionPose;
+  readonly behaviour: ObjectBehaviour | null;
+  readonly district: DistrictObjectPlacement | null;
+  readonly describe: string;
+}
+
+/** Refusals a fresh check can clear: a newer base, or a new identity for the addition. */
+const RECHECKABLE: ReadonlySet<string> = new Set(['stale_base', 'subject_already_present']);
 
 /** Said when a write is confirmed with no saved version to write to. */
 const NO_AUTHORITY = 'No saved world version is connected, so nothing was changed.';
@@ -180,6 +223,10 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
   let nudged: RegionPose | null = null;
   let pending: Pending | null = null;
   let issued = 0;
+  /** Which placement check is current; a verdict for any other is ignored. */
+  let placementCheck = 0;
+  /** True only while the pending placement holds a ready verdict for its exact request. */
+  let placementReady = false;
   /** Refusals and clamps the runtime reported, by object, so a row can keep showing them. */
   const notices = new Map<string, string>();
   /** Objects the preview drew for this session only. Never sent anywhere. */
@@ -188,6 +235,8 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     onConfirm: () => void commit(),
     onCancel: () => {
       pending = null;
+      placementReady = false;
+      placementCheck += 1;
       clearPlacementLandingMark();
       confirm.hide();
     },
@@ -269,7 +318,11 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
         );
         return;
       }
-      deps.showTravelStatus('Press P to add an object to this world.');
+      // The hint is for a world with nothing added yet, and that is the version's to say: a world
+      // that already holds an object never shows it again, on this device or any other.
+      if (visibleObjects().length === 0) {
+        deps.showTravelStatus('Press P to add an object to this world.');
+      }
     } catch (error) {
       if (disposed || generation !== drawGeneration) return;
       clearingRepresentationsForRedraw = true;
@@ -585,45 +638,15 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
   }
 
   /**
-   * Draw the place pose already held for confirmation on the authored ground.
-   *
-   * Uses the same `RegionPose` that `client.place` will commit. The field mark is the existing
-   * ground API’s placement landing, not the Map visitor triangle.
-   *
-   * Conversion mirrors `atlasPointFromRegion` inline so this surface can call the ground mark
-   * without depending on a package-boundary rebuild of atlas-react for the inverse helper alone.
+   * Draw the pose held for confirmation on the ground: the same `RegionPose` preview and apply
+   * send. The field mark is the world field's placement landing, not the Map visitor triangle.
    */
   function showPlacementLandingMark(region: ObjectRegion, pose: RegionPose): void {
-    const field = state.atlas?.binding.field as
-      | { setPlacementLandingPose?: (pose: {
-          readonly position: ReturnType<typeof atlasVec3>;
-          readonly yaw: number;
-          readonly pitch: number;
-        } | null) => void }
-      | undefined;
-    if (field?.setPlacementLandingPose === undefined) return;
-    const scale = region.placement.scale;
-    const lx = pose.xMm / MM_PER_METRE;
-    const ly = pose.yMm / MM_PER_METRE;
-    const lz = pose.zMm / MM_PER_METRE;
-    const c = Math.cos(region.placement.yaw);
-    const s = Math.sin(region.placement.yaw);
-    field.setPlacementLandingPose({
-      position: atlasVec3(
-        region.placement.position.x + scale * (c * lx + s * lz),
-        region.placement.position.y + scale * ly,
-        region.placement.position.z + scale * (-s * lx + c * lz),
-      ),
-      yaw: region.placement.yaw + pose.yawMicroradians / MICRORADIANS_PER_RADIAN,
-      pitch: 0,
-    });
+    state.atlas?.binding.field.setPlacementLandingPose(placementLandingPose(region.placement, pose));
   }
 
   function clearPlacementLandingMark(): void {
-    const field = state.atlas?.binding.field as
-      | { setPlacementLandingPose?: (pose: null) => void }
-      | undefined;
-    field?.setPlacementLandingPose?.(null);
+    state.atlas?.binding.field.setPlacementLandingPose(null);
   }
 
   // -- proposing -----------------------------------------------------------------------------------
@@ -708,8 +731,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       panel.report('That spot is outside the district. Face toward its ground and try again.', 'failure');
       return;
     }
-    const districtKey = JSON.stringify(districtAtPlacement);
-    const behaviour = draft.motion
+    const behaviour: ObjectBehaviour | null = draft.motion
       ? {
           behaviourKey: BOUNDED_PATH_KEY,
           behaviourVersion: BOUNDED_PATH_VERSION,
@@ -721,44 +743,179 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
           },
         }
       : null;
-    // The caller chooses the object id, and it is stable within the version. A monotonic counter
-    // beside the edit sequence keeps it unique without a clock or a random source.
-    const objectId = `object-${version.editSeq + 1}-${(issued += 1)}`;
-
-    showPlacementLandingMark(region, pose);
-    stage({
-      kind: 'place',
+    stagePlacement({
+      asset,
+      role,
+      region,
+      pose,
+      behaviour,
+      district: districtAtPlacement,
       describe:
-        `Add “${asset.title}” to ${regionLabel(region.regionId)}, `
+        `Add “${asset.title}” where the mark shows, `
         + (districtAtPlacement !== null
           ? 'standing on this district’s authored ground'
           : region.sceneId === 'authored-starter'
           ? 'standing on this world’s authored ground'
           : groundIsMeasured(region.sceneId)
           ? 'standing on the ground its cameras recovered'
-          : 'standing at your feet, because this region has no recovered cameras to place a '
+          : 'standing at your feet, because this place has no recovered cameras to place a '
             + 'ground from')
         + `${behaviour === null ? '' : `, travelling ${axisWords(draft.axis)}`}.`,
+    });
+  }
+
+  /**
+   * Show a placement for confirmation and ask the server about it, against the version held now.
+   *
+   * The object id is chosen here, stable within the version: a monotonic counter beside the edit
+   * sequence keeps it unique without a clock or a random source. The request built here is the one
+   * previewed and the one applied, so the verdict a person reads is about exactly what is sent.
+   */
+  function stagePlacement(plan: PlacementPlan): void {
+    if (client === null || version === null) {
+      panel.report(NO_AUTHORITY, 'failure');
+      return;
+    }
+    const base = version;
+    const request: CompositionApplyRequest = Object.freeze({
+      source: Object.freeze({ kind: 'reviewed_asset' as const, assetKey: plan.asset.assetKey }),
+      placement: Object.freeze({
+        subjectId: `object-${base.editSeq + 1}-${(issued += 1)}`,
+        regionId: String(plan.region.regionId),
+        transform: plan.pose,
+        originRole: plan.role,
+        behaviour: plan.behaviour,
+      }),
+    });
+    const districtKey = JSON.stringify(plan.district);
+    const verdict = buildCompositionVerdict();
+    verdict.checking();
+    showPlacementLandingMark(plan.region, plan.pose);
+    stage({
+      kind: 'place',
+      describe: plan.describe,
       reversible: true,
+      verdict,
       run: async () => {
-        if (client === null || version === null) {
+        if (client === null) {
           panel.report(NO_AUTHORITY, 'failure');
           return;
         }
-        if (districtAtPlacement !== null && JSON.stringify(currentDistrict()) !== districtKey) {
+        if (plan.district !== null && JSON.stringify(currentDistrict()) !== districtKey) {
           throw new Error('The district binding changed. Choose the placement again.');
         }
-        const result = await client.place(version, {
-          objectId,
-          assetSha256: asset.contentSha256,
-          regionId: String(region.regionId),
-          transform: pose,
-          originRole: role,
-          behaviour,
-        });
-        await settle(result, 'Added.');
+        return settlePlacement(await applyComposition(client, base, request), plan);
       },
+      failed: (error) => reportPlacementFailure(explainCompositionFailure(error, 'apply'), plan),
     });
+    const check = placementCheck;
+    void checkPlacement(check, base, request, plan, verdict);
+  }
+
+  function placementIsCurrent(check: number): boolean {
+    return !disposed && check === placementCheck && pending?.kind === 'place';
+  }
+
+  /** The server's preview for one staged placement, put in the confirmation surface. */
+  async function checkPlacement(
+    check: number,
+    base: AlternateVersion,
+    request: CompositionApplyRequest,
+    plan: PlacementPlan,
+    verdict: CompositionVerdictView,
+  ): Promise<void> {
+    if (client === null) return;
+    const again = { label: 'Check again', run: () => stagePlacement(plan) };
+    let preview: CompositionPreview;
+    try {
+      preview = await previewComposition(client, base, request);
+    } catch (error) {
+      if (placementIsCurrent(check)) verdict.refused(explainCompositionFailure(error, 'preview'), again);
+      return;
+    }
+    if (!placementIsCurrent(check)) return;
+    const refused = explainPreview(preview);
+    if (refused !== null) {
+      if (preview.blockedReason === 'stale_base') {
+        // Read the world as it is now, so what is drawn is current before anything is retried.
+        await rereadVersion(base.versionId);
+        if (!placementIsCurrent(check)) return;
+      }
+      verdict.refused(
+        refused,
+        RECHECKABLE.has(preview.blockedReason ?? '') ? again : undefined,
+      );
+      return;
+    }
+    if (!answersThisPlacement(preview, base, request)) {
+      verdict.refused(Object.freeze({
+        happened: 'The world answered about a different change than the one shown here.',
+        next: 'Nothing was changed. Check again.',
+        code: null,
+        detail: `Answered for version ${preview.version.authoredVersionId} `
+          + `at ${preview.version.stateSha256} and subject ${preview.wouldChange.subjectId ?? 'none'}.`,
+        outcome: 'unchanged',
+      }), again);
+      return;
+    }
+    placementReady = true;
+    verdict.ready(
+      `${describeReady(preview, plan.asset.title)} Confirm to add it, or Cancel to leave the world `
+      + 'as it is.',
+    );
+    confirm.setConfirmable(true);
+  }
+
+  /** A ready verdict counts only for the version, base and subject this surface sent. */
+  function answersThisPlacement(
+    preview: CompositionPreview,
+    base: AlternateVersion,
+    request: CompositionApplyRequest,
+  ): boolean {
+    return preview.version.authoredVersionId === base.versionId
+      && preview.version.worldId === base.worldId
+      && preview.version.stateSha256 === base.stateSha256
+      && preview.wouldChange.kind === 'add_object'
+      && preview.wouldChange.subjectId === request.placement.subjectId;
+  }
+
+  async function rereadVersion(versionId: string): Promise<void> {
+    if (client === null) return;
+    try {
+      version = await client.readVersion(versionId);
+    } catch {
+      return;
+    }
+    await redrawAll();
+  }
+
+  /** An applied placement, or the stale base it met, which is read again and offered back. */
+  async function settlePlacement(
+    result: ObjectWriteResult,
+    plan: PlacementPlan,
+  ): Promise<void | 'reported'> {
+    if (result.kind === 'recorded') {
+      await settle(result, 'Added. “Take back the last change” removes it again.');
+      return;
+    }
+    if (disposed) return 'reported';
+    version = result.current;
+    await redrawAll();
+    reportPlacementFailure(explainBlockedReason('stale_base'), plan);
+    return 'reported';
+  }
+
+  function reportPlacementFailure(explanation: CompositionExplanation, plan: PlacementPlan): void {
+    const recheck = explanation.outcome === 'unchanged'
+      && explanation.code !== null
+      && RECHECKABLE.has(explanation.code);
+    confirm.reportFailure(explanation.happened, {
+      ...(explanation.outcome === 'unknown' ? { title: 'Not confirmed' } : {}),
+      next: explanation.next,
+      details: compositionDetails(explanation),
+      ...(recheck ? { retry: { label: 'Check again', run: () => stagePlacement(plan) } } : {}),
+    });
+    panel.report(`${explanation.happened} ${explanation.next}`, 'failure');
   }
 
   function proposeMove(): void {
@@ -842,27 +999,37 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
   /** Stage a write and render it for reading. Nothing is sent until the panel's confirm. */
   function stage(next: Pending): void {
     pending = next;
+    placementReady = false;
+    placementCheck += 1;
     issued += 1;
     deps.hideWritePathConfirm();
     if (next.kind !== 'place') clearPlacementLandingMark();
     confirm.show(`world-object-${issued}`, summaryFor(next), next.describe, {
       undoControlAvailable: client !== null && next.reversible
         && (next.kind === 'place' || next.kind === 'move' || next.kind === 'remove'),
+      ...(next.verdict === undefined ? {} : { verdict: next.verdict.root, confirmable: false }),
     });
   }
 
   async function commit(): Promise<void> {
     const running = pending;
     if (running === null) return;
+    // A placement is confirmable only on the server's ready verdict for exactly this request.
+    if (running.kind === 'place' && !placementReady) return;
     pending = null;
+    placementReady = false;
+    placementCheck += 1;
     clearPlacementLandingMark();
     panel.setBusy(true);
     try {
-      await running.run();
-      confirm.hide();
+      if (await running.run() !== 'reported') confirm.hide();
     } catch (error) {
-      confirm.reportFailure(objectWriteFailure(error));
-      panel.report(objectWriteFailure(error), 'failure');
+      if (running.failed !== undefined) {
+        running.failed(error);
+      } else {
+        confirm.reportFailure(objectWriteFailure(error));
+        panel.report(objectWriteFailure(error), 'failure');
+      }
     } finally {
       panel.setBusy(false);
     }
@@ -874,13 +1041,10 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
    * Every mutation answers with `AlternateVersionView`, so a write is also the re-read and there
    * is no second request to get out of step with.
    */
-  async function settle(
-    result: { readonly kind: 'recorded' | 'stale'; readonly version?: AlternateVersion; readonly current?: AlternateVersion },
-    said: string,
-  ): Promise<void> {
+  async function settle(result: ObjectWriteResult, said: string): Promise<void> {
     if (disposed) return;
     const next = result.kind === 'stale' ? result.current : result.version;
-    if (next !== undefined) version = next;
+    version = next;
     await redrawAll();
     if (result.kind === 'stale') {
       panel.report(
@@ -1039,10 +1203,6 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     return selectedId === null ? null : recordOf(selectedId);
   }
 
-  function regionLabel(islandId: IslandId): string {
-    return `region ${String(islandId).slice(0, 8)}`;
-  }
-
   function axisWords(axis: MotionAxisKey): string {
     return { x: 'side to side', y: 'up and down', z: 'forward and back' }[axis] ?? String(axis);
   }
@@ -1083,7 +1243,6 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       visibleObjects().map((record) => ({
         objectId: record.objectId,
         label: record.asset.title,
-        regionLabel: regionLabel(record.regionId as IslandId),
         motion: motionOf(record),
         note: notices.get(record.objectId) ?? null,
       })),
@@ -1227,6 +1386,8 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       clearPlacementLandingMark();
       state.atlas?.binding.objects.cancelPending();
       pending = null;
+      placementReady = false;
+      placementCheck += 1;
     },
   };
 }

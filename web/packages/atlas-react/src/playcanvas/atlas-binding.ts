@@ -349,6 +349,47 @@ export function residencyFrameInputs(input: {
   };
 }
 
+/**
+ * The representation subject for one object placed from the reviewed catalog.
+ *
+ * What exists for it is a display record and the reviewed asset's identity: its key as the label
+ * and its content digest as the one reference. It has no structured source records, so it claims
+ * none. `extent` is the object root's local bounds, before authored placement is applied.
+ */
+export function placedCatalogObjectSubject(
+  object: PlacedAuthoredObject,
+  extent: {
+    readonly min: readonly [number, number, number];
+    readonly max: readonly [number, number, number];
+  },
+): RepresentationSubject {
+  const frameId = `authored-object:${object.objectId}:object-local`;
+  return Object.freeze({
+    subjectId: object.objectId,
+    subjectKind: 'object',
+    sceneId: null,
+    frameId,
+    origin: 'authored',
+    sourceRefs: Object.freeze([object.asset.contentSha256]),
+    availability: 'available',
+    rendered: true,
+    // These are deterministic presentation samples of the authored triangles, not measurements.
+    points: 'mesh-surface-samples',
+    compatibleBlend: true,
+    bounds: Object.freeze({
+      frameId,
+      units: 'scene-units',
+      origin: 'authored',
+      basis: 'authored-bounds',
+      min: extent.min,
+      max: extent.max,
+    }),
+    label: object.asset.assetKey,
+    dataAvailable: false,
+    unavailableReason: 'Generated whole-object surface samples from static renderer triangles; not observed measurements, semantic parts or segmentation.',
+  });
+}
+
 export interface AtlasBindingOptions {
   readonly canvas: HTMLCanvasElement;
   readonly overlayParent: HTMLElement;
@@ -1263,31 +1304,7 @@ export class AtlasBinding {
         reason: 'World to data is unavailable for this object because its static triangle hierarchy exceeds the bounded source size or has no finite surface and extent.',
       });
     }
-    const frameId = `authored-object:${object.objectId}:object-local`;
-    subject = Object.freeze({
-      subjectId: object.objectId,
-      subjectKind: 'object',
-      sceneId: null,
-      frameId,
-      origin: 'authored',
-      sourceRefs: Object.freeze([object.asset.contentSha256]),
-      availability: 'available',
-      rendered: true,
-      // These are deterministic presentation samples of the authored triangles, not measurements.
-      points: 'mesh-surface-samples',
-      compatibleBlend: true,
-      bounds: Object.freeze({
-        frameId,
-        units: 'scene-units',
-        origin: 'authored',
-        basis: 'authored-bounds',
-        min: group.extent.min,
-        max: group.extent.max,
-      }),
-      label: object.asset.assetKey,
-      dataAvailable: true,
-      unavailableReason: 'Generated whole-object surface samples from static renderer triangles; not observed measurements, semantic parts or segmentation.',
-    });
+    subject = placedCatalogObjectSubject(object, group.extent);
     try {
       return Object.freeze({
         ok: true as const,

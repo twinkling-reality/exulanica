@@ -391,7 +391,7 @@ export class WorldObjectsClient {
 
   async place(base: AlternateVersion, request: ObjectPlacementRequest): Promise<ObjectWriteResult> {
     assertTransform(request.transform);
-    return this.#write(base, `${objectsPath(base.versionId)}`, {
+    return this.#write(base, this.#path(objectsPath(base.versionId)), {
       object_id: request.objectId,
       asset_sha256: request.assetSha256,
       region_id: request.regionId,
@@ -411,18 +411,54 @@ export class WorldObjectsClient {
     transform: TransformInput,
   ): Promise<ObjectWriteResult> {
     assertTransform(transform);
-    return this.#write(base, `${objectPath(base.versionId, objectId)}/move`, {
+    return this.#write(base, this.#path(`${objectPath(base.versionId, objectId)}/move`), {
       transform: wireTransform(transform),
     });
   }
 
   remove(base: AlternateVersion, objectId: string): Promise<ObjectWriteResult> {
-    return this.#write(base, `${objectPath(base.versionId, objectId)}/remove`, {});
+    return this.#write(base, this.#path(`${objectPath(base.versionId, objectId)}/remove`), {});
   }
 
   /** Reverse the newest edit no undo already names. Refused with `invalid_object_state` when none. */
   undo(base: AlternateVersion): Promise<ObjectWriteResult> {
-    return this.#write(base, `${objectsPath(base.versionId)}/undo`, {});
+    return this.#write(base, this.#path(`${objectsPath(base.versionId)}/undo`), {});
+  }
+
+  /**
+   * `POST .../compositions/preview` for a body `composition-preview-api.ts` built. Never writes.
+   *
+   * It carries the base this client read and never a saved-entry binding, which preview refuses.
+   * The version's own world is always named: a starter world that omitted it would resolve in the
+   * default world and answer as absent.
+   */
+  async compositionPreview(
+    base: AlternateVersion,
+    body: Readonly<Record<string, unknown>>,
+  ): Promise<unknown> {
+    return this.#transport.postJson<unknown>(
+      this.#versionWorldPath(`${compositionsPath(base.versionId)}/preview`, base),
+      { ...body, base_state_sha256: base.stateSha256 },
+    );
+  }
+
+  /**
+   * `POST .../compositions/apply`, through the same serialized write as every other edit.
+   *
+   * So it carries the base and the saved-entry binding, advances the entry cursor on success, and
+   * turns a stale base into a re-read. Composition reports a stale base as `composition_blocked`
+   * with the code `stale_base`, and that is the same fact as `stale_object_base`.
+   */
+  compositionApply(
+    base: AlternateVersion,
+    body: Readonly<Record<string, unknown>>,
+  ): Promise<ObjectWriteResult> {
+    return this.#write(
+      base,
+      this.#versionWorldPath(`${compositionsPath(base.versionId)}/apply`, base),
+      body,
+      (error) => error.code === 'composition_blocked' && problemDetail(error) === 'stale_base',
+    );
   }
 
   /**
@@ -457,13 +493,14 @@ export class WorldObjectsClient {
    */
   #write(
     base: AlternateVersion,
-    path: string,
+    scopedPath: string,
     body: Readonly<Record<string, unknown>>,
+    alsoStale: (error: ApiError) => boolean = () => false,
   ): Promise<ObjectWriteResult> {
     const run = async (): Promise<ObjectWriteResult> => {
       const savedEntry = this.#savedEntry?.();
       try {
-        const version = parseVersion(await this.#transport.postJson<unknown>(this.#path(path), {
+        const version = parseVersion(await this.#transport.postJson<unknown>(scopedPath, {
           ...body,
           base_state_sha256: base.stateSha256,
           ...(savedEntry === undefined ? {} : {
@@ -482,7 +519,7 @@ export class WorldObjectsClient {
         }
         return Object.freeze({ kind: 'recorded' as const, version });
       } catch (error) {
-        if (error instanceof ApiError && error.code === 'stale_object_base') {
+        if (error instanceof ApiError && (error.code === 'stale_object_base' || alsoStale(error))) {
           const current = await this.readVersion(base.versionId);
           return Object.freeze({ kind: 'stale' as const, current });
         }
@@ -504,12 +541,26 @@ export class WorldObjectsClient {
     if (this.#worldId === undefined) return path;
     return `${path}${path.includes('?') ? '&' : '?'}world_id=${encodeURIComponent(this.#worldId)}`;
   }
+
+  /** The configured world, or the world the version itself names when none was configured. */
+  #versionWorldPath(path: string, base: AlternateVersion): string {
+    return `${path}?world_id=${encodeURIComponent(this.#worldId ?? base.worldId)}`;
+  }
+}
+
+/** The `detail` of a problem, without the `code: ` prefix `ApiError` puts on its message. */
+export function problemDetail(error: ApiError): string {
+  const prefix = `${error.code}: `;
+  return error.message.startsWith(prefix) ? error.message.slice(prefix.length) : error.message;
 }
 
 // -- paths ---------------------------------------------------------------------------------------
 
 const objectsPath = (versionId: string): string =>
   `/world/versions/${encodeURIComponent(versionId)}/objects`;
+
+const compositionsPath = (versionId: string): string =>
+  `/world/versions/${encodeURIComponent(versionId)}/compositions`;
 
 const objectPath = (versionId: string, objectId: string): string =>
   `${objectsPath(versionId)}/${encodeURIComponent(objectId)}`;

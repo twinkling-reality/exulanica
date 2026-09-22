@@ -747,3 +747,20 @@
 #shell :is(.settings-view.system-overlay, .atlas-instrument.options-view.system-overlay) {
   animation: diegetic-plane-arrive 220ms cubic-bezier(.2,.8,.2,1);
 }
+
+/* -- Composition verdict: the server's answer on an addition, shown before it is confirmed. -- */
+#shell .composition-verdict { margin: 16px 0 4px; padding: 12px 14px; border: 1px solid var(--edge); border-left-width: 3px; border-radius: 4px; background: var(--surface); }
+#shell .confirm .composition-verdict p,
+#shell .composition-verdict p { margin: 0; font-size: 14px; line-height: 1.55; }
+#shell .composition-verdict p + p { margin-top: 6px; }
+#shell .composition-verdict[data-state='checking'] { color: var(--ink-soft); }
+#shell .composition-verdict[data-state='ready'] { border-left-color: var(--accent); }
+#shell .composition-verdict[data-state='refused'] { border-left-color: var(--error); }
+#shell .composition-verdict-next,
+#shell .confirm .confirm-next { color: var(--ink-soft); }
+#shell .composition-verdict-details { margin-top: 8px; color: var(--ink-soft); font-size: 12px; }
+#shell .composition-verdict-details summary { cursor: pointer; }
+#shell .composition-verdict-details code { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; overflow-wrap: anywhere; }
+#shell .composition-verdict-retry { margin-top: 10px; }
+#shell .confirm .confirm-actions button:disabled { opacity: .55; }
+/* -- end composition verdict -- */
