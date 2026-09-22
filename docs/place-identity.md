@@ -2,7 +2,9 @@
 
 Status: **PLACE PLANE AND SYNTHETIC ALIGNMENT**. The vocabulary and tables are decided and the
 geometry is measured against a synthetic fixture. No joint reconstruction of two real captures
-has run.
+has run. A place may also carry a frame a provider declared instead of one a reconstruction
+measured; that path is reachable through the product's own routes and no real external dataset
+has been admitted through it.
 
 ## Scene and place
 
@@ -176,7 +178,8 @@ three existing meanings of "region" is reused.
 ### The three tables
 
 `place`. One row per durable place: `place_id`, `workspace_id`, `created_at`. That is all of it,
-and the emptiness is the decision. There is no `display_name`, because naming is the identity
+and the emptiness is the decision. It stays all of it: the second frame authority decided below
+is its own table rather than four more columns here. There is no `display_name`, because naming is the identity
 plane's job and it already has a guard; no `deleted_at`, because the table is append-only and a
 place's liveness is derived from its anchor's; and no position, for the reasons in "Where a place
 is" below. The id is allocated once and never derived, the same choice `entity` makes for the same
@@ -364,6 +367,143 @@ that machinery exists to survive, a worker dying mid-COLMAP and a lease expiring
 system for an unchecked one. What is given up in exchange is real: until the queue exists, a joint
 run is an operator action rather than something a read of an unbuilt place can trigger, which is
 the dispatcher the roadmap wants in the same phase.
+
+## A place a provider documented, decided 2026-09-22
+
+Everything above gives a place one frame authority: its anchor scene's own recovered frame,
+established by a joint reconstruction and never by a name. That is right for a place somebody
+photographed, and it leaves a second kind of place with no way to exist at all.
+
+An admitted external source is geography a person is entitled to bring into their world: a
+footprint extract, a tile set, a survey. No photographs stand behind it, so it has no scene, no
+recovered frame and therefore no anchor. `environment_source_admission.place_id` is nonetheless a
+foreign key to `place`, so until this decision the admission chain referenced a row that only a
+hand-written insert could produce. The three things a person is promised on the other side of it,
+bringing a permitted real place into their world, asking a grounded question about that place,
+and composing an admitted environment, were all unreachable for that one reason.
+
+**Decided: a place created for an admitted source declares its frame when it is created, and the
+declaration is its frame authority.** Migration 0091 adds one append-only table,
+`place_source_frame`, with at most one row per place.
+
+### The row, and what each part of it is for
+
+`profile` fixes the stored contract as `exulanica.place-source-frame/v1`. A changed reduction
+changes that string rather than silently reinterpreting rows written under the old one, which is
+the same discipline `exulanica.environment-source-admission/v1` already keeps one table over.
+
+`frame_authority` is the honesty column, and it is this plane's `frame_hops`. Its only value is
+`declared_provider_frame`, in a check constraint rather than free text, so a second basis
+arriving as a new spelling fails loudly instead of passing as a value nobody defined. What it
+prevents is one specific reader failure: taking a frame a provider asserted for a frame this
+system measured. `frame_hops` exists so a composed transform is not read as a measured one; this
+exists so a declaration is not read as a measurement at all.
+
+`geographic_frame` and `geographic_bounds` hold the declaration: the coordinate reference system,
+axis order, units, orientation, altitude reference, and a bounding box in integers with an
+explicit decimal scale. `provider_key` and `provider_frame_statement` record where the
+declaration came from and what the provider says, so a reader can check it against its source
+rather than against the row that repeats it.
+
+`receipt_record`, `receipt_canonical` and `receipt_sha256` fix what was declared, byte for byte,
+in the form the environment tables already use. A declaration is immutable: correcting one names
+a different place, because a place's declared frame is what that place is.
+
+The primary key on `(workspace_id, place_id)` is this plane's `place_version_one_anchor_idx`. A
+second declaration would be a second frame claiming one place.
+
+### What is measured, what is declared, and what neither establishes
+
+- **Measured: nothing.** No geometry is recovered and no coordinate is checked against the world.
+  The provider's coordinates are accepted exactly as given.
+- **Declared:** the coordinate reference system, axis order, horizontal and vertical units,
+  orientation, altitude reference and bounds, copied from the provider's own documentation,
+  recorded with the provider key and the sentence they came from, and frozen in a digest-bound
+  receipt.
+- **Neither establishes:** that the place is where those coordinates say; that this frame relates
+  in any way to a scene's recovered frame; that the bounds are complete, current or exclusive; or
+  that the provider's data is accurate. Nor does any of it grant a right: a place carries no
+  operation rights, and every right is resolved per admission by `environment_resource_allows`.
+
+### One authority per place, in SQL and in both directions
+
+A place that carried an anchor scene and a declared frame would assert a correspondence between a
+recovered COLMAP frame and a geographic reference system that nothing here measures. Relating
+them is georeferencing, and "Where a place is" above already names the independent physical
+reference that would need as an unmet dependency. Every read of such a place would have to pick
+one authority silently.
+
+So 0091 refuses both directions with triggers rather than with a convention: a
+`place_source_frame` row cannot be written for a place that has any `place_version`, and a
+`place_version` cannot be written for a place that has a `place_source_frame`. A guard that held
+only in the order the service happens to write would be a guard against the service.
+
+### What an admitted source must agree with
+
+An admission into a place that declared a frame must carry that frame, jsonb for jsonb, and its
+bounds must lie inside the declared box. Without the first, one place could hold two sources in
+unrelated coordinate systems and nothing would say which one its declared frame described.
+Without the second, a place created for one neighbourhood could silently receive geography from
+another, which is a world holding something nobody asked for.
+
+Containment is integer arithmetic over bounds of kind `bbox` or `polygon` in the same frame and
+the same coordinate scale. Bounds of kind `feature` are **refused**: those are a provider's own
+feature identifier, which is not geometry, so nothing can establish that they lie inside a box,
+and accepting them would record a containment claim nobody checked.
+
+A place that declared nothing is untouched by all of this. It claims no frame, so an admission
+has nothing to disagree with. That is what a bare `insert into place` produces, it stays legal,
+and an unanchored place is honest because it asserts nothing. What changed is narrower and is the
+part a person depends on: the product's own paths now always produce one of the two authorities.
+
+### What a declared place is not
+
+It is **not read by the scene-addressed World Read bundle**, and that is the correct refusal
+rather than a gap. That bundle expresses versions in a place's recovered frame, and this place
+has neither a version nor a recovered frame. `tombstone_blocks_place` therefore blocks it, as it
+blocks any place with no anchor, and `GET /world-read/places/{place_id}` answers 424
+`place_frame_is_declared` rather than `place_without_anchor`: the second sentence would promise a
+state that is not coming.
+
+It carries **no transform** to any scene frame, for the reason above. It has **no position block**
+either: "Where a place is" derives a position from its member captures' EXIF fixes, and a declared
+place has no captures. Its extent is the declared bounds and nothing reduces them.
+
+### Rejected: an anchor row naming an admitted source, written afterwards
+
+The shape that mirrors `place_version` most literally is a `place_source_anchor` row naming the
+`admission_id` whose frame the place adopts, written once the source is admitted.
+
+It is rejected on ordering, not on taste. The admission's foreign key needs the place to exist
+first, so between a place's creation and its anchoring it has no frame authority at all, and any
+number of admissions carrying disagreeing frames can land in it. Anchoring then has two bad
+choices: refuse admissions already written, which an append-only table cannot undo, or leave
+sources standing in a place whose frame they do not share. Declaring the frame when the place is
+created closes that window by construction, because there is no moment at which an admission can
+enter a place whose frame is not yet decided.
+
+### Rejected: columns on `place`
+
+`place` is `place_id`, `workspace_id` and `created_at`, and the section above says the emptiness
+is the decision. A frame, bounds, an authority and a receipt would be four environment-shaped
+columns sitting null on every scene-anchored place, and they would put a geographic frame on the
+one table whose point is that identity is not geometry.
+
+### Rejected: no new table, with agreement enforced between admissions
+
+A trigger requiring every admission in one place to carry the same frame needs no schema at all
+and is the cheapest thing that closes the disagreement. It is rejected because it leaves no
+honesty column: nothing would distinguish a place whose frame a reconstruction measured from one
+whose frame a provider asserted. That is the reader failure `frame_hops` exists to prevent, one
+plane over, and a cheaper schema is not worth reintroducing it.
+
+### What this does not build
+
+No browser flow admits a place. The routes exist and are exercised, and nothing in the
+application's own interface calls them, so bringing a real place into a world is still an
+operator action taken with a client. No real external dataset is admitted either: the tests
+generate a synthetic source file in the workspace inbox, and admitting a provider's actual data
+remains a separate decision about that provider's terms.
 
 ## The alignment, and what makes it refusable
 

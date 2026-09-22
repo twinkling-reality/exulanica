@@ -335,7 +335,7 @@ def test_oversized_file_is_refused_before_hashing(repository, tmp_path, monkeypa
         lambda _path: (_ for _ in ()).throw(AssertionError("oversized file was hashed")),
     )
     with pytest.raises(EnvironmentPayloadTooLarge):
-        repo._store_exact(path, "0" * 64, MAX_ENVIRONMENT_PAYLOAD_BYTES + 1)
+        repo._verified_bytes(path, "0" * 64, MAX_ENVIRONMENT_PAYLOAD_BYTES + 1)
 
 
 def test_oversized_database_row_is_refused_before_store_read(monkeypatch):

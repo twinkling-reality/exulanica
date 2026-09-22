@@ -85,6 +85,57 @@ class GeographicBounds(BaseModel):
         return self
 
 
+#: The stored contract a declared place frame is written under. A changed reduction changes this
+#: string rather than silently reinterpreting rows written by an earlier one.
+PLACE_SOURCE_FRAME_PROFILE = "exulanica.place-source-frame/v1"
+
+
+class DeclaredPlaceFrame(BaseModel):
+    """A place whose frame a provider documented rather than a reconstruction measured.
+
+    ``docs/place-identity.md`` gives a place one frame authority: its anchor scene's own
+    recovered frame. An admitted map, footprint set or tile set has no photographs behind it and
+    therefore no anchor scene, so this is the other authority, and ``frame_authority`` is the
+    column that keeps the two distinguishable.
+
+    Everything here is **declared**. The coordinate reference system, axis order, units,
+    orientation, altitude reference and bounds are copied from the provider's own documentation;
+    nothing in this repository measures a coordinate against the world. A declaration says where
+    a provider says its data lives. It does not say that the place is there, that this frame
+    relates to any recovered scene frame, or that the bounds are complete or current, and it
+    grants no right to anything: rights are resolved per admission and a place carries none.
+    """
+
+    model_config = ConfigDict(extra="forbid", frozen=True)
+
+    place_id: uuid.UUID = Field(default_factory=uuid.uuid4)
+    frame_authority: Literal["declared_provider_frame"] = "declared_provider_frame"
+    provider_key: Annotated[str, Field(min_length=1)]
+    #: What the provider itself says about this frame, so a reader can check the declaration
+    #: against its source rather than against the row that repeats it.
+    provider_frame_statement: Annotated[str, Field(min_length=1, max_length=2000)]
+    geographic_frame: GeographicFrame
+    geographic_bounds: GeographicBounds
+
+    @field_validator("provider_key", "provider_frame_statement")
+    @classmethod
+    def _trimmed(cls, value: str) -> str:
+        if value != value.strip():
+            raise ValueError("text identity fields must not carry surrounding whitespace")
+        return value
+
+    @model_validator(mode="after")
+    def _bounds_are_a_declared_extent(self) -> DeclaredPlaceFrame:
+        if self.geographic_bounds.frame_name != self.geographic_frame.name:
+            raise ValueError("geographic bounds must name the declared frame")
+        if self.geographic_bounds.kind != "bbox":
+            raise ValueError(
+                "a declared place extent is a bounding box; a polygon or a provider feature "
+                "identifier would make containment a different question for every place"
+            )
+        return self
+
+
 class SourceAdmission(BaseModel):
     """A declaration about an exact local file. This type performs no I/O."""
 
@@ -184,6 +235,20 @@ class DerivedEnvironmentAsset(BaseModel):
             )
         canonical_json(self.derivation_lineage)
         return self
+
+
+def place_frame_receipt(value: DeclaredPlaceFrame) -> tuple[dict[str, Any], bytes, bytes]:
+    record = {
+        "profile": PLACE_SOURCE_FRAME_PROFILE,
+        "place_id": str(value.place_id),
+        "frame_authority": value.frame_authority,
+        "provider_key": value.provider_key,
+        "provider_frame_statement": value.provider_frame_statement,
+        "geographic_frame": value.geographic_frame.model_dump(mode="json"),
+        "geographic_bounds": value.geographic_bounds.model_dump(mode="json"),
+    }
+    encoded = canonical_json(record)
+    return record, encoded, hashlib.sha256(encoded).digest()
 
 
 def source_receipt(value: SourceAdmission) -> tuple[dict[str, Any], bytes, bytes]:

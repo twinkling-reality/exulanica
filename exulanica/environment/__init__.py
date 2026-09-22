@@ -12,6 +12,8 @@ This package does not grant source-reuse rights, animation quality, or a runnabl
 
 from exulanica.environment.admission import (
     MAX_ENVIRONMENT_PAYLOAD_BYTES,
+    PLACE_SOURCE_FRAME_PROFILE,
+    DeclaredPlaceFrame,
     DerivedEnvironmentAsset,
     EnvironmentOperation,
     GeographicBounds,
@@ -19,6 +21,7 @@ from exulanica.environment.admission import (
     OperationRights,
     SourceAdmission,
     derived_receipt,
+    place_frame_receipt,
     source_receipt,
 )
 from exulanica.environment.feature_index import (
@@ -41,12 +44,16 @@ from exulanica.environment.feature_index import (
 )
 from exulanica.environment.repository import (
     AuthorizedEnvironmentBytes,
+    DeclaredPlace,
+    DuplicateEnvironmentSource,
+    EnvironmentAdmissionRefused,
     EnvironmentFeatureCatalog,
     EnvironmentOperationDenied,
     EnvironmentPayloadTooLarge,
     EnvironmentRepository,
     EnvironmentResource,
     EnvironmentResourceWithdrawn,
+    PlaceFrameConflict,
     SourceDigestMismatch,
     UnknownEnvironmentResource,
 )
@@ -61,8 +68,13 @@ __all__ = [
     "FEATURE_INDEX_PROFILE_V2",
     "MAX_ENVIRONMENT_FEATURES",
     "MAX_ENVIRONMENT_PAYLOAD_BYTES",
+    "PLACE_SOURCE_FRAME_PROFILE",
     "AuthorizedEnvironmentBytes",
+    "DeclaredPlace",
+    "DeclaredPlaceFrame",
     "DerivedEnvironmentAsset",
+    "DuplicateEnvironmentSource",
+    "EnvironmentAdmissionRefused",
     "EnvironmentFeatureCatalog",
     "EnvironmentFeatureInput",
     "EnvironmentFeatureKind",
@@ -77,12 +89,14 @@ __all__ = [
     "GeographicFrame",
     "InvalidEnvironmentFeatureFilter",
     "OperationRights",
+    "PlaceFrameConflict",
     "SourceAdmission",
     "SourceDigestMismatch",
     "UnknownEnvironmentResource",
     "build_feature_index",
     "derived_receipt",
     "filter_features",
+    "place_frame_receipt",
     "segment_id",
     "source_receipt",
     "validate_feature_index",

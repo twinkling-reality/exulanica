@@ -16,12 +16,15 @@ from exulanica.canonical import canonical_json
 from exulanica.db.session import set_workspace
 from exulanica.environment.admission import (
     MAX_ENVIRONMENT_PAYLOAD_BYTES,
+    PLACE_SOURCE_FRAME_PROFILE,
+    DeclaredPlaceFrame,
     DerivedEnvironmentAsset,
     EnvironmentOperation,
     GeographicBounds,
     GeographicFrame,
     SourceAdmission,
     derived_receipt,
+    place_frame_receipt,
     source_receipt,
 )
 from exulanica.environment.feature_index import (
@@ -35,7 +38,9 @@ from exulanica.environment.feature_index import (
 from exulanica.errors import ExulanicaError, IntegrityError
 from exulanica.evidence.blob import BlobId
 from exulanica.graph.asset_read_policy import final_check
-from exulanica.store.base import ContentAddressedStore, PutResult
+from exulanica.ingest.spine import places
+from exulanica.ingest.spine.scope import WorkspaceScope
+from exulanica.store.base import ContentAddressedStore
 
 ResourceKind = Literal["source", "asset"]
 
@@ -58,6 +63,23 @@ class SourceDigestMismatch(IntegrityError):
 
 class EnvironmentPayloadTooLarge(ExulanicaError):
     pass
+
+
+class EnvironmentAdmissionRefused(ExulanicaError):
+    """The database refused the write, and its own sentence is the reason.
+
+    Raised rather than translated because the refusals behind it live in 0091's triggers and
+    check constraints, which are the authority. A second copy of each rule here, phrased
+    differently, would be a second place for the rule to be right or wrong.
+    """
+
+
+class DuplicateEnvironmentSource(ExulanicaError):
+    """This provider revision is already admitted in this workspace."""
+
+
+class PlaceFrameConflict(ExulanicaError):
+    """This place already declared a different frame, and a declaration cannot be corrected."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -113,6 +135,36 @@ class EnvironmentFeatureCatalog:
         }
 
 
+@dataclass(frozen=True, slots=True)
+class DeclaredPlace:
+    """One place whose frame came from a provider's documentation."""
+
+    place_id: uuid.UUID
+    frame_authority: str
+    provider_key: str
+    provider_frame_statement: str
+    geographic_frame: dict[str, Any]
+    geographic_bounds: dict[str, Any]
+    receipt: dict[str, Any]
+    receipt_sha256: str
+
+    def document(self) -> dict[str, Any]:
+        return {
+            "place_id": str(self.place_id),
+            "frame_authority": self.frame_authority,
+            "provider_key": self.provider_key,
+            "provider_frame_statement": self.provider_frame_statement,
+            "geographic_frame": self.geographic_frame,
+            "geographic_bounds": self.geographic_bounds,
+            "receipt": self.receipt,
+            "receipt_sha256": self.receipt_sha256,
+        }
+
+
+def _refusal(exc: psycopg.Error) -> str:
+    return exc.diag.message_primary or str(exc).strip()
+
+
 class EnvironmentRepository:
     def __init__(
         self,
@@ -126,8 +178,84 @@ class EnvironmentRepository:
         self.workspace_id = workspace_id
         self.store = store
 
+    def declare_place_frame(self, value: DeclaredPlaceFrame, *, actor: uuid.UUID) -> DeclaredPlace:
+        """Create a place whose frame a provider documented, and declare that frame.
+
+        The product's other way to make a place binds an anchor SCENE whose recovered frame the
+        place adopts. A geography admitted from a provider has no photographs behind it, so it
+        has no anchor scene and, before 0091, no way to exist at all. This writes the other
+        authority and says in a column which one it is.
+
+        Repeating the same declaration is the same declaration: a retried request returns the
+        stored row rather than a conflict. Declaring a *different* frame for one place is
+        refused, because a place's declared frame is what that place is, and correcting it names
+        a different place.
+        """
+        scope = WorkspaceScope(self.connection, self.workspace_id)
+        record, encoded, receipt_digest = place_frame_receipt(value)
+        stored = places.source_frame(scope, place_id=value.place_id)
+        if stored is not None:
+            if stored.receipt_sha256 != receipt_digest:
+                raise PlaceFrameConflict(
+                    f"place {value.place_id} already declared a different frame"
+                )
+            return self._declared(stored)
+        try:
+            with self.connection.transaction():
+                places.insert_place(scope, place_id=value.place_id)
+                places.insert_source_frame(
+                    scope,
+                    place_id=value.place_id,
+                    profile=PLACE_SOURCE_FRAME_PROFILE,
+                    frame_authority=value.frame_authority,
+                    provider_key=value.provider_key,
+                    provider_frame_statement=value.provider_frame_statement,
+                    geographic_frame=value.geographic_frame.model_dump(mode="json"),
+                    geographic_bounds=value.geographic_bounds.model_dump(mode="json"),
+                    receipt_record=record,
+                    receipt_canonical=encoded,
+                    receipt_sha256=receipt_digest,
+                    declared_by=actor,
+                )
+        except psycopg.errors.UniqueViolation as exc:
+            # A fixed sentence rather than the database's, because ``place_id`` is unique across
+            # every workspace and the database's message would say whether one is already taken.
+            raise PlaceFrameConflict(
+                f"place {value.place_id} cannot be declared under this identifier"
+            ) from exc
+        except psycopg.errors.IntegrityError as exc:
+            raise EnvironmentAdmissionRefused(_refusal(exc)) from exc
+        written = places.source_frame(scope, place_id=value.place_id)
+        if written is None:
+            raise IntegrityError("the declared place frame was not stored")
+        return self._declared(written)
+
+    def declared_place(self, place_id: uuid.UUID) -> DeclaredPlace:
+        """Read back what a place declared, so a later reader can tell declared from measured.
+
+        Raises rather than returning None for a place that declared nothing, because the two
+        answers a caller needs are "this place's frame is a provider's statement" and "there is
+        no such declaration here"; a null would leave them to guess which.
+        """
+        stored = places.source_frame(
+            WorkspaceScope(self.connection, self.workspace_id), place_id=place_id
+        )
+        if stored is None:
+            raise UnknownEnvironmentResource("no such declared place frame")
+        return self._declared(stored)
+
     def admit_source(self, value: SourceAdmission, *, actor: uuid.UUID) -> EnvironmentResource:
-        stored = self._store_exact(
+        """Admit one exact local file as a reusable environment source.
+
+        **Nothing reaches the content-addressed store until every refusal is past.** The bytes
+        are verified against the declared digest and size first, which needs no store, then the
+        row is written, and only then are the bytes put. A refused admission therefore leaves
+        nothing behind: no row, and no blob under a digest nothing references. Ordering the put
+        after the insert rather than before a list of Python pre-checks is what makes that true
+        of refusals nobody has written yet, including the ones 0091's triggers raise and any a
+        later migration adds.
+        """
+        blob_id, byte_size = self._verified_bytes(
             value.local_path, value.expected_sha256, value.expected_byte_size
         )
         place = self.connection.execute(
@@ -137,40 +265,47 @@ class EnvironmentRepository:
         if place is None:
             raise UnknownEnvironmentResource("no such place")
         record, encoded, receipt_digest = source_receipt(value)
-        with self.connection.transaction():
-            self.connection.execute(
-                """
-                insert into environment_source_admission(
-                  workspace_id,admission_id,place_id,provider_key,provider_original_id,
-                  provider_revision,source_sha256,source_path,member_path,media_type,byte_size,
-                  geographic_frame,geographic_bounds,operation_rights,attribution,
-                  modification_notice,receipt_record,receipt_canonical,receipt_sha256,admitted_by)
-                values(
-                  %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                """,
-                (
-                    self.workspace_id,
-                    value.admission_id,
-                    value.place_id,
-                    value.provider_key,
-                    value.provider_original_id,
-                    value.provider_revision,
-                    stored.blob_id.digest,
-                    value.source_path,
-                    value.member_path,
-                    value.media_type,
-                    stored.byte_size,
-                    Jsonb(value.geographic_frame.model_dump(mode="json")),
-                    Jsonb(value.geographic_bounds.model_dump(mode="json")),
-                    Jsonb(value.operation_rights.model_dump(mode="json")),
-                    value.attribution,
-                    value.modification_notice,
-                    Jsonb(record),
-                    encoded,
-                    receipt_digest,
-                    actor,
-                ),
-            )
+        try:
+            with self.connection.transaction():
+                self.connection.execute(
+                    """
+                    insert into environment_source_admission(
+                      workspace_id,admission_id,place_id,provider_key,provider_original_id,
+                      provider_revision,source_sha256,source_path,member_path,media_type,
+                      byte_size,geographic_frame,geographic_bounds,operation_rights,attribution,
+                      modification_notice,receipt_record,receipt_canonical,receipt_sha256,
+                      admitted_by)
+                    values(
+                      %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    """,
+                    (
+                        self.workspace_id,
+                        value.admission_id,
+                        value.place_id,
+                        value.provider_key,
+                        value.provider_original_id,
+                        value.provider_revision,
+                        blob_id.digest,
+                        value.source_path,
+                        value.member_path,
+                        value.media_type,
+                        byte_size,
+                        Jsonb(value.geographic_frame.model_dump(mode="json")),
+                        Jsonb(value.geographic_bounds.model_dump(mode="json")),
+                        Jsonb(value.operation_rights.model_dump(mode="json")),
+                        value.attribution,
+                        value.modification_notice,
+                        Jsonb(record),
+                        encoded,
+                        receipt_digest,
+                        actor,
+                    ),
+                )
+                self._put_verified(value.local_path, blob_id, byte_size)
+        except psycopg.errors.UniqueViolation as exc:
+            raise DuplicateEnvironmentSource(_refusal(exc)) from exc
+        except psycopg.errors.IntegrityError as exc:
+            raise EnvironmentAdmissionRefused(_refusal(exc)) from exc
         return self.read_metadata("source", value.admission_id, EnvironmentOperation.PERSIST)
 
     def register_derived(
@@ -192,46 +327,52 @@ class EnvironmentRepository:
             ).fetchone()
             if parent is None:
                 raise UnknownEnvironmentResource("no such parent environment asset")
-        stored = self._store_exact(
+        blob_id, byte_size = self._verified_bytes(
             value.local_path, value.expected_sha256, value.expected_byte_size
         )
         source_hex = bytes(source["source_sha256"]).hex()
         record, encoded, receipt_digest = derived_receipt(value, source_sha256=source_hex)
-        with self.connection.transaction():
-            self.connection.execute(
-                """
-                insert into derived_environment_asset(
-                  workspace_id,asset_id,admission_id,parent_asset_id,source_sha256,
-                  content_sha256,source_member_path,media_type,byte_size,derivation_kind,
-                  derivation_lineage,geographic_frame,geographic_bounds,operation_rights,
-                  attribution,modification_notice,receipt_record,receipt_canonical,
-                  receipt_sha256,created_by)
-                values(
-                  %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
-                """,
-                (
-                    self.workspace_id,
-                    value.asset_id,
-                    value.admission_id,
-                    value.parent_asset_id,
-                    source["source_sha256"],
-                    stored.blob_id.digest,
-                    value.source_member_path,
-                    value.media_type,
-                    stored.byte_size,
-                    value.derivation_kind,
-                    Jsonb(value.derivation_lineage),
-                    Jsonb(value.geographic_frame.model_dump(mode="json")),
-                    Jsonb(value.geographic_bounds.model_dump(mode="json")),
-                    Jsonb(value.operation_rights.model_dump(mode="json")),
-                    value.attribution,
-                    value.modification_notice,
-                    Jsonb(record),
-                    encoded,
-                    receipt_digest,
-                    actor,
-                ),
-            )
+        try:
+            with self.connection.transaction():
+                self.connection.execute(
+                    """
+                    insert into derived_environment_asset(
+                      workspace_id,asset_id,admission_id,parent_asset_id,source_sha256,
+                      content_sha256,source_member_path,media_type,byte_size,derivation_kind,
+                      derivation_lineage,geographic_frame,geographic_bounds,operation_rights,
+                      attribution,modification_notice,receipt_record,receipt_canonical,
+                      receipt_sha256,created_by)
+                    values(
+                      %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)
+                    """,
+                    (
+                        self.workspace_id,
+                        value.asset_id,
+                        value.admission_id,
+                        value.parent_asset_id,
+                        source["source_sha256"],
+                        blob_id.digest,
+                        value.source_member_path,
+                        value.media_type,
+                        byte_size,
+                        value.derivation_kind,
+                        Jsonb(value.derivation_lineage),
+                        Jsonb(value.geographic_frame.model_dump(mode="json")),
+                        Jsonb(value.geographic_bounds.model_dump(mode="json")),
+                        Jsonb(value.operation_rights.model_dump(mode="json")),
+                        value.attribution,
+                        value.modification_notice,
+                        Jsonb(record),
+                        encoded,
+                        receipt_digest,
+                        actor,
+                    ),
+                )
+                self._put_verified(value.local_path, blob_id, byte_size)
+        except psycopg.errors.UniqueViolation as exc:
+            raise DuplicateEnvironmentSource(_refusal(exc)) from exc
+        except psycopg.errors.IntegrityError as exc:
+            raise EnvironmentAdmissionRefused(_refusal(exc)) from exc
         return self.read_metadata("asset", value.asset_id, EnvironmentOperation.PERSIST)
 
     def publish_feature_index(
@@ -513,7 +654,15 @@ class EnvironmentRepository:
         if result.rowcount != 1:
             raise UnknownEnvironmentResource("no such environment resource")
 
-    def _store_exact(self, path: Path, expected_hex: str, expected_size: int) -> PutResult:
+    def _verified_bytes(
+        self, path: Path, expected_hex: str, expected_size: int
+    ) -> tuple[BlobId, int]:
+        """Check a local file against what the request declared. Writes nothing anywhere.
+
+        Separate from :meth:`_put_verified` so that everything a refusal needs to know is known
+        before anything is stored. Both digest and size are checked, because a file whose bytes
+        hash as promised and whose length does not is a file the caller does not have.
+        """
         size = path.stat().st_size
         if size > MAX_ENVIRONMENT_PAYLOAD_BYTES or expected_size > MAX_ENVIRONMENT_PAYLOAD_BYTES:
             raise EnvironmentPayloadTooLarge(
@@ -526,10 +675,31 @@ class EnvironmentRepository:
                 f"local bytes are sha256 {actual.hex} and size {size}; "
                 f"expected {expected_hex} and {expected_size}"
             )
+        return actual, size
+
+    def _put_verified(self, path: Path, blob_id: BlobId, byte_size: int) -> None:
+        """Store bytes that :meth:`_verified_bytes` already accepted, inside the write.
+
+        Called last, after the row is written, so that a refusal at any depth of the database
+        leaves the store untouched. A file that changed between the two calls is a mismatch, not
+        a silent substitution.
+        """
         stored = self.store.put_file(path)
-        if stored.blob_id != actual or stored.byte_size != size:
+        if stored.blob_id != blob_id or stored.byte_size != byte_size:
             raise SourceDigestMismatch("stored bytes do not match the verified local file")
-        return stored
+
+    @staticmethod
+    def _declared(row: places.PlaceSourceFrameRow) -> DeclaredPlace:
+        return DeclaredPlace(
+            place_id=row.place_id,
+            frame_authority=row.frame_authority,
+            provider_key=row.provider_key,
+            provider_frame_statement=row.provider_frame_statement,
+            geographic_frame=row.geographic_frame,
+            geographic_bounds=row.geographic_bounds,
+            receipt=row.receipt_record,
+            receipt_sha256=row.receipt_sha256.hex(),
+        )
 
     def _authorized_row(
         self, kind: ResourceKind, resource_id: uuid.UUID, operation: EnvironmentOperation

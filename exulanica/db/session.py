@@ -2,7 +2,7 @@
 
 Neither setting is optional, and neither is a convenience.
 
-*   **``exulanica.workspace_id``.** 120 tables are under FORCE row-level security keyed on
+*   **``exulanica.workspace_id``.** 121 tables are under FORCE row-level security keyed on
     ``current_workspace()``, whose policy compares the row's isolation column to
     ``current_workspace()`` and which reads exactly this setting. Most of those columns are
     ``workspace_id``. ``consent_record`` compares ``tenant_id``, the name migration 0001 gave

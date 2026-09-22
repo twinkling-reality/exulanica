@@ -303,6 +303,7 @@ ROUTE_RULES: Final[Mapping[tuple[str, str], Public | Authentication | Requires]]
         ("GET", "/selection/place-bridges"): _LIBRARY_READ,
         ("GET", "/identity/events"): _LIBRARY_READ,
         ("GET", "/companion/memory/recent"): _LIBRARY_READ,
+        ("GET", "/environment-resources/places/{place_id}"): _LIBRARY_READ,
         ("GET", "/environment-resources/sources/{admission_id}/features"): _LIBRARY_READ,
         ("GET", "/environment-resources/{kind}/{resource_id}"): _LIBRARY_READ,
         ("GET", "/environment-resources/{kind}/{resource_id}/bytes"): _LIBRARY_READ,
@@ -346,7 +347,9 @@ ROUTE_RULES: Final[Mapping[tuple[str, str], Public | Authentication | Requires]]
         ("POST", "/personal-admission"): _ADMISSION_WRITE,
         ("POST", "/personal-admission/model-rights/{right_id}/withdraw"): _ADMISSION_WRITE,
         ("POST", "/operations/reconstruction-admission"): _ADMISSION_WRITE,
+        ("POST", "/environment-resources/places"): _ADMISSION_WRITE,
         ("POST", "/environment-resources/sources"): _ADMISSION_WRITE,
+        ("POST", "/environment-resources/assets"): _ADMISSION_WRITE,
         ("POST", "/environment-resources/sources/{admission_id}/feature-indexes"): (
             _ADMISSION_WRITE
         ),

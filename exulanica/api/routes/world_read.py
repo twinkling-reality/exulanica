@@ -75,23 +75,32 @@ def _withdrawn(connection: Any, workspace: uuid.UUID, scene_id: uuid.UUID) -> bo
     return bool(row is not None and row["blocked"])
 
 
-def _place_state(connection: Any, workspace: uuid.UUID, place_id: uuid.UUID) -> tuple[bool, bool]:
-    """Whether this workspace holds this place, and whether it has an anchor.
+def _place_state(
+    connection: Any, workspace: uuid.UUID, place_id: uuid.UUID
+) -> tuple[bool, bool, bool]:
+    """Whether this workspace holds this place, whether it has an anchor, and whether it declared.
 
     ``tombstone_blocks_place`` fails closed on both a withdrawn anchor and no anchor at all, which
     is right for the guard and wrong for the answer: one of those is a deletion the caller is
-    entitled to hear about and the other is a place nobody has aligned yet. So the two halves are
+    entitled to hear about and the other is a place nobody has aligned yet. So the halves are
     asked separately, and only about a place row already known to be in this workspace, so the
     answer cannot distinguish another tenant's ids from absent ones.
+
+    The third half is a place whose frame a provider declared rather than a reconstruction
+    measured. It has no anchor scene and never will, so reporting it as one nobody has aligned
+    yet would promise a state that is not coming. It is not a degraded place; it is a place this
+    bundle does not read, because this bundle reads recovered scene frames.
     """
     row = connection.execute(
         "select exists (select 1 from place "
         "                where workspace_id = %s and place_id = %s) as known, "
         "       exists (select 1 from place_version "
-        "                where workspace_id = %s and place_id = %s and frame_hops = 0) as anchored",
-        (workspace, place_id, workspace, place_id),
+        "                where workspace_id = %s and place_id = %s and frame_hops = 0) as anchored,"
+        "       exists (select 1 from place_source_frame "
+        "                where workspace_id = %s and place_id = %s) as declared",
+        (workspace, place_id, workspace, place_id, workspace, place_id),
     ).fetchone()
-    return bool(row["known"]), bool(row["anchored"])
+    return bool(row["known"]), bool(row["anchored"]), bool(row["declared"])
 
 
 @router.get(
@@ -190,9 +199,16 @@ def place_bundle(
         except CanonicalisationError as error:
             return _problem(424, "unreadable_place", str(error))
         if bundle is None:
-            known, anchored = _place_state(connection, session.workspace_id, place_id)
+            known, anchored, declared = _place_state(connection, session.workspace_id, place_id)
             if not known:
                 return _problem(404, "unknown_reference", "no such place")
+            if declared:
+                return _problem(
+                    424,
+                    "place_frame_is_declared",
+                    "this place's frame was declared by a provider, and this bundle reads "
+                    "recovered scene frames only",
+                )
             if not anchored:
                 return _problem(
                     424,

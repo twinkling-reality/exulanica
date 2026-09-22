@@ -104,8 +104,11 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
     },
     ("GET", "/graph"): {},
     ("GET", "/graph/sources"): {},
+    ("POST", "/environment-resources/places"): {"json": {}},
     ("POST", "/environment-resources/sources"): {"json": {}},
+    ("POST", "/environment-resources/assets"): {"json": {}},
     ("POST", "/environment-resources/sources/{admission_id}/feature-indexes"): {"json": {}},
+    ("GET", "/environment-resources/places/{place_id}"): {},
     ("GET", "/environment-resources/sources/{admission_id}/features"): {},
     ("GET", "/environment-resources/{kind}/{resource_id}"): {"params": {"operation": "display"}},
     ("GET", "/environment-resources/{kind}/{resource_id}/bytes"): {

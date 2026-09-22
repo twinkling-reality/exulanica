@@ -128,6 +128,7 @@ INSERT_ONLY_TABLES: Final = (
     "saved_world_source_attachment",
     "saved_world_source_detach_operation",
     "saved_world_source_detach",
+    "place_source_frame",
 )
 
 #: The vocabulary is administered, not generated. Without revoking this the role could insert a

@@ -21,6 +21,8 @@ import datetime as dt
 import uuid
 from dataclasses import dataclass
 
+from psycopg.types.json import Jsonb
+
 from exulanica.db.guards import terminal_if_tombstoned
 from exulanica.evidence.blob import BlobId
 from exulanica.ingest.spine.scope import WorkspaceScope
@@ -28,6 +30,7 @@ from exulanica.ingest.spine.scope import WorkspaceScope
 __all__ = [
     "PlaceAlignmentRow",
     "PlaceSceneMember",
+    "PlaceSourceFrameRow",
     "PlaceVersionRow",
     "RetainedPoseReceipt",
     "alignment",
@@ -37,11 +40,13 @@ __all__ = [
     "insert_alignment",
     "insert_place",
     "insert_place_artifact",
+    "insert_source_frame",
     "insert_version",
     "next_ordinal",
     "retained_pose_receipt",
     "scene_blocked",
     "scene_members",
+    "source_frame",
     "version",
     "version_of_scene",
 ]
@@ -78,6 +83,20 @@ class PlaceAlignmentRow:
 
 
 @dataclass(frozen=True, slots=True)
+class PlaceSourceFrameRow:
+    """The frame a place declared, and the receipt that fixes what it declared."""
+
+    place_id: uuid.UUID
+    frame_authority: str
+    provider_key: str
+    provider_frame_statement: str
+    geographic_frame: dict
+    geographic_bounds: dict
+    receipt_record: dict
+    receipt_sha256: bytes
+
+
+@dataclass(frozen=True, slots=True)
 class PlaceVersionRow:
     place_id: uuid.UUID
     scene_id: uuid.UUID
@@ -99,6 +118,79 @@ def insert_place(scope: WorkspaceScope, *, place_id: uuid.UUID) -> bool:
         (place_id, scope.workspace_id),
     )
     return cursor.rowcount > 0
+
+
+def insert_source_frame(
+    scope: WorkspaceScope,
+    *,
+    place_id: uuid.UUID,
+    profile: str,
+    frame_authority: str,
+    provider_key: str,
+    provider_frame_statement: str,
+    geographic_frame: dict,
+    geographic_bounds: dict,
+    receipt_record: dict,
+    receipt_canonical: bytes,
+    receipt_sha256: bytes,
+    declared_by: uuid.UUID,
+) -> bool:
+    """Declare the frame of a place whose geography came from a provider. False if already so.
+
+    The second of the two ways a place can have a frame, and the one that measures nothing. An
+    anchor version adopts a frame a joint reconstruction recovered; this copies one a provider
+    documented. 0091's ``frame_authority`` is what keeps the two distinguishable at a glance,
+    and its triggers are what keep one place from carrying both.
+    """
+    cursor = scope.connection.execute(
+        "insert into place_source_frame (workspace_id, place_id, profile, frame_authority, "
+        "provider_key, provider_frame_statement, geographic_frame, geographic_bounds, "
+        "receipt_record, receipt_canonical, receipt_sha256, declared_by) "
+        "values (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) "
+        "on conflict (workspace_id, place_id) do nothing",
+        (
+            scope.workspace_id,
+            place_id,
+            profile,
+            frame_authority,
+            provider_key,
+            provider_frame_statement,
+            Jsonb(geographic_frame),
+            Jsonb(geographic_bounds),
+            Jsonb(receipt_record),
+            receipt_canonical,
+            receipt_sha256,
+            declared_by,
+        ),
+    )
+    return cursor.rowcount > 0
+
+
+def source_frame(scope: WorkspaceScope, *, place_id: uuid.UUID) -> PlaceSourceFrameRow | None:
+    """The frame this place declared, or None when it declared none.
+
+    None is the ordinary answer. A place anchored by a scene declares nothing, and so does a
+    place that has neither anchor yet, so a caller must treat the absence as "this place claims
+    no frame" rather than as a missing row to fill in.
+    """
+    row = scope.connection.execute(
+        "select place_id,frame_authority,provider_key,provider_frame_statement,geographic_frame,"
+        "geographic_bounds,receipt_record,receipt_sha256 from place_source_frame "
+        "where workspace_id=%s and place_id=%s",
+        (scope.workspace_id, place_id),
+    ).fetchone()
+    if row is None:
+        return None
+    return PlaceSourceFrameRow(
+        place_id=row["place_id"],
+        frame_authority=row["frame_authority"],
+        provider_key=row["provider_key"],
+        provider_frame_statement=row["provider_frame_statement"],
+        geographic_frame=row["geographic_frame"],
+        geographic_bounds=row["geographic_bounds"],
+        receipt_record=row["receipt_record"],
+        receipt_sha256=bytes(row["receipt_sha256"]),
+    )
 
 
 def scene_members(scope: WorkspaceScope, scene_id: uuid.UUID) -> list[PlaceSceneMember]:

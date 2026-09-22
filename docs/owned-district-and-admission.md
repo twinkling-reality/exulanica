@@ -44,6 +44,62 @@ Google photorealistic tiles remain a reference-only optional visualization under
 provider policy. They do not supply owned-district collision, semantic identity, persistence,
 extraction, model inputs, or export.
 
+## The admission chain, and the place an admitted source belongs to
+
+An admitted source is always admitted **to a place**. The place is what a memory, a question and
+an authored placement all address, and without one an admission is bytes with a licence and no
+subject. Because an external source has no reconstruction behind it, its place cannot be anchored
+by a scene; it declares its frame instead. `place-identity.md` owns that decision, including the
+honesty column that keeps a declared frame from being read as a measured one, and the two
+alternatives it rejects.
+
+The chain, in the order the routes take it:
+
+| Step | Route | What it establishes |
+| --- | --- | --- |
+| Create the place | `POST /environment-resources/places` | A canonical place whose frame is a provider's declaration, with `frame_authority`, the declared frame and bounds, and a digest-bound receipt |
+| Read it back | `GET /environment-resources/places/{place_id}` | The same declaration, for any later reader holding only the identifier |
+| Admit the source | `POST /environment-resources/sources` | Exact local bytes, verified against the declared digest and size, with provenance, attribution and the operation matrix |
+| Register derived bytes | `POST /environment-resources/assets` | A render or extraction output bound to that admission's source digest and lineage |
+| Publish a catalog | `POST /environment-resources/sources/{admission_id}/feature-indexes` | The bounded feature index and its relational projection, pinned to exact source and render digests |
+| Read features | `GET /environment-resources/sources/{admission_id}/features` | The current publication, filtered, with fail-closed rights and digest binding |
+
+Each step resolves rights for itself. Creating a place grants nothing: a place carries no
+operation rights, and a source is admitted, derived from, indexed and composed only while
+`environment_resource_allows` says so for that exact operation at that exact moment. An
+admission whose rights review has not concluded is not admissible, and the preparer for NYC
+Building Footprints writes a plan that says so rather than a row: it marks place identity as
+integration input and the operation rights as requiring legal review, and leaves publication
+blocked. Nothing in the chain above overrides that.
+
+### What an admission into a declared place must agree with
+
+The admitted source must carry the frame its place declared and its bounds must lie inside the
+declared box, checked in integers over bounds of kind `bbox` or `polygon`. Bounds naming a
+provider feature identifier are refused, because a feature id is not geometry and nothing could
+establish that it lies inside a box.
+
+A derived asset is **not** held to the place's frame. A derivation may legitimately reproject
+into a local frame, which is what the Flatiron compiler does when it transforms source
+coordinates into a local centimetre frame, and a constraint there would forbid the ordinary case
+in order to restate a fact about the source.
+
+### A refused admission stores nothing
+
+Admission verifies the local bytes against the declared digest and size, writes the row, and only
+then puts the bytes in the content-addressed store. Every refusal therefore happens before
+anything is stored, including refusals the database raises inside the write, so a rejected
+request leaves no row and no blob under a digest nothing references. The ordering is what makes
+that true of refusals added later, rather than of a list of checks somebody remembered to put
+first.
+
+### What is not reachable from the interface
+
+No browser flow admits a place or a source. The routes above are exercised end to end against
+PostgreSQL and a real content-addressed store, including composition into an authored version and
+a cross-content Selection over the resulting place, and no shipped screen calls them. Admitting a
+real provider dataset is a separate decision about that provider's terms and has not been made.
+
 ## What the artifact authoritatively contains
 
 The `exulanica.owned-district/v1` browser contract contains:
