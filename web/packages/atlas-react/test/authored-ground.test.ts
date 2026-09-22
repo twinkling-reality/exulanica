@@ -9,6 +9,7 @@ import {
   authoredGroundGeometry,
   authoredGroundScaleCue,
   createWorldField,
+  endlessAuthoredGroundSurface,
 } from '../src/playcanvas/world-field.js';
 
 describe('authored ground geometry', () => {
@@ -202,5 +203,74 @@ describe('authored ground geometry', () => {
     expect(map.enabled).toBe(true);
     field.destroy();
     app.destroy();
+  });
+});
+
+describe('an endless authored ground', () => {
+  const build = (ground?: Parameters<typeof createWorldField>[5]) => {
+    const canvas = document.createElement('canvas');
+    const device = new pc.NullGraphicsDevice(canvas);
+    const app = new pc.AppBase(canvas);
+    const options = new pc.AppOptions();
+    options.graphicsDevice = device;
+    options.componentSystems = [pc.RenderComponentSystem];
+    app.init(options);
+    const field = createWorldField(
+      device, buildNavigationWorld(makeScene([], 1, 1)), ORIGIN_LANDSCAPE, DAWN_THEME, false, ground,
+    );
+    app.root.addChild(field.entity);
+    return { app, field };
+  };
+
+  it('is the floor objects stand on: lit, shadow-receiving, and at the authored elevation', () => {
+    const { app, field } = build({ kind: 'endless', elevation: 0.4 });
+    const instances = field.entity.render!.meshInstances;
+    // The walking face alone. A rim, a fascia or metre marks would all be drawn from a
+    // rectangle, and this ground has none to draw them from.
+    expect(instances).toHaveLength(1);
+    const surface = instances[0]!;
+    // The shadow that separates a placed object from the floor. The landscape shader this ground
+    // used to fall through to never samples a shadow map, so this flag alone proves nothing: the
+    // material has to be one that does, which is the lit standard material a bounded ground uses.
+    expect(surface.receiveShadow).toBe(true);
+    expect(surface.material).toBeInstanceOf(pc.StandardMaterial);
+    expect((surface.material as pc.StandardMaterial).useLighting).toBe(true);
+    // Where objects are placed, not 35 mm under them.
+    expect(field.entity.getPosition().y).toBe(0);
+    const heights = new Set<number>();
+    const positions: number[] = [];
+    surface.mesh.getPositions(positions);
+    for (let index = 1; index < positions.length; index += 3) heights.add(positions[index]!);
+    // One height, stored as float32, so compared to float32 precision rather than exactly.
+    expect(heights.size).toBe(1);
+    expect([...heights][0]).toBeCloseTo(0.4, 6);
+    app.destroy();
+  });
+
+  it('follows the saved appearance with no rim to key it on', () => {
+    const { app, field } = build({ kind: 'endless', elevation: 0 });
+    field.setProfile(SURVEY_RELIEF);
+    const surface = field.entity.render!.meshInstances[0]!.material as pc.StandardMaterial;
+    expect([surface.diffuse.r, surface.diffuse.g, surface.diffuse.b])
+      .toEqual(unitRgb(SURVEY_RELIEF.palette.terrain));
+    app.destroy();
+  });
+
+  it('leaves a world with no authored ground on the landscape it always had', () => {
+    // The control for the two cases above: the same builder with no authored ground still takes
+    // the custom landscape shader, sunk just under zero and receiving nothing.
+    const { app, field } = build(undefined);
+    const surface = field.entity.render!.meshInstances[0]!;
+    expect(surface.material).toBeInstanceOf(pc.ShaderMaterial);
+    expect(surface.receiveShadow).toBe(false);
+    expect(field.entity.getPosition().y).toBeCloseTo(-0.035, 6);
+    app.destroy();
+  });
+
+  it('draws past anywhere a walk can see, and refuses a reach it cannot draw', () => {
+    const surface = endlessAuthoredGroundSurface(0, 40_000);
+    expect(Math.max(...surface.positions.filter((_, index) => index % 3 === 0))).toBe(40_000);
+    expect(() => endlessAuthoredGroundSurface(Number.NaN, 10)).toThrow('finite elevation');
+    expect(() => endlessAuthoredGroundSurface(0, 0)).toThrow('positive drawn reach');
   });
 });

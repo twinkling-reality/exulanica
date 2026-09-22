@@ -226,6 +226,53 @@ export interface AuthoredGroundSupport {
 }
 
 /**
+ * An authored ground with no perimeter: it states an elevation and nothing a rectangle could be
+ * drawn from. It is still an authored starter, so it is still the floor objects are placed on.
+ */
+export interface EndlessAuthoredGroundSupport {
+  readonly kind: 'endless';
+  readonly elevation: number;
+}
+
+/**
+ * Which of the two supports this is. By the presence of `kind`, because the bounded shape has no
+ * such field: it predates grounds that could be endless, and its callers build it without one.
+ */
+function isEndlessAuthoredGroundSupport(
+  support: AuthoredGroundSupport | EndlessAuthoredGroundSupport,
+): support is EndlessAuthoredGroundSupport {
+  return 'kind' in support && support.kind === 'endless';
+}
+
+/**
+ * The walking face of an endless authored ground: one flat quad at the authored elevation.
+ *
+ * `halfExtent` is how far the drawn surface reaches, which is not an edge the ground has. It is
+ * sized by the caller past everything the camera can see from anywhere a walk can reach, so the
+ * quad's own border is always behind the far clip and the fog, and never reads as a place.
+ */
+export function endlessAuthoredGroundSurface(
+  elevation: number,
+  halfExtent: number,
+): MeshGeometryData {
+  if (!Number.isFinite(elevation) || !Number.isFinite(halfExtent) || halfExtent <= 0) {
+    throw new Error(
+      'an endless authored ground needs a finite elevation and a positive drawn reach',
+    );
+  }
+  return Object.freeze({
+    positions: Object.freeze([
+      -halfExtent, elevation, -halfExtent,
+      halfExtent, elevation, -halfExtent,
+      halfExtent, elevation, halfExtent,
+      -halfExtent, elevation, halfExtent,
+    ]),
+    normals: Object.freeze([0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0]),
+    indices: Object.freeze([0, 2, 1, 0, 3, 2]),
+  });
+}
+
+/**
  * Metres between scale marks on an authored walking face.
  *
  * One metre is a body-scale interval a person can count against the player figure and against
@@ -565,8 +612,23 @@ export function createWorldField(
   initialProfile: WorldArtProfile = ORIGIN_LANDSCAPE,
   theme: PresentationTheme = DAWN_THEME,
   initiallyReducedMotion = false,
-  authoredSupport?: AuthoredGroundSupport,
+  authoredSupport?: AuthoredGroundSupport | EndlessAuthoredGroundSupport,
 ): WorldField {
+  /*
+   * TWO QUESTIONS, ASKED SEPARATELY. "Is this an authored starter?" decides the walking face: its
+   * lit, shadow-receiving material, where it sits, which uniforms exist, and what the map marks
+   * are read against. "Does this ground have a rectangle?" decides only what draws a rectangle:
+   * the rim, the fascia and the metre marks. Before a ground could be endless, both had the same
+   * answer, so a single test for a support stood for both. An endless starter then took the
+   * photo-world landscape shader, which never samples a shadow map, and nothing placed on it cast
+   * a shadow: measured, forcing that path's receive flags changed no pixel at all.
+   */
+  const authoredStarter = authoredSupport !== undefined;
+  const rectangle =
+    authoredSupport === undefined || isEndlessAuthoredGroundSupport(authoredSupport)
+      ? undefined
+      : authoredSupport;
+  const authoredElevation = authoredSupport?.elevation ?? 0;
   const entity = new pc.Entity('atlas-world-field');
   const buffers = worldFieldBufferShape(world);
   // The navigable/recovery radii remain visible in the material, but the physical draw surface
@@ -575,12 +637,12 @@ export function createWorldField(
   // 220 segments is ~193k triangles for a surface whose relief, contours, regions and traces are
   // all computed per pixel. The mesh only has to carry the height field well enough that the
   // silhouette and the horizon read correctly, and 96 does that at a fifth of the geometry.
-  const authoredGeometry = authoredSupport === undefined
-    ? null
-    : authoredGroundGeometry(authoredSupport);
-  const mesh = authoredGeometry === null
-    ? createLandscapeMesh(device, world, visualHalfExtent, 96)
-    : createMesh(device, authoredGeometry.surface);
+  const authoredGeometry = rectangle === undefined ? null : authoredGroundGeometry(rectangle);
+  const mesh = authoredGeometry !== null
+    ? createMesh(device, authoredGeometry.surface)
+    : authoredStarter
+      ? createMesh(device, endlessAuthoredGroundSurface(authoredElevation, visualHalfExtent))
+      : createLandscapeMesh(device, world, visualHalfExtent, 96);
   const material = new pc.ShaderMaterial({
     uniqueName: `exulanica-grounded-world-field:${buffers.regionCapacity}:${buffers.traceCapacity}`,
     attributes: { aPosition: pc.SEMANTIC_POSITION, aNormal: pc.SEMANTIC_NORMAL },
@@ -590,19 +652,19 @@ export function createWorldField(
   material.cull = pc.CULLFACE_NONE;
   material.depthWrite = true;
   material.blendType = pc.BLEND_NONE;
-  const authoredMaterial = authoredSupport === undefined
-    ? null
-    : authoredGroundMaterial(initialProfile, 'surface');
+  const authoredMaterial = authoredStarter
+    ? authoredGroundMaterial(initialProfile, 'surface')
+    : null;
   const boundaryMesh = authoredGeometry === null
     ? null
     : createMesh(device, authoredGeometry.boundary);
-  const boundaryMaterial = authoredSupport === undefined
+  const boundaryMaterial = rectangle === undefined
     ? null
     : authoredGroundMaterial(initialProfile, 'boundary');
   const scaleCueMesh = authoredGeometry === null || authoredGeometry.scaleCue.indices.length === 0
     ? null
     : createMesh(device, authoredGeometry.scaleCue);
-  const scaleCueMaterial = authoredSupport === undefined || scaleCueMesh === null
+  const scaleCueMaterial = rectangle === undefined || scaleCueMesh === null
     ? null
     : authoredGroundMaterial(initialProfile, 'scaleCue');
 
@@ -642,9 +704,11 @@ export function createWorldField(
   let reducedMotion = initiallyReducedMotion;
   const setProfile = (profile: WorldArtProfile): void => {
     idleCycleMs = profile.ui.motion.idleCycleMs;
-    if (authoredMaterial !== null && boundaryMaterial !== null) {
+    // Keyed on the walking face alone. Requiring the rim too would leave an endless ground, which
+    // has none, on whatever appearance it was built with while the rest of the world moved on.
+    if (authoredMaterial !== null) {
       authoredMaterial.applyProfile(profile);
-      boundaryMaterial.applyProfile(profile);
+      boundaryMaterial?.applyProfile(profile);
       scaleCueMaterial?.applyProfile(profile);
       return;
     }
@@ -660,13 +724,15 @@ export function createWorldField(
   };
   setProfile(initialProfile);
 
-  const fieldCentre = authoredSupport === undefined
-    ? { x: world.centre.x, z: world.centre.z }
-    : { x: 0, z: 0 };
-  entity.setPosition(fieldCentre.x, authoredSupport === undefined ? -0.035 : 0, fieldCentre.z);
+  const fieldCentre = authoredStarter
+    ? { x: 0, z: 0 }
+    : { x: world.centre.x, z: world.centre.z };
+  // An authored walking face carries its elevation in its vertices and sits exactly where objects
+  // are placed. The landscape's small drop keeps its contour field under anything drawn at zero.
+  entity.setPosition(fieldCentre.x, authoredStarter ? 0 : -0.035, fieldCentre.z);
   const fieldInstance = new pc.MeshInstance(mesh, authoredMaterial?.material ?? material, entity);
   fieldInstance.castShadow = false;
-  fieldInstance.receiveShadow = authoredSupport !== undefined;
+  fieldInstance.receiveShadow = authoredStarter;
   const boundaryInstance = boundaryMesh === null || boundaryMaterial === null
     ? null
     : new pc.MeshInstance(boundaryMesh, boundaryMaterial.material, entity);
@@ -689,7 +755,7 @@ export function createWorldField(
   });
   if (entity.render !== undefined && entity.render !== null) {
     entity.render.castShadows = false;
-    entity.render.receiveShadows = authoredSupport !== undefined;
+    entity.render.receiveShadows = authoredStarter;
   }
   // The render component's receiveShadows flag re-enables every instance; keep the scale marks
   // free of object shadows so metre spacing stays countable.
@@ -705,7 +771,7 @@ export function createWorldField(
   markerMaterial.cull = pc.CULLFACE_NONE;
   markerMaterial.emissiveIntensity = 1;
   // Map pose reads against the authored floor marks; keep it stronger than a decorative wash.
-  markerMaterial.opacity = authoredSupport === undefined ? 0.24 : 0.55;
+  markerMaterial.opacity = authoredStarter ? 0.55 : 0.24;
   markerMaterial.blendType = pc.BLEND_NORMAL;
   markerMaterial.depthWrite = false;
 
@@ -753,7 +819,7 @@ export function createWorldField(
   landingMaterial.useLighting = false;
   landingMaterial.cull = pc.CULLFACE_NONE;
   landingMaterial.emissiveIntensity = 1;
-  landingMaterial.opacity = authoredSupport === undefined ? 0.4 : 0.78;
+  landingMaterial.opacity = authoredStarter ? 0.78 : 0.4;
   landingMaterial.blendType = pc.BLEND_NORMAL;
   landingMaterial.depthWrite = false;
   const setLandingTheme = (next: PresentationTheme): void => {
@@ -778,11 +844,11 @@ export function createWorldField(
     setProfile,
     setMapGroundPose(pose) {
       marker.enabled = pose !== null;
-      if (authoredSupport === undefined) material.setParameter('uMapMode', pose === null ? 0 : 1);
+      if (!authoredStarter) material.setParameter('uMapMode', pose === null ? 0 : 1);
       if (pose === null) return;
       marker.setPosition(
         pose.position.x - fieldCentre.x,
-        (authoredSupport?.elevation ?? 0) + 0.09,
+        authoredElevation + 0.09,
         pose.position.z - fieldCentre.z,
       );
       marker.setEulerAngles(0, (pose.yaw * 180) / Math.PI, 0);
@@ -792,13 +858,13 @@ export function createWorldField(
       if (pose === null) return;
       landing.setPosition(
         pose.position.x - fieldCentre.x,
-        (authoredSupport?.elevation ?? 0) + 0.05,
+        authoredElevation + 0.05,
         pose.position.z - fieldCentre.z,
       );
       landing.setEulerAngles(0, (pose.yaw * 180) / Math.PI, 0);
     },
     setRenderOrigin(x, z) {
-      if (authoredSupport === undefined) {
+      if (!authoredStarter) {
         material.setParameter('uRenderOrigin', new Float32Array([x, z]));
       }
     },
@@ -806,7 +872,7 @@ export function createWorldField(
       reducedMotion = reduced;
     },
     update(nowMs) {
-      if (authoredSupport === undefined) {
+      if (!authoredStarter) {
         material.setParameter('uTime', worldMotionSeconds(nowMs, idleCycleMs, reducedMotion));
       }
     },

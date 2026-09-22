@@ -1088,19 +1088,20 @@ export class AtlasBinding {
       theme,
       options.reducedMotion ?? false,
       /*
-       * The world field draws an authored ground from an exact rectangle, and a ground with no
-       * extent has none to give it. Rather than invent one, an endless ground takes the field's
-       * own continuous surface, which is built by sampling the navigation surface above and so
-       * runs flat and unbroken to well past the distance this renderer supports. Giving that
-       * ground its own appearance is the world field's own work.
+       * An endless ground is still an authored starter, so the field is told so rather than given
+       * nothing: given nothing, it drew the photo-world landscape, whose shader never samples a
+       * shadow map, and objects placed on it cast no shadow. It is given an elevation and no
+       * extent, because it has none, and the field draws its walking face without a rim.
        */
-      authoredGround === undefined || authoredGround.kind === 'endless'
+      authoredGround === undefined
         ? undefined
-        : Object.freeze({
-            halfWidth: authoredGround.halfWidthMm / 1000,
-            halfDepth: authoredGround.halfDepthMm / 1000,
-            elevation: authoredGround.elevationMm / 1000,
-          }),
+        : authoredGround.kind === 'endless'
+          ? Object.freeze({ kind: 'endless' as const, elevation: authoredGround.elevationMm / 1000 })
+          : Object.freeze({
+              halfWidth: authoredGround.halfWidthMm / 1000,
+              halfDepth: authoredGround.halfDepthMm / 1000,
+              elevation: authoredGround.elevationMm / 1000,
+            }),
     );
     if (options.ownedDistrict !== undefined || options.generatedTile !== undefined) field.entity.enabled = false;
     renderRoot.addChild(field.entity);

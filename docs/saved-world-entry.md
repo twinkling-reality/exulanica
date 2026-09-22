@@ -194,13 +194,18 @@ The browser mounts the authored descriptor as a first-class region and ground. I
 a graph island, capture, evidence card, or reconstructed surface for it. Personal entries return
 `authored_scene: null`; their current graph and reconstruction limitations remain visible.
 
-A bounded authored floor uses the descriptor's exact horizontal bounds and elevation, its
-perimeter marks the supported walking area, and it receives object shadows. An endless ground
-states no perimeter to draw, so it takes the world field's own continuous surface, which runs flat
-and unbroken well past the distance the renderer supports. That surface receives no object shadows
-and is drawn 35 millimetres below the authored elevation, so an object placed on an endless ground
-casts no shadow onto it; giving that ground an appearance of its own is the world field's work and
-is not done yet. Both surfaces follow the saved appearance palette. Photo-derived scene-segment controls are absent from source-independent
+A bounded authored floor uses the descriptor's exact horizontal bounds and elevation, and its
+perimeter marks the supported walking area. An endless ground states no perimeter, so it has no
+rim, fascia or metre marks: its walking face is one flat surface at the authored elevation, drawn
+far enough out that its border stays behind the far clip and the fog from anywhere a walk can
+reach. Both walking faces use the same lit material, receive object shadows and sit at exactly the
+elevation objects are placed on, so an object placed on either rests on the drawn ground and casts
+its shadow onto it. Both follow the saved appearance palette.
+`web/packages/atlas-react/test/authored-ground.test.ts` checks the material, shadow receiving,
+elevation and palette of each. One limitation is visible on an endless ground and on no bounded
+one: the fog the far ground fades into is tone-mapped and the sky's clear colour is not, so the
+far ground is drawn greyer than the sky beside it and the plane ends in a horizon line rather than
+dissolving into haze. Photo-derived scene-segment controls are absent from source-independent
 starters. In-world controls expose the World menu, object placement and photo review alongside
 the editable title. When the starter's Companion has no substantive turn, it presents creation
 guidance and the ordinary question control rather than an acknowledgement of an unstated exchange.
