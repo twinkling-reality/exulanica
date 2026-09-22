@@ -412,15 +412,18 @@ Society playback now has persisted play/pause, speed settings and pause-aware ex
 with exclusive worker leases, bounded catch-up and recovery receipts. Simulation events determine
 state; browser frames do not create canonical ticks. Automatic playback accepts current-authorized
 v2/v3 inputs. The worker is available through an explicit programmatic Services configuration;
-the default application does not automatically start it. The authenticated world UI reads the
-persisted control and exposes play, pause, 1x/2x/4x speed, refresh and pause-aware one-minute steps.
+the default application does not automatically start it. The world UI's playback controls read the
+persisted control and expose play, pause, 1x/2x/4x speed, refresh and pause-aware one-minute steps;
+they connect only when the owned district is loaded, and saved and starter worlds open without it.
 Reviewed deployment configuration remains to be connected. Speed settings change minimum waits
 after completed batches, not a guaranteed real-time rate. The [society contract](synthetic-society-contract.md) specifies
 pause, recovery, source withdrawal and replay behavior. Typed `go_to` and `perform` requests are now
 persisted against a current inhabitant, branch, state/input digest and canonical destination. The
 next deterministic transition records their disposition and exact event binding, and replay consumes
-that receipt without inference. Browser controls for issuing those requests and live acceptance
-remain open; selecting or inspecting a destination does not direct an inhabitant.
+that receipt without inference. A browser control issues one `perform` from a declared destination
+and is unit-tested; no shipped configuration reaches it (the prerequisites are in the
+[society contract](synthetic-society-contract.md#typed-user-directed-actions)), so live acceptance
+remains open. Selecting or inspecting a destination does not by itself direct an inhabitant.
 
 Vehicle traffic follows the pedestrian/control foundation. It requires independently validated
 road lanes, vehicle routes, intersection and right-of-way policies, pedestrian crossings, parking
@@ -534,7 +537,7 @@ The inventory below identifies existing code and the extensions required by each
 | Authored objects and versions | Source snapshots, alternate-version lineage, object add/move/remove/undo, durable admitted environment instances and bounded motion; synthetic browser checks recorded below | Unified selection and real-scene acceptance; arbitrary world branching is not established |
 | Earth and source admission | Bounded, versioned Flatiron source compiler and owned runtime path; visual validation remains incomplete | Additional admitted sources, reusable extraction/indexing, richer geographic interpretation and first-person coexistence |
 | Package | WMP 1.0, opt-in authored-world 1.0, and opt-in environment-instances 1.0 describe existing state | Society projection, versioned geographic rights support, permitted asset resolution and an explicit runtime loader |
-| Simulation | Reviewed bounded object behaviors, persisted deterministic v2/v3/v4 society, saved playback controls and typed user action requests over canonical targets; no learned or general simulation capability established. A deterministic traffic engine exists on main and is not run by any runtime. | Browser-directed actions, production worker/runtime configuration, richer affordances, calibrated learned decisions and fictional rules through measured scenarios |
+| Simulation | Reviewed bounded object behaviors, persisted deterministic v2/v3/v4 society, saved playback controls and typed user action requests over canonical targets; a browser destination control for `perform` on held v2 societies is implemented and unit-tested, and no shipped configuration reaches it; no learned or general simulation capability established. A deterministic traffic engine exists on main and is not run by any runtime. | An inhabited saved world the browser can reach, directed actions on living (v4) societies, production worker/runtime configuration, richer affordances, calibrated learned decisions and fictional rules through measured scenarios |
 
 World Write receipts are not payload delivery. Package verification is not runnable import.
 Neither is evidence that a compatible simulation runtime exists.
@@ -555,9 +558,16 @@ societies retain their original profile and history.
 
 The living-world composition path creates `exulanica-society/v4` societies. An existing
 society keeps its original profile. The generic society client still defaults to v2. The
-browser can inspect persisted inhabitants and events and control
-configured playback; its development path can also show an explicitly labeled recorded fixture.
-It does not issue the implemented directed-action requests. V3 browser interaction and live-model quality have not been
+browser code can inspect persisted inhabitants and events and control configured playback when
+an owned district and a persisted society are loaded; its development path can also show an
+explicitly labeled recorded fixture. A destination control issues one typed `perform` request for
+a held v2 society through the existing directed-action API and shows the returned record or an
+explicit unavailable or refused state; living (v4) societies refuse it. That control is
+implemented and unit-tested, and no shipped configuration reaches it: saved and starter worlds
+open without the owned district whose destinations it attaches to, the development preview omits
+it, the default API configures no society runtime (creating a v2, v3 or v4 society answers 424),
+and society routes resolve versions only in the default world. Simulated action records stay
+distinct from personal evidence. V3 browser interaction and live-model quality have not been
 validated. Recorded fact transmission does not establish natural conversation, evolving social
 relationships, general object manipulation or emergent social behavior. Background progression
 between visits remains delivery work. The opt-in composition/v2 adapter records an unreachable

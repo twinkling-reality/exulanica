@@ -211,7 +211,13 @@ The same authorized input exposes canonical `visit` and `rest` targets to the so
 Typed `go_to` and `perform` requests can name those target IDs through the society action API; the
 server freezes the current target and the next deterministic transition records whether the request
 applied. This adds no road crossing, browser-space destination, teleport or new affordance. The
-browser can inspect district destinations but does not issue directed-action requests.
+browser destination list has a control that issues one typed `perform` against a selected
+synthetic inhabitant and shows the returned record or an explicit unavailable or refused state;
+living (v4) societies refuse it. The control is implemented and unit-tested, and no shipped
+configuration reaches it: saved worlds open without this district, and the development preview
+omits the control. The prerequisites are listed in
+[synthetic-society-contract.md](synthetic-society-contract.md#typed-user-directed-actions).
+Simulated action records are not personal evidence.
 
 ## Relationship to authored worlds
 

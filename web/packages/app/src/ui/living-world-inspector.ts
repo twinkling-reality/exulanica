@@ -8,7 +8,12 @@ export interface InspectionNote {
   readonly details: readonly (readonly [string, string])[];
 }
 
-/** A plain-language foreground with a keyboard-accessible provenance disclosure. */
+/**
+ * A plain-language foreground with a keyboard-accessible provenance disclosure.
+ *
+ * Controls for the subject being shown go in its own action slot through `addAction`, and every
+ * `show` or `clear` empties that slot, so a control never outlives the subject it acts on.
+ */
 export function createLivingWorldInspector() {
   const root = el('section', {
     class: 'living-world-inspector',
@@ -26,11 +31,15 @@ export function createLivingWorldInspector() {
     el('summary', { text: 'Origin and details' }),
     fields,
   ]);
-  root.append(title, description, activity, details);
+  const actions = el('div', { class: 'living-world-actions' });
+  root.append(title, description, activity, details, actions);
   return {
     root,
+    addAction(node: HTMLElement) {
+      actions.append(node);
+    },
     show(note: InspectionNote) {
-      root.querySelectorAll('button').forEach((button) => button.remove());
+      actions.replaceChildren();
       root.hidden = false;
       root.dataset['subjectId'] = note.subject;
       title.textContent = note.title;
@@ -48,6 +57,7 @@ export function createLivingWorldInspector() {
     clear() {
       root.hidden = true;
       fields.replaceChildren();
+      actions.replaceChildren();
       delete root.dataset['subjectId'];
     },
   };

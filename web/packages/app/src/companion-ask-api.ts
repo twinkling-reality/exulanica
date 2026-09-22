@@ -33,6 +33,7 @@
 
 import { ApiError, Transport, type TransportOptions } from '@exulanica/graph-client';
 import type { EvidenceHandle } from '@exulanica/graph-client';
+import { parseContentSurface, type CompanionContentSurface } from './companion-content.js';
 
 /** Long enough for the reasoning core, which has been measured at tens of seconds on a packet. */
 const ASK_TIMEOUT_MS = 180_000;
@@ -150,6 +151,11 @@ export interface CompanionAnswer {
   readonly deterministic: boolean;
   readonly repaired: boolean;
   readonly evidence: readonly AnswerEvidence[];
+  /**
+   * Existing `Intent.CONTENT` rows when a confirmed place Selection already returned them.
+   * Absent or empty when the answer is not about place content.
+   */
+  readonly content?: CompanionContentSurface;
   readonly provenance: AnswerProvenance;
   readonly promptVersion: string;
   readonly calls: readonly ModelCall[];
@@ -203,6 +209,7 @@ interface WireCall {
 interface WireAnswer {
   readonly answer: { readonly clauses: readonly WireClause[] };
   readonly plan: unknown;
+  readonly selection?: unknown;
   readonly citations: Readonly<Record<string, string>>;
   readonly abstained: string | null;
   readonly deterministic: boolean;
@@ -242,6 +249,10 @@ export interface CompanionAskOptions extends TransportOptions {
   readonly now?: () => number;
 }
 
+/**
+ * The admitted city feature a question is about. The server resolves its canonical place and
+ * confirmed bridge from these two ids; the browser never names a place on its own authority.
+ */
 export interface CompanionCityContext {
   readonly admissionId: string;
   readonly featureId: string;
@@ -292,6 +303,8 @@ export class CompanionAskClient {
         }),
       });
     } catch (error) {
+      // A confirmed place's CONTENT is answered by the server without a model, so a no-model
+      // failure here is a question that needed one: there is nothing to fall back to.
       throw asAskFailure(error);
     }
 
@@ -352,6 +365,15 @@ export class CompanionAskClient {
       }),
     );
 
+    const planIntent =
+      body.plan !== null &&
+      typeof body.plan === 'object' &&
+      !Array.isArray(body.plan) &&
+      (body.plan as { intent?: unknown }).intent;
+    const content = parseContentSurface(body.selection, {
+      placeConfirmed: planIntent === 'content',
+    });
+
     const abstained = body.abstained;
     return {
       question,
@@ -361,6 +383,7 @@ export class CompanionAskClient {
       deterministic: body.deterministic === true,
       repaired: body.repaired === true,
       evidence,
+      content,
       provenance: provenanceOf(
         calls,
         body.deterministic === true,
@@ -473,7 +496,14 @@ function provenanceOf(
 
 function asAskFailure(error: unknown): AskUnavailable {
   if (error instanceof ApiError) {
-    if (error.status === 503) return new AskUnavailable('no_model', error.message);
+    // `_require_model` answers 503 with this FastAPI detail and no `code`. Any other 503
+    // (proxy, tiles, materials) must stay an error, not open the content fallback.
+    if (
+      error.status === 503
+      && error.message.includes('no model credential is configured on this instance')
+    ) {
+      return new AskUnavailable('no_model', error.message);
+    }
     if (error.isUnauthenticated) return new AskUnavailable('unauthenticated', error.message);
     return new AskUnavailable('refused', error.message);
   }

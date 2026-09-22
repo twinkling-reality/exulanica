@@ -1,10 +1,12 @@
 /**
- * Authenticated society snapshot, events, and one deterministic step.
+ * Authenticated society snapshot, events, one deterministic step, and typed directed actions.
  *
- * Speaks `/world/versions/{id}/society` (`exulanica/api/routes/society.py`). `connect`
- * reads an existing society or creates one; `advance` posts one step against the tick
- * and digest the caller already holds. This module does not start playback or request
- * a model decision.
+ * Speaks `/world/versions/{id}/society` (`exulanica/api/routes/society.py`) and
+ * `/world/versions/{id}/society/actions` (`exulanica/api/routes/society_actions.py`).
+ * `connect` reads an existing society or creates one; `advance` posts one step against the
+ * tick and digest the caller already holds; `requestAction` records a typed `go_to` or
+ * `perform` against a canonical target. This module does not start playback or request a
+ * model decision.
  */
 
 import { ApiError, Transport, type TransportOptions } from '@exulanica/graph-client';
@@ -238,6 +240,100 @@ function boundSnapshot(value: unknown, versionId: string): SocietySnapshot {
   return snapshot;
 }
 
+/** Typed user-directed action over a canonical simulation target. Not personal evidence. */
+export type SocietyActionKind = 'go_to' | 'perform';
+export type SocietyActionAffordance = 'visit' | 'rest';
+export type SocietyActionStatus = 'pending' | 'consumed';
+
+export interface SocietyActionIntent {
+  readonly kind: SocietyActionKind;
+  readonly targetId: string;
+  readonly affordance?: SocietyActionAffordance;
+}
+
+export interface SocietyActionRequest {
+  readonly profile: 'exulanica.society-action-request/v1';
+  readonly requestId: string;
+  readonly requestedBy: string;
+  readonly subjectId: string;
+  readonly branchId: string;
+  readonly baseTick: number;
+  readonly baseStateSha256: string;
+  readonly inputSeq: number;
+  readonly inputSha256: string;
+  readonly intent: Readonly<{
+    readonly kind: SocietyActionKind;
+    readonly target_id: string;
+    readonly affordance?: SocietyActionAffordance;
+  }>;
+  readonly target: Readonly<Record<string, unknown>>;
+  readonly documentSha256: string;
+}
+
+export interface SocietyActionRecord {
+  readonly request: SocietyActionRequest;
+  readonly status: SocietyActionStatus;
+  readonly consumption: Readonly<{
+    readonly tick: number;
+    readonly disposition: string;
+  }> | null;
+}
+
+export function parseSocietyActionRecord(value: unknown, versionId: string): SocietyActionRecord {
+  const row = record(value);
+  const request = record(row['request']);
+  const intent = record(request['intent']);
+  const target = record(request['target']);
+  const kind = intent['kind'];
+  const affordance = intent['affordance'];
+  if (request['profile'] !== 'exulanica.society-action-request/v1'
+    || request['branch_id'] !== versionId
+    || !textValue(request['request_id']) || !textValue(request['requested_by'])
+    || !textValue(request['subject_id']) || !integer(request['base_tick'])
+    || !digest(request['base_state_sha256']) || !integer(request['input_seq'], 1)
+    || !digest(request['input_sha256']) || !digest(request['document_sha256'])
+    || !textValue(intent['target_id'])
+    || (kind !== 'go_to' && kind !== 'perform')
+    || (kind === 'go_to' && affordance !== undefined)
+    || (kind === 'perform' && affordance !== 'visit' && affordance !== 'rest')
+    || !textValue(target['target_id'])
+    || (row['status'] !== 'pending' && row['status'] !== 'consumed')) {
+    throw new Error('Invalid society action response');
+  }
+  let consumption: SocietyActionRecord['consumption'] = null;
+  if (row['consumption'] !== null && row['consumption'] !== undefined) {
+    const held = record(row['consumption']);
+    if (!integer(held['tick']) || !textValue(held['disposition'])) {
+      throw new Error('Invalid society action consumption');
+    }
+    consumption = Object.freeze({ tick: held['tick'] as number, disposition: held['disposition'] as string });
+  } else if (row['status'] === 'consumed') {
+    throw new Error('Invalid society action consumption');
+  }
+  return Object.freeze({
+    request: Object.freeze({
+      profile: 'exulanica.society-action-request/v1' as const,
+      requestId: request['request_id'] as string,
+      requestedBy: request['requested_by'] as string,
+      subjectId: request['subject_id'] as string,
+      branchId: request['branch_id'] as string,
+      baseTick: request['base_tick'] as number,
+      baseStateSha256: request['base_state_sha256'] as string,
+      inputSeq: request['input_seq'] as number,
+      inputSha256: request['input_sha256'] as string,
+      intent: Object.freeze({
+        kind: kind as SocietyActionKind,
+        target_id: intent['target_id'] as string,
+        ...(kind === 'perform' ? { affordance: affordance as SocietyActionAffordance } : {}),
+      }),
+      target: Object.freeze({ ...target }),
+      documentSha256: request['document_sha256'] as string,
+    }),
+    status: row['status'] as SocietyActionStatus,
+    consumption,
+  });
+}
+
 export class SocietyClient {
   private readonly transport: Transport;
 
@@ -286,5 +382,33 @@ export class SocietyClient {
         base_state_sha256: snapshot.stateSha256,
       },
     ).then(value => boundSnapshot(value, snapshot.versionId));
+  }
+
+  /**
+   * Record one typed directed action through `record_action` on the society actions route.
+   * Returns the server envelope; does not advance simulation time.
+   */
+  requestAction(
+    snapshot: SocietySnapshot,
+    subjectId: string,
+    intent: SocietyActionIntent,
+    idempotencyKey: string = crypto.randomUUID(),
+  ): Promise<SocietyActionRecord> {
+    const bodyIntent = intent.kind === 'perform'
+      ? { kind: 'perform' as const, target_id: intent.targetId, affordance: intent.affordance }
+      : { kind: 'go_to' as const, target_id: intent.targetId };
+    if (intent.kind === 'perform' && intent.affordance !== 'visit' && intent.affordance !== 'rest') {
+      return Promise.reject(new Error('perform requires a visit or rest affordance'));
+    }
+    return this.transport.postJson<unknown>(
+      `/world/versions/${encodeURIComponent(snapshot.versionId)}/society/actions`,
+      {
+        idempotency_key: idempotencyKey,
+        base_tick: snapshot.currentTick,
+        base_state_sha256: snapshot.stateSha256,
+        subject_id: subjectId,
+        intent: bodyIntent,
+      },
+    ).then(value => parseSocietyActionRecord(value, snapshot.versionId));
   }
 }

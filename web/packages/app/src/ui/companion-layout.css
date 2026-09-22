@@ -131,6 +131,8 @@
   box-sizing: border-box;
   padding: 24px 22px 18px 126px;
   background: color-mix(in srgb, var(--raised) 96%, transparent);
+  /* The encounter scrolls under this bar; without a blur a long answer reads through it. */
+  backdrop-filter: blur(var(--ui-companion-blur)) saturate(var(--ui-companion-saturation));
   border-bottom: 1px solid var(--edge);
 }
 
@@ -290,10 +292,72 @@
   font: 500 10px/1.45 var(--ui-font-utility);
 }
 
+#shell .companion-encounter[data-state='open'] .companion-content-heading {
+  margin: 16px 0 8px;
+  color: var(--accent);
+  font: 600 10px/1.2 var(--ui-font-utility);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+#shell .companion-encounter[data-state='open'] .companion-content-empty {
+  margin: 0;
+  color: var(--ink-soft);
+  font: 420 13px/1.45 var(--ui-font-body);
+}
+
+#shell .companion-encounter[data-state='open'] .companion-content-list {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+#shell .companion-encounter[data-state='open'] .companion-content-item {
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid color-mix(in srgb, var(--edge) 80%, transparent);
+  border-radius: var(--radius-label);
+}
+
+#shell .companion-encounter[data-state='open'] .companion-content-fields {
+  display: grid;
+  grid-template-columns: max-content 1fr;
+  gap: 4px 12px;
+  margin: 0;
+}
+
+#shell .companion-encounter[data-state='open'] .companion-content-fields dt {
+  margin: 0;
+  color: var(--ink-faint);
+  font: 500 10px/1.35 var(--ui-font-utility);
+}
+
+#shell .companion-encounter[data-state='open'] .companion-content-fields dd {
+  margin: 0;
+  color: var(--ink);
+  font: 420 13px/1.35 var(--ui-font-body);
+}
+
 #shell .companion-refusal {
   margin: 0.65rem 0 0;
   color: var(--ink-soft);
   font-size: 0.78rem;
+}
+
+/* A question that failed: the plain sentence is what the Companion says, the detail is small. */
+#shell .companion-encounter[data-state='open'] .companion-speech[data-mode='failed'] .companion-refusal {
+  margin: 0;
+  color: var(--ink);
+  font: 420 17px/1.55 var(--ui-font-body);
+  letter-spacing: -0.012em;
+}
+
+#shell .companion-encounter[data-state='open'] .companion-speech[data-mode='failed'] .companion-refusal-detail {
+  margin: 8px 0 0;
+  color: var(--ink-soft);
+  font: 420 13px/1.45 var(--ui-font-body);
 }
 
 #shell .companion-encounter[data-state='open'] .companion-choices {

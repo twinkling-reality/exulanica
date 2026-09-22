@@ -271,6 +271,17 @@ def test_missing_model_echo_and_usage_remain_null(client, transport, retained_pa
     assert log.calls[0].usd is None
 
 
+class _UnusedModel:
+    """A model client these tests hand in and must never touch: composing is replaced below.
+
+    ``answer_question`` refuses ``None`` for any plan that is not CONTENT, so these tests pass
+    an object that fails on first use instead, which also proves no model call happens.
+    """
+
+    def __getattr__(self, name: str) -> object:
+        raise AssertionError(f"the model client was used: {name}")
+
+
 @pytest.mark.parametrize("mutation", ["deleted", "withdrawn", "caption_changed", "count_changed"])
 def test_evidence_changed_while_composing_cannot_support_final_answer(
     monkeypatch, retained_packet, mutation
@@ -300,7 +311,7 @@ def test_evidence_changed_while_composing_cannot_support_final_answer(
     monkeypatch.setattr(module, "compose_answer", lambda *a, **k: (answer, False, ()))
     result = answer_question(
         None,
-        None,
+        _UnusedModel(),
         "What do they hold?",
         Session(workspace_id=uuid.UUID(int=1), actor=uuid.UUID(int=2)),
         plan=SelectionPlan(intent="captures"),
@@ -340,7 +351,7 @@ def test_fresh_packet_random_tokens_do_not_invalidate_unchanged_answer(
     monkeypatch.setattr(module, "compose_answer", lambda *a, **k: (answer, False, ()))
     result = answer_question(
         None,
-        None,
+        _UnusedModel(),
         "What do they hold?",
         Session(workspace_id=uuid.UUID(int=1), actor=uuid.UUID(int=2)),
         plan=SelectionPlan(intent="captures"),

@@ -36,6 +36,10 @@ import {
 import { el } from '../ui/dom.js';
 import { characterDisplayDetails } from '../ui/character-details.js';
 import { buildRepresentationInspector } from '../ui/representation-inspector.js';
+import {
+  buildSocietyDirectedAction,
+  type SocietyDirectedActionControl,
+} from '../ui/society-directed-action.js';
 import { buildWorldWorkspace } from '../ui/world-workspace.js';
 import '../ui/living-world-inspector.css';
 import { createLivingWorldInspector } from '../ui/living-world-inspector.js';
@@ -71,6 +75,10 @@ export interface EnvironmentSelectionDependencies {
   readonly onPanelOpen?: () => void;
   readonly onObjects?: () => void;
   readonly showStatus: (message: string, kind?: 'progress' | 'failure') => void;
+  /**
+   * The admitted building now selected, or null. Only the admission and feature: the server
+   * resolves the canonical place and any confirmed bridge from them when the Companion asks.
+   */
   readonly onSelect?: (context: {
     readonly admissionId: string;
     readonly featureId: string;
@@ -273,6 +281,10 @@ export function mountEnvironmentSelection(
   let society: SocietySnapshot | null = null;
   let renderedSnapshot: SocietySnapshot | null = null;
   let selectedInhabitant: string | null = null;
+  // What the inspector is showing. A society refresh re-renders an inspected inhabitant and
+  // re-gates a destination's directed-action control; it never swaps one view for the other.
+  let inspectedInhabitant: string | null = null;
+  let directedAction: SocietyDirectedActionControl | null = null;
   let previewState: OwnedSocietyState | null = null;
   let recording: LivingSocietyRecording | null = null;
   let recordingFrame = 0;
@@ -301,12 +313,14 @@ export function mountEnvironmentSelection(
     reflectMemoryLayer(memoryCheckbox.checked);
   });
 
-  function inspectSubject(subject: DistrictSubject): void {
+  function inspectSubject(subject: DistrictSubject, keepInhabitant = false): void {
     const runtime = deps.state.atlas?.binding.ownedDistrict;
     const doc = runtime?.interpretation;
     if (!doc) return;
     workspace.inspect();
-    selectedInhabitant = null;
+    if (!keepInhabitant) selectedInhabitant = null;
+    inspectedInhabitant = null;
+    directedAction = null;
     chosen = null;
     deps.onSelect?.(null);
     setRepresentationHighlight(null);
@@ -326,6 +340,25 @@ export function mountEnvironmentSelection(
         ['Unavailable dependencies', doc.navigation.unavailable_reason ?? doc.unsupported.join('; ')],
       ],
     });
+    // Existing destination buttons already open this inspector. When the place declares a
+    // visit/rest affordance, mount the directed-action control that posts to record_action.
+    if (destination && !deps.env.preview) {
+      const actionClient = deps.societyClient ?? new SocietyClient(deps.credentials);
+      directedAction = buildSocietyDirectedAction({
+        client: actionClient,
+        getSnapshot: () => society,
+        getSubjectId: () => selectedInhabitant,
+        targetId: destination.destination_id,
+        affordance: destination.affordance,
+      });
+      inspector.addAction(directedAction.root);
+    }
+  }
+
+  function clearInspector(): void {
+    inspector.clear();
+    inspectedInhabitant = null;
+    directedAction = null;
   }
 
   function inhabitantLabel(inhabitant: OwnedSocietyState['inhabitants'][number]): string {
@@ -369,6 +402,8 @@ export function mountEnvironmentSelection(
     if (!inhabitant || !state) return;
     if (reveal) workspace.inspect();
     selectedInhabitant = id;
+    inspectedInhabitant = id;
+    directedAction = null;
     chosen = null;
     deps.onSelect?.(null);
     setRepresentationHighlight(null);
@@ -584,6 +619,8 @@ export function mountEnvironmentSelection(
   function reportSelection(feature: NYCLocalFeature, reveal = true): void {
     if (reveal) workspace.inspect();
     selectedInhabitant = null;
+    inspectedInhabitant = null;
+    directedAction = null;
     if (representationAvailability(feature.providerFeatureId) === 'unavailable') {
       representation.refresh();
       return;
@@ -620,7 +657,7 @@ export function mountEnvironmentSelection(
     if (doc) {
       for (const part of doc.subjects.filter(s => (s.recipe.kind === 'facade-grid' || s.recipe.kind === 'roof-parapet') && s.recipe.feature_id === feature.providerFeatureId)) {
         const button = el('button', {type:'button', text: part.kind === 'roof' ? 'Inspect roof recipe' : 'Inspect facade recipe'});
-        button.addEventListener('click', () => inspectSubject(part)); inspector.root.append(button);
+        button.addEventListener('click', () => inspectSubject(part)); inspector.addAction(button);
       }
     }
     place.disabled = current === null;
@@ -679,7 +716,7 @@ export function mountEnvironmentSelection(
     place.disabled = true;
     modify.disabled = true;
     remove.disabled = true;
-    inspector.clear();
+    clearInspector();
     selected.textContent = subjectId === null
       ? authorityCleared
         ? 'Selected source-backed building is unavailable.'
@@ -1109,7 +1146,7 @@ export function mountEnvironmentSelection(
     if (society === null) {
       atlas.ownedDistrict.clearSociety();
       renderedSnapshot = null;
-      if (selectedInhabitant) { selectedInhabitant = null; inspector.clear(); selected.textContent = 'Selected inhabitant is unavailable.'; }
+      if (selectedInhabitant) { selectedInhabitant = null; clearInspector(); selected.textContent = 'Selected inhabitant is unavailable.'; }
       delete canvas.dataset.societyPopulation;
       delete canvas.dataset.societyRendered;
       delete canvas.dataset.societyTick;
@@ -1122,8 +1159,11 @@ export function mountEnvironmentSelection(
       canvas.dataset.societyPopulation = String(society.populationSize);
       canvas.dataset.societyRendered = String(atlas.ownedDistrict.drawnInhabitantCount);
       canvas.dataset.societyTick = String(society.currentTick);
-      if (selectedInhabitant) inspectInhabitant(selectedInhabitant, false);
+      if (selectedInhabitant !== null && inspectedInhabitant === selectedInhabitant) {
+        inspectInhabitant(selectedInhabitant, false);
+      }
     }
+    directedAction?.reflect();
     reflectNearby();
     reflectPlayback();
     atlas.invalidate();
@@ -1180,7 +1220,8 @@ export function mountEnvironmentSelection(
           const subject = interpretation.subjects.find(s => s.subject_id === destination.subject_id);
           if (!subject) continue;
           const button = el('button', {type: 'button', text: destination.affordance === 'rest' ? `Rest pad · ${destination.node_id}` : 'Exterior visit marker'});
-          button.addEventListener('click', () => inspectSubject(subject)); destinations.append(button);
+          // Keep a selected inhabitant so the same destination control can issue perform.
+          button.addEventListener('click', () => inspectSubject(subject, true)); destinations.append(button);
         }
         workspace.nearby.append(destinations);
       }

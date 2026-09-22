@@ -501,6 +501,7 @@ export function rememberedAsAnswer(remembered: PersistedAnswer): CompanionAnswer
     deterministic: remembered.deterministic,
     repaired: remembered.repaired,
     evidence,
+    content: { rows: [], placeConfirmed: false, totalMatched: 0 },
     provenance: {
       // A correction has no composing model, and a restored one must not borrow the model that
       // wrote the sentence it replaced. `servedModel` null is what the provenance line reads as

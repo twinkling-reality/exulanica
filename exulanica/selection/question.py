@@ -84,6 +84,7 @@ __all__ = [
     "compose_answer",
     "propose_plan",
     "render_content_answer",
+    "requires_model",
 ]
 
 #: Bumped when either prompt changes. It is an input to the response cache key, so an edit that
@@ -279,6 +280,27 @@ def _reported(usage: Mapping[str, Any], key: str) -> int | None:
     return int(value)
 
 
+#: What a CONTENT row with no label is called, by kind. Generic on purpose: the executor gives
+#: memory captures no label at all, and a name here would be invented.
+_UNLABELLED_CONTENT: Final[Mapping[str, str]] = {
+    "memory_capture": "a photograph in your library",
+    "admitted_environment_source": "an admitted source",
+    "admitted_environment_feature": "a feature derived from an admitted source",
+    "authored_environment_instance": "an authored addition",
+    "synthetic_inhabitant": "an unnamed inhabitant",
+    "simulation_event": "an unlabelled simulation event",
+}
+
+
+def requires_model(plan: SelectionPlan | None) -> bool:
+    """Whether answering needs a model client: planning words, or composing a capture answer.
+
+    A supplied CONTENT plan needs none. It refuses a semantic query, so there is no query vector
+    to embed, and :func:`render_content_answer` writes its sentences without a composer.
+    """
+    return plan is None or plan.intent is not Intent.CONTENT
+
+
 def render_content_answer(content: tuple[SelectedContent, ...]) -> Answer:
     """Render typed truth classes without sending personal or simulated state to a model.
 
@@ -296,7 +318,9 @@ def render_content_answer(content: tuple[SelectedContent, ...]) -> Answer:
     """
     clauses = []
     for item in content[:8]:
-        label = item.label or item.source_id
+        # A source id is a capture UUID or a publication:feature key, which says nothing to a
+        # person. A row without a label is described by its kind, and never given a name.
+        label = item.label or _UNLABELLED_CONTENT.get(item.result_kind, "an authorized record")
         if item.result_kind == "memory_capture":
             text = f"Authorized memory evidence: {label}."
         elif item.result_kind == "admitted_environment_source":
@@ -754,7 +778,7 @@ def compose_answer(
 
 def answer_question(
     connection: psycopg.Connection,
-    client: ModelClient,
+    client: ModelClient | None,
     question: str,
     session: Session,
     *,
@@ -779,7 +803,14 @@ def answer_question(
     There is still no honest default plan, which is the reason ``propose_plan`` refuses rather
     than returning an empty one; the answer here is to say so and search nothing, not to search
     everything and call it a reply.
+
+    **``client`` may be ``None`` only for a supplied CONTENT plan** (:func:`requires_model`).
+    Anything else raises before a query runs, rather than answering part of the question.
     """
+    if client is None and requires_model(plan):
+        raise ValueError(
+            "a model client is required to plan a question or compose a capture answer"
+        )
     proposed = plan is None
     log = CallLog()
     if plan is None:
@@ -815,7 +846,11 @@ def answer_question(
             calls=log.calls,
         )
     query_vector = None
-    if plan.semantic_query and has_embeddings(connection, session.workspace_id, client):
+    if (
+        client is not None
+        and plan.semantic_query
+        and has_embeddings(connection, session.workspace_id, client)
+    ):
         # An unavailable vector role leaves lexical retrieval usable.
         with suppress(ModelError):
             query_vector = embed_query(client, plan.semantic_query, record=log.record_embedding)

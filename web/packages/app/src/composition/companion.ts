@@ -479,6 +479,7 @@ function spokenAnswer(
     deterministic: false,
     repaired: false,
     evidence: [],
+    content: { rows: [], placeConfirmed: false, totalMatched: 0 },
     provenance: {
       composed,
       // The identifier that DREW it, out of the response body. Null when no draft call
@@ -527,6 +528,7 @@ function outcomeAnswer(utterance: string, outcome: WorldStyleProposalOutcome): C
     deterministic: false,
     repaired: false,
     evidence: [],
+    content: { rows: [], placeConfirmed: false, totalMatched: 0 },
     // No model decided this. A person did, or the authority refused it, and a provenance line
     // naming a model over either would be naming the wrong author.
     provenance: {

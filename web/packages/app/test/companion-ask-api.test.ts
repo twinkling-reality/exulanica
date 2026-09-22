@@ -383,9 +383,11 @@ describe('asking the library a question', () => {
   });
 
   it('reports an instance with no model as exactly that', async () => {
+    // `_require_model` raises FastAPI HTTPException with this detail and no `code`.
     const { fetch } = transport(json({
-      code: 'http_503',
-      detail: 'no model credential is configured on this instance.',
+      detail:
+        'no model credential is configured on this instance. Every other endpoint '
+        + 'works; this one needs a model and will not guess without one.',
     }, 503));
 
     await expect(new CompanionAskClient({ ...WHERE, fetch }).ask('where was I?'))
@@ -396,6 +398,7 @@ describe('asking the library a question', () => {
     const cases: [Response | Error, string][] = [
       [json({ code: 'invalid', detail: 'no' }, 400), 'refused'],
       [json({ code: 'unauthenticated', detail: 'no' }, 401), 'unauthenticated'],
+      [json({ detail: 'service unavailable' }, 503), 'refused'],
       [new TypeError('network down'), 'unreachable'],
     ];
     for (const [outcome, kind] of cases) {
@@ -455,5 +458,69 @@ describe('asking the library a question', () => {
     const { fetch, seen } = transport(json(answerBody()), json(packetBody([])));
     await new CompanionAskClient({ ...WHERE, fetch }).ask('where was I?');
     for (const request of seen) expect(request.url).not.toContain('not-a-real-token');
+  });
+
+  it('reads a confirmed place\'s CONTENT answer from the one ask response', async () => {
+    // What `/selection/ask` returns for a bridged city selection, with no model configured.
+    const entityId = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
+    const { fetch, seen } = transport(json(answerBody({
+      answer: {
+        clauses: [
+          { text: 'Synthetic Hall is selected from official NYC BUILDING data.', type: 'meta', citations: [], value_refs: [] },
+          { text: 'Authorized memory evidence: a photograph in your library.', type: 'meta', citations: [], value_refs: [] },
+        ],
+      },
+      plan: { intent: 'content', place: { ids: [entityId] }, content: { scope: 'related' } },
+      selection: {
+        captures: [], entities: [], total_matched: 1, truncated: false, includes_proposals: false,
+        next_page: null,
+        content: [{
+          result_kind: 'memory_capture', origin_kind: 'personal', content_kind: 'capture',
+          authored_role: null, place_relationship: 'captured_at', match_reason: 'confirmed_memory_place',
+          memory_place_entity_id: entityId, canonical_place_id: null, world_id: null, version_id: null,
+          source_id: '01a0c9d1-e7de-7db5-8643-2b6266b36f48', lineage_ids: [], label: null,
+          availability: 'available', personal_visit_evidence: true,
+        }],
+      },
+      citations: {},
+      deterministic: true,
+      execution: { prompt_version: 'selection-5', calls: [] },
+    })));
+
+    const answered = await new CompanionAskClient({ ...WHERE, fetch }).ask(
+      'What belongs here?',
+      { admissionId: 'ffffffff-ffff-4fff-8fff-ffffffffffff', featureId: 'a'.repeat(32) },
+    );
+
+    expect(seen).toHaveLength(1);
+    expect(seen[0]?.url.endsWith('/selection/ask')).toBe(true);
+    // The browser names the admitted feature and nothing else; the server resolves the place.
+    expect((seen[0]?.body as { city_context?: unknown }).city_context).toEqual({
+      admission_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      feature_id: 'a'.repeat(32),
+    });
+    expect(answered.deterministic).toBe(true);
+    expect(answered.calls).toEqual([]);
+    expect(answered.provenance.composed).toBe('none');
+    expect(answered.content?.placeConfirmed).toBe(true);
+    expect(answered.content?.rows).toHaveLength(1);
+    expect(answered.content?.rows[0]?.personalVisitEvidence).toBe(true);
+  });
+
+  it('reports a no-model failure for a city selection instead of answering some other way', async () => {
+    const { fetch, seen } = transport(json({
+      detail:
+        'no model credential is configured on this instance. Every other endpoint '
+        + 'works; this one needs a model and will not guess without one.',
+    }, 503));
+
+    const failure = await new CompanionAskClient({ ...WHERE, fetch }).ask(
+      'What belongs here?',
+      { admissionId: 'ffffffff-ffff-4fff-8fff-ffffffffffff', featureId: 'a'.repeat(32) },
+    ).catch((error: unknown) => error);
+
+    expect(failure).toBeInstanceOf(AskUnavailable);
+    expect((failure as AskUnavailable).kind).toBe('no_model');
+    expect(seen).toHaveLength(1);
   });
 });

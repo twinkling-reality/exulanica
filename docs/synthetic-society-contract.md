@@ -499,8 +499,22 @@ completed movement.
 There is no cancellation, expiry or mid-action interruption in this version. A request can direct
 only the next eligible goal and ordinary navigation/action checks remain authoritative. It cannot
 teleport, cross unsupported space, undo completed actions or simulation history, or replace a
-withdrawn target. The current browser can inspect inhabitants and destinations but does not issue
-this API, so directed-action interaction and manual acceptance remain open.
+withdrawn target. The browser has a control on a declared visit or rest destination that issues
+one typed `perform` request through this API and shows the returned pending or consumed record, or
+an explicit unavailable or refused state. It re-checks its gate whenever the persisted society
+refreshes. Living (v4) societies refuse it because directed actions are a v2/v3 foundation.
+Simulated action records stay labeled as simulation and are never presented as personal evidence.
+
+The control is implemented and unit-tested (`web/packages/app/test/society-directed-action.test.ts`,
+`web/packages/app/test/environment-selection.test.ts`), and no shipped configuration reaches it:
+
+| Prerequisite | What the shipped app does instead |
+| --- | --- |
+| The owned district's interpretation, which publishes the destinations | Saved and starter worlds open without the owned district, and its interpretation is read only by a caller that supplies current dependency resolution |
+| A mounted control | The development preview (`?preview=1`) omits it |
+| A held v2 or v3 society | `build_services` configures no society runtime, so creating a v2, v3 or v4 society answers 424 `unavailable_society_input`, and a v1 society does not accept directed actions |
+| A society on the opened world | Society routes resolve versions only in the default world, and a starter's version belongs to its own `world:authored:<uuid>` world |
+| A profile the API directs | The browser creates a new society as v4 (`web/packages/app/src/composition/live-society.ts`), and the API accepts directed actions for v2 and v3 only |
 
 ## V4 living society: routines, places and occupancy
 

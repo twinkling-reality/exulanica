@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { Turn, TurnOption } from '@exulanica/companion-runtime';
 import { AskUnavailable, type CompanionAnswer } from '../src/companion-ask-api.js';
 import { buildCompanionPanel } from '../src/ui/companion-panel.js';
+import { say } from '../src/ui/copy.js';
 
 /**
  * The rules the Companion's panel carries, checked against what actually renders.
@@ -315,8 +316,16 @@ describe('a source-independent starter turn', () => {
     expect(panel.root.textContent).toContain('The memory service did not respond.');
 
     panel.askStarted('What sources are available?');
-    panel.reportAskFailure(new AskUnavailable('no_model', 'No model is configured.'));
-    expect(panel.root.textContent).toContain('No model is configured.');
+    panel.reportAskFailure(new AskUnavailable('no_model', 'http_503: No model is configured.'));
+    // The kind sentence, then the server's own sentence without the transport's status code.
+    expect(panel.root.textContent).toContain(say('ask.failed.no_model'));
+    expect(panel.root.querySelector('.companion-refusal-detail')?.textContent)
+      .toBe('No model is configured.');
+    expect(panel.root.textContent).not.toContain('http_503');
+    panel.askStarted('What sources are available?');
+    panel.reportAskFailure(new AskUnavailable('refused', 'invalid_plan: the plan names no place'));
+    expect(panel.root.querySelector('.companion-refusal-detail')?.textContent)
+      .toBe('the plan names no place');
     expect(panel.root.querySelectorAll('.companion-starter-actions button')).toHaveLength(2);
 
     panel.setState('summon');

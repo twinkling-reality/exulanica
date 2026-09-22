@@ -4,6 +4,7 @@ import type {
   AskUnavailable,
   CompanionAnswer,
 } from '../companion-ask-api.js';
+import { contentRowFields } from '../companion-content.js';
 import { el, replace } from './dom.js';
 import { fill, say } from './copy.js';
 
@@ -99,6 +100,48 @@ export function provenanceSentence(provenance: AnswerProvenance): string {
   return fill(provenance.usedFallback ? 'provenance.modelOnFallback' : 'provenance.model', values);
 }
 
+/**
+ * Structured CONTENT rows already returned by Selection. Shown only when a place-content
+ * surface is present (confirmed place, including empty). Ordinary capture answers omit it.
+ * Each row is described in words; its identifiers stay on the parsed row, not on the screen.
+ */
+function renderContentSurface(answer: CompanionAnswer): Node[] {
+  const surface = answer.content;
+  if (surface === undefined || (!surface.placeConfirmed && surface.rows.length === 0)) {
+    return [];
+  }
+  const nodes: Node[] = [
+    el('h3', {
+      class: 'companion-content-heading',
+      text: 'Place content',
+    }),
+  ];
+  if (surface.rows.length === 0) {
+    nodes.push(el('p', {
+      class: 'companion-content-empty',
+      text: 'Nothing is linked to this place yet.',
+    }));
+    return nodes;
+  }
+  const list = el('ul', { class: 'companion-content-list' });
+  for (const row of surface.rows) {
+    const fields = contentRowFields(row);
+    list.append(el('li', {
+      class: 'companion-content-item',
+      'data-origin': row.originKind,
+      'data-availability': row.availability,
+      'data-visit-evidence': row.personalVisitEvidence ? 'yes' : 'no',
+    }, [
+      el('dl', { class: 'companion-content-fields' }, fields.flatMap((field) => [
+        el('dt', { text: field.label }),
+        el('dd', { text: field.value }),
+      ])),
+    ]));
+  }
+  nodes.push(list);
+  return nodes;
+}
+
 /*
  * The band holds speech, and only speech.
  *
@@ -166,7 +209,12 @@ export function buildCompanionSpeech(options: CompanionSpeechOptions): Companion
       content.push(el('p', { class: 'companion-utterance', text: say('ask.emptyAnswer') }));
     }
 
-    if (answer.abstained !== null) {
+    content.push(...renderContentSurface(answer));
+
+    // A place with nothing linked to it is not a photograph search that found nothing, so the
+    // photograph abstention sentence would be wrong there. The server's clause and the empty
+    // place-content line already say what happened.
+    if (answer.abstained !== null && answer.content?.placeConfirmed !== true) {
       content.push(el('p', {
         class: 'companion-abstention',
         text: say(`abstention.${answer.abstained}`),
@@ -223,11 +271,14 @@ export function buildCompanionSpeech(options: CompanionSpeechOptions): Companion
       // first of them is this file's to write.
       root.dataset['mode'] = 'failed';
       root.removeAttribute('data-abstained');
+      // The server's sentence is shown as written, without the transport's `code: ` prefix
+      // (`http_503: `), which names a status rather than saying anything to a person.
+      const detail = failure.detail.replace(/^[a-z0-9_]+: /, '');
       replace(root, [
         speaker(),
         el('p', { class: 'companion-question-echo', text: lastQuestion }),
         el('p', { class: 'companion-refusal', text: say(`ask.failed.${failure.kind}`) }),
-        el('p', { class: 'companion-refusal-detail', text: failure.detail }),
+        ...(detail === '' ? [] : [el('p', { class: 'companion-refusal-detail', text: detail })]),
       ]);
     },
     reportRefusal(reasonKey) {

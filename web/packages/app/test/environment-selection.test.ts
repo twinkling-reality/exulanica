@@ -685,20 +685,37 @@ describe('mounted NYC semantic selection lifecycle', () => {
 
 import { ApiError } from '@exulanica/graph-client';
 import { readFileSync } from 'node:fs';
-import { parseSociety, type SocietySnapshot } from '../src/society-api.js';
+import { parseSociety, parseSocietyActionRecord, type SocietySnapshot } from '../src/society-api.js';
 const producerLivingResponse = JSON.parse(readFileSync(
   `${process.cwd()}/packages/app/test/living-v4-grid-response.json`, 'utf8',
 )) as { readonly fixture_provenance: { readonly canonical_state_sha256: string } };
-function liveSnapshot(tick = 0): SocietySnapshot {
+function liveSnapshot(tick = 0, absent: string | null = null): SocietySnapshot {
   return parseSociety({ society_id:'society', version_id:'version',branch_id:'version',place_id:'place',population_size:100,current_tick:tick,
     state_sha256:String(tick + 1).repeat(64),input_seq:1,input_sha256:'b'.repeat(64),
     state:{profile:'exulanica-society/v2',society_id:'society',branch_id:'version',tick,input_seq:1,input_sha256:'b'.repeat(64),
-      inhabitants:Array.from({length:100},(_,i)=>({id:`person-${i}`,synthetic:true,display_name:`Person ${i}`,role:'steward',position_mm:[i,0],motion_path_mm:[[i,0]],goal:null,route:null,
+      inhabitants:Array.from({length:100},(_,i)=>({id:`person-${i}`===absent?`replacement-${i}`:`person-${i}`,synthetic:true,display_name:`Person ${i}`,role:'steward',position_mm:[i,0],motion_path_mm:[[i,0]],goal:null,route:null,
         action:{kind:'idle',status:'active',target_id:null,remaining_ticks:0,reason:'awaiting_goal'},
         explanation:{summary:tick?'The target was removed.':'Awaiting a goal.',event_ids:tick?['event','outside-window']:[]}}))}});
 }
 function livingSnapshot(): SocietySnapshot { return parseSociety(producerLivingResponse); }
-function liveMount(preview = false, living = false) {
+/** One declared rest destination, the shape the district interpretation publishes. */
+const restInterpretation = {
+  producer:'test interpretation',document_sha256:'d'.repeat(64),unsupported:[],
+  navigation:{unavailable_reason:null,destinations:[{destination_id:'district:rest:1',subject_id:'subject:rest',affordance:'rest',duration_ticks:2,node_id:'n1'}]},
+  subjects:[{subject_id:'subject:rest',kind:'civic-object',uncertainty:'Placed from the district plan.',epistemic_status:'interpretation',source_refs:[],permitted_uses:['display'],recipe:{kind:'rest-pad'}}],
+};
+function restRecord() {
+  const digest='1'.repeat(64);
+  return parseSocietyActionRecord({
+    request:{profile:'exulanica.society-action-request/v1',request_id:'33333333-3333-4333-8333-333333333333',requested_by:'44444444-4444-4444-8444-444444444444',
+      subject_id:'person-0',branch_id:'version',base_tick:0,base_state_sha256:digest,input_seq:1,input_sha256:'b'.repeat(64),
+      intent:{kind:'perform',target_id:'district:rest:1',affordance:'rest'},
+      target:{target_id:'district:rest:1',subject_id:'subject:rest',node_id:'n1',affordance:'rest',duration_ticks:2,origin:'district',object_id:null,version_id:'version',enabled:true},
+      document_sha256:digest},
+    status:'pending',consumption:null,
+  },'version');
+}
+function liveMount(preview = false, living = false, interpretation: unknown = undefined) {
   const canvas = document.createElement('canvas');
   const controls = {state:{x:0,y:1.68,z:0},onInteract:null as (()=>void)|null};
   const snapshot = living ? livingSnapshot : liveSnapshot;
@@ -706,12 +723,13 @@ function liveMount(preview = false, living = false) {
   const inhabitantId = initialSnapshot.state.inhabitants[0]!.id;
   const connectedCatalog = living ? { ...catalog, placeId: initialSnapshot.placeId } : catalog;
   const connectedVersion = living ? { ...version, versionId: initialSnapshot.versionId } : version;
-  const district = {district:{name:'Test district',sidewalks:[]},setAuthoredInstances:vi.fn(),setSociety:vi.fn(()=>24),clearSociety:vi.fn(),
+  const district = {district:{name:'Test district',sidewalks:[]},interpretation,setAuthoredInstances:vi.fn(),setSociety:vi.fn(()=>24),clearSociety:vi.fn(),
     visibleInhabitantIds:[inhabitantId],drawnInhabitantCount:1,pickInhabitant:()=> inhabitantId,revealInhabitant:vi.fn(),inhabitantRepresentation:()=>undefined,coincidentInhabitants:()=>[inhabitantId],
     inhabitantDetail:()=>'near',societyCounts:{population:128,outdoors:128,indoors:0,near:1,far:0,drawn:1}};
   const binding = {controls,ownedDistrict:district,camera:{forward:{x:0,y:0,z:1}},invalidate:vi.fn(),setDistrictObjectFrame:vi.fn()};
   const client = {connect:vi.fn(async()=>snapshot()),read:vi.fn(async()=>snapshot(1)),advance:vi.fn(async(_snapshot:SocietySnapshot)=>snapshot(1)),events:vi.fn(async()=>[
-    {event_id:'event',subject_id:inhabitantId,tick:1,event_kind:'replanned',document_sha256:'c'.repeat(64),document:{synthetic:true,summary:'Recorded target removal.',reason:'target_disabled_or_removed'}}])};
+    {event_id:'event',subject_id:inhabitantId,tick:1,event_kind:'replanned',document_sha256:'c'.repeat(64),document:{synthetic:true,summary:'Recorded target removal.',reason:'target_disabled_or_removed'}}]),
+    requestAction:vi.fn(async()=>restRecord())};
   let playback: SocietyPlaybackControl = {
     societyId:'society',versionId:'version',persisted:true,revision:0,mode:'paused',speed:1,
     tickIntervalMs:1000,currentTick:0,stateSha256:'1'.repeat(64),nextDueAt:null,reason:null,
@@ -806,6 +824,44 @@ describe('persisted living world controls',()=>{
     const {mount,client,district}=liveMount();const held=deferred<SocietySnapshot>();client.connect.mockReturnValueOnce(held.promise);
     const beginning=mount.begin();await vi.waitFor(()=>expect(client.connect).toHaveBeenCalled());mount.dispose();held.resolve(liveSnapshot());await beginning;
     expect(district.setSociety).not.toHaveBeenCalled();expect(client.events).not.toHaveBeenCalled();
+  });
+});
+
+describe('destination directed-action control in the inspector',()=>{
+  const inspectorOf = (root: HTMLElement) => root.querySelector<HTMLElement>('.living-world-inspector')!;
+  it('holds exactly one control for the destination shown and none once another subject is shown',async()=>{
+    const {mount,controls,button}=liveMount(false,false,restInterpretation);await mount.begin();
+    controls.onInteract?.();
+    button('Rest pad · n1').click();
+    button('Rest pad · n1').click();
+    expect(inspectorOf(mount.root).querySelectorAll('.society-directed-action')).toHaveLength(1);
+    controls.onInteract?.();
+    expect(inspectorOf(mount.root).querySelector('h3')?.textContent).toBe('Person 0');
+    expect(inspectorOf(mount.root).querySelectorAll('.society-directed-action')).toHaveLength(0);
+    expect(inspectorOf(mount.root).querySelectorAll('button')).toHaveLength(0);
+    button('Rest pad · n1').click();
+    expect(inspectorOf(mount.root).querySelectorAll('.society-directed-action')).toHaveLength(1);
+    mount.dispose();
+  });
+  it('re-gates the control when the society refreshes and keeps the destination in view',async()=>{
+    const {mount,controls,button,client,canvas}=liveMount(false,false,restInterpretation);await mount.begin();
+    controls.onInteract?.();
+    button('Rest pad · n1').click();
+    const perform=()=>button('Direct selected inhabitant to rest here');
+    expect(perform().disabled).toBe(false);
+    perform().click();
+    await vi.waitFor(()=>expect(client.requestAction).toHaveBeenCalledTimes(1));
+    await vi.waitFor(()=>expect(mount.root.querySelector('.society-directed-action-status')?.textContent)
+      .toMatch(/Simulation action request recorded/));
+
+    client.read.mockResolvedValueOnce(liveSnapshot(1,'person-0'));
+    button('Refresh persisted society').click();
+    await vi.waitFor(()=>expect(canvas.dataset.societyTick).toBe('1'));
+    expect(inspectorOf(mount.root).querySelector('h3')?.textContent).toBe('Rest pad');
+    expect(perform().disabled).toBe(true);
+    expect(mount.root.querySelector('.society-directed-action-status')?.textContent)
+      .toBe('The selected inhabitant is not in the current society state.');
+    mount.dispose();
   });
 });
 

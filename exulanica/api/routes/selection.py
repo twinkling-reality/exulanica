@@ -68,7 +68,13 @@ from exulanica.selection.environment_proposal import (
 from exulanica.selection.packet import build_content_packet
 from exulanica.selection.proposal import PROMPT_VERSION as PROPOSAL_PROMPT_VERSION
 from exulanica.selection.proposal import propose_appearance
-from exulanica.selection.question import PROMPT_VERSION, ModelCall, answer_question, propose_plan
+from exulanica.selection.question import (
+    PROMPT_VERSION,
+    ModelCall,
+    answer_question,
+    propose_plan,
+    requires_model,
+)
 from exulanica.world import (
     EnvironmentBindingDrift,
     EnvironmentCompositionDenied,
@@ -440,7 +446,10 @@ def ask(
                 repaired=False,
                 execution=_execution((), ()),
             )
-    client = _require_model(request)
+    # A model plans a question asked in words and composes a capture answer. A CONTENT plan,
+    # supplied or resolved from a city selection, is answered from its rows without one, and a
+    # configured model is not asked to rephrase it either.
+    client = _require_model(request) if requires_model(plan) else get_services(request).model_client
     outcome = answer_question(
         connection,
         client,
