@@ -230,6 +230,28 @@ def test_the_executor_may_update_nothing(provisioned):
     assert _updatable(provisioned, EXECUTOR_ROLE) == set()
 
 
+def test_the_runtime_reads_current_reference_membership_and_never_writes_it(provisioned):
+    """Which photographs a world uses moves with an attach, detach or rebind event, never alone.
+
+    Migration 0090's insert triggers maintain the pointer with the owner's rights, so the
+    runtime needs no write on it; ``test_source_membership_events.py`` drives the statements.
+    """
+    verbs = {
+        verb: provisioned.execute(
+            "select has_table_privilege(%s, 'saved_world_source_current_membership', %s) as held",
+            (RUNTIME_ROLE, verb),
+        ).fetchone()["held"]
+        for verb in ("SELECT", "INSERT", "UPDATE", "DELETE", "TRUNCATE")
+    }
+    assert verbs == {
+        "SELECT": True,
+        "INSERT": False,
+        "UPDATE": False,
+        "DELETE": False,
+        "TRUNCATE": False,
+    }
+
+
 def test_no_view_the_runtime_may_update_writes_with_its_owners_rights(provisioned):
     """An updatable view writes its table as the view's owner unless it says otherwise."""
     rows = provisioned.execute(

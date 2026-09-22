@@ -418,6 +418,14 @@ ROUTE_RULES: Final[Mapping[tuple[str, str], Public | Authentication | Requires]]
         ("POST", "/world-entries/{entry_id}/source-attachments"): _requires(
             _P.WORLD_WRITE, _P.ADMISSION_READ
         ),
+        # Detach reads no admission receipt, and it answers with the same entry body
+        # PUT /world-entries/{entry_id} already returns to a world.write token, so admission.read
+        # would guard nothing there. Rebind resolves and pins a new human review, so it reads
+        # admission state as attach does.
+        ("POST", "/world-entries/{entry_id}/source-detachments"): _WORLD_WRITE,
+        ("POST", "/world-entries/{entry_id}/source-rebinds"): _requires(
+            _P.WORLD_WRITE, _P.ADMISSION_READ
+        ),
         ("PUT", "/world-entries/{entry_id}"): _WORLD_WRITE,
         ("POST", "/world/styles/previews"): _WORLD_WRITE,
         ("DELETE", "/world/styles/previews/{preview_id}"): _WORLD_WRITE,

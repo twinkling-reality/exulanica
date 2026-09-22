@@ -26,6 +26,11 @@ from exulanica.world import (
     SourceAttachmentSelection,
     StaleSavedWorldEntry,
 )
+from exulanica.world.saved_entries import SourceRebindRequired
+from exulanica.world.source_membership_events import (
+    MembershipEventConflict,
+    MembershipEventRefused,
+)
 from exulanica.world.starter import AuthoredStarterScene
 
 router = APIRouter(prefix="/world-entries", tags=["world-entries"])
@@ -94,6 +99,7 @@ class SavedWorldEntryView(BaseModel):
     availability: Literal["available", "unavailable"]
     unavailable_reason: str | None
     source_attachments: list[SavedWorldSourceAttachmentView]
+    previous_source_attachments: list[SavedWorldPreviousSourceAttachmentView]
     created_by: uuid.UUID
     created_at: dt.datetime
     updated_at: dt.datetime
@@ -145,6 +151,40 @@ class AttachSavedWorldSourcesBody(BaseModel):
     sources: Annotated[list[SourceAttachmentSelectionBody], Field(min_length=1, max_length=200)]
 
 
+class DetachSelectionBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    attachment_id: uuid.UUID
+
+
+class DetachSavedWorldSourcesBody(BaseModel):
+    """Detach names current memberships by attachment. The cursor is the resume point read."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    operation_id: uuid.UUID
+    base_revision: Annotated[int, Field(ge=1)]
+    authored_version_id: uuid.UUID
+    authored_state_sha256: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
+    authored_edit_seq: Annotated[int, Field(ge=0)]
+    style_version_id: uuid.UUID
+    selections: Annotated[list[DetachSelectionBody], Field(min_length=1, max_length=200)]
+
+
+class RebindSavedWorldSourcesBody(BaseModel):
+    """Rebind names photographs; the server resolves and pins their new review receipts."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    operation_id: uuid.UUID
+    base_revision: Annotated[int, Field(ge=1)]
+    authored_version_id: uuid.UUID
+    authored_state_sha256: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
+    authored_edit_seq: Annotated[int, Field(ge=0)]
+    style_version_id: uuid.UUID
+    sources: Annotated[list[SourceAttachmentSelectionBody], Field(min_length=1, max_length=200)]
+
+
 class SavedWorldSourceAttachmentView(BaseModel):
     model_config = ConfigDict(extra="forbid", from_attributes=True)
 
@@ -168,6 +208,26 @@ class SavedWorldSourceAttachmentView(BaseModel):
     ] | None
     viewer_sha256: str | None
     evidence_path: str | None
+
+
+class SavedWorldPreviousSourceAttachmentView(BaseModel):
+    model_config = ConfigDict(extra="forbid", from_attributes=True)
+
+    attachment_id: uuid.UUID
+    operation_id: uuid.UUID
+    capture_id: uuid.UUID
+    evidence_span_id: uuid.UUID
+    source_sha256: str
+    authorization_id: uuid.UUID
+    screening_id: uuid.UUID
+    attached_entry_revision: int
+    attached_at: dt.datetime
+    detach_operation_id: uuid.UUID
+    detached_entry_revision: int
+    detached_by: uuid.UUID
+    detached_at: dt.datetime
+    availability: Literal["available", "unavailable"]
+    unavailable_reason: Literal["source_unavailable"] | None
 
 
 class SavedWorldStyleCandidateView(BaseModel):
@@ -194,6 +254,10 @@ def _view(entry: SavedWorldEntry) -> SavedWorldEntryView:
     values["source_attachments"] = [
         SavedWorldSourceAttachmentView.model_validate(attachment)
         for attachment in entry.source_attachments
+    ]
+    values["previous_source_attachments"] = [
+        SavedWorldPreviousSourceAttachmentView.model_validate(attachment)
+        for attachment in entry.previous_source_attachments
     ]
     return SavedWorldEntryView(**values)
 
@@ -365,9 +429,104 @@ def attach_sources(
             status_code=409,
             content={"code": "stale_saved_world_entry", "detail": str(exc)},
         )
+    except SourceRebindRequired as exc:
+        return JSONResponse(
+            status_code=422,
+            content={"code": "rebind_required", "detail": str(exc)},
+        )
     except (InvalidStructuralData, ValueError) as exc:
         return JSONResponse(
             status_code=422,
             content={"code": "invalid_source_attachment", "detail": str(exc)},
         )
     return _view(attached)
+
+
+def _membership_refusal(exc: Exception) -> JSONResponse:
+    if isinstance(exc, MembershipEventConflict):
+        return JSONResponse(
+            status_code=409,
+            content={"code": "membership_event_operation_conflict", "detail": str(exc)},
+        )
+    if isinstance(exc, StaleSavedWorldEntry):
+        return JSONResponse(
+            status_code=409,
+            content={"code": "stale_saved_world_entry", "detail": str(exc)},
+        )
+    if isinstance(exc, MembershipEventRefused):
+        return JSONResponse(status_code=422, content={"code": exc.code, "detail": exc.detail})
+    return JSONResponse(
+        status_code=422, content={"code": "invalid_source_membership", "detail": str(exc)}
+    )
+
+
+@router.post("/{entry_id}/source-detachments", response_model=SavedWorldEntryView)
+def detach_sources(
+    entry_id: Annotated[uuid.UUID, Path()],
+    body: DetachSavedWorldSourcesBody,
+    connection: ScopedConnection,
+    session: CurrentSession,
+    services: Annotated[Services, Depends(get_services)],
+) -> SavedWorldEntryView | JSONResponse:
+    try:
+        detached = SavedWorldEntryRepository(
+            connection, session.workspace_id, services.store
+        ).detach_sources(
+            entry_id,
+            operation_id=body.operation_id,
+            base_revision=body.base_revision,
+            authored_version_id=body.authored_version_id,
+            authored_state_sha256=body.authored_state_sha256,
+            authored_edit_seq=body.authored_edit_seq,
+            style_version_id=body.style_version_id,
+            attachment_ids=tuple(selection.attachment_id for selection in body.selections),
+            detached_by=session.actor,
+        )
+    except (
+        MembershipEventConflict,
+        StaleSavedWorldEntry,
+        MembershipEventRefused,
+        InvalidStructuralData,
+        ValueError,
+    ) as exc:
+        return _membership_refusal(exc)
+    return _view(detached)
+
+
+@router.post("/{entry_id}/source-rebinds", response_model=SavedWorldEntryView)
+def rebind_sources(
+    entry_id: Annotated[uuid.UUID, Path()],
+    body: RebindSavedWorldSourcesBody,
+    connection: ScopedConnection,
+    session: CurrentSession,
+    services: Annotated[Services, Depends(get_services)],
+) -> SavedWorldEntryView | JSONResponse:
+    try:
+        rebound = SavedWorldEntryRepository(
+            connection, session.workspace_id, services.store
+        ).rebind_sources(
+            entry_id,
+            operation_id=body.operation_id,
+            base_revision=body.base_revision,
+            authored_version_id=body.authored_version_id,
+            authored_state_sha256=body.authored_state_sha256,
+            authored_edit_seq=body.authored_edit_seq,
+            style_version_id=body.style_version_id,
+            sources=tuple(
+                SourceAttachmentSelection(
+                    capture_id=source.capture_id,
+                    evidence_span_id=source.evidence_span_id,
+                )
+                for source in body.sources
+            ),
+            rebound_by=session.actor,
+        )
+    except (
+        MembershipEventConflict,
+        StaleSavedWorldEntry,
+        MembershipEventRefused,
+        InvalidStructuralData,
+        ValueError,
+    ) as exc:
+        return _membership_refusal(exc)
+    return _view(rebound)

@@ -313,6 +313,124 @@ describe('saved world entry client', () => {
     })).rejects.toMatchObject({ code: 'stale_saved_world_entry' });
   });
 
+  it('removes and adds back references with the exact cursor and reads removed references', async () => {
+    const requests: { path: string; body: Record<string, unknown> }[] = [];
+    const removed = {
+      attachment_id: '66666666-6666-4666-8666-666666666666',
+      operation_id: '77777777-7777-4777-8777-777777777777',
+      capture_id: '88888888-8888-4888-8888-888888888888',
+      evidence_span_id: '99999999-9999-4999-8999-999999999999',
+      source_sha256: 'd'.repeat(64),
+      authorization_id: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
+      screening_id: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
+      attached_entry_revision: 2,
+      attached_at: '2026-09-20T12:00:00Z',
+      detach_operation_id: 'dddddddd-dddd-4ddd-8ddd-dddddddddddd',
+      detached_entry_revision: 3,
+      detached_by: 'cccccccc-cccc-4ccc-8ccc-cccccccccccc',
+      detached_at: '2026-09-21T12:00:00Z',
+      availability: 'available',
+      unavailable_reason: null,
+    };
+    const fetch = vi.fn(async (input: string | URL | Request, init: RequestInit = {}) => {
+      const path = new URL(String(input)).pathname;
+      requests.push({ path, body: JSON.parse(String(init.body)) as Record<string, unknown> });
+      if (path.endsWith('/source-detachments')) {
+        return Response.json(wire({ revision: 3, previous_source_attachments: [removed] }));
+      }
+      return Response.json(wire({
+        revision: 4,
+        source_attachments: [attachmentWire({ attached_entry_revision: 4 })],
+        previous_source_attachments: [],
+      }));
+    });
+    const client = new WorldEntryClient({
+      baseUrl: 'https://exulanica.test', token: 'private', fetch,
+    });
+    const base = parseFixture();
+    const cursor = {
+      entryId: base.entryId,
+      baseRevision: 2,
+      authoredVersionId: base.authoredVersionId,
+      authoredStateSha256: base.authoredStateSha256,
+      authoredEditSeq: base.authoredEditSeq,
+      styleVersionId: base.styleVersionId,
+    };
+    const afterRemoval = await client.detachSources({
+      ...cursor, kind: 'detach', operationId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+      attachmentIds: [removed.attachment_id],
+    });
+    expect(afterRemoval.sourceAttachments).toEqual([]);
+    expect(afterRemoval.previousSourceAttachments).toEqual([expect.objectContaining({
+      attachmentId: removed.attachment_id, captureId: removed.capture_id,
+      detachOperationId: removed.detach_operation_id, detachedEntryRevision: 3,
+      availability: 'available', unavailableReason: null,
+    })]);
+    const afterReturn = await client.rebindSources({
+      ...cursor, kind: 'rebind', baseRevision: 3,
+      operationId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      sources: [{ captureId: removed.capture_id, evidenceSpanId: removed.evidence_span_id }],
+    });
+    expect(afterReturn.previousSourceAttachments).toEqual([]);
+    expect(requests).toEqual([
+      {
+        path: `/world-entries/${base.entryId}/source-detachments`,
+        body: {
+          operation_id: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee', base_revision: 2,
+          authored_version_id: base.authoredVersionId,
+          authored_state_sha256: base.authoredStateSha256,
+          authored_edit_seq: base.authoredEditSeq, style_version_id: base.styleVersionId,
+          selections: [{ attachment_id: removed.attachment_id }],
+        },
+      },
+      {
+        path: `/world-entries/${base.entryId}/source-rebinds`,
+        body: {
+          operation_id: 'ffffffff-ffff-4fff-8fff-ffffffffffff', base_revision: 3,
+          authored_version_id: base.authoredVersionId,
+          authored_state_sha256: base.authoredStateSha256,
+          authored_edit_seq: base.authoredEditSeq, style_version_id: base.styleVersionId,
+          sources: [{ capture_id: removed.capture_id, evidence_span_id: removed.evidence_span_id }],
+        },
+      },
+    ]);
+
+    await expect(client.detachSources({
+      ...cursor, kind: 'detach', operationId: 'eeeeeeee-eeee-4eee-8eee-eeeeeeeeeeee',
+      attachmentIds: [removed.attachment_id, removed.attachment_id],
+    })).rejects.toThrow('only once');
+    expect(requests).toHaveLength(2);
+    const invalid = new WorldEntryClient({
+      baseUrl: 'https://exulanica.test', token: 'private',
+      fetch: vi.fn(async () => Response.json(wire({
+        previous_source_attachments: [{ ...removed, availability: 'unavailable' }],
+      }))),
+    });
+    await expect(invalid.entry(base.entryId)).rejects.toThrow('removed reference availability');
+    const older = new WorldEntryClient({
+      baseUrl: 'https://exulanica.test', token: 'private',
+      fetch: vi.fn(async () => Response.json(wire())),
+    });
+    expect((await older.entry(base.entryId)).previousSourceAttachments).toEqual([]);
+  });
+
+  it('carries a refusal code from a membership event to the caller', async () => {
+    const client = new WorldEntryClient({
+      baseUrl: 'https://exulanica.test', token: 'private',
+      fetch: vi.fn(async () => Response.json({
+        code: 'review_required', detail: 'adding a photograph back needs a new human review',
+      }, { status: 422 })),
+    });
+    const base = parseFixture();
+    await expect(client.rebindSources({
+      kind: 'rebind', entryId: base.entryId, operationId: 'ffffffff-ffff-4fff-8fff-ffffffffffff',
+      baseRevision: 3, authoredVersionId: base.authoredVersionId,
+      authoredStateSha256: base.authoredStateSha256, authoredEditSeq: base.authoredEditSeq,
+      styleVersionId: base.styleVersionId,
+      sources: [{ captureId: 'c', evidenceSpanId: 's' }],
+    })).rejects.toMatchObject({ status: 422, code: 'review_required' });
+  });
+
   it('keeps invalidated entries visible and explicitly unavailable', async () => {
     const fetch = vi.fn(async () => Response.json([wire({
       availability: 'unavailable', unavailable_reason: 'source_deleted',

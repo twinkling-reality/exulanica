@@ -41,6 +41,11 @@ So this module creates the role and grants it exactly what it needs:
     photograph a recipe was read from, which is what deletion follows. 0066's triggers refuse the
     same updates for any role. Nothing locks a recipe row either, which would need UPDATE: the
     writers that decide on a recipe hold the workspace's material lifecycle lock instead.
+*   **SELECT only on ``saved_world_source_current_membership``.** It says which photographs a
+    saved world currently uses. Migration 0090 moves it from the insert triggers on attachment
+    and detach rows, with the owner's rights, so every change has an event that records it. With
+    INSERT or UPDATE the runtime could empty a world's references with no detach, or point one
+    back at an old attachment and revive receipts a person withdrew by removing it.
 *   **No ownership and no BYPASSRLS**, which is the whole point.
 
 Every statement here is built with :mod:`psycopg.sql` rather than an f-string. Role names,
@@ -104,6 +109,7 @@ READ_ONLY_TABLES: Final = (
     "world_texture_set",
     "world_texture_set_class",
     "baked_tile",
+    "saved_world_source_current_membership",
 )
 
 #: Tables the runtime may read and append to and may not update. See the module docstring.
@@ -120,6 +126,8 @@ INSERT_ONLY_TABLES: Final = (
     "society_experiment_outcome",
     "saved_world_source_attachment_operation",
     "saved_world_source_attachment",
+    "saved_world_source_detach_operation",
+    "saved_world_source_detach",
 )
 
 #: The vocabulary is administered, not generated. Without revoking this the role could insert a

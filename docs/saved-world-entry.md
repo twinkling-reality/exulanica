@@ -180,43 +180,144 @@ under the existing canvas.
 The photo drawer presents this world's reference collection and attachment status immediately.
 Upload and human review remain in a separate expandable workflow. Already-attached selections
 are identified as part of the world and do not offer duplicate attachment; a selection containing
-new sources without completed review or current viewer access is refused atomically.
+new sources without completed review or current viewer access is refused atomically. Each
+reviewed photograph that is ready and not yet in the world also has its own Add to this world
+action, which attaches that one photograph without changing the review selection. Recorded
+reviews are described per photograph in words; receipt identities stay inside a Details
+disclosure.
+
+Each reference card shows a plain status (in this world, or in this world but not viewable and
+why) and a Remove from this world action behind a confirmation that says the photo stays in the
+library and this world stops using it. Reference cards host no composition controls; composition
+belongs to object placement. Removed photographs are listed under Previously in this world with
+Add back. Until the drawer has seen a newer eligible review of that photograph, Add back opens
+the review workflow with it selected and adds nothing; recording the review adds nothing either,
+and the person chooses Add back again. The drawer's view of a review is a hint, not the rule:
+the receipts it reads carry no time, so a review that predates the removal can still look newer
+to it, and the server refuses that with `review_required`, which the drawer explains in the same
+words and sends the person back to review. Refusals are shown in words mapped from the stable
+codes below, with the code itself only inside Details. An interrupted remove or add back is kept
+per world, and retry sends exactly the same request.
 
 Deleted sources, expired authorization or screening, and unavailable viewer bytes affect the
 individual reference. They do not make the independently authored world unavailable. Unavailable
 references retain lineage but return no viewer digest or evidence path. Genuine structural source
 dependencies continue to use snapshot invalidation.
 
-Migration `0086_saved_world_source_attachments.sql` stores one membership row per capture on an
-entry (`unique (workspace_id, entry_id, capture_id)`). Operation and membership tables are
-append-only: triggers refuse `UPDATE` and `DELETE`, and the application roles have `INSERT` and
-`SELECT` only. Each membership pins the authorization and screening resolved at attach time.
-Reads evaluate those pinned receipts. They do not select a later authorization or screening for
-the same capture.
+Migration `0086_saved_world_source_attachments.sql` stores operation and membership rows.
+Both tables are append-only: triggers refuse `UPDATE` and `DELETE`, and the application roles
+have `INSERT` and `SELECT` only. Each membership pins the authorization and screening resolved
+when it was written. Reads evaluate those pinned receipts. They do not select a later
+authorization or screening for the same capture.
 
-That stored uniqueness and append-only shape is the same provenance discipline
+That append-only shape is the same provenance discipline
 [world-objects-contract.md](world-objects-contract.md) uses for reviewed-asset import receipts:
-an existing key's provenance cannot be rebound in place. Rebind is a later membership with a new
-`operation_id` after a new human review, not an `UPDATE` of the first row. The 0086 unique names
-every historical row, so a second membership for the same capture cannot be inserted while that
-row exists. Detach-event rows and current-membership uniqueness are not in that migration.
+an existing key's provenance cannot be rebound in place.
+
+### Removing a reference and adding it back
+
+A person can remove a reference photograph from one world and later add it back after a new
+human review. The photograph stays in the library, its media and every history row remain, and
+permission is never revived without that review. The history is also the input set a later
+photo-to-world step reads to learn which photographs a world currently uses, so it has to hold
+under retries, concurrent writers, the restricted runtime role, and the migration of existing
+data.
 
 | Event | What it is | What it is not |
 | --- | --- | --- |
 | Attach | A new `operation_id` plus membership rows that pin the current reviewed personal authorization and screening, while the authored cursor, style, snapshot, and undo history stay exactly as read | A topology write, a clone of a personal snapshot over the starter, geometry, or materialization of protected composition |
-| Detach | A later unavailability event that names an existing membership so the reference is no longer part of the current collection | `DELETE` of the membership or operation row; hiding or substituting the independently authored world |
-| Rebind | A later attach-shaped membership with a new `operation_id` after a new human review of the same capture | `UPDATE` of the prior row's `authorization_id` or `screening_id`; reuse of the prior `operation_id` with different receipts |
+| Detach | A later event naming current memberships, after which those photographs are no longer part of the world | `DELETE` of any row; deletion of media; hiding or substituting the independently authored world |
+| Rebind | A later attach-shaped membership row, with a new `operation_id`, pinning a human review of a removed photograph recorded after that removal | `UPDATE` of an earlier row's receipts; reuse of any receipt an earlier membership of that photograph on that world pinned; a review recorded while the photograph was still in the world |
 | Later authorization or screening receipt | Additional admission history on the capture | Reactivation of an expired membership; replacement of pinned lineage; an implicit rebind |
 | Expired, deleted, or unreadable reference | Individual `source_attachments[]` unavailability with retained lineage | World `availability: unavailable`; snapshot invalidation |
 
-`POST /world-entries/{entry_id}/source-attachments` is attach. It refuses a capture that already
-has a membership row, including after that membership's pinned receipts expire and after a later
-eligible receipt exists. Exact retry of the same `operation_id` and request body returns the
-current entry. A different body on that `operation_id` is `source_attachment_operation_conflict`.
+Migration `0090_saved_world_source_membership_events.sql` replaces 0086's all-history
+`unique (workspace_id, entry_id, capture_id)` with `saved_world_source_current_membership`: one
+row per world and photograph naming the attachment the world uses, or null after a detach. It
+adds append-only `saved_world_source_detach_operation` and `saved_world_source_detach` tables and a
+`kind` (`attach` or `rebind`) on attachment operations. Existing attachments are backfilled as
+current.
 
-The public HTTP surface does not delete a membership row or patch pinned authorization or
-screening. Detach and rebind are membership events. They are not public `DELETE` or `PATCH`
-routes.
+The pointer is derived state and only the database moves it. Insert triggers on attachment and
+detach rows, running with the table owner's rights, maintain it: an attach inserts it and is
+refused if the photograph has any membership on that world; a rebind fills a null pointer and is
+refused unless exactly one removed row changes; a detach clears the pointer only when it names
+the attachment the pointer holds. A write to the pointer from anywhere else is refused by its own
+trigger, and the runtime role holds `SELECT` on it and nothing more. No runtime statement can
+therefore change which photographs a world uses without an event row that says so, and the
+event rows are themselves checked against the saved-world cursor when the transaction commits.
+Foreign keys on `(workspace_id, entry_id, capture_id, attachment_id)` tie the pointer and every
+detach to an attachment of the same world and photograph.
+
+A rebind pins the newest current human review of the photograph, and that review must answer the
+removal: it is refused with `review_required` when its authorization or screening was recorded at
+or before the latest detach of that photograph from that world, and when either receipt was
+pinned by any earlier membership of the same photograph on the same world. The database refuses
+both for every rebind row, so no writer reaches a membership the route would not.
+
+Each half closes a measured gap. Comparing only the most recent membership let a third membership
+pin the first membership's receipts once the second review expired. Requiring only receipts this
+world had not used let a renewal recorded while the photograph was still a reference bring it
+back, so the person made no decision after choosing to remove it, which is exactly what the
+drawer says they do.
+
+`POST /world-entries/{entry_id}/source-attachments` is attach. A photograph the world currently
+uses is refused as `invalid_source_attachment`, including after its pinned receipts expire and
+after a later eligible receipt exists. A photograph removed from the world is refused as
+`rebind_required`: adding it back is a rebind. Exact retry of the same `operation_id` and request
+body returns the current entry. The attach request digest is unchanged since 0086, so an
+attachment recorded before 0090 retries as the same request.
+
+`POST /world-entries/{entry_id}/source-detachments` accepts an `operation_id`, the entry cursor
+the caller read (`base_revision`, `authored_version_id`, `authored_state_sha256`,
+`authored_edit_seq`, `style_version_id`) and 1 to 200 `selections` naming current `attachment_id`s.
+The cursor must equal the saved cursor. The live authored branch and the world's availability are
+not consulted: a detach reads and writes no scene, style, or snapshot, so it cannot adopt unseen
+state, and a world whose branch drifted or whose source was deleted can still stop using a
+photograph. The pinned receipts are not consulted either. Removing an expired or deleted
+reference is allowed, because a detach only reduces use. The route requires `world.write`; it
+reads no admission receipt and answers with the same entry `GET` returns under `world.read`, so
+`admission.read` would guard nothing there.
+
+`POST /world-entries/{entry_id}/source-rebinds` accepts the same cursor and 1 to 200 `sources`
+naming `capture_id` and `evidence_span_id`. It is attach-shaped: the complete cursor and the live
+authored branch must match, the world must be available, the same structure and style check runs,
+and the server resolves the receipts. It requires `world.write` and `admission.read`.
+
+Every membership event takes the workspace lock before the entry row, as every other entry writer
+does, and advances the entry revision exactly once without moving the authored cursor or style.
+Two writers from the same resume point therefore serialize, and the second is refused as
+`stale_saved_world_entry`. An `operation_id` names one request in one workspace across attach,
+rebind, and detach, whichever world it was sent to. The recorded operation is looked up before
+any cursor or authority check, so an exact retry returns the current entry after the world moved
+on, after a newer review, and after the pinned review expired. The detach and rebind request
+digests cover the client's body, cursor included, and the caller; they do not cover receipts the
+server resolved. Reusing an identity for a different request, kind, or world is a 409:
+`source_attachment_operation_conflict` on attach and `membership_event_operation_conflict` on
+detach and rebind. The database refuses a duplicate identity across both operation tables too.
+
+| Code | Status | Meaning |
+| --- | --- | --- |
+| `stale_saved_world_entry` | 409 | The world changed since the cursor was read |
+| `membership_event_operation_conflict` | 409 | The `operation_id` already names a different request |
+| `membership_unavailable` | 422 | Detach names an attachment the world does not use, or rebind names a photograph the world never used |
+| `membership_current` | 422 | Rebind names a photograph the world still uses |
+| `review_required` | 422 | The photograph's current review was already used by this world, or predates its removal; a new review is needed |
+| `authority_unavailable` | 422 | No current human-reviewed personal authorization, or no authorized viewer bytes |
+| `entry_unavailable` | 422 | Rebind on a world that cannot be opened |
+| `invalid_detach`, `invalid_rebind` | 422 | A selection is repeated or outside 1 to 200 |
+| `rebind_required` | 422 | Attach names a photograph removed from this world |
+
+Entry reads return the current collection in `source_attachments` and the removed photographs in
+`previous_source_attachments`: one row per photograph, its most recent membership lineage, the
+detach that ended it, and whether the original photograph is still a live source
+(`availability`, `unavailable_reason: source_unavailable`). A removed reference returns no
+viewer digest or evidence path. `SavedWorldEntryRepository.membership_ledger` returns the complete
+history: every membership with its kind, every detach, and every operation.
+
+Rebind rows take the table's `uuidv7()` default like attach rows. Migration 0090 is forward-only.
+After the first rebind two attachment rows name one photograph on one world, so 0086's constraint
+cannot be restored over them; recovery is a restore from backup.
 
 ## HTTP surface
 
@@ -229,6 +330,8 @@ routes.
 | `GET` | `/world-entries/{entry_id}` | One entry, with cross-workspace IDs answered as absent |
 | `PUT` | `/world-entries/{entry_id}` | Compare and advance the exact version references |
 | `POST` | `/world-entries/{entry_id}/source-attachments` | Attach reviewed reference photographs while preserving the world cursor |
+| `POST` | `/world-entries/{entry_id}/source-detachments` | Remove references from the current collection; no row or media is deleted |
+| `POST` | `/world-entries/{entry_id}/source-rebinds` | Add removed references back under a new human review, as new membership rows |
 
 ## Verification
 
@@ -245,8 +348,30 @@ inference.
 Reference-attachment coverage includes atomic mixed-source refusal, exact retry and operation
 identity conflicts, live authored-cursor drift, preserved object undo, authorization and screening
 expiry, a later admission receipt that does not reactivate an expired membership, source deletion,
-and unavailable viewer bytes. Browser component tests cover entry-scoped retry, same-scene
-metadata refresh, response ordering, and explicit refusal of ineligible selections.
+and unavailable viewer bytes. `tests/test_source_membership_events.py` runs detach and rebind
+through an application connected as the runtime role: rows and media survive a detach; attach of
+a removed photograph is `rebind_required`; a rebind without a new review, with receipts any
+earlier membership pinned, or with a review recorded before the removal is refused, through the
+route and again as a forged row the database rejects; a review recorded after the removal is
+accepted; two detach and rebind cycles keep every event; expired and
+deleted references can be removed; exact retries survive a cursor move, a newer review, and
+expiry; operation identities are unique across kinds and worlds; concurrent writers from one resume
+point serialize; another workspace's token sees and changes nothing; and direct runtime-role and
+owner statements cannot move the pointer or forge an event that moves it the wrong way. The
+stored pointer is compared with a replay of the events in each case.
+`tests/test_saved_world_membership_backfill.py` migrates a schema to 0089, fills it through the
+real repository, ingest and privacy receipts, applies 0090 as a superuser and as a table owner
+without superuser or `BYPASSRLS`, and requires identical row counts, one pointer per attachment,
+and identical `GET /world-entries/{entry_id}` bodies before and after, for available references
+and for references whose authorization expired, whose review expired, and whose original
+photograph was deleted. A 0090 made to fail mid-transaction leaves FORCE row-level security as it
+found it. Browser component tests
+cover entry-scoped retry, same-scene metadata refresh, response ordering, and explicit refusal of
+ineligible selections. `web/packages/app/test/personal-intake.test.ts` also covers removal only
+after confirmation, Add back through a new review with no automatic return, refusal words with
+the code inside Details, exact retry of an unanswered change, adding one reviewed photograph
+directly, and review receipts in words; `world-entry-api.test.ts` covers the detach and rebind
+request bodies and the removed-reference parse.
 
 ## Starter placement boundary
 

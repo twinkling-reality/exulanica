@@ -448,6 +448,48 @@
   background: var(--raised);
 }
 #shell .attached-reference details { color: var(--ink-soft); font-size: 12px; }
+/* Reference lifecycle: remove, add back and add one photo (photo drawer). Begin. */
+#shell .photo-reference-status { color: var(--ink-soft); font-size: 12px; }
+#shell .photo-reference-hint { margin: 0; color: var(--ink-soft); font-size: 12px; line-height: 1.5; }
+#shell .photo-reference-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+#shell .photo-reference-actions button { margin: 0; min-height: 36px; }
+#shell .photo-reference-confirm {
+  display: grid;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  background: var(--raised);
+}
+#shell .photo-reference-confirm p { margin: 0; font-size: 13px; line-height: 1.5; }
+#shell .photo-reference-remove-confirm:not(:disabled),
+#shell .photo-reference-add:not(:disabled),
+#shell .photo-reference-add-back:not(:disabled) {
+  color: var(--raised);
+  background: var(--accent);
+  border-color: var(--accent);
+}
+#shell .photo-reference-notice:empty { display: none; }
+#shell .photo-reference-notice {
+  padding: 10px 12px;
+  background: var(--raised);
+  border: 1px solid var(--edge);
+  border-radius: 4px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+#shell .photo-reference-notice p { margin: 0; }
+#shell .photo-reference-notice details { margin-top: 6px; color: var(--ink-soft); font-size: 12px; }
+#shell :is(.photo-ready, .photo-previous) { display: grid; gap: 8px; }
+#shell :is(.photo-ready, .photo-previous)[hidden] { display: none; }
+#shell :is(.photo-ready, .photo-previous) h4 { margin: 0; font-size: 14px; font-weight: 600; }
+#shell .photo-previous-intro { margin: 0; color: var(--ink-soft); font-size: 12px; }
+#shell .previous-reference { background: var(--raised); }
+/* Reference lifecycle. End. */
+#shell .composition-preview-control { display: grid; gap: 8px; margin-top: 4px; }
+#shell .composition-preview-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+#shell .composition-preview-status { margin: 0; color: var(--ink-soft); font-size: 12px; line-height: 1.5; }
+#shell .composition-preview-status:not(:empty) { color: var(--ink); }
 @media (min-width: 960px) and (max-width: 1250px) {
   #shell .index-workspace[data-detail-open='true'] { grid-template-columns: minmax(0, 1fr); }
   #shell .index-workspace[data-detail-open='true'] .index-plan { display: none; }

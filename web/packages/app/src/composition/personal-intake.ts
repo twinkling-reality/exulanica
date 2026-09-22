@@ -11,10 +11,60 @@ import { buildPersonalIntake } from '../ui/personal-intake.js';
 import { buildPersonReview } from '../ui/person-review.js';
 import { PersonRegionDrafts, type ManualRegion } from '../ui/person-region-editor.js';
 import { el, replace } from '../ui/dom.js';
-import type {
-  SavedWorldEntry,
-  SourceAttachmentRequest,
+import {
+  WorldEntryClient,
+  type SavedWorldEntry,
+  type SavedWorldPreviousSourceAttachment,
+  type SavedWorldSourceAttachment,
+  type SourceAttachmentRequest,
+  type SourceDetachRequest,
+  type SourceRebindRequest,
 } from '../world-entry-api.js';
+
+type MembershipRequest = SourceDetachRequest | SourceRebindRequest;
+
+/**
+ * Plain words for each stable refusal code. The code itself is shown only inside Details, so a
+ * person reads what happened and a report can still name the exact refusal.
+ */
+const REFERENCE_REFUSALS: Readonly<Record<string, string>> = {
+  stale_saved_world_entry:
+    'This world changed somewhere else before your change was saved, so nothing changed. ' +
+    'The photos have been refreshed; try again.',
+  membership_event_operation_conflict:
+    'That change no longer matches what was first sent, so it was not repeated. Nothing changed.',
+  source_attachment_operation_conflict:
+    'That change no longer matches what was first sent, so it was not repeated. Nothing changed.',
+  membership_unavailable: 'That photo is not part of this world, so there was nothing to change.',
+  membership_current: 'That photo is already in this world.',
+  review_required:
+    'This photo needs a new review before it can be added back. Nothing was added. ' +
+    'Review it again in Add or review photos, then choose Add back.',
+  authority_unavailable:
+    'This photo cannot be added back yet: it has no current review, or its image cannot be ' +
+    'shown. Review it again, then choose Add back.',
+  entry_unavailable: 'This world cannot be opened right now, so photos cannot be added back to it.',
+  invalid_detach: 'That selection could not be used. Choose each photo once.',
+  invalid_rebind: 'That selection could not be used. Choose each photo once.',
+  rebind_required:
+    'This photo was removed from this world earlier. Use Add back under Previously in this world.',
+  invalid_source_attachment:
+    'That photo cannot be added: it is already in this world, or it has no current review.',
+  unknown_reference: 'This world is not available to this account.',
+};
+
+const REFERENCE_STATUS: Readonly<Record<string, string>> = {
+  source_unavailable: 'In this world, but the original photo was deleted',
+  authorization_expired: 'In this world, but the permission to use it has ended',
+  screening_expired: 'In this world, but its review has expired',
+  viewer_unavailable: 'In this world, but its image cannot be shown right now',
+};
+
+const RECEIPT_STATE: Readonly<Record<string, string>> = {
+  eligible: 'reviewed and ready to keep with a world',
+  'detection-only': 'checked for people; a human review is still needed',
+  'blocked-or-stale': 'not ready; its review is missing or out of date',
+};
 
 interface Journal {
   sources: PersonalSource[];
@@ -41,11 +91,15 @@ export function mountPersonalIntake(deps: {
   attachSources?: (request: SourceAttachmentRequest) => Promise<SavedWorldEntry>;
   refreshEntry?: (entryId: string) => Promise<SavedWorldEntry>;
   storage?: Storage;
+  /** Injectable for tests. Production builds a client from the same credentials. */
+  entryClient?: Pick<WorldEntryClient, 'detachSources' | 'rebindSources'>;
 }) {
   deps.session.dispose?.();
   const ui = buildPersonalIntake();
   const api = new PersonalAdmissionApi(deps.credentials);
   const reviewApi = new PersonReviewApi(deps.credentials);
+  const entryClient = deps.entryClient
+    ?? (deps.preview === true ? null : new WorldEntryClient(deps.credentials));
   let storage: Storage | null = deps.storage ?? null;
   try { storage ??= window.sessionStorage; } catch { /* Server review still loads in restricted browsers. */ }
   let journal: Journal = {
@@ -59,6 +113,11 @@ export function mountPersonalIntake(deps: {
     deps.getEntry === undefined ? entry : deps.getEntry();
   let pendingAttachment: SourceAttachmentRequest | null = null;
   let attachmentStorageKey = '';
+  let pendingMembership: MembershipRequest | null = null;
+  let membershipStorageKey = '';
+  let confirmingRemoval: string | null = null;
+  // Photos whose Add back sent the person to review. Finishing a review never adds one back.
+  const awaitingReview = new Set<string>();
   let media = deps.media;
   let ownMedia: Awaited<ReturnType<SourceMediaClient['load']>> | null = null;
   let disposed = false;
@@ -72,30 +131,60 @@ export function mountPersonalIntake(deps: {
   const localOriginals = new Map<string, string>();
   const inspected = new Set<string>();
   const say = (text: string) => { if (!disposed) ui.status.textContent = text; };
+  const notice = (message: string, code: string | null = null) => {
+    if (disposed) return;
+    const children: HTMLElement[] = message.length > 0 ? [el('p', { text: message })] : [];
+    if (code !== null) {
+      children.push(el('details', {}, [
+        el('summary', { text: 'Details' }),
+        el('p', { text: `Refusal code: ${code}` }),
+      ]));
+    }
+    replace(ui.referenceNotice, children);
+  };
+  const photoLabel = (captureId: string): string => {
+    const index = (current.reviewSources ?? []).findIndex((source) => source.captureId === captureId);
+    return index >= 0 ? `Photograph ${index + 1}` : 'A photograph no longer in the library';
+  };
+  const eligibleCaptures = (): Set<string> => new Set(receiptHistory.flatMap((result) =>
+    result.receipts
+      .filter((receipt) => receipt.eligibility_state === 'eligible')
+      .map((receipt) => receipt.capture_id)));
+  /** A recorded eligible review this removed membership did not pin. The server decides. */
+  const newReviewFor = (removed: SavedWorldPreviousSourceAttachment): boolean =>
+    receiptHistory.some((result) => result.receipts.some((receipt) =>
+      receipt.capture_id === removed.captureId && receipt.eligibility_state === 'eligible' &&
+      receipt.authorization_id !== removed.authorizationId &&
+      receipt.screening_id !== removed.screeningId));
 
   const attachmentSelection = (): {
     readonly selectedCount: number;
     readonly sources: SourceAttachmentRequest['sources'];
     readonly attachedCount: number;
     readonly refusedCount: number;
+    readonly removedCount: number;
   } => {
     const active = getEntry();
     if (active === null) {
-      return { selectedCount: 0, sources: [], attachedCount: 0, refusedCount: 0 };
+      return { selectedCount: 0, sources: [], attachedCount: 0, refusedCount: 0, removedCount: 0 };
     }
-    const eligible = new Set(receiptHistory.flatMap((result) => result.receipts
-      .filter((receipt) => receipt.eligibility_state === 'eligible')
-      .map((receipt) => receipt.capture_id)));
+    const eligible = eligibleCaptures();
     const attached = new Set(active.sourceAttachments.map((attachment) => attachment.captureId));
+    const removed = new Set((active.previousSourceAttachments ?? []).map((row) => row.captureId));
     const reviewSources = new Map((current.reviewSources ?? []).map((source) => [
       source.captureId, source,
     ]));
     const sources: SourceAttachmentRequest['sources'][number][] = [];
     let attachedCount = 0;
     let refusedCount = 0;
+    let removedCount = 0;
     for (const captureId of journal.memberIds) {
       if (attached.has(captureId)) {
         attachedCount += 1;
+        continue;
+      }
+      if (removed.has(captureId)) {
+        removedCount += 1;
         continue;
       }
       const source = reviewSources.get(captureId);
@@ -113,15 +202,127 @@ export function mountPersonalIntake(deps: {
       sources: Object.freeze(sources),
       attachedCount,
       refusedCount,
+      removedCount,
     });
   };
 
-  const unavailableAttachment = (reason: string | null): string => ({
-    source_unavailable: 'Source unavailable',
-    authorization_expired: 'Authorization expired',
-    screening_expired: 'Human review expired',
-    viewer_unavailable: 'Authorized viewer unavailable',
-  })[reason ?? ''] ?? 'Reference unavailable';
+  function referenceImage(evidenceSpanId: string, captureId: string): HTMLElement | null {
+    const descriptor = media?.get(evidenceSpanId) ?? media?.get(captureId);
+    return descriptor?.available === true && descriptor.url !== null
+      ? el('img', { src: descriptor.url, alt: descriptor.alt })
+      : null;
+  }
+  function lineage(captureId: string, sourceSha256: string): HTMLElement {
+    return el('details', {}, [
+      el('summary', { text: 'About this photo' }),
+      el('p', { text: `Capture ${captureId}; original SHA-256 ${sourceSha256}.` }),
+    ]);
+  }
+  function currentCard(attachment: SavedWorldSourceAttachment, index: number): HTMLElement {
+    const children: HTMLElement[] = [
+      el('strong', { text: `Reference photograph ${index + 1}` }),
+      el('span', {
+        class: 'photo-reference-status',
+        text: attachment.availability === 'available'
+          ? 'In this world'
+          : REFERENCE_STATUS[attachment.unavailableReason ?? ''] ??
+            'In this world, but it cannot be shown right now',
+      }),
+    ];
+    // The image is shown only when the pinned reference is available and the viewer loaded.
+    const image = attachment.availability === 'available'
+      ? referenceImage(attachment.evidenceSpanId, attachment.captureId) : null;
+    if (image !== null) children.push(image);
+    children.push(lineage(attachment.captureId, attachment.sourceSha256));
+    const locked = busy || deps.preview === true || entryClient === null ||
+      pendingMembership !== null;
+    if (confirmingRemoval === attachment.attachmentId) {
+      const remove = el('button', {
+        type: 'button', class: 'photo-reference-remove-confirm', text: 'Remove',
+      });
+      const keep = el('button', { type: 'button', text: 'Keep in this world' });
+      remove.disabled = locked;
+      remove.onclick = () => { void removeReference(attachment.attachmentId); };
+      keep.onclick = () => { confirmingRemoval = null; reflect(); };
+      children.push(el('div', {
+        class: 'photo-reference-confirm', role: 'group', 'aria-label': 'Confirm removal',
+      }, [
+        el('p', { text: 'Remove this photo from this world? The photo stays in your library. ' +
+          'This world stops using it, and adding it back later needs a new review.' }),
+        el('div', { class: 'photo-reference-actions' }, [remove, keep]),
+      ]));
+    } else {
+      const remove = el('button', {
+        type: 'button', class: 'photo-reference-remove', text: 'Remove from this world',
+      });
+      remove.disabled = locked;
+      remove.onclick = () => { confirmingRemoval = attachment.attachmentId; reflect(); };
+      children.push(el('div', { class: 'photo-reference-actions' }, [remove]));
+    }
+    return el('article', { class: 'attached-reference' }, children);
+  }
+  function previousCard(removed: SavedWorldPreviousSourceAttachment): HTMLElement {
+    const reviewed = newReviewFor(removed);
+    const children: HTMLElement[] = [
+      el('strong', { text: photoLabel(removed.captureId) }),
+      el('span', {
+        class: 'photo-reference-status',
+        text: removed.availability === 'available'
+          ? 'Removed from this world. The photo is still in your library.'
+          : 'Removed from this world. The original photo is no longer in your library, ' +
+            'so it cannot be added back.',
+      }),
+    ];
+    const image = removed.availability === 'available'
+      ? referenceImage(removed.evidenceSpanId, removed.captureId) : null;
+    if (image !== null) children.push(image);
+    if (removed.availability === 'available') {
+      children.push(el('p', {
+        class: 'photo-reference-hint',
+        text: reviewed
+          ? 'A new review is recorded. Choose Add back to use this photo in this world again.'
+          : awaitingReview.has(removed.captureId)
+            ? 'Waiting for a new review of this photo in Add or review photos.'
+            : 'Adding it back starts with a new review of the photo.',
+      }));
+      const addBack = el('button', {
+        type: 'button', class: 'photo-reference-add-back', text: 'Add back',
+      });
+      addBack.disabled = busy || deps.preview === true || entryClient === null ||
+        pendingMembership !== null;
+      addBack.onclick = () => { void addReferenceBack(removed); };
+      children.push(el('div', { class: 'photo-reference-actions' }, [addBack]));
+    }
+    children.push(lineage(removed.captureId, removed.sourceSha256));
+    return el('article', { class: 'attached-reference previous-reference' }, children);
+  }
+  function readyCard(source: { captureId: string; evidenceSpanId: string }): HTMLElement {
+    const add = el('button', {
+      type: 'button', class: 'photo-reference-add', text: 'Add to this world',
+    });
+    add.disabled = busy || deps.preview === true || deps.attachSources === undefined ||
+      pendingAttachment !== null;
+    add.onclick = () => { void attachOne(source); };
+    const children: HTMLElement[] = [
+      el('strong', { text: photoLabel(source.captureId) }),
+      el('span', { class: 'photo-reference-status', text: 'Reviewed and ready' }),
+    ];
+    const image = referenceImage(source.evidenceSpanId, source.captureId);
+    if (image !== null) children.push(image);
+    children.push(el('div', { class: 'photo-reference-actions' }, [add]));
+    return el('article', { class: 'attached-reference ready-reference' }, children);
+  }
+  function readySources(active: SavedWorldEntry): { captureId: string; evidenceSpanId: string }[] {
+    const used = new Set([
+      ...active.sourceAttachments.map((row) => row.captureId),
+      ...(active.previousSourceAttachments ?? []).map((row) => row.captureId),
+    ]);
+    const eligible = eligibleCaptures();
+    return (current.reviewSources ?? [])
+      .filter((source) => source.state === 'available' && eligible.has(source.captureId) &&
+        !used.has(source.captureId))
+      .map((source) => ({ captureId: source.captureId, evidenceSpanId: source.evidenceSpanId }));
+  }
 
   function renderAttachments(): void {
     if (entry === null) {
@@ -129,37 +330,23 @@ export function mountPersonalIntake(deps: {
       replace(ui.attachedReferences, [el('p', {
         text: 'Open a saved world to keep reviewed photographs with that project.',
       })]);
+      ui.ready.hidden = true;
+      ui.previous.hidden = true;
       return;
     }
     ui.referenceCount.textContent = `${entry.sourceAttachments.length} ` +
       `photo${entry.sourceAttachments.length === 1 ? '' : 's'}`;
-    if (entry.sourceAttachments.length === 0) {
-      replace(ui.attachedReferences, [el('p', { class: 'photo-collection-empty',
+    replace(ui.attachedReferences, entry.sourceAttachments.length === 0
+      ? [el('p', { class: 'photo-collection-empty',
         text: 'No reference photos yet. Add or review photos, then select eligible photos to keep with this world.',
-      })]);
-      return;
-    }
-    replace(ui.attachedReferences, entry.sourceAttachments.map((attachment, index) => {
-      const descriptor = media?.get(attachment.evidenceSpanId) ?? media?.get(attachment.captureId);
-      const canShow = attachment.availability === 'available' &&
-        descriptor?.available === true && descriptor.url !== null;
-      return el('article', { class: 'attached-reference' }, [
-        el('strong', { text: `Reference photograph ${index + 1}` }),
-        el('span', {
-          text: attachment.availability === 'available'
-            ? 'Attached reference'
-            : unavailableAttachment(attachment.unavailableReason),
-        }),
-        ...(canShow ? [el('img', { src: descriptor.url!, alt: descriptor.alt })] : []),
-        el('details', {}, [
-          el('summary', { text: 'Reference lineage' }),
-          el('p', {
-            text: `Capture ${attachment.captureId}; evidence ${attachment.evidenceSpanId}; ` +
-              `original SHA-256 ${attachment.sourceSha256}.`,
-          }),
-        ]),
-      ]);
-    }));
+      })]
+      : entry.sourceAttachments.map(currentCard));
+    const ready = readySources(entry);
+    ui.ready.hidden = ready.length === 0;
+    replace(ui.readyReferences, ready.map(readyCard));
+    const previous = entry.previousSourceAttachments ?? [];
+    ui.previous.hidden = previous.length === 0;
+    replace(ui.previousReferences, previous.map(previousCard));
   }
 
   function persist(): void {
@@ -179,11 +366,22 @@ export function mountPersonalIntake(deps: {
       say('Browser recovery storage is unavailable. Keep this page open for exact attachment retry.');
     }
   }
+  function persistMembership(): void {
+    if (membershipStorageKey.length === 0) return;
+    try {
+      if (!storage) throw new Error('Storage unavailable');
+      if (pendingMembership === null) storage.removeItem(membershipStorageKey);
+      else storage.setItem(membershipStorageKey, JSON.stringify(pendingMembership));
+    } catch {
+      say('Browser recovery storage is unavailable. Keep this page open to retry the photo change.');
+    }
+  }
   function reflect(): void {
     ui.controls.disabled = busy || deps.preview === true;
     ui.retry.hidden = journal.pending === null;
     const attachment = attachmentSelection();
     ui.retryAttachment.hidden = pendingAttachment === null;
+    ui.retryMembership.hidden = pendingMembership === null;
     ui.worldAction.textContent = entry === null ? 'Refresh world after processing'
       : attachment.sources.length > 0
         ? `Attach ${attachment.sources.length} selected ` +
@@ -215,6 +413,9 @@ export function mountPersonalIntake(deps: {
               ? `${attachment.refusedCount} ${attachment.refusedCount === 1 ? 'needs' : 'need'} ` +
                 'completed review or current viewer access'
               : '',
+            attachment.removedCount > 0
+              ? `${attachment.removedCount} removed from this world earlier; use Add back`
+              : '',
           ].filter(Boolean).join(' · ') + '.';
     replace(ui.inventory, journal.sources.map((source, index) => {
       const checkbox = el('input', { type: 'checkbox', 'aria-label': `Include photograph ${index + 1} in this admission` });
@@ -234,10 +435,24 @@ export function mountPersonalIntake(deps: {
           el('p', { text: `${source.bytes} bytes; SHA-256 ${source.sha256}; capture ${source.capture_id}` })]),
       ]);
     }));
-    replace(ui.receipts, receiptHistory.flatMap(result => [el('p', { text: `Saved admission ${result.batch_id}` }),
-      ...result.receipts.map(receipt => el('p', {
-      text: `Capture ${receipt.capture_id}: ${receipt.eligibility_state}. Authorization ${receipt.authorization_id}; screening ${receipt.screening_id}. Queued work is not completed depth.`,
-    }))]));
+    // The latest recorded state of each photograph, in words; receipt identities stay in Details.
+    const latest = new Map<string, string>();
+    for (const result of receiptHistory) {
+      for (const receipt of result.receipts) latest.set(receipt.capture_id, receipt.eligibility_state);
+    }
+    replace(ui.receipts, latest.size === 0 ? [] : [
+      el('p', { text: 'Recorded so far:' }),
+      ...[...latest].map(([captureId, state]) => el('p', {
+        text: `${photoLabel(captureId)}: ${RECEIPT_STATE[state] ?? 'not ready'}.`,
+      })),
+      el('details', {}, [
+        el('summary', { text: 'Receipt details' }),
+        ...receiptHistory.flatMap((result) => result.receipts.map((receipt) => el('p', {
+          text: `Batch ${result.batch_id}. Capture ${receipt.capture_id}: ${receipt.eligibility_state}. ` +
+            `Authorization ${receipt.authorization_id}; screening ${receipt.screening_id}.`,
+        }))),
+      ]),
+    ]);
     renderAttachments();
   }
   async function act(run: () => Promise<void>): Promise<void> {
@@ -271,7 +486,7 @@ export function mountPersonalIntake(deps: {
     const subject = ui.linkedSubject.value;
     const ids = [...new Set([...reviews.values()].flatMap(r => r.regions.flatMap(p => p.subjectId ? [p.subjectId] : [])))];
     replace(ui.linkedSubject, [el('option', { value: '', text: 'Use selected person, or create one if unlinked' }),
-      ...ids.map((id, i) => el('option', { value: id, text: `Person ${i + 1} (${id})` }))]);
+      ...ids.map((id, i) => el('option', { value: id, text: `Person ${i + 1}` }))]);
     ui.linkedSubject.value = ids.includes(subject) ? subject : '';
   }
   async function reload(): Promise<void> {
@@ -434,12 +649,33 @@ export function mountPersonalIntake(deps: {
     await reload();
   }
 
+  function attachmentRequest(
+    active: SavedWorldEntry,
+    sources: SourceAttachmentRequest['sources'],
+  ): SourceAttachmentRequest {
+    return Object.freeze({
+      entryId: active.entryId,
+      operationId: crypto.randomUUID(),
+      baseRevision: active.revision,
+      authoredVersionId: active.authoredVersionId,
+      authoredStateSha256: active.authoredStateSha256,
+      authoredEditSeq: active.authoredEditSeq,
+      styleVersionId: active.styleVersionId,
+      sources,
+    });
+  }
   function prepareAttachment(): SourceAttachmentRequest {
     const active = getEntry();
     if (active === null) throw new Error('Open a saved world before attaching references.');
     const selection = attachmentSelection();
     if (selection.selectedCount === 0) {
       throw new Error('Select reviewed photographs before attaching references.');
+    }
+    if (selection.removedCount > 0) {
+      throw new Error(
+        'A selected photo was removed from this world earlier. Use Add back under Previously ' +
+        'in this world; nothing was attached.',
+      );
     }
     if (selection.refusedCount > 0) {
       throw new Error(
@@ -451,16 +687,7 @@ export function mountPersonalIntake(deps: {
     if (selection.sources.length === 0) {
       throw new Error('The selected photos are already in this world. Choose another reviewed photo.');
     }
-    return Object.freeze({
-      entryId: active.entryId,
-      operationId: crypto.randomUUID(),
-      baseRevision: active.revision,
-      authoredVersionId: active.authoredVersionId,
-      authoredStateSha256: active.authoredStateSha256,
-      authoredEditSeq: active.authoredEditSeq,
-      styleVersionId: active.styleVersionId,
-      sources: selection.sources,
-    });
+    return attachmentRequest(active, selection.sources);
   }
 
   async function sendPendingAttachment(): Promise<void> {
@@ -504,7 +731,145 @@ export function mountPersonalIntake(deps: {
               'attaching again.',
         );
       }
+      if (apiError !== null && REFERENCE_REFUSALS[apiError.code] !== undefined) {
+        notice(REFERENCE_REFUSALS[apiError.code]!, apiError.code);
+        return;
+      }
       throw error;
+    }
+  }
+
+  /** One reviewed photo, added directly; the admission selection is not involved. */
+  async function attachOne(source: { captureId: string; evidenceSpanId: string }): Promise<void> {
+    await act(async () => {
+      const active = getEntry();
+      if (active === null) throw new Error('Open a saved world before adding photos to it.');
+      if (deps.attachSources === undefined) {
+        throw new Error('Reference attachment is unavailable for this saved world.');
+      }
+      notice('');
+      pendingAttachment = attachmentRequest(active, Object.freeze([Object.freeze({ ...source })]));
+      persistAttachment();
+      await sendPendingAttachment();
+    });
+  }
+
+  function openReviewFor(captureId: string): void {
+    awaitingReview.add(captureId);
+    // The existing human review, with only this photo selected. Recording that review adds
+    // nothing back; the person chooses Add back again afterwards.
+    if (journal.pending === null && journal.sources.some((row) => row.capture_id === captureId)) {
+      journal.memberIds = [captureId];
+      ui.attestation.checked = false;
+      persist();
+    }
+    ui.workflow.open = true;
+    if ([...ui.source.options].some((option) => option.value === captureId)) {
+      ui.source.value = captureId;
+      correction = undefined;
+      renderReview();
+    }
+  }
+
+  async function addReferenceBack(removed: SavedWorldPreviousSourceAttachment): Promise<void> {
+    if (!newReviewFor(removed)) {
+      openReviewFor(removed.captureId);
+      notice(
+        'This photo needs a new review before it can be added back. It is selected in Add or ' +
+        'review photos: inspect it, record your review, then choose Add back again. Nothing is ' +
+        'added back until you do.',
+      );
+      reflect();
+      return;
+    }
+    await act(async () => {
+      const active = getEntry();
+      if (active === null) throw new Error('Open a saved world before adding photos back.');
+      pendingMembership = Object.freeze({
+        kind: 'rebind' as const,
+        entryId: active.entryId,
+        operationId: crypto.randomUUID(),
+        baseRevision: active.revision,
+        authoredVersionId: active.authoredVersionId,
+        authoredStateSha256: active.authoredStateSha256,
+        authoredEditSeq: active.authoredEditSeq,
+        styleVersionId: active.styleVersionId,
+        sources: Object.freeze([Object.freeze({
+          captureId: removed.captureId, evidenceSpanId: removed.evidenceSpanId,
+        })]),
+      });
+      persistMembership();
+      await sendPendingMembership();
+    });
+  }
+
+  async function removeReference(attachmentId: string): Promise<void> {
+    await act(async () => {
+      const active = getEntry();
+      if (active === null) throw new Error('Open a saved world before removing photos from it.');
+      confirmingRemoval = null;
+      pendingMembership = Object.freeze({
+        kind: 'detach' as const,
+        entryId: active.entryId,
+        operationId: crypto.randomUUID(),
+        baseRevision: active.revision,
+        authoredVersionId: active.authoredVersionId,
+        authoredStateSha256: active.authoredStateSha256,
+        authoredEditSeq: active.authoredEditSeq,
+        styleVersionId: active.styleVersionId,
+        attachmentIds: Object.freeze([attachmentId]),
+      });
+      persistMembership();
+      await sendPendingMembership();
+    });
+  }
+
+  async function sendPendingMembership(): Promise<void> {
+    const request = pendingMembership;
+    if (request === null || entryClient === null) return;
+    const active = getEntry();
+    if (active === null || active.entryId !== request.entryId) {
+      throw new Error('This retained photo change belongs to a different saved world. Open that world to retry it.');
+    }
+    try {
+      let updated = request.kind === 'detach'
+        ? await entryClient.detachSources(request)
+        : await entryClient.rebindSources(request);
+      pendingMembership = null;
+      persistMembership();
+      if (deps.refreshEntry !== undefined) {
+        // Hands the new revision to the page that owns the open world, so its next edit uses it.
+        try { updated = await deps.refreshEntry(request.entryId); } catch { /* The reply above is current. */ }
+      }
+      entry = updated;
+      if (request.kind === 'rebind') {
+        for (const source of request.sources) awaitingReview.delete(source.captureId);
+      }
+      notice(request.kind === 'detach'
+        ? 'Removed from this world. The photo is still in your library.'
+        : 'Added back to this world with its new review.');
+    } catch (error) {
+      const apiError = error instanceof ApiError ? error : null;
+      if (apiError === null || apiError.status < 400 || apiError.status >= 500 ||
+          apiError.status === 408) {
+        notice(
+          'The change did not reach the server or was not answered. Retry sends exactly the ' +
+          'same request, and it takes effect at most once.',
+          apiError === null ? null : apiError.code,
+        );
+        return;
+      }
+      // Answered: the exact request cannot succeed by repeating it.
+      pendingMembership = null;
+      persistMembership();
+      if (apiError.code === 'stale_saved_world_entry' && deps.refreshEntry !== undefined) {
+        try { entry = await deps.refreshEntry(request.entryId); } catch { /* Reload can retry. */ }
+      }
+      if (request.kind === 'rebind' &&
+          (apiError.code === 'review_required' || apiError.code === 'authority_unavailable')) {
+        for (const source of request.sources) openReviewFor(source.captureId);
+      }
+      notice(REFERENCE_REFUSALS[apiError.code] ?? 'The change was not saved.', apiError.code);
     }
   }
   ui.originals.onchange = () => { void act(async () => {
@@ -567,6 +932,7 @@ export function mountPersonalIntake(deps: {
     await sendPendingAttachment();
   }); };
   ui.retryAttachment.onclick = () => { void act(sendPendingAttachment); };
+  ui.retryMembership.onclick = () => { void act(sendPendingMembership); };
   async function begin(): Promise<void> {
     if (deps.preview) {
       say('Photo upload and human review require an authenticated workspace. This preview shows the workflow; its controls do not upload or save.');
@@ -586,6 +952,12 @@ export function mountPersonalIntake(deps: {
             const retained = JSON.parse(savedAttachment) as SourceAttachmentRequest;
             if (retained.entryId === active.entryId) pendingAttachment = retained;
           }
+          membershipStorageKey = `${storageKey}:world-entry:${active.entryId}:source-membership`;
+          const savedMembership = storage?.getItem(membershipStorageKey);
+          if (savedMembership) {
+            const retained = JSON.parse(savedMembership) as MembershipRequest;
+            if (retained.entryId === active.entryId) pendingMembership = retained;
+          }
         }
       } catch { say('Local recovery metadata could not be read. Saved server regions remain available.'); }
       // Old local journals did not distinguish inventory and admission. Only a frozen pending
@@ -594,6 +966,9 @@ export function mountPersonalIntake(deps: {
       if (journal.pending) say('An interrupted admission is retained. Retry uses the exact original dated request.');
       if (pendingAttachment) {
         say('An interrupted reference attachment is retained. Retry uses its exact world cursor and source selection.');
+      }
+      if (pendingMembership) {
+        notice('An interrupted photo change is kept. Retry sends exactly the same request.');
       }
       if (journal.result) watch(journal.result.batch_id);
       else { const latest = (await listBatches(deps.credentials))[0]; if (latest && !disposed) watch(latest.batchId); }

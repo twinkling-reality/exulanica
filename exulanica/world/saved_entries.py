@@ -16,6 +16,20 @@ from exulanica.evidence.blob import BlobId
 from exulanica.store.base import ContentAddressedStore
 from exulanica.world.errors import InvalidStyleData, StaleStyleVersion, UnknownWorldResource
 from exulanica.world.repository import WorldStyleRepository
+from exulanica.world.source_membership_events import (
+    DetachEvent,
+    MembershipEventConflict,
+    MembershipEventRefused,
+    MembershipLedger,
+    OperationKind,
+    PinnedMembership,
+    RecordedOperation,
+    current_memberships,
+    detach_request_sha256,
+    rebind_request_sha256,
+    require_detachable,
+    require_rebindable,
+)
 from exulanica.world.style_structure import (
     AuthoredVersionRef,
     CompatibilityIntent,
@@ -28,9 +42,11 @@ __all__ = [
     "SavedWorldCandidate",
     "SavedWorldEntry",
     "SavedWorldEntryRepository",
+    "SavedWorldPreviousSourceAttachment",
     "SavedWorldSourceAttachment",
     "SourceAttachmentOperationConflict",
     "SourceAttachmentSelection",
+    "SourceRebindRequired",
     "StaleSavedWorldEntry",
 ]
 
@@ -43,6 +59,10 @@ class StaleSavedWorldEntry(Exception):
 
 class SourceAttachmentOperationConflict(Exception):
     """An attachment operation id was reused for a different exact request."""
+
+
+class SourceRebindRequired(Exception):
+    """Attach named a photograph this world used before; adding it back is a rebind."""
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,6 +88,31 @@ class SavedWorldSourceAttachment:
     unavailable_reason: str | None
     viewer_sha256: str | None
     evidence_path: str | None
+
+
+@dataclass(frozen=True, slots=True)
+class SavedWorldPreviousSourceAttachment:
+    """A photograph removed from this world: its last membership and the detach that ended it.
+
+    ``availability`` says whether the original photograph is still a live source in the
+    library, not whether the world may use it. Using it again is a rebind after a new review.
+    """
+
+    attachment_id: uuid.UUID
+    operation_id: uuid.UUID
+    capture_id: uuid.UUID
+    evidence_span_id: uuid.UUID
+    source_sha256: str
+    authorization_id: uuid.UUID
+    screening_id: uuid.UUID
+    attached_entry_revision: int
+    attached_at: dt.datetime
+    detach_operation_id: uuid.UUID
+    detached_entry_revision: int
+    detached_by: uuid.UUID
+    detached_at: dt.datetime
+    availability: Literal["available", "unavailable"]
+    unavailable_reason: Literal["source_unavailable"] | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -104,6 +149,7 @@ class SavedWorldEntry:
     availability: Literal["available", "unavailable"]
     unavailable_reason: str | None
     source_attachments: tuple[SavedWorldSourceAttachment, ...]
+    previous_source_attachments: tuple[SavedWorldPreviousSourceAttachment, ...]
     created_by: uuid.UUID
     created_at: dt.datetime
     updated_at: dt.datetime
@@ -331,8 +377,10 @@ class SavedWorldEntryRepository:
     ) -> SavedWorldEntry:
         """Append exact reviewed references while preserving the complete saved scene cursor.
 
-        A later authorization or screening receipt is not a rebind. A capture that already
-        has a membership row is refused, including after those pinned receipts expire.
+        A later authorization or screening receipt is not a rebind. A photograph this world
+        already uses is refused, including after its pinned receipts expire, and a photograph
+        removed from this world is refused with :class:`SourceRebindRequired`: adding it back is
+        a rebind after a new human review.
         """
 
         if not 1 <= len(sources) <= 200:
@@ -342,6 +390,8 @@ class SavedWorldEntryRepository:
             raise ValueError("each source photograph and evidence span must be unique")
         if len({source.capture_id for source in sources}) != len(sources):
             raise ValueError("a capture can be attached only once in one operation")
+        # Unchanged from migration 0086, so a retry of an attachment recorded before 0090 still
+        # matches its stored digest.
         request_sha256 = sha256_of_canonical(
             {
                 "entry_id": str(entry_id),
@@ -363,147 +413,588 @@ class SavedWorldEntryRepository:
         )
         with self.connection.transaction():
             self._lock_workspace()
-            row = self.connection.execute(
-                "select e.world_id,e.revision,e.authored_version_id,e.authored_state_sha256,"
-                "e.authored_edit_seq,e.style_version_id,"
-                "exists(select 1 from world_structure_invalidation i "
-                "join world_alternate_version v on v.workspace_id=e.workspace_id "
-                "and v.world_id=e.world_id and v.version_id=e.authored_version_id "
-                "where i.workspace_id=e.workspace_id and i.world_id=e.world_id "
-                "and i.snapshot_id=v.source_snapshot_id) as source_invalidated "
-                "from saved_world_entry e where e.workspace_id=%s and e.entry_id=%s for update",
-                (self.workspace_id, entry_id),
-            ).fetchone()
-            if row is None:
-                raise UnknownWorldResource("no such saved world entry")
-            prior = self.connection.execute(
-                "select entry_id,request_sha256 from saved_world_source_attachment_operation "
-                "where workspace_id=%s and operation_id=%s",
-                (self.workspace_id, operation_id),
-            ).fetchone()
-            if prior is not None:
-                if (
-                    prior["entry_id"] != entry_id
-                    or bytes(prior["request_sha256"]) != request_sha256
-                ):
-                    raise SourceAttachmentOperationConflict(
-                        "operation_id already names a different source attachment request"
-                    )
-                return self.entry(entry_id)
-            exact_cursor = (
-                row["revision"] == base_revision
-                and row["authored_version_id"] == authored_version_id
-                and row["authored_state_sha256"] == authored_state_sha256
-                and row["authored_edit_seq"] == authored_edit_seq
-                and row["style_version_id"] == style_version_id
-            )
-            if not exact_cursor:
-                raise StaleSavedWorldEntry(
-                    "the saved world resume point changed before its sources were attached"
-                )
-            if row["source_invalidated"]:
-                raise ValueError("sources cannot be attached to an unavailable saved world")
-            authored = self.connection.execute(
-                "select state_sha256,edit_seq,source_snapshot_id from world_alternate_version "
-                "where workspace_id=%s and world_id=%s and version_id=%s for update",
-                (self.workspace_id, row["world_id"], authored_version_id),
-            ).fetchone()
-            if authored is None:
-                raise UnknownWorldResource("no such authored world version")
-            if (
-                authored["state_sha256"] != authored_state_sha256
-                or authored["edit_seq"] != authored_edit_seq
+            self._lock_entry(entry_id)
+            if self._recorded_operation(
+                operation_id,
+                kind="attach",
+                entry_id=entry_id,
+                request_sha256=request_sha256,
+                conflict=SourceAttachmentOperationConflict(
+                    "operation_id already names a different source attachment request"
+                ),
             ):
-                raise StaleSavedWorldEntry(
-                    "the authored world changed before its sources were attached"
-                )
-            style = self.connection.execute(
-                "select 1 from world_style_version where workspace_id=%s and world_id=%s "
-                "and version_id=%s for update",
-                (self.workspace_id, row["world_id"], style_version_id),
-            ).fetchone()
-            if style is None:
-                raise UnknownWorldResource("no such world style version")
-            try:
-                raise_for_incompatible_structure_style(
-                    WorldStyleRepository(
-                        self.connection, self.workspace_id, world_id=row["world_id"]
-                    ).classify_structure_style_compatibility(
-                        intent=CompatibilityIntent.ATTACH,
-                        style=StyleVersionRef(style_version_id),
-                        authored=AuthoredVersionRef(authored_version_id),
-                        snapshot=StructuralSnapshotRef(authored["source_snapshot_id"]),
-                    )
-                )
-            except InvalidStyleData as exc:
-                raise ValueError(str(exc)) from exc
-            # Unique (workspace, entry, capture): a later receipt does not replace this row.
-            duplicate = self.connection.execute(
-                "select capture_id from saved_world_source_attachment "
-                "where workspace_id=%s and entry_id=%s and capture_id=any(%s)",
-                (self.workspace_id, entry_id, [source.capture_id for source in sources]),
-            ).fetchone()
-            if duplicate is not None:
+                return self.entry(entry_id)
+            self._require_attachable_cursor(
+                entry_id,
+                base_revision=base_revision,
+                authored_version_id=authored_version_id,
+                authored_state_sha256=authored_state_sha256,
+                authored_edit_seq=authored_edit_seq,
+                style_version_id=style_version_id,
+                action="attached",
+            )
+            membership = self._membership_state(entry_id, [source.capture_id for source in sources])
+            if any(state == "current" for state in membership.values()):
                 raise ValueError("a selected photograph is already attached to this saved world")
-
+            if membership:
+                raise SourceRebindRequired(
+                    "a selected photograph was removed from this saved world; "
+                    "add it back after a new review instead of attaching it again"
+                )
             resolved = [self._resolve_attachment(source, attached_by) for source in sources]
-            result_revision = base_revision + 1
-            self.connection.execute(
-                "insert into saved_world_source_attachment_operation "
-                "(workspace_id,operation_id,entry_id,request_sha256,base_entry_revision,"
-                "result_entry_revision,authored_version_id,authored_state_sha256,"
-                "authored_edit_seq,style_version_id,created_by) "
-                "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-                (
-                    self.workspace_id,
-                    operation_id,
-                    entry_id,
-                    request_sha256,
-                    base_revision,
-                    result_revision,
-                    authored_version_id,
-                    authored_state_sha256,
-                    authored_edit_seq,
-                    style_version_id,
-                    attached_by,
+            self._insert_attachment_operation(
+                entry_id,
+                operation_id=operation_id,
+                kind="attach",
+                request_sha256=request_sha256,
+                base_revision=base_revision,
+                authored_version_id=authored_version_id,
+                authored_state_sha256=authored_state_sha256,
+                authored_edit_seq=authored_edit_seq,
+                style_version_id=style_version_id,
+                actor=attached_by,
+                conflict=SourceAttachmentOperationConflict(
+                    "operation_id already names a different source attachment request"
                 ),
             )
             for source, authority in zip(sources, resolved, strict=True):
+                self._insert_attachment(
+                    entry_id,
+                    operation_id=operation_id,
+                    source=source,
+                    authority=authority,
+                    result_revision=base_revision + 1,
+                    actor=attached_by,
+                )
+            self._advance_revision(entry_id, base_revision, action="attached")
+        return self.entry(entry_id)
+
+    def detach_sources(
+        self,
+        entry_id: uuid.UUID,
+        *,
+        operation_id: uuid.UUID,
+        base_revision: int,
+        authored_version_id: uuid.UUID,
+        authored_state_sha256: str,
+        authored_edit_seq: int,
+        style_version_id: uuid.UUID,
+        attachment_ids: tuple[uuid.UUID, ...],
+        detached_by: uuid.UUID,
+    ) -> SavedWorldEntry:
+        """Remove references from this world's current collection. Deletes no row and no media.
+
+        The caller proves which resume point it saw: the entry revision and the saved cursor it
+        read. The live authored branch and the world's availability are not consulted. A detach
+        reads and writes no scene, style or snapshot, so it cannot adopt unseen state, and a
+        world whose branch drifted or whose source was deleted can still stop using a photograph.
+        Pinned receipts are not consulted either: removing an expired or deleted reference is
+        allowed, because detach only reduces use.
+        """
+
+        if not 1 <= len(attachment_ids) <= 200:
+            raise MembershipEventRefused(
+                "invalid_detach", "remove between 1 and 200 reference photographs"
+            )
+        request_sha256 = detach_request_sha256(
+            entry_id=entry_id,
+            operation_id=operation_id,
+            base_revision=base_revision,
+            authored_version_id=authored_version_id,
+            authored_state_sha256=authored_state_sha256,
+            authored_edit_seq=authored_edit_seq,
+            style_version_id=style_version_id,
+            attachment_ids=attachment_ids,
+            actor=detached_by,
+        )
+        with self.connection.transaction():
+            self._lock_workspace()
+            saved = self._lock_entry(entry_id)
+            if self._recorded_operation(
+                operation_id,
+                kind="detach",
+                entry_id=entry_id,
+                request_sha256=request_sha256,
+                conflict=MembershipEventConflict(
+                    "operation_id already names a different reference membership request"
+                ),
+            ):
+                return self.entry(entry_id)
+            if (
+                saved["revision"] != base_revision
+                or saved["authored_version_id"] != authored_version_id
+                or saved["authored_state_sha256"] != authored_state_sha256
+                or saved["authored_edit_seq"] != authored_edit_seq
+                or saved["style_version_id"] != style_version_id
+            ):
+                raise StaleSavedWorldEntry(
+                    "the saved world resume point changed before its sources were removed"
+                )
+            members = require_detachable(self.membership_ledger(entry_id), attachment_ids)
+            try:
                 self.connection.execute(
-                    "insert into saved_world_source_attachment "
-                    "(workspace_id,entry_id,operation_id,capture_id,evidence_span_id,"
-                    "source_sha256,authorization_id,screening_id,attached_entry_revision,"
-                    "attached_by) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                    "insert into saved_world_source_detach_operation "
+                    "(workspace_id,operation_id,entry_id,request_sha256,base_entry_revision,"
+                    "result_entry_revision,authored_version_id,authored_state_sha256,"
+                    "authored_edit_seq,style_version_id,created_by) "
+                    "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                    (
+                        self.workspace_id,
+                        operation_id,
+                        entry_id,
+                        request_sha256,
+                        base_revision,
+                        base_revision + 1,
+                        authored_version_id,
+                        authored_state_sha256,
+                        authored_edit_seq,
+                        style_version_id,
+                        detached_by,
+                    ),
+                )
+            except psycopg.errors.UniqueViolation as exc:
+                raise MembershipEventConflict(
+                    "operation_id already names a different reference membership request"
+                ) from exc
+            for member in members:
+                self.connection.execute(
+                    "insert into saved_world_source_detach "
+                    "(workspace_id,entry_id,operation_id,attachment_id,capture_id,"
+                    "detached_entry_revision,detached_by) values (%s,%s,%s,%s,%s,%s,%s)",
                     (
                         self.workspace_id,
                         entry_id,
                         operation_id,
-                        source.capture_id,
-                        source.evidence_span_id,
-                        authority["source_sha256"],
-                        authority["authorization_id"],
-                        authority["screening_id"],
-                        result_revision,
-                        attached_by,
+                        member.attachment_id,
+                        member.capture_id,
+                        base_revision + 1,
+                        detached_by,
                     ),
                 )
-            updated = self.connection.execute(
-                "update saved_world_entry set revision=revision+1,updated_at=now() "
-                "where workspace_id=%s and entry_id=%s and revision=%s returning entry_id",
-                (self.workspace_id, entry_id, base_revision),
-            ).fetchone()
-            if updated is None:
-                raise StaleSavedWorldEntry(
-                    "the saved world resume point changed before its sources were attached"
-                )
+            self._advance_revision(entry_id, base_revision, action="removed")
         return self.entry(entry_id)
+
+    def rebind_sources(
+        self,
+        entry_id: uuid.UUID,
+        *,
+        operation_id: uuid.UUID,
+        base_revision: int,
+        authored_version_id: uuid.UUID,
+        authored_state_sha256: str,
+        authored_edit_seq: int,
+        style_version_id: uuid.UUID,
+        sources: tuple[SourceAttachmentSelection, ...],
+        rebound_by: uuid.UUID,
+    ) -> SavedWorldEntry:
+        """Add removed photographs back to this world under a new human review.
+
+        Attach-shaped: the complete cursor and the live authored branch must match, the world
+        must be available, and each photograph's newest current review is resolved and pinned.
+        That review must be one no earlier membership of the photograph on this world pinned.
+        Historical rows keep their receipts; the new membership is a new row.
+        """
+
+        if not 1 <= len(sources) <= 200:
+            raise MembershipEventRefused(
+                "invalid_rebind", "add back between 1 and 200 reference photographs"
+            )
+        identities = [(source.capture_id, source.evidence_span_id) for source in sources]
+        if len({source.capture_id for source in sources}) != len(sources):
+            raise MembershipEventRefused(
+                "invalid_rebind", "each photograph can be added back once per request"
+            )
+        request_sha256 = rebind_request_sha256(
+            entry_id=entry_id,
+            operation_id=operation_id,
+            base_revision=base_revision,
+            authored_version_id=authored_version_id,
+            authored_state_sha256=authored_state_sha256,
+            authored_edit_seq=authored_edit_seq,
+            style_version_id=style_version_id,
+            sources=identities,
+            actor=rebound_by,
+        )
+        with self.connection.transaction():
+            self._lock_workspace()
+            self._lock_entry(entry_id)
+            if self._recorded_operation(
+                operation_id,
+                kind="rebind",
+                entry_id=entry_id,
+                request_sha256=request_sha256,
+                conflict=MembershipEventConflict(
+                    "operation_id already names a different reference membership request"
+                ),
+            ):
+                return self.entry(entry_id)
+            self._require_attachable_cursor(
+                entry_id,
+                base_revision=base_revision,
+                authored_version_id=authored_version_id,
+                authored_state_sha256=authored_state_sha256,
+                authored_edit_seq=authored_edit_seq,
+                style_version_id=style_version_id,
+                action="added back",
+            )
+            ledger = self.membership_ledger(entry_id)
+            known = {member.capture_id for member in ledger.memberships}
+            current = {member.capture_id for member in current_memberships(ledger)}
+            resolved = []
+            for source in sources:
+                # Membership before authority, so a photograph still in the world, or never in
+                # it, is not reported as needing review.
+                if source.capture_id not in known:
+                    raise MembershipEventRefused(
+                        "membership_unavailable",
+                        "this photograph was never part of this world; attach it instead",
+                    )
+                if source.capture_id in current:
+                    raise MembershipEventRefused(
+                        "membership_current", "this photograph is already part of this world"
+                    )
+                try:
+                    authority = self._resolve_attachment(source, rebound_by)
+                except ValueError as exc:
+                    raise MembershipEventRefused("authority_unavailable", str(exc)) from exc
+                require_rebindable(
+                    ledger,
+                    source.capture_id,
+                    authorization_id=authority["authorization_id"],
+                    screening_id=authority["screening_id"],
+                    authorized_at=authority["authorized_at"],
+                    screened_at=authority["screened_at"],
+                )
+                resolved.append(authority)
+            self._insert_attachment_operation(
+                entry_id,
+                operation_id=operation_id,
+                kind="rebind",
+                request_sha256=request_sha256,
+                base_revision=base_revision,
+                authored_version_id=authored_version_id,
+                authored_state_sha256=authored_state_sha256,
+                authored_edit_seq=authored_edit_seq,
+                style_version_id=style_version_id,
+                actor=rebound_by,
+                conflict=MembershipEventConflict(
+                    "operation_id already names a different reference membership request"
+                ),
+            )
+            for source, authority in zip(sources, resolved, strict=True):
+                self._insert_attachment(
+                    entry_id,
+                    operation_id=operation_id,
+                    source=source,
+                    authority=authority,
+                    result_revision=base_revision + 1,
+                    actor=rebound_by,
+                )
+            self._advance_revision(entry_id, base_revision, action="added back")
+        return self.entry(entry_id)
+
+    def membership_ledger(self, entry_id: uuid.UUID) -> MembershipLedger:
+        """This world's complete reference history: every membership, detach and operation."""
+
+        entry = self.connection.execute(
+            "select revision from saved_world_entry where workspace_id=%s and entry_id=%s",
+            (self.workspace_id, entry_id),
+        ).fetchone()
+        if entry is None:
+            raise UnknownWorldResource("no such saved world entry")
+        memberships = tuple(
+            PinnedMembership(
+                attachment_id=row["attachment_id"],
+                operation_id=row["operation_id"],
+                kind=row["kind"],
+                capture_id=row["capture_id"],
+                evidence_span_id=row["evidence_span_id"],
+                source_sha256=bytes(row["source_sha256"]).hex(),
+                authorization_id=row["authorization_id"],
+                screening_id=row["screening_id"],
+                attached_entry_revision=row["attached_entry_revision"],
+                attached_by=row["attached_by"],
+                attached_at=row["attached_at"],
+            )
+            for row in self.connection.execute(
+                "select a.attachment_id,a.operation_id,o.kind,a.capture_id,a.evidence_span_id,"
+                "a.source_sha256,a.authorization_id,a.screening_id,a.attached_entry_revision,"
+                "a.attached_by,a.attached_at from saved_world_source_attachment a "
+                "join saved_world_source_attachment_operation o "
+                "on o.workspace_id=a.workspace_id and o.operation_id=a.operation_id "
+                "where a.workspace_id=%s and a.entry_id=%s "
+                "order by a.attached_entry_revision,a.attachment_id",
+                (self.workspace_id, entry_id),
+            ).fetchall()
+        )
+        detach_events = tuple(
+            DetachEvent(
+                operation_id=row["operation_id"],
+                attachment_id=row["attachment_id"],
+                capture_id=row["capture_id"],
+                detached_entry_revision=row["detached_entry_revision"],
+                detached_by=row["detached_by"],
+                detached_at=row["detached_at"],
+            )
+            for row in self.connection.execute(
+                "select operation_id,attachment_id,capture_id,detached_entry_revision,"
+                "detached_by,detached_at from saved_world_source_detach "
+                "where workspace_id=%s and entry_id=%s "
+                "order by detached_entry_revision,detach_id",
+                (self.workspace_id, entry_id),
+            ).fetchall()
+        )
+        operations = tuple(
+            RecordedOperation(
+                operation_id=row["operation_id"],
+                kind=row["kind"],
+                request_sha256=bytes(row["request_sha256"]),
+                base_entry_revision=row["base_entry_revision"],
+                result_entry_revision=row["result_entry_revision"],
+            )
+            for row in self.connection.execute(
+                "select operation_id,kind,request_sha256,base_entry_revision,"
+                "result_entry_revision from saved_world_source_attachment_operation "
+                "where workspace_id=%s and entry_id=%s "
+                "union all select operation_id,'detach',request_sha256,base_entry_revision,"
+                "result_entry_revision from saved_world_source_detach_operation "
+                "where workspace_id=%s and entry_id=%s "
+                "order by result_entry_revision,operation_id",
+                (self.workspace_id, entry_id, self.workspace_id, entry_id),
+            ).fetchall()
+        )
+        return MembershipLedger(
+            entry_id=entry_id,
+            revision=entry["revision"],
+            memberships=memberships,
+            detach_events=detach_events,
+            operations=operations,
+        )
+
+    def _lock_entry(self, entry_id: uuid.UUID) -> dict[str, object]:
+        row = self.connection.execute(
+            "select world_id,revision,authored_version_id,authored_state_sha256,"
+            "authored_edit_seq,style_version_id from saved_world_entry "
+            "where workspace_id=%s and entry_id=%s for update",
+            (self.workspace_id, entry_id),
+        ).fetchone()
+        if row is None:
+            raise UnknownWorldResource("no such saved world entry")
+        return row
+
+    def _recorded_operation(
+        self,
+        operation_id: uuid.UUID,
+        *,
+        kind: OperationKind,
+        entry_id: uuid.UUID,
+        request_sha256: bytes,
+        conflict: Exception,
+    ) -> bool:
+        """Whether this exact request is already recorded; raise ``conflict`` for any other use.
+
+        Looked up before any cursor or authority check, so an exact retry returns the recorded
+        result after the world moved on, a newer review arrived, or the pinned review expired.
+        An identity names one request in one workspace whatever its kind or saved world.
+        """
+
+        row = self.connection.execute(
+            "select kind,entry_id,request_sha256 from saved_world_source_attachment_operation "
+            "where workspace_id=%s and operation_id=%s "
+            "union all select 'detach',entry_id,request_sha256 "
+            "from saved_world_source_detach_operation "
+            "where workspace_id=%s and operation_id=%s",
+            (self.workspace_id, operation_id, self.workspace_id, operation_id),
+        ).fetchone()
+        if row is None:
+            return False
+        if (
+            row["kind"] != kind
+            or row["entry_id"] != entry_id
+            or bytes(row["request_sha256"]) != request_sha256
+        ):
+            raise conflict
+        return True
+
+    def _require_attachable_cursor(
+        self,
+        entry_id: uuid.UUID,
+        *,
+        base_revision: int,
+        authored_version_id: uuid.UUID,
+        authored_state_sha256: str,
+        authored_edit_seq: int,
+        style_version_id: uuid.UUID,
+        action: str,
+    ) -> str:
+        """The exact saved cursor, the live authored branch and an available world; locks both."""
+
+        row = self.connection.execute(
+            "select e.world_id,e.revision,e.authored_version_id,e.authored_state_sha256,"
+            "e.authored_edit_seq,e.style_version_id,"
+            "exists(select 1 from world_structure_invalidation i "
+            "join world_alternate_version v on v.workspace_id=e.workspace_id "
+            "and v.world_id=e.world_id and v.version_id=e.authored_version_id "
+            "where i.workspace_id=e.workspace_id and i.world_id=e.world_id "
+            "and i.snapshot_id=v.source_snapshot_id) as source_invalidated "
+            "from saved_world_entry e where e.workspace_id=%s and e.entry_id=%s",
+            (self.workspace_id, entry_id),
+        ).fetchone()
+        if row is None:
+            raise UnknownWorldResource("no such saved world entry")
+        if not (
+            row["revision"] == base_revision
+            and row["authored_version_id"] == authored_version_id
+            and row["authored_state_sha256"] == authored_state_sha256
+            and row["authored_edit_seq"] == authored_edit_seq
+            and row["style_version_id"] == style_version_id
+        ):
+            raise StaleSavedWorldEntry(
+                f"the saved world resume point changed before its sources were {action}"
+            )
+        if row["source_invalidated"]:
+            if action == "attached":
+                raise ValueError("sources cannot be attached to an unavailable saved world")
+            raise MembershipEventRefused(
+                "entry_unavailable", f"sources cannot be {action} on an unavailable saved world"
+            )
+        authored = self.connection.execute(
+            "select state_sha256,edit_seq,source_snapshot_id from world_alternate_version "
+            "where workspace_id=%s and world_id=%s and version_id=%s for update",
+            (self.workspace_id, row["world_id"], authored_version_id),
+        ).fetchone()
+        if authored is None:
+            raise UnknownWorldResource("no such authored world version")
+        if (
+            authored["state_sha256"] != authored_state_sha256
+            or authored["edit_seq"] != authored_edit_seq
+        ):
+            raise StaleSavedWorldEntry(
+                f"the authored world changed before its sources were {action}"
+            )
+        style = self.connection.execute(
+            "select 1 from world_style_version where workspace_id=%s and world_id=%s "
+            "and version_id=%s for update",
+            (self.workspace_id, row["world_id"], style_version_id),
+        ).fetchone()
+        if style is None:
+            raise UnknownWorldResource("no such world style version")
+        try:
+            raise_for_incompatible_structure_style(
+                WorldStyleRepository(
+                    self.connection, self.workspace_id, world_id=row["world_id"]
+                ).classify_structure_style_compatibility(
+                    intent=CompatibilityIntent.ATTACH,
+                    style=StyleVersionRef(style_version_id),
+                    authored=AuthoredVersionRef(authored_version_id),
+                    snapshot=StructuralSnapshotRef(authored["source_snapshot_id"]),
+                )
+            )
+        except InvalidStyleData as exc:
+            raise ValueError(str(exc)) from exc
+        return str(row["world_id"])
+
+    def _membership_state(
+        self, entry_id: uuid.UUID, capture_ids: list[uuid.UUID]
+    ) -> dict[uuid.UUID, Literal["current", "removed"]]:
+        rows = self.connection.execute(
+            "select capture_id,attachment_id from saved_world_source_current_membership "
+            "where workspace_id=%s and entry_id=%s and capture_id=any(%s)",
+            (self.workspace_id, entry_id, capture_ids),
+        ).fetchall()
+        return {
+            row["capture_id"]: "current" if row["attachment_id"] is not None else "removed"
+            for row in rows
+        }
+
+    def _insert_attachment_operation(
+        self,
+        entry_id: uuid.UUID,
+        *,
+        operation_id: uuid.UUID,
+        kind: Literal["attach", "rebind"],
+        request_sha256: bytes,
+        base_revision: int,
+        authored_version_id: uuid.UUID,
+        authored_state_sha256: str,
+        authored_edit_seq: int,
+        style_version_id: uuid.UUID,
+        actor: uuid.UUID,
+        conflict: Exception,
+    ) -> None:
+        try:
+            self.connection.execute(
+                "insert into saved_world_source_attachment_operation "
+                "(workspace_id,operation_id,entry_id,kind,request_sha256,base_entry_revision,"
+                "result_entry_revision,authored_version_id,authored_state_sha256,"
+                "authored_edit_seq,style_version_id,created_by) "
+                "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                (
+                    self.workspace_id,
+                    operation_id,
+                    entry_id,
+                    kind,
+                    request_sha256,
+                    base_revision,
+                    base_revision + 1,
+                    authored_version_id,
+                    authored_state_sha256,
+                    authored_edit_seq,
+                    style_version_id,
+                    actor,
+                ),
+            )
+        except psycopg.errors.UniqueViolation as exc:
+            raise conflict from exc
+
+    def _insert_attachment(
+        self,
+        entry_id: uuid.UUID,
+        *,
+        operation_id: uuid.UUID,
+        source: SourceAttachmentSelection,
+        authority: dict[str, object],
+        result_revision: int,
+        actor: uuid.UUID,
+    ) -> None:
+        # The attachment identity is the table's uuidv7 default. The insert trigger moves the
+        # current-membership pointer; nothing here writes it.
+        self.connection.execute(
+            "insert into saved_world_source_attachment "
+            "(workspace_id,entry_id,operation_id,capture_id,evidence_span_id,"
+            "source_sha256,authorization_id,screening_id,attached_entry_revision,"
+            "attached_by) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+            (
+                self.workspace_id,
+                entry_id,
+                operation_id,
+                source.capture_id,
+                source.evidence_span_id,
+                authority["source_sha256"],
+                authority["authorization_id"],
+                authority["screening_id"],
+                result_revision,
+                actor,
+            ),
+        )
+
+    def _advance_revision(self, entry_id: uuid.UUID, base_revision: int, *, action: str) -> None:
+        updated = self.connection.execute(
+            "update saved_world_entry set revision=revision+1,updated_at=now() "
+            "where workspace_id=%s and entry_id=%s and revision=%s returning entry_id",
+            (self.workspace_id, entry_id, base_revision),
+        ).fetchone()
+        if updated is None:
+            raise StaleSavedWorldEntry(
+                f"the saved world resume point changed before its sources were {action}"
+            )
 
     def _resolve_attachment(
         self, source: SourceAttachmentSelection, attached_by: uuid.UUID
     ) -> dict[str, object]:
         row = self.connection.execute(
             "select c.blob_sha256 as source_sha256,a.authorization_id,p.screening_id,"
-            "statement_timestamp() as evaluated_at "
+            "a.authorized_at,p.screened_at,statement_timestamp() as evaluated_at "
             "from capture c join evidence_span s on s.workspace_id=c.workspace_id "
             "and s.span_id=%s and s.blob_sha256=c.blob_sha256 "
             "and s.modality='still_image' and s.track_key='img' "
@@ -867,6 +1358,7 @@ class SavedWorldEntryRepository:
                 else None
             ),
             source_attachments=self._attachments(row["entry_id"]),
+            previous_source_attachments=self._previous_attachments(row["entry_id"]),
             created_by=row["created_by"],
             created_at=row["created_at"],
             updated_at=row["updated_at"],
@@ -874,6 +1366,7 @@ class SavedWorldEntryRepository:
 
     def _attachments(self, entry_id: uuid.UUID) -> tuple[SavedWorldSourceAttachment, ...]:
         # Availability is the pinned authorization and screening, not the newest receipts.
+        # Current collection membership excludes captures vacated by later detach events.
         rows = self.connection.execute(
             "select a.*,c.blob_sha256 as current_source_sha256,c.deleted_at,"
             "auth.capture_id as authorized_capture_id,auth.source_sha256 as authorized_sha256,"
@@ -887,7 +1380,9 @@ class SavedWorldEntryRepository:
             "asset_capture_live(a.workspace_id,a.capture_id,statement_timestamp()) as source_live,"
             "not tombstone_blocks_span(a.workspace_id,s.blob_sha256,s.track_key,"
             "s.t_start_ns,s.t_end_ns) as span_live "
-            "from saved_world_source_attachment a "
+            "from saved_world_source_current_membership cur "
+            "join saved_world_source_attachment a on a.workspace_id=cur.workspace_id "
+            "and a.attachment_id=cur.attachment_id "
             "join capture c on c.workspace_id=a.workspace_id and c.capture_id=a.capture_id "
             "join evidence_span s on s.workspace_id=a.workspace_id "
             "and s.span_id=a.evidence_span_id "
@@ -895,7 +1390,7 @@ class SavedWorldEntryRepository:
             "and auth.authorization_id=a.authorization_id "
             "join reconstruction_privacy_screening p on p.workspace_id=a.workspace_id "
             "and p.screening_id=a.screening_id "
-            "where a.workspace_id=%s and a.entry_id=%s "
+            "where cur.workspace_id=%s and cur.entry_id=%s and cur.attachment_id is not null "
             "order by a.attached_at,a.attachment_id",
             (self.workspace_id, entry_id),
         ).fetchall()
@@ -965,3 +1460,53 @@ class SavedWorldEntryRepository:
                 )
             )
         return tuple(attachments)
+
+    def _previous_attachments(
+        self, entry_id: uuid.UUID
+    ) -> tuple[SavedWorldPreviousSourceAttachment, ...]:
+        # A removed photograph appears once, as its latest membership and the detach that ended
+        # it. It returns no viewer digest or evidence path: this world no longer uses it, and the
+        # library's own authorized viewer is what shows it.
+        rows = self.connection.execute(
+            "select a.attachment_id,a.operation_id,a.capture_id,a.evidence_span_id,"
+            "a.source_sha256,a.authorization_id,a.screening_id,a.attached_entry_revision,"
+            "a.attached_at,d.operation_id as detach_operation_id,d.detached_entry_revision,"
+            "d.detached_by,d.detached_at,"
+            "c.blob_sha256=a.source_sha256 "
+            "and asset_capture_live(a.workspace_id,a.capture_id,statement_timestamp()) "
+            "and not tombstone_blocks_span(a.workspace_id,s.blob_sha256,s.track_key,"
+            "s.t_start_ns,s.t_end_ns) as source_live "
+            "from saved_world_source_current_membership cur "
+            "join lateral (select * from saved_world_source_attachment h "
+            "where h.workspace_id=cur.workspace_id and h.entry_id=cur.entry_id "
+            "and h.capture_id=cur.capture_id "
+            "order by h.attached_entry_revision desc,h.attachment_id desc limit 1) a on true "
+            "join saved_world_source_detach d on d.workspace_id=a.workspace_id "
+            "and d.attachment_id=a.attachment_id "
+            "join capture c on c.workspace_id=a.workspace_id and c.capture_id=a.capture_id "
+            "join evidence_span s on s.workspace_id=a.workspace_id "
+            "and s.span_id=a.evidence_span_id "
+            "where cur.workspace_id=%s and cur.entry_id=%s and cur.attachment_id is null "
+            "order by d.detached_at desc,d.detach_id desc",
+            (self.workspace_id, entry_id),
+        ).fetchall()
+        return tuple(
+            SavedWorldPreviousSourceAttachment(
+                attachment_id=row["attachment_id"],
+                operation_id=row["operation_id"],
+                capture_id=row["capture_id"],
+                evidence_span_id=row["evidence_span_id"],
+                source_sha256=bytes(row["source_sha256"]).hex(),
+                authorization_id=row["authorization_id"],
+                screening_id=row["screening_id"],
+                attached_entry_revision=row["attached_entry_revision"],
+                attached_at=row["attached_at"],
+                detach_operation_id=row["detach_operation_id"],
+                detached_entry_revision=row["detached_entry_revision"],
+                detached_by=row["detached_by"],
+                detached_at=row["detached_at"],
+                availability="available" if row["source_live"] else "unavailable",
+                unavailable_reason=None if row["source_live"] else "source_unavailable",
+            )
+            for row in rows
+        )

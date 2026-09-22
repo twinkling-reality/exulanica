@@ -20,6 +20,11 @@ export interface SavedWorldEntry {
   readonly availability: 'available' | 'unavailable';
   readonly unavailableReason: 'source_deleted' | string | null;
   readonly sourceAttachments: readonly SavedWorldSourceAttachment[];
+  /**
+   * Photographs removed from this world, each once, with the detach that removed it. Parsed
+   * entries always carry the list; it is optional so entries built elsewhere need not name it.
+   */
+  readonly previousSourceAttachments?: readonly SavedWorldPreviousSourceAttachment[];
   readonly createdAt: string;
   readonly updatedAt: string;
 }
@@ -47,6 +52,54 @@ export interface SavedWorldSourceAttachment {
   /** Digest of the currently authorized viewer representation, never the original source digest. */
   readonly viewerSha256: string | null;
   readonly evidencePath: string | null;
+}
+
+/**
+ * A photograph this world used and no longer uses. Its rows and media remain; the world may use
+ * it again only through a rebind after a new human review. `availability` says whether the
+ * original photograph is still a live source in the library.
+ */
+export interface SavedWorldPreviousSourceAttachment {
+  readonly attachmentId: string;
+  readonly operationId: string;
+  readonly captureId: string;
+  readonly evidenceSpanId: string;
+  readonly sourceSha256: string;
+  readonly authorizationId: string;
+  readonly screeningId: string;
+  readonly attachedEntryRevision: number;
+  readonly attachedAt: string;
+  readonly detachOperationId: string;
+  readonly detachedEntryRevision: number;
+  readonly detachedAt: string;
+  readonly availability: 'available' | 'unavailable';
+  readonly unavailableReason: 'source_unavailable' | null;
+}
+
+/** The entry cursor a membership event was prepared against, retained for exact retry. */
+interface MembershipCursor {
+  readonly entryId: string;
+  readonly operationId: string;
+  readonly baseRevision: number;
+  readonly authoredVersionId: string;
+  readonly authoredStateSha256: string;
+  readonly authoredEditSeq: number;
+  readonly styleVersionId: string;
+}
+
+/** Remove references from this world. The photographs stay in the library. */
+export interface SourceDetachRequest extends MembershipCursor {
+  readonly kind: 'detach';
+  readonly attachmentIds: readonly string[];
+}
+
+/** Add removed photographs back; the server pins their new human review. */
+export interface SourceRebindRequest extends MembershipCursor {
+  readonly kind: 'rebind';
+  readonly sources: readonly {
+    readonly captureId: string;
+    readonly evidenceSpanId: string;
+  }[];
 }
 
 /** The complete entry cursor and selected references retained for exact retry. */
@@ -292,6 +345,46 @@ export class WorldEntryClient {
     ));
   }
 
+  /** Remove references from this world's current collection. No row or media is deleted. */
+  async detachSources(request: SourceDetachRequest): Promise<SavedWorldEntry> {
+    if (request.attachmentIds.length < 1 || request.attachmentIds.length > 200) {
+      throw new TypeError('Remove between 1 and 200 reference photographs.');
+    }
+    if (new Set(request.attachmentIds).size !== request.attachmentIds.length) {
+      throw new TypeError('Each reference photograph can be removed only once per request.');
+    }
+    return parseEntry(await this.#transport.postJson<unknown>(
+      `/world-entries/${encodeURIComponent(request.entryId)}/source-detachments`,
+      {
+        ...cursorBody(request),
+        selections: request.attachmentIds.map((attachmentId) => ({
+          attachment_id: attachmentId,
+        })),
+      },
+    ));
+  }
+
+  /** Add removed photographs back after a new human review. Never used without that review. */
+  async rebindSources(request: SourceRebindRequest): Promise<SavedWorldEntry> {
+    if (request.sources.length < 1 || request.sources.length > 200) {
+      throw new TypeError('Add back between 1 and 200 reference photographs.');
+    }
+    if (new Set(request.sources.map((source) => source.captureId)).size !==
+        request.sources.length) {
+      throw new TypeError('Each photograph can be added back only once per request.');
+    }
+    return parseEntry(await this.#transport.postJson<unknown>(
+      `/world-entries/${encodeURIComponent(request.entryId)}/source-rebinds`,
+      {
+        ...cursorBody(request),
+        sources: request.sources.map((source) => ({
+          capture_id: source.captureId,
+          evidence_span_id: source.evidenceSpanId,
+        })),
+      },
+    ));
+  }
+
   /** Adopt only the exact current branch state returned with this entry read. */
   adoptLatestAuthored(base: SavedWorldEntry): Promise<SavedWorldEntry> {
     return this.saveVersion(base, {
@@ -301,6 +394,17 @@ export class WorldEntryClient {
       styleVersionId: base.styleVersionId,
     });
   }
+}
+
+function cursorBody(request: MembershipCursor): Record<string, unknown> {
+  return {
+    operation_id: request.operationId,
+    base_revision: request.baseRevision,
+    authored_version_id: request.authoredVersionId,
+    authored_state_sha256: request.authoredStateSha256,
+    authored_edit_seq: request.authoredEditSeq,
+    style_version_id: request.styleVersionId,
+  };
 }
 
 function parseEntry(value: unknown): SavedWorldEntry {
@@ -317,6 +421,11 @@ function parseEntry(value: unknown): SavedWorldEntry {
   const sourceAttachments = row['source_attachments'];
   if (!Array.isArray(sourceAttachments)) {
     throw new TypeError('The server returned invalid saved world source attachments.');
+  }
+  // A server before removed references existed sends no list; it has removed nothing.
+  const previousAttachments = row['previous_source_attachments'] ?? [];
+  if (!Array.isArray(previousAttachments)) {
+    throw new TypeError('The server returned invalid removed saved world references.');
   }
   if (sourceKind === 'authored' && authoredScene === null) {
     throw new TypeError('An authored world entry did not include its pinned authored scene.');
@@ -346,6 +455,7 @@ function parseEntry(value: unknown): SavedWorldEntry {
     availability,
     unavailableReason: optionalText(row['unavailable_reason'], 'unavailable reason'),
     sourceAttachments: Object.freeze(sourceAttachments.map(parseSourceAttachment)),
+    previousSourceAttachments: Object.freeze(previousAttachments.map(parsePreviousAttachment)),
     createdAt: text(row['created_at'], 'created time'),
     updatedAt: text(row['updated_at'], 'updated time'),
   });
@@ -396,6 +506,34 @@ function parseSourceAttachment(value: unknown): SavedWorldSourceAttachment {
     unavailableReason: unavailableReason as SavedWorldSourceAttachment['unavailableReason'],
     viewerSha256,
     evidencePath,
+  });
+}
+
+function parsePreviousAttachment(value: unknown): SavedWorldPreviousSourceAttachment {
+  const row = record(value, 'removed saved world reference');
+  const availability = row['availability'];
+  const unavailableReason = row['unavailable_reason'];
+  if (
+    !(availability === 'available' && unavailableReason === null) &&
+    !(availability === 'unavailable' && unavailableReason === 'source_unavailable')
+  ) {
+    throw new TypeError('The server returned an invalid removed reference availability.');
+  }
+  return Object.freeze({
+    attachmentId: text(row['attachment_id'], 'removed reference attachment ID'),
+    operationId: text(row['operation_id'], 'removed reference operation ID'),
+    captureId: text(row['capture_id'], 'removed reference capture ID'),
+    evidenceSpanId: text(row['evidence_span_id'], 'removed reference evidence span ID'),
+    sourceSha256: sha256(row['source_sha256'], 'removed reference source digest'),
+    authorizationId: text(row['authorization_id'], 'removed reference authorization ID'),
+    screeningId: text(row['screening_id'], 'removed reference screening ID'),
+    attachedEntryRevision: integer(row['attached_entry_revision'], 'attached entry revision'),
+    attachedAt: text(row['attached_at'], 'attachment time'),
+    detachOperationId: text(row['detach_operation_id'], 'removal operation ID'),
+    detachedEntryRevision: integer(row['detached_entry_revision'], 'removal entry revision'),
+    detachedAt: text(row['detached_at'], 'removal time'),
+    availability,
+    unavailableReason,
   });
 }
 

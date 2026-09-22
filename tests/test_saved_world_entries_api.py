@@ -141,8 +141,14 @@ def _attachment_body(entry, source, operation_id=None):
 
 
 def _renew_reviewed_source(repository, objects_api, source, *, valid_for_seconds=3600):
+    """Authorize and review the same photograph again, recorded now.
+
+    Recorded now, not backdated, because that is what the browser sends: the intake stamps both
+    the authority and the review with the current instant. A rebind requires a review recorded
+    after the photograph was removed, so a backdated fixture would test a review no person could
+    have produced at that point in the story.
+    """
     now = repository.connection.execute("select clock_timestamp() as at").fetchone()["at"]
-    start = now - dt.timedelta(minutes=1)
     end = now + dt.timedelta(seconds=valid_for_seconds)
     authority = authorize_personal_capture(
         repository,
@@ -151,7 +157,7 @@ def _renew_reviewed_source(repository, objects_api, source, *, valid_for_seconds
         account_authority_basis="Synthetic test fixture owned by the test actor",
         authorization_scope={"purpose": "saved-world reference attachment renewal"},
         purpose="saved-world reference attachment renewal",
-        authorized_at=start,
+        authorized_at=now,
         valid_until=end,
     )
     screening = record_human_screening(
@@ -159,7 +165,7 @@ def _renew_reviewed_source(repository, objects_api, source, *, valid_for_seconds
         authorization_id=authority.authorization_id,
         reviewed_by=objects_api.actor,
         sensitive_regions=[],
-        screened_at=start + dt.timedelta(seconds=30),
+        screened_at=now,
         valid_until=end,
     )
     renewed = dict(source)

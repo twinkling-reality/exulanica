@@ -215,6 +215,17 @@ def test_the_consequential_surfaces_are_each_isolated():
     ):
         assert required(*key) == {Permission.ADMISSION_WRITE}, key
     assert required("POST", "/world-write/scenes/{scene_id}/generated") == {Permission.WORLD_WRITE}
+    assert required("POST", "/world-entries/{entry_id}/source-attachments") == {
+        Permission.WORLD_WRITE,
+        Permission.ADMISSION_READ,
+    }
+    assert required("POST", "/world-entries/{entry_id}/source-detachments") == {
+        Permission.WORLD_WRITE,
+    }
+    assert required("POST", "/world-entries/{entry_id}/source-rebinds") == {
+        Permission.WORLD_WRITE,
+        Permission.ADMISSION_READ,
+    }
     assert required("POST", "/operations/reconstruction-scenes/{job_id}/retry") == {
         Permission.OPERATIONS_WRITE
     }

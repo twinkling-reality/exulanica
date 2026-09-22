@@ -23,6 +23,34 @@ export function buildPersonalIntake() {
     type: 'button', class: 'photo-attachment-retry', text: 'Retry exact interrupted attachment',
   });
   retryAttachment.hidden = true;
+  const retryMembership = el('button', {
+    type: 'button', class: 'photo-membership-retry', text: 'Retry the interrupted photo change',
+  });
+  retryMembership.hidden = true;
+  // Outcomes of removing and adding back, in words; a stable code only inside Details.
+  const referenceNotice = el('div', {
+    class: 'photo-reference-notice', role: 'status', 'aria-live': 'polite',
+  });
+  const readyReferences = el('div', {
+    class: 'photo-reference-grid', 'aria-label': 'Reviewed photographs ready to add',
+  });
+  const ready = el('section', { class: 'photo-ready', 'aria-labelledby': 'photo-ready-title' }, [
+    el('h4', { id: 'photo-ready-title', text: 'Ready to add' }),
+    readyReferences,
+  ]);
+  ready.hidden = true;
+  const previousReferences = el('div', {
+    class: 'photo-reference-grid', 'aria-label': 'Photographs previously in this world',
+  });
+  const previous = el('section', {
+    class: 'photo-previous', 'aria-labelledby': 'photo-previous-title',
+  }, [
+    el('h4', { id: 'photo-previous-title', text: 'Previously in this world' }),
+    el('p', { class: 'photo-previous-intro', text:
+      'These photos stay in your library. Adding one back needs a new review first.' }),
+    previousReferences,
+  ]);
+  previous.hidden = true;
   const collection = el('section', { class: 'photo-collection', 'aria-labelledby': 'photo-collection-title' }, [
     el('header', { class: 'photo-collection-header' }, [
       el('div', {}, [
@@ -34,8 +62,11 @@ export function buildPersonalIntake() {
     el('p', { class: 'photo-collection-intro', text:
       'Keep reviewed photos with this project as references. Attaching a photo does not create scene geometry.' }),
     attachedReferences,
+    referenceNotice,
+    ready,
+    previous,
     attachmentStatus,
-    el('div', { class: 'photo-collection-actions' }, [worldAction, retryAttachment]),
+    el('div', { class: 'photo-collection-actions' }, [worldAction, retryAttachment, retryMembership]),
   ]);
   const workflow = el('details', { class: 'photo-review-workflow' });
   const entry = el('summary', { text: 'Add or review photos' });
@@ -115,11 +146,12 @@ export function buildPersonalIntake() {
   group.append(el('p', { text: 'The inventory in this attestation is the selected admission photographs. '
     + 'Inspect and review every selected original before checking it.' }));
   const attestation = field(HUMAN_ATTESTATION, 'checkbox');
-  const complete = button('Record human review and request eligible depth');
+  const complete = button('Record human review');
   workflow.append(controls);
   root.append(collection, status, workflow);
   return { root, controls, status, files, upload, inventory, members, purpose, authority, validUntil, detect,
     retry, retryReview, receipts, progress, reload, source, review, linkedSubject, selection, link,
     reviewChoice, reviewer, attestation, complete, attachedReferences, referenceCount,
-    attachmentStatus, worldAction, retryAttachment, originals, workflow };
+    attachmentStatus, worldAction, retryAttachment, originals, workflow, referenceNotice,
+    ready, readyReferences, previous, previousReferences, retryMembership };
 }
