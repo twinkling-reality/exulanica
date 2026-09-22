@@ -13,10 +13,8 @@
  * stable blocked codes); that client owns the transport and the version.
  */
 
-import { Transport, type TransportOptions } from '@exulanica/graph-client';
 import {
   assertTransform,
-  parseVersion,
   type AlternateVersion,
   type ObjectBehaviour,
   type ObjectRole,
@@ -24,10 +22,6 @@ import {
   type TransformInput,
   type WorldObjectsClient,
 } from './world-objects-api.js';
-import type {
-  SavedWorldEntry,
-  SavedWorldSourceAttachment,
-} from './world-entry-api.js';
 
 // -- the request ---------------------------------------------------------------------------------
 
@@ -357,97 +351,4 @@ export function applyComposition(
   request: CompositionApplyRequest,
 ): Promise<ObjectWriteResult> {
   return client.compositionApply(base, compositionRequestBody(request));
-}
-
-// -- addressed by explicit ids ---------------------------------------------------------------------
-
-/** A request for a caller that holds ids rather than a version it read. */
-export interface AddressedCompositionRequest extends CompositionRequest {
-  readonly worldId: string;
-  readonly baseStateSha256: string;
-}
-
-export interface AddressedCompositionApplyRequest extends AddressedCompositionRequest {
-  readonly placement: CompositionPlacement;
-  readonly savedEntry?: {
-    readonly entryId: string;
-    readonly baseRevision: number;
-    readonly authoredStateSha256: string;
-    readonly authoredEditSeq: number;
-  };
-}
-
-/** The same two routes, addressed by version id and world id. */
-export class CompositionPreviewClient {
-  readonly #transport: Transport;
-
-  constructor(options: TransportOptions) {
-    this.#transport = new Transport(options);
-  }
-
-  async preview(
-    versionId: string,
-    request: AddressedCompositionRequest,
-  ): Promise<CompositionPreview> {
-    return parseCompositionPreview(await this.#transport.postJson<unknown>(
-      compositionPath(versionId, 'preview', request.worldId),
-      { base_state_sha256: request.baseStateSha256, ...compositionRequestBody(request) },
-    ));
-  }
-
-  async apply(
-    versionId: string,
-    request: AddressedCompositionApplyRequest,
-  ): Promise<AlternateVersion> {
-    const body: Record<string, unknown> = {
-      base_state_sha256: request.baseStateSha256,
-      ...compositionRequestBody(request),
-    };
-    if (request.savedEntry !== undefined) {
-      body['saved_entry'] = {
-        entry_id: request.savedEntry.entryId,
-        base_revision: request.savedEntry.baseRevision,
-        authored_state_sha256: request.savedEntry.authoredStateSha256,
-        authored_edit_seq: request.savedEntry.authoredEditSeq,
-      };
-    }
-    return parseVersion(await this.#transport.postJson<unknown>(
-      compositionPath(versionId, 'apply', request.worldId),
-      body,
-    ));
-  }
-}
-
-export function compositionPath(
-  versionId: string,
-  route: 'preview' | 'apply',
-  worldId: string,
-): string {
-  return `/world/versions/${encodeURIComponent(versionId)}/compositions/${route}`
-    + `?world_id=${encodeURIComponent(worldId)}`;
-}
-
-/**
- * A preview request for one saved-world reference photograph.
- *
- * It names the entry and the attachment and nothing else. The server resolves the attachment and
- * answers blocked: a reference stays a reference and never becomes placed geometry.
- */
-export function sourceAttachmentCompositionRequest(
-  entry: SavedWorldEntry,
-  attachment: SavedWorldSourceAttachment,
-): { readonly versionId: string; readonly request: AddressedCompositionRequest } {
-  return Object.freeze({
-    versionId: entry.authoredVersionId,
-    request: Object.freeze({
-      worldId: entry.worldId,
-      baseStateSha256: entry.authoredStateSha256,
-      source: Object.freeze({
-        kind: 'source_attachment' as const,
-        entryId: entry.entryId,
-        attachmentId: attachment.attachmentId,
-      }),
-      placement: null,
-    }),
-  });
 }

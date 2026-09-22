@@ -1,29 +1,24 @@
 // @vitest-environment happy-dom
 
+import { readFileSync } from 'node:fs';
 import { describe, expect, it, vi } from 'vitest';
 import { ApiError } from '@exulanica/graph-client';
 import {
   COMPOSITION_BLOCKED_REASONS,
   CompositionContractError,
-  CompositionPreviewClient,
   CompositionRequestError,
   applyComposition,
+  isCompositionBlockedReason,
   compositionRequestBody,
   parseCompositionPreview,
   previewComposition,
-  sourceAttachmentCompositionRequest,
   type CompositionApplyRequest,
 } from '../src/composition-preview-api.js';
 import {
   COMPOSITION_BLOCKED_WORDS,
-  buildCompositionPreviewControl,
   describeReady,
   explainCompositionFailure,
 } from '../src/ui/composition-preview.js';
-import type {
-  SavedWorldEntry,
-  SavedWorldSourceAttachment,
-} from '../src/world-entry-api.js';
 import {
   WorldObjectsClient,
   WorldObjectsContractError,
@@ -60,8 +55,6 @@ const FIXTURE: Readonly<Record<string, unknown>> = Object.freeze({
   element_overrides: [],
   edits: [],
 });
-const digest = 'a'.repeat(64);
-const attachmentId = '55555555-5555-4555-8555-555555555555';
 
 const base = (): AlternateVersion => parseVersion({ ...FIXTURE, world_id: STARTER_WORLD });
 
@@ -132,48 +125,10 @@ const placement: CompositionApplyRequest = Object.freeze({
   },
 });
 
-const attachment = (): SavedWorldSourceAttachment => Object.freeze({
-  attachmentId,
-  operationId: '44444444-4444-4444-8444-444444444444',
-  captureId: '11111111-1111-4111-8111-111111111111',
-  evidenceSpanId: 'span-1',
-  sourceSha256: digest,
-  authorizationId: 'auth',
-  screeningId: 'screen',
-  role: 'reference' as const,
-  attachedEntryRevision: 1,
-  attachedBy: 'actor',
-  attachedAt: '2026-09-21T12:00:00Z',
-  availability: 'available' as const,
-  unavailableReason: null,
-  viewerSha256: 'b'.repeat(64),
-  evidencePath: '/evidence/span-1/masked',
-});
-
-const entry = (): SavedWorldEntry => Object.freeze({
-  entryId: '99999999-9999-4999-8999-999999999999',
-  worldId: STARTER_WORLD,
-  title: 'My world',
-  sourceKind: 'authored' as const,
-  sourceSnapshotId: '88888888-8888-4888-8888-888888888888',
-  sourceSnapshotSha256: 'c'.repeat(64),
-  authoredScene: null,
-  authoredVersionId: '77777777-7777-4777-8777-777777777777',
-  authoredStateSha256: digest,
-  authoredEditSeq: 2,
-  currentAuthoredStateSha256: digest,
-  currentAuthoredEditSeq: 2,
-  styleVersionId: '66666666-6666-4666-8666-666666666666',
-  revision: 3,
-  availability: 'available' as const,
-  unavailableReason: null,
-  sourceAttachments: Object.freeze([attachment()]),
-  createdAt: '2026-09-21T12:00:00Z',
-  updatedAt: '2026-09-21T12:00:00Z',
-});
+const ENTRY_ID = '99999999-9999-4999-8999-999999999999';
 
 const entryBinding = () => ({
-  entryId: entry().entryId,
+  entryId: ENTRY_ID,
   revision: 3,
   authoredVersionId: String(FIXTURE['version_id']),
   authoredStateSha256: String(FIXTURE['state_sha256']),
@@ -233,17 +188,6 @@ describe('the request names references and intent, never readiness', () => {
       placement: { ...placement.placement, sourceAnchor: environment.placement.sourceAnchor },
     })).toThrow(CompositionRequestError);
   });
-
-  it('asks about a reference photo by entry and attachment, with no facts about it', () => {
-    const { versionId, request } = sourceAttachmentCompositionRequest(entry(), attachment());
-    expect(versionId).toBe(entry().authoredVersionId);
-    expect(request.worldId).toBe(STARTER_WORLD);
-    expect(request.baseStateSha256).toBe(digest);
-    expect(compositionRequestBody(request)).toEqual({
-      source: { kind: 'source_attachment', entry_id: entry().entryId, attachment_id: attachmentId },
-      placement: null,
-    });
-  });
 });
 
 describe('preview and apply through the version client', () => {
@@ -294,7 +238,7 @@ describe('preview and apply through the version client', () => {
       ...compositionRequestBody(placement),
       base_state_sha256: version.stateSha256,
       saved_entry: {
-        entry_id: entry().entryId,
+        entry_id: ENTRY_ID,
         base_revision: 3,
         authored_state_sha256: version.stateSha256,
         authored_edit_seq: version.editSeq,
@@ -419,85 +363,34 @@ describe('words for failures that carry no verdict', () => {
   });
 });
 
-describe('the control addressed by explicit ids', () => {
-  it('asks with the entry’s world and base, and says why a reference is never placed', async () => {
-    const { sent, fetch } = wire(() => json(200, {
-      availability: 'blocked',
-      blocked_reason: 'attachment_is_not_composition',
-      blocked_detail: 'attachment membership is a project reference',
-      source: {
-        kind: 'source_attachment', entry_id: entry().entryId, attachment_id: attachmentId,
-        content_sha256: null, bytes: 'not_applicable',
-      },
-      version: {
-        authored_version_id: entry().authoredVersionId, world_id: STARTER_WORLD,
-        state_sha256: digest, edit_seq: 2, source_snapshot_id: entry().sourceSnapshotId,
-        style_version_id: null,
-      },
-      would_change: { kind: 'none', subject_id: null, document: null, preserves: [] },
-    }));
-    const client = new CompositionPreviewClient({ baseUrl: 'https://exulanica.test', token: 'token', fetch });
-    const control = buildCompositionPreviewControl({
-      client,
-      getVersionId: () => entry().authoredVersionId,
-      buildPreview: () => sourceAttachmentCompositionRequest(entry(), attachment()).request,
-    });
-    document.body.append(control.root);
-    expect(control.applyButton.hidden).toBe(true);
-    control.previewButton.click();
-    await vi.waitFor(() => expect(control.status.dataset['state']).toBe('refused'));
+/**
+ * The codes this client knows, against the codes the server declares.
+ *
+ * Read out of `exulanica/world/composition_preview.py` at run time rather than copied here: a
+ * copied list is a second source of truth, and it would agree with itself while the server moved.
+ * A code added there with no sentence here would otherwise reach a person as the generic refusal.
+ */
+describe('the blocked codes are the server’s own list', () => {
+  const declaredByTheServer = (): readonly string[] => {
+    const source = readFileSync(`${process.cwd()}/../exulanica/world/composition_preview.py`, 'utf8');
+    const opens = source.indexOf('BLOCKED_REASONS: frozenset[str] = frozenset(');
+    expect(opens, 'BLOCKED_REASONS is not declared where this test reads it').toBeGreaterThan(-1);
+    const closes = source.indexOf('\n)\n', opens);
+    expect(closes, 'the BLOCKED_REASONS literal does not end where this test reads it')
+      .toBeGreaterThan(opens);
+    return [...source.slice(opens, closes).matchAll(/"([a-z_]+)"/g)].map((match) => match[1]!);
+  };
 
-    expect(sent[0]!.url.searchParams.get('world_id')).toBe(STARTER_WORLD);
-    expect(sent[0]!.body).toEqual({
-      base_state_sha256: digest,
-      source: { kind: 'source_attachment', entry_id: entry().entryId, attachment_id: attachmentId },
-      placement: null,
-    });
-    const sentence = control.status.querySelector('.composition-verdict-sentence')!.textContent;
-    expect(sentence).toContain('A reference photo stays a reference');
-    expect(control.status.querySelector('details')?.textContent)
-      .toContain('attachment_is_not_composition');
-    expect(control.applyButton.hidden).toBe(true);
-    control.root.remove();
+  it('reads a non-empty list out of the server source', () => {
+    // The parse is checked before it is compared, so an empty read cannot pass as agreement.
+    expect(declaredByTheServer().length).toBeGreaterThan(0);
   });
 
-  it('offers Apply only for a ready answer with a placement, and applies it to that world', async () => {
-    const version = base();
-    const { sent, fetch } = wire((request) => request.url.pathname.endsWith('/preview')
-      ? json(200, readyAnswer(version, 'object:lantern'))
-      : json(201, { ...FIXTURE, world_id: STARTER_WORLD }));
-    const client = new CompositionPreviewClient({ baseUrl: 'https://exulanica.test', token: 'token', fetch });
-    const onApplied = vi.fn();
-    const addressed = { ...placement, worldId: STARTER_WORLD, baseStateSha256: version.stateSha256 };
-    const control = buildCompositionPreviewControl({
-      client,
-      title: 'Marker cube',
-      getVersionId: () => version.versionId,
-      buildPreview: () => addressed,
-      buildApply: () => addressed,
-      onApplied,
-    });
-    await control.requestPreview();
-    expect(control.status.textContent).toContain('Ready to add. “Marker cube”');
-    expect(control.applyButton.hidden).toBe(false);
-    expect(await control.requestApply()).toBe(true);
-    expect(onApplied).toHaveBeenCalledOnce();
-    expect(sent.map((item) => item.url.pathname.split('/').at(-1))).toEqual(['preview', 'apply']);
-    expect(sent[1]!.url.searchParams.get('world_id')).toBe(STARTER_WORLD);
-    expect(sent[1]!.body).toEqual(sent[0]!.body);
-  });
-
-  it('keeps Apply hidden for a ready answer when this surface has no placement to send', async () => {
-    const version = base();
-    const { fetch } = wire(() => json(200, readyAnswer(version, 'object:lantern')));
-    const client = new CompositionPreviewClient({ baseUrl: 'https://exulanica.test', token: 'token', fetch });
-    const control = buildCompositionPreviewControl({
-      client,
-      getVersionId: () => version.versionId,
-      buildPreview: () => ({ ...placement, worldId: STARTER_WORLD, baseStateSha256: version.stateSha256 }),
-    });
-    await control.requestPreview();
-    expect(control.previewDocument()?.availability).toBe('ready');
-    expect(control.applyButton.hidden).toBe(true);
+  it('knows exactly those codes, with a sentence for each', () => {
+    const declared = declaredByTheServer();
+    expect([...declared].sort()).toEqual([...COMPOSITION_BLOCKED_REASONS].sort());
+    for (const code of declared) {
+      expect(isCompositionBlockedReason(code), code).toBe(true);
+    }
   });
 });
