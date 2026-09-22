@@ -502,6 +502,67 @@ export interface AuthoredRegion {
   };
 }
 
+/*
+ * FOG IN THE SPACE THE SKY IS DRAWN IN.
+ *
+ * The engine's lit materials end by fogging, then tone mapping, then encoding: fog is mixed in
+ * linear light and the result goes through ACES with the scene's exposure. The origin sky and the
+ * camera's clear colour are written raw. So fully fogged ground reached the screen as the fog
+ * colour tone-mapped, which is greyer than the same colour written raw: 232 against a sky of 254
+ * in the default look, measured, and a hard horizon line wherever open ground runs to the sky.
+ * These replace the lit end chunk so a surface is tone-mapped and encoded first and then mixed
+ * toward the fog colour exactly as authored, which is how the sky arrives on the screen. The mix
+ * uses the engine's own fog factor, so start, end and blend-mode handling are unchanged.
+ */
+const DISPLAY_SPACE_FOG_END_GLSL = `
+    gl_FragColor.rgb = combineColor(litArgs_albedo, litArgs_sheen_specularity, litArgs_clearcoat_specularity);
+    gl_FragColor.rgb += litArgs_emission;
+    gl_FragColor.rgb = toneMap(gl_FragColor.rgb);
+    gl_FragColor.rgb = gammaCorrectOutput(gl_FragColor.rgb);
+    #if (FOG != NONE)
+        gl_FragColor.rgb = mix(gammaCorrectOutput(fog_color * dBlendModeFogFactor), gl_FragColor.rgb, getFogFactor());
+    #endif
+`;
+const DISPLAY_SPACE_FOG_END_WGSL = `
+    var finalRgb: vec3f = combineColor(litArgs_albedo, litArgs_sheen_specularity, litArgs_clearcoat_specularity);
+    finalRgb = finalRgb + litArgs_emission;
+    finalRgb = toneMap(finalRgb);
+    finalRgb = gammaCorrectOutput(finalRgb);
+    #if (FOG != NONE)
+        finalRgb = mix(gammaCorrectOutput(uniform.fog_color * dBlendModeFogFactor), finalRgb, getFogFactor());
+    #endif
+    output.color = vec4f(finalRgb, output.color.a);
+`;
+
+/**
+ * Make every lit material on this device fog in display space.
+ *
+ * THE ORDERING IS LOAD-BEARING, AT BOTH ENDS. Call it after `app.init` and before the first frame.
+ * `app.init` registers the engine's default chunks over whatever the map held, so an earlier call
+ * is silently undone (`display-space-fog.test.ts` shows it). And the map is read when a program is
+ * built, so a program already built keeps the chunk it was built with: measured, setting this map
+ * after the scene had drawn left the ground on the old order even with every material's variants
+ * cleared. Between the two, nothing has compiled and every program is built with it.
+ *
+ * Particles and Gaussian splats have end chunks of their own and still fog before tone mapping.
+ */
+export function installDisplaySpaceFog(device: pc.GraphicsDevice): void {
+  pc.ShaderChunks.get(device, pc.SHADERLANGUAGE_GLSL).set('endPS', DISPLAY_SPACE_FOG_END_GLSL);
+  pc.ShaderChunks.get(device, pc.SHADERLANGUAGE_WGSL).set('endPS', DISPLAY_SPACE_FOG_END_WGSL);
+}
+
+/**
+ * The colour the sky shows at eye level: the composed world's own sky when it is drawing one,
+ * otherwise the colour the camera clears to, which is then the whole sky.
+ */
+export function skyColourAtEyeLevel(
+  world: Pick<ComposedWorld, 'skyHorizonColour'>,
+  clear: pc.Color | undefined,
+): readonly [number, number, number] {
+  return world.skyHorizonColour()
+    ?? (clear === undefined ? [1, 1, 1] : [clear.r, clear.g, clear.b]);
+}
+
 /** Where an authored ground has a walking surface, in metres, for the navigation contract. */
 export function authoredGroundSurface(ground: AuthoredGround): NavigationSurface {
   const elevation = ground.elevationMm / 1000;
@@ -646,6 +707,8 @@ export class AtlasBinding {
   readonly ownedDistrict: OwnedDistrictRuntime | null;
   /** The mounted evaluation tile, if the preview route asked for one. */
   generatedTile: GeneratedTileAttachment | null = null;
+  /** Whether lit materials fog in display space, toward the sky's own colour. */
+  private displaySpaceFog = false;
   private representationController: RepresentationRuntime | null = null;
   get representation(): RepresentationRuntime {
     return this.representationController ??= new RepresentationRuntime();
@@ -926,6 +989,12 @@ export class AtlasBinding {
     // Error, which is why `scene-objects.ts` converts it before a status line sees it.
     appOptions.resourceHandlers = [pc.TextureHandler, pc.GSplatHandler, pc.ContainerHandler];
     app.init(appOptions);
+    // A generated tile draws its sky as a skybox, and the engine tone-maps skyboxes, so its sky and
+    // its fog already share one pipeline and meet without a line. Fog moves to display space only
+    // where the sky is written raw. Decided here, before any material exists, for the reason
+    // `installDisplaySpaceFog` gives.
+    const displaySpaceFog = options.generatedTile === undefined;
+    if (displaySpaceFog) installDisplaySpaceFog(device);
     app.setCanvasFillMode(pc.FILLMODE_NONE);
     app.setCanvasResolution(pc.RESOLUTION_AUTO);
     /*
@@ -960,11 +1029,9 @@ export class AtlasBinding {
       : new pc.Color(hazeR * 0.58, hazeG * 0.58, hazeB * 0.58);
     app.scene.exposure = cityActive ? 1.12 : 1.06;
     app.scene.fog.type = pc.FOG_LINEAR;
-    app.scene.fog.color.set(
-      cityActive ? 0.83 : hazeR,
-      cityActive ? 0.86 : hazeG,
-      cityActive ? 0.89 : hazeB,
-    );
+    // The clear colour for now: `syncFogToSky` aims the fog at the world's own sky once it exists.
+    const initialSky = camera.camera?.clearColor ?? new pc.Color(hazeR, hazeG, hazeB);
+    app.scene.fog.color.set(initialSky.r, initialSky.g, initialSky.b);
     app.scene.fog.start = cityActive ? 110 : 46;
     app.scene.fog.end = cityActive ? 820 : 220;
 
@@ -1345,6 +1412,10 @@ export class AtlasBinding {
       void binding.googleTiles.attach();
     }
     binding.initializeRepresentation(options.representationSubjects ?? []);
+    // After every render root is on or off, because whether the world's own sky is drawn depends
+    // on it: the city and the tile switch the composed world off and their sky is the clear colour.
+    binding.displaySpaceFog = displaySpaceFog;
+    if (displaySpaceFog) binding.syncFogToSky();
     return binding;
   }
 
@@ -1921,6 +1992,16 @@ export class AtlasBinding {
     );
   }
 
+  /**
+   * Aim the fog at the colour the sky shows at eye level: the composed world's own sky when it is
+   * drawing one, otherwise the colour the camera clears to. With fog mixed in display space, far
+   * ground then arrives on the screen as exactly the sky beside it.
+   */
+  private syncFogToSky(): void {
+    const [r, g, b] = skyColourAtEyeLevel(this.composedWorld, this.camera.camera?.clearColor);
+    this.app.scene.fog.color.set(r, g, b);
+  }
+
   private setProfileVisuals(profile: WorldArtProfile): void {
     this.invalidate();
     this.composedWorld.setProfile(profile);
@@ -1936,7 +2017,8 @@ export class AtlasBinding {
     }
     const [hazeR, hazeG, hazeB] = unitRgb(profile.palette.haze);
     this.app.scene.ambientLight.set(hazeR * 0.58, hazeG * 0.58, hazeB * 0.58);
-    this.app.scene.fog.color.set(hazeR, hazeG, hazeB);
+    if (this.displaySpaceFog) this.syncFogToSky();
+    else this.app.scene.fog.color.set(hazeR, hazeG, hazeB);
     const [sunR, sunG, sunB] = unitRgb(profile.palette.sun);
     const light = (this.app.root.findByName('atlas-directional-light') as pc.Entity | null)?.light;
     if (light !== undefined && light !== null) light.color.set(sunR, sunG, sunB);
@@ -2209,6 +2291,7 @@ export class AtlasBinding {
     if (this.camera.camera !== undefined && this.camera.camera !== null) {
       this.camera.camera.clearColor.copy(active ? this.mapClearColor : this.skyClearColor);
     }
+    if (this.displaySpaceFog) this.syncFogToSky();
     if (active) {
       this.cancelDirectNavigation();
       const s = this.controls.state;

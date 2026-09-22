@@ -202,11 +202,16 @@ reach. Both walking faces use the same lit material, receive object shadows and 
 elevation objects are placed on, so an object placed on either rests on the drawn ground and casts
 its shadow onto it. Both follow the saved appearance palette.
 `web/packages/atlas-react/test/authored-ground.test.ts` checks the material, shadow receiving,
-elevation and palette of each. One limitation is visible on an endless ground and on no bounded
-one: the fog the far ground fades into is tone-mapped and the sky's clear colour is not, so the
-far ground is drawn greyer than the sky beside it and the plane ends in a horizon line rather than
-dissolving into haze. Photo-derived scene-segment controls are absent from source-independent
-starters. In-world controls expose the World menu, object placement and photo review alongside
+elevation and palette of each. Far ground dissolves into the sky rather than ending at a line. The
+sky is written to the screen as authored, while lit surfaces are tone-mapped, so lit materials are
+fogged after tone mapping, toward the colour the sky itself shows at eye level: paper for the
+default look's diffuse-canvas sky, the camera's clear colour where no sky sphere is drawn, as in
+Survey relief and the city. Fully fogged ground therefore reaches the screen as exactly the sky
+beside it. The generated-tile preview keeps fog before tone mapping, because its skybox is
+tone-mapped as well. Particles and Gaussian splats still fog before tone mapping, so a splat's far
+fade is greyer than the sky around it. `web/packages/atlas-react/test/display-space-fog.test.ts`
+checks the installed fog order and the eye-level sky colour for each look. Photo-derived
+scene-segment controls are absent from source-independent starters. In-world controls expose the World menu, object placement and photo review alongside
 the editable title. When the starter's Companion has no substantive turn, it presents creation
 guidance and the ordinary question control rather than an acknowledgement of an unstated exchange.
 The arrival prompt provides a Start building button that opens this guidance without requiring

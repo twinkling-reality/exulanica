@@ -39,6 +39,13 @@ export interface ComposedWorld {
   setTheme(theme: PresentationTheme): void;
   setProfile(profile: WorldArtProfile): void;
   setMapActive(active: boolean): void;
+  /**
+   * The colour this world's own sky shows at eye level, as the sky writes it, or null when it is
+   * drawing no sky: a profile without one, the Map, or a render root that is off. Null means the
+   * camera's clear colour is the sky. Fog is aimed at this so far ground meets the sky it is seen
+   * against, and the rule lives here because the sky shader below is what it describes.
+   */
+  skyHorizonColour(): readonly [number, number, number] | null;
   destroy(): void;
 }
 
@@ -462,10 +469,12 @@ export function createComposedWorld(
   layers.set(ORIGIN_LANDSCAPE.profileId, buildLayer(ORIGIN_LANDSCAPE));
   layers.set(SURVEY_RELIEF.profileId, buildLayer(SURVEY_RELIEF));
   let activeProfileId = initialProfile.profileId;
+  let activeProfile = initialProfile;
   let mapActive = false;
 
   const setProfile = (profile: WorldArtProfile): void => {
     activeProfileId = layers.has(profile.profileId) ? profile.profileId : ORIGIN_LANDSCAPE.profileId;
+    activeProfile = profile;
     for (const [id, layer] of layers) {
       layer.root.enabled = id === activeProfileId;
       if (id === activeProfileId) layer.applyProfile(profile);
@@ -486,6 +495,17 @@ export function createComposedWorld(
       for (const layer of layers.values()) {
         for (const hidden of layer.mapHidden) hidden.enabled = !active;
       }
+    },
+    skyHorizonColour() {
+      const sky = layers.get(activeProfileId)?.mapHidden[0]?.findByName('origin-sky') ?? null;
+      // `enabled` is false when any ancestor is off, so a hidden layer, the Map and a disabled
+      // render root all read as "no sky drawn" without this file knowing why.
+      if (sky === null || !sky.enabled) return null;
+      // What SKY_FRAGMENT_GLSL writes at d.y = 0: a diffuse canvas meets the horizon at paper, a
+      // layered horizon at its haze shelf. Written raw, never tone-mapped.
+      return unitRgb(activeProfile.field.atmosphere === 'diffuse-canvas'
+        ? activeProfile.palette.paper
+        : activeProfile.palette.haze);
     },
     destroy() {
       for (const layer of layers.values()) {
