@@ -502,6 +502,20 @@ Four rules that make revocation actually work, rather than appear to:
    message that can be lost.
 4. **Revocation must survive a restore.** See 5.4.
 
+The same rule governs the account holder's own decisions about their own photographs, and the
+table above does not cover them because they are not a subject's consent. Two are recorded as
+their own objects. A **personal model right** (migration 0073) says which model may receive a
+photograph and where the bytes go; withdrawing it is synchronous and final, and every model read
+resolves it again at the instant of the read. A **depth estimate** made under such a right is
+stored, so a right that governed only the inference would have let a withdrawal stop the next one
+and leave a three-dimensional reading of the room servable. Migration 0092 binds each point map to
+the right that permitted it, inside the publication transaction, and `asset_point_allows` refuses a
+bound artifact whose right has ended: the geometry route, the graph, scene selection and world
+composition all ask that one predicate, so the estimate stops being readable everywhere at once.
+Destruction is the separate cascade this section describes, and it has not been written for point
+maps yet; what holds today is that nothing serves them. A map published before the binding existed
+is unaffected, because nothing here invents a right for a photograph processed before rights did.
+
 ---
 
 ## 5. Deletion

@@ -33,7 +33,13 @@ import {
   unposedArrangementSentence,
   type GeometryIssue,
   type GeometryIssueState,
+  type PlacedEstimateReference,
 } from '../geometry-api.js';
+import {
+  WorldObjectsClient,
+  drawablePointMaps,
+  type PointMapInstance,
+} from '../world-objects-api.js';
 import {
   InteractionPolicyClient,
   preferencesFromInteractionPolicy,
@@ -265,7 +271,12 @@ export async function mountSessionGeometry(deps: {
     });
     env.shell.setAttribute('aria-busy', 'true');
     env.shell.append(loading);
-    try { await loadGeometry(env, state, deps.credentials, deps.snapshot); }
+    try {
+      await loadGeometry(env, state, deps.credentials, deps.snapshot);
+      // After the region geometry and before the mount: what a person placed in their own world
+      // is read from that world's version, not from the workspace's list of every estimate.
+      await loadAuthoredPointMaps(state, deps.credentials);
+    }
     finally { loading.remove(); env.shell.removeAttribute('aria-busy'); }
   }
   return { dispose: () => undefined };
@@ -294,6 +305,80 @@ export async function mountSessionGeometry(deps: {
  * fixture is missing. What previously could still take the world down was a request that never
  * settled; every one of them now carries a deadline.
  */
+/**
+ * The depth estimates the account holder placed in the world they have open, ready to draw.
+ *
+ * Read from the authored version rather than from the ``/geometry`` list. The list is every
+ * estimate this workspace holds; what a world draws is what somebody PUT in it, which is the
+ * placement rows, and each of those pins the exact bytes it was made against.
+ *
+ * Returns an empty list rather than throwing on anything: a world whose estimates cannot be
+ * loaded is a world that opens without them, not a world that fails to open. Every reason lands
+ * in ``state.geometryIssues`` beside the rest.
+ */
+export async function loadAuthoredPointMaps(
+  state: SessionState,
+  where: { baseUrl: string; token: string },
+): Promise<void> {
+  const entry = state.activeWorldEntry;
+  if (entry?.authoredVersionId === undefined || entry.authoredVersionId === null) {
+    state.authoredPointMaps = undefined;
+    return;
+  }
+  try {
+    const version = await new WorldObjectsClient({
+      ...where, worldId: entry.worldId,
+    }).readVersion(entry.authoredVersionId);
+    const drawable = drawablePointMaps(version);
+    if (drawable.length === 0) {
+      state.authoredPointMaps = Object.freeze([]);
+      return;
+    }
+    const session = await new GeometryClient(where).loadPlacedEstimates(
+      drawable.map((instance) => placedEstimateReference(instance)),
+    );
+    state.authoredPointMaps = Object.freeze(
+      drawable.flatMap((instance) => {
+        const map = session.maps.get(instance.instanceId);
+        // Absent means the bytes failed their check or did not arrive. Nothing is drawn for it.
+        return map === undefined
+          ? []
+          : [{
+              instanceId: instance.instanceId,
+              map,
+              transform: {
+                xMm: instance.transform.xMm,
+                yMm: instance.transform.yMm,
+                zMm: instance.transform.zMm,
+                yawMicroradians: instance.transform.yawMicroradians,
+                scaleMilli: instance.transform.scaleMilli,
+              },
+            }];
+      }),
+    );
+    if (session.issues.length > 0) {
+      state.geometryIssues = Object.freeze([...state.geometryIssues ?? [], ...session.issues]);
+    }
+  } catch {
+    // A world opens without its estimates rather than not at all.
+    state.authoredPointMaps = Object.freeze([]);
+  }
+}
+
+/** What the client needs to fetch and check one placed estimate, read from the placement itself. */
+function placedEstimateReference(instance: PointMapInstance): PlacedEstimateReference {
+  const source = instance.source as Record<string, Record<string, unknown> | string>;
+  const artifact = (source['artifact'] ?? {}) as Record<string, unknown>;
+  return {
+    instanceId: instance.instanceId,
+    captureId: String(source['capture_id'] ?? ''),
+    artifactId: String(artifact['artifact_id'] ?? ''),
+    contentSha256: String(artifact['content_sha256'] ?? ''),
+    byteSize: Number(artifact['byte_size'] ?? 0),
+    container: String(artifact['container'] ?? ''),
+  };
+}
+
 export async function loadGeometry(
   env: AppEnvironment,
   state: SessionState,

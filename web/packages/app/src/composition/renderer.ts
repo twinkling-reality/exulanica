@@ -171,6 +171,11 @@ export async function mountRenderer(deps: RendererDependencies): Promise<Mounted
               ground: state.activeWorldEntry.authoredScene.region.ground,
               spawn: state.activeWorldEntry.authoredScene.region.spawn,
             },
+            // Only what the session resolved: available, verified against the digest the
+            // placement pins, and decoded. Anything else is absent and draws nothing.
+            ...(state.authoredPointMaps === undefined || state.authoredPointMaps.length === 0
+              ? {}
+              : { authoredPointMaps: state.authoredPointMaps }),
           }),
     }, env.browserMeasurement === null ? undefined : (binding) => {
       env.browserMeasurement!.observeBinding(binding, {

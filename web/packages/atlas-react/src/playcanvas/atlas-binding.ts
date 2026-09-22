@@ -125,12 +125,21 @@ import { createRegionRelief, type RegionRelief } from './region-relief.js';
 import type { PointMap } from './opm.js';
 import type { PointCloud } from './point-cloud.js';
 import {
-  RELIEF_PARALLAX_DEG,
   SINGLE_VIEW_EDGE_MARGIN,
   createPointCloud,
   singleViewDepths,
 } from './point-cloud.js';
 import { defaultSemanticsFor } from './semantics.js';
+// `reliefFor` moved to point-cloud.ts beside RELIEF_PARALLAX_DEG, the constant it reads, so the
+// authored point-map runtime can use it without importing this module back. Re-exported here
+// because this is where every existing caller imports it from.
+export { reliefFor } from './point-cloud.js';
+import { reliefFor } from './point-cloud.js';
+import {
+  createAuthoredPointMaps,
+  type AuthoredPointMapPlacement,
+  type AuthoredPointMaps,
+} from './authored-point-maps.js';
 import { sceneInspectionViews, calibratedCameraFrustum, type SceneInspectionView, type RecoveredSceneCamera } from './scene-inspection.js';
 import { PROOF_LENS_SPLAT_MODIFIER, createSceneSplatAsset, type TrainedSceneGeometry } from './scene-splats.js';
 import {
@@ -236,24 +245,6 @@ const SINGLE_VIEW_PRINT = new pc.Vec3();
  * `RELIEF_PARALLAX_DEG` and beyond that flattens just enough to hold it there. `parallaxPerUnit` is
  * (1/near - 1/far) in world units. Far away, or well to the side, the relief is a flat print.
  */
-export function reliefFor(
-  camera: Readonly<{ x: number; y: number; z: number }>,
-  print: Readonly<{ x: number; y: number; z: number }>,
-  viewer: Readonly<{ x: number; y: number; z: number }>,
-  parallaxPerUnit: number,
-): { readonly flatten: number; readonly behind: boolean } {
-  const ax = print.x - camera.x;
-  const ay = print.y - camera.y;
-  const az = print.z - camera.z;
-  // Behind the print is beyond its plane, whose normal is the camera's line of sight to it.
-  if (ax * (viewer.x - print.x) + ay * (viewer.y - print.y) + az * (viewer.z - print.z) > 0) {
-    return { flatten: 1, behind: true };
-  }
-  const parallax = Math.hypot(viewer.x - camera.x, viewer.y - camera.y, viewer.z - camera.z) * parallaxPerUnit;
-  const allowed = (RELIEF_PARALLAX_DEG * Math.PI) / 180;
-  return { flatten: parallax > allowed ? 1 - allowed / parallax : 0, behind: false };
-}
-
 /**
  * The deepest, up to `wanted`, a photograph's print can stand without its lower edge going under
  * the walking ground. MEASURED 2026-09-11 on the first personal place: a print at the median depth
@@ -398,6 +389,14 @@ export interface AtlasBindingOptions {
   readonly scene: AtlasScene;
   /** Source-independent authored ground. It is a region, never a capture-backed Atlas island. */
   readonly authoredRegion?: AuthoredRegion;
+  /**
+   * Depth estimates from the account holder's own photographs, placed by them in that region.
+   *
+   * Only the ones the server said are available; an instance in any other state is not passed
+   * here and nothing is drawn where it was. Requires ``authoredRegion``: the placements are in
+   * that region's frame, and there is no other root they could hang from.
+   */
+  readonly authoredPointMaps?: readonly AuthoredPointMapPlacement[];
   /** Legacy unposed point maps, one per island. Islands with no map render as anchors only. */
   readonly pointMaps: ReadonlyMap<IslandId, PointMap>;
   /** Every map in a posed reconstruction scene. Supersedes pointMaps when supplied. */
@@ -582,6 +581,13 @@ export class AtlasBinding {
    * renders as nothing at all. Rung 4 is a real rung with a movement model, not an absence.
    */
   readonly motes: AnchorMotes;
+  /**
+   * Placed depth estimates on the authored region, or null when the world has none to draw.
+   *
+   * Attached after construction rather than threaded through the constructor, as the generated
+   * tile is: it hangs off a root the factory built and needs nothing else the binding holds.
+   */
+  authoredPointMaps: AuthoredPointMaps | null = null;
   readonly table: AnchorTable;
   readonly emphasis: EmphasisBuffers;
   readonly islands: readonly IslandVisual[];
@@ -1152,11 +1158,24 @@ export class AtlasBinding {
     const trainedScenes: Array<AtlasBinding['trainedScenes'][number]> = [];
 
     const objectRoots = new Map<IslandId, pc.Entity>();
+    let authoredPointMaps: AuthoredPointMaps | null = null;
     if (options.authoredRegion !== undefined) {
       const root = new pc.Entity(`authored-region:${options.authoredRegion.regionId}`);
       root.setLocalPosition(0, options.authoredRegion.ground.elevationMm / 1000, 0);
       renderRoot.addChild(root);
       objectRoots.set(options.authoredRegion.regionId, root);
+      if (options.authoredPointMaps !== undefined && options.authoredPointMaps.length > 0) {
+        // Built after the root is in the graph, because each print's world-space camera is read
+        // once here rather than recomputed every frame.
+        authoredPointMaps = createAuthoredPointMaps({
+          device,
+          root,
+          placements: options.authoredPointMaps,
+          ...(options.sizeGain === undefined ? {} : { sizeGain: options.sizeGain }),
+          ...(options.maxSizePx === undefined ? {} : { maxSizePx: options.maxSizePx }),
+          theme,
+        });
+      }
     }
     for (const island of options.scene.islands) {
       const islandEntity = new pc.Entity(`island:${island.islandId}`);
@@ -1304,6 +1323,7 @@ export class AtlasBinding {
       objectRoots,
       ownedDistrict,
     );
+    binding.authoredPointMaps = authoredPointMaps;
     if (options.ownedDistrict !== undefined) binding.renderRoot.enabled = false;
     if (options.generatedTile !== undefined) {
       binding.renderRoot.enabled = false;
@@ -2678,6 +2698,10 @@ export class AtlasBinding {
         visual.cloud.setRelief(relief.flatten, relief.behind);
       }
     }
+    // The placed estimates flatten against the same camera, on the same frame, through the same
+    // relief rule the scene path uses. Nothing else about them moves: they are drawn and that is
+    // all, so there is no residency, no emphasis and no lens to deliver.
+    this.authoredPointMaps?.frame(this.camera.getPosition());
     this.objects.update(dt);
     this.settleProofLens();
 
@@ -2779,6 +2803,8 @@ export class AtlasBinding {
     // Authored objects own borrowed representation handles. Release them while the registry is
     // live so points, cloned materials and selection are restored through the ordinary path.
     this.objects.destroy();
+    this.authoredPointMaps?.destroy();
+    this.authoredPointMaps = null;
     this.representationSelectionObservers.clear();
     this.representation.destroy();
     this.nativeCharacters?.destroy();

@@ -140,8 +140,17 @@ def build_society_input(
         raise ValueError("district base artifact digest mismatch")
     if input_sha256(interpretation) != interpretation["document_sha256"]:
         raise ValueError("district interpretation digest mismatch")
+    # Placed depth estimates take part in the digest and in nothing else here: they carry no
+    # navigation and no collision, so a district interpretation is the same with or without them.
+    # Leaving them out of the digest would make every world that holds one refuse with a message
+    # about a mismatch, which would be true and would name the wrong cause.
     if (
-        delta_sha256(version.objects, version.element_overrides, version.environment_instances)
+        delta_sha256(
+            version.objects,
+            version.element_overrides,
+            version.environment_instances,
+            version.point_map_instances,
+        )
         != version.state_sha256
     ):
         raise ValueError("authored delta digest mismatch")

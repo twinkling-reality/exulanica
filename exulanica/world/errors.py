@@ -19,12 +19,20 @@ __all__ = [
     "InvalidInteractionPreviewState",
     "InvalidObjectData",
     "InvalidObjectState",
+    "InvalidPointMapPlacement",
     "InvalidPreviewState",
     "InvalidStructuralData",
     "InvalidStructuralPreviewState",
     "InvalidStyleData",
     "InvalidatedSourceVersion",
+    "PointMapNotPermitted",
+    "PointMapNotProduced",
+    "PointMapNotReadable",
+    "PointMapReviewDiffers",
+    "PointMapTooSparse",
     "ProtectedTopologyConflict",
+    "SourceAuthorityExpired",
+    "SourceNotCurrentMembership",
     "StaleInteractionPolicy",
     "StaleObjectBase",
     "StaleStructuralBase",
@@ -126,3 +134,49 @@ class EnvironmentSourceWithdrawn(WorldStyleError):
 
 class EnvironmentBindingDrift(WorldStyleError):
     """A feature placement no longer names the current exact publication."""
+
+
+class SourceNotCurrentMembership(WorldStyleError):
+    """The photograph is not currently a reference of this saved world.
+
+    Distinct from an attachment nobody ever made: the recovery is to add it back, which needs a
+    new review, and a message that said "no such attachment" would send the person looking for a
+    typing mistake instead.
+    """
+
+
+class SourceAuthorityExpired(WorldStyleError):
+    """The personal authority or the human review this reference pins has run out.
+
+    Separate from a photograph that was never eligible: nothing is wrong with the photograph and
+    the recovery is to review it again, which is a sentence a person can act on.
+    """
+
+
+class PointMapNotPermitted(WorldStyleError):
+    """No current depth right lets this photograph's estimate be used."""
+
+
+class PointMapNotProduced(WorldStyleError):
+    """No depth estimate exists for the exact bytes and screening this reference pins."""
+
+
+class PointMapReviewDiffers(WorldStyleError):
+    """An estimate exists and was made under a different human review than this reference pins.
+
+    Separate from :class:`PointMapNotProduced` because the recoveries differ and the cause is not
+    the person's mistake: the worker builds from the newest eligible screening, so a photograph
+    reviewed twice can have an estimate the current reference does not name.
+    """
+
+
+class PointMapTooSparse(WorldStyleError):
+    """The estimate recovered too little of its frame to be worth standing in front of."""
+
+
+class PointMapNotReadable(WorldStyleError):
+    """The estimate's bytes are absent, or what stands behind them no longer allows a read."""
+
+
+class InvalidPointMapPlacement(WorldStyleError):
+    """The region, transform, origin role or instance id is not acceptable."""

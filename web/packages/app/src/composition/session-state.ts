@@ -20,6 +20,7 @@ import type { CharacterLook, CharacterSelection } from '../character-catalog.js'
 import type { IslandId, SceneDisplayFrame } from '@exulanica/atlas-core';
 import type { GraphSnapshot } from '@exulanica/graph-client';
 import type {
+  AuthoredPointMapPlacement,
   PlacedScenePointMap,
   PointMap,
   RecoveredSceneCamera,
@@ -108,6 +109,14 @@ export interface SessionState {
   pointMaps: ReadonlyMap<IslandId, PointMap> | undefined;
   /** All maps with their shared-scene transforms. Undefined for the legacy preview path. */
   placedPointMaps: readonly PlacedScenePointMap[] | undefined;
+  /**
+   * Depth estimates the account holder placed in their own authored world, ready to draw.
+   *
+   * Only the ones the server said are available and whose bytes verified against the digest the
+   * placement pins. Undefined before a world is read; empty when there are none. An instance in
+   * any other state is absent here and nothing is drawn where it was.
+   */
+  authoredPointMaps: readonly AuthoredPointMapPlacement[] | undefined;
   trainedGeometry: readonly TrainedSceneGeometry[];
   recoveredCameras: readonly RecoveredSceneCamera[];
   notDrawnScenes: ReadonlySet<string>;
@@ -223,6 +232,7 @@ export function createSessionState(): SessionState {
 
     pointMaps: undefined,
     placedPointMaps: undefined,
+    authoredPointMaps: undefined,
     trainedGeometry: Object.freeze([]),
     recoveredCameras: Object.freeze([]),
     notDrawnScenes: new Set(),

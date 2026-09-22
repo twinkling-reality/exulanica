@@ -1223,6 +1223,19 @@ def _extension_version_sets(
             (workspace_id, world_id),
         ).fetchall()
     }
+    point_map_bearing = {
+        row["version_id"]
+        for row in cursor.execute(
+            "select version_id from world_alternate_point_map_instance "
+            "where workspace_id=%s and world_id=%s and not addition_undone "
+            "union "
+            "select version_id from world_alternate_version_edit "
+            "where workspace_id=%s and world_id=%s "
+            "and (kind in ('add_point_map','move_point_map','remove_point_map') "
+            "or point_map_instance_id is not null)",
+            (workspace_id, world_id, workspace_id, world_id),
+        ).fetchall()
+    }
     env_bearing = {
         row["version_id"]
         for row in cursor.execute(
@@ -1248,6 +1261,7 @@ def _extension_version_sets(
                 parent_version_id=row["parent_version_id"],
                 environment_bearing=row["version_id"] in env_bearing,
                 source_invalidated=row["source_snapshot_id"] in invalidated,
+                point_map_bearing=row["version_id"] in point_map_bearing,
             )
             for row in rows
         )

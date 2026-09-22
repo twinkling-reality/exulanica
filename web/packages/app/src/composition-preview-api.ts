@@ -25,7 +25,11 @@ import {
 
 // -- the request ---------------------------------------------------------------------------------
 
-export type CompositionSourceKind = 'reviewed_asset' | 'environment_admission' | 'source_attachment';
+export type CompositionSourceKind =
+  | 'reviewed_asset'
+  | 'environment_admission'
+  | 'source_attachment'
+  | 'photo_point_map';
 
 export type EnvironmentSelectionInput =
   | { readonly kind: 'whole_asset' }
@@ -48,7 +52,15 @@ export type CompositionSource =
     readonly publicationId: string | null;
     readonly selection: EnvironmentSelectionInput;
   }
-  | { readonly kind: 'source_attachment'; readonly entryId: string; readonly attachmentId: string };
+  | { readonly kind: 'source_attachment'; readonly entryId: string; readonly attachmentId: string }
+  /**
+   * The depth estimate reached through this world's current membership of a photograph.
+   *
+   * The same two identifiers ``source_attachment`` carries, and a different request: that one asks
+   * for the photograph itself to become geometry and is always refused; this one asks for the
+   * estimate a depth model made from it, under permission the account holder granted.
+   */
+  | { readonly kind: 'photo_point_map'; readonly entryId: string; readonly attachmentId: string };
 
 /** Where it goes. The same pose is previewed and applied. */
 export interface CompositionPlacement {
@@ -97,6 +109,7 @@ function wireSource(source: CompositionSource): Record<string, unknown> {
           },
       };
     case 'source_attachment':
+    case 'photo_point_map':
       return { kind: source.kind, entry_id: source.entryId, attachment_id: source.attachmentId };
   }
 }
@@ -180,6 +193,12 @@ export const COMPOSITION_BLOCKED_REASONS = Object.freeze([
   'unknown_attachment',
   'expired_source_not_composable',
   'attachment_is_not_composition',
+  'membership_not_current',
+  'depth_not_permitted',
+  'review_differs_from_reference',
+  'depth_not_produced',
+  'insufficient_depth',
+  'point_map_bytes_unavailable',
   'placement_required',
   'invalid_placement',
   'subject_already_present',
@@ -192,7 +211,7 @@ export function isCompositionBlockedReason(value: unknown): value is Composition
     && (COMPOSITION_BLOCKED_REASONS as readonly string[]).includes(value);
 }
 
-export type CompositionChangeKind = 'add_object' | 'add_environment' | 'none';
+export type CompositionChangeKind = 'add_object' | 'add_environment' | 'add_point_map' | 'none';
 
 /** Whether the bytes the placement would draw are stored; null when the source did not resolve. */
 export type CompositionBytes = 'available' | 'unavailable' | 'not_applicable' | null;

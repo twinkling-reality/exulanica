@@ -50,6 +50,12 @@ pytestmark = pytest.mark.postgres
 _OWNER = "exulanica_membership_backfill_owner"
 
 #: What the 0089 read path meant: every attachment row is current and nothing was detached.
+#:
+#: The third is a different kind of stand-in and says so. The first two restate what 0089 MEANT by
+#: a collection it had no table for; ``world_alternate_point_map_instance`` is a table migration
+#: 0093 adds, and at 0089 a world simply had none, so the empty view is not an interpretation but
+#: a fact. It is here because the CURRENT version read is used below to establish the reference
+#: set before 0090 runs, and that read lists a version's placed estimates.
 _STAND_INS = (
     "create view saved_world_source_current_membership as "
     "select workspace_id,entry_id,capture_id,attachment_id from saved_world_source_attachment",
@@ -57,6 +63,22 @@ _STAND_INS = (
     "null::uuid as workspace_id,null::uuid as entry_id,null::uuid as operation_id,"
     "null::uuid as attachment_id,null::uuid as capture_id,null::bigint as detached_entry_revision,"
     "null::uuid as detached_by,null::timestamptz as detached_at where false",
+    "create view world_alternate_point_map_instance as select null::uuid as workspace_id,"
+    "null::text as world_id,null::uuid as version_id,null::text as instance_id,"
+    "null::uuid as entry_id,null::uuid as attachment_id,null::uuid as capture_id,"
+    "null::bytea as source_sha256,null::uuid as authorization_id,"
+    "null::bytea as authorization_evidence_sha256,null::uuid as screening_id,"
+    "null::bytea as screening_receipt_sha256,null::uuid as right_id,"
+    "null::bytea as right_receipt_sha256,null::text as model_provider,null::text as model_role,"
+    "null::text as model_identifier,null::text as model_revision,"
+    "null::text as model_destination,null::uuid as artifact_id,"
+    "null::bytea as point_map_sha256,null::bigint as byte_size,null::text as container,"
+    "null::integer as stage_version,null::integer as rung,null::boolean as declared_metric,"
+    "null::bigint as declared_fov_y_microdegrees,null::text as region_id,null::bigint as x_mm,"
+    "null::bigint as y_mm,null::bigint as z_mm,null::bigint as yaw_microradians,"
+    "null::bigint as scale_milli,null::text as origin_kind,null::text as origin_role,"
+    "null::boolean as removed,null::boolean as addition_undone,null::uuid as created_edit_id,"
+    "null::uuid as last_edit_id where false",
 )
 
 
@@ -334,6 +356,7 @@ def test_0090_keeps_every_reference_a_populated_0089_database_held(
 
             admin.execute("drop view saved_world_source_detach")
             admin.execute("drop view saved_world_source_current_membership")
+            admin.execute("drop view world_alternate_point_map_instance")
             admin.commit()
             _as_owner(admin, owned)
             admin.execute(by_version["0090"].sql)
@@ -369,6 +392,25 @@ def test_0090_keeps_every_reference_a_populated_0089_database_held(
                 ),
             ).fetchall()
             assert all(flag for _name, flag in forced) and len(forced) == 4
+
+            # EVERY MIGRATION AFTER 0090, before the current application is asked to read.
+            #
+            # Everything above is about 0090 and is asserted at 0090. What follows exercises the
+            # CURRENT repository and the CURRENT routes, and those read the schema at head: a
+            # later migration that adds a table they read would otherwise fail here, in a test
+            # whose subject is an upgrade that happened before it existed. Applying the rest is
+            # also what a real upgrade does, so this is the honest continuation rather than a
+            # workaround. Found by migration 0093, which adds a table the version read touches.
+            #
+            # As the bootstrap role, not the owner: the owner parameter is about how 0090 behaves
+            # under a non-superuser, and a later migration that replaces a function this schema's
+            # bootstrap role created is not that question.
+            for migration in everything:
+                if migration.version > "0090":
+                    admin.execute(migration.sql)
+            provision_runtime_role(admin)
+            admin.commit()
+            assert _counts(admin) == counts
 
             with TestClient(create_app(services, verify=False)) as client:
                 after = read_all(client)

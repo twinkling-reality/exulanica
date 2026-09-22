@@ -75,6 +75,17 @@ export {
 
 export type { PointCloud, PointCloudOptions } from './point-cloud.js';
 export { createPointCloud } from './point-cloud.js';
+export type {
+  AuthoredPointMapPlacement,
+  AuthoredPointMaps,
+  AuthoredPointMapVisual,
+  AuthoredTransform,
+} from './authored-point-maps.js';
+export {
+  authoredPlacementTransform,
+  createAuthoredPointMaps,
+  printDepthOnFlatGround,
+} from './authored-point-maps.js';
 
 export type { CameraState, ControlsConfig, InputMode } from './controls.js';
 export { DEFAULT_CONTROLS, FirstPersonControls } from './controls.js';

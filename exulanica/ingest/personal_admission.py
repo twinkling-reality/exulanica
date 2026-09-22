@@ -342,10 +342,18 @@ class ModelRightRequest(StrictInput):
 
     A role, never an identifier: the server resolves it against the manifest and records a right
     for each exact model the role can reach, which the response names.
+
+    ``notice`` is the wording the account holder was shown before granting it. A role listed in
+    :data:`ROLE_NOTICE` carries its exact text and nothing else; a role that is not listed carries
+    none. Both halves matter. Without the first, a client could grant the depth role while showing
+    a person any sentence it liked, or none; without the second, a client could attach a sentence
+    of its own invention to a role whose wording the server has never approved, and the stored
+    receipt would say the person read it.
     """
 
     role: str = Field(min_length=1, max_length=63)
     valid_until: str
+    notice: str | None = None
 
 
 class PersonalBatch(StrictInput):
@@ -397,6 +405,27 @@ HUMAN_ATTESTATION = (
     "and sensitive person regions, including any missed by the detector."
 )
 
+#: What a person is shown before letting the depth model estimate shape from their photographs.
+#:
+#: It says what runs, where the bytes go, what masking has already happened, what the result is
+#: and is not, where it can appear, and how to stop it. It deliberately does not say "runs
+#: locally" or "fully deleted": ``docs/privacy-consent-threat-model.md`` forbids both, because
+#: neither is a promise this system keeps in every configuration.
+DEPTH_MODEL_NOTICE = (
+    "Exulanica's depth model (MoGe-2, a fixed version) will estimate the 3D shape of what each "
+    "selected photo shows. It runs inside Exulanica's own processing; the photo is not sent to "
+    "an outside AI service for this step. People you chose to hide are hidden before the model "
+    "sees the photo. The result is an estimate from one photo: sizes and distances are "
+    "approximate, and it shows only what the camera saw. It appears in a world only where you "
+    "place it. You can stop this at any time: no new estimates are made and existing estimates "
+    "stop being shown in your worlds."
+)
+
+#: The roles a person is shown wording for, and the exact wording. Checked the way
+#: :data:`HUMAN_ATTESTATION` is: the client sends back the text it displayed, and a single
+#: character of difference is a different statement and is refused.
+ROLE_NOTICE: dict[str, str] = {DEPTH_ROLE: DEPTH_MODEL_NOTICE}
+
 
 def admit_batch(
     body: PersonalBatch, *, actor: uuid.UUID, pipeline: PhotoIngestPipeline
@@ -440,6 +469,13 @@ def admit_batch(
             raise ValueError(
                 "a model right must end in the future and no later than the authority granting it"
             )
+        expected = ROLE_NOTICE.get(request.role)
+        if request.notice != expected:
+            raise ValueError(
+                f"the {request.role} model right is granted against this server's own notice"
+                if expected is not None
+                else f"this server states no notice for the model role {request.role!r}"
+            )
         rights.append((role_handoff(request.role), until))
     # Check all originals, including storage bytes, before the first receipt is written.
     for member in body.members:
@@ -454,6 +490,14 @@ def admit_batch(
         scope.update(
             reviewed_by_name=body.reviewed_by_name.strip(), human_attestation=body.attestation
         )
+    if body.model_rights:
+        # The wording each right was granted against, inside the authority the screening receipt
+        # hashes, so what the person was shown is fixed by the same digest as the review itself.
+        # The right rows carry the model, destination and term; this carries the sentence.
+        scope["model_rights"] = [
+            {"role": request.role, "valid_until": request.valid_until, "notice": request.notice}
+            for request in sorted(body.model_rights, key=lambda request: request.role)
+        ]
     results = []
     with repository.connection.transaction():
         for member in body.members:

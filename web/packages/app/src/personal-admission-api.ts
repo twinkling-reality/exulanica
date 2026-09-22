@@ -19,6 +19,40 @@ export interface PersonalAuthority {
 }
 export const HUMAN_ATTESTATION = 'I personally inspected every exact photograph in this inventory and reviewed all people '
   + 'and sensitive person regions, including any missed by the detector.';
+/**
+ * What a person reads before letting the depth model estimate shape from their photographs.
+ *
+ * Sent back verbatim with the right and compared for exact equality by the server, which holds
+ * the same sentences. The browser is not the authority on what somebody was told; sending the
+ * displayed text back is how the server can refuse a client that showed something else.
+ */
+export const DEPTH_MODEL_NOTICE = "Exulanica's depth model (MoGe-2, a fixed version) will estimate the 3D shape of what each "
+  + "selected photo shows. It runs inside Exulanica's own processing; the photo is not sent to "
+  + 'an outside AI service for this step. People you chose to hide are hidden before the model '
+  + 'sees the photo. The result is an estimate from one photo: sizes and distances are '
+  + 'approximate, and it shows only what the camera saw. It appears in a world only where you '
+  + 'place it. You can stop this at any time: no new estimates are made and existing estimates '
+  + 'stop being shown in your worlds.';
+/** Shown before a stop is sent. A stop is final: the right is never restored, only granted again. */
+export const STOP_DEPTH_ESTIMATES = 'Stop 3D estimates for this photo? Your photo, review and worlds stay. '
+  + 'Estimates made from it stop showing, and none are made again unless you review it again and allow it.';
+export const DEPTH_ROLE = 'depth';
+export interface ModelRightRequest {
+  readonly role: string;
+  readonly valid_until: string;
+  readonly notice?: string;
+}
+export interface ModelRightState {
+  readonly right_id: string;
+  readonly capture_id: string;
+  readonly operation: string;
+  readonly model: { readonly provider: string; readonly role: string; readonly model_id: string; readonly revision: string | null };
+  readonly destination: string;
+  readonly granted_at: string;
+  readonly valid_until: string;
+  readonly withdrawn: boolean;
+  readonly state?: 'current' | 'ended';
+}
 export interface PersonalAdmission {
   readonly request_id?: string;
   readonly members: readonly (PersonalSource & { readonly review: 'not-reviewed' | 'no-person' | 'confirmed-regions' })[];
@@ -28,6 +62,8 @@ export interface PersonalAdmission {
   readonly operation: 'detect' | 'review';
   readonly reviewed_by_name?: string;
   readonly attestation?: string;
+  /** Empty unless the account holder ticked a box. Nothing here is implied by the review. */
+  readonly model_rights?: readonly ModelRightRequest[];
 }
 export interface AdmissionResult {
   readonly batch_id: string;
@@ -37,6 +73,8 @@ export interface AdmissionResult {
     readonly authorization_id: string;
     readonly screening_id: string;
     readonly eligibility_state: string;
+    readonly model_right_ids?: readonly string[];
+    readonly model_rights?: readonly ModelRightState[];
   }[];
 }
 export async function sha256(data: ArrayBuffer): Promise<string> {
@@ -93,12 +131,23 @@ export class PersonalAdmissionApi {
     }
     return this.requests.post<AdmissionResult>('/personal-admission', { ...body });
   }
+
+  /**
+   * Stop one model right now. Final and idempotent on the server, so it needs no retry journal:
+   * sending it twice is the same as sending it once, and a lost answer is recovered by reloading.
+   */
+  async stopModelRight(rightId: string): Promise<ModelRightState & { readonly state: string }> {
+    return new Transport({ ...this.options, signal: AbortSignal.timeout(20_000) })
+      .postJson(`/personal-admission/model-rights/${encodeURIComponent(rightId)}/withdraw`, {});
+  }
 }
 
 export interface PersonalStatus {
   readonly sources: readonly (PersonalSource & {
     readonly media_type: string;
     readonly authority: (PersonalAuthority & { readonly authorization_id: string; readonly purpose: string }) | null;
+    /** Every right this account holder granted over the photograph, current or ended. */
+    readonly model_rights?: readonly ModelRightState[];
   })[];
   readonly requests: readonly (Partial<AdmissionResult> & { readonly request_id: string; readonly operation: string })[];
 }

@@ -61,6 +61,7 @@ from exulanica.world import (
     InvalidStructuralData,
     ObjectBehaviour,
     ObjectOrigin,
+    PhotoPointMapSource,
     ProposalOrigin,
     ProposalProvenance,
     ReviewedAssetRow,
@@ -82,7 +83,11 @@ from exulanica.world import (
     WorldSourceMedia,
     WorldStyleRepository,
     apply_composition,
+    coverage_statement,
+    point_map_instance_document,
     preview_composition,
+    scale_statement,
+    truth_statement,
 )
 from exulanica.world.bootstrap import bootstrap_world
 from exulanica.world.society import UnavailableSocietyInput
@@ -945,6 +950,10 @@ class AlternateVersionView(BaseModel):
     objects: list[AuthoredObjectView]
     element_overrides: list[ElementOverrideView]
     environment_instances: list[dict[str, JsonValue]]
+    #: Placed depth estimates from reviewed photographs, each with the state it can be drawn in.
+    #: Availability is computed on read and is deliberately not part of ``state_sha256``: a right
+    #: ending is not an edit, and a token that moved with one would refuse unrelated changes.
+    point_map_instances: list[dict[str, JsonValue]]
     edits: list[VersionEditView]
 
 
@@ -1037,7 +1046,13 @@ def _alternate_version_view(
 ) -> AlternateVersionView:
     """``assets`` is keyed by content digest, which is how an object names one."""
     return AlternateVersionView(
-        schema_version=2 if version.environment_instances else 1,
+        schema_version=(
+            3
+            if version.point_map_instances
+            else 2
+            if version.environment_instances
+            else 1
+        ),
         version_id=version.version_id,
         world_id=version.world_id,
         source_snapshot_id=version.source_snapshot_id,
@@ -1093,6 +1108,20 @@ def _alternate_version_view(
                 "availability": instance.availability,
             }
             for instance in version.environment_instances
+        ],
+        point_map_instances=[
+            {
+                **point_map_instance_document(instance),
+                "availability": instance.availability,
+                "unavailable_reason": instance.unavailable_reason,
+                # The three sentences an interface must not paraphrase. They are computed from the
+                # stored placement rather than written in the client, so the words a person reads
+                # about scale and coverage cannot drift from what the server placed.
+                "truth": truth_statement(),
+                "scale": scale_statement(instance),
+                "coverage": coverage_statement(),
+            }
+            for instance in version.point_map_instances
         ],
         edits=[
             VersionEditView(
@@ -1585,8 +1614,29 @@ class SourceAttachmentSourceBody(BaseModel):
         return SourceAttachmentSource(self.entry_id, self.attachment_id)
 
 
+class PhotoPointMapSourceBody(BaseModel):
+    """The depth estimate reached through this world's current membership of a photograph.
+
+    The same two identifiers ``source_attachment`` carries, deliberately: the reference is how the
+    server finds the photograph, the review it was added under and the world that may use it. What
+    differs is what is asked for, and that is the ``kind``.
+    """
+
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["photo_point_map"]
+    entry_id: uuid.UUID
+    attachment_id: uuid.UUID
+
+    def domain(self) -> PhotoPointMapSource:
+        return PhotoPointMapSource(self.entry_id, self.attachment_id)
+
+
 CompositionSourceBody = Annotated[
-    ReviewedAssetSourceBody | EnvironmentAdmissionSourceBody | SourceAttachmentSourceBody,
+    ReviewedAssetSourceBody
+    | EnvironmentAdmissionSourceBody
+    | SourceAttachmentSourceBody
+    | PhotoPointMapSourceBody,
     Field(discriminator="kind"),
 ]
 
@@ -1597,7 +1647,9 @@ class CompositionPlacementBody(BaseModel):
     subject_id: str = Field(min_length=1, max_length=200)
     region_id: str = Field(min_length=1, max_length=500)
     transform: TransformBody
-    #: Chosen by the person, never inferred, exactly as on POST .../objects.
+    #: Chosen by the person, never inferred, exactly as on POST .../objects. A photo point map
+    #: takes only ``personal``, which the resolver refuses rather than this transport: the reason
+    #: is about what the thing IS, and a person who sent the wrong one should read that sentence.
     origin_role: Literal["fictional", "personal"]
     behaviour: BehaviourBody | None = None
     source_anchor: SourceAnchorBody | None = None

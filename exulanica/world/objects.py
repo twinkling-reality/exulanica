@@ -25,6 +25,7 @@ from exulanica.world.errors import InvalidObjectData
 
 if TYPE_CHECKING:
     from exulanica.world.environment_instances import EnvironmentInstance
+    from exulanica.world.photo_point_maps import PointMapInstance
 
 __all__ = [
     "MAX_SCALE_MILLI",
@@ -171,6 +172,7 @@ class AlternateVersion:
     objects: tuple[AuthoredObject, ...] = ()
     element_overrides: tuple[ElementOverride, ...] = ()
     environment_instances: tuple[EnvironmentInstance, ...] = ()
+    point_map_instances: tuple[PointMapInstance, ...] = ()
     edits: tuple[VersionEdit, ...] = ()
 
 
@@ -203,12 +205,18 @@ def canonical_delta_document(
     objects: Sequence[AuthoredObject],
     overrides: Sequence[ElementOverride],
     environment_instances: Sequence[EnvironmentInstance] = (),
+    point_map_instances: Sequence[PointMapInstance] = (),
 ) -> dict[str, Any]:
     """The whole delta, in the one order its digest is defined over.
 
     Sorting here rather than trusting the caller is the point. The state digest is the concurrency
     token, and a token that depended on the order rows came back in would make two identical
     worlds disagree the first time a query plan changed.
+
+    Each later section is added only when it holds something, and that is load-bearing rather than
+    tidy: the digest is every stored version's compare-and-swap token, so a section that appeared
+    empty would move the token of every world that has none and refuse the next edit on all of
+    them. A world with no point maps digests exactly as it did before this kind existed.
     """
     document = {
         "schema_version": 1,
@@ -225,6 +233,14 @@ def canonical_delta_document(
             environment_instance_document(instance)
             for instance in sorted(environment_instances, key=lambda value: value.instance_id)
         ]
+    if point_map_instances:
+        from exulanica.world.photo_point_maps import point_map_instance_document
+
+        document["schema_version"] = 3
+        document["point_map_instances"] = [
+            point_map_instance_document(instance)
+            for instance in sorted(point_map_instances, key=lambda value: value.instance_id)
+        ]
     return document
 
 
@@ -232,9 +248,12 @@ def delta_sha256(
     objects: Sequence[AuthoredObject],
     overrides: Sequence[ElementOverride],
     environment_instances: Sequence[EnvironmentInstance] = (),
+    point_map_instances: Sequence[PointMapInstance] = (),
 ) -> str:
     """The state token: SHA-256 over the canonical delta, hex."""
-    document = canonical_delta_document(objects, overrides, environment_instances)
+    document = canonical_delta_document(
+        objects, overrides, environment_instances, point_map_instances
+    )
     # Round-trips through canonical_json first so a value the digest could not represent raises
     # here, where the message names this plane, rather than inside the hashing helper.
     canonical_json(document)

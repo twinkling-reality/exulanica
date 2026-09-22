@@ -121,6 +121,22 @@ export type GeometryLoadObserver = (measurement: GeometryLoadMeasurement) => voi
 /** What a previous session decoded, by artifact id. See `GeometryClient.load`. */
 export type HeldPointMaps = ReadonlyMap<string, PointMap>;
 
+/** What a placement pins about the estimate it drew, as the client needs it to fetch the bytes. */
+export interface PlacedEstimateReference {
+  readonly instanceId: string;
+  readonly captureId: string;
+  readonly artifactId: string;
+  readonly contentSha256: string;
+  readonly byteSize: number;
+  readonly container: string;
+}
+
+export interface PlacedEstimateSession {
+  /** Decoded containers by instance id. An instance that is absent draws nothing. */
+  readonly maps: ReadonlyMap<string, PointMap>;
+  readonly issues: readonly GeometryIssue[];
+}
+
 /**
  * The one sentence the status shows for a scene's presentation frame, beside its rung.
  *
@@ -399,6 +415,77 @@ export class GeometryClient {
       trainedGeometry: Object.freeze([]),
       recoveredCameras: Object.freeze([]),
     });
+  }
+
+  /**
+   * Load the bytes of each placed depth estimate, checked against the digest the PLACEMENT pins.
+   *
+   * Not against the ``/geometry`` list. The list says what each artifact's digest is now; the
+   * placement says what digest the person put in their world. Those are the same in every ordinary
+   * case, and where they could differ the placement is the one that must decide, because it is the
+   * record of what was agreed to. A mismatch draws nothing and says so.
+   *
+   * One attempt per instance, each bounded, exactly as ``load`` is: a stall costs one estimate
+   * rather than the world. An instance whose bytes fail for any reason simply does not appear in
+   * the result, and its reason is in ``issues``. Nothing is drawn in its place.
+   */
+  async loadPlacedEstimates(
+    instances: readonly PlacedEstimateReference[],
+  ): Promise<PlacedEstimateSession> {
+    const maps = new Map<string, PointMap>();
+    const issues: GeometryIssue[] = [];
+    const digest = globalThis.crypto?.subtle;
+    for (const instance of instances) {
+      const report = (state: GeometryIssueState, reason: string): void => {
+        issues.push(Object.freeze({
+          captureId: instance.captureId, islandId: null, state, reason,
+        }));
+      };
+      if (instance.container !== SUPPORTED_CONTAINER) {
+        report(
+          'unsupported_container',
+          `This build reads ${SUPPORTED_CONTAINER} and the estimate is ${instance.container}.`,
+        );
+        continue;
+      }
+      const href = `/geometry/${encodeURIComponent(instance.artifactId)}`;
+      if (!safeGeometryPath(href)) {
+        report('error', 'The estimate reference failed its provenance check.');
+        continue;
+      }
+      if (digest === undefined) {
+        report(
+          'unverifiable',
+          'This page has no SubtleCrypto, so the bytes cannot be checked against the digest the '
+            + 'placement names. The estimate is not drawn rather than drawn unchecked.',
+        );
+        continue;
+      }
+      try {
+        const response = await this.#transport(BYTES_TIMEOUT_MS).getBytes(href);
+        const bytes = await response.arrayBuffer();
+        const failure = await verify(digest, bytes, instance.contentSha256, instance.byteSize);
+        if (failure !== null) {
+          report('verification_failed', failure);
+          continue;
+        }
+        maps.set(instance.instanceId, decodeOpm(bytes));
+      } catch (error) {
+        if (error instanceof ApiError) {
+          report(error.isUnauthenticated ? 'unauthorized' : 'error', geometryFailure(error));
+          continue;
+        }
+        if (error instanceof DOMException && error.name === 'TimeoutError') {
+          report('timed_out', 'The estimate did not arrive in time.');
+          continue;
+        }
+        report(
+          'undecodable',
+          error instanceof Error ? error.message : 'The container did not decode.',
+        );
+      }
+    }
+    return Object.freeze({ maps, issues: Object.freeze(issues) });
   }
 
   /**

@@ -65,6 +65,10 @@ RUNTIME_UPDATES: dict[str, str] = {
     "stage_registry": "registering a stage moves its current version (stage_registry.py)",
     "workspace_tile_quota": "tile use is counted against the quota (api/quotas.py)",
     "world_alternate_environment_instance": "an instance moves and is removed",
+    "world_alternate_point_map_instance": (
+        "a placed depth estimate moves and is removed, and an undo sets addition_undone; "
+        "migration 0093's trigger refuses every change to what it names"
+    ),
     "world_alternate_object": "an object moves, changes and is removed",
     "world_alternate_version": "a version records its state digest and edit sequence, under a lock",
     "saved_world_entry": (

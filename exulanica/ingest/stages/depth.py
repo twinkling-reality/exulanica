@@ -28,6 +28,7 @@ from exulanica.ingest.model_rights import (
     ModelHandoff,
     ModelIdentity,
     ModelRightRefused,
+    bind_point_map,
     require_model_right,
 )
 from exulanica.ingest.privacy import require_privacy_screening
@@ -139,7 +140,7 @@ def run(
     # Unavailable rather than raised, unlike a missing screening: a person who has not let this
     # model see the photograph has made a choice, and the photograph stays a rung 4 region.
     try:
-        require_model_right(
+        permission = require_model_right(
             writes.repository, capture_id, screening.screening_id, model_handoff(model)
         )
     except ModelRightRefused as refusal:
@@ -234,6 +235,12 @@ def run(
                     if decoded is not None
                     else None
                 ),
+            )
+            # Inside the publication transaction, so the map and the statement of what permitted
+            # it land together or not at all. A withdrawal that arrived while the model was
+            # running refuses this insert and takes the artifact with it.
+            bind_point_map(
+                writes.repository, artifact_id=result.artifact_id, decision=permission
             )
             _record_rung(writes, capture_id, image_span_id, decision, result, prediction, ledger)
     # `persist_artifact` already recorded the stage as run. Appending it here as well is what

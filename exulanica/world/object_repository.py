@@ -35,6 +35,11 @@ from psycopg.types.json import Jsonb
 from exulanica.canonical import canonical_json
 from exulanica.errors import BlobNotFoundError, IntegrityError
 from exulanica.evidence.blob import BlobId
+from exulanica.reconstruction.validation import (
+    OpmIntegrityError,
+    OpmIntegrityReport,
+    validate_opm,
+)
 from exulanica.store.base import ContentAddressedStore
 from exulanica.world.environment_instances import (
     EnvironmentInstance,
@@ -54,6 +59,14 @@ from exulanica.world.errors import (
     InvalidEnvironmentState,
     InvalidObjectData,
     InvalidObjectState,
+    InvalidPointMapPlacement,
+    PointMapNotPermitted,
+    PointMapNotProduced,
+    PointMapNotReadable,
+    PointMapReviewDiffers,
+    PointMapTooSparse,
+    SourceAuthorityExpired,
+    SourceNotCurrentMembership,
     StaleObjectBase,
     UnavailableAsset,
     UnknownWorldResource,
@@ -72,6 +85,17 @@ from exulanica.world.objects import (
     override_document,
     validate_object,
     validate_transform,
+)
+from exulanica.world.photo_point_maps import (
+    DEPTH_ROLE,
+    PLACEABLE_RUNG,
+    POINT_MAP_CONTAINER,
+    PointMapInstance,
+    PointMapModel,
+    PointMapPlacement,
+    PointMapSourceBinding,
+    point_map_instance_document,
+    validate_point_map_instance,
 )
 
 __all__ = ["ResolvedEnvironmentSource", "ReviewedAssetRow", "WorldObjectRepository"]
@@ -223,12 +247,22 @@ class WorldObjectRepository:
                 objects = self._objects(parent_version_id)
                 overrides = self._overrides(parent_version_id)
                 environments = self._environment_instances(parent_version_id)
+                # ONLY THE ONES THAT CAN STILL BE DRAWN. A branch is a new version and its rows
+                # are new placements, so copying an estimate whose depth right has ended would
+                # write a fresh placement of a reading the person has already stopped. The
+                # insert trigger would refuse it and take the whole branch with it; leaving it
+                # behind lets the branch succeed and states the loss.
+                point_maps = tuple(
+                    instance
+                    for instance in self._point_map_instances(parent_version_id)
+                    if instance.availability == "available"
+                )
             else:
-                objects, overrides, environments = (), (), ()
+                objects, overrides, environments, point_maps = (), (), (), ()
             self._require_snapshot(source_snapshot_id)
             self._require_style_version(style_version_id)
             version_id = uuid.uuid4()
-            state = delta_sha256(objects, overrides, environments)
+            state = delta_sha256(objects, overrides, environments, point_maps)
             self.connection.execute(
                 "insert into world_alternate_version (version_id,workspace_id,world_id,"
                 "source_snapshot_id,parent_version_id,title,origin,style_version_id,"
@@ -261,6 +295,12 @@ class WorldObjectRepository:
                     instance,
                     self._environment_edit_ids(parent_version_id, instance.instance_id),
                 )
+            for placed in point_maps:
+                self._insert_point_map(
+                    version_id,
+                    placed,
+                    self._point_map_edit_ids(parent_version_id, placed.instance_id),
+                )
         return self.version(version_id)
 
     def versions(self) -> tuple[AlternateVersion, ...]:
@@ -288,6 +328,7 @@ class WorldObjectRepository:
         objects = self._objects(version_id)
         overrides = self._overrides(version_id)
         environments = self._environment_instances(version_id)
+        point_maps = self._point_map_instances(version_id)
         row = self._version_row(version_id)
         return AlternateVersion(
             version_id=row["version_id"],
@@ -296,7 +337,7 @@ class WorldObjectRepository:
             parent_version_id=row["parent_version_id"],
             title=row["title"],
             style_version_id=row["style_version_id"],
-            state_sha256=delta_sha256(objects, overrides, environments),
+            state_sha256=delta_sha256(objects, overrides, environments, point_maps),
             edit_seq=row["edit_seq"],
             source_invalidated=self._source_invalidated(row["source_snapshot_id"]),
             created_by=row["created_by"],
@@ -304,6 +345,7 @@ class WorldObjectRepository:
             objects=objects,
             element_overrides=overrides,
             environment_instances=environments,
+            point_map_instances=point_maps,
             edits=self._edits(version_id),
         )
 
@@ -594,7 +636,8 @@ class WorldObjectRepository:
         with self.connection.transaction():
             row = self._begin_edit(version_id, base_state_sha256)
             newest = self.connection.execute(
-                "select edit_id,kind,object_id,element_id,environment_instance_id,before_document "
+                "select edit_id,kind,object_id,element_id,environment_instance_id,"
+                "point_map_instance_id,before_document "
                 "from world_alternate_version_edit e "
                 "where e.workspace_id=%s and e.world_id=%s and e.version_id=%s "
                 "and e.kind <> 'undo' "
@@ -618,6 +661,10 @@ class WorldObjectRepository:
                 subject, after = self._undo_environment(
                     version_id, newest["environment_instance_id"], before, edit_id
                 )
+            elif newest["kind"] in {"add_point_map", "move_point_map", "remove_point_map"}:
+                subject, after = self._undo_point_map(
+                    version_id, newest["point_map_instance_id"], before, edit_id
+                )
             else:
                 subject, after = self._undo_override(
                     version_id, newest["element_id"], before, edit_id
@@ -629,6 +676,7 @@ class WorldObjectRepository:
                 object_id=newest["object_id"],
                 element_id=newest["element_id"],
                 environment_instance_id=newest["environment_instance_id"],
+                point_map_instance_id=newest["point_map_instance_id"],
                 before=subject,
                 after=after,
                 actor=actor,
@@ -828,6 +876,7 @@ class WorldObjectRepository:
         actor: uuid.UUID,
         element_id: str | None = None,
         environment_instance_id: str | None = None,
+        point_map_instance_id: str | None = None,
         undone_edit_id: uuid.UUID | None = None,
     ) -> None:
         version_id = row["version_id"]
@@ -835,13 +884,14 @@ class WorldObjectRepository:
             self._objects(version_id),
             self._overrides(version_id),
             self._environment_instances(version_id, with_availability=False),
+            self._point_map_instances(version_id, with_availability=False),
         )
         self.connection.execute(
             "insert into world_alternate_version_edit (edit_id,workspace_id,world_id,version_id,"
-            "edit_seq,kind,object_id,element_id,environment_instance_id,undone_edit_id,"
-            "base_state_sha256,"
+            "edit_seq,kind,object_id,element_id,environment_instance_id,point_map_instance_id,"
+            "undone_edit_id,base_state_sha256,"
             "result_state_sha256,before_document,after_document,actor) "
-            "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+            "values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
             (
                 edit_id,
                 self.workspace_id,
@@ -852,6 +902,7 @@ class WorldObjectRepository:
                 object_id,
                 element_id,
                 environment_instance_id,
+                point_map_instance_id,
                 undone_edit_id,
                 row["state_sha256"],
                 result,
@@ -1119,6 +1170,733 @@ class WorldObjectRepository:
         )
 
     # -- reads ------------------------------------------------------------------------------
+
+    # -- photo-derived point map edits -------------------------------------------------------
+    #
+    # A reviewed photograph's depth estimate, placed in this version by the person whose
+    # photograph it is. Three things separate this from the environment kind above and are worth
+    # reading before the methods.
+    #
+    # WHAT RESOLVES IS NOT THE ATTACHMENT. An attachment is membership, and composing one is
+    # refused (``attachment_is_not_composition``). What is placed is the depth artifact reached
+    # THROUGH a current membership, and the membership is recorded so a detach can reach what it
+    # produced.
+    #
+    # THE PINNED SCREENING DECIDES WHICH ESTIMATE. The attachment pins the human review the
+    # photograph was added under. The derivative worker builds from the NEWEST eligible screening.
+    # A photograph reviewed twice therefore has an estimate the current reference does not name,
+    # and that is ``PointMapReviewDiffers`` rather than "not produced": nothing is wrong, the
+    # reference is simply older than the estimate, and the recovery is to add it back under the
+    # newer review.
+    #
+    # AVAILABILITY IS READ, NEVER STORED. Whether a person may see a placed estimate changes when
+    # a right ends, a review expires, a photograph is deleted or a membership is detached, none of
+    # which is an edit to their world. It is computed on read and kept out of the state digest.
+
+    def add_point_map(
+        self,
+        version_id: uuid.UUID,
+        placement: PointMapPlacement,
+        *,
+        base_state_sha256: str,
+        actor: uuid.UUID,
+    ) -> AlternateVersion:
+        with self.connection.transaction():
+            row = self._begin_edit(version_id, base_state_sha256)
+            instance = self._validated_point_map_placement(row, placement)
+            edit_id = uuid.uuid4()
+            self._insert_point_map(version_id, instance, (edit_id, edit_id))
+            self._append_edit(
+                row,
+                edit_id=edit_id,
+                kind="add_point_map",
+                point_map_instance_id=instance.instance_id,
+                before=None,
+                after=point_map_instance_document(instance),
+                actor=actor,
+            )
+            self._final_point_map_authorization(instance)
+        return self.version(version_id)
+
+    def validate_point_map_placement(
+        self,
+        version_id: uuid.UUID,
+        placement: PointMapPlacement,
+        *,
+        base_state_sha256: str,
+        resolved_source: PointMapSourceBinding | None = None,
+    ) -> PointMapInstance:
+        """Validate exactly what add would validate, without taking a lock or writing.
+
+        The point-map counterpart of ``validate_environment_placement``: the same membership,
+        permission, artifact, rung, byte, region and duplicate checks, in the same order, through
+        the same ``_validated_point_map_placement``. Every operation is a SELECT or a store read.
+        """
+        row = self._version_row(version_id)
+        self._require_edit_base(row, base_state_sha256)
+        return self._validated_point_map_placement(row, placement, resolved_source)
+
+    def move_point_map(
+        self,
+        version_id: uuid.UUID,
+        instance_id: str,
+        transform: Transform,
+        *,
+        base_state_sha256: str,
+        actor: uuid.UUID,
+    ) -> AlternateVersion:
+        """Move a placed estimate, which is refused while it may not be drawn.
+
+        Moving something a person cannot see is an edit they cannot judge the result of, and on an
+        estimate whose permission has ended it is an edit to a reading of their home that they
+        have already stopped. Remove and undo stay available, because both take it away.
+        """
+        with self.connection.transaction():
+            row = self._begin_edit(version_id, base_state_sha256)
+            current = self._require_point_map(version_id, instance_id)
+            if current.removed:
+                raise InvalidObjectState(f"{instance_id} is removed in this version")
+            validate_transform(transform)
+            self._require_point_map_current(current)
+            edit_id = uuid.uuid4()
+            self.connection.execute(
+                "update world_alternate_point_map_instance "
+                "set x_mm=%s,y_mm=%s,z_mm=%s,yaw_microradians=%s,scale_milli=%s,last_edit_id=%s "
+                "where workspace_id=%s and world_id=%s and version_id=%s and instance_id=%s",
+                (
+                    transform.x_mm,
+                    transform.y_mm,
+                    transform.z_mm,
+                    transform.yaw_microradians,
+                    transform.scale_milli,
+                    edit_id,
+                    self.workspace_id,
+                    self.world_id,
+                    version_id,
+                    instance_id,
+                ),
+            )
+            self._append_edit(
+                row,
+                edit_id=edit_id,
+                kind="move_point_map",
+                point_map_instance_id=instance_id,
+                before=point_map_instance_document(current),
+                after=point_map_instance_document(
+                    self._require_point_map(version_id, instance_id)
+                ),
+                actor=actor,
+            )
+            self._final_point_map_authorization(self._require_point_map(version_id, instance_id))
+        return self.version(version_id)
+
+    def remove_point_map(
+        self,
+        version_id: uuid.UUID,
+        instance_id: str,
+        *,
+        base_state_sha256: str,
+        actor: uuid.UUID,
+    ) -> AlternateVersion:
+        """Take it out, whatever has happened to the photograph or the permission behind it.
+
+        Deliberately asks nothing about the source. A person whose right has ended, or whose
+        photograph is gone, is exactly the person most likely to want this, and a removal that
+        first required the thing being removed to be readable would refuse them.
+        """
+        with self.connection.transaction():
+            row = self._begin_edit(version_id, base_state_sha256)
+            current = self._require_point_map(version_id, instance_id)
+            if current.removed:
+                raise InvalidObjectState(f"{instance_id} is already removed in this version")
+            edit_id = uuid.uuid4()
+            self.connection.execute(
+                "update world_alternate_point_map_instance set removed=true,last_edit_id=%s "
+                "where workspace_id=%s and world_id=%s and version_id=%s and instance_id=%s",
+                (edit_id, self.workspace_id, self.world_id, version_id, instance_id),
+            )
+            self._append_edit(
+                row,
+                edit_id=edit_id,
+                kind="remove_point_map",
+                point_map_instance_id=instance_id,
+                before=point_map_instance_document(current),
+                after=point_map_instance_document(
+                    self._require_point_map(version_id, instance_id)
+                ),
+                actor=actor,
+            )
+        return self.version(version_id)
+
+    # -- point map source resolution ---------------------------------------------------------
+
+    def validate_point_map_source(
+        self, entry_id: uuid.UUID, attachment_id: uuid.UUID
+    ) -> PointMapSourceBinding:
+        """The source half of ``validate_point_map_placement``, before a placement exists.
+
+        Runs the membership, permission, artifact, rung and byte checks add would run for this
+        exact reference, in the same order and through the same resolver, and returns what a
+        placement would pin. Read-only.
+        """
+        return self._resolve_point_map_source(entry_id, attachment_id)
+
+    def _resolve_point_map_source(
+        self, entry_id: uuid.UUID, attachment_id: uuid.UUID
+    ) -> PointMapSourceBinding:
+        """Membership, then permission, then the estimate. Each step raises its own refusal.
+
+        The order is the order a person would ask the questions in, and it decides which sentence
+        they read: a detached photograph is not "no estimate exists", and a stopped depth right is
+        not "your review expired".
+        """
+        row = self.connection.execute(
+            """
+            select a.attachment_id,a.capture_id,a.source_sha256,a.authorization_id,a.screening_id,
+                   a.attached_by,cur.attachment_id as current_attachment_id,
+                   auth.corpus_class,auth.capture_id as authorized_capture_id,
+                   auth.source_sha256 as authorized_sha256,auth.authorized_by,
+                   auth.valid_until as authorization_valid_until,auth.evidence_digest,
+                   p.capture_id as screened_capture_id,p.source_sha256 as screened_sha256,
+                   p.authorization_id as screened_authorization_id,p.screening_method,
+                   p.reviewed_by,p.eligibility_state,p.valid_until as screening_valid_until,
+                   p.receipt_digest as screening_receipt_digest,
+                   c.blob_sha256 as current_source_sha256,
+                   asset_capture_live(a.workspace_id,a.capture_id,statement_timestamp())
+                     as source_live,
+                   statement_timestamp() as evaluated_at
+              from saved_world_source_attachment a
+              join saved_world_entry e
+                on e.workspace_id=a.workspace_id and e.entry_id=a.entry_id
+              left join saved_world_source_current_membership cur
+                on cur.workspace_id=a.workspace_id and cur.entry_id=a.entry_id
+               and cur.capture_id=a.capture_id
+              join capture c on c.workspace_id=a.workspace_id and c.capture_id=a.capture_id
+              join capture_reconstruction_authorization auth
+                on auth.workspace_id=a.workspace_id and auth.authorization_id=a.authorization_id
+              join reconstruction_privacy_screening p
+                on p.workspace_id=a.workspace_id and p.screening_id=a.screening_id
+             where a.workspace_id=%s and a.entry_id=%s and a.attachment_id=%s
+               and e.world_id=%s
+            """,
+            (self.workspace_id, entry_id, attachment_id, self.world_id),
+        ).fetchone()
+        if row is None:
+            raise UnknownWorldResource("no such attachment on a saved world of this world")
+        if row["current_attachment_id"] != attachment_id:
+            raise SourceNotCurrentMembership(
+                "this photograph is not currently a reference of this world"
+            )
+        at = row["evaluated_at"]
+        if (
+            not row["source_live"]
+            or row["current_source_sha256"] != row["source_sha256"]
+            or row["authorized_capture_id"] != row["capture_id"]
+            or row["authorized_sha256"] != row["source_sha256"]
+            or row["corpus_class"] != "personal"
+            or row["screened_capture_id"] != row["capture_id"]
+            or row["screened_sha256"] != row["source_sha256"]
+            or row["screened_authorization_id"] != row["authorization_id"]
+            or row["screening_method"] != "human_review"
+            or row["reviewed_by"] is None
+            or row["eligibility_state"] != "eligible"
+        ):
+            raise UnknownWorldResource(
+                "this reference's photograph, authority and review no longer agree"
+            )
+        if (
+            row["authorization_valid_until"] is not None
+            and row["authorization_valid_until"] <= at
+        ) or (row["screening_valid_until"] is not None and row["screening_valid_until"] <= at):
+            raise SourceAuthorityExpired(
+                "this reference's authority or review has expired; review the photograph again"
+            )
+        right = self._current_depth_right(row["capture_id"], at)
+        artifact = self._point_map_artifact(row, right)
+        return PointMapSourceBinding(
+            entry_id=entry_id,
+            attachment_id=attachment_id,
+            capture_id=row["capture_id"],
+            source_sha256=bytes(row["source_sha256"]).hex(),
+            authorization_id=row["authorization_id"],
+            authorization_evidence_sha256=bytes(row["evidence_digest"]).hex(),
+            screening_id=row["screening_id"],
+            screening_receipt_sha256=bytes(row["screening_receipt_digest"]).hex(),
+            right_id=right["right_id"],
+            right_receipt_sha256=bytes(right["receipt_sha256"]).hex(),
+            model=PointMapModel(
+                provider=right["model_provider"],
+                role=right["model_role"],
+                identifier=right["model_id"],
+                revision=right["model_revision"],
+                destination=right["destination"],
+            ),
+            artifact_id=artifact["artifact_id"],
+            point_map_sha256=bytes(artifact["content_sha256"]).hex(),
+            byte_size=int(artifact["byte_size"]),
+            container=POINT_MAP_CONTAINER,
+            stage_version=int(artifact["stage_version"]),
+            rung=int(artifact["rung"]),
+            declared_metric=bool(artifact["declared_metric"]),
+            declared_fov_y_microdegrees=int(artifact["fov_y_microdegrees"]),
+        )
+
+    def _current_depth_right(self, capture_id: uuid.UUID, at: Any) -> Mapping[str, Any]:
+        """The newest depth right that stands for this photograph right now, or a refusal.
+
+        A role, not a checkpoint: which checkpoint ran is a property of the estimate, and the
+        estimate's own binding is checked against this right afterwards. Asking for a named
+        checkpoint here would refuse a person who granted the right again after the pin moved.
+        """
+        row = self.connection.execute(
+            "select right_id,model_provider,model_role,model_id,model_revision,destination,"
+            "receipt_sha256 from personal_model_right r "
+            "where r.workspace_id=%s and r.capture_id=%s and r.model_role=%s "
+            "and personal_model_right_allows(r.workspace_id,r.right_id,r.capture_id,"
+            "r.model_provider,r.model_role,r.model_id,r.model_revision,r.destination,%s) "
+            "order by r.granted_at desc,r.right_id desc limit 1",
+            (self.workspace_id, capture_id, DEPTH_ROLE, at),
+        ).fetchone()
+        if row is None:
+            raise PointMapNotPermitted(
+                "no current permission lets a 3D estimate from this photograph be used"
+            )
+        return row
+
+    def _point_map_artifact(
+        self, reference: Mapping[str, Any], right: Mapping[str, Any]
+    ) -> Mapping[str, Any]:
+        """The estimate for these exact bytes under the review this reference pins.
+
+        The rung comes from the recorded assertion and NOT from the container, which is the one
+        place those two disagree and it matters. ``encode_opm`` writes ``rung: 3`` as a format
+        constant on every map it produces, including one the quality gate decided was rung 4, so a
+        reader that trusted the header would place a handful of points and call it somebody's
+        kitchen. What ``decide_rung`` measured is the assertion the depth stage recorded beside
+        the artifact, and that is what is read here.
+
+        The field of view and the metric flag come from the container, because those are what a
+        renderer places the camera from; a second copy in a row could disagree with what is drawn.
+        """
+        row = self.connection.execute(
+            """
+            select a.artifact_id,a.content_sha256,a.byte_size,a.stage_version,
+                   a.privacy_screening_id,
+                   (s.object_value->>'rung')::int as rung,
+                   asset_point_allows(a.workspace_id,a.artifact_id,statement_timestamp())
+                     as readable,
+                   exists(select 1 from point_map_model_right b
+                          where b.workspace_id=a.workspace_id and b.artifact_id=a.artifact_id
+                            and b.right_id=%(right)s) as bound
+              from artifact a
+              join assertion s on s.workspace_id=a.workspace_id and s.status='active'
+               and s.object_value->>'point_map_artifact'=a.artifact_id::text
+              join predicate pr on pr.predicate_id=s.predicate_id
+               and pr.key='reconstruction_rung_is'
+             where a.workspace_id=%(w)s and a.kind='point_map'
+               and a.source_blob_sha256=%(source)s
+               and a.purged_at is null and not a.needs_repair and a.superseded_by is null
+               and a.content_sha256 is not null and a.byte_size is not null
+             order by a.privacy_screening_id=%(screening)s desc,a.stage_version desc,
+                      s.asserted_at desc,a.artifact_id
+             limit 1
+            """,
+            {
+                "w": self.workspace_id,
+                "source": reference["source_sha256"],
+                "screening": reference["screening_id"],
+                "right": right["right_id"],
+            },
+        ).fetchone()
+        if row is None:
+            raise PointMapNotProduced("no 3D estimate has been made from this photograph yet")
+        if row["privacy_screening_id"] != reference["screening_id"]:
+            raise PointMapReviewDiffers(
+                "the estimate for this photograph was made under a different review than this "
+                "world's reference names"
+            )
+        if not row["bound"]:
+            raise PointMapNotPermitted(
+                "this estimate was not made under the permission that stands now"
+            )
+        if row["rung"] is None or int(row["rung"]) != PLACEABLE_RUNG:
+            raise PointMapTooSparse(
+                "too little of this photograph could be placed to stand in front of"
+            )
+        if not row["readable"]:
+            raise PointMapNotReadable("this estimate may not be read right now")
+        report = self._read_point_map(bytes(row["content_sha256"]))
+        return {
+            **row,
+            "declared_metric": report.metric,
+            "fov_y_microdegrees": round(report.fov_y_degrees * 1_000_000),
+        }
+
+    def _read_point_map(self, content_sha256: bytes) -> OpmIntegrityReport:
+        """The stored container, validated. Refuses bytes a renderer would refuse anyway."""
+        if self.store is None:
+            raise UnavailableAsset("point map composition requires the content-addressed store")
+        try:
+            data = self.store.get(BlobId(content_sha256))
+        except (BlobNotFoundError, IntegrityError, OSError) as exc:
+            raise PointMapNotReadable(
+                "this estimate's row survived and its stored bytes did not"
+            ) from exc
+        try:
+            return validate_opm(data)
+        except OpmIntegrityError as exc:
+            raise PointMapNotReadable(f"this estimate's bytes are not placeable: {exc}") from exc
+
+    def _validated_point_map_placement(
+        self,
+        row: Mapping[str, Any],
+        placement: PointMapPlacement,
+        resolved: PointMapSourceBinding | None = None,
+    ) -> PointMapInstance:
+        present = self.connection.execute(
+            "select 1 from world_alternate_point_map_instance where workspace_id=%s "
+            "and world_id=%s and version_id=%s and instance_id=%s and not addition_undone",
+            (self.workspace_id, self.world_id, row["version_id"], placement.instance_id),
+        ).fetchone()
+        if present is not None:
+            raise InvalidObjectState(f"{placement.instance_id} already exists in this version")
+        source = resolved
+        if source is None:
+            source = self._resolve_point_map_source(placement.entry_id, placement.attachment_id)
+        elif (source.entry_id, source.attachment_id) != (
+            placement.entry_id,
+            placement.attachment_id,
+        ):
+            raise InvalidPointMapPlacement("the resolved source is not this placement's reference")
+        try:
+            return validate_point_map_instance(
+                PointMapInstance(
+                    instance_id=placement.instance_id,
+                    source=source,
+                    region_id=placement.region_id,
+                    transform=placement.transform,
+                    origin=placement.origin,
+                ),
+                region_ids=self._source_region_ids(row["source_snapshot_id"]),
+            )
+        except InvalidObjectData as exc:
+            raise InvalidPointMapPlacement(str(exc)) from exc
+
+    def _final_point_map_authorization(self, instance: PointMapInstance) -> None:
+        """Ask again under the global asset read lock, after the row is written.
+
+        The same discipline ``_final_environment_authorization`` follows and the same one
+        ``require_model_right`` follows before a hand-over: a withdrawal cannot commit while this
+        runs, so it is either seen here or it waits, and an edit that committed against a
+        permission that ended mid-transaction cannot exist.
+        """
+        self.connection.execute("select asset_read_lock()")
+        self._require_point_map_current(instance)
+
+    def _require_point_map_current(self, instance: PointMapInstance) -> None:
+        current = self._point_map_availability(instance)
+        if current != "available":
+            raise PointMapNotPermitted(
+                f"this estimate cannot be used right now ({current})"
+            )
+
+    def _point_map_availability(self, instance: PointMapInstance) -> str:
+        return self._point_map_state(instance)[0]
+
+    def _point_map_state(self, instance: PointMapInstance) -> tuple[str, str | None]:
+        """Why a placed estimate can or cannot be drawn, computed now and never stored.
+
+        Every branch names a state a person can act on. ``withdrawn`` carries which end of
+        permission it was, because a stopped right, an expired review, a deleted photograph and a
+        withdrawn person are four different situations with four different recoveries.
+        """
+        source = instance.source
+        row = self.connection.execute(
+            """
+            select personal_model_right_allows(%(w)s,r.right_id,r.capture_id,r.model_provider,
+                     r.model_role,r.model_id,r.model_revision,r.destination,
+                     statement_timestamp()) as right_stands,
+                   r.withdrawn_at is not null as right_withdrawn,
+                   asset_point_allows(%(w)s,%(artifact)s,statement_timestamp()) as readable,
+                   asset_capture_live(%(w)s,%(capture)s,statement_timestamp()) as source_live,
+                   (select c.deleted_at is null from capture c
+                     where c.workspace_id=%(w)s and c.capture_id=%(capture)s) as capture_present,
+                   asset_screening_allows(%(w)s,%(capture)s,%(screening)s,statement_timestamp())
+                     as review_stands,
+                   (select cur.attachment_id from saved_world_source_current_membership cur
+                     where cur.workspace_id=%(w)s and cur.entry_id=%(entry)s
+                       and cur.capture_id=%(capture)s) as current_attachment_id
+              from personal_model_right r
+             where r.workspace_id=%(w)s and r.right_id=%(right)s
+            """,
+            {
+                "w": self.workspace_id,
+                "right": source.right_id,
+                "capture": source.capture_id,
+                "artifact": source.artifact_id,
+                "screening": source.screening_id,
+                "entry": source.entry_id,
+            },
+        ).fetchone()
+        if not row["capture_present"] or not row["source_live"]:
+            return "withdrawn", "source_deleted"
+        if row["right_withdrawn"] or not row["right_stands"]:
+            return "withdrawn", "model_right_withdrawn"
+        if not row["review_stands"]:
+            return "withdrawn", "review_expired"
+        if row["current_attachment_id"] != source.attachment_id:
+            # DETACHED, and rebinding never brings this back. A later attachment is a new
+            # membership under a new review, and the placement pins the one it was made through.
+            return "detached", None
+        if not row["readable"]:
+            # The permission terms above all stood, so what is left is the bytes or a person
+            # whose likeness was withdrawn from this derivative.
+            return "unavailable_bytes", None
+        if self.store is not None and not self.store.exists(
+            BlobId.from_hex(source.point_map_sha256)
+        ):
+            return "unavailable_bytes", None
+        return "available", None
+
+    def _insert_point_map(
+        self,
+        version_id: uuid.UUID,
+        instance: PointMapInstance,
+        edit_ids: tuple[uuid.UUID, uuid.UUID],
+    ) -> None:
+        source = instance.source
+        created_edit_id, last_edit_id = edit_ids
+        written = self.connection.execute(
+            """
+            insert into world_alternate_point_map_instance(
+              workspace_id,world_id,version_id,instance_id,entry_id,attachment_id,capture_id,
+              source_sha256,authorization_id,authorization_evidence_sha256,screening_id,
+              screening_receipt_sha256,right_id,right_receipt_sha256,model_provider,model_role,
+              model_identifier,model_revision,model_destination,artifact_id,point_map_sha256,
+              byte_size,container,stage_version,rung,declared_metric,
+              declared_fov_y_microdegrees,region_id,x_mm,y_mm,z_mm,yaw_microradians,scale_milli,
+              origin_kind,origin_role,removed,created_edit_id,last_edit_id,addition_undone)
+            values(
+              %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,
+              %s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,false)
+            on conflict (workspace_id,world_id,version_id,instance_id) do update set
+              entry_id=excluded.entry_id,attachment_id=excluded.attachment_id,
+              capture_id=excluded.capture_id,source_sha256=excluded.source_sha256,
+              authorization_id=excluded.authorization_id,
+              authorization_evidence_sha256=excluded.authorization_evidence_sha256,
+              screening_id=excluded.screening_id,
+              screening_receipt_sha256=excluded.screening_receipt_sha256,
+              right_id=excluded.right_id,right_receipt_sha256=excluded.right_receipt_sha256,
+              model_provider=excluded.model_provider,model_role=excluded.model_role,
+              model_identifier=excluded.model_identifier,model_revision=excluded.model_revision,
+              model_destination=excluded.model_destination,artifact_id=excluded.artifact_id,
+              point_map_sha256=excluded.point_map_sha256,byte_size=excluded.byte_size,
+              container=excluded.container,stage_version=excluded.stage_version,
+              rung=excluded.rung,declared_metric=excluded.declared_metric,
+              declared_fov_y_microdegrees=excluded.declared_fov_y_microdegrees,
+              region_id=excluded.region_id,x_mm=excluded.x_mm,y_mm=excluded.y_mm,
+              z_mm=excluded.z_mm,yaw_microradians=excluded.yaw_microradians,
+              scale_milli=excluded.scale_milli,origin_kind=excluded.origin_kind,
+              origin_role=excluded.origin_role,removed=excluded.removed,
+              created_edit_id=excluded.created_edit_id,last_edit_id=excluded.last_edit_id,
+              addition_undone=false
+            where world_alternate_point_map_instance.addition_undone
+            returning instance_id
+            """,
+            (
+                self.workspace_id,
+                self.world_id,
+                version_id,
+                instance.instance_id,
+                source.entry_id,
+                source.attachment_id,
+                source.capture_id,
+                bytes.fromhex(source.source_sha256),
+                source.authorization_id,
+                bytes.fromhex(source.authorization_evidence_sha256),
+                source.screening_id,
+                bytes.fromhex(source.screening_receipt_sha256),
+                source.right_id,
+                bytes.fromhex(source.right_receipt_sha256),
+                source.model.provider,
+                source.model.role,
+                source.model.identifier,
+                source.model.revision,
+                source.model.destination,
+                source.artifact_id,
+                bytes.fromhex(source.point_map_sha256),
+                source.byte_size,
+                source.container,
+                source.stage_version,
+                source.rung,
+                source.declared_metric,
+                source.declared_fov_y_microdegrees,
+                instance.region_id,
+                instance.transform.x_mm,
+                instance.transform.y_mm,
+                instance.transform.z_mm,
+                instance.transform.yaw_microradians,
+                instance.transform.scale_milli,
+                instance.origin.kind,
+                instance.origin.role,
+                instance.removed,
+                created_edit_id,
+                last_edit_id,
+            ),
+        ).fetchone()
+        if written is None:
+            raise InvalidObjectState(f"{instance.instance_id} already exists in this version")
+
+    def _point_map_instances(
+        self, version_id: uuid.UUID, *, with_availability: bool = True
+    ) -> tuple[PointMapInstance, ...]:
+        rows = self.connection.execute(
+            """
+            select instance_id,entry_id,attachment_id,capture_id,source_sha256,authorization_id,
+                   authorization_evidence_sha256,screening_id,screening_receipt_sha256,right_id,
+                   right_receipt_sha256,model_provider,model_role,model_identifier,model_revision,
+                   model_destination,artifact_id,point_map_sha256,byte_size,container,
+                   stage_version,rung,declared_metric,declared_fov_y_microdegrees,region_id,
+                   x_mm,y_mm,z_mm,yaw_microradians,scale_milli,origin_kind,origin_role,removed
+              from world_alternate_point_map_instance
+             where workspace_id=%s and world_id=%s and version_id=%s and not addition_undone
+             order by instance_id
+            """,
+            (self.workspace_id, self.world_id, version_id),
+        ).fetchall()
+        return tuple(self._point_map_from_row(row, with_availability) for row in rows)
+
+    def _point_map_from_row(
+        self, row: Mapping[str, Any], with_availability: bool = True
+    ) -> PointMapInstance:
+        instance = PointMapInstance(
+            instance_id=row["instance_id"],
+            source=PointMapSourceBinding(
+                entry_id=row["entry_id"],
+                attachment_id=row["attachment_id"],
+                capture_id=row["capture_id"],
+                source_sha256=bytes(row["source_sha256"]).hex(),
+                authorization_id=row["authorization_id"],
+                authorization_evidence_sha256=bytes(row["authorization_evidence_sha256"]).hex(),
+                screening_id=row["screening_id"],
+                screening_receipt_sha256=bytes(row["screening_receipt_sha256"]).hex(),
+                right_id=row["right_id"],
+                right_receipt_sha256=bytes(row["right_receipt_sha256"]).hex(),
+                model=PointMapModel(
+                    provider=row["model_provider"],
+                    role=row["model_role"],
+                    identifier=row["model_identifier"],
+                    revision=row["model_revision"],
+                    destination=row["model_destination"],
+                ),
+                artifact_id=row["artifact_id"],
+                point_map_sha256=bytes(row["point_map_sha256"]).hex(),
+                byte_size=int(row["byte_size"]),
+                container=row["container"],
+                stage_version=int(row["stage_version"]),
+                rung=int(row["rung"]),
+                declared_metric=bool(row["declared_metric"]),
+                declared_fov_y_microdegrees=int(row["declared_fov_y_microdegrees"]),
+            ),
+            region_id=row["region_id"],
+            transform=Transform(
+                row["x_mm"],
+                row["y_mm"],
+                row["z_mm"],
+                row["yaw_microradians"],
+                row["scale_milli"],
+            ),
+            origin=ObjectOrigin(row["origin_kind"], row["origin_role"]),
+            removed=row["removed"],
+        )
+        if not with_availability:
+            return instance
+        availability, reason = self._point_map_state(instance)
+        return PointMapInstance(
+            instance_id=instance.instance_id,
+            source=instance.source,
+            region_id=instance.region_id,
+            transform=instance.transform,
+            origin=instance.origin,
+            removed=instance.removed,
+            availability=availability,  # type: ignore[arg-type]
+            unavailable_reason=reason,
+        )
+
+    def _require_point_map(self, version_id: uuid.UUID, instance_id: str) -> PointMapInstance:
+        for instance in self._point_map_instances(version_id):
+            if instance.instance_id == instance_id:
+                return instance
+        raise UnknownWorldResource(f"no point map instance {instance_id} in this version")
+
+    def _point_map_edit_ids(
+        self, version_id: uuid.UUID, instance_id: str
+    ) -> tuple[uuid.UUID, uuid.UUID]:
+        row = self.connection.execute(
+            "select created_edit_id,last_edit_id from world_alternate_point_map_instance "
+            "where workspace_id=%s and world_id=%s and version_id=%s and instance_id=%s",
+            (self.workspace_id, self.world_id, version_id, instance_id),
+        ).fetchone()
+        return (row["created_edit_id"], row["last_edit_id"])
+
+    def _undo_point_map(
+        self,
+        version_id: uuid.UUID,
+        instance_id: str,
+        before: Mapping[str, Any] | None,
+        edit_id: uuid.UUID,
+    ) -> tuple[Mapping[str, Any] | None, Mapping[str, Any] | None]:
+        """Restore stored authored state without re-authorizing a permission that has since ended.
+
+        Undo takes an edit back. Taking back an addition always works, because the result is less
+        of the person's photograph in the world, not more; taking back a removal restores what was
+        already stored, and whether it may be DRAWN is decided on read, where every other change
+        of permission is decided too.
+        """
+        current = self._require_point_map(version_id, instance_id)
+        if before is None:
+            self.connection.execute(
+                "update world_alternate_point_map_instance "
+                "set removed=true,addition_undone=true,last_edit_id=%s "
+                "where workspace_id=%s and world_id=%s and version_id=%s and instance_id=%s",
+                (edit_id, self.workspace_id, self.world_id, version_id, instance_id),
+            )
+            return point_map_instance_document(current), None
+        self._restore_point_map(version_id, before, edit_id)
+        return point_map_instance_document(current), point_map_instance_document(
+            self._require_point_map(version_id, instance_id)
+        )
+
+    def _restore_point_map(
+        self, version_id: uuid.UUID, document: Mapping[str, Any], edit_id: uuid.UUID
+    ) -> None:
+        current = self._require_point_map(version_id, document["instance_id"])
+        current_document = point_map_instance_document(current)
+        if (
+            current_document["source"] != document["source"]
+            or current_document["origin"] != document["origin"]
+        ):
+            raise InvalidObjectState("stored undo source binding disagrees with current state")
+        transform = document["transform"]
+        self.connection.execute(
+            "update world_alternate_point_map_instance set region_id=%s,x_mm=%s,y_mm=%s,z_mm=%s,"
+            "yaw_microradians=%s,scale_milli=%s,removed=%s,last_edit_id=%s "
+            "where workspace_id=%s and world_id=%s and version_id=%s and instance_id=%s",
+            (
+                document["region_id"],
+                transform["x_mm"],
+                transform["y_mm"],
+                transform["z_mm"],
+                transform["yaw_microradians"],
+                transform["scale_milli"],
+                document["removed"],
+                edit_id,
+                self.workspace_id,
+                self.world_id,
+                version_id,
+                document["instance_id"],
+            ),
+        )
 
     def _version_row(self, version_id: uuid.UUID, *, for_update: bool = False) -> Mapping[str, Any]:
         row = self.connection.execute(

@@ -116,6 +116,24 @@ export const SINGLE_VIEW_EDGE_MARGIN = 0.15;
  */
 export const RELIEF_PARALLAX_DEG = 1;
 
+export function reliefFor(
+  camera: Readonly<{ x: number; y: number; z: number }>,
+  print: Readonly<{ x: number; y: number; z: number }>,
+  viewer: Readonly<{ x: number; y: number; z: number }>,
+  parallaxPerUnit: number,
+): { readonly flatten: number; readonly behind: boolean } {
+  const ax = print.x - camera.x;
+  const ay = print.y - camera.y;
+  const az = print.z - camera.z;
+  // Behind the print is beyond its plane, whose normal is the camera's line of sight to it.
+  if (ax * (viewer.x - print.x) + ay * (viewer.y - print.y) + az * (viewer.z - print.z) > 0) {
+    return { flatten: 1, behind: true };
+  }
+  const parallax = Math.hypot(viewer.x - camera.x, viewer.y - camera.y, viewer.z - camera.z) * parallaxPerUnit;
+  const allowed = (RELIEF_PARALLAX_DEG * Math.PI) / 180;
+  return { flatten: parallax > allowed ? 1 - allowed / parallax : 0, behind: false };
+}
+
 /** A photograph's depths from its own camera, in its local units. */
 export interface SingleViewDepths {
   /** Where half the photograph's content is nearer and half further: where its subject stands. */

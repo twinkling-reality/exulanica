@@ -374,13 +374,29 @@ answers `ready`, or `blocked` with the first failing check in this order:
 | 3 | `unknown_attachment` | The entry and attachment do not name an attachment of a saved world of this world |
 | 3 | `expired_source_not_composable` | The attachment's authorization or screening has expired |
 | 3 | `attachment_is_not_composition` | Any other attachment: membership never becomes placed geometry |
+| 3 | `membership_not_current` | The photograph was removed from this world; add it back, which needs a new review |
+| 3 | `depth_not_permitted` | No current permission lets a 3D estimate from this photograph be used |
+| 3 | `review_differs_from_reference` | An estimate exists and was made under a different human review than this world's reference names |
+| 3 | `depth_not_produced` | No 3D estimate has been made from this photograph yet |
+| 3 | `insufficient_depth` | Too little of the photograph could be placed to stand in front of |
+| 3 | `point_map_bytes_unavailable` | The estimate's stored bytes are absent, do not verify, or may not be read right now |
 | 4 | `placement_required` | Preview only: the source resolves and no placement was given |
 | 5 | `invalid_placement` | Subject id, region of the source snapshot, transform, origin role, behaviour or source anchor is not acceptable |
-| 5 | `subject_already_present` | The version already has an object, or an environment instance, with that id |
+| 5 | `subject_already_present` | The version already has an object, an environment instance, or a placed estimate, with that id |
 
 Step 3 is the durable resolver's own order for each source kind. Step 5 is the durable validators'
 order: an object is checked for data before its id is checked for duplicates, and an environment
 instance the other way round.
+
+`photo_point_map` composes the depth estimate reached THROUGH a saved world's current membership of
+a photograph, which is why it takes the same `entry_id` and `attachment_id` a `source_attachment`
+source takes and answers differently. The attachment says which photograph, under which review, in
+which world; what is placed is the depth artifact. Its own step 3 order is membership, then the
+permission behind the estimate, then the estimate itself, because that is the order the recoveries
+differ in: add the photograph back, allow 3D estimates again, review it again, or wait for the
+estimate. A placed estimate's `origin_role` is always `personal`; `fictional` is
+`invalid_placement`, because an estimate built from the account holder's own photograph is not an
+invented prop. Its placement takes neither a `behaviour` nor a `source_anchor`.
 
 Preview is a dry run of apply rather than a second rule set. Both call the same resolver, which runs
 the repository's read-only validators (`validate_object_placement`, `validate_environment_source`,

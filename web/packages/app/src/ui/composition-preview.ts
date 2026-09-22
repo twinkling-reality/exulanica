@@ -86,6 +86,31 @@ export const COMPOSITION_BLOCKED_WORDS: Readonly<Record<CompositionBlockedReason
       happened: 'A reference photo stays a reference. It is kept with this world and is never placed into it.',
       next: 'To add something you can see, choose an object in the object panel.',
     },
+    membership_not_current: {
+      happened: 'That photo was removed from this world, so its 3D estimate cannot be placed.',
+      next: 'Add the photo back in the photo drawer. Adding it back needs a new review first.',
+    },
+    depth_not_permitted: {
+      happened: 'You have not allowed a 3D estimate of that photo, or you stopped it.',
+      next: 'Review the photo again and tick Estimate 3D shape from these photos.',
+    },
+    review_differs_from_reference: {
+      happened:
+        'The 3D estimate of that photo was made under a different review than this world uses.',
+      next: 'Remove the photo from this world and add it back, which uses the newer review.',
+    },
+    depth_not_produced: {
+      happened: 'No 3D estimate has been made from that photo yet.',
+      next: 'Refresh the world after processing. Estimates are made after a review is recorded.',
+    },
+    insufficient_depth: {
+      happened: 'Too little of that photo could be placed to be worth standing in front of.',
+      next: 'A closer photograph of one scene, with more of it in focus, gives more to place.',
+    },
+    point_map_bytes_unavailable: {
+      happened: 'The 3D estimate of that photo cannot be read right now.',
+      next: 'Try again, or ask whoever hosts this world to restore it.',
+    },
     placement_required: {
       happened: 'No spot was chosen for this addition.',
       next: 'Stand where you want it and choose Place before me.',

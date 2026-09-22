@@ -1,5 +1,5 @@
 import { el } from './dom.js';
-import { HUMAN_ATTESTATION } from '../personal-admission-api.js';
+import { DEPTH_MODEL_NOTICE, HUMAN_ATTESTATION } from '../personal-admission-api.js';
 
 /** Sequential reading groups; callbacks and server receipts still own progress. */
 export function buildPersonalIntake() {
@@ -146,12 +146,18 @@ export function buildPersonalIntake() {
   group.append(el('p', { text: 'The inventory in this attestation is the selected admission photographs. '
     + 'Inspect and review every selected original before checking it.' }));
   const attestation = field(HUMAN_ATTESTATION, 'checkbox');
+  // A second, separate decision. Unticked, and never implied by the review above: a person who
+  // said "I looked at this photograph and these are the people in it" has said nothing about
+  // whether a depth network may read the same pixels.
+  const depthConsent = field('Estimate 3D shape from these photos', 'checkbox');
+  const depthTerm = el('p', { class: 'depth-consent-term' });
+  group.append(el('p', { class: 'depth-consent-notice', text: DEPTH_MODEL_NOTICE }), depthTerm);
   const complete = button('Record human review');
   workflow.append(controls);
   root.append(collection, status, workflow);
   return { root, controls, status, files, upload, inventory, members, purpose, authority, validUntil, detect,
     retry, retryReview, receipts, progress, reload, source, review, linkedSubject, selection, link,
-    reviewChoice, reviewer, attestation, complete, attachedReferences, referenceCount,
+    reviewChoice, reviewer, attestation, depthConsent, depthTerm, complete, attachedReferences, referenceCount,
     attachmentStatus, worldAction, retryAttachment, originals, workflow, referenceNotice,
     ready, readyReferences, previous, previousReferences, retryMembership };
 }

@@ -126,6 +126,10 @@ INSERT_ONLY_TABLES: Final = (
     "society_experiment_outcome",
     "saved_world_source_attachment_operation",
     "saved_world_source_attachment",
+    # Migration 0092's append-only trigger refuses every update and delete. Revoking UPDATE as
+    # well states the same rule where provisioning can see it, rather than leaving a grant the
+    # trigger happens to make unusable.
+    "point_map_model_right",
     "saved_world_source_detach_operation",
     "saved_world_source_detach",
     "place_source_frame",

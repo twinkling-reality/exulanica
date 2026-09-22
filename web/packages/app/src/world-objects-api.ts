@@ -142,6 +142,7 @@ export interface AlternateVersion {
   readonly objects: readonly AuthoredObject[];
   readonly elementOverrides: readonly ElementOverride[];
   readonly environmentInstances?: readonly EnvironmentInstance[];
+  readonly pointMapInstances?: readonly PointMapInstance[];
   readonly edits: readonly VersionEdit[];
 }
 
@@ -153,6 +154,54 @@ export interface EnvironmentInstance {
   readonly origin: { readonly kind: string; readonly role: ObjectRole };
   readonly removed: boolean;
   readonly availability: string;
+}
+
+/** Why a placed estimate cannot be drawn right now, as the server computed it. */
+export type PointMapAvailability =
+  | 'available'
+  | 'unavailable_bytes'
+  | 'withdrawn'
+  | 'detached'
+  | 'binding_drift'
+  | 'unknown'
+  | string;
+
+/**
+ * A depth estimate from one reviewed photograph, placed in this version.
+ *
+ * ``truth``, ``scale`` and ``coverage`` are sentences the SERVER wrote. They are carried rather
+ * than composed here on purpose: what a person is told about whether this is a measurement, and
+ * about what it does not show, must not be able to drift from what was actually placed because a
+ * client was updated separately.
+ */
+export interface PointMapInstance {
+  readonly instanceId: string;
+  readonly source: Readonly<Record<string, unknown>>;
+  readonly regionId: string;
+  readonly transform: ObjectTransform;
+  readonly origin: { readonly kind: string; readonly role: ObjectRole };
+  readonly removed: boolean;
+  readonly availability: PointMapAvailability;
+  /** Which end of permission it was, for the ``withdrawn`` state. Null otherwise. */
+  readonly unavailableReason: string | null;
+  readonly truth: string;
+  readonly scale: string;
+  readonly coverage: string;
+}
+
+/**
+ * The placed estimates a renderer may draw, and nothing else.
+ *
+ * A removed one is gone; anything not ``available`` draws NOTHING, with no placeholder and no
+ * outline. Something drawn where a stopped estimate used to be would be the system keeping a
+ * shape of somebody's home after they said no, and a grey box is still a shape.
+ */
+export function drawablePointMaps(
+  version: AlternateVersion,
+): readonly PointMapInstance[] {
+  return (version.pointMapInstances ?? []).filter(
+    (instance) => !instance.removed && instance.availability === 'available',
+  );
 }
 
 export class WorldObjectsContractError extends Error {
@@ -726,6 +775,26 @@ function parseEnvironmentInstance(value: unknown): EnvironmentInstance {
   });
 }
 
+function parsePointMapInstance(value: unknown): PointMapInstance {
+  const row = record(value, 'point map instance');
+  const origin = record(row['origin'], 'point map instance origin');
+  const role = text(origin['role'], 'point map instance role');
+  if (!isObjectRole(role)) throw invalid('point map instance role');
+  return Object.freeze({
+    instanceId: text(row['instance_id'], 'point map instance id'),
+    source: Object.freeze({ ...record(row['source'], 'point map instance source') }),
+    regionId: text(row['region_id'], 'point map instance region'),
+    transform: parseTransform(row['transform']),
+    origin: Object.freeze({ kind: text(origin['kind'], 'point map origin kind'), role }),
+    removed: flag(row['removed'], 'point map instance removal'),
+    availability: text(row['availability'], 'point map instance availability'),
+    unavailableReason: optionalText(row['unavailable_reason'], 'point map unavailable reason'),
+    truth: text(row['truth'], 'point map truth line'),
+    scale: text(row['scale'], 'point map scale line'),
+    coverage: text(row['coverage'], 'point map coverage line'),
+  });
+}
+
 export function parseVersion(value: unknown): AlternateVersion {
   const row = record(value, 'alternate world version');
   const objects = array(row['objects'], 'authored object list').map(parseObject);
@@ -753,6 +822,10 @@ export function parseVersion(value: unknown): AlternateVersion {
     environmentInstances: Object.freeze(
       array(row['environment_instances'] ?? [], 'environment instance list')
         .map(parseEnvironmentInstance),
+    ),
+    pointMapInstances: Object.freeze(
+      array(row['point_map_instances'] ?? [], 'point map instance list')
+        .map(parsePointMapInstance),
     ),
     edits: Object.freeze(array(row['edits'], 'version edit list').map(parseEdit)),
   });

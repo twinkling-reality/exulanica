@@ -73,6 +73,7 @@ __all__ = [
     "ModelRightRefused",
     "ModelRightRow",
     "RefusalReason",
+    "bind_point_map",
     "egress_origin",
     "grant_model_right",
     "model_right",
@@ -349,6 +350,32 @@ def grant_model_right(
     if stored is None or stored.receipt_sha256 != digest:
         raise ValueError("an existing model right disagrees with this receipt")
     return stored
+
+
+def bind_point_map(
+    repository: IngestRepository, *, artifact_id: uuid.UUID, decision: ModelRightDecision
+) -> tuple[uuid.UUID, ...]:
+    """Record that this point map exists because of the rights that permitted the read.
+
+    Call it inside the transaction that publishes the artifact. A point map is not a transient
+    answer: it is a three-dimensional reading of the room, and it outlives the hand-over that
+    produced it, so :func:`require_model_right` alone would let a withdrawal stop the next
+    inference and leave every existing map servable. Migration 0092's binding is what makes
+    ``asset_point_allows`` refuse this artifact the moment the right ends.
+
+    The insert is refused by that migration's trigger if the right stopped being current between
+    the hand-over and now, which rolls the publication back with it. An exempt capture has no
+    rights and is bound to nothing; nothing here invents a right for a photograph that needs none.
+    """
+    bound: list[uuid.UUID] = []
+    for right in decision.rights:
+        repository.connection.execute(
+            "insert into point_map_model_right (workspace_id,artifact_id,capture_id,right_id,"
+            "bound_at) values (%s,%s,%s,%s,clock_timestamp()) on conflict do nothing",
+            (repository.workspace_id, artifact_id, decision.capture_id, right.right_id),
+        )
+        bound.append(right.right_id)
+    return tuple(bound)
 
 
 def withdraw_model_right(

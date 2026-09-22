@@ -157,6 +157,15 @@ class ExportVersion:
     parent_version_id: object | None
     environment_bearing: bool
     source_invalidated: bool
+    #: Carries a placed depth estimate from a photograph, which neither profile can write.
+    #:
+    #: A package is a portable copy of a world. A photo point map's whole identity is a chain of
+    #: receipts inside the workspace it lives in: the personal authority, the human review and the
+    #: depth right that the owner can end at any moment. Writing one into a crate that leaves this
+    #: machine would carry a reading of somebody's home past the only place their withdrawal can
+    #: reach it. Exporting that is a decision, not a projection, so until it is taken these
+    #: versions are withheld and counted, exactly as an invalidated source is.
+    point_map_bearing: bool = False
 
 
 def partition_export_versions(
@@ -171,14 +180,15 @@ def partition_export_versions(
 
     ``authored_ids`` is the kept schema-v1 subset whose ancestor chain is also schema-v1. Those
     versions may also appear in ``environment_ids`` when a descendant needs them as a parent.
-    Invalidated sources are counted on the side that would have exported them and are not named.
+    Invalidated sources, and versions carrying a placed depth estimate, are counted on the side
+    that would have exported them and are not named.
     """
     by_id = {item.version_id: item for item in versions}
     authored_withheld = 0
     environment_withheld = 0
     kept: list[ExportVersion] = []
     for item in versions:
-        if item.source_invalidated:
+        if item.source_invalidated or item.point_map_bearing:
             if item.environment_bearing:
                 environment_withheld += 1
             else:

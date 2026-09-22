@@ -573,7 +573,7 @@ drain when the current role is a superuser, has BYPASSRLS, or owns any row-level
 role starts and cannot see another workspace, while the bootstrap owner is rejected. The same
 check runs in the API lifespan and the dedicated worker command before either accepts work.
 
-121 tables are under FORCE row-level security keyed on ``current_workspace()``. The package-export receipt is
+123 tables are under FORCE row-level security keyed on ``current_workspace()``. The package-export receipt is
 append-only and scoped by the same session workspace as the protected world state whose Merkle
 root it records. Migration 0029 adds four reconstruction privacy tables under the same enforced
 workspace policy. Their authorization, screening, exact-set admission, and admission membership
