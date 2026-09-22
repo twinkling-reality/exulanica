@@ -14,7 +14,7 @@ from exulanica.epistemics.source_images import selected_image
 from exulanica.errors import BlobNotFoundError, IntegrityError
 from exulanica.evidence.blob import BlobId
 from exulanica.store.base import ContentAddressedStore
-from exulanica.world.errors import InvalidStyleData, UnknownWorldResource
+from exulanica.world.errors import InvalidStyleData, StaleStyleVersion, UnknownWorldResource
 from exulanica.world.repository import WorldStyleRepository
 from exulanica.world.style_structure import (
     AuthoredVersionRef,
@@ -686,6 +686,26 @@ class SavedWorldEntryRepository:
         ):
             raise StaleSavedWorldEntry(
                 "the authored world changed before the appearance could be saved"
+            )
+
+    def require_saved_style_is_live_write_base(
+        self, *, world_id: str, style_version_id: uuid.UUID
+    ) -> None:
+        """Refuse an appearance edit while this saved style is not the live style.
+
+        The entry lock has already proved ``style_version_id`` is the saved cursor.
+        Rollback restores that appearance onto the live authority and does not call this.
+        """
+
+        row = self.connection.execute(
+            "select current_style_version_id from world_style_state "
+            "where workspace_id=%s and world_id=%s for update",
+            (self.workspace_id, world_id),
+        ).fetchone()
+        if row is None or row["current_style_version_id"] != style_version_id:
+            raise StaleStyleVersion(
+                "restore the visible saved appearance before editing; "
+                "another appearance is active"
             )
 
     def advance_style_locked(

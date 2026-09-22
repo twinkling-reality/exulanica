@@ -279,6 +279,22 @@ def test_partition_keeps_schema_v1_siblings_in_authored_world_and_closes_parent_
     assert env_withheld == 1
 
 
+def test_partition_copies_a_multi_hop_schema_v1_ancestor_chain_into_both_sets():
+    grandparent, parent, child, sibling = "grandparent", "parent", "child", "sibling"
+    authored_ids, env_ids, authored_withheld, env_withheld = environments.partition_export_versions(
+        (
+            _export_row(grandparent),
+            _export_row(parent, parent=grandparent),
+            _export_row(child, parent=parent, environment_bearing=True),
+            _export_row(sibling),
+        )
+    )
+    assert authored_ids == (grandparent, parent, sibling)
+    assert env_ids == (grandparent, parent, child)
+    assert set(authored_ids) & set(env_ids) == {grandparent, parent}
+    assert authored_withheld == env_withheld == 0
+
+
 def test_partition_omits_authored_ids_when_every_kept_version_is_environment_bearing():
     authored_ids, env_ids, authored_withheld, env_withheld = environments.partition_export_versions(
         (_export_row("only", environment_bearing=True),)

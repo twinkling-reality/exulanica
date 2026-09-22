@@ -481,6 +481,7 @@ def rollback(
             before_write=before,
             after_write=after,
         ),
+        restoring=True,
     )
 
 
@@ -490,6 +491,8 @@ def _commit_style(
     operation: Callable[
         [Callable[[], None] | None, Callable[[StyleVersion], None] | None], StyleVersion
     ],
+    *,
+    restoring: bool = False,
 ) -> StyleVersionView | JSONResponse:
     """Commit a style and its saved resume pointer together when an entry is bound."""
 
@@ -507,6 +510,11 @@ def _commit_style(
                 authored_edit_seq=saved_entry.authored_edit_seq,
                 style_version_id=saved_entry.style_version_id,
             )
+            if not restoring:
+                entries.require_saved_style_is_live_write_base(
+                    world_id=repository.world_id,
+                    style_version_id=saved_entry.style_version_id,
+                )
 
         def after(version: StyleVersion) -> None:
             entries.advance_style_locked(

@@ -1040,6 +1040,117 @@ def test_bound_style_write_and_entry_pointer_commit_or_rollback_together(objects
     assert advanced["revision"] == entry["revision"] + 1
 
 
+def _appearance_preview(objects_api, state: dict, *, vitality: float):
+    return objects_api.post(
+        "/world/styles/previews",
+        {
+            "proposal_id": str(uuid.uuid4()),
+            "origin": "settings",
+            "origin_reference": "appearance-panel",
+            "scope": {"kind": "global"},
+            "base_style_version_id": state["current"]["version_id"],
+            "base_topology_digest": state["current_topology_digest"],
+            "profile": {
+                "profile_id": "origin-landscape",
+                "profile_version": 1,
+                "parameters": {"vitality": vitality},
+            },
+        },
+    )
+
+
+def test_bound_appearance_edit_refuses_a_historical_saved_style_until_restore(
+    objects_api, repository
+):
+    entry, _version, _style = _create_entry(objects_api, repository)
+    initial = objects_api.get("/world/styles/current").json()
+    drifted_preview = _appearance_preview(objects_api, initial, vitality=0.25)
+    assert drifted_preview.status_code == 201, drifted_preview.text
+    drifted = objects_api.post(
+        f"/world/styles/previews/{drifted_preview.json()['preview_id']}/apply",
+        {
+            "base_style_version_id": initial["current"]["version_id"],
+            "base_topology_digest": initial["current_topology_digest"],
+        },
+    )
+    assert drifted.status_code == 200, drifted.text
+    live = objects_api.get("/world/styles/current").json()
+    assert live["current"]["version_id"] == drifted.json()["version_id"]
+    assert live["current"]["version_id"] != entry["style_version_id"]
+    saved = objects_api.get(f"/world-entries/{entry['entry_id']}").json()
+    assert saved["style_version_id"] == entry["style_version_id"]
+    assert saved["revision"] == entry["revision"]
+
+    later_preview = _appearance_preview(objects_api, live, vitality=0.75)
+    assert later_preview.status_code == 201, later_preview.text
+    binding = {
+        "entry_id": entry["entry_id"],
+        "base_revision": entry["revision"],
+        "authored_state_sha256": entry["authored_state_sha256"],
+        "authored_edit_seq": entry["authored_edit_seq"],
+        "style_version_id": entry["style_version_id"],
+    }
+    refused = objects_api.post(
+        f"/world/styles/previews/{later_preview.json()['preview_id']}/apply",
+        {
+            "base_style_version_id": live["current"]["version_id"],
+            "base_topology_digest": live["current_topology_digest"],
+            "saved_entry": binding,
+        },
+    )
+    assert refused.status_code == 409, refused.text
+    assert refused.json()["code"] == "stale_style_version"
+    assert refused.json()["detail"] == (
+        "restore the visible saved appearance before editing; another appearance is active"
+    )
+    assert objects_api.get("/world/styles/current").json()["current"]["version_id"] == (
+        live["current"]["version_id"]
+    )
+    untouched = objects_api.get(f"/world-entries/{entry['entry_id']}").json()
+    assert untouched["style_version_id"] == entry["style_version_id"]
+    assert untouched["revision"] == entry["revision"]
+
+    restored = objects_api.post(
+        "/world/styles/rollback",
+        {
+            "target_version_id": entry["style_version_id"],
+            "base_style_version_id": live["current"]["version_id"],
+            "base_topology_digest": live["current_topology_digest"],
+            "origin": "settings",
+            "origin_reference": "appearance-history",
+            "saved_entry": binding,
+        },
+    )
+    assert restored.status_code == 200, restored.text
+    assert restored.json()["rollback_target_version_id"] == entry["style_version_id"]
+    reopened = objects_api.get(f"/world-entries/{entry['entry_id']}").json()
+    assert reopened["style_version_id"] == restored.json()["version_id"]
+    assert reopened["revision"] == entry["revision"] + 1
+    assert objects_api.get("/world/styles/current").json()["current"]["version_id"] == (
+        restored.json()["version_id"]
+    )
+
+    restored_state = objects_api.get("/world/styles/current").json()
+    editable_preview = _appearance_preview(objects_api, restored_state, vitality=0.75)
+    assert editable_preview.status_code == 201, editable_preview.text
+    edited = objects_api.post(
+        f"/world/styles/previews/{editable_preview.json()['preview_id']}/apply",
+        {
+            "base_style_version_id": restored.json()["version_id"],
+            "base_topology_digest": restored_state["current_topology_digest"],
+            "saved_entry": {
+                **binding,
+                "base_revision": reopened["revision"],
+                "style_version_id": reopened["style_version_id"],
+            },
+        },
+    )
+    assert edited.status_code == 200, edited.text
+    saved_edit = objects_api.get(f"/world-entries/{entry['entry_id']}").json()
+    assert saved_edit["style_version_id"] == edited.json()["version_id"]
+    assert saved_edit["revision"] == reopened["revision"] + 1
+
+
 def test_entry_is_not_an_existence_oracle_across_workspaces(objects_api, repository):
     entry, _version, _style = _create_entry(objects_api, repository)
     path = f"/world-entries/{entry['entry_id']}"

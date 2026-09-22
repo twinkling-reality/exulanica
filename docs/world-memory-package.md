@@ -420,14 +420,19 @@ whole authored state. `import-check` runs no loader and does not write a live wo
 for byte. `tests/test_world_package_environment.py` checks that schema version 2 is refused
 under authored-world 1.0, that this extension re-derives an environment-inclusive digest
 without the product domain types, that a schema-v1 ancestor and environment-bearing child
-verify together, that a child whose parent is absent from this directory is refused, and that
+verify together, that a schema-v1 grandparent and parent of an environment-bearing child stay
+in the authored-world set and are copied into the environment set, that a child whose parent
+is absent from this directory is refused, and that
 a loader without the capability is told to omit rather than infer.
 `tests/test_world_package_environment_postgres.py` round-trips a live environment instance,
 omits an undone addition, states withdrawn and unavailable honestly, refuses an
 authored-world-1.0-only export of a version that has environments, verifies a parent in
 authored-world 1.0 whose child later gained an environment, includes that parent in an
-environment-only cut, verifies a schema-v1 child whose parent stayed environment-bearing
-after undo, and omits an empty authored-world directory when every kept version belongs here.
+environment-only cut, closes that two-ancestor chain in a dual export, tells a loader without
+the environment capability to omit the parent/child dual rather than treat the authored-world
+subset as the whole authored state, verifies a schema-v1 child whose parent stayed
+environment-bearing after undo, and omits an empty authored-world directory when every kept
+version belongs here.
 
 ## Explicit training dataset profile
 

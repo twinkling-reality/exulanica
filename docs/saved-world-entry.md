@@ -228,8 +228,10 @@ routes.
 ## Verification
 
 `tests/test_saved_world_entries_api.py` executes exact reopen, cursor adoption races, atomic
-authored and appearance advancement, transaction rollback, source invalidation, cross-world
-reference refusal, and cross-workspace non-disclosure against PostgreSQL. Browser tests in
+authored and appearance advancement, refusal of a bound appearance edit while the saved style
+is historical, rollback that restores that appearance onto the live authority, transaction
+rollback, source invalidation, cross-world reference refusal, and cross-workspace
+non-disclosure against PostgreSQL. Browser tests in
 `web/packages/app/test/world-entry-api.test.ts`, `world-entry-surface.test.ts`,
 `world-objects-api.test.ts`, and `world-style-api.test.ts` verify explicit recovery, bound writes,
 creation, appearance save/reload, named-world propagation, and the absence of newest-version

@@ -274,6 +274,108 @@ def test_dual_export_of_an_authored_parent_and_environment_child_verifies(
     assert [item["instance_id"] for item in exported] == ["environment:plaza"]
 
 
+def test_dual_export_closes_a_multi_hop_schema_v1_ancestor_chain(repository, tmp_path: Path):
+    composed = _composed_over(repository, tmp_path, structural_candidate())
+    grandparent = composed.version
+    parent = composed.worlds.create_version(
+        parent_version_id=grandparent.version_id,
+        title="Middle floor",
+        created_by=uuid.uuid4(),
+    )
+    child = composed.worlds.create_version(
+        parent_version_id=parent.version_id,
+        title="Child plaza",
+        created_by=uuid.uuid4(),
+    )
+    child = composed.worlds.add_environment(
+        child.version_id,
+        composed.placement("environment:plaza"),
+        base_state_sha256=child.state_sha256,
+        actor=uuid.uuid4(),
+    )
+    result = _export(
+        repository,
+        tmp_path / "multi-hop-dual.wmp",
+        extensions=[authored.EXTENSION_KEY, environments.EXTENSION_KEY],
+        store=composed.store,
+    )
+    report = verify_package(result.output)
+    by_name = {finding.extension: finding for finding in report.extensions}
+    authored_by_id = {
+        item["version_id"]: item
+        for item in by_name[authored.EXTENSION_NAME].authored_world.versions
+    }
+    env_by_id = {
+        item["version_id"]: item
+        for item in by_name[environments.EXTENSION_NAME].environment_instances.versions
+    }
+    grandparent_urn = _urn("alternate-version", grandparent.version_id)
+    parent_urn = _urn("alternate-version", parent.version_id)
+    child_urn = _urn("alternate-version", child.version_id)
+    assert set(authored_by_id) == {grandparent_urn, parent_urn}
+    assert set(env_by_id) == {grandparent_urn, parent_urn, child_urn}
+    assert set(authored_by_id) & set(env_by_id) == {grandparent_urn, parent_urn}
+    for ancestor in (grandparent_urn, parent_urn):
+        assert authored_by_id[ancestor]["delta"]["schema_version"] == 1
+        assert env_by_id[ancestor]["delta"]["schema_version"] == 1
+        assert "environment_instances" not in authored_by_id[ancestor]["delta"]
+        assert "environment_instances" not in env_by_id[ancestor]["delta"]
+    assert env_by_id[parent_urn]["parent_version_id"] == grandparent_urn
+    assert env_by_id[child_urn]["parent_version_id"] == parent_urn
+    assert env_by_id[child_urn]["delta"]["schema_version"] == 2
+    exported = env_by_id[child_urn]["delta"]["environment_instances"]
+    assert [item["instance_id"] for item in exported] == ["environment:plaza"]
+
+
+def test_an_incapable_loader_omits_a_parent_child_dual_rather_than_inferring_authored_world(
+    repository, tmp_path: Path
+):
+    composed, parent, child = _parent_then_environment_child(repository, tmp_path)
+    result = _export(
+        repository,
+        tmp_path / "parent-child-omit.wmp",
+        extensions=[authored.EXTENSION_KEY, environments.EXTENSION_KEY],
+        store=composed.store,
+    )
+    report = verify_package(result.output)
+    by_name = {finding.extension: finding for finding in report.extensions}
+    parent_urn = _urn("alternate-version", parent.version_id)
+    child_urn = _urn("alternate-version", child.version_id)
+    authored_ids = {
+        item["version_id"] for item in by_name[authored.EXTENSION_NAME].authored_world.versions
+    }
+    env_ids = {
+        item["version_id"]
+        for item in by_name[environments.EXTENSION_NAME].environment_instances.versions
+    }
+    assert authored_ids == {parent_urn}
+    assert env_ids == {parent_urn, child_urn}
+    declared = import_check_package(result.output)
+    styles = {f"style-profile:{profile}" for profile in declared["required_style_profiles"]}
+    interactions = {
+        f"interaction:{capability}" for capability in declared["required_interaction_capabilities"]
+    }
+    capabilities = frozenset(styles | interactions | {authored.EXTENSION_CAPABILITY})
+    checked = import_check_package(result.output, loader_capabilities=capabilities)
+    assert checked["loadability"] == "partial"
+    authored_report = next(
+        item for item in checked["extensions"] if item["extension"] == authored.EXTENSION_NAME
+    )
+    env_report = next(
+        item for item in checked["extensions"] if item["extension"] == environments.EXTENSION_NAME
+    )
+    assert authored_report["load"] == "loaded"
+    assert env_report["load"] == "not loaded"
+    omission = (
+        f"this loader does not declare {environments.EXTENSION_CAPABILITY}, so "
+        "2 alternate version(s) and 1 present environment instance(s) "
+        "in this package are not loaded; the loader must say so rather than infer "
+        "objects from exulanica-wmp-ext-authored-world@1.0 as the whole authored state"
+    )
+    assert env_report["not_loaded"] == omission
+    assert omission in checked["warnings"]
+
+
 def test_environment_only_export_includes_the_authored_parent_the_child_names(
     repository, tmp_path: Path
 ):
