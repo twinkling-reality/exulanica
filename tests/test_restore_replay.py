@@ -87,6 +87,15 @@ def _postgres_tool(name):
 
 
 def _backup(purged, tmp_path):
+    """Dump the way an operator's backup does, privileges included.
+
+    The restore below drops and rebuilds the session's shared schema, so whatever this dump omits
+    is missing from every test that runs after this file in the same process. Dumped without
+    privileges, the migrations' own ``revoke all on function ... from public`` went with it and
+    every SECURITY DEFINER function came back executable by PUBLIC, which is the escalation those
+    revokes exist to prevent: the definer-function privilege test passes alone and fails after
+    this file. ``--no-owner`` stays, because the restoring role owns the rebuilt schema.
+    """
     dump = tmp_path / "before-deletion.sql"
     completed = subprocess.run(
         [
@@ -96,7 +105,6 @@ def _backup(purged, tmp_path):
             "--schema",
             purged.scratch,
             "--no-owner",
-            "--no-privileges",
             "--file",
             str(dump),
         ],
@@ -133,6 +141,20 @@ def _restore(purged, dump, blobs):
     with purged.database().unscoped() as connection:
         provision_runtime_role(connection, role=_APP_ROLE, password=_APP_PASSWORD)
         provision_purge_role(connection, role=_PURGE_ROLE, password=_PURGE_PASSWORD)
+    # Provisioning grants; it never revokes PUBLIC's execute, because the migrations do that where
+    # they create the function. So a restore is the one moment those revokes can be lost, and this
+    # schema is the session's, shared with every test that runs after this file. Asked as a
+    # property rather than a list of names: an owner-rights function added later is covered by it
+    # without anyone remembering to come back here. A null proacl is the default ACL, which grants
+    # PUBLIC execute, and grantee 0 is PUBLIC.
+    executable_by_public = purged.rows(
+        "select p.proname from pg_proc p join pg_namespace n on n.oid=p.pronamespace, "
+        "lateral aclexplode(coalesce(p.proacl,acldefault('f',p.proowner))) a "
+        "where n.nspname=%s and p.prosecdef and a.grantee=0 and a.privilege_type='EXECUTE' "
+        "order by p.proname",
+        purged.scratch,
+    )
+    assert executable_by_public == [], executable_by_public
 
 
 def _capture(purged):
