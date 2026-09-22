@@ -1,0 +1,218 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "already_seen": "No model output of any kind exists for these photographs. Their drawings were viewed as a contact sheet to confirm they render as intended; two drawing errors were corrected before this was written.",
+    "corpus": {
+      "drawn_by": "scripts/make_sign_completeness_probe.py",
+      "ground_truth_sha256": "bc4575f1c56f5f0c6dfda8490ca77282dfb4c029b8495449b7b500f55e134cde",
+      "partial": 12,
+      "partial_covered": 8,
+      "partial_cut_by_frame": 4,
+      "photographs": [
+        {
+          "file": "probe-01-whole-plain.jpg",
+          "how": "plain",
+          "sha256": "e8a272dc0455174b406c411bd4bfaf779d8e3d88aaa376176b4a5c3c0252598f",
+          "state": "whole"
+        },
+        {
+          "file": "probe-02-whole-plain.jpg",
+          "how": "plain",
+          "sha256": "ff2b07f128ef1a9ae9a5e7ad43cde69b06072abdc5cc13235b81999fc1cbeb97",
+          "state": "whole"
+        },
+        {
+          "file": "probe-03-whole-plain.jpg",
+          "how": "plain",
+          "sha256": "724f117a35ed482249e7d806cdeaf9d5fec25e68f592e28ec00d4684316c1310",
+          "state": "whole"
+        },
+        {
+          "file": "probe-04-whole-plain.jpg",
+          "how": "plain",
+          "sha256": "cb37419ddf1bda7c60b8795efacc9c7f6eb21763a4cae6e90036e05a0df7d467",
+          "state": "whole"
+        },
+        {
+          "file": "probe-05-whole-plain.jpg",
+          "how": "plain",
+          "sha256": "3e4bfe79ca68809cf80b47658ae800d103cc7b8a66cf0f314fbcd43e766d43da",
+          "state": "whole"
+        },
+        {
+          "file": "probe-06-whole-plain.jpg",
+          "how": "plain",
+          "sha256": "c2557dd0a46ec4c92e44b115ae914735de0d967d5efcd557b475ababd81f0ab8",
+          "state": "whole"
+        },
+        {
+          "file": "probe-07-whole-plain.jpg",
+          "how": "plain",
+          "sha256": "75aa2f1f84292cc5f1cea13574736f774fb76fdb12ac8c16a3a142098fcaa458",
+          "state": "whole"
+        },
+        {
+          "file": "probe-08-whole-plain.jpg",
+          "how": "plain",
+          "sha256": "9331528928d82ab2d180294bff2a292b045624fb82ec2d1af2e19cda917156b2",
+          "state": "whole"
+        },
+        {
+          "file": "probe-09-whole-tree_beside.jpg",
+          "how": "tree_beside",
+          "sha256": "57a04eb59bd829f3915b254b9b3823fd57ba4f5d3a8e83521cd82ab1a9be32ad",
+          "state": "whole"
+        },
+        {
+          "file": "probe-10-whole-tree_beside.jpg",
+          "how": "tree_beside",
+          "sha256": "7450e429a0d20f0027b712b28e17ecd126fd094b8dfe06724a1acbcbb86397c4",
+          "state": "whole"
+        },
+        {
+          "file": "probe-11-whole-tree_beside.jpg",
+          "how": "tree_beside",
+          "sha256": "5786794dff6bbda7b98e7989f2507e96b1e0bd4eefb3f027a5cce5adc267080e",
+          "state": "whole"
+        },
+        {
+          "file": "probe-12-whole-tree_beside.jpg",
+          "how": "tree_beside",
+          "sha256": "621e9dee2efc9492d243f390913ec04fefac40a7c251240c9920807fa0ab106b",
+          "state": "whole"
+        },
+        {
+          "file": "probe-13-partial-cover_last.jpg",
+          "how": "cover_last",
+          "sha256": "4786b1a0e841c3d745992da1e0f87f64124939b4f25e9cb0760c437615391bbf",
+          "state": "partial"
+        },
+        {
+          "file": "probe-14-partial-cover_last.jpg",
+          "how": "cover_last",
+          "sha256": "558e763f7fda051a604bbdc5f34547fb38a1914d26dc6759fed290b97ac6c8f7",
+          "state": "partial"
+        },
+        {
+          "file": "probe-15-partial-cover_last.jpg",
+          "how": "cover_last",
+          "sha256": "bacdc451b557822aea965a7f07546c3762824db296dead6c29423d2aad6e887a",
+          "state": "partial"
+        },
+        {
+          "file": "probe-16-partial-cover_last.jpg",
+          "how": "cover_last",
+          "sha256": "a13388439cb27201f3e9fec834dadbe71a5aad67ee41a9a3b5ba4ba4308a6226",
+          "state": "partial"
+        },
+        {
+          "file": "probe-17-partial-cover_first.jpg",
+          "how": "cover_first",
+          "sha256": "23b95ca54405951141d998cf68b0168854f73af2a396fc5721910a431d4f8335",
+          "state": "partial"
+        },
+        {
+          "file": "probe-18-partial-cover_first.jpg",
+          "how": "cover_first",
+          "sha256": "f6b51e97342251f879f0cfd9201b6048757a90dfadd34776452babb96a803051",
+          "state": "partial"
+        },
+        {
+          "file": "probe-19-partial-cover_middle.jpg",
+          "how": "cover_middle",
+          "sha256": "469a165b1be9be9ddf5bc1bdfe3d0a2339b1633886b556569777c1cb9bcfd7bf",
+          "state": "partial"
+        },
+        {
+          "file": "probe-20-partial-cover_middle.jpg",
+          "how": "cover_middle",
+          "sha256": "6f6fde8f5a9767db422f27188ae64e0a0031c3486f0c17f0b71cf3003614a935",
+          "state": "partial"
+        },
+        {
+          "file": "probe-21-partial-cut.jpg",
+          "how": "cut",
+          "sha256": "03e746b702b42c8129682688e077350f0a6169c9ec46478bdaee98a64512cf0e",
+          "state": "partial"
+        },
+        {
+          "file": "probe-22-partial-cut.jpg",
+          "how": "cut",
+          "sha256": "d471c30325c0395108685153c615a68740be994209e18c4e464a653d213cca1b",
+          "state": "partial"
+        },
+        {
+          "file": "probe-23-partial-cut.jpg",
+          "how": "cut",
+          "sha256": "150df24c67fc57032f853d4a9d4afe91561fd77d7c2c54537cc60cdde0baad64",
+          "state": "partial"
+        },
+        {
+          "file": "probe-24-partial-cut.jpg",
+          "how": "cut",
+          "sha256": "497e87933f78849de98ac982a1925239fa7b85dfb006fc7b6d7df5bd64c5279e",
+          "state": "partial"
+        }
+      ],
+      "whole": 12,
+      "whole_with_tree_beside": 4
+    },
+    "decision_rule": {
+      "can_tell_when": "partial detected at least 10 of 12 AND covered boards detected at least 7 of 8 AND whole boards correct at least 10 of 12",
+      "chance": "at random, 10 or more of 12 happens with probability about 0.019 per arm, so passing both arms is not luck",
+      "covered_detected_min": 7,
+      "covered_of": 8,
+      "if_it_can": "wording 3 gates the proposal on the model's own completeness judgement, then development with 4 or more partial boards, then a fresh held-out split pre-registered before any call.",
+      "if_it_cannot_tell": "B stops. No wording 3 is written, and the finding goes to root for A or C.",
+      "partial_detected_min": 10,
+      "partial_of": 12,
+      "whole_correct_min": 10,
+      "whole_of": 12,
+      "why_covered_separately": "the held-out failures were covered boards. A model that sees frame edges but not covers would pass on the whole partial arm and still miss the failure that matters.",
+      "why_whole_as_well": "a model that calls every sign partly hidden would detect every partial board and suppress every proposal."
+    },
+    "input": "the rendition production sends (exulanica.ingest.derivatives.render)",
+    "model": {
+      "calls_per_photograph": 1,
+      "fallback": "disabled",
+      "model_id": "MiniMaxAI/MiniMax-M3",
+      "role": "vision",
+      "temperature": 0
+    },
+    "probe": {
+      "probe_sha256": "be4142d22b01e8bc6786905c012cba860d126a5110ef0ae9ca6fbe65a01aea95",
+      "question": "Is there a sign with writing on it in this photograph? If there is, is the whole sign visible, or is part of it hidden behind something or cut off by the edge of the photograph? Transcribe the words you can read.",
+      "schema": {
+        "additionalProperties": false,
+        "properties": {
+          "completeness": {
+            "enum": [
+              "whole",
+              "partly_hidden",
+              "no_sign"
+            ],
+            "type": "string"
+          },
+          "readable_text": {
+            "type": "string"
+          },
+          "sign_present": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "sign_present",
+          "completeness",
+          "readable_text"
+        ],
+        "type": "object"
+      },
+      "schema_name": "exulanica_sign_completeness_probe_v1",
+      "system": "You look at one photograph and answer one question about the most prominent sign with writing on it. Report only what is visible. Do not guess at anything you cannot see. Reply with one JSON object matching the schema and nothing else."
+    },
+    "question": "Can the vision role's primary tell a whole sign from a partly hidden one, asked directly and separately from any place proposal?",
+    "scoring": "a whole board is correct when completeness is whole; a partial board is detected when completeness is partly_hidden. no_sign is wrong for both.",
+    "why": "Option B makes a place proposal depend on the model's own judgement that a sign is complete. If the model cannot make that judgement, no wording can make a proposal depend on it, and B stops here."
+  },
+  "record_sha256": "8bf76b2e5e268147f0483c4faae05335dfb75f09df5e7d9df62819f5f55c4c51"
+}

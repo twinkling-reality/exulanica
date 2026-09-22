@@ -8,6 +8,7 @@ import uuid
 from decimal import Decimal
 
 import pytest
+from exulanica.api.composer_rights import composer_rights_check
 from exulanica.db.migrate import provision_workspace
 from exulanica.ingest.pipeline import PhotoIngestPipeline
 from exulanica.models.manifest import Role
@@ -257,6 +258,7 @@ def test_ask_records_query_vector_cost_before_composition(
         "Which photos show winter clothing?",
         Session(workspace_id=repository.workspace_id, actor=uuid.uuid4()),
         plan=SelectionPlan(intent=Intent.CAPTURES, semantic_query="winter clothing"),
+        before_compose=composer_rights_check(repository.connection, repository.workspace_id),
     )
     assert len(calls) == 2
     assert calls[1][0] == ["winter clothing"]

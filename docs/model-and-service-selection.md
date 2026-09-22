@@ -22,9 +22,9 @@ Provider availability and prices must be checked again before an execution campa
 
 | Role | Current implementation | Evidence and boundary |
 | --- | --- | --- |
-| Cited Companion answers | Nebius Token Factory: Nemotron 3 Nano 30B-A3B; Lightning fallback | `exulanica/selection/question.py::compose_answer` uses `REASONING_CHEAP`. The September 9 comparison supports latency and validator conformance on four questions, not general answer quality. |
+| Cited Companion answers | Nebius Token Factory: Nemotron 3 Nano 30B-A3B; Lightning fallback | `exulanica/selection/question.py::compose_answer` uses `REASONING_CHEAP`. The September 9 comparison supports latency and validator conformance on four questions, not general answer quality. A pre-registered held-out comparison kept Nano against Super and Ultra: neither cleared the margin on hard grounded questions ([outcome](evaluation/2026-09-22-model-selection-outcome.json)). |
 | Request classification, search planning and appearance drafts | Nebius Token Factory: Qwen3-235B-A22B-Instruct-2507; DeepSeek-V4-Flash-0731 fallback | `propose_plan`, `classify_request` and `draft_appearance` call `STRUCTURED_EXTRACTION`; this is an implemented role with feature-level validation of proposals. |
-| Photograph observations | Nebius Token Factory: MiniMax M3; MiniCPM-V-4_5 fallback | `exulanica/ingest/vision.py`; observation and evidence validation remain separate. No broad comparison establishes M3 as the most accurate option for our photographs. |
+| Photograph observations | Nebius Token Factory: MiniMax M3; MiniCPM-V-4_5 fallback | `exulanica/ingest/vision.py`; observation and evidence validation remain separate. On synthetic held-out photographs M3 omitted and misplaced fewer objects than MiniCPM, which also reported people who were not there ([outcome](evaluation/2026-09-22-model-selection-outcome.json)). Synthetic drawings do not establish accuracy on real photographs. |
 | Caption/text semantic retrieval | Nebius Token Factory: Qwen3-Embedding-8B, 4096 dimensions | `exulanica/epistemics/caption_embeddings.py` and `exulanica/selection/embeddings.py`; lexical and cosine retrieval, not direct image embeddings. No model fallback is configured for embeddings. |
 | Object boxes | Grounding DINO Tiny; OWLv2 Base Patch16 Ensemble fallback | `exulanica/ingest/stages/segmentation.py`; local inference when hosted observations lack suitable boxes. |
 | Object masks | SAM 2.1 Hiera Tiny | Same segmentation module; masks are distinct from human identity confirmation, source rights and placement into recovered shared coordinates. |
@@ -66,6 +66,35 @@ checks and an evaluation corpus; live answers and human quality judgments remain
 positive first-place person lift because pose was absent. The
 [GPU record](evaluation/2026-09-12-place-compute-readiness.json) establishes generated CUDA
 execution and cleanup. None proves an optimal model set.
+
+The [September 22 outcome](evaluation/2026-09-22-model-selection-outcome.json) answers the
+criteria [pre-registered](evaluation/2026-09-22-model-selection-preregistration.json) before any
+candidate output was read. For cited answers, Super was fully correct on one more hard held-out
+question than Nano and Ultra on none; the frozen margin was two, so Nano stays. Both candidates
+answered an empty evidence packet by stating that the library held no photographs, which was
+false, and Super exposed an internal packet field name in answer text. They were faster than
+Nano and cost more. The rubric was applied by an automated reviewer rather than the blinded human
+review the roadmap requires, so the answer-quality half of this comparison is still owed. For
+observations, MiniCPM had a higher combined rate of omitted and unsupported objects than M3 and
+reported a person on two photographs with nobody in them, so M3 stays. Because MiniCPM is the
+fallback, a provider error on the primary can turn an ordinary photograph into a proposed place:
+on unsigned photographs it returned generic scene labels such as "outdoor urban area" as places.
+
+Whether the vision role proposes a place at all depends on how the prompt asks for it. The place
+instruction phrased as an exception inside a prohibition produced no proposal from any of 8
+legible place names while transcribing every one. A rewrite that asks for the proposal directly
+proposed all 8 and invented no place across 12 negative photographs, including product, slogan
+and name-on-a-shirt text, but proposed the visible word of a partly covered board at medium
+confidence on 2 of 3 such boards. Its [pre-registered gate](evaluation/2026-09-22-vision-place-proposal-preregistration.json)
+allows no false proposal, so the rewrite [did not pass](evaluation/2026-09-22-vision-place-proposal-outcome.json).
+Asked alone whether a sign is whole or partly hidden, the same model answered all 24 boards of a
+[probe](evaluation/2026-09-22-sign-completeness-probe-outcome.json) correctly. Inside the
+observation it did not use that judgement for a board with a tree in front of it: in a
+[second experiment](evaluation/2026-09-22-vision-place-proposal-b-outcome.json), two further
+wordings, one asking the completeness question as its own schema field before the label, still
+judged both such boards whole, while judging every board cut by the frame correctly. The
+place-class memory entity has no other producer, so this instruction decides whether a grounded
+answer about a person's own place is possible.
 
 ### Quality and runtime requirements, updated 2026-09-13
 

@@ -35,16 +35,19 @@ what the packet asked for, and the model has no tool to call and no state it can
 from __future__ import annotations
 
 import datetime as dt
+import re
 import uuid
-from collections.abc import Callable, Mapping
+from collections.abc import Callable, Iterable, Mapping
 from contextlib import suppress
 from dataclasses import dataclass, replace
 from typing import Any, Final
 
 import psycopg
 
+from exulanica.errors import PrivacyAdmissionError
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import ModelError, StructuredOutputError, TruncatedResponseError
+from exulanica.models.handoff import ModelHandoff
 from exulanica.models.manifest import Role
 from exulanica.models.results import ChatResult, EmbeddingResult
 from exulanica.selection.answer import (
@@ -66,6 +69,7 @@ from exulanica.selection.packet import (
     build_content_packet,
     build_packet,
 )
+from exulanica.selection.people import PersonName, redact_people, saved_person_names
 from exulanica.selection.plan import Intent, SelectionPlan
 from exulanica.selection.validation import (
     RejectionCode,
@@ -449,6 +453,10 @@ class AnsweredQuestion:
     #: call is absent from a list that is not empty of the planner. ``deterministic`` and
     #: ``rejections`` are what say a discarded attempt happened.
     calls: tuple[ModelCall, ...] = ()
+    #: Each placeholder the answer text may carry, and the person it stands for. People's names
+    #: are replaced before anything reaches a model, so a composed answer can name somebody only
+    #: as ``[person A]``; the client puts the name back from the account holder's own data.
+    people: tuple[tuple[str, uuid.UUID], ...] = ()
 
 
 def entity_catalogue(
@@ -619,11 +627,37 @@ _EMPTY_CATALOGUE: Final = (
 )
 
 
+def _catalogue_line(choice: EntityChoice, placeholders: Mapping[uuid.UUID, str]) -> str:
+    """One catalogue entry as the planner sees it. A person is an id and a class, never a name."""
+    if choice.entity_class in ("person", "voice"):
+        label = placeholders.get(choice.entity_id)
+        return f"- {choice.entity_id} ({choice.entity_class})" + (f": {label}" if label else "")
+    return f"- {choice.entity_id} ({choice.entity_class}): {choice.display_name}"
+
+
+_PLACEHOLDER_TEXT: Final = re.compile(r"\[person [A-Z]+\]")
+
+
+def _without_placeholders(plan: SelectionPlan) -> SelectionPlan:
+    """A person's placeholder is never a search term.
+
+    The text dimension is joined, not ranked, so a placeholder the model copied into
+    ``semantic_query`` would search for the words "person" and a letter and quietly discard every
+    photograph that does not contain them. A person belongs in the entity dimension, by id.
+    """
+    if not plan.semantic_query or not _PLACEHOLDER_TEXT.search(plan.semantic_query):
+        return plan
+    remaining = " ".join(_PLACEHOLDER_TEXT.sub(" ", plan.semantic_query).split())
+    return plan.model_copy(update={"semantic_query": remaining or None})
+
+
 def propose_plan(
     client: ModelClient,
     question: str,
     catalogue: tuple[EntityChoice, ...],
     *,
+    people: Iterable[PersonName],
+    placeholders: Mapping[uuid.UUID, str] | None = None,
     now: dt.datetime | None = None,
     log: CallLog | None = None,
 ) -> SelectionPlan:
@@ -636,10 +670,14 @@ def propose_plan(
     ``log`` collects what the calls actually cost and which model served them. It is optional
     because ``POST /selection/plan`` has nowhere to put the answer and asks for none.
     """
+    # People's names never reach a hosted model. ``people`` is every name the account holder has
+    # saved for a person and is required, so no caller can plan without it; each one recognised
+    # in the question is replaced by its placeholder, and the catalogue names that placeholder
+    # against the person's id so the plan can still refer to them.
+    asked = redact_people(question, people, placeholders)
     catalogue_text = (
         "\n".join(
-            f"- {choice.entity_id} ({choice.entity_class}): {choice.display_name}"
-            for choice in catalogue[:MAX_CATALOGUE]
+            _catalogue_line(choice, asked.placeholders) for choice in catalogue[:MAX_CATALOGUE]
         )
         or _EMPTY_CATALOGUE
     )
@@ -662,7 +700,7 @@ def propose_plan(
         {
             "role": "user",
             "content": (
-                f"Today is {stamp}.\n\nCatalogue:\n{catalogue_text}\n\nQuestion: {question}"
+                f"Today is {stamp}.\n\nCatalogue:\n{catalogue_text}\n\nQuestion: {asked.text}"
             ),
         },
     ]
@@ -689,7 +727,7 @@ def propose_plan(
             )
             if log is not None:
                 log.record(proposed.call)
-            return proposed.value
+            return _without_placeholders(proposed.value)
         except StructuredOutputError as rejected:
             if attempt == PLANNER_ATTEMPTS:
                 raise
@@ -786,8 +824,16 @@ def answer_question(
     now: dt.datetime | None = None,
     store: ContentAddressedStore | None = None,
     society_authorizer: Callable[[dict[str, Any]], None] | None = None,
+    before_compose: Callable[[Iterable[uuid.UUID], ModelHandoff], None],
 ) -> AnsweredQuestion:
     """The whole path, once. Pass ``plan`` to answer from a Selection the user already approved.
+
+    ``before_compose`` is required, and it is the personal model right check. It is called with
+    every capture the packet cites and the composer role's whole chain, immediately before the
+    composer, and raises ``PrivacyAdmissionError`` when any of them may not reach that model. A
+    packet is photograph-derived text, so it is sent only after that check, and this function
+    cannot import the right it asks about: ingesting and answering are sibling workflows, so the
+    API, which sits above both, supplies it (``exulanica.api.composer_rights``).
 
     The composer is not called at all when the packet is empty. That is the abstention
     guarantee, and having no code path from an empty packet to a model call is a stronger form
@@ -807,16 +853,31 @@ def answer_question(
     **``client`` may be ``None`` only for a supplied CONTENT plan** (:func:`requires_model`).
     Anything else raises before a query runs, rather than answering part of the question.
     """
+    if not callable(before_compose):
+        raise TypeError("a packet is composed only after a before_compose right check")
     if client is None and requires_model(plan):
         raise ValueError(
             "a model client is required to plan a question or compose a capture answer"
         )
     proposed = plan is None
     log = CallLog()
+    # People's names never reach a hosted model, with or without a right. Every name the account
+    # holder has saved for a person is replaced in what the planner and the composer are sent;
+    # an answer that makes no model call has nothing to replace.
+    people = saved_person_names(connection, session.workspace_id) if requires_model(plan) else ()
+    asked = redact_people(question, people)
     if plan is None:
         catalogue = entity_catalogue(connection, session.workspace_id)
         try:
-            plan = propose_plan(client, question, catalogue, now=now, log=log)
+            plan = propose_plan(
+                client,
+                asked.text,
+                catalogue,
+                people=people,
+                placeholders=asked.placeholders,
+                now=now,
+                log=log,
+            )
         except StructuredOutputError as refused:
             # The endpoint answered and the answer was not a plan, twice. Nothing was searched
             # and nothing is claimed about the library.
@@ -902,7 +963,30 @@ def answer_question(
             calls=log.calls,
         )
 
-    answer, deterministic, rejections = compose_answer(client, question, packet, log=log)
+    # The packet is photograph-derived text, so it goes to the composer's model only under a
+    # current personal model right for every photograph it cites. A refusal sends nothing and
+    # answers from the same packet locally, which is the deterministic answer compose_answer
+    # already falls back to, and the reason is kept with the answer. All or nothing: composing
+    # from the permitted part would answer about some photographs while seeming to answer about
+    # all of them.
+    try:
+        before_compose(
+            (item.capture_id for item in packet.items),
+            ModelHandoff.hosted(client.manifest, Role.REASONING_CHEAP),
+        )
+    except PrivacyAdmissionError as refused:
+        return AnsweredQuestion(
+            answer=render_deterministic_answer(packet),
+            plan=plan,
+            result=result,
+            packet=packet,
+            deterministic=True,
+            rejections=(f"model_right_refused: {refused}",),
+            calls=log.calls,
+        )
+
+    sent, placeholders = _without_people(packet, people, asked.placeholders)
+    answer, deterministic, rejections = compose_answer(client, asked.text, sent, log=log)
     # Composition can take seconds. Re-run the validated dimensions as well as span/claim
     # loading so a withdrawal, deletion or changed count during that wait cannot support the
     # final answer. Reuse the query vector; this check makes no further model call.
@@ -949,7 +1033,31 @@ def answer_question(
         deterministic=deterministic,
         rejections=rejections,
         calls=log.calls,
+        people=tuple((label, entity_id) for entity_id, label in placeholders.items()),
     )
+
+
+def _without_people(
+    packet: EvidencePacket,
+    people: Iterable[PersonName],
+    placeholders: Mapping[uuid.UUID, str],
+) -> tuple[EvidencePacket, Mapping[uuid.UUID, str]]:
+    """The packet as the composer may see it: every saved person name in its text replaced.
+
+    Tokens are untouched, so a citation in the composed answer still resolves against the packet
+    the caller kept. The text is a sign, a caption or another stored claim, and a person's name
+    can be written on a shirt as easily as typed into a question.
+    """
+    people = tuple(people)
+    items = []
+    for item in packet.items:
+        if item.text is None:
+            items.append(item)
+            continue
+        redacted = redact_people(item.text, people, placeholders)
+        placeholders = redacted.placeholders
+        items.append(replace(item, text=redacted.text))
+    return replace(packet, items=tuple(items)), placeholders
 
 
 def _same_evidence(before: EvidencePacket, after: EvidencePacket) -> bool:

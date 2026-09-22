@@ -1,0 +1,438 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "adoption_condition": "Passing is not adoption. Adopting a wording is also a decision about the captures already stored: the prompt text is part of the vision stage's reprocessing key, so a new capture gets the new prompt, and reprocessing an existing capture is a new paid call that writes a new observation. Neither follows from a record without that decision being made explicitly.",
+    "baseline_prompt_sha256": "b4e29d53011598d952a2398cf800eaeb2579584b5a8318928fafd1dc2cfbf919",
+    "corpus_note": "Measured after scoring, from the drawn text widths: the held-out park board WILLOW COMMON overflowed its board by 2 pixels. Its proposal read the name correctly, so no result depends on it.",
+    "development_runs": [
+      {
+        "baseline_summary": {
+          "failed_calls": 0,
+          "false_proposals": 0,
+          "invented_places": 0,
+          "latency_ms_p95": 4385,
+          "micro_usd_total": 11628,
+          "negative_of": 6,
+          "people_reported_where_none_drawn": 0,
+          "person_name_with_trace": 1,
+          "photographs": 10,
+          "positive_of": 4,
+          "positive_pass": 0,
+          "text_scenes": 9,
+          "text_transcribed": 9
+        },
+        "candidate_prompt_sha256": "c45d1a8abbfab29d25ab8b9b880e0e69fe39aaaf7f7b1f61bbcbf628ae7ae438",
+        "candidate_summary": {
+          "failed_calls": 0,
+          "false_proposals": 1,
+          "invented_places": 0,
+          "latency_ms_p95": 4455,
+          "micro_usd_total": 12150,
+          "negative_of": 6,
+          "people_reported_where_none_drawn": 0,
+          "person_name_with_trace": 1,
+          "photographs": 10,
+          "positive_of": 4,
+          "positive_pass": 4,
+          "text_scenes": 9,
+          "text_transcribed": 9
+        },
+        "gates": {
+          "all_pass": false,
+          "checks": {
+            "cost_at_most_twice": true,
+            "latency_p95": true,
+            "negative_zero_false_proposals": false,
+            "no_failed_calls": true,
+            "no_more_people_where_none_drawn": true,
+            "person_traces_not_worse": true,
+            "positive_minimum": true,
+            "text_not_worse_by_more_than_one": true
+          },
+          "positive_minimum_used": 3
+        }
+      },
+      {
+        "baseline_summary": {
+          "failed_calls": 0,
+          "false_proposals": 0,
+          "invented_places": 0,
+          "latency_ms_p95": 3868,
+          "micro_usd_total": 11165,
+          "negative_of": 6,
+          "people_reported_where_none_drawn": 0,
+          "person_name_with_trace": 1,
+          "photographs": 10,
+          "positive_of": 4,
+          "positive_pass": 0,
+          "text_scenes": 9,
+          "text_transcribed": 9
+        },
+        "candidate_prompt_sha256": "a0f2b94c6e384d5bea46930520c2646821f299927be8d80afd69c18b1d123c9a",
+        "candidate_summary": {
+          "failed_calls": 0,
+          "false_proposals": 0,
+          "invented_places": 0,
+          "latency_ms_p95": 4673,
+          "micro_usd_total": 12691,
+          "negative_of": 6,
+          "people_reported_where_none_drawn": 0,
+          "person_name_with_trace": 1,
+          "photographs": 10,
+          "positive_of": 4,
+          "positive_pass": 4,
+          "text_scenes": 9,
+          "text_transcribed": 9
+        },
+        "gates": {
+          "all_pass": true,
+          "checks": {
+            "cost_at_most_twice": true,
+            "latency_p95": true,
+            "negative_zero_false_proposals": true,
+            "no_failed_calls": true,
+            "no_more_people_where_none_drawn": true,
+            "person_traces_not_worse": true,
+            "positive_minimum": true,
+            "text_not_worse_by_more_than_one": true
+          },
+          "positive_minimum_used": 3
+        }
+      }
+    ],
+    "findings": [
+      "Proposing a place does not consult whether the sign is whole. On the development board it passed, the model gave low confidence as instructed and wrote 'The sign is fully visible and unobstructed', which is false. Asked separately whether each of 24 boards was whole or partly hidden, the same model answered all 24 correctly (docs/evaluation/2026-09-22-sign-completeness-probe-outcome.json), so the judgement is available and the proposal does not use it.",
+      "It never completed a hidden word. Every partial-board proposal carried only words that were visible, and the fully hidden board produced none.",
+      "The development split held one partly hidden board, which was too few to show that the second wording's pass on that kind was narrow."
+    ],
+    "frozen_wording_prompt_sha256": "a0f2b94c6e384d5bea46930520c2646821f299927be8d80afd69c18b1d123c9a",
+    "held_out": {
+      "baseline_summary": {
+        "failed_calls": 0,
+        "false_proposals": 0,
+        "invented_places": 0,
+        "latency_ms_p95": 4097,
+        "micro_usd_total": 22928,
+        "negative_of": 12,
+        "people_reported_where_none_drawn": 0,
+        "person_name_with_trace": 2,
+        "photographs": 20,
+        "positive_of": 8,
+        "positive_pass": 0,
+        "text_scenes": 16,
+        "text_transcribed": 16
+      },
+      "candidate_rows": [
+        {
+          "arm": "positive",
+          "false_proposal": false,
+          "file": "place_held_out-01-nameplate.jpg",
+          "invented_place": false,
+          "kind": "nameplate",
+          "latency_ms": 3701,
+          "micro_usd": 1251,
+          "positive_pass": true,
+          "proposed_place": {
+            "basis": "signage",
+            "confidence": "high",
+            "label": "Corbel House",
+            "supporting_evidence": "Sign across the top of the building reads 'CORBEL HOUSE' in white capital letters on a dark blue background."
+          }
+        },
+        {
+          "arm": "positive",
+          "false_proposal": false,
+          "file": "place_held_out-02-nameplate.jpg",
+          "invented_place": false,
+          "kind": "nameplate",
+          "latency_ms": 3808,
+          "micro_usd": 1269,
+          "positive_pass": true,
+          "proposed_place": {
+            "basis": "signage",
+            "confidence": "high",
+            "label": "Orchard Mill",
+            "supporting_evidence": "A dark blue sign across the top of the building reads 'ORCHARD MILL' in white capital letters; the entire sign is visible within the frame."
+          }
+        },
+        {
+          "arm": "positive",
+          "false_proposal": false,
+          "file": "place_held_out-03-street_sign.jpg",
+          "invented_place": false,
+          "kind": "street_sign",
+          "latency_ms": 3226,
+          "micro_usd": 1117,
+          "positive_pass": true,
+          "proposed_place": {
+            "basis": "signage",
+            "confidence": "high",
+            "label": "Harbour Street",
+            "supporting_evidence": "A green street sign on a pole clearly reads 'HARBOUR STREET' in white capital letters."
+          }
+        },
+        {
+          "arm": "positive",
+          "false_proposal": false,
+          "file": "place_held_out-04-street_sign.jpg",
+          "invented_place": false,
+          "kind": "street_sign",
+          "latency_ms": 3296,
+          "micro_usd": 1094,
+          "positive_pass": true,
+          "proposed_place": {
+            "basis": "signage",
+            "confidence": "high",
+            "label": "Linden Road",
+            "supporting_evidence": "A green street sign on a pole to the left of the building clearly reads 'LINDEN ROAD' in white capital letters."
+          }
+        },
+        {
+          "arm": "positive",
+          "false_proposal": false,
+          "file": "place_held_out-05-park_sign.jpg",
+          "invented_place": false,
+          "kind": "park_sign",
+          "latency_ms": 3392,
+          "micro_usd": 1108,
+          "positive_pass": true,
+          "proposed_place": {
+            "basis": "signage",
+            "confidence": "high",
+            "label": "Elmwood Park",
+            "supporting_evidence": "A brown sign in the center of the image clearly reads 'ELMWOOD PARK' in white capital letters."
+          }
+        },
+        {
+          "arm": "positive",
+          "false_proposal": false,
+          "file": "place_held_out-06-park_sign.jpg",
+          "invented_place": false,
+          "kind": "park_sign",
+          "latency_ms": 3387,
+          "micro_usd": 1160,
+          "positive_pass": true,
+          "proposed_place": {
+            "basis": "signage",
+            "confidence": "high",
+            "label": "Willow Common",
+            "supporting_evidence": "Brown sign on two posts in the center of the frame reads 'WILLOW COMMON' in white capital letters."
+          }
+        },
+        {
+          "arm": "positive",
+          "false_proposal": false,
+          "file": "place_held_out-07-station_sign.jpg",
+          "invented_place": false,
+          "kind": "station_sign",
+          "latency_ms": 3679,
+          "micro_usd": 1346,
+          "positive_pass": true,
+          "proposed_place": {
+            "basis": "signage",
+            "confidence": "high",
+            "label": "Northgate Station",
+            "supporting_evidence": "A blue sign on the front of the building reads 'NORTHGATE STATION' in white capital letters; the entire sign is visible within the frame."
+          }
+        },
+        {
+          "arm": "positive",
+          "false_proposal": false,
+          "file": "place_held_out-08-station_sign.jpg",
+          "invented_place": false,
+          "kind": "station_sign",
+          "latency_ms": 3252,
+          "micro_usd": 1071,
+          "positive_pass": true,
+          "proposed_place": {
+            "basis": "signage",
+            "confidence": "high",
+            "label": "Ferryside Station",
+            "supporting_evidence": "A blue sign on the building reads 'FERRYSIDE STATION' in white text."
+          }
+        },
+        {
+          "arm": "negative",
+          "false_proposal": false,
+          "file": "place_held_out-09-no_text.jpg",
+          "invented_place": false,
+          "kind": "no_text",
+          "latency_ms": 2987,
+          "micro_usd": 978,
+          "positive_pass": null,
+          "proposed_place": null
+        },
+        {
+          "arm": "negative",
+          "false_proposal": false,
+          "file": "place_held_out-10-no_text.jpg",
+          "invented_place": false,
+          "kind": "no_text",
+          "latency_ms": 2962,
+          "micro_usd": 971,
+          "positive_pass": null,
+          "proposed_place": null
+        },
+        {
+          "arm": "negative",
+          "false_proposal": false,
+          "file": "place_held_out-11-no_text.jpg",
+          "invented_place": false,
+          "kind": "no_text",
+          "latency_ms": 3383,
+          "micro_usd": 1135,
+          "positive_pass": null,
+          "proposed_place": null
+        },
+        {
+          "arm": "negative",
+          "false_proposal": false,
+          "file": "place_held_out-12-product.jpg",
+          "invented_place": false,
+          "kind": "product",
+          "latency_ms": 3173,
+          "micro_usd": 1018,
+          "positive_pass": null,
+          "proposed_place": null
+        },
+        {
+          "arm": "negative",
+          "false_proposal": false,
+          "file": "place_held_out-13-product.jpg",
+          "invented_place": false,
+          "kind": "product",
+          "latency_ms": 3348,
+          "micro_usd": 1256,
+          "positive_pass": null,
+          "proposed_place": null
+        },
+        {
+          "arm": "negative",
+          "false_proposal": false,
+          "file": "place_held_out-14-slogan.jpg",
+          "invented_place": false,
+          "kind": "slogan",
+          "latency_ms": 3373,
+          "micro_usd": 1073,
+          "positive_pass": null,
+          "proposed_place": null
+        },
+        {
+          "arm": "negative",
+          "false_proposal": false,
+          "file": "place_held_out-15-slogan.jpg",
+          "invented_place": false,
+          "kind": "slogan",
+          "latency_ms": 3477,
+          "micro_usd": 1263,
+          "positive_pass": null,
+          "proposed_place": null
+        },
+        {
+          "arm": "negative",
+          "false_proposal": false,
+          "file": "place_held_out-16-person_name.jpg",
+          "invented_place": false,
+          "kind": "person_name",
+          "latency_ms": 3395,
+          "micro_usd": 1140,
+          "positive_pass": null,
+          "proposed_place": null
+        },
+        {
+          "arm": "negative",
+          "false_proposal": false,
+          "file": "place_held_out-17-person_name.jpg",
+          "invented_place": false,
+          "kind": "person_name",
+          "latency_ms": 4816,
+          "micro_usd": 1958,
+          "positive_pass": null,
+          "proposed_place": null
+        },
+        {
+          "arm": "negative",
+          "false_proposal": true,
+          "file": "place_held_out-18-partial.jpg",
+          "invented_place": false,
+          "kind": "partial",
+          "latency_ms": 3873,
+          "micro_usd": 1243,
+          "positive_pass": null,
+          "proposed_place": {
+            "basis": "signage",
+            "confidence": "medium",
+            "label": "Halcyon",
+            "supporting_evidence": "A dark blue sign on the building facade reads 'HALCYON' in white capital letters."
+          }
+        },
+        {
+          "arm": "negative",
+          "false_proposal": true,
+          "file": "place_held_out-19-partial.jpg",
+          "invented_place": false,
+          "kind": "partial",
+          "latency_ms": 4249,
+          "micro_usd": 1338,
+          "positive_pass": null,
+          "proposed_place": {
+            "basis": "signage",
+            "confidence": "medium",
+            "label": "Penrose",
+            "supporting_evidence": "A dark blue sign with white text reading 'PENROSE' is mounted on the upper facade of the building."
+          }
+        },
+        {
+          "arm": "negative",
+          "false_proposal": false,
+          "file": "place_held_out-20-partial.jpg",
+          "invented_place": false,
+          "kind": "partial",
+          "latency_ms": 3237,
+          "micro_usd": 1059,
+          "positive_pass": null,
+          "proposed_place": null
+        }
+      ],
+      "candidate_summary": {
+        "failed_calls": 0,
+        "false_proposals": 2,
+        "invented_places": 0,
+        "latency_ms_p95": 4249,
+        "micro_usd_total": 23848,
+        "negative_of": 12,
+        "people_reported_where_none_drawn": 0,
+        "person_name_with_trace": 2,
+        "photographs": 20,
+        "positive_of": 8,
+        "positive_pass": 8,
+        "text_scenes": 16,
+        "text_transcribed": 16
+      },
+      "gates": {
+        "all_pass": false,
+        "checks": {
+          "cost_at_most_twice": true,
+          "latency_p95": true,
+          "negative_zero_false_proposals": false,
+          "no_failed_calls": true,
+          "no_more_people_where_none_drawn": true,
+          "person_traces_not_worse": true,
+          "positive_minimum": true,
+          "text_not_worse_by_more_than_one": true
+        },
+        "positive_minimum_used": 6
+      }
+    },
+    "not_covered": [
+      "A distinctive landmark with no text; synthetic drawings cannot depict one.",
+      "Personal photographs."
+    ],
+    "predecessor_record": {
+      "path": "docs/evaluation/2026-09-22-vision-place-proposal-preregistration.json",
+      "record_sha256": "6556fa6604b06d266a8f58e56d683f47703215c631b3cbb60f264f7b6de3e514"
+    },
+    "verdict": "FAILED THE PRE-REGISTERED NEGATIVE GATE. The frozen wording proposed a place from all 8 held-out place names where the baseline proposed none, invented no place on any of the 12 negative photographs, and proposed nothing from products, slogans or a person's name on a shirt. It made 2 false proposals, both on partly hidden boards: the visible word, at medium confidence, with no mention that the board was covered. The gate allows zero, so the wording is not adopted under this record and was not revised against these photographs."
+  },
+  "record_sha256": "c6d65c111525ef6f564ab3b915b834726083361dcf8a5771f5442dee862cf98d"
+}

@@ -27,6 +27,7 @@ from typing import Annotated, Any, Literal
 from fastapi import APIRouter, HTTPException, Request, status
 from pydantic import BaseModel, ConfigDict, Field, StrictInt
 
+from exulanica.api.composer_rights import composer_rights_check
 from exulanica.api.dependencies import (
     CurrentSession,
     ReadOnlyConnection,
@@ -66,6 +67,7 @@ from exulanica.selection.environment_proposal import (
     draft_environment_operation,
 )
 from exulanica.selection.packet import build_content_packet
+from exulanica.selection.people import redact_people, saved_person_names
 from exulanica.selection.proposal import PROMPT_VERSION as PROPOSAL_PROMPT_VERSION
 from exulanica.selection.proposal import propose_appearance
 from exulanica.selection.question import (
@@ -303,6 +305,11 @@ class AnswerView(BaseModel):
     #: Which models answered, how long they took and what they spent. Additive: nothing above
     #: changed, and a client that ignores this field sees exactly the response it saw before.
     execution: ExecutionView
+    #: Each ``[person A]`` placeholder the answer text may carry, and the entity it stands for.
+    #: People's names are never sent to a hosted model, so a composed answer names somebody only
+    #: by placeholder, and the client restores the name from the account holder's own data.
+    #: Additive, and empty when the answer names nobody.
+    people: dict[str, uuid.UUID] = Field(default_factory=dict)
 
 
 def _society_authorizer(
@@ -403,7 +410,12 @@ def plan_from_question(
     session: CurrentSession,
 ) -> SelectionPlan:
     client = _require_model(request)
-    return propose_plan(client, body.question, entity_catalogue(connection, session.workspace_id))
+    return propose_plan(
+        client,
+        body.question,
+        entity_catalogue(connection, session.workspace_id),
+        people=saved_person_names(connection, session.workspace_id),
+    )
 
 
 @router.post("/ask", summary="Answer a question, citing evidence, or decline to answer.")
@@ -458,6 +470,7 @@ def ask(
         plan=plan,
         store=get_services(request).store,
         society_authorizer=_society_authorizer(request, connection, session),
+        before_compose=composer_rights_check(connection, session.workspace_id),
     )
     answer = outcome.answer
     if city_clause is not None:
@@ -475,6 +488,7 @@ def ask(
         deterministic=outcome.deterministic,
         repaired=outcome.repaired,
         execution=_execution(outcome.calls, outcome.rejections),
+        people=dict(outcome.people),
     )
 
 
@@ -1117,7 +1131,11 @@ def environment_proposal(
     ]
     if _has_reversible_edit(version):
         operations.append(EnvironmentOperation.UNDO_LATEST_VERSION_EDIT)
-    decision = draft_environment_operation(client, body.utterance, operations)
+    # People's names never reach a hosted model; the drafter needs none to pick an operation.
+    utterance = redact_people(
+        body.utterance, saved_person_names(connection, session.workspace_id)
+    ).text
+    decision = draft_environment_operation(client, utterance, operations)
     execution = _execution(decision.calls, (), prompt_version=ENVIRONMENT_PROMPT_VERSION)
     if decision.operation is None:
         assert decision.refusal is not None

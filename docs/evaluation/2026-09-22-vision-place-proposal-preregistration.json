@@ -1,0 +1,270 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "already_seen_before_this_was_written": [
+      "The production prompt's outputs on an earlier corpus (make_place_photographs.py): 8 of 8 boards transcribed, 0 of 8 places proposed.",
+      "One diagnostic call, on that earlier corpus's development-01 only, with the production prompt plus one sentence; it proposed the board's name at high confidence. That sentence is not the candidate wording, and that photograph is in neither split below.",
+      "The drawings of both splits below, viewed as contact sheets to confirm they render as intended. No model output of any kind exists for either split."
+    ],
+    "base_commit": "5a393bfa",
+    "baseline": {
+      "prompt": "exulanica/ingest/vision.py as it stands at the base commit",
+      "prompt_sha256": "b4e29d53011598d952a2398cf800eaeb2579584b5a8318928fafd1dc2cfbf919"
+    },
+    "candidate": {
+      "must_keep": [
+        "no date, time or location stated as fact",
+        "no person's name, and no proposal of who someone is",
+        "no identity of any kind",
+        "a proposed place is framed as a proposal for a human to confirm",
+        "every person trace reported, including partial ones"
+      ],
+      "prompt": "exulanica/ingest/vision.py in this lane's worktree. Each run records the prompt_sha256 it was made with, so every result is attributable to one wording."
+    },
+    "definitions": {
+      "false_proposal": "on a no_text, product, slogan or person_name photograph: any non-null proposed_place, at any confidence. On a partial photograph: a non-null proposed_place whose confidence is not low, or whose label carries a word that is not among the board's VISIBLE words",
+      "invented_place": "the subset of false proposals whose label carries a word that no text drawn anywhere in the frame shows, or any proposal at all on a no_text photograph. Reported separately because it is the failure a person cannot detect from the proposal alone.",
+      "positive_pass": "proposed_place is not null, AND every word of the drawn place name is in its label, AND every word of its label appears in some text drawn in the frame, AND basis is signage, AND supporting_evidence names at least one word of the place name",
+      "text_transcribed": "on a photograph with a place board or other text, every visible word of it appears in legible_text",
+      "words": "a label or a drawn text is upper-cased and split on anything that is not a letter; these words are ignored: A, AN, AND, AT, OF, THE"
+    },
+    "gates": {
+      "cost": "mean cost per photograph at most twice the baseline's, from the provider's reported usage",
+      "latency_ms": {
+        "per_photograph_p95_max": 30000
+      },
+      "negative": {
+        "max_false_proposals": 0,
+        "statement": "zero false proposals on the negative arm of the split",
+        "why_zero": "an invented place is the failure this change is most likely to cause and the one a person is least able to notice, so no number of them is traded for positive gains. Zero of 12 is a gate, not an estimate of a rate: it bounds the true rate only loosely, and this record says so rather than claiming more."
+      },
+      "order": "the negative gate is checked first and a failure there ends the evaluation as a failure; the positive number is then reported but cannot rescue it",
+      "positive": {
+        "development_min_pass": 3,
+        "development_of": 4,
+        "held_out_min_pass": 6,
+        "held_out_of": 8
+      },
+      "regression_against_baseline_same_run": [
+        "photographs with text transcribed: candidate at least baseline minus 1",
+        "person_name photographs with at least one person trace: candidate at least baseline",
+        "person traces reported on photographs where no person was drawn: candidate at most baseline"
+      ]
+    },
+    "input": "the rendition production sends: exulanica.ingest.derivatives.render over the upright image with the registry's rendition parameters. Both arms receive the same bytes.",
+    "model": {
+      "call": "NebiusVisionModel.observe from each arm's own module, which is the exact production call: its messages, its schema, temperature 0, no response cache",
+      "calls_per_photograph_per_arm": 1,
+      "determinism": "not claimed. Temperature 0 on a serverless endpoint is not a guarantee of identical output, which is one reason the thresholds below are stated in whole photographs.",
+      "fallback": "disabled for both arms, on an in-memory copy of the manifest, so a provider failure is recorded as a failure rather than silently answered by a different model in one arm and not the other",
+      "model_id": "MiniMaxAI/MiniMax-M3",
+      "role": "vision"
+    },
+    "not_covered": [
+      "A distinctive landmark with no text. A synthetic drawing cannot depict a real landmark, so this corpus measures signage only and makes no claim about landmarks.",
+      "Personal photographs. Automated work uses synthetic images only; the operator's own photographs are for a session with the operator present.",
+      "Any model other than the vision primary."
+    ],
+    "profile_note": "Pre-registration for a change to the vision prompt. Written before any call was made on either split below, by any prompt.",
+    "question": "Does the rewritten prompt make the vision role propose a place from a legible place name, without proposing places the photograph does not show?",
+    "splits": {
+      "development": {
+        "ground_truth_sha256": "40911dffe54503a72e649abb863cd9bc92bc867a2b58c07dc2c20208f162b269",
+        "negative": 6,
+        "photographs": [
+          {
+            "arm": "positive",
+            "file": "place_development-01-nameplate.jpg",
+            "kind": "nameplate",
+            "sha256": "3ecd442aa548c4ddeb75280d92d8cf0178b08905a44391ce2795e40f31519847"
+          },
+          {
+            "arm": "positive",
+            "file": "place_development-02-street_sign.jpg",
+            "kind": "street_sign",
+            "sha256": "8a91f877141e3e41bd32e949cfe125cc975462133a5848096703237161bb036b"
+          },
+          {
+            "arm": "positive",
+            "file": "place_development-03-park_sign.jpg",
+            "kind": "park_sign",
+            "sha256": "e56ad8c55d1948d0bb257ffd1420ed4950af632ac6d091e73bb873e3385816d6"
+          },
+          {
+            "arm": "positive",
+            "file": "place_development-04-station_sign.jpg",
+            "kind": "station_sign",
+            "sha256": "38d8ac38bfc2b14de9d6653291916cbb65e0505753bdb46cdeee8fa5aa1e9d08"
+          },
+          {
+            "arm": "negative",
+            "file": "place_development-05-no_text.jpg",
+            "kind": "no_text",
+            "sha256": "ac15792ac7deea3b6a30d6d9a41220615776cc25f6889e408627423bdbd6ed01"
+          },
+          {
+            "arm": "negative",
+            "file": "place_development-06-product.jpg",
+            "kind": "product",
+            "sha256": "abd6d7883e3ea955ae15ebcb8993ff692688be26a1eef2c9b7e4d0a37929b6c3"
+          },
+          {
+            "arm": "negative",
+            "file": "place_development-07-slogan.jpg",
+            "kind": "slogan",
+            "sha256": "900f0457f48655e50e8b584434b3b3acef3188e9c5fd3fc54723853878a6c9ef"
+          },
+          {
+            "arm": "negative",
+            "file": "place_development-08-person_name.jpg",
+            "kind": "person_name",
+            "sha256": "2d526b7eb60e6c310d765e5c60bafe74cdf163732a333dc34e3fd7060077ae8b"
+          },
+          {
+            "arm": "negative",
+            "file": "place_development-09-partial.jpg",
+            "kind": "partial",
+            "sha256": "9c7aa69af77d9ec16a590b2cfdd1c70a87b8a68950c160690095422259b4ef54"
+          },
+          {
+            "arm": "negative",
+            "file": "place_development-10-slogan.jpg",
+            "kind": "slogan",
+            "sha256": "15e398bc26b9f6f36c165e64bcf464ee7b471250add32422c6948c074aa29aee"
+          }
+        ],
+        "positive": 4,
+        "use": "wording may be revised here. At most 3 candidate wordings. The first that passes every development gate is frozen and is the only wording the held-out split ever sees."
+      },
+      "held_out": {
+        "ground_truth_sha256": "b98a6fe75b9f82fa47fe1b4b0f916abf6644f1bb72d6f66584e525d9e53c3390",
+        "negative": 12,
+        "photographs": [
+          {
+            "arm": "positive",
+            "file": "place_held_out-01-nameplate.jpg",
+            "kind": "nameplate",
+            "sha256": "b5b9e67f4c20989544d260faa70fde1e379ce31be685e0a7ad686968ea0e8d70"
+          },
+          {
+            "arm": "positive",
+            "file": "place_held_out-02-nameplate.jpg",
+            "kind": "nameplate",
+            "sha256": "ba2110de8af6d2e67a8799f736135119ed2107e66461667755976ca91ec9647a"
+          },
+          {
+            "arm": "positive",
+            "file": "place_held_out-03-street_sign.jpg",
+            "kind": "street_sign",
+            "sha256": "2b5bab6f8d90b09ab3adab5f11cbb16aeef94ba603f6b5022803eaca1928309b"
+          },
+          {
+            "arm": "positive",
+            "file": "place_held_out-04-street_sign.jpg",
+            "kind": "street_sign",
+            "sha256": "b79fd582abfbf6e160c32482632129dace9488f1cd5d6004c6c6d7867b595820"
+          },
+          {
+            "arm": "positive",
+            "file": "place_held_out-05-park_sign.jpg",
+            "kind": "park_sign",
+            "sha256": "6956f98fd5d9a9bd5d1d103e2db338aa1b1d92d8bd0084c3e003139c1b7ba003"
+          },
+          {
+            "arm": "positive",
+            "file": "place_held_out-06-park_sign.jpg",
+            "kind": "park_sign",
+            "sha256": "da0e031314c21b50a1c946d4bb69cce26e92e7e6f29cf07956995141718b3091"
+          },
+          {
+            "arm": "positive",
+            "file": "place_held_out-07-station_sign.jpg",
+            "kind": "station_sign",
+            "sha256": "cdb91314246319ac2f8c19ddcbbe5cf8aa10e917ce5c4d62c2b0db7717986d66"
+          },
+          {
+            "arm": "positive",
+            "file": "place_held_out-08-station_sign.jpg",
+            "kind": "station_sign",
+            "sha256": "6103041321d7cfad2edaae38ede5b39c703c086b8e6482fc75ce3603af9f07f0"
+          },
+          {
+            "arm": "negative",
+            "file": "place_held_out-09-no_text.jpg",
+            "kind": "no_text",
+            "sha256": "1349dcd55420cd50d3c7a4ba6b95ed1e8290b29c3c9d18263bc0af78684404af"
+          },
+          {
+            "arm": "negative",
+            "file": "place_held_out-10-no_text.jpg",
+            "kind": "no_text",
+            "sha256": "ccd242c880275299137f161dde8e8ca387375308f570d6cdff10bbfeb08ddee8"
+          },
+          {
+            "arm": "negative",
+            "file": "place_held_out-11-no_text.jpg",
+            "kind": "no_text",
+            "sha256": "8f697daf5d7539e0e28de3216b1b53ccccce27518372cdd016b9bdb0f63e1513"
+          },
+          {
+            "arm": "negative",
+            "file": "place_held_out-12-product.jpg",
+            "kind": "product",
+            "sha256": "1a75699c3840be35de0e068e0e02c36985c4bf314ac094d13e66ba994fe8680a"
+          },
+          {
+            "arm": "negative",
+            "file": "place_held_out-13-product.jpg",
+            "kind": "product",
+            "sha256": "f06e7aa0b11d9436e09fc677031bd092ba5813c609b070e77cd60b810c87d2e3"
+          },
+          {
+            "arm": "negative",
+            "file": "place_held_out-14-slogan.jpg",
+            "kind": "slogan",
+            "sha256": "4d09fcfdf53b246a2cbde5e4472723c86181f83e157a9c4bb522bf3d5e3f57f9"
+          },
+          {
+            "arm": "negative",
+            "file": "place_held_out-15-slogan.jpg",
+            "kind": "slogan",
+            "sha256": "430d83087a88e6fd580b19d3228cc42bf411dde684984fd90f0195da055a7f67"
+          },
+          {
+            "arm": "negative",
+            "file": "place_held_out-16-person_name.jpg",
+            "kind": "person_name",
+            "sha256": "f9503772762778fda3227dac116e41dfe5ee21f082bedc66fb58249d093edb34"
+          },
+          {
+            "arm": "negative",
+            "file": "place_held_out-17-person_name.jpg",
+            "kind": "person_name",
+            "sha256": "e491beef5bed6ef0893c88eeaacc26a89b023fe0045c9145a907ec8c03fe5b7e"
+          },
+          {
+            "arm": "negative",
+            "file": "place_held_out-18-partial.jpg",
+            "kind": "partial",
+            "sha256": "63c42489e9c9d6e3f12f8d4284d6d0f974101ff9cdace2ac5f19a3abe0d237bd"
+          },
+          {
+            "arm": "negative",
+            "file": "place_held_out-19-partial.jpg",
+            "kind": "partial",
+            "sha256": "3500108718ec5ddef86d1ff510fa148742c4ace50cb6e26a239d24340930a2f1"
+          },
+          {
+            "arm": "negative",
+            "file": "place_held_out-20-partial.jpg",
+            "kind": "partial",
+            "sha256": "0d97d92d2c3a97c79442c7e1e96774ad72cc646298152a77ec0f1685590461fc"
+          }
+        ],
+        "positive": 8,
+        "use": "scored once per arm, with the frozen wording. If the held-out gates fail, the result is reported as a failure and no wording is revised against these photographs."
+      }
+    }
+  },
+  "record_sha256": "6556fa6604b06d266a8f58e56d683f47703215c631b3cbb60f264f7b6de3e514"
+}

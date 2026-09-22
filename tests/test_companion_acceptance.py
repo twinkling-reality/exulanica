@@ -35,6 +35,10 @@ from model_fakes import chat_body
 FROZEN_INPUT_EVIDENCE: tuple[str, ...] = (MATCHING, FIRST_PLACE, WIRE)
 
 
+def _no_model_is_called(capture_ids, handoff):
+    """compose_answer is replaced in these tests, so no packet reaches a model to guard."""
+
+
 def frozen_input() -> dict:
     """The frozen input, or a skip naming exactly which retained files this tree does not hold.
 
@@ -299,6 +303,7 @@ def test_evidence_changed_while_composing_cannot_support_final_answer(
     monkeypatch.setattr(module, "validate", lambda *a, **k: object())
     monkeypatch.setattr(module, "execute", lambda *a, **k: None)
     monkeypatch.setattr(module, "build_packet", lambda *a, **k: next(packets))
+    monkeypatch.setattr(module, "saved_person_names", lambda *a, **k: ())
     answer = Answer(
         clauses=[
             AnswerClause(
@@ -315,6 +320,7 @@ def test_evidence_changed_while_composing_cannot_support_final_answer(
         "What do they hold?",
         Session(workspace_id=uuid.UUID(int=1), actor=uuid.UUID(int=2)),
         plan=SelectionPlan(intent="captures"),
+        before_compose=_no_model_is_called,
     )
     assert result.abstention is not None
     assert all(c.type == "meta" and not c.citations for c in result.answer.clauses)
@@ -339,6 +345,7 @@ def test_fresh_packet_random_tokens_do_not_invalidate_unchanged_answer(
     monkeypatch.setattr(module, "validate", lambda *a, **k: object())
     monkeypatch.setattr(module, "execute", lambda *a, **k: None)
     monkeypatch.setattr(module, "build_packet", lambda *a, **k: next(packets))
+    monkeypatch.setattr(module, "saved_person_names", lambda *a, **k: ())
     answer = Answer(
         clauses=[
             AnswerClause(
@@ -355,6 +362,7 @@ def test_fresh_packet_random_tokens_do_not_invalidate_unchanged_answer(
         "What do they hold?",
         Session(workspace_id=uuid.UUID(int=1), actor=uuid.UUID(int=2)),
         plan=SelectionPlan(intent="captures"),
+        before_compose=_no_model_is_called,
     )
     assert result.answer == answer
     assert result.abstention is None

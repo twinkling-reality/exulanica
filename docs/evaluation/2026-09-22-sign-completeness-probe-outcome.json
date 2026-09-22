@@ -1,0 +1,265 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "answers": [
+      {
+        "completeness": "whole",
+        "correct": true,
+        "file": "probe-01-whole-plain.jpg",
+        "how": "plain",
+        "latency_ms": 1986,
+        "micro_usd": 278,
+        "readable_text": "ASHWORTH HALL",
+        "state": "whole"
+      },
+      {
+        "completeness": "whole",
+        "correct": true,
+        "file": "probe-02-whole-plain.jpg",
+        "how": "plain",
+        "latency_ms": 2287,
+        "micro_usd": 278,
+        "readable_text": "BELLMONT ROW",
+        "state": "whole"
+      },
+      {
+        "completeness": "whole",
+        "correct": true,
+        "file": "probe-03-whole-plain.jpg",
+        "how": "plain",
+        "latency_ms": 2141,
+        "micro_usd": 276,
+        "readable_text": "CRANMORE HOUSE",
+        "state": "whole"
+      },
+      {
+        "completeness": "whole",
+        "correct": true,
+        "file": "probe-04-whole-plain.jpg",
+        "how": "plain",
+        "latency_ms": 1910,
+        "micro_usd": 278,
+        "readable_text": "DUNSTAN ROW",
+        "state": "whole"
+      },
+      {
+        "completeness": "whole",
+        "correct": true,
+        "file": "probe-05-whole-plain.jpg",
+        "how": "plain",
+        "latency_ms": 2014,
+        "micro_usd": 278,
+        "readable_text": "EVERLEIGH MEWS",
+        "state": "whole"
+      },
+      {
+        "completeness": "whole",
+        "correct": true,
+        "file": "probe-06-whole-plain.jpg",
+        "how": "plain",
+        "latency_ms": 1990,
+        "micro_usd": 276,
+        "readable_text": "FAIRHOLME",
+        "state": "whole"
+      },
+      {
+        "completeness": "whole",
+        "correct": true,
+        "file": "probe-07-whole-plain.jpg",
+        "how": "plain",
+        "latency_ms": 1866,
+        "micro_usd": 276,
+        "readable_text": "GLENARM HOUSE",
+        "state": "whole"
+      },
+      {
+        "completeness": "whole",
+        "correct": true,
+        "file": "probe-08-whole-plain.jpg",
+        "how": "plain",
+        "latency_ms": 1927,
+        "micro_usd": 278,
+        "readable_text": "HOLLINS YARD",
+        "state": "whole"
+      },
+      {
+        "completeness": "whole",
+        "correct": true,
+        "file": "probe-09-whole-tree_beside.jpg",
+        "how": "tree_beside",
+        "latency_ms": 1945,
+        "micro_usd": 280,
+        "readable_text": "IVYBRIDGE HALL",
+        "state": "whole"
+      },
+      {
+        "completeness": "whole",
+        "correct": true,
+        "file": "probe-10-whole-tree_beside.jpg",
+        "how": "tree_beside",
+        "latency_ms": 1963,
+        "micro_usd": 279,
+        "readable_text": "JUNIPER COURT",
+        "state": "whole"
+      },
+      {
+        "completeness": "whole",
+        "correct": true,
+        "file": "probe-11-whole-tree_beside.jpg",
+        "how": "tree_beside",
+        "latency_ms": 1889,
+        "micro_usd": 278,
+        "readable_text": "KINGSMERE",
+        "state": "whole"
+      },
+      {
+        "completeness": "whole",
+        "correct": true,
+        "file": "probe-12-whole-tree_beside.jpg",
+        "how": "tree_beside",
+        "latency_ms": 1956,
+        "micro_usd": 276,
+        "readable_text": "LOXLEY HOUSE",
+        "state": "whole"
+      },
+      {
+        "completeness": "partly_hidden",
+        "correct": true,
+        "file": "probe-13-partial-cover_last.jpg",
+        "how": "cover_last",
+        "latency_ms": 2017,
+        "micro_usd": 279,
+        "readable_text": "MARCHMONT",
+        "state": "partial"
+      },
+      {
+        "completeness": "partly_hidden",
+        "correct": true,
+        "file": "probe-14-partial-cover_last.jpg",
+        "how": "cover_last",
+        "latency_ms": 1970,
+        "micro_usd": 279,
+        "readable_text": "NEWBOLD",
+        "state": "partial"
+      },
+      {
+        "completeness": "partly_hidden",
+        "correct": true,
+        "file": "probe-15-partial-cover_last.jpg",
+        "how": "cover_last",
+        "latency_ms": 2043,
+        "micro_usd": 279,
+        "readable_text": "OAKLANDS",
+        "state": "partial"
+      },
+      {
+        "completeness": "partly_hidden",
+        "correct": true,
+        "file": "probe-16-partial-cover_last.jpg",
+        "how": "cover_last",
+        "latency_ms": 1972,
+        "micro_usd": 279,
+        "readable_text": "PRESTWICK",
+        "state": "partial"
+      },
+      {
+        "completeness": "partly_hidden",
+        "correct": true,
+        "file": "probe-17-partial-cover_first.jpg",
+        "how": "cover_first",
+        "latency_ms": 1992,
+        "micro_usd": 278,
+        "readable_text": "MEWS",
+        "state": "partial"
+      },
+      {
+        "completeness": "partly_hidden",
+        "correct": true,
+        "file": "probe-18-partial-cover_first.jpg",
+        "how": "cover_first",
+        "latency_ms": 1897,
+        "micro_usd": 275,
+        "readable_text": "HOUSE",
+        "state": "partial"
+      },
+      {
+        "completeness": "partly_hidden",
+        "correct": true,
+        "file": "probe-19-partial-cover_middle.jpg",
+        "how": "cover_middle",
+        "latency_ms": 1875,
+        "micro_usd": 279,
+        "readable_text": "SAND GHAM",
+        "state": "partial"
+      },
+      {
+        "completeness": "partly_hidden",
+        "correct": true,
+        "file": "probe-20-partial-cover_middle.jpg",
+        "how": "cover_middle",
+        "latency_ms": 1946,
+        "micro_usd": 279,
+        "readable_text": "THO URY",
+        "state": "partial"
+      },
+      {
+        "completeness": "partly_hidden",
+        "correct": true,
+        "file": "probe-21-partial-cut.jpg",
+        "how": "cut",
+        "latency_ms": 1904,
+        "micro_usd": 281,
+        "readable_text": "UPPERTHORPE T",
+        "state": "partial"
+      },
+      {
+        "completeness": "partly_hidden",
+        "correct": true,
+        "file": "probe-22-partial-cut.jpg",
+        "how": "cut",
+        "latency_ms": 1990,
+        "micro_usd": 279,
+        "readable_text": "VANBRUGH CRI",
+        "state": "partial"
+      },
+      {
+        "completeness": "partly_hidden",
+        "correct": true,
+        "file": "probe-23-partial-cut.jpg",
+        "how": "cut",
+        "latency_ms": 2165,
+        "micro_usd": 279,
+        "readable_text": "WHITLOCK GA",
+        "state": "partial"
+      },
+      {
+        "completeness": "partly_hidden",
+        "correct": true,
+        "file": "probe-24-partial-cut.jpg",
+        "how": "cut",
+        "latency_ms": 1999,
+        "micro_usd": 280,
+        "readable_text": "YARDLEY BUI",
+        "state": "partial"
+      }
+    ],
+    "can_tell": true,
+    "consequence": "The place proposal's failure on partly hidden boards is not a limit of what the model perceives. A wording that makes the proposal depend on this judgement can succeed, so the second place-proposal experiment proceeds.",
+    "predecessor_record": {
+      "path": "docs/evaluation/2026-09-22-sign-completeness-probe-preregistration.json",
+      "record_sha256": "8bf76b2e5e268147f0483c4faae05335dfb75f09df5e7d9df62819f5f55c4c51"
+    },
+    "probe_sha256": "be4142d22b01e8bc6786905c012cba860d126a5110ef0ae9ca6fbe65a01aea95",
+    "tally": {
+      "covered_detected": 8,
+      "cut_detected": 4,
+      "failed_calls": 0,
+      "micro_usd_total": 6677,
+      "partial_detected": 12,
+      "whole_correct": 12,
+      "whole_with_tree_beside_correct": 4
+    },
+    "verdict": "CAN TELL. Asked only whether the sign is whole or partly hidden, the model answered every one of 24 boards correctly: 12 of 12 partly hidden (8 covered by a canopy, 4 cut by the frame) and 12 of 12 whole, including all 4 with a canopy beside the board. It transcribed only the visible lettering. The decision rule needed at least 10, 7 and 10."
+  },
+  "record_sha256": "e6031553cee8f706369c00b5dfaa99bafdaaf7fb47a73733a1e9ce97568e356f"
+}

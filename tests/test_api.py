@@ -1030,7 +1030,11 @@ def test_the_execution_block_is_additive_and_changes_nothing_above_it(deployment
         "deterministic",
         "repaired",
         "execution",
+        # Added with the rule that people's names never reach a hosted model: the placeholder
+        # each answer may carry and the entity it stands for, so the client restores the name.
+        "people",
     }
+    assert body["people"] == {}, "this question names nobody, so there is nothing to restore"
     assert body["deterministic"] is True
     assert body["citations"], "the citation map is what the answer's tokens resolve through"
     assert len(body["execution"]["calls"]) == 2, "the refused attempt was a call that happened"

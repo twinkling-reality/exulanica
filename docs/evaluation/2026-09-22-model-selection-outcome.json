@@ -1,0 +1,701 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "comparison_a_reasoning": {
+      "denominator_note": "Six hard questions were pre-registered. Two produced no packet because the product's planner declined them (unrelated, invented_place), which is correct behaviour and leaves nothing to compose, so the hard denominator is 4. The threshold of 2 was not lowered to follow it.",
+      "findings_beyond_the_score": [
+        "On an EMPTY packet (what_objects), Super and Ultra both answered 'Your photograph library contains no photographs', which is false: the library held 13. Nano said the descriptions did not specify items. A false statement about the person's own library is a different and worse failure than a wrong answer to the question.",
+        "Super named the internal packet field untrusted_text in user-facing answer text and repeated one clause verbatim (people_absent). That is a boundary leak, not style.",
+        "Both candidates were faster than the baseline on every question with a packet, and cost more.",
+        "Every arm served the model it requested, one call each, and none needed a repair."
+      ],
+      "fully_correct_on_hard": {
+        "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B": 3,
+        "nvidia/Nemotron-3-Ultra-550b-a55b": 3,
+        "nvidia/nemotron-3-super-120b-a12b": 4
+      },
+      "hard_questions_with_a_packet": 4,
+      "hard_questions_without_a_packet": [
+        "unrelated",
+        "invented_place"
+      ],
+      "latency_ms_by_model": {
+        "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B": [
+          5468,
+          8578,
+          9808,
+          11160,
+          13751,
+          21866,
+          24679,
+          24896
+        ],
+        "nvidia/Nemotron-3-Ultra-550b-a55b": [
+          1499,
+          1569,
+          1808,
+          1809,
+          2655,
+          2753,
+          4439,
+          7437
+        ],
+        "nvidia/nemotron-3-super-120b-a12b": [
+          2662,
+          2729,
+          3073,
+          3157,
+          3255,
+          4778,
+          7197,
+          7528
+        ]
+      },
+      "micro_usd_by_model": {
+        "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B": 3963,
+        "nvidia/Nemotron-3-Ultra-550b-a55b": 33461,
+        "nvidia/nemotron-3-super-120b-a12b": 9166
+      },
+      "per_question": [
+        {
+          "arms": {
+            "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B": {
+              "clauses": [
+                {
+                  "citations": 4,
+                  "text": "In your photographs, the sign on the building reads KESTREL YARD, ALDER COURT, BRAMBLE WHARF, or MERIDIAN HALL.",
+                  "type": "historical"
+                }
+              ],
+              "latency_ms": 21866,
+              "micro_usd": 791,
+              "repaired": false,
+              "served_models": [
+                "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+              ]
+            },
+            "nvidia/Nemotron-3-Ultra-550b-a55b": {
+              "clauses": [
+                {
+                  "citations": 2,
+                  "text": "One building sign reads KESTREL YARD.",
+                  "type": "historical"
+                },
+                {
+                  "citations": 2,
+                  "text": "Another building sign reads ALDER COURT.",
+                  "type": "historical"
+                },
+                {
+                  "citations": 2,
+                  "text": "A third building sign reads BRAMBLE WHARF.",
+                  "type": "historical"
+                },
+                {
+                  "citations": 2,
+                  "text": "A fourth building sign reads MERIDIAN HALL.",
+                  "type": "historical"
+                }
+              ],
+              "latency_ms": 4439,
+              "micro_usd": 7555,
+              "repaired": false,
+              "served_models": [
+                "nvidia/Nemotron-3-Ultra-550b-a55b"
+              ]
+            },
+            "nvidia/nemotron-3-super-120b-a12b": {
+              "clauses": [
+                {
+                  "citations": 1,
+                  "text": "The sign on the building reads 'KESTREL YARD'.",
+                  "type": "historical"
+                },
+                {
+                  "citations": 1,
+                  "text": "The sign on the building reads 'ALDER COURT'.",
+                  "type": "historical"
+                },
+                {
+                  "citations": 1,
+                  "text": "The sign on the building reads 'BRAMBLE WHARF'.",
+                  "type": "historical"
+                },
+                {
+                  "citations": 1,
+                  "text": "The sign on the building reads 'MERIDIAN HALL'.",
+                  "type": "historical"
+                }
+              ],
+              "latency_ms": 4778,
+              "micro_usd": 1656,
+              "repaired": false,
+              "served_models": [
+                "nvidia/nemotron-3-super-120b-a12b"
+              ]
+            }
+          },
+          "hard": "no",
+          "key": "sign_text",
+          "planner_produced_a_packet": true,
+          "route_latency_ms": 15417,
+          "route_status": 200
+        },
+        {
+          "arms": {
+            "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B": {
+              "clauses": [
+                {
+                  "citations": 1,
+                  "text": "There are 13 photographs in your library.",
+                  "type": "historical"
+                }
+              ],
+              "latency_ms": 11160,
+              "micro_usd": 372,
+              "repaired": false,
+              "served_models": [
+                "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+              ]
+            },
+            "nvidia/Nemotron-3-Ultra-550b-a55b": {
+              "clauses": [
+                {
+                  "citations": 0,
+                  "text": "Your library contains 13 photographs.",
+                  "type": "meta"
+                }
+              ],
+              "latency_ms": 2753,
+              "micro_usd": 3275,
+              "repaired": false,
+              "served_models": [
+                "nvidia/Nemotron-3-Ultra-550b-a55b"
+              ]
+            },
+            "nvidia/nemotron-3-super-120b-a12b": {
+              "clauses": [
+                {
+                  "citations": 0,
+                  "text": "There are 13 photographs in your library.",
+                  "type": "meta"
+                }
+              ],
+              "latency_ms": 3157,
+              "micro_usd": 799,
+              "repaired": false,
+              "served_models": [
+                "nvidia/nemotron-3-super-120b-a12b"
+              ]
+            }
+          },
+          "hard": "no",
+          "key": "how_many",
+          "planner_produced_a_packet": true,
+          "route_latency_ms": 9981,
+          "route_status": 200
+        },
+        {
+          "arms": {
+            "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B": {
+              "clauses": [
+                {
+                  "citations": 0,
+                  "text": "Your photographs may contain objects, but the available descriptions do not specify any particular items.",
+                  "type": "uncertain"
+                }
+              ],
+              "latency_ms": 9808,
+              "micro_usd": 315,
+              "repaired": false,
+              "served_models": [
+                "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+              ]
+            },
+            "nvidia/Nemotron-3-Ultra-550b-a55b": {
+              "clauses": [
+                {
+                  "citations": 0,
+                  "text": "Your photograph library contains no photographs, so there are no objects to describe.",
+                  "type": "meta"
+                }
+              ],
+              "latency_ms": 1499,
+              "micro_usd": 1499,
+              "repaired": false,
+              "served_models": [
+                "nvidia/Nemotron-3-Ultra-550b-a55b"
+              ]
+            },
+            "nvidia/nemotron-3-super-120b-a12b": {
+              "clauses": [
+                {
+                  "citations": 0,
+                  "text": "Your photograph library contains no photographs, so no objects can be identified.",
+                  "type": "meta"
+                }
+              ],
+              "latency_ms": 3255,
+              "micro_usd": 679,
+              "repaired": false,
+              "served_models": [
+                "nvidia/nemotron-3-super-120b-a12b"
+              ]
+            }
+          },
+          "hard": "no",
+          "key": "what_objects",
+          "planner_produced_a_packet": true,
+          "route_latency_ms": 4160,
+          "route_status": 200
+        },
+        {
+          "arms": {
+            "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B": {
+              "clauses": [
+                {
+                  "citations": 0,
+                  "text": "I cannot identify any of your photographs as having been taken at Meridian Hall.",
+                  "type": "meta"
+                }
+              ],
+              "fully_correct": true,
+              "judgement": "Declines to attribute any photograph to Meridian Hall in a meta clause; no place entity or bridge exists, so declining is correct.",
+              "latency_ms": 8578,
+              "micro_usd": 304,
+              "repaired": false,
+              "served_models": [
+                "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+              ]
+            },
+            "nvidia/Nemotron-3-Ultra-550b-a55b": {
+              "clauses": [
+                {
+                  "citations": 0,
+                  "text": "None of the photographs in this selection show any indication of being taken at Meridian Hall.",
+                  "type": "meta"
+                }
+              ],
+              "fully_correct": true,
+              "judgement": "Same decision. 'No indication' understates the transcribed board, but the clause is meta and asserts no place.",
+              "latency_ms": 1809,
+              "micro_usd": 2189,
+              "repaired": false,
+              "served_models": [
+                "nvidia/Nemotron-3-Ultra-550b-a55b"
+              ]
+            },
+            "nvidia/nemotron-3-super-120b-a12b": {
+              "clauses": [
+                {
+                  "citations": 0,
+                  "text": "Your photographs do not record any information about being taken at Meridian Hall.",
+                  "type": "meta"
+                }
+              ],
+              "fully_correct": true,
+              "judgement": "Same decision, worded as the photographs recording nothing about being taken there.",
+              "latency_ms": 2729,
+              "micro_usd": 724,
+              "repaired": false,
+              "served_models": [
+                "nvidia/nemotron-3-super-120b-a12b"
+              ]
+            }
+          },
+          "hard": "yes",
+          "key": "which_place",
+          "planner_produced_a_packet": true,
+          "route_latency_ms": 20765,
+          "route_status": 200
+        },
+        {
+          "arms": {
+            "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B": {
+              "clauses": [
+                {
+                  "citations": 0,
+                  "text": "13 captures were matched, but none of them include any description of people in your photographs.",
+                  "type": "meta"
+                }
+              ],
+              "fully_correct": true,
+              "judgement": "Declines; says no packet item describes people.",
+              "latency_ms": 24896,
+              "micro_usd": 771,
+              "repaired": false,
+              "served_models": [
+                "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+              ]
+            },
+            "nvidia/Nemotron-3-Ultra-550b-a55b": {
+              "clauses": [
+                {
+                  "citations": 0,
+                  "text": "The photographs in this selection have no descriptions, so there is no information about who appears in them.",
+                  "type": "meta"
+                }
+              ],
+              "fully_correct": true,
+              "judgement": "Declines. Its reason, that the photographs have no descriptions, is wrong, but it names nobody and the clause is meta.",
+              "latency_ms": 1808,
+              "micro_usd": 2261,
+              "repaired": false,
+              "served_models": [
+                "nvidia/Nemotron-3-Ultra-550b-a55b"
+              ]
+            },
+            "nvidia/nemotron-3-super-120b-a12b": {
+              "clauses": [
+                {
+                  "citations": 0,
+                  "text": "Your photographs do not record anything about who is in them.",
+                  "type": "meta"
+                }
+              ],
+              "fully_correct": true,
+              "judgement": "Declines; says nothing records who is in them.",
+              "latency_ms": 2662,
+              "micro_usd": 684,
+              "repaired": false,
+              "served_models": [
+                "nvidia/nemotron-3-super-120b-a12b"
+              ]
+            }
+          },
+          "hard": "yes",
+          "key": "who",
+          "planner_produced_a_packet": true,
+          "route_latency_ms": 32717,
+          "route_status": 200
+        },
+        {
+          "arms": {
+            "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B": {
+              "clauses": [
+                {
+                  "citations": 0,
+                  "text": "I cannot determine when these photographs were taken.",
+                  "type": "meta"
+                }
+              ],
+              "fully_correct": true,
+              "judgement": "Says it cannot determine when; the packet carries no capture time.",
+              "latency_ms": 5468,
+              "micro_usd": 206,
+              "repaired": false,
+              "served_models": [
+                "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+              ]
+            },
+            "nvidia/Nemotron-3-Ultra-550b-a55b": {
+              "clauses": [
+                {
+                  "citations": 0,
+                  "text": "The photographs in this selection do not carry any date or time information in the evidence provided.",
+                  "type": "meta"
+                }
+              ],
+              "fully_correct": true,
+              "judgement": "Scopes the absence to 'the evidence provided', which is exact.",
+              "latency_ms": 1569,
+              "micro_usd": 1793,
+              "repaired": false,
+              "served_models": [
+                "nvidia/Nemotron-3-Ultra-550b-a55b"
+              ]
+            },
+            "nvidia/nemotron-3-super-120b-a12b": {
+              "clauses": [
+                {
+                  "citations": 0,
+                  "text": "Your photographs do not include any information about when they were taken.",
+                  "type": "meta"
+                }
+              ],
+              "fully_correct": true,
+              "judgement": "Says no information about when; correct for the packet.",
+              "latency_ms": 3073,
+              "micro_usd": 754,
+              "repaired": false,
+              "served_models": [
+                "nvidia/nemotron-3-super-120b-a12b"
+              ]
+            }
+          },
+          "hard": "yes",
+          "key": "when",
+          "planner_produced_a_packet": true,
+          "route_latency_ms": 19895,
+          "route_status": 200
+        },
+        {
+          "arms": {},
+          "hard": "yes",
+          "key": "unrelated",
+          "planner_produced_a_packet": false,
+          "route_latency_ms": 2133,
+          "route_status": 200
+        },
+        {
+          "arms": {},
+          "hard": "yes",
+          "key": "invented_place",
+          "planner_produced_a_packet": false,
+          "route_latency_ms": 2080,
+          "route_status": 200
+        },
+        {
+          "arms": {
+            "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B": {
+              "clauses": [
+                {
+                  "citations": 8,
+                  "text": "The cars are red, blue, and yellow.",
+                  "type": "historical"
+                }
+              ],
+              "latency_ms": 24679,
+              "micro_usd": 788,
+              "repaired": false,
+              "served_models": [
+                "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+              ]
+            },
+            "nvidia/Nemotron-3-Ultra-550b-a55b": {
+              "clauses": [
+                {
+                  "citations": 4,
+                  "text": "Several photographs show a red car.",
+                  "type": "historical"
+                },
+                {
+                  "citations": 3,
+                  "text": "Others show a blue car.",
+                  "type": "historical"
+                },
+                {
+                  "citations": 2,
+                  "text": "Others show a yellow car.",
+                  "type": "historical"
+                }
+              ],
+              "latency_ms": 7437,
+              "micro_usd": 11685,
+              "repaired": false,
+              "served_models": [
+                "nvidia/Nemotron-3-Ultra-550b-a55b"
+              ]
+            },
+            "nvidia/nemotron-3-super-120b-a12b": {
+              "clauses": [
+                {
+                  "citations": 4,
+                  "text": "In some of your photographs the car appears red.",
+                  "type": "historical"
+                },
+                {
+                  "citations": 3,
+                  "text": "In some of your photographs the car appears blue.",
+                  "type": "historical"
+                },
+                {
+                  "citations": 2,
+                  "text": "In some of your photographs the car appears yellow.",
+                  "type": "historical"
+                }
+              ],
+              "latency_ms": 7197,
+              "micro_usd": 2192,
+              "repaired": false,
+              "served_models": [
+                "nvidia/nemotron-3-super-120b-a12b"
+              ]
+            }
+          },
+          "hard": "no",
+          "key": "colour",
+          "planner_produced_a_packet": true,
+          "route_latency_ms": 69750,
+          "route_status": 200
+        },
+        {
+          "arms": {
+            "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B": {
+              "clauses": [
+                {
+                  "citations": 1,
+                  "text": "No person is visible in any of your photographs.",
+                  "type": "historical"
+                }
+              ],
+              "fully_correct": false,
+              "judgement": "Cites one item and asserts 'No person is visible in any of your photographs': a claim about all 13 from a packet of 3, and an observation can establish that no person was reported, not that none is there. The over-claim the question was chosen to catch.",
+              "latency_ms": 13751,
+              "micro_usd": 416,
+              "repaired": false,
+              "served_models": [
+                "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B"
+              ]
+            },
+            "nvidia/Nemotron-3-Ultra-550b-a55b": {
+              "clauses": [
+                {
+                  "citations": 1,
+                  "text": "The photograph in your library shows a stylized illustration of a building called Meridian Hall with trees, a bench, a street lamp, and a small red car, but no people appear in the scene.",
+                  "type": "historical"
+                },
+                {
+                  "citations": 1,
+                  "text": "Text within the same image reads 'SYNTHETIC IMAGE - GENERATED LOCALLY - NO REAL PLACE, NO PERSON', reinforcing that no person is depicted.",
+                  "type": "historical"
+                },
+                {
+                  "citations": 0,
+                  "text": "Your library contains one photograph, and nothing in it shows a person.",
+                  "type": "meta"
+                }
+              ],
+              "fully_correct": false,
+              "judgement": "States 'Your library contains one photograph'; the library holds 13.",
+              "latency_ms": 2655,
+              "micro_usd": 3204,
+              "repaired": false,
+              "served_models": [
+                "nvidia/Nemotron-3-Ultra-550b-a55b"
+              ]
+            },
+            "nvidia/nemotron-3-super-120b-a12b": {
+              "clauses": [
+                {
+                  "citations": 1,
+                  "text": "This photograph contains the text 'NO REAL PLACE, NO PERSON'.",
+                  "type": "historical"
+                },
+                {
+                  "citations": 1,
+                  "text": "The untrusted_text of this photograph does not mention a person.",
+                  "type": "historical"
+                },
+                {
+                  "citations": 1,
+                  "text": "The untrusted_text of this photograph does not mention a person.",
+                  "type": "historical"
+                },
+                {
+                  "citations": 0,
+                  "text": "Based on the descriptions provided, there is no evidence of a person being visible in any of the photographs.",
+                  "type": "meta"
+                }
+              ],
+              "fully_correct": true,
+              "judgement": "Hedges to 'no evidence of a person' over the descriptions provided. Passes the rubric, with a presentation defect recorded separately: it names the internal packet field untrusted_text to the user and repeats a clause verbatim.",
+              "latency_ms": 7528,
+              "micro_usd": 1678,
+              "repaired": false,
+              "served_models": [
+                "nvidia/nemotron-3-super-120b-a12b"
+              ]
+            }
+          },
+          "hard": "yes",
+          "key": "people_absent",
+          "planner_produced_a_packet": true,
+          "route_latency_ms": 27399,
+          "route_status": 200
+        }
+      ],
+      "procedure_departures": [
+        "The pre-registration said the rubric is applied by one reviewer with the model identity hidden. The judgements here were made by an automated reviewer, the lane's own agent, with the identity VISIBLE. This is not the human review the roadmap requires. The verdict it supports is the conservative default, and a human review of these twelve answers is outstanding."
+      ],
+      "verdict": "KEEP THE BASELINE. Super is fully correct on one more hard question than Nano (4 against 3 of 4), and the pre-registered minimum is two. Ultra matches Nano. Below the threshold the baseline is kept and the result is inconclusive, which the pre-registration names as a result."
+    },
+    "comparison_b_vision": {
+      "baseline": "MiniMaxAI/MiniMax-M3",
+      "baseline_arm": "the held-out M3 run already scored under this pre-registration, through the product routes; not re-run",
+      "baseline_micro_usd": 12287,
+      "baseline_primary": {
+        "basis_points": 3877,
+        "drawn_salient": 66,
+        "errors": 57,
+        "items": 147,
+        "omitted_salient": 24,
+        "reported": 81,
+        "unsupported_reported": 33
+      },
+      "baseline_secondary": {
+        "photographs_with_a_person_reported": 0,
+        "place_proposed_on_signed": 0,
+        "place_proposed_on_unsigned": 0,
+        "sign_transcribed": 6,
+        "signed": 6
+      },
+      "candidate": "openbmb/MiniCPM-V-4_5",
+      "candidate_latency_ms_p95": 6425,
+      "candidate_micro_usd": 12718,
+      "candidate_primary": {
+        "basis_points": 5581,
+        "drawn_salient": 66,
+        "errors": 72,
+        "items": 129,
+        "omitted_salient": 38,
+        "reported": 63,
+        "unsupported_reported": 34
+      },
+      "candidate_secondary": {
+        "photographs_with_a_person_reported": 2,
+        "place_proposed_on_signed": 5,
+        "place_proposed_on_unsigned": 3,
+        "sign_transcribed": 6,
+        "signed": 6
+      },
+      "candidate_unsigned_place_proposals": [
+        {
+          "file": "held_out-05.jpg",
+          "proposed_place": {
+            "basis": "architecture",
+            "confidence": "medium",
+            "label": "outdoor urban area",
+            "supporting_evidence": "building with multiple windows and a door"
+          }
+        },
+        {
+          "file": "held_out-08.jpg",
+          "proposed_place": {
+            "basis": "architecture",
+            "confidence": "medium",
+            "label": "outdoor urban or suburban area",
+            "supporting_evidence": "presence of a building, streetlamp, bench, and car"
+          }
+        },
+        {
+          "file": "held_out-10.jpg",
+          "proposed_place": {
+            "basis": "architecture",
+            "confidence": "medium",
+            "label": "outdoor urban or suburban area",
+            "supporting_evidence": "presence of a building with multiple windows and a door, a streetlamp, a bench, and a car"
+          }
+        }
+      ],
+      "checks": {
+        "cost_at_most_twice_baseline": true,
+        "every_photograph_answered": true,
+        "latency_p95_within_ceiling": true,
+        "no_person_reported_anywhere": false,
+        "primary_reduced_by_minimum": false
+      },
+      "finding_about_the_fallback": "MiniCPM-V-4_5 is the configured vision fallback, so it answers whenever the primary has a provider error. Under the same prompt it proposed a place on 3 of 4 photographs with no sign, each a generic scene label at medium confidence. A non-null proposal writes a place occurrence, so a fallback call turns an ordinary photograph into a place for a person to review.",
+      "iou_threshold_basis_points": 3000,
+      "photographs_reproduced_byte_for_byte_before_scoring": 11,
+      "prompt_note": "Held at the prompt the pre-registration was written against, so the model is the only thing varied.",
+      "prompt_sha256": "b4e29d53011598d952a2398cf800eaeb2579584b5a8318928fafd1dc2cfbf919",
+      "verdict": "KEEP MINIMAX M3. The candidate's primary error is higher (5581 against 3877 basis points), and it reported a person on 2 photographs drawn with nobody in them, which the pre-registration makes disqualifying at any quality."
+    },
+    "predecessor_record": {
+      "path": "docs/evaluation/2026-09-22-model-selection-preregistration.json",
+      "record_sha256": "e0d6d44dc85f5bcaa8da58a2ab1b1d144e98bc2782fed1afd9019ad13906c336"
+    }
+  },
+  "record_sha256": "9cc4765cf7d48ac933a8938b8fe196e40af15cc6cbd5723657390d6b7591bdfa"
+}

@@ -1,0 +1,571 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "adoption_condition": "Passing is not adoption, and nothing passed here. Adopting any wording is also a decision about the captures already stored: the prompt text is part of the vision stage's reprocessing key, so a new capture gets the new prompt, and reprocessing an existing capture is a new paid call that writes a new observation.",
+    "development_runs": [
+      {
+        "baseline_summary": {
+          "failed_calls": 0,
+          "false_proposals": 0,
+          "invented_places": 0,
+          "latency_ms_p95": 4603,
+          "micro_usd_total": 11864,
+          "negative_of": 7,
+          "people_reported_where_none_drawn": 0,
+          "person_name_with_trace": 1,
+          "photographs": 11,
+          "positive_of": 4,
+          "positive_pass": 0,
+          "text_scenes": 10,
+          "text_transcribed": 8
+        },
+        "candidate_rows": [
+          {
+            "arm": "positive",
+            "evidence_says_partly_hidden": null,
+            "false_proposal": false,
+            "file": "place_b_development-01-nameplate.jpg",
+            "invented_place": false,
+            "kind": "nameplate",
+            "latency_ms": 3667,
+            "micro_usd": 1344,
+            "positive_pass": true,
+            "proposed_place": {
+              "basis": "signage",
+              "confidence": "high",
+              "label": "Albury House",
+              "supporting_evidence": "Whole sign: the dark blue sign across the top of the building is fully visible and reads 'ALBURY HOUSE' in white capital letters."
+            }
+          },
+          {
+            "arm": "positive",
+            "evidence_says_partly_hidden": null,
+            "false_proposal": false,
+            "file": "place_b_development-02-street_sign.jpg",
+            "invented_place": false,
+            "kind": "street_sign",
+            "latency_ms": 3176,
+            "micro_usd": 1105,
+            "positive_pass": true,
+            "proposed_place": {
+              "basis": "signage",
+              "confidence": "high",
+              "label": "Quayside Lane",
+              "supporting_evidence": "Whole sign: 'QUAYSIDE LANE' is fully visible on the green street sign on the left side of the image."
+            }
+          },
+          {
+            "arm": "positive",
+            "evidence_says_partly_hidden": null,
+            "false_proposal": false,
+            "file": "place_b_development-03-park_sign.jpg",
+            "invented_place": false,
+            "kind": "park_sign",
+            "latency_ms": 3588,
+            "micro_usd": 1171,
+            "positive_pass": true,
+            "proposed_place": {
+              "basis": "signage",
+              "confidence": "high",
+              "label": "Broom Park",
+              "supporting_evidence": "Whole sign: 'BROOM PARK'"
+            }
+          },
+          {
+            "arm": "positive",
+            "evidence_says_partly_hidden": null,
+            "false_proposal": false,
+            "file": "place_b_development-04-station_sign.jpg",
+            "invented_place": false,
+            "kind": "station_sign",
+            "latency_ms": 3347,
+            "micro_usd": 1164,
+            "positive_pass": true,
+            "proposed_place": {
+              "basis": "signage",
+              "confidence": "high",
+              "label": "Hillcrest Station",
+              "supporting_evidence": "Whole sign: 'HILLCREST STATION' is fully visible on the blue sign above the building entrance."
+            }
+          },
+          {
+            "arm": "negative",
+            "evidence_says_partly_hidden": false,
+            "false_proposal": true,
+            "file": "place_b_development-05-partial.jpg",
+            "invented_place": false,
+            "kind": "partial",
+            "latency_ms": 3540,
+            "micro_usd": 1191,
+            "positive_pass": null,
+            "proposed_place": {
+              "basis": "signage",
+              "confidence": "medium",
+              "label": "Carrington",
+              "supporting_evidence": "Whole sign: 'CARRINGTON' is fully visible on the front of the building."
+            }
+          },
+          {
+            "arm": "negative",
+            "evidence_says_partly_hidden": false,
+            "false_proposal": true,
+            "file": "place_b_development-06-partial.jpg",
+            "invented_place": false,
+            "kind": "partial",
+            "latency_ms": 3538,
+            "micro_usd": 1176,
+            "positive_pass": null,
+            "proposed_place": {
+              "basis": "signage",
+              "confidence": "high",
+              "label": "Lyndhurst",
+              "supporting_evidence": "Whole sign: 'LYNDHURST' is fully visible on the front of the building."
+            }
+          },
+          {
+            "arm": "negative",
+            "evidence_says_partly_hidden": true,
+            "false_proposal": false,
+            "file": "place_b_development-07-partial_cut.jpg",
+            "invented_place": false,
+            "kind": "partial_cut",
+            "latency_ms": 3274,
+            "micro_usd": 1093,
+            "positive_pass": null,
+            "proposed_place": {
+              "basis": "signage",
+              "confidence": "low",
+              "label": "Underwood Te...",
+              "supporting_evidence": "Partly hidden: the dark blue band across the top of the building shows the white text 'UNDERWOOD TE' but the remainder of the sign is cut off by the right edge of the photograph, so the full name cannot be read."
+            }
+          },
+          {
+            "arm": "negative",
+            "evidence_says_partly_hidden": true,
+            "false_proposal": false,
+            "file": "place_b_development-08-partial_cut.jpg",
+            "invented_place": false,
+            "kind": "partial_cut",
+            "latency_ms": 3043,
+            "micro_usd": 966,
+            "positive_pass": null,
+            "proposed_place": {
+              "basis": "signage",
+              "confidence": "low",
+              "label": "PEMBERTON GA",
+              "supporting_evidence": "Partly hidden: the sign on the building reads 'PEMBERTON GA' but the right edge of the sign is cut off by the right edge of the photograph, so the full name is not visible."
+            }
+          },
+          {
+            "arm": "negative",
+            "evidence_says_partly_hidden": null,
+            "false_proposal": false,
+            "file": "place_b_development-09-no_text.jpg",
+            "invented_place": false,
+            "kind": "no_text",
+            "latency_ms": 3058,
+            "micro_usd": 990,
+            "positive_pass": null,
+            "proposed_place": null
+          },
+          {
+            "arm": "negative",
+            "evidence_says_partly_hidden": null,
+            "false_proposal": false,
+            "file": "place_b_development-10-product.jpg",
+            "invented_place": false,
+            "kind": "product",
+            "latency_ms": 3144,
+            "micro_usd": 997,
+            "positive_pass": null,
+            "proposed_place": null
+          },
+          {
+            "arm": "negative",
+            "evidence_says_partly_hidden": null,
+            "false_proposal": false,
+            "file": "place_b_development-11-person_name.jpg",
+            "invented_place": false,
+            "kind": "person_name",
+            "latency_ms": 4247,
+            "micro_usd": 1555,
+            "positive_pass": null,
+            "proposed_place": null
+          }
+        ],
+        "candidate_summary": {
+          "failed_calls": 0,
+          "false_proposals": 2,
+          "invented_places": 0,
+          "latency_ms_p95": 4247,
+          "micro_usd_total": 12752,
+          "negative_of": 7,
+          "people_reported_where_none_drawn": 0,
+          "person_name_with_trace": 1,
+          "photographs": 11,
+          "positive_of": 4,
+          "positive_pass": 4,
+          "text_scenes": 10,
+          "text_transcribed": 8
+        },
+        "gates": {
+          "all_pass": false,
+          "checks": {
+            "cost_at_most_twice": true,
+            "latency_p95": true,
+            "negative_zero_false_proposals": false,
+            "no_failed_calls": true,
+            "no_more_people_where_none_drawn": true,
+            "person_traces_not_worse": true,
+            "positive_minimum": true,
+            "text_not_worse_by_more_than_one": true
+          },
+          "positive_minimum_used": 3
+        },
+        "wording": {
+          "prompt_sha256": "25c3f70939a1db209c546ae141d272334ef1bca7cfd4a5f5c5445f4723b7e14b",
+          "proposed_place_schema": {
+            "additionalProperties": false,
+            "description": "Where this photograph may have been taken, proposed for the account holder to confirm or reject. Fill it when text in the frame names a place, such as a name on a building or a street, station, park or venue sign, or when a distinctive landmark identifies one. Null when nothing in the frame names a place. A proposal, never a statement of fact.",
+            "properties": {
+              "basis": {
+                "enum": [
+                  "signage",
+                  "landmark",
+                  "architecture",
+                  "natural_feature"
+                ],
+                "type": "string"
+              },
+              "confidence": {
+                "description": "A qualitative band. Do not emit a percentage or a probability.",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high"
+                ],
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "supporting_evidence": {
+                "description": "What in the image supports this, quoted or described.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "label",
+              "basis",
+              "supporting_evidence",
+              "confidence"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "rules": "Rules:\n- Never write a person's name, and never propose who someone is. Not even a famous person.\n- Report every visible trace of a person in `people`, including partial ones: a hand, an arm, a leg or a shoulder at the edge of the frame, somebody reflected in a window, somebody on a screen in the photograph. Give the location and the part only, never a description. When you are unsure whether something is part of a person, include it with low confidence.\n- Never state a date or a time as fact, and never state where the photograph was taken as fact.\n- `proposed_place` is how you suggest where the photograph was taken, for the account holder to confirm or reject. Fill it whenever text in the frame names a place: a name on a building, or a street, station, park or venue sign. Use the name you read as the label, `signage` as the basis, and quote the words you read as the supporting evidence. A distinctive landmark supports a proposal in the same way, with `landmark` as the basis.\n- Before you fill `proposed_place`, answer one question about the sign that carries the name, exactly as you would if it were the only question you had been asked: is the whole sign visible, or is part of it hidden behind something or cut off by the edge of the photograph? The proposal depends on that answer:\n  - Whole sign visible: propose the name it shows, and begin the supporting evidence with \"Whole sign:\".\n  - Part of it hidden or cut off: either leave `proposed_place` null, or propose only the words you can actually read, with low confidence, and begin the supporting evidence with \"Partly hidden:\". Never complete a name you cannot see.\n- Leave `proposed_place` null when nothing in the frame names a place. Text that names a product, an advertisement, a slogan, a person or anything else that is not a place is not a place name.\n- Describe only what is in the frame. Do not fill gaps with what is usually true.\n- Use the qualitative confidence bands. Never emit a percentage.\n- Reply with one JSON object matching the schema and nothing else.",
+          "schema_version": 2
+        }
+      },
+      {
+        "baseline_summary": {
+          "failed_calls": 0,
+          "false_proposals": 0,
+          "invented_places": 0,
+          "latency_ms_p95": 3890,
+          "micro_usd_total": 11982,
+          "negative_of": 7,
+          "people_reported_where_none_drawn": 0,
+          "person_name_with_trace": 1,
+          "photographs": 11,
+          "positive_of": 4,
+          "positive_pass": 0,
+          "text_scenes": 10,
+          "text_transcribed": 8
+        },
+        "candidate_rows": [
+          {
+            "arm": "positive",
+            "evidence_says_partly_hidden": null,
+            "false_proposal": false,
+            "file": "place_b_development-01-nameplate.jpg",
+            "invented_place": false,
+            "kind": "nameplate",
+            "latency_ms": 4140,
+            "micro_usd": 1376,
+            "positive_pass": true,
+            "proposed_place": {
+              "basis": "signage",
+              "confidence": "high",
+              "label": "Albury House",
+              "sign_completeness": "whole",
+              "supporting_evidence": "A dark blue sign across the top of the building reads 'ALBURY HOUSE' in full, with no part of the sign cut off or obscured."
+            }
+          },
+          {
+            "arm": "positive",
+            "evidence_says_partly_hidden": null,
+            "false_proposal": false,
+            "file": "place_b_development-02-street_sign.jpg",
+            "invented_place": false,
+            "kind": "street_sign",
+            "latency_ms": 3342,
+            "micro_usd": 1125,
+            "positive_pass": true,
+            "proposed_place": {
+              "basis": "signage",
+              "confidence": "high",
+              "label": "Quayside Lane",
+              "sign_completeness": "whole",
+              "supporting_evidence": "A green street sign on the left side of the image clearly reads 'QUAYSIDE LANE' in white capital letters. The entire sign is visible within the frame."
+            }
+          },
+          {
+            "arm": "positive",
+            "evidence_says_partly_hidden": null,
+            "false_proposal": false,
+            "file": "place_b_development-03-park_sign.jpg",
+            "invented_place": false,
+            "kind": "park_sign",
+            "latency_ms": 3606,
+            "micro_usd": 1164,
+            "positive_pass": true,
+            "proposed_place": {
+              "basis": "signage",
+              "confidence": "high",
+              "label": "Broom Park",
+              "sign_completeness": "whole",
+              "supporting_evidence": "A brown rectangular sign on two posts clearly displays the words 'BROOM PARK' in white capital letters; the entire sign is visible within the frame."
+            }
+          },
+          {
+            "arm": "positive",
+            "evidence_says_partly_hidden": null,
+            "false_proposal": false,
+            "file": "place_b_development-04-station_sign.jpg",
+            "invented_place": false,
+            "kind": "station_sign",
+            "latency_ms": 3366,
+            "micro_usd": 1212,
+            "positive_pass": true,
+            "proposed_place": {
+              "basis": "signage",
+              "confidence": "high",
+              "label": "Hillcrest Station",
+              "sign_completeness": "whole",
+              "supporting_evidence": "A blue sign on the building facade clearly reads 'HILLCREST STATION' in white capital letters; the entire sign is visible within the frame."
+            }
+          },
+          {
+            "arm": "negative",
+            "evidence_says_partly_hidden": false,
+            "false_proposal": true,
+            "file": "place_b_development-05-partial.jpg",
+            "invented_place": false,
+            "kind": "partial",
+            "latency_ms": 3790,
+            "micro_usd": 1248,
+            "positive_pass": null,
+            "proposed_place": {
+              "basis": "signage",
+              "confidence": "high",
+              "label": "Carrington",
+              "sign_completeness": "whole",
+              "supporting_evidence": "A sign on the front of the building clearly reads 'CARRINGTON' in full."
+            }
+          },
+          {
+            "arm": "negative",
+            "evidence_says_partly_hidden": false,
+            "false_proposal": true,
+            "file": "place_b_development-06-partial.jpg",
+            "invented_place": false,
+            "kind": "partial",
+            "latency_ms": 3615,
+            "micro_usd": 1298,
+            "positive_pass": null,
+            "proposed_place": {
+              "basis": "signage",
+              "confidence": "medium",
+              "label": "Lyndhurst",
+              "sign_completeness": "whole",
+              "supporting_evidence": "A sign on the front of the building clearly reads 'LYNDHURST' in white capital letters on a dark background, and the entire sign is visible within the frame."
+            }
+          },
+          {
+            "arm": "negative",
+            "evidence_says_partly_hidden": true,
+            "false_proposal": false,
+            "file": "place_b_development-07-partial_cut.jpg",
+            "invented_place": false,
+            "kind": "partial_cut",
+            "latency_ms": 3157,
+            "micro_usd": 1057,
+            "positive_pass": null,
+            "proposed_place": {
+              "basis": "signage",
+              "confidence": "low",
+              "label": "Underwood Te...",
+              "sign_completeness": "partly_hidden",
+              "supporting_evidence": "The dark blue band on the building reads 'UNDERWOOD TE' but the text is cut off at the right edge of the frame, so the full name is not visible."
+            }
+          },
+          {
+            "arm": "negative",
+            "evidence_says_partly_hidden": true,
+            "false_proposal": false,
+            "file": "place_b_development-08-partial_cut.jpg",
+            "invented_place": false,
+            "kind": "partial_cut",
+            "latency_ms": 3485,
+            "micro_usd": 1199,
+            "positive_pass": null,
+            "proposed_place": {
+              "basis": "signage",
+              "confidence": "low",
+              "label": "PEMBERTON GA",
+              "sign_completeness": "partly_hidden",
+              "supporting_evidence": "The dark blue band across the top of the building reads 'PEMBERTON GA' in white capital letters, but the right edge of the sign is cut off by the right edge of the photograph, so the full name is not visible."
+            }
+          },
+          {
+            "arm": "negative",
+            "evidence_says_partly_hidden": null,
+            "false_proposal": false,
+            "file": "place_b_development-09-no_text.jpg",
+            "invented_place": false,
+            "kind": "no_text",
+            "latency_ms": 3156,
+            "micro_usd": 1037,
+            "positive_pass": null,
+            "proposed_place": null
+          },
+          {
+            "arm": "negative",
+            "evidence_says_partly_hidden": null,
+            "false_proposal": false,
+            "file": "place_b_development-10-product.jpg",
+            "invented_place": false,
+            "kind": "product",
+            "latency_ms": 3502,
+            "micro_usd": 1218,
+            "positive_pass": null,
+            "proposed_place": null
+          },
+          {
+            "arm": "negative",
+            "evidence_says_partly_hidden": null,
+            "false_proposal": false,
+            "file": "place_b_development-11-person_name.jpg",
+            "invented_place": false,
+            "kind": "person_name",
+            "latency_ms": 5050,
+            "micro_usd": 1952,
+            "positive_pass": null,
+            "proposed_place": null
+          }
+        ],
+        "candidate_summary": {
+          "failed_calls": 0,
+          "false_proposals": 2,
+          "invented_places": 0,
+          "latency_ms_p95": 5050,
+          "micro_usd_total": 13886,
+          "negative_of": 7,
+          "people_reported_where_none_drawn": 0,
+          "person_name_with_trace": 1,
+          "photographs": 11,
+          "positive_of": 4,
+          "positive_pass": 4,
+          "text_scenes": 10,
+          "text_transcribed": 8
+        },
+        "gates": {
+          "all_pass": false,
+          "checks": {
+            "cost_at_most_twice": true,
+            "latency_p95": true,
+            "negative_zero_false_proposals": false,
+            "no_failed_calls": true,
+            "no_more_people_where_none_drawn": true,
+            "person_traces_not_worse": true,
+            "positive_minimum": true,
+            "text_not_worse_by_more_than_one": true
+          },
+          "positive_minimum_used": 3
+        },
+        "wording": {
+          "prompt_sha256": "9f5949d5b75012ba50d096ee4521913f5e3bf50dd9db140f7b9c9df82593ec6c",
+          "proposed_place_schema": {
+            "additionalProperties": false,
+            "description": "Where this photograph may have been taken, proposed for the account holder to confirm or reject. Fill it when text in the frame names a place, such as a name on a building or a street, station, park or venue sign, or when a distinctive landmark identifies one. Null when nothing in the frame names a place. A proposal, never a statement of fact.",
+            "properties": {
+              "basis": {
+                "enum": [
+                  "signage",
+                  "landmark",
+                  "architecture",
+                  "natural_feature"
+                ],
+                "type": "string"
+              },
+              "confidence": {
+                "description": "A qualitative band. Do not emit a percentage or a probability.",
+                "enum": [
+                  "low",
+                  "medium",
+                  "high"
+                ],
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "sign_completeness": {
+                "description": "Answer this first, as if it were the only question: is the whole sign that carries the name visible, or is part of it hidden behind something or cut off by the edge of the photograph? A sign is partly hidden even when the words you can read are complete words. no_sign when the proposal rests on a landmark rather than a sign.",
+                "enum": [
+                  "whole",
+                  "partly_hidden",
+                  "no_sign"
+                ],
+                "type": "string"
+              },
+              "supporting_evidence": {
+                "description": "What in the image supports this, quoted or described.",
+                "type": "string"
+              }
+            },
+            "required": [
+              "sign_completeness",
+              "label",
+              "basis",
+              "supporting_evidence",
+              "confidence"
+            ],
+            "type": [
+              "object",
+              "null"
+            ]
+          },
+          "rules": "Rules:\n- Never write a person's name, and never propose who someone is. Not even a famous person.\n- Report every visible trace of a person in `people`, including partial ones: a hand, an arm, a leg or a shoulder at the edge of the frame, somebody reflected in a window, somebody on a screen in the photograph. Give the location and the part only, never a description. When you are unsure whether something is part of a person, include it with low confidence.\n- Never state a date or a time as fact, and never state where the photograph was taken as fact.\n- `proposed_place` is how you suggest where the photograph was taken, for the account holder to confirm or reject. Fill it whenever text in the frame names a place: a name on a building, or a street, station, park or venue sign. Use the name you read as the label, `signage` as the basis, and quote the words you read as the supporting evidence. A distinctive landmark supports a proposal in the same way, with `landmark` as the basis.\n- Fill `sign_completeness` before anything else in `proposed_place`, answering it as if it were the only question you had been asked: is the whole sign that carries the name visible, or is part of it hidden behind something or cut off by the edge of the photograph? A sign is partly hidden even when the words you can read are complete words. The proposal depends on that answer:\n  - `whole`: propose the name the sign shows.\n  - `partly_hidden`: either leave `proposed_place` null, or propose only the words you can actually read, with low confidence, and say in the supporting evidence that the sign is partly hidden. Never complete a name you cannot see.\n- Leave `proposed_place` null when nothing in the frame names a place. Text that names a product, an advertisement, a slogan, a person or anything else that is not a place is not a place name.\n- Describe only what is in the frame. Do not fill gaps with what is usually true.\n- Use the qualitative confidence bands. Never emit a percentage.\n- Reply with one JSON object matching the schema and nothing else.",
+          "schema_version": 3
+        }
+      }
+    ],
+    "findings": [
+      "Asked alone, the same model called 8 of 8 canopy-covered boards partly hidden (docs/evaluation/2026-09-22-sign-completeness-probe-outcome.json). Asked inside the observation, as a check or as its own field answered first, it called 0 of 2 partly hidden on drawings built the same way. The judgement exists; the combined observation task does not use it for covers.",
+      "A board cut by the frame was judged partly hidden in every case, standalone and in the observation, so the gap is specific to something in front of the sign.",
+      "A design this suggests, not tested here and not a decision this record makes: ask the completeness question as its own call whenever a place is proposed, and hold back or lower the proposal on a partly hidden answer. The standalone question cost about 280 micro-USD a photograph in the probe."
+    ],
+    "held_out": "NOT RUN. No wording passed development, so none was frozen, and no call of any kind was made on the held-out split, which remains unspent.",
+    "lost_run": "The first development run of wording 3 made all 22 calls and was lost when the measuring script failed writing its output, after the candidate labels of 6 photographs had been printed. Its cost was not recorded and is not estimated here. The wording 3 run above is the second run of the same wording on the same photographs.",
+    "predecessor_record": {
+      "path": "docs/evaluation/2026-09-22-vision-place-proposal-b-preregistration.json",
+      "record_sha256": "618b5f6def067393da0ff0b0680f3fc171d6e76ce75db5f3a76d79bfbbfdf01c"
+    },
+    "verdict": "B STOPS AT DEVELOPMENT. Both permitted wordings proposed every place name from a whole sign (4 of 4 each), invented no place, proposed nothing from product or person-name text, and handled both boards cut by the frame correctly: partly hidden, low confidence, only the letters inside the frame. Both judged both canopy-covered boards whole and proposed their visible word at medium or high confidence, including wording 4, which asks the completeness question as a schema field answered before the label."
+  },
+  "record_sha256": "e6a4e82dc70a62fdeae9e056edd5198ac250633775d14ab1c10c921c0d6b7f8a"
+}

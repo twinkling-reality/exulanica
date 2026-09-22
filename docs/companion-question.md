@@ -75,6 +75,40 @@ unconsented person reached a viewer's screen. That is why the client makes a sec
 random per request, so the packet's tokens are not the answer's tokens. Matching them would
 resolve nothing, silently, and every chip would open nothing.
 
+**Photograph-derived text reaches the composer only under a personal model right.** A packet
+carries the claims stored about each photograph it cites: a transcribed sign, a described scene, a
+recorded date. Those are personal exactly when the photograph is, and the account holder has
+decided that derived text goes to a hosted model only under a current right naming that model and
+its destination, the same as the photograph's bytes. `answer_question` therefore requires a
+`before_compose` check, which the API supplies from `exulanica/api/composer_rights.py` because
+answering and ingesting are sibling workflows that may not import each other. Before the composer
+is called, every photograph the packet cites must pass `require_model_right` for every model the
+`reasoning_cheap` role can reach, or be screened under a synthetic or benchmark exemption. It is
+all or nothing: if any photograph fails, no model is called, the deterministic answer is rendered
+locally from the same packet, and the execution block carries `model_right_refused` with the
+reason. Composing from the permitted part alone would answer about some photographs while seeming
+to answer about all of them. A personal photograph admitted without a right for that role is
+therefore answered deterministically, never composed.
+
+**People's names never go to a hosted model, with or without a right.** A person's name exists
+only because the account holder saved it, and every such name is replaced before a request is
+built, by `exulanica/selection/people.py`. A saved name is recognised whole or by any part of at
+least three letters, case-insensitively and as a whole word, and each person recognised gets a
+placeholder, `[person A]`, `[person B]`, stable for the whole request. The planner's catalogue
+lists a person as an id and a class, with the placeholder when the question named them and never
+with a name. The question the planner, the composer, the request classifier and both drafters are
+sent is the redacted one, and so is every line of packet text, because a name can be written on a
+shirt as easily as typed. The answer's `people` field maps each placeholder to its entity so the
+client can restore the name from the account holder's own data. What still works: asking about
+somebody by a name the account holder has saved, which is resolved locally and reaches the plan
+as an id. What is lost: the model can no longer pick a person out from a description. Two
+limitations, stated rather than hidden: a name the account holder has not saved cannot be
+recognised as a person's name, so it leaves as the text it was typed as; and a saved name that is
+also an ordinary word is replaced wherever that word appears. A confirmed place name is still sent
+to the planner by name in the catalogue, although the account holder's rule allows that only under
+a right for the model it goes to; no right that can express it exists yet, so this is an open
+limitation rather than a permitted use.
+
 ## 3. Which refusals mean "this was a question"
 
 Two, named in one set in `companion.ts` rather than inferred:

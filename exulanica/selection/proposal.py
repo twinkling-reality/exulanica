@@ -58,6 +58,7 @@ from pydantic import BaseModel, ConfigDict, Field, create_model
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import StructuredOutputError, TruncatedResponseError
 from exulanica.models.manifest import Role
+from exulanica.selection.people import redact_people, saved_person_names
 from exulanica.selection.question import CallLog, ModelCall
 from exulanica.selection.validation import Session
 from exulanica.world import STYLE_REGISTRY, InvalidStyleData, StyleReference, StyleRegistry
@@ -512,7 +513,11 @@ def propose_appearance(
     against a version the caller has to name anyway when it posts the preview.
     """
     log = CallLog()
-    kind, classified_by = classify_request(client, utterance, log=log)
+    # People's names never reach a hosted model: the classifier and the drafter are sent the
+    # utterance with every name the account holder has saved for a person replaced. Neither needs
+    # a name to decide whether an utterance asks to change how the world looks.
+    sent = redact_people(utterance, saved_person_names(connection, session.workspace_id)).text
+    kind, classified_by = classify_request(client, sent, log=log)
     if kind is RequestKind.QUESTION:
         return AppearanceOutcome(
             kind=kind, classified_by=classified_by, calls=log.calls
@@ -556,7 +561,7 @@ def propose_appearance(
         )
     try:
         draft, model_id = draft_appearance(
-            client, utterance, current, catalogue, registry=registry, log=log
+            client, sent, current, catalogue, registry=registry, log=log
         )
     except (StructuredOutputError, TruncatedResponseError) as refused:
         return AppearanceOutcome(

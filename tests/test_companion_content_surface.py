@@ -55,6 +55,11 @@ UUID_TEXT = re.compile(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f
 TOKEN = "companion-content-surface-owner-token"
 
 
+def _not_reached(capture_ids, handoff):
+    """Each call below is refused before any query runs, so the right check is never reached."""
+    raise AssertionError("the right check was reached on a path that runs no query")
+
+
 def _row(kind: str, *, label: str | None, source_id: str) -> SelectedContent:
     place = uuid.uuid4()
     return SelectedContent(
@@ -110,10 +115,21 @@ def test_only_a_supplied_content_plan_answers_without_a_model() -> None:
     assert not requires_model(content)
     # Refused before any query runs: the connection is never touched.
     with pytest.raises(ValueError, match="model client is required"):
-        answer_question(object(), None, "What is here?", Session(uuid.uuid4(), uuid.uuid4()))
+        answer_question(
+            object(),
+            None,
+            "What is here?",
+            Session(uuid.uuid4(), uuid.uuid4()),
+            before_compose=_not_reached,
+        )
     with pytest.raises(ValueError, match="model client is required"):
         answer_question(
-            object(), None, "Show me", Session(uuid.uuid4(), uuid.uuid4()), plan=capture
+            object(),
+            None,
+            "Show me",
+            Session(uuid.uuid4(), uuid.uuid4()),
+            plan=capture,
+            before_compose=_not_reached,
         )
 
 
