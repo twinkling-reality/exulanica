@@ -441,6 +441,8 @@ ROUTE_RULES: Final[Mapping[tuple[str, str], Public | Authentication | Requires]]
         ("POST", "/world/versions/{version_id}/environment-instances/{instance_id}/remove"): (
             _WORLD_WRITE
         ),
+        ("POST", "/world/versions/{version_id}/compositions/preview"): _WORLD_WRITE,
+        ("POST", "/world/versions/{version_id}/compositions/apply"): _WORLD_WRITE,
         ("POST", "/world/versions/{version_id}/society"): _WORLD_WRITE,
         ("POST", "/world/versions/{version_id}/society/steps"): _WORLD_WRITE,
         ("PUT", "/world/versions/{version_id}/society/control"): _WORLD_WRITE,

@@ -107,11 +107,13 @@ def apply_candidate(structures, candidate, *, actor=None):
 
 
 @pytest.fixture
-def world(repository):
+def world(repository, tmp_path):
     """One committed structural snapshot and an object repository over the same connection."""
     structures = WorldStructureRepository(repository.connection, repository.workspace_id)
     snapshot = apply_candidate(structures, structural_candidate())
-    objects = WorldObjectRepository(repository.connection, repository.workspace_id)
+    store = LocalContentAddressedStore(tmp_path / "world-objects-store")
+    seed_reviewed_assets(store)
+    objects = WorldObjectRepository(repository.connection, repository.workspace_id, store=store)
     return objects, snapshot, structures
 
 
@@ -377,7 +379,7 @@ def test_runtime_role_undo_retains_history_without_delete_privilege(
     with scratch_role_database(spine_schema[1], RUNTIME_ROLE).session(
         repository.workspace_id
     ) as connection:
-        runtime = WorldObjectRepository(connection, repository.workspace_id)
+        runtime = WorldObjectRepository(connection, repository.workspace_id, store=objects.store)
         assert connection.execute(
             "select has_table_privilege(current_user,'world_alternate_object','DELETE') as allowed"
         ).fetchone()["allowed"] is False
@@ -797,7 +799,8 @@ def test_deleting_the_source_scene_invalidates_every_dependent_version(
         structural_candidate(graph="graph-with-source", evidence_span_id=evidence["span_id"]),
     )
 
-    objects = WorldObjectRepository(repository.connection, repository.workspace_id)
+    seed_reviewed_assets(store)
+    objects = WorldObjectRepository(repository.connection, repository.workspace_id, store=store)
     first = objects.create_version(
         source_snapshot_id=dependent.snapshot_id, title="One", created_by=uuid.uuid4()
     )

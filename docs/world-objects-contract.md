@@ -280,6 +280,16 @@ An unavailable asset yields no geometry, no placeholder mesh and no substitute i
 same rule the source-media contract states, for the same reason: a fallback that looks like the
 thing it replaces is a lie the renderer cannot take back.
 
+Adding an object therefore requires its bytes. `WorldObjectRepository.add_object` refuses an asset
+whose registry row exists and whose bytes are not in the content-addressed store, and a repository
+constructed without a store refuses every addition because it cannot look, as environment
+composition does. It is one rule on one code path for both routes that add objects:
+`POST /world/versions/{version_id}/objects` answers 424 `unavailable_asset` through the
+application-wide handler, and composition apply answers 409 `composition_blocked` with detail
+`asset_bytes_unavailable`. Nothing is written in either case. Moving, removing and undoing an
+object that already exists do not read its bytes, so history stays correctable after bytes go
+missing.
+
 ## 5. Concurrency, undo, and reopening
 
 Every mutation names the base it was made against: the version id and that version's
@@ -386,7 +396,7 @@ The problem codes are distinct, because the recovery differs:
 | `409` | `stale_object_base` | Read the version again and re-issue the edit against the new `state_sha256` |
 | `409` | `invalid_object_state` | Do not move or remove an already-removed object, re-add an existing id, or undo an empty history |
 | `409` | `invalidated_source_version` | The source was deleted; branch from a live snapshot instead |
-| `424` | `unavailable_asset` | Restore the reviewed bytes; render the recorded state, never a substitute |
+| `424` | `unavailable_asset` | Restore the reviewed bytes; an addition is refused, and the recorded state renders without a substitute |
 | `404` | `unknown_reference` | Absent and cross-workspace ids are indistinguishable |
 
 `unknown_reference` and `unavailable_asset` reuse the existing application error classes and their

@@ -13,14 +13,13 @@ from exulanica.world import (
     AuthoredObject,
     ObjectOrigin,
     Transform,
-    WorldObjectRepository,
 )
 from exulanica.world.objects import canonical_delta_document
 from exulanica.world_package import authored, environments, project_world_package, verify_package
 from exulanica.world_package.package import PackageError, import_check_package
 
 from test_world_environment_composition_postgres import _add, _composed_over
-from test_world_package_extension_postgres import CUBE, _one_version_one_object
+from test_world_package_extension_postgres import CUBE, _one_version_one_object, _reviewed_objects
 from world_structure_fixtures import structural_candidate
 
 pytestmark = pytest.mark.postgres
@@ -43,7 +42,7 @@ def _export(repository, output: Path, *, extensions=(), store=None):
 
 
 def test_authored_world_1_0_without_environments_still_verifies(repository, tmp_path: Path):
-    _one_version_one_object(repository)
+    _one_version_one_object(repository, tmp_path)
     result = _export(repository, tmp_path / "authored.wmp", extensions=[authored.EXTENSION_KEY])
     report = verify_package(result.output)
     [finding] = report.extensions
@@ -166,7 +165,7 @@ def test_dual_export_keeps_schema_v1_in_authored_world_and_environments_in_the_o
 ):
     composed = _composed_over(repository, tmp_path, structural_candidate())
     env_version = _add(composed, composed.placement("environment:plaza"))
-    objects = WorldObjectRepository(repository.connection, repository.workspace_id)
+    objects = _reviewed_objects(repository, tmp_path)
     object_version = objects.create_version(
         source_snapshot_id=env_version.source_snapshot_id,
         title="Lantern only",
@@ -416,7 +415,7 @@ def test_dual_export_of_a_child_whose_parent_stayed_environment_bearing_after_un
         title="Lantern only",
         created_by=uuid.uuid4(),
     )
-    lantern = composed.worlds.add_object(
+    lantern = _reviewed_objects(repository, tmp_path).add_object(
         lantern.version_id,
         AuthoredObject(
             object_id="object:lantern",

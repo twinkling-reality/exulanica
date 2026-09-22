@@ -26,6 +26,7 @@ import hashlib
 import json
 import uuid
 from collections.abc import Callable, Mapping
+from dataclasses import dataclass
 from typing import Any, Final
 
 import psycopg
@@ -73,7 +74,7 @@ from exulanica.world.objects import (
     validate_transform,
 )
 
-__all__ = ["ReviewedAssetRow", "WorldObjectRepository"]
+__all__ = ["ResolvedEnvironmentSource", "ReviewedAssetRow", "WorldObjectRepository"]
 
 #: The structural plane's seed. See the module docstring: sharing it is what serializes an object
 #: edit against a structural commit and against tombstone invalidation.
@@ -105,6 +106,27 @@ class ReviewedAssetRow:
         self.licence_id = row["licence_id"]
         self.licence_sha256 = row["licence_sha256"]
         self.availability = availability
+
+
+@dataclass(frozen=True, slots=True)
+class ResolvedEnvironmentSource:
+    """One authorized resolution of an exact environment source, before any destination.
+
+    ``validate_environment_source`` returns it so a placement check in the same read can reuse it
+    rather than resolving the source, and reading every pinned blob, a second time.
+    """
+
+    admission_id: uuid.UUID
+    render_asset_id: uuid.UUID
+    publication_id: uuid.UUID | None
+    selection: EnvironmentSelection
+    row: Mapping[str, Any]
+    publication: Mapping[str, Any] | None
+    bounds: Mapping[str, Any]
+
+    @property
+    def render_sha256(self) -> str:
+        return bytes(self.row["render_sha256"]).hex()
 
 
 class WorldObjectRepository:
@@ -312,23 +334,39 @@ class WorldObjectRepository:
             self._final_environment_authorization(instance)
         return self.version(version_id)
 
+    def edit_base_row(self, version_id: uuid.UUID) -> Mapping[str, Any]:
+        """The stored version row an edit compares against, read without a lock.
+
+        ``state_sha256`` here is the stored compare-and-swap token, not the digest ``version``
+        recomputes. Absent, cross-workspace and other-world ids raise the same
+        ``UnknownWorldResource``.
+        """
+        return self._version_row(version_id)
+
+    def require_edit_base(self, row: Mapping[str, Any], base_state_sha256: str) -> None:
+        """The base check every mutation runs under its lock: invalidated source, then stale."""
+        self._require_edit_base(row, base_state_sha256)
+
     def validate_environment_placement(
         self,
         version_id: uuid.UUID,
         placement: EnvironmentPlacement,
         *,
         base_state_sha256: str,
+        resolved_source: ResolvedEnvironmentSource | None = None,
     ) -> EnvironmentInstance:
         """Validate exactly what add would validate, without taking a lock or writing.
 
         Apply repeats this validation under its write transaction and final authorization lock.
         This read-only pass exists so a proposal that could not currently be applied is never shown
         as valid. It is safe for the executor connection: every operation below is a SELECT or a
-        content-addressed store read.
+        content-addressed store read. ``resolved_source``, from ``validate_environment_source`` in
+        the same read, stands in for resolving the placement's source again; it must name the
+        placement's exact binding.
         """
         row = self._version_row(version_id)
         self._require_edit_base(row, base_state_sha256)
-        return self._validated_environment_placement(row, placement)
+        return self._validated_environment_placement(row, placement, resolved_source)
 
     def move_environment(
         self,
@@ -428,15 +466,7 @@ class WorldObjectRepository:
     ) -> AlternateVersion:
         with self.connection.transaction():
             row = self._begin_edit(version_id, base_state_sha256)
-            checked = validate_object(
-                obj,
-                region_ids=self._source_region_ids(row["source_snapshot_id"]),
-                asset_digests=frozenset(a.content_sha256 for a in self.reviewed_assets()),
-                registry=self.behaviour_registry(),
-            )
-            existing = {o.object_id for o in self._objects(version_id)}
-            if checked.object_id in existing:
-                raise InvalidObjectState(f"{checked.object_id} already exists in this version")
+            checked = self._validated_object(row, obj)
             edit_id = uuid.uuid4()
             self._insert_object(version_id, checked, (edit_id, edit_id))
             self._append_edit(
@@ -449,6 +479,23 @@ class WorldObjectRepository:
                 actor=actor,
             )
         return self.version(version_id)
+
+    def validate_object_placement(
+        self,
+        version_id: uuid.UUID,
+        obj: AuthoredObject,
+        *,
+        base_state_sha256: str,
+    ) -> AuthoredObject:
+        """Validate exactly what add would validate, without taking a lock or writing.
+
+        The object counterpart of ``validate_environment_placement``: the same base, region,
+        catalog, behaviour, byte and duplicate checks ``add_object`` runs, in the same order,
+        through the same ``_validated_object``. Every operation is a SELECT or a store lookup.
+        """
+        row = self._version_row(version_id)
+        self._require_edit_base(row, base_state_sha256)
+        return self._validated_object(row, obj)
 
     def move_object(
         self,
@@ -717,16 +764,47 @@ class WorldObjectRepository:
                 "this version moved since the base was read; read it again and re-issue the edit"
             )
 
+    def _validated_object(self, row: Mapping[str, Any], obj: AuthoredObject) -> AuthoredObject:
+        checked = validate_object(
+            obj,
+            region_ids=self._source_region_ids(row["source_snapshot_id"]),
+            asset_digests=frozenset(a.content_sha256 for a in self.reviewed_assets()),
+            registry=self.behaviour_registry(),
+        )
+        self._require_reviewed_asset_bytes(checked.asset_sha256)
+        if checked.object_id in {o.object_id for o in self._objects(row["version_id"])}:
+            raise InvalidObjectState(f"{checked.object_id} already exists in this version")
+        return checked
+
+    def _require_reviewed_asset_bytes(self, asset_sha256: str) -> None:
+        """Refuse an addition that could never draw.
+
+        The registry row is the reviewed decision and the store holds the bytes. An object whose
+        bytes are absent yields no geometry and no placeholder, so adding one would store an edit
+        the person can never see. A repository without a store cannot look, and says so rather
+        than adding on trust, the same rule environment composition follows.
+        """
+        if self.store is None:
+            raise UnavailableAsset("object composition requires the content-addressed store")
+        if not self.store.exists(BlobId.from_hex(asset_sha256)):
+            raise UnavailableAsset("the reviewed asset row exists and its bytes do not")
+
     def _validated_environment_placement(
-        self, row: Mapping[str, Any], placement: EnvironmentPlacement
+        self,
+        row: Mapping[str, Any],
+        placement: EnvironmentPlacement,
+        resolved: ResolvedEnvironmentSource | None = None,
     ) -> EnvironmentInstance:
-        version_id = row["version_id"]
-        if any(
-            instance.instance_id == placement.instance_id
-            for instance in self._environment_instances(version_id)
-        ):
+        # The same id set ``_environment_instances`` reads, without resolving every existing
+        # instance's availability, which reads each of their pinned blobs.
+        present = self.connection.execute(
+            "select 1 from world_alternate_environment_instance where workspace_id=%s "
+            "and world_id=%s and version_id=%s and instance_id=%s and not addition_undone",
+            (self.workspace_id, self.world_id, row["version_id"], placement.instance_id),
+        ).fetchone()
+        if present is not None:
             raise InvalidEnvironmentState(f"{placement.instance_id} already exists in this version")
-        source = self._resolve_environment_source(placement)
+        source = self._resolve_environment_source(placement, resolved)
         return validate_environment_instance(
             EnvironmentInstance(
                 instance_id=placement.instance_id,
@@ -756,7 +834,7 @@ class WorldObjectRepository:
         result = delta_sha256(
             self._objects(version_id),
             self._overrides(version_id),
-            self._environment_instances(version_id),
+            self._environment_instances(version_id, with_availability=False),
         )
         self.connection.execute(
             "insert into world_alternate_version_edit (edit_id,workspace_id,world_id,version_id,"
@@ -1118,7 +1196,15 @@ class WorldObjectRepository:
             for r in rows
         )
 
-    def _environment_instances(self, version_id: uuid.UUID) -> tuple[EnvironmentInstance, ...]:
+    def _environment_instances(
+        self, version_id: uuid.UUID, *, with_availability: bool = True
+    ) -> tuple[EnvironmentInstance, ...]:
+        """The version's environment instances, sorted by id.
+
+        ``with_availability`` resolves each instance's current binding and reads its pinned bytes,
+        which is what a reader needs and what a digest must not pay for: availability is not part
+        of ``environment_instance_document`` and so not part of ``state_sha256``.
+        """
         rows = self.connection.execute(
             """
             select instance_id,admission_id,render_asset_id,publication_id,selection_kind,
@@ -1134,9 +1220,11 @@ class WorldObjectRepository:
             """,
             (self.workspace_id, self.world_id, version_id),
         ).fetchall()
-        return tuple(self._environment_from_row(row) for row in rows)
+        return tuple(self._environment_from_row(row, with_availability) for row in rows)
 
-    def _environment_from_row(self, row: Mapping[str, Any]) -> EnvironmentInstance:
+    def _environment_from_row(
+        self, row: Mapping[str, Any], with_availability: bool = True
+    ) -> EnvironmentInstance:
         source = EnvironmentSourceBinding(
             admission_id=row["admission_id"],
             render_asset_id=row["render_asset_id"],
@@ -1184,6 +1272,8 @@ class WorldObjectRepository:
             origin=ObjectOrigin(row["origin_kind"], row["origin_role"]),
             removed=row["removed"],
         )
+        if not with_availability:
+            return instance
         return EnvironmentInstance(
             instance_id=instance.instance_id,
             source=instance.source,
@@ -1261,66 +1351,50 @@ class WorldObjectRepository:
 
     # -- environment source authorization ---------------------------------------------------
 
-    def _resolve_environment_source(
-        self, placement: EnvironmentPlacement
-    ) -> EnvironmentSourceBinding:
-        if self.store is None:
-            raise UnavailableAsset("environment composition requires the content-addressed store")
-        row = self.connection.execute(
-            """
-            select s.place_id,s.source_sha256,s.receipt_sha256 as source_receipt_sha256,
-                   s.withdrawn_at as source_withdrawn_at,
-                   r.content_sha256 as render_sha256,r.receipt_sha256 as render_receipt_sha256,
-                   s.geographic_frame,s.geographic_bounds,
-                   r.withdrawn_at as render_withdrawn_at,
-                   environment_resource_allows(
-                     %s,'source',s.admission_id,'compose',statement_timestamp()) source_compose,
-                   environment_resource_allows(
-                     %s,'asset',r.asset_id,'compose',statement_timestamp()) render_compose
-              from environment_source_admission s
-              join derived_environment_asset r
-                on r.workspace_id=s.workspace_id and r.admission_id=s.admission_id
-             where s.workspace_id=%s and s.admission_id=%s and r.asset_id=%s
-            """,
-            (
-                self.workspace_id,
-                self.workspace_id,
-                self.workspace_id,
-                placement.admission_id,
-                placement.render_asset_id,
-            ),
-        ).fetchone()
-        if row is None:
-            raise UnknownWorldResource("no such environment source and render binding")
-        if row["source_withdrawn_at"] is not None or row["render_withdrawn_at"] is not None:
-            raise EnvironmentSourceWithdrawn("the environment source or render asset is withdrawn")
-        if not row["source_compose"] or not row["render_compose"]:
-            raise EnvironmentCompositionDenied(
-                "compose is not permitted for the source and render asset"
-            )
-        self._require_environment_bytes(row["source_sha256"], row["render_sha256"], None)
+    def validate_environment_source(
+        self,
+        admission_id: uuid.UUID,
+        render_asset_id: uuid.UUID,
+        publication_id: uuid.UUID | None,
+        selection: EnvironmentSelection,
+    ) -> ResolvedEnvironmentSource:
+        """The source half of ``validate_environment_placement``, before a placement exists.
 
-        bounds = row["geographic_bounds"]
-        publication = None
-        if placement.selection.kind == "feature":
-            publication = self._current_publication(
+        Runs the binding, withdrawal, compose-rights, byte and publication checks that add would
+        run for this exact source, in the same order and through the same resolver, and returns
+        the resolution, whose ``render_sha256`` is the digest a placement would pin. Nothing about
+        a destination is checked, because there is none yet. Read-only, like
+        ``validate_environment_placement``.
+        """
+        return self._authorized_environment_source(
+            admission_id, render_asset_id, publication_id, selection
+        )
+
+    def _resolve_environment_source(
+        self,
+        placement: EnvironmentPlacement,
+        resolved: ResolvedEnvironmentSource | None = None,
+    ) -> EnvironmentSourceBinding:
+        if resolved is None:
+            resolved = self._authorized_environment_source(
                 placement.admission_id,
                 placement.render_asset_id,
                 placement.publication_id,
-                require_rights=True,
+                placement.selection,
             )
-            index = self._read_feature(
-                publication, placement.selection.feature_id, placement.selection.render_batch_id
-            )
-            bounds = {
-                "kind": "bbox",
-                "frame_name": row["geographic_frame"]["name"],
-                "coordinate_scale": row["geographic_bounds"]["coordinate_scale"],
-                "coordinates": index["bbox"],
-            }
-        elif placement.selection.kind != "whole_asset" or placement.publication_id is not None:
-            raise InvalidEnvironmentData("whole-asset placement cannot name a publication")
-
+        elif (
+            resolved.admission_id,
+            resolved.render_asset_id,
+            resolved.publication_id,
+            resolved.selection,
+        ) != (
+            placement.admission_id,
+            placement.render_asset_id,
+            placement.publication_id,
+            placement.selection,
+        ):
+            raise ValueError("the resolved source names a different binding than the placement")
+        row, publication, bounds = resolved.row, resolved.publication, resolved.bounds
         return EnvironmentSourceBinding(
             admission_id=placement.admission_id,
             render_asset_id=placement.render_asset_id,
@@ -1345,6 +1419,78 @@ class WorldObjectRepository:
             bounds=bounds,
             anchor=placement.source_anchor,
             selection=placement.selection,
+        )
+
+    def _authorized_environment_source(
+        self,
+        admission_id: uuid.UUID,
+        render_asset_id: uuid.UUID,
+        publication_id: uuid.UUID | None,
+        selection: EnvironmentSelection,
+    ) -> ResolvedEnvironmentSource:
+        if self.store is None:
+            raise UnavailableAsset("environment composition requires the content-addressed store")
+        row = self.connection.execute(
+            """
+            select s.place_id,s.source_sha256,s.receipt_sha256 as source_receipt_sha256,
+                   s.withdrawn_at as source_withdrawn_at,
+                   r.content_sha256 as render_sha256,r.receipt_sha256 as render_receipt_sha256,
+                   s.geographic_frame,s.geographic_bounds,
+                   r.withdrawn_at as render_withdrawn_at,
+                   environment_resource_allows(
+                     %s,'source',s.admission_id,'compose',statement_timestamp()) source_compose,
+                   environment_resource_allows(
+                     %s,'asset',r.asset_id,'compose',statement_timestamp()) render_compose
+              from environment_source_admission s
+              join derived_environment_asset r
+                on r.workspace_id=s.workspace_id and r.admission_id=s.admission_id
+             where s.workspace_id=%s and s.admission_id=%s and r.asset_id=%s
+            """,
+            (
+                self.workspace_id,
+                self.workspace_id,
+                self.workspace_id,
+                admission_id,
+                render_asset_id,
+            ),
+        ).fetchone()
+        if row is None:
+            raise UnknownWorldResource("no such environment source and render binding")
+        if row["source_withdrawn_at"] is not None or row["render_withdrawn_at"] is not None:
+            raise EnvironmentSourceWithdrawn("the environment source or render asset is withdrawn")
+        if not row["source_compose"] or not row["render_compose"]:
+            raise EnvironmentCompositionDenied(
+                "compose is not permitted for the source and render asset"
+            )
+        self._require_environment_bytes(row["source_sha256"], row["render_sha256"], None)
+
+        bounds = row["geographic_bounds"]
+        publication = None
+        if selection.kind == "feature":
+            publication = self._current_publication(
+                admission_id,
+                render_asset_id,
+                publication_id,
+                require_rights=True,
+            )
+            index = self._read_feature(publication, selection.feature_id, selection.render_batch_id)
+            bounds = {
+                "kind": "bbox",
+                "frame_name": row["geographic_frame"]["name"],
+                "coordinate_scale": row["geographic_bounds"]["coordinate_scale"],
+                "coordinates": index["bbox"],
+            }
+        elif selection.kind != "whole_asset" or publication_id is not None:
+            raise InvalidEnvironmentData("whole-asset placement cannot name a publication")
+
+        return ResolvedEnvironmentSource(
+            admission_id=admission_id,
+            render_asset_id=render_asset_id,
+            publication_id=publication_id,
+            selection=selection,
+            row=row,
+            publication=publication,
+            bounds=bounds,
         )
 
     def _current_publication(

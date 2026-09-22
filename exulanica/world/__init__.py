@@ -7,9 +7,9 @@ Repositories own the PostgreSQL transactions. Document modules
 are pure: an independent verifier can reproduce their documents without a database.
 
 This package's public exports are the style, object, structure, environment-instance,
-interaction, saved-entry, and shared society-core types. Scene tiles, character appearance,
-companion memory, and society stepping live in sibling modules and are imported by name, not
-through this package.
+interaction, composition-preview, saved-entry, and shared society-core types. Scene tiles,
+character appearance, companion memory, and society stepping live in sibling modules and are
+imported by name, not through this package.
 """
 
 from exulanica.world.assets import (
@@ -19,6 +19,17 @@ from exulanica.world.assets import (
     ReviewedAsset,
     reviewed_assets,
     seed_reviewed_assets,
+)
+from exulanica.world.composition_preview import (
+    CompositionBlocked,
+    CompositionPlacement,
+    CompositionPreview,
+    CompositionRequest,
+    EnvironmentAdmissionSource,
+    ReviewedAssetSource,
+    SourceAttachmentSource,
+    apply_composition,
+    preview_composition,
 )
 from exulanica.world.environment_instances import (
     ENVIRONMENT_INSTANCE_ID_PATTERN,
@@ -155,7 +166,12 @@ __all__ = [
     "AuthoredVersionRef",
     "CompatibilityIntent",
     "ComposedTopologyRef",
+    "CompositionBlocked",
+    "CompositionPlacement",
+    "CompositionPreview",
+    "CompositionRequest",
     "ElementOverride",
+    "EnvironmentAdmissionSource",
     "EnvironmentBindingDrift",
     "EnvironmentCompositionDenied",
     "EnvironmentInstance",
@@ -189,6 +205,7 @@ __all__ = [
     "ProtectedTopologyConflict",
     "ReviewedAsset",
     "ReviewedAssetRow",
+    "ReviewedAssetSource",
     "SavedWorldCandidate",
     "SavedWorldEntry",
     "SavedWorldEntryRepository",
@@ -198,6 +215,7 @@ __all__ = [
     "SourceAttachmentOperationConflict",
     "SourceAttachmentRef",
     "SourceAttachmentSelection",
+    "SourceAttachmentSource",
     "SourceMediaState",
     "SpatialCandidate",
     "SpatialDigests",
@@ -233,12 +251,14 @@ __all__ = [
     "WorldSourceMedia",
     "WorldStructureRepository",
     "WorldStyleRepository",
+    "apply_composition",
     "canonical_delta_document",
     "classify_structure_style_compatibility",
     "delta_sha256",
     "environment_instance_document",
     "object_document",
     "override_document",
+    "preview_composition",
     "raise_for_incompatible_structure_style",
     "reviewed_assets",
     "seed_reviewed_assets",

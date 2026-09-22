@@ -112,7 +112,12 @@ Source-media reads also carry the entry’s exact `source_snapshot_id`, preservi
 context after the global topology pointer moves. Historical style display uses the selected
 style’s topology while reconciliation and writes retain the live authority base.
 Authored object composition receives `authored_version_id` explicitly. The entry surface never
-uses `WorldObjectsClient.connect()` without a pinned version.
+uses `WorldObjectsClient.connect()` without a pinned version. Composition prepare and ready
+apply also address that version through
+`POST /world/versions/{version_id}/compositions/preview` and
+`POST /world/versions/{version_id}/compositions/apply`. Apply may carry the same optional
+`saved_entry` binding as authored object edits so the reopen cursor advances with the
+mutation. Attachment membership, detach, and rebind remain separate from composition apply.
 
 ## Structural rendering boundary
 

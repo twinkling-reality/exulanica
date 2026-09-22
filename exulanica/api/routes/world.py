@@ -44,6 +44,10 @@ from exulanica.world import (
     STYLE_REGISTRY,
     AlternateVersion,
     AuthoredObject,
+    CompositionBlocked,
+    CompositionPlacement,
+    CompositionRequest,
+    EnvironmentAdmissionSource,
     EnvironmentBindingDrift,
     EnvironmentCompositionDenied,
     EnvironmentPlacement,
@@ -60,8 +64,10 @@ from exulanica.world import (
     ProposalOrigin,
     ProposalProvenance,
     ReviewedAssetRow,
+    ReviewedAssetSource,
     SavedWorldEntryRepository,
     SourceAnchor,
+    SourceAttachmentSource,
     StaleObjectBase,
     StaleSavedWorldEntry,
     StaleStructuralBase,
@@ -75,8 +81,11 @@ from exulanica.world import (
     WorldObjectRepository,
     WorldSourceMedia,
     WorldStyleRepository,
+    apply_composition,
+    preview_composition,
 )
 from exulanica.world.bootstrap import bootstrap_world
+from exulanica.world.society import UnavailableSocietyInput
 
 router = APIRouter(prefix="/world", tags=["world"])
 
@@ -736,7 +745,7 @@ class BehaviourBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     behaviour_key: str = Field(max_length=200)
-    behaviour_version: int = Field(ge=1)
+    behaviour_version: StrictInt = Field(ge=1)
     parameters: dict[str, JsonValue]
 
     def domain(self) -> ObjectBehaviour:
@@ -983,6 +992,8 @@ _OBJECT_PROBLEMS: Final[tuple[tuple[type[Exception], int, str], ...]] = (
     (EnvironmentBindingDrift, 409, "environment_binding_drift"),
     (EnvironmentSourceWithdrawn, 410, "withdrawn"),
     (EnvironmentCompositionDenied, 403, "operation_denied"),
+    #: The body's detail is exactly the blocked_reason code: clients keep only code and detail.
+    (CompositionBlocked, 409, "composition_blocked"),
     (InvalidObjectData, 422, "invalid_object_data"),
     (InvalidStructuralData, 422, "invalid_structural_data"),
     (StaleStructuralBase, 409, "stale_structural_base"),
@@ -990,6 +1001,9 @@ _OBJECT_PROBLEMS: Final[tuple[tuple[type[Exception], int, str], ...]] = (
     (StaleSavedWorldEntry, 409, "stale_saved_world_entry"),
     (InvalidObjectState, 409, "invalid_object_state"),
     (InvalidatedSourceVersion, 409, "invalidated_source_version"),
+    #: The society input hook refusing an accepted edit inside its transaction. The code and
+    #: status are the ones the society routes answer for the same refusal.
+    (UnavailableSocietyInput, 424, "unavailable_society_input"),
 )
 
 
@@ -1508,6 +1522,161 @@ def undo_authored_edit(
         lambda: repository.undo(
             version_id, base_state_sha256=body.base_state_sha256, actor=session.actor
         ),
+        saved_entry=body.saved_entry,
+        authored_version_id=version_id,
+        mutation_base_state_sha256=body.base_state_sha256,
+    )
+
+
+# ------------------------------------------------------------------------------------------
+# Composition preview and apply.
+#
+# Transport for ``exulanica.world.composition_preview``. The bodies carry references and intent
+# only: a version by path and world, the base state the caller read, a source by identity and a
+# placement. Everything that decides readiness is resolved on the server, so no field here can
+# make a preview ready. Apply runs inside ``_edit`` like every other authored edit: the same
+# transaction, the same saved-entry lock and advance, and the same durable write.
+# ------------------------------------------------------------------------------------------
+
+
+class ReviewedAssetSourceBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["reviewed_asset"]
+    #: The registry's own key rule (migration 0042), so a key the catalog could never hold is a
+    #: 422 here rather than a string the database is asked to compare.
+    asset_key: str = Field(min_length=1, max_length=200, pattern=r"^[a-z][a-z0-9.-]*$")
+
+    def domain(self) -> ReviewedAssetSource:
+        return ReviewedAssetSource(self.asset_key)
+
+
+class EnvironmentAdmissionSourceBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["environment_admission"]
+    admission_id: uuid.UUID
+    render_asset_id: uuid.UUID
+    publication_id: uuid.UUID | None = None
+    selection: EnvironmentSelectionBody
+
+    @model_validator(mode="after")
+    def publication_matches_selection(self) -> EnvironmentAdmissionSourceBody:
+        if (self.selection.kind == "feature") != (self.publication_id is not None):
+            raise ValueError(
+                "a feature selection names its publication and a whole asset names none"
+            )
+        return self
+
+    def domain(self) -> EnvironmentAdmissionSource:
+        return EnvironmentAdmissionSource(
+            self.admission_id, self.render_asset_id, self.publication_id, self.selection.domain()
+        )
+
+
+class SourceAttachmentSourceBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    kind: Literal["source_attachment"]
+    entry_id: uuid.UUID
+    attachment_id: uuid.UUID
+
+    def domain(self) -> SourceAttachmentSource:
+        return SourceAttachmentSource(self.entry_id, self.attachment_id)
+
+
+CompositionSourceBody = Annotated[
+    ReviewedAssetSourceBody | EnvironmentAdmissionSourceBody | SourceAttachmentSourceBody,
+    Field(discriminator="kind"),
+]
+
+
+class CompositionPlacementBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    subject_id: str = Field(min_length=1, max_length=200)
+    region_id: str = Field(min_length=1, max_length=500)
+    transform: TransformBody
+    #: Chosen by the person, never inferred, exactly as on POST .../objects.
+    origin_role: Literal["fictional", "personal"]
+    behaviour: BehaviourBody | None = None
+    source_anchor: SourceAnchorBody | None = None
+
+    def domain(self) -> CompositionPlacement:
+        return CompositionPlacement(
+            subject_id=self.subject_id,
+            region_id=self.region_id,
+            transform=self.transform.domain(),
+            origin_role=self.origin_role,
+            behaviour=None if self.behaviour is None else self.behaviour.domain(),
+            source_anchor=None if self.source_anchor is None else self.source_anchor.domain(),
+        )
+
+
+class CompositionPreviewBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    base_state_sha256: str = Field(pattern=r"^[0-9a-f]{64}$")
+    source: CompositionSourceBody
+    placement: CompositionPlacementBody | None = None
+
+    @model_validator(mode="after")
+    def placement_fits_source(self) -> CompositionPreviewBody:
+        """Refuse a field the source kind would ignore, rather than accept it and drop it."""
+        if self.placement is None:
+            return self
+        kind = self.source.kind
+        if self.placement.behaviour is not None and kind != "reviewed_asset":
+            raise ValueError("only a reviewed asset placement takes a behaviour")
+        if (self.placement.source_anchor is not None) != (kind == "environment_admission"):
+            raise ValueError("an environment placement, and only one, takes a source_anchor")
+        return self
+
+    def domain(self) -> CompositionRequest:
+        return CompositionRequest(
+            base_state_sha256=self.base_state_sha256,
+            source=self.source.domain(),
+            placement=None if self.placement is None else self.placement.domain(),
+        )
+
+
+class CompositionApplyBody(CompositionPreviewBody):
+    placement: CompositionPlacementBody
+    saved_entry: SavedEntryAdvanceBody | None = None
+
+
+@router.post(
+    "/versions/{version_id}/compositions/preview",
+    summary="The server's verdict on one composition into one authored version. Writes nothing.",
+)
+def composition_preview_route(
+    version_id: Annotated[uuid.UUID, Path()],
+    body: CompositionPreviewBody,
+    repository: WriteObjects,
+) -> dict[str, object]:
+    # The write-scoped connection, read only: apply resolves on this same connection role, so the
+    # two cannot see different rows.
+    return preview_composition(repository, version_id, body.domain()).document()
+
+
+@router.post(
+    "/versions/{version_id}/compositions/apply",
+    response_model=AlternateVersionView,
+    status_code=201,
+    summary="Perform exactly the resolved composition, or refuse with its blocked reason.",
+)
+def composition_apply_route(
+    version_id: Annotated[uuid.UUID, Path()],
+    body: CompositionApplyBody,
+    repository: WriteObjects,
+    session: CurrentSession,
+    request: Request,
+) -> Response | AlternateVersionView:
+    composition = body.domain()
+    return _edit(
+        request,
+        repository,
+        lambda: apply_composition(repository, version_id, composition, actor=session.actor),
         saved_entry=body.saved_entry,
         authored_version_id=version_id,
         mutation_base_state_sha256=body.base_state_sha256,

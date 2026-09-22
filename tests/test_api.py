@@ -183,6 +183,8 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
     ("POST", "/world/versions/{version_id}/environment-instances/{instance_id}/remove"): {
         "json": {}
     },
+    ("POST", "/world/versions/{version_id}/compositions/preview"): {"json": {}},
+    ("POST", "/world/versions/{version_id}/compositions/apply"): {"json": {}},
     ("POST", "/world-write/scenes/{scene_id}/generated"): {
         "json": {
             "model": {"provider": "p", "model_id": "m", "model_version": "v"},

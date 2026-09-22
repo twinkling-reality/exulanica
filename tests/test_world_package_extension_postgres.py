@@ -26,6 +26,7 @@ from exulanica.world import (
     Transform,
     WorldObjectRepository,
     WorldStructureRepository,
+    seed_reviewed_assets,
 )
 from exulanica.world.objects import canonical_delta_document
 from exulanica.world_package import authored, project_world_package, verify_package
@@ -71,10 +72,16 @@ def _export(repository, output: Path, *, extensions=()):
     )
 
 
-def _one_version_one_object(repository):
+def _reviewed_objects(repository, tmp_path: Path) -> WorldObjectRepository:
+    store = LocalContentAddressedStore(tmp_path / "reviewed-assets")
+    seed_reviewed_assets(store)
+    return WorldObjectRepository(repository.connection, repository.workspace_id, store=store)
+
+
+def _one_version_one_object(repository, tmp_path: Path):
     structures = WorldStructureRepository(repository.connection, repository.workspace_id)
     snapshot = _apply(structures, structural_candidate())
-    objects = WorldObjectRepository(repository.connection, repository.workspace_id)
+    objects = _reviewed_objects(repository, tmp_path)
     version = objects.create_version(
         source_snapshot_id=snapshot.snapshot_id, title="Evening study", created_by=uuid.uuid4()
     )
@@ -103,7 +110,7 @@ def _one_version_one_object(repository):
 
 
 def test_one_version_one_object_round_trips_through_a_signed_package(repository, tmp_path: Path):
-    objects, snapshot, version = _one_version_one_object(repository)
+    objects, snapshot, version = _one_version_one_object(repository, tmp_path)
     plain = _export(repository, tmp_path / "plain.wmp")
     extended = _export(repository, tmp_path / "extended.wmp", extensions=[authored.EXTENSION_KEY])
 
@@ -189,7 +196,7 @@ def test_one_version_one_object_round_trips_through_a_signed_package(repository,
 def test_undone_addition_is_history_without_canonical_or_exported_object(repository, tmp_path):
     structures = WorldStructureRepository(repository.connection, repository.workspace_id)
     snapshot = _apply(structures, structural_candidate())
-    objects = WorldObjectRepository(repository.connection, repository.workspace_id)
+    objects = _reviewed_objects(repository, tmp_path)
     version = objects.create_version(
         source_snapshot_id=snapshot.snapshot_id, title="Empty again", created_by=uuid.uuid4()
     )
@@ -253,7 +260,7 @@ def test_undone_override_is_history_without_canonical_or_exported_override(repos
 
 
 def test_a_branch_and_a_source_override_resolve_inside_the_package(repository, tmp_path: Path):
-    objects, _snapshot, version = _one_version_one_object(repository)
+    objects, _snapshot, version = _one_version_one_object(repository, tmp_path)
     child = objects.create_version(
         parent_version_id=version.version_id, title="Variation", created_by=uuid.uuid4()
     )

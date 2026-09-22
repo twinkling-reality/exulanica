@@ -328,6 +328,92 @@ returns `compatible`, `preview_required`, or `refuse`. `compatibility_key` is pr
 binding only. Digest-string equality across planes is not the reason for compatibility; live
 typed identities may still agree when hex strings collide. `preview_required` /
 `style_topology_drift` is a CLASSIFY-family result. Family-matched digest change on
-`register_topology` is the composer handoff. COMPOSE tokens are latent; there is no compose
-write. Historical style may be displayed; appearance writes and rollback use the live
-composed digest. Reviewed-source composition into geometry is absent.
+`register_topology` is the composer handoff. COMPOSE tokens refuse attachment rows as
+composition inputs (`attachment_is_not_composition`, `expired_source_not_composable`); there
+is no attachment-to-geometry compose write. Historical style may be displayed; appearance
+writes and rollback use the live composed digest. Reviewed-photograph composition into
+geometry is absent.
+
+## Composition preview and apply
+
+[composition_preview.py](../exulanica/world/composition_preview.py) is the one path by which a
+source is placed into a named authored alternate version; a further source kind extends its resolver
+rather than adding a route. Two sources compose: a reviewed catalog asset, which becomes an authored
+object through `WorldObjectRepository.add_object`, and an admitted environment selection, which
+becomes an environment instance through `WorldObjectRepository.add_environment`. A saved-world
+source attachment resolves and is always refused: membership is a project reference, not
+composition.
+
+HTTP transport is `POST /world/versions/{version_id}/compositions/preview` and
+`POST /world/versions/{version_id}/compositions/apply`, both with the `world_id` query parameter the
+other version routes take. The request carries references and intent only: `base_state_sha256`,
+the source by identity (`asset_key`; or `admission_id`, `render_asset_id`, `publication_id` and
+selection; or `entry_id` and `attachment_id`), and a placement (subject id, region, transform, the
+person's origin role, a behaviour for an object, a source anchor for an environment). Unknown fields
+answer 422, so no field can assert rights, bytes, classification or readiness. So do an `asset_key`
+the registry could never hold (its key rule is `^[a-z][a-z0-9.-]*$`) and a non-integer
+`behaviour_version`, which `POST .../objects` refuses the same way.
+
+The server resolves everything else in the session's workspace and the requested world. An absent
+version, another workspace's version and another world's version answer the same 404
+`unknown_reference`. Preview writes nothing and takes no lock. It reads in one read-only,
+repeatable-read transaction, so its verdict and the version it names come from one snapshot. It
+answers `ready`, or `blocked` with the first failing check in this order:
+
+| Order | `blocked_reason` | What the server found |
+| --- | --- | --- |
+| 1 | `source_invalidated` | A committed deletion invalidated the version's source snapshot |
+| 2 | `stale_base` | `base_state_sha256` is not the version's stored state |
+| 3 | `unknown_asset` | No reviewed asset has that `asset_key` |
+| 3 | `asset_bytes_unavailable` | The reviewed asset row exists and its bytes are not in the store |
+| 3 | `environment_binding_unknown` | The admission and render asset, the publication, or the feature and render batch do not resolve |
+| 3 | `environment_withdrawn` | The admission, render asset or feature index asset is withdrawn |
+| 3 | `compose_not_permitted` | Current rights do not allow compose on the exact binding, or index and compose for a feature |
+| 3 | `environment_bytes_unavailable` | A pinned source, render or index blob is not in the store, or what the store holds under its digest does not verify as it |
+| 3 | `environment_binding_drift` | The named feature publication is no longer the current one |
+| 3 | `unknown_attachment` | The entry and attachment do not name an attachment of a saved world of this world |
+| 3 | `expired_source_not_composable` | The attachment's authorization or screening has expired |
+| 3 | `attachment_is_not_composition` | Any other attachment: membership never becomes placed geometry |
+| 4 | `placement_required` | Preview only: the source resolves and no placement was given |
+| 5 | `invalid_placement` | Subject id, region of the source snapshot, transform, origin role, behaviour or source anchor is not acceptable |
+| 5 | `subject_already_present` | The version already has an object, or an environment instance, with that id |
+
+Step 3 is the durable resolver's own order for each source kind. Step 5 is the durable validators'
+order: an object is checked for data before its id is checked for duplicates, and an environment
+instance the other way round.
+
+Preview is a dry run of apply rather than a second rule set. Both call the same resolver, which runs
+the repository's read-only validators (`validate_object_placement`, `validate_environment_source`,
+`validate_environment_placement`), and those share their validation code with the durable writers.
+A ready preview names the stored version (`state_sha256`, `edit_seq`, `source_snapshot_id`,
+`style_version_id`, `world_id`), the resolved source with its content digest and byte availability,
+and the exact canonical object or environment-instance document apply stores.
+
+Apply runs in the same transaction wrapper as the object and environment routes, after the optional
+saved-entry lock, and advances that entry in the same transaction. It resolves again, then performs
+the durable write, which repeats every check under the workspace lock and, for an environment,
+repeats authorization under `asset_read_lock()`. A refusal at either point answers 409
+`composition_blocked` whose `detail` is exactly the `blocked_reason` preview reports for that state,
+and writes nothing. An entry binding that does not match answers `stale_saved_world_entry` before
+the composition is resolved. Success is the 201 version body `POST .../objects` returns, and undo is
+the existing version undo route.
+
+Apply can refuse where preview could not know. The society input hook runs inside the write
+transaction, after the edit row is appended, and preview never runs it. When a purposeful society on
+the version cannot take the authored input, apply answers 424 `unavailable_society_input`, the code
+the society routes use. When the running application has no society input adapter for a purposeful
+society on the version, apply answers 409 `invalid_object_state`. Either way the edit rolls back and
+nothing is written, and `POST .../objects` answers the same two.
+
+No preview digest is bound into apply. Everything a preview names is either compared by the
+`state_sha256` compare-and-swap, immutable for its identity (reviewed asset keys and environment
+admission, render and receipt rows), taken from the request itself, or mutable authority that apply
+re-checks and refuses on: rights (a grant withdrawn, an attachment's authorization or screening
+expired), publication currency, bytes and source invalidation.
+
+No style or structure classification gates reviewed-asset or environment composition. The durable
+writers compare the version's stored state and source snapshot, and an object or environment
+instance is region-local to that snapshot; neither reads the appearance plane. A version whose
+`style_version_id` is no longer the live style composes exactly as `POST .../objects` accepts it.
+Attachment refusal is the `CompatibilityIntent.COMPOSE` classification of the typed attachment
+reference.
