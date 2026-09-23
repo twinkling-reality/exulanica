@@ -328,7 +328,7 @@ Every mutation names the base it was made against: the version id and that versi
 advisory lock the structural plane uses, `pg_advisory_xact_lock(hashtextextended(workspace_id::text,
 880024))` through `exulanica/world/workspace_lock.py`, re-reads the version row `for update`, and
 compares. `tests/test_workspace_lock.py` holds every other statement of that seed to the helper's
-and refuses a new one outside the modules that already restated it. Sharing that seed rather than
+and refuses one anywhere outside the modules that already restated it. Sharing that seed rather than
 minting a new one is what makes an object edit serialize against a structural commit and against
 `tg_world_structure_invalidate_on_tombstone`, closing the same check-then-commit race deletion
 already closes for snapshots. A mismatch changes nothing and raises
@@ -348,8 +348,8 @@ which is what makes undo a stored fact rather than a client's memory of one.
 
 **The kinds are one registry.** `exulanica/world/edit_kinds.py` lists every kind the log may hold
 and the subject each one changes: an authored object, an element of the source snapshot, a placed
-environment instance or a placed photo point map, each named by its own id column. A new kind is
-still a migration, because the CHECK constraints `world_alternate_version_edit_kind_check` and
+environment instance or a placed photo point map, each named by its own id column. Adding a kind
+is still a migration, because the CHECK constraints `world_alternate_version_edit_kind_check` and
 `world_alternate_edit_names_its_subject` are the storage authority, and a migration restates both
 with every kind. `tests/test_edit_kinds.py` holds the registry equal to the newest migration's text
 of both constraints and to the live schema's, requires an undo rule and a history field for every
