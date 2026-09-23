@@ -87,6 +87,7 @@ from exulanica.world.photo_point_maps import (
     validate_point_map_instance,
 )
 from exulanica.world.point_map_source_authority import PointMapSourceAuthority
+from exulanica.world.society_engines import INPUT_ENGINES
 from exulanica.world.workspace_lock import lock_workspace
 
 __all__ = ["ResolvedEnvironmentSource", "ReviewedAssetRow", "WorldObjectRepository"]
@@ -968,9 +969,8 @@ class WorldObjectRepository:
         elif (
             self.connection.execute(
                 "select 1 from world_society where workspace_id=%s and world_id=%s "
-                "and version_id=%s and engine_version in "
-                "('exulanica-society/v2','exulanica-society/v3','exulanica-society/v4')",
-                (self.workspace_id, self.world_id, version_id),
+                "and version_id=%s and engine_version=any(%s::text[])",
+                (self.workspace_id, self.world_id, version_id, list(INPUT_ENGINES)),
             ).fetchone()
             is not None
         ):

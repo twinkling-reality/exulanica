@@ -1484,6 +1484,88 @@
     }
    }
   },
+  "/world/versions/{version_id}/society/presence": {
+   "post": {
+    "tags": [
+     "society"
+    ],
+    "summary": "Change Society Presence",
+    "description": "One recorded minute in which everyone leaves, or the same people arrive again.\n\nThe request names only what the person wants and the state they saw; the server resolves the\nworld, the society, the rights and the minute. A refusal names what stands in the way.",
+    "operationId": "change_society_presence_world_versions__version_id__society_presence_post",
+    "parameters": [
+     {
+      "name": "version_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Version Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": false,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "default": "atlas:default",
+       "title": "World Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/PresenceBody"
+       }
+      }
+     }
+    },
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Change Society Presence World Versions  Version Id  Society Presence Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/world/versions/{version_id}/society/events": {
    "get": {
     "tags": [
@@ -17708,6 +17790,43 @@
      "followup_ticks"
     ],
     "title": "PrepareExperimentBody"
+   },
+   "PresenceBody": {
+    "properties": {
+     "base_tick": {
+      "type": "integer",
+      "minimum": 0.0,
+      "title": "Base Tick"
+     },
+     "base_state_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$",
+      "title": "Base State Sha256"
+     },
+     "idempotency_key": {
+      "type": "string",
+      "format": "uuid",
+      "title": "Idempotency Key"
+     },
+     "presence": {
+      "type": "string",
+      "enum": [
+       "away",
+       "here"
+      ],
+      "title": "Presence"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "base_tick",
+     "base_state_sha256",
+     "idempotency_key",
+     "presence"
+    ],
+    "title": "PresenceBody",
+    "description": "Send everyone away, or bring them back, against the state the person was shown."
    },
    "PreviewBody": {
     "properties": {

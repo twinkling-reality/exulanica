@@ -41,13 +41,7 @@ ROOT = Path(__file__).resolve().parents[1]
 QUOTED_ENGINE = re.compile(r"'(exulanica-society/v[0-9]+)'")
 #: Python source that still restates an engine list as SQL text, each with why it may for now.
 #: An entry whose file no longer holds such a list fails, so this only ever shrinks.
-PENDING_SQL_COPIES = {
-    "exulanica/world/object_repository.py": (
-        INPUT_ENGINES,
-        "the authored-edit society guard; the file is being restructured in another lane and "
-        "takes the bound-parameter form from the engine table when that lands",
-    ),
-}
+PENDING_SQL_COPIES: dict[str, tuple[frozenset[str], str]] = {}
 
 
 def test_every_engine_in_the_table_is_implemented_and_every_implementation_is_listed():

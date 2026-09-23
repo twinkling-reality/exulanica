@@ -126,6 +126,8 @@ INSERT_ONLY_TABLES: Final = (
     "saved_world_source_detach_operation",
     "saved_world_source_detach",
     "place_source_frame",
+    # Migration 0098's append-only trigger refuses every update and delete of a presence request.
+    "world_society_presence",
 )
 
 #: The vocabulary is administered, not generated. Without revoking this the role could insert a

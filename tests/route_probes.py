@@ -237,6 +237,14 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
     "POST /world/versions/{version_id}/society/control/steps": {
         "json": {"base_revision": 0, "base_tick": 0, "base_state_sha256": _ZERO_DIGEST}
     },
+    "POST /world/versions/{version_id}/society/presence": {
+        "json": {
+            "idempotency_key": str(uuid.uuid4()),
+            "presence": "away",
+            "base_tick": 0,
+            "base_state_sha256": _ZERO_DIGEST,
+        }
+    },
 }
 
 
