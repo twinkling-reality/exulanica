@@ -230,7 +230,7 @@ async function step(name, body) {
   await Promise.all(mine.map((entry) => entry.body).filter(Boolean));
   current.requests = mine.map(({ body, ...entry }) => entry);
   record.steps.push(current);
-  console.log(`${current.ok ? 'PASS' : 'FAIL'} ${name}${current.ok ? '' : `: ${current.error.split('\n')[0]}`}`);
+  console.log(`${current.ok ? 'PASS' : 'FAIL'} ${name}${current.ok ? '' : `: ${(current.error ?? '').split('\n')[0]}`}`);
   writeFileSync(join(out, 'evidence.json'), `${JSON.stringify(record, null, 2)}\n`);
   current = null;
 }
