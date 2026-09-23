@@ -18,6 +18,7 @@ from dataclasses import replace
 import pytest
 from exulanica.environment.district_geometry import segment_blocked
 from exulanica.world.assets import reviewed_assets
+from exulanica.world.authored_delta import AlternateVersion, delta_sha256
 from exulanica.world.environment_instances import (
     EnvironmentInstance,
     EnvironmentSelection,
@@ -25,13 +26,11 @@ from exulanica.world.environment_instances import (
     SourceAnchor,
 )
 from exulanica.world.objects import (
-    AlternateVersion,
     AuthoredObject,
     ElementOverride,
     ObjectBehaviour,
     ObjectOrigin,
     Transform,
-    delta_sha256,
 )
 from exulanica.world.society_authored_ground import (
     StandingPolicy,
@@ -125,7 +124,12 @@ def world(*objects, overrides=(), placements=()) -> AlternateVersion:
         parent_version_id=None,
         title="A world of my own",
         style_version_id=None,
-        state_sha256=delta_sha256(held, overrides, placements, ()),
+        state_sha256=delta_sha256(
+            objects=held,
+            element_overrides=overrides,
+            environment_instances=placements,
+            point_map_instances=(),
+        ),
         edit_seq=len(held) + len(placements) + len(overrides),
         source_invalidated=False,
         created_by=uuid.uuid4(),
