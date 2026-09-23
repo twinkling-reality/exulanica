@@ -53,6 +53,7 @@ from exulanica.graph.observations import (
 )
 from exulanica.graph.world_read import place_read_bundle, world_read_bundle
 from exulanica.graph.world_read_views import views_current
+from exulanica.world import DEFAULT_WORLD_ID
 
 router = APIRouter(prefix="/world-read", tags=["world-read"])
 
@@ -116,7 +117,14 @@ def scene_bundle(
     with connection.transaction():
         connection.execute("set transaction isolation level repeatable read read only")
         try:
-            bundle = world_read_bundle(connection, session.workspace_id, scene_id, services.store)
+            bundle = world_read_bundle(
+                connection,
+                session.workspace_id,
+                scene_id,
+                services.store,
+                # Photographs are placed in the regions of the personal-source world.
+                world_id=DEFAULT_WORLD_ID,
+            )
         except CanonicalisationError as error:
             # A coordinate this reader cannot encode is a degenerate receipt, not a missing scene.
             # 424 rather than 500, and rather than 404, so the caller learns the scene is theirs
@@ -194,7 +202,12 @@ def place_bundle(
         connection.execute("set transaction isolation level repeatable read read only")
         try:
             bundle = place_read_bundle(
-                connection, session.workspace_id, place_id, services.store, at=at
+                connection,
+                session.workspace_id,
+                place_id,
+                services.store,
+                world_id=DEFAULT_WORLD_ID,
+                at=at,
             )
         except CanonicalisationError as error:
             return _problem(424, "unreadable_place", str(error))

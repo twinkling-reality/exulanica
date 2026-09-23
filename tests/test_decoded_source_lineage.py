@@ -32,6 +32,7 @@ from exulanica.reconstruction.source_lineage import (
     decoded_receipt,
     verify_decoded_training_files,
 )
+from exulanica.world import DEFAULT_WORLD_ID
 from PIL import Image
 
 from test_intake_upload import _TOKEN
@@ -239,7 +240,11 @@ def test_depth_segmentation_and_pose_share_exact_persisted_pixels(upload, tmp_pa
     from exulanica.graph.world_read_verification import verify_downloads
 
     envelope = world_read_bundle(
-        upload.repository.connection, upload.repository.workspace_id, claim.scene_id, upload.store
+        upload.repository.connection,
+        upload.repository.workspace_id,
+        claim.scene_id,
+        upload.store,
+        world_id=DEFAULT_WORLD_ID,
     )
     assert envelope is not None
     points = envelope["bundle"]["recipient_evidence"]["record"]["point_maps"]

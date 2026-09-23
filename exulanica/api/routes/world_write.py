@@ -42,6 +42,7 @@ from exulanica.reconstruction.generated import (
     GeneratedSceneReceipt,
     GenerationModel,
 )
+from exulanica.world import DEFAULT_WORLD_ID
 
 router = APIRouter(prefix="/world-write", tags=["world-write"])
 
@@ -124,7 +125,14 @@ def record_generation(
     services: Annotated[Services, Depends(get_services)],
 ) -> JSONResponse:
     try:
-        envelope = world_read_bundle(connection, session.workspace_id, scene_id, services.store)
+        envelope = world_read_bundle(
+            connection,
+            session.workspace_id,
+            scene_id,
+            services.store,
+            # Photographs are placed in the regions of the personal-source world.
+            world_id=DEFAULT_WORLD_ID,
+        )
     except CanonicalisationError as error:
         # No generation may be filed against a scene whose own conditioning digest cannot be
         # computed: the receipt would name a bundle nobody can reproduce.

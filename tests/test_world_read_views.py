@@ -19,6 +19,7 @@ from exulanica.db.roles import provision_runtime_role
 from exulanica.evidence.blob import BlobId
 from exulanica.graph.world_read_verification import EvidenceError, verify_downloads
 from exulanica.ingest.person_review import record_region_edits
+from exulanica.world import DEFAULT_WORLD_ID
 
 from conftest import photo_bytes, scratch_role_database, write_photo
 from test_api import deployment as deployment
@@ -490,7 +491,11 @@ def test_expiry_exact_boundary_preserves_recorded_identity(
         response = deployment.as_owner("GET", desc["fetch"])
         assert response.status_code == expected, response.text
     second = world_read_bundle(
-        repository.connection, repository.workspace_id, scene, deployment.store
+        repository.connection,
+        repository.workspace_id,
+        scene,
+        deployment.store,
+        world_id=DEFAULT_WORLD_ID,
     )
     assert first["bundle"]["recorded_sha256"] == second["bundle"]["recorded_sha256"]
     assert first["bundle_sha256"] != second["bundle_sha256"]
@@ -589,7 +594,11 @@ def test_unregistered_members_and_legacy_bindings_remain_unavailable(
     from exulanica.graph.world_read import world_read_bundle
 
     envelope = world_read_bundle(
-        repository.connection, repository.workspace_id, scene, deployment.store
+        repository.connection,
+        repository.workspace_id,
+        scene,
+        deployment.store,
+        world_id=DEFAULT_WORLD_ID,
     )
     response = deployment.as_owner("GET", f"/world-read/scenes/{scene}")
     assert response.status_code == 200, response.text
@@ -704,7 +713,11 @@ def test_rebuilt_selected_mask_never_rebinds_old_pose(
     from exulanica.graph.world_read import world_read_bundle
 
     changed = world_read_bundle(
-        repository.connection, repository.workspace_id, scene, deployment.store
+        repository.connection,
+        repository.workspace_id,
+        scene,
+        deployment.store,
+        world_id=DEFAULT_WORLD_ID,
     )
     unavailable = next(
         v["photo_bytes"]

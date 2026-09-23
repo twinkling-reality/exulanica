@@ -25,14 +25,14 @@ from typing import Any
 import pytest
 from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from exulanica.world.assets import reviewed_assets
+from exulanica.world.authored_delta import canonical_delta_document
+from exulanica.world.authored_delta import delta_sha256 as product_delta_sha256
 from exulanica.world.objects import (
     AuthoredObject,
     ObjectBehaviour,
     ObjectOrigin,
     Transform,
-    canonical_delta_document,
 )
-from exulanica.world.objects import delta_sha256 as product_delta_sha256
 from exulanica.world_package import authored
 from exulanica.world_package.cli import main
 from exulanica.world_package.diff import diff_packages
@@ -134,23 +134,25 @@ def _sections(*, behaviour: bool = True, removed: bool = False) -> dict[str, Any
     )
     moved = replace(placed, transform=Transform(2_400, 0, -450, 785_398, 1_000))
     final = replace(moved, removed=removed)
-    added_state = product_delta_sha256([placed], [])
-    moved_state = product_delta_sha256([moved], [])
+    added_state = product_delta_sha256(**_objects_only([placed]))
+    moved_state = product_delta_sha256(**_objects_only([moved]))
     edits = [
         _edit(1, "add_object", authored.EMPTY_DELTA_SHA256, added_state),
         _edit(2, "move_object", added_state, moved_state),
     ]
     if removed:
-        edits.append(_edit(3, "remove_object", moved_state, product_delta_sha256([final], [])))
+        edits.append(
+            _edit(3, "remove_object", moved_state, product_delta_sha256(**_objects_only([final])))
+        )
     version = {
         "created_at": "2026-09-11T10:00:00Z",
-        "delta": canonical_delta_document([final], []),
+        "delta": canonical_delta_document(**_objects_only([final])),
         "edit_seq": len(edits),
         "edits": edits,
         "origin": "authored",
         "parent_version_id": None,
         "source_snapshot_id": structure["lineage"]["snapshot_id"],
-        "state_sha256": product_delta_sha256([final], []),
+        "state_sha256": product_delta_sha256(**_objects_only([final])),
         "style_version_id": None,
         "title": "Evening study",
         "version_id": _urn("alternate-version", "one"),
@@ -183,6 +185,16 @@ def _sections(*, behaviour: bool = True, removed: bool = False) -> dict[str, Any
         behaviours=[MOTION] if behaviour else [],
         withheld_versions=0,
     )
+
+
+def _objects_only(objects):
+    """The delta sections of a schema version 1 world that holds objects and nothing else."""
+    return {
+        "objects": objects,
+        "element_overrides": [],
+        "environment_instances": [],
+        "point_map_instances": [],
+    }
 
 
 def _edit(seq: int, kind: str, base: str, result: str) -> dict[str, Any]:
@@ -359,7 +371,7 @@ def test_the_exported_digest_rederives_without_the_product_code(tmp_path: Path):
     sections = _sections()
     [version] = sections[authored.VERSIONS_PATH]["items"]
     assert authored.delta_sha256(version["delta"]) == version["state_sha256"]
-    assert authored.delta_sha256(authored.EMPTY_DELTA) == product_delta_sha256([], [])
+    assert authored.delta_sha256(authored.EMPTY_DELTA) == product_delta_sha256(**_objects_only([]))
 
 
 def test_asset_bytes_are_not_embedded_and_references_overstate_nothing(tmp_path: Path):

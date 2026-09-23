@@ -23,8 +23,8 @@ from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final, Literal
 
+from exulanica.world.authored_delta import AlternateVersion, version_delta_sha256
 from exulanica.world.errors import InvalidStructuralData
-from exulanica.world.objects import AlternateVersion, delta_sha256
 from exulanica.world.society import society_state_sha256
 from exulanica.world.society_composition import (
     ComposedObject,
@@ -285,15 +285,7 @@ def build_authored_ground_society_input(
     """
     # Placed depth estimates take part in the digest and in nothing else here, as in the district
     # projection: they are drawn, and they are neither ground to stand on nor an obstacle.
-    if (
-        delta_sha256(
-            version.objects,
-            version.element_overrides,
-            version.environment_instances,
-            version.point_map_instances,
-        )
-        != version.state_sha256
-    ):
+    if version_delta_sha256(version) != version.state_sha256:
         raise ValueError("authored delta digest mismatch")
     validate_reviewed_affordances(reviewed_affordances)
     if availability not in ("available", "unavailable"):

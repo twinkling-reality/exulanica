@@ -9,11 +9,17 @@ counter would make two edits that produce identical state look like different ba
 the canonical delta makes them the same one, which is the behaviour ``base_topology_digest``
 already has on the appearance side.
 
-**The lock seed is the structural plane's, deliberately.** ``_WORKSPACE_LOCK_SEED`` is 880024, the
-same value ``WorldStructureRepository`` and ``tg_world_structure_invalidate_on_tombstone`` take.
-Minting a fresh seed here would have been tidier and wrong: it is precisely because an object edit
-and a tombstone serialize on one lock that an edit cannot commit against a source snapshot that a
-concurrent deletion is in the act of invalidating.
+**The lock is the structural plane's, deliberately.** Every edit takes
+:func:`exulanica.world.workspace_lock.lock_workspace`, the lock ``WorldStructureRepository`` and
+``tg_world_structure_invalidate_on_tombstone`` take. Minting a fresh seed here would have been
+tidier and wrong: it is precisely because an object edit and a tombstone serialize on one lock that
+an edit cannot commit against a source snapshot that a concurrent deletion is in the act of
+invalidating.
+
+**Other planes' sources are asked, not decided, here.** Whether an environment source or a
+photograph's depth estimate may be used is the environment source authority's and the point map
+source authority's question. This repository asks both inside its own transaction and writes
+only its own plane.
 
 **Undo restores a document, not an intention.** Each edit stores the object's canonical document
 on both sides. Undo reads ``before_document`` back and writes it, so replaying an inverse operation
@@ -22,25 +28,18 @@ is never necessary and an edit whose inverse is ambiguous cannot exist.
 
 from __future__ import annotations
 
-import hashlib
-import json
 import uuid
 from collections.abc import Callable, Mapping
-from dataclasses import dataclass
-from typing import Any, Final
+from types import MappingProxyType
+from typing import Any, ClassVar, Final
 
 import psycopg
 from psycopg.types.json import Jsonb
 
-from exulanica.canonical import canonical_json
-from exulanica.errors import BlobNotFoundError, IntegrityError
 from exulanica.evidence.blob import BlobId
-from exulanica.reconstruction.validation import (
-    OpmIntegrityError,
-    OpmIntegrityReport,
-    validate_opm,
-)
 from exulanica.store.base import ContentAddressedStore
+from exulanica.world.authored_delta import AlternateVersion, delta_sha256
+from exulanica.world.edit_kinds import EditSubject, edit_kind
 from exulanica.world.environment_instances import (
     EnvironmentInstance,
     EnvironmentPlacement,
@@ -50,37 +49,29 @@ from exulanica.world.environment_instances import (
     environment_instance_document,
     validate_environment_instance,
 )
+from exulanica.world.environment_source_authority import (
+    EnvironmentSourceAuthority,
+    ResolvedEnvironmentSource,
+)
 from exulanica.world.errors import (
-    EnvironmentBindingDrift,
-    EnvironmentCompositionDenied,
-    EnvironmentSourceWithdrawn,
     InvalidatedSourceVersion,
     InvalidEnvironmentData,
     InvalidEnvironmentState,
     InvalidObjectData,
     InvalidObjectState,
     InvalidPointMapPlacement,
-    PointMapNotPermitted,
-    PointMapNotProduced,
-    PointMapNotReadable,
-    PointMapReviewDiffers,
-    PointMapTooSparse,
-    SourceAuthorityExpired,
-    SourceNotCurrentMembership,
     StaleObjectBase,
     UnavailableAsset,
     UnknownWorldResource,
 )
 from exulanica.world.models import DEFAULT_WORLD_ID
 from exulanica.world.objects import (
-    AlternateVersion,
     AuthoredObject,
     ElementOverride,
     ObjectBehaviour,
     ObjectOrigin,
     Transform,
     VersionEdit,
-    delta_sha256,
     object_document,
     override_document,
     validate_behaviour,
@@ -88,9 +79,6 @@ from exulanica.world.objects import (
     validate_transform,
 )
 from exulanica.world.photo_point_maps import (
-    DEPTH_ROLE,
-    PLACEABLE_RUNG,
-    POINT_MAP_CONTAINER,
     PointMapInstance,
     PointMapModel,
     PointMapPlacement,
@@ -98,12 +86,13 @@ from exulanica.world.photo_point_maps import (
     point_map_instance_document,
     validate_point_map_instance,
 )
+from exulanica.world.point_map_source_authority import PointMapSourceAuthority
+from exulanica.world.workspace_lock import lock_workspace
 
 __all__ = ["ResolvedEnvironmentSource", "ReviewedAssetRow", "WorldObjectRepository"]
 
-#: The structural plane's seed. See the module docstring: sharing it is what serializes an object
-#: edit against a structural commit and against tombstone invalidation.
-_WORKSPACE_LOCK_SEED: Final = 880_024
+#: Every subject id column of the edit log, in the order the table declares them.
+_SUBJECT_COLUMNS: Final = ",".join(subject.column for subject in EditSubject)
 
 
 class ReviewedAssetRow:
@@ -133,29 +122,20 @@ class ReviewedAssetRow:
         self.availability = availability
 
 
-@dataclass(frozen=True, slots=True)
-class ResolvedEnvironmentSource:
-    """One authorized resolution of an exact environment source, before any destination.
-
-    ``validate_environment_source`` returns it so a placement check in the same read can reuse it
-    rather than resolving the source, and reading every pinned blob, a second time.
-    """
-
-    admission_id: uuid.UUID
-    render_asset_id: uuid.UUID
-    publication_id: uuid.UUID | None
-    selection: EnvironmentSelection
-    row: Mapping[str, Any]
-    publication: Mapping[str, Any] | None
-    bounds: Mapping[str, Any]
-
-    @property
-    def render_sha256(self) -> str:
-        return bytes(self.row["render_sha256"]).hex()
-
-
 class WorldObjectRepository:
     """One workspace and world's alternate versions, their objects, and the reviewed catalogs."""
+
+    #: Undo's rule for each subject the edit-kind registry names, as the method that restores it.
+    #: ``tests/test_edit_kinds.py`` requires one for every subject; a kind the registry does not
+    #: name never reaches this table, because ``edit_kind`` refuses it first.
+    _UNDO_RULES: ClassVar[Mapping[EditSubject, str]] = MappingProxyType(
+        {
+            EditSubject.OBJECT: "_undo_object",
+            EditSubject.ELEMENT: "_undo_override",
+            EditSubject.ENVIRONMENT_INSTANCE: "_undo_environment",
+            EditSubject.POINT_MAP_INSTANCE: "_undo_point_map",
+        }
+    )
 
     def __init__(
         self,
@@ -263,7 +243,12 @@ class WorldObjectRepository:
             self._require_snapshot(source_snapshot_id)
             self._require_style_version(style_version_id)
             version_id = uuid.uuid4()
-            state = delta_sha256(objects, overrides, environments, point_maps)
+            state = delta_sha256(
+                objects=objects,
+                element_overrides=overrides,
+                environment_instances=environments,
+                point_map_instances=point_maps,
+            )
             self.connection.execute(
                 "insert into world_alternate_version (version_id,workspace_id,world_id,"
                 "source_snapshot_id,parent_version_id,title,origin,style_version_id,"
@@ -338,7 +323,12 @@ class WorldObjectRepository:
             parent_version_id=row["parent_version_id"],
             title=row["title"],
             style_version_id=row["style_version_id"],
-            state_sha256=delta_sha256(objects, overrides, environments, point_maps),
+            state_sha256=delta_sha256(
+                objects=objects,
+                element_overrides=overrides,
+                environment_instances=environments,
+                point_map_instances=point_maps,
+            ),
             edit_seq=row["edit_seq"],
             source_invalidated=self._source_invalidated(row["source_snapshot_id"]),
             created_by=row["created_by"],
@@ -693,12 +683,17 @@ class WorldObjectRepository:
 
         Undo is still not redo. An undo edit is never itself a candidate, and undoing an undo
         would be a redo, which is a second meaning for one control.
+
+        **A kind with no rule is refused, by name, before anything is written.** The rule is found
+        through the edit-kind registry: the kind names its subject and the subject names the
+        method that restores it. An edit the registry does not name raises
+        :class:`~exulanica.world.edit_kinds.UnregisteredEditKind` rather than being read as some
+        other subject's document.
         """
         with self.connection.transaction():
             row = self._begin_edit(version_id, base_state_sha256)
             newest = self.connection.execute(
-                "select edit_id,kind,object_id,element_id,environment_instance_id,"
-                "point_map_instance_id,before_document "
+                f"select edit_id,kind,{_SUBJECT_COLUMNS},before_document "
                 "from world_alternate_version_edit e "
                 "where e.workspace_id=%s and e.world_id=%s and e.version_id=%s "
                 "and e.kind <> 'undo' "
@@ -710,43 +705,21 @@ class WorldObjectRepository:
             ).fetchone()
             if newest is None:
                 raise InvalidObjectState("this version has no edit left to undo")
+            subject_kind = edit_kind(newest["kind"]).subject
+            restore = getattr(self, self._UNDO_RULES[subject_kind])
             edit_id = uuid.uuid4()
-            before = newest["before_document"]
-            if newest["kind"] in {
-                "add_object",
-                "move_object",
-                "remove_object",
-                "set_object_behaviour",
-            }:
-                subject, after = self._undo_object(version_id, newest["object_id"], before, edit_id)
-            elif newest["kind"] in {
-                "add_environment",
-                "move_environment",
-                "remove_environment",
-            }:
-                subject, after = self._undo_environment(
-                    version_id, newest["environment_instance_id"], before, edit_id
-                )
-            elif newest["kind"] in {"add_point_map", "move_point_map", "remove_point_map"}:
-                subject, after = self._undo_point_map(
-                    version_id, newest["point_map_instance_id"], before, edit_id
-                )
-            else:
-                subject, after = self._undo_override(
-                    version_id, newest["element_id"], before, edit_id
-                )
+            subject, after = restore(
+                version_id, newest[subject_kind.column], newest["before_document"], edit_id
+            )
             self._append_edit(
                 row,
                 edit_id=edit_id,
                 kind="undo",
-                object_id=newest["object_id"],
-                element_id=newest["element_id"],
-                environment_instance_id=newest["environment_instance_id"],
-                point_map_instance_id=newest["point_map_instance_id"],
                 before=subject,
                 after=after,
                 actor=actor,
                 undone_edit_id=newest["edit_id"],
+                **{each.column: newest[each.column] for each in EditSubject},
             )
         return self.version(version_id)
 
@@ -947,10 +920,10 @@ class WorldObjectRepository:
     ) -> None:
         version_id = row["version_id"]
         result = delta_sha256(
-            self._objects(version_id),
-            self._overrides(version_id),
-            self._environment_instances(version_id, with_availability=False),
-            self._point_map_instances(version_id, with_availability=False),
+            objects=self._objects(version_id),
+            element_overrides=self._overrides(version_id),
+            environment_instances=self._environment_instances(version_id, with_availability=False),
+            point_map_instances=self._point_map_instances(version_id, with_availability=False),
         )
         self.connection.execute(
             "insert into world_alternate_version_edit (edit_id,workspace_id,world_id,version_id,"
@@ -1240,24 +1213,9 @@ class WorldObjectRepository:
     # -- photo-derived point map edits -------------------------------------------------------
     #
     # A reviewed photograph's depth estimate, placed in this version by the person whose
-    # photograph it is. Three things separate this from the environment kind above and are worth
-    # reading before the methods.
-    #
-    # WHAT RESOLVES IS NOT THE ATTACHMENT. An attachment is membership, and composing one is
-    # refused (``attachment_is_not_composition``). What is placed is the depth artifact reached
-    # THROUGH a current membership, and the membership is recorded so a detach can reach what it
-    # produced.
-    #
-    # THE PINNED SCREENING DECIDES WHICH ESTIMATE. The attachment pins the human review the
-    # photograph was added under. The derivative worker builds from the NEWEST eligible screening.
-    # A photograph reviewed twice therefore has an estimate the current reference does not name,
-    # and that is ``PointMapReviewDiffers`` rather than "not produced": nothing is wrong, the
-    # reference is simply older than the estimate, and the recovery is to add it back under the
-    # newer review.
-    #
-    # AVAILABILITY IS READ, NEVER STORED. Whether a person may see a placed estimate changes when
-    # a right ends, a review expires, a photograph is deleted or a membership is detached, none of
-    # which is an edit to their world. It is computed on read and kept out of the state digest.
+    # photograph it is. What resolves (the estimate reached through a current membership, never
+    # the attachment), which estimate the pinned screening names, and why availability is read and
+    # never stored are the point map source authority's, and its module says so first.
 
     def add_point_map(
         self,
@@ -1348,9 +1306,7 @@ class WorldObjectRepository:
                 kind="move_point_map",
                 point_map_instance_id=instance_id,
                 before=point_map_instance_document(current),
-                after=point_map_instance_document(
-                    self._require_point_map(version_id, instance_id)
-                ),
+                after=point_map_instance_document(self._require_point_map(version_id, instance_id)),
                 actor=actor,
             )
             self._final_point_map_authorization(self._require_point_map(version_id, instance_id))
@@ -1387,14 +1343,22 @@ class WorldObjectRepository:
                 kind="remove_point_map",
                 point_map_instance_id=instance_id,
                 before=point_map_instance_document(current),
-                after=point_map_instance_document(
-                    self._require_point_map(version_id, instance_id)
-                ),
+                after=point_map_instance_document(self._require_point_map(version_id, instance_id)),
                 actor=actor,
             )
         return self.version(version_id)
 
-    # -- point map source resolution ---------------------------------------------------------
+    # -- point map source authority ---------------------------------------------------------
+    #
+    # Whether a placed estimate's source may be used is asked of
+    # :class:`~exulanica.world.point_map_source_authority.PointMapSourceAuthority`, on this
+    # repository's connection and inside its transaction, through the same-named methods below.
+
+    @property
+    def _point_map_sources(self) -> PointMapSourceAuthority:
+        return PointMapSourceAuthority(
+            self.connection, self.workspace_id, world_id=self.world_id, store=self.store
+        )
 
     def validate_point_map_source(
         self, entry_id: uuid.UUID, attachment_id: uuid.UUID
@@ -1405,213 +1369,12 @@ class WorldObjectRepository:
         exact reference, in the same order and through the same resolver, and returns what a
         placement would pin. Read-only.
         """
-        return self._resolve_point_map_source(entry_id, attachment_id)
+        return self._point_map_sources.resolve(entry_id, attachment_id)
 
     def _resolve_point_map_source(
         self, entry_id: uuid.UUID, attachment_id: uuid.UUID
     ) -> PointMapSourceBinding:
-        """Membership, then permission, then the estimate. Each step raises its own refusal.
-
-        The order is the order a person would ask the questions in, and it decides which sentence
-        they read: a detached photograph is not "no estimate exists", and a stopped depth right is
-        not "your review expired".
-        """
-        row = self.connection.execute(
-            """
-            select a.attachment_id,a.capture_id,a.source_sha256,a.authorization_id,a.screening_id,
-                   a.attached_by,cur.attachment_id as current_attachment_id,
-                   auth.corpus_class,auth.capture_id as authorized_capture_id,
-                   auth.source_sha256 as authorized_sha256,auth.authorized_by,
-                   auth.valid_until as authorization_valid_until,auth.evidence_digest,
-                   p.capture_id as screened_capture_id,p.source_sha256 as screened_sha256,
-                   p.authorization_id as screened_authorization_id,p.screening_method,
-                   p.reviewed_by,p.eligibility_state,p.valid_until as screening_valid_until,
-                   p.receipt_digest as screening_receipt_digest,
-                   c.blob_sha256 as current_source_sha256,
-                   asset_capture_live(a.workspace_id,a.capture_id,statement_timestamp())
-                     as source_live,
-                   statement_timestamp() as evaluated_at
-              from saved_world_source_attachment a
-              join saved_world_entry e
-                on e.workspace_id=a.workspace_id and e.entry_id=a.entry_id
-              left join saved_world_source_current_membership cur
-                on cur.workspace_id=a.workspace_id and cur.entry_id=a.entry_id
-               and cur.capture_id=a.capture_id
-              join capture c on c.workspace_id=a.workspace_id and c.capture_id=a.capture_id
-              join capture_reconstruction_authorization auth
-                on auth.workspace_id=a.workspace_id and auth.authorization_id=a.authorization_id
-              join reconstruction_privacy_screening p
-                on p.workspace_id=a.workspace_id and p.screening_id=a.screening_id
-             where a.workspace_id=%s and a.entry_id=%s and a.attachment_id=%s
-               and e.world_id=%s
-            """,
-            (self.workspace_id, entry_id, attachment_id, self.world_id),
-        ).fetchone()
-        if row is None:
-            raise UnknownWorldResource("no such attachment on a saved world of this world")
-        if row["current_attachment_id"] != attachment_id:
-            raise SourceNotCurrentMembership(
-                "this photograph is not currently a reference of this world"
-            )
-        at = row["evaluated_at"]
-        if (
-            not row["source_live"]
-            or row["current_source_sha256"] != row["source_sha256"]
-            or row["authorized_capture_id"] != row["capture_id"]
-            or row["authorized_sha256"] != row["source_sha256"]
-            or row["corpus_class"] != "personal"
-            or row["screened_capture_id"] != row["capture_id"]
-            or row["screened_sha256"] != row["source_sha256"]
-            or row["screened_authorization_id"] != row["authorization_id"]
-            or row["screening_method"] != "human_review"
-            or row["reviewed_by"] is None
-            or row["eligibility_state"] != "eligible"
-        ):
-            raise UnknownWorldResource(
-                "this reference's photograph, authority and review no longer agree"
-            )
-        if (
-            row["authorization_valid_until"] is not None
-            and row["authorization_valid_until"] <= at
-        ) or (row["screening_valid_until"] is not None and row["screening_valid_until"] <= at):
-            raise SourceAuthorityExpired(
-                "this reference's authority or review has expired; review the photograph again"
-            )
-        right = self._current_depth_right(row["capture_id"], at)
-        artifact = self._point_map_artifact(row, right)
-        return PointMapSourceBinding(
-            entry_id=entry_id,
-            attachment_id=attachment_id,
-            capture_id=row["capture_id"],
-            source_sha256=bytes(row["source_sha256"]).hex(),
-            authorization_id=row["authorization_id"],
-            authorization_evidence_sha256=bytes(row["evidence_digest"]).hex(),
-            screening_id=row["screening_id"],
-            screening_receipt_sha256=bytes(row["screening_receipt_digest"]).hex(),
-            right_id=right["right_id"],
-            right_receipt_sha256=bytes(right["receipt_sha256"]).hex(),
-            model=PointMapModel(
-                provider=right["model_provider"],
-                role=right["model_role"],
-                identifier=right["model_id"],
-                revision=right["model_revision"],
-                destination=right["destination"],
-            ),
-            artifact_id=artifact["artifact_id"],
-            point_map_sha256=bytes(artifact["content_sha256"]).hex(),
-            byte_size=int(artifact["byte_size"]),
-            container=POINT_MAP_CONTAINER,
-            stage_version=int(artifact["stage_version"]),
-            rung=int(artifact["rung"]),
-            declared_metric=bool(artifact["declared_metric"]),
-            declared_fov_y_microdegrees=int(artifact["fov_y_microdegrees"]),
-        )
-
-    def _current_depth_right(self, capture_id: uuid.UUID, at: Any) -> Mapping[str, Any]:
-        """The newest depth right that stands for this photograph right now, or a refusal.
-
-        A role, not a checkpoint: which checkpoint ran is a property of the estimate, and the
-        estimate's own binding is checked against this right afterwards. Asking for a named
-        checkpoint here would refuse a person who granted the right again after the pin moved.
-        """
-        row = self.connection.execute(
-            "select right_id,model_provider,model_role,model_id,model_revision,destination,"
-            "receipt_sha256 from personal_model_right r "
-            "where r.workspace_id=%s and r.capture_id=%s and r.model_role=%s "
-            "and personal_model_right_allows(r.workspace_id,r.right_id,r.capture_id,"
-            "r.model_provider,r.model_role,r.model_id,r.model_revision,r.destination,%s) "
-            "order by r.granted_at desc,r.right_id desc limit 1",
-            (self.workspace_id, capture_id, DEPTH_ROLE, at),
-        ).fetchone()
-        if row is None:
-            raise PointMapNotPermitted(
-                "no current permission lets a 3D estimate from this photograph be used"
-            )
-        return row
-
-    def _point_map_artifact(
-        self, reference: Mapping[str, Any], right: Mapping[str, Any]
-    ) -> Mapping[str, Any]:
-        """The estimate for these exact bytes under the review this reference pins.
-
-        The rung comes from the recorded assertion and NOT from the container, which is the one
-        place those two disagree and it matters. ``encode_opm`` writes ``rung: 3`` as a format
-        constant on every map it produces, including one the quality gate decided was rung 4, so a
-        reader that trusted the header would place a handful of points and call it somebody's
-        kitchen. What ``decide_rung`` measured is the assertion the depth stage recorded beside
-        the artifact, and that is what is read here.
-
-        The field of view and the metric flag come from the container, because those are what a
-        renderer places the camera from; a second copy in a row could disagree with what is drawn.
-        """
-        row = self.connection.execute(
-            """
-            select a.artifact_id,a.content_sha256,a.byte_size,a.stage_version,
-                   a.privacy_screening_id,
-                   (s.object_value->>'rung')::int as rung,
-                   asset_point_allows(a.workspace_id,a.artifact_id,statement_timestamp())
-                     as readable,
-                   exists(select 1 from point_map_model_right b
-                          where b.workspace_id=a.workspace_id and b.artifact_id=a.artifact_id
-                            and b.right_id=%(right)s) as bound
-              from artifact a
-              join assertion s on s.workspace_id=a.workspace_id and s.status='active'
-               and s.object_value->>'point_map_artifact'=a.artifact_id::text
-              join predicate pr on pr.predicate_id=s.predicate_id
-               and pr.key='reconstruction_rung_is'
-             where a.workspace_id=%(w)s and a.kind='point_map'
-               and a.source_blob_sha256=%(source)s
-               and a.purged_at is null and not a.needs_repair and a.superseded_by is null
-               and a.content_sha256 is not null and a.byte_size is not null
-             order by a.privacy_screening_id=%(screening)s desc,a.stage_version desc,
-                      s.asserted_at desc,a.artifact_id
-             limit 1
-            """,
-            {
-                "w": self.workspace_id,
-                "source": reference["source_sha256"],
-                "screening": reference["screening_id"],
-                "right": right["right_id"],
-            },
-        ).fetchone()
-        if row is None:
-            raise PointMapNotProduced("no 3D estimate has been made from this photograph yet")
-        if row["privacy_screening_id"] != reference["screening_id"]:
-            raise PointMapReviewDiffers(
-                "the estimate for this photograph was made under a different review than this "
-                "world's reference names"
-            )
-        if not row["bound"]:
-            raise PointMapNotPermitted(
-                "this estimate was not made under the permission that stands now"
-            )
-        if row["rung"] is None or int(row["rung"]) != PLACEABLE_RUNG:
-            raise PointMapTooSparse(
-                "too little of this photograph could be placed to stand in front of"
-            )
-        if not row["readable"]:
-            raise PointMapNotReadable("this estimate may not be read right now")
-        report = self._read_point_map(bytes(row["content_sha256"]))
-        return {
-            **row,
-            "declared_metric": report.metric,
-            "fov_y_microdegrees": round(report.fov_y_degrees * 1_000_000),
-        }
-
-    def _read_point_map(self, content_sha256: bytes) -> OpmIntegrityReport:
-        """The stored container, validated. Refuses bytes a renderer would refuse anyway."""
-        if self.store is None:
-            raise UnavailableAsset("point map composition requires the content-addressed store")
-        try:
-            data = self.store.get(BlobId(content_sha256))
-        except (BlobNotFoundError, IntegrityError, OSError) as exc:
-            raise PointMapNotReadable(
-                "this estimate's row survived and its stored bytes did not"
-            ) from exc
-        try:
-            return validate_opm(data)
-        except OpmIntegrityError as exc:
-            raise PointMapNotReadable(f"this estimate's bytes are not placeable: {exc}") from exc
+        return self._point_map_sources.resolve(entry_id, attachment_id)
 
     def _validated_point_map_placement(
         self,
@@ -1649,80 +1412,13 @@ class WorldObjectRepository:
             raise InvalidPointMapPlacement(str(exc)) from exc
 
     def _final_point_map_authorization(self, instance: PointMapInstance) -> None:
-        """Ask again under the global asset read lock, after the row is written.
-
-        The same discipline ``_final_environment_authorization`` follows and the same one
-        ``require_model_right`` follows before a hand-over: a withdrawal cannot commit while this
-        runs, so it is either seen here or it waits, and an edit that committed against a
-        permission that ended mid-transaction cannot exist.
-        """
-        self.connection.execute("select asset_read_lock()")
-        self._require_point_map_current(instance)
+        self._point_map_sources.final_authorization(instance)
 
     def _require_point_map_current(self, instance: PointMapInstance) -> None:
-        current = self._point_map_availability(instance)
-        if current != "available":
-            raise PointMapNotPermitted(
-                f"this estimate cannot be used right now ({current})"
-            )
-
-    def _point_map_availability(self, instance: PointMapInstance) -> str:
-        return self._point_map_state(instance)[0]
+        self._point_map_sources.require_current(instance)
 
     def _point_map_state(self, instance: PointMapInstance) -> tuple[str, str | None]:
-        """Why a placed estimate can or cannot be drawn, computed now and never stored.
-
-        Every branch names a state a person can act on. ``withdrawn`` carries which end of
-        permission it was, because a stopped right, an expired review, a deleted photograph and a
-        withdrawn person are four different situations with four different recoveries.
-        """
-        source = instance.source
-        row = self.connection.execute(
-            """
-            select personal_model_right_allows(%(w)s,r.right_id,r.capture_id,r.model_provider,
-                     r.model_role,r.model_id,r.model_revision,r.destination,
-                     statement_timestamp()) as right_stands,
-                   r.withdrawn_at is not null as right_withdrawn,
-                   asset_point_allows(%(w)s,%(artifact)s,statement_timestamp()) as readable,
-                   asset_capture_live(%(w)s,%(capture)s,statement_timestamp()) as source_live,
-                   (select c.deleted_at is null from capture c
-                     where c.workspace_id=%(w)s and c.capture_id=%(capture)s) as capture_present,
-                   asset_screening_allows(%(w)s,%(capture)s,%(screening)s,statement_timestamp())
-                     as review_stands,
-                   (select cur.attachment_id from saved_world_source_current_membership cur
-                     where cur.workspace_id=%(w)s and cur.entry_id=%(entry)s
-                       and cur.capture_id=%(capture)s) as current_attachment_id
-              from personal_model_right r
-             where r.workspace_id=%(w)s and r.right_id=%(right)s
-            """,
-            {
-                "w": self.workspace_id,
-                "right": source.right_id,
-                "capture": source.capture_id,
-                "artifact": source.artifact_id,
-                "screening": source.screening_id,
-                "entry": source.entry_id,
-            },
-        ).fetchone()
-        if not row["capture_present"] or not row["source_live"]:
-            return "withdrawn", "source_deleted"
-        if row["right_withdrawn"] or not row["right_stands"]:
-            return "withdrawn", "model_right_withdrawn"
-        if not row["review_stands"]:
-            return "withdrawn", "review_expired"
-        if row["current_attachment_id"] != source.attachment_id:
-            # DETACHED, and rebinding never brings this back. A later attachment is a new
-            # membership under a new review, and the placement pins the one it was made through.
-            return "detached", None
-        if not row["readable"]:
-            # The permission terms above all stood, so what is left is the bytes or a person
-            # whose likeness was withdrawn from this derivative.
-            return "unavailable_bytes", None
-        if self.store is not None and not self.store.exists(
-            BlobId.from_hex(source.point_map_sha256)
-        ):
-            return "unavailable_bytes", None
-        return "available", None
+        return self._point_map_sources.state(instance)
 
     def _insert_point_map(
         self,
@@ -2130,8 +1826,7 @@ class WorldObjectRepository:
 
     def _edits(self, version_id: uuid.UUID) -> tuple[VersionEdit, ...]:
         rows = self.connection.execute(
-            "select edit_id,edit_seq,kind,object_id,element_id,environment_instance_id,"
-            "undone_edit_id,base_state_sha256,"
+            f"select edit_id,edit_seq,kind,{_SUBJECT_COLUMNS},undone_edit_id,base_state_sha256,"
             "result_state_sha256,actor,recorded_at from world_alternate_version_edit "
             "where workspace_id=%s and world_id=%s and version_id=%s order by edit_seq",
             (self.workspace_id, self.world_id, version_id),
@@ -2141,14 +1836,12 @@ class WorldObjectRepository:
                 edit_id=r["edit_id"],
                 edit_seq=r["edit_seq"],
                 kind=r["kind"],
-                object_id=r["object_id"],
-                element_id=r["element_id"],
-                environment_instance_id=r["environment_instance_id"],
                 undone_edit_id=r["undone_edit_id"],
                 base_state_sha256=r["base_state_sha256"],
                 result_state_sha256=r["result_state_sha256"],
                 actor=r["actor"],
                 recorded_at=r["recorded_at"].isoformat(),
+                **{each.column: r[each.column] for each in EditSubject},
             )
             for r in rows
         )
@@ -2193,7 +1886,16 @@ class WorldObjectRepository:
         ).fetchone()
         return (row["created_edit_id"], row["last_edit_id"])
 
-    # -- environment source authorization ---------------------------------------------------
+    # -- environment source authority -------------------------------------------------------
+    #
+    # Whether an exact environment source may be composed is asked of
+    # :class:`~exulanica.world.environment_source_authority.EnvironmentSourceAuthority`, on this
+    # repository's connection and inside its transaction. The same-named methods below are the
+    # only way the repository reaches it, so a test that patches one intercepts every caller.
+
+    @property
+    def _environment_sources(self) -> EnvironmentSourceAuthority:
+        return EnvironmentSourceAuthority(self.connection, self.workspace_id, self.store)
 
     def validate_environment_source(
         self,
@@ -2210,7 +1912,7 @@ class WorldObjectRepository:
         a destination is checked, because there is none yet. Read-only, like
         ``validate_environment_placement``.
         """
-        return self._authorized_environment_source(
+        return self._environment_sources.authorize(
             admission_id, render_asset_id, publication_id, selection
         )
 
@@ -2219,255 +1921,7 @@ class WorldObjectRepository:
         placement: EnvironmentPlacement,
         resolved: ResolvedEnvironmentSource | None = None,
     ) -> EnvironmentSourceBinding:
-        if resolved is None:
-            resolved = self._authorized_environment_source(
-                placement.admission_id,
-                placement.render_asset_id,
-                placement.publication_id,
-                placement.selection,
-            )
-        elif (
-            resolved.admission_id,
-            resolved.render_asset_id,
-            resolved.publication_id,
-            resolved.selection,
-        ) != (
-            placement.admission_id,
-            placement.render_asset_id,
-            placement.publication_id,
-            placement.selection,
-        ):
-            raise ValueError("the resolved source names a different binding than the placement")
-        row, publication, bounds = resolved.row, resolved.publication, resolved.bounds
-        return EnvironmentSourceBinding(
-            admission_id=placement.admission_id,
-            render_asset_id=placement.render_asset_id,
-            publication_id=None if publication is None else publication["publication_id"],
-            source_sha256=bytes(row["source_sha256"]).hex(),
-            source_receipt_sha256=bytes(row["source_receipt_sha256"]).hex(),
-            render_sha256=bytes(row["render_sha256"]).hex(),
-            render_receipt_sha256=bytes(row["render_receipt_sha256"]).hex(),
-            index_sha256=(
-                None if publication is None else bytes(publication["index_sha256"]).hex()
-            ),
-            index_receipt_sha256=(
-                None if publication is None else bytes(publication["index_receipt_sha256"]).hex()
-            ),
-            publication_receipt_sha256=(
-                None
-                if publication is None
-                else bytes(publication["publication_receipt_sha256"]).hex()
-            ),
-            place_id=row["place_id"],
-            frame=row["geographic_frame"],
-            bounds=bounds,
-            anchor=placement.source_anchor,
-            selection=placement.selection,
-        )
-
-    def _authorized_environment_source(
-        self,
-        admission_id: uuid.UUID,
-        render_asset_id: uuid.UUID,
-        publication_id: uuid.UUID | None,
-        selection: EnvironmentSelection,
-    ) -> ResolvedEnvironmentSource:
-        if self.store is None:
-            raise UnavailableAsset("environment composition requires the content-addressed store")
-        row = self.connection.execute(
-            """
-            select s.place_id,s.source_sha256,s.receipt_sha256 as source_receipt_sha256,
-                   s.withdrawn_at as source_withdrawn_at,
-                   r.content_sha256 as render_sha256,r.receipt_sha256 as render_receipt_sha256,
-                   s.geographic_frame,s.geographic_bounds,
-                   r.withdrawn_at as render_withdrawn_at,
-                   environment_resource_allows(
-                     %s,'source',s.admission_id,'compose',statement_timestamp()) source_compose,
-                   environment_resource_allows(
-                     %s,'asset',r.asset_id,'compose',statement_timestamp()) render_compose
-              from environment_source_admission s
-              join derived_environment_asset r
-                on r.workspace_id=s.workspace_id and r.admission_id=s.admission_id
-             where s.workspace_id=%s and s.admission_id=%s and r.asset_id=%s
-            """,
-            (
-                self.workspace_id,
-                self.workspace_id,
-                self.workspace_id,
-                admission_id,
-                render_asset_id,
-            ),
-        ).fetchone()
-        if row is None:
-            raise UnknownWorldResource("no such environment source and render binding")
-        if row["source_withdrawn_at"] is not None or row["render_withdrawn_at"] is not None:
-            raise EnvironmentSourceWithdrawn("the environment source or render asset is withdrawn")
-        if not row["source_compose"] or not row["render_compose"]:
-            raise EnvironmentCompositionDenied(
-                "compose is not permitted for the source and render asset"
-            )
-        self._require_environment_bytes(row["source_sha256"], row["render_sha256"], None)
-
-        bounds = row["geographic_bounds"]
-        publication = None
-        if selection.kind == "feature":
-            publication = self._current_publication(
-                admission_id,
-                render_asset_id,
-                publication_id,
-                require_rights=True,
-            )
-            index = self._read_feature(publication, selection.feature_id, selection.render_batch_id)
-            bounds = {
-                "kind": "bbox",
-                "frame_name": row["geographic_frame"]["name"],
-                "coordinate_scale": row["geographic_bounds"]["coordinate_scale"],
-                "coordinates": index["bbox"],
-            }
-        elif selection.kind != "whole_asset" or publication_id is not None:
-            raise InvalidEnvironmentData("whole-asset placement cannot name a publication")
-
-        return ResolvedEnvironmentSource(
-            admission_id=admission_id,
-            render_asset_id=render_asset_id,
-            publication_id=publication_id,
-            selection=selection,
-            row=row,
-            publication=publication,
-            bounds=bounds,
-        )
-
-    def _current_publication(
-        self,
-        admission_id: uuid.UUID,
-        render_asset_id: uuid.UUID,
-        publication_id: uuid.UUID | None,
-        *,
-        require_rights: bool,
-    ) -> Mapping[str, Any]:
-        row = self.connection.execute(
-            """
-            select p.publication_id,p.admission_id,p.render_asset_id,
-                   p.source_sha256,p.source_receipt_sha256,
-                   p.render_sha256,p.render_receipt_sha256,p.index_sha256,
-                   p.index_receipt_sha256,p.receipt_sha256 as publication_receipt_sha256,
-                   p.index_asset_id,i.withdrawn_at as index_withdrawn_at,
-                   s.place_id,s.geographic_frame,s.geographic_bounds,
-                   (select newest.publication_id
-                      from environment_feature_index_publication newest
-                     where newest.workspace_id=p.workspace_id
-                       and newest.admission_id=p.admission_id
-                     order by newest.published_at desc,newest.publication_id desc limit 1)
-                     as current_publication_id,
-                   environment_resource_allows(
-                     %s,'source',p.admission_id,'index',statement_timestamp()) source_index,
-                   environment_resource_allows(
-                     %s,'asset',p.render_asset_id,'index',statement_timestamp()) render_index,
-                   environment_resource_allows(
-                     %s,'asset',p.index_asset_id,'index',statement_timestamp()) index_index,
-                   environment_resource_allows(
-                     %s,'asset',p.index_asset_id,'compose',statement_timestamp()) index_compose
-              from environment_feature_index_publication p
-              join environment_source_admission s
-                on s.workspace_id=p.workspace_id and s.admission_id=p.admission_id
-              join derived_environment_asset i
-                on i.workspace_id=p.workspace_id and i.asset_id=p.index_asset_id
-             where p.workspace_id=%s and p.admission_id=%s and p.publication_id=%s
-            """,
-            (
-                self.workspace_id,
-                self.workspace_id,
-                self.workspace_id,
-                self.workspace_id,
-                self.workspace_id,
-                admission_id,
-                publication_id,
-            ),
-        ).fetchone()
-        if row is None or row["render_asset_id"] != render_asset_id:
-            raise UnknownWorldResource("no such environment feature publication")
-        if row["index_withdrawn_at"] is not None:
-            raise EnvironmentSourceWithdrawn("the environment feature index is withdrawn")
-        if row["publication_id"] != row["current_publication_id"]:
-            raise EnvironmentBindingDrift("the named feature publication is no longer current")
-        if require_rights and not all(
-            row[key] for key in ("source_index", "render_index", "index_index", "index_compose")
-        ):
-            raise EnvironmentCompositionDenied(
-                "feature placement requires index and compose rights on its exact binding"
-            )
-        return row
-
-    def _read_feature(
-        self,
-        publication: Mapping[str, Any],
-        feature_id: str | None,
-        render_batch_id: int | None,
-    ) -> Mapping[str, Any]:
-        if self.store is None:
-            raise UnavailableAsset("environment composition requires the content-addressed store")
-        try:
-            data = self.store.get(BlobId(bytes(publication["index_sha256"])))
-            document = json.loads(data)
-            payload = document["index"]
-            if (
-                (document.get("profile"), payload.get("profile"))
-                not in (
-                    (
-                        "exulanica.environment-feature-index-envelope/v1",
-                        "exulanica.environment-feature-index/v1",
-                    ),
-                    (
-                        "exulanica.environment-feature-index-envelope/v2",
-                        "exulanica.environment-feature-index/v2",
-                    ),
-                )
-                or document.get("payload_sha256")
-                != hashlib.sha256(canonical_json(payload)).hexdigest()
-                or payload.get("admission_id") != str(publication["admission_id"])
-                or payload.get("place_id") != str(publication["place_id"])
-                or payload.get("source")
-                != {
-                    "content_sha256": bytes(publication["source_sha256"]).hex(),
-                    "receipt_sha256": bytes(publication["source_receipt_sha256"]).hex(),
-                }
-                or payload.get("render_asset")
-                != {
-                    "asset_id": str(publication["render_asset_id"]),
-                    "content_sha256": bytes(publication["render_sha256"]).hex(),
-                    "receipt_sha256": bytes(publication["render_receipt_sha256"]).hex(),
-                }
-                or payload.get("geographic_frame") != publication["geographic_frame"]
-                or payload.get("geographic_bounds") != publication["geographic_bounds"]
-            ):
-                raise IntegrityError("the pinned environment feature index binding is malformed")
-            features = payload["features"]
-        except BlobNotFoundError as exc:
-            raise UnavailableAsset("the pinned environment index bytes are unavailable") from exc
-        except (KeyError, TypeError, ValueError, json.JSONDecodeError) as exc:
-            raise IntegrityError("the pinned environment feature index is malformed") from exc
-        matches = [
-            feature
-            for feature in features
-            if isinstance(feature, dict) and feature.get("id") == feature_id
-        ]
-        if len(matches) != 1 or matches[0].get("render_batch_id") != render_batch_id:
-            raise InvalidEnvironmentData(
-                "the feature and render batch do not match the exact publication"
-            )
-        return matches[0]
-
-    def _require_environment_bytes(
-        self, source_sha256: bytes, render_sha256: bytes, index_sha256: bytes | None
-    ) -> None:
-        if self.store is None:
-            raise UnavailableAsset("environment composition requires the content-addressed store")
-        try:
-            for digest in (source_sha256, render_sha256, index_sha256):
-                if digest is not None:
-                    self.store.get(BlobId(bytes(digest)))
-        except BlobNotFoundError as exc:
-            raise UnavailableAsset("the exact pinned environment bytes are unavailable") from exc
+        return self._environment_sources.binding(placement, resolved)
 
     def _require_pinned_environment_current(
         self,
@@ -2476,132 +1930,15 @@ class WorldObjectRepository:
         require_bytes: bool,
         validate_feature_bytes: bool = True,
     ) -> None:
-        source = instance.source
-        row = self.connection.execute(
-            """
-            select s.place_id,s.source_sha256,s.receipt_sha256 as source_receipt_sha256,
-                   s.withdrawn_at as source_withdrawn_at,
-                   r.content_sha256 as render_sha256,r.receipt_sha256 as render_receipt_sha256,
-                   s.geographic_frame,s.geographic_bounds,
-                   r.withdrawn_at as render_withdrawn_at,
-                   environment_resource_allows(
-                     %s,'source',s.admission_id,'compose',statement_timestamp()) source_compose,
-                   environment_resource_allows(
-                     %s,'asset',r.asset_id,'compose',statement_timestamp()) render_compose
-              from environment_source_admission s
-              join derived_environment_asset r
-                on r.workspace_id=s.workspace_id and r.admission_id=s.admission_id
-             where s.workspace_id=%s and s.admission_id=%s and r.asset_id=%s
-            """,
-            (
-                self.workspace_id,
-                self.workspace_id,
-                self.workspace_id,
-                source.admission_id,
-                source.render_asset_id,
-            ),
-        ).fetchone()
-        if row is None:
-            raise EnvironmentBindingDrift("the pinned environment binding no longer resolves")
-        if row["source_withdrawn_at"] is not None or row["render_withdrawn_at"] is not None:
-            raise EnvironmentSourceWithdrawn("the pinned environment source is withdrawn")
-        if not row["source_compose"] or not row["render_compose"]:
-            raise EnvironmentCompositionDenied("compose is no longer permitted")
-        expected = (
-            source.place_id,
-            source.source_sha256,
-            source.source_receipt_sha256,
-            source.render_sha256,
-            source.render_receipt_sha256,
-            dict(source.frame),
-            dict(source.bounds) if source.selection.kind == "whole_asset" else None,
+        self._environment_sources.require_current(
+            instance, require_bytes=require_bytes, validate_feature_bytes=validate_feature_bytes
         )
-        actual = (
-            row["place_id"],
-            bytes(row["source_sha256"]).hex(),
-            bytes(row["source_receipt_sha256"]).hex(),
-            bytes(row["render_sha256"]).hex(),
-            bytes(row["render_receipt_sha256"]).hex(),
-            row["geographic_frame"],
-            row["geographic_bounds"] if source.selection.kind == "whole_asset" else None,
-        )
-        if actual != expected:
-            raise EnvironmentBindingDrift("the pinned environment source binding drifted")
-        index_digest = None
-        if source.publication_id is not None:
-            publication = self._current_publication(
-                source.admission_id,
-                source.render_asset_id,
-                source.publication_id,
-                require_rights=True,
-            )
-            published = (
-                bytes(publication["source_sha256"]).hex(),
-                bytes(publication["source_receipt_sha256"]).hex(),
-                bytes(publication["render_sha256"]).hex(),
-                bytes(publication["render_receipt_sha256"]).hex(),
-                bytes(publication["index_sha256"]).hex(),
-                bytes(publication["index_receipt_sha256"]).hex(),
-                bytes(publication["publication_receipt_sha256"]).hex(),
-            )
-            pinned = (
-                source.source_sha256,
-                source.source_receipt_sha256,
-                source.render_sha256,
-                source.render_receipt_sha256,
-                source.index_sha256,
-                source.index_receipt_sha256,
-                source.publication_receipt_sha256,
-            )
-            if published != pinned:
-                raise EnvironmentBindingDrift("the pinned feature publication binding drifted")
-            if validate_feature_bytes:
-                feature = self._read_feature(
-                    publication,
-                    source.selection.feature_id,
-                    source.selection.render_batch_id,
-                )
-                feature_bounds = {
-                    "kind": "bbox",
-                    "frame_name": row["geographic_frame"]["name"],
-                    "coordinate_scale": row["geographic_bounds"]["coordinate_scale"],
-                    "coordinates": feature["bbox"],
-                }
-                if feature_bounds != dict(source.bounds):
-                    raise EnvironmentBindingDrift("the pinned feature bounds drifted")
-            index_digest = publication["index_sha256"]
-        if require_bytes:
-            self._require_environment_bytes(
-                row["source_sha256"], row["render_sha256"], index_digest
-            )
 
     def _final_environment_authorization(self, instance: EnvironmentInstance) -> None:
-        self.connection.execute("select asset_read_lock()")
-        self._require_pinned_environment_current(
-            instance, require_bytes=False, validate_feature_bytes=False
-        )
+        self._environment_sources.final_authorization(instance)
 
     def _environment_availability(self, instance: EnvironmentInstance) -> str:
-        try:
-            self._require_pinned_environment_current(instance, require_bytes=False)
-        except EnvironmentSourceWithdrawn:
-            return "withdrawn"
-        except UnavailableAsset:
-            return "unavailable_bytes"
-        except (EnvironmentBindingDrift, EnvironmentCompositionDenied, UnknownWorldResource):
-            return "binding_drift"
-        if self.store is None:
-            return "unknown"
-        try:
-            source = instance.source
-            self._require_environment_bytes(
-                bytes.fromhex(source.source_sha256),
-                bytes.fromhex(source.render_sha256),
-                None if source.index_sha256 is None else bytes.fromhex(source.index_sha256),
-            )
-        except UnavailableAsset:
-            return "unavailable_bytes"
-        return "available"
+        return self._environment_sources.availability(instance)
 
     # -- the source snapshot ----------------------------------------------------------------
 
@@ -2669,10 +2006,7 @@ class WorldObjectRepository:
         return frozenset(row["element_id"] for row in rows)
 
     def _lock_workspace(self) -> None:
-        self.connection.execute(
-            "select pg_advisory_xact_lock(hashtextextended(%s::text,%s))",
-            (self.workspace_id, _WORKSPACE_LOCK_SEED),
-        )
+        lock_workspace(self.connection, self.workspace_id)
 
 
 def _override_from_document(document: Mapping[str, Any]) -> ElementOverride:

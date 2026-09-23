@@ -64,6 +64,7 @@ from exulanica.graph.world_read_views import ViewError, current_binding, image_f
 from exulanica.ingest.resolve import resolve_region_image
 from exulanica.selection.validation import Session
 from exulanica.store.resolve import address_from_span_row, resolve_original_bytes
+from exulanica.world import DEFAULT_WORLD_ID
 
 router = APIRouter(prefix="/evidence", tags=["evidence"])
 
@@ -124,7 +125,14 @@ def masked(
             raise HTTPException(422, "all posed view bindings are required")
         with connection.transaction():
             connection.execute("set transaction isolation level repeatable read read only")
-            envelope = world_read_bundle(connection, session.workspace_id, view_scene, store)
+            envelope = world_read_bundle(
+                connection,
+                session.workspace_id,
+                view_scene,
+                store,
+                # Photographs are placed in the regions of the personal-source world.
+                world_id=DEFAULT_WORLD_ID,
+            )
             if envelope is None:
                 raise HTTPException(404, "no such posed view")
             matching = [

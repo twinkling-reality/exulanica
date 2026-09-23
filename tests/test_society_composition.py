@@ -7,13 +7,12 @@ from dataclasses import replace
 
 import pytest
 from exulanica.world.assets import reviewed_assets
+from exulanica.world.authored_delta import AlternateVersion, delta_sha256
 from exulanica.world.objects import (
-    AlternateVersion,
     AuthoredObject,
     ObjectBehaviour,
     ObjectOrigin,
     Transform,
-    delta_sha256,
 )
 from exulanica.world.society_composition import build_society_input
 from exulanica.world.society_planner import input_sha256, validate_society_input
@@ -61,7 +60,9 @@ def version(objects=(), **changes):
         None,
         "Synthetic authored composition",
         None,
-        delta_sha256(objects, ()),
+        delta_sha256(
+            objects=objects, element_overrides=(), environment_instances=(), point_map_instances=()
+        ),
         0,
         False,
         uuid.UUID("0069bd32-851f-4f25-b9a8-9e2b38565bc1"),

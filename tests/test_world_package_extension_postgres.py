@@ -28,7 +28,7 @@ from exulanica.world import (
     WorldStructureRepository,
     seed_reviewed_assets,
 )
-from exulanica.world.objects import canonical_delta_document
+from exulanica.world.authored_delta import canonical_delta_document
 from exulanica.world_package import authored, project_world_package, verify_package
 from exulanica.world_package.package import MANIFEST_PATH, SIGNATURE_PATH, import_check_package
 
@@ -131,7 +131,12 @@ def test_one_version_one_object_round_trips_through_a_signed_package(repository,
     stored = objects.version(version.version_id)
     assert packaged["version_id"] == _urn("alternate-version", version.version_id)
     assert packaged["source_snapshot_id"] == _urn("structure", snapshot.snapshot_id)
-    assert packaged["delta"] == canonical_delta_document(stored.objects, stored.element_overrides)
+    assert packaged["delta"] == canonical_delta_document(
+        objects=stored.objects,
+        element_overrides=stored.element_overrides,
+        environment_instances=(),
+        point_map_instances=(),
+    )
     assert (
         packaged["state_sha256"] == stored.state_sha256 == authored.delta_sha256(packaged["delta"])
     )

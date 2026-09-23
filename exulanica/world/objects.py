@@ -1,4 +1,8 @@
-"""The authored delta: what an alternate world version stores, and what makes it a digest.
+"""Authored objects and element overrides: their documents and the validation that guards them.
+
+These are the two version 1 sections of an alternate version's authored delta. The delta itself,
+every kind's section composed into the version's state token, is
+:mod:`exulanica.world.authored_delta`, which sits above this module and above every instance kind.
 
 This module is pure. It holds no connection and issues no SQL, for the same reason
 :mod:`exulanica.world.structure` does not: the canonical document and the validation that guards
@@ -16,30 +20,22 @@ from __future__ import annotations
 
 import re
 import uuid
-from collections.abc import Mapping, Sequence
+from collections.abc import Mapping
 from dataclasses import dataclass, replace
-from typing import TYPE_CHECKING, Any, Final
+from typing import Any, Final
 
-from exulanica.canonical import canonical_json, sha256_of_canonical
 from exulanica.world.errors import InvalidObjectData
-
-if TYPE_CHECKING:
-    from exulanica.world.environment_instances import EnvironmentInstance
-    from exulanica.world.photo_point_maps import PointMapInstance
 
 __all__ = [
     "MAX_SCALE_MILLI",
     "MAX_YAW_MICRORADIANS",
     "OBJECT_ID_PATTERN",
-    "AlternateVersion",
     "AuthoredObject",
     "ElementOverride",
     "ObjectBehaviour",
     "ObjectOrigin",
     "Transform",
     "VersionEdit",
-    "canonical_delta_document",
-    "delta_sha256",
     "object_document",
     "override_document",
     "validate_behaviour",
@@ -143,37 +139,24 @@ class ElementOverride:
 
 @dataclass(frozen=True, slots=True)
 class VersionEdit:
+    """One row of a version's edit log. It names its subject in exactly one id field.
+
+    The id fields are the log's subject columns, one per subject the edit-kind registry names, and
+    ``tests/test_edit_kinds.py`` holds the two equal, so history cannot drop a subject.
+    """
+
     edit_id: uuid.UUID
     edit_seq: int
     kind: str
     object_id: str | None
     element_id: str | None
     environment_instance_id: str | None
+    point_map_instance_id: str | None
     undone_edit_id: uuid.UUID | None
     base_state_sha256: str
     result_state_sha256: str
     actor: uuid.UUID
     recorded_at: str
-
-
-@dataclass(frozen=True, slots=True)
-class AlternateVersion:
-    version_id: uuid.UUID
-    world_id: str
-    source_snapshot_id: uuid.UUID
-    parent_version_id: uuid.UUID | None
-    title: str
-    style_version_id: uuid.UUID | None
-    state_sha256: str
-    edit_seq: int
-    source_invalidated: bool
-    created_by: uuid.UUID
-    created_at: str
-    objects: tuple[AuthoredObject, ...] = ()
-    element_overrides: tuple[ElementOverride, ...] = ()
-    environment_instances: tuple[EnvironmentInstance, ...] = ()
-    point_map_instances: tuple[PointMapInstance, ...] = ()
-    edits: tuple[VersionEdit, ...] = ()
 
 
 def object_document(obj: AuthoredObject) -> dict[str, Any]:
@@ -199,65 +182,6 @@ def override_document(override: ElementOverride) -> dict[str, Any]:
         "suppressed": override.suppressed,
         "transform": None if override.transform is None else override.transform.document(),
     }
-
-
-def canonical_delta_document(
-    objects: Sequence[AuthoredObject],
-    overrides: Sequence[ElementOverride],
-    environment_instances: Sequence[EnvironmentInstance] = (),
-    point_map_instances: Sequence[PointMapInstance] = (),
-) -> dict[str, Any]:
-    """The whole delta, in the one order its digest is defined over.
-
-    Sorting here rather than trusting the caller is the point. The state digest is the concurrency
-    token, and a token that depended on the order rows came back in would make two identical
-    worlds disagree the first time a query plan changed.
-
-    Each later section is added only when it holds something, and that is load-bearing rather than
-    tidy: the digest is every stored version's compare-and-swap token, so a section that appeared
-    empty would move the token of every world that has none and refuse the next edit on all of
-    them. A world with no point maps digests exactly as it did before this kind existed.
-    """
-    document = {
-        "schema_version": 1,
-        "element_overrides": [
-            override_document(o) for o in sorted(overrides, key=lambda o: o.element_id)
-        ],
-        "objects": [object_document(o) for o in sorted(objects, key=lambda o: o.object_id)],
-    }
-    if environment_instances:
-        from exulanica.world.environment_instances import environment_instance_document
-
-        document["schema_version"] = 2
-        document["environment_instances"] = [
-            environment_instance_document(instance)
-            for instance in sorted(environment_instances, key=lambda value: value.instance_id)
-        ]
-    if point_map_instances:
-        from exulanica.world.photo_point_maps import point_map_instance_document
-
-        document["schema_version"] = 3
-        document["point_map_instances"] = [
-            point_map_instance_document(instance)
-            for instance in sorted(point_map_instances, key=lambda value: value.instance_id)
-        ]
-    return document
-
-
-def delta_sha256(
-    objects: Sequence[AuthoredObject],
-    overrides: Sequence[ElementOverride],
-    environment_instances: Sequence[EnvironmentInstance] = (),
-    point_map_instances: Sequence[PointMapInstance] = (),
-) -> str:
-    """The state token: SHA-256 over the canonical delta, hex."""
-    document = canonical_delta_document(
-        objects, overrides, environment_instances, point_map_instances
-    )
-    # Round-trips through canonical_json first so a value the digest could not represent raises
-    # here, where the message names this plane, rather than inside the hashing helper.
-    canonical_json(document)
-    return sha256_of_canonical(document).hex()
 
 
 def validate_object_id(object_id: str) -> str:

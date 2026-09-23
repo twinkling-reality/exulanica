@@ -8,14 +8,15 @@ import uuid
 from pathlib import Path
 
 import pytest
+from exulanica.world.authored_delta import canonical_delta_document
+from exulanica.world.authored_delta import delta_sha256 as product_delta_sha256
 from exulanica.world.environment_instances import (
     EnvironmentInstance,
     EnvironmentSelection,
     EnvironmentSourceBinding,
     SourceAnchor,
 )
-from exulanica.world.objects import ObjectOrigin, Transform, canonical_delta_document
-from exulanica.world.objects import delta_sha256 as product_delta_sha256
+from exulanica.world.objects import ObjectOrigin, Transform
 from exulanica.world_package import authored, environments
 from exulanica.world_package.package import PackageError, import_check_package, verify_package
 
@@ -80,12 +81,19 @@ def _instance(
 
 def _environment_sections(*, availability: str = "available") -> dict[str, object]:
     instance = _instance()
-    added = product_delta_sha256([], [], [instance])
+    added = product_delta_sha256(
+        objects=[], element_overrides=[], environment_instances=[instance], point_map_instances=[]
+    )
     structure = json.loads((GOLDEN / "world/structure.json").read_bytes())
     topology = json.loads((GOLDEN / "world/topology.json").read_bytes())
     version = {
         "created_at": "2026-09-21T10:00:00Z",
-        "delta": canonical_delta_document([], [], [instance]),
+        "delta": canonical_delta_document(
+            objects=[],
+            element_overrides=[],
+            environment_instances=[instance],
+            point_map_instances=[],
+        ),
         "edit_seq": 1,
         "edits": [
             {
@@ -154,7 +162,12 @@ def test_the_environment_inclusive_digest_rederives_without_the_product_code():
     sections = _environment_sections()
     [version] = sections[environments.VERSIONS_PATH]["items"]
     assert environments.delta_sha256(version["delta"]) == version["state_sha256"]
-    assert version["state_sha256"] == product_delta_sha256([], [], [_instance()])
+    assert version["state_sha256"] == product_delta_sha256(
+        objects=[],
+        element_overrides=[],
+        environment_instances=[_instance()],
+        point_map_instances=[],
+    )
     assert version["delta"]["schema_version"] == 2
     assert "environment_instances" in version["delta"]
 

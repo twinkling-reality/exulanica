@@ -45,6 +45,7 @@ import psycopg
 from psycopg import pq
 
 from exulanica.errors import IntegrityError
+from exulanica.world.authored_delta import AlternateVersion
 from exulanica.world.environment_instances import (
     EnvironmentPlacement,
     EnvironmentSelection,
@@ -74,7 +75,6 @@ from exulanica.world.errors import (
 )
 from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.objects import (
-    AlternateVersion,
     AuthoredObject,
     ObjectBehaviour,
     ObjectOrigin,

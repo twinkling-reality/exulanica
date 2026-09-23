@@ -96,7 +96,7 @@ from exulanica.graph.wire_numbers import (
 from exulanica.graph.world_read_evidence import recorded_evidence
 from exulanica.graph.world_read_views import descriptor
 from exulanica.store import ContentAddressedStore
-from exulanica.world import DEFAULT_WORLD_ID, WorldStructureRepository
+from exulanica.world import WorldStructureRepository
 
 __all__ = [
     "NUMBER_DECIMALS",
@@ -552,12 +552,16 @@ def world_read_bundle(
     scene_id: uuid.UUID,
     store: ContentAddressedStore | None,
     *,
-    world_id: str = DEFAULT_WORLD_ID,
+    world_id: str,
 ) -> dict[str, Any] | None:
     """Assemble the digest-bound read bundle for one scene, or ``None`` if it is not readable.
 
     ``None`` covers both "no such scene" and "a scene in another workspace", because the route
     above turns both into the same 404: the surface is not an existence oracle.
+
+    ``world_id`` names the world whose structural snapshot places the scene's photographs in
+    regions. It has no default: a workspace can hold several worlds, and a read that assumed one
+    would answer about the wrong world's regions without saying so.
     """
     scenes = reconstruction_scene_rows(connection, workspace, store, scene_id=scene_id)
     if not scenes:
@@ -585,10 +589,13 @@ def place_read_bundle(
     place_id: uuid.UUID,
     store: ContentAddressedStore | None,
     *,
+    world_id: str,
     at: dt.datetime | None = None,
-    world_id: str = DEFAULT_WORLD_ID,
 ) -> dict[str, Any] | None:
     """The bundle for the version of one place in force at one time, or ``None`` if unreadable.
+
+    ``world_id`` names the world whose structure places the resolved scene's photographs in
+    regions, and has no default, for the reason :func:`world_read_bundle` gives.
 
     ``None`` covers a place that does not exist, one in another workspace, one whose anchor was
     withdrawn and one that has no anchor yet, for the same reason the scene read collapses its

@@ -167,13 +167,14 @@ refused, which is what keeps asset bytes from riding along unchecked.
 | `assets.json` | The reviewed assets the objects name: key, title, summary, media type, `content_sha256`, byte size, licence id and licence digest, an RFC 6920 `ni` URI, and `retrieval: "requires an authorized content-addressed resolver"`. No URL and no bytes |
 | `behaviours.json` | The reviewed behaviours the objects name: key, version, summary and parameter bounds |
 
-`delta` is the document `exulanica.world.objects.canonical_delta_document` builds, so its SHA-256
-over the canonical JSON rule is the version's `state_sha256`, the same token `GET /world/versions`
-returns and every edit names as its base. Objects keep their region-local fixed-point transforms,
-their `origin` (`authored`, with the role the person chose) and their behaviour key, version and
-parameters. Ids are pseudonymised with the same `urn:exulanica:wmp:<kind>:<sha256>` rule as the 1.0
-components, so `version_id` is `sha256("alternate-version:" + uuid)`: a holder of the version id
-can match it, and the package alone does not reveal it.
+`delta` is the document `exulanica.world.authored_delta.canonical_delta_document` builds, so its
+SHA-256 over the canonical JSON rule is the version's `state_sha256`, the same token
+`GET /world/versions` returns and every edit names as its base. Objects keep their region-local
+fixed-point transforms, their `origin` (`authored`, with the role the person chose) and their
+behaviour key, version and parameters. Ids are pseudonymised with the same
+`urn:exulanica:wmp:<kind>:<sha256>` rule as the 1.0 components, so `version_id` is
+`sha256("alternate-version:" + uuid)`: a holder of the version id can match it, and the package
+alone does not reveal it.
 
 The extension is added only when `project` is given `--extension authored-world-1.0`. With it, the
 eighteen 1.0 payloads are unchanged except `ro-crate-metadata.json`, which gains the four files in
@@ -338,7 +339,7 @@ there is refused.
 | `assets.json` | The reviewed object assets those versions name, in the same digest-only form as authored-world 1.0 |
 | `behaviours.json` | The reviewed behaviours those objects name |
 
-`delta` is the document `exulanica.world.objects.canonical_delta_document` builds when
+`delta` is the document `exulanica.world.authored_delta.canonical_delta_document` builds when
 environment instances are supplied. Schema version 2 and `environment_instances` appear only
 when at least one instance remains after omitting undone additions. Schema version 1 is the
 current state of a version whose environment additions were all undone; its edit chain still

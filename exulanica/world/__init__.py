@@ -20,6 +20,11 @@ from exulanica.world.assets import (
     reviewed_assets,
     seed_reviewed_assets,
 )
+from exulanica.world.authored_delta import (
+    AlternateVersion,
+    canonical_delta_document,
+    delta_sha256,
+)
 from exulanica.world.composition_preview import (
     CompositionBlocked,
     CompositionPlacement,
@@ -97,15 +102,12 @@ from exulanica.world.objects import (
     MAX_SCALE_MILLI,
     MAX_YAW_MICRORADIANS,
     OBJECT_ID_PATTERN,
-    AlternateVersion,
     AuthoredObject,
     ElementOverride,
     ObjectBehaviour,
     ObjectOrigin,
     Transform,
     VersionEdit,
-    canonical_delta_document,
-    delta_sha256,
     object_document,
     override_document,
     validate_behaviour,

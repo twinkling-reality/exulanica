@@ -151,21 +151,40 @@ def test_validate_object_puts_every_object_through_the_id_contract():
 # -- the canonical delta -----------------------------------------------------------------------
 
 
+def v1_digest(objects=(), overrides=()):
+    """The state token of a world holding only the two version 1 sections."""
+    return delta_sha256(
+        objects=objects,
+        element_overrides=overrides,
+        environment_instances=(),
+        point_map_instances=(),
+    )
+
+
+def v1_document(objects=(), overrides=()):
+    return canonical_delta_document(
+        objects=objects,
+        element_overrides=overrides,
+        environment_instances=(),
+        point_map_instances=(),
+    )
+
+
 def test_the_delta_digest_ignores_the_order_rows_arrive_in():
     a, b = authored("object:a"), authored("object:b")
-    assert delta_sha256((a, b), ()) == delta_sha256((b, a), ())
+    assert v1_digest((a, b)) == v1_digest((b, a))
 
 
 def test_the_delta_digest_does_not_ignore_the_content():
     """The negative control for the test above: an order-insensitive digest that ignored
     everything would also pass it."""
-    assert delta_sha256((authored("object:a"),), ()) != delta_sha256((authored("object:b"),), ())
+    assert v1_digest((authored("object:a"),)) != v1_digest((authored("object:b"),))
     moved = authored("object:a", transform=transform(x_mm=1_201))
-    assert delta_sha256((authored("object:a"),), ()) != delta_sha256((moved,), ())
+    assert v1_digest((authored("object:a"),)) != v1_digest((moved,))
 
 
 def test_the_delta_document_sorts_objects_and_overrides():
-    document = canonical_delta_document(
+    document = v1_document(
         (authored("object:c"), authored("object:a")),
         (ElementOverride("element:z", True), ElementOverride("element:a", True)),
     )
@@ -174,7 +193,7 @@ def test_the_delta_document_sorts_objects_and_overrides():
 
 
 def test_the_delta_document_is_canonically_encodable():
-    canonical_json(canonical_delta_document((authored(),), (ElementOverride("element:a", True),)))
+    canonical_json(v1_document((authored(),), (ElementOverride("element:a", True),)))
 
 
 def test_a_float_coordinate_cannot_reach_a_digest():
@@ -531,7 +550,7 @@ def test_the_fixture_state_digest_recomputes_from_its_own_delta(published_fixtur
         )
         for o in published_fixture["element_overrides"]
     )
-    assert delta_sha256(objects, overrides) == published_fixture["state_sha256"]
+    assert v1_digest(objects, overrides) == published_fixture["state_sha256"]
 
 
 def test_the_fixture_carries_every_published_field(published_fixture):

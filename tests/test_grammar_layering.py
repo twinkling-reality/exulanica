@@ -122,7 +122,11 @@ def test_the_grammar_package_exists_and_has_something_to_check():
 def test_the_layers_contract_is_still_exhaustive_and_places_both_new_slots():
     config = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     contracts = config["tool"]["importlinter"]["contracts"]
-    [layers] = [contract for contract in contracts if contract["type"] == "layers"]
+    [layers] = [
+        contract
+        for contract in contracts
+        if contract["type"] == "layers" and contract["containers"] == ["exulanica"]
+    ]
     assert layers["exhaustive"] is True
     order = layers["layers"]
     at = order.index("grammar")

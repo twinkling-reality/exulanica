@@ -47,25 +47,34 @@ def _instance(instance_id: str) -> EnvironmentInstance:
     )
 
 
+def _sections(*environment_instances: EnvironmentInstance) -> dict[str, object]:
+    return {
+        "objects": (),
+        "element_overrides": (),
+        "environment_instances": environment_instances,
+        "point_map_instances": (),
+    }
+
+
 def test_no_environment_rows_preserve_the_exact_schema_v1_bytes_and_digest() -> None:
-    document = canonical_delta_document((), ())
+    document = canonical_delta_document(**_sections())
     assert canonical_json(document) == b'{"element_overrides":[],"objects":[],"schema_version":1}'
-    assert delta_sha256((), ()) == (
+    assert delta_sha256(**_sections()) == (
         "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa"
     )
 
 
 def test_environment_rows_select_schema_v2_and_sort_by_instance_id() -> None:
     document = canonical_delta_document(
-        (), (), (_instance("environment:z"), _instance("environment:a"))
+        **_sections(_instance("environment:z"), _instance("environment:a"))
     )
     assert document["schema_version"] == 2
     assert [row["instance_id"] for row in document["environment_instances"]] == [
         "environment:a",
         "environment:z",
     ]
-    assert delta_sha256((), (), (_instance("environment:z"), _instance("environment:a"))) == (
-        delta_sha256((), (), (_instance("environment:a"), _instance("environment:z")))
+    assert delta_sha256(**_sections(_instance("environment:z"), _instance("environment:a"))) == (
+        delta_sha256(**_sections(_instance("environment:a"), _instance("environment:z")))
     )
 
 
@@ -79,4 +88,4 @@ def test_availability_is_not_part_of_canonical_authored_state() -> None:
         origin=available.origin,
         availability="withdrawn",
     )
-    assert delta_sha256((), (), (available,)) == delta_sha256((), (), (withdrawn,))
+    assert delta_sha256(**_sections(available)) == delta_sha256(**_sections(withdrawn))

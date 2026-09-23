@@ -14,7 +14,7 @@ from exulanica.world import (
     ObjectOrigin,
     Transform,
 )
-from exulanica.world.objects import canonical_delta_document
+from exulanica.world.authored_delta import canonical_delta_document
 from exulanica.world_package import authored, environments, project_world_package, verify_package
 from exulanica.world_package.package import PackageError, import_check_package
 
@@ -68,7 +68,10 @@ def test_environment_instance_round_trips_through_a_signed_package(repository, t
     [packaged] = world.versions
     assert packaged["version_id"] == _urn("alternate-version", version.version_id)
     assert packaged["delta"] == canonical_delta_document(
-        stored.objects, stored.element_overrides, stored.environment_instances
+        objects=stored.objects,
+        element_overrides=stored.element_overrides,
+        environment_instances=stored.environment_instances,
+        point_map_instances=(),
     )
     assert packaged["delta"]["schema_version"] == 2
     assert packaged["state_sha256"] == stored.state_sha256 == environments.delta_sha256(

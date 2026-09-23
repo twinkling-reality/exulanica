@@ -37,9 +37,9 @@ from exulanica.errors import BlobNotFoundError, IntegrityError
 from exulanica.evidence.blob import BlobId
 from exulanica.selection.validation import Session
 from exulanica.store.base import ContentAddressedStore
+from exulanica.world.authored_delta import AlternateVersion
 from exulanica.world.errors import InvalidStructuralData, UnknownWorldResource
 from exulanica.world.object_repository import WorldObjectRepository
-from exulanica.world.objects import AlternateVersion
 from exulanica.world.society import UnavailableSocietyInput, society_state_sha256
 from exulanica.world.society_authored_ground import (
     SocietyGround,

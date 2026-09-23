@@ -22,7 +22,7 @@ from typing import Any, Final
 
 from exulanica.environment.district_geometry import DistrictGeometry, segment_blocked
 from exulanica.environment.district_interpretation import validate_interpretation
-from exulanica.world.objects import AlternateVersion, delta_sha256
+from exulanica.world.authored_delta import AlternateVersion, delta_sha256
 from exulanica.world.society import society_state_sha256
 from exulanica.world.society_catalogs import load_routine_model
 from exulanica.world.society_composition import build_society_input
@@ -63,7 +63,9 @@ def flatiron_input(interpretation_path: Path = FLATIRON_INTERPRETATION) -> dict[
         parent_version_id=None,
         title="Fictional living society preview",
         style_version_id=None,
-        state_sha256=delta_sha256((), ()),
+        state_sha256=delta_sha256(
+            objects=(), element_overrides=(), environment_instances=(), point_map_instances=()
+        ),
         edit_seq=0,
         source_invalidated=False,
         created_by=ACTOR_ID,

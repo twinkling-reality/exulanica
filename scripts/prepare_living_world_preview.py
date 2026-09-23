@@ -27,12 +27,11 @@ from exulanica.environment.district_interpretation import (
     validate_interpretation,
 )
 from exulanica.world.assets import reviewed_assets
+from exulanica.world.authored_delta import AlternateVersion, delta_sha256
 from exulanica.world.objects import (
-    AlternateVersion,
     AuthoredObject,
     ObjectOrigin,
     Transform,
-    delta_sha256,
     object_document,
 )
 from exulanica.world.society import SOCIETY_POPULATION, society_state_sha256
@@ -195,7 +194,9 @@ def generate_preview(
         parent_version_id=None,
         title="Fictional living-world preview",
         style_version_id=None,
-        state_sha256=delta_sha256((), ()),
+        state_sha256=delta_sha256(
+            objects=(), element_overrides=(), environment_instances=(), point_map_instances=()
+        ),
         edit_seq=0,
         source_invalidated=False,
         created_by=ACTOR_ID,
@@ -283,7 +284,12 @@ def generate_preview(
                 version,
                 objects=objects,
                 edit_seq=version.edit_seq + 1,
-                state_sha256=delta_sha256(objects, ()),
+                state_sha256=delta_sha256(
+                    objects=objects,
+                    element_overrides=(),
+                    environment_instances=(),
+                    point_map_instances=(),
+                ),
             )
             inputs.append(composed(len(inputs) + 1))
         if tick > 0:

@@ -88,7 +88,11 @@ def test_the_traffic_package_exists_and_has_something_to_check():
 def test_traffic_has_its_own_layer_below_the_database_and_a_forbidden_contract():
     config = tomllib.loads((ROOT / "pyproject.toml").read_text(encoding="utf-8"))
     contracts = config["tool"]["importlinter"]["contracts"]
-    [layers] = [contract for contract in contracts if contract["type"] == "layers"]
+    [layers] = [
+        contract
+        for contract in contracts
+        if contract["type"] == "layers" and contract["containers"] == ["exulanica"]
+    ]
     assert layers["exhaustive"] is True
     order = layers["layers"]
     at = order.index("traffic")

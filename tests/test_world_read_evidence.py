@@ -16,6 +16,7 @@ from exulanica.canonical import canonical_json, sha256_of_canonical
 from exulanica.graph.world_read import world_read_bundle
 from exulanica.graph.world_read_verification import EvidenceError, verify
 from exulanica.ingest.person_review import create_subject, record_consent, record_region_edits
+from exulanica.world import DEFAULT_WORLD_ID
 
 from test_api import deployment as deployment
 from test_screening_currency import ACTOR, KEY, OUTLINE
@@ -166,7 +167,11 @@ def test_recipient_consent_expiry_and_record_movement(deployment, repository, tm
     response = deployment.as_owner("GET", path)
     assert response.status_code == 404, response.text
     second = world_read_bundle(
-        repository.connection, repository.workspace_id, scene, deployment.store
+        repository.connection,
+        repository.workspace_id,
+        scene,
+        deployment.store,
+        world_id=DEFAULT_WORLD_ID,
     )
     assert first["bundle"]["recorded_sha256"] == second["bundle"]["recorded_sha256"]
     key = str(capture)
@@ -190,7 +195,11 @@ def test_recipient_consent_expiry_and_record_movement(deployment, repository, tm
         effective_at=dt.datetime.now(dt.UTC),
     )
     withdrawn = world_read_bundle(
-        repository.connection, repository.workspace_id, scene, deployment.store
+        repository.connection,
+        repository.workspace_id,
+        scene,
+        deployment.store,
+        world_id=DEFAULT_WORLD_ID,
     )
     assert withdrawn["bundle"]["recorded_sha256"] != second["bundle"]["recorded_sha256"]
     assert _verify(withdrawn)["people"][key][0]["withdrawn"] is True
@@ -431,7 +440,11 @@ def test_recipient_masked_sources_and_stale_lineage(deployment, repository, tmp_
         ],
     )
     stale = world_read_bundle(
-        repository.connection, repository.workspace_id, scene, deployment.store
+        repository.connection,
+        repository.workspace_id,
+        scene,
+        deployment.store,
+        world_id=DEFAULT_WORLD_ID,
     )
     with pytest.raises(EvidenceError, match="stale_derivative_lineage"):
         _verify(stale)

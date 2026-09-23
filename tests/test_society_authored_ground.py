@@ -9,15 +9,14 @@ from dataclasses import dataclass, replace
 import pytest
 from exulanica.environment.district_geometry import segment_blocked
 from exulanica.world.assets import reviewed_assets
+from exulanica.world.authored_delta import AlternateVersion, delta_sha256
 from exulanica.world.errors import InvalidStructuralData
 from exulanica.world.objects import (
-    AlternateVersion,
     AuthoredObject,
     ElementOverride,
     ObjectBehaviour,
     ObjectOrigin,
     Transform,
-    delta_sha256,
 )
 from exulanica.world.photo_point_maps import (
     PLACEABLE_RUNG,
@@ -107,7 +106,12 @@ def version(
         style_version_id=None,
         # The state token covers every part of the authored delta, placed estimates included,
         # exactly as the object repository computes it.
-        state_sha256=delta_sha256(objects, overrides, (), point_maps),
+        state_sha256=delta_sha256(
+            objects=objects,
+            element_overrides=overrides,
+            environment_instances=(),
+            point_map_instances=point_maps,
+        ),
         edit_seq=len(objects) + len(point_maps),
         source_invalidated=invalidated,
         created_by=uuid.uuid4(),

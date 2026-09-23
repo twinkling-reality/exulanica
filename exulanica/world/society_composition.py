@@ -14,7 +14,8 @@ from copy import deepcopy
 from typing import Any
 
 from exulanica.world.assets import reviewed_assets
-from exulanica.world.objects import AlternateVersion, delta_sha256, object_document
+from exulanica.world.authored_delta import AlternateVersion, version_delta_sha256
+from exulanica.world.objects import object_document
 from exulanica.world.society import society_state_sha256
 from exulanica.world.society_input_policy import (
     AUTHORED_GROUND_COMPOSITION,
@@ -159,15 +160,7 @@ def build_society_input(
     # navigation and no collision, so a district interpretation is the same with or without them.
     # Leaving them out of the digest would make every world that holds one refuse with a message
     # about a mismatch, which would be true and would name the wrong cause.
-    if (
-        delta_sha256(
-            version.objects,
-            version.element_overrides,
-            version.environment_instances,
-            version.point_map_instances,
-        )
-        != version.state_sha256
-    ):
+    if version_delta_sha256(version) != version.state_sha256:
         raise ValueError("authored delta digest mismatch")
     validate_reviewed_affordances(reviewed_affordances)
     if availability not in ("available", "unavailable"):

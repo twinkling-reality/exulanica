@@ -16,6 +16,7 @@ the discipline and not the lifecycle, for the reasons in section 1. It implement
 contract in [product-direction.md](product-direction.md) and steps 2, 3 and 4 of the first
 milestone. The implementation is migration `0042_authored_world_objects.sql`,
 `exulanica/world/objects.py`, `exulanica/world/object_repository.py`,
+`exulanica/world/edit_kinds.py`, `exulanica/world/authored_delta.py`,
 `exulanica/world/assets.py`, migration `0050_durable_environment_composition.sql`,
 `exulanica/world/environment_instances.py`, and the `/world/versions` and `/world/assets` routes.
 
@@ -325,7 +326,9 @@ missing.
 Every mutation names the base it was made against: the version id and that version's
 `state_sha256` at the moment the caller read it. The repository takes the same per-workspace
 advisory lock the structural plane uses, `pg_advisory_xact_lock(hashtextextended(workspace_id::text,
-880024))`, re-reads the version row `for update`, and compares. Sharing that seed rather than
+880024))` through `exulanica/world/workspace_lock.py`, re-reads the version row `for update`, and
+compares. `tests/test_workspace_lock.py` holds every other statement of that seed to the helper's
+and refuses a new one outside the modules that already restated it. Sharing that seed rather than
 minting a new one is what makes an object edit serialize against a structural commit and against
 `tg_world_structure_invalidate_on_tombstone`, closing the same check-then-commit race deletion
 already closes for snapshots. A mismatch changes nothing and raises
@@ -335,12 +338,26 @@ compare-and-swap both existing world planes use.
 Every applied edit appends one immutable row to `world_alternate_version_edit`:
 
 ```text
-edit_id, edit_seq, kind, object_id, element_id, undone_edit_id,
-base_state_sha256, result_state_sha256, before_document, after_document, actor, recorded_at
+edit_id, edit_seq, kind, object_id, element_id, environment_instance_id, point_map_instance_id,
+undone_edit_id, base_state_sha256, result_state_sha256, before_document, after_document, actor,
+recorded_at
 ```
 
 `before_document` and `after_document` are the canonical documents on either side of the edit,
 which is what makes undo a stored fact rather than a client's memory of one.
+
+**The kinds are one registry.** `exulanica/world/edit_kinds.py` lists every kind the log may hold
+and the subject each one changes: an authored object, an element of the source snapshot, a placed
+environment instance or a placed photo point map, each named by its own id column. A new kind is
+still a migration, because the CHECK constraints `world_alternate_version_edit_kind_check` and
+`world_alternate_edit_names_its_subject` are the storage authority, and a migration restates both
+with every kind. `tests/test_edit_kinds.py` holds the registry equal to the newest migration's text
+of both constraints and to the live schema's, requires an undo rule and a history field for every
+subject, keeps each package verifier's closed list inside the registry with the same subjects, and
+reads every `kind=` the repository writes from the source and requires it to be registered with the
+subject column it writes; `tests/test_authored_delta.py` requires a delta section for every subject.
+A migration that restates the constraints from an older list, dropping a kind another change
+added, fails the first of those.
 
 **Undo** appends a new edit of kind `undo` naming the edit it reverses, and restores that edit's
 `before_document`. History is never rewritten.
@@ -348,9 +365,13 @@ which is what makes undo a stored fact rather than a client's memory of one.
 It reverses **the newest edit that no undo already names**, so a person who made three edits can
 take all three back. Reversing "the newest edit" instead would refuse the second undo, because by
 then the newest edit is an undo, and a control that works once is not an undo. The repository
-defines inverses for object, element-override and environment edits. The ordinary runtime can
-reverse these edits without deletion authority. Tests exercise that restricted role, including
-replacement and restoration of element overrides and environment addition, movement and removal.
+defines an inverse for every subject the registry names: object, element-override, environment
+and photo point map edits. Undo finds it through the registry, from the edit's kind to its subject
+and from the subject to the method that restores it. An edit whose kind the registry does not name
+is refused before anything is written, with `invalid_object_state` and the kind in the detail,
+rather than being read as some other subject's document. The ordinary runtime can reverse these
+edits without deletion authority. Tests exercise that restricted role, including replacement and
+restoration of element overrides and environment addition, movement and removal.
 
 Undo is still not redo. An undo edit is never itself a candidate. When every edit has been
 reversed, a further undo is refused with `invalid_object_state`, as it is on a version with no
@@ -542,6 +563,13 @@ writes the other's tables.
 reviewed asset registry including byte and licence delivery, and all six problem codes in the
 table above.
 
+`tests/test_edit_kind_undo_postgres.py` pins undo for every registered kind from the log rows: the
+state token and the subject's document return to the ones before the edit, and the undo row names
+the edit it reverses, repeats its subject column and stores the documents on both sides. It also
+shows an unregistered kind refused with nothing written. `tests/test_edit_kinds.py` is the registry
+parity described in section 5, and `tests/test_authored_delta.py` holds golden state digests for
+every delta schema version and requires every section to be passed by keyword.
+
 Each invariant carries a negative control: a test that the guard refuses the thing it claims to
 refuse, rather than passing because the operation never ran. Two of them are regressions with a
 recorded cause. An object id that Python accepted and the schema refused reached the caller as a
@@ -616,9 +644,13 @@ transform used for authored objects. `origin.kind` remains `authored`, and the p
 Adding a whole asset requires current `compose` rights on the admitted source and render asset.
 Adding a feature also requires the named publication to be current, the exact feature to name the
 stored render batch, `compose` on its index asset, and `index` on the source, render and index
-assets. All referenced content-addressed bytes must verify as present. The repository repeats the
-binding and authorization checks under `asset_read_lock()` immediately before transaction commit,
-so a concurrent withdrawal cannot pass an earlier check and then commit. New publications do not
+assets. All referenced content-addressed bytes must verify as present. These checks belong to the
+environment source authority, `exulanica/world/environment_source_authority.py`, which the
+repository asks inside its own transaction; a placed photo point map's source is asked of
+`exulanica/world/point_map_source_authority.py` the same way. The repository repeats the binding
+and authorization checks under `asset_read_lock()` immediately before transaction commit, after
+the edit row and its society hook, so a concurrent withdrawal cannot pass an earlier check and then
+commit. `tests/test_source_authorities_postgres.py` pins that lock order. New publications do not
 rewrite existing placement history.
 
 Availability is read separately from canonical authored state:

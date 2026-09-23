@@ -680,3 +680,32 @@ name = "The product never imports the generated appearance code"
 type = "forbidden"
 source_modules = ["exulanica"]
 forbidden_modules = ["exulanica_appearance"]
+
+[[tool.importlinter.contracts]]
+# The authored-world plane inside exulanica.world, top to bottom.
+#
+# An alternate version's authored delta is every kind's section composed into one state token:
+# objects and element overrides from `objects`, and each instance kind from its own module. The
+# composition used to live in `objects` and import both instance modules from inside a function
+# and under TYPE_CHECKING, so a kind could be added below it without the composer being told: its
+# section defaulted to empty, and a call that passed fewer sections digested less than the world
+# held. Here the delta sits above every instance kind, the instance kinds sit above the documents
+# they build on and cannot import each other, and the edit-kind registry is at the bottom where
+# everything may read it.
+#
+# Above the delta are the two source authorities the object repository asks inside its own
+# transaction, whether an environment source or a photograph's depth estimate may be used. They
+# are siblings and neither may import the repository, so a question about another plane cannot
+# grow back into the writer; the repository is the one module here that knows all of them.
+# grimp sees deferred and typing-only imports, so neither dodges this.
+name = "An authored delta composes the instance kinds, and no instance kind composes the delta"
+type = "layers"
+containers = ["exulanica.world"]
+layers = [
+  "object_repository",
+  "environment_source_authority | point_map_source_authority",
+  "authored_delta",
+  "environment_instances | photo_point_maps",
+  "objects",
+  "edit_kinds",
+]

@@ -54,7 +54,7 @@ def test_the_import_contract_names_the_tool():
     assert contract["type"] == "forbidden"
     assert contract["source_modules"] == ["exulanica"]
     assert contract["forbidden_modules"] == ["exulanica_lettering_tool"]
-    (layers,) = [c for c in contracts if c["type"] == "layers"]
+    (layers,) = [c for c in contracts if c["type"] == "layers" and c["containers"] == ["exulanica"]]
     assert layers["exhaustive"] is True
     assert "lettering" in " ".join(layers["layers"]).split()
 

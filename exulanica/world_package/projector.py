@@ -20,6 +20,7 @@ from psycopg.rows import dict_row
 
 from exulanica.epistemics.vocabulary import RECONSTRUCTION_SCENE_RUNG_PREDICATE
 from exulanica.store.base import ContentAddressedStore
+from exulanica.world.authored_delta import canonical_delta_document, delta_sha256
 from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.objects import (
     AuthoredObject,
@@ -27,8 +28,6 @@ from exulanica.world.objects import (
     ObjectBehaviour,
     ObjectOrigin,
     Transform,
-    canonical_delta_document,
-    delta_sha256,
 )
 from exulanica.world_package import authored, environments
 from exulanica.world_package.package import (
@@ -1018,8 +1017,8 @@ def _authored_world(
     reason tombstones omit the requesting actor. The digests that make the edit chain checkable
     are kept.
 
-    The delta is built with :func:`exulanica.world.objects.canonical_delta_document`, the one
-    the product digests, and the stored ``state_sha256`` must equal its digest inside this
+    The delta is built with :func:`exulanica.world.authored_delta.canonical_delta_document`, the
+    one the product digests, and the stored ``state_sha256`` must equal its digest inside this
     snapshot; the offline verifier then re-derives it independently.
     """
     invalidated = {
@@ -1110,9 +1109,15 @@ def _authored_world(
 
     versions: list[dict[str, Any]] = []
     for row in kept:
-        version_objects = objects.get(row["version_id"], [])
-        version_overrides = overrides.get(row["version_id"], [])
-        if delta_sha256(version_objects, version_overrides) != row["state_sha256"]:
+        sections: dict[str, Any] = {
+            "objects": objects.get(row["version_id"], []),
+            "element_overrides": overrides.get(row["version_id"], []),
+            # Schema version 1 only. The partition sends every version that holds an environment
+            # instance to the environment extension and withholds every one holding a point map.
+            "environment_instances": (),
+            "point_map_instances": (),
+        }
+        if delta_sha256(**sections) != row["state_sha256"]:
             raise PackageError(
                 "an alternate version's stored state token does not describe its delta inside "
                 "the export snapshot"
@@ -1120,7 +1125,7 @@ def _authored_world(
         versions.append(
             {
                 "created_at": row["created_at"],
-                "delta": canonical_delta_document(version_objects, version_overrides),
+                "delta": canonical_delta_document(**sections),
                 "edit_seq": row["edit_seq"],
                 "edits": edits.get(row["version_id"], []),
                 "origin": "authored",
@@ -1306,7 +1311,7 @@ def _environment_instances(
 ) -> dict[str, Any]:
     """Project environment-inclusive authored state for the environment-instances extension.
 
-    The delta is :func:`exulanica.world.objects.canonical_delta_document` with environment
+    The delta is :func:`exulanica.world.authored_delta.canonical_delta_document` with environment
     instances, so ``state_sha256`` is the live version token. Availability is read from the
     same repository path the HTTP surface uses and is stored beside the instance, not in the
     digest. Source identifiers stay the live UUID strings because they participate in that
@@ -1349,9 +1354,15 @@ def _environment_instances(
     every_object = []
     for row in rows:
         stored = worlds.version(row["version_id"])
-        digest = delta_sha256(
-            stored.objects, stored.element_overrides, stored.environment_instances
-        )
+        sections: dict[str, Any] = {
+            "objects": stored.objects,
+            "element_overrides": stored.element_overrides,
+            "environment_instances": stored.environment_instances,
+            # Schema versions 1 and 2 only. The partition withholds every version holding a
+            # placed point map, so one that reached here would fail the token check below.
+            "point_map_instances": (),
+        }
+        digest = delta_sha256(**sections)
         if digest != row["state_sha256"]:
             raise PackageError(
                 "an alternate version's stored state token does not describe its "
@@ -1361,9 +1372,7 @@ def _environment_instances(
         versions.append(
             {
                 "created_at": row["created_at"],
-                "delta": canonical_delta_document(
-                    stored.objects, stored.element_overrides, stored.environment_instances
-                ),
+                "delta": canonical_delta_document(**sections),
                 "edit_seq": row["edit_seq"],
                 "edits": edits.get(row["version_id"], []),
                 "environment_availability": [

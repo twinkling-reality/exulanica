@@ -51,11 +51,13 @@ _OWNER = "exulanica_membership_backfill_owner"
 
 #: What the 0089 read path meant: every attachment row is current and nothing was detached.
 #:
-#: The third is a different kind of stand-in and says so. The first two restate what 0089 MEANT by
-#: a collection it had no table for; ``world_alternate_point_map_instance`` is a table migration
-#: 0093 adds, and at 0089 a world simply had none, so the empty view is not an interpretation but
-#: a fact. It is here because the CURRENT version read is used below to establish the reference
-#: set before 0090 runs, and that read lists a version's placed estimates.
+#: The last two are a different kind of stand-in and say so. The first two restate what 0089 MEANT
+#: by a collection it had no table for; ``world_alternate_point_map_instance`` and the edit log's
+#: ``point_map_instance_id`` are what migration 0093 adds, and at 0089 a world simply had no placed
+#: estimate and no edit naming one, so the empty view and the empty column are not an
+#: interpretation but a fact. They are here because the CURRENT version read is used below to
+#: establish the reference set before 0090 runs, and that read lists a version's placed estimates
+#: and every subject column of its edit history.
 _STAND_INS = (
     "create view saved_world_source_current_membership as "
     "select workspace_id,entry_id,capture_id,attachment_id from saved_world_source_attachment",
@@ -79,6 +81,7 @@ _STAND_INS = (
     "null::bigint as scale_milli,null::text as origin_kind,null::text as origin_role,"
     "null::boolean as removed,null::boolean as addition_undone,null::uuid as created_edit_id,"
     "null::uuid as last_edit_id where false",
+    "alter table world_alternate_version_edit add column point_map_instance_id text",
 )
 
 
@@ -357,6 +360,9 @@ def test_0090_keeps_every_reference_a_populated_0089_database_held(
             admin.execute("drop view saved_world_source_detach")
             admin.execute("drop view saved_world_source_current_membership")
             admin.execute("drop view world_alternate_point_map_instance")
+            admin.execute(
+                "alter table world_alternate_version_edit drop column point_map_instance_id"
+            )
             admin.commit()
             _as_owner(admin, owned)
             admin.execute(by_version["0090"].sql)

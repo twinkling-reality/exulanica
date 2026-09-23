@@ -21,6 +21,7 @@ from exulanica.graph.world_read_verification import EvidenceError, verify
 from exulanica.ingest import person_review
 from exulanica.ingest.person_review import create_subject, record_consent, record_region_edits
 from exulanica.ingest.privacy import authorize_personal_capture, record_human_screening
+from exulanica.world import DEFAULT_WORLD_ID
 
 from conftest import write_point_map
 from test_api import deployment as deployment
@@ -262,7 +263,11 @@ def test_default_time_writer_to_authenticated_recipient(deployment, repository, 
         effective_at=FIRST,
     )
     withdrawn = world_read_bundle(
-        repository.connection, repository.workspace_id, scene, deployment.store
+        repository.connection,
+        repository.workspace_id,
+        scene,
+        deployment.store,
+        world_id=DEFAULT_WORLD_ID,
     )
     evaluation = verify(
         withdrawn, at="2026-09-08T00:00:00Z", expected_bundle_sha256=withdrawn["bundle_sha256"]
