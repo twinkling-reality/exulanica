@@ -20,6 +20,7 @@ refuse the kind for every caller. The last section holds that over the wire with
 from __future__ import annotations
 
 import datetime as dt
+import hashlib
 import json
 import uuid
 from contextlib import contextmanager
@@ -819,3 +820,65 @@ def test_holding_both_places_reloads_and_undoes_an_estimate(placed, grants):
     assert undone.status_code == 200, undone.text
     assert undone.json()["point_map_instances"] == []
     assert placed.instances() == ()
+
+
+def test_a_branch_of_a_withheld_estimate_goes_with_it_and_the_package_verifies(placed, tmp_path):
+    """A branch made after the right ended holds no estimate, and still names its parent.
+
+    The parent is withheld for the estimate it keeps. A branch left in the package would name a
+    parent the package does not contain, and the package's own verifier refuses exactly that.
+    """
+    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from exulanica.world_package import authored, project_world_package, verify_package
+
+    assert placed.apply().status_code == 201
+    withdraw_model_right(
+        placed.repository, right_id=placed.right.right_id, withdrawn_by=placed.api.actor
+    )
+    branch = placed.worlds().create_version(
+        title="Branch after stopping it",
+        parent_version_id=uuid.UUID(placed.version_id),
+        created_by=placed.api.actor,
+    )
+    assert branch.point_map_instances == () and branch.edits == ()
+    placed.repository.connection.commit()
+
+    result = project_world_package(
+        placed.repository.connection,
+        workspace_id=placed.repository.workspace_id,
+        actor=placed.api.actor,
+        output=tmp_path / "branch.wmp",
+        private_key=Ed25519PrivateKey.generate(),
+        world_id=placed.entry["world_id"],
+        extensions=[authored.EXTENSION_KEY],
+    )
+    world = verify_package(result.output).extensions[0].authored_world
+    assert world.versions == ()
+    assert world.withheld_versions == 2
+    written = "\n".join(p.read_text() for p in (result.output / "extensions").rglob("*.json"))
+    for version_id in (placed.version_id, branch.version_id):
+        name = hashlib.sha256(f"alternate-version:{version_id}".encode()).hexdigest()
+        assert name not in written
+
+
+def test_the_partition_withholds_every_branch_of_an_estimate_and_keeps_its_ancestors():
+    from exulanica.world_package.environments import ExportVersion, partition_export_versions
+
+    root, holder, branch, grandchild = (uuid.uuid4() for _ in range(4))
+    authored, environment, authored_withheld, environment_withheld = partition_export_versions(
+        (
+            ExportVersion(root, None, environment_bearing=False, source_invalidated=False),
+            ExportVersion(
+                holder,
+                root,
+                environment_bearing=False,
+                source_invalidated=False,
+                point_map_bearing=True,
+            ),
+            ExportVersion(branch, holder, environment_bearing=False, source_invalidated=False),
+            ExportVersion(grandchild, branch, environment_bearing=True, source_invalidated=False),
+        )
+    )
+    assert authored == (root,)
+    assert environment == ()
+    assert (authored_withheld, environment_withheld) == (2, 1)

@@ -850,6 +850,12 @@ class MoveObjectBody(EntryBoundEditBody):
     transform: TransformBody
 
 
+class SetObjectBehaviourBody(EntryBoundEditBody):
+    #: Required, and null means "take the behaviour away". A body that simply omitted it would
+    #: otherwise be read as a clear the caller never asked for.
+    behaviour: BehaviourBody | None
+
+
 class BaseStateBody(EntryBoundEditBody):
     pass
 
@@ -1526,6 +1532,35 @@ def remove_authored_object(
         repository,
         lambda: repository.remove_object(
             version_id, object_id, base_state_sha256=body.base_state_sha256, actor=session.actor
+        ),
+        saved_entry=body.saved_entry,
+        authored_version_id=version_id,
+        mutation_base_state_sha256=body.base_state_sha256,
+    )
+
+
+@router.post(
+    "/versions/{version_id}/objects/{object_id}/behaviour",
+    response_model=AlternateVersionView,
+    summary="Give one authored object a reviewed behaviour, replace it, or take it away with null.",
+)
+def set_authored_object_behaviour(
+    version_id: Annotated[uuid.UUID, Path()],
+    object_id: Annotated[str, Path(max_length=200)],
+    body: SetObjectBehaviourBody,
+    repository: WriteObjects,
+    session: CurrentSession,
+    request: Request,
+) -> Response | AlternateVersionView:
+    return _edit(
+        request,
+        repository,
+        lambda: repository.set_object_behaviour(
+            version_id,
+            object_id,
+            None if body.behaviour is None else body.behaviour.domain(),
+            base_state_sha256=body.base_state_sha256,
+            actor=session.actor,
         ),
         saved_entry=body.saved_entry,
         authored_version_id=version_id,

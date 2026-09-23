@@ -1023,3 +1023,326 @@ def test_an_override_of_an_element_the_source_does_not_have_is_refused(world):
             base_state_sha256=version.state_sha256,
             actor=uuid.uuid4(),
         )
+
+
+# -- a behaviour given to, changed on, or taken from an object that already exists ---------------
+
+MOTION = ObjectBehaviour("motion.bounded-path", 1, PARAMETERS)
+#: Every parameter differs from MOTION, so a restore that kept any one of them would show.
+SLOWER = ObjectBehaviour(
+    "motion.bounded-path",
+    1,
+    {"travel_mm": 650, "period_milliseconds": 9_000, "axis": "y", "easing": "linear"},
+)
+
+
+def set_behaviour(objects, version, behaviour, object_id="object:lantern"):
+    return objects.set_object_behaviour(
+        version.version_id,
+        object_id,
+        behaviour,
+        base_state_sha256=version.state_sha256,
+        actor=uuid.uuid4(),
+    )
+
+
+def undo(objects, version):
+    return objects.undo(
+        version.version_id, base_state_sha256=version.state_sha256, actor=uuid.uuid4()
+    )
+
+
+def edit_documents(objects, edit_id):
+    return objects.connection.execute(
+        "select before_document,after_document from world_alternate_version_edit where edit_id=%s",
+        (edit_id,),
+    ).fetchone()
+
+
+def edit_count(objects, version_id, kind=None):
+    return objects.connection.execute(
+        "select count(*) as n from world_alternate_version_edit where version_id=%s "
+        "and (%s::text is null or kind=%s)",
+        (version_id, kind, kind),
+    ).fetchone()["n"]
+
+
+def test_a_placed_object_is_given_a_behaviour_and_undo_takes_back_only_that(world):
+    objects, snapshot, _ = world
+    version = objects.create_version(
+        source_snapshot_id=snapshot.snapshot_id, title="Study", created_by=uuid.uuid4()
+    )
+    placed = add(objects, version)
+    assert placed.objects[0].behaviour is None
+
+    moving = set_behaviour(objects, placed, MOTION)
+
+    [obj] = moving.objects
+    assert obj.behaviour == MOTION
+    assert obj.transform == transform()
+    assert (obj.origin, obj.removed) == (placed.objects[0].origin, False)
+    assert moving.state_sha256 != placed.state_sha256, "the behaviour is inside the digest"
+    edit = moving.edits[-1]
+    assert (edit.kind, edit.object_id, edit.element_id) == (
+        "set_object_behaviour",
+        "object:lantern",
+        None,
+    )
+    assert (edit.base_state_sha256, edit.result_state_sha256) == (
+        placed.state_sha256,
+        moving.state_sha256,
+    )
+    stored = edit_documents(objects, edit.edit_id)
+    assert stored["before_document"]["behaviour"] is None
+    assert stored["after_document"]["behaviour"]["parameters"] == PARAMETERS
+
+    back = undo(objects, moving)
+    assert back.objects == placed.objects, "the object is as it was, and still there"
+    assert back.state_sha256 == placed.state_sha256
+    assert back.edits[-1].undone_edit_id == edit.edit_id
+
+
+def test_undo_restores_exactly_the_previous_behaviour_after_a_change_and_after_a_clear(world):
+    objects, snapshot, _ = world
+    version = objects.create_version(
+        source_snapshot_id=snapshot.snapshot_id, title="Study", created_by=uuid.uuid4()
+    )
+    placed = add(objects, version, authored(behaviour=MOTION))
+
+    changed = set_behaviour(objects, placed, SLOWER)
+    assert changed.objects[0].behaviour == SLOWER
+    restored = undo(objects, changed)
+    assert restored.objects[0].behaviour == MOTION
+    assert dict(restored.objects[0].behaviour.parameters) == PARAMETERS
+    assert restored.state_sha256 == placed.state_sha256
+
+    cleared = set_behaviour(objects, restored, None)
+    assert cleared.objects[0].behaviour is None
+    assert cleared.objects[0].transform == transform(), "clearing moves nothing"
+    assert cleared.edits[-1].kind == "set_object_behaviour"
+    brought_back = undo(objects, cleared)
+    assert brought_back.objects[0].behaviour == MOTION
+    assert dict(brought_back.objects[0].behaviour.parameters) == PARAMETERS
+    assert brought_back.state_sha256 == placed.state_sha256
+
+
+def test_undo_steps_back_through_a_chain_of_behaviour_edits_to_the_placement(world):
+    objects, snapshot, _ = world
+    version = objects.create_version(
+        source_snapshot_id=snapshot.snapshot_id, title="Study", created_by=uuid.uuid4()
+    )
+    placed = add(objects, version)
+    given = set_behaviour(objects, placed, MOTION)
+    changed = set_behaviour(objects, given, SLOWER)
+    cleared = set_behaviour(objects, changed, None)
+
+    states = [cleared]
+    for _ in range(3):
+        states.append(undo(objects, states[-1]))
+    assert [s.objects[0].behaviour for s in states] == [None, SLOWER, MOTION, None]
+    assert [s.state_sha256 for s in states[1:]] == [
+        changed.state_sha256,
+        given.state_sha256,
+        placed.state_sha256,
+    ]
+    emptied = undo(objects, states[-1])
+    assert emptied.objects == (), "the fourth undo reaches the placement itself"
+
+
+@pytest.mark.parametrize(
+    ("behaviour", "reason"),
+    [
+        (ObjectBehaviour("motion.spin", 1, PARAMETERS), "motion.spin@1 is not reviewed"),
+        (ObjectBehaviour("motion.bounded-path", 2, PARAMETERS), "bounded-path@2 is not reviewed"),
+        (
+            ObjectBehaviour("motion.bounded-path", 1, {**PARAMETERS, "travel_mm": 10_001}),
+            "travel_mm must be between 100 and 10000",
+        ),
+        (
+            ObjectBehaviour("motion.bounded-path", 1, {**PARAMETERS, "period_milliseconds": 499}),
+            "period_milliseconds must be between 500 and 60000",
+        ),
+        (
+            ObjectBehaviour("motion.bounded-path", 1, {**PARAMETERS, "axis": "w"}),
+            "axis must be one of x, y, z",
+        ),
+        (
+            ObjectBehaviour("motion.bounded-path", 1, {**PARAMETERS, "speed": 3}),
+            "unknown behaviour parameter speed",
+        ),
+        (
+            ObjectBehaviour(
+                "motion.bounded-path", 1, {k: v for k, v in PARAMETERS.items() if k != "easing"}
+            ),
+            "behaviour parameter easing is required",
+        ),
+        (
+            ObjectBehaviour("motion.bounded-path", 1, {**PARAMETERS, "travel_mm": 2_000.0}),
+            "travel_mm must be an integer",
+        ),
+    ],
+)
+def test_an_unreviewed_behaviour_is_refused_and_nothing_is_written(world, behaviour, reason):
+    objects, snapshot, _ = world
+    version = objects.create_version(
+        source_snapshot_id=snapshot.snapshot_id, title="Study", created_by=uuid.uuid4()
+    )
+    placed = add(objects, version)
+    edits_before = edit_count(objects, placed.version_id)
+
+    with pytest.raises(InvalidObjectData, match=reason):
+        set_behaviour(objects, placed, behaviour)
+
+    after = objects.version(placed.version_id)
+    assert (after.state_sha256, after.edit_seq, after.objects) == (
+        placed.state_sha256,
+        placed.edit_seq,
+        placed.objects,
+    )
+    assert edit_count(objects, placed.version_id) == edits_before
+
+
+def test_the_reviewed_bounds_themselves_are_accepted(world):
+    """The positive control for the refusals above: each bound is inclusive."""
+    objects, snapshot, _ = world
+    version = objects.create_version(
+        source_snapshot_id=snapshot.snapshot_id, title="Study", created_by=uuid.uuid4()
+    )
+    version = add(objects, version)
+    for travel, period in ((100, 500), (10_000, 60_000)):
+        bounded = ObjectBehaviour(
+            "motion.bounded-path",
+            1,
+            {**PARAMETERS, "travel_mm": travel, "period_milliseconds": period},
+        )
+        version = set_behaviour(objects, version, bounded)
+        assert version.objects[0].behaviour == bounded
+
+
+def test_a_behaviour_edit_against_a_stale_base_is_refused_and_changes_nothing(world):
+    objects, snapshot, _ = world
+    version = objects.create_version(
+        source_snapshot_id=snapshot.snapshot_id, title="Study", created_by=uuid.uuid4()
+    )
+    placed = add(objects, version)
+    moved = objects.move_object(
+        placed.version_id,
+        "object:lantern",
+        transform(x_mm=3_000),
+        base_state_sha256=placed.state_sha256,
+        actor=uuid.uuid4(),
+    )
+    with pytest.raises(StaleObjectBase):
+        set_behaviour(objects, placed, MOTION)
+    current = objects.version(placed.version_id)
+    assert (current.state_sha256, current.edit_seq) == (moved.state_sha256, moved.edit_seq)
+    assert current.objects[0].behaviour is None
+
+
+def test_a_behaviour_edit_names_a_live_object_and_must_change_something(world):
+    objects, snapshot, _ = world
+    version = objects.create_version(
+        source_snapshot_id=snapshot.snapshot_id, title="Study", created_by=uuid.uuid4()
+    )
+    placed = add(objects, version, authored(behaviour=MOTION))
+
+    with pytest.raises(UnknownWorldResource):
+        set_behaviour(objects, placed, MOTION, object_id="object:absent")
+    with pytest.raises(InvalidObjectState, match="already has exactly that behaviour"):
+        set_behaviour(objects, placed, MOTION)
+    cleared = set_behaviour(objects, placed, None)
+    with pytest.raises(InvalidObjectState, match="has no behaviour to take away"):
+        set_behaviour(objects, cleared, None)
+    removed = objects.remove_object(
+        cleared.version_id,
+        "object:lantern",
+        base_state_sha256=cleared.state_sha256,
+        actor=uuid.uuid4(),
+    )
+    with pytest.raises(InvalidObjectState, match="is removed"):
+        set_behaviour(objects, removed, MOTION)
+    assert objects.version(placed.version_id).state_sha256 == removed.state_sha256
+
+
+def test_the_edit_log_admits_a_behaviour_edit_only_about_one_object(world):
+    """Migration 0096 on the live schema: the kind exists, and it must name an object alone."""
+    objects, snapshot, _ = world
+    version = objects.create_version(
+        source_snapshot_id=snapshot.snapshot_id, title="Study", created_by=uuid.uuid4()
+    )
+    version = set_behaviour(objects, add(objects, version), MOTION)  # the kind is admitted
+    base = version.state_sha256
+
+    def insert(kind, *, object_id=None, element_id=None, environment_instance_id=None):
+        objects.connection.execute(
+            "insert into world_alternate_version_edit (workspace_id,world_id,version_id,"
+            "edit_seq,kind,object_id,element_id,environment_instance_id,base_state_sha256,"
+            "result_state_sha256,actor) values (%s,%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+            (
+                objects.workspace_id,
+                objects.world_id,
+                version.version_id,
+                1_000,
+                kind,
+                object_id,
+                element_id,
+                environment_instance_id,
+                base,
+                base,
+                uuid.uuid4(),
+            ),
+        )
+
+    refused = (
+        ("set_object_behaviour", {"element_id": "element:region-a:root"}),
+        ("set_object_behaviour", {"object_id": "object:lantern", "element_id": "e"}),
+        ("set_object_behaviour", {"object_id": "object:lantern", "environment_instance_id": "i"}),
+        ("set_object_behaviours", {"object_id": "object:lantern"}),
+    )
+    for kind, subject in refused:
+        with pytest.raises(psycopg.errors.CheckViolation), objects.connection.transaction():
+            insert(kind, **subject)
+    with objects.connection.transaction():
+        insert("set_object_behaviour", object_id="object:lantern")  # the shape that is admitted
+    assert edit_count(objects, version.version_id, "set_object_behaviour") == 2
+
+
+def test_runtime_role_gives_clears_and_restores_a_behaviour(world, repository, spine_schema):
+    objects, snapshot, _ = world
+    version = objects.create_version(
+        source_snapshot_id=snapshot.snapshot_id, title="Study", created_by=uuid.uuid4()
+    )
+    placed = add(objects, version)
+    repository.connection.commit()
+    provision_runtime_role(repository.connection)
+    repository.connection.commit()
+
+    with scratch_role_database(spine_schema[1], RUNTIME_ROLE).session(
+        repository.workspace_id
+    ) as connection:
+        runtime = WorldObjectRepository(connection, repository.workspace_id, store=objects.store)
+        given = set_behaviour(runtime, placed, MOTION)
+        cleared = set_behaviour(runtime, given, None)
+        restored = undo(runtime, cleared)
+        assert restored.objects[0].behaviour == MOTION
+        assert restored.state_sha256 == given.state_sha256
+
+
+def test_a_behaviour_given_later_reopens_on_a_new_connection(world, spine_schema):
+    objects, snapshot, _ = world
+    version = objects.create_version(
+        source_snapshot_id=snapshot.snapshot_id, title="Study", created_by=uuid.uuid4()
+    )
+    version = set_behaviour(objects, add(objects, version), SLOWER)
+    objects.connection.commit()
+
+    reopened_connection = another_connection(spine_schema, objects.workspace_id)
+    try:
+        reopened = WorldObjectRepository(reopened_connection, objects.workspace_id).version(
+            version.version_id
+        )
+    finally:
+        reopened_connection.close()
+    assert reopened.state_sha256 == version.state_sha256
+    assert reopened.objects[0].behaviour == SLOWER
+    assert [e.kind for e in reopened.edits] == ["add_object", "set_object_behaviour"]

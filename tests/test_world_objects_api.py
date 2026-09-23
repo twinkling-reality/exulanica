@@ -600,3 +600,123 @@ def test_the_reviewed_catalog_is_shared_because_it_is_not_tenant_data(objects_ap
     mine = objects_api.get("/world/assets").json()
     theirs = objects_api.stranger_get("/world/assets").json()
     assert mine == theirs
+
+
+# -- a behaviour given to an object that is already placed -------------------------------------
+
+MOTION = {"behaviour_key": "motion.bounded-path", "behaviour_version": 1, "parameters": PARAMETERS}
+
+
+def set_behaviour(objects_api, version, behaviour, object_id="object:lantern"):
+    return objects_api.post(
+        f"/world/versions/{version['version_id']}/objects/{object_id}/behaviour",
+        {"base_state_sha256": version["state_sha256"], "behaviour": behaviour},
+    )
+
+
+def test_a_behaviour_is_given_taken_away_and_restored_over_http(objects_api):
+    placed = objects_api.add(objects_api.version()).json()
+    assert placed["objects"][0]["behaviour"] is None
+
+    given = set_behaviour(objects_api, placed, MOTION)
+    assert given.status_code == 200, given.text
+    given = given.json()
+    assert given["objects"][0]["behaviour"] == MOTION
+    assert given["objects"][0]["transform"] == placed["objects"][0]["transform"]
+    assert given["edits"][-1]["kind"] == "set_object_behaviour"
+    assert given["edits"][-1]["object_id"] == "object:lantern"
+
+    cleared = set_behaviour(objects_api, given, None)
+    assert cleared.status_code == 200, cleared.text
+    cleared = cleared.json()
+    assert cleared["objects"][0]["behaviour"] is None
+
+    restored = objects_api.post(
+        f"/world/versions/{cleared['version_id']}/objects/undo",
+        {"base_state_sha256": cleared["state_sha256"]},
+    ).json()
+    assert restored["objects"][0]["behaviour"] == MOTION, "parameters included"
+    assert restored["state_sha256"] == given["state_sha256"]
+
+    before_motion = objects_api.post(
+        f"/world/versions/{restored['version_id']}/objects/undo",
+        {"base_state_sha256": restored["state_sha256"]},
+    ).json()
+    assert before_motion["objects"] == placed["objects"], "the object is as it was placed"
+    assert before_motion["state_sha256"] == placed["state_sha256"]
+    assert [e["kind"] for e in before_motion["edits"]] == [
+        "add_object",
+        "set_object_behaviour",
+        "set_object_behaviour",
+        "undo",
+        "undo",
+    ]
+    reread = objects_api.get(f"/world/versions/{placed['version_id']}").json()
+    assert reread == before_motion
+
+
+@pytest.mark.parametrize(
+    ("behaviour", "reason"),
+    [
+        (
+            {"behaviour_key": "motion.teleport", "behaviour_version": 1, "parameters": PARAMETERS},
+            "behaviour motion.teleport@1 is not reviewed",
+        ),
+        (
+            {**MOTION, "parameters": {**PARAMETERS, "travel_mm": 10_001}},
+            "behaviour parameter travel_mm must be between 100 and 10000",
+        ),
+        (
+            {**MOTION, "parameters": {**PARAMETERS, "easing": "bouncy"}},
+            "behaviour parameter easing must be one of linear, smooth",
+        ),
+    ],
+)
+def test_an_unsupported_behaviour_given_later_is_refused_with_the_reason(
+    objects_api, behaviour, reason
+):
+    placed = objects_api.add(objects_api.version()).json()
+    response = set_behaviour(objects_api, placed, behaviour)
+    assert response.status_code == 422, response.text
+    assert response.json()["code"] == "invalid_object_data"
+    assert reason in response.json()["detail"]
+    current = objects_api.get(f"/world/versions/{placed['version_id']}").json()
+    assert current == placed, "nothing was written"
+
+
+def test_a_behaviour_edit_against_a_stale_base_is_a_named_conflict(objects_api):
+    placed = objects_api.add(objects_api.version()).json()
+    moved = objects_api.post(
+        f"/world/versions/{placed['version_id']}/objects/object:lantern/move",
+        {"base_state_sha256": placed["state_sha256"], "transform": transform(x_mm=2_400)},
+    ).json()
+    response = set_behaviour(objects_api, placed, MOTION)
+    assert response.status_code == 409
+    assert response.json()["code"] == "stale_object_base"
+    current = objects_api.get(f"/world/versions/{placed['version_id']}").json()
+    assert current == moved
+
+
+def test_a_behaviour_edit_on_nothing_or_on_a_removed_object_is_refused(objects_api):
+    placed = objects_api.add(objects_api.version()).json()
+    unknown = set_behaviour(objects_api, placed, MOTION, object_id="object:absent")
+    assert (unknown.status_code, unknown.json()["code"]) == (404, "unknown_reference")
+    unchanged = set_behaviour(objects_api, placed, None)
+    assert (unchanged.status_code, unchanged.json()["code"]) == (409, "invalid_object_state")
+    removed = objects_api.post(
+        f"/world/versions/{placed['version_id']}/objects/object:lantern/remove",
+        {"base_state_sha256": placed["state_sha256"]},
+    ).json()
+    refused = set_behaviour(objects_api, removed, MOTION)
+    assert (refused.status_code, refused.json()["code"]) == (409, "invalid_object_state")
+    omitted = objects_api.post(
+        f"/world/versions/{placed['version_id']}/objects/object:lantern/behaviour",
+        {"base_state_sha256": removed["state_sha256"]},
+    )
+    assert omitted.status_code == 422, "a body that does not say what it sets is not a clear"
+    stranger = objects_api.stranger_post(
+        f"/world/versions/{placed['version_id']}/objects/object:lantern/behaviour",
+        {"base_state_sha256": removed["state_sha256"], "behaviour": MOTION},
+    )
+    assert stranger.status_code == 404
+    assert objects_api.get(f"/world/versions/{placed['version_id']}").json() == removed

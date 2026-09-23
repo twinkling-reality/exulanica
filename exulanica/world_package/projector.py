@@ -176,10 +176,19 @@ def project_world_package(
                         and bool(env_ids)
                     )
                     if authored.EXTENSION_KEY in extensions and not omit_empty_authored:
-                        authored_kwargs: dict[str, Any] = {}
-                        if environments.EXTENSION_KEY in extensions:
-                            authored_kwargs["version_ids"] = authored_ids
-                            authored_kwargs["withheld_count"] = authored_withheld
+                        # The partition decides what authored-world 1.0 may name whether or not
+                        # the environment extension is requested, because an edit kind outside
+                        # its closed list would otherwise be signed into a package its verifier
+                        # refuses. Alone, the extension counts every withheld version in its one
+                        # total, environment-bearing ones included.
+                        authored_kwargs: dict[str, Any] = {
+                            "version_ids": authored_ids,
+                            "withheld_count": (
+                                authored_withheld
+                                if environments.EXTENSION_KEY in extensions
+                                else authored_withheld + env_withheld
+                            ),
+                        }
                         components.update(
                             _authored_world(
                                 cursor,
@@ -1213,7 +1222,9 @@ def _extension_version_sets(
     environment edit, cannot be written under authored-world 1.0: that extension's verifier
     requires schema version 1 and refuses environment edit kinds. The environment-instances
     set is then closed under parent pointers so a published crate verifies. Invalidated sources
-    stay withheld from the extension that would otherwise have exported them.
+    stay withheld from the extension that would otherwise have exported them, and so do versions
+    whose chain carries an edit neither extension names
+    (:data:`exulanica.world_package.environments.BEHAVIOUR_EDIT_WITHHELD`).
     """
     invalidated = {
         row["snapshot_id"]
@@ -1234,6 +1245,14 @@ def _extension_version_sets(
             "and (kind in ('add_point_map','move_point_map','remove_point_map') "
             "or point_map_instance_id is not null)",
             (workspace_id, world_id, workspace_id, world_id),
+        ).fetchall()
+    }
+    behaviour_edit_bearing = {
+        row["version_id"]
+        for row in cursor.execute(
+            "select distinct version_id from world_alternate_version_edit "
+            "where workspace_id=%s and world_id=%s and kind='set_object_behaviour'",
+            (workspace_id, world_id),
         ).fetchall()
     }
     env_bearing = {
@@ -1262,6 +1281,7 @@ def _extension_version_sets(
                 environment_bearing=row["version_id"] in env_bearing,
                 source_invalidated=row["source_snapshot_id"] in invalidated,
                 point_map_bearing=row["version_id"] in point_map_bearing,
+                behaviour_edit_bearing=row["version_id"] in behaviour_edit_bearing,
             )
             for row in rows
         )

@@ -192,6 +192,12 @@ The export receipt's `export_policy` records the extension; the package root doe
   counted (`withheld.invalidated_source_versions`), never named. The authored work survives in the
   database and in `GET /world/versions`. Invalidation is per source snapshot and a branch shares its
   parent's source, so no exported version names a withheld parent.
+- **Versions whose edit chain changes a behaviour.** Neither this extension's closed list of edit
+  kinds nor the environment-instances extension's names `set_object_behaviour`, the edit that gives
+  a placed object a behaviour, replaces it or takes it away, so a version whose chain carries one,
+  and every version branched from it, is withheld and counted in
+  `withheld.invalidated_source_versions`, the package's one withheld total, while a behaviour named
+  when the object was added is part of `add_object` and exports with the object.
 - **Asset bytes and runtime code.** An asset is a digest an authorized resolver supplies; a
   behaviour is an identifier with bounded parameters. Embedding reviewed CC0 bytes would be a new,
   separately versioned opt-in, and this version refuses any file it does not name.

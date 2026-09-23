@@ -304,6 +304,21 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
     ("POST", "/world/versions/{version_id}/objects/{object_id}/remove"): {
         "json": {"base_state_sha256": "0" * 64}
     },
+    ("POST", "/world/versions/{version_id}/objects/{object_id}/behaviour"): {
+        "json": {
+            "base_state_sha256": "0" * 64,
+            "behaviour": {
+                "behaviour_key": "motion.bounded-path",
+                "behaviour_version": 1,
+                "parameters": {
+                    "travel_mm": 1000,
+                    "period_milliseconds": 4000,
+                    "axis": "x",
+                    "easing": "smooth",
+                },
+            },
+        }
+    },
     ("POST", "/world/versions/{version_id}/objects/undo"): {
         "json": {"base_state_sha256": "0" * 64}
     },

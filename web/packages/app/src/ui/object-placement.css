@@ -37,6 +37,17 @@
   backdrop-filter: blur(var(--blur-system));
 }
 
+/*
+ * The panel scrolls; its rows never shrink.
+ *
+ * It is a height-limited flex column, and a flex row may shrink to its own minimum height. The
+ * status line declares one line as that minimum, so a two-line refusal was squeezed to one and
+ * its second line ran under the actions beneath it, hiding the words that said why.
+ */
+.object-placement > * {
+  flex-shrink: 0;
+}
+
 .object-placement h2 {
   margin: 0;
   font-family: var(--companion-utility-font);
@@ -197,6 +208,26 @@
   display: flex;
   flex-wrap: wrap;
   gap: 0.3rem;
+}
+
+/*
+ * An object's own motion, opened from its row.
+ *
+ * The same four controls as placing with a motion, inside the row they change, so it is plain
+ * which object a saved motion will belong to.
+ */
+.object-placement-motion-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.45rem;
+  padding-top: 0.4rem;
+  border-top: 1px solid var(--edge);
+}
+
+.object-placement-motion-editor-note {
+  margin: 0;
+  font-size: 0.74rem;
+  color: var(--ink-soft);
 }
 
 .object-placement-controls > button {

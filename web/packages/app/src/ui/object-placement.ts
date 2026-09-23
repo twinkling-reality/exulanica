@@ -30,6 +30,11 @@
  * integers in the units the wire uses, so the sliders move in whole millimetres and whole
  * milliseconds and no value is ever converted twice. A view that reached for the registry would be
  * a second declaration of a bound the server already owns.
+ *
+ * A motion can be given when an object is placed, and given, changed or taken away later from the
+ * object's own row. Both use the same four controls, so both offer exactly the reviewed choices. A
+ * later change is its own edit, which is what lets "take back the last change" undo the motion and
+ * leave the object where it stands.
  */
 
 import { el, replace } from './dom.js';
@@ -68,6 +73,14 @@ export interface MotionBounds {
   readonly periodMilliseconds: IntegerBound;
 }
 
+/** A bounded motion as a person chose it, in the units the wire uses. */
+export interface MotionDraft {
+  readonly axis: MotionAxisKey;
+  readonly easing: string;
+  readonly travelMm: number;
+  readonly periodMilliseconds: number;
+}
+
 /** What the panel shows for one object already in the world. */
 export interface PlacedObjectRow {
   readonly objectId: string;
@@ -77,24 +90,29 @@ export interface PlacedObjectRow {
    * cannot run. The two are different facts and the panel says which.
    */
   readonly motion: 'running' | 'held' | 'at-rest' | 'none' | 'unsupported';
+  /**
+   * The stored motion in this panel's own controls, so a change starts from what is saved. Null
+   * when the object carries none, or carries one these controls cannot show exactly.
+   */
+  readonly storedMotion: MotionDraft | null;
   /** A sentence the row must show, such as why a motion was refused. */
   readonly note: string | null;
 }
 
-export interface ObjectPlacementDraft {
+export interface ObjectPlacementDraft extends MotionDraft {
   readonly assetKey: string;
   readonly role: string;
   readonly motion: boolean;
-  readonly axis: MotionAxisKey;
-  readonly easing: string;
-  readonly travelMm: number;
-  readonly periodMilliseconds: number;
 }
 
 export interface ObjectPlacementHandlers {
   onPlace(draft: ObjectPlacementDraft): void;
   onSelect(objectId: string): void;
   onControl(objectId: string, action: BehaviourControlKey): void;
+  /** Give a placed object this motion, or replace the one it has. Confirmed before it is saved. */
+  onSetMotion(objectId: string, motion: MotionDraft): void;
+  /** Take a placed object's motion away. Confirmed before it is saved. */
+  onClearMotion(objectId: string): void;
   onRemove(objectId: string): void;
   /** Take back the newest change to this world. The authority decides which one that is. */
   onUndo(): void;
@@ -111,6 +129,8 @@ export interface ObjectPlacementPanel {
   visible(): boolean;
   showAssets(assets: readonly ObjectAssetOption[], roles: readonly ObjectRoleOption[]): void;
   showObjects(rows: readonly PlacedObjectRow[], selectedId: string | null): void;
+  /** Close an object's motion controls once what they proposed is saved. A refusal leaves them. */
+  closeMotionEditor(): void;
   /** Whether this world has an edit left to take back. */
   setUndoable(undoable: boolean): void;
   /**
@@ -147,6 +167,18 @@ const EASING_WORDS: Readonly<Record<string, string>> = Object.freeze({
   smooth: 'Easing in and out',
 });
 
+/** The slider steps a person drags in, where a stored value allows them. */
+const TRAVEL_STEP_MM = 10;
+const PERIOD_STEP_MILLISECONDS = 100;
+
+/**
+ * A control a busy panel disables and an idle one must not simply re-enable.
+ *
+ * Start, Stop and Reset on an object with no motion are disabled for a reason of their own. When
+ * the panel stops being busy, only the controls without such a reason come back.
+ */
+const UNAVAILABLE = 'unavailable';
+
 export function buildObjectPlacement(
   handlers: ObjectPlacementHandlers,
   bounds: MotionBounds,
@@ -160,20 +192,7 @@ export function buildObjectPlacement(
   const assetSelect = el('select', { class: 'object-placement-asset', id: 'object-placement-asset' });
   const roleSelect = el('select', { class: 'object-placement-role', id: 'object-placement-role' });
   const motionToggle = el('input', { type: 'checkbox', id: 'object-placement-motion' });
-  const axisSelect = el('select', { id: 'object-placement-axis' });
-  const easingSelect = el('select', { id: 'object-placement-easing' });
-  const travel = el('input', {
-    type: 'range', id: 'object-placement-travel',
-    min: bounds.travelMm.min, max: bounds.travelMm.max, step: 10,
-    value: bounds.travelMm.fallback,
-  });
-  const period = el('input', {
-    type: 'range', id: 'object-placement-period',
-    min: bounds.periodMilliseconds.min, max: bounds.periodMilliseconds.max, step: 100,
-    value: bounds.periodMilliseconds.fallback,
-  });
-  const travelValue = el('output');
-  const periodValue = el('output');
+  const placementMotion = buildMotionControls('object-placement', bounds, null);
   const placeButton = el('button', {
     type: 'button', class: 'primary object-placement-place', text: 'Place before me',
   });
@@ -194,33 +213,11 @@ export function buildObjectPlacement(
   ]);
   pending.hidden = true;
 
-  for (const axis of bounds.axes) {
-    axisSelect.append(el('option', { value: axis, text: AXIS_WORDS[axis] ?? axis }));
-  }
-  // The registry declares its axes in coordinate order, which is not a preference order, and it
-  // carries its own default. That default is the reviewed one, so the view uses it rather than
-  // whichever option happens to be first.
-  if (bounds.axes.includes(bounds.axisFallback)) axisSelect.value = bounds.axisFallback;
-  for (const easing of bounds.easings) {
-    easingSelect.append(el('option', { value: easing, text: EASING_WORDS[easing] ?? easing }));
-  }
-  if (bounds.easings.includes(bounds.easingFallback)) easingSelect.value = bounds.easingFallback;
-
-  const motionFields = el('div', { class: 'object-placement-motion-fields' }, [
-    field('object-placement-axis', 'Direction', axisSelect),
-    field('object-placement-easing', 'How it moves', easingSelect),
-    field('object-placement-travel', 'How far it travels', travel, travelValue),
-    field('object-placement-period', 'How long one journey takes', period, periodValue),
-  ]);
+  const motionFields = placementMotion.root;
+  motionFields.classList.add('object-placement-motion-fields');
 
   const reflectMotion = (): void => {
     motionFields.hidden = !motionToggle.checked;
-  };
-  const reflectValues = (): void => {
-    // Shown in the units a person thinks in, sent in the units the wire uses. The slider itself
-    // is the wire's unit, so what is sent is exactly what was chosen.
-    travelValue.textContent = `${(Number(travel.value) / 1000).toFixed(2)} m`;
-    periodValue.textContent = `${(Number(period.value) / 1000).toFixed(1)} s`;
   };
   const reflectAsset = (): void => {
     const chosen = assetSelect.selectedOptions[0];
@@ -228,8 +225,6 @@ export function buildObjectPlacement(
   };
 
   motionToggle.addEventListener('change', reflectMotion);
-  travel.addEventListener('input', reflectValues);
-  period.addEventListener('input', reflectValues);
   assetSelect.addEventListener('change', reflectAsset);
   close.addEventListener('click', () => handlers.onClose());
 
@@ -240,10 +235,7 @@ export function buildObjectPlacement(
       assetKey: chosen.value,
       role: roleSelect.value,
       motion: motionToggle.checked,
-      axis: axisSelect.value === '' ? bounds.axisFallback : axisSelect.value,
-      easing: easingSelect.value === '' ? bounds.easingFallback : easingSelect.value,
-      travelMm: Math.round(Number(travel.value)),
-      periodMilliseconds: Math.round(Number(period.value)),
+      ...placementMotion.read(),
     });
   };
   placeButton.addEventListener('click', () => {
@@ -278,8 +270,125 @@ export function buildObjectPlacement(
     el('div', { class: 'object-placement-actions' }, [undoButton, close]),
   ]);
 
-  reflectValues();
   reflectMotion();
+
+  /**
+   * The one object whose motion controls are open, and what has been chosen in them so far.
+   *
+   * Held here rather than in the row, because a refresh rebuilds every row: the chosen values
+   * have to survive the redraw a Start press or a selection causes, or a half-made choice would
+   * reset under the person's hand.
+   */
+  let editing: { readonly objectId: string; values: MotionDraft } | null = null;
+  let rendered: { rows: readonly PlacedObjectRow[]; selectedId: string | null } = {
+    rows: [], selectedId: null,
+  };
+  let busy = false;
+
+  const motionEditor = (row: PlacedObjectRow, values: MotionDraft): HTMLElement => {
+    const controls = buildMotionControls('object-motion', bounds, values, (draft) => {
+      if (editing?.objectId === row.objectId) editing.values = draft;
+    });
+    controls.root.classList.add('object-placement-motion-fields');
+    const save = el('button', { type: 'button', class: 'primary', text: 'Save this motion' });
+    save.addEventListener('click', () => handlers.onSetMotion(row.objectId, controls.read()));
+    const keep = el('button', { type: 'button', class: 'ghost', text: 'Keep it as it is' });
+    keep.addEventListener('click', () => {
+      editing = null;
+      showObjects(rendered.rows, rendered.selectedId);
+    });
+    const buttons: HTMLElement[] = [save];
+    if (row.motion !== 'none') {
+      const takeAway = el('button', { type: 'button', class: 'ghost', text: 'Take its motion away' });
+      takeAway.addEventListener('click', () => handlers.onClearMotion(row.objectId));
+      buttons.push(takeAway);
+    }
+    buttons.push(keep);
+    return el('div', {
+      class: 'object-placement-motion-editor',
+      role: 'group',
+      'aria-label': `Motion for ${row.label}`,
+    }, [
+      el('p', {
+        class: 'object-placement-motion-editor-note',
+        text: row.motion === 'unsupported'
+          ? 'Saving replaces the motion this client cannot run with the one chosen here.'
+          : 'Saved as its own change, so it can be taken back without moving the object.',
+      }),
+      controls.root,
+      el('div', { class: 'object-placement-controls' }, buttons),
+    ]);
+  };
+
+  function showObjects(rows: readonly PlacedObjectRow[], selectedId: string | null): void {
+    rendered = { rows, selectedId };
+    if (editing !== null && !rows.some((row) => row.objectId === editing!.objectId)) editing = null;
+    replace(objectList, rows.map((row) => {
+      const selected = row.objectId === selectedId;
+      const item = el('li', { class: 'object-placement-item' });
+      item.dataset['selected'] = selected ? 'yes' : 'no';
+
+      const choose = el('button', {
+        type: 'button',
+        class: 'object-placement-choose',
+        'aria-pressed': selected ? 'true' : 'false',
+      }, [
+        el('strong', { text: row.label }),
+        el('span', { class: 'object-placement-motion', text: MOTION_STATE_WORDS[row.motion] }),
+      ]);
+      choose.addEventListener('click', () => handlers.onSelect(row.objectId));
+
+      const controls = el('div', { class: 'object-placement-controls' });
+      const runnable = row.motion === 'running' || row.motion === 'held' || row.motion === 'at-rest';
+      for (const [action, label] of [
+        ['trigger', 'Start'], ['stop', 'Stop'], ['reset', 'Reset'],
+      ] as const) {
+        const button = el('button', { type: 'button', class: 'ghost', text: label });
+        if (!runnable) button.dataset[UNAVAILABLE] = 'yes';
+        button.disabled = busy || !runnable;
+        button.addEventListener('click', () => handlers.onControl(row.objectId, action));
+        controls.append(button);
+      }
+      const open = editing?.objectId === row.objectId;
+      const motion = el('button', {
+        type: 'button',
+        class: 'ghost object-placement-motion-edit',
+        'aria-expanded': open ? 'true' : 'false',
+        text: row.motion === 'none' ? 'Give it motion' : 'Change its motion',
+      });
+      motion.disabled = busy;
+      motion.addEventListener('click', () => {
+        editing = editing?.objectId === row.objectId
+          ? null
+          : { objectId: row.objectId, values: row.storedMotion ?? placementMotion.fallback() };
+        showObjects(rendered.rows, rendered.selectedId);
+      });
+      controls.append(motion);
+      const remove = el('button', { type: 'button', class: 'ghost object-placement-remove', text: 'Remove' });
+      remove.disabled = busy;
+      remove.addEventListener('click', () => handlers.onRemove(row.objectId));
+      controls.append(remove);
+
+      const children: HTMLElement[] = [choose, controls];
+      if (row.note !== null) {
+        children.splice(1, 0, el('p', { class: 'object-placement-item-note', text: row.note }));
+      }
+      if (open) {
+        children.push(motionEditor(row, editing!.values));
+        for (const button of children[children.length - 1]!.querySelectorAll('button')) {
+          button.disabled = busy;
+        }
+      }
+      replace(item, children);
+      return item;
+    }));
+    if (rows.length === 0) {
+      objectList.append(el('li', {
+        class: 'object-placement-empty',
+        text: 'You have not added anything to this world yet.',
+      }));
+    }
+  }
 
   let restoreFocus: HTMLElement | null = null;
   return {
@@ -327,49 +436,12 @@ export function buildObjectPlacement(
       reflectAsset();
     },
 
-    showObjects(rows, selectedId) {
-      replace(objectList, rows.map((row) => {
-        const selected = row.objectId === selectedId;
-        const item = el('li', { class: 'object-placement-item' });
-        item.dataset['selected'] = selected ? 'yes' : 'no';
+    showObjects,
 
-        const choose = el('button', {
-          type: 'button',
-          class: 'object-placement-choose',
-          'aria-pressed': selected ? 'true' : 'false',
-        }, [
-          el('strong', { text: row.label }),
-          el('span', { class: 'object-placement-motion', text: MOTION_STATE_WORDS[row.motion] }),
-        ]);
-        choose.addEventListener('click', () => handlers.onSelect(row.objectId));
-
-        const controls = el('div', { class: 'object-placement-controls' });
-        const runnable = row.motion === 'running' || row.motion === 'held' || row.motion === 'at-rest';
-        for (const [action, label] of [
-          ['trigger', 'Start'], ['stop', 'Stop'], ['reset', 'Reset'],
-        ] as const) {
-          const button = el('button', { type: 'button', class: 'ghost', text: label });
-          button.disabled = !runnable;
-          button.addEventListener('click', () => handlers.onControl(row.objectId, action));
-          controls.append(button);
-        }
-        const remove = el('button', { type: 'button', class: 'ghost object-placement-remove', text: 'Remove' });
-        remove.addEventListener('click', () => handlers.onRemove(row.objectId));
-        controls.append(remove);
-
-        const children: HTMLElement[] = [choose, controls];
-        if (row.note !== null) {
-          children.splice(1, 0, el('p', { class: 'object-placement-item-note', text: row.note }));
-        }
-        replace(item, children);
-        return item;
-      }));
-      if (rows.length === 0) {
-        objectList.append(el('li', {
-          class: 'object-placement-empty',
-          text: 'You have not added anything to this world yet.',
-        }));
-      }
+    closeMotionEditor() {
+      if (editing === null) return;
+      editing = null;
+      showObjects(rendered.rows, rendered.selectedId);
     },
 
     setUndoable(undoable) {
@@ -386,15 +458,113 @@ export function buildObjectPlacement(
       status.dataset['kind'] = kind;
     },
 
-    setBusy(busy) {
-      root.dataset['busy'] = busy ? 'yes' : 'no';
-      placeButton.disabled = busy || currentDraft() === null;
-      for (const button of objectList.querySelectorAll('button')) button.disabled = busy;
-      saveMove.disabled = busy;
-      discardMove.disabled = busy;
+    setBusy(next) {
+      busy = next;
+      root.dataset['busy'] = next ? 'yes' : 'no';
+      placeButton.disabled = next || currentDraft() === null;
+      for (const button of objectList.querySelectorAll<HTMLButtonElement>('button')) {
+        button.disabled = next || button.dataset[UNAVAILABLE] === 'yes';
+      }
+      saveMove.disabled = next;
+      discardMove.disabled = next;
     },
 
     draft: currentDraft,
+  };
+}
+
+interface MotionControls {
+  readonly root: HTMLElement;
+  read(): MotionDraft;
+  /** The reviewed defaults, which is what a motion starts from when none is stored. */
+  fallback(): MotionDraft;
+}
+
+/**
+ * Direction, pace, distance and duration, as four labelled controls.
+ *
+ * The same four serve placing an object with a motion and changing the motion of one already
+ * placed, so both offer exactly the reviewed choices and bounds. `prefix` keeps their ids apart,
+ * because the two can be on screen together.
+ *
+ * A slider moves in steps that are comfortable to drag. A stored value between two steps would be
+ * snapped to one of them by the browser and then saved as a change nobody made, so a slider
+ * starting from such a value moves in whole units instead.
+ */
+function buildMotionControls(
+  prefix: string,
+  bounds: MotionBounds,
+  initial: MotionDraft | null,
+  onInput: (draft: MotionDraft) => void = () => undefined,
+): MotionControls {
+  const fallback = (): MotionDraft => Object.freeze({
+    axis: bounds.axisFallback,
+    easing: bounds.easingFallback,
+    travelMm: bounds.travelMm.fallback,
+    periodMilliseconds: bounds.periodMilliseconds.fallback,
+  });
+  const start = initial ?? fallback();
+  const stepFor = (value: number, min: number, step: number): number =>
+    (value - min) % step === 0 ? step : 1;
+
+  const axisSelect = el('select', { id: `${prefix}-axis` });
+  const easingSelect = el('select', { id: `${prefix}-easing` });
+  const travel = el('input', {
+    type: 'range', id: `${prefix}-travel`,
+    min: bounds.travelMm.min, max: bounds.travelMm.max,
+    step: stepFor(start.travelMm, bounds.travelMm.min, TRAVEL_STEP_MM),
+    value: start.travelMm,
+  });
+  const period = el('input', {
+    type: 'range', id: `${prefix}-period`,
+    min: bounds.periodMilliseconds.min, max: bounds.periodMilliseconds.max,
+    step: stepFor(start.periodMilliseconds, bounds.periodMilliseconds.min, PERIOD_STEP_MILLISECONDS),
+    value: start.periodMilliseconds,
+  });
+  const travelValue = el('output');
+  const periodValue = el('output');
+
+  for (const axis of bounds.axes) {
+    axisSelect.append(el('option', { value: axis, text: AXIS_WORDS[axis] ?? axis }));
+  }
+  // The registry declares its axes in coordinate order, which is not a preference order, and it
+  // carries its own default. That default is the reviewed one, so the view uses it rather than
+  // whichever option happens to be first.
+  if (bounds.axes.includes(start.axis)) axisSelect.value = start.axis;
+  else if (bounds.axes.includes(bounds.axisFallback)) axisSelect.value = bounds.axisFallback;
+  for (const easing of bounds.easings) {
+    easingSelect.append(el('option', { value: easing, text: EASING_WORDS[easing] ?? easing }));
+  }
+  if (bounds.easings.includes(start.easing)) easingSelect.value = start.easing;
+  else if (bounds.easings.includes(bounds.easingFallback)) easingSelect.value = bounds.easingFallback;
+
+  const read = (): MotionDraft => Object.freeze({
+    axis: axisSelect.value === '' ? bounds.axisFallback : axisSelect.value,
+    easing: easingSelect.value === '' ? bounds.easingFallback : easingSelect.value,
+    travelMm: Math.round(Number(travel.value)),
+    periodMilliseconds: Math.round(Number(period.value)),
+  });
+  const reflect = (): void => {
+    // Shown in the units a person thinks in, sent in the units the wire uses. The slider itself
+    // is the wire's unit, so what is sent is exactly what was chosen.
+    travelValue.textContent = `${(Number(travel.value) / 1000).toFixed(2)} m`;
+    periodValue.textContent = `${(Number(period.value) / 1000).toFixed(1)} s`;
+  };
+  for (const control of [axisSelect, easingSelect, travel, period]) {
+    control.addEventListener('input', () => { reflect(); onInput(read()); });
+    control.addEventListener('change', () => { reflect(); onInput(read()); });
+  }
+  reflect();
+
+  return {
+    root: el('div', {}, [
+      field(`${prefix}-axis`, 'Direction', axisSelect),
+      field(`${prefix}-easing`, 'How it moves', easingSelect),
+      field(`${prefix}-travel`, 'How far it travels', travel, travelValue),
+      field(`${prefix}-period`, 'How long one journey takes', period, periodValue),
+    ]),
+    read,
+    fallback,
   };
 }
 

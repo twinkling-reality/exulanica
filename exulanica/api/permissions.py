@@ -452,6 +452,7 @@ ROUTE_RULES: Final[Mapping[tuple[str, str], Public | Authentication | Requires]]
         ("POST", "/world/versions/{version_id}/objects/undo"): _WORLD_WRITE,
         ("POST", "/world/versions/{version_id}/objects/{object_id}/move"): _WORLD_WRITE,
         ("POST", "/world/versions/{version_id}/objects/{object_id}/remove"): _WORLD_WRITE,
+        ("POST", "/world/versions/{version_id}/objects/{object_id}/behaviour"): _WORLD_WRITE,
         ("POST", "/world/versions/{version_id}/environment-instances"): _WORLD_WRITE,
         ("POST", "/world/versions/{version_id}/environment-instances/undo"): _WORLD_WRITE,
         ("POST", "/world/versions/{version_id}/environment-instances/{instance_id}/move"): (

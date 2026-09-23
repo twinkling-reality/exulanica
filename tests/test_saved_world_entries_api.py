@@ -801,6 +801,65 @@ def test_bound_object_write_advances_entry_atomically_and_conflict_rolls_back(
     assert reread["objects"][0]["transform"]["x_mm"] == 1_200
 
 
+def test_bound_behaviour_edit_advances_the_entry_and_a_stale_binding_writes_nothing(
+    objects_api, repository
+):
+    entry, version, _style = _create_entry(objects_api, repository)
+    binding = {
+        "entry_id": entry["entry_id"],
+        "base_revision": entry["revision"],
+        "authored_state_sha256": entry["authored_state_sha256"],
+        "authored_edit_seq": entry["authored_edit_seq"],
+    }
+    added = objects_api.add(version, saved_entry=binding).json()
+    advanced = objects_api.get(f"/world-entries/{entry['entry_id']}").json()
+    current_binding = {
+        "entry_id": entry["entry_id"],
+        "base_revision": advanced["revision"],
+        "authored_state_sha256": advanced["authored_state_sha256"],
+        "authored_edit_seq": advanced["authored_edit_seq"],
+    }
+    motion = {
+        "behaviour_key": "motion.bounded-path",
+        "behaviour_version": 1,
+        "parameters": {
+            "travel_mm": 2_000,
+            "period_milliseconds": 4_000,
+            "axis": "x",
+            "easing": "linear",
+        },
+    }
+    path = f"/world/versions/{version['version_id']}/objects/object:lantern/behaviour"
+
+    given = objects_api.post(
+        path,
+        {
+            "base_state_sha256": added["state_sha256"],
+            "behaviour": motion,
+            "saved_entry": current_binding,
+        },
+    )
+    assert given.status_code == 200, given.text
+    moved_on = objects_api.get(f"/world-entries/{entry['entry_id']}").json()
+    assert moved_on["revision"] == advanced["revision"] + 1
+    assert moved_on["authored_state_sha256"] == given.json()["state_sha256"]
+    assert moved_on["authored_edit_seq"] == given.json()["edit_seq"] == 2
+
+    stale = objects_api.post(
+        path,
+        {
+            "base_state_sha256": given.json()["state_sha256"],
+            "behaviour": None,
+            "saved_entry": current_binding,
+        },
+    )
+    assert stale.status_code == 409, stale.text
+    assert stale.json()["code"] == "stale_saved_world_entry"
+    reread = objects_api.get(f"/world/versions/{version['version_id']}").json()
+    assert reread["objects"][0]["behaviour"] == motion
+    assert reread["state_sha256"] == given.json()["state_sha256"]
+
+
 def test_bound_write_cannot_skip_reconciliation_after_an_unbound_branch_edit(
     objects_api, repository
 ):

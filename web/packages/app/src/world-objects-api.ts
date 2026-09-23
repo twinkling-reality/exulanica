@@ -284,6 +284,12 @@ const wireTransform = (value: TransformInput): Readonly<Record<string, number>> 
   scale_milli: value.scaleMilli,
 });
 
+const wireBehaviour = (value: ObjectBehaviour): Readonly<Record<string, unknown>> => Object.freeze({
+  behaviour_key: value.behaviourKey,
+  behaviour_version: value.behaviourVersion,
+  parameters: { ...value.parameters },
+});
+
 // -- the client ----------------------------------------------------------------------------------
 
 export class WorldObjectsClient {
@@ -446,11 +452,25 @@ export class WorldObjectsClient {
       region_id: request.regionId,
       transform: wireTransform(request.transform),
       origin_role: request.originRole,
-      behaviour: request.behaviour === null ? null : {
-        behaviour_key: request.behaviour.behaviourKey,
-        behaviour_version: request.behaviour.behaviourVersion,
-        parameters: { ...request.behaviour.parameters },
-      },
+      behaviour: request.behaviour === null ? null : wireBehaviour(request.behaviour),
+    });
+  }
+
+  /**
+   * Give a placed object a reviewed behaviour, replace the one it has, or take it away with null.
+   *
+   * `behaviour` is always in the body, null included: the route refuses a body that leaves it out
+   * rather than reading an omission as a clear nobody asked for. The parameters are not checked
+   * here. The server's registry is the one that decides, and its refusal is what the person is
+   * shown, in its own words.
+   */
+  setBehaviour(
+    base: AlternateVersion,
+    objectId: string,
+    behaviour: ObjectBehaviour | null,
+  ): Promise<ObjectWriteResult> {
+    return this.#write(base, this.#path(`${objectPath(base.versionId, objectId)}/behaviour`), {
+      behaviour: behaviour === null ? null : wireBehaviour(behaviour),
     });
   }
 

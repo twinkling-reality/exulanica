@@ -43,6 +43,10 @@
  * runtime's contract, not a stored parameter", so an object reopens at the transform its author
  * placed, at rest.
  *
+ * **Giving, changing or taking away a motion is its own confirmed edit.** It keeps the object's
+ * identity and place, so undo takes back the motion alone. The parameters go to the server as
+ * chosen and its registry decides; a refusal is shown in the server's words and nothing is saved.
+ *
  * **Preview draws but never sends.** `?preview=1` has no authority behind it, so the surface uses
  * a small built-in catalogue and says, every time, that what it drew was not saved.
  */
@@ -97,6 +101,7 @@ import {
   buildObjectPlacement,
   type BehaviourControlKey,
   type MotionAxisKey,
+  type MotionDraft,
   type ObjectPlacementDraft,
   type ObjectPlacementPanel,
   type PlacedObjectRow,
@@ -179,7 +184,7 @@ export interface MountedObjects {
 }
 
 interface Pending {
-  readonly kind: 'place' | 'move' | 'remove' | 'undo' | 'bootstrap';
+  readonly kind: 'place' | 'move' | 'remove' | 'behaviour' | 'undo' | 'bootstrap';
   readonly describe: string;
   readonly reversible: boolean;
   /** The server's verdict on a placement. Confirm is held until it is ready. */
@@ -263,6 +268,8 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     onPlace: (draft) => proposePlacement(draft),
     onSelect: (objectId) => select(objectId),
     onControl: (objectId, action) => control(objectId, action),
+    onSetMotion: (objectId, motion) => proposeMotion(objectId, motion),
+    onClearMotion: (objectId) => proposeClearMotion(objectId),
     onRemove: (objectId) => proposeRemoval(objectId),
     onUndo: () => proposeUndo(),
     onSaveMove: () => proposeMove(),
@@ -758,18 +765,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
       panel.report('That spot is outside the district. Face toward its ground and try again.', 'failure');
       return;
     }
-    const behaviour: ObjectBehaviour | null = draft.motion
-      ? {
-          behaviourKey: BOUNDED_PATH_KEY,
-          behaviourVersion: BOUNDED_PATH_VERSION,
-          parameters: {
-            axis: draft.axis,
-            easing: draft.easing,
-            travel_mm: draft.travelMm,
-            period_milliseconds: draft.periodMilliseconds,
-          },
-        }
-      : null;
+    const behaviour: ObjectBehaviour | null = draft.motion ? boundedPath(draft) : null;
     stagePlacement({
       asset,
       role,
@@ -993,6 +989,64 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
   }
 
   /**
+   * Give a placed object a bounded motion, or replace the one it carries, as its own edit.
+   *
+   * The parameters are sent exactly as chosen and nothing here decides whether they are allowed:
+   * the server's reviewed registry does, and a refusal reaches the confirmation surface and the
+   * status line in its words, with nothing saved. The controls stay open after a refusal so the
+   * person can correct what they chose rather than choose it all again.
+   */
+  function proposeMotion(objectId: string, motion: MotionDraft): void {
+    const object = recordOf(objectId);
+    if (object === null) return;
+    const stored = storedMotionOf(object);
+    if (stored !== null && stored.axis === motion.axis && stored.easing === motion.easing
+      && stored.travelMm === motion.travelMm
+      && stored.periodMilliseconds === motion.periodMilliseconds) {
+      panel.report('That is the motion it already has, so there is nothing to save.');
+      return;
+    }
+    const behaviour = boundedPath(motion);
+    stage({
+      kind: 'behaviour',
+      describe: (object.behaviour === null
+        ? `Give “${object.asset.title}” a motion: `
+        : `Change the motion of “${object.asset.title}” to this: `)
+        + `${motionWords(motion)}. It stays where it was placed, at rest until you start it.`,
+      reversible: true,
+      run: async () => {
+        if (client === null || version === null) {
+          panel.report(NO_AUTHORITY, 'failure');
+          return;
+        }
+        const result = await client.setBehaviour(version, objectId, behaviour);
+        await settle(result, 'Motion saved. Start runs it, and “Take back the last change” removes it.');
+        if (result.kind === 'recorded') panel.closeMotionEditor();
+      },
+    });
+  }
+
+  /** Take a placed object's motion away. The object stays, still, where it was placed. */
+  function proposeClearMotion(objectId: string): void {
+    const object = recordOf(objectId);
+    if (object === null || object.behaviour === null) return;
+    stage({
+      kind: 'behaviour',
+      describe: `Take the motion away from “${object.asset.title}”. It stays where it was placed.`,
+      reversible: true,
+      run: async () => {
+        if (client === null || version === null) {
+          panel.report(NO_AUTHORITY, 'failure');
+          return;
+        }
+        const result = await client.setBehaviour(version, objectId, null);
+        await settle(result, 'Motion taken away. You can take that back.');
+        if (result.kind === 'recorded') panel.closeMotionEditor();
+      },
+    });
+  }
+
+  /**
    * Undo, which the contract owns rather than this surface.
    *
    * It reverses "the newest edit that no undo already names", from the document that edit stored,
@@ -1033,7 +1087,8 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     if (next.kind !== 'place') clearPlacementLandingMark();
     confirm.show(`world-object-${issued}`, summaryFor(next), next.describe, {
       undoControlAvailable: client !== null && next.reversible
-        && (next.kind === 'place' || next.kind === 'move' || next.kind === 'remove'),
+        && (next.kind === 'place' || next.kind === 'move' || next.kind === 'remove'
+          || next.kind === 'behaviour'),
       ...(next.verdict === undefined ? {} : { verdict: next.verdict.root, confirmable: false }),
     });
   }
@@ -1234,11 +1289,49 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
     return { x: 'side to side', y: 'up and down', z: 'forward and back' }[axis] ?? String(axis);
   }
 
+  /** The reviewed behaviour a motion draft names, in the registry's own parameter names. */
+  function boundedPath(motion: MotionDraft): ObjectBehaviour {
+    return {
+      behaviourKey: BOUNDED_PATH_KEY,
+      behaviourVersion: BOUNDED_PATH_VERSION,
+      parameters: {
+        axis: motion.axis,
+        easing: motion.easing,
+        travel_mm: motion.travelMm,
+        period_milliseconds: motion.periodMilliseconds,
+      },
+    };
+  }
+
+  function motionWords(motion: MotionDraft): string {
+    return `${axisWords(motion.axis)}, ${(motion.travelMm / MM_PER_METRE).toFixed(2)} m out and `
+      + `back every ${(motion.periodMilliseconds / 1000).toFixed(1)} s, `
+      + (motion.easing === 'linear' ? 'at an even pace' : 'easing in and out');
+  }
+
+  /** The stored motion in the panel's own controls, or null when they cannot show it exactly. */
+  function storedMotionOf(record: AuthoredObject): MotionDraft | null {
+    const behaviour = record.behaviour;
+    if (behaviour === null || behaviour.behaviourKey !== BOUNDED_PATH_KEY
+      || behaviour.behaviourVersion !== BOUNDED_PATH_VERSION) return null;
+    const read = BEHAVIOUR_REGISTRY.readParameters(
+      behaviour.behaviourKey, behaviour.behaviourVersion, behaviour.parameters,
+    );
+    if (!read.ok || read.clamped.length > 0) return null;
+    return Object.freeze({
+      axis: String(read.parameters['axis']),
+      easing: String(read.parameters['easing']),
+      travelMm: Number(read.parameters['travel_mm']),
+      periodMilliseconds: Number(read.parameters['period_milliseconds']),
+    });
+  }
+
   function editWords(kind: string): string {
     return {
       add_object: 'an object you added',
       move_object: 'a move',
       remove_object: 'a removal',
+      set_object_behaviour: 'a change to an object’s motion',
     }[kind] ?? kind.replace(/_/g, ' ');
   }
 
@@ -1271,6 +1364,7 @@ export function mountObjects(deps: ObjectsDependencies): MountedObjects {
         objectId: record.objectId,
         label: record.asset.title,
         motion: motionOf(record),
+        storedMotion: storedMotionOf(record),
         note: notices.get(record.objectId) ?? null,
       })),
       selectedId,

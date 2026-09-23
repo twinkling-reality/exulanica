@@ -234,6 +234,7 @@ function script(initial: AlternateVersion = version()) {
       place: record('place'),
       move: record('move'),
       remove: record('remove'),
+      setBehaviour: record('behaviour'),
       undo: record('undo'),
     } as unknown as WorldObjectsClient,
   };
@@ -334,7 +335,7 @@ const button = (root: HTMLElement, label: string): HTMLButtonElement => {
 
 /** Every write. `place` is here so a regression to the direct object route would show. */
 const writes = (calls: { name: string }[]): string[] =>
-  calls.filter((call) => ['apply', 'place', 'move', 'remove', 'undo'].includes(call.name))
+  calls.filter((call) => ['apply', 'place', 'move', 'remove', 'behaviour', 'undo'].includes(call.name))
     .map((call) => call.name);
 
 type AppliedBody = {
@@ -1344,6 +1345,165 @@ describe('running a motion writes nothing, and a refusal is visible', () => {
     // The second object is still drawn: one failed asset is not a failed world.
     expect(h.objects.objectIds).toEqual(['object:plinth']);
     expect(h.mounted.panel.root.textContent).toContain('SHA-256');
+  });
+});
+
+describe('a motion given, changed or taken away later is its own confirmed edit', () => {
+  const bounded = (parameters: Record<string, unknown>) => Object.freeze({
+    behaviourKey: 'motion.bounded-path', behaviourVersion: 1, parameters: Object.freeze(parameters),
+  });
+  const editor = (root: HTMLElement): HTMLElement | null =>
+    root.querySelector<HTMLElement>('.object-placement-motion-editor');
+  const choose = (root: HTMLElement, id: string, value: string): void => {
+    const control = root.querySelector<HTMLInputElement | HTMLSelectElement>(`#${id}`)!;
+    control.value = value;
+    control.dispatchEvent(new Event('input'));
+    control.dispatchEvent(new Event('change'));
+  };
+  const sent = (h: ReturnType<typeof harness>, n = 0): unknown[] =>
+    h.authority.calls.filter((call) => call.name === 'behaviour')[n]!.args;
+  const placedWithout = () => version({
+    objects: [objectRecord()], editSeq: 1, edits: [edit(1, 'add_object')],
+  });
+
+  it('gives a placed object the chosen motion, and sends it only once confirmed', async () => {
+    const h = harness({ initial: placedWithout() });
+    await h.mounted.begin();
+    h.mounted.panel.setVisible(true);
+    button(h.mounted.panel.root, 'Give it motion').click();
+    const open = editor(h.mounted.panel.root)!;
+    expect(open.getAttribute('aria-label')).toBe('Motion for Marker pillar');
+    choose(open, 'object-motion-axis', 'y');
+    choose(open, 'object-motion-easing', 'linear');
+    choose(open, 'object-motion-travel', '2000');
+    choose(open, 'object-motion-period', '6000');
+    button(open, 'Save this motion').click();
+
+    expect(h.mounted.confirm.root.hidden).toBe(false);
+    expect(h.mounted.confirm.root.textContent).toContain(
+      'Give “Marker pillar” a motion: up and down, 2.00 m out and back every 6.0 s, at an even pace.',
+    );
+    expect(writes(h.authority.calls)).toEqual([]);
+    confirmButton(h).click();
+    await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['behaviour']));
+    expect(sent(h).slice(1)).toEqual([
+      'object:lantern',
+      {
+        behaviourKey: 'motion.bounded-path',
+        behaviourVersion: 1,
+        parameters: { axis: 'y', easing: 'linear', travel_mm: 2000, period_milliseconds: 6000 },
+      },
+    ]);
+    await vi.waitFor(() => expect(editor(h.mounted.panel.root)).toBeNull());
+  });
+
+  it('starts a change from the stored motion without snapping it, and can take it away', async () => {
+    // 655 mm is between two of the slider's 10 mm steps; a snapped slider would save 650 or 660.
+    const stored = bounded({ axis: 'z', easing: 'smooth', travel_mm: 655, period_milliseconds: 9000 });
+    const h = harness({
+      initial: version({
+        objects: [objectRecord({ behaviour: stored })], editSeq: 1, edits: [edit(1, 'add_object')],
+      }),
+    });
+    await h.mounted.begin();
+    h.mounted.panel.setVisible(true);
+    button(h.mounted.panel.root, 'Change its motion').click();
+    const open = editor(h.mounted.panel.root)!;
+    expect(open.querySelector<HTMLSelectElement>('#object-motion-axis')!.value).toBe('z');
+    // happy-dom keeps a value between steps as given; a browser snaps it to the nearest step. So
+    // the step is asserted too: whole units are what keep 655 from becoming 650 in a browser.
+    const travel = open.querySelector<HTMLInputElement>('#object-motion-travel')!;
+    expect([travel.value, travel.step]).toEqual(['655', '1']);
+    expect(open.querySelector<HTMLInputElement>('#object-motion-period')!.step).toBe('100');
+
+    button(open, 'Save this motion').click();
+    expect(h.mounted.confirm.root.hidden).toBe(true);
+    expect(h.mounted.panel.root.textContent).toContain('That is the motion it already has');
+
+    choose(open, 'object-motion-axis', 'x');
+    button(open, 'Save this motion').click();
+    expect(h.mounted.confirm.root.textContent).toContain('Change the motion of “Marker pillar”');
+    confirmButton(h).click();
+    await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['behaviour']));
+    expect((sent(h)[2] as { parameters: unknown }).parameters).toEqual({
+      axis: 'x', easing: 'smooth', travel_mm: 655, period_milliseconds: 9000,
+    });
+
+    await vi.waitFor(() => expect(editor(h.mounted.panel.root)).toBeNull());
+    button(h.mounted.panel.root, 'Change its motion').click();
+    button(editor(h.mounted.panel.root)!, 'Take its motion away').click();
+    expect(h.mounted.confirm.root.textContent).toContain(
+      'Take the motion away from “Marker pillar”. It stays where it was placed.',
+    );
+    confirmButton(h).click();
+    await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['behaviour', 'behaviour']));
+    expect(sent(h, 1).slice(1)).toEqual(['object:lantern', null]);
+  });
+
+  it('shows the server’s refusal in its own words, saves nothing and keeps the choice', async () => {
+    const h = harness({ initial: placedWithout() });
+    await h.mounted.begin();
+    h.mounted.panel.setVisible(true);
+    button(h.mounted.panel.root, 'Give it motion').click();
+    choose(editor(h.mounted.panel.root)!, 'object-motion-travel', '2000');
+    const reason = 'behaviour parameter travel_mm must be between 100 and 10000';
+    h.authority.answerWith(new ApiError(422, 'invalid_object_data', reason));
+    button(editor(h.mounted.panel.root)!, 'Save this motion').click();
+    confirmButton(h).click();
+
+    const said = `The authority refused this edit: ${reason}`;
+    await vi.waitFor(() => expect(h.mounted.confirm.root.textContent).toContain(said));
+    const status = h.mounted.panel.root.querySelector<HTMLElement>('.object-placement-status')!;
+    expect([status.textContent, status.dataset['kind']]).toEqual([said, 'failure']);
+    const open = editor(h.mounted.panel.root);
+    expect(open).not.toBeNull();
+    expect(open!.querySelector<HTMLInputElement>('#object-motion-travel')!.value).toBe('2000');
+    // Drawn once when the world was read, and not again: a refused write changes nothing drawn.
+    expect(h.objects.place).toHaveBeenCalledTimes(1);
+  });
+
+  it('names a motion change as the edit undo would take back', async () => {
+    const h = harness({
+      initial: version({
+        objects: [objectRecord({
+          behaviour: bounded({ axis: 'x', easing: 'linear', travel_mm: 2000, period_milliseconds: 4000 }),
+        })],
+        editSeq: 2,
+        edits: [edit(1, 'add_object'), edit(2, 'set_object_behaviour')],
+      }),
+    });
+    await h.mounted.begin();
+    h.mounted.panel.setVisible(true);
+    button(h.mounted.panel.root, 'Take back the last change').click();
+    expect(h.mounted.confirm.root.textContent).toContain('a change to an object’s motion');
+    confirmButton(h).click();
+    await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['undo']));
+  });
+
+  it('keeps Start disabled on an object with no motion after another object’s write', async () => {
+    const h = harness({
+      initial: version({
+        objects: [
+          objectRecord(),
+          objectRecord({
+            objectId: 'object:plinth',
+            behaviour: bounded({ axis: 'x', easing: 'linear', travel_mm: 2000, period_milliseconds: 4000 }),
+          }),
+        ],
+        editSeq: 2,
+        edits: [edit(1, 'add_object'), edit(2, 'add_object', { objectId: 'object:plinth' })],
+      }),
+    });
+    await h.mounted.begin();
+    h.mounted.panel.setVisible(true);
+    const rows = () => [...h.mounted.panel.root.querySelectorAll<HTMLElement>('.object-placement-item')];
+    button(rows()[1]!, 'Change its motion').click();
+    button(editor(h.mounted.panel.root)!, 'Take its motion away').click();
+    confirmButton(h).click();
+    await vi.waitFor(() => expect(writes(h.authority.calls)).toEqual(['behaviour']));
+    await vi.waitFor(() => expect(h.mounted.panel.root.dataset['busy']).toBe('no'));
+    expect(button(rows()[0]!, 'Start').disabled).toBe(true);
+    expect(button(rows()[1]!, 'Start').disabled).toBe(false);
   });
 });
 

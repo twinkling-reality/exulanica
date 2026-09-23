@@ -164,8 +164,27 @@ class ExportVersion:
     #: depth right that the owner can end at any moment. Writing one into a crate that leaves this
     #: machine would carry a reading of somebody's home past the only place their withdrawal can
     #: reach it. Exporting that is a decision, not a projection, so until it is taken these
-    #: versions are withheld and counted, exactly as an invalidated source is.
+    #: versions are withheld and counted, exactly as an invalidated source is, and every version
+    #: branched from one goes with it.
     point_map_bearing: bool = False
+    #: Its edit chain carries ``set_object_behaviour``. See :data:`BEHAVIOUR_EDIT_WITHHELD`.
+    behaviour_edit_bearing: bool = False
+
+
+#: Why a version whose edit chain carries ``set_object_behaviour`` is not exported, and neither is
+#: any version branched from it.
+#:
+#: The edit kinds of authored-world 1.0 and of this extension are closed lists, and that edit is in
+#: neither, so writing the chain would sign a package their verifiers refuse. A branch carries no
+#: such edit of its own, but its parent pointer must resolve in the directory that holds it, and
+#: the parent is not there. An object placed with a behaviour by ``add_object`` is inside both
+#: lists and exports as before; only the later edit that gives, changes or takes away a behaviour
+#: is withheld. The package counts these versions in its existing ``withheld`` total, which has no
+#: field for another reason.
+BEHAVIOUR_EDIT_WITHHELD: Final = (
+    "the edit chain carries set_object_behaviour, which no exported edit kind names; the version "
+    "and every version branched from it are not exported"
+)
 
 
 def partition_export_versions(
@@ -180,15 +199,37 @@ def partition_export_versions(
 
     ``authored_ids`` is the kept schema-v1 subset whose ancestor chain is also schema-v1. Those
     versions may also appear in ``environment_ids`` when a descendant needs them as a parent.
-    Invalidated sources, and versions carrying a placed depth estimate, are counted on the side
-    that would have exported them and are not named.
+    Invalidated sources, versions carrying a placed depth estimate or a behaviour edit, and every
+    version branched from one of those two, are counted on the side that would have exported them
+    and are not named.
     """
     by_id = {item.version_id: item for item in versions}
+
+    def withheld_with_its_lineage(item: ExportVersion) -> bool:
+        """Whether this version, or any version it was branched from, cannot be written.
+
+        A branch copies its parent's state and not its parent's chain, so it can hold no placed
+        estimate and carry no behaviour edit of its own and still name a parent that is withheld.
+        A parent pointer must resolve in the directory that holds it, so the branch goes with the
+        parent. An invalidated source needs no such walk: a branch shares its parent's source.
+        """
+        seen = {item.version_id}
+        cursor: ExportVersion | None = item
+        while cursor is not None:
+            if cursor.point_map_bearing or cursor.behaviour_edit_bearing:
+                return True
+            parent_id = cursor.parent_version_id
+            if parent_id is None or parent_id in seen:
+                return False
+            seen.add(parent_id)
+            cursor = by_id.get(parent_id)
+        return False
+
     authored_withheld = 0
     environment_withheld = 0
     kept: list[ExportVersion] = []
     for item in versions:
-        if item.source_invalidated or item.point_map_bearing:
+        if item.source_invalidated or withheld_with_its_lineage(item):
             if item.environment_bearing:
                 environment_withheld += 1
             else:

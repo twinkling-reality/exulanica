@@ -83,6 +83,7 @@ from exulanica.world.objects import (
     delta_sha256,
     object_document,
     override_document,
+    validate_behaviour,
     validate_object,
     validate_transform,
 )
@@ -613,6 +614,66 @@ class WorldObjectRepository:
             )
         return self.version(version_id)
 
+    def set_object_behaviour(
+        self,
+        version_id: uuid.UUID,
+        object_id: str,
+        behaviour: ObjectBehaviour | None,
+        *,
+        base_state_sha256: str,
+        actor: uuid.UUID,
+    ) -> AlternateVersion:
+        """Give an object that already exists a behaviour, change it, or take it away with ``None``.
+
+        The behaviour is checked by the same ``validate_behaviour`` an addition runs, so an unknown
+        key, an unknown version or an out-of-range parameter fails closed before anything is
+        written. The edit stores the whole object document on both sides, as a move does, which is
+        what lets undo restore the previous behaviour with its parameters rather than a default.
+
+        An edit that leaves the behaviour as it was is refused. It would append a log entry whose
+        undo changes nothing a person can see, and "take back the last change" would then appear
+        to do nothing.
+        """
+        with self.connection.transaction():
+            row = self._begin_edit(version_id, base_state_sha256)
+            current = self._require_object(version_id, object_id)
+            if current.removed:
+                raise InvalidObjectState(f"{object_id} is removed in this version")
+            checked = validate_behaviour(behaviour, self.behaviour_registry())
+            before = object_document(current)
+            if before["behaviour"] == (None if checked is None else checked.document()):
+                raise InvalidObjectState(
+                    f"{object_id} has no behaviour to take away"
+                    if checked is None
+                    else f"{object_id} already has exactly that behaviour"
+                )
+            edit_id = uuid.uuid4()
+            self.connection.execute(
+                "update world_alternate_object set behaviour_key=%s,behaviour_version=%s,"
+                "behaviour_parameters=%s,last_edit_id=%s "
+                "where workspace_id=%s and world_id=%s and version_id=%s and object_id=%s",
+                (
+                    None if checked is None else checked.behaviour_key,
+                    None if checked is None else checked.behaviour_version,
+                    None if checked is None else Jsonb(dict(checked.parameters)),
+                    edit_id,
+                    self.workspace_id,
+                    self.world_id,
+                    version_id,
+                    object_id,
+                ),
+            )
+            self._append_edit(
+                row,
+                edit_id=edit_id,
+                kind="set_object_behaviour",
+                object_id=object_id,
+                before=before,
+                after=object_document(self._require_object(version_id, object_id)),
+                actor=actor,
+            )
+        return self.version(version_id)
+
     def undo(
         self, version_id: uuid.UUID, *, base_state_sha256: str, actor: uuid.UUID
     ) -> AlternateVersion:
@@ -651,7 +712,12 @@ class WorldObjectRepository:
                 raise InvalidObjectState("this version has no edit left to undo")
             edit_id = uuid.uuid4()
             before = newest["before_document"]
-            if newest["kind"] in {"add_object", "move_object", "remove_object"}:
+            if newest["kind"] in {
+                "add_object",
+                "move_object",
+                "remove_object",
+                "set_object_behaviour",
+            }:
                 subject, after = self._undo_object(version_id, newest["object_id"], before, edit_id)
             elif newest["kind"] in {
                 "add_environment",

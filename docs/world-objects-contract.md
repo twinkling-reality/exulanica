@@ -1,7 +1,7 @@
 # Authored world versions and created objects
 
 Status: **DECISION** and **IMPLEMENTED** for alternate world versions, authored object add/move/
-remove/undo, durable environment placement, the reviewed asset registry, the bounded
+remove/behaviour/undo, durable environment placement, the reviewed asset registry, the bounded
 object-behaviour registry, and the opt-in environment-instances 1.0 package extension. Object
 rendering and bounded-motion controls have synthetic browser coverage, and the authored-world
 1.0 package extension exists. Unified retrieval, the conversational authoring service, and
@@ -196,9 +196,36 @@ The one seeded behaviour is the one the first milestone names.
 | --- | --- | --- |
 | `motion.bounded-path` | 1 | `travel_mm` 100 to 10000, `period_milliseconds` 500 to 60000, `axis` one of `x`, `y`, `z`, `easing` one of `linear`, `smooth` |
 
+A behaviour reaches an object in one of two edits, and both run the same check. `add_object` may
+name one when the object is created. `set_object_behaviour`, through `POST
+/world/versions/{version_id}/objects/{object_id}/behaviour`, gives an object that already exists a
+behaviour, replaces the one it has, or takes it away when the body's required `behaviour` field is
+`null`. It changes nothing else about the object. It is an edit of its own so that undo reverses
+the motion and leaves the object where it stands: like a move, it stores the whole object document
+on both sides, and undo restores the previous behaviour with its parameters, a clear included. An
+edit that would leave the behaviour as it is, or that names a removed object, is refused with
+`invalid_object_state`. A refused edit writes nothing, and a stale base answers
+`stale_object_base` as every object edit does. Migration
+`0096_a_placed_object_s_behaviour_can_change.sql` admits the kind in the edit log's two CHECK
+constraints.
+
 Bounded motion with trigger, stop and reset is the runtime's contract, not a stored parameter: the
 registry bounds the path, and the renderer owns the controls. A behaviour cannot carry code, a
 shader, a URL, or a selector, for the same reason a style recipe cannot.
+
+The renderer moves the object from its authored transform along the named axis of its region, out
+to `travel_mm` and back once every `period_milliseconds`, and reset returns it to the authored
+transform exactly (`web/packages/atlas-core/src/behaviour/bounded-motion.ts`). The controls write
+nothing, so a reopened object stands at rest at its authored transform and does not start by
+itself. The motion advances by the renderer's frame time, which PlayCanvas caps at 0.1 s a frame:
+a page drawing fewer than ten frames a second runs the motion slower than its stated period.
+
+Two consequences outside this plane. A saved world's society recomposes its input in the same
+transaction as each behaviour edit, and while any object carries a behaviour that input is
+unavailable with the reason `unsupported_active_behaviour:<object id>`; taking the behaviour away
+makes it available again. A version whose edit chain carries `set_object_behaviour` is withheld
+from package export, as [world-memory-package.md](world-memory-package.md#what-is-not-exported)
+describes; a behaviour named by `add_object` exports with its object.
 
 ## 4. The reviewed asset registry
 
@@ -367,6 +394,7 @@ snake_case, and this fixture matches them.
 | `POST` | `/world/versions/{version_id}/objects` | Add one authored object |
 | `POST` | `/world/versions/{version_id}/objects/{object_id}/move` | Replace one object's transform |
 | `POST` | `/world/versions/{version_id}/objects/{object_id}/remove` | Store a removal |
+| `POST` | `/world/versions/{version_id}/objects/{object_id}/behaviour` | Give one object a reviewed behaviour, replace it, or take it away with `null` |
 | `POST` | `/world/versions/{version_id}/objects/undo` | Reverse the newest edit not already reversed |
 | `GET` | `/world/assets` | The reviewed asset registry with availability |
 | `GET` | `/world/assets/{asset_key}` | One reviewed asset |
@@ -394,7 +422,7 @@ The problem codes are distinct, because the recovery differs:
 | --- | --- | --- |
 | `422` | `invalid_object_data` | Correct the asset, region, transform, origin role, behaviour or parameter |
 | `409` | `stale_object_base` | Read the version again and re-issue the edit against the new `state_sha256` |
-| `409` | `invalid_object_state` | Do not move or remove an already-removed object, re-add an existing id, or undo an empty history |
+| `409` | `invalid_object_state` | Do not move, remove or change the behaviour of an already-removed object, re-add an existing id, set the behaviour an object already has, or undo an empty history |
 | `409` | `invalidated_source_version` | The source was deleted; branch from a live snapshot instead |
 | `424` | `unavailable_asset` | Restore the reviewed bytes; an addition is refused, and the recorded state renders without a substitute |
 | `404` | `unknown_reference` | Absent and cross-workspace ids are indistinguishable |

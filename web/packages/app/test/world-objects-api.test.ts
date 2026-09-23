@@ -509,6 +509,57 @@ describe('the client reads both routes and writes through one queue', () => {
     expect(calls.some((call) => call.method === 'DELETE')).toBe(false);
   });
 
+  it('gives, replaces and takes away a behaviour at its own route, null included', async () => {
+    const path = `/world/versions/${VERSION_ID}/objects/object%3Alantern/behaviour`;
+    const { subject, calls } = client({
+      [ASSETS]: registryRows(),
+      [VERSIONS]: [FIXTURE],
+      [`POST ${path}`]: FIXTURE,
+    });
+    const { version } = await subject.connect();
+    const base = version as AlternateVersion;
+    const motion = {
+      behaviourKey: 'motion.bounded-path',
+      behaviourVersion: 1,
+      parameters: { axis: 'x', easing: 'linear', travel_mm: 2000, period_milliseconds: 4000 },
+    };
+
+    const given = await subject.setBehaviour(base, 'object:lantern', motion);
+    await subject.setBehaviour(base, 'object:lantern', null);
+
+    expect(given.kind).toBe('recorded');
+    const writes = calls.filter((call) => call.method === 'POST');
+    expect(writes.map((call) => call.path)).toEqual([path, path]);
+    expect(writes[0]!.body).toEqual({
+      base_state_sha256: FIXTURE['state_sha256'],
+      behaviour: {
+        behaviour_key: 'motion.bounded-path',
+        behaviour_version: 1,
+        parameters: { axis: 'x', easing: 'linear', travel_mm: 2000, period_milliseconds: 4000 },
+      },
+    });
+    // A clear is said, not implied: the key is present and null.
+    expect(writes[1]!.body).toEqual({ base_state_sha256: FIXTURE['state_sha256'], behaviour: null });
+  });
+
+  it('passes a refused behaviour through with the server’s own reason', async () => {
+    const path = `/world/versions/${VERSION_ID}/objects/object%3Alantern/behaviour`;
+    const reason = 'behaviour parameter travel_mm must be between 100 and 10000';
+    const { subject } = client({
+      [ASSETS]: registryRows(),
+      [VERSIONS]: [FIXTURE],
+      [`POST ${path}`]: problem(422, 'invalid_object_data', reason),
+    });
+    const { version } = await subject.connect();
+    const refused = await subject.setBehaviour(version as AlternateVersion, 'object:lantern', {
+      behaviourKey: 'motion.bounded-path',
+      behaviourVersion: 1,
+      parameters: { axis: 'x', easing: 'linear', travel_mm: 20000, period_milliseconds: 4000 },
+    }).catch((error: unknown) => error);
+    expect(refused).toBeInstanceOf(ApiError);
+    expect(objectWriteFailure(refused)).toBe(`The authority refused this edit: ${reason}`);
+  });
+
   it('turns a stale base into a re-read rather than into a thrown failure', async () => {
     const { subject, calls } = client({
       [ASSETS]: registryRows(),
