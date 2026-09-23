@@ -6,7 +6,7 @@ and fails if this file disagrees with the catalog rules.
 This catalog lists living contracts, capability guides, and decision records.
 Start from [README.md](README.md).
 
-**100 documents** in the public catalog.
+**101 documents** in the public catalog.
 
 ## Living contracts and reference
 
@@ -89,9 +89,10 @@ What the system is. Edited when the system changes.
 
 Written for somebody choosing to use the product.
 
-5 documents.
+6 documents.
 
 - [companion](capabilities/companion.md) : Someone to share your world with, who gets to know you through what you create and experience together
+- [developer-client](capabilities/developer-client.md) : A program outside the application can use a person's world through the public API, with nothing
 - [scene-reconstruction](capabilities/scene-reconstruction.md) : Build 3D places from the media associated with your experiences
 - [simulation](capabilities/simulation.md) : Give created objects movement, interactions, and rules for responding to the world
 - [world-api](capabilities/world-api.md) : Connect tools to personal world state through authenticated read and write interfaces
