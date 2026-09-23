@@ -9,12 +9,13 @@ Migration 0072 holds the shape and every rule; this is the path that reaches it.
 * :meth:`BakedTileRepository.tiles_of_world` lists the CURRENT bake of each tile of one world, as
   metadata: one row per level of detail and coordinate, the most recently published.
 * :meth:`BakedTileRepository.serve` delivers one tile's bytes to a workspace. The bytes are read
-  from the store, held to the row's digest, and the row is read again under the 0041 asset read
-  lock, so a tile that stopped being servable between the read and the delivery is refused rather
-  than served. Only then is the delivery recorded: the first delivery of a tile to a workspace
-  inserts the ledger row migration 0072 keys ``(workspace, tile)``, whose trigger spends one of the
-  workspace's 0062 tile quota in the same statement, and later deliveries of that tile to that
-  workspace are free. A delivery that fails costs nothing.
+  from the store, held to the row's digest, and the row is read again under the final read check
+  (:func:`exulanica.db.read_check.final_read_check`, the 0041 asset read lock), so a tile that
+  stopped being servable between the read and the delivery is refused rather than served. Only
+  then is the delivery recorded: the first delivery of a tile to a workspace inserts the ledger
+  row migration 0072 keys ``(workspace, tile)``, whose trigger spends one of the workspace's 0062
+  tile quota in the same statement, and later deliveries of that tile to that workspace are free.
+  A delivery that fails costs nothing.
 * :meth:`BakedTileRepository.servable` answers what a tile's bytes would be without fetching or
   charging, which is what a conditional request needs.
 
@@ -33,6 +34,7 @@ from typing import Any, Final
 
 import psycopg
 
+from exulanica.db.read_check import final_read_check
 from exulanica.errors import BlobNotFoundError, ExulanicaError
 from exulanica.evidence.blob import BlobId
 from exulanica.store.base import ContentAddressedStore
@@ -278,7 +280,8 @@ class BakedTileRepository:
         The bytes are fetched and held to their digest **before** the quota is charged. A delivery
         that cannot happen costs nothing: a row whose bytes are missing from the store is an
         operator's fault, and charging a workspace a tile of its ceiling for it would make our
-        problem theirs.
+        problem theirs. The row is checked again under the final read check, so ``connection`` must
+        be idle, as a route's autocommit connection is between statements.
         """
         tile = self.servable(baked_tile_id)
         try:
@@ -321,8 +324,9 @@ class BakedTileRepository:
 
     def _final_check(self, seen: BakedTile) -> None:
         """The 0041 final check: under the asset read lock, the tile is still what was read."""
-        with self.connection.transaction():
-            self.connection.execute("select asset_read_lock()")
+        with final_read_check(
+            self.connection, not_idle="a baked tile is served only on an idle connection"
+        ):
             current = self.connection.execute(
                 f"select {_COLUMNS} from baked_tile where baked_tile_id = %s",
                 (seen.baked_tile_id,),

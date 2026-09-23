@@ -43,6 +43,7 @@ from typing import Any, Final, Literal, TypeVar
 import psycopg
 from psycopg.types.json import Jsonb
 
+from exulanica.db.read_check import final_read_check
 from exulanica.errors import (
     BlobNotFoundError,
     CanonicalisationError,
@@ -590,12 +591,9 @@ class MaterialRepository:
 
     def _final_check(self, recipe_id: uuid.UUID, seen: Mapping[str, Any]) -> None:
         """The 0041 final check: under the asset-read lock, the bake is exactly what was read."""
-        if self.connection.info.transaction_status != psycopg.pq.TransactionStatus.IDLE:
-            raise ValueError("a final bake authorization needs an idle connection")
-        with self.connection.transaction():
-            self.connection.execute("set transaction read only")
-            self.connection.execute("select asset_read_lock()")
-            # A separate statement, so READ COMMITTED sees whatever committed during the wait.
+        with final_read_check(
+            self.connection, not_idle="a final bake authorization needs an idle connection"
+        ):
             current = self.connection.execute(
                 "select b.content_sha256, b.state, b.purged_at, "
                 "  tombstone_blocks_material_bake(b.workspace_id, b.bake_id) as blocked "

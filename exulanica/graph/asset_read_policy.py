@@ -13,13 +13,13 @@ import hashlib
 import json
 import uuid
 from collections import OrderedDict
-from collections.abc import Iterator
-from contextlib import contextmanager
+from contextlib import AbstractContextManager
 from threading import Lock
 from typing import Any, Final
 
 import psycopg
 
+from exulanica.db.read_check import final_read_check
 from exulanica.epistemics.source_images import image_digest
 from exulanica.errors import BlobNotFoundError, IntegrityError
 from exulanica.evidence.blob import BlobId
@@ -43,15 +43,14 @@ def evaluation_time(connection: psycopg.Connection) -> dt.datetime:
     return connection.execute("select statement_timestamp() as at").fetchone()["at"]
 
 
-@contextmanager
-def final_check(connection: psycopg.Connection) -> Iterator[dt.datetime]:
-    if connection.info.transaction_status.name != "IDLE":
-        raise ValueError("final asset authorization requires an idle connection")
-    with connection.transaction():
-        connection.execute("set transaction read only")
-        connection.execute("select asset_read_lock()")
-        # Separate statement: READ COMMITTED observes writers that committed during the wait.
-        yield evaluation_time(connection)
+def final_check(connection: psycopg.Connection) -> AbstractContextManager[dt.datetime]:
+    """The asset read policy's final read check.
+
+    :func:`exulanica.db.read_check.final_read_check` states its steps and why each is in its place.
+    """
+    return final_read_check(
+        connection, not_idle="final asset authorization requires an idle connection"
+    )
 
 
 def point_allowed(

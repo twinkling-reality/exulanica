@@ -15,10 +15,11 @@ currency lock before reading the last event, which is what makes the next positi
 **Deciding and releasing are different reads.** :func:`read_place_name_rights` reports what each
 use means now and permits nothing by reporting it. :func:`released_place_names` and
 :func:`place_name_released` are the only functions here that answer whether a name may be sent, and
-they read under the final read check the photograph right uses: an idle connection, a read-only
-transaction, the global asset read lock and one evaluation instant. A grant, withdrawal, rename,
-merge or deletion cannot commit while the check runs, so each is either seen or refused until it
-has finished, and the lock is released before anything is sent.
+they read under the final read check the photograph right uses,
+:func:`exulanica.db.read_check.final_read_check`: an idle connection, a read-only transaction, the
+global asset read lock and one evaluation instant. A grant, withdrawal, rename, merge or deletion
+cannot commit while the check runs, so each is either seen or refused until it has finished, and
+the lock is released before anything is sent.
 """
 
 from __future__ import annotations
@@ -26,8 +27,7 @@ from __future__ import annotations
 import datetime as dt
 import hashlib
 import uuid
-from collections.abc import Iterator, Mapping, Sequence
-from contextlib import contextmanager
+from collections.abc import Mapping, Sequence
 from dataclasses import dataclass
 from typing import Any, Final, Literal
 
@@ -45,6 +45,7 @@ from exulanica.consent.place_names import (
     model_state,
     read_use,
 )
+from exulanica.db.read_check import final_read_check
 from exulanica.errors import PrivacyAdmissionError
 from exulanica.models.handoff import ModelHandoff, ModelIdentity
 from exulanica.models.manifest import Manifest, load_manifest
@@ -409,23 +410,6 @@ def withdraw_place_name(
             )
 
 
-@contextmanager
-def _final_check(connection: psycopg.Connection) -> Iterator[dt.datetime]:
-    """``exulanica.graph.asset_read_policy.final_check``, restated for this layer.
-
-    ``consent`` sits below ``graph`` and may not import it, so the discipline is repeated as
-    :mod:`exulanica.ingest.model_rights` repeats it: an idle connection, a read-only transaction,
-    the global asset read lock, and an instant read in a separate statement so READ COMMITTED
-    observes every writer that committed while this waited.
-    """
-    if connection.info.transaction_status.name != "IDLE":
-        raise ValueError("a place name is released only on an idle connection")
-    with connection.transaction():
-        connection.execute("set transaction read only")
-        connection.execute("select asset_read_lock()")
-        yield connection.execute("select statement_timestamp() as at").fetchone()["at"]
-
-
 def _released(
     connection: psycopg.Connection,
     workspace_id: uuid.UUID,
@@ -443,7 +427,9 @@ def _released(
     if use is None:
         return frozenset()
     notice = uses.notice(use, uses.handoff(use, manifest))
-    with _final_check(connection) as at:
+    with final_read_check(
+        connection, not_idle="a place name is released only on an idle connection"
+    ) as at:
         stored = _last_decisions(connection, workspace_id, entity_ids, at)
     return frozenset(
         entity_id

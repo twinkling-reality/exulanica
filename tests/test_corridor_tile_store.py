@@ -85,6 +85,16 @@ def stored(tmp_path) -> Iterator[tuple[psycopg.Connection, BakedTileRepository, 
         yield admin, BakedTileRepository(connection=admin, store=tile_store(tmp_path)), scratch
 
 
+def _serve_as_a_route_does(admin: psycopg.Connection) -> None:
+    """Commit what was recorded and serve in autocommit, idle between statements as a route is.
+
+    A delivery is checked again under the final read check, which refuses a connection already
+    inside a transaction, and the harness's connection opens one at its first statement.
+    """
+    admin.commit()
+    admin.autocommit = True
+
+
 def test_the_table_is_global_and_read_only_for_the_runtime():
     assert "baked_tile" in GLOBAL_TABLES
     assert "baked_tile" in READ_ONLY_TABLES
@@ -365,6 +375,7 @@ def test_a_workspace_is_charged_once_for_a_tile_however_often_it_is_served(store
     first, second = uuid.uuid4(), uuid.uuid4()
     _record(repository, first, b"container one")
     _record(repository, second, b"container two", tile={"tile_inputs_digest": "1" * 64})
+    _serve_as_a_route_does(admin)
     assert repository.serve(workspace, first).charged is True
     assert repository.serve(workspace, first).charged is False
     used = admin.execute(
@@ -381,6 +392,7 @@ def test_a_workspace_with_no_quota_is_served_nothing(stored):
     admin.execute("select set_config('exulanica.workspace_id', %s, false)", (str(workspace),))
     key = uuid.uuid4()
     _record(repository, key, b"container one")
+    _serve_as_a_route_does(admin)
     with pytest.raises(TileQuotaRefused):
         repository.serve(workspace, key)
 

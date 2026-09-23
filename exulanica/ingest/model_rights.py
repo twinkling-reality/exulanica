@@ -31,10 +31,11 @@ hand-over names the whole chain and needs a right for each member. A local check
 named by its full commit, and its destination is this process.
 
 **Checked at the moment of the read.** The right is resolved first, then everything is asked again
-inside the final read check that the environment and graph read paths use: the global asset read
-lock, a read-only transaction, one evaluation instant. A grant or withdrawal cannot commit while
-that check runs, so a withdrawal is either seen by it or refused until it has finished. The lock is
-released before the bytes are handed over; a model call can take minutes and holds nothing.
+inside the final read check that the environment and graph read paths use,
+:func:`exulanica.db.read_check.final_read_check`: the global asset read lock, a read-only
+transaction, one evaluation instant. A grant or withdrawal cannot commit while that check runs, so
+a withdrawal is either seen by it or refused until it has finished. The lock is released before the
+bytes are handed over; a model call can take minutes and holds nothing.
 """
 
 from __future__ import annotations
@@ -42,15 +43,14 @@ from __future__ import annotations
 import datetime as dt
 import re
 import uuid
-from collections.abc import Iterator, Sequence
-from contextlib import contextmanager
+from collections.abc import Sequence
 from dataclasses import dataclass
 from typing import Any, Final, Literal
 
-import psycopg
 from psycopg.types.json import Jsonb
 
 from exulanica.canonical import canonical_json, sha256_digest
+from exulanica.db.read_check import final_read_check
 from exulanica.errors import PrivacyAdmissionError
 from exulanica.ingest.repository import IngestRepository
 from exulanica.models.handoff import (
@@ -398,23 +398,6 @@ def withdraw_model_right(
     return stored
 
 
-@contextmanager
-def _final_check(connection: psycopg.Connection) -> Iterator[dt.datetime]:
-    """``exulanica.graph.asset_read_policy.final_check``, restated here.
-
-    ``ingest`` and ``graph`` are sibling layers and may not import each other, so the discipline is
-    repeated rather than shared: an idle connection, a read-only transaction, the global asset read
-    lock, and an evaluation instant read in a separate statement so READ COMMITTED observes every
-    writer that committed while this waited. Nothing is read from the store under it.
-    """
-    if connection.info.transaction_status.name != "IDLE":
-        raise ValueError("a model hand-over is authorized only on an idle connection")
-    with connection.transaction():
-        connection.execute("set transaction read only")
-        connection.execute("select asset_read_lock()")
-        yield connection.execute("select statement_timestamp() as at").fetchone()["at"]
-
-
 def _refusal(
     repository: IngestRepository,
     capture_id: uuid.UUID,
@@ -540,7 +523,9 @@ def require_model_right(
         if stated is not None
     ]
 
-    with _final_check(connection) as at:
+    with final_read_check(
+        connection, not_idle="a model hand-over is authorized only on an idle connection"
+    ) as at:
         checked = connection.execute(
             "select asset_observation_allows(%(w)s,%(c)s,%(s)s,%(at)s) as observed,"
             "personal_model_right_required(%(w)s,%(c)s,%(s)s) as required,"

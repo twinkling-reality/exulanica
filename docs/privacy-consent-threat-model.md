@@ -584,11 +584,12 @@ decision means is stated once, in [`exulanica/consent/place_names.py`](../exulan
 whether one place's name may go to every model a
 [`ModelHandoff`](../exulanica/models/handoff.py) can reach, and `released_place_names(connection,
 workspace_id, handoff)` answers for every place at once. Both default to no and read under the
-same final read check as a photograph's model right: an idle connection, a read-only
-transaction, the global asset read lock and one evaluation instant, released before anything is
-sent. A grant, stop, rename, merge or deletion therefore cannot commit while a name is being
-checked; it is either seen or refused with `busy` until the check has finished. A caller holding an
-open transaction resolves the released names before entering it, or on a fresh connection.
+same final read check as a photograph's model right, stated once in
+[`final_read_check`](../exulanica/db/read_check.py): an idle connection, a read-only transaction,
+the global asset read lock and one evaluation instant, released before anything is sent. A grant,
+stop, rename, merge or deletion therefore cannot commit while a name is being checked; it is either
+seen or refused with `busy` until the check has finished. A caller holding an open transaction
+resolves the released names before entering it, or on a fresh connection.
 
 **Where it is decided.** `GET /place-name-rights` and `GET /place-name-rights/{entity_id}` read each
 use's notice and state under `consent.read`; `POST /place-name-rights/{entity_id}/grants` and

@@ -60,15 +60,13 @@ from __future__ import annotations
 import datetime as dt
 import re
 import uuid
-from collections.abc import Iterator
-from contextlib import contextmanager
 from dataclasses import dataclass
 from typing import Any, Final, Literal
 
-import psycopg
 from psycopg.types.json import Jsonb
 
 from exulanica.canonical import canonical_json, sha256_digest
+from exulanica.db.read_check import final_read_check
 from exulanica.errors import PrivacyAdmissionError
 from exulanica.ingest.repository import IngestRepository
 from exulanica.models.handoff import LOCAL_PROCESS, egress_origin
@@ -395,22 +393,9 @@ def withdraw_training_right(
     return stored
 
 
-@contextmanager
-def _final_check(connection: psycopg.Connection) -> Iterator[dt.datetime]:
-    """``exulanica.graph.asset_read_policy.final_check``, restated here.
-
-    ``ingest`` and ``graph`` are sibling layers and may not import each other, so the discipline is
-    repeated rather than shared, exactly as :mod:`exulanica.ingest.model_rights` repeats it: an
-    idle connection, a read-only transaction, the global asset read lock, and an evaluation instant
-    read in a separate statement so READ COMMITTED observes every writer that committed while this
-    waited. A grant or withdrawal cannot commit while this runs.
-    """
-    if connection.info.transaction_status.name != "IDLE":
-        raise ValueError("a training run is authorized only on an idle connection")
-    with connection.transaction():
-        connection.execute("set transaction read only")
-        connection.execute("select asset_read_lock()")
-        yield connection.execute("select statement_timestamp() as at").fetchone()["at"]
+#: The final read check's refusal of a connection already inside a transaction, in this module's
+#: words, for both of the checks below.
+_NOT_IDLE: Final = "a training run is authorized only on an idle connection"
 
 
 _REASONS: Final[tuple[tuple[str, RefusalReason], ...]] = (
@@ -445,7 +430,7 @@ def require_scene_training(
     permitted it, one per member that needed one, in member order.
     """
     connection = repository.connection
-    with _final_check(connection) as at:
+    with final_read_check(connection, not_idle=_NOT_IDLE) as at:
         rows = connection.execute(
             "select m.capture_id,"
             "scene_training_job_refusal(%(w)s,%(j)s,m.capture_id,%(at)s) as refusal,"
@@ -511,7 +496,7 @@ def require_artifact_training_right(
     withdrawal is either seen by it or refused until it has finished.
     """
     connection = repository.connection
-    with _final_check(connection) as at:
+    with final_read_check(connection, not_idle=_NOT_IDLE) as at:
         withdrawn = connection.execute(
             "select scene_training_artifact_withdrawn(%s,%s,%s) as withdrawn",
             (repository.workspace_id, artifact_id, at),
