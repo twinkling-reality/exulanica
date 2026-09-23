@@ -544,7 +544,8 @@ derived from it go only under a current personal model right for that photograph
 that moment even when the code that built the request asked already. System messages are product
 instructions and are sent as written, and `tests/test_hosted_boundary.py` holds, for every hosted
 call the product package makes, that no saved name is in any part of any request. What the policy
-cannot do and which requests honour a place right are stated in `companion-question.md` section 2.
+cannot do and which requests honour a place right are stated in
+[companion-question.md, Answer and source boundaries](companion-question.md#answer-and-source-boundaries).
 The World Memory Package applies the read path's withdrawal rule to the names it exports: a
 withdrawn person's entity and naming assertions keep their rows, lose their values and say why,
 and the projector refuses to sign a package in which any value is a name that person was ever
@@ -608,8 +609,8 @@ they send, a released place's included, so a grant never reaches their requests,
 stage's policy releases no place's name, because no vision use is offered
 ([`exulanica/ingest/hosted_policy.py`](../exulanica/ingest/hosted_policy.py)).
 `tests/test_place_name_release_paths.py` holds this wiring at the transport. How every other saved
-name is kept out of a request is the redaction boundary's to state, in `companion-question.md`
-section 2.
+name is kept out of a request is the redaction boundary's to state, in
+[companion-question.md, Answer and source boundaries](companion-question.md#answer-and-source-boundaries).
 
 ---
 
