@@ -2592,6 +2592,17 @@
       }
      },
      {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
       "name": "society_id",
       "in": "query",
       "required": false,
@@ -2686,6 +2697,17 @@
        "type": "string",
        "format": "uuid",
        "title": "Subject Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
       }
      },
      {
@@ -2798,6 +2820,17 @@
       }
      },
      {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
+      }
+     },
+     {
       "name": "society_id",
       "in": "query",
       "required": false,
@@ -2904,6 +2937,17 @@
        "type": "string",
        "format": "uuid",
        "title": "Subject Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
       }
      },
      {
@@ -3032,6 +3076,17 @@
        "type": "string",
        "format": "uuid",
        "title": "Subject Id"
+      }
+     },
+     {
+      "name": "world_id",
+      "in": "query",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "minLength": 1,
+       "maxLength": 200,
+       "title": "World Id"
       }
      },
      {
