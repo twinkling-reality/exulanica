@@ -17,6 +17,7 @@ from exulanica.world.asset_import import (
     import_reviewed_asset,
     validate_asset_import,
 )
+from exulanica.world.asset_kinds import ASSET_KINDS, AssetKind
 
 
 def read_bounded(path: Path, limit: int) -> bytes:
@@ -32,6 +33,13 @@ def main() -> None:
     parser.add_argument("--manifest", type=Path, required=True)
     parser.add_argument("--asset", type=Path, required=True)
     parser.add_argument("--licence", type=Path, required=True)
+    parser.add_argument(
+        "--kind",
+        required=True,
+        choices=[kind.value for kind in AssetKind],
+        help="What the asset is for, declared rather than inferred: "
+        + "; ".join(f"{kind.value}: {ASSET_KINDS[kind].summary}" for kind in AssetKind),
+    )
     parser.add_argument("--data-dir", type=Path)
     parser.add_argument(
         "--apply",
@@ -50,7 +58,9 @@ def main() -> None:
             parser.error("EXULANICA_DATABASE_URL is required for publication")
         store = LocalContentAddressedStore(resolve_data_dir(explicit=args.data_dir) / "blobs")
         with psycopg.connect(url) as connection:
-            import_reviewed_asset(connection, store, manifest, payload, licence)
+            import_reviewed_asset(
+                connection, store, manifest, payload, licence, kind=AssetKind(args.kind)
+            )
     print(
         f"{'Published' if args.apply else 'Validated'} {manifest.asset_key}; receipt {receipt_sha}"
     )

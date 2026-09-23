@@ -384,6 +384,7 @@ answers `ready`, or `blocked` with the first failing check in this order:
 | 1 | `source_invalidated` | A committed deletion invalidated the version's source snapshot |
 | 2 | `stale_base` | `base_state_sha256` is not the version's stored state |
 | 3 | `unknown_asset` | No reviewed asset has that `asset_key` |
+| 3 | `asset_not_placeable` | The reviewed asset's declared kind is not placeable: a component, such as a character's body, worn part or material pack |
 | 3 | `asset_bytes_unavailable` | The reviewed asset row exists and its bytes are not in the store |
 | 3 | `environment_binding_unknown` | The admission and render asset, the publication, or the feature and render batch do not resolve |
 | 3 | `environment_withdrawn` | The admission, render asset or feature index asset is withdrawn |

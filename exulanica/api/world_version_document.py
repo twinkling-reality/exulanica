@@ -39,6 +39,9 @@ class ReviewedAssetView(BaseModel):
     licence_id: str
     licence_sha256: str
     availability: str
+    #: Whether a person may place this asset as an object, as its declared kind says. An object a
+    #: version already holds embeds its asset whatever this says, and keeps drawing.
+    placeable: bool
 
 
 class ObjectBehaviourView(BaseModel):
@@ -141,6 +144,7 @@ def asset_view(asset: ReviewedAssetRow) -> ReviewedAssetView:
         licence_id=asset.licence_id,
         licence_sha256=asset.licence_sha256,
         availability=asset.availability,
+        placeable=asset.placeable,
     )
 
 

@@ -1,8 +1,13 @@
 """The reviewed asset registry: what may be placed, its bytes and the licence they carry.
 
-Read-only. Every asset is a reviewed CC0 mesh named by content digest, and each answer says whether
-its bytes are present in this instance's store, because a client must not offer to place an asset
-nothing could draw.
+Read-only. Every asset is a reviewed CC0 container named by content digest, and each answer says
+whether its bytes are present in this instance's store, because a client must not offer to place an
+asset nothing could draw.
+
+The list answers what a person may place, so it holds only assets whose declared kind is placeable
+(:mod:`exulanica.world.asset_kinds`). The one-key reads serve every reviewed asset, because the
+character renderer fetches its bodies, worn parts and material packs by key from here, and their
+answer says whether the asset is placeable.
 """
 
 from __future__ import annotations
@@ -23,17 +28,17 @@ router = APIRouter(prefix="/world", tags=["world"])
 @router.get(
     "/assets",
     response_model=list[ReviewedAssetView],
-    summary="The reviewed CC0 asset registry, read-only, with real byte availability.",
+    summary="The reviewed assets a person may place as objects, with real byte availability.",
 )
 def reviewed_asset_catalog(repository: ReadObjects, request: Request) -> list[ReviewedAssetView]:
     store = get_services(request).store
-    return [asset_view(asset) for asset in repository.reviewed_assets(store)]
+    return [asset_view(asset) for asset in repository.placeable_assets(store)]
 
 
 @router.get(
     "/assets/{asset_key}",
     response_model=ReviewedAssetView,
-    summary="One reviewed asset and whether its bytes are present.",
+    summary="One reviewed asset of any kind, whether it may be placed and whether its bytes exist.",
 )
 def reviewed_asset(
     asset_key: Annotated[str, Path(max_length=200)],

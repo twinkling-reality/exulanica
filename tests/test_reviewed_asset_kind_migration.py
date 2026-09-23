@@ -1,0 +1,164 @@
+"""Migration 0101: every reviewed asset row declares its kind, by allowing and never by defaulting.
+
+Each database test migrates a schema of its own to just below 0101 with the migrations exactly as
+they are on disk, writes ``world_reviewed_asset`` rows the way publishers wrote them before 0101
+(every column but ``kind``, which did not exist), then applies 0101 itself and reads what it left.
+The pairs 0101 allows are read from the migration's own text, so these tests exercise the file a
+database runs rather than a copy of its lists.
+"""
+
+from __future__ import annotations
+
+import re
+from collections.abc import Iterator
+from contextlib import contextmanager
+
+import psycopg
+import pytest
+from exulanica.migrations import migrations
+from exulanica.world.asset_kinds import AssetKind
+from exulanica.world.assets import reviewed_assets
+
+import pg_harness
+
+pytestmark = pytest.mark.postgres
+
+MIGRATION = next(migration for migration in migrations() if migration.version == "0101")
+_PAIR = re.compile(r"\('([a-z][a-z0-9.-]*)', '([0-9a-f]{64})'\)")
+
+
+def _code(text: str) -> str:
+    """The SQL with its comments removed, so prose about a rule is not mistaken for the rule."""
+    return "\n".join(line.split("--", 1)[0] for line in text.splitlines())
+
+
+def _allowed(kind: str) -> list[tuple[str, str]]:
+    """The (asset_key, content_sha256) pairs 0101 declares to be one kind, from its own text."""
+    block = re.search(
+        rf"update world_reviewed_asset set kind = '{kind}'\s+where \(asset_key, content_sha256\) "
+        r"in \(values\s+(.*?)\n\);",
+        _code(MIGRATION.sql),
+        re.S,
+    )
+    assert block is not None, f"0101 names no {kind} pairs where this test reads them"
+    return _PAIR.findall(block.group(1))
+
+
+OBJECTS = _allowed("object")
+COMPONENTS = _allowed("component")
+
+
+@contextmanager
+def _below_0101(monkeypatch) -> Iterator[psycopg.Connection]:
+    everything = list(migrations())
+    with monkeypatch.context() as patch:
+        patch.setattr(
+            pg_harness, "migrations", lambda: iter(m for m in everything if m.version < "0101")
+        )
+        with pg_harness.migrated_schema() as (_psycopg, admin):
+            yield admin
+
+
+def _publish(admin: psycopg.Connection, pairs: list[tuple[str, str]]) -> None:
+    """Rows as a pre-0101 import wrote them. Title and licence are placeholders 0101 never reads."""
+    for key, digest in pairs:
+        admin.execute(
+            "insert into world_reviewed_asset (asset_key, title, summary, media_type, "
+            "  content_sha256, byte_size, licence_id, licence_sha256) values "
+            "(%s, %s, %s, 'model/gltf-binary', %s, 1, 'CC0-1.0', %s)",
+            (key, key, key, digest, "a" * 64),
+        )
+
+
+def _kinds(admin: psycopg.Connection) -> dict[str, int]:
+    rows = admin.execute(
+        "select kind, count(*) from world_reviewed_asset group by kind order by kind"
+    ).fetchall()
+    return {kind: count for kind, count in rows}
+
+
+def _has_kind_column(admin: psycopg.Connection) -> bool:
+    return (
+        admin.execute(
+            "select 1 from information_schema.columns where table_schema = current_schema() "
+            "and table_name = 'world_reviewed_asset' and column_name = 'kind'"
+        ).fetchone()
+        is not None
+    )
+
+
+def test_0101_allows_exactly_the_generated_markers_as_objects_and_reads_nothing_outside():
+    assert sorted((a.asset_key, a.content_sha256) for a in reviewed_assets()) == OBJECTS
+    assert {asset.kind for asset in reviewed_assets()} == {AssetKind.OBJECT}
+    assert COMPONENTS, "0101 allows no component, so every test below would pass on nothing"
+    # A key may carry several digests, one per committed revision of its bytes; a digest names
+    # one asset, and no key is allowed as both kinds.
+    digests = [digest for _, digest in OBJECTS + COMPONENTS]
+    assert len(set(digests)) == len(digests)
+    assert not {key for key, _ in OBJECTS} & {key for key, _ in COMPONENTS}
+    # Pure SQL over this database: no file, program, large object or other server is read.
+    code = _code(MIGRATION.sql).lower()
+    for reach in ("pg_read_file", "pg_read_binary_file", "copy ", "lo_import", "dblink", "\\i "):
+        assert reach not in code, reach
+
+
+def test_0101_on_a_freshly_migrated_registry_declares_the_three_markers_objects(monkeypatch):
+    with _below_0101(monkeypatch) as admin:
+        assert not _has_kind_column(admin)
+        admin.execute(MIGRATION.sql)
+        assert _kinds(admin) == {"object": 3}
+        assert (
+            admin.execute(
+                "select is_nullable from information_schema.columns where "
+                "table_schema = current_schema() and table_name = 'world_reviewed_asset' "
+                "and column_name = 'kind'"
+            ).fetchone()[0]
+            == "NO"
+        )
+
+
+def _generations(pairs: list[tuple[str, str]]) -> list[list[tuple[str, str]]]:
+    """The pairs split so no key repeats within one: a database holds one digest per key."""
+    generations: list[list[tuple[str, str]]] = []
+    seen: dict[str, int] = {}
+    for key, digest in pairs:
+        index = seen[key] = seen.get(key, -1) + 1
+        if index == len(generations):
+            generations.append([])
+        generations[index].append((key, digest))
+    return generations
+
+
+def test_0101_declares_every_committed_character_container_a_component(monkeypatch):
+    generations = _generations(COMPONENTS)
+    assert sum(len(generation) for generation in generations) == len(COMPONENTS)
+    for generation in generations:
+        with _below_0101(monkeypatch) as admin:
+            _publish(admin, generation)
+            admin.commit()
+            admin.execute(MIGRATION.sql)
+            assert _kinds(admin) == {"component": len(generation), "object": len(OBJECTS)}
+            declared = set(
+                admin.execute(
+                    "select asset_key, content_sha256 from world_reviewed_asset "
+                    "where kind = 'component'"
+                ).fetchall()
+            )
+            assert declared == set(generation)
+
+
+def test_0101_refuses_by_name_every_row_whose_kind_it_cannot_establish(monkeypatch):
+    """An unknown key, and a known key bound to other bytes, each stop the whole migration."""
+    first, *rest = _generations(COMPONENTS)[0]
+    known_key = first[0]
+    with _below_0101(monkeypatch) as admin:
+        _publish(admin, [*rest, ("test.unknown-prop", "b" * 64), (known_key, "c" * 64)])
+        admin.commit()
+        with pytest.raises(psycopg.errors.CheckViolation) as refused:
+            admin.execute(MIGRATION.sql)
+        message = str(refused.value)
+        assert "test.unknown-prop" in message and known_key in message
+        assert rest[0][0] not in message
+        admin.rollback()
+        # Nothing of 0101 stays: the refusal is before the column is committed.
+        assert not _has_kind_column(admin)

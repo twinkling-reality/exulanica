@@ -63,6 +63,7 @@ const asset = (over: Partial<ReviewedAsset> = {}): ReviewedAsset => Object.freez
   licenceId: 'CC0-1.0',
   licenceSha256: 'c'.repeat(64),
   availability: 'available',
+  placeable: true,
   ...over,
 });
 

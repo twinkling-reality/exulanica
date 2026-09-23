@@ -2,6 +2,10 @@
 
 This is a host administration boundary, not an upload API or a licence classifier.
 Asset decode, character rig compatibility and current subject authority remain separate.
+
+The publisher declares what the asset is for, as a kind from :mod:`exulanica.world.asset_kinds`.
+The kind is stored on the registry row beside the digests and is not part of the import receipt:
+the receipt is the upstream provenance, and the kind is this registry's decision about its use.
 """
 
 from __future__ import annotations
@@ -18,6 +22,7 @@ from pydantic import BaseModel, ConfigDict, Field, HttpUrl, StrictInt
 
 from exulanica.canonical import canonical_json
 from exulanica.store.base import ContentAddressedStore
+from exulanica.world.asset_kinds import AssetKind, asset_kind
 
 Digest = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 Text = Annotated[str, Field(min_length=1, max_length=1000, pattern=r"\S")]
@@ -118,12 +123,17 @@ def import_reviewed_asset(
     manifest: ReviewedAssetImport,
     payload: bytes,
     licence: bytes,
+    *,
+    kind: AssetKind,
 ) -> str:
     """Retain exact bytes and append one registry entry; never update an existing key.
 
     The caller controls the database transaction. Blobs may outlive a failed transaction,
     but no registry entry can commit before its asset, licence and receipt are retained.
+    ``kind`` has no default: a publisher states what the asset is for, and a key already
+    published under another kind is refused like any other rebinding.
     """
+    declared = asset_kind(kind).kind
     receipt = validate_asset_import(manifest, payload, licence)
     if connection.autocommit and connection.info.transaction_status != TransactionStatus.INTRANS:
         raise ValueError("asset publication requires an explicit database transaction")
@@ -137,6 +147,7 @@ def import_reviewed_asset(
         "byte_size": manifest.byte_size,
         "licence_id": manifest.licence_id,
         "licence_sha256": manifest.licence_sha256,
+        "kind": declared.value,
     }
     with connection.cursor(row_factory=dict_row) as cursor:
         # Serialize administrative imports, including first publication of a new key.
@@ -166,9 +177,9 @@ def import_reviewed_asset(
             cursor.execute(
                 "insert into world_reviewed_asset "
                 "(asset_key,title,summary,media_type,content_sha256,byte_size,"
-                "licence_id,licence_sha256) "
+                "licence_id,licence_sha256,kind) "
                 "values (%(asset_key)s,%(title)s,%(summary)s,%(media_type)s,%(content_sha256)s,"
-                "%(byte_size)s,%(licence_id)s,%(licence_sha256)s)",
+                "%(byte_size)s,%(licence_id)s,%(licence_sha256)s,%(kind)s)",
                 expected,
             )
             cursor.execute(

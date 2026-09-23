@@ -257,10 +257,11 @@ describes; a behaviour named by `add_object` exports with its object.
 
 Reviewed external CC0 assets can also be imported through the host administration command
 `scripts/import_reviewed_world_asset.py`. Its manifest pins the asset bytes, exact upstream
-license evidence, source URL/revision and producer. Validation refuses digest/size mismatches,
-external GLB dependencies and unsupported codecs. It does not certify animation quality or
-character rig compatibility. The command validates by default; publication retains the asset,
-license and canonical import receipt before committing a registry row.
+license evidence, source URL/revision and producer, and the command requires `--kind`, the
+asset's kind below. Validation refuses digest/size mismatches, external GLB dependencies and
+unsupported codecs. It does not certify animation quality or character rig compatibility. The
+command validates by default; publication retains the asset, license and canonical import receipt
+before committing a registry row.
 
 Migration 0054 adds append-only import receipts. Repeating an identical import is idempotent;
 an existing key or its provenance cannot be rebound. Withdrawing a registry entry preserves
@@ -275,7 +276,34 @@ byte_size        exact byte length
 licence_id       CC0-1.0
 licence_sha256   SHA-256 of the licence text bytes
 title, summary   what the asset is
+kind             object | component, declared by whoever publishes the row
 ```
+
+### Which assets may be placed
+
+The registry holds every reviewed container a catalog publishes, and only an `object` may be placed.
+[`exulanica/world/asset_kinds.py`](../exulanica/world/asset_kinds.py) is the registry of kinds and
+says what each permits: an `object` is reviewed geometry a person places as an authored object; a
+`component` is a container another catalog composes and fetches by key, such as a character's
+body, a worn part or a material pack. The publisher declares the kind and nothing infers one from a
+key or a title: migration 0101 declares the three generated markers objects,
+`import_reviewed_asset` requires a kind, and the character catalog's publish step
+(`scripts/prepare_character_people.py --import`) declares every container it publishes a
+component. The schema's `world_reviewed_asset_kind_check` lists the same kinds as the registry.
+
+`GET /world/assets` lists only placeable assets, because it is what a client chooses an object
+from. `GET /world/assets/{asset_key}`, its bytes and its licence serve every reviewed asset,
+because the character renderer fetches components by key, and each view carries `placeable`.
+Placing a component is refused by name: `POST /world/versions/{version_id}/objects` answers 422
+`invalid_object_data` with a detail that names the asset, and composition answers
+`asset_not_placeable`. The kind is checked before the bytes, because restoring missing bytes is not
+the recovery for a component. An object a version already holds keeps its asset whatever its kind:
+it reads, draws, moves, is removed and is undone as before. Only placing a component is refused.
+
+Migration 0101 declares the kind of every row that existed before it by allowing, not by
+defaulting. The three `(asset_key, content_sha256)` pairs 0042 pinned become objects, the pairs the
+committed character import manifests name become components, and any other row stops the migration
+with an error that names it. The migration reads nothing outside the database.
 
 Three small CC0 assets are seeded. Their bytes are **generated deterministically** by
 `exulanica.world.assets`, not committed, which is the rule `tests/conftest.py` states for the
@@ -439,8 +467,8 @@ snake_case, and this fixture matches them.
 | `POST` | `/world/versions/{version_id}/objects/{object_id}/remove` | Store a removal |
 | `POST` | `/world/versions/{version_id}/objects/{object_id}/behaviour` | Give one object a reviewed behaviour, replace it, or take it away with `null` |
 | `POST` | `/world/versions/{version_id}/objects/undo` | Reverse the newest edit not already reversed |
-| `GET` | `/world/assets` | The reviewed asset registry with availability |
-| `GET` | `/world/assets/{asset_key}` | One reviewed asset |
+| `GET` | `/world/assets` | The reviewed assets a person may place, with availability |
+| `GET` | `/world/assets/{asset_key}` | One reviewed asset of any kind, and whether it may be placed |
 | `GET` | `/world/assets/{asset_key}/bytes` | The reviewed GLB bytes |
 | `GET` | `/world/assets/{asset_key}/licence` | The licence text those bytes are published under |
 | `GET` | `/world/behaviours` | The reviewed behaviour registry, with each parameter's kind and bounds |
@@ -523,7 +551,7 @@ knows what it may draw, and under what licence, without a second call:
 
 ```text
 asset_key, title, summary, media_type, content_sha256, byte_size,
-licence_id, licence_sha256, availability
+licence_id, licence_sha256, availability, placeable
 ```
 
 `content_sha256` is the object's actual reference. There is no separate `asset_sha256` on the wire
@@ -581,6 +609,15 @@ writes the other's tables.
 `tests/test_world_objects_api.py` covers the full add, move, remove and undo cycle over HTTP, the
 reviewed asset registry including byte and licence delivery, and all six problem codes in the
 table above.
+
+`tests/test_reviewed_asset_placeability.py` publishes the committed character catalog through its
+own publish step and reads it back through the routes: the list holds only the three markers, every
+container reads by key as not placeable, each stored kind matches the catalog that published it,
+the schema's kind check equals the registry, placing a component is refused by name on the object
+route and in composition, and a version that already holds one keeps reading, composing and
+editing. `tests/test_reviewed_asset_kind_migration.py` applies 0101 to schemas migrated just
+below it: a registry holding only the markers, every pair 0101 allows, and rows it must refuse by
+name.
 
 `tests/test_edit_kind_undo_postgres.py` pins undo for every registered kind from the log rows: the
 state token and the subject's document return to the ones before the edit, and the undo row names

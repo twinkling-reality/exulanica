@@ -1120,8 +1120,9 @@ def test_the_global_registries_refuse_a_private_licence(materials, table):
         if table == "world_reviewed_asset":
             materials.connection.execute(
                 "insert into world_reviewed_asset (asset_key, title, summary, media_type, "
-                "  content_sha256, byte_size, licence_id, licence_sha256) values "
-                "('ws.private', 'Private', 'Private', 'model/gltf-binary', %s, 1, %s, %s)",
+                "  content_sha256, byte_size, licence_id, licence_sha256, kind) values "
+                "('ws.private', 'Private', 'Private', 'model/gltf-binary', %s, 1, %s, %s, "
+                "  'object')",
                 ("1" * 64, WORKSPACE_LICENCE_ID, WORKSPACE_LICENCE_SHA256),
             )
         else:

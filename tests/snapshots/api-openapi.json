@@ -7730,7 +7730,7 @@
     "tags": [
      "world"
     ],
-    "summary": "The reviewed CC0 asset registry, read-only, with real byte availability.",
+    "summary": "The reviewed assets a person may place as objects, with real byte availability.",
     "operationId": "reviewed_asset_catalog_world_assets_get",
     "parameters": [
      {
@@ -7795,7 +7795,7 @@
     "tags": [
      "world"
     ],
-    "summary": "One reviewed asset and whether its bytes are present.",
+    "summary": "One reviewed asset of any kind, whether it may be placed and whether its bytes exist.",
     "operationId": "reviewed_asset_world_assets__asset_key__get",
     "parameters": [
      {
@@ -19008,6 +19008,10 @@
      "availability": {
       "type": "string",
       "title": "Availability"
+     },
+     "placeable": {
+      "type": "boolean",
+      "title": "Placeable"
      }
     },
     "additionalProperties": false,
@@ -19021,7 +19025,8 @@
      "byte_size",
      "licence_id",
      "licence_sha256",
-     "availability"
+     "availability",
+     "placeable"
     ],
     "title": "ReviewedAssetView"
    },

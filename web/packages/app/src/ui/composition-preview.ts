@@ -50,6 +50,11 @@ export const COMPOSITION_BLOCKED_WORDS: Readonly<Record<CompositionBlockedReason
       happened: 'That object is not in the reviewed collection.',
       next: 'Choose a different object.',
     },
+    asset_not_placeable: {
+      happened: 'That is a part other things are made from, such as a person’s hair or clothes, '
+        + 'so it cannot be placed on its own.',
+      next: 'Choose one of the objects offered for placing.',
+    },
     asset_bytes_unavailable: {
       happened: 'The file for that object is missing from storage, so it cannot be drawn.',
       next: 'Choose a different object, or ask whoever hosts this world to restore the file.',

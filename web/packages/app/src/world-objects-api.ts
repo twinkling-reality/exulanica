@@ -73,6 +73,12 @@ export interface ReviewedAsset {
   readonly licenceSha256: string;
   /** `available`, or a recorded reason it is not. Never a substitute. */
   readonly availability: AssetAvailability;
+  /**
+   * Whether a person may place this asset as an object, as the kind the server's registry
+   * declares for it says. `GET /world/assets` lists only placeable assets; an object a version
+   * already holds carries its asset whatever this says, and keeps drawing.
+   */
+  readonly placeable: boolean;
 }
 
 export interface ObjectTransform {
@@ -715,6 +721,7 @@ export function parseAsset(value: unknown): ReviewedAsset {
     licenceId: text(row['licence_id'], 'reviewed asset licence id'),
     licenceSha256: digest(row['licence_sha256'], 'reviewed asset licence hash'),
     availability: text(row['availability'], 'reviewed asset availability'),
+    placeable: flag(row['placeable'], 'reviewed asset placeability'),
   });
 }
 

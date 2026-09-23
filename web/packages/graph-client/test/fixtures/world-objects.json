@@ -24,7 +24,8 @@
         "byte_size": 784,
         "licence_id": "CC0-1.0",
         "licence_sha256": "6f89ee797a8cb18ff880d0d38840884953b437230709a84dfa94cf2a5869ea6f",
-        "availability": "available"
+        "availability": "available",
+        "placeable": true
       },
       "region_id": "region-a",
       "transform": {
@@ -63,7 +64,8 @@
         "byte_size": 684,
         "licence_id": "CC0-1.0",
         "licence_sha256": "6f89ee797a8cb18ff880d0d38840884953b437230709a84dfa94cf2a5869ea6f",
-        "availability": "available"
+        "availability": "available",
+        "placeable": true
       },
       "region_id": "region-a",
       "transform": {

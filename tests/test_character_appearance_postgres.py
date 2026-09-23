@@ -36,11 +36,14 @@ def publish_reviewed(repository):
     connection it writes through does.
     """
     from exulanica.world.asset_import import import_reviewed_asset
+    from exulanica.world.asset_kinds import AssetKind
 
     published: list[str] = []
 
     def publish(connection, store, manifest, payload, licence):
-        receipt = import_reviewed_asset(connection, store, manifest, payload, licence)
+        receipt = import_reviewed_asset(
+            connection, store, manifest, payload, licence, kind=AssetKind.COMPONENT
+        )
         published.append(manifest.asset_key)
         return receipt
 

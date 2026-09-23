@@ -29,6 +29,7 @@ from dataclasses import dataclass
 from typing import Final
 
 from exulanica.store.base import ContentAddressedStore
+from exulanica.world.asset_kinds import AssetKind
 
 __all__ = [
     "CC0_LICENCE_ID",
@@ -78,6 +79,9 @@ class ReviewedAsset:
     title: str
     summary: str
     payload: bytes
+    #: What the asset is for, as :mod:`exulanica.world.asset_kinds` declares kinds. Migration 0101
+    #: stores the same kind on the row 0042 pinned, and a test holds the two equal.
+    kind: AssetKind
     media_type: str = GLB_MEDIA_TYPE
     licence_id: str = CC0_LICENCE_ID
 
@@ -235,25 +239,32 @@ def _plate(size: float) -> bytes:
 
 
 def reviewed_assets() -> tuple[ReviewedAsset, ...]:
-    """The reviewed catalog, in the order migration 0042 seeds it."""
+    """The generated reviewed catalog, in the order migration 0042 seeds it.
+
+    Every entry is an object a person places. The character catalog's containers reach the same
+    registry through :mod:`exulanica.world.asset_import` as components, and are not listed here.
+    """
     return (
         ReviewedAsset(
             asset_key="cc0.marker-cube",
             title="Marker cube",
             summary="A half-metre cube resting on the ground plane.",
             payload=_box(0.5, 0.5, 0.5, base_at_origin=True),
+            kind=AssetKind.OBJECT,
         ),
         ReviewedAsset(
             asset_key="cc0.marker-pillar",
             title="Marker pillar",
             summary="A two-metre square pillar resting on the ground plane.",
             payload=_box(0.25, 2.0, 0.25, base_at_origin=True),
+            kind=AssetKind.OBJECT,
         ),
         ReviewedAsset(
             asset_key="cc0.marker-plate",
             title="Marker plate",
             summary="A one-metre flat square lying on the ground plane.",
             payload=_plate(1.0),
+            kind=AssetKind.OBJECT,
         ),
     )
 

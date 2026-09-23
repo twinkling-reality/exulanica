@@ -53,6 +53,7 @@ from exulanica.world.environment_instances import (
     environment_instance_document,
 )
 from exulanica.world.errors import (
+    AssetNotPlaceable,
     EnvironmentBindingDrift,
     EnvironmentCompositionDenied,
     EnvironmentSourceWithdrawn,
@@ -115,6 +116,7 @@ BLOCKED_REASONS: frozenset[str] = frozenset(
         "source_invalidated",
         "stale_base",
         "unknown_asset",
+        "asset_not_placeable",
         "asset_bytes_unavailable",
         "environment_binding_unknown",
         "environment_withdrawn",
@@ -369,6 +371,8 @@ _ENVIRONMENT_SOURCE_REFUSALS: tuple[tuple[type[Exception], str], ...] = (
 _OBJECT_PLACEMENT_REFUSALS: tuple[tuple[type[Exception], str], ...] = (
     *_BASE_REFUSALS,
     (UnavailableAsset, "asset_bytes_unavailable"),
+    # Before its parent class: a component named by a placement is its own verdict.
+    (AssetNotPlaceable, "asset_not_placeable"),
     (InvalidObjectData, "invalid_placement"),
     (InvalidObjectState, "subject_already_present"),
 )
@@ -523,6 +527,12 @@ def _resolve_reviewed_asset(
             asset.availability
         ),
     }
+    # The asset's declared kind before its bytes: a component is never placeable, whether or not
+    # its bytes are present, so restoring them is not the recovery.
+    try:
+        asset.require_placeable()
+    except AssetNotPlaceable as exc:
+        return frame.blocked("asset_not_placeable", str(exc), view)
     if asset.availability != "available":
         return frame.blocked(
             "asset_bytes_unavailable", "the reviewed asset row exists and its bytes do not", view

@@ -597,6 +597,7 @@ def test_the_fixture_carries_every_published_field(published_fixture):
             "licence_id",
             "licence_sha256",
             "availability",
+            "placeable",
         }
         assert set(obj["transform"]) == {
             "coordinate_space",

@@ -1,4 +1,7 @@
-"""Prepared character bytes use the same authenticated catalog as other reviewed assets."""
+"""Prepared character bytes use the same authenticated catalog as other reviewed assets.
+
+They are components, so they are served by key and never listed as something to place.
+"""
 
 import json
 from pathlib import Path
@@ -6,6 +9,7 @@ from pathlib import Path
 import pytest
 from exulanica.evidence.blob import BlobId
 from exulanica.world.asset_import import ReviewedAssetImport, import_reviewed_asset
+from exulanica.world.asset_kinds import AssetKind
 
 import test_world_objects_api as helpers
 
@@ -28,14 +32,19 @@ def test_prepared_characters_are_delivered_exactly_and_withdrawal_revokes_delive
         assert manifest.licence_sha256 == BlobId.of_bytes(licence).hex
         with connection.transaction():
             receipt = import_reviewed_asset(
-                connection, objects_api.store, manifest, payload, licence
+                connection, objects_api.store, manifest, payload, licence, kind=AssetKind.COMPONENT
             )
         connection.commit()
         route = f"/world/assets/{manifest.asset_key}"
         try:
-            catalog = {row["asset_key"]: row for row in objects_api.get("/world/assets").json()}
-            assert catalog[manifest.asset_key]["availability"] == "available"
-            assert catalog[manifest.asset_key]["content_sha256"] == manifest.content_sha256
+            served = objects_api.get(route)
+            assert served.status_code == 200, served.text
+            assert served.json()["availability"] == "available"
+            assert served.json()["content_sha256"] == manifest.content_sha256
+            assert served.json()["placeable"] is False
+            assert manifest.asset_key not in {
+                row["asset_key"] for row in objects_api.get("/world/assets").json()
+            }
             response = objects_api.get(route + "/bytes")
             assert response.status_code == 200, response.text
             assert response.content == payload
@@ -55,6 +64,4 @@ def test_prepared_characters_are_delivered_exactly_and_withdrawal_revokes_delive
         assert objects_api.store.get(BlobId.from_hex(manifest.content_sha256)) == payload
         assert objects_api.get(route + "/bytes").status_code == 404
         assert objects_api.get(route + "/licence").status_code == 404
-        assert manifest.asset_key not in {
-            row["asset_key"] for row in objects_api.get("/world/assets").json()
-        }
+        assert objects_api.get(route).status_code == 404

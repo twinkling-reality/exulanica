@@ -188,6 +188,7 @@ export const COMPOSITION_BLOCKED_REASONS = Object.freeze([
   'source_invalidated',
   'stale_base',
   'unknown_asset',
+  'asset_not_placeable',
   'asset_bytes_unavailable',
   'environment_binding_unknown',
   'environment_withdrawn',

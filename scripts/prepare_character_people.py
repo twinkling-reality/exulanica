@@ -149,10 +149,13 @@ def import_catalog(connection, store, document=None):
     receipt is left as it is, and a key bound to anything else refuses the whole batch.
     """
     from exulanica.world.asset_import import import_reviewed_asset
+    from exulanica.world.asset_kinds import AssetKind
 
     imports = catalog_imports(document)
     for manifest, payload, licence in imports:
-        import_reviewed_asset(connection, store, manifest, payload, licence)
+        import_reviewed_asset(
+            connection, store, manifest, payload, licence, kind=AssetKind.COMPONENT
+        )
     return len(imports)
 
 

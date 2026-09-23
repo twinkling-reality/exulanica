@@ -187,6 +187,16 @@ describe('the published version body, as the fixture publishes it', () => {
     expect(() => parseVersion(noFlag)).toThrow(/authored object removal/);
   });
 
+  it('reads whether an asset may be placed, and refuses an asset row that does not say', () => {
+    const [row] = registryRows() as Record<string, unknown>[];
+    expect(parseAsset(row).placeable).toBe(true);
+    expect(parseAsset({ ...row, placeable: false }).placeable).toBe(false);
+    const { placeable: _omitted, ...silent } = row!;
+    for (const bad of [silent, { ...row, placeable: 'yes' }, { ...row, placeable: null }]) {
+      expect(() => parseAsset(bad)).toThrow(/reviewed asset placeability/);
+    }
+  });
+
   it('refuses two objects sharing an id', () => {
     const duplicated = clone(FIXTURE) as { objects: unknown[] };
     duplicated.objects.push(clone(duplicated.objects[0]));

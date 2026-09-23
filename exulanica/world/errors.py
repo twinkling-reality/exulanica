@@ -10,6 +10,7 @@ from __future__ import annotations
 from exulanica.errors import ExulanicaError
 
 __all__ = [
+    "AssetNotPlaceable",
     "EnvironmentBindingDrift",
     "EnvironmentCompositionDenied",
     "EnvironmentSourceWithdrawn",
@@ -102,6 +103,15 @@ class InvalidInteractionPreviewState(WorldStyleError):
 
 class InvalidObjectData(WorldStyleError):
     """An authored object's asset, region, transform, origin, or behaviour is not acceptable."""
+
+
+class AssetNotPlaceable(InvalidObjectData):
+    """A placement named a reviewed asset whose declared kind cannot be placed as an object.
+
+    An ``InvalidObjectData`` because the recovery is the same, choosing another asset, so the
+    objects route answers ``invalid_object_data`` with a detail that names the asset. Composition
+    reports its own ``asset_not_placeable`` verdict, because its reasons each name one recovery.
+    """
 
 
 class StaleObjectBase(WorldStyleError):
