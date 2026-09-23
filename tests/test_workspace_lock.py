@@ -3,9 +3,10 @@
 ``exulanica.world.workspace_lock`` owns the seed. Migrations restate it inside PostgreSQL functions
 that cannot import Python, and modules written before the helper restate it too. This file fails on
 a restatement anywhere else, on a listed module that has stopped restating it (so the list shrinks
-as modules move onto the helper), and on a migration that locks a workspace with any other seed. What it cannot see is a restatement that got the number wrong in a module outside the
-list: that is not the seed's value, so it reads as some other lock, which is why the helper, not
-a copy, is the way a new module takes this lock.
+as modules move onto the helper), and on a migration that locks a workspace with any other seed.
+What it cannot see is a restatement that got the number wrong in a module outside the list: that
+is not the seed's value, so it reads as some other lock, which is why the helper, not a copy, is
+the way a new module takes this lock.
 """
 
 from __future__ import annotations
