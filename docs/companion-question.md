@@ -44,7 +44,8 @@ happens when it cannot, and the guarantee is structural rather than promised:
   `SelectionOutcome` that `companion-runtime` produced.
 * The gate never leaves `session.ts`. `.dependency-cruiser.cjs` names that one file, so a second
   importer of `@exulanica/graph-client/mutations` fails the boundary check rather than a review.
-* The rail an answer renders holds two controls, and neither is an assertion about anybody.
+* The rail an answer renders holds two controls and, for an answer about a place the account holder
+  named, the control for where that place's name may go; none is an assertion about anybody.
 
 **A question it cannot read is an abstention, not an error.** The path has four ways to say
 nothing and they are four different facts: nothing matched, the matches are unconfirmed, the
@@ -68,6 +69,18 @@ unconsented person reached a viewer's screen. That is why the client makes a sec
 **The two responses are joined on the permalink, never on the token.** Token namespaces are
 random per request, so the packet's tokens are not the answer's tokens. Matching them would
 resolve nothing, silently, and every chip would open nothing.
+
+**A citation opens inside the Companion.** A chip, or `E`, draws the masked photograph in the
+Companion's own surface in place of the answer, with the date its citation carries and a way back:
+`Back to the answer`, or Escape, which closes the photograph before it closes the Companion
+(`web/packages/app/src/ui/companion-evidence.ts`, and `showEvidence` in
+`web/packages/app/src/ui/companion-encounter.ts`). A read is drawn only while its photograph is
+still the one open, so going back or opening another before it arrives leaves it undrawn. A
+photograph that does not open, because it was deleted, is not available to this session or needs a
+mask that does not exist, is said in words with the reason the server gave, and nothing is drawn in
+its place: a stand-in picture would claim the evidence exists and looks like that.
+`web/packages/app/test/companion-evidence.test.ts` holds both faces, the late read and the
+keyboard, and the end-to-end run recorded in `docs/evaluation/2026-09-23-companion-place-link-outcome.json` shows both in the running app.
 
 **Photograph-derived text reaches the composer only under a personal model right.** A packet
 carries the claims stored about each photograph it cites: a transcribed sign, a described scene, a
@@ -110,6 +123,58 @@ recognised, so it leaves as the text it was typed as. And a saved name that is a
 word is replaced wherever that word appears, which for a person includes each part of their name:
 somebody saved as Rose makes "the rose garden" arrive as "the [person A] garden". That is a
 deliberate bias towards privacy, and it can make a question harder for the model to read.
+
+**The browser puts each name back from the account holder's own library.** One resolver,
+`companionNames` in `web/packages/app/src/companion-names.ts`, draws every clause of an answer and
+every turn's words in the Companion's speech band. For each placeholder the text carries, the
+answer's `names` says which entity it stands for, and the name shown is that entity's
+`displayName` in the graph this session read with the account holder's own credential
+(`GET /graph`), read when the answer is drawn. Only a person's own naming writes that column
+(`display_name` in `exulanica/migrations/0001_spine.sql`), and nothing a model wrote is read as a
+name: not the sentence around a placeholder and not the letters inside one. The composer does not
+always copy a placeholder exactly, and the end-to-end run recorded in `docs/evaluation/2026-09-23-companion-place-link-outcome.json` found `place A` and
+`PLACE A` beside `[place A]`, so an answer's own labels are recognised without their brackets too,
+the class word in any case and the letters as the server wrote them; in text with no `names`, only
+a bracketed placeholder is recognised. A placeholder the page cannot resolve is said in words and
+never shown as brackets:
+
+| Why the name is not shown | What the Companion says |
+| --- | --- |
+| The entity has no name | a place you have not named |
+| The entity was merged into another | a place you merged into another |
+| The account holder deleted the entity | a place no longer in your library |
+| The library this page read does not hold the entity | a place whose name this page has not loaded |
+| The text does not say which entity it is | a place this answer does not name |
+
+The noun follows the placeholder's class, `a person`, `a place`, `an object` and so on, from
+`web/packages/app/src/ui/copy.ts`, and `tests/test_companion_placeholder_parity.py` holds the
+browser's placeholder pattern to the server's. What it does not do: an answer the Companion
+remembers across a reload keeps its text and not its `names`, because `companion_answer` has no
+column for them, so each placeholder in it reads as one this answer does not name; an appearance
+proposal's words arrive with no `names` either; and a name is the entity's current one, so an
+answer kept from before a rename shows the later name, even where the placeholder stood for the
+words on a sign.
+
+**The composer is told where the account holder confirmed a photograph was taken.** A Selection
+filtered by a place holds a photograph because of a confirmed link from the photograph's place
+occurrence to that place, and only a person's decision writes a confirmed link
+(`confirmed_needs_a_human` in `exulanica/migrations/0001_spine.sql`). `build_packet` in
+`exulanica/selection/packet.py` keeps that link on the photograph's line as the place's id
+(`ConfirmedPlace`), which adds no line and no token. `_without_names` in
+`exulanica/selection/question.py` gives the place the request's placeholder, by its id and from its
+own saved name alone, and `_render_packet` states it under the photograph's token as
+`user_confirmed_place: [place A]`. The composer's prompt, `selection-7`, says that line is the
+user's confirmation that the photograph was taken there, which supports a historical clause citing
+it, and that it says nothing about what the photograph shows. Without it, each such photograph
+reached the composer as a bare line with no description, and asked which photographs were taken at
+the place, the composer answered that no photograph could be identified as taken there (measured
+under Evidence and limits). The place is always its placeholder on that line: the Companion's call
+sites replace every saved name, a released place's included, and no place-name use is offered to
+the composer's role (`exulanica/consent/place-name-uses.v1.json` offers the embedding role only).
+A person or an object linked the same way is not stated, because telling a hosted model who is in
+a photograph is a decision about people that this path does not make, and a place with no saved
+name has no placeholder and is not stated. `tests/test_companion_place_link.py` holds the line, the
+placeholder given by id, and the absence of the saved name from every request.
 
 **Every hosted request passes one boundary.** `ModelClient` in `exulanica/models/client.py` hands
 every request it sends, from `chat`, `structured`, `vision` and `embed` alike, to the policies
@@ -230,6 +295,45 @@ are retained with their original inputs and limitations in the
 [fixed implementation history](https://github.com/twinkling-reality/exulanica/blob/857cffe730dad97f9edb34535c773115277e2769/docs/companion-question.md).
 Some cited campaign artifacts are local-only; a clone does not contain them. Do not present a
 historical result, patch or unconfigured route as a live end-to-end demonstration.
+
+**A confirmed place, end to end.** A place-class entity comes from the vision role's place
+proposal, which `exulanica/ingest/vision.py` makes under a versioned rule: a place is written only
+when its name is read whole on a sign the photograph transcribes
+(`exulanica/ingest/place_proposal.py`, measured in
+`docs/evaluation/2026-09-23-vision-place-proposal-d-outcome.json`). One measurement takes that
+proposal through to the answer a person reads, on two synthetic workspaces on an acceptance runtime
+with the model client, through the routes the browser uses: four synthetic drawings of one place,
+MIRELAND HALL (two whole nameplates, one with its last word covered, one with no text), each with a
+recorded capture time, admitted with the model rights the synthetic account holder granted. The
+vision stage wrote the place for the two whole nameplates and for neither of the others, and the
+measuring script confirmed it as the account holder. Three questions, registered with the answers
+the photographs support before any model call, were asked once each, with the packet before the
+change (`selection-6`) and with the confirmed place on each photograph's line (`selection-7`):
+
+| Question | `selection-6` | `selection-7` |
+| --- | --- | --- |
+| What does the sign say at Mireland Hall? | wrong: "The sign says this photograph." | right: "The sign reads '[place A]'." |
+| Which of my photographs were taken at Mireland Hall? | wrong: "No description mentions [place A], so no photograph can be identified as taken there." | right: "These photographs were taken at place A.", citing both |
+| When were my photographs at Mireland Hall taken? | wrong: "The provided evidence does not contain any information about place A." | right: "Your photographs were taken on 2026-08-14 and 2026-08-16.", citing both |
+
+In the running app the Companion showed each answer with the confirmed name in place of the
+placeholder, opened the cited photograph inside the Companion from the masked route, and said "This
+photograph cannot be shown." with no picture when the capture script answered that read 410. Costs,
+from the provider's reported usage: 0.00771565 and 0.00864106 US dollars for the two arms and
+0.00282130 for the final browser run. What this does not establish: one draw per question per arm,
+so a difference is one observation each and not a rate; synthetic drawings of one place; English
+questions; no remembered answer or rename. The records are
+`docs/evaluation/2026-09-23-companion-place-link-preregistration.json` and
+`docs/evaluation/2026-09-23-companion-place-link-outcome.json`.
+
+**Caption vectors in use.** The derivative worker runs the caption-vector pass for each admitted
+photograph, through the boundary above and under a personal model right for the embedding role
+(`exulanica/ingest/worker_command.py`); a capture's tombstone reaches its caption vectors
+(migration 0044 records each vector a tombstone targets, and the purge worker deletes it;
+`tests/test_caption_vector_lifecycle.py`). In the measurement above, the one question whose plan
+carried a semantic query made one query-vector call each time it was asked, of two prompt tokens,
+taking 7858, 9586 and 10907 ms. Embedding quality, the 0.65 threshold and latency over a large
+corpus are not measured.
 
 Changes to this contract require checking the affected route, repository, request-policy and
 browser boundary. Broader continuity, live-model usefulness and personal-source acceptance need
