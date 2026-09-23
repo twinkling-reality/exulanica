@@ -14,7 +14,7 @@ from exulanica.selection.environment_proposal import (
 )
 
 from conftest import TEST_CEILING_USD, TEST_MAX_CALLS
-from model_fakes import FakeTransport, chat_body
+from model_fakes import FakeTransport, RecordingPolicy, chat_body
 
 
 def _reply(value: object) -> HttpResponse:
@@ -31,6 +31,7 @@ def _client(*responses: HttpResponse) -> tuple[ModelClient, FakeTransport]:
             api_key="test-key-not-real",
             transport=transport,
             budget=BudgetGuard(ceiling_usd=TEST_CEILING_USD, max_calls=TEST_MAX_CALLS),
+            policy=RecordingPolicy(),
         ),
         transport,
     )

@@ -34,7 +34,7 @@ from exulanica.models.manifest import load_manifest
 from PIL import Image
 from PIL.TiffImagePlugin import IFDRational
 
-from model_fakes import FakeTransport
+from model_fakes import FakeTransport, RecordingPolicy
 from pg_harness import migrated_schema, open_scratch_connection
 
 #: Explicit rather than environment-derived, so a developer's exported EXULANICA_BUDGET_USD cannot
@@ -497,6 +497,7 @@ def client(manifest, transport) -> ModelClient:
         manifest=manifest,
         transport=transport,
         budget=BudgetGuard(ceiling_usd=TEST_CEILING_USD, max_calls=TEST_MAX_CALLS),
+        policy=RecordingPolicy(),
     )
 
 

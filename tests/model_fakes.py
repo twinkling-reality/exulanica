@@ -12,6 +12,7 @@ from collections.abc import Mapping, Sequence
 from typing import Any
 
 from exulanica.models.manifest import Role
+from exulanica.models.policy import HostedRequest
 from exulanica.models.transport import HttpResponse
 
 CHEAP_FLOOR = 640
@@ -109,6 +110,22 @@ class FakeTransport:
                 raise nxt
             return nxt
         return HttpResponse(status_code=200, text="[]")
+
+
+class RecordingPolicy:
+    """A hosted-request policy for tests whose requests carry nothing of an account holder's.
+
+    Admits every request unchanged and keeps each one it judged, so a test can read what the
+    client's policy was shown. Product code has no such policy: it attaches a workspace's rules,
+    and ``BenchmarkInputs`` is for scripts whose inputs carry no account holder's data.
+    """
+
+    def __init__(self) -> None:
+        self.requests: list[HostedRequest] = []
+
+    def admit(self, request: HostedRequest) -> Sequence[str]:
+        self.requests.append(request)
+        return request.texts
 
 
 CHEAP = Role.REASONING_CHEAP

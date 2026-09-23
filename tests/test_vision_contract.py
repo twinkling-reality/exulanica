@@ -45,7 +45,7 @@ from exulanica.models.manifest import Role, load_manifest
 from exulanica.models.schema import extract_json_object
 from exulanica.models.transport import HttpResponse, HttpxTransport
 
-from model_fakes import FakeTransport, chat_body, model_not_found
+from model_fakes import FakeTransport, RecordingPolicy, chat_body, model_not_found
 
 VALID = {
     "scene_description": "A waterfall in low winter light.",
@@ -151,6 +151,7 @@ def _model(
             manifest=load_manifest(),
             transport=transport,
             budget=BudgetGuard(ceiling_usd=Decimal("5.00"), max_calls=1000),
+            policy=RecordingPolicy(),
             **client_kwargs,
         ),
         max_tokens=max_tokens,
@@ -395,6 +396,7 @@ def test_the_vision_stage_does_not_write_a_response_cache_entry(transport):
             transport=transport,
             cache=cache,
             budget=BudgetGuard(ceiling_usd=Decimal("5.00"), max_calls=1000),
+            policy=RecordingPolicy(),
         )
     ).observe(image_bytes=b"\x89PNG", media_type="image/png")
     assert len(cache) == 0

@@ -50,7 +50,7 @@ from exulanica.world import STYLE_REGISTRY, StyleReference, TopologyContract, To
 from exulanica.world import WorldStyleRepository as Styles
 
 from conftest import TEST_CEILING_USD, TEST_MAX_CALLS, write_photo
-from model_fakes import FakeTransport, chat_body
+from model_fakes import FakeTransport, RecordingPolicy, chat_body
 
 
 def _structured_extraction() -> tuple[str, str]:
@@ -130,6 +130,7 @@ def scripted(*responses: HttpResponse) -> tuple[ModelClient, FakeTransport]:
         api_key="test-key-not-real",
         transport=transport,
         budget=BudgetGuard(ceiling_usd=TEST_CEILING_USD, max_calls=TEST_MAX_CALLS),
+        policy=RecordingPolicy(),
     )
     return client, transport
 

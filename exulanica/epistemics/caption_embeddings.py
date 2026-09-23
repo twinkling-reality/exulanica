@@ -13,9 +13,12 @@ raises before anything is sent. This layer cannot import that decision, which li
 ``exulanica.ingest.model_rights``, so it asks for it instead.
 
 The text also carries whatever the photograph showed in writing, and a sign or a shirt can carry a
-name the account holder saved. Every saved name is replaced in what is sent, as it is in the
-Companion's packet (:mod:`exulanica.epistemics.saved_names`). The stored vector is keyed by the
-text as stored, so a name saved after a vector was made does not make it again.
+name the account holder saved. The request names the capture it carries, and the client's policy
+decides what of it leaves: :class:`CaptionEmbeddingPass` attaches the workspace's
+(:class:`~exulanica.epistemics.hosted_requests.WorkspaceRequestPolicy`), which replaces every
+saved name but a place's that a right releases for the embedding role, and checks the capture's
+right again as the text goes. The stored vector is keyed by the text as stored, so a name saved
+after a vector was made does not make it again.
 """
 
 from __future__ import annotations
@@ -30,7 +33,13 @@ from typing import Any
 import psycopg
 from psycopg.pq import TransactionStatus
 
-from exulanica.epistemics.saved_names import redact_names, saved_names
+from exulanica.epistemics.hosted_requests import (
+    ReleasedPlaces,
+    WorkspaceRequestPolicy,
+    borrowing,
+    no_place_released,
+)
+from exulanica.errors import PrivacyAdmissionError
 from exulanica.models.client import ModelClient
 from exulanica.models.handoff import ModelHandoff
 from exulanica.models.manifest import Role
@@ -92,12 +101,12 @@ def embed_capture(
 
     Workspace provisioning must already have created its vector partition. Never create schema
     at runtime. A session lock per capture serializes this pass, and no transaction is open while
-    the model runs. The text is read first, with every saved name in it replaced; ``before_send``
-    is then called on the idle connection with the embedding role's whole chain and its endpoint,
-    and a refusal it raises propagates with nothing sent. The write re-reads the text and stores
-    nothing when it changed or went, and the
-    insert's tombstone guard refuses a deletion that arrived while the model ran. No response cache
-    retains deleted caption text.
+    the model runs. The text is read first; ``before_send`` is then called on the idle connection
+    with the embedding role's whole chain and its endpoint, and a refusal it raises propagates with
+    nothing sent. The request names ``capture_id`` as the photograph it carries, and ``client``'s
+    policy decides what of the text leaves. The write re-reads the text and stores nothing when it
+    changed or went, and the insert's tombstone guard refuses a deletion that arrived while the
+    model ran. No response cache retains deleted caption text.
 
     Returns the model's result whenever a request was sent, so its cost is counted, and None when
     nothing was sent.
@@ -131,10 +140,13 @@ def embed_capture(
             )
             if _stored(connection, workspace_id, key):
                 return None
-            sent = redact_names(source["body"], saved_names(connection, workspace_id)).text
         before_send(ModelHandoff.hosted(client.manifest, Role.EMBEDDING))
         result = client.embed(
-            [sent], role=Role.EMBEDDING, prompt_version=PROMPT_VERSION, use_cache=False
+            [source["body"]],
+            role=Role.EMBEDDING,
+            prompt_version=PROMPT_VERSION,
+            use_cache=False,
+            photographs=(capture_id,),
         )
         if result.model_id != model or len(result.vectors) != 1:
             raise ValueError("The embedding role returned an unexpected model or vector count")
@@ -171,11 +183,18 @@ class CaptionEmbeddingPass:
     """The derivative worker's caption vector pass over one configured client.
 
     States the models it reaches, so the worker can ask for the right to reach them, and sends
-    nothing until the worker's ``before_send`` allows it.
+    nothing until the worker's ``before_send`` allows it. Each capture's request goes through the
+    client with its workspace's policy attached, fresh for that capture, whose right check is the
+    worker's ``before_send`` again, asked as the text leaves. ``released_places`` is the
+    place-name right's resolver; the one that releases nothing is the default, so a pass built
+    without the resolver sends no place's name.
     """
 
-    def __init__(self, client: ModelClient) -> None:
+    def __init__(
+        self, client: ModelClient, *, released_places: ReleasedPlaces = no_place_released
+    ) -> None:
         self.client = client
+        self._released_places = released_places
 
     @property
     def model_handoff(self) -> ModelHandoff:
@@ -190,8 +209,30 @@ class CaptionEmbeddingPass:
         *,
         before_send: BeforeSend,
     ) -> EmbeddingResult | None:
+        def right(
+            _connection: psycopg.Connection,
+            _workspace_id: uuid.UUID,
+            photographs: frozenset[uuid.UUID],
+            handoff: ModelHandoff,
+        ) -> None:
+            if photographs != {capture_id}:
+                raise PrivacyAdmissionError(
+                    f"the caption pass for capture {capture_id} carries no other photograph"
+                )
+            before_send(handoff)
+
+        policy = WorkspaceRequestPolicy(
+            workspace_id,
+            connection=borrowing(connection),
+            photograph_right=right,
+            released_places=self._released_places,
+        )
         return embed_capture(
-            connection, workspace_id, capture_id, self.client, before_send=before_send
+            connection,
+            workspace_id,
+            capture_id,
+            self.client.with_policy(policy),
+            before_send=before_send,
         )
 
 

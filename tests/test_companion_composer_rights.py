@@ -37,7 +37,7 @@ from exulanica.selection.question import answer_question
 from exulanica.store.local import LocalContentAddressedStore
 
 from conftest import TEST_CEILING_USD, TEST_MAX_CALLS, photo_bytes, scratch_role_database
-from model_fakes import FakeTransport, chat_body
+from model_fakes import FakeTransport, RecordingPolicy, chat_body
 from test_personal_admission_route import HostedVisionDouble
 from test_personal_model_right import ACCOUNT, admit_personal, grant, grant_all
 
@@ -157,6 +157,7 @@ def _client(responses: list[HttpResponse]) -> tuple[ModelClient, FakeTransport]:
         api_key="test-key-not-real",
         transport=transport,
         budget=BudgetGuard(ceiling_usd=TEST_CEILING_USD, max_calls=TEST_MAX_CALLS),
+        policy=RecordingPolicy(),
     )
     return client, transport
 

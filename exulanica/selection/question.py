@@ -832,6 +832,7 @@ def compose_answer(
                 Answer,
                 prompt_version=PROMPT_VERSION,
                 max_tokens=COMPOSER_MAX_TOKENS,
+                photographs=(item.capture_id for item in packet.items),
             )
             # Recorded BEFORE the validator runs. An answer the validator refuses was still a
             # call the endpoint served and billed, and a record that dropped it would report the
@@ -968,15 +969,13 @@ def answer_question(
         and plan.semantic_query
         and has_embeddings(connection, session.workspace_id, client)
     ):
-        # The query goes to the hosted vector role, and a plan the caller supplies is embedded
-        # as the caller wrote it, which can name anybody. So every saved name is replaced in it,
-        # as in what the planner and the composer are sent.
-        query = redact_names(
-            plan.semantic_query, names or saved_names(connection, session.workspace_id)
-        ).text
+        # A plan the caller supplies is embedded as the caller wrote it, and it can name anybody.
+        # The client's policy replaces every saved name in the query as it leaves, and leaves a
+        # place's name only where a right releases it for that role; nothing here replaces a
+        # name first, so that a released place's name can reach the query.
         # An unavailable vector role leaves lexical retrieval usable.
         with suppress(ModelError):
-            query_vector = embed_query(client, query, record=log.record_embedding)
+            query_vector = embed_query(client, plan.semantic_query, record=log.record_embedding)
     result = execute(
         connection,
         validated,

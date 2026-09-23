@@ -11,7 +11,8 @@ is a second optional extension, `exulanica-wmp-ext-environment-instances` 1.0, s
 [Environment-instances extension 1.0](#environment-instances-extension-10). The 1.0 profile,
 its eighteen required paths and its signature payload are unchanged, and a package written
 without either extension is byte for byte what the projector wrote before the extensions
-existed.
+existed, apart from the names a withdrawn person's rows withhold (see
+[Inventory and privacy boundary](#inventory-and-privacy-boundary)).
 
 The World Memory Package (WMP) is a signed projection of one PostgreSQL snapshot. It is not the
 live store, a backup, a consent grant, or an executable world. An exported copy cannot be recalled.
@@ -78,6 +79,19 @@ The package contains canonical JSON for:
 - explicitly supplied evaluation reports, or `unavailable` with its reason;
 - deletion tombstones without the private reason or requesting actor; and
 - export/consent boundary and generated-content declarations.
+
+A person who withdrew is exported without their name. Their entity row and their naming
+assertions stay in `memory/graph.json`, so the package still shows that somebody was named and
+when; the entity's `display_name` and each naming assertion's `object_value` are null, and each
+such row carries `withheld` naming the field and the reason. The rule is the read path's
+(`exulanica/graph/entities.py`), asked of the same predicate. Before signing, the projector reads
+back the files it is about to sign: every row of a withdrawn person must withhold its name and say
+why, and the package is refused when any JSON value anywhere in it is a name that person was ever
+saved under, so a field that carried a name past the rule is refused rather than signed. The one
+exception is a name somebody who did not withdraw is also saved under and carries in their own
+row: two people can share a name, and the one who did not withdraw keeps theirs, which also means
+a later field carrying that shared name is not caught
+(`tests/test_world_package_withdrawal_postgres.py`).
 
 The default scanner rejects raw media, credentials, biometric templates, embeddings, private
 conversation fields, model caches/internals, training intermediates, executable UI assets, shaders,

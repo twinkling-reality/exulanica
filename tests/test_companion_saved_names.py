@@ -1,11 +1,12 @@
 """No name the account holder saved is in any request the Companion sends to a hosted model.
 
 The account holder's rules: a person's name never goes to a hosted model, with or without a right,
-and a confirmed place name goes only under a right that does not yet exist, so for now no saved
-name of any kind does. A name exists in this product only because the account holder saved it, so
-these tests save real ones through the product's own naming path, a person and a place, ask a
-question that uses both, put both in the photograph's text as well, and read every byte the
-client double was handed.
+and a confirmed place name goes only under a place-name right for that place and that model. No
+test here grants one, so no saved name of any kind may go. A name exists in this product only
+because the account holder saved it, so these tests save real ones through the product's own
+naming path, a person and a place, ask a question that uses both, put both in the photograph's
+text as well, and read every byte the transport was handed. The clients carry the workspace's
+policy as the API attaches it, so what is read is what would leave.
 
 The positive controls are what make an absence mean something. The planner request must still
 carry each entity by id and placeholder, or the redaction has simply dropped the question; and
@@ -20,10 +21,15 @@ import uuid
 
 import psycopg
 import pytest
-from exulanica.api.composer_rights import composer_rights_check
+from exulanica.api.composer_rights import composer_rights_check, photograph_text_right
 from exulanica.db.migrate import provision_workspace
 from exulanica.epistemics.assertions import AssertionWriter
-from exulanica.epistemics.caption_embeddings import embed_capture
+from exulanica.epistemics.caption_embeddings import CaptionEmbeddingPass
+from exulanica.epistemics.hosted_requests import (
+    WorkspaceRequestPolicy,
+    borrowing,
+    no_place_released,
+)
 from exulanica.epistemics.saved_names import saved_names
 from exulanica.identity import IdentityRepository, merge_entities, name_occurrence
 from exulanica.identity.subjects import IdentityError
@@ -109,7 +115,8 @@ def named(tmp_path, photo_dir, repository):
     return repository, store, session, entities
 
 
-def _client(responses: list[HttpResponse]) -> tuple[ModelClient, FakeTransport]:
+def _bare(responses: list[HttpResponse]) -> tuple[ModelClient, FakeTransport]:
+    """The process's client: no policy, so it sends nothing until one is attached."""
     transport = FakeTransport(responses)
     return (
         ModelClient(
@@ -121,6 +128,18 @@ def _client(responses: list[HttpResponse]) -> tuple[ModelClient, FakeTransport]:
     )
 
 
+def _client(repository, responses: list[HttpResponse]) -> tuple[ModelClient, FakeTransport]:
+    """The client a route sends through: the workspace's policy attached, as the API builds it."""
+    client, transport = _bare(responses)
+    policy = WorkspaceRequestPolicy(
+        repository.workspace_id,
+        connection=borrowing(repository.connection),
+        photograph_right=photograph_text_right,
+        released_places=no_place_released,
+    )
+    return client.with_policy(policy), transport
+
+
 def _reply(body: str) -> HttpResponse:
     return HttpResponse(status_code=200, text=json.dumps(chat_body(body)))
 
@@ -130,7 +149,9 @@ def _ask(repository, store, session, question: str, search: str) -> tuple[object
     answer = Answer(
         clauses=[AnswerClause(text="I have no evidence for that.", type=ClauseType.META)]
     )
-    client, transport = _client([_reply(plan.model_dump_json()), _reply(answer.model_dump_json())])
+    client, transport = _client(
+        repository, [_reply(plan.model_dump_json()), _reply(answer.model_dump_json())]
+    )
     outcome = answer_question(
         repository.connection,
         client,
@@ -188,7 +209,7 @@ def test_the_planner_redacts_a_raw_question_on_its_own(named):
     """
     repository, _, _, entities = named
     plan = SelectionPlan(intent=Intent.CAPTURES, semantic_query="running club")
-    client, transport = _client([_reply(plan.model_dump_json())])
+    client, transport = _client(repository, [_reply(plan.model_dump_json())])
 
     propose_plan(
         client,
@@ -282,9 +303,10 @@ def _photograph(repository) -> uuid.UUID:
 
 
 def _embed(repository, capture: uuid.UUID) -> tuple[object, FakeTransport]:
-    client, transport = _client([_vector_reply()])
-    embedded = embed_capture(
-        repository.connection, repository.workspace_id, capture, client, before_send=_allow
+    """The derivative worker's pass over the process's client, which attaches the policy itself."""
+    client, transport = _bare([_vector_reply()])
+    embedded = CaptionEmbeddingPass(client)(
+        repository.connection, repository.workspace_id, capture, before_send=_allow
     )
     return embedded, transport
 
@@ -321,7 +343,7 @@ def test_no_saved_name_reaches_the_query_embedding_of_a_supplied_plan(named):
     answer = Answer(
         clauses=[AnswerClause(text="I have no evidence for that.", type=ClauseType.META)]
     )
-    client, transport = _client([_vector_reply(), _reply(answer.model_dump_json())])
+    client, transport = _client(repository, [_vector_reply(), _reply(answer.model_dump_json())])
     answer_question(
         repository.connection,
         client,

@@ -88,19 +88,21 @@ all or nothing: if any photograph fails, no model is called, the deterministic a
 locally from the same packet, and the execution block carries `model_right_refused` with the
 reason. Composing from the permitted part alone would answer about some photographs while seeming
 to answer about all of them. A personal photograph admitted without a right for that role is
-therefore answered deterministically, never composed.
+therefore answered deterministically, never composed. The composer's request also names the
+packet's captures, so the boundary described below asks the same right again as the request
+leaves; a right withdrawn between the two checks refuses the request there, with nothing sent.
 
 **The rule: no name the account holder saved goes to a hosted model.** A name exists in this
 product only because the account holder typed it: who a person is, what a place is called. A
 person's name never goes to a hosted model, with or without a right, and a confirmed place name goes
-only under a right the account holder grants for that place and that model. No such right exists
-yet, so no saved name of any kind may be sent. In the requests this section describes, every one is
-replaced before the request is built, by `exulanica/epistemics/saved_names.py`, and so is every
-one in the two requests to the embedding role, as the paragraph after the limitations states. A
-saved name is recognised whole, case-insensitively and as a whole word; a person's or a voice's name is also recognised by any part of at least three letters,
-because people are named by first name, while other names are recognised whole only, because
-their parts are ordinary words and a saved "Lantern House" must not turn "photos of the house" into
-a filter on one place. Each entity recognised gets a placeholder of its class, `[person A]`,
+only under a right the account holder grants for that place and that model. Every hosted request
+passes one boundary that applies the rule, described after the limitations below. The requests this
+section describes also replace every saved name themselves, a place's included, before the request
+is built, with `exulanica/epistemics/saved_names.py`. A saved name is recognised whole,
+case-insensitively and as a whole word; a person's or a voice's name is also recognised by any
+part of at least three letters, because people are named by first name, while other names are
+recognised whole only, because their parts are ordinary words and a saved "Lantern House" must not
+turn "photos of the house" into a filter on one place. Each entity recognised gets a placeholder of its class, `[person A]`,
 `[place A]`, stable for the whole request. The planner's catalogue lists every entity as an id and
 a class, with its placeholder only when the question named it, and never with a name. The question
 the planner, the composer, the request classifier and both drafters are sent is the redacted one,
@@ -115,17 +117,50 @@ word is replaced wherever that word appears, which for a person includes each pa
 somebody saved as Rose makes "the rose garden" arrive as "the [person A] garden". That is a
 deliberate bias towards privacy, and it can make a question harder for the model to read.
 
-The two requests to the embedding role apply the same rule. The caption-vector pass,
-`embed_capture` in `exulanica/epistemics/caption_embeddings.py`, replaces every saved name in a
-photograph's stored caption, transcribed text and place values, and its `before_send` right check
-decides whether that replaced text goes at all. `answer_question` in
-`exulanica/selection/question.py` replaces every saved name in the `semantic_query` it embeds,
-which is what a plan the caller supplies needs; a plan the planner proposes holds none, because the
-planner is sent only the redacted question. `tests/test_companion_saved_names.py` holds both
-requests to it with a person and a place saved through `name_occurrence` and written on the
-photograph's sign: the recorded request carries each as its placeholder and still carries the
-sign's other words. With either replacement removed, the recorded request carries both names as
-they are stored.
+**Every hosted request passes one boundary.** `ModelClient` in `exulanica/models/client.py` hands
+every request it sends, from `chat`, `structured`, `vision` and `embed` alike, to the policies
+attached to it before the response cache key is computed, and sends exactly the text they return.
+A client with no policy refuses to send, by name, with `NoHostedRequestPolicy`
+(`exulanica/models/policy.py`), and the one client an instance builds carries none. The policy
+that applies the account holder's rules is `WorkspaceRequestPolicy` in
+`exulanica/epistemics/hosted_requests.py`, attached where the workspace is known: a route sends
+through `Services.hosted_model`, the caption-vector pass and the vision stage attach it for the
+photograph whose text or bytes they send, and the society runtime for the decision it asks for. As each request leaves
+it:
+
+* replaces every saved name in every user and assistant message and every embedding input: a
+  person's, a voice's, an object's, an event's and a conversation's always, and a place's unless
+  the place-name right releases it for every model that request's role can reach, at its
+  destination;
+* checks a current personal model right for every photograph the request names, all or nothing:
+  the composer names its packet's captures, the caption pass its capture, and the vision stage its
+  photograph; a capture screened under a synthetic or benchmark authority passes as it does
+  everywhere else, and a request with an image part and no photograph is refused.
+
+`tests/test_hosted_boundary.py` finds every hosted call the product package makes by walking its
+syntax trees, requires each to be a registered path with a scripted run, and runs each through the
+code the product runs over a person and a place saved through `name_occurrence` and written on a
+photograph's sign. No request carries either name, system messages included; every request the
+transport recorded was admitted by the policy, text for text; and the four paths whose call site
+replaces names itself hold with that replacement disabled. Measured 2026-09-23 by making
+`ModelClient._admit` return the payload untouched: 15 of the file's 19 tests fail, and the caption,
+query, environment and society requests carry both names as they are stored.
+
+**Which requests honour a place right.** The Companion's own call sites replace every saved name
+before the boundary sees the text, a released place's included, so the planner, the composer, the
+request classifier and both drafters never carry a place's name. The caption-vector pass and the
+query embedding leave their text to the boundary, so a place whose right names the embedding
+role's models reaches them by name. The resolver that reads the right is injected as
+`Services.released_place_names`; an instance built without it releases no place's name.
+
+**What the boundary does not do.** It never rewrites a system message: a system message is product
+instruction, and rewriting one would put `[person A]` for every "may" in every prompt of somebody
+saved as May. The byte test holds that no system message on any path carries a saved name
+instead. It cannot recognise a name the account holder has not saved. And it assigns placeholders
+per request, in the order it recognises names, so in embedding text `[place A]` is a different
+place in each caption and in each query: a query about one saved place shares that token with every
+caption that holds any saved place. That leaks nothing, and it can pull the wrong photographs into
+vector retrieval; it is not measured, because measuring it needs hosted calls.
 
 ## 3. Which refusals mean "this was a question"
 

@@ -22,6 +22,7 @@ from exulanica.evidence.blob import BlobId
 from exulanica.evidence.region import DisplayGeometry, Rect, Region
 from exulanica.identity.keys import occurrence_identity_key
 from exulanica.ingest.exif import ExifFacts
+from exulanica.ingest.hosted_policy import photograph_policy
 from exulanica.ingest.ledger import Ledger
 from exulanica.ingest.model_rights import ModelHandoff, ModelRightRefused, require_model_right
 from exulanica.ingest.privacy import require_observation_screening
@@ -172,6 +173,11 @@ def run(
             input_blob=blob_id,
         )
         return None
+    # Every hosted request passes its client's policies. This one is the workspace's, scoped to
+    # this photograph, so the right just checked is asked again as the bytes leave.
+    bind = getattr(model, "with_policy", None)
+    if callable(bind):
+        model = bind(photograph_policy(writes.repository, capture_id, screening.screening_id))
     with ledger.stage(
         spec, input_artifact_ids=[rendition.artifact_id], input_blob=blob_id
     ) as recorder:

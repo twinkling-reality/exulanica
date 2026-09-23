@@ -19,6 +19,7 @@ from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
 from psycopg.rows import dict_row
 
 from exulanica.epistemics.vocabulary import RECONSTRUCTION_SCENE_RUNG_PREDICATE
+from exulanica.graph.entities import NAME_PREDICATE, _withdrawn_entity_ids
 from exulanica.store.base import ContentAddressedStore
 from exulanica.world.authored_delta import canonical_delta_document, delta_sha256
 from exulanica.world.object_repository import WorldObjectRepository
@@ -58,6 +59,12 @@ _EXPORT_POLICY: Final = {
     "profile": "exulanica-wmp-default-exclusion-v1",
     "raw_payloads": "excluded",
 }
+
+#: Why a person's saved name is not in the package: they withdrew. A withdrawn person keeps their
+#: entity row and their naming assertions, so the package still shows that somebody was named and
+#: when, and the name itself does not travel. The rule is the one ``exulanica.graph.entities``
+#: applies to the read path, asked of the same predicate.
+PERSON_WITHDRAWN_REASON: Final = "the person withdrew; their saved name is not exported"
 
 
 @dataclass(frozen=True, slots=True)
@@ -143,6 +150,7 @@ def project_world_package(
                 pointers = _current_pointers(cursor, world_id)
                 if after_snapshot_hook is not None:
                     after_snapshot_hook()
+                withdrawn = _withdrawn_entity_ids(connection, workspace_id)
                 components = _project_components(
                     cursor,
                     world_id,
@@ -150,6 +158,7 @@ def project_world_package(
                     workspace_id=workspace_id,
                     evaluation_reports=evaluation_reports,
                     parent_merkle_root_sha256=parent_merkle_root_sha256,
+                    withdrawn=withdrawn,
                 )
                 if authored.EXTENSION_KEY in extensions or environments.EXTENSION_KEY in extensions:
                     # Read inside the same REPEATABLE READ snapshot as every 1.0 component, so
@@ -213,6 +222,10 @@ def project_world_package(
                         published_extensions.append(environments.EXTENSION_KEY)
                     extensions = published_extensions
                 files = _crate_files(components)
+                # Read back from the bytes about to be signed, not from the rows that made them.
+                _refuse_withdrawn_names(
+                    files, _withdrawn_names(cursor, workspace_id, withdrawn), withdrawn
+                )
                 for path, data in files.items():
                     if path.endswith(".json"):
                         scan_payload(path, json.loads(data))
@@ -307,6 +320,7 @@ def _project_components(
     workspace_id: uuid.UUID,
     evaluation_reports: Sequence[Path],
     parent_merkle_root_sha256: str | None,
+    withdrawn: frozenset[uuid.UUID],
 ) -> dict[str, Any]:
     captures = cursor.execute(
         "select c.capture_id,c.blob_sha256,c.started_at,c.created_at,b.byte_size,b.media_type,"
@@ -463,7 +477,7 @@ def _project_components(
                 "external_source": row["external_source"],
                 "kind": str(row["kind"]),
                 "object_ref": _reference(row["object_ref"]),
-                "object_value": row["object_value"],
+                "object_value": None if _names_withdrawn(row, withdrawn) else row["object_value"],
                 "predicate": row["predicate"],
                 "status": str(row["status"]),
                 "subject_ref": _reference(row["subject_ref"]),
@@ -472,6 +486,7 @@ def _project_components(
                 ],
                 "supersedes": _optional_urn("assertion", row["supersedes"]),
                 "valid_time": row["valid_time"],
+                **_withheld("object_value", _names_withdrawn(row, withdrawn)),
             }
             for row in assertions
         ],
@@ -487,9 +502,10 @@ def _project_components(
         "entities": [
             {
                 "class": str(row["class"]),
-                "display_name": row["display_name"],
+                "display_name": None if row["entity_id"] in withdrawn else row["display_name"],
                 "entity_id": entity_ids[row["entity_id"]],
                 "merged_into": _mapped_or_urn(entity_ids, "entity", row["merged_into"]),
+                **_withheld("display_name", row["entity_id"] in withdrawn),
             }
             for row in entities
         ],
@@ -710,6 +726,112 @@ def _project_components(
         "world/structure.json": structure,
         **world_sections,
     }
+
+
+def _names_withdrawn(row: Mapping[str, Any], withdrawn: frozenset[uuid.UUID]) -> bool:
+    """Whether this assertion names a person who withdrew, so its value does not travel."""
+    subject = row["subject_ref"] or {}
+    return (
+        row["predicate"] == NAME_PREDICATE
+        and subject.get("type") == "entity"
+        and uuid.UUID(str(subject.get("id"))) in withdrawn
+    )
+
+
+def _withheld(field: str, withheld: bool) -> dict[str, Any]:
+    """The reason a field of this row carries no value, on the row itself, or nothing."""
+    return {"withheld": {field: PERSON_WITHDRAWN_REASON}} if withheld else {}
+
+
+def _withdrawn_names(
+    cursor: psycopg.Cursor, workspace_id: uuid.UUID, withdrawn: frozenset[uuid.UUID]
+) -> frozenset[str]:
+    """Every name a withdrawn person was saved under: display names and every naming value.
+
+    Deleted and superseded names included, because a name the account holder once typed for this
+    person is still theirs, and the package must carry none of them.
+    """
+    if not withdrawn:
+        return frozenset()
+    rows = cursor.execute(
+        "select display_name as name from entity where workspace_id=%s and entity_id=any(%s) "
+        "and display_name is not null "
+        "union select a.object_value #>> '{}' from assertion a "
+        "join predicate p on p.predicate_id=a.predicate_id and p.key=%s "
+        "where a.workspace_id=%s and a.subject_ref->>'type'='entity' "
+        "and a.subject_ref->>'id'=any(%s) and jsonb_typeof(a.object_value)='string'",
+        (
+            workspace_id,
+            list(withdrawn),
+            NAME_PREDICATE,
+            workspace_id,
+            [str(entity) for entity in withdrawn],
+        ),
+    ).fetchall()
+    return frozenset(_spelled(row["name"]) for row in rows if row["name"] and row["name"].strip())
+
+
+def _spelled(name: str) -> str:
+    return " ".join(name.split()).casefold()
+
+
+def _refuse_withdrawn_names(
+    files: Mapping[str, bytes], names: frozenset[str], withdrawn: frozenset[uuid.UUID]
+) -> None:
+    """Refuse to sign a package that carries a withdrawn person's saved name.
+
+    Read back from the bytes about to be signed. Every row of a withdrawn person must withhold its
+    name and say why, and no JSON value anywhere in the package may be a name that person was saved
+    under, so a name exported by a field added later is refused rather than signed. The one
+    exception is a name an entity that did not withdraw is itself saved under and carries in its
+    own row: two people can share a name, and the one who did not withdraw keeps theirs.
+    """
+    if not withdrawn:
+        return
+    graph = json.loads(files["memory/graph.json"])
+    urns = {_urn("entity", entity) for entity in withdrawn}
+    kept: set[str] = set()
+    for row in graph["entities"]:
+        if row["entity_id"] not in urns:
+            if isinstance(row["display_name"], str):
+                kept.add(_spelled(row["display_name"]))
+        elif row["display_name"] is not None or row.get("withheld") != {
+            "display_name": PERSON_WITHDRAWN_REASON
+        }:
+            raise PackageError(
+                f"memory/graph.json: entity {row['entity_id']} withdrew and does not withhold "
+                "its name"
+            )
+    for row in graph["assertions"]:
+        if row["predicate"] != NAME_PREDICATE:
+            continue
+        if (row["subject_ref"] or {}).get("id") not in urns:
+            if isinstance(row["object_value"], str):
+                kept.add(_spelled(row["object_value"]))
+        elif row["object_value"] is not None or row.get("withheld") != {
+            "object_value": PERSON_WITHDRAWN_REASON
+        }:
+            raise PackageError(
+                f"memory/graph.json: naming assertion {row['assertion_id']} names a person who "
+                "withdrew and does not withhold its value"
+            )
+    refused = names - kept
+
+    def walk(node: Any, pointer: str) -> None:
+        if isinstance(node, Mapping):
+            for key, child in node.items():
+                walk(child, f"{pointer}/{key}")
+        elif isinstance(node, list):
+            for index, child in enumerate(node):
+                walk(child, f"{pointer}/{index}")
+        elif isinstance(node, str) and _spelled(node) in refused:
+            raise PackageError(
+                f"{pointer}: a withdrawn person's saved name would be signed into the package"
+            )
+
+    for path, data in sorted(files.items()):
+        if path.endswith(".json"):
+            walk(json.loads(data), path)
 
 
 def _structure(

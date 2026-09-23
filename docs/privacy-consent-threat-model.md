@@ -516,6 +516,23 @@ Destruction is the separate cascade this section describes, and it has not been 
 maps yet; what holds today is that nothing serves them. A map published before the binding existed
 is unaffected, because nothing here invents a right for a photograph processed before rights did.
 
+**What leaves for a hosted model is decided at one point.** Every request the product sends to a
+hosted model passes the policies attached to its `ModelClient` before anything else is done with
+it, and a client with no policy refuses to send (`exulanica/models/client.py`,
+`exulanica/models/policy.py`). The policy the product attaches, `WorkspaceRequestPolicy` in
+`exulanica/epistemics/hosted_requests.py`, applies the account holder's rules to each request as it
+leaves: a person's saved name never goes, a confirmed place's name goes only where the place-name
+right releases it for every model the request can reach, and a photograph's bytes or the text
+derived from it go only under a current personal model right for that photograph, asked again at
+that moment even when the code that built the request asked already. System messages are product
+instructions and are sent as written, and `tests/test_hosted_boundary.py` holds, for every hosted
+call the product package makes, that no saved name is in any part of any request. What the policy
+cannot do and which requests honour a place right are stated in `companion-question.md` section 2.
+The World Memory Package applies the read path's withdrawal rule to the names it exports: a
+withdrawn person's entity and naming assertions keep their rows, lose their values and say why,
+and the projector refuses to sign a package in which any value is a name that person was ever
+saved under, unless somebody who did not withdraw is saved under the same name
+(`exulanica/world_package/projector.py`, `docs/world-memory-package.md`).
 
 ### 4.5 Where a place's name may go
 

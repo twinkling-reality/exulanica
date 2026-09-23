@@ -27,7 +27,7 @@ from exulanica.models.reasoning import split_reasoning
 from exulanica.models.transport import HttpResponse
 from pydantic import BaseModel, model_validator
 
-from model_fakes import chat_body, model_not_found
+from model_fakes import RecordingPolicy, chat_body, model_not_found
 
 MESSAGES = [{"role": "user", "content": "how many photographs are in this album"}]
 
@@ -496,7 +496,11 @@ def test_the_key_never_reaches_the_cache(manifest, transport):
     cache = InMemoryResponseCache()
     transport.default = ok(chat_body("x"))
     ModelClient(
-        api_key="super-secret", manifest=manifest, transport=transport, cache=cache
+        api_key="super-secret",
+        manifest=manifest,
+        transport=transport,
+        cache=cache,
+        policy=RecordingPolicy(),
     ).chat(Role.REASONING_CHEAP, MESSAGES, prompt_version="v1")
     assert "super-secret" not in json.dumps(cache.entries)
 
@@ -671,7 +675,11 @@ def test_a_cached_reply_is_revalidated_on_the_way_out(manifest, transport):
     cache = InMemoryResponseCache()
     transport.default = ok(chat_body('{"required_field": "present"}'))
     client = ModelClient(
-        api_key="test-key-not-real", manifest=manifest, transport=transport, cache=cache
+        api_key="test-key-not-real",
+        manifest=manifest,
+        transport=transport,
+        cache=cache,
+        policy=RecordingPolicy(),
     )
     first = client.chat(
         Role.VISION, MESSAGES, prompt_version="v1", response_format=hand_written_format()

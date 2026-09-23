@@ -32,7 +32,7 @@ from exulanica.models.lens_budget import (
 from exulanica.models.manifest import Role, load_manifest
 from exulanica.models.usage import USD_QUANTUM
 
-from model_fakes import FakeTransport
+from model_fakes import FakeTransport, RecordingPolicy
 
 LENS = "facade-proposer"
 ROLE = Role.REASONING_CHEAP
@@ -84,7 +84,10 @@ def _guarded(budget: LensBudget, clock: Clock | None = None, **kwargs):
     )
     transport = FakeTransport()
     client = guard.model_client(
-        api_key="test-key-not-real", manifest=load_manifest(), transport=transport
+        api_key="test-key-not-real",
+        manifest=load_manifest(),
+        transport=transport,
+        policy=RecordingPolicy(),
     )
     return guard, transport, client
 
@@ -219,6 +222,7 @@ def test_a_refusal_is_a_budget_error_the_chain_never_retries():
         transport=transport,
         max_attempts=3,
         sleep=lambda _seconds: None,
+        policy=RecordingPolicy(),
     )
     with pytest.raises(LensBudgetExceeded, match="Never retry") as refused:
         _ask(client)
@@ -231,7 +235,10 @@ def test_a_failed_request_stays_charged_at_its_worst_case():
     guard = LensBudgetGuard(LENS, GENEROUS, per_call_timeout_ms=TIMEOUT_MS, clock=Clock())
     transport = FakeTransport([TransportError("reset after send", retryable=False)])
     client = guard.model_client(
-        api_key="test-key-not-real", manifest=load_manifest(), transport=transport
+        api_key="test-key-not-real",
+        manifest=load_manifest(),
+        transport=transport,
+        policy=RecordingPolicy(),
     )
     with pytest.raises(TransportError):
         _ask(client)
@@ -313,6 +320,7 @@ def test_a_cache_hit_changes_no_ceiling():
         manifest=load_manifest(),
         transport=transport,
         cache=InMemoryResponseCache(),
+        policy=RecordingPolicy(),
     )
     client.chat(ROLE, MESSAGES, prompt_version="lens-v1", max_tokens=MAX_TOKENS)
     before = (guard.calls_committed, guard.tokens_committed, guard.usd_committed)

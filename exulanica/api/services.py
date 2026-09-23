@@ -11,6 +11,10 @@ Four things, and the interesting one is the second.
 *   **The object store**, which is what an evidence citation resolves against.
 *   **The model client**, built lazily. Model-dependent endpoints need a configured client, and
     an instance with no credential should serve the other endpoints rather than refuse to start.
+    The client is shared by every workspace and carries no policy, so it sends nothing by itself:
+    a route sends through :meth:`Services.hosted_model`, which attaches the workspace's rules
+    (:class:`~exulanica.epistemics.hosted_requests.WorkspaceRequestPolicy`), and the derivative
+    worker's passes attach them per capture.
 *   **Whether this instance drains the derivative queue.** ``POST /intake`` runs the intake stage
     in the request and queues the rest by capture id, so something has to drain it. In one
     process that is a daemon thread here. An instance that leaves it to somebody else says so in
@@ -27,18 +31,28 @@ from __future__ import annotations
 import json
 import os
 import uuid
-from collections.abc import Mapping
+from collections.abc import Callable, Mapping
+from contextlib import AbstractContextManager
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Final
 
+import psycopg
+
 from exulanica.api.account_runtime import AccountRuntime, load_account_runtime
 from exulanica.api.authorisation import API_TOKENS_ENV, TokenDirectory, load_token_directory
+from exulanica.api.composer_rights import photograph_text_right
 from exulanica.api.society_control_worker import SocietyControlWorker
 from exulanica.api.society_runtime import AuthoredWorldSocietyBinding, SocietyRuntime
 from exulanica.db.session import DATABASE_URL_ENV, Database
 from exulanica.env import env_get, env_name, resolve_data_dir
 from exulanica.epistemics.caption_embeddings import CaptionEmbeddingPass
+from exulanica.epistemics.hosted_requests import (
+    ReleasedPlaces,
+    WorkspaceRequestPolicy,
+    borrowing,
+    no_place_released,
+)
 from exulanica.ingest.vision import NebiusVisionModel
 from exulanica.ingest.worker import DerivativeWorker, lease_seconds_for
 from exulanica.models.client import ModelClient
@@ -135,10 +149,46 @@ class Services:
     #: Explicit host opt-in to discover all currently active account-owned workspaces.
     runs_society_control_worker: bool = False
     society_base_tick_interval_ms: int = 1000
+    #: The place-name right's resolver, asked by every workspace policy this instance attaches
+    #: whether a confirmed place's name may go to a hand-over. The one that releases nothing is
+    #: the account holder's default and what an instance without the right runs.
+    released_place_names: ReleasedPlaces = no_place_released
 
     @property
     def society_control_enabled(self) -> bool:
         return self.runs_society_control_worker or bool(self.society_control_workspaces)
+
+    def request_policy(
+        self,
+        workspace_id: uuid.UUID,
+        connection: Callable[[], AbstractContextManager[psycopg.Connection]],
+    ) -> WorkspaceRequestPolicy:
+        """The workspace's rules for what a hosted request may carry, as this instance applies them.
+
+        ``connection`` lends or opens an idle connection scoped to ``workspace_id``; the policy
+        reads the saved names, the photograph rights and the place-name rights on it as each
+        request leaves.
+        """
+        return WorkspaceRequestPolicy(
+            workspace_id,
+            connection=connection,
+            photograph_right=photograph_text_right,
+            released_places=self.released_place_names,
+        )
+
+    def hosted_model(
+        self, connection: psycopg.Connection, workspace_id: uuid.UUID
+    ) -> ModelClient | None:
+        """The model client for one request of one workspace, or None with no credential.
+
+        The process's client with this workspace's rules attached, lent the request's own
+        connection, which is idle between the route's queries. A route sends through nothing else.
+        """
+        if self.model_client is None:
+            return None
+        return self.model_client.with_policy(
+            self.request_policy(workspace_id, borrowing(connection))
+        )
 
     def build_society_control_worker(self) -> SocietyControlWorker | None:
         if not self.society_control_enabled:
@@ -257,7 +307,11 @@ class Services:
                 self.accounts.active_owned_workspaces if self.accounts is not None else None
             ),
             vision=NebiusVisionModel(self.model_client) if self.model_client else None,
-            embedding_pass=CaptionEmbeddingPass(self.model_client) if self.model_client else None,
+            embedding_pass=(
+                CaptionEmbeddingPass(self.model_client, released_places=self.released_place_names)
+                if self.model_client
+                else None
+            ),
             lease_seconds=lease_seconds_for(
                 max(
                     self.model_client.worst_case_seconds(role)

@@ -35,6 +35,12 @@ Everything here exists because of something that was measured, not assumed:
     deployment whose ``EXULANICA_EGRESS_ALLOWLIST`` does not declare ``manifest.base_url`` fails
     here, at startup, instead of at its first question. The transport checks every call again;
     see :mod:`exulanica.models.egress` for what that does and does not cover.
+*   **Every request passes the client's policies before anything else happens to it.** ``chat``
+    (and so ``structured`` and ``vision``) and ``embed`` hand the request to each attached policy
+    before the cache key is computed, and send exactly the text the policies return. A client with
+    no policy refuses to send, by name. A policy is attached with :meth:`ModelClient.with_policy`
+    by the code that knows whose data the request carries; policies only accumulate. See
+    :mod:`exulanica.models.policy`.
 
 The client holds a cache, a budget guard and a ledger. All three are optional collaborators with
 inert defaults, so a caller gets no caching and generous limits unless it asks, and a test gets
@@ -43,8 +49,10 @@ exact ones.
 
 from __future__ import annotations
 
+import copy
 import time
-from collections.abc import Callable, Mapping, Sequence
+import uuid
+from collections.abc import Callable, Iterable, Mapping, Sequence
 from typing import Any, Final, TypeVar
 
 from pydantic import BaseModel, ValidationError
@@ -59,8 +67,17 @@ from exulanica.models.errors import (
     MaxTokensTooLowError,
     StructuredOutputError,
 )
+from exulanica.models.handoff import ModelHandoff
 from exulanica.models.manifest import Manifest, Role, load_manifest
 from exulanica.models.messages import image_part, text_part
+from exulanica.models.policy import (
+    HostedRequest,
+    HostedRequestPolicy,
+    HostedRequestRefused,
+    NoHostedRequestPolicy,
+    admitted_payload,
+    request_parts,
+)
 from exulanica.models.response import embedding_from_body, result_from_body
 from exulanica.models.results import ChatResult, EmbeddingResult, StructuredResult
 from exulanica.models.schema import (
@@ -126,7 +143,11 @@ class ModelClient:
         timeout: float = _DEFAULT_TIMEOUT,
         max_attempts: int = 1,
         sleep: Callable[[float], None] = time.sleep,
+        policy: HostedRequestPolicy | None = None,
     ) -> None:
+        # No policy means nothing is sent: every sending method refuses by name until one is
+        # attached, here or with `with_policy` where the workspace is known.
+        self._policies: tuple[HostedRequestPolicy, ...] = () if policy is None else (policy,)
         self._manifest = manifest or load_manifest()
         self._cache: ResponseCache = cache if cache is not None else NullResponseCache()
         self._budget = budget if budget is not None else BudgetGuard()
@@ -178,6 +199,61 @@ class ModelClient:
             f"ModelClient(base_url={self._manifest.base_url!r}, "
             f"pipeline_version={self._manifest.pipeline_version})"
         )
+
+    # -- policy ------------------------------------------------------------------------------
+
+    def with_policy(self, policy: HostedRequestPolicy) -> ModelClient:
+        """This client with ``policy`` added after the ones it already has.
+
+        The copy shares the manifest, the cache, the budget and the chain, so a request it sends
+        is counted and cached exactly as one sent by this client. Policies only accumulate: every
+        policy attached before still applies, so attaching one can never loosen what an earlier
+        attachment decided.
+        """
+        if not callable(getattr(policy, "admit", None)):
+            raise TypeError("a hosted-request policy has an admit method")
+        bound = copy.copy(self)
+        bound._policies = (*self._policies, policy)
+        return bound
+
+    def _admit(
+        self, role: Role, payload: dict[str, Any], photographs: Iterable[uuid.UUID]
+    ) -> dict[str, Any]:
+        """The one point every hosted request passes, before the cache key and before the chain.
+
+        Each policy judges the request as the one before it left it, and the payload that goes on
+        carries exactly the texts the last one returned.
+        """
+        if not self._policies:
+            raise NoHostedRequestPolicy(
+                f"this client has no hosted-request policy, so it sends nothing to the {role} "
+                "role. Attach the workspace's policy with with_policy() where the workspace is "
+                "known, or BenchmarkInputs to a client whose inputs carry no account holder's data."
+            )
+        declared = frozenset(photographs)
+        if not all(isinstance(capture, uuid.UUID) for capture in declared):
+            raise TypeError("a request declares its photographs by capture id")
+        texts, instructions, images = request_parts(payload)
+        handoff = ModelHandoff.hosted(self._manifest, role)
+        for policy in self._policies:
+            admitted = tuple(
+                policy.admit(
+                    HostedRequest(
+                        role=role,
+                        handoff=handoff,
+                        texts=texts,
+                        instructions=instructions,
+                        photographs=declared,
+                        images=images,
+                    )
+                )
+            )
+            if len(admitted) != len(texts):
+                raise HostedRequestRefused(
+                    f"a policy returned {len(admitted)} texts for a request carrying {len(texts)}"
+                )
+            texts = admitted
+        return admitted_payload(payload, texts)
 
     def worst_case_seconds(self, role: Role) -> float:
         """The longest one call for this role can take on THIS client, timeouts and retries in.
@@ -280,21 +356,29 @@ class ModelClient:
         extra: Mapping[str, Any] | None = None,
         image_prompt_tokens: int = 0,
         use_cache: bool = True,
+        photographs: Iterable[uuid.UUID] = (),
     ) -> ChatResult:
         """One chat completion, routed by role.
 
         ``prompt_version`` is required rather than defaulted. It is part of the cache key, and a
         default would mean editing a prompt and silently getting the previous prompt's answers,
         which is a full afternoon of confusion for the sake of one keyword argument.
+
+        ``photographs`` names every capture whose bytes or derived text the messages carry. The
+        client's policies decide whether they may go; see :mod:`exulanica.models.policy`.
         """
         role = Role(role)
         resolved_max = self._resolve_max_tokens(role, max_tokens)
-        payload = self._build_payload(
-            messages=messages,
-            max_tokens=resolved_max,
-            temperature=temperature,
-            response_format=response_format,
-            extra=extra,
+        payload = self._admit(
+            role,
+            self._build_payload(
+                messages=messages,
+                max_tokens=resolved_max,
+                temperature=temperature,
+                response_format=response_format,
+                extra=extra,
+            ),
+            photographs,
         )
 
         key = cache_key(
@@ -327,7 +411,7 @@ class ModelClient:
                     response_format=response_format,
                 )
 
-        prompt_chars = sum(len(str(m)) for m in messages)
+        prompt_chars = sum(len(str(m)) for m in payload["messages"])
         served = self._chain.walk(
             role,
             "/chat/completions",
@@ -378,6 +462,7 @@ class ModelClient:
         extra: Mapping[str, Any] | None = None,
         image_prompt_tokens: int = 0,
         use_cache: bool = True,
+        photographs: Iterable[uuid.UUID] = (),
     ) -> StructuredResult[T]:
         """The only path by which model output may become canonical state.
 
@@ -402,6 +487,7 @@ class ModelClient:
             extra=extra,
             image_prompt_tokens=image_prompt_tokens,
             use_cache=use_cache,
+            photographs=photographs,
         )
         # ``chat`` has already refused a body carrying more than one candidate object and
         # validated the survivor against the exact schema it sent, so ``call.payload`` is
@@ -439,11 +525,13 @@ class ModelClient:
         max_tokens: int | None = None,
         image_prompt_tokens: int | None = None,
         use_cache: bool = True,
+        photographs: Iterable[uuid.UUID] = (),
     ) -> ChatResult | StructuredResult[T]:
         """One call over one or more photographs.
 
         The single-photograph path is the primary experience, not a degenerate case of a batch,
-        so a bare ``bytes`` is accepted directly and needs no wrapping.
+        so a bare ``bytes`` is accepted directly and needs no wrapping. ``photographs`` names the
+        captures the images are, for the client's policies.
 
         Nothing here trusts the catalog's ``type`` field. The primary vision model is typed
         ``text2text`` and was runtime-verified to accept an ``image_url`` part and describe the
@@ -475,6 +563,7 @@ class ModelClient:
                 max_tokens=max_tokens,
                 image_prompt_tokens=estimated,
                 use_cache=use_cache,
+                photographs=photographs,
             )
         return self.structured(
             role,
@@ -484,6 +573,7 @@ class ModelClient:
             max_tokens=max_tokens,
             image_prompt_tokens=estimated,
             use_cache=use_cache,
+            photographs=photographs,
         )
 
     # -- embeddings ---------------------------------------------------------------------------
@@ -495,6 +585,7 @@ class ModelClient:
         role: Role | str = Role.EMBEDDING,
         prompt_version: str = "embed-v1",
         use_cache: bool = True,
+        photographs: Iterable[uuid.UUID] = (),
     ) -> EmbeddingResult:
         """Embed one or more strings.
 
@@ -503,9 +594,12 @@ class ModelClient:
         vector from a different model is not a worse vector, it is a vector in a different space,
         and mixing spaces silently poisons every stored embedding and every retrieval built on
         them.
+
+        ``photographs`` names every capture whose derived text is among ``texts``, for the
+        client's policies, which also decide what of each text leaves.
         """
         role = Role(role)
-        payload: dict[str, Any] = {"input": list(texts)}
+        payload = self._admit(role, {"input": list(texts)}, photographs)
         key = cache_key(
             payload,
             pipeline_version=self._manifest.pipeline_version,
@@ -523,7 +617,7 @@ class ModelClient:
             role,
             "/embeddings",
             payload,
-            prompt_chars=sum(len(t) for t in texts),
+            prompt_chars=sum(len(t) for t in payload["input"]),
             extra_prompt_tokens=0,
             max_tokens=0,
         )

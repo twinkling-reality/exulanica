@@ -69,7 +69,7 @@ from conftest import (
     ingest_observed,
     write_photo,
 )
-from model_fakes import FakeTransport, chat_body
+from model_fakes import FakeTransport, RecordingPolicy, chat_body
 
 #: The string an attacker holds up in front of the camera. It reaches the composer as OCR text,
 #: which is exactly the channel evaluation-methodology.md section 5 calls "photographed text",
@@ -125,6 +125,7 @@ class Answered:
             api_key="test-key-not-real",
             transport=transport,
             budget=_budget(),
+            policy=RecordingPolicy(),
         )
 
 
@@ -1183,7 +1184,12 @@ def _planner_client(*bodies: str | dict) -> tuple[ModelClient, FakeTransport]:
             for body in bodies
         ]
     )
-    client = ModelClient(api_key="test-key-not-real", transport=transport, budget=_budget())
+    client = ModelClient(
+        api_key="test-key-not-real",
+        transport=transport,
+        budget=_budget(),
+        policy=RecordingPolicy(),
+    )
     return client, transport
 
 

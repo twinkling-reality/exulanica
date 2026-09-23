@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import uuid
+from dataclasses import replace
 
 import psycopg
 from fastapi import Request
@@ -12,6 +13,7 @@ from exulanica.selection.validation import Session
 from exulanica.world.models import DEFAULT_WORLD_ID
 from exulanica.world.society import UnavailableSocietyInput
 from exulanica.world.society_decision_repository import SocietyDecisionRepository
+from exulanica.world.society_decisions import SocietyDecisionProvider
 from exulanica.world.society_repository import SocietyRepository
 
 
@@ -62,6 +64,18 @@ def request_decision(
             "provider": None,
         }
     else:
+        if isinstance(provider, SocietyDecisionProvider):
+            # The workspace's rules go with the request; its policy opens its own short read-only
+            # session as the request leaves, so the call itself still holds no connection.
+            provider = replace(
+                provider,
+                client=provider.client.with_policy(
+                    services.request_policy(
+                        session.workspace_id,
+                        lambda: services.readonly_database.session(session.workspace_id),
+                    )
+                ),
+            )
         try:
             result = provider.propose(reservation["request"]["context"])
         except Exception:

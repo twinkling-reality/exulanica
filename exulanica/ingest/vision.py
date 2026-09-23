@@ -63,6 +63,7 @@ from exulanica.models.errors import ModelError
 from exulanica.models.handoff import ModelHandoff
 from exulanica.models.manifest import Role
 from exulanica.models.messages import image_part
+from exulanica.models.policy import HostedRequestPolicy
 from exulanica.models.results import ChatResult
 from exulanica.models.schema import response_format_for_schema
 
@@ -668,6 +669,10 @@ class NebiusVisionModel:
         A personal photograph is sent only when a right names each of these.
         """
         return ModelHandoff.hosted(self._client.manifest, Role.VISION)
+
+    def with_policy(self, policy: HostedRequestPolicy) -> NebiusVisionModel:
+        """This model, sending through its client with ``policy`` attached after its own."""
+        return NebiusVisionModel(self._client.with_policy(policy), max_tokens=self._max_tokens)
 
     def observe(self, *, image_bytes: bytes, media_type: str) -> VisionResult:
         call: ChatResult = self._client.chat(

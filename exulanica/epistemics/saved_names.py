@@ -2,9 +2,12 @@
 
 A name exists in this product only because the account holder typed it as an annotation: who a
 person is, what a place is called, what an object is. The account holder's rules are that a
-person's name never goes to a hosted model, with or without a right, and that a confirmed place
-name goes only under a right for that place and that model, which does not yet exist. So until it
-does, no saved name of any kind is sent, and each one is found and replaced locally instead:
+person's name never goes to a hosted model, with or without a right, and that a confirmed place's
+name goes only under a right the account holder grants for that place and that model. Every other
+saved name is found and replaced locally, by this module, in two places: the Companion's own
+requests, which replace every saved name including every place's, and the boundary every hosted
+request passes (:mod:`exulanica.epistemics.hosted_requests`), which leaves a place's name only
+where a right releases it for that request's models:
 
 *   **The names to look for** are every name the account holder has saved for any entity. Deleted
     and merged records are included, because a name the account holder once typed is still theirs.
@@ -27,6 +30,7 @@ somebody saved as Rose makes "the rose garden" arrive as "the [person A] garden"
 
 from __future__ import annotations
 
+import json
 import re
 import uuid
 from collections.abc import Iterable, Mapping
@@ -88,7 +92,12 @@ def _label(entity_class: str, index: int) -> str:
 
 
 def _patterns(names: Iterable[SavedName]) -> list[tuple[re.Pattern[str], SavedName]]:
-    """One pattern per recognisable form of each name, longest first so whole names win."""
+    """One pattern per recognisable form of each name, longest first so whole names win.
+
+    A form a JSON string would spell differently, one with a quotation mark or a backslash in it,
+    is also recognised as JSON spells it, the way canonical JSON writes it (non-ASCII kept as
+    itself), because a request can carry a JSON document as text.
+    """
     forms: list[tuple[str, SavedName]] = []
     for saved in names:
         whole = " ".join(saved.name.split())
@@ -99,6 +108,11 @@ def _patterns(names: Iterable[SavedName]) -> list[tuple[re.Pattern[str], SavedNa
             for part in whole.split(" "):
                 if len(re.sub(r"[^\w]", "", part)) >= MIN_PART_LETTERS and part != whole:
                     forms.append((part, saved))
+    forms.extend(
+        (spelled, saved)
+        for form, saved in list(forms)
+        if (spelled := json.dumps(form, ensure_ascii=False)[1:-1]) != form
+    )
     forms.sort(key=lambda form: len(form[0]), reverse=True)
     return [
         (
@@ -116,11 +130,15 @@ def redact_names(
     text: str,
     names: Iterable[SavedName],
     placeholders: Mapping[uuid.UUID, str] | None = None,
+    *,
+    reserved: Iterable[str] = (),
 ) -> Redacted:
     """Replace every recognised saved name in ``text``.
 
     ``placeholders`` continues an earlier redaction, so an entity recognised in the question keeps
-    the same placeholder when recognised again in a packet.
+    the same placeholder when recognised again in a packet. ``reserved`` names labels that are
+    never handed out here, because another part of the same request already carries them for an
+    entity this call cannot know.
     """
     assigned: dict[uuid.UUID, str] = dict(placeholders or {})
     # Split around placeholders already in the text, so a short saved name can never match inside
@@ -128,7 +146,7 @@ def redact_names(
     # every pattern so the next one sees the placeholders this one inserted.
     pieces = PLACEHOLDER.split(text)
     # A label already present, typed or left by an earlier pass, is never handed to anything else.
-    taken = set(assigned.values()) | set(pieces[1::2])
+    taken = set(assigned.values()) | set(pieces[1::2]) | set(reserved)
     for pattern, saved in _patterns(names):
         rebuilt: list[str] = []
         for position, piece in enumerate(pieces):

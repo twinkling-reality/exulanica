@@ -409,7 +409,7 @@ def plan_from_question(
     connection: ReadOnlyConnection,
     session: CurrentSession,
 ) -> SelectionPlan:
-    client = _require_model(request)
+    client = _require_model(request, connection, session)
     return propose_plan(
         client,
         body.question,
@@ -461,7 +461,11 @@ def ask(
     # A model plans a question asked in words and composes a capture answer. A CONTENT plan,
     # supplied or resolved from a city selection, is answered from its rows without one, and a
     # configured model is not asked to rephrase it either.
-    client = _require_model(request) if requires_model(plan) else get_services(request).model_client
+    client = (
+        _require_model(request, connection, session)
+        if requires_model(plan)
+        else get_services(request).hosted_model(connection, session.workspace_id)
+    )
     outcome = answer_question(
         connection,
         client,
@@ -661,8 +665,15 @@ def _execution(
     )
 
 
-def _require_model(request: Request) -> ModelClient:
-    client = get_services(request).model_client
+def _require_model(
+    request: Request, connection: ReadOnlyConnection, session: CurrentSession
+) -> ModelClient:
+    """The model client with this workspace's rules attached, or the 503 that says there is none.
+
+    Every hosted request a route sends leaves through this client, whose policy replaces every
+    saved name and checks every photograph's right as the request goes (``Services.hosted_model``).
+    """
+    client = get_services(request).hosted_model(connection, session.workspace_id)
     if client is None:
         raise HTTPException(
             status_code=503,
@@ -852,7 +863,7 @@ def appearance(
     connection: ReadOnlyConnection,
     session: CurrentSession,
 ) -> AppearanceView:
-    client = _require_model(request)
+    client = _require_model(request, connection, session)
     current: StyleReference | None = None
     try:
         current = WorldStyleRepository(connection, session.workspace_id).current().global_style
@@ -993,7 +1004,7 @@ def environment_proposal(
     connection: ReadOnlyConnection,
     session: CurrentSession,
 ) -> EnvironmentProposalResponse:
-    client = _require_model(request)
+    client = _require_model(request, connection, session)
     empty_execution = _execution((), (), prompt_version=ENVIRONMENT_PROMPT_VERSION)
     if body.selected_feature_id is None:
         return EnvironmentProposalResponse(

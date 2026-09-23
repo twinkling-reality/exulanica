@@ -23,7 +23,7 @@ from exulanica.models.manifest import Role
 from exulanica.models.transport import HttpResponse
 from exulanica.models.usage import CallUsage, CostLedger
 
-from model_fakes import chat_body
+from model_fakes import RecordingPolicy, chat_body
 
 MESSAGES = [{"role": "user", "content": "where was this taken"}]
 
@@ -39,6 +39,7 @@ def make_client(manifest, transport, *, cache=None, budget=None):
         transport=transport,
         cache=cache,
         budget=budget or BudgetGuard(ceiling_usd=Decimal("5.00"), max_calls=1000),
+        policy=RecordingPolicy(),
     )
 
 
