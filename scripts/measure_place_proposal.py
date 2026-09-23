@@ -106,6 +106,12 @@ def observe(module, manifest, image: bytes, cap: Decimal) -> dict[str, Any]:
                 "micro_usd": micro_usd(client.budget.spent_usd)}
     return {
         "payload": result.payload,
+        # What the stage writes from: the observation after any adjustment the vision model's own
+        # code made, such as lowering a proposal whose sign was found partly hidden. For a module
+        # that adjusts nothing this is the payload, validated.
+        "scored": result.observation.model_dump(mode="json"),
+        "calls": getattr(result, "calls", 1),
+        "completeness": getattr(result, "completeness", None),
         "model_id": result.model_id,
         "models_tried": list(result.tried),
         "usage": result.cost,
@@ -250,8 +256,8 @@ def main() -> None:
         for truth in truths:
             outcome = observe(module, manifest, rendition(photos / truth["file"]), stated)
             row = {"file": truth["file"], **outcome}
-            if "payload" in outcome:
-                row["score"] = score(truth, outcome["payload"])
+            if "scored" in outcome:
+                row["score"] = score(truth, outcome["scored"])
             rows.append(row)
             flag = row.get("score", {})
             print(f"{arm:<9} {truth['file']:<40} {outcome['latency_ms']:>6} ms "
