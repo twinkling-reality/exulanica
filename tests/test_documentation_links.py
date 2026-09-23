@@ -177,7 +177,12 @@ _TEXT_SUFFIXES = {
 #: A path inside a URL belongs to somebody else's repository. MEASURED: without this, the external
 #: `deep-person-reid` model zoo link in evaluation-methodology.md reads as a local dangling path.
 _URL = re.compile(r"https?://\S+")
-_DOC_PATH = re.compile(r"docs/[A-Za-z0-9][A-Za-z0-9/._-]*\.(?:md|json|patch|txt|png|py)")
+#: The suffix must end the path. Without the lookahead, `runs/gates.jsonl` was read as
+#: `runs/gates.json`, a file nobody wrote: MEASURED 2026-09-23, fourteen `.jsonl` artifacts a world
+#: scale record names, all tracked, reported as missing.
+_DOC_PATH = re.compile(
+    r"docs/[A-Za-z0-9][A-Za-z0-9/._-]*\.(?:md|jsonl|json|patch|txt|png|py)(?![A-Za-z0-9_])"
+)
 _MD_LINK = re.compile(r"\]\(([A-Za-z0-9][A-Za-z0-9/._-]*\.md)(?:#[^)]*)?\)")
 
 
@@ -262,6 +267,23 @@ def _relative_references() -> list[tuple[str, str, str]]:
             target = os.path.normpath(os.path.join(base, link))
             found.append((rel, link, link if target.startswith("..") else target))
     return found
+
+
+def test_a_named_path_keeps_its_whole_suffix():
+    """A longer suffix is not read as the shorter one it starts with; punctuation ends a path.
+
+    The examples are assembled from ``root`` because this file is scanned like any other, and a
+    literal example would be reported as a path the repository does not contain.
+    """
+    root = "docs"
+    assert _referenced_paths(f"see {root}/evaluation/artifacts/x/runs/gates.jsonl and more") == {
+        f"{root}/evaluation/artifacts/x/runs/gates.jsonl"
+    }
+    assert _referenced_paths(f"({root}/evaluation/a.json), {root}/b.md#part") == {
+        f"{root}/evaluation/a.json",
+        f"{root}/b.md",
+    }
+    assert _referenced_paths(f"{root}/c.jsonx") == set()
 
 
 def test_every_documentation_path_named_anywhere_in_the_repository_resolves():
