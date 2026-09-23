@@ -2,8 +2,12 @@
  * Composition preview and apply, from the client's side.
  *
  * Speaks `POST /world/versions/{version_id}/compositions/preview` and `.../compositions/apply`,
- * both with `?world_id=`. The request names references and intent only: which source, where it
- * goes, and the version state the caller last read. Readiness, rights, byte availability and the
+ * both with `?world_id=`. A 3D estimate from a photo has routes of its own,
+ * `.../compositions/photo-point-maps/preview` and `.../apply`, with the same body and the same
+ * answers: resolving one reads the photo's admission state, so those routes also require
+ * `admission.read`, and the generic pair refuses the kind. The version client picks the route from
+ * the body it sends. The request names references and intent only: which source, where it goes,
+ * and the version state the caller last read. Readiness, rights, byte availability and the
  * version the server compared against are all answered by the server; nothing here can assert
  * them, and nothing here sends a field that could.
  *
@@ -284,8 +288,12 @@ function oneOf<T extends string>(value: unknown, allowed: readonly T[], label: s
   return value as T;
 }
 
-const SOURCE_KINDS = ['reviewed_asset', 'environment_admission', 'source_attachment'] as const;
-const CHANGE_KINDS = ['add_object', 'add_environment', 'none'] as const;
+const SOURCE_KINDS = [
+  'reviewed_asset', 'environment_admission', 'source_attachment', 'photo_point_map',
+] as const satisfies readonly CompositionSourceKind[];
+const CHANGE_KINDS = [
+  'add_object', 'add_environment', 'add_point_map', 'none',
+] as const satisfies readonly CompositionChangeKind[];
 const BYTES_STATES = ['available', 'unavailable', 'not_applicable'] as const;
 
 /** Parse the preview document. Availability and blocked_reason are the server's, and only its. */

@@ -1565,6 +1565,11 @@ def undo_authored_edit(
 # placement. Everything that decides readiness is resolved on the server, so no field here can
 # make a preview ready. Apply runs inside ``_edit`` like every other authored edit: the same
 # transaction, the same saved-entry lock and advance, and the same durable write.
+#
+# A photo point map has a pair of routes of its own over the same resolver. Resolving one reads
+# the photograph's admission state, and a permission is declared per route in
+# ``exulanica.api.permissions`` and checked before the body is read, so the kind cannot share a
+# route with kinds that need only ``world.write``. The generic pair refuses it for every caller.
 # ------------------------------------------------------------------------------------------
 
 
@@ -1697,18 +1702,52 @@ class CompositionApplyBody(CompositionPreviewBody):
     saved_entry: SavedEntryAdvanceBody | None = None
 
 
+class PhotoPointMapPreviewBody(CompositionPreviewBody):
+    """The composition body with its source fixed to the one kind these routes take."""
+
+    source: PhotoPointMapSourceBody
+
+
+class PhotoPointMapApplyBody(CompositionApplyBody):
+    source: PhotoPointMapSourceBody
+
+
+#: Where a photo point map is composed, under this router's prefix.
+_PHOTO_POINT_MAP_COMPOSITIONS: Final = "/versions/{version_id}/compositions/photo-point-maps"
+
+#: The generic routes' answer to a photo point map, the same for every caller and every version.
+#: Deciding by the caller's grant here would be a permission read from a body, and it is not a
+#: ``blocked_reason`` because nothing was resolved.
+PHOTO_POINT_MAP_ROUTE_REQUIRED: Final = "photo_point_map_route_required"
+
+
+def _photo_point_map_route_required() -> JSONResponse:
+    routes = " and ".join(
+        f"POST {router.prefix}{_PHOTO_POINT_MAP_COMPOSITIONS}/{action}"
+        for action in ("preview", "apply")
+    )
+    return JSONResponse(
+        status_code=422,
+        content={
+            "code": PHOTO_POINT_MAP_ROUTE_REQUIRED,
+            "detail": f"a photo_point_map source is composed through {routes}",
+        },
+    )
+
+
 @router.post(
     "/versions/{version_id}/compositions/preview",
+    response_model=dict[str, object],
     summary="The server's verdict on one composition into one authored version. Writes nothing.",
 )
 def composition_preview_route(
     version_id: Annotated[uuid.UUID, Path()],
     body: CompositionPreviewBody,
     repository: WriteObjects,
-) -> dict[str, object]:
-    # The write-scoped connection, read only: apply resolves on this same connection role, so the
-    # two cannot see different rows.
-    return preview_composition(repository, version_id, body.domain()).document()
+) -> dict[str, object] | JSONResponse:
+    if body.source.kind == "photo_point_map":
+        return _photo_point_map_route_required()
+    return _preview(repository, version_id, body)
 
 
 @router.post(
@@ -1724,11 +1763,61 @@ def composition_apply_route(
     session: CurrentSession,
     request: Request,
 ) -> Response | AlternateVersionView:
+    if body.source.kind == "photo_point_map":
+        return _photo_point_map_route_required()
+    return _apply(request, repository, version_id, body, actor=session.actor)
+
+
+@router.post(
+    f"{_PHOTO_POINT_MAP_COMPOSITIONS}/preview",
+    response_model=dict[str, object],
+    summary="The server's verdict on placing a 3D estimate from a photograph. Writes nothing.",
+)
+def photo_point_map_preview_route(
+    version_id: Annotated[uuid.UUID, Path()],
+    body: PhotoPointMapPreviewBody,
+    repository: WriteObjects,
+) -> dict[str, object]:
+    return _preview(repository, version_id, body)
+
+
+@router.post(
+    f"{_PHOTO_POINT_MAP_COMPOSITIONS}/apply",
+    response_model=AlternateVersionView,
+    status_code=201,
+    summary="Place exactly the resolved estimate, or refuse with its blocked reason.",
+)
+def photo_point_map_apply_route(
+    version_id: Annotated[uuid.UUID, Path()],
+    body: PhotoPointMapApplyBody,
+    repository: WriteObjects,
+    session: CurrentSession,
+    request: Request,
+) -> Response | AlternateVersionView:
+    return _apply(request, repository, version_id, body, actor=session.actor)
+
+
+def _preview(
+    repository: WorldObjectRepository, version_id: uuid.UUID, body: CompositionPreviewBody
+) -> dict[str, object]:
+    # The write-scoped connection, read only: apply resolves on this same connection role, so the
+    # two cannot see different rows.
+    return preview_composition(repository, version_id, body.domain()).document()
+
+
+def _apply(
+    request: Request,
+    repository: WorldObjectRepository,
+    version_id: uuid.UUID,
+    body: CompositionApplyBody,
+    *,
+    actor: uuid.UUID,
+) -> Response | AlternateVersionView:
     composition = body.domain()
     return _edit(
         request,
         repository,
-        lambda: apply_composition(repository, version_id, composition, actor=session.actor),
+        lambda: apply_composition(repository, version_id, composition, actor=actor),
         saved_entry=body.saved_entry,
         authored_version_id=version_id,
         mutation_base_state_sha256=body.base_state_sha256,

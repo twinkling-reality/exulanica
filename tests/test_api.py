@@ -190,6 +190,8 @@ ROUTE_PROBES: dict[tuple[str, str], dict] = {
     },
     ("POST", "/world/versions/{version_id}/compositions/preview"): {"json": {}},
     ("POST", "/world/versions/{version_id}/compositions/apply"): {"json": {}},
+    ("POST", "/world/versions/{version_id}/compositions/photo-point-maps/preview"): {"json": {}},
+    ("POST", "/world/versions/{version_id}/compositions/photo-point-maps/apply"): {"json": {}},
     ("POST", "/world-write/scenes/{scene_id}/generated"): {
         "json": {
             "model": {"provider": "p", "model_id": "m", "model_version": "v"},

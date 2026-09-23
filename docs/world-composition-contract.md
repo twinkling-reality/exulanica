@@ -337,16 +337,37 @@ geometry is absent.
 ## Composition preview and apply
 
 [composition_preview.py](../exulanica/world/composition_preview.py) is the one path by which a
-source is placed into a named authored alternate version; a further source kind extends its resolver
-rather than adding a route. Two sources compose: a reviewed catalog asset, which becomes an authored
-object through `WorldObjectRepository.add_object`, and an admitted environment selection, which
-becomes an environment instance through `WorldObjectRepository.add_environment`. A saved-world
-source attachment resolves and is always refused: membership is a project reference, not
-composition.
+source is placed into a named authored alternate version; a further source kind extends its resolver,
+and has routes of its own only when it needs a permission the generic routes do not require. Three
+sources compose: a reviewed catalog asset, which becomes an authored object through
+`WorldObjectRepository.add_object`; an admitted environment selection, which becomes an environment
+instance through `WorldObjectRepository.add_environment`; and the depth estimate made from a
+reviewed photograph, which becomes a placed estimate through `WorldObjectRepository.add_point_map`.
+A saved-world source attachment resolves and is always refused: membership is a project reference,
+not composition.
 
-HTTP transport is `POST /world/versions/{version_id}/compositions/preview` and
-`POST /world/versions/{version_id}/compositions/apply`, both with the `world_id` query parameter the
-other version routes take. The request carries references and intent only: `base_state_sha256`,
+HTTP transport is two pairs of routes over that one resolver, both with the `world_id` query
+parameter the other version routes take:
+
+| Routes | Source kinds | A caller must hold |
+| --- | --- | --- |
+| `POST /world/versions/{version_id}/compositions/preview` and `.../compositions/apply` | `reviewed_asset`, `environment_admission`, `source_attachment` | `world.write` |
+| `POST /world/versions/{version_id}/compositions/photo-point-maps/preview` and `.../photo-point-maps/apply` | `photo_point_map` | `world.write` and `admission.read` |
+
+Resolving a `photo_point_map` reads the photograph's admission state: the depth model right the
+account holder granted and the review the estimate was made under. That is what `admission.read`
+guards on the attach and rebind routes too. A route's permissions are declared once, per route, in
+[permissions.py](../exulanica/api/permissions.py), a caller must hold every one of them, and the
+check runs before the body is read, so a kind that needs another permission cannot share a route
+with kinds that do not. The photo point map routes take the same body with the source kind fixed
+and answer with the same documents. The generic routes refuse a `photo_point_map` source for every
+caller, whatever it holds and whichever version it names, with 422
+`photo_point_map_route_required`, whose `detail` names the photo point map routes. That code is not
+a `blocked_reason`, because nothing was resolved. A caller missing either permission is refused on
+the photo point map routes by the permission floor, before anything is resolved, with the 404
+`unknown_reference` every route addressed by an id answers with.
+
+The request carries references and intent only: `base_state_sha256`,
 the source by identity (`asset_key`; or `admission_id`, `render_asset_id`, `publication_id` and
 selection; or `entry_id` and `attachment_id`), and a placement (subject id, region, transform, the
 person's origin role, a behaviour for an object, a source anchor for an environment). Unknown fields
@@ -412,7 +433,8 @@ repeats authorization under `asset_read_lock()`. A refusal at either point answe
 `composition_blocked` whose `detail` is exactly the `blocked_reason` preview reports for that state,
 and writes nothing. An entry binding that does not match answers `stale_saved_world_entry` before
 the composition is resolved. Success is the 201 version body `POST .../objects` returns, and undo is
-the existing version undo route.
+the existing version undo route, which requires `world.write` for every kind: taking a placed
+estimate back re-authorises nothing.
 
 Apply can refuse where preview could not know. The society input hook runs inside the write
 transaction, after the edit row is appended, and preview never runs it. When a purposeful society on

@@ -64,6 +64,16 @@ which has no source to inherit from.
 through `request_decision` without the endpoint naming a model client. The test that finds them
 reads each endpoint's source for all three markers.
 
+**Routes that read a photograph's admission state** require `admission.read` beside `world.write`:
+`POST /world-entries/{entry_id}/source-attachments` and `.../source-rebinds`, which resolve and pin
+a human review, and `POST /world/versions/{version_id}/compositions/photo-point-maps/preview` and
+`.../apply`, which resolve the depth model right and the review behind an estimate. The floor
+decides before the body is read, so a kind of request that needs a permission its siblings do not
+is given a route of its own: the generic composition routes refuse a `photo_point_map` source for
+every caller rather than check a grant. `admission.read` does not hide which photographs a world
+holds. `GET /world-entries` lists a world's reference photographs under `world.read`, and
+`GET /world/versions/{version_id}` includes each placed estimate's source and availability.
+
 **The status a refusal carries.** DECISION. On a route addressed by an id (a `{parameter}` in its
 path), a missing permission answers `404 unknown_reference` with one fixed detail, identical for a
 real id, a foreign id and an invented one, because M10 scores any 403 on such a route as an

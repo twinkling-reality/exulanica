@@ -177,7 +177,10 @@ Authored object composition receives `authored_version_id` explicitly. The entry
 uses `WorldObjectsClient.connect()` without a pinned version. Composition prepare and ready
 apply also address that version through
 `POST /world/versions/{version_id}/compositions/preview` and
-`POST /world/versions/{version_id}/compositions/apply`. Apply may carry the same optional
+`POST /world/versions/{version_id}/compositions/apply`. A 3D estimate from a reference photograph
+addresses it through `.../compositions/photo-point-maps/preview` and `.../apply` instead, which
+require `admission.read` as well as `world.write`; the client picks the route from the source kind
+it sends. Apply may carry the same optional
 `saved_entry` binding as authored object edits so the reopen cursor advances with the
 mutation. Attachment membership, detach, and rebind remain separate from composition apply.
 

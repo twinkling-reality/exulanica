@@ -323,6 +323,32 @@ def test_an_undeclared_route_refuses_everybody(monkeypatch):
         permissions.require(frozenset(Permission), "GET", "/graph")
 
 
+def test_a_route_naming_several_permissions_requires_every_one_of_them():
+    """All of them, not any of them, read from the function the floor calls.
+
+    Generated from the map, so an entry declared with two permissions is covered by being
+    declared. Each permission is dropped in turn from exactly what the entry names: the refusal
+    must name that one as missing, and the whole set must pass.
+    """
+    several = {
+        key: rule
+        for key, rule in ROUTE_RULES.items()
+        if isinstance(rule, Requires) and len(rule.permissions) > 1
+    }
+    # The guard on the guard: the entries this matters most for are among those swept.
+    assert {
+        ("POST", "/world-entries/{entry_id}/source-attachments"),
+        ("POST", "/world/versions/{version_id}/compositions/photo-point-maps/preview"),
+        ("POST", "/world/versions/{version_id}/compositions/photo-point-maps/apply"),
+    } <= set(several)
+    for (method, path), rule in several.items():
+        assert permissions.require(rule.permissions, method, path) is rule
+        for dropped in rule.permissions:
+            with pytest.raises(PermissionRefused) as refused:
+                permissions.require(rule.permissions - {dropped}, method, path)
+            assert refused.value.missing == {dropped}, (method, path)
+
+
 # -- the grant ----------------------------------------------------------------------------
 
 _TOKEN = "grant-token-that-is-long-enough-to-be-accepted"
@@ -798,4 +824,31 @@ def test_a_society_decision_needs_model_invoke_as_well_as_world_write(floor):
     )
     assert passed.status_code == 422, passed.text
     # And the owner, who holds both, reaches the decision route's validation too.
+    assert floor.request("owner", "POST", _fill(path), json={}).status_code == 422
+
+
+@pytest.mark.postgres
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/world/versions/{version_id}/compositions/photo-point-maps/preview",
+        "/world/versions/{version_id}/compositions/photo-point-maps/apply",
+    ],
+)
+def test_placing_a_photo_estimate_needs_admission_read_as_well_as_world_write(floor, path):
+    """Resolving an estimate reads the photograph's admission state, so world.write is not enough.
+
+    Refused by the floor before the body is read, and counted as missing exactly admission.read.
+    The owner, who holds both, reaches the route's own validation, so the refusal is the grant and
+    not the body.
+    """
+    before = _refusal_rows(floor, floor.workspace_a, "world_writer").get(("POST", path))
+    response = floor.request("world_writer", "POST", _fill(path), json={})
+    assert (response.status_code, response.json()) == (
+        404,
+        {"code": "unknown_reference", "detail": _OUR_404},
+    )
+    row = _refusal_rows(floor, floor.workspace_a, "world_writer")[("POST", path)]
+    assert row["missing_permissions"] == ["admission.read"]
+    assert row["refusals"] == (before["refusals"] if before else 0) + 1
     assert floor.request("owner", "POST", _fill(path), json={}).status_code == 422

@@ -479,14 +479,15 @@ export class WorldObjectsClient {
    *
    * It carries the base this client read and never a saved-entry binding, which preview refuses.
    * The version's own world is always named: a starter world that omitted it would resolve in the
-   * default world and answer as absent.
+   * default world and answer as absent. A photo estimate goes to its own route instead; see
+   * `compositionRoute`.
    */
   async compositionPreview(
     base: AlternateVersion,
     body: Readonly<Record<string, unknown>>,
   ): Promise<unknown> {
     return this.#transport.postJson<unknown>(
-      this.#versionWorldPath(`${compositionsPath(base.versionId)}/preview`, base),
+      this.#versionWorldPath(`${compositionRoute(base.versionId, body)}/preview`, base),
       { ...body, base_state_sha256: base.stateSha256 },
     );
   }
@@ -504,7 +505,7 @@ export class WorldObjectsClient {
   ): Promise<ObjectWriteResult> {
     return this.#write(
       base,
-      this.#versionWorldPath(`${compositionsPath(base.versionId)}/apply`, base),
+      this.#versionWorldPath(`${compositionRoute(base.versionId, body)}/apply`, base),
       body,
       (error) => error.code === 'composition_blocked' && problemDetail(error) === 'stale_base',
     );
@@ -610,6 +611,23 @@ const objectsPath = (versionId: string): string =>
 
 const compositionsPath = (versionId: string): string =>
   `/world/versions/${encodeURIComponent(versionId)}/compositions`;
+
+/**
+ * Where a composition body is sent, read from the body itself so the two cannot disagree.
+ *
+ * Resolving a 3D estimate from a photo reads that photo's admission state, so the server declares
+ * it on routes of its own, which also require `admission.read`, and the generic routes refuse the
+ * kind with `photo_point_map_route_required`.
+ */
+function compositionRoute(versionId: string, body: Readonly<Record<string, unknown>>): string {
+  const source = body['source'];
+  const kind = typeof source === 'object' && source !== null
+    ? (source as Readonly<Record<string, unknown>>)['kind']
+    : undefined;
+  return kind === 'photo_point_map'
+    ? `${compositionsPath(versionId)}/photo-point-maps`
+    : compositionsPath(versionId);
+}
 
 const objectPath = (versionId: string, objectId: string): string =>
   `${objectsPath(versionId)}/${encodeURIComponent(objectId)}`;

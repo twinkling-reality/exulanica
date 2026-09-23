@@ -10,15 +10,25 @@ The one thing worth naming before the tests: the SOURCE of a request of this kin
 A request naming the same two identifiers with ``kind: source_attachment`` asks for the photograph
 itself to become geometry and is always refused. Both are tested here, side by side, because the
 difference between them is the whole point of the kind.
+
+The kind has routes of its own, ``.../compositions/photo-point-maps/preview`` and ``.../apply``,
+because resolving an estimate reads the photograph's admission state: the depth right and the
+review. They require ``admission.read`` beside ``world.write``, and the generic composition routes
+refuse the kind for every caller. The last section holds that over the wire with narrower grants.
 """
 
 from __future__ import annotations
 
 import datetime as dt
+import json
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
+from exulanica.api.app import create_app
+from exulanica.api.authorisation import load_token_directory
+from exulanica.api.services import Services
 from exulanica.evidence.blob import BlobId
 from exulanica.ingest.model_rights import (
     LOCAL_PROCESS,
@@ -32,9 +42,13 @@ from exulanica.ingest.stages.segmentation import DEPTH_ROLE as INGEST_DEPTH_ROLE
 from exulanica.reconstruction.testing import FlatDepthModel
 from exulanica.world import WorldObjectRepository
 from exulanica.world.photo_point_maps import DEPTH_ROLE as WORLD_DEPTH_ROLE
+from fastapi.testclient import TestClient
 
+from test_composition_authority_postgres import environment_body
 from test_saved_world_entries_api import _attachment_body, _create_starter, _reviewed_source
+from test_world_environment_composition_postgres import composed as imported_composed  # noqa: F401
 from test_world_objects_api import objects_api as imported_objects_api  # noqa: F401
+from tests_support_api import scratch_database
 
 pytestmark = pytest.mark.postgres
 
@@ -42,10 +56,20 @@ pytestmark = pytest.mark.postgres
 #: matters is that the right names exactly the model that ran.
 DEPTH_MODEL = ModelIdentity.local(INGEST_DEPTH_ROLE, "test/plane-depth", "1" * 40)
 
+#: The estimate's own routes and the generic ones, relative to the version, so every request here
+#: names which of the two it asked.
+PHOTO_ROUTE = "compositions/photo-point-maps"
+GENERIC_ROUTE = "compositions"
+
 
 @pytest.fixture(name="objects_api")
 def _objects_api_alias(request):
     return request.getfixturevalue("imported_objects_api")
+
+
+@pytest.fixture(name="composed")
+def _composed_alias(request):
+    return request.getfixturevalue("imported_composed")
 
 
 class CountingDepth(FlatDepthModel):
@@ -129,11 +153,14 @@ class Placed:
             "placement": self.placement(**placement_overrides) if placement else None,
         }
 
-    def preview(self, body=None):
+    def path(self, action, *, route=PHOTO_ROUTE):
+        return (
+            f"/world/versions/{self.version_id}/{route}/{action}?world_id={self.entry['world_id']}"
+        )
+
+    def preview(self, body=None, *, route=PHOTO_ROUTE):
         return self.api.post(
-            f"/world/versions/{self.version_id}/compositions/preview"
-            f"?world_id={self.entry['world_id']}",
-            body if body is not None else self.request(),
+            self.path("preview", route=route), body if body is not None else self.request()
         )
 
     def saved_entry_body(self):
@@ -146,11 +173,9 @@ class Placed:
             "authored_edit_seq": current["authored_edit_seq"],
         }
 
-    def apply(self, body=None):
+    def apply(self, body=None, *, route=PHOTO_ROUTE):
         return self.api.post(
-            f"/world/versions/{self.version_id}/compositions/apply"
-            f"?world_id={self.entry['world_id']}",
-            body if body is not None else self.request(),
+            self.path("apply", route=route), body if body is not None else self.request()
         )
 
     def stored_entry(self):
@@ -320,7 +345,7 @@ def _blocked(response, reason):
 def test_the_same_reference_as_an_attachment_is_still_never_geometry(placed):
     """The kind is the whole difference: one asks for the photograph, the other for the estimate."""
     _blocked(
-        placed.preview(placed.request(kind="source_attachment")),
+        placed.preview(placed.request(kind="source_attachment"), route=GENERIC_ROUTE),
         "attachment_is_not_composition",
     )
     assert placed.preview().json()["availability"] == "ready"
@@ -621,3 +646,176 @@ def test_a_package_export_withholds_a_world_holding_a_placed_estimate(placed):
     assert authored == (kept_id,)
     assert withheld_id not in authored and withheld_id not in environment
     assert (authored_withheld, environment_withheld) == (1, 0)
+
+
+# -- who may place one ----------------------------------------------------------------------------
+
+#: Grants narrower than the fixture's, which holds every permission.
+NARROW_GRANTS = {
+    "world_writer": ["world.read", "world.write"],
+    "photo_placer": ["world.read", "world.write", "admission.read"],
+}
+
+
+class Grants:
+    """The same routes over the same rows, asked with a named narrower grant."""
+
+    def __init__(self, client, tokens) -> None:
+        self.client = client
+        self.tokens = tokens
+
+    def post(self, who, path, body):
+        return self.client.post(path, headers=self._headers(who), json=body)
+
+    def get(self, who, path):
+        return self.client.get(path, headers=self._headers(who))
+
+    def _headers(self, who):
+        return {"Authorization": f"Bearer {self.tokens[who]}"}
+
+
+@contextmanager
+def _narrow_application(spine_schema, workspace_id, store):
+    """A second application over one fixture's schema and store, holding :data:`NARROW_GRANTS`.
+
+    A second one because an application reads its token directory once, when it is built. It
+    serves only rows the fixture committed.
+    """
+    tokens = {who: f"{who}-token-{uuid.uuid4().hex}" for who in NARROW_GRANTS}
+    directory = load_token_directory(
+        {
+            "EXULANICA_API_TOKENS": json.dumps(
+                {
+                    tokens[who]: {
+                        "workspace_id": str(workspace_id),
+                        "actor": str(uuid.uuid4()),
+                        "permissions": granted,
+                    }
+                    for who, granted in NARROW_GRANTS.items()
+                }
+            )
+        }
+    )
+    database = scratch_database(spine_schema[1])
+    services = Services(
+        database=database,
+        readonly_database=database,
+        store=store,
+        tokens=directory,
+        executor_shares_the_write_role=True,
+        model_client=None,
+    )
+    with TestClient(create_app(services, verify=False)) as client:
+        yield Grants(client, tokens)
+
+
+@pytest.fixture
+def grants(placed, spine_schema):
+    with _narrow_application(spine_schema, placed.repository.workspace_id, placed.api.store) as g:
+        yield g
+
+
+def test_the_generic_routes_refuse_an_estimate_for_every_caller_and_name_its_own(placed):
+    """Refused for a caller holding every permission, so the refusal is the route, not a grant.
+
+    Decided from the body before anything is looked up: an invented version is answered the same.
+    """
+    for action in ("preview", "apply"):
+        refused = placed.api.post(placed.path(action, route=GENERIC_ROUTE), placed.request())
+        assert refused.status_code == 422, refused.text
+        assert refused.json()["code"] == "photo_point_map_route_required"
+        assert f"/world/versions/{{version_id}}/{PHOTO_ROUTE}/{action}" in refused.json()["detail"]
+        invented = placed.api.post(
+            f"/world/versions/{uuid.uuid4()}/{GENERIC_ROUTE}/{action}"
+            f"?world_id={placed.entry['world_id']}",
+            placed.request(),
+        )
+        assert (invented.status_code, invented.json()) == (422, refused.json())
+    assert placed.instances() == ()
+    # The same request on the estimate's own route is ready: what refused it above was the route.
+    assert placed.preview().json()["availability"] == "ready"
+
+
+def test_editing_the_world_without_reading_admission_cannot_place_an_estimate(placed, grants):
+    """Refused on the estimate's routes by the permission floor, and on the generic ones by name."""
+    for action in ("preview", "apply"):
+        own = grants.post("world_writer", placed.path(action), placed.request())
+        assert (own.status_code, own.json()["code"]) == (404, "unknown_reference"), own.text
+        generic = grants.post(
+            "world_writer", placed.path(action, route=GENERIC_ROUTE), placed.request()
+        )
+        assert (generic.status_code, generic.json()["code"]) == (
+            422,
+            "photo_point_map_route_required",
+        ), generic.text
+    assert placed.instances() == ()
+    # The control: the same request with admission.read as well is ready on the same route.
+    ready = grants.post("photo_placer", placed.path("preview"), placed.request())
+    assert ready.json()["availability"] == "ready", ready.text
+
+
+def test_every_other_kind_still_composes_with_world_write_alone(placed, grants):
+    """Giving one kind a route of its own narrowed nobody else's.
+
+    A reviewed asset previews ready and is placed, and an attachment reaches its own verdict,
+    through the generic routes with world.write and no admission.read.
+    """
+    _blocked(
+        grants.post(
+            "world_writer",
+            placed.path("preview", route=GENERIC_ROUTE),
+            placed.request(kind="source_attachment"),
+        ),
+        "attachment_is_not_composition",
+    )
+    asset = {
+        "base_state_sha256": placed.stored_version()["state_sha256"],
+        "source": {"kind": "reviewed_asset", "asset_key": "cc0.marker-cube"},
+        "placement": placed.placement("object:lantern", origin_role="fictional"),
+    }
+    ready = grants.post("world_writer", placed.path("preview", route=GENERIC_ROUTE), asset)
+    assert ready.json()["availability"] == "ready", ready.text
+    applied = grants.post("world_writer", placed.path("apply", route=GENERIC_ROUTE), asset)
+    assert applied.status_code == 201, applied.text
+    assert [o["object_id"] for o in applied.json()["objects"]] == ["object:lantern"]
+
+
+def test_an_environment_still_composes_with_world_write_alone(composed, spine_schema):
+    composed.worlds.connection.commit()
+    version_id = composed.version.version_id
+    with _narrow_application(spine_schema, composed.worlds.workspace_id, composed.store) as narrow:
+        version = narrow.get("world_writer", f"/world/versions/{version_id}").json()
+        body = environment_body(composed, version)
+        ready = narrow.post(
+            "world_writer", f"/world/versions/{version_id}/compositions/preview", body
+        )
+        assert ready.json()["availability"] == "ready", ready.text
+        applied = narrow.post(
+            "world_writer", f"/world/versions/{version_id}/compositions/apply", body
+        )
+        assert applied.status_code == 201, applied.text
+
+
+def test_holding_both_places_reloads_and_undoes_an_estimate(placed, grants):
+    ready = grants.post("photo_placer", placed.path("preview"), placed.request())
+    assert ready.json()["availability"] == "ready", ready.text
+    applied = grants.post("photo_placer", placed.path("apply"), placed.request())
+    assert applied.status_code == 201, applied.text
+
+    # A reload is a new request on a new connection, with the same narrower grant.
+    version_path = f"/world/versions/{placed.version_id}?world_id={placed.entry['world_id']}"
+    reloaded = grants.get("photo_placer", version_path)
+    assert reloaded.status_code == 200, reloaded.text
+    (instance,) = reloaded.json()["point_map_instances"]
+    assert (instance["instance_id"], instance["availability"]) == ("point-map:kitchen", "available")
+    assert instance["source"]["right"]["right_id"] == str(placed.right.right_id)
+
+    # Undo is the version's own undo route, which reads no admission state.
+    undone = grants.post(
+        "photo_placer",
+        f"/world/versions/{placed.version_id}/objects/undo?world_id={placed.entry['world_id']}",
+        {"base_state_sha256": reloaded.json()["state_sha256"]},
+    )
+    assert undone.status_code == 200, undone.text
+    assert undone.json()["point_map_instances"] == []
+    assert placed.instances() == ()

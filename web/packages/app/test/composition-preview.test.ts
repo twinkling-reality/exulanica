@@ -278,6 +278,95 @@ describe('preview and apply through the version client', () => {
   });
 });
 
+/**
+ * A 3D estimate from a photo is composed on routes of its own, which also require
+ * `admission.read`; the generic pair refuses the kind. The client picks the route from the body.
+ */
+describe('a 3D estimate from a photo goes to its own route', () => {
+  const ATTACHMENT_ID = '77777777-7777-4777-8777-777777777777';
+  const photo: CompositionApplyRequest = Object.freeze({
+    source: { kind: 'photo_point_map' as const, entryId: ENTRY_ID, attachmentId: ATTACHMENT_ID },
+    placement: {
+      subjectId: 'point-map:kitchen',
+      regionId: 'region:starter',
+      transform: { xMm: 1200, yMm: 0, zMm: -450, yawMicroradians: 785398, scaleMilli: 1000 },
+      originRole: 'personal' as const,
+    },
+  });
+
+  /** The server's ready answer for this kind: the source names what resolved it. */
+  function photoReady(version: AlternateVersion): Record<string, unknown> {
+    const ready = readyAnswer(version, 'point-map:kitchen');
+    return {
+      ...ready,
+      source: {
+        kind: 'photo_point_map', entry_id: ENTRY_ID, attachment_id: ATTACHMENT_ID,
+        content_sha256: 'c'.repeat(64), bytes: 'available',
+        capture_id: '66666666-6666-4666-8666-666666666666',
+        model: {
+          destination: 'local-process', identifier: 'test/plane-depth', provider: 'local',
+          revision: '1'.repeat(40), role: 'depth',
+        },
+        declared_metric: true, rung: 3,
+      },
+      would_change: {
+        ...ready['would_change'] as Record<string, unknown>,
+        kind: 'add_point_map',
+        document: { instance_id: 'point-map:kitchen', removed: false },
+      },
+    };
+  }
+
+  it('previews on the estimate’s route and reads the answer as a placed estimate', async () => {
+    const version = base();
+    const { sent, fetch } = wire(() => json(200, photoReady(version)));
+    const client = new WorldObjectsClient({
+      baseUrl: 'https://exulanica.test', token: 'token', fetch, worldId: STARTER_WORLD,
+    });
+    const preview = await previewComposition(client, version, photo);
+
+    expect(sent).toHaveLength(1);
+    expect(sent[0]!.url.pathname)
+      .toBe(`/world/versions/${version.versionId}/compositions/photo-point-maps/preview`);
+    expect(sent[0]!.url.searchParams.get('world_id')).toBe(STARTER_WORLD);
+    expect(sent[0]!.body).toEqual({
+      ...compositionRequestBody(photo), base_state_sha256: version.stateSha256,
+    });
+    expect(preview.availability).toBe('ready');
+    expect(preview.source.kind).toBe('photo_point_map');
+    expect(preview.wouldChange.kind).toBe('add_point_map');
+    expect(preview.source.identifiers).toMatchObject({
+      entry_id: ENTRY_ID, attachment_id: ATTACHMENT_ID,
+    });
+  });
+
+  it('applies on the estimate’s route with the entry binding, and no other kind goes there', async () => {
+    const version = base();
+    const { sent, fetch } = wire(() => json(201, { ...FIXTURE, world_id: STARTER_WORLD }));
+    const client = new WorldObjectsClient({
+      baseUrl: 'https://exulanica.test', token: 'token', fetch,
+      worldId: STARTER_WORLD, savedEntry: entryBinding,
+    });
+    expect((await applyComposition(client, version, photo)).kind).toBe('recorded');
+    expect((await applyComposition(client, version, placement)).kind).toBe('recorded');
+
+    expect(sent.map((request) => request.url.pathname)).toEqual([
+      `/world/versions/${version.versionId}/compositions/photo-point-maps/apply`,
+      `/world/versions/${version.versionId}/compositions/apply`,
+    ]);
+    expect(sent[0]!.body).toEqual({
+      ...compositionRequestBody(photo),
+      base_state_sha256: version.stateSha256,
+      saved_entry: {
+        entry_id: ENTRY_ID,
+        base_revision: 3,
+        authored_state_sha256: version.stateSha256,
+        authored_edit_seq: version.editSeq,
+      },
+    });
+  });
+});
+
 describe('the preview document is the server’s, and only well-formed ones are read', () => {
   it('reads the contract’s blocked stale answer, with bytes not looked for', () => {
     const version = base();

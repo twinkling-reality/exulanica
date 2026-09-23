@@ -9,7 +9,7 @@ memory, withdraw a consent or rewrite the world. This is the first boundary.
 mounted ``(method, path)`` to one of three declarations: :class:`Public`, carrying the reason the
 route needs no credential; :class:`Authentication`, for the sign-in surface, which needs no prior
 credential because it is where one is issued, checked and ended; or :class:`Requires`, naming the
-permissions the route needs. Nothing
+permissions the route needs, every one of which a caller must hold. Nothing
 here enumerates routes by reading the route modules. :func:`require_complete_declaration` compares
 the map against :func:`exulanica.api.routes.routable_paths`, the one walk of the router tree this
 codebase has, and :func:`exulanica.api.app.create_app` refuses to build an application whose
@@ -18,6 +18,14 @@ surface and declaration disagree in either direction. A route added anywhere und
 name in the message, until somebody decides what it requires. A declaration for a route that no
 longer exists fails the same way, because a rule about nothing is the same defect pointing the
 other way.
+
+**A permission belongs to a route, never to what a request asks for.** The floor decides from the
+matched route template and the grant, before the body is read, so nothing here can see a body.
+A kind of request that needs a permission its siblings do not is given a route of its own and an
+entry of its own, and the shared route refuses that kind for every caller. A depth estimate from
+a photograph is that case: resolving one reads the photograph's admission state, so its
+composition routes require ``admission.read`` beside ``world.write`` and the generic composition
+routes refuse the ``photo_point_map`` kind.
 
 **The vocabulary is closed.** :class:`Permission` is an enum, a grant naming anything else is
 refused when the token directory loads, and there is no wildcard: a wildcard would silently widen
@@ -454,6 +462,15 @@ ROUTE_RULES: Final[Mapping[tuple[str, str], Public | Authentication | Requires]]
         ),
         ("POST", "/world/versions/{version_id}/compositions/preview"): _WORLD_WRITE,
         ("POST", "/world/versions/{version_id}/compositions/apply"): _WORLD_WRITE,
+        # Resolving a depth estimate reads the photograph's admission state, as attach and rebind
+        # do: the depth right the account holder granted and the review the estimate was made
+        # under. The generic routes above refuse this kind for every caller.
+        ("POST", "/world/versions/{version_id}/compositions/photo-point-maps/preview"): (
+            _requires(_P.WORLD_WRITE, _P.ADMISSION_READ)
+        ),
+        ("POST", "/world/versions/{version_id}/compositions/photo-point-maps/apply"): (
+            _requires(_P.WORLD_WRITE, _P.ADMISSION_READ)
+        ),
         ("POST", "/world/versions/{version_id}/society"): _WORLD_WRITE,
         ("POST", "/world/versions/{version_id}/society/steps"): _WORLD_WRITE,
         ("PUT", "/world/versions/{version_id}/society/control"): _WORLD_WRITE,
