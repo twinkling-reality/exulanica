@@ -173,9 +173,9 @@ describe('a saved world holds inhabitants only when the person asks', () => {
     for (let i = 0; i < 6; i += 1) await settle();
     expect(controlClient.step).toHaveBeenCalledTimes(1);
     expect(panel().querySelector('.world-inhabitants-summary')?.textContent).toMatch(/Simulated minute 1\./);
-    // Resting is what the simulation says; the figure stands because no seated pose exists yet.
+    // Resting is what the simulation says; a catalog person sits on the ground in front of the place.
     expect(mounted.root.querySelector('.living-world-activity')?.textContent)
-      .toBe('Person 0 (simulated) rests at the plate. Drawn standing, because there is no seated pose yet.');
+      .toBe('Person 0 (simulated) rests at the plate. Drawn sitting on the ground in front of the place.');
     mounted.dispose();
   });
 });
