@@ -123,6 +123,16 @@ step is read out of the bits rather than restated, the render origin is shown no
 scene with no regions, and the walk is run through the world's own movement resolver one 23
 millimetre frame at a time, from the origin to 8 kilometres, without a recovery.
 
+The radius promises positions and walking, not the rest of the picture. Measured on a release build
+and recorded in the [world scale record](evaluation/2026-09-22-world-scale-baseline.json): out to 8
+kilometres each object is drawn within about a pixel of the same place in the frame, and the frame
+work of a sprint stays within 0.7 ms at the 95th percentile. Two things do not hold. The sky is a
+sphere of radius 540 metres placed where the world opened
+(`web/packages/atlas-react/src/playcanvas/composed-world.ts`), and nothing moves it, so at 1, 4 and 8
+kilometres the sky above the horizon is one flat colour instead of its gradient; where between 80
+metres and 1 kilometre that begins is not measured. And at 4 and 8 kilometres the lit faces of
+objects carry diagonal bands that they do not have at 1 kilometre, for a reason not established.
+
 ### The spawn on a ground with no extents
 
 The browser refuses a descriptor whose spawn is outside its own ground. On a bounded ground that is
