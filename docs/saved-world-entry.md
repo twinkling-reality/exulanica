@@ -123,35 +123,41 @@ step is read out of the bits rather than restated, the render origin is shown no
 scene with no regions, and the walk is run through the world's own movement resolver one 23
 millimetre frame at a time, from the origin to 8 kilometres, without a recovery.
 
-The radius promises positions and walking, and the rest of the picture holds with them to 8
-kilometres. Measured on a release build and recorded in the
-[render at distance record](evaluation/2026-09-23-render-at-distance.json), which repeats the walk of
-the [world scale record](evaluation/2026-09-22-world-scale-baseline.json): at 40 and 80 metres and at
-1, 4 and 8 kilometres the sky above the horizon keeps the gradient it has at arrival (29 colours
-down one column at every mark), a placed cube's lit face differs from its arrival in none of the
-11,328 pixels measured on it, and without the cube the whole frame differs from the arrival frame in
-no pixel by more than three levels. The cube is drawn on the same pixels as at arrival, give or take
-one pixel at its edge. What moves between positions is the outline of its shadow, as the shadow
-map's texels fall differently at each: it shifts the centre of cube and shadow together by 0.4 to
-4.1 pixels, near the origin as much as far from it. Frame work while sprinting stays within 0.9 ms
-at the 95th percentile at 1 and 4 kilometres. At 8 kilometres the record holds the pixels and no
-frame time, because every 8 kilometre session ran on a machine too busy for its idle gate.
+The radius promises positions and walking, and the picture was measured holding with them to 8
+kilometres. Measured on a release build and recorded in the [render at distance
+record](evaluation/2026-09-23-render-at-distance.json), which repeats the walk of the [world scale
+record](evaluation/2026-09-22-world-scale-baseline.json): at 40 and 80 metres and at 1, 4 and 8
+kilometres the sky above the horizon keeps the gradient it has at arrival (29 colours down one
+column at every mark), a placed cube's lit face differs from its arrival by more than eight levels
+in none of the 11,328 pixels measured on it, and without the cube the whole frame differs from the
+arrival frame in no pixel by more than three levels. The cube is drawn on the same pixels as at
+arrival, give or take one pixel at its edge. What moves between positions is the outline of its
+shadow, as the shadow map's texels fall differently at each: it shifts the centre of cube and shadow
+together by 0.4 to 4.1 pixels, near the origin as much as far from it. Frame work while sprinting
+measured within 0.9 ms at the 95th percentile at 1 and 4 kilometres. At 40 and 80 metres the same
+build measured 3.2 and 1.8 ms, from a few long frames in a session run with the machine 59 per cent
+idle, against 0.5 to 0.7 ms before; whether those frames are the machine's load or the change is not
+established. At 8 kilometres the record holds the pixels and no frame time, because every 8
+kilometre session ran on a machine too busy for its idle gate.
 
 The sky is a direction rather than a place: `web/packages/atlas-react/src/playcanvas/composed-world.ts`
 draws it around the eye at the far plane, so no walk leaves it. A sky placed where the world opened
 is what the world scale record measured going flat from 1 kilometre.
 
-The sun's shadow holds because it does not depend on what else is in view. The engine fits a
-directional shadow's depth range to the shadow casters in view and offsets every receiver by a fixed
+The sun's shadow offset no longer depends on what else is in view. The engine fits a directional
+shadow's depth range to the shadow casters in view and offsets every receiver by a fixed
 ten-thousandth of that range, so with one half-metre cube in view the offset is a tenth of a
-millimetre, too little to keep a smooth-shaded face from shadowing itself. The starter's sun
-therefore carries a shadow bias of 0.2 (`web/packages/atlas-react/src/playcanvas/atmosphere.ts`),
-which offsets each caster in the shadow pass by an amount that grows with its slope to the light,
-and the sky casts no shadow. A sky drawn as a caster stretches the range to about two kilometres
-wherever it is in the shadow's view and hides the fault there, which is why the world scale record
-found bands only at 4 and 8 kilometres. The float32 step did not band them: drawing the whole walk
-around the render origin left the bands where they were, and the render origin does not move in a
-world with no regions.
+millimetre, too little to keep a smooth-shaded face from shadowing itself. The sun of every world
+that is not a city, a starter world or a photo-built one, therefore carries a shadow bias of 0.2
+(`COMPOSED_WORLD_ATMOSPHERE` in `web/packages/atlas-react/src/playcanvas/atmosphere.ts`), which
+offsets each caster in the shadow pass by an amount that grows with its slope to the light, and the
+sky casts no shadow. The record measured the result on one cube in a starter world; other shapes and
+photo-built worlds were not measured. A sky drawn as a caster stretches the range to about two
+kilometres wherever it is in the shadow's view and hides the fault there. The record infers that
+this is why the world scale record found bands only at 4 and 8 kilometres; where between 1 and 4
+kilometres the old sky left the shadow's view was not measured. The float32 step did not band them:
+drawing the whole walk around the render origin left the bands where they were, and the render
+origin does not move in a world with no regions.
 
 The endless walking face holds its depth order at the same distances. It is drawn as a grid of cells
 no wider than the camera's reach, out to the recovery radius plus that reach, and its depth is
