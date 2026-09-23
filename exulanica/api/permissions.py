@@ -86,6 +86,7 @@ if TYPE_CHECKING:
 __all__ = [
     "ACCOUNT_OWNER_PERMISSIONS",
     "ROUTE_RULES",
+    "ROUTE_RULE_SECTIONS",
     "SELF_CHARGING_TILE_ROUTES",
     "Authentication",
     "Permission",
@@ -100,6 +101,7 @@ __all__ = [
     "record_refusal",
     "require",
     "require_complete_declaration",
+    "route_key",
     "rule_for",
     "stale_declarations",
     "undeclared_routes",
@@ -247,249 +249,369 @@ _LIBRARY_READ = _requires(_P.LIBRARY_READ)
 _LIBRARY_WRITE = _requires(_P.LIBRARY_WRITE)
 _WORLD_READ = _requires(_P.WORLD_READ)
 _WORLD_WRITE = _requires(_P.WORLD_WRITE)
-_CONSENT_WRITE = _requires(_P.CONSENT_WRITE)
-_DELETION = _requires(_P.DELETION_WRITE)
-_ADMISSION_WRITE = _requires(_P.ADMISSION_WRITE)
-_OPERATIONS_READ = _requires(_P.OPERATIONS_READ)
-_TILES = _requires(_P.TILES_MATERIALISE)
-_NOT_DATA = "the schema of the API, which is not data"
-_APPEARANCE = "/world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance"
 
-#: The single declaration of what each mounted route requires. Keyed by ``(method, path)`` exactly
-#: as :func:`exulanica.api.routes.routable_paths` reports them.
-#:
-#: **A route added here is added to ``ROUTE_PROBES`` in tests/test_api.py in the same change**, or
-#: to ``PUBLIC_ROUTES`` with the reason it needs no credential. That file's sweep is what holds a
-#: route to refusing an anonymous caller, refusing a bad token and never answering a stranger 403;
-#: a route with its own tests and no probe is held to none of those. The tile routes were added
-#: without probes on 2026-09-17 and nothing but the sweep's own coverage check noticed.
-ROUTE_RULES: Final[Mapping[tuple[str, str], Public | Authentication | Requires]] = MappingProxyType(
+_NOT_DATA = "the schema of the API, which is not data"
+_LIVENESS = "a liveness probe that needed a credential would go red when the credential rotated"
+_READINESS = "the same, and it reports no workspace content"
+_SIGN_IN_START = (
+    "begins Google sign-in; there is no credential yet, and it sets only a login cookie"
+)
+_SIGN_IN_CALLBACK = (
+    "completes sign-in against its own login cookie, provider state and origin check"
+)
+_SIGN_IN_SESSION = "reports the browser session its own cookie names, and refuses without one"
+_SIGN_IN_LOGOUT = (
+    "ends the browser session its own cookie names, and must work for any holder of it"
+)
+
+#: Every method a route can be declared under: what routable_paths reports, which leaves out the
+#: HEAD and OPTIONS Starlette adds by itself.
+_DECLARABLE_METHODS: Final = frozenset({"DELETE", "GET", "PATCH", "POST", "PUT"})
+
+
+def _every(rule: Requires, *routes: str) -> Mapping[str, Requires]:
+    """One section: the requirement, then every route that has it, one ``METHOD /path`` a line."""
+    twice = sorted({route for route in routes if routes.count(route) > 1})
+    if twice:
+        raise RouteDeclarationError(f"listed twice in one section: {', '.join(twice)}")
+    return MappingProxyType(dict.fromkeys(routes, rule))
+
+
+# -- The sections of ROUTE_RULES -------------------------------------------------------------
+#
+# Three rules, and tests/test_route_rule_layout.py holds each of them. A section declares one
+# requirement. Its routes are listed one per line, sorted by path and then method. No two sections
+# declare the same requirement. So a new route has exactly one place to go, and two changes that
+# add different routes touch different lines instead of the same end of the same block.
+
+#: Routes that need no credential, each with the reason it needs none.
+_PUBLIC_ROUTES: Final[Mapping[str, Public]] = MappingProxyType(
     {
-        # -- public ------------------------------------------------------------------------
-        ("GET", "/healthz"): Public(
-            "a liveness probe that needed a credential would go red when the credential rotated"
-        ),
-        ("GET", "/readyz"): Public("the same, and it reports no workspace content"),
-        ("GET", "/openapi.json"): Public(_NOT_DATA),
-        ("GET", "/docs"): Public(_NOT_DATA),
-        ("GET", "/docs/oauth2-redirect"): Public("part of the documentation page"),
-        ("GET", "/redoc"): Public(_NOT_DATA),
-        # -- the sign-in surface -----------------------------------------------------------
-        ("GET", "/auth/google/start"): Authentication(
-            "begins Google sign-in; there is no credential yet, and it sets only a login cookie"
-        ),
-        ("GET", "/auth/google/callback"): Authentication(
-            "completes sign-in against its own login cookie, provider state and origin check"
-        ),
-        ("GET", "/auth/session"): Authentication(
-            "reports the browser session its own cookie names, and refuses without one"
-        ),
-        ("POST", "/auth/logout"): Authentication(
-            "ends the browser session its own cookie names, and must work for any holder of it"
-        ),
-        # -- the recorded library ----------------------------------------------------------
-        ("GET", "/graph"): _LIBRARY_READ,
-        ("GET", "/graph/sources"): _LIBRARY_READ,
-        ("GET", "/evidence"): _LIBRARY_READ,
-        ("GET", "/evidence/{span_id}"): _LIBRARY_READ,
-        ("GET", "/evidence/{span_id}/masked"): _LIBRARY_READ,
-        ("GET", "/evidence/{span_id}/region"): _LIBRARY_READ,
-        ("GET", "/formation"): _LIBRARY_READ,
-        ("GET", "/formation/{batch_id}"): _LIBRARY_READ,
-        ("GET", "/geometry"): _LIBRARY_READ,
-        ("GET", "/geometry/{artifact_id}"): _LIBRARY_READ,
-        ("GET", "/scene-geometry/{artifact_id}"): _LIBRARY_READ,
-        ("GET", "/scene-segments/{scene_id}"): _LIBRARY_READ,
-        ("GET", "/world-read/places/{place_id}"): _LIBRARY_READ,
-        ("GET", "/world-read/scenes/{scene_id}"): _LIBRARY_READ,
-        ("GET", "/world-read/scenes/{scene_id}/observations"): _LIBRARY_READ,
-        ("GET", "/world-read/scenes/{scene_id}/observations/resolve"): _LIBRARY_READ,
-        ("GET", "/world-read/scenes/{scene_id}/observations/summary"): _LIBRARY_READ,
-        ("POST", "/selection"): _LIBRARY_READ,
-        ("POST", "/selection/packet"): _LIBRARY_READ,
-        ("GET", "/selection/catalogue"): _LIBRARY_READ,
-        ("GET", "/selection/place-bridges"): _LIBRARY_READ,
-        ("GET", "/identity/events"): _LIBRARY_READ,
-        ("GET", "/companion/memory/recent"): _LIBRARY_READ,
-        ("GET", "/environment-resources/places/{place_id}"): _LIBRARY_READ,
-        ("GET", "/environment-resources/sources/{admission_id}/features"): _LIBRARY_READ,
-        ("GET", "/environment-resources/{kind}/{resource_id}"): _LIBRARY_READ,
-        ("GET", "/environment-resources/{kind}/{resource_id}/bytes"): _LIBRARY_READ,
-        # -- library writes ----------------------------------------------------------------
-        ("POST", "/identity/name"): _LIBRARY_WRITE,
-        ("POST", "/identity/rename"): _LIBRARY_WRITE,
-        ("POST", "/identity/confirm"): _LIBRARY_WRITE,
-        ("POST", "/identity/reject"): _LIBRARY_WRITE,
-        ("POST", "/identity/merge"): _LIBRARY_WRITE,
-        ("POST", "/identity/split"): _LIBRARY_WRITE,
-        ("POST", "/identity/undo"): _LIBRARY_WRITE,
-        ("POST", "/selection/place-bridges"): _LIBRARY_WRITE,
-        ("POST", "/companion/memory/answers"): _LIBRARY_WRITE,
-        ("POST", "/companion/memory/escapes"): _LIBRARY_WRITE,
-        ("POST", "/companion/memory/answers/{answer_id}/corrections"): _LIBRARY_WRITE,
-        # -- routes that may call a model --------------------------------------------------
-        ("POST", "/selection/plan"): _requires(_P.LIBRARY_READ, _P.MODEL_INVOKE),
-        ("POST", "/selection/ask"): _requires(_P.LIBRARY_READ, _P.MODEL_INVOKE),
-        ("POST", "/selection/appearance"): _requires(_P.WORLD_READ, _P.MODEL_INVOKE),
-        ("POST", "/selection/environment"): _requires(_P.WORLD_READ, _P.MODEL_INVOKE),
-        # The decision provider is a model; the endpoint reaches it through
-        # exulanica.api.society_decision_runtime.request_decision, and records what it proposed.
-        ("POST", "/world/versions/{version_id}/society/decisions"): _requires(
-            _P.WORLD_WRITE, _P.MODEL_INVOKE
-        ),
-        # -- intake ------------------------------------------------------------------------
-        ("POST", "/intake"): _requires(_P.INTAKE_WRITE),
-        # -- deletion and withdrawal -------------------------------------------------------
-        ("DELETE", "/companion/memory/answers/{answer_id}"): _DELETION,
-        ("POST", "/identity/revoke"): _DELETION,
-        ("POST", "/selection/place-bridges/{decision_id}/revoke"): _DELETION,
-        # -- person consent ----------------------------------------------------------------
-        ("GET", "/person-regions/{capture_id}"): _requires(_P.CONSENT_READ),
-        ("POST", "/person-regions/{capture_id}/edits"): _CONSENT_WRITE,
-        ("POST", "/person-subjects"): _CONSENT_WRITE,
-        ("POST", "/person-subjects/{subject_id}/consents"): _CONSENT_WRITE,
-        ("POST", "/identity/subjects/link"): _CONSENT_WRITE,
-        ("POST", "/identity/subjects/unlink"): _CONSENT_WRITE,
-        # -- admission ---------------------------------------------------------------------
-        ("GET", "/personal-admission"): _requires(_P.ADMISSION_READ),
-        ("POST", "/personal-admission"): _ADMISSION_WRITE,
-        ("POST", "/personal-admission/model-rights/{right_id}/withdraw"): _ADMISSION_WRITE,
-        ("POST", "/operations/reconstruction-admission"): _ADMISSION_WRITE,
-        ("POST", "/environment-resources/places"): _ADMISSION_WRITE,
-        ("POST", "/environment-resources/sources"): _ADMISSION_WRITE,
-        ("POST", "/environment-resources/assets"): _ADMISSION_WRITE,
-        ("POST", "/environment-resources/sources/{admission_id}/feature-indexes"): (
-            _ADMISSION_WRITE
-        ),
-        # -- operations --------------------------------------------------------------------
-        ("GET", "/operations/derivative-jobs"): _OPERATIONS_READ,
-        ("GET", "/operations/derivative-jobs/{job_id}/events"): _OPERATIONS_READ,
-        ("GET", "/operations/reconstruction-scenes"): _OPERATIONS_READ,
-        ("GET", "/operations/reconstruction-scenes/{job_id}"): _OPERATIONS_READ,
-        ("POST", "/operations/reconstruction-scenes/{job_id}/retry"): _requires(
-            _P.OPERATIONS_WRITE
-        ),
-        # -- the authored world, read ------------------------------------------------------
-        ("GET", "/world-entries"): _WORLD_READ,
-        ("GET", "/world-entries/candidates"): _WORLD_READ,
-        ("GET", "/world-entries/{entry_id}"): _WORLD_READ,
-        ("GET", "/world/assets"): _WORLD_READ,
-        ("GET", "/world/assets/{asset_key}"): _WORLD_READ,
-        ("GET", "/world/assets/{asset_key}/bytes"): _WORLD_READ,
-        ("GET", "/world/assets/{asset_key}/licence"): _WORLD_READ,
-        ("GET", "/world/source-media"): _WORLD_READ,
-        ("GET", "/world/source-media/{source_id}"): _WORLD_READ,
-        ("GET", "/world/styles/catalog"): _WORLD_READ,
-        ("GET", "/world/styles/current"): _WORLD_READ,
-        ("GET", "/world/styles/proposals/{proposal_id}"): _WORLD_READ,
-        ("GET", "/world/styles/versions"): _WORLD_READ,
-        ("GET", "/world/interactions/catalog"): _WORLD_READ,
-        ("GET", "/world/interactions/current"): _WORLD_READ,
-        ("GET", "/world/interactions/proposals/{proposal_id}"): _WORLD_READ,
-        ("GET", "/world/interactions/recommendations"): _WORLD_READ,
-        ("GET", "/world/interactions/versions"): _WORLD_READ,
-        ("GET", "/world/versions"): _WORLD_READ,
-        ("GET", "/world/versions/{version_id}"): _WORLD_READ,
-        ("GET", "/world/versions/{version_id}/society"): _WORLD_READ,
-        ("GET", "/world/versions/{version_id}/society/events"): _WORLD_READ,
-        ("GET", "/world/versions/{version_id}/society/replay"): _WORLD_READ,
-        ("GET", "/world/versions/{version_id}/society/district"): _WORLD_READ,
-        ("GET", "/world/versions/{version_id}/society/control"): _WORLD_READ,
-        ("GET", "/world/versions/{version_id}/society/control/events"): _WORLD_READ,
-        ("GET", "/world/versions/{version_id}/society/actions"): _WORLD_READ,
-        ("GET", "/world/versions/{version_id}/society/actions/{request_id}"): _WORLD_READ,
-        ("GET", "/world/versions/{version_id}/society/decisions/{request_id}"): _WORLD_READ,
-        ("GET", "/world/versions/{version_id}/society/experiments/{experiment_id}"): _WORLD_READ,
-        (
-            "GET",
-            "/world/versions/{version_id}/society/experiments/{experiment_id}/attempts/"
-            "{attempt_id}",
-        ): _WORLD_READ,
-        ("GET", _APPEARANCE): _WORLD_READ,
-        ("GET", _APPEARANCE + "/history"): _WORLD_READ,
-        ("GET", _APPEARANCE + "/families"): _WORLD_READ,
-        # -- asking for a generated world, and the parameters one can be asked for by -----
-        # The catalog is a read of declared data and materialises nothing, so it is a world read
-        # like the style catalog beside it. The generation route is metered instead: it is the
-        # first route whose cost scales with what the caller asked for.
-        ("GET", "/world-generation/grammars"): _WORLD_READ,
-        ("POST", "/world-generation/worlds"): _TILES,
-        # -- baked tiles of a generated city -----------------------------------------------
-        ("GET", "/tiles"): _TILES,
-        ("GET", "/tiles/{baked_tile_id}/bytes"): _TILES,
-        ("GET", "/materials/makers"): _WORLD_READ,
-        ("GET", "/materials/library"): _WORLD_READ,
-        ("GET", "/materials/recipes"): _WORLD_READ,
-        ("GET", "/materials/recipes/{recipe_id}"): _WORLD_READ,
-        ("GET", "/materials/recipes/{recipe_id}/bake"): _WORLD_READ,
-        ("GET", "/materials/recipes/{recipe_id}/bake/bytes"): _WORLD_READ,
-        # -- the authored world, write -----------------------------------------------------
-        ("POST", "/world-entries"): _WORLD_WRITE,
-        ("POST", "/world-entries/starter"): _WORLD_WRITE,
-        ("POST", "/world-entries/{entry_id}/source-attachments"): _requires(
-            _P.WORLD_WRITE, _P.ADMISSION_READ
-        ),
-        # Detach reads no admission receipt, and it answers with the same entry body
-        # PUT /world-entries/{entry_id} already returns to a world.write token, so admission.read
-        # would guard nothing there. Rebind resolves and pins a new human review, so it reads
-        # admission state as attach does.
-        ("POST", "/world-entries/{entry_id}/source-detachments"): _WORLD_WRITE,
-        ("POST", "/world-entries/{entry_id}/source-rebinds"): _requires(
-            _P.WORLD_WRITE, _P.ADMISSION_READ
-        ),
-        ("PUT", "/world-entries/{entry_id}"): _WORLD_WRITE,
-        ("POST", "/world/styles/previews"): _WORLD_WRITE,
-        ("DELETE", "/world/styles/previews/{preview_id}"): _WORLD_WRITE,
-        ("POST", "/world/styles/previews/{preview_id}/apply"): _WORLD_WRITE,
-        ("POST", "/world/styles/rollback"): _WORLD_WRITE,
-        ("POST", "/world/interactions/previews"): _WORLD_WRITE,
-        ("DELETE", "/world/interactions/previews/{preview_id}"): _WORLD_WRITE,
-        ("POST", "/world/interactions/previews/{preview_id}/apply"): _WORLD_WRITE,
-        ("POST", "/world/interactions/rollback"): _WORLD_WRITE,
-        ("POST", "/world/versions"): _WORLD_WRITE,
-        ("POST", "/world/versions/bootstrap"): _WORLD_WRITE,
-        ("POST", "/world/versions/{version_id}/objects"): _WORLD_WRITE,
-        ("POST", "/world/versions/{version_id}/objects/undo"): _WORLD_WRITE,
-        ("POST", "/world/versions/{version_id}/objects/{object_id}/move"): _WORLD_WRITE,
-        ("POST", "/world/versions/{version_id}/objects/{object_id}/remove"): _WORLD_WRITE,
-        ("POST", "/world/versions/{version_id}/objects/{object_id}/behaviour"): _WORLD_WRITE,
-        ("POST", "/world/versions/{version_id}/environment-instances"): _WORLD_WRITE,
-        ("POST", "/world/versions/{version_id}/environment-instances/undo"): _WORLD_WRITE,
-        ("POST", "/world/versions/{version_id}/environment-instances/{instance_id}/move"): (
-            _WORLD_WRITE
-        ),
-        ("POST", "/world/versions/{version_id}/environment-instances/{instance_id}/remove"): (
-            _WORLD_WRITE
-        ),
-        ("POST", "/world/versions/{version_id}/compositions/preview"): _WORLD_WRITE,
-        ("POST", "/world/versions/{version_id}/compositions/apply"): _WORLD_WRITE,
-        # Resolving a depth estimate reads the photograph's admission state, as attach and rebind
-        # do: the depth right the account holder granted and the review the estimate was made
-        # under. The generic routes above refuse this kind for every caller.
-        ("POST", "/world/versions/{version_id}/compositions/photo-point-maps/preview"): (
-            _requires(_P.WORLD_WRITE, _P.ADMISSION_READ)
-        ),
-        ("POST", "/world/versions/{version_id}/compositions/photo-point-maps/apply"): (
-            _requires(_P.WORLD_WRITE, _P.ADMISSION_READ)
-        ),
-        ("POST", "/world/versions/{version_id}/society"): _WORLD_WRITE,
-        ("POST", "/world/versions/{version_id}/society/steps"): _WORLD_WRITE,
-        ("PUT", "/world/versions/{version_id}/society/control"): _WORLD_WRITE,
-        ("POST", "/world/versions/{version_id}/society/control/steps"): _WORLD_WRITE,
-        ("POST", "/world/versions/{version_id}/society/actions"): _WORLD_WRITE,
-        ("POST", "/world/versions/{version_id}/society/experiments"): _WORLD_WRITE,
-        (
-            "POST",
-            "/world/versions/{version_id}/society/experiments/{experiment_id}/attempts",
-        ): _WORLD_WRITE,
-        ("PUT", _APPEARANCE): _WORLD_WRITE,
-        ("POST", _APPEARANCE + "/reset"): _WORLD_WRITE,
-        # A bake request is a compute amplifier, bounded per workspace by migration 0066's quota.
-        ("POST", "/materials/recipes"): _WORLD_WRITE,
-        ("POST", "/materials/recipes/{recipe_id}/withdraw"): _WORLD_WRITE,
-        ("POST", "/materials/recipes/{recipe_id}/bake"): _WORLD_WRITE,
-        ("POST", "/world-write/scenes/{scene_id}/generated"): _WORLD_WRITE,
+        "GET /docs": Public(_NOT_DATA),
+        "GET /docs/oauth2-redirect": Public("part of the documentation page"),
+        "GET /healthz": Public(_LIVENESS),
+        "GET /openapi.json": Public(_NOT_DATA),
+        "GET /readyz": Public(_READINESS),
+        "GET /redoc": Public(_NOT_DATA),
     }
+)
+
+#: The sign-in surface, each route with what it does with a credential of its own.
+_SIGN_IN_ROUTES: Final[Mapping[str, Authentication]] = MappingProxyType(
+    {
+        "GET /auth/google/callback": Authentication(_SIGN_IN_CALLBACK),
+        "GET /auth/google/start": Authentication(_SIGN_IN_START),
+        "POST /auth/logout": Authentication(_SIGN_IN_LOGOUT),
+        "GET /auth/session": Authentication(_SIGN_IN_SESSION),
+    }
+)
+
+#: The recorded library, read.
+_LIBRARY_READS: Final = _every(
+    _LIBRARY_READ,
+    "GET /companion/memory/recent",
+    "GET /environment-resources/places/{place_id}",
+    "GET /environment-resources/sources/{admission_id}/features",
+    "GET /environment-resources/{kind}/{resource_id}",
+    "GET /environment-resources/{kind}/{resource_id}/bytes",
+    "GET /evidence",
+    "GET /evidence/{span_id}",
+    "GET /evidence/{span_id}/masked",
+    "GET /evidence/{span_id}/region",
+    "GET /formation",
+    "GET /formation/{batch_id}",
+    "GET /geometry",
+    "GET /geometry/{artifact_id}",
+    "GET /graph",
+    "GET /graph/sources",
+    "GET /identity/events",
+    "GET /scene-geometry/{artifact_id}",
+    "GET /scene-segments/{scene_id}",
+    "POST /selection",
+    "GET /selection/catalogue",
+    "POST /selection/packet",
+    "GET /selection/place-bridges",
+    "GET /world-read/places/{place_id}",
+    "GET /world-read/scenes/{scene_id}",
+    "GET /world-read/scenes/{scene_id}/observations",
+    "GET /world-read/scenes/{scene_id}/observations/resolve",
+    "GET /world-read/scenes/{scene_id}/observations/summary",
+)
+
+#: Identity decisions, place bridges and companion memory writes.
+_LIBRARY_WRITES: Final = _every(
+    _LIBRARY_WRITE,
+    "POST /companion/memory/answers",
+    "POST /companion/memory/answers/{answer_id}/corrections",
+    "POST /companion/memory/escapes",
+    "POST /identity/confirm",
+    "POST /identity/merge",
+    "POST /identity/name",
+    "POST /identity/reject",
+    "POST /identity/rename",
+    "POST /identity/split",
+    "POST /identity/undo",
+    "POST /selection/place-bridges",
+)
+
+#: Library reads that may call a model.
+_LIBRARY_READS_WITH_A_MODEL: Final = _every(
+    _requires(_P.LIBRARY_READ, _P.MODEL_INVOKE),
+    "POST /selection/ask",
+    "POST /selection/plan",
+)
+
+#: World reads that may call a model.
+_WORLD_READS_WITH_A_MODEL: Final = _every(
+    _requires(_P.WORLD_READ, _P.MODEL_INVOKE),
+    "POST /selection/appearance",
+    "POST /selection/environment",
+)
+
+#: A world write whose decision provider is a model: the endpoint reaches it through
+#: exulanica.api.society_decision_runtime.request_decision, and records what it proposed.
+_WORLD_WRITES_WITH_A_MODEL: Final = _every(
+    _requires(_P.WORLD_WRITE, _P.MODEL_INVOKE),
+    "POST /world/versions/{version_id}/society/decisions",
+)
+
+#: The only way new photographs arrive.
+_INTAKE: Final = _every(
+    _requires(_P.INTAKE_WRITE),
+    "POST /intake",
+)
+
+#: Deleting a companion memory and revoking a confirmed identity or place decision.
+_DELETIONS: Final = _every(
+    _requires(_P.DELETION_WRITE),
+    "DELETE /companion/memory/answers/{answer_id}",
+    "POST /identity/revoke",
+    "POST /selection/place-bridges/{decision_id}/revoke",
+)
+
+#: Reading proposed person regions.
+_CONSENT_READS: Final = _every(
+    _requires(_P.CONSENT_READ),
+    "GET /person-regions/{capture_id}",
+)
+
+#: Region edits, person subjects, consent transitions and subject links, withdrawals included.
+_CONSENT_WRITES: Final = _every(
+    _requires(_P.CONSENT_WRITE),
+    "POST /identity/subjects/link",
+    "POST /identity/subjects/unlink",
+    "POST /person-regions/{capture_id}/edits",
+    "POST /person-subjects",
+    "POST /person-subjects/{subject_id}/consents",
+)
+
+#: Reading personal admission status.
+_ADMISSION_READS: Final = _every(
+    _requires(_P.ADMISSION_READ),
+    "GET /personal-admission",
+)
+
+#: Personal, reconstruction and environment source admission.
+_ADMISSION_WRITES: Final = _every(
+    _requires(_P.ADMISSION_WRITE),
+    "POST /environment-resources/assets",
+    "POST /environment-resources/places",
+    "POST /environment-resources/sources",
+    "POST /environment-resources/sources/{admission_id}/feature-indexes",
+    "POST /operations/reconstruction-admission",
+    "POST /personal-admission",
+    "POST /personal-admission/model-rights/{right_id}/withdraw",
+)
+
+#: Derivative and reconstruction job status.
+_OPERATIONS_READS: Final = _every(
+    _requires(_P.OPERATIONS_READ),
+    "GET /operations/derivative-jobs",
+    "GET /operations/derivative-jobs/{job_id}/events",
+    "GET /operations/reconstruction-scenes",
+    "GET /operations/reconstruction-scenes/{job_id}",
+)
+
+#: Retrying a reconstruction job.
+_OPERATIONS_WRITES: Final = _every(
+    _requires(_P.OPERATIONS_WRITE),
+    "POST /operations/reconstruction-scenes/{job_id}/retry",
+)
+
+#: The authored world, read. The generation grammar catalog is a read of declared data and
+#: materialises nothing, so it is a world read like the style catalog; the material catalog and
+#: recipe reads are world reads for the same reason.
+_WORLD_READS: Final = _every(
+    _WORLD_READ,
+    "GET /materials/library",
+    "GET /materials/makers",
+    "GET /materials/recipes",
+    "GET /materials/recipes/{recipe_id}",
+    "GET /materials/recipes/{recipe_id}/bake",
+    "GET /materials/recipes/{recipe_id}/bake/bytes",
+    "GET /world-entries",
+    "GET /world-entries/candidates",
+    "GET /world-entries/{entry_id}",
+    "GET /world-generation/grammars",
+    "GET /world/assets",
+    "GET /world/assets/{asset_key}",
+    "GET /world/assets/{asset_key}/bytes",
+    "GET /world/assets/{asset_key}/licence",
+    "GET /world/behaviours",
+    "GET /world/interactions/catalog",
+    "GET /world/interactions/current",
+    "GET /world/interactions/proposals/{proposal_id}",
+    "GET /world/interactions/recommendations",
+    "GET /world/interactions/versions",
+    "GET /world/source-media",
+    "GET /world/source-media/{source_id}",
+    "GET /world/styles/catalog",
+    "GET /world/styles/current",
+    "GET /world/styles/proposals/{proposal_id}",
+    "GET /world/styles/versions",
+    "GET /world/versions",
+    "GET /world/versions/{version_id}",
+    "GET /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance",
+    "GET /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/families",
+    "GET /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/history",
+    "GET /world/versions/{version_id}/society",
+    "GET /world/versions/{version_id}/society/actions",
+    "GET /world/versions/{version_id}/society/actions/{request_id}",
+    "GET /world/versions/{version_id}/society/control",
+    "GET /world/versions/{version_id}/society/control/events",
+    "GET /world/versions/{version_id}/society/decisions/{request_id}",
+    "GET /world/versions/{version_id}/society/district",
+    "GET /world/versions/{version_id}/society/events",
+    "GET /world/versions/{version_id}/society/experiments/{experiment_id}",
+    "GET /world/versions/{version_id}/society/experiments/{experiment_id}/attempts/{attempt_id}",
+    "GET /world/versions/{version_id}/society/replay",
+)
+
+#: Metered against the workspace tile quota, by being declared here: the baked tiles of a generated
+#: city, and asking for a generated world, which is the first route whose cost scales with what
+#: the caller asked for.
+_TILES: Final = _every(
+    _requires(_P.TILES_MATERIALISE),
+    "GET /tiles",
+    "GET /tiles/{baked_tile_id}/bytes",
+    "POST /world-generation/worlds",
+)
+
+#: Every change to the authored world, and recording generated content against a scene. A bake
+#: request (POST /materials/recipes/{recipe_id}/bake) is a compute amplifier, bounded per workspace
+#: by migration 0066's quota.
+_WORLD_WRITES: Final = _every(
+    _WORLD_WRITE,
+    "POST /materials/recipes",
+    "POST /materials/recipes/{recipe_id}/bake",
+    "POST /materials/recipes/{recipe_id}/withdraw",
+    "POST /world-entries",
+    "POST /world-entries/starter",
+    "PUT /world-entries/{entry_id}",
+    "POST /world-entries/{entry_id}/source-detachments",
+    "POST /world-write/scenes/{scene_id}/generated",
+    "POST /world/interactions/previews",
+    "DELETE /world/interactions/previews/{preview_id}",
+    "POST /world/interactions/previews/{preview_id}/apply",
+    "POST /world/interactions/rollback",
+    "POST /world/styles/previews",
+    "DELETE /world/styles/previews/{preview_id}",
+    "POST /world/styles/previews/{preview_id}/apply",
+    "POST /world/styles/rollback",
+    "POST /world/versions",
+    "POST /world/versions/bootstrap",
+    "PUT /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance",
+    "POST /world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/reset",
+    "POST /world/versions/{version_id}/compositions/apply",
+    "POST /world/versions/{version_id}/compositions/preview",
+    "POST /world/versions/{version_id}/environment-instances",
+    "POST /world/versions/{version_id}/environment-instances/undo",
+    "POST /world/versions/{version_id}/environment-instances/{instance_id}/move",
+    "POST /world/versions/{version_id}/environment-instances/{instance_id}/remove",
+    "POST /world/versions/{version_id}/objects",
+    "POST /world/versions/{version_id}/objects/undo",
+    "POST /world/versions/{version_id}/objects/{object_id}/behaviour",
+    "POST /world/versions/{version_id}/objects/{object_id}/move",
+    "POST /world/versions/{version_id}/objects/{object_id}/remove",
+    "POST /world/versions/{version_id}/society",
+    "POST /world/versions/{version_id}/society/actions",
+    "PUT /world/versions/{version_id}/society/control",
+    "POST /world/versions/{version_id}/society/control/steps",
+    "POST /world/versions/{version_id}/society/experiments",
+    "POST /world/versions/{version_id}/society/experiments/{experiment_id}/attempts",
+    "POST /world/versions/{version_id}/society/steps",
+)
+
+#: World writes that read admission state. Attach and rebind resolve and pin a human review, and
+#: resolving a depth estimate reads the photograph's admission state: the depth right the account
+#: holder granted and the review the estimate was made under. The generic composition routes
+#: refuse the photo_point_map kind for every caller. Detach is absent on purpose: it reads no
+#: admission receipt and answers with the same entry body PUT /world-entries/{entry_id} already
+#: returns to a world.write token, so admission.read would guard nothing there.
+_WORLD_WRITES_READING_ADMISSION: Final = _every(
+    _requires(_P.WORLD_WRITE, _P.ADMISSION_READ),
+    "POST /world-entries/{entry_id}/source-attachments",
+    "POST /world-entries/{entry_id}/source-rebinds",
+    "POST /world/versions/{version_id}/compositions/photo-point-maps/apply",
+    "POST /world/versions/{version_id}/compositions/photo-point-maps/preview",
+)
+
+#: Every section, in reading order. A route is declared by appearing in exactly one of them.
+ROUTE_RULE_SECTIONS: Final[tuple[Mapping[str, Public | Authentication | Requires], ...]] = (
+    _PUBLIC_ROUTES,
+    _SIGN_IN_ROUTES,
+    _LIBRARY_READS,
+    _LIBRARY_WRITES,
+    _LIBRARY_READS_WITH_A_MODEL,
+    _WORLD_READS_WITH_A_MODEL,
+    _WORLD_WRITES_WITH_A_MODEL,
+    _INTAKE,
+    _DELETIONS,
+    _CONSENT_READS,
+    _CONSENT_WRITES,
+    _ADMISSION_READS,
+    _ADMISSION_WRITES,
+    _OPERATIONS_READS,
+    _OPERATIONS_WRITES,
+    _WORLD_READS,
+    _TILES,
+    _WORLD_WRITES,
+    _WORLD_WRITES_READING_ADMISSION,
+)
+
+
+def route_key(route: str) -> tuple[str, str]:
+    """``"METHOD /path"`` as the ``(method, path)`` key routable_paths reports, or a refusal."""
+    method, _, path = route.partition(" ")
+    if method not in _DECLARABLE_METHODS or not path.startswith("/") or " " in path:
+        raise RouteDeclarationError(f"{route!r} is not a route written as 'METHOD /path'")
+    return method, path
+
+
+def _declare(
+    sections: Iterable[Mapping[str, Public | Authentication | Requires]],
+) -> Mapping[tuple[str, str], Public | Authentication | Requires]:
+    declared: dict[tuple[str, str], Public | Authentication | Requires] = {}
+    for section in sections:
+        for route, rule in section.items():
+            key = route_key(route)
+            if key in declared:
+                raise RouteDeclarationError(f"{route} is declared in two sections")
+            declared[key] = rule
+    return MappingProxyType(declared)
+
+
+#: The single declaration of what each mounted route requires, assembled from
+#: :data:`ROUTE_RULE_SECTIONS` and keyed by ``(method, path)`` exactly as
+#: :func:`exulanica.api.routes.routable_paths` reports them.
+#:
+#: **Every route declared here is probed by the authorisation sweep in tests/test_api.py**, which
+#: holds it to refusing an anonymous caller, refusing a bad token and never answering a stranger
+#: 403. The probes are derived from this map in tests/route_probes.py, so a new route is swept the
+#: moment it is declared; a route whose default request would stop at validation before reaching
+#: its own lookup is given a realistic body in that module's PROBE_OVERRIDES.
+ROUTE_RULES: Final[Mapping[tuple[str, str], Public | Authentication | Requires]] = _declare(
+    ROUTE_RULE_SECTIONS
 )
 
 

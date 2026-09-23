@@ -1,0 +1,94 @@
+// Screenshot of the slot-6 app after the developer client's edit. Lane file; published as
+// app_screenshot.mjs.txt. Writes nothing to the world: it opens the app the launcher serves, which
+// authenticates with the person's synthetic token, waits for the saved world's version and the
+// placed object's reviewed bytes to arrive, and captures the composited viewport over CDP.
+//
+//   node app_screenshot.mjs <launcher state.json> <output directory>
+//
+// Chrome runs headless with its own profile under the run directory, on slot 6's debugging port.
+
+import { spawn } from 'node:child_process';
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { join } from 'node:path';
+
+const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+// Long enough for the reviewed GLB to decode and the first frames with it to draw, measured by eye
+// on this run's first attempt in the Claude browser pane (the cube appeared on the second frame).
+const SETTLE_MS = 5000;
+const OBJECT_BYTES = '/api/world/assets/cc0.marker-cube/bytes';
+
+const [stateFile, out] = process.argv.slice(2);
+const state = JSON.parse(readFileSync(stateFile, 'utf8'));
+mkdirSync(out, { recursive: true });
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+const profile = join(state.run_dir, `chrome-profile-client-${Date.now()}`);
+const chrome = spawn(CHROME, [
+  '--headless=new', `--remote-debugging-port=${state.ports.browser}`, `--user-data-dir=${profile}`,
+  '--window-size=1280,860', '--no-first-run', '--no-default-browser-check', '--disable-extensions',
+  '--disable-background-networking', '--disable-sync', '--password-store=basic',
+  '--use-mock-keychain', 'about:blank',
+], { stdio: 'ignore', detached: true });
+const stop = () => { try { process.kill(-chrome.pid, 'SIGTERM'); } catch { /* gone */ } };
+process.on('exit', stop);
+
+let target;
+for (let i = 0; i < 60 && !target; i += 1) {
+  try {
+    const list = await (await fetch(`http://127.0.0.1:${state.ports.browser}/json/list`)).json();
+    target = list.find((t) => t.type === 'page')?.webSocketDebuggerUrl;
+  } catch { /* not up yet */ }
+  if (!target) await sleep(250);
+}
+if (!target) throw new Error('headless Chrome exposed no page target');
+
+const socket = new WebSocket(target);
+await new Promise((resolve, reject) => { socket.onopen = resolve; socket.onerror = reject; });
+let next = 0;
+const pending = new Map();
+const requests = new Map();
+const events = [];
+socket.onmessage = (message) => {
+  const data = JSON.parse(message.data);
+  if (data.id !== undefined && pending.has(data.id)) {
+    pending.get(data.id)(data);
+    pending.delete(data.id);
+  } else if (data.method === 'Network.requestWillBeSent') {
+    requests.set(data.params.requestId, { method: data.params.request.method, url: data.params.request.url });
+  } else if (data.method === 'Network.responseReceived') {
+    const request = requests.get(data.params.requestId);
+    if (request && request.url.includes('/api/')) {
+      events.push({ ...request, url: new URL(request.url).pathname + new URL(request.url).search, status: data.params.response.status });
+    }
+  }
+};
+const send = (method, params = {}) => new Promise((resolve) => {
+  next += 1;
+  pending.set(next, resolve);
+  socket.send(JSON.stringify({ id: next, method, params }));
+});
+
+await send('Network.enable');
+await send('Page.enable');
+await send('Page.navigate', { url: `http://localhost:${state.ports.vite}/` });
+const deadline = Date.now() + 60000;
+while (!events.some((e) => e.url.startsWith(OBJECT_BYTES) && e.status === 200)) {
+  if (Date.now() > deadline) throw new Error(`the page never received ${OBJECT_BYTES}`);
+  await sleep(250);
+}
+await sleep(SETTLE_MS);
+const shot = await send('Page.captureScreenshot', { format: 'png' });
+writeFileSync(join(out, 'app-after-client.png'), Buffer.from(shot.result.data, 'base64'));
+const title = await send('Runtime.evaluate', {
+  expression: "document.querySelector('[aria-label=\"World title\"]')?.value ?? null",
+  returnByValue: true,
+});
+writeFileSync(join(out, 'app-after-client.json'), JSON.stringify({
+  app: `http://localhost:${state.ports.vite}/`,
+  settle_ms: SETTLE_MS,
+  world_title_field: title.result?.result?.value ?? null,
+  api_requests: events,
+}, null, 2) + '\n');
+socket.close();
+stop();
+process.exit(0);

@@ -1,0 +1,47 @@
+$ /opt/homebrew/bin/python3 -S -s -E -m exulanica_client walkthrough ...
+# exit 0
+# stdout
+  GET /openapi.json -> 200
+  GET /world/behaviours -> 200
+  GET /world/assets -> 200
+edits this server documents for an authored version:
+  POST /world/versions/{version_id}/environment-instances  (Place one exact environment asset or feature against the current version state.)
+  POST /world/versions/{version_id}/environment-instances/{instance_id}/move  (Move an available, still-authorized environment instance without changing its source.)
+  POST /world/versions/{version_id}/environment-instances/{instance_id}/remove  (Store a removal, including when the pinned source has since been withdrawn.)
+  POST /world/versions/{version_id}/environment-instances/undo  (Undo the newest authored edit from stored history, even after source withdrawal.)
+  POST /world/versions/{version_id}/objects  (Add one authored object against an explicit base version state.)
+  POST /world/versions/{version_id}/objects/{object_id}/move  (Replace one authored object's region-local transform.)
+  POST /world/versions/{version_id}/objects/{object_id}/remove  (Store a removal. POST rather than DELETE: this appends history, it destroys nothing.)
+  POST /world/versions/{version_id}/objects/{object_id}/behaviour  (Give one authored object a reviewed behaviour, replace it, or take it away with null.)
+  POST /world/versions/{version_id}/objects/undo  (Reverse the newest object edit, from the document that edit stored.)
+  POST /world/versions/{version_id}/compositions/apply  (Perform exactly the resolved composition, or refuse with its blocked reason.)
+  POST /world/versions/{version_id}/compositions/photo-point-maps/apply  (Place exactly the resolved estimate, or refuse with its blocked reason.)
+behaviours it reviews:
+  motion.bounded-path@1: axis x|y|z (default 'x'), easing linear|smooth (default 'smooth'), travel_mm 100..10000 (default 1000), period_milliseconds 500..60000 (default 4000)
+assets it can place:
+  cc0.marker-cube available b41289ac1054
+  cc0.marker-pillar available b960af0f1c85
+  cc0.marker-plate available 19425a058c19
+  GET /world-entries -> 200
+  GET /world/versions/52e7883b-39d8-4bda-8c06-04e21f3b54c2 -> 200
+saved world 'Evening garden' opens at version 52e7883b-39d8-4bda-8c06-04e21f3b54c2, state b42557ee1fc8, 0 object(s)
+  POST /world/versions/52e7883b-39d8-4bda-8c06-04e21f3b54c2/objects -> 201
+  GET /world-entries/01a0ce66-6e6c-756a-b76d-39b08d79d687 -> 200
+  POST /world/versions/52e7883b-39d8-4bda-8c06-04e21f3b54c2/objects/developer-client%3Aevening-lantern/behaviour -> 200
+  GET /world-entries/01a0ce66-6e6c-756a-b76d-39b08d79d687 -> 200
+  POST /world/versions/52e7883b-39d8-4bda-8c06-04e21f3b54c2/objects/developer-client%3Aevening-lantern/behaviour -> 422 invalid_object_data: behaviour motion.bounded-path@2 is not reviewed
+refused as it should be: 422 invalid_object_data: behaviour motion.bounded-path@2 is not reviewed
+  GET /world/versions/52e7883b-39d8-4bda-8c06-04e21f3b54c2 -> 200
+  GET /world-entries/01a0ce66-6e6c-756a-b76d-39b08d79d687 -> 200
+  holds: the object is in the version and not removed
+  holds: it is made from the chosen reviewed asset
+  holds: its bytes are available to draw
+  holds: it stands where it was placed
+  holds: its origin is the role the person chose
+  holds: it carries the motion that was set
+  holds: the version's state is the one the motion edit answered with, so the refused request changed nothing
+  holds: the newest two edits are this client's
+  holds: the saved world reopens at that state
+  holds: the saved world reopens at that edit
+result: confirmed
+# stderr

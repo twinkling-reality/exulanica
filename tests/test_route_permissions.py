@@ -161,7 +161,7 @@ def test_the_older_route_sets_agree_with_the_declaration():
     """None of them is restated here. Each is imported and compared with the map."""
     from exulanica.evaluation.cli import _PUBLIC
 
-    from test_api import ACCOUNT_ROUTES, PUBLIC_ROUTES
+    from route_probes import ACCOUNT_ROUTES, PUBLIC_ROUTES
 
     assert public_paths() == set(PUBLIC_ROUTES) == set(_PUBLIC)
     assert authentication_routes() == set(ACCOUNT_ROUTES)

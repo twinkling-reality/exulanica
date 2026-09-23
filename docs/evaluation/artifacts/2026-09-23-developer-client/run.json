@@ -1,0 +1,149 @@
+{
+  "argv": [
+    "/opt/homebrew/bin/python3",
+    "-S",
+    "-s",
+    "-E",
+    "-m",
+    "exulanica_client",
+    "walkthrough",
+    "--base-url",
+    "http://127.0.0.1:19234",
+    "--asset-key",
+    "cc0.marker-cube",
+    "--origin-role",
+    "fictional",
+    "--place",
+    "0,0,0",
+    "--object-id",
+    "developer-client:evening-lantern",
+    "--transcript",
+    "<run-dir>/walkthrough.json"
+  ],
+  "client_api": {
+    "derivative_worker": "off",
+    "grants": [
+      "person (launcher set)",
+      "client"
+    ],
+    "imported_exulanica_from": "<worktree>/exulanica/__init__.py",
+    "port": 19234
+  },
+  "client_exit_code": 0,
+  "client_interpreter": {
+    "flags": "-S -s -E",
+    "path": "/opt/homebrew/bin/python3",
+    "version": "3.14.6 (main, Jun 10 2026, 10:03:53) [Clang 21.0.0 (clang-2100.0.123.102)]"
+  },
+  "completed_at": "2026-09-23T13:13:37+00:00",
+  "confirmation": {
+    "edit_kinds": [
+      "add_object",
+      "set_object_behaviour"
+    ],
+    "object": {
+      "asset_key": "cc0.marker-cube",
+      "behaviour": {
+        "behaviour_key": "motion.bounded-path",
+        "behaviour_version": 1,
+        "parameters": {
+          "axis": "x",
+          "easing": "smooth",
+          "period_milliseconds": 4000,
+          "travel_mm": 1000
+        }
+      },
+      "content_sha256": "b41289ac10548cf698d46a15206caa8e744b0b800f4ac29260c99f18d8b831d9",
+      "object_id": "developer-client:evening-lantern",
+      "origin": {
+        "kind": "authored",
+        "role": "fictional"
+      },
+      "region_id": "region:starter",
+      "removed": false,
+      "transform": {
+        "coordinate_space": "region_local",
+        "coordinate_unit": "millimetre",
+        "scale_milli": 1000,
+        "x_mm": 0,
+        "y_mm": 0,
+        "yaw_microradians": 0,
+        "z_mm": 0
+      }
+    },
+    "read_through": "the launcher's API process on port 19231, with the person's token",
+    "saved_world": {
+      "authored_edit_seq": 2,
+      "authored_state_sha256": "1070c6bf905a90b79a7b19d98a794459fdb2bf2c7a9ec759b3f178efd7f30d4f",
+      "authored_version_id": "52e7883b-39d8-4bda-8c06-04e21f3b54c2",
+      "entry_id": "01a0ce66-6e6c-756a-b76d-39b08d79d687",
+      "revision": 3,
+      "title": "Evening garden",
+      "world_id": "world:authored:28feb9c3-5a72-4f2e-a010-35d7ac93d649"
+    },
+    "saved_world_opens_at_version_state": true,
+    "version": {
+      "edit_seq": 2,
+      "state_sha256": "1070c6bf905a90b79a7b19d98a794459fdb2bf2c7a9ec759b3f178efd7f30d4f",
+      "version_id": "52e7883b-39d8-4bda-8c06-04e21f3b54c2",
+      "world_id": "world:authored:28feb9c3-5a72-4f2e-a010-35d7ac93d649"
+    }
+  },
+  "driver": {
+    "as_run_sha256": "1454295cc0c9e16d79720757f465ef7ea29a2e15457860ef5bb436853defa57f",
+    "published_as": "run.py.txt, local paths replaced by placeholders"
+  },
+  "launcher": {
+    "api_imported_exulanica_from": "<worktree>/exulanica/__init__.py",
+    "derivative_worker": "in-process",
+    "ports": {
+      "api": 19231,
+      "browser": 19233,
+      "database": 19230,
+      "vite": 19232
+    },
+    "slot": 6,
+    "tree": {
+      "branch": "lane/0923-client",
+      "changed_paths": "31",
+      "diff_head_bytes": "113785",
+      "diff_head_sha256": "4eaa0706ce4b6504456e169049ce8f9775dec468979f84bae5591a6ba58bf836",
+      "head": "e9dee3c288dbb3fb7a066bfb40b31143207fc11e",
+      "status_sha256": "b88531f1f6140581095255da75bd07037a305ca6a0a4be2add19b535e148ddb9"
+    }
+  },
+  "narrow_token": {
+    "GET /graph": {
+      "code": "not_authorised",
+      "detail": "this credential does not hold library.read, which GET /graph requires",
+      "status": 403
+    },
+    "GET /world-entries": {
+      "status": 200
+    },
+    "client_grant": [
+      "world.read",
+      "world.write"
+    ],
+    "person_grant": [
+      "library.read",
+      "library.write",
+      "model.invoke",
+      "intake.write",
+      "deletion.write",
+      "consent.read",
+      "consent.write",
+      "admission.read",
+      "admission.write",
+      "world.read",
+      "world.write",
+      "operations.read",
+      "operations.write"
+    ]
+  },
+  "saved_world_created": {
+    "entry_id": "01a0ce66-6e6c-756a-b76d-39b08d79d687",
+    "route": "POST /world-entries/starter",
+    "title": "Evening garden"
+  }
+}

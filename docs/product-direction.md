@@ -768,7 +768,7 @@ interaction. The initial behavior is bounded motion with trigger, stop, and rese
 | 2 | Alternate version | Create a variation, change its appearance, reload it, and return to the unchanged starting version |
 | 3 | One created object | Add/place/remove one reviewed asset; accepted edits survive reload and can be undone |
 | 4 | One interaction | Trigger/stop/reset its supported motion; behavior remains attached after reopening; unsupported behavior fails visibly |
-| 5 | Developer proof | A small client reads the same saved version and submits the supported edit through the authenticated API |
+| 5 | Developer proof | A small client reads the same saved version and submits the supported edit through the authenticated API. Shown on a synthetic starter world ([record](evaluation/2026-09-23-developer-client.json)): the standard-library [developer client](capabilities/developer-client.md), holding a token granted only `world.read` and `world.write`, read the saved world, discovered the supported edits, behaviours and assets from the server, placed a reviewed object and gave it bounded motion, had an unlisted behaviour refused with the server's reason, and confirmed the result on a fresh read; the application then reopened the saved world and drew the object. A reconstructed personal place was not the subject |
 | 6 | Package proof, only with a compatible extension | Save and verify the new state with an explicit profile/version; distinguish successful verification from successful runtime loading |
 
 Dependencies are sequential for the demonstration; existing recovery and source-validation work
@@ -1052,7 +1052,9 @@ nor that every renderer will execute it the same way.
 
 The API should operate on a named world/version with authenticated reads and reviewed changes.
 The existing World Read/Write routes are starting points, not a promise of the final route shape.
-Do not publish invented endpoints before implementing the contract.
+Do not publish invented endpoints before implementing the contract. Every route, schema and
+permission rule is pinned in `tests/snapshots/api-routes.json` and `tests/snapshots/api-openapi.json`,
+so a change to the surface a client depends on reaches review as a diff rather than as a side effect.
 
 Project outputs use capability-declared projections: a scene asset, annotated dataset, experiment
 result and portable world snapshot serve different consumers. Each declares the source world and

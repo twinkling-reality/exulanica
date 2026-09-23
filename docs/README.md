@@ -71,6 +71,7 @@ in the matching contract, not in a brief.
 - [Companion](capabilities/companion.md)
 - [Simulation runtime](capabilities/simulation.md)
 - [World API](capabilities/world-api.md)
+- [Developer client](capabilities/developer-client.md)
 
 ## Capability status
 
@@ -82,6 +83,7 @@ README. It does not promote delivery-roadmap items to shipped claims.
 | World Memory Package | Ordinary profile `exulanica-wmp-1.0`; opt-in authored-world 1.0 and environment-instances 1.0 extensions; opt-in training profile `exulanica-wmp-training-1.1` | A general learned simulation runtime; a complete society projection |
 | World Read / Write | Scene and place bundles; generation receipts; `Intent.CONTENT` over confirmed-place memories, admitted environment sources and features, and authored environment instances | The Iceland-class personal journey; authored objects as a CONTENT kind; people, capture-time, processing-state, or semantic-text filters on CONTENT |
 | Authored objects | Add, move, remove, undo, and alternate versions, with code and synthetic checks | Real-scene acceptance; arbitrary world branching |
+| Developer client | A standard-library Python client that reads a saved world, discovers the supported edits from the server and places an object with motion through a token limited to world reads and writes; a recorded run on a synthetic starter world | A client in another language; stale-base reconciliation inside this client |
 | Accounts | Optional Google account sessions, account-owned workspaces, authenticated district reads | Configured live-provider deployment and a completed account-deletion lifecycle |
 | Simulation | Persisted deterministic v2, v3, and v4 profiles; composition default `exulanica.society-composition/v1`; typed `go_to` and `perform` HTTP requests; a browser destination control for `perform` on held v2 societies, implemented and unit-tested, which no shipped configuration reaches | Learned dynamics; natural social behavior; directed actions on living (v4) societies; production worker configuration; an inhabited saved world the browser can reach |
 | Character | Version-scoped appearance history; catalog people for the player and inhabitants | Source-linked likeness; production family configuration; movement and visual acceptance |

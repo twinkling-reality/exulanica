@@ -1,0 +1,122 @@
+{
+  "app": "http://localhost:19232/",
+  "settle_ms": 5000,
+  "world_title_field": "Evening garden",
+  "api_requests": [
+    {
+      "method": "GET",
+      "url": "/api/graph",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "/api/world-entries",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "/api/world/styles/catalog?world_id=world%3Aauthored%3A28feb9c3-5a72-4f2e-a010-35d7ac93d649",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "/api/world/styles/versions?world_id=world%3Aauthored%3A28feb9c3-5a72-4f2e-a010-35d7ac93d649",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "/api/world/styles/current?world_id=world%3Aauthored%3A28feb9c3-5a72-4f2e-a010-35d7ac93d649",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "/api/world/interactions/current",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "/api/geometry",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "/api/world/versions/52e7883b-39d8-4bda-8c06-04e21f3b54c2?world_id=world%3Aauthored%3A28feb9c3-5a72-4f2e-a010-35d7ac93d649",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "/api/companion/memory/recent?limit=50",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "/api/formation",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "/api/formation",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "/api/world/assets?world_id=world%3Aauthored%3A28feb9c3-5a72-4f2e-a010-35d7ac93d649",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "/api/world/versions/52e7883b-39d8-4bda-8c06-04e21f3b54c2?world_id=world%3Aauthored%3A28feb9c3-5a72-4f2e-a010-35d7ac93d649",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "/api/world/assets?world_id=world%3Aauthored%3A28feb9c3-5a72-4f2e-a010-35d7ac93d649",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "/api/world/versions/52e7883b-39d8-4bda-8c06-04e21f3b54c2/society?world_id=world%3Aauthored%3A28feb9c3-5a72-4f2e-a010-35d7ac93d649&places=true",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "url": "/api/graph",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "/api/world/versions/52e7883b-39d8-4bda-8c06-04e21f3b54c2?world_id=world%3Aauthored%3A28feb9c3-5a72-4f2e-a010-35d7ac93d649",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "/api/world/versions/52e7883b-39d8-4bda-8c06-04e21f3b54c2/society/control?world_id=world%3Aauthored%3A28feb9c3-5a72-4f2e-a010-35d7ac93d649",
+      "status": 404
+    },
+    {
+      "method": "GET",
+      "url": "/api/world/assets/cc0.marker-cube/bytes",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "/api/graph/sources",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "/api/world-entries/01a0ce66-6e6c-756a-b76d-39b08d79d687",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "/api/personal-admission",
+      "status": 200
+    },
+    {
+      "method": "GET",
+      "url": "/api/world/versions/52e7883b-39d8-4bda-8c06-04e21f3b54c2?world_id=world%3Aauthored%3A28feb9c3-5a72-4f2e-a010-35d7ac93d649",
+      "status": 200
+    }
+  ]
+}

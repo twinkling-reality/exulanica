@@ -185,7 +185,10 @@ stable and undo restores it rather than resurrecting a new identity.
 ### Behaviours
 
 A behaviour is `behaviour_key` plus `behaviour_version` plus parameters, all validated against
-`world_object_behaviour_registry` before any write. The registry is reviewed migration data. A
+`world_object_behaviour_registry` before any write. The registry is reviewed migration data, and
+`GET /world/behaviours` serves it as the table holds it, so a client chooses a behaviour and its
+parameters by asking the server rather than by keeping a copy
+(`tests/test_world_behaviours_route.py` holds every advertised bound to the one enforced). A
 parameter is `integer` with an inclusive minimum and maximum, `choice` over at least two values, or
 `toggle`. An unknown key, an unknown version, an unknown parameter, a missing parameter, a wrong
 kind, and an out-of-range value all fail closed with `invalid_object_data`.
@@ -400,6 +403,7 @@ snake_case, and this fixture matches them.
 | `GET` | `/world/assets/{asset_key}` | One reviewed asset |
 | `GET` | `/world/assets/{asset_key}/bytes` | The reviewed GLB bytes |
 | `GET` | `/world/assets/{asset_key}/licence` | The licence text those bytes are published under |
+| `GET` | `/world/behaviours` | The reviewed behaviour registry, with each parameter's kind and bounds |
 
 The two byte routes follow `GET /geometry/{artifact_id}`: a `Response` with an `ETag` that is the
 content digest, `X-Content-Type-Options: nosniff` and `Accept-Ranges: none`. They differ from it in
@@ -428,7 +432,7 @@ The problem codes are distinct, because the recovery differs:
 | `404` | `unknown_reference` | Absent and cross-workspace ids are indistinguishable |
 
 `unknown_reference` and `unavailable_asset` reuse the existing application error classes and their
-existing handlers. The four object-edit codes are mapped inside `exulanica/api/routes/world.py`, following
+existing handlers. The four object-edit codes are mapped inside `exulanica/api/world_edit.py`, following
 the local `_problem` helper that `world_write.py` already uses, so registering this surface adds no
 new global exception handler.
 

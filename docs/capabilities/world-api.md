@@ -21,14 +21,22 @@ Every route requires `Authorization: Bearer <token>`, and a token is bound to on
 | `POST /world/versions/{version_id}/objects` | Add one authored object from the reviewed registry |
 | `POST /world/versions/{version_id}/objects/{object_id}/move` | Replace one object's region-local transform |
 | `POST /world/versions/{version_id}/objects/{object_id}/remove` | Store a removal |
+| `POST /world/versions/{version_id}/objects/{object_id}/behaviour` | Give one object a reviewed behaviour, replace it, or take it away |
 | `POST /world/versions/{version_id}/objects/undo` | Reverse the newest edit not already reversed |
 | `GET /world/assets` | The reviewed asset registry, with whether each asset's bytes are present |
 | `GET /world/assets/{asset_key}/bytes` | The reviewed GLB bytes |
+| `GET /world/behaviours` | The reviewed behaviours an object may be given, with each parameter's bounds |
+| `GET /world-entries` | The workspace's saved worlds, each naming the version and state it reopens at |
 | `GET /world/source-media` | Protected topology source slots, including their region ids |
 
 World Write records provenance; it does not deliver generated assets or execute behavior. The
 `/world/versions` routes are the object-editing surface, and their full contract, including every
 problem code, is [world-objects-contract.md](../world-objects-contract.md) sections 5 to 7.
+
+The whole surface, every route with its permission rule and every schema, is pinned in
+`tests/snapshots/api-routes.json` and `tests/snapshots/api-openapi.json`; a change to either reaches
+review as a diff, as the [developer client guide](developer-client.md#the-contract-it-is-written-against)
+describes.
 
 ## Making an edit from another tool
 
@@ -40,10 +48,16 @@ decide whether the edit still makes sense against what is there now, and only th
 against the new token. Re-sending the same body with a fresh token without looking is the lost
 update the check exists to prevent.
 
-`scripts/world_client_example.py` is a complete second client that does exactly this: it reads a
-named version and its objects, adds one reviewed asset, moves it, handles a stale-base refusal by
-re-reading and reconciling, and prints what changed. It uses the standard library and httpx and
-imports nothing from this repository.
+The [developer client](developer-client.md) in `clients/python` is a complete second client
+written against the standard library only. With a token granted `world.read` and `world.write`, it
+reads the person's saved world, discovers the edits, behaviours and assets the server supports,
+places a reviewed object and gives it motion, has a behaviour the registry does not list refused
+with the server's reason, and confirms every fact on a fresh read.
+
+`scripts/world_client_example.py` is a second client that shows the stale-base path: it
+reads a named version and its objects, adds one reviewed asset, moves it, handles a stale-base
+refusal by re-reading and reconciling, and prints what changed. It uses the standard library and
+httpx and imports nothing from this repository.
 
 ```bash
 EXULANICA_TOKEN=<token> uv run python scripts/world_client_example.py --base-url http://127.0.0.1:8000 --title "Evening study" --origin-role fictional --demonstrate-stale-base
@@ -58,12 +72,14 @@ Its run against the reference copy, with the wire transcript, is retained in
 
 ## Gaps a second tool meets
 
-- A version can be created only from an existing structural snapshot, and no route composes one.
-  A workspace whose structural plane was never composed offers no version to edit.
-- No route lists a source snapshot's regions. A client learns a region id from an object that
-  already uses one, or from `GET /world/source-media`; the server refuses a region its source lacks.
-- No route reads the behaviour registry. A client learns the one reviewed behaviour,
-  `motion.bounded-path@1`, from the objects contract, and the server refuses anything outside it.
+- A workspace with no saved world has no version to edit until one is made.
+  `POST /world-entries/starter` creates the authored starter world and its version, which is how
+  [the recorded developer-client run](../evaluation/2026-09-23-developer-client.json) began in an
+  empty synthetic workspace. Otherwise a version is created from an existing structural snapshot or
+  from another version.
+- No route lists a source snapshot's regions. An authored starter world names its region in the
+  saved world's `authored_scene`; otherwise a client learns a region id from an object that already
+  uses one, or from `GET /world/source-media`. The server refuses a region its source lacks.
 
 ## Carrying a version elsewhere
 
@@ -80,6 +96,10 @@ capabilities with what the package needs and names what it cannot load; see
 [environment-instances 1.0](../world-memory-package.md#environment-instances-extension-10).
 
 Definitions: [World Read](../../exulanica/api/routes/world_read.py),
-[World Write](../../exulanica/api/routes/world_write.py) and
-[world versions and assets](../../exulanica/api/routes/world.py).
+[World Write](../../exulanica/api/routes/world_write.py),
+[world versions](../../exulanica/api/routes/world_versions.py),
+[authored objects](../../exulanica/api/routes/world_objects.py),
+[reviewed assets](../../exulanica/api/routes/world_assets.py) and
+[reviewed behaviours](../../exulanica/api/routes/world_behaviours.py), with the shared edit bodies
+and problem codes in [world_edit.py](../../exulanica/api/world_edit.py).
 See [development setup](../development-setup.md) for authentication and server configuration.

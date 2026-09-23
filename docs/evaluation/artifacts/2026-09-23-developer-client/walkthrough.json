@@ -1,0 +1,731 @@
+{
+  "base_url": "http://127.0.0.1:19234",
+  "checks": [
+    {
+      "check": "the object is in the version and not removed",
+      "expected": true,
+      "holds": true,
+      "observed": true
+    },
+    {
+      "check": "it is made from the chosen reviewed asset",
+      "expected": "b41289ac10548cf698d46a15206caa8e744b0b800f4ac29260c99f18d8b831d9",
+      "holds": true,
+      "observed": "b41289ac10548cf698d46a15206caa8e744b0b800f4ac29260c99f18d8b831d9"
+    },
+    {
+      "check": "its bytes are available to draw",
+      "expected": "available",
+      "holds": true,
+      "observed": "available"
+    },
+    {
+      "check": "it stands where it was placed",
+      "expected": {
+        "scale_milli": 1000,
+        "x_mm": 0,
+        "y_mm": 0,
+        "yaw_microradians": 0,
+        "z_mm": 0
+      },
+      "holds": true,
+      "observed": {
+        "scale_milli": 1000,
+        "x_mm": 0,
+        "y_mm": 0,
+        "yaw_microradians": 0,
+        "z_mm": 0
+      }
+    },
+    {
+      "check": "its origin is the role the person chose",
+      "expected": {
+        "kind": "authored",
+        "role": "fictional"
+      },
+      "holds": true,
+      "observed": {
+        "kind": "authored",
+        "role": "fictional"
+      }
+    },
+    {
+      "check": "it carries the motion that was set",
+      "expected": {
+        "behaviour_key": "motion.bounded-path",
+        "behaviour_version": 1,
+        "parameters": {
+          "axis": "x",
+          "easing": "smooth",
+          "period_milliseconds": 4000,
+          "travel_mm": 1000
+        }
+      },
+      "holds": true,
+      "observed": {
+        "behaviour_key": "motion.bounded-path",
+        "behaviour_version": 1,
+        "parameters": {
+          "axis": "x",
+          "easing": "smooth",
+          "period_milliseconds": 4000,
+          "travel_mm": 1000
+        }
+      }
+    },
+    {
+      "check": "the version's state is the one the motion edit answered with, so the refused request changed nothing",
+      "expected": "1070c6bf905a90b79a7b19d98a794459fdb2bf2c7a9ec759b3f178efd7f30d4f",
+      "holds": true,
+      "observed": "1070c6bf905a90b79a7b19d98a794459fdb2bf2c7a9ec759b3f178efd7f30d4f"
+    },
+    {
+      "check": "the newest two edits are this client's",
+      "expected": [
+        [
+          "add_object",
+          "developer-client:evening-lantern"
+        ],
+        [
+          "set_object_behaviour",
+          "developer-client:evening-lantern"
+        ]
+      ],
+      "holds": true,
+      "observed": [
+        [
+          "add_object",
+          "developer-client:evening-lantern"
+        ],
+        [
+          "set_object_behaviour",
+          "developer-client:evening-lantern"
+        ]
+      ]
+    },
+    {
+      "check": "the saved world reopens at that state",
+      "expected": "1070c6bf905a90b79a7b19d98a794459fdb2bf2c7a9ec759b3f178efd7f30d4f",
+      "holds": true,
+      "observed": "1070c6bf905a90b79a7b19d98a794459fdb2bf2c7a9ec759b3f178efd7f30d4f"
+    },
+    {
+      "check": "the saved world reopens at that edit",
+      "expected": 2,
+      "holds": true,
+      "observed": 2
+    }
+  ],
+  "command": "walkthrough",
+  "discovered": {
+    "assets": [
+      {
+        "asset_key": "cc0.marker-cube",
+        "availability": "available",
+        "content_sha256": "b41289ac10548cf698d46a15206caa8e744b0b800f4ac29260c99f18d8b831d9"
+      },
+      {
+        "asset_key": "cc0.marker-pillar",
+        "availability": "available",
+        "content_sha256": "b960af0f1c85f6c41a38ce09727cd19bc2bbc0e21bb8f3f111707af9b90b2737"
+      },
+      {
+        "asset_key": "cc0.marker-plate",
+        "availability": "available",
+        "content_sha256": "19425a058c19d4009392093e770c7f115a68d020b67e0bdce83abdad4b5a2f6e"
+      }
+    ],
+    "behaviours": [
+      {
+        "key": "motion.bounded-path",
+        "parameters": {
+          "axis": {
+            "choices": [
+              "x",
+              "y",
+              "z"
+            ],
+            "default": "x",
+            "kind": "choice"
+          },
+          "easing": {
+            "choices": [
+              "linear",
+              "smooth"
+            ],
+            "default": "smooth",
+            "kind": "choice"
+          },
+          "period_milliseconds": {
+            "default": 4000,
+            "kind": "integer",
+            "maximum": 60000,
+            "minimum": 500
+          },
+          "travel_mm": {
+            "default": 1000,
+            "kind": "integer",
+            "maximum": 10000,
+            "minimum": 100
+          }
+        },
+        "version": 1
+      }
+    ],
+    "edits": [
+      {
+        "method": "POST",
+        "operation_id": "add_environment_instance_world_versions__version_id__environment_instances_post",
+        "path": "/world/versions/{version_id}/environment-instances",
+        "summary": "Place one exact environment asset or feature against the current version state."
+      },
+      {
+        "method": "POST",
+        "operation_id": "move_environment_instance_world_versions__version_id__environment_instances__instance_id__move_post",
+        "path": "/world/versions/{version_id}/environment-instances/{instance_id}/move",
+        "summary": "Move an available, still-authorized environment instance without changing its source."
+      },
+      {
+        "method": "POST",
+        "operation_id": "remove_environment_instance_world_versions__version_id__environment_instances__instance_id__remove_post",
+        "path": "/world/versions/{version_id}/environment-instances/{instance_id}/remove",
+        "summary": "Store a removal, including when the pinned source has since been withdrawn."
+      },
+      {
+        "method": "POST",
+        "operation_id": "undo_environment_edit_world_versions__version_id__environment_instances_undo_post",
+        "path": "/world/versions/{version_id}/environment-instances/undo",
+        "summary": "Undo the newest authored edit from stored history, even after source withdrawal."
+      },
+      {
+        "method": "POST",
+        "operation_id": "add_authored_object_world_versions__version_id__objects_post",
+        "path": "/world/versions/{version_id}/objects",
+        "summary": "Add one authored object against an explicit base version state."
+      },
+      {
+        "method": "POST",
+        "operation_id": "move_authored_object_world_versions__version_id__objects__object_id__move_post",
+        "path": "/world/versions/{version_id}/objects/{object_id}/move",
+        "summary": "Replace one authored object's region-local transform."
+      },
+      {
+        "method": "POST",
+        "operation_id": "remove_authored_object_world_versions__version_id__objects__object_id__remove_post",
+        "path": "/world/versions/{version_id}/objects/{object_id}/remove",
+        "summary": "Store a removal. POST rather than DELETE: this appends history, it destroys nothing."
+      },
+      {
+        "method": "POST",
+        "operation_id": "set_authored_object_behaviour_world_versions__version_id__objects__object_id__behaviour_post",
+        "path": "/world/versions/{version_id}/objects/{object_id}/behaviour",
+        "summary": "Give one authored object a reviewed behaviour, replace it, or take it away with null."
+      },
+      {
+        "method": "POST",
+        "operation_id": "undo_authored_edit_world_versions__version_id__objects_undo_post",
+        "path": "/world/versions/{version_id}/objects/undo",
+        "summary": "Reverse the newest object edit, from the document that edit stored."
+      },
+      {
+        "method": "POST",
+        "operation_id": "composition_apply_route_world_versions__version_id__compositions_apply_post",
+        "path": "/world/versions/{version_id}/compositions/apply",
+        "summary": "Perform exactly the resolved composition, or refuse with its blocked reason."
+      },
+      {
+        "method": "POST",
+        "operation_id": "photo_point_map_apply_route_world_versions__version_id__compositions_photo_point_maps_apply_post",
+        "path": "/world/versions/{version_id}/compositions/photo-point-maps/apply",
+        "summary": "Place exactly the resolved estimate, or refuse with its blocked reason."
+      }
+    ]
+  },
+  "edits": [
+    {
+      "asset_key": "cc0.marker-cube",
+      "base_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+      "edit": "place_object",
+      "object_id": "developer-client:evening-lantern",
+      "origin_role": "fictional",
+      "region_id": "region:starter",
+      "result_state_sha256": "6f9ddc091fe7ab003ce3dc6a6718586014881dea1441f0b64c74d3987b7422b4",
+      "transform": {
+        "scale_milli": 1000,
+        "x_mm": 0,
+        "y_mm": 0,
+        "yaw_microradians": 0,
+        "z_mm": 0
+      }
+    },
+    {
+      "base_state_sha256": "6f9ddc091fe7ab003ce3dc6a6718586014881dea1441f0b64c74d3987b7422b4",
+      "behaviour": {
+        "behaviour_key": "motion.bounded-path",
+        "behaviour_version": 1,
+        "parameters": {
+          "axis": "x",
+          "easing": "smooth",
+          "period_milliseconds": 4000,
+          "travel_mm": 1000
+        }
+      },
+      "edit": "set_object_behaviour",
+      "object_id": "developer-client:evening-lantern",
+      "result_state_sha256": "1070c6bf905a90b79a7b19d98a794459fdb2bf2c7a9ec759b3f178efd7f30d4f"
+    }
+  ],
+  "exchanges": [
+    {
+      "method": "GET",
+      "openapi": {
+        "info": {
+          "summary": "A personal world memory model. Every historical claim resolves to its source.",
+          "title": "Exulanica",
+          "version": "0.1.0"
+        },
+        "version": "3.1.0"
+      },
+      "path": "/openapi.json",
+      "status": 200,
+      "step": "discover"
+    },
+    {
+      "items": 1,
+      "method": "GET",
+      "path": "/world/behaviours",
+      "status": 200,
+      "step": "discover"
+    },
+    {
+      "items": 3,
+      "method": "GET",
+      "path": "/world/assets",
+      "status": 200,
+      "step": "discover"
+    },
+    {
+      "items": 1,
+      "method": "GET",
+      "path": "/world-entries",
+      "status": 200,
+      "step": "read"
+    },
+    {
+      "method": "GET",
+      "path": "/world/versions/52e7883b-39d8-4bda-8c06-04e21f3b54c2",
+      "query": {
+        "world_id": "world:authored:28feb9c3-5a72-4f2e-a010-35d7ac93d649"
+      },
+      "status": 200,
+      "step": "read",
+      "version": {
+        "edit_seq": 0,
+        "edits": [],
+        "objects": [],
+        "state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+        "version_id": "52e7883b-39d8-4bda-8c06-04e21f3b54c2",
+        "world_id": "world:authored:28feb9c3-5a72-4f2e-a010-35d7ac93d649"
+      }
+    },
+    {
+      "method": "POST",
+      "path": "/world/versions/52e7883b-39d8-4bda-8c06-04e21f3b54c2/objects",
+      "query": {
+        "world_id": "world:authored:28feb9c3-5a72-4f2e-a010-35d7ac93d649"
+      },
+      "request_body": {
+        "asset_sha256": "b41289ac10548cf698d46a15206caa8e744b0b800f4ac29260c99f18d8b831d9",
+        "base_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+        "object_id": "developer-client:evening-lantern",
+        "origin_role": "fictional",
+        "region_id": "region:starter",
+        "saved_entry": {
+          "authored_edit_seq": 0,
+          "authored_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+          "base_revision": 1,
+          "entry_id": "01a0ce66-6e6c-756a-b76d-39b08d79d687"
+        },
+        "transform": {
+          "scale_milli": 1000,
+          "x_mm": 0,
+          "y_mm": 0,
+          "yaw_microradians": 0,
+          "z_mm": 0
+        }
+      },
+      "status": 201,
+      "step": "place",
+      "version": {
+        "edit_seq": 1,
+        "edits": [
+          {
+            "base_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+            "edit_seq": 1,
+            "kind": "add_object",
+            "object_id": "developer-client:evening-lantern",
+            "result_state_sha256": "6f9ddc091fe7ab003ce3dc6a6718586014881dea1441f0b64c74d3987b7422b4"
+          }
+        ],
+        "objects": [
+          {
+            "asset_key": "cc0.marker-cube",
+            "behaviour": null,
+            "content_sha256": "b41289ac10548cf698d46a15206caa8e744b0b800f4ac29260c99f18d8b831d9",
+            "object_id": "developer-client:evening-lantern",
+            "origin": {
+              "kind": "authored",
+              "role": "fictional"
+            },
+            "region_id": "region:starter",
+            "removed": false,
+            "transform": {
+              "coordinate_space": "region_local",
+              "coordinate_unit": "millimetre",
+              "scale_milli": 1000,
+              "x_mm": 0,
+              "y_mm": 0,
+              "yaw_microradians": 0,
+              "z_mm": 0
+            }
+          }
+        ],
+        "state_sha256": "6f9ddc091fe7ab003ce3dc6a6718586014881dea1441f0b64c74d3987b7422b4",
+        "version_id": "52e7883b-39d8-4bda-8c06-04e21f3b54c2",
+        "world_id": "world:authored:28feb9c3-5a72-4f2e-a010-35d7ac93d649"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/world-entries/01a0ce66-6e6c-756a-b76d-39b08d79d687",
+      "saved_world": {
+        "authored_edit_seq": 1,
+        "authored_state_sha256": "6f9ddc091fe7ab003ce3dc6a6718586014881dea1441f0b64c74d3987b7422b4",
+        "authored_version_id": "52e7883b-39d8-4bda-8c06-04e21f3b54c2",
+        "availability": "available",
+        "entry_id": "01a0ce66-6e6c-756a-b76d-39b08d79d687",
+        "revision": 2,
+        "source_kind": "authored",
+        "title": "Evening garden",
+        "world_id": "world:authored:28feb9c3-5a72-4f2e-a010-35d7ac93d649"
+      },
+      "status": 200,
+      "step": "place"
+    },
+    {
+      "method": "POST",
+      "path": "/world/versions/52e7883b-39d8-4bda-8c06-04e21f3b54c2/objects/developer-client%3Aevening-lantern/behaviour",
+      "query": {
+        "world_id": "world:authored:28feb9c3-5a72-4f2e-a010-35d7ac93d649"
+      },
+      "request_body": {
+        "base_state_sha256": "6f9ddc091fe7ab003ce3dc6a6718586014881dea1441f0b64c74d3987b7422b4",
+        "behaviour": {
+          "behaviour_key": "motion.bounded-path",
+          "behaviour_version": 1,
+          "parameters": {
+            "axis": "x",
+            "easing": "smooth",
+            "period_milliseconds": 4000,
+            "travel_mm": 1000
+          }
+        },
+        "saved_entry": {
+          "authored_edit_seq": 1,
+          "authored_state_sha256": "6f9ddc091fe7ab003ce3dc6a6718586014881dea1441f0b64c74d3987b7422b4",
+          "base_revision": 2,
+          "entry_id": "01a0ce66-6e6c-756a-b76d-39b08d79d687"
+        }
+      },
+      "status": 200,
+      "step": "motion",
+      "version": {
+        "edit_seq": 2,
+        "edits": [
+          {
+            "base_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+            "edit_seq": 1,
+            "kind": "add_object",
+            "object_id": "developer-client:evening-lantern",
+            "result_state_sha256": "6f9ddc091fe7ab003ce3dc6a6718586014881dea1441f0b64c74d3987b7422b4"
+          },
+          {
+            "base_state_sha256": "6f9ddc091fe7ab003ce3dc6a6718586014881dea1441f0b64c74d3987b7422b4",
+            "edit_seq": 2,
+            "kind": "set_object_behaviour",
+            "object_id": "developer-client:evening-lantern",
+            "result_state_sha256": "1070c6bf905a90b79a7b19d98a794459fdb2bf2c7a9ec759b3f178efd7f30d4f"
+          }
+        ],
+        "objects": [
+          {
+            "asset_key": "cc0.marker-cube",
+            "behaviour": {
+              "behaviour_key": "motion.bounded-path",
+              "behaviour_version": 1,
+              "parameters": {
+                "axis": "x",
+                "easing": "smooth",
+                "period_milliseconds": 4000,
+                "travel_mm": 1000
+              }
+            },
+            "content_sha256": "b41289ac10548cf698d46a15206caa8e744b0b800f4ac29260c99f18d8b831d9",
+            "object_id": "developer-client:evening-lantern",
+            "origin": {
+              "kind": "authored",
+              "role": "fictional"
+            },
+            "region_id": "region:starter",
+            "removed": false,
+            "transform": {
+              "coordinate_space": "region_local",
+              "coordinate_unit": "millimetre",
+              "scale_milli": 1000,
+              "x_mm": 0,
+              "y_mm": 0,
+              "yaw_microradians": 0,
+              "z_mm": 0
+            }
+          }
+        ],
+        "state_sha256": "1070c6bf905a90b79a7b19d98a794459fdb2bf2c7a9ec759b3f178efd7f30d4f",
+        "version_id": "52e7883b-39d8-4bda-8c06-04e21f3b54c2",
+        "world_id": "world:authored:28feb9c3-5a72-4f2e-a010-35d7ac93d649"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/world-entries/01a0ce66-6e6c-756a-b76d-39b08d79d687",
+      "saved_world": {
+        "authored_edit_seq": 2,
+        "authored_state_sha256": "1070c6bf905a90b79a7b19d98a794459fdb2bf2c7a9ec759b3f178efd7f30d4f",
+        "authored_version_id": "52e7883b-39d8-4bda-8c06-04e21f3b54c2",
+        "availability": "available",
+        "entry_id": "01a0ce66-6e6c-756a-b76d-39b08d79d687",
+        "revision": 3,
+        "source_kind": "authored",
+        "title": "Evening garden",
+        "world_id": "world:authored:28feb9c3-5a72-4f2e-a010-35d7ac93d649"
+      },
+      "status": 200,
+      "step": "motion"
+    },
+    {
+      "method": "POST",
+      "path": "/world/versions/52e7883b-39d8-4bda-8c06-04e21f3b54c2/objects/developer-client%3Aevening-lantern/behaviour",
+      "problem": {
+        "code": "invalid_object_data",
+        "detail": "behaviour motion.bounded-path@2 is not reviewed"
+      },
+      "query": {
+        "world_id": "world:authored:28feb9c3-5a72-4f2e-a010-35d7ac93d649"
+      },
+      "request_body": {
+        "base_state_sha256": "1070c6bf905a90b79a7b19d98a794459fdb2bf2c7a9ec759b3f178efd7f30d4f",
+        "behaviour": {
+          "behaviour_key": "motion.bounded-path",
+          "behaviour_version": 2,
+          "parameters": {
+            "axis": "x",
+            "easing": "smooth",
+            "period_milliseconds": 4000,
+            "travel_mm": 1000
+          }
+        },
+        "saved_entry": {
+          "authored_edit_seq": 2,
+          "authored_state_sha256": "1070c6bf905a90b79a7b19d98a794459fdb2bf2c7a9ec759b3f178efd7f30d4f",
+          "base_revision": 3,
+          "entry_id": "01a0ce66-6e6c-756a-b76d-39b08d79d687"
+        }
+      },
+      "status": 422,
+      "step": "unsupported"
+    },
+    {
+      "method": "GET",
+      "path": "/world/versions/52e7883b-39d8-4bda-8c06-04e21f3b54c2",
+      "query": {
+        "world_id": "world:authored:28feb9c3-5a72-4f2e-a010-35d7ac93d649"
+      },
+      "status": 200,
+      "step": "confirm",
+      "version": {
+        "edit_seq": 2,
+        "edits": [
+          {
+            "base_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+            "edit_seq": 1,
+            "kind": "add_object",
+            "object_id": "developer-client:evening-lantern",
+            "result_state_sha256": "6f9ddc091fe7ab003ce3dc6a6718586014881dea1441f0b64c74d3987b7422b4"
+          },
+          {
+            "base_state_sha256": "6f9ddc091fe7ab003ce3dc6a6718586014881dea1441f0b64c74d3987b7422b4",
+            "edit_seq": 2,
+            "kind": "set_object_behaviour",
+            "object_id": "developer-client:evening-lantern",
+            "result_state_sha256": "1070c6bf905a90b79a7b19d98a794459fdb2bf2c7a9ec759b3f178efd7f30d4f"
+          }
+        ],
+        "objects": [
+          {
+            "asset_key": "cc0.marker-cube",
+            "behaviour": {
+              "behaviour_key": "motion.bounded-path",
+              "behaviour_version": 1,
+              "parameters": {
+                "axis": "x",
+                "easing": "smooth",
+                "period_milliseconds": 4000,
+                "travel_mm": 1000
+              }
+            },
+            "content_sha256": "b41289ac10548cf698d46a15206caa8e744b0b800f4ac29260c99f18d8b831d9",
+            "object_id": "developer-client:evening-lantern",
+            "origin": {
+              "kind": "authored",
+              "role": "fictional"
+            },
+            "region_id": "region:starter",
+            "removed": false,
+            "transform": {
+              "coordinate_space": "region_local",
+              "coordinate_unit": "millimetre",
+              "scale_milli": 1000,
+              "x_mm": 0,
+              "y_mm": 0,
+              "yaw_microradians": 0,
+              "z_mm": 0
+            }
+          }
+        ],
+        "state_sha256": "1070c6bf905a90b79a7b19d98a794459fdb2bf2c7a9ec759b3f178efd7f30d4f",
+        "version_id": "52e7883b-39d8-4bda-8c06-04e21f3b54c2",
+        "world_id": "world:authored:28feb9c3-5a72-4f2e-a010-35d7ac93d649"
+      }
+    },
+    {
+      "method": "GET",
+      "path": "/world-entries/01a0ce66-6e6c-756a-b76d-39b08d79d687",
+      "saved_world": {
+        "authored_edit_seq": 2,
+        "authored_state_sha256": "1070c6bf905a90b79a7b19d98a794459fdb2bf2c7a9ec759b3f178efd7f30d4f",
+        "authored_version_id": "52e7883b-39d8-4bda-8c06-04e21f3b54c2",
+        "availability": "available",
+        "entry_id": "01a0ce66-6e6c-756a-b76d-39b08d79d687",
+        "revision": 3,
+        "source_kind": "authored",
+        "title": "Evening garden",
+        "world_id": "world:authored:28feb9c3-5a72-4f2e-a010-35d7ac93d649"
+      },
+      "status": 200,
+      "step": "confirm"
+    }
+  ],
+  "refusal": {
+    "code": "invalid_object_data",
+    "detail": "behaviour motion.bounded-path@2 is not reviewed",
+    "reason_unsupported": "motion.bounded-path@2 is not in the server's behaviour registry, which lists motion.bounded-path@1",
+    "request": {
+      "behaviour": {
+        "behaviour_key": "motion.bounded-path",
+        "behaviour_version": 2,
+        "parameters": {
+          "axis": "x",
+          "easing": "smooth",
+          "period_milliseconds": 4000,
+          "travel_mm": 1000
+        }
+      },
+      "object_id": "developer-client:evening-lantern"
+    },
+    "status": 422
+  },
+  "result": "confirmed",
+  "saved_world_after": {
+    "authored_edit_seq": 2,
+    "authored_state_sha256": "1070c6bf905a90b79a7b19d98a794459fdb2bf2c7a9ec759b3f178efd7f30d4f",
+    "authored_version_id": "52e7883b-39d8-4bda-8c06-04e21f3b54c2",
+    "availability": "available",
+    "entry_id": "01a0ce66-6e6c-756a-b76d-39b08d79d687",
+    "revision": 3,
+    "source_kind": "authored",
+    "title": "Evening garden",
+    "world_id": "world:authored:28feb9c3-5a72-4f2e-a010-35d7ac93d649"
+  },
+  "saved_world_before": {
+    "authored_edit_seq": 0,
+    "authored_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+    "authored_version_id": "52e7883b-39d8-4bda-8c06-04e21f3b54c2",
+    "availability": "available",
+    "entry_id": "01a0ce66-6e6c-756a-b76d-39b08d79d687",
+    "revision": 1,
+    "source_kind": "authored",
+    "title": "Evening garden",
+    "world_id": "world:authored:28feb9c3-5a72-4f2e-a010-35d7ac93d649"
+  },
+  "version_after": {
+    "edit_seq": 2,
+    "edits": [
+      {
+        "base_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+        "edit_seq": 1,
+        "kind": "add_object",
+        "object_id": "developer-client:evening-lantern",
+        "result_state_sha256": "6f9ddc091fe7ab003ce3dc6a6718586014881dea1441f0b64c74d3987b7422b4"
+      },
+      {
+        "base_state_sha256": "6f9ddc091fe7ab003ce3dc6a6718586014881dea1441f0b64c74d3987b7422b4",
+        "edit_seq": 2,
+        "kind": "set_object_behaviour",
+        "object_id": "developer-client:evening-lantern",
+        "result_state_sha256": "1070c6bf905a90b79a7b19d98a794459fdb2bf2c7a9ec759b3f178efd7f30d4f"
+      }
+    ],
+    "objects": [
+      {
+        "asset_key": "cc0.marker-cube",
+        "behaviour": {
+          "behaviour_key": "motion.bounded-path",
+          "behaviour_version": 1,
+          "parameters": {
+            "axis": "x",
+            "easing": "smooth",
+            "period_milliseconds": 4000,
+            "travel_mm": 1000
+          }
+        },
+        "content_sha256": "b41289ac10548cf698d46a15206caa8e744b0b800f4ac29260c99f18d8b831d9",
+        "object_id": "developer-client:evening-lantern",
+        "origin": {
+          "kind": "authored",
+          "role": "fictional"
+        },
+        "region_id": "region:starter",
+        "removed": false,
+        "transform": {
+          "coordinate_space": "region_local",
+          "coordinate_unit": "millimetre",
+          "scale_milli": 1000,
+          "x_mm": 0,
+          "y_mm": 0,
+          "yaw_microradians": 0,
+          "z_mm": 0
+        }
+      }
+    ],
+    "state_sha256": "1070c6bf905a90b79a7b19d98a794459fdb2bf2c7a9ec759b3f178efd7f30d4f",
+    "version_id": "52e7883b-39d8-4bda-8c06-04e21f3b54c2",
+    "world_id": "world:authored:28feb9c3-5a72-4f2e-a010-35d7ac93d649"
+  },
+  "version_before": {
+    "edit_seq": 0,
+    "edits": [],
+    "objects": [],
+    "state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+    "version_id": "52e7883b-39d8-4bda-8c06-04e21f3b54c2",
+    "world_id": "world:authored:28feb9c3-5a72-4f2e-a010-35d7ac93d649"
+  }
+}

@@ -13,7 +13,7 @@ import uuid
 from pathlib import Path
 
 import pytest
-from exulanica.api.routes.world import CompositionApplyBody, CompositionPreviewBody
+from exulanica.api.routes.world_compositions import CompositionApplyBody, CompositionPreviewBody
 from exulanica.world import composition_preview
 from exulanica.world.composition_preview import BLOCKED_REASONS
 from exulanica.world.style_structure import (

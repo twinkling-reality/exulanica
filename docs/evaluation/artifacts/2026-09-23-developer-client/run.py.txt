@@ -1,0 +1,243 @@
+"""Slot-6 developer-client run. Lane file, published as run.py.txt with local paths replaced.
+
+Precondition: `launch.py up --worktree <worktree> --slot 6` has started the private database, the
+application's API on port 19231 with the launcher's synthetic workspace token (the account owner
+set, no tiles.materialise) and the Vite app on 19232. The launcher mints exactly one token, so a
+narrowly scoped token needs a second grant in EXULANICA_API_TOKENS, which only a second API process
+can hold. This driver:
+
+1. creates the person's saved world through the public route POST /world-entries/starter, with
+   the launcher's token, on the launcher's API (nothing else is seeded);
+2. starts a second API process from the same worktree on slot 6's spare port 19234, over the same
+   database, store and runtime role, holding the launcher's grant plus a client grant of exactly
+   world.read and world.write for the same workspace; the launcher's own wrapper and environment
+   scrubbing are loaded from the launcher file rather than copied;
+3. shows the client token is narrow (GET /graph refused for want of library.read);
+4. runs the client walkthrough from an interpreter outside the product's virtual environment,
+   with -S -s -E so no site-packages directory is importable;
+5. reads the saved world and its version again as the person, through the launcher's API process,
+   which is the one the Vite app talks to;
+6. stops the second API process and writes the artifacts, with local paths replaced by
+   placeholders, into docs/evaluation/artifacts/2026-09-23-developer-client/.
+
+No token is printed or written. The client's token lives in this process's memory and in the second
+API process's environment only.
+"""
+
+from __future__ import annotations
+
+import datetime as dt
+import hashlib
+import importlib.util
+import json
+import os
+import secrets
+import signal
+import subprocess
+import sys
+import time
+import urllib.error
+import urllib.request
+import uuid
+from pathlib import Path
+
+WORKTREE = Path(__file__).resolve().parents[2]
+#: The main checkout, found from git rather than written down: the worktree's common git directory.
+MAIN_CHECKOUT = Path(
+    subprocess.run(
+        ["git", "-C", str(WORKTREE), "rev-parse", "--path-format=absolute", "--git-common-dir"],
+        capture_output=True, text=True, check=True,
+    ).stdout.strip()
+).parent
+LAUNCHER = MAIN_CHECKOUT / ".exulanica" / "acceptance" / "launch.py"
+STATE = Path("/tmp/exulanica-0922-acceptance") / WORKTREE.name / "state.json"
+SLOT = 6
+#: The launcher's spare port for slot 6: 19200 + 5 * 6 + 4 (launch.py `ports`, "one spare").
+SPARE_PORT = 19200 + 5 * SLOT + 4
+CLIENT_GRANT = ["world.read", "world.write"]
+#: An interpreter outside the product's virtual environment, and a different minor version.
+CLIENT_PYTHON = "/opt/homebrew/bin/python3"
+SAVED_WORLD_TITLE = "Evening garden"
+#: Four metres in front of the starter spawn (z = 4000 mm), on the ground (y = 0). Chosen by eye on
+#: a first run: at z = 2000 the cube is cut by the lower edge of the app's first view.
+PLACE = "0,0,0"
+ARTIFACTS = WORKTREE / "docs" / "evaluation" / "artifacts" / "2026-09-23-developer-client"
+RUN_DIR = WORKTREE / ".exulanica" / "lane-client" / "runs" / dt.datetime.now().strftime("%Y%m%dT%H%M%S")
+SCRUB = ((str(WORKTREE), "<worktree>"), (str(MAIN_CHECKOUT), "<main-checkout>"), (str(Path.home()), "<home>"))
+
+
+def scrub(text: str) -> str:
+    for local, placeholder in SCRUB:
+        text = text.replace(local, placeholder)
+    return text
+
+
+def load_launcher():
+    spec = importlib.util.spec_from_file_location("acceptance_launch", LAUNCHER)
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def call(port: int, token: str, method: str, path: str, body: object = None) -> tuple[int, object]:
+    request = urllib.request.Request(
+        f"http://127.0.0.1:{port}{path}",
+        data=None if body is None else json.dumps(body).encode(),
+        headers={"Authorization": f"Bearer {token}", "Content-Type": "application/json"},
+        method=method,
+    )
+    try:
+        with urllib.request.urlopen(request, timeout=30) as response:
+            return response.status, json.loads(response.read())
+    except urllib.error.HTTPError as refused:
+        return refused.code, json.loads(refused.read())
+
+
+def wait_healthy(port: int, seconds: float) -> None:
+    deadline = time.monotonic() + seconds
+    while time.monotonic() < deadline:
+        try:
+            with urllib.request.urlopen(f"http://127.0.0.1:{port}/healthz", timeout=2) as response:
+                if response.status == 200:
+                    return
+        except OSError:
+            pass
+        time.sleep(0.5)
+    raise SystemExit(f"the API on {port} did not answer /healthz within {seconds:.0f} s")
+
+
+def main() -> int:
+    launch = load_launcher()
+    state = json.loads(STATE.read_text())
+    assert state["slot"] == SLOT and state["worktree"] == str(WORKTREE), state
+    person_token = Path(state["token_file"]).read_text().strip()
+    api_port = state["ports"]["api"]
+    RUN_DIR.mkdir(parents=True)
+
+    # 1. The person's saved world, through the public route, on the launcher's API.
+    status, entry = call(api_port, person_token, "POST", "/world-entries/starter", {"title": SAVED_WORLD_TITLE})
+    assert status == 200, (status, entry)
+
+    # 2. A second API process holding the narrow grant as well.
+    exports: dict[str, str] = {}
+    for line in (Path(state["run_dir"]) / "logs" / "database-serve.txt").read_text().splitlines():
+        if line.startswith("export "):
+            key, value = line[len("export "):].split("=", 1)
+            exports[key] = value
+    client_token = secrets.token_urlsafe(48)
+    grants = {
+        person_token: {"workspace_id": state["workspace_id"], "actor": state["actor"], "permissions": state["permissions"]},
+        client_token: {"workspace_id": state["workspace_id"], "actor": str(uuid.uuid4()), "permissions": CLIENT_GRANT},
+    }
+    env = launch.clean_environment()
+    env.update({
+        "EXULANICA_DATABASE_URL": exports["EXULANICA_DATABASE_URL"],
+        "EXULANICA_READONLY_DATABASE_URL": exports["EXULANICA_READONLY_DATABASE_URL"],
+        "EXULANICA_PURGE_DATABASE_URL": exports["EXULANICA_PURGE_DATABASE_URL"],
+        "EXULANICA_API_TOKENS": json.dumps(grants),
+        "EXULANICA_DATA_DIR": state["data_dir"],
+        # The launcher's API already drains this workspace's queue; a second worker would race it.
+        "EXULANICA_DERIVATIVE_WORKER": "off",
+    })
+    api_log = RUN_DIR / "client-api.log"
+    python = WORKTREE / ".venv" / "bin" / "python"
+    with api_log.open("ab") as handle:
+        process = subprocess.Popen(
+            [str(python), "-c", launch.API_WRAPPER, str(WORKTREE), str(SPARE_PORT)],
+            cwd=WORKTREE, env=env, stdout=handle, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+            start_new_session=True,
+        )
+    try:
+        wait_healthy(SPARE_PORT, 90)
+        imported = [l for l in api_log.read_text().splitlines() if l.startswith("ACCEPTANCE-")]
+        assert imported and imported[0].startswith("ACCEPTANCE-EXULANICA "), imported
+
+        # 3. The client token is narrow.
+        graph_status, graph = call(SPARE_PORT, client_token, "GET", "/graph")
+        entries_status, _ = call(SPARE_PORT, client_token, "GET", "/world-entries")
+        assert graph_status == 403 and entries_status == 200, (graph_status, graph, entries_status)
+
+        # 4. The client, from outside the product's environment.
+        transcript = RUN_DIR / "walkthrough.json"
+        argv = [
+            CLIENT_PYTHON, "-S", "-s", "-E", "-m", "exulanica_client", "walkthrough",
+            "--base-url", f"http://127.0.0.1:{SPARE_PORT}",
+            "--asset-key", "cc0.marker-cube",
+            "--origin-role", "fictional",
+            "--place", PLACE,
+            "--object-id", "developer-client:evening-lantern",
+            "--transcript", str(transcript),
+        ]
+        run = subprocess.run(
+            argv, cwd=WORKTREE / "clients" / "python", capture_output=True, text=True, timeout=120,
+            env={"EXULANICA_TOKEN": client_token, "PATH": "/usr/bin:/bin"},
+        )
+        interpreter = subprocess.run([CLIENT_PYTHON, "-S", "-c", "import sys; print(sys.version)"],
+                                     capture_output=True, text=True, check=True).stdout.strip()
+    finally:
+        os.killpg(process.pid, signal.SIGTERM)
+        process.wait(timeout=30)
+
+    # 5. The person's fresh read, through the launcher's API process.
+    _, reopened = call(api_port, person_token, "GET", f"/world-entries/{entry['entry_id']}")
+    _, version = call(
+        api_port, person_token, "GET",
+        f"/world/versions/{entry['authored_version_id']}?world_id={entry['world_id']}",
+    )
+    [obj] = [o for o in version["objects"] if o["object_id"] == "developer-client:evening-lantern"]
+    confirmation = {
+        "read_through": f"the launcher's API process on port {api_port}, with the person's token",
+        "saved_world": {k: reopened[k] for k in ("entry_id", "title", "world_id", "authored_version_id",
+                                                 "authored_state_sha256", "authored_edit_seq", "revision")},
+        "version": {k: version[k] for k in ("version_id", "world_id", "state_sha256", "edit_seq")},
+        "object": {k: obj[k] for k in ("object_id", "region_id", "transform", "origin", "behaviour", "removed")}
+        | {"asset_key": obj["asset"]["asset_key"], "content_sha256": obj["asset"]["content_sha256"]},
+        "edit_kinds": [e["kind"] for e in version["edits"]],
+        "saved_world_opens_at_version_state": (reopened["authored_state_sha256"], reopened["authored_edit_seq"])
+        == (version["state_sha256"], version["edit_seq"]),
+    }
+    narrow = {
+        "client_grant": CLIENT_GRANT,
+        "person_grant": state["permissions"],
+        "GET /graph": {"status": graph_status, "code": graph.get("code"), "detail": graph.get("detail")},
+        "GET /world-entries": {"status": entries_status},
+    }
+
+    # 6. Artifacts, scrubbed of local paths.
+    ARTIFACTS.mkdir(parents=True, exist_ok=True)
+    (ARTIFACTS / "walkthrough.json").write_text(scrub(transcript.read_text()))
+    (ARTIFACTS / "client-output.log.txt").write_text(
+        scrub(f"$ {' '.join(argv[:7])} ...\n# exit {run.returncode}\n# stdout\n{run.stdout}# stderr\n{run.stderr}")
+    )
+    as_run = Path(__file__).read_bytes()
+    (ARTIFACTS / "run.py.txt").write_text(scrub(as_run.decode()))
+    (ARTIFACTS / "run.json").write_text(json.dumps({
+        "argv": [scrub(a) for a in argv[:-1]] + ["<run-dir>/walkthrough.json"],
+        "client_exit_code": run.returncode,
+        "client_interpreter": {"path": CLIENT_PYTHON, "version": interpreter, "flags": "-S -s -E"},
+        "client_api": {"port": SPARE_PORT, "imported_exulanica_from": scrub(imported[0].split(" ", 1)[1]),
+                       "derivative_worker": "off", "grants": ["person (launcher set)", "client"]},
+        "launcher": {"slot": SLOT, "ports": state["ports"], "tree": state["tree"],
+                     "api_imported_exulanica_from": scrub(state["api_imported_exulanica_from"]),
+                     "derivative_worker": state["derivative_worker"]},
+        "saved_world_created": {"route": "POST /world-entries/starter", "title": SAVED_WORLD_TITLE,
+                                "entry_id": entry["entry_id"]},
+        "narrow_token": narrow,
+        "confirmation": confirmation,
+        "driver": {"published_as": "run.py.txt, local paths replaced by placeholders",
+                   "as_run_sha256": hashlib.sha256(as_run).hexdigest()},
+        "completed_at": dt.datetime.now(dt.UTC).isoformat(timespec="seconds"),
+    }, indent=2, sort_keys=True) + "\n")
+    for artifact in sorted(ARTIFACTS.iterdir()):
+        text = artifact.read_bytes()
+        assert person_token.encode() not in text and client_token.encode() not in text, artifact
+        assert str(Path.home()).encode() not in text, artifact
+        if artifact.suffix != ".txt" or artifact.name.endswith(".log.txt"):
+            assert b"Bearer " not in text, artifact
+    print(f"client exit {run.returncode}; artifacts in {scrub(str(ARTIFACTS))}; run dir {scrub(str(RUN_DIR))}")
+    print(run.stdout)
+    return run.returncode
+
+
+if __name__ == "__main__":
+    sys.exit(main())

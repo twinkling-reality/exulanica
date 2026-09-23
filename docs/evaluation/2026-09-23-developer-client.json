@@ -1,0 +1,636 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "artifacts": [
+      {
+        "byte_size": 3283,
+        "path": "docs/evaluation/artifacts/2026-09-23-developer-client/app-after-client.json",
+        "sha256": "ec52db59ed5206aecc49cef65394eb015afcb638be0536a6f5fb7194f4c8f94c"
+      },
+      {
+        "byte_size": 4304,
+        "path": "docs/evaluation/artifacts/2026-09-23-developer-client/app_screenshot.mjs.txt",
+        "sha256": "b507dc6d0199bd1de7b15ad1a06805b5231f9c80c281b6dd992d0d022c633e25"
+      },
+      {
+        "byte_size": 9263,
+        "path": "docs/evaluation/artifacts/2026-09-23-developer-client/assemble_record.py.txt",
+        "sha256": "1a75eeef15f3cd3d36a3e70088005c1277db3cc4936615932ad36c584cc6b679"
+      },
+      {
+        "byte_size": 3632,
+        "path": "docs/evaluation/artifacts/2026-09-23-developer-client/client-output.log.txt",
+        "sha256": "f5f6b8de884d508bd01c569a0625fa52a875b7bfbf8ee48309972daff7e72c87"
+      },
+      {
+        "byte_size": 4237,
+        "path": "docs/evaluation/artifacts/2026-09-23-developer-client/run.json",
+        "sha256": "83aa0acb7a3516b0d9ba5525a24a209de310e1ee48dc908f45371d86ccdf11cd"
+      },
+      {
+        "byte_size": 12342,
+        "path": "docs/evaluation/artifacts/2026-09-23-developer-client/run.py.txt",
+        "sha256": "1454295cc0c9e16d79720757f465ef7ea29a2e15457860ef5bb436853defa57f"
+      },
+      {
+        "byte_size": 25208,
+        "path": "docs/evaluation/artifacts/2026-09-23-developer-client/walkthrough.json",
+        "sha256": "3d423910c59beba898d13fe672abbc30fc3f83fbcbdcaf6de3457b3e37910e63"
+      }
+    ],
+    "browser": {
+      "app": "http://localhost:19232/",
+      "requests_seen": [
+        {
+          "method": "GET",
+          "status": 200,
+          "url": "/api/world/versions/52e7883b-39d8-4bda-8c06-04e21f3b54c2?world_id=world%3Aauthored%3A28feb9c3-5a72-4f2e-a010-35d7ac93d649"
+        },
+        {
+          "method": "GET",
+          "status": 200,
+          "url": "/api/world/versions/52e7883b-39d8-4bda-8c06-04e21f3b54c2?world_id=world%3Aauthored%3A28feb9c3-5a72-4f2e-a010-35d7ac93d649"
+        },
+        {
+          "method": "GET",
+          "status": 404,
+          "url": "/api/world/versions/52e7883b-39d8-4bda-8c06-04e21f3b54c2/society?world_id=world%3Aauthored%3A28feb9c3-5a72-4f2e-a010-35d7ac93d649&places=true"
+        },
+        {
+          "method": "GET",
+          "status": 200,
+          "url": "/api/world/versions/52e7883b-39d8-4bda-8c06-04e21f3b54c2?world_id=world%3Aauthored%3A28feb9c3-5a72-4f2e-a010-35d7ac93d649"
+        },
+        {
+          "method": "GET",
+          "status": 404,
+          "url": "/api/world/versions/52e7883b-39d8-4bda-8c06-04e21f3b54c2/society/control?world_id=world%3Aauthored%3A28feb9c3-5a72-4f2e-a010-35d7ac93d649"
+        },
+        {
+          "method": "GET",
+          "status": 200,
+          "url": "/api/world/assets/cc0.marker-cube/bytes"
+        },
+        {
+          "method": "GET",
+          "status": 200,
+          "url": "/api/world-entries/01a0ce66-6e6c-756a-b76d-39b08d79d687"
+        },
+        {
+          "method": "GET",
+          "status": 200,
+          "url": "/api/world/versions/52e7883b-39d8-4bda-8c06-04e21f3b54c2?world_id=world%3Aauthored%3A28feb9c3-5a72-4f2e-a010-35d7ac93d649"
+        }
+      ],
+      "served_by": "the launcher's Vite development server, authenticated with the person's token",
+      "settle_ms": 5000,
+      "world_title_field": "Evening garden"
+    },
+    "captures": [
+      {
+        "byte_size": 450775,
+        "path": "docs/evaluation/artifacts/2026-09-23-developer-client/app-after-client.png",
+        "scope": "whole viewport of the app's first view of the saved world after the client's edits",
+        "sha256": "9f13d8c6514b1b4d13a10efcdd8209fef74644fa9087454dbb3b4daaeb152409"
+      }
+    ],
+    "client": {
+      "argv": [
+        "/opt/homebrew/bin/python3",
+        "-S",
+        "-s",
+        "-E",
+        "-m",
+        "exulanica_client",
+        "walkthrough",
+        "--base-url",
+        "http://127.0.0.1:19234",
+        "--asset-key",
+        "cc0.marker-cube",
+        "--origin-role",
+        "fictional",
+        "--place",
+        "0,0,0",
+        "--object-id",
+        "developer-client:evening-lantern",
+        "--transcript",
+        "<run-dir>/walkthrough.json"
+      ],
+      "exit_code": 0,
+      "interpreter": {
+        "flags": "-S -s -E",
+        "path": "/opt/homebrew/bin/python3",
+        "version": "3.14.6 (main, Jun 10 2026, 10:03:53) [Clang 21.0.0 (clang-2100.0.123.102)]"
+      },
+      "package": "clients/python/exulanica_client",
+      "sources_sha256": {
+        "__init__.py": "0c59f4eb3053f118fab7d7131a9366fdb648c8f07b787934a2bd51f5b48edd91",
+        "__main__.py": "00a316634890347d819a6578af664f9765e944f9d619e2714f796b1a7ef021ed",
+        "client.py": "13f4c5fdcd1aa9fa463cc7bf7782e3160429c5519ba203255bf333fac420519c",
+        "discovery.py": "e8bcbcbc93bb41385447c1122d666e0056c8d889bf6fdcead681e4942ba4f8cf",
+        "walkthrough.py": "16f68d90b101b104aa9d6736747dce8083247fac1dcd2ae206c9ef596e7fef58"
+      }
+    },
+    "commands": [
+      {
+        "argv": [
+          "python3",
+          "<main-checkout>/.exulanica/acceptance/launch.py",
+          "up",
+          "--worktree",
+          "<worktree>",
+          "--slot",
+          "6"
+        ],
+        "exit_code": 0,
+        "name": "launcher-up"
+      },
+      {
+        "argv": [
+          "uv",
+          "run",
+          "--offline",
+          "python",
+          ".exulanica/lane-client/slot6_run.py"
+        ],
+        "exit_code": 0,
+        "name": "run",
+        "published_as": "run.py.txt"
+      },
+      {
+        "argv": [
+          "node",
+          ".exulanica/lane-client/app_screenshot.mjs",
+          "<state.json>",
+          "<out>"
+        ],
+        "exit_code": 0,
+        "name": "screenshot",
+        "published_as": "app_screenshot.mjs.txt"
+      },
+      {
+        "argv": [
+          "python3",
+          "<main-checkout>/.exulanica/acceptance/launch.py",
+          "down",
+          "--worktree",
+          "<worktree>"
+        ],
+        "exit_code": 0,
+        "name": "launcher-down"
+      }
+    ],
+    "completed_at": "2026-09-23T13:13:37+00:00",
+    "confirmation": {
+      "edit_kinds": [
+        "add_object",
+        "set_object_behaviour"
+      ],
+      "object": {
+        "asset_key": "cc0.marker-cube",
+        "behaviour": {
+          "behaviour_key": "motion.bounded-path",
+          "behaviour_version": 1,
+          "parameters": {
+            "axis": "x",
+            "easing": "smooth",
+            "period_milliseconds": 4000,
+            "travel_mm": 1000
+          }
+        },
+        "content_sha256": "b41289ac10548cf698d46a15206caa8e744b0b800f4ac29260c99f18d8b831d9",
+        "object_id": "developer-client:evening-lantern",
+        "origin": {
+          "kind": "authored",
+          "role": "fictional"
+        },
+        "region_id": "region:starter",
+        "removed": false,
+        "transform": {
+          "coordinate_space": "region_local",
+          "coordinate_unit": "millimetre",
+          "scale_milli": 1000,
+          "x_mm": 0,
+          "y_mm": 0,
+          "yaw_microradians": 0,
+          "z_mm": 0
+        }
+      },
+      "read_through": "the launcher's API process on port 19231, with the person's token",
+      "saved_world": {
+        "authored_edit_seq": 2,
+        "authored_state_sha256": "1070c6bf905a90b79a7b19d98a794459fdb2bf2c7a9ec759b3f178efd7f30d4f",
+        "authored_version_id": "52e7883b-39d8-4bda-8c06-04e21f3b54c2",
+        "entry_id": "01a0ce66-6e6c-756a-b76d-39b08d79d687",
+        "revision": 3,
+        "title": "Evening garden",
+        "world_id": "world:authored:28feb9c3-5a72-4f2e-a010-35d7ac93d649"
+      },
+      "saved_world_opens_at_version_state": true,
+      "version": {
+        "edit_seq": 2,
+        "state_sha256": "1070c6bf905a90b79a7b19d98a794459fdb2bf2c7a9ec759b3f178efd7f30d4f",
+        "version_id": "52e7883b-39d8-4bda-8c06-04e21f3b54c2",
+        "world_id": "world:authored:28feb9c3-5a72-4f2e-a010-35d7ac93d649"
+      }
+    },
+    "corpus": {
+      "personal_media_admitted": false,
+      "seeded": "only POST /world-entries/starter with the person's token, through the public API",
+      "workspace": "a fresh synthetic workspace minted by the acceptance launcher for this run"
+    },
+    "corpus_class": "synthetic",
+    "new_files": {
+      "clients/python/exulanica_client/__init__.py": "0c59f4eb3053f118fab7d7131a9366fdb648c8f07b787934a2bd51f5b48edd91",
+      "clients/python/exulanica_client/__main__.py": "00a316634890347d819a6578af664f9765e944f9d619e2714f796b1a7ef021ed",
+      "clients/python/exulanica_client/client.py": "13f4c5fdcd1aa9fa463cc7bf7782e3160429c5519ba203255bf333fac420519c",
+      "clients/python/exulanica_client/discovery.py": "e8bcbcbc93bb41385447c1122d666e0056c8d889bf6fdcead681e4942ba4f8cf",
+      "clients/python/exulanica_client/walkthrough.py": "16f68d90b101b104aa9d6736747dce8083247fac1dcd2ae206c9ef596e7fef58",
+      "exulanica/api/routes/world_assets.py": "d5c25a0932d84ecb412d731e89000d1ced99bc41891f6848279b08c202f894f7",
+      "exulanica/api/routes/world_behaviours.py": "07ab19539c376c3595a433f671d32d44fd67c5a78f4e1dd158741d9883936fc8",
+      "exulanica/api/routes/world_compositions.py": "d856981051ae000e4d04a8ce08466baa1d1fdcfd53a8ee824941159e03256672",
+      "exulanica/api/routes/world_environments.py": "8b1f9cbaeaebdf0a96759c277b01dfddaa3a11b479e9a867703040ca6c676a0d",
+      "exulanica/api/routes/world_objects.py": "ed6395d621ce6161b3b1b61c23a6b2e1a16cccaa1c56b1b88ebd08a1b948dd52",
+      "exulanica/api/routes/world_versions.py": "2a307ad7ffe2bb3061249ed0c0680e144b895da7ce2c923a93aa53e934c144a0",
+      "exulanica/api/surface.py": "004e70253d323ea89c4c762473a9b0e24b51d07f7398a8ed76a750203fc19980",
+      "exulanica/api/world_edit.py": "8fa2ff61245ac3ef32645c0bcd78d1bf35a8df6a4679f4d1aad53e8a2e4776b2",
+      "exulanica/api/world_version_document.py": "02147d02b9263467177fb938e37a519f3dcbf8d740ac5dbea92d447593167763"
+    },
+    "profile": "exulanica.developer-client/v1",
+    "runtime": {
+      "client_api": {
+        "derivative_worker": "off",
+        "grants": [
+          "person (launcher set)",
+          "client"
+        ],
+        "imported_exulanica_from": "<worktree>/exulanica/__init__.py",
+        "port": 19234
+      },
+      "launcher": {
+        "api_imported_exulanica_from": "<worktree>/exulanica/__init__.py",
+        "derivative_worker": "in-process",
+        "ports": {
+          "api": 19231,
+          "browser": 19233,
+          "database": 19230,
+          "vite": 19232
+        },
+        "slot": 6
+      },
+      "model_credential": "none",
+      "why_a_second_api_process": "the launcher mints one token, holding the account owner set; a narrowly scoped token is a second grant in EXULANICA_API_TOKENS, which only a second process can hold. It ran the same worktree over the same database, store and runtime role, on the slot's spare port."
+    },
+    "saved_world_created": {
+      "entry_id": "01a0ce66-6e6c-756a-b76d-39b08d79d687",
+      "route": "POST /world-entries/starter",
+      "title": "Evening garden"
+    },
+    "scope": "First milestone deliverable 5, the developer proof. A program outside the application, written against the Python standard library only and holding a token granted exactly world.read and world.write, reads the person's saved world, discovers from the server the edits, reviewed behaviours and reviewed assets it supports, places one reviewed object and gives it bounded motion through the authenticated API, has a behaviour the registry does not list refused with the server's reason, and confirms every fact the edits claimed on a fresh read. The application then reopens the saved world and draws the object.",
+    "scrubbing": "absolute local paths in the published artifacts are replaced by <worktree>, <main-checkout> and <home>; run.json records the SHA-256 of the driver's as-run bytes",
+    "tokens": {
+      "GET /graph": {
+        "code": "not_authorised",
+        "detail": "this credential does not hold library.read, which GET /graph requires",
+        "status": 403
+      },
+      "GET /world-entries": {
+        "status": 200
+      },
+      "client_grant": [
+        "world.read",
+        "world.write"
+      ],
+      "person_grant": [
+        "library.read",
+        "library.write",
+        "model.invoke",
+        "intake.write",
+        "deletion.write",
+        "consent.read",
+        "consent.write",
+        "admission.read",
+        "admission.write",
+        "world.read",
+        "world.write",
+        "operations.read",
+        "operations.write"
+      ]
+    },
+    "tree": {
+      "branch": "lane/0923-client",
+      "changed_paths": "31",
+      "diff_head_bytes": "113785",
+      "diff_head_sha256": "4eaa0706ce4b6504456e169049ce8f9775dec468979f84bae5591a6ba58bf836",
+      "head": "e9dee3c288dbb3fb7a066bfb40b31143207fc11e",
+      "status_sha256": "b88531f1f6140581095255da75bd07037a305ca6a0a4be2add19b535e148ddb9"
+    },
+    "tree_note": "the lane worktree at main plus its uncommitted delta: the launcher's SHA-256 of `git diff HEAD --binary` binds changes to tracked files, and new_files binds each new file under exulanica/ and clients/, every one last modified before the launcher started",
+    "walkthrough": {
+      "checks": [
+        {
+          "check": "the object is in the version and not removed",
+          "expected": true,
+          "holds": true,
+          "observed": true
+        },
+        {
+          "check": "it is made from the chosen reviewed asset",
+          "expected": "b41289ac10548cf698d46a15206caa8e744b0b800f4ac29260c99f18d8b831d9",
+          "holds": true,
+          "observed": "b41289ac10548cf698d46a15206caa8e744b0b800f4ac29260c99f18d8b831d9"
+        },
+        {
+          "check": "its bytes are available to draw",
+          "expected": "available",
+          "holds": true,
+          "observed": "available"
+        },
+        {
+          "check": "it stands where it was placed",
+          "expected": {
+            "scale_milli": 1000,
+            "x_mm": 0,
+            "y_mm": 0,
+            "yaw_microradians": 0,
+            "z_mm": 0
+          },
+          "holds": true,
+          "observed": {
+            "scale_milli": 1000,
+            "x_mm": 0,
+            "y_mm": 0,
+            "yaw_microradians": 0,
+            "z_mm": 0
+          }
+        },
+        {
+          "check": "its origin is the role the person chose",
+          "expected": {
+            "kind": "authored",
+            "role": "fictional"
+          },
+          "holds": true,
+          "observed": {
+            "kind": "authored",
+            "role": "fictional"
+          }
+        },
+        {
+          "check": "it carries the motion that was set",
+          "expected": {
+            "behaviour_key": "motion.bounded-path",
+            "behaviour_version": 1,
+            "parameters": {
+              "axis": "x",
+              "easing": "smooth",
+              "period_milliseconds": 4000,
+              "travel_mm": 1000
+            }
+          },
+          "holds": true,
+          "observed": {
+            "behaviour_key": "motion.bounded-path",
+            "behaviour_version": 1,
+            "parameters": {
+              "axis": "x",
+              "easing": "smooth",
+              "period_milliseconds": 4000,
+              "travel_mm": 1000
+            }
+          }
+        },
+        {
+          "check": "the version's state is the one the motion edit answered with, so the refused request changed nothing",
+          "expected": "1070c6bf905a90b79a7b19d98a794459fdb2bf2c7a9ec759b3f178efd7f30d4f",
+          "holds": true,
+          "observed": "1070c6bf905a90b79a7b19d98a794459fdb2bf2c7a9ec759b3f178efd7f30d4f"
+        },
+        {
+          "check": "the newest two edits are this client's",
+          "expected": [
+            [
+              "add_object",
+              "developer-client:evening-lantern"
+            ],
+            [
+              "set_object_behaviour",
+              "developer-client:evening-lantern"
+            ]
+          ],
+          "holds": true,
+          "observed": [
+            [
+              "add_object",
+              "developer-client:evening-lantern"
+            ],
+            [
+              "set_object_behaviour",
+              "developer-client:evening-lantern"
+            ]
+          ]
+        },
+        {
+          "check": "the saved world reopens at that state",
+          "expected": "1070c6bf905a90b79a7b19d98a794459fdb2bf2c7a9ec759b3f178efd7f30d4f",
+          "holds": true,
+          "observed": "1070c6bf905a90b79a7b19d98a794459fdb2bf2c7a9ec759b3f178efd7f30d4f"
+        },
+        {
+          "check": "the saved world reopens at that edit",
+          "expected": 2,
+          "holds": true,
+          "observed": 2
+        }
+      ],
+      "discovered": {
+        "assets": [
+          {
+            "asset_key": "cc0.marker-cube",
+            "availability": "available",
+            "content_sha256": "b41289ac10548cf698d46a15206caa8e744b0b800f4ac29260c99f18d8b831d9"
+          },
+          {
+            "asset_key": "cc0.marker-pillar",
+            "availability": "available",
+            "content_sha256": "b960af0f1c85f6c41a38ce09727cd19bc2bbc0e21bb8f3f111707af9b90b2737"
+          },
+          {
+            "asset_key": "cc0.marker-plate",
+            "availability": "available",
+            "content_sha256": "19425a058c19d4009392093e770c7f115a68d020b67e0bdce83abdad4b5a2f6e"
+          }
+        ],
+        "behaviours": [
+          {
+            "key": "motion.bounded-path",
+            "parameters": {
+              "axis": {
+                "choices": [
+                  "x",
+                  "y",
+                  "z"
+                ],
+                "default": "x",
+                "kind": "choice"
+              },
+              "easing": {
+                "choices": [
+                  "linear",
+                  "smooth"
+                ],
+                "default": "smooth",
+                "kind": "choice"
+              },
+              "period_milliseconds": {
+                "default": 4000,
+                "kind": "integer",
+                "maximum": 60000,
+                "minimum": 500
+              },
+              "travel_mm": {
+                "default": 1000,
+                "kind": "integer",
+                "maximum": 10000,
+                "minimum": 100
+              }
+            },
+            "version": 1
+          }
+        ],
+        "edits": [
+          {
+            "method": "POST",
+            "operation_id": "add_environment_instance_world_versions__version_id__environment_instances_post",
+            "path": "/world/versions/{version_id}/environment-instances",
+            "summary": "Place one exact environment asset or feature against the current version state."
+          },
+          {
+            "method": "POST",
+            "operation_id": "move_environment_instance_world_versions__version_id__environment_instances__instance_id__move_post",
+            "path": "/world/versions/{version_id}/environment-instances/{instance_id}/move",
+            "summary": "Move an available, still-authorized environment instance without changing its source."
+          },
+          {
+            "method": "POST",
+            "operation_id": "remove_environment_instance_world_versions__version_id__environment_instances__instance_id__remove_post",
+            "path": "/world/versions/{version_id}/environment-instances/{instance_id}/remove",
+            "summary": "Store a removal, including when the pinned source has since been withdrawn."
+          },
+          {
+            "method": "POST",
+            "operation_id": "undo_environment_edit_world_versions__version_id__environment_instances_undo_post",
+            "path": "/world/versions/{version_id}/environment-instances/undo",
+            "summary": "Undo the newest authored edit from stored history, even after source withdrawal."
+          },
+          {
+            "method": "POST",
+            "operation_id": "add_authored_object_world_versions__version_id__objects_post",
+            "path": "/world/versions/{version_id}/objects",
+            "summary": "Add one authored object against an explicit base version state."
+          },
+          {
+            "method": "POST",
+            "operation_id": "move_authored_object_world_versions__version_id__objects__object_id__move_post",
+            "path": "/world/versions/{version_id}/objects/{object_id}/move",
+            "summary": "Replace one authored object's region-local transform."
+          },
+          {
+            "method": "POST",
+            "operation_id": "remove_authored_object_world_versions__version_id__objects__object_id__remove_post",
+            "path": "/world/versions/{version_id}/objects/{object_id}/remove",
+            "summary": "Store a removal. POST rather than DELETE: this appends history, it destroys nothing."
+          },
+          {
+            "method": "POST",
+            "operation_id": "set_authored_object_behaviour_world_versions__version_id__objects__object_id__behaviour_post",
+            "path": "/world/versions/{version_id}/objects/{object_id}/behaviour",
+            "summary": "Give one authored object a reviewed behaviour, replace it, or take it away with null."
+          },
+          {
+            "method": "POST",
+            "operation_id": "undo_authored_edit_world_versions__version_id__objects_undo_post",
+            "path": "/world/versions/{version_id}/objects/undo",
+            "summary": "Reverse the newest object edit, from the document that edit stored."
+          },
+          {
+            "method": "POST",
+            "operation_id": "composition_apply_route_world_versions__version_id__compositions_apply_post",
+            "path": "/world/versions/{version_id}/compositions/apply",
+            "summary": "Perform exactly the resolved composition, or refuse with its blocked reason."
+          },
+          {
+            "method": "POST",
+            "operation_id": "photo_point_map_apply_route_world_versions__version_id__compositions_photo_point_maps_apply_post",
+            "path": "/world/versions/{version_id}/compositions/photo-point-maps/apply",
+            "summary": "Place exactly the resolved estimate, or refuse with its blocked reason."
+          }
+        ]
+      },
+      "edits": [
+        {
+          "asset_key": "cc0.marker-cube",
+          "base_state_sha256": "b42557ee1fc8f83170fd24e88748dcbbcf5879fbc45f02df62b6c298b420f8fa",
+          "edit": "place_object",
+          "object_id": "developer-client:evening-lantern",
+          "origin_role": "fictional",
+          "region_id": "region:starter",
+          "result_state_sha256": "6f9ddc091fe7ab003ce3dc6a6718586014881dea1441f0b64c74d3987b7422b4",
+          "transform": {
+            "scale_milli": 1000,
+            "x_mm": 0,
+            "y_mm": 0,
+            "yaw_microradians": 0,
+            "z_mm": 0
+          }
+        },
+        {
+          "base_state_sha256": "6f9ddc091fe7ab003ce3dc6a6718586014881dea1441f0b64c74d3987b7422b4",
+          "behaviour": {
+            "behaviour_key": "motion.bounded-path",
+            "behaviour_version": 1,
+            "parameters": {
+              "axis": "x",
+              "easing": "smooth",
+              "period_milliseconds": 4000,
+              "travel_mm": 1000
+            }
+          },
+          "edit": "set_object_behaviour",
+          "object_id": "developer-client:evening-lantern",
+          "result_state_sha256": "1070c6bf905a90b79a7b19d98a794459fdb2bf2c7a9ec759b3f178efd7f30d4f"
+        }
+      ],
+      "exchanges": 12,
+      "refusal": {
+        "code": "invalid_object_data",
+        "detail": "behaviour motion.bounded-path@2 is not reviewed",
+        "reason_unsupported": "motion.bounded-path@2 is not in the server's behaviour registry, which lists motion.bounded-path@1",
+        "request": {
+          "behaviour": {
+            "behaviour_key": "motion.bounded-path",
+            "behaviour_version": 2,
+            "parameters": {
+              "axis": "x",
+              "easing": "smooth",
+              "period_milliseconds": 4000,
+              "travel_mm": 1000
+            }
+          },
+          "object_id": "developer-client:evening-lantern"
+        },
+        "status": 422
+      },
+      "result": "confirmed"
+    },
+    "what_this_does_not_show": [
+      "The saved world is the built-in authored starter in a synthetic workspace, not a reconstructed personal place.",
+      "The motion is stored, and the object is drawn at rest at its authored transform; the renderer's trigger, stop and reset controls were not exercised in this run.",
+      "The app was the Vite development server, not a production build; the capture is one frame of the first view, not a measure of quality or timing.",
+      "The registry holds one reviewed behaviour, so choosing between behaviours was not exercised.",
+      "No stale base arose. The client stops with the server's reason on any refusal other than the one it asks for, and does not retry.",
+      "The client token reached the API through the second API process described under runtime, not through the launcher's own API process."
+    ]
+  },
+  "record_sha256": "571362c7005d40e56249b126160e6b5caf134410a2d14956bac2f3e436fdf842"
+}

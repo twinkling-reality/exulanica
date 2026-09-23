@@ -18,9 +18,9 @@ import uuid
 import pytest
 from exulanica.api.app import create_app
 from exulanica.api.authorisation import load_token_directory
-from exulanica.api.routes.world import _object_problem
 from exulanica.api.services import Services
 from exulanica.api.society_runtime import SocietyRuntime
+from exulanica.api.world_edit import object_problem
 from exulanica.environment import DerivedEnvironmentAsset, FeatureIndexPublication
 from exulanica.evidence.blob import BlobId
 from exulanica.store.local import LocalContentAddressedStore
@@ -1499,7 +1499,7 @@ def test_a_real_society_runtime_refusal_rolls_apply_back(runtime_world):
     assert preview_composition(objects, version.version_id, request).availability == "ready"
     with pytest.raises(UnavailableSocietyInput) as refused, w["connection"].transaction():
         apply_composition(objects, version.version_id, request, actor=uuid.uuid4())
-    problem = _object_problem(refused.value)
+    problem = object_problem(refused.value)
     assert problem is not None
     assert problem.status_code == 424
     assert json.loads(problem.body)["code"] == "unavailable_society_input"
@@ -1522,7 +1522,7 @@ def test_a_purposeful_society_without_an_adapter_refuses_apply(runtime_world):
     adapter = "atomic authored-input adapter"
     with pytest.raises(InvalidObjectState, match=adapter) as refused, w["connection"].transaction():
         apply_composition(direct, version.version_id, request, actor=uuid.uuid4())
-    problem = _object_problem(refused.value)
+    problem = object_problem(refused.value)
     assert problem is not None
     assert problem.status_code == 409
     assert json.loads(problem.body)["code"] == "invalid_object_state"

@@ -40,8 +40,17 @@ before a database connection is opened for the route.
   `exulanica.api.routes.routable_paths`, the one walk of the router tree. A route any lane adds under
   `exulanica/api/routes/` therefore needs one line in `ROUTE_RULES` before any test that builds the
   application passes.
+- Laid out in `ROUTE_RULE_SECTIONS`, which `ROUTE_RULES` is assembled from: each section declares
+  one requirement and lists its routes one per line as `METHOD /path`, sorted by path and then
+  method, and no two sections declare the same requirement (`tests/test_route_rule_layout.py`).
 - Enforced by `tests/test_route_permissions.py`, which sweeps every route from the router with a
-  real request and reads the status.
+  real request and reads the status, and by `tests/test_api.py`, which sends every declared
+  authenticated route an anonymous caller, a bad token and a stranger's session, with requests
+  derived from `ROUTE_RULES` in `tests/route_probes.py`; `tests/test_route_probes.py` checks
+  without a database that every mounted route is probed.
+- Pinned with the rest of the surface: `tests/snapshots/api-routes.json` records every route's
+  permission rule beside its schema, and `tests/test_api_surface_snapshot.py` fails when a
+  declaration changes until the snapshot is rewritten and reviewed.
 
 **Who holds what.** DECISION. A bearer token holds exactly the permissions its grant names. A
 browser session holds `ACCOUNT_OWNER_PERMISSIONS`: `admission.read`, `admission.write`,

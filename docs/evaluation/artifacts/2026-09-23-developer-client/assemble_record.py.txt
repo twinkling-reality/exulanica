@@ -1,0 +1,167 @@
+"""Assemble docs/evaluation/2026-09-23-developer-client.json from the slot-6 run's artifacts.
+
+Lane file, published beside the other artifacts as assemble_record.py.txt with local paths replaced.
+Reads only the files slot6_run.py and app_screenshot.mjs wrote; every fact in the record is copied
+from them or computed from their bytes, and every artifact is bound by size and SHA-256.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import datetime as dt
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+from exulanica.canonical import canonical_json
+from exulanica.evaluation import visual_gate
+
+WORKTREE = Path(__file__).resolve().parents[2]
+LANE = WORKTREE / ".exulanica" / "lane-client"
+NAME = "2026-09-23-developer-client"
+ARTIFACTS = WORKTREE / "docs" / "evaluation" / "artifacts" / NAME
+RECORD = WORKTREE / "docs" / "evaluation" / f"{NAME}.json"
+RELATIVE = f"docs/evaluation/artifacts/{NAME}"
+#: The launcher's kept run state for this run: where its start time is recorded.
+RUN_STATE = "/tmp/exulanica-0922-acceptance/exulanica-0923-client/20260923T091330/state.json"
+HOME = str(Path.home())
+
+
+def scrub(text: str) -> str:
+    return text.replace(str(WORKTREE), "<worktree>").replace(HOME, "<home>")
+
+
+def bound(name: str) -> dict:
+    data = (ARTIFACTS / name).read_bytes()
+    return {"path": f"{RELATIVE}/{name}", "byte_size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+
+
+def main() -> int:
+    shutil.copyfile(LANE / "shots" / "app-after-client.png", ARTIFACTS / "app-after-client.png")
+    shutil.copyfile(LANE / "shots" / "app-after-client.json", ARTIFACTS / "app-after-client.json")
+    for source, published in (("app_screenshot.mjs", "app_screenshot.mjs.txt"), ("assemble_record.py", "assemble_record.py.txt")):
+        (ARTIFACTS / published).write_text(scrub((LANE / source).read_text()))
+
+    run = json.loads((ARTIFACTS / "run.json").read_text())
+    # `git diff HEAD` hashes changes to tracked files only, so the launcher's tree identity does not
+    # bind the content of new files. Bind the new server and client files here, each checked to be
+    # older than the launcher's start, so these digests are of the code that ran.
+    launched = json.loads((Path(RUN_STATE)).read_text())["started_at"]
+    started = dt.datetime.fromisoformat(launched).timestamp()
+    listed = subprocess.run(
+        ["git", "ls-files", "--others", "--exclude-standard", "--", "exulanica", "clients"],
+        cwd=WORKTREE, capture_output=True, text=True, check=True,
+    ).stdout.split()
+    new_files = {}
+    for rel in sorted(listed):
+        path = WORKTREE / rel
+        assert path.stat().st_mtime < started, f"{rel} changed after the run started"
+        new_files[rel] = hashlib.sha256(path.read_bytes()).hexdigest()
+    walk = json.loads((ARTIFACTS / "walkthrough.json").read_text())
+    app = json.loads((ARTIFACTS / "app-after-client.json").read_text())
+    package = WORKTREE / "clients" / "python" / "exulanica_client"
+    record = {
+        "profile": "exulanica.developer-client/v1",
+        "scope": (
+            "First milestone deliverable 5, the developer proof. A program outside the application, "
+            "written against the Python standard library only and holding a token granted exactly "
+            "world.read and world.write, reads the person's saved world, discovers from the server "
+            "the edits, reviewed behaviours and reviewed assets it supports, places one reviewed "
+            "object and gives it bounded motion through the authenticated API, has a behaviour the "
+            "registry does not list refused with the server's reason, and confirms every fact the "
+            "edits claimed on a fresh read. The application then reopens the saved world and draws "
+            "the object."
+        ),
+        "corpus_class": "synthetic",
+        "corpus": {
+            "workspace": "a fresh synthetic workspace minted by the acceptance launcher for this run",
+            "seeded": "only POST /world-entries/starter with the person's token, through the public API",
+            "personal_media_admitted": False,
+        },
+        "tree": run["launcher"]["tree"],
+        "tree_note": (
+            "the lane worktree at main plus its uncommitted delta: the launcher's SHA-256 of `git diff "
+            "HEAD --binary` binds changes to tracked files, and new_files binds each new file under "
+            "exulanica/ and clients/, every one last modified before the launcher started"
+        ),
+        "new_files": new_files,
+        "runtime": {
+            "launcher": {k: run["launcher"][k] for k in ("slot", "ports", "api_imported_exulanica_from", "derivative_worker")},
+            "client_api": run["client_api"],
+            "why_a_second_api_process": (
+                "the launcher mints one token, holding the account owner set; a narrowly scoped "
+                "token is a second grant in EXULANICA_API_TOKENS, which only a second process can "
+                "hold. It ran the same worktree over the same database, store and runtime role, on "
+                "the slot's spare port."
+            ),
+            "model_credential": "none",
+        },
+        "client": {
+            "package": "clients/python/exulanica_client",
+            "sources_sha256": {
+                path.name: hashlib.sha256(path.read_bytes()).hexdigest() for path in sorted(package.glob("*.py"))
+            },
+            "interpreter": run["client_interpreter"],
+            "argv": run["argv"],
+            "exit_code": run["client_exit_code"],
+        },
+        "tokens": run["narrow_token"],
+        "saved_world_created": run["saved_world_created"],
+        "walkthrough": {
+            "result": walk["result"],
+            "discovered": walk["discovered"],
+            "edits": walk["edits"],
+            "refusal": walk["refusal"],
+            "checks": walk["checks"],
+            "exchanges": len(walk["exchanges"]),
+        },
+        "confirmation": run["confirmation"],
+        "browser": {
+            "app": app["app"],
+            "served_by": "the launcher's Vite development server, authenticated with the person's token",
+            "world_title_field": app["world_title_field"],
+            "requests_seen": [e for e in app["api_requests"] if "bytes" in e["url"] or "/world-entries/" in e["url"] or "/world/versions/" in e["url"]],
+            "settle_ms": app["settle_ms"],
+        },
+        "captures": [
+            {**bound("app-after-client.png"),
+             "scope": "whole viewport of the app's first view of the saved world after the client's edits"},
+        ],
+        "artifacts": [bound(path.name) for path in sorted(ARTIFACTS.iterdir()) if path.name != "app-after-client.png"],
+        "commands": [
+            {"name": "launcher-up", "argv": ["python3", "<main-checkout>/.exulanica/acceptance/launch.py", "up", "--worktree", "<worktree>", "--slot", "6"], "exit_code": 0},
+            {"name": "run", "argv": ["uv", "run", "--offline", "python", ".exulanica/lane-client/slot6_run.py"], "exit_code": run["client_exit_code"], "published_as": "run.py.txt"},
+            {"name": "screenshot", "argv": ["node", ".exulanica/lane-client/app_screenshot.mjs", "<state.json>", "<out>"], "exit_code": 0, "published_as": "app_screenshot.mjs.txt"},
+            {"name": "launcher-down", "argv": ["python3", "<main-checkout>/.exulanica/acceptance/launch.py", "down", "--worktree", "<worktree>"], "exit_code": 0},
+        ],
+        "what_this_does_not_show": [
+            "The saved world is the built-in authored starter in a synthetic workspace, not a reconstructed personal place.",
+            "The motion is stored, and the object is drawn at rest at its authored transform; the renderer's trigger, stop and reset controls were not exercised in this run.",
+            "The app was the Vite development server, not a production build; the capture is one frame of the first view, not a measure of quality or timing.",
+            "The registry holds one reviewed behaviour, so choosing between behaviours was not exercised.",
+            "No stale base arose. The client stops with the server's reason on any refusal other than the one it asks for, and does not retry.",
+            "The client token reached the API through the second API process described under runtime, not through the launcher's own API process.",
+        ],
+        "scrubbing": (
+            "absolute local paths in the published artifacts are replaced by <worktree>, "
+            "<main-checkout> and <home>; run.json records the SHA-256 of the driver's as-run bytes"
+        ),
+        "completed_at": run["completed_at"],
+    }
+    text = json.dumps(
+        {"profile": "exulanica.digest-bound-record/v1", "record": record,
+         "record_sha256": hashlib.sha256(canonical_json(record)).hexdigest()},
+        indent=2, sort_keys=True,
+    ) + "\n"
+    # The phrases the retained-records test refuses, from the gate that owns them, not a copy.
+    for forbidden in visual_gate._FORBIDDEN_TEXT:
+        assert forbidden not in text, forbidden
+    RECORD.write_text(text)
+    print(f"wrote {RECORD.relative_to(WORKTREE)} with {len(record['artifacts'])} artifacts and 1 capture")
+    return 0
+
+
+if __name__ == "__main__":
+    sys.exit(main())

@@ -9,9 +9,11 @@ of the requirement is unusual enough to quote:
     direct object storage URLs. **404, never 403**, so the surface is not an existence oracle.
     Nonexistent and foreign IDs return the identical code."
 
-So the sweep below does not enumerate routes by hand. It walks ``app.routes``, and a route that
-is neither exercised nor explicitly listed as public fails the test. Adding an endpoint without
-thinking about who may call it is not possible here; the suite goes red.
+So the sweep below does not enumerate routes by hand. Its probes are derived from the one
+declaration of what each route requires, in ``tests/route_probes.py``, and
+``tests/test_route_probes.py`` checks without a database that every mounted route is public, part
+of the sign-in surface, or probed here. Adding an endpoint without deciding who may call it is not
+possible; the application refuses to build, and a declared endpoint is swept from that moment.
 """
 
 from __future__ import annotations
@@ -25,7 +27,6 @@ import uuid
 import pytest
 from exulanica.api.app import create_app
 from exulanica.api.authorisation import load_token_directory
-from exulanica.api.routes import routable_paths
 from exulanica.api.services import Services
 from exulanica.epistemics.assertions import AssertionWriter
 from exulanica.evidence.blob import BlobId
@@ -47,27 +48,11 @@ from conftest import (
     write_point_map,
 )
 from model_fakes import chat_body
+from route_probes import ACCOUNT_ROUTES, ROUTE_PROBES, fill
 from tests_support_api import EVERY_PERMISSION
 
-#: Routes that are deliberately unauthenticated, with the reason each one is.
-PUBLIC_ROUTES: dict[str, str] = {
-    "/healthz": "a liveness probe that needed a credential would go red when it rotated",
-    "/readyz": "the same, and it reports no workspace content",
-    "/openapi.json": "the schema of the API, which is not data",
-    "/docs": "the schema of the API, which is not data",
-    "/docs/oauth2-redirect": "part of the docs page",
-    "/redoc": "the schema of the API, which is not data",
-}
 
 # Cookie-only endpoints have a separate disabled-provider and signed-login suite.
-ACCOUNT_ROUTES = {
-    ("GET", "/auth/google/start"),
-    ("GET", "/auth/google/callback"),
-    ("GET", "/auth/session"),
-    ("POST", "/auth/logout"),
-}
-
-
 @pytest.mark.parametrize(("method", "path"), sorted(ACCOUNT_ROUTES))
 def test_account_routes_are_unavailable_without_configured_accounts(deployment, method, path):
     response = deployment.client.request(method, path)
@@ -75,345 +60,6 @@ def test_account_routes_are_unavailable_without_configured_accounts(deployment, 
     assert response.json()["code"] == "account_unavailable"
     assert "no-store" in response.headers["cache-control"]
 
-
-#: A request body for every authenticated route, so the sweep can actually call it. A route
-#: missing from here and from PUBLIC_ROUTES fails `test_every_route_is_covered_by_this_file`.
-ROUTE_PROBES: dict[tuple[str, str], dict] = {
-    ("GET", "/world-entries"): {},
-    ("GET", "/world-entries/candidates"): {},
-    ("POST", "/world-entries"): {"json": {}},
-    ("POST", "/world-entries/starter"): {"json": {}},
-    ("GET", "/world-entries/{entry_id}"): {},
-    ("PUT", "/world-entries/{entry_id}"): {"json": {}},
-    ("POST", "/world-entries/{entry_id}/source-attachments"): {"json": {}},
-    ("POST", "/world-entries/{entry_id}/source-detachments"): {"json": {}},
-    ("POST", "/world-entries/{entry_id}/source-rebinds"): {"json": {}},
-    ("GET", "/world/versions/{version_id}/society/control"): {},
-    ("PUT", "/world/versions/{version_id}/society/control"): {
-        "json": {"base_revision": 0, "mode": "paused", "speed": 1}
-    },
-    ("POST", "/world/versions/{version_id}/society/control/steps"): {
-        "json": {"base_revision": 0, "base_tick": 0, "base_state_sha256": "0" * 64}
-    },
-    ("GET", "/world/versions/{version_id}/society/control/events"): {},
-    ("GET", "/world-generation/grammars"): {},
-    # Enough of a specification to reach the permission floor, which is all this sweep asks of
-    # it. What the route does with a body it accepts is tests/test_world_generation_route.py.
-    ("POST", "/world-generation/worlds"): {
-        "json": {"grammar_id": "city", "grammar_version": 3, "bindings": []}
-    },
-    ("GET", "/graph"): {},
-    ("GET", "/graph/sources"): {},
-    ("POST", "/environment-resources/places"): {"json": {}},
-    ("POST", "/environment-resources/sources"): {"json": {}},
-    ("POST", "/environment-resources/assets"): {"json": {}},
-    ("POST", "/environment-resources/sources/{admission_id}/feature-indexes"): {"json": {}},
-    ("GET", "/environment-resources/places/{place_id}"): {},
-    ("GET", "/environment-resources/sources/{admission_id}/features"): {},
-    ("GET", "/environment-resources/{kind}/{resource_id}"): {"params": {"operation": "display"}},
-    ("GET", "/environment-resources/{kind}/{resource_id}/bytes"): {
-        "params": {"operation": "display"}
-    },
-    ("GET", "/geometry"): {},
-    ("GET", "/geometry/{artifact_id}"): {},
-    ("GET", "/scene-geometry/{artifact_id}"): {},
-    ("GET", "/scene-segments/{scene_id}"): {},
-    ("GET", "/world-read/scenes/{scene_id}"): {},
-    ("GET", "/world-read/scenes/{scene_id}/observations"): {},
-    ("GET", "/world-read/scenes/{scene_id}/observations/summary"): {},
-    ("GET", "/world-read/scenes/{scene_id}/observations/resolve"): {
-        "params": {"capture_id": str(uuid.uuid4()), "u": "10", "v": "20"}
-    },
-    ("GET", "/world-read/places/{place_id}"): {},
-    ("POST", "/selection/environment"): {"json": {}},
-    ("GET", "/world/versions/{version_id}/society"): {},
-    ("GET", "/tiles"): {"params": {"city_seed": "0" * 64}},
-    ("GET", "/tiles/{baked_tile_id}/bytes"): {},
-    ("GET", "/materials/makers"): {},
-    ("GET", "/materials/library"): {},
-    ("GET", "/materials/recipes"): {},
-    ("POST", "/materials/recipes"): {"json": {}},
-    ("GET", "/materials/recipes/{recipe_id}"): {},
-    ("POST", "/materials/recipes/{recipe_id}/withdraw"): {},
-    ("POST", "/materials/recipes/{recipe_id}/bake"): {},
-    ("GET", "/materials/recipes/{recipe_id}/bake"): {},
-    ("GET", "/materials/recipes/{recipe_id}/bake/bytes"): {},
-    ("GET", "/world/versions/{version_id}/society/events"): {},
-    ("GET", "/world/versions/{version_id}/society/actions"): {},
-    ("GET", "/world/versions/{version_id}/society/actions/{request_id}"): {},
-    ("POST", "/world/versions/{version_id}/society/actions"): {
-        "json": {
-            "idempotency_key": str(uuid.uuid4()),
-            "base_tick": 0,
-            "base_state_sha256": "0" * 64,
-            "subject_id": str(uuid.uuid4()),
-            "intent": {"kind": "go_to", "target_id": "fixture:target"},
-        }
-    },
-    ("POST", "/world/versions/{version_id}/society/experiments"): {"json": {}},
-    ("GET", "/world/versions/{version_id}/society/experiments/{experiment_id}"): {},
-    (
-        "POST",
-        "/world/versions/{version_id}/society/experiments/{experiment_id}/attempts",
-    ): {"json": {}},
-    (
-        "GET",
-        "/world/versions/{version_id}/society/experiments/{experiment_id}/attempts/{attempt_id}",
-    ): {},
-    ("GET", "/world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance"): {},
-    ("PUT", "/world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance"): {
-        "json": {}
-    },
-    (
-        "POST",
-        "/world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/reset",
-    ): {"json": {}},
-    (
-        "GET",
-        "/world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/history",
-    ): {},
-    (
-        "GET",
-        "/world/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance/families",
-    ): {},
-    ("GET", "/world/versions/{version_id}/society/replay"): {},
-    ("POST", "/world/versions/{version_id}/society"): {"json": {}},
-    ("POST", "/world/versions/{version_id}/society/steps"): {"json": {}},
-    ("POST", "/world/versions/{version_id}/society/decisions"): {"json": {}},
-    ("GET", "/world/versions/{version_id}/society/decisions/{request_id}"): {},
-    ("GET", "/world/versions/{version_id}/society/district"): {},
-    ("POST", "/world/versions/{version_id}/environment-instances"): {"json": {}},
-    ("POST", "/world/versions/{version_id}/environment-instances/undo"): {"json": {}},
-    ("POST", "/world/versions/{version_id}/environment-instances/{instance_id}/move"): {"json": {}},
-    ("POST", "/world/versions/{version_id}/environment-instances/{instance_id}/remove"): {
-        "json": {}
-    },
-    ("POST", "/world/versions/{version_id}/compositions/preview"): {"json": {}},
-    ("POST", "/world/versions/{version_id}/compositions/apply"): {"json": {}},
-    ("POST", "/world/versions/{version_id}/compositions/photo-point-maps/preview"): {"json": {}},
-    ("POST", "/world/versions/{version_id}/compositions/photo-point-maps/apply"): {"json": {}},
-    ("POST", "/world-write/scenes/{scene_id}/generated"): {
-        "json": {
-            "model": {"provider": "p", "model_id": "m", "model_version": "v"},
-            "prompt_sha256": "0" * 64,
-            "conditioning": [{"role": "world-read-bundle", "sha256": "1" * 64}],
-            "container": "sog/1",
-            "content_sha256": "2" * 64,
-            "byte_size": 1,
-            "seam": "where the record stops and the imagining begins",
-        }
-    },
-    ("GET", "/selection/catalogue"): {},
-    ("GET", "/selection/place-bridges"): {},
-    ("POST", "/selection"): {"json": {"intent": "captures"}},
-    ("POST", "/selection/place-bridges"): {"json": {}},
-    ("POST", "/selection/place-bridges/{decision_id}/revoke"): {"json": {}},
-    ("POST", "/selection/packet"): {"json": {"intent": "captures"}},
-    ("POST", "/selection/plan"): {"json": {"question": "where was I?"}},
-    ("POST", "/selection/ask"): {"json": {"question": "where was I?"}},
-    ("POST", "/selection/appearance"): {"json": {"utterance": "could it be softer in here?"}},
-    ("GET", "/companion/memory/recent"): {},
-    ("POST", "/companion/memory/answers"): {
-        "json": {
-            "question": "when were these taken?",
-            "answer_text": "on 2026-02-01",
-            "prompt_version": "selection-3",
-            "latency_ms": 1,
-        }
-    },
-    ("POST", "/companion/memory/escapes"): {
-        "json": {"escape": "skip", "intent": "confirm_continuity", "turn_id": "turn-1"}
-    },
-    ("POST", "/companion/memory/answers/{answer_id}/corrections"): {
-        "json": {"answer_text": "no, it was 2026-03-04"}
-    },
-    ("DELETE", "/companion/memory/answers/{answer_id}"): {},
-    ("GET", "/evidence"): {"params": {"uri": "exulanica://blob/x/img#t=0,1"}},
-    ("GET", "/evidence/{span_id}"): {},
-    ("GET", "/evidence/{span_id}/region"): {},
-    ("GET", "/evidence/{span_id}/masked"): {},
-    ("GET", "/person-regions/{capture_id}"): {},
-    ("POST", "/person-regions/{capture_id}/edits"): {
-        "json": {"edits": [{"region_key": "aa" * 32, "action": "confirm"}]}
-    },
-    ("POST", "/person-subjects"): {"json": {}},
-    ("POST", "/person-subjects/{subject_id}/consents"): {
-        "json": {"consent_scope": "likeness", "decision": "granted"}
-    },
-    ("POST", "/identity/subjects/link"): {
-        "json": {"regions": [{"capture_id": str(uuid.uuid4()), "region_key": "aa" * 32}]}
-    },
-    ("POST", "/identity/subjects/unlink"): {
-        "json": {
-            "regions": [{"capture_id": str(uuid.uuid4()), "region_key": "aa" * 32}],
-            "subject_id": str(uuid.uuid4()),
-        }
-    },
-    # Authentication must precede validation of personal authority or review receipts.
-    ("POST", "/personal-admission"): {"json": {}},
-    ("GET", "/personal-admission"): {},
-    ("POST", "/personal-admission/model-rights/{right_id}/withdraw"): {},
-    ("GET", "/identity/events"): {},
-    ("GET", "/operations/derivative-jobs"): {},
-    ("GET", "/operations/derivative-jobs/{job_id}/events"): {},
-    ("GET", "/operations/reconstruction-scenes"): {},
-    # Authentication must precede body validation; the complete review path has its own tests.
-    ("POST", "/operations/reconstruction-admission"): {"json": {}},
-    ("GET", "/operations/reconstruction-scenes/{job_id}"): {},
-    ("POST", "/operations/reconstruction-scenes/{job_id}/retry"): {},
-    ("GET", "/world/styles/catalog"): {},
-    ("GET", "/world/styles/current"): {},
-    ("GET", "/world/styles/versions"): {},
-    ("GET", "/world/styles/proposals/{proposal_id}"): {},
-    # Authored world versions and created objects. Every one of these needs a workspace bearer
-    # token, so every one is probed without a credential here.
-    ("GET", "/world/versions"): {},
-    ("GET", "/world/versions/{version_id}"): {},
-    ("POST", "/world/versions"): {
-        "json": {"title": "probe", "source_snapshot_id": str(uuid.uuid4())}
-    },
-    ("POST", "/world/versions/bootstrap"): {"json": {"base_topology_digest": "0" * 64}},
-    ("POST", "/world/versions/{version_id}/objects"): {
-        "json": {
-            "base_state_sha256": "0" * 64,
-            "object_id": "object:probe",
-            "asset_sha256": "1" * 64,
-            "region_id": "region-a",
-            "transform": {
-                "x_mm": 0,
-                "y_mm": 0,
-                "z_mm": 0,
-                "yaw_microradians": 0,
-                "scale_milli": 1000,
-            },
-            "origin_role": "fictional",
-        }
-    },
-    ("POST", "/world/versions/{version_id}/objects/{object_id}/move"): {
-        "json": {
-            "base_state_sha256": "0" * 64,
-            "transform": {
-                "x_mm": 0,
-                "y_mm": 0,
-                "z_mm": 0,
-                "yaw_microradians": 0,
-                "scale_milli": 1000,
-            },
-        }
-    },
-    ("POST", "/world/versions/{version_id}/objects/{object_id}/remove"): {
-        "json": {"base_state_sha256": "0" * 64}
-    },
-    ("POST", "/world/versions/{version_id}/objects/{object_id}/behaviour"): {
-        "json": {
-            "base_state_sha256": "0" * 64,
-            "behaviour": {
-                "behaviour_key": "motion.bounded-path",
-                "behaviour_version": 1,
-                "parameters": {
-                    "travel_mm": 1000,
-                    "period_milliseconds": 4000,
-                    "axis": "x",
-                    "easing": "smooth",
-                },
-            },
-        }
-    },
-    ("POST", "/world/versions/{version_id}/objects/undo"): {
-        "json": {"base_state_sha256": "0" * 64}
-    },
-    ("GET", "/world/assets"): {},
-    ("GET", "/world/assets/{asset_key}"): {},
-    ("GET", "/world/assets/{asset_key}/bytes"): {},
-    ("GET", "/world/assets/{asset_key}/licence"): {},
-    ("GET", "/world/interactions/catalog"): {},
-    ("GET", "/world/interactions/current"): {},
-    ("GET", "/world/interactions/versions"): {},
-    ("GET", "/world/interactions/proposals/{proposal_id}"): {},
-    ("GET", "/world/interactions/recommendations"): {},
-    ("GET", "/world/source-media"): {},
-    ("GET", "/world/source-media/{source_id}"): {},
-    ("DELETE", "/world/styles/previews/{preview_id}"): {},
-    ("POST", "/world/styles/previews"): {
-        "json": {
-            "proposal_id": str(uuid.uuid4()),
-            "origin": "user",
-            "scope": {"kind": "global"},
-            "base_style_version_id": str(uuid.uuid4()),
-            "base_topology_digest": "probe-topology",
-            "profile": {"profile_id": "origin-landscape", "profile_version": 1},
-        }
-    },
-    ("POST", "/world/styles/previews/{preview_id}/apply"): {
-        "json": {
-            "base_style_version_id": str(uuid.uuid4()),
-            "base_topology_digest": "probe-topology",
-        }
-    },
-    ("POST", "/world/styles/rollback"): {
-        "json": {
-            "target_version_id": str(uuid.uuid4()),
-            "base_style_version_id": str(uuid.uuid4()),
-            "base_topology_digest": "probe-topology",
-            "origin": "user",
-        }
-    },
-    ("DELETE", "/world/interactions/previews/{preview_id}"): {},
-    ("POST", "/world/interactions/previews"): {
-        "json": {
-            "proposal_id": str(uuid.uuid4()),
-            "origin": "settings",
-            "origin_reference": "probe-panel",
-            "base_policy_version_id": None,
-            "base_structure_snapshot_id": None,
-            "base_topology_sha256": None,
-            "capability_patch": {"initiative.mode": "minimal"},
-            "proposal_input": {"control": "initiative"},
-            "explanation": "The user selected less initiative.",
-        }
-    },
-    ("POST", "/world/interactions/previews/{preview_id}/apply"): {
-        "json": {
-            "base_policy_version_id": None,
-            "base_structure_snapshot_id": None,
-            "base_topology_sha256": None,
-        }
-    },
-    ("POST", "/world/interactions/rollback"): {
-        "json": {
-            "target_version_id": str(uuid.uuid4()),
-            "origin": "settings",
-            "base_policy_version_id": str(uuid.uuid4()),
-            "base_structure_snapshot_id": None,
-            "base_topology_sha256": None,
-        }
-    },
-    # The stream is opened but never read here: an anonymous or foreign caller is refused
-    # before the generator starts, which is the only thing this sweep asks about. Reading it
-    # as the owner is `test_formation_stream.py`, which has a batch to read.
-    ("GET", "/formation"): {},
-    ("GET", "/formation/{batch_id}"): {},
-    # Multipart, because that is what the route takes, and a part the route refuses on its
-    # name, because the sweep asks only who may reach the endpoint. What it does with a
-    # photograph is `test_intake_upload.py`, which has a store and a schema to check against.
-    ("POST", "/intake"): {"files": {"files": ("probe.txt", b"probe", "text/plain")}},
-    ("POST", "/identity/rename"): {"json": {"entity_id": str(uuid.uuid4()), "display_name": "X"}},
-    ("POST", "/identity/name"): {"json": {"occurrence_id": str(uuid.uuid4()), "display_name": "X"}},
-    ("POST", "/identity/confirm"): {
-        "json": {"occurrence_id": str(uuid.uuid4()), "entity_id": str(uuid.uuid4())}
-    },
-    ("POST", "/identity/reject"): {
-        "json": {"occurrence_id": str(uuid.uuid4()), "entity_id": str(uuid.uuid4())}
-    },
-    ("POST", "/identity/revoke"): {"json": {"occurrence_id": str(uuid.uuid4())}},
-    ("POST", "/identity/merge"): {
-        "json": {"sources": [str(uuid.uuid4())], "target": str(uuid.uuid4())}
-    },
-    ("POST", "/identity/split"): {
-        "json": {"entity_id": str(uuid.uuid4()), "occurrence_ids": [str(uuid.uuid4())]}
-    },
-    ("POST", "/identity/undo"): {"json": {"event_id": str(uuid.uuid4())}},
-}
 
 _OWNER_TOKEN = "owner-token-that-is-long-enough-to-be-accepted"
 _STRANGER_TOKEN = "stranger-token-that-is-long-enough-to-pass"
@@ -455,34 +101,10 @@ class Deployment:
         return self._request(_STRANGER_TOKEN, method, path, **kwargs)
 
     def fill(self, path: str) -> str:
-        return (
-            path.replace("{span_id}", str(self.span_id))
-            .replace("{batch_id}", str(self.batch_id))
-            .replace("{proposal_id}", str(uuid.uuid4()))
-            .replace("{preview_id}", str(uuid.uuid4()))
-            .replace("{source_id}", str(uuid.uuid4()))
-            .replace("{job_id}", str(uuid.uuid4()))
-            .replace("{artifact_id}", str(self.artifact_id))
-            .replace("{baked_tile_id}", str(uuid.uuid4()))
-            .replace("{scene_id}", str(uuid.uuid4()))
-            # A place id nobody allocated, the same choice the scene id above it makes. The
-            # sweep asks who may reach a route, and an id that resolves to nothing answers that
-            # without a place in the fixture; leaving the literal placeholder in the path would
-            # ask the uuid parser about it instead of asking the route about the session.
-            .replace("{place_id}", str(uuid.uuid4()))
-            # A memory nobody recorded, for the same reason as the two above: the sweep asks who
-            # may reach the route, and an id that resolves to nothing answers that without
-            # putting a conversation in the fixture. Leaving the literal placeholder here would
-            # ask the uuid parser about it and report a 422 the sweep would read as a refusal.
-            .replace("{answer_id}", str(uuid.uuid4()))
-            .replace("{kind}", "source")
-            .replace("{resource_id}", str(uuid.uuid4()))
-            .replace("{version_id}", str(uuid.uuid4()))
-            .replace("{request_id}", str(uuid.uuid4()))
-            .replace("{right_id}", str(uuid.uuid4()))
-            .replace("{subject_kind}", "avatar")
-            .replace("{subject_id}", str(uuid.uuid4()))
-            .replace("{recipe_id}", str(uuid.uuid4()))
+        """The route's URL: this fixture's real ids where it has them, fresh ones elsewhere."""
+        return fill(
+            path,
+            {"span_id": self.span_id, "batch_id": self.batch_id, "artifact_id": self.artifact_id},
         )
 
 
@@ -585,40 +207,10 @@ def deployment(tmp_path, photo_dir, repository, spine_schema, monkeypatch):
 
 
 # -- the sweep ----------------------------------------------------------------------------
-
-
-def test_the_route_sweep_can_actually_see_the_application(deployment):
-    """The guard on the guard, and it is not decoration.
-
-    A coverage check over an empty set of routes passes. So before asking whether every route is
-    covered, this asks whether the walk found any routes at all, and whether it found ones this
-    file knows exist by name. Both halves matter: a walk that returned nothing and a walk that
-    returned only the documentation pages are both green under the check below, and both mean the
-    authorisation sweep is testing nothing.
-    """
-    found = routable_paths(deployment.client.app)
-    assert ("GET", "/graph") in found, found
-    assert ("POST", "/identity/name") in found, found
-    assert ("GET", "/evidence/{span_id}") in found, found
-    # Every probed route must be reachable. A probe for a route that no longer exists is a test
-    # asserting things about nothing, which is the same defect pointing the other way.
-    missing = sorted(set(ROUTE_PROBES) - set(found))
-    assert not missing, f"probed routes that the application does not serve: {missing}"
-
-
-def test_every_route_is_covered_by_this_file(deployment):
-    """The generated half. A new endpoint with no entry here fails, which is the point."""
-    uncovered = [
-        (method, path)
-        for method, path in routable_paths(deployment.client.app)
-        if path not in PUBLIC_ROUTES
-        and (method, path) not in ROUTE_PROBES
-        and (method, path) not in ACCOUNT_ROUTES
-    ]
-    assert not uncovered, (
-        f"these routes are neither public nor probed: {uncovered}. Add them to ROUTE_PROBES "
-        "with a body, or to PUBLIC_ROUTES with the reason they need no credential."
-    )
+#
+# The guard on the guard (the walk sees the authenticated surface by name), the coverage check
+# (every mounted route is public, sign-in or probed) and the stale-probe check run without a
+# database in tests/test_route_probes.py.
 
 
 @pytest.mark.parametrize(("method", "path"), sorted(ROUTE_PROBES))
