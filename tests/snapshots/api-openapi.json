@@ -6687,7 +6687,7 @@
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/Allow"
+        "$ref": "#/components/schemas/PlaceNameAllowRequest"
        }
       }
      }
@@ -6757,7 +6757,7 @@
      "content": {
       "application/json": {
        "schema": {
-        "$ref": "#/components/schemas/Stop"
+        "$ref": "#/components/schemas/PlaceNameStopRequest"
        }
       }
      }
@@ -11173,28 +11173,6 @@
      "base_state_sha256"
     ],
     "title": "AdvanceSocietyBody"
-   },
-   "Allow": {
-    "properties": {
-     "use": {
-      "type": "string",
-      "pattern": "^[a-z][a-z0-9_]{0,62}$",
-      "title": "Use"
-     },
-     "notice": {
-      "type": "string",
-      "maxLength": 2000,
-      "minLength": 1,
-      "title": "Notice"
-     }
-    },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "use",
-     "notice"
-    ],
-    "title": "Allow"
    },
    "AlternateVersionView": {
     "properties": {
@@ -17551,6 +17529,43 @@
     ],
     "title": "PlaceEnvironmentProposalView"
    },
+   "PlaceNameAllowRequest": {
+    "properties": {
+     "use": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,62}$",
+      "title": "Use"
+     },
+     "notice": {
+      "type": "string",
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Notice"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "use",
+     "notice"
+    ],
+    "title": "PlaceNameAllowRequest"
+   },
+   "PlaceNameStopRequest": {
+    "properties": {
+     "use": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,62}$",
+      "title": "Use"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "use"
+    ],
+    "title": "PlaceNameStopRequest"
+   },
    "PlaceSelector": {
     "properties": {
      "ids": {
@@ -21478,21 +21493,6 @@
      "base_state_sha256"
     ],
     "title": "StepBody"
-   },
-   "Stop": {
-    "properties": {
-     "use": {
-      "type": "string",
-      "pattern": "^[a-z][a-z0-9_]{0,62}$",
-      "title": "Use"
-     }
-    },
-    "additionalProperties": false,
-    "type": "object",
-    "required": [
-     "use"
-    ],
-    "title": "Stop"
    },
    "StyleProposalView": {
     "properties": {

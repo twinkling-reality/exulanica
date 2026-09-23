@@ -47,7 +47,7 @@ router = APIRouter(tags=["place-name-rights"])
 _ROLE = r"^[a-z][a-z0-9_]{0,62}$"
 
 
-class Allow(BaseModel):
+class PlaceNameAllowRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     #: The use to allow, as the read names it.
@@ -56,7 +56,7 @@ class Allow(BaseModel):
     notice: str = Field(min_length=1, max_length=2000)
 
 
-class Stop(BaseModel):
+class PlaceNameStopRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     use: str = Field(pattern=_ROLE)
@@ -141,7 +141,7 @@ def _decide(record: Callable[[], None]) -> JSONResponse | None:
 @router.post("/place-name-rights/{entity_id}/grants", status_code=201)
 def allow(
     entity_id: Annotated[uuid.UUID, Path()],
-    body: Allow,
+    body: PlaceNameAllowRequest,
     connection: ScopedConnection,
     session: CurrentSession,
 ) -> Any:
@@ -162,7 +162,7 @@ def allow(
 @router.post("/place-name-rights/{entity_id}/withdrawals", status_code=201)
 def stop(
     entity_id: Annotated[uuid.UUID, Path()],
-    body: Stop,
+    body: PlaceNameStopRequest,
     connection: ScopedConnection,
     session: CurrentSession,
 ) -> Any:
