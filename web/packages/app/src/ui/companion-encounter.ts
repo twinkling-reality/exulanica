@@ -77,9 +77,19 @@ export interface CompanionEncounter {
    *
    * `opening` is the read already under way, and its result is drawn only while this photograph
    * is still the one open: going back, opening another, or sending the Companion away before it
-   * arrives leaves it undrawn. `capturedAt` is the date the citation carries, or null.
+   * arrives leaves it undrawn. `cited` is which citation opened it, by its index on the face, and
+   * the date it carries, or null.
    */
-  showEvidence(opening: Promise<OpenedEvidence>, capturedAt: string | null): void;
+  showEvidence(
+    opening: Promise<OpenedEvidence>,
+    cited: { readonly index: number; readonly capturedAt: string | null },
+  ): void;
+  /**
+   * Close the photograph a citation opened and return to the face that cited it, with the keyboard
+   * on the citation it came from. False when no photograph was open, so the caller's Escape can go
+   * on to close the Companion itself.
+   */
+  closeEvidence(): boolean;
   /** Say that the question did not reach an answer. Never a sentence from the copy table alone. */
   reportAskFailure(failure: AskUnavailable): void;
   /** Whether an answer, rather than the turn, is what the panel is currently showing. */
@@ -206,7 +216,7 @@ export function buildCompanionEncounter(
    * ticket and a read is drawn only under the ticket it was opened with, which is what keeps a
    * late photograph off a face that has moved on.
    */
-  let evidence: (ShownEvidence & { readonly ticket: number }) | null = null;
+  let evidence: (ShownEvidence & { readonly ticket: number; readonly index: number }) | null = null;
   let evidenceTickets = 0;
   let currentPlacement: CompanionPlacement | null = null;
   let firstUsePrompt: FirstUsePrompt | null = null;
@@ -291,12 +301,15 @@ export function buildCompanionEncounter(
 
   function renderEvidence(shown: ShownEvidence): void {
     mode = 'evidence';
-    // Every redraw builds the face again, so the way back keeps the keyboard when it had it:
+    // Every redraw builds the face again, so whatever in it held the keyboard holds it again:
     // measured in the running app, the photograph's arrival otherwise dropped focus to the page.
-    const holding = document.activeElement?.classList.contains('companion-evidence-back') === true;
+    const focused = document.activeElement;
+    const onBack = focused?.classList.contains('companion-evidence-back') === true;
+    const inFace = focused instanceof Element && focused.closest('.companion-evidence') !== null;
     const view = buildCompanionEvidence(shown, () => closeEvidence());
     draw([toolbar, view.root]);
-    if (holding) view.back.focus({ preventScroll: true });
+    if (onBack) view.back.focus({ preventScroll: true });
+    else if (inFace) view.root.focus({ preventScroll: true });
   }
 
   /** Forget the open photograph and return to the face that opened it, without drawing. */
@@ -307,11 +320,17 @@ export function buildCompanionEncounter(
     root.removeAttribute('data-evidence');
   }
 
-  /** Back to the face that opened the photograph. */
-  function closeEvidence(): void {
-    if (evidence === null) return;
+  /** Back to the face that opened the photograph, with the keyboard on what opened it. */
+  function closeEvidence(): boolean {
+    if (evidence === null) return false;
+    const { origin, index } = evidence;
     dropEvidence();
     reflect();
+    const citation = origin === 'answer'
+      ? root.querySelectorAll<HTMLButtonElement>('.companion-evidence-chip')[index]
+      : root.querySelector<HTMLButtonElement>('.companion-evidence-action');
+    citation?.focus({ preventScroll: true });
+    return true;
   }
 
   function renderFailure(failure: AskUnavailable): void {
@@ -380,8 +399,7 @@ export function buildCompanionEncounter(
     event.preventDefault();
     event.stopImmediatePropagation();
     // A photograph is opened over what cited it, so Escape closes the photograph first.
-    if (mode === 'evidence') closeEvidence();
-    else options.onDismiss?.();
+    if (!closeEvidence()) options.onDismiss?.();
   });
 
   return {
@@ -491,11 +509,17 @@ export function buildCompanionEncounter(
       root.setAttribute('data-answering', 'failed');
       reflect();
     },
-    showEvidence(opening, capturedAt) {
+    showEvidence(opening, cited) {
       // A citation is pressed on the face that shows it; any other face has none to open.
       if (state !== 'open' || !(mode === 'answer' || mode === 'turn' || mode === 'failed')) return;
       const ticket = (evidenceTickets += 1);
-      evidence = { ticket, origin: mode === 'answer' ? 'answer' : 'turn', opened: null, capturedAt };
+      evidence = {
+        ticket,
+        index: cited.index,
+        origin: mode === 'answer' ? 'answer' : 'turn',
+        opened: null,
+        capturedAt: cited.capturedAt,
+      };
       root.setAttribute('data-evidence', 'opening');
       reflect();
       // The chip that was pressed left with the face it was on, so the way back takes the keyboard.
@@ -512,6 +536,7 @@ export function buildCompanionEncounter(
         arrived({ ok: false, reason: error instanceof Error ? error.message : String(error) });
       });
     },
+    closeEvidence: () => closeEvidence(),
     showingAnswer: () => answer !== null,
     noteMemoryFailure(reasonKey, detail) {
       memoryNotice = { reasonKey, detail };

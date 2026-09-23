@@ -14,6 +14,7 @@ question plans, and read the packet ``build_packet`` makes of it.
 
 from __future__ import annotations
 
+import datetime as dt
 import json
 import re
 import uuid
@@ -36,6 +37,7 @@ from exulanica.selection.answer import Answer, AnswerClause, ClauseType
 from exulanica.selection.executor import execute
 from exulanica.selection.packet import MAX_PACKET_ITEMS, ConfirmedPlace, build_packet
 from exulanica.selection.plan import (
+    CaptureWindow,
     EntitySelector,
     Intent,
     PlaceSelector,
@@ -138,20 +140,32 @@ def test_the_confirmed_place_is_on_its_photographs_line(confirmed):
 def test_stating_the_link_adds_no_line(confirmed):
     """The packet's size rule: one line per supporting span and claim, a link included in one."""
     repository, store, session, _, entities = confirmed
+    # The day the fixture's first photograph was taken, so its time match and its place link
+    # both rest on the whole photograph: two supports, one line.
+    day = dt.datetime(2026, 8, 14, tzinfo=dt.UTC)
     plan = SelectionPlan(
         intent=Intent.CAPTURES,
         place=PlaceSelector(ids=[entities["place"]]),
+        time=[CaptureWindow(start=day, end=day + dt.timedelta(days=1))],
         semantic_query="lantern house",
     )
     result, packet = _packet(repository, store, session, plan)
 
-    supported = {
+    supports = [
         (support.span_id, support.assertion_id)
         for capture in result.captures
         for support in capture.support
-    }
-    assert {(item.span_id, item.assertion_id) for item in packet.items} == supported
+    ]
+    assert len(supports) > len(set(supports)), "no line was supported twice, so nothing is shown"
+    # In order and once each. A set would hide a line drawn twice.
+    assert [(item.span_id, item.assertion_id) for item in packet.items] == list(
+        dict.fromkeys(supports)
+    )
     assert len(packet.items) <= MAX_PACKET_ITEMS
+    # The shared line is the photograph's own, and it carries the place.
+    assert [item.confirmed_places for item in packet.items if item.assertion_id is None] == [
+        (ConfirmedPlace(entity_id=entities["place"]),)
+    ]
     # A search for the sign's words selected claim lines as well, and none of them carries a link.
     assert any(item.text is not None for item in packet.items)
     assert all(not item.confirmed_places for item in packet.items if item.assertion_id is not None)
@@ -168,6 +182,43 @@ def test_a_confirmed_person_is_not_stated(confirmed):
     )
     assert packet.items, "the person question built an empty packet"
     assert all(not item.confirmed_places for item in packet.items)
+
+
+def test_a_confirmed_place_whose_name_was_taken_back_is_carried_and_never_stated(confirmed):
+    """Its link still selects the photograph, and with no saved name there is nothing to say it by.
+
+    Retracting the naming claim clears the entity's name (``tg_entity_name_follows_its_assertion``)
+    and leaves the confirmed link, which is the case: a photograph a place selects, and no
+    placeholder to give that place.
+    """
+    repository, store, session, captures, entities = confirmed
+    assertions = AssertionWriter(repository.connection, repository.workspace_id)
+    naming = assertions.active_naming_assertion(entities["place"], PLACE)
+    assert naming is not None
+    assertions.retract(naming, retracted_by=session.actor, reason="the name was taken back")
+    row = repository.connection.execute(
+        "select display_name from entity where workspace_id=%s and entity_id=%s",
+        (repository.workspace_id, entities["place"]),
+    ).fetchone()
+    assert row["display_name"] is None, "the place kept its name, so this is not the case"
+
+    plan = SelectionPlan(intent=Intent.CAPTURES, place=PlaceSelector(ids=[entities["place"]]))
+    result, packet = _packet(repository, store, session, plan)
+    assert [capture.capture_id for capture in result.captures] == [captures[0]]
+    assert [item.confirmed_places for item in packet.items if item.confirmed_places] == [
+        (ConfirmedPlace(entity_id=entities["place"]),)
+    ]
+
+    outcome, (composer,) = _answered(
+        repository,
+        store,
+        session,
+        "Which of these photographs were taken there?",
+        [_NOTHING.model_dump_json()],
+        plan=plan,
+    )
+    assert not any(_stated(composer).values()), "an unnamed place was stated"
+    assert entities["place"] not in dict(outcome.names).values()
 
 
 # -- what the composer is sent ---------------------------------------------------------------

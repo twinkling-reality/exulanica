@@ -19,9 +19,10 @@
  * not named" stay two different statements.
  *
  * What it does not do: an answer kept in the Companion's memory stores its text and not its
- * `names`, so a placeholder in a remembered answer cannot be tied to an entity and reads as
- * `not_identified`. And a name is always the entity's current one, so a remembered sentence about
- * a sign reads whatever the place is called now.
+ * `names`, so every placeholder in a remembered answer reads as `not_identified` and none is ever
+ * restored. And a name is the entity's name in the library the page holds when the answer is drawn:
+ * an answer drawn again in the same page session, once the page has read a rename, shows the new
+ * name, even where the placeholder stood for the words on a sign.
  */
 
 import { entityById, type EntityRecord, type GraphSnapshot } from '@exulanica/graph-client';
@@ -36,10 +37,20 @@ import { fill, say } from './ui/copy.js';
  */
 export const PLACEHOLDER_SOURCE = '(\\[(?:person|voice|place|object|conversation|event) [A-Z]+\\])';
 
+/**
+ * The predicate a naming claim is written under, as the graph sends it.
+ *
+ * `NAME_PREDICATE` in `exulanica/graph/entities.py`; `tests/test_companion_placeholder_parity.py`
+ * fails when the two differ.
+ */
+export const NAME_PREDICATE = 'name_is';
+
 /** Why a placeholder is shown in words rather than as a name. */
 export type Unresolved =
   /** The entity is in the library and has no name: never named, or its name was taken back. */
   | 'not_named'
+  /** A person whose consent was withdrawn: the graph keeps the naming and withholds the name. */
+  | 'withdrawn'
   /** The entity was merged into another one. */
   | 'merged'
   /** The account holder deleted the entity. */
@@ -116,28 +127,65 @@ function resolve(
   if (entity === undefined) return { reason: 'not_loaded' };
   if (entity.mergedInto !== null) return { reason: 'merged' };
   const name = entity.displayName;
-  return name === null || name.trim() === '' ? { reason: 'not_named' } : { name };
+  if (name !== null && name.trim() !== '') return { name };
+  return withheld(entity) ? { reason: 'withdrawn' } : { reason: 'not_named' };
 }
 
 /**
- * The answer's own labels written without their brackets, `place A`, `Place A` or `PLACE A`.
+ * Whether the entity was named and its name is withheld, which is not the same as never named.
+ *
+ * The graph blanks a withdrawn person's name and keeps their naming claim, active, with its value
+ * redacted (`entity_rows` in `exulanica/graph/entities.py`), so the ledger still shows somebody
+ * was named. Saying "you have not named" there would be false.
+ */
+function withheld(entity: EntityRecord): boolean {
+  return entity.assertions.some(
+    (claim) =>
+      claim.predicateKey === NAME_PREDICATE &&
+      claim.status === 'active' &&
+      (claim.objectValue === null || claim.objectValue === undefined),
+  );
+}
+
+/**
+ * The one-letter English words, as a label's letters are written: `a`, `I` and `O`. In running text
+ * only `I` and `O` are capitals; in text written in capitals all three are.
+ */
+const ONE_LETTER_WORDS: ReadonlySet<string> = new Set(['A', 'I', 'O']);
+const CAPITAL_IN_RUNNING_TEXT: ReadonlySet<string> = new Set(['I', 'O']);
+
+/** After a bare label that could be a word: punctuation or the end, where no word follows. */
+const ONLY_BEFORE_PUNCTUATION = '(?=[^\\w\\s]|$)';
+/** After any other bare label: nothing word-like, so `place AB` is never read as `place A`. */
+const NOT_INSIDE_A_WORD = '(?![\\w\\]])';
+
+/**
+ * The answer's own labels written without their brackets: `place A`, `Place A` or `PLACE A`.
  *
  * Measured on the live composer: asked which photographs were taken at a confirmed place, it wrote
  * "These photographs were taken at place A.", and asked what a sign in capitals says, "The sign
- * reads PLACE A." Only a label this answer's `names` assigned is looked for, its class word in any
- * case and its letters exactly as the server wrote them, with nothing word-like either side, so
- * "a place a friend chose" and "workplace A" stay the words they are. A remembered answer has no
- * `names`, and in its text only the bracketed form is recognised.
+ * reads PLACE A." Only a label this answer's `names` assigned is looked for, its letters exactly as
+ * the server wrote them. A bare label is restored only where it cannot be an ordinary word: where
+ * its letters could be one, a one-letter word or two or more letters, it must have punctuation or
+ * the end of the text after it, so "the place I visited" keeps its pronoun and "THE PLACE A FRIEND
+ * CHOSE" its article, while "taken at place I." is the place. `A` after a class word in running
+ * text is never the article, which is written `a` there. A remembered answer has no `names`, and in
+ * its text only the bracketed form is recognised.
  */
 function bareLabels(names: Readonly<Record<string, string>> | undefined): RegExp | null {
   const forms = Object.keys(names ?? {}).flatMap((label) => {
     const parts = /^\[([a-z]+) ([A-Z]+)\]$/.exec(label);
     if (parts === null) return [];
     const [, word = '', letters = ''] = parts;
-    const anyCase = [...word].map((letter) => `[${letter}${letter.toUpperCase()}]`).join('');
-    return [`${anyCase} ${letters}`];
+    const ends = (couldBeAWord: boolean): string =>
+      couldBeAWord ? ONLY_BEFORE_PUNCTUATION : NOT_INSIDE_A_WORD;
+    const running = `[${word.charAt(0)}${word.charAt(0).toUpperCase()}]${word.slice(1)}`;
+    return [
+      `${running} ${letters}${ends(letters.length > 1 || CAPITAL_IN_RUNNING_TEXT.has(letters))}`,
+      `${word.toUpperCase()} ${letters}${ends(letters.length > 1 || ONE_LETTER_WORDS.has(letters))}`,
+    ];
   });
-  return forms.length === 0 ? null : new RegExp(`(?<![\\w[])(?:${forms.join('|')})(?![\\w\\]])`, 'g');
+  return forms.length === 0 ? null : new RegExp(`(?<![\\w[])(?:${forms.join('|')})`, 'g');
 }
 
 interface Found {

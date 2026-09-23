@@ -45,6 +45,14 @@ export class EvidenceCache {
   readonly #source: EvidenceSource;
   /** Insertion-ordered, which is what makes the eviction below least-recently-opened. */
   readonly #held = new Map<EvidenceHandle, { url: string; type: string }>();
+  /**
+   * Reads under way, so opening the same photograph again before the first read lands shares it.
+   * Two reads of one handle would make two URLs, and the second would replace the first in `held`
+   * where nothing revokes it: the photograph's bytes kept alive for the life of the page.
+   */
+  readonly #reading = new Map<EvidenceHandle, Promise<OpenedEvidence>>();
+  /** Moved on by `dispose`, so a read that lands afterwards makes no URL for its bytes. */
+  #generation = 0;
 
   constructor(source: EvidenceSource) {
     this.#source = source;
@@ -59,12 +67,25 @@ export class EvidenceCache {
       this.#held.set(handle, existing);
       return { ok: true, url: existing.url, type: existing.type };
     }
+    const reading = this.#reading.get(handle);
+    if (reading !== undefined) return reading;
+    const read = this.#read(handle, this.#generation).finally(() => {
+      if (this.#reading.get(handle) === read) this.#reading.delete(handle);
+    });
+    this.#reading.set(handle, read);
+    return read;
+  }
 
+  async #read(handle: EvidenceHandle, generation: number): Promise<OpenedEvidence> {
     let blob: Blob;
     try {
       blob = await this.#source.evidenceBytes(handle);
     } catch (error) {
       return { ok: false, reason: describe(error) };
+    }
+    if (generation !== this.#generation) {
+      // The view that asked is gone, so nothing will ever revoke a URL made now.
+      return { ok: false, reason: 'the view that asked for this evidence was closed' };
     }
 
     const entry = { url: URL.createObjectURL(blob), type: blob.type };
@@ -76,6 +97,8 @@ export class EvidenceCache {
   dispose(): void {
     for (const entry of this.#held.values()) URL.revokeObjectURL(entry.url);
     this.#held.clear();
+    this.#reading.clear();
+    this.#generation += 1;
   }
 
   #evict(): void {

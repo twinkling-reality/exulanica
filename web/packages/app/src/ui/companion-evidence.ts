@@ -44,18 +44,20 @@ function reasonText(reason: string): string {
   return reason.replace(/^[a-z0-9_]+: /, '');
 }
 
+/** The sentence saying the photograph cannot be shown, and the reason under it if there is one. */
+function unavailable(detail: string): Node[] {
+  return [
+    el('p', { class: 'companion-evidence-unavailable', role: 'status', text: say('evidence.unavailable') }),
+    ...(detail === '' ? [] : [el('p', { class: 'companion-evidence-unavailable-detail', text: detail })]),
+  ];
+}
+
 function body(shown: ShownEvidence): Node[] {
   const opened = shown.opened;
   if (opened === null) {
     return [el('p', { class: 'companion-evidence-status', role: 'status', text: say('evidence.opening') })];
   }
-  if (!opened.ok) {
-    const detail = reasonText(opened.reason);
-    return [
-      el('p', { class: 'companion-evidence-unavailable', role: 'status', text: say('evidence.unavailable') }),
-      ...(detail === '' ? [] : [el('p', { class: 'companion-evidence-unavailable-detail', text: detail })]),
-    ];
-  }
+  if (!opened.ok) return unavailable(reasonText(opened.reason));
   // The date an answer states is the first ten characters of this value, so the caption shows
   // the same ten characters rather than a second rendering of the instant.
   return [
@@ -83,10 +85,13 @@ export function buildCompanionEvidence(
   back.addEventListener('click', onBack);
 
   const state = shown.opened === null ? 'opening' : shown.opened.ok ? 'shown' : 'unavailable';
+  // Focusable, and out of the tab order: a click on the photograph keeps focus in the Companion
+  // rather than dropping it to the page, so Escape reaches the photograph before the Companion.
   const root = el('section', {
     class: 'companion-evidence',
     'aria-labelledby': 'companion-evidence-title',
     'data-evidence': state,
+    tabindex: -1,
   }, [
     el('div', { class: 'companion-evidence-body' }, [
       el('h2', {
@@ -98,5 +103,12 @@ export function buildCompanionEvidence(
     ]),
     el('div', { class: 'companion-rail-foot companion-evidence-foot' }, [back]),
   ]);
+  // A URL the cache has since released draws nothing, and a broken picture is not a stated
+  // absence. The face says so instead, in the same words as any photograph that did not open.
+  const figure = root.querySelector('.companion-evidence-figure');
+  figure?.querySelector('img')?.addEventListener('error', () => {
+    figure.replaceWith(...unavailable(say('evidence.released')));
+    root.dataset['evidence'] = 'unavailable';
+  });
   return { root, back };
 }

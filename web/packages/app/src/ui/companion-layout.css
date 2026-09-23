@@ -369,6 +369,11 @@
  * A photograph a citation opened: the picture and its date where the speech band sits, the way
  * back where the rail sits. Where a photograph did not open, the sentence saying so is all there is.
  */
+/* The face takes focus from a click so Escape stays in the Companion; it is not a keyboard stop. */
+#shell .companion-encounter[data-state='open'] .companion-evidence:focus:not(:focus-visible) {
+  outline: none;
+}
+
 #shell .companion-encounter[data-state='open'] .companion-evidence-body {
   display: grid;
   gap: 12px;

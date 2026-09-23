@@ -4,6 +4,7 @@ import type { GraphSnapshot } from '@exulanica/graph-client';
 
 import { CompanionAskClient, type CompanionAnswer } from '../src/companion-ask-api.js';
 import {
+  NAME_PREDICATE,
   PLACEHOLDER_SOURCE,
   companionNames,
   spokenText,
@@ -28,15 +29,23 @@ interface Named {
   readonly entityId: string;
   readonly displayName: string | null;
   readonly mergedInto?: string | null;
+  readonly assertions?: readonly unknown[];
 }
 
-/** A library with only what the resolver reads: each entity's id, name and merge redirect. */
+/** A library with only what the resolver reads: each entity's id, name, merges and claims. */
 function library(entities: readonly Named[], deleted: readonly string[] = []): GraphSnapshot {
   return {
-    entities: entities.map((entity) => ({ mergedInto: null, ...entity })),
+    entities: entities.map((entity) => ({ mergedInto: null, assertions: [], ...entity })),
     deletedEntityIds: deleted,
   } as unknown as GraphSnapshot;
 }
+
+/** A naming claim as the graph sends one: its value blanked once consent is withdrawn. */
+const naming = (objectValue: string | null, status = 'active') => ({
+  predicateKey: NAME_PREDICATE,
+  status,
+  objectValue,
+});
 
 const NAMED = library([
   { entityId: PERSON, displayName: 'Maria Estrada' },
@@ -154,11 +163,39 @@ describe('a placeholder in an answer', () => {
     // A remembered answer keeps no names, so only the bracketed form is read as a placeholder.
     expect(spokenText(names.restore('Taken at place A.', undefined))).toBe('Taken at place A.');
   });
+
+  it('restores a bare label that could be a word only where no word follows it', () => {
+    const names = companionNames(() => NAMED);
+    const letterI = { '[place I]': PLACE };
+    // The pronoun, the article in capitals and a two-letter label with a word after it stay words.
+    for (const [text, labels] of [
+      ['It is the place I visited.', letterI],
+      ['THE PLACE A FRIEND CHOSE', NAMES],
+      ['The place AB was there.', { '[place AB]': PLACE }],
+    ] as const) {
+      expect(spokenText(names.restore(text, labels)), text).toBe(text);
+    }
+    // Where punctuation or the end follows, it can only be the label.
+    expect(spokenText(names.restore('Taken at place I.', letterI))).toBe('Taken at Mireland Hall.');
+    expect(spokenText(names.restore('Taken at place AB', { '[place AB]': PLACE }))).toBe(
+      'Taken at Mireland Hall',
+    );
+    // A letter that is no word is the label anywhere, in running text or in capitals.
+    expect(spokenText(names.restore('THE SIGN READS PLACE B NOW', { '[place B]': PLACE }))).toBe(
+      'THE SIGN READS Mireland Hall NOW',
+    );
+  });
 });
 
 describe('a placeholder the page cannot resolve', () => {
   const cases: readonly [string, GraphSnapshot | null, Readonly<Record<string, string>> | undefined, string][] = [
     ['deleted', library([{ entityId: PLACE, displayName: 'Mireland Hall' }], [PLACE]), NAMES, 'no longer in your library'],
+    [
+      'unnamed after its name was taken back',
+      library([{ entityId: PLACE, displayName: null, assertions: [naming('Mireland Hall', 'retracted')] }]),
+      NAMES,
+      'you have not named',
+    ],
     ['merged', library([{ entityId: PLACE, displayName: 'Mireland Hall', mergedInto: PERSON }]), NAMES, 'you merged into another'],
     ['unnamed', library([{ entityId: PLACE, displayName: null }]), NAMES, 'you have not named'],
     ['not in this library', library([]), NAMES, 'whose name this page has not loaded'],
@@ -179,6 +216,27 @@ describe('a placeholder the page cannot resolve', () => {
       expect(utterance.querySelector('.companion-name')?.hasAttribute('data-unresolved')).toBe(true);
     });
   }
+
+  it('says a person\'s consent was withdrawn, never that they were not named', () => {
+    // The graph keeps a withdrawn person's naming claim, active, with its value blanked.
+    const withdrawn = library([
+      { entityId: PERSON, displayName: null, assertions: [naming(null)] },
+      { entityId: PLACE, displayName: 'Mireland Hall' },
+    ]);
+    const utterance = drawn(
+      answer('[person A] was photographed at [place A].', NAMES),
+      companionNames(() => withdrawn),
+    );
+
+    const person = say('name.class.person').replace(/^a/, 'A');
+    expect(utterance.textContent).toBe(
+      `${person} whose consent was withdrawn was photographed at Mireland Hall.`,
+    );
+    expect(utterance.textContent).not.toContain('you have not named');
+    expect(utterance.querySelector('[data-unresolved]')?.getAttribute('data-unresolved')).toBe(
+      'withdrawn',
+    );
+  });
 
   it('begins a sentence with a capital where the placeholder began one', () => {
     const pieces = companionNames(() => library([])).restore(

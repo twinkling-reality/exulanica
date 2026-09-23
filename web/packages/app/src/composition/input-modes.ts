@@ -255,7 +255,9 @@ export function mountInputModes(deps: InputModeDependencies): MountedInputModes 
         }
         if (companion.panel.state() === 'open') {
           event.preventDefault();
-          companion.dismiss();
+          // A photograph a citation opened sits inside the Companion, so it is taken back first,
+          // whether or not the keyboard was in the panel when Escape was pressed.
+          if (!companion.panel.closeEvidence()) companion.dismiss();
           return;
         }
         if (deps.shellState().detailId !== null) {

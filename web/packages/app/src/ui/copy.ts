@@ -240,6 +240,7 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
   'evidence.opening': 'Opening the photograph.',
   'evidence.alt': 'The cited photograph',
   'evidence.unavailable': 'This photograph cannot be shown.',
+  'evidence.released': 'This page no longer holds its copy. Go back and open it again.',
   'evidence.takenOn': 'Taken on {date}.',
   'evidence.backToAnswer': 'Back to the answer',
 
@@ -253,6 +254,10 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
   'name.class.conversation': 'a conversation',
   'name.class.event': 'an event',
   'name.unresolved.not_named': '{thing} you have not named',
+  // Named once and withheld since, which the person review surface says as "Consent withdrawn".
+  // The account holder records a withdrawal on the person's behalf, so this says it happened and
+  // not who made it.
+  'name.unresolved.withdrawn': '{thing} whose consent was withdrawn',
   'name.unresolved.merged': '{thing} you merged into another',
   'name.unresolved.removed': '{thing} no longer in your library',
   'name.unresolved.not_loaded': '{thing} whose name this page has not loaded',

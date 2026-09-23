@@ -333,7 +333,10 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
       // Drawn inside the Companion: the masked read's photograph, or the reason it is not one.
       // The date is the citation's own, which only an answer's citations carry.
       const cited = controller.answer()?.evidence[index];
-      panel.showEvidence(deps.evidence.open(handle), cited?.capturedAt ?? null);
+      panel.showEvidence(deps.evidence.open(handle), {
+        index,
+        capturedAt: cited?.capturedAt ?? null,
+      });
     },
     onSay: (text) => {
       controller.say(text);
