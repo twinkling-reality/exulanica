@@ -1,0 +1,67 @@
+"""Run one timing command only while the CPU is idle: at least 70 percent over 10 s before it starts
+(retried up to 240 s), sampled every 2 s while it runs (the command discards itself below 50).
+
+    python3 gate.py -- COMMAND...     (inside quiet-slot, and gpu-slot for browser timing)
+
+The samples file reaches the command as LANE_IDLE_SAMPLES. One line per run goes to runs/gates.jsonl.
+Same rule as the world-scale lane's gated.py; written again here because that file is evidence.
+"""
+import json, os, subprocess, sys, threading, time
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+LEDGER = HERE / "runs" / "gates.jsonl"
+
+
+def interval_idle(seconds):
+    done = subprocess.run(["iostat", "-C", "-w", str(seconds), "-c", "2", "-n", "0"],
+                          capture_output=True, text=True, check=True)
+    rows = [line.split() for line in done.stdout.splitlines() if line.strip()[:1].isdigit()]
+    return int(rows[-1][2])
+
+
+def main():
+    command = sys.argv[sys.argv.index("--") + 1:]
+    LEDGER.parent.mkdir(parents=True, exist_ok=True)
+    record = {"command": " ".join(command)[:300], "load_before": os.getloadavg(), "pre": []}
+    deadline = time.monotonic() + 240
+    while True:
+        idle = interval_idle(10)
+        record["pre"].append(idle)
+        if idle >= 70:
+            break
+        if time.monotonic() >= deadline:
+            record["verdict"] = "refused: not idle"
+            LEDGER.open("a").write(json.dumps(record) + "\n")
+            print("gate: refused, idle", idle, flush=True)
+            raise SystemExit(75)
+    samples_path = HERE / "runs" / f"idle-{time.strftime('%Y%m%dT%H%M%S')}-{os.getpid()}.jsonl"
+    samples = samples_path.open("w")
+    monitor = subprocess.Popen(["iostat", "-C", "-w", "2", "-n", "0"], stdout=subprocess.PIPE, text=True)
+
+    def read():
+        first = True
+        for line in monitor.stdout:
+            parts = line.split()
+            if not parts or not parts[0].isdigit():
+                continue
+            if first:
+                first = False
+                continue
+            samples.write(json.dumps({"t": time.time(), "idle": int(parts[2])}) + "\n")
+            samples.flush()
+
+    threading.Thread(target=read, daemon=True).start()
+    env = dict(os.environ, LANE_IDLE_SAMPLES=str(samples_path))
+    started = time.time()
+    rc = subprocess.run(command, env=env).returncode
+    monitor.terminate()
+    record.update(exit=rc, seconds=round(time.time() - started, 1), load_after=os.getloadavg(),
+                  samples=str(samples_path), at=time.strftime("%Y-%m-%dT%H:%M:%S%z"))
+    LEDGER.open("a").write(json.dumps(record) + "\n")
+    print("gate: exit", rc, "pre idle", record["pre"][-1], flush=True)
+    raise SystemExit(rc)
+
+
+if __name__ == "__main__":
+    main()

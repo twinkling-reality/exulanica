@@ -1,0 +1,390 @@
+"""Write the digest-bound record of what opening a saved world with inhabitants costs.
+
+    LANE_SCRATCH=DIR .venv/bin/python -B .exulanica/lane-society/write_open_cost_record.py
+
+LANE_SCRATCH names the directory holding the frozen copies, before-tree and after-tree. It is given
+at run time because it is a machine location, and this file is published beside the record.
+
+Ignored evidence script. Reads the run files the two measurements wrote (open_cost.py on the frozen
+copies, open_prod.mjs through open_arm.zsh on the release build), copies them and the scripts that
+made them into docs/evaluation/artifacts/2026-09-23-society-open-cost/ with machine paths replaced
+by names, and writes docs/evaluation/2026-09-23-society-open-cost.json. Every figure in the record
+is computed here from those files; none is typed.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import os
+import platform
+import re
+import subprocess
+import sys
+import tempfile
+from datetime import UTC, datetime
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+WORKTREE = HERE.parents[1]
+sys.path.insert(0, str(WORKTREE))
+
+from exulanica.canonical import canonical_json  # noqa: E402
+
+NAME = "2026-09-23-society-open-cost"
+RECORD = WORKTREE / "docs" / "evaluation" / f"{NAME}.json"
+ARTIFACTS = WORKTREE / "docs" / "evaluation" / "artifacts" / NAME
+if "LANE_SCRATCH" not in os.environ:
+    raise SystemExit("set LANE_SCRATCH to the directory holding before-tree and after-tree")
+SCRATCH = Path(os.environ["LANE_SCRATCH"])
+FROZEN = {arm: SCRATCH / f"{arm}-tree" / ".exulanica" / "lane-society" / "runs" for arm in ("before", "after")}
+RELEASE = HERE / "runs" / "open-prod"
+SIZES = (1, 25, 100, 400)
+
+#: Machine locations, longest first, and the names the published copies carry instead. Each is
+#: computed or given at run time; none is written here.
+NAMES = (
+    (str(SCRATCH / "before-tree"), "<frozen-copy-before>"),
+    (str(SCRATCH / "after-tree"), "<frozen-copy-after>"),
+    (str(SCRATCH), "<scratch>"),
+    (str(WORKTREE), "<worktree>"),
+    (str(WORKTREE.parent / "orimera"), "<main-checkout>"),
+    (str(Path("/tmp/exulanica-0922-acceptance") / WORKTREE.name), "<slot-run-root>"),
+    (tempfile.gettempdir(), "<private-postgres-root>"),
+    (str(Path.home()), "<home>"),
+)
+#: What no published file may carry, built at run time or from parts so this file does not carry
+#: it either: a home directory, the system's private and temporary roots, a session's scratch
+#: folder name, this session's id and the account's user name.
+FORBIDDEN = (
+    "/" + "Users/",
+    "/" + "private",
+    "/" + "var/folders",
+    "claude" + "-",
+    SCRATCH.parent.name,
+    Path.home().name,
+)
+
+
+def named(text: str) -> str:
+    for path, name in NAMES:
+        text = text.replace(path, name)
+    carried = [fragment for fragment in FORBIDDEN if fragment in text]
+    if carried:
+        raise SystemExit(f"{len(carried)} machine fragments survived the naming: refusing to publish")
+    return text
+
+
+def sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def publish(source: Path, relative: str) -> dict:
+    data = named(source.read_text(encoding="utf-8")).encode()
+    target = ARTIFACTS / relative
+    target.parent.mkdir(parents=True, exist_ok=True)
+    target.write_bytes(data)
+    return {"path": f"docs/evaluation/artifacts/{NAME}/{relative}", "byte_size": len(data), "sha256": sha256(data)}
+
+
+def point(series: dict, inputs: int) -> dict:
+    [found] = [p for p in series["points"] if p["inputs"] == inputs]
+    return found
+
+
+def ms(us: int | None) -> str:
+    """Milliseconds for prose only; the record's figures stay integer microseconds."""
+    return "unmeasured" if us is None else f"{us / 1000:.1f}"
+
+
+def idle_summary(summary: dict) -> dict:
+    """An idle summary with its mean as integer tenths, since a digest input holds no float."""
+    return {"samples": summary["samples"], "mean_tenths": round(summary["mean"] * 10), "min": summary["min"]}
+
+
+def main() -> None:
+    if RECORD.exists():
+        raise SystemExit(f"{RECORD.name} exists; a record is never rewritten")
+    in_process = {arm: json.loads((FROZEN[arm] / f"open-{arm}.json").read_text()) for arm in FROZEN}
+    release = {arm: json.loads((RELEASE / f"open-prod-{arm}.json").read_text()) for arm in ("after", "before")}
+    for arm, run in release.items():
+        idle = run["idle_during"]
+        if idle is None or idle["mean"] is None or idle["mean"] < 50:
+            raise SystemExit(f"release arm {arm} has no usable idle record: {idle}")
+        if run["label"] != arm:
+            raise SystemExit(f"release file for {arm} says it is {run['label']}")
+    for arm, run in in_process.items():
+        if run["idle_during"]["mean"] < 50:
+            raise SystemExit(f"in-process arm {arm} ran below 50 percent idle")
+
+    files = []
+    scripts = {
+        "open_cost.py": FROZEN["after"].parent / "open_cost.py",
+        "gate.py": HERE / "gate.py",
+        "open_prod.mjs": HERE / "open_prod.mjs",
+        "open_arm.zsh": HERE / "open_arm.zsh",
+        "build_release.zsh": HERE / "build_release.zsh",
+        "write_open_cost_record.py": Path(__file__),
+    }
+    for name, path in scripts.items():
+        files.append(publish(path, f"scripts/{name}.txt"))
+    for arm in FROZEN:
+        files.append(publish(FROZEN[arm] / f"open-{arm}.json", f"runs/in-process-{arm}.json"))
+        files.append(publish(FROZEN[arm] / f"open-{arm}.log", f"runs/in-process-{arm}.log.txt"))
+        files.append(publish(FROZEN[arm] / "gates.jsonl", f"runs/in-process-{arm}-gates.jsonl.txt"))
+        [idle] = sorted(FROZEN[arm].glob("idle-*.jsonl"))
+        files.append(publish(idle, f"runs/in-process-{arm}-idle.jsonl.txt"))
+    for arm in release:
+        files.append(publish(RELEASE / f"open-prod-{arm}.json", f"runs/release-{arm}.json"))
+        files.append(publish(RELEASE / f"{arm}-files-at-start.txt", f"runs/release-{arm}-files-at-start.txt"))
+    files.append(publish(RELEASE / "build.log", "runs/release-build.log.txt"))
+    for arm in ("after", "before"):
+        files.append(publish(RELEASE / f"{arm}-preview.log", f"runs/release-{arm}-preview.log.txt"))
+    files.append(publish(HERE / "runs" / "diagnosis-events.txt", "runs/diagnosis-events.txt"))
+    files.append(publish(HERE / "diag_events.py", "scripts/diag_events.py.txt"))
+    files.append(publish(RELEASE / "build.json", "runs/release-build.json"))
+    files.append(publish(RELEASE / "before-files-measured.txt", "runs/release-before-files-measured.txt"))
+    files.append(publish(RELEASE / "before-files-restored.txt", "runs/release-before-files-restored.txt"))
+    for patch in sorted(RELEASE.glob("targeted-reads-*.patch")):
+        files.append(publish(patch, f"runs/{patch.name}.txt"))
+    ledger = [json.loads(line) for line in (HERE / "runs" / "gates.jsonl").read_text().splitlines() if line]
+    release_gates = [entry for entry in ledger if "open_prod.mjs" in entry["command"]]
+    files.append(publish(HERE / "runs" / "gates.jsonl", "runs/release-gates.jsonl.txt"))
+    for entry in release_gates:
+        samples = Path(entry["samples"])
+        files.append(publish(samples, f"runs/release-{samples.name}.txt"))
+    for arm in FROZEN:
+        if (FROZEN[arm].parent / "gate.py").read_bytes() != (HERE / "gate.py").read_bytes():
+            raise SystemExit(f"the {arm} copy ran a different gate.py")
+
+    def table(series: dict, key: str) -> dict:
+        return {str(size): point(series, size)[key]["p50_us"] for size in SIZES}
+
+    def prose(values: dict) -> str:
+        return ", ".join(ms(values[str(size)]) for size in SIZES)
+
+    in_open = {arm: table(in_process[arm], "open") for arm in in_process}
+    in_step = {arm: table(in_process[arm], "step") for arm in in_process}
+    rel_open = {arm: table(release[arm], "submit_to_shown") for arm in release}
+    rel_done = {arm: table(release[arm], "submit_to_reads_done") for arm in release}
+    rel_read = {arm: table(release[arm], "society_read") for arm in release}
+    rel_events = {arm: table(release[arm], "events_read") for arm in release}
+    per_input_before = f"{(in_open['before']['400'] - in_open['before']['1']) / 399 / 1000:.2f}"
+    rel_per_input_before = f"{(rel_open['before']['400'] - rel_open['before']['1']) / 399 / 1000:.2f}"
+    after_step_max_400 = ms(point(in_process["after"], 400)["step"]["max_us"])
+    replay = {arm: ms(point(in_process[arm], 400)["replay_us"]) for arm in in_process}
+
+    def changed(path: Path) -> set[str]:
+        return {
+            line
+            for line in path.read_text().splitlines()
+            if line[:1] in "+-" and not line.startswith(("+++", "---"))
+        }
+
+    patch_difference = {
+        name: sorted(
+            changed(RELEASE / f"targeted-reads-{name}.patch")
+            ^ changed(RELEASE / f"targeted-reads-in-process-{name}.patch")
+        )
+        for name in ("society_repository.py", "society_control_repository.py")
+    }
+    before_400 = point(release["before"], 400)["runs"]
+    censored = [run for run in before_400 if run["events_read_us"] is None]
+    if censored:
+        bound_ms = round(min(run["submit_to_shown_us"] for run in censored) / 1000 + 1500)
+        censored_sentence = (
+            f"At 400 inputs with every input validated, the events and control reads left no "
+            f"Resource Timing entry by the time the driver read the timeline, 1.5 s after the "
+            f"society was shown, in {len(censored)} of {len(before_400)} opens, so their durations "
+            "are unmeasured. Either they had not ended, in which case each ended more than "
+            f"{bound_ms} ms after its form was submitted, or the page's timeline buffer (250 "
+            "entries by default) was full; the entry count was not recorded, so which is not "
+            "established."
+        )
+    else:
+        censored_sentence = "Every open's three reads ended before the driver read them."
+    diagnosis = (HERE / "runs" / "diagnosis-events.txt").read_text()
+    counted = re.findall(
+        r"inputs (\d+): (\d+) events naming (\d+) distinct inputs .*?; (\d+) authorizations", diagnosis
+    )
+    if [int(size) for size, *_ in counted] != [25, 100, 400]:
+        raise SystemExit("the diagnosis does not hold the three sizes")
+    diagnosis_sentence = ", ".join(
+        f"{named} distinct inputs named by {events} events and {calls} authorizations at {size}"
+        for size, events, named, calls in counted
+    )
+    build = json.loads((RELEASE / "build.json").read_text())
+    browser = release["after"]["browser"]
+    record = {
+        "profile": "exulanica.society-open-cost/v1",
+        "subject": "opening a saved world with inhabitants, against the inputs its history holds",
+        "question": (
+            "Does opening a saved world with inhabitants cost more the more edits its history "
+            "holds, and does reading only the inputs a read shows or consumes remove that growth?"
+        ),
+        "tree": {
+            "head": release["after"]["tree"]["head"],
+            "release_after_arm": release["after"]["tree"],
+            "release_before_arm": release["before"]["tree"],
+            "difference_between_arms": (
+                "exactly runs/targeted-reads-society_repository.py.patch.txt and "
+                "runs/targeted-reads-society_control_repository.py.patch.txt, reversed for the "
+                "before arm and put back after it (runs/release-before-files-*.txt)"
+            ),
+            "in_process_copies": (
+                "frozen copies of the lane tree (e9dee3c2 plus its working changes at the time), "
+                "before and after differing only in runs/targeted-reads-in-process-*.patch.txt"
+            ),
+            "patch_lines_differing_between_release_and_in_process": patch_difference,
+            "rule": (
+                "The release arms ran on the lane tree the launcher recorded (head plus a working "
+                "diff, digest in release_*_arm). The in-process arms ran on frozen copies made "
+                "earlier from the same lane tree; they measure the same patch, not the final tree."
+            ),
+        },
+        "build": build,
+        "machine": {
+            "hardware_model": subprocess.run(["sysctl", "-n", "hw.model"], capture_output=True, text=True).stdout.strip(),
+            "logical_cpus": int(subprocess.run(["sysctl", "-n", "hw.logicalcpu"], capture_output=True, text=True).stdout),
+            "memory_bytes": int(subprocess.run(["sysctl", "-n", "hw.memsize"], capture_output=True, text=True).stdout),
+            "os": f"macOS {platform.mac_ver()[0]}",
+            "node": subprocess.run(["node", "-v"], capture_output=True, text=True).stdout.strip(),
+            "browser": browser,
+            "postgresql": re.sub(r"^postgres \(PostgreSQL\) ", "", subprocess.run(
+                ["/opt/homebrew/opt/postgresql@18/bin/postgres", "--version"], capture_output=True, text=True
+            ).stdout.strip()),
+        },
+        "method": {
+            "world": (
+                "a starter saved world on the endless ground holding one Marker plate 0.5 m in "
+                "front of the arrival point, inhabitants brought in with profile "
+                "exulanica-society/v2 at the population the product creates, ten simulated minutes "
+                "advanced; the history grows by moving the plate back and forth by 100 mm, each "
+                "move an accepted edit and so one stored input, then one minute consumes them"
+            ),
+            "in_process": (
+                "open_cost.py: the three repository reads a world's opening makes (society with "
+                "places, events, playback control) and ten steps, on a private PostgreSQL server "
+                "as the runtime role, eight opens per size; no HTTP"
+            ),
+            "release_build": (
+                "open_prod.mjs through open_arm.zsh: the app built with vite build (no token in "
+                "its environment) and served by vite preview against a fresh slot runtime per arm; "
+                "each open a new document in headless Chrome, the slot's token typed into the "
+                "access form; submit_to_shown runs from the form's submit click to the moment the "
+                "page hands the society's current minute to the renderer; read durations are "
+                "Resource Timing durations through the preview's proxy; one warm-up open, then "
+                "five per size. The bundle reads VITE_EXULANICA_TOKEN from an environment object "
+                "holding BASE_URL, DEV, MODE, PROD and SSR only, so the page asks for the token; "
+                "the line build_release.zsh printed about the token variable reports that lookup, "
+                "not a value"
+            ),
+            "gating": (
+                "quiet-slot then gpu-slot (release) or quiet-slot (in-process), and gate.py: at "
+                "least 70 percent idle over 10 s before a run, a run discarded below 50 percent "
+                "mean idle during it"
+            ),
+        },
+        "series": {
+            "in_process_open_p50_us": in_open,
+            "in_process_step_p50_us": in_step,
+            "release_submit_to_shown_p50_us": rel_open,
+            "release_submit_to_reads_done_p50_us": rel_done,
+            "release_society_read_p50_us": rel_read,
+            "release_events_read_p50_us": rel_events,
+            "idle_during": {
+                "in_process": {arm: idle_summary(in_process[arm]["idle_during"]) for arm in in_process},
+                "release": {arm: idle_summary(release[arm]["idle_during"]) for arm in release},
+            },
+        },
+        "claims": {
+            "measured": [
+                f"In process, opening at 1, 25, 100 and 400 stored inputs took "
+                f"{prose(in_open['before'])} ms (p50) when every read validated every stored "
+                f"input, and {prose(in_open['after'])} ms when a read loads and validates only "
+                "the inputs it shows or consumes.",
+                f"In the release build, from submitting the access form to the page handing the "
+                f"society's minute to the renderer took {prose(rel_open['before'])} ms (p50) with "
+                f"every read validating every input and {prose(rel_open['after'])} ms with the "
+                f"targeted reads; the society read itself {prose(rel_read['before'])} ms and "
+                f"{prose(rel_read['after'])} ms.",
+                f"The events read in the release build took {prose(rel_events['before'])} ms (p50) "
+                f"with every read validating every input and {prose(rel_events['after'])} ms with "
+                "the targeted reads. " + censored_sentence,
+                f"A step at 400 stored inputs took {ms(in_step['before']['400'])} ms (p50) before "
+                f"and {ms(in_step['after']['400'])} ms after in process.",
+                f"Replay, which still validates the whole chain, took {replay['before']} ms and "
+                f"{replay['after']} ms at 400 inputs in process.",
+            ],
+            "inferred": [
+                f"Every-input validation added about {per_input_before} ms per stored input to an "
+                f"in-process open and {rel_per_input_before} ms to the release build's time to "
+                "show the world: the slope between 1 and 400 inputs, one world shape.",
+                "The events read with targeted reads still grows with history because it "
+                "authorizes every input its page of events names, and each authorization reads the "
+                "authored version with its whole edit list (SocietyRuntime._authored_version, "
+                "WorldObjectRepository.version). A diagnosis of the same world shape in process, "
+                "ungated and not a timing figure (runs/diagnosis-events.txt), counted "
+                + diagnosis_sentence
+                + "; cProfile there attributes the call's time to authorization, the input "
+                "validation it repeats, and the edit list.",
+                f"The in-process after arm's slowest step at 400 inputs, {after_step_max_400} ms, "
+                "is the first step after the 399 edits, which consumes all of them; per-step "
+                "times were not recorded, so which step it was is inferred from the code.",
+            ],
+            "observed_by_eye": [],
+            "assumed": [
+                "That one plate moved back and forth stands for edits in general. Inputs grow with "
+                "what a world holds, so every-input validation costs more per input in a fuller "
+                "world, and the targeted read's one input costs more too.",
+                "That the curve continues past 400 stored inputs. The count _chain makes over a "
+                "society's inputs grows with history; it was not measured separately.",
+            ],
+        },
+        "incidents": [
+            "open_arm.zsh stopped the preview only if the recorded pid's command line contained "
+            "'vite preview'; pnpm's wrapper execs node, whose command line reads 'vite.js "
+            "preview', so the check failed and the after arm's preview kept running. The before "
+            "arm's own preview then failed to bind port 19229 "
+            "(runs/release-before-preview.log.txt), so the before arm's opens were served by the "
+            "after arm's preview process: the same prod-dist and the same proxy target, "
+            "127.0.0.1:19226, which by then was the before arm's freshly launched API "
+            "(release-before.json names its tree and the exulanica it imported). The orphan was "
+            "stopped at the end of the lane's measurements.",
+        ],
+        "not_measured": [
+            "Worlds holding more than one object, and societies above the product's population.",
+            "Histories longer than 400 stored inputs.",
+            "Frame times; this measures reads and the hand-off to the renderer, not drawing.",
+            "The before arm's events and control reads at 400 inputs, beyond the bound stated.",
+            "Edits spread over many minutes, the ordinary pattern, where a page of events names "
+            "few inputs; every size here consumed its edits in one minute.",
+        ],
+        "artifacts": {
+            "directory": f"docs/evaluation/artifacts/{NAME}",
+            "files": files,
+            "substitutions": [f"{name} stands for a machine path" for _, name in NAMES],
+        },
+        "how_to_rerun": [
+            "Restore the scripts: copy scripts/*.txt to their names without .txt beside a lane "
+            "worktree at the head above, with the lane's working changes applied.",
+            "In process: freeze a copy of the tree with and without the targeted-read patches and "
+            "run quiet-slot .venv/bin/python -B gate.py -- .venv/bin/python -B open_cost.py --out "
+            "FILE --inputs 1,25,100,400 --ticks 10 --opens 8 in each copy.",
+            "Release build: vite build --outDir prod-dist from web/packages/app with no token in "
+            "the environment, then quiet-slot gpu-slot zsh open_arm.zsh after, then the same with "
+            "before.",
+        ],
+        "written_at": datetime.now(UTC).isoformat(timespec="seconds"),
+    }
+    sealed = {"profile": "exulanica.digest-bound-record/v1", "record": record}
+    sealed["record_sha256"] = sha256(canonical_json(record))
+    text = json.dumps(sealed, indent=2, sort_keys=True) + "\n"
+    if any(fragment in text for fragment in FORBIDDEN):
+        raise SystemExit("the record carries a machine path")
+    RECORD.write_text(text)
+    print(RECORD.relative_to(WORKTREE), sealed["record_sha256"])
+
+
+if __name__ == "__main__":
+    main()

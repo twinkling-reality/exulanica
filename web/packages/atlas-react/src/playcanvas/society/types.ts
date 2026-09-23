@@ -4,12 +4,13 @@ import type { CharacterSubject, ResolvedCharacterRepresentation } from '@exulani
 export type SocietyProfile =
   | 'exulanica-society/v1'
   | 'exulanica-society/v2'
+  | 'exulanica-society/v3'
   | 'exulanica-society/v4';
 
-/** The v2 goal: one reviewed affordance at one target. */
+/** The v2 goal: one reviewed affordance at one target, or a walk that makes room at a busy destination, which names no target. */
 export interface PurposefulGoal {
-  readonly kind: 'visit' | 'rest';
-  readonly target_id: string;
+  readonly kind: 'visit' | 'rest' | 'make_room';
+  readonly target_id: string | null;
   readonly reason: string;
 }
 
@@ -96,6 +97,12 @@ export interface CrowdPose {
   readonly deltaSeconds: number;
   readonly reducedMotion?: boolean;
   readonly discontinuity?: boolean;
+  /**
+   * What the person is doing where they stand, as the state says: the kind of an action under way,
+   * such as `rest`, or null. A renderable that draws postures draws the one its catalog declares for
+   * it; one that draws none, like the abstract figure, stands.
+   */
+  readonly activity?: string | null;
 }
 
 /**

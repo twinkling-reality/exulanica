@@ -51,6 +51,7 @@ from exulanica.selection.plan import (
 from exulanica.selection.validation import STATEMENT_TIMEOUT_MS, ValidatedPlan
 from exulanica.store.base import ContentAddressedStore
 from exulanica.world.society import UnavailableSocietyInput
+from exulanica.world.society_engines import INPUT_ENGINES, LEGACY_ENGINES
 from exulanica.world.society_planner import validate_input_successor, validate_society_input
 
 __all__ = [
@@ -396,7 +397,7 @@ select 'synthetic_inhabitant','simulated','inhabitant',null::text,
   join selected_places selected on selected.place_id=s.place_id
   cross join lateral jsonb_array_elements(s.state->'inhabitants') inhabitant
  where s.workspace_id=%(workspace)s
-   and (s.engine_version='exulanica-society/v1'
+   and (s.engine_version=any(%(legacy_engines)s::text[])
         or s.society_id=any(%(authorized_societies)s::uuid[]))
 union all
 select 'simulation_event','simulated','event',null::text,
@@ -416,7 +417,7 @@ select 'simulation_event','simulated','event',null::text,
     on s.workspace_id=e.workspace_id and s.society_id=e.society_id
   join selected_places selected on selected.place_id=e.place_id
  where e.workspace_id=%(workspace)s
-   and (s.engine_version='exulanica-society/v1'
+   and (s.engine_version=any(%(legacy_engines)s::text[])
         or s.society_id=any(%(authorized_societies)s::uuid[]))
 """
 )
@@ -439,9 +440,8 @@ def _authorized_societies(
         "join confirmed_place_entity_bridge b "
         "on b.workspace_id=s.workspace_id and b.place_id=s.place_id "
         "where s.workspace_id=%s and b.entity_id=any(%s::uuid[]) "
-        "and s.engine_version in "
-        "('exulanica-society/v2','exulanica-society/v3','exulanica-society/v4')",
-        (validated.workspace_id, list(validated.place_ids)),
+        "and s.engine_version=any(%s::text[])",
+        (validated.workspace_id, list(validated.place_ids), list(INPUT_ENGINES)),
     ).fetchall()
     allowed = []
     for society in societies:
@@ -491,6 +491,9 @@ def _matching_content(
     parameters: dict[str, object] = {
         "workspace": validated.workspace_id,
         "place_ids": list(validated.place_ids),
+        # Engines that read no input are visible without input authorisation; the engine table
+        # says which, so this query never restates a list of engines.
+        "legacy_engines": list(LEGACY_ENGINES),
         "authorized_societies": (
             _authorized_societies(connection, validated, society_authorizer)
             if plan.content.scope is not ContentScope.MEMORIES_ONLY

@@ -1,0 +1,62 @@
+{
+  "default_engine": "exulanica-society/v1",
+  "engines": [
+    {
+      "directed_actions": false,
+      "engine": "exulanica-society/v1",
+      "experiments": false,
+      "model_decisions": false,
+      "playback": false,
+      "playback_refusal": "legacy_society_not_playable",
+      "population": {"maximum": 512, "minimum": 100},
+      "presence": false,
+      "reason": "Seeded synthetic motion over a district. It reads no authorised input, so an edit never reaches it and nothing but its own seed decides where anybody goes; the worker does not play it, and it holds the 100 to 512 people a district was sized for.",
+      "saved_world": false,
+      "state_family": "legacy",
+      "takes_inputs": false
+    },
+    {
+      "directed_actions": true,
+      "engine": "exulanica-society/v2",
+      "experiments": false,
+      "model_decisions": false,
+      "playback": true,
+      "playback_refusal": null,
+      "population": {"maximum": 512, "minimum": 1},
+      "presence": true,
+      "reason": "Purposeful goals, routes and the two reviewed activities over authorised inputs, with typed user-directed actions, and the person whose world it lives in can send its people away and bring them back. It stands on a district or on a saved world's own ground, where it starts with a handful of people, so its floor is one; a district's floor of 100 is the initializer's.",
+      "saved_world": true,
+      "state_family": "purposeful",
+      "takes_inputs": true
+    },
+    {
+      "directed_actions": true,
+      "engine": "exulanica-society/v3",
+      "experiments": false,
+      "model_decisions": true,
+      "playback": true,
+      "playback_refusal": null,
+      "population": {"maximum": 512, "minimum": 1},
+      "presence": false,
+      "reason": "The purposeful society plus a bounded cast with local observations, communicated beliefs and explicitly requested, validated model proposals. Its state carries every purposeful field and a social block. Its people are not sent away: its cast would leave and return with memories this version does not model.",
+      "saved_world": true,
+      "state_family": "purposeful",
+      "takes_inputs": true
+    },
+    {
+      "directed_actions": false,
+      "engine": "exulanica-society/v4",
+      "experiments": true,
+      "model_decisions": false,
+      "playback": true,
+      "playback_refusal": null,
+      "population": {"maximum": 65536, "minimum": 1},
+      "presence": false,
+      "reason": "The living society: catalogued routines, occupancy and a population sized to its place. Its place contract reads streets, occupancy and stated surface heights, which a saved world's flat ground does not state, so it stands on a district only; it takes no directed actions or model decisions.",
+      "saved_world": false,
+      "state_family": "living",
+      "takes_inputs": true
+    }
+  ],
+  "profile": "exulanica.society-engines/v1"
+}

@@ -15,17 +15,40 @@
 
 import { ApiError, Transport, type TransportOptions } from '@exulanica/graph-client';
 import type { OwnedSocietyState } from '@exulanica/atlas-react/playcanvas';
+import { DEFAULT_SOCIETY_ENGINE, societyEngine, type SocietyEngineProfile } from './society-engines.js';
 
 export interface SocietySnapshot {
   readonly societyId: string;
   readonly versionId: string;
   readonly placeId: string;
+  /** How many people the society was created with, whether or not they are here now. */
   readonly populationSize: number;
   readonly currentTick: number;
   readonly stateSha256: string;
   readonly state: OwnedSocietyState;
   /** Where inhabitants can go, when the read asked for it; null otherwise. */
   readonly places: SocietyPlaces | null;
+  /** Whether the people are here, or were sent away, and since which simulated minute. */
+  readonly presence: SocietyPresence;
+}
+
+/** Everyone here, or everyone sent away by the person whose world it is. */
+export interface SocietyPresence {
+  readonly status: 'here' | 'away';
+  /** The simulated minute of the last change, or null when nobody was ever sent away. */
+  readonly sinceTick: number | null;
+}
+
+const EVERYONE_HERE: SocietyPresence = Object.freeze({ status: 'here', sinceTick: null });
+
+function presenceOf(state: Readonly<Record<string, unknown>>): SocietyPresence {
+  if (state['presence'] === undefined) return EVERYONE_HERE;
+  const held = record(state['presence']);
+  if (!['here', 'away'].includes(String(held['status'])) || !integer(held['since_tick'], 1) ||
+      !textValue(held['request_id']) || !digest(held['request_sha256'])) {
+    throw new Error('Invalid society presence');
+  }
+  return Object.freeze({ status: held['status'] as 'here' | 'away', sinceTick: held['since_tick'] as number });
 }
 
 export type SocietyAffordance = 'visit' | 'rest';
@@ -39,6 +62,11 @@ export interface SocietyPlace {
   readonly affordance: SocietyAffordance;
   readonly durationTicks: number;
   readonly enabled: boolean;
+  /**
+   * Where its occupants stand, one person to a place, when the input states places; empty for
+   * an input that does not, where the activity is used at its access node with no limit.
+   */
+  readonly placeNodeIds: readonly string[];
 }
 
 /** An object's activity the input says no inhabitant can reach, with the server's reason. */
@@ -219,14 +247,19 @@ function placesOf(row: Readonly<Record<string, unknown>>): SocietyPlaces | null 
     clearanceMm: places['clearance_mm'] as number,
     targets: Object.freeze(targets.map((value) => {
       const target = record(value);
+      const places = target['place_node_ids'];
       if (!textValue(target['target_id']) || !textValue(target['subject_id']) ||
           !(target['object_id'] === null || textValue(target['object_id'])) ||
           !affordance(target['affordance']) || !integer(target['duration_ticks'], 1) ||
-          typeof target['enabled'] !== 'boolean') throw new Error('Invalid society place');
+          typeof target['enabled'] !== 'boolean' ||
+          !(places === undefined || (Array.isArray(places) && places.length > 0 && places.every(textValue)))) {
+        throw new Error('Invalid society place');
+      }
       return Object.freeze({
         targetId: target['target_id'], subjectId: target['subject_id'],
         objectId: target['object_id'] as string | null, affordance: target['affordance'],
         durationTicks: target['duration_ticks'] as number, enabled: target['enabled'] as boolean,
+        placeNodeIds: Object.freeze([...((places ?? []) as string[])]),
       });
     })),
     unreachable: Object.freeze(unreachable.map((value) => {
@@ -246,7 +279,14 @@ function placesOf(row: Readonly<Record<string, unknown>>): SocietyPlaces | null 
 export function parseSociety(value: unknown): SocietySnapshot {
   const row = record(value);
   const state = record(row['state']);
-  if (state['profile'] === 'exulanica-society/v4') {
+  // Which reader applies, and how many people the engine may hold, come from the engine table;
+  // an engine it does not state is refused by name. A state that names no profile is the
+  // default engine's, the one a society is created with when a request names none.
+  const engine = societyEngine(state['profile'] ?? DEFAULT_SOCIETY_ENGINE);
+  if (!boundedInteger(row['population_size'], engine.populationMinimum, engine.populationMaximum)) {
+    throw new Error('Invalid society response');
+  }
+  if (engine.stateFamily === 'living') {
     if (!textValue(row['society_id']) || !textValue(row['version_id']) || !textValue(row['place_id']) ||
         !integer(row['current_tick']) || state['tick'] !== row['current_tick'] || !digest(row['state_sha256'])) {
       throw new Error('Invalid society response');
@@ -254,18 +294,19 @@ export function parseSociety(value: unknown): SocietySnapshot {
     return Object.freeze({
       societyId: row['society_id'], versionId: row['version_id'], placeId: row['place_id'],
       populationSize: row['population_size'] as number, currentTick: row['current_tick'], stateSha256: row['state_sha256'],
-      state: livingPresentation(row, state), places: placesOf(row),
+      state: livingPresentation(row, state), places: placesOf(row), presence: EVERYONE_HERE,
     });
   }
   const inhabitants = state['inhabitants'];
-  const v2 = state['profile'] === 'exulanica-society/v2';
-  // A purposeful society on a saved world's own ground holds a handful of people; the legacy
-  // society always holds at least 100.
+  const v2 = engine.stateFamily === 'purposeful';
+  // Sent away, a society holds nobody until the same people are brought back.
+  const presence = presenceOf(state);
+  const holding = presence.status === 'away' ? 0 : row['population_size'];
   if (!textValue(row['society_id']) || !textValue(row['version_id']) || !textValue(row['place_id']) ||
-      !integer(row['population_size'], v2 ? 1 : 100) || row['population_size'] > 512 ||
       !integer(row['current_tick']) || state['tick'] !== row['current_tick'] ||
-      !digest(row['state_sha256']) || !Array.isArray(inhabitants) || inhabitants.length !== row['population_size'] ||
-      (state['profile'] !== undefined && state['profile'] !== 'exulanica-society/v1' && !v2)) throw new Error('Invalid society response');
+      !digest(row['state_sha256']) || !Array.isArray(inhabitants) || inhabitants.length !== holding) {
+    throw new Error('Invalid society response');
+  }
   const ids = new Set<string>();
   for (const value of inhabitants) {
     const inhabitant = record(value);
@@ -286,8 +327,12 @@ export function parseSociety(value: unknown): SocietySnapshot {
     const end = path[path.length - 1] as readonly number[];
     if (end[0] !== inhabitant['position_mm'][0] || end[1] !== inhabitant['position_mm'][1]) throw new Error('Invalid society motion endpoint');
     if (inhabitant['goal'] !== null) {
+      // A goal is an activity at a target, or a walk that makes room at a busy destination,
+      // which names no target.
       const goal = record(inhabitant['goal']);
-      if (!['visit', 'rest'].includes(String(goal['kind'])) || !textValue(goal['target_id']) || !textValue(goal['reason'])) throw new Error('Invalid society goal');
+      const activity = ['visit', 'rest'].includes(String(goal['kind'])) && textValue(goal['target_id']);
+      const makingRoom = goal['kind'] === 'make_room' && goal['target_id'] === null;
+      if (!(activity || makingRoom) || !textValue(goal['reason'])) throw new Error('Invalid society goal');
     }
     if (inhabitant['route'] !== null) {
       const route = record(inhabitant['route']);
@@ -303,11 +348,12 @@ export function parseSociety(value: unknown): SocietySnapshot {
   return Object.freeze({
     societyId: row['society_id'], versionId: row['version_id'], placeId: row['place_id'],
     populationSize: row['population_size'], currentTick: row['current_tick'], stateSha256: row['state_sha256'],
-    state: state as unknown as OwnedSocietyState, places: v2 ? placesOf(row) : null,
+    state: state as unknown as OwnedSocietyState, places: v2 ? placesOf(row) : null, presence,
   });
 }
 
-export type SocietyProfile = 'exulanica-society/v1' | 'exulanica-society/v2' | 'exulanica-society/v4';
+/** Every engine profile the server's engine table states. */
+export type SocietyProfile = SocietyEngineProfile;
 
 /** Authorized persisted events. The endpoint returns only its latest bounded window. */
 export interface SocietyEvent {
@@ -326,17 +372,20 @@ export function parseSocietyEvents(value: unknown, snapshot: SocietySnapshot): r
   const rows = record(value)['events'];
   if (!Array.isArray(rows) || rows.length > 256) throw new Error('Invalid society events');
   const ids = new Set<string>();
+  // While everyone is away the state names nobody, yet the history still holds their events:
+  // those belong to the society's own people, whom the state will name again when they return.
   const subjects = new Set(snapshot.state.inhabitants.map(person => person.id));
+  const anyoneOfTheSociety = snapshot.presence.status === 'away';
   const events = rows.map(raw => {
     const row = record(raw), doc = record(row['document']);
     if (!textValue(row['event_id']) || ids.has(row['event_id']) ||
-        !textValue(row['subject_id']) || !subjects.has(row['subject_id']) ||
+        !textValue(row['subject_id']) || !(anyoneOfTheSociety || subjects.has(row['subject_id'])) ||
         !integer(row['tick']) || !textValue(row['event_kind']) ||
         !digest(row['document_sha256']) || doc['synthetic'] !== true || !textValue(doc['summary'])) {
       throw new Error('Invalid society event');
     }
     ids.add(row['event_id']);
-    const pathful = snapshot.state.profile === 'exulanica-society/v2' || snapshot.state.profile === 'exulanica-society/v4';
+    const pathful = societyEngine(snapshot.state.profile ?? DEFAULT_SOCIETY_ENGINE).takesInputs;
     if (pathful &&
         (doc['profile'] !== snapshot.state.profile || doc['branch_id'] !== snapshot.versionId ||
          doc['subject_id'] !== row['subject_id'] || doc['tick'] !== row['tick'] ||
@@ -499,6 +548,20 @@ export class SocietyClient {
       seed: '7a'.repeat(32),
       profile,
     }).then(value => boundSnapshot(value, versionId));
+  }
+
+  /**
+   * Send everyone away, or bring them back, against the state the person was shown. The server
+   * records the change as one simulated minute of history and answers with the new state; a
+   * refusal names what stands in the way (`nobody_to_send_away`, `already_here`, ...).
+   */
+  changePresence(snapshot: SocietySnapshot, presence: 'away' | 'here', idempotencyKey: string = crypto.randomUUID()): Promise<SocietySnapshot> {
+    return this.transport.postJson<unknown>(this.path(snapshot.versionId, '/presence'), {
+      idempotency_key: idempotencyKey,
+      presence,
+      base_tick: snapshot.currentTick,
+      base_state_sha256: snapshot.stateSha256,
+    }).then(value => boundSnapshot(value, snapshot.versionId));
   }
 
   /** The current state; `places` also reads where inhabitants can go. */

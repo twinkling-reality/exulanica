@@ -1,0 +1,214 @@
+"""In-process cost of opening a saved world's society, against how many inputs its history holds.
+
+    .venv/bin/python -B .exulanica/lane-society/open_cost.py --out FILE [--inputs 1,50,200,800]
+        [--ticks 60] [--opens 20]
+
+Opening a saved world with inhabitants makes three reads, in this order (live-society.ts and
+environment-selection.ts): the society with its places, its events, and its playback control.
+This calls the same three repository methods the routes call, on a private PostgreSQL 18 server
+as the non-owner runtime role through Database.session. HTTP, serialisation and the permission
+floor are left out. A history of N inputs is N-1 accepted edits after creation (the plate moved
+between two positions); then TICKS simulated minutes are advanced so events exist. Each point is
+a fresh saved world on the endless ground holding one marker plate, society profile v2, at the
+population the product creates.
+"""
+
+from __future__ import annotations
+
+import argparse
+import io
+import json
+import math
+import os
+import sys
+import tempfile
+import time
+import uuid
+from pathlib import Path
+
+WORKTREE = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(WORKTREE / "scripts"))
+sys.path.insert(0, str(WORKTREE))
+
+import psycopg  # noqa: E402
+
+import test_postgres  # noqa: E402
+from exulanica.api.society_runtime import SocietyRuntime  # noqa: E402
+from exulanica.db.cli import provision  # noqa: E402
+from exulanica.db.migrate import provision_workspace  # noqa: E402
+from exulanica.db.roles import RUNTIME_ROLE  # noqa: E402
+from exulanica.db.session import Database  # noqa: E402
+from exulanica.selection.validation import Session  # noqa: E402
+from exulanica.store.local import LocalContentAddressedStore  # noqa: E402
+from exulanica.world.assets import reviewed_assets, seed_reviewed_assets  # noqa: E402
+from exulanica.world.object_repository import WorldObjectRepository  # noqa: E402
+from exulanica.world.objects import AuthoredObject, ObjectOrigin, Transform  # noqa: E402
+from exulanica.world.society_composition import reviewed_affordance_registry  # noqa: E402
+from exulanica.world.society_control_repository import SocietyControlRepository  # noqa: E402
+from exulanica.world.society_repository import SocietyRepository  # noqa: E402
+from exulanica.world.starter import AUTHORED_STARTER_REGION_ID, create_starter_authorities  # noqa: E402
+
+PROFILE = "exulanica-society/v2"
+SEED = "7a" * 32
+IDLE_SAMPLES = os.environ.get("LANE_IDLE_SAMPLES")
+STARTED = time.time()
+
+
+def quantile(values, q):
+    ordered = sorted(values)
+    return ordered[min(len(ordered) - 1, max(0, math.ceil(q * len(ordered)) - 1))] if ordered else None
+
+
+def summary(values):
+    return {"n": len(values), "p50_us": quantile(values, 0.5), "p95_us": quantile(values, 0.95),
+            "max_us": quantile(values, 1.0), "min_us": quantile(values, 0.0)}
+
+
+def idle_during():
+    if IDLE_SAMPLES is None:
+        return None
+    values = [json.loads(line) for line in Path(IDLE_SAMPLES).read_text().splitlines() if line]
+    values = [v["idle"] for v in values if v["t"] >= STARTED]
+    return {"samples": len(values), "mean": round(sum(values) / len(values), 1) if values else None,
+            "min": min(values) if values else None}
+
+
+class Harness:
+    def __init__(self) -> None:
+        self.server, self.owner_url = test_postgres.start_test_server("lane-society-open")
+        previous = os.environ.get("EXULANICA_DATABASE_URL")
+        os.environ["EXULANICA_DATABASE_URL"] = self.owner_url
+        try:
+            provision(io.StringIO())
+        finally:
+            if previous is None:
+                os.environ.pop("EXULANICA_DATABASE_URL", None)
+            else:
+                os.environ["EXULANICA_DATABASE_URL"] = previous
+        self.database = Database(url=self.server.url(self.owner_url.rsplit("/", 1)[1], RUNTIME_ROLE))
+        self.workspace, self.actor = uuid.uuid4(), uuid.uuid4()
+        self.session = Session(workspace_id=self.workspace, actor=self.actor)
+        with psycopg.connect(self.owner_url, autocommit=True) as owner:
+            provision_workspace(owner, self.workspace)
+        self.tmp = Path(tempfile.mkdtemp(prefix="lane-society-open-"))
+        self.store = LocalContentAddressedStore(self.tmp / "blobs")
+        seed_reviewed_assets(self.store)
+        self.runtime = SocietyRuntime(store=self.store, reviewed_affordances=reviewed_affordance_registry())
+        self.plate = next(a for a in reviewed_assets() if a.asset_key == "cc0.marker-plate")
+
+    def close(self) -> None:
+        test_postgres.remove_test_server(self.server)
+
+    def objects(self, connection, world_id):
+        return WorldObjectRepository(
+            connection, self.workspace, world_id=world_id, store=self.store,
+            on_edit=lambda vid: self.runtime.authored_edit(connection, self.session, vid),
+        )
+
+    def societies(self, connection, world_id):
+        return SocietyRepository(
+            connection, self.workspace, world_id=world_id,
+            input_authorizer=lambda doc: self.runtime.authorize(connection, self.session, doc),
+        )
+
+    def world(self, connection):
+        world_id = f"world:authored:{uuid.uuid4()}"
+        with connection.transaction():
+            _, _, version_id = create_starter_authorities(
+                connection, workspace_id=self.workspace, actor=self.actor,
+                title="A world of my own", world_id=world_id)
+        objects = self.objects(connection, world_id)
+        version = objects.version(version_id)
+        objects.add_object(version.version_id, AuthoredObject(
+            object_id="object:cushion", asset_sha256=self.plate.content_sha256,
+            region_id=AUTHORED_STARTER_REGION_ID,
+            transform=Transform(3000, 0, 5000, 3_141_593, 1000),
+            origin=ObjectOrigin("authored", "fictional")),
+            base_state_sha256=version.state_sha256, actor=self.actor)
+        with connection.transaction():
+            place = self.runtime.saved_world_place(connection, self.session, version_id)
+            document = self.runtime.initial_input(connection, self.session, version_id, None,
+                                                  AUTHORED_STARTER_REGION_ID)
+            society = self.societies(connection, world_id).create(
+                version_id, place_id=place, region_id=AUTHORED_STARTER_REGION_ID, seed=SEED,
+                actor=self.actor, profile=PROFILE, initial_input=document)
+        return world_id, version_id, society
+
+    def edit(self, connection, world_id, version_id, n):
+        objects = self.objects(connection, world_id)
+        for i in range(n):
+            version = objects.version(version_id)
+            [cushion] = [o for o in version.objects if o.object_id == "object:cushion"]
+            moved = Transform(3000 + (100 if i % 2 == 0 else 0), 0, 5000, 3_141_593, 1000)
+            objects.move_object(version_id, "object:cushion", moved,
+                                base_state_sha256=version.state_sha256, actor=self.actor)
+
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--out", required=True)
+    parser.add_argument("--inputs", default="1,50,200,800")
+    parser.add_argument("--ticks", type=int, default=60)
+    parser.add_argument("--opens", type=int, default=20)
+    args = parser.parse_args()
+    import exulanica
+    record = {"worktree": str(WORKTREE), "exulanica": exulanica.__file__, "profile": PROFILE,
+              "load_before": os.getloadavg(), "points": []}
+    harness = Harness()
+    try:
+        for inputs in [int(v) for v in args.inputs.split(",")]:
+            with harness.database.session(harness.workspace) as connection:
+                world_id, version_id, society = harness.world(connection)
+                harness.edit(connection, world_id, version_id, inputs - 1)
+                repository = harness.societies(connection, world_id)
+                steps = []
+                for _ in range(args.ticks):
+                    started = time.perf_counter_ns()
+                    society = repository.advance(version_id, base_tick=society["current_tick"],
+                                                 base_state_sha256=society["state_sha256"])
+                    steps.append((time.perf_counter_ns() - started) // 1000)
+                stored = connection.execute(
+                    "select count(*) as n from world_society_input where workspace_id=%s and society_id=%s",
+                    (harness.workspace, society["society_id"])).fetchone()["n"]
+                opens, parts = [], {"society": [], "events": [], "control": []}
+                for _ in range(args.opens):
+                    t0 = time.perf_counter_ns()
+                    snapshot = harness.societies(connection, world_id).snapshot(version_id, places=True)
+                    t1 = time.perf_counter_ns()
+                    harness.societies(connection, world_id).events(version_id, limit=256)
+                    t2 = time.perf_counter_ns()
+                    SocietyControlRepository(connection, harness.workspace, world_id=world_id,
+                                             input_authorizer=lambda doc: harness.runtime.authorize(
+                                                 connection, harness.session, doc)).read(version_id)
+                    t3 = time.perf_counter_ns()
+                    connection.commit()
+                    parts["society"].append((t1 - t0) // 1000)
+                    parts["events"].append((t2 - t1) // 1000)
+                    parts["control"].append((t3 - t2) // 1000)
+                    opens.append((t3 - t0) // 1000)
+                started = time.perf_counter_ns()
+                replay = harness.societies(connection, world_id).replay(version_id)
+                replay_us = (time.perf_counter_ns() - started) // 1000
+                point = {"inputs": stored, "ticks": society["current_tick"],
+                         "population": len(society["state"]["inhabitants"]),
+                         "open": summary(opens), "society_read": summary(parts["society"]),
+                         "events_read": summary(parts["events"]), "control_read": summary(parts["control"]),
+                         "step": summary(steps[-10:]), "replay_us": replay_us,
+                         "replay_verified": bool(replay.get("replay_verified")),
+                         "state_matches": snapshot["state_sha256"] == society["state_sha256"],
+                         "load_after": os.getloadavg()}
+                record["points"].append(point)
+                print(json.dumps({k: point[k] for k in ("inputs", "ticks", "open", "step", "replay_us")}), flush=True)
+                Path(args.out).write_text(json.dumps(record, indent=1))
+    finally:
+        harness.close()
+    record["idle_during"] = idle_during()
+    record["load_after"] = os.getloadavg()
+    Path(args.out).write_text(json.dumps(record, indent=1))
+    if record["idle_during"] and record["idle_during"]["mean"] is not None and record["idle_during"]["mean"] < 50:
+        print("discarded: mean idle below 50 percent during the run", flush=True)
+        raise SystemExit(75)
+
+
+if __name__ == "__main__":
+    main()

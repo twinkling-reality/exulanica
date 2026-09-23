@@ -1,0 +1,2 @@
+fbf2f91cbe9e4745b96ef36250040e38575908dc7be9218b1a77094560232490  exulanica/world/society_repository.py
+957aa98d796811e6db960a55095c45dd881b160473dfc0891780902d0d7d644e  exulanica/world/society_control_repository.py

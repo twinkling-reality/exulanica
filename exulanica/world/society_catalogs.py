@@ -1,11 +1,17 @@
 """The living society routine model as versioned data, not planner constants.
 
 Needs, activities, capacity rules, the premises use-class to role mapping and the policy values
-live in ``assets/catalogs/society``, one reviewed file per catalog, in the same envelope the
-city grammar's catalogs use. They sit in a subdirectory because the grammar's directory loader
-refuses any file in ``assets/catalogs`` it has no schema for. Every entry carries a licence and a
-``reason``. The model's digest covers every loaded catalog, and a society records it, so changing
-the routine means publishing a new catalog version, never editing the one a society replays.
+live in ``assets/catalogs/society``, one reviewed file per catalog version, in the same envelope
+the city grammar's catalogs use. They sit in a subdirectory because the grammar's directory
+loader refuses any file in ``assets/catalogs`` it has no schema for. Every entry carries a licence
+and a ``reason``. The model's digest covers every catalog it loads, and a society records the
+versions and the digest, so changing the routine means publishing a new catalog version beside
+the old one, never editing the one a society replays.
+
+Schemas are keyed by catalog id and version, so two versions of one catalog can be read side by
+side. The directory keeps every version any schema names, and holds nothing a schema does not
+name. A model reads one version of each catalog: a new society reads ``ROUTINE_VERSIONS``, and a
+stored society reads the versions it recorded.
 """
 
 from __future__ import annotations
@@ -22,7 +28,7 @@ from exulanica.grammar.catalogs import (
     catalog_digest,
     integer_field,
     key_list_field,
-    load_catalog_directory,
+    load_catalog,
     text_field,
 )
 from exulanica.grammar.errors import CatalogError
@@ -42,8 +48,9 @@ __all__ = [
 ROUTINE_DIRECTORY: Final = (
     Path(__file__).resolve().parents[2].joinpath("assets", "catalogs", "society")
 )
-#: The catalog versions a model reads by default. A society records its model's digest, and a
-#: new routine is a new catalog version listed here, so an older society keeps replaying.
+#: The catalog versions a new society's model reads. A society records its model's versions and
+#: digest, and a new routine is a new catalog version listed here, published beside the old one,
+#: so an older society keeps reading the versions it recorded and keeps replaying.
 ROUTINE_VERSIONS: Final = {
     "society-activity": 1,
     "society-capacity": 1,
@@ -125,8 +132,10 @@ def _use_class_bounds(where: str, values: dict[str, FieldValue]) -> None:
         raise CatalogError(f"{where}: a workplace declares its shift")
 
 
-SCHEMAS: Final = {
-    "society-need": CatalogSchema(
+#: Every schema the society reads, keyed by catalog id and version. A version a stored society
+#: names keeps its schema here and its file in the directory for as long as the society exists.
+SCHEMAS: Final[dict[tuple[str, int], CatalogSchema]] = {
+    ("society-need", 1): CatalogSchema(
         "society-need",
         1,
         (
@@ -139,7 +148,7 @@ SCHEMAS: Final = {
         ),
         entry_check=_need_bounds,
     ),
-    "society-activity": CatalogSchema(
+    ("society-activity", 1): CatalogSchema(
         "society-activity",
         1,
         (
@@ -159,7 +168,7 @@ SCHEMAS: Final = {
         ),
         entry_check=_activity_bounds,
     ),
-    "society-capacity": CatalogSchema(
+    ("society-capacity", 1): CatalogSchema(
         "society-capacity",
         1,
         (
@@ -168,7 +177,7 @@ SCHEMAS: Final = {
             ("reason", text_field),
         ),
     ),
-    "society-use-class": CatalogSchema(
+    ("society-use-class", 1): CatalogSchema(
         "society-use-class",
         1,
         (
@@ -186,7 +195,7 @@ SCHEMAS: Final = {
         ),
         entry_check=_use_class_bounds,
     ),
-    "society-policy": CatalogSchema(
+    ("society-policy", 1): CatalogSchema(
         "society-policy",
         1,
         (("value", integer_field(0, 10**9)), ("reason", text_field)),
@@ -274,20 +283,38 @@ def _values(catalog: Catalog) -> dict[str, dict[str, FieldValue]]:
 def load_routine_model(
     directory: Path = ROUTINE_DIRECTORY, versions: Mapping[str, int] | None = None
 ) -> RoutineModel:
-    """Read and cross-check the routine catalogs. Every inconsistency is a CatalogError."""
+    """Read and cross-check one version of each routine catalog. Every inconsistency is a
+    CatalogError.
+
+    ``versions`` names the version of each catalog to read; left out, it is the versions a new
+    society reads. A stored society passes the versions it recorded.
+    """
     chosen = dict(ROUTINE_VERSIONS if versions is None else versions)
     if set(chosen) != set(ROUTINE_VERSIONS):
         raise CatalogError(f"a routine model reads exactly {sorted(ROUTINE_VERSIONS)}")
     for catalog_id, version in sorted(chosen.items()):
-        if version != SCHEMAS[catalog_id].catalog_version:
+        if (catalog_id, version) not in SCHEMAS:
             raise CatalogError(f"{catalog_id} v{version} has no schema")
     # The directory is asked what is in it, rather than the versions above being taken as an
-    # account of it: load_catalog_directory refuses a file no schema claims and a schema with no
-    # file. A catalog dropped in here therefore cannot sit outside the model and outside the
-    # digest a society records, which is what a list of ids to read would have allowed.
-    catalogs = list(
-        load_catalog_directory(directory, [SCHEMAS[catalog_id] for catalog_id in sorted(chosen)])
-    )
+    # account of it: a file no schema claims and a schema with no file are both refused. A catalog
+    # dropped in here therefore cannot sit outside every model and every digest a society records,
+    # and a version a stored society names cannot quietly leave the directory.
+    claimed = {
+        f"{schema.catalog_id}.v{schema.catalog_version}.json": schema for schema in SCHEMAS.values()
+    }
+    present = sorted(path.name for path in directory.glob("*.json"))
+    unexpected = sorted(set(present) - set(claimed))
+    absent = sorted(set(claimed) - set(present))
+    if unexpected or absent:
+        raise CatalogError(
+            f"{directory}: files with no schema {unexpected}, schemas with no file {absent}"
+        )
+    catalogs = [
+        load_catalog(
+            directory.joinpath(f"{catalog_id}.v{version}.json"), SCHEMAS[(catalog_id, version)]
+        )
+        for catalog_id, version in sorted(chosen.items())
+    ]
     by_id = {catalog.catalog_id: _values(catalog) for catalog in catalogs}
     needs = {
         key: Need(

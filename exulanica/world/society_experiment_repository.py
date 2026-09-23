@@ -19,7 +19,7 @@ from psycopg.types.json import Jsonb
 from exulanica.canonical import canonical_json
 from exulanica.world import society_experiments as experiments
 from exulanica.world.society import UnavailableSocietyInput, society_state_sha256
-from exulanica.world.society_living import LIVING_PROFILE
+from exulanica.world.society_engines import EXPERIMENT_ENGINES, society_engine
 
 __all__ = [
     "ExperimentConflict",
@@ -156,7 +156,7 @@ class SocietyExperimentRepository:
             "and v.version_id=s.version_id where s.workspace_id=%s and s.society_id=%s",
             (self.workspace_id, source_society_id),
         ).fetchone()
-        if source is None or source["engine_version"] != LIVING_PROFILE:
+        if source is None or not society_engine(source["engine_version"]).experiments:
             raise UnknownExperiment("experiment source is unavailable")
         rows = self.connection.execute(
             "select input_seq,document,document_sha256 from world_society_input "
@@ -186,8 +186,8 @@ class SocietyExperimentRepository:
     def _source_society_for_version(self, version_id: uuid.UUID) -> uuid.UUID:
         rows = self.connection.execute(
             "select society_id from world_society where workspace_id=%s and version_id=%s "
-            "and engine_version=%s order by society_id limit 2",
-            (self.workspace_id, version_id, LIVING_PROFILE),
+            "and engine_version=any(%s) order by society_id limit 2",
+            (self.workspace_id, version_id, list(EXPERIMENT_ENGINES)),
         ).fetchall()
         if len(rows) != 1:
             raise UnknownExperiment("experiment source is unavailable")

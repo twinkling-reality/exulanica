@@ -1,0 +1,84 @@
+#!/bin/zsh
+# Lane F (society): one arm of the release-build open-cost comparison. Ignored evidence script.
+#
+#   quiet-slot gpu-slot zsh open_arm.zsh after|before
+#
+# Runs inside the machine-wide quiet and GPU slots, in that order. Brings up a fresh slot 5 runtime
+# for this worktree, serves prod-dist beside this script (built beforehand with `vite build
+# --outDir`, no token in its environment) with `vite preview` on 19229 against the slot's API, runs
+# open_prod.mjs through gate.py, then stops both. The arms differ in two files only: `before`
+# reverses runs/open-prod/targeted-reads-*.patch on exulanica/world/society_repository.py and
+# society_control_repository.py for its runtime, and puts both files back from saved copies after,
+# refusing to finish until their SHA-256 matches what they were.
+emulate -L zsh
+setopt no_bg_nice
+arm=$1
+W=<worktree>
+L=$W/.exulanica/lane-society
+R=$L/runs/open-prod
+APP=$W/web/packages/app
+LAUNCH=<main-checkout>/.exulanica/acceptance/launch.py
+STATE=<slot-run-root>/state.json
+FILES=(exulanica/world/society_repository.py exulanica/world/society_control_repository.py)
+[[ $arm == after || $arm == before ]] || { print -r -- "open_arm: name the arm, after or before"; return 2 }
+DIST=$L/prod-dist
+[[ -f $DIST/index.html ]] || { print -r -- "open_arm: build the app into $DIST first"; return 2 }
+mkdir -p $R/saved
+
+print -r -- "open_arm $arm: files before the arm"
+(cd $W && shasum -a 256 $FILES) | tee $R/$arm-files-at-start.txt
+if [[ $arm == before ]]; then
+  for f in $FILES; do cp $W/$f $R/saved/${f:t}; done
+  if ! (cd $W/exulanica/world && patch -s -R society_repository.py < $R/targeted-reads-society_repository.py.patch \
+    && patch -s -R society_control_repository.py < $R/targeted-reads-society_control_repository.py.patch); then
+    for f in $FILES; do cp $R/saved/${f:t} $W/$f; done
+    print -r -- "open_arm: the patch did not reverse; both files put back"
+    return 6
+  fi
+  (cd $W && shasum -a 256 $FILES) | tee $R/$arm-files-measured.txt
+fi
+
+restore() {
+  if [[ $arm == before ]]; then
+    for f in $FILES; do cp $R/saved/${f:t} $W/$f; done
+    (cd $W && shasum -a 256 $FILES) > $R/$arm-files-restored.txt
+    if ! diff -q $R/$arm-files-at-start.txt $R/$arm-files-restored.txt >/dev/null; then
+      print -r -- "open_arm: RESTORE MISMATCH; see $R/$arm-files-restored.txt"
+      return 1
+    fi
+    print -r -- "open_arm: both files restored and verified"
+  fi
+}
+
+rc=0
+{
+  python3 $LAUNCH up --worktree $W --slot 5 > $R/$arm-launch.log 2>&1 || { rc=$?; print -r -- "launch failed"; tail -20 $R/$arm-launch.log; }
+  if (( rc == 0 )); then
+    grep -q "\"api_imported_exulanica_from\": \"$W/exulanica/__init__.py\"" $STATE || { rc=3; print -r -- "the API did not import this worktree"; }
+  fi
+  if (( rc == 0 )); then
+    (cd $APP; env -i HOME=$HOME PATH=$PATH EXULANICA_API_URL=http://127.0.0.1:19226 \
+      ./node_modules/.bin/vite preview --outDir $DIST --port 19229 --strictPort > $R/$arm-preview.log 2>&1 &
+      print -r -- $! > $R/$arm-preview.pid)
+    for i in {1..60}; do
+      curl -sf http://localhost:19229/api/healthz > /dev/null && break
+      sleep 0.5
+    done
+    curl -sf http://localhost:19229/api/healthz > /dev/null || { rc=4; print -r -- "the preview did not answer"; }
+  fi
+  if (( rc == 0 )); then
+    (cd $W && .venv/bin/python -B $L/gate.py -- node $L/open_prod.mjs --state $STATE \
+      --preview http://localhost:19229/ --out $R/open-prod-$arm.json --label $arm \
+      --sizes 1,25,100,400 --opens 5 --ticks 10) || rc=$?
+  fi
+} always {
+  if [[ -f $R/$arm-preview.pid ]]; then
+    pid=$(<$R/$arm-preview.pid)
+    if ps -p $pid -o command= | grep -q "vite preview"; then kill $pid; fi
+    rm -f $R/$arm-preview.pid
+  fi
+  python3 $LAUNCH down --worktree $W > $R/$arm-down.log 2>&1
+  restore || rc=5
+}
+print -r -- "open_arm $arm: exit $rc"
+return $rc

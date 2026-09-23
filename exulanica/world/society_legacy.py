@@ -25,6 +25,11 @@ from exulanica.world.society import (
     _inhabitant_id,
     _number,
 )
+from exulanica.world.society_engines import society_engine
+
+#: This genesis is the v1 engine's own, so its population bounds are v1's row of the engine
+#: table; a later profile that builds on it passes its own row's bounds.
+_V1: Final = society_engine(SOCIETY_ENGINE_VERSION)
 
 __all__ = ["advance_society", "initial_society"]
 
@@ -42,17 +47,20 @@ def initial_society(
     seed: str,
     *,
     population: int = SOCIETY_POPULATION,
-    minimum_population: int = 100,
+    minimum_population: int = _V1.population_minimum,
+    maximum_population: int = _V1.population_maximum,
 ) -> dict[str, Any]:
-    """The seeded population. ``minimum_population`` is the caller's profile's own floor."""
+    """The seeded population, held to the calling profile's own bounds from the engine table."""
     if (
         not isinstance(seed, str)
         or len(seed) != 64
         or any(c not in "0123456789abcdef" for c in seed)
     ):
         raise ValueError("society seed must be a lowercase SHA-256")
-    if population < minimum_population or population > 512:
-        raise ValueError(f"society population must be between {minimum_population} and 512")
+    if population < minimum_population or population > maximum_population:
+        raise ValueError(
+            f"society population must be between {minimum_population} and {maximum_population}"
+        )
     inhabitants = []
     first, last = LEGACY_FIRST_NAMES, LEGACY_LAST_NAMES
     for ordinal in range(population):

@@ -30,10 +30,12 @@ from exulanica.world.society_controls import (
     utc,
     validate_settings,
 )
+from exulanica.world.society_engines import PLAYABLE_ENGINES, society_engine
 from exulanica.world.society_repository import SocietyRepository
 
 #: Profiles an explicitly enabled playback worker may advance.
-PLAYABLE_PROFILES = ("exulanica-society/v2", "exulanica-society/v3", "exulanica-society/v4")
+#: The engines the playback worker may play, from the engine table.
+PLAYABLE_PROFILES = PLAYABLE_ENGINES
 
 
 class SocietyControlRepository:
@@ -84,11 +86,12 @@ class SocietyControlRepository:
         ).fetchone()
 
     def _ready(self, society: dict, actor: uuid.UUID) -> None:
-        if society["engine_version"] not in PLAYABLE_PROFILES:
-            raise ValueError("legacy_society_not_playable")
+        engine = society_engine(society["engine_version"])
+        if not engine.playback:
+            raise ValueError(engine.playback_refusal)
         repo = self._society(actor)
         repo.snapshot(society["version_id"])
-        latest = repo._validated_inputs(society)[-1]
+        latest = repo._pending_inputs(society)[-1]
         if latest["availability"] != "available" or latest["navigation"]["unavailable_reason"]:
             raise UnavailableSocietyInput("society input is unavailable for playback")
 
@@ -177,12 +180,8 @@ class SocietyControlRepository:
             "last_event_seq": c["last_event_seq"],
             "current_tick": society["current_tick"],
             "state_sha256": society["state_sha256"],
-            "play_ineligible_reason": (
-                "legacy_society_not_playable"
-                if society["engine_version"] == "exulanica-society/v1"
-                else None
-            ),
-            "play_eligible": society["engine_version"] in PLAYABLE_PROFILES,
+            "play_ineligible_reason": society_engine(society["engine_version"]).playback_refusal,
+            "play_eligible": society_engine(society["engine_version"]).playback,
         }
 
     def read(self, version_id: uuid.UUID) -> dict:

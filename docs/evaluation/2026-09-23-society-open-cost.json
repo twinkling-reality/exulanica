@@ -1,0 +1,504 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "artifacts": {
+      "directory": "docs/evaluation/artifacts/2026-09-23-society-open-cost",
+      "files": [
+        {
+          "byte_size": 11140,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/scripts/open_cost.py.txt",
+          "sha256": "aa1489ea3e27b272a2779ce3a32ffc7e58fa1118a845863238cedc0db122a12c"
+        },
+        {
+          "byte_size": 2783,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/scripts/gate.py.txt",
+          "sha256": "e663a64026e2d08041fb07f3854576fb054a2b40f0e5e4f939e556a981fc9e19"
+        },
+        {
+          "byte_size": 16396,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/scripts/open_prod.mjs.txt",
+          "sha256": "83a290029ed6bb504474fdd3504df293f91da1c4bdafa765bf3aac6bf9aaee86"
+        },
+        {
+          "byte_size": 3841,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/scripts/open_arm.zsh.txt",
+          "sha256": "a9dee95286091c5c69eb968cf925c88a205a49d11c178120a5d924a37058feed"
+        },
+        {
+          "byte_size": 2431,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/scripts/build_release.zsh.txt",
+          "sha256": "7f627979a03a678c42428c07d3a000549c5ce7691b994a4f5794171b6dbfe1da"
+        },
+        {
+          "byte_size": 21745,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/scripts/write_open_cost_record.py.txt",
+          "sha256": "1625afbfbd8bfdf74ddb2ba262e5017330c2d8ceb729efb2541ec97e39b1d081"
+        },
+        {
+          "byte_size": 3628,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/runs/in-process-before.json",
+          "sha256": "e0a79ef56531de788ce6d1f36276d260fdca06e22cb34b40be4abf0430822098"
+        },
+        {
+          "byte_size": 1165,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/runs/in-process-before.log.txt",
+          "sha256": "26f0c695c46dcd4b21552086ebdde24f21756e1e457240f7a6e684319d250d48"
+        },
+        {
+          "byte_size": 491,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/runs/in-process-before-gates.jsonl.txt",
+          "sha256": "c1f952305d42d0d3388378a769a4ae5b3c065ed4b433636e794e645f21aca7a5"
+        },
+        {
+          "byte_size": 1336,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/runs/in-process-before-idle.jsonl.txt",
+          "sha256": "f3176fbd86119bef6a72ec103afe02f635f11d81f8f81a3014eeabdb49e140e0"
+        },
+        {
+          "byte_size": 3568,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/runs/in-process-after.json",
+          "sha256": "1cc70b9db53f4edefae1cecb01e212d969872b682b4f41153fb92451ca7f8421"
+        },
+        {
+          "byte_size": 1136,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/runs/in-process-after.log.txt",
+          "sha256": "5848374091f794beef3afc21d215d78241326219561572a4763fe327ddfea970"
+        },
+        {
+          "byte_size": 470,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/runs/in-process-after-gates.jsonl.txt",
+          "sha256": "abfbf2e5ebbefcf9122d40e4b15d495bd4b3a515ab718504745660fe4f20c49f"
+        },
+        {
+          "byte_size": 296,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/runs/in-process-after-idle.jsonl.txt",
+          "sha256": "15e77908e1ba8215a79a5e1ba4bf6e93816e5519eee9e9d7d504ea383a491400"
+        },
+        {
+          "byte_size": 10569,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/runs/release-after.json",
+          "sha256": "8e9440b184630930a2e8b3e156b160e27f437139219d3f05b931022df9879445"
+        },
+        {
+          "byte_size": 216,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/runs/release-after-files-at-start.txt",
+          "sha256": "162031ff059046857cbdd7c974c11412437d9545fd3c40e561638b2938449eff"
+        },
+        {
+          "byte_size": 10572,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/runs/release-before.json",
+          "sha256": "187535c0d2ef639c722cd0b49cfccad661f6eedd2656a0c7c6d5a5878f122bb8"
+        },
+        {
+          "byte_size": 216,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/runs/release-before-files-at-start.txt",
+          "sha256": "162031ff059046857cbdd7c974c11412437d9545fd3c40e561638b2938449eff"
+        },
+        {
+          "byte_size": 1810,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/runs/release-build.log.txt",
+          "sha256": "49701064cfc2e4bc28b9255121a9d5a67c1491b991b5f783267e3dddb5997d89"
+        },
+        {
+          "byte_size": 9677,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/runs/release-after-preview.log.txt",
+          "sha256": "2c83fd280ca9cd2ae7cf0ec0787f55c49ffb685465acce30a80219e2351c7168"
+        },
+        {
+          "byte_size": 420,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/runs/release-before-preview.log.txt",
+          "sha256": "ad40a09b404ecd32dc7261057d1f7b14a44243106322b355143bd869e6105e91"
+        },
+        {
+          "byte_size": 2585,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/runs/diagnosis-events.txt",
+          "sha256": "31b9320fafe4a1f2876306aa49760b623c1f2469431b057a75a9a61e6d55e7b3"
+        },
+        {
+          "byte_size": 4044,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/scripts/diag_events.py.txt",
+          "sha256": "abc5b96b5945b91f56f0f37bfb00ad0804ac36c36b991cc9b3ac095caca76000"
+        },
+        {
+          "byte_size": 3803,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/runs/release-build.json",
+          "sha256": "1c88f183d8be556da79706e488c616ed7a24539c0fdc8a95e2906b8c4de1c7d8"
+        },
+        {
+          "byte_size": 216,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/runs/release-before-files-measured.txt",
+          "sha256": "fd26e450bc81d10a198b7c9c5f7e8b020d53a5442d05e2be5af38e0cd15d72ee"
+        },
+        {
+          "byte_size": 216,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/runs/release-before-files-restored.txt",
+          "sha256": "162031ff059046857cbdd7c974c11412437d9545fd3c40e561638b2938449eff"
+        },
+        {
+          "byte_size": 612,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/runs/targeted-reads-in-process-society_control_repository.py.patch.txt",
+          "sha256": "6d97c264306d925fb59edda0c54eaddc02996977e6c30f6b603c0bed72998a42"
+        },
+        {
+          "byte_size": 7088,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/runs/targeted-reads-in-process-society_repository.py.patch.txt",
+          "sha256": "0df56334af99b62e48f67a40f7bd696cb74d0cf39597d38effb3baec1d20fa27"
+        },
+        {
+          "byte_size": 612,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/runs/targeted-reads-society_control_repository.py.patch.txt",
+          "sha256": "6d97c264306d925fb59edda0c54eaddc02996977e6c30f6b603c0bed72998a42"
+        },
+        {
+          "byte_size": 7118,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/runs/targeted-reads-society_repository.py.patch.txt",
+          "sha256": "a1546825baa6bf9099b70dc10eaece8cbd643c5bdb16811204c8b986f116b452"
+        },
+        {
+          "byte_size": 995,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/runs/release-gates.jsonl.txt",
+          "sha256": "bd86079b52c8a38e891071b184e79dca037b4a59737305fdeb029ab1c1f570af"
+        },
+        {
+          "byte_size": 1338,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/runs/release-idle-20260923T110438-96577.jsonl.txt",
+          "sha256": "8427dcaeb7ef7d3fa12c632e2313c18aabe3710cb3627647fabeeac367aeab7f"
+        },
+        {
+          "byte_size": 1414,
+          "path": "docs/evaluation/artifacts/2026-09-23-society-open-cost/runs/release-idle-20260923T112407-61346.jsonl.txt",
+          "sha256": "b408d6d4f5c233714b564fa17f2211667e518847d75886412d7dcb1aabb1763f"
+        }
+      ],
+      "substitutions": [
+        "<frozen-copy-before> stands for a machine path",
+        "<frozen-copy-after> stands for a machine path",
+        "<scratch> stands for a machine path",
+        "<worktree> stands for a machine path",
+        "<main-checkout> stands for a machine path",
+        "<slot-run-root> stands for a machine path",
+        "<private-postgres-root> stands for a machine path",
+        "<home> stands for a machine path"
+      ]
+    },
+    "build": {
+      "command": "vite build --outDir prod-dist --emptyOutDir, from web/packages/app, environment emptied but HOME and PATH",
+      "files": [
+        {
+          "byte_size": 23004,
+          "path": "apple-touch-icon.png",
+          "sha256": "12b66d96f7736b6f868f4af4f99babcb0789eb746840f4bc228229c4d69c9506"
+        },
+        {
+          "byte_size": 773086,
+          "path": "assets/district-interpretation-rwMLKtnK.json",
+          "sha256": "a89db5df543848fa815d285545805991ecfd7e91f1b97915d28620501f1c197f"
+        },
+        {
+          "byte_size": 232454,
+          "path": "assets/flatiron-owned-district-BtzrqgXV.json",
+          "sha256": "22fbde04028124ded8cb5e6bf08642706ed845a946f627499e8245aae9d28580"
+        },
+        {
+          "byte_size": 3143,
+          "path": "assets/index-CfD_TUA9.js",
+          "sha256": "2d82fa8348fecf7fc38dbb0a2705462348a4efaab37d53d4f207b5b1d250b7a4"
+        },
+        {
+          "byte_size": 140183,
+          "path": "assets/index-CwVm5hhV.css",
+          "sha256": "544fe99b4bd2838826221c78d7df707efb5904e0f1e80f6b3a6bbf711e062701"
+        },
+        {
+          "byte_size": 4903,
+          "path": "assets/main-BPbid1NS.css",
+          "sha256": "46d1c04b974b638474f3fd1556622c2b784eacfb28404961cd0d7455a353d370"
+        },
+        {
+          "byte_size": 2664112,
+          "path": "assets/main-IpmSEd-o.js",
+          "sha256": "b688fb5cc6cab001ff716ad23bed5018ed3ef03e13e6d520e8e7e181e48b6b57"
+        },
+        {
+          "byte_size": 742,
+          "path": "assets/media-sampler-DfaVH_uv.js",
+          "sha256": "3a47fdf789433cff520c9624418fe35b4304086850a9a41b187c51059b76b871"
+        },
+        {
+          "byte_size": 5937,
+          "path": "assets/preview-graph-BIMQ7_wh.js",
+          "sha256": "cf9e4cf57b98180588f9dfa9fe80a4c5a47c2e4afd6113cc2fa8feda51934d78"
+        },
+        {
+          "byte_size": 1399,
+          "path": "assets/preview-media-BKmSDqIM.js",
+          "sha256": "240767a68936b9c1da0c2e55a4d1602c059183e6983ea69a5d939d0f7e4ea47b"
+        },
+        {
+          "byte_size": 475,
+          "path": "assets/preview-point-maps-BhxaVbKQ.js",
+          "sha256": "d12424608a5d062a65cea29bfb39fd80da435db60d597039d5cc048ea150f488"
+        },
+        {
+          "byte_size": 1448,
+          "path": "favicon-32.png",
+          "sha256": "01e4cbabfebe1ba4564b36f04c54adbc18abeec754164853a830a3302e3ecc86"
+        },
+        {
+          "byte_size": 53078,
+          "path": "favicon.svg",
+          "sha256": "11fe463030dd198afffdc3ead15d4373aecd458d136158b4d3d1ba0743893572"
+        },
+        {
+          "byte_size": 469969,
+          "path": "fixtures/memory/glasshouse-courtyard.jpg",
+          "sha256": "23a88a3ca60731360cc5e791d1e4770017f696567fba643cd60a0fa7cb533de6"
+        },
+        {
+          "byte_size": 3812696,
+          "path": "fixtures/memory/glasshouse-courtyard.opm",
+          "sha256": "939ebd1b36d49bc0f6a2f190bfa4030c8f91cf2f59276ed48c13f62a339f5f27"
+        },
+        {
+          "byte_size": 367021,
+          "path": "fixtures/memory/glasshouse-studio.jpg",
+          "sha256": "69924d0b70103e8d524eac92a92b03dfe7168b89a690edf765f6ec568b5d6413"
+        },
+        {
+          "byte_size": 342987,
+          "path": "fixtures/memory/lakeshore-kite.jpg",
+          "sha256": "aace577dd3b09c08233a06d012660ec09aa99fa90585487afa5fed6c512b6431"
+        },
+        {
+          "byte_size": 25355,
+          "path": "icon-192.png",
+          "sha256": "4efc7e8165f0f753d2900f8de4a011c24432a6f210e63bb5976d934842554bbf"
+        },
+        {
+          "byte_size": 153257,
+          "path": "icon-512.png",
+          "sha256": "55c949ddcd39c7ef87937ad2fa23afdb69708ee974d25be88217f64758652237"
+        },
+        {
+          "byte_size": 2272,
+          "path": "index.html",
+          "sha256": "44f7cef6dc29918da901af54d2f309fc093b1dcedb32325a45dc7a2ec607ef1e"
+        },
+        {
+          "byte_size": 393,
+          "path": "site.webmanifest",
+          "sha256": "58836d305fd298c205ab053749157710d4b35f2d0f702f7da2015c98c1af5ea5"
+        }
+      ],
+      "index_html_sha256": "44f7cef6dc29918da901af54d2f309fc093b1dcedb32325a45dc7a2ec607ef1e",
+      "started_at": "2026-09-23T14:53:02Z",
+      "tree": {
+        "head": "e9dee3c288dbb3fb7a066bfb40b31143207fc11e",
+        "untracked_files_sha256": "a44f3617c8b372af6ba620222ca8f747b344e821ed2b5057a9eee122f602515d",
+        "working_diff_sha256": "87c0be2ac090cd29a8eaedfec82e68e9a32aa47aaca2cd6098acdba143c933a2"
+      },
+      "vite": "vite/6.4.3 darwin-arm64 node-v24.15.0"
+    },
+    "claims": {
+      "assumed": [
+        "That one plate moved back and forth stands for edits in general. Inputs grow with what a world holds, so every-input validation costs more per input in a fuller world, and the targeted read's one input costs more too.",
+        "That the curve continues past 400 stored inputs. The count _chain makes over a society's inputs grows with history; it was not measured separately."
+      ],
+      "inferred": [
+        "Every-input validation added about 5.86 ms per stored input to an in-process open and 2.99 ms to the release build's time to show the world: the slope between 1 and 400 inputs, one world shape.",
+        "The events read with targeted reads still grows with history because it authorizes every input its page of events names, and each authorization reads the authored version with its whole edit list (SocietyRuntime._authored_version, WorldObjectRepository.version). A diagnosis of the same world shape in process, ungated and not a timing figure (runs/diagnosis-events.txt), counted 14 distinct inputs named by 66 events and 15 authorizations at 25, 52 distinct inputs named by 148 events and 53 authorizations at 100, 128 distinct inputs named by 256 events and 129 authorizations at 400; cProfile there attributes the call's time to authorization, the input validation it repeats, and the edit list.",
+        "The in-process after arm's slowest step at 400 inputs, 876.7 ms, is the first step after the 399 edits, which consumes all of them; per-step times were not recorded, so which step it was is inferred from the code."
+      ],
+      "measured": [
+        "In process, opening at 1, 25, 100 and 400 stored inputs took 15.0, 155.5, 664.5, 2354.0 ms (p50) when every read validated every stored input, and 14.8, 13.8, 14.0, 18.8 ms when a read loads and validates only the inputs it shows or consumes.",
+        "In the release build, from submitting the access form to the page handing the society's minute to the renderer took 233.1, 284.7, 460.5, 1424.8 ms (p50) with every read validating every input and 261.3, 285.9, 286.8, 267.1 ms with the targeted reads; the society read itself 15.0, 62.1, 236.3, 1094.4 ms and 16.2, 21.9, 21.3, 19.3 ms.",
+        "The events read in the release build took 20.2, 156.6, 586.3, unmeasured ms (p50) with every read validating every input and 23.5, 103.9, 318.3, 761.2 ms with the targeted reads. At 400 inputs with every input validated, the events and control reads left no Resource Timing entry by the time the driver read the timeline, 1.5 s after the society was shown, in 5 of 5 opens, so their durations are unmeasured. Either they had not ended, in which case each ended more than 2661 ms after its form was submitted, or the page's timeline buffer (250 entries by default) was full; the entry count was not recorded, so which is not established.",
+        "A step at 400 stored inputs took 1886.2 ms (p50) before and 22.3 ms after in process.",
+        "Replay, which still validates the whole chain, took 2703.6 ms and 2951.4 ms at 400 inputs in process."
+      ],
+      "observed_by_eye": []
+    },
+    "how_to_rerun": [
+      "Restore the scripts: copy scripts/*.txt to their names without .txt beside a lane worktree at the head above, with the lane's working changes applied.",
+      "In process: freeze a copy of the tree with and without the targeted-read patches and run quiet-slot .venv/bin/python -B gate.py -- .venv/bin/python -B open_cost.py --out FILE --inputs 1,25,100,400 --ticks 10 --opens 8 in each copy.",
+      "Release build: vite build --outDir prod-dist from web/packages/app with no token in the environment, then quiet-slot gpu-slot zsh open_arm.zsh after, then the same with before."
+    ],
+    "incidents": [
+      "open_arm.zsh stopped the preview only if the recorded pid's command line contained 'vite preview'; pnpm's wrapper execs node, whose command line reads 'vite.js preview', so the check failed and the after arm's preview kept running. The before arm's own preview then failed to bind port 19229 (runs/release-before-preview.log.txt), so the before arm's opens were served by the after arm's preview process: the same prod-dist and the same proxy target, 127.0.0.1:19226, which by then was the before arm's freshly launched API (release-before.json names its tree and the exulanica it imported). The orphan was stopped at the end of the lane's measurements."
+    ],
+    "machine": {
+      "browser": {
+        "product": "Chrome/153.0.8010.53",
+        "revision": "@792bf6722e73a45aa9e47c163b9901bdc17f3230",
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36"
+      },
+      "hardware_model": "Mac17,6",
+      "logical_cpus": 18,
+      "memory_bytes": 68719476736,
+      "node": "v24.15.0",
+      "os": "macOS 26.7",
+      "postgresql": "18.6 (Homebrew)"
+    },
+    "method": {
+      "gating": "quiet-slot then gpu-slot (release) or quiet-slot (in-process), and gate.py: at least 70 percent idle over 10 s before a run, a run discarded below 50 percent mean idle during it",
+      "in_process": "open_cost.py: the three repository reads a world's opening makes (society with places, events, playback control) and ten steps, on a private PostgreSQL server as the runtime role, eight opens per size; no HTTP",
+      "release_build": "open_prod.mjs through open_arm.zsh: the app built with vite build (no token in its environment) and served by vite preview against a fresh slot runtime per arm; each open a new document in headless Chrome, the slot's token typed into the access form; submit_to_shown runs from the form's submit click to the moment the page hands the society's current minute to the renderer; read durations are Resource Timing durations through the preview's proxy; one warm-up open, then five per size. The bundle reads VITE_EXULANICA_TOKEN from an environment object holding BASE_URL, DEV, MODE, PROD and SSR only, so the page asks for the token; the line build_release.zsh printed about the token variable reports that lookup, not a value",
+      "world": "a starter saved world on the endless ground holding one Marker plate 0.5 m in front of the arrival point, inhabitants brought in with profile exulanica-society/v2 at the population the product creates, ten simulated minutes advanced; the history grows by moving the plate back and forth by 100 mm, each move an accepted edit and so one stored input, then one minute consumes them"
+    },
+    "not_measured": [
+      "Worlds holding more than one object, and societies above the product's population.",
+      "Histories longer than 400 stored inputs.",
+      "Frame times; this measures reads and the hand-off to the renderer, not drawing.",
+      "The before arm's events and control reads at 400 inputs, beyond the bound stated.",
+      "Edits spread over many minutes, the ordinary pattern, where a page of events names few inputs; every size here consumed its edits in one minute."
+    ],
+    "profile": "exulanica.society-open-cost/v1",
+    "question": "Does opening a saved world with inhabitants cost more the more edits its history holds, and does reading only the inputs a read shows or consumes remove that growth?",
+    "series": {
+      "idle_during": {
+        "in_process": {
+          "after": {
+            "mean_tenths": 705,
+            "min": 58,
+            "samples": 8
+          },
+          "before": {
+            "mean_tenths": 521,
+            "min": 1,
+            "samples": 36
+          }
+        },
+        "release": {
+          "after": {
+            "mean_tenths": 524,
+            "min": 18,
+            "samples": 36
+          },
+          "before": {
+            "mean_tenths": 724,
+            "min": 45,
+            "samples": 38
+          }
+        }
+      },
+      "in_process_open_p50_us": {
+        "after": {
+          "1": 14815,
+          "100": 14040,
+          "25": 13804,
+          "400": 18772
+        },
+        "before": {
+          "1": 14980,
+          "100": 664497,
+          "25": 155525,
+          "400": 2353982
+        }
+      },
+      "in_process_step_p50_us": {
+        "after": {
+          "1": 17373,
+          "100": 25298,
+          "25": 17792,
+          "400": 22266
+        },
+        "before": {
+          "1": 20167,
+          "100": 465428,
+          "25": 116087,
+          "400": 1886196
+        }
+      },
+      "release_events_read_p50_us": {
+        "after": {
+          "1": 23500,
+          "100": 318300,
+          "25": 103900,
+          "400": 761200
+        },
+        "before": {
+          "1": 20200,
+          "100": 586300,
+          "25": 156600,
+          "400": null
+        }
+      },
+      "release_society_read_p50_us": {
+        "after": {
+          "1": 16200,
+          "100": 21300,
+          "25": 21900,
+          "400": 19300
+        },
+        "before": {
+          "1": 15000,
+          "100": 236300,
+          "25": 62100,
+          "400": 1094400
+        }
+      },
+      "release_submit_to_reads_done_p50_us": {
+        "after": {
+          "1": 276600,
+          "100": 588600,
+          "25": 381400,
+          "400": 1011100
+        },
+        "before": {
+          "1": 262200,
+          "100": 1037900,
+          "25": 444500,
+          "400": null
+        }
+      },
+      "release_submit_to_shown_p50_us": {
+        "after": {
+          "1": 261300,
+          "100": 286800,
+          "25": 285900,
+          "400": 267100
+        },
+        "before": {
+          "1": 233100,
+          "100": 460500,
+          "25": 284700,
+          "400": 1424800
+        }
+      }
+    },
+    "subject": "opening a saved world with inhabitants, against the inputs its history holds",
+    "tree": {
+      "difference_between_arms": "exactly runs/targeted-reads-society_repository.py.patch.txt and runs/targeted-reads-society_control_repository.py.patch.txt, reversed for the before arm and put back after it (runs/release-before-files-*.txt)",
+      "head": "e9dee3c288dbb3fb7a066bfb40b31143207fc11e",
+      "in_process_copies": "frozen copies of the lane tree (e9dee3c2 plus its working changes at the time), before and after differing only in runs/targeted-reads-in-process-*.patch.txt",
+      "patch_lines_differing_between_release_and_in_process": {
+        "society_control_repository.py": [],
+        "society_repository.py": [
+          "+        read loads and validates the inputs it shows or consumes, never the history behind them;",
+          "+        read loads the inputs it shows or consumes, never the history behind them: a world's",
+          "+        thousandth edit costs the next read nothing.",
+          "+        what the history adds to a read is the one count ``_chain`` makes over its rows."
+        ]
+      },
+      "release_after_arm": {
+        "branch": "lane/0923-society",
+        "changed_paths": "46",
+        "diff_head_bytes": "215553",
+        "diff_head_sha256": "87c0be2ac090cd29a8eaedfec82e68e9a32aa47aaca2cd6098acdba143c933a2",
+        "head": "e9dee3c288dbb3fb7a066bfb40b31143207fc11e",
+        "status_sha256": "c4da7105db12687a7675bf859a83ca38c8c2366b6c797460e0b1d5457c320d81"
+      },
+      "release_before_arm": {
+        "branch": "lane/0923-society",
+        "changed_paths": "46",
+        "diff_head_bytes": "208389",
+        "diff_head_sha256": "2b6c6dbcddd49143c9664ff561e8006927e5660b4383530133cc19df09456fde",
+        "head": "e9dee3c288dbb3fb7a066bfb40b31143207fc11e",
+        "status_sha256": "c4da7105db12687a7675bf859a83ca38c8c2366b6c797460e0b1d5457c320d81"
+      },
+      "rule": "The release arms ran on the lane tree the launcher recorded (head plus a working diff, digest in release_*_arm). The in-process arms ran on frozen copies made earlier from the same lane tree; they measure the same patch, not the final tree."
+    },
+    "written_at": "2026-09-23T18:42:53+00:00"
+  },
+  "record_sha256": "b49c6d2d6cf1ae5efde3a85244cda0a5c1da6000faec978ddbf0026c39cab127"
+}

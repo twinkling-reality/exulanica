@@ -75,16 +75,15 @@ def test_a_behaviour_edit_and_its_undo_each_recompose_the_society(saved_world): 
         taken_back.state_sha256,
     ]
     assert [d["authored_state"]["edit_seq"] for d in documents] == [1, 2, 3, 4, 5]
-    # An object that moves is not somewhere an inhabitant can rest, so the composition says so
-    # by name; without the motion the same cushion is a target again.
-    assert [d["availability"] for d in documents] == [
-        "available",
-        "unavailable",
-        "available",
-        "unavailable",
-        "available",
-    ]
-    assert documents[1]["unavailable_reason"] == "unsupported_active_behaviour:object:cushion"
-    assert documents[3]["unavailable_reason"] == "unsupported_active_behaviour:object:cushion"
+    # An object that moves is not somewhere an inhabitant can rest, so the composition says so by
+    # name against that object's own activity and the rest of the world stays usable; without the
+    # motion the same cushion is a target again.
+    assert [d["availability"] for d in documents] == ["available"] * 5
+    for moving_input in (documents[1], documents[3]):
+        assert moving_input["targets"] == []
+        assert [
+            (record["object_id"], record["reason"])
+            for record in moving_input["unavailable_affordances"]
+        ] == [("object:cushion", "authored_object_moves")]
     assert documents[2]["targets"] == documents[4]["targets"] == first["targets"]
     assert society_repository(world).replay(world["binding"].version_id)["replay_verified"]

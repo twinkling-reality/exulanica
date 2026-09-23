@@ -43,20 +43,27 @@ from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.society import UnavailableSocietyInput, society_state_sha256
 from exulanica.world.society_authored_ground import (
     SocietyGround,
+    StandingPolicy,
     authored_ground_from_snapshot,
-    build_authored_ground_society_input,
+    build_authored_ground_society_input_v2,
 )
-from exulanica.world.society_composition import build_society_input, policy_dependency_refs
+from exulanica.world.society_composition import (
+    build_society_input,
+    keep_registry,
+    policy_dependency_refs,
+    validate_recorded_registry,
+)
+from exulanica.world.society_engines import society_engine
 from exulanica.world.society_input_policy import (
-    AUTHORED_GROUND_COMPOSITION,
-    AUTHORED_GROUND_INPUT,
     LEGACY_COMPOSITION,
     LOCAL_INPUT,
     input_profile,
+    is_authored_ground,
 )
 from exulanica.world.society_input_policy import (
     composition_profile as policy_for_input,
 )
+from exulanica.world.society_living import current_routine
 from exulanica.world.society_planner import input_sha256, validate_society_input
 from exulanica.world.society_repository import SocietyRepository
 
@@ -64,8 +71,6 @@ Digest = Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
 Text = Annotated[str, Field(min_length=1, max_length=500)]
 Millimetre = Annotated[StrictInt, Field(ge=-1_000_000_000, le=1_000_000_000)]
 _OPERATIONS = ("display", "persist", "modify", "compose")
-#: The engine profiles that consume ordered inputs, and so react to an accepted authored edit.
-_INPUT_ENGINES = ("exulanica-society/v2", "exulanica-society/v3", "exulanica-society/v4")
 
 #: The name a saved world's society place is derived under, from the authored version's identity,
 #: exactly as the society's own identity is derived under ``exulanica-society/v1``. The place names
@@ -154,14 +159,21 @@ class SocietyRuntime:
         composition_profile: str = LEGACY_COMPOSITION,
     ) -> None:
         self.store = store
-        input_profile(composition_profile)
-        if composition_profile == AUTHORED_GROUND_COMPOSITION:
+        if is_authored_ground(input_profile(composition_profile)):
             raise ValueError("the authored-ground policy is selected by binding, not by profile")
         self._composition_profile = composition_profile
+        # Where a saved world's destinations seat their occupants, from the same catalog figures
+        # the living society keeps its standing spacing with.
+        policy = current_routine().policy
+        self._standing = StandingPolicy(
+            spacing_mm=policy["standing_spacing_mm"], radius_mm=policy["standing_radius_mm"]
+        )
         self._bindings: dict[tuple[uuid.UUID, uuid.UUID], SocietyRuntimeBinding] = {}
         self._authored: dict[tuple[uuid.UUID, uuid.UUID], AuthoredWorldSocietyBinding] = {}
-        # Freeze caller-owned dictionaries by serializing once; no mutable registry leaks out.
-        self._registry_bytes = canonical_json(dict(reviewed_affordances))
+        # Freeze caller-owned dictionaries by serializing once; no mutable registry leaks out. The
+        # registry this runtime composes with is kept in the store under its own digest, so an
+        # input composed under it keeps authorising after the registry changes.
+        self._registry_bytes, self._registry_sha256 = keep_registry(store, reviewed_affordances)
         for supplied in bindings:
             binding = SocietyRuntimeBinding.model_validate_json(supplied.model_dump_json())
             key = (binding.workspace_id, binding.version_id)
@@ -349,8 +361,45 @@ class SocietyRuntime:
             DistrictGeometry(json.loads(base_bytes)),
         )
 
-    def _asset(self, connection: psycopg.Connection, key: str, digest: str) -> None:
-        registry = json.loads(self._registry_bytes)
+    def _registry(self, digest: str) -> dict[str, Any]:
+        """The affordance registry with this digest: the current one, or one kept in the store."""
+        if digest == self._registry_sha256:
+            return json.loads(self._registry_bytes)
+        try:
+            data = self._blob(digest)
+        except UnavailableSocietyInput as exc:
+            raise UnavailableSocietyInput(
+                "the affordance registry this input was composed under is not held here"
+            ) from exc
+        try:
+            registry = json.loads(data)
+            if canonical_json(registry) != data:
+                raise ValueError("a registry is stored in its canonical form")
+            validate_recorded_registry(registry)
+        except ValueError as exc:
+            raise UnavailableSocietyInput(
+                "the affordance registry this input names is not a reviewed registry"
+            ) from exc
+        return registry
+
+    def _recorded_registry(self, document: dict) -> tuple[str, dict[str, Any]]:
+        """The registry a stored input was composed under, as the input itself names it."""
+        refs = [
+            ref
+            for ref in document["dependency_refs"]
+            if ref["kind"] == "society_affordance_registry"
+        ]
+        if len(refs) != 1 or refs[0]["identity"] != policy_for_input(document["profile"]):
+            raise UnavailableSocietyInput("runtime registration or registry binding drift")
+        return refs[0]["sha256"], self._registry(refs[0]["sha256"])
+
+    def _asset(
+        self,
+        connection: psycopg.Connection,
+        key: str,
+        digest: str,
+        registry: Mapping[str, dict[str, Any]],
+    ) -> None:
         assignment = registry.get(digest)
         if assignment is None or assignment["asset_key"] != key:
             raise UnavailableSocietyInput("reviewed affordance assignment is unavailable")
@@ -393,8 +442,17 @@ class SocietyRuntime:
         return refs
 
     def _policy_refs(
-        self, binding: SocietyRuntimeBinding, *, composition: str | None = None
+        self,
+        binding: SocietyRuntimeBinding,
+        *,
+        composition: str | None = None,
+        registry_sha256: str | None = None,
     ) -> list[dict[str, str]]:
+        """The policy references an input binds: its composition, registration and registry.
+
+        Left out, the composition is this runtime's and the registry its current one, as a new
+        input is composed; a stored input passes the ones it recorded.
+        """
         profile = self._composition_profile if composition is None else composition
         input_profile(profile)
         return [
@@ -411,7 +469,7 @@ class SocietyRuntime:
             {
                 "kind": "society_affordance_registry",
                 "identity": profile,
-                "sha256": hashlib.sha256(self._registry_bytes).hexdigest(),
+                "sha256": self._registry_sha256 if registry_sha256 is None else registry_sha256,
             },
         ]
 
@@ -469,7 +527,7 @@ class SocietyRuntime:
                 assignment = registry.get(obj.asset_sha256)
                 if assignment is None:
                     raise UnavailableSocietyInput("reviewed affordance assignment is unavailable")
-                self._asset(connection, assignment["asset_key"], obj.asset_sha256)
+                self._asset(connection, assignment["asset_key"], obj.asset_sha256, registry)
                 refs.append(
                     {
                         "kind": "reviewed_asset",
@@ -518,7 +576,7 @@ class SocietyRuntime:
     def authorize(self, connection: psycopg.Connection, session: Session, document: dict) -> None:
         """Authorize an exact persisted historical input or exact fresh server recomposition."""
         validate_society_input(document)
-        if document["profile"] == AUTHORED_GROUND_INPUT:
+        if is_authored_ground(document["profile"]):
             self._authored_authorize(connection, session, document)
             return
         binding = self._binding(session, uuid.UUID(document["version_id"]))
@@ -571,10 +629,17 @@ class SocietyRuntime:
             ):
                 raise UnavailableSocietyInput("historical society input binding drift")
             actual = {(r["kind"], r["identity"], r["sha256"]) for r in document["dependency_refs"]}
+            # A stored input is held to the registry it recorded, never to whichever registry this
+            # runtime holds now; a fresh one was compared byte for byte with a current composition.
+            registry_sha256, registry = self._recorded_registry(document)
             required = {
                 (r["kind"], r["identity"], r["sha256"])
                 for r in self._refs(binding)
-                + self._policy_refs(binding, composition=policy_for_input(document["profile"]))
+                + self._policy_refs(
+                    binding,
+                    composition=policy_for_input(document["profile"]),
+                    registry_sha256=registry_sha256,
+                )
             }
             if not required.issubset(actual):
                 raise UnavailableSocietyInput("runtime registration or registry binding drift")
@@ -594,7 +659,7 @@ class SocietyRuntime:
             self._district(connection, session, binding)
             for ref in document["dependency_refs"]:
                 if ref["kind"] == "reviewed_asset":
-                    self._asset(connection, ref["identity"], ref["sha256"])
+                    self._asset(connection, ref["identity"], ref["sha256"], registry)
 
     def authored_edit(
         self, connection: psycopg.Connection, session: Session, version_id: uuid.UUID
@@ -610,7 +675,9 @@ class SocietyRuntime:
                 "where workspace_id=%s and version_id=%s",
                 (session.workspace_id, version_id),
             ).fetchone()
-            if row is None or row["engine_version"] not in _INPUT_ENGINES:
+            # Only an engine that consumes inputs reacts to an edit; an engine the table does not
+            # state is refused by name rather than passed over.
+            if row is None or not society_engine(row["engine_version"]).takes_inputs:
                 return
             binding = self._binding(session, version_id)
             if (row["world_id"], row["place_id"], row["region_id"]) != (
@@ -719,13 +786,17 @@ class SocietyRuntime:
         ]
 
     def _authored_policy_refs(
-        self, binding: AuthoredWorldSocietyBinding, ground: SocietyGround
+        self,
+        binding: AuthoredWorldSocietyBinding,
+        ground: SocietyGround,
+        composition: str,
+        registry: Mapping[str, dict[str, Any]],
     ) -> list[dict[str, str]]:
         return policy_dependency_refs(
-            composition_profile=AUTHORED_GROUND_COMPOSITION,
+            composition_profile=composition,
             version_id=binding.version_id,
             registration=ground.registration(),
-            reviewed_affordances=json.loads(self._registry_bytes),
+            reviewed_affordances=registry,
         )
 
     def _authored_compose(
@@ -745,10 +816,10 @@ class SocietyRuntime:
                 assignment = registry.get(obj.asset_sha256)
                 if assignment is None:
                     raise UnavailableSocietyInput("reviewed affordance assignment is unavailable")
-                self._asset(connection, assignment["asset_key"], obj.asset_sha256)
+                self._asset(connection, assignment["asset_key"], obj.asset_sha256, registry)
         except UnavailableSocietyInput as exc:
             reason = str(exc)
-        return build_authored_ground_society_input(
+        return build_authored_ground_society_input_v2(
             ground=ground,
             version=version,
             input_seq=seq,
@@ -757,6 +828,7 @@ class SocietyRuntime:
             unavailable_reason=reason,
             reviewed_affordances=registry,
             segment_blocked=segment_blocked,
+            standing=self._standing,
         )
 
     def _authored_initial_input(
@@ -832,10 +904,15 @@ class SocietyRuntime:
             ):
                 raise UnavailableSocietyInput("historical society input binding drift")
             actual = {(r["kind"], r["identity"], r["sha256"]) for r in document["dependency_refs"]}
+            # A stored input is held to the policy its own profile names and the registry it
+            # recorded, never to whichever this runtime would choose for a new one.
+            _, registry = self._recorded_registry(document)
             required = {
                 (r["kind"], r["identity"], r["sha256"])
                 for r in self._authored_refs(binding, ground)
-                + self._authored_policy_refs(binding, ground)
+                + self._authored_policy_refs(
+                    binding, ground, policy_for_input(document["profile"]), registry
+                )
             }
             if not required.issubset(actual):
                 raise UnavailableSocietyInput("runtime registration or registry binding drift")
@@ -854,7 +931,7 @@ class SocietyRuntime:
             # Even a correctly persisted historic input needs current asset byte availability.
             for ref in document["dependency_refs"]:
                 if ref["kind"] == "reviewed_asset":
-                    self._asset(connection, ref["identity"], ref["sha256"])
+                    self._asset(connection, ref["identity"], ref["sha256"], registry)
 
     def _authored_world_edit(
         self, connection: psycopg.Connection, session: Session, version_id: uuid.UUID
@@ -869,7 +946,7 @@ class SocietyRuntime:
                 "where workspace_id=%s and version_id=%s",
                 (session.workspace_id, version_id),
             ).fetchone()
-            if row is None or row["engine_version"] not in _INPUT_ENGINES:
+            if row is None or not society_engine(row["engine_version"]).takes_inputs:
                 return
             connection.execute("select asset_read_lock()")
             genesis = connection.execute(
@@ -877,7 +954,7 @@ class SocietyRuntime:
                 "where workspace_id=%s and society_id=%s and input_seq=1",
                 (session.workspace_id, row["society_id"]),
             ).fetchone()
-            if genesis is None or genesis["profile"] != AUTHORED_GROUND_INPUT:
+            if genesis is None or not is_authored_ground(genesis["profile"]):
                 # A district society whose host registration is gone. Its edits need that
                 # registration, exactly as they always have.
                 raise UnavailableSocietyInput(

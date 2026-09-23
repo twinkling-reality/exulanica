@@ -5,9 +5,10 @@ import {
   type SocietyProfile,
   type SocietySnapshot,
 } from '../society-api.js';
+import { societyEngine } from '../society-engines.js';
 
 type SocietyPort = Pick<SocietyClient, 'connect' | 'read' | 'advance' | 'events'> &
-  Partial<Pick<SocietyClient, 'create'>>;
+  Partial<Pick<SocietyClient, 'create' | 'changePresence'>>;
 export interface LiveSocietyView {
   readonly mode: 'authenticated';
   /** `absent`: this world holds no society yet, and none is made until somebody asks. */
@@ -17,7 +18,7 @@ export interface LiveSocietyView {
   readonly events: readonly SocietyEvent[];
   readonly eventsAvailable: boolean;
   readonly message: string;
-  /** The server's refusal of the last request to bring inhabitants in, until the next one. */
+  /** The server's refusal of the person's last request about who lives here, until the next one. */
   readonly refusal: { readonly status: number; readonly code: string; readonly detail: string } | null;
 }
 export interface LiveSocietyOptions {
@@ -48,6 +49,10 @@ export interface LiveSociety {
   connect(): Promise<void>;
   /** Create this world's society because the person asked. Never called on their behalf. */
   bringIn(): Promise<void>;
+  /** Send everyone away because the person asked; the server records it as one minute. */
+  sendAway(): Promise<void>;
+  /** Bring the same people back because the person asked: a new arrival, not an undo. */
+  bringBack(): Promise<void>;
   refresh(): Promise<void>;
   advance(): Promise<void>;
   /** Call only after the authored API confirms an edit or restore succeeded. */
@@ -96,7 +101,9 @@ export function createLiveSociety(options: LiveSocietyOptions): LiveSociety {
         (view.snapshot && view.snapshot.societyId !== snapshot.societyId)) {
       throw new Error('Society response does not match the connected world');
     }
-    if (snapshot.state.profile !== 'exulanica-society/v2' && snapshot.state.profile !== 'exulanica-society/v4') {
+    // Live display follows recorded paths, so it reads an engine that consumes inputs; the
+    // engine table says which those are, and refuses an engine it does not state by name.
+    if (!societyEngine(snapshot.state.profile).takesInputs) {
       throw new Error('This world does not use a supported society profile. Its existing history was preserved.');
     }
     return snapshot;
@@ -144,6 +151,30 @@ export function createLiveSociety(options: LiveSocietyOptions): LiveSociety {
     }
   };
   const refresh = () => run(() => read());
+  /** A refusal is an answer about the world, and it changed nothing on the server. */
+  const refused = (error: unknown): boolean => {
+    if (!(error instanceof ApiError) || ![409, 422, 424].includes(error.status)) return false;
+    const prefix = `${error.code}: `;
+    const detail = error.message.startsWith(prefix) ? error.message.slice(prefix.length) : error.message;
+    publish({ refusal: { status: error.status, code: error.code, detail } });
+    return true;
+  };
+  const changePresence = (wanted: 'away' | 'here', message: string) => run(async () => {
+    const snapshot = view.snapshot;
+    if (client.changePresence === undefined) throw new Error('This society client cannot change who is here.');
+    if (!snapshot) throw new Error('Connect to this world\'s inhabitants first.');
+    publish({ refusal: null });
+    try {
+      await client.changePresence(snapshot, wanted);
+    } catch (error) {
+      if (refused(error)) {
+        await read();
+        return;
+      }
+      throw error;
+    }
+    await read(message);
+  });
   const api: LiveSociety = {
     get view() { return view; },
     // An existing society keeps its own profile. A new one is created with the profile this
@@ -160,10 +191,7 @@ export function createLiveSociety(options: LiveSocietyOptions): LiveSociety {
       } catch (error) {
         // A refusal is an answer about the world, such as nothing in it anybody can reach, and
         // it changed nothing on the server. It is kept for the surface to say in words.
-        if (!(error instanceof ApiError) || ![409, 422, 424].includes(error.status)) throw error;
-        const prefix = `${error.code}: `;
-        const detail = error.message.startsWith(prefix) ? error.message.slice(prefix.length) : error.message;
-        publish({ refusal: { status: error.status, code: error.code, detail } });
+        if (!refused(error)) throw error;
         if (view.snapshot === null) absent();
         return;
       }
@@ -171,6 +199,8 @@ export function createLiveSociety(options: LiveSocietyOptions): LiveSociety {
       await read('Inhabitants live in this world now. Each advance is one simulated minute.');
     }),
     refresh,
+    sendAway: () => changePresence('away', 'Everyone has left. What they did here is still in this world\'s history.'),
+    bringBack: () => changePresence('here', 'They are back. Each advance is one simulated minute.'),
     advance: () => run(async () => {
       const snapshot = view.snapshot;
       if (!snapshot || !view.eventsAvailable) {

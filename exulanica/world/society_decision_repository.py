@@ -19,8 +19,9 @@ from exulanica.world.society_decisions import (
     validate_decision_receipt,
     validate_decision_request,
 )
+from exulanica.world.society_engines import society_engine
 from exulanica.world.society_repository import SocietyRepository
-from exulanica.world.society_social import SOCIAL_PROFILE, decision_context, validate_proposal
+from exulanica.world.society_social import decision_context, validate_proposal
 
 
 class SocietyDecisionRepository:
@@ -33,8 +34,8 @@ class SocietyDecisionRepository:
         row = self.society._row(version_id, lock=True)
         if row is None:
             raise UnknownSociety("society is unavailable")
-        if row["engine_version"] != SOCIAL_PROFILE:
-            raise ValueError("model decisions require a v3 society")
+        if not society_engine(row["engine_version"]).model_decisions:
+            raise ValueError(f"{row['engine_version']} takes no model decisions")
         return row
 
     def _request(self, row: dict, request_id: uuid.UUID) -> dict | None:

@@ -14,7 +14,7 @@ const places = (overrides: Partial<SocietyPlaces> = {}): SocietyPlaces => ({
   inputSeq: 2, inputSha256: 'b'.repeat(64), available: true, unavailableReason: null,
   walkableArea: { source: 'declared', centreMm: [0, 0], halfWidthMm: 12000, halfDepthMm: 12000 },
   clearanceMm: 450,
-  targets: [{ targetId: 't-near', subjectId: 's-near', objectId: 'near', affordance: 'rest', durationTicks: 3, enabled: true }],
+  targets: [{ targetId: 't-near', subjectId: 's-near', objectId: 'near', affordance: 'rest', durationTicks: 3, enabled: true, placeNodeIds: [] }],
   unreachable: [
     { targetId: 't-far', objectId: 'far', affordance: 'rest', reason: 'authored_affordance_unreachable' },
     { targetId: 't-edge', objectId: 'edge', affordance: 'visit', reason: 'authored_affordance_unreachable' },
@@ -45,6 +45,24 @@ describe('where each object stands for inhabitants', () => {
     expect(rows[3]!.words).toBe('Inhabitants notice this after the next simulated minute.');
   });
 
+  it('says how many use a destination at once, and why an object nobody uses is unused', () => {
+    const rows = placeRows(objects, places({
+      targets: [{ targetId: 't-near', subjectId: 's-near', objectId: 'near', affordance: 'rest', durationTicks: 3, enabled: true,
+        placeNodeIds: ['place:near:0', 'place:near:1'] }],
+      unreachable: [
+        { targetId: 't-far', objectId: 'far', affordance: 'rest', reason: 'authored_object_moves' },
+        { targetId: 't-edge', objectId: 'edge', affordance: 'visit', reason: 'authored_object_off_ground' },
+        { targetId: 't-new', objectId: 'new', affordance: 'visit', reason: 'a_reason_this_panel_has_no_words_for' },
+      ],
+    }));
+    expect(rows.map((row) => [row.status.kind, row.words])).toEqual([
+      ['usable', 'Inhabitants can rest here, 2 at a time.'],
+      ['unusable', 'Inhabitants do not use this while it moves.'],
+      ['unusable', 'Inhabitants cannot use this: it is not resting on the ground.'],
+      ['unusable', 'Inhabitants cannot use this.'],
+    ]);
+  });
+
   it('says the area in the server\'s numbers, and says where the ground goes on', () => {
     expect(areaWords(places())).toBe(
       'They walk inside a square about 23 metres across around where you arrive. The ground goes on; they do not.',
@@ -71,7 +89,7 @@ describe('the inhabitants panel', () => {
 
   it('before anyone lives here: says so, says what they need, and offers only the request', () => {
     const onBringIn = vi.fn();
-    const panel = buildWorldInhabitants({ onBringIn, onAdvance: vi.fn() });
+    const panel = buildWorldInhabitants({ onBringIn, onAdvance: vi.fn() , onSendAway: vi.fn(), onBringBack: vi.fn() });
     panel.render({ society: view({}), objects: [], walked: 0, advanceBlocked: null });
     expect(panel.root.dataset['state']).toBe('absent');
     expect(panel.root.querySelector('.world-inhabitants-summary')?.textContent).toBe('Nobody lives here yet.');
@@ -84,7 +102,7 @@ describe('the inhabitants panel', () => {
   });
 
   it('shows a refusal until the next request, with its code only in the details', () => {
-    const panel = buildWorldInhabitants({ onBringIn: vi.fn(), onAdvance: vi.fn() });
+    const panel = buildWorldInhabitants({ onBringIn: vi.fn(), onAdvance: vi.fn() , onSendAway: vi.fn(), onBringBack: vi.fn() });
     panel.render({
       society: view({ refusal: { status: 422, code: 'invalid_society_state', detail: 'initial society requires reachable targets' } }),
       objects: [], walked: 0, advanceBlocked: null,
@@ -116,7 +134,7 @@ describe('the inhabitants panel', () => {
       },
     });
     const onAdvance = vi.fn();
-    const panel = buildWorldInhabitants({ onBringIn: vi.fn(), onAdvance });
+    const panel = buildWorldInhabitants({ onBringIn: vi.fn(), onAdvance , onSendAway: vi.fn(), onBringBack: vi.fn() });
     panel.render({ society: view({ status: 'ready', snapshot, eventsAvailable: true }), objects, walked: 3, advanceBlocked: null });
     expect(panel.root.dataset['state']).toBe('present');
     expect(panel.root.querySelector('.world-inhabitants-summary')?.textContent)

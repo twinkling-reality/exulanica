@@ -32,8 +32,10 @@ import uuid
 from collections.abc import Iterable, Sequence
 from functools import cache, partial
 from itertools import pairwise
+from pathlib import Path
 from typing import Any, Final
 
+from exulanica.world import society_catalogs
 from exulanica.world.society import (
     SOCIETY_NAMESPACE,
     SocietyEvent,
@@ -43,7 +45,6 @@ from exulanica.world.society import (
 )
 from exulanica.world.society_catalogs import (
     MINUTES_PER_DAY,
-    ROUTINE_VERSIONS,
     Activity,
     RoutineModel,
     load_routine_model,
@@ -189,19 +190,24 @@ class LivingPlace:
 
 
 @cache
-def _routine(versions: tuple[tuple[str, int], ...]) -> RoutineModel:
-    return load_routine_model(versions=dict(versions))
+def _routine(versions: tuple[tuple[str, int], ...], directory: Path) -> RoutineModel:
+    return load_routine_model(directory, versions=dict(versions))
 
 
 def current_routine() -> RoutineModel:
-    """The routine new societies are created under."""
-    return _routine(tuple(sorted(ROUTINE_VERSIONS.items())))
+    """The routine new societies are created under, from the catalog directory as it is now."""
+    versions = society_catalogs.ROUTINE_VERSIONS
+    return _routine(tuple(sorted(versions.items())), society_catalogs.ROUTINE_DIRECTORY)
 
 
 def routine_for(state: dict[str, Any]) -> RoutineModel:
-    """The routine a stored society recorded; a changed catalog file fails the digest check."""
+    """The routine a stored society recorded: the catalog versions it names, read side by side
+    with any newer ones. A changed catalog file fails the digest check."""
     versions = state["routine"]["catalog_versions"]
-    return _routine(tuple(sorted((str(k), int(v)) for k, v in versions.items())))
+    return _routine(
+        tuple(sorted((str(k), int(v)) for k, v in versions.items())),
+        society_catalogs.ROUTINE_DIRECTORY,
+    )
 
 
 def living_places(
@@ -872,7 +878,8 @@ def _options(
             because = f"{need.label} at {value} of 1000"
             if not is_pressing:
                 because = f"nothing pressing; {because}"
-        # The shortage is deliberately discarded: v4 cannot record it (see this function's docstring).
+        # The shortage is deliberately discarded: v4 cannot record it (see this function's
+        # docstring).
         targets, _shortage = _targets(
             person, place, activity, paths, here_spot, here_dest, spot_holder, visitors
         )

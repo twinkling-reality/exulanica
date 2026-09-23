@@ -16,6 +16,7 @@
     "texture-look": "tsx packages/loom-texture/src/inspect/look-cli.ts",
     "tess": "tsx packages/loom-tess/src/node/cli.ts",
     "world-style:sync": "tsx scripts/sync-world-style-registry.ts",
+    "society-engines:sync": "tsx scripts/sync-society-engines.ts",
     "app": "pnpm --filter @exulanica/app dev",
     "app:build": "pnpm --filter @exulanica/app build",
     "landing": "pnpm --filter @exulanica/landing dev",

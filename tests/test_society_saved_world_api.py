@@ -470,12 +470,23 @@ def add_turned(world, runtime, object_id, x_mm, z_mm, yaw):
 def test_a_society_recorded_under_the_old_rule_still_reads_and_moves_on(saved_world, monkeypatch):
     """Inputs stored while a turned object made the world unusable stay exactly as they were.
 
-    The rule that refused any turn is put back for the first part, so the society records what it
-    recorded then. With the rule of today restored, every stored input still authorises (they are
-    matched by their stored bytes, never composed again), the society still reads and replays,
-    and the next edit composes a usable world again, with nobody stranded.
+    The first saved-world composition, with the rule that refused any turn, is put back for the
+    first part, so the society records what it recorded then. With today's composition restored,
+    every stored input still authorises (they are matched by their stored bytes, never composed
+    again), the society still reads and replays, and the next edit composes a usable world again
+    under the second profile, with nobody stranded.
     """
+    import exulanica.api.society_runtime as runtime_module
     import exulanica.world.society_composition as composition
+    from exulanica.world.society_authored_ground import build_authored_ground_society_input
+    from exulanica.world.society_input_policy import (
+        AUTHORED_GROUND_INPUT,
+        AUTHORED_GROUND_INPUT_V2,
+    )
+
+    def first_composition(*, standing, **arguments):
+        # What the runtime composed a saved world with before objects were decided one by one.
+        return build_authored_ground_society_input(**arguments)
 
     world = saved_world
     connection = world["connection"]
@@ -487,6 +498,7 @@ def test_a_society_recorded_under_the_old_rule_still_reads_and_moves_on(saved_wo
     )
     society = helpers.society_repository(world, runtime)
     monkeypatch.setattr(composition, "AUTHORED_GROUND_COMPOSITION", "the rule before turns")
+    monkeypatch.setattr(runtime_module, "build_authored_ground_society_input_v2", first_composition)
 
     add_turned(world, runtime, "object:cushion", 3_000, 5_000, 0)
     with connection.transaction():
@@ -514,6 +526,7 @@ def test_a_society_recorded_under_the_old_rule_still_reads_and_moves_on(saved_wo
         ).fetchall()
     ]
     assert [d["availability"] for d in stored] == ["available", "unavailable"]
+    assert [d["profile"] for d in stored] == [AUTHORED_GROUND_INPUT] * 2
     assert stored[1]["unavailable_reason"] == "unsupported_object_transform:object:turned"
     for document in stored:
         runtime.authorize(connection, session, document)
@@ -527,6 +540,7 @@ def test_a_society_recorded_under_the_old_rule_still_reads_and_moves_on(saved_wo
         (world["workspace"],),
     ).fetchone()["document"]
     assert latest["input_seq"] == 3 and latest["availability"] == "available"
+    assert latest["profile"] == AUTHORED_GROUND_INPUT_V2
     assert sorted(t["object_id"] for t in latest["targets"]) == [
         "object:cushion",
         "object:facing",

@@ -1,0 +1,314 @@
+// Lane F (society): what opening a saved world with inhabitants costs in the release build, against
+// how many inputs the society's history holds. Ignored evidence script.
+//
+//   node open_prod.mjs --state /tmp/exulanica-0922-acceptance/<worktree>/state.json \
+//        --preview http://localhost:19229/ --out FILE --label after|before \
+//        [--sizes 1,25,100,400] [--opens 5] [--ticks 10]
+//
+// Setup goes through the routes the page itself calls, as the page calls them: the starter world
+// (POST /world-entries/starter), one Marker plate in front of the person (compositions/apply),
+// inhabitants (POST .../society, profile v2), TICKS simulated minutes (POST .../society/steps).
+// The history then grows by moving the plate back and forth by 100 mm (POST .../objects/{id}/move,
+// each an accepted edit and so one society input), and one minute consumes the queued inputs.
+//
+// Each open is a new document of the release build served by `vite preview`: navigate to
+// about:blank, navigate to the build, paste the slot's token into the access form and submit, as a
+// person does. Marks come from an instrument installed before any page script runs:
+//   submit  the access form's submit click (performance.now)
+//   shown   the first moment canvas.dataset.societyTick names the society's current minute,
+//           polled every 10 ms; the page sets it, with societyRendered, when it hands the
+//           society's state to the renderer
+// and from Resource Timing for the three society reads the page makes when a world opens: the
+// society with its places, its events and its playback control, each read's duration and, as
+// reads_done, when the last of the three first reads ended. `shown` follows the society read
+// alone; the events and control reads may end after it. One open before the series warms the HTTP
+// cache for the build's own files and is not counted.
+//
+// Launches its own headless Chrome (own profile under the run directory, the slot's debugging port)
+// and talks CDP over Node's WebSocket. The token is read from the launcher's token file and typed
+// into the page; it is never printed or written.
+
+import { spawn } from 'node:child_process';
+import { readFileSync, writeFileSync } from 'node:fs';
+import { join, resolve } from 'node:path';
+import { loadavg } from 'node:os';
+
+const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const STARTED = Date.now() / 1000;
+
+function argument(name, fallback) {
+  const at = process.argv.indexOf(`--${name}`);
+  return at > 0 ? process.argv[at + 1] : fallback;
+}
+const stateFile = resolve(argument('state'));
+const state = JSON.parse(readFileSync(stateFile, 'utf8'));
+const out = resolve(argument('out'));
+const label = argument('label');
+const previewUrl = argument('preview', 'http://localhost:19229/');
+const sizes = argument('sizes', '1,25,100,400').split(',').map(Number);
+const opens = Number(argument('opens', '5'));
+const ticks = Number(argument('ticks', '10'));
+const token = readFileSync(state.token_file, 'utf8').trim();
+const apiBase = `http://127.0.0.1:${state.ports.api}`;
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+if (!label) throw new Error('--label names the arm');
+
+const profile = join(state.run_dir, `chrome-profile-lane-f-open-${Date.now()}`);
+const chrome = spawn(CHROME, [
+  '--headless=new', `--remote-debugging-port=${state.ports.browser}`, `--user-data-dir=${profile}`,
+  '--window-size=1440,900', '--no-first-run', '--no-default-browser-check',
+  '--disable-extensions', '--disable-background-networking', '--disable-sync',
+  '--password-store=basic', '--use-mock-keychain', 'about:blank',
+], { stdio: 'ignore', detached: true });
+process.on('exit', () => { try { process.kill(-chrome.pid, 'SIGTERM'); } catch { /* gone */ } });
+
+async function debuggerTarget() {
+  for (let i = 0; i < 60; i += 1) {
+    try {
+      const list = await (await fetch(`http://127.0.0.1:${state.ports.browser}/json/list`)).json();
+      const page = list.find((t) => t.type === 'page');
+      if (page) return page.webSocketDebuggerUrl;
+    } catch { /* not up yet */ }
+    await sleep(250);
+  }
+  throw new Error('headless Chrome did not expose a page target');
+}
+
+class Cdp {
+  constructor(url) {
+    this.socket = new WebSocket(url);
+    this.next = 1;
+    this.pending = new Map();
+    this.socket.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      if (message.id && this.pending.has(message.id)) {
+        const { ok, reject } = this.pending.get(message.id);
+        this.pending.delete(message.id);
+        if (message.error) reject(new Error(`${message.error.message} ${message.error.data ?? ''}`));
+        else ok(message.result);
+      }
+    };
+  }
+  open() { return new Promise((ok, fail) => { this.socket.onopen = ok; this.socket.onerror = fail; }); }
+  send(method, params = {}, timeoutMs = 120_000) {
+    const id = this.next++;
+    this.socket.send(JSON.stringify({ id, method, params }));
+    return new Promise((ok, reject) => {
+      const timer = setTimeout(() => { this.pending.delete(id); reject(new Error(`${method} timed out`)); }, timeoutMs);
+      this.pending.set(id, {
+        ok: (value) => { clearTimeout(timer); ok(value); },
+        reject: (error) => { clearTimeout(timer); reject(error); },
+      });
+    });
+  }
+}
+
+async function api(method, path, body) {
+  const response = await fetch(`${apiBase}${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  const text = await response.text();
+  let parsed = text;
+  try { parsed = JSON.parse(text); } catch { /* not JSON */ }
+  if (response.status >= 300) throw new Error(`${method} ${path.split('?')[0]} answered ${response.status}: ${text.slice(0, 300)}`);
+  return parsed;
+}
+
+// ------------------------------------------------------------------------------------------------
+// The world, through the routes the page calls
+// ------------------------------------------------------------------------------------------------
+const PLATE = 'object-1-1';
+let world = null;
+
+async function entry() {
+  const listed = await api('GET', '/world-entries');
+  return listed.find((e) => e.world_id === world.world_id);
+}
+const scope = () => `world_id=${encodeURIComponent(world.world_id)}`;
+const versionPath = () => `/world/versions/${world.version_id}`;
+const savedEntry = (e) => ({ entry_id: e.entry_id, base_revision: e.revision,
+  authored_state_sha256: e.current_authored_state_sha256, authored_edit_seq: e.current_authored_edit_seq });
+
+async function society() {
+  return api('GET', `${versionPath()}/society?${scope()}`);
+}
+async function advance(current) {
+  return api('POST', `${versionPath()}/society/steps?${scope()}`,
+    { base_tick: current.current_tick, base_state_sha256: current.state_sha256 });
+}
+
+async function setup() {
+  const created = await api('POST', '/world-entries/starter', { title: 'My world' });
+  world = { world_id: created.world_id, version_id: created.authored_version_id };
+  const e = await entry();
+  const version = await api('GET', `${versionPath()}?${scope()}`);
+  await api('POST', `${versionPath()}/compositions/apply?${scope()}`, {
+    source: { kind: 'reviewed_asset', asset_key: 'cc0.marker-plate' },
+    placement: { subject_id: PLATE, region_id: 'region:starter',
+      transform: { x_mm: 0, y_mm: 0, z_mm: 500, yaw_microradians: 3141593, scale_milli: 1000 },
+      origin_role: 'fictional', behaviour: null },
+    base_state_sha256: version.state_sha256,
+    saved_entry: savedEntry(e),
+  });
+  let current = await api('POST', `${versionPath()}/society?${scope()}`,
+    { region_id: 'region:starter', seed: '7a'.repeat(32), profile: 'exulanica-society/v2' });
+  for (let i = 0; i < ticks; i += 1) current = await advance(current);
+  return current;
+}
+
+let edits = 0;
+async function growTo(inputs) {
+  let current = await society();
+  while (edits < inputs - 1) {
+    const e = await entry();
+    const version = await api('GET', `${versionPath()}?${scope()}`);
+    await api('POST', `${versionPath()}/objects/${PLATE}/move?${scope()}`, {
+      transform: { x_mm: edits % 2 === 0 ? 100 : 0, y_mm: 0, z_mm: 500, yaw_microradians: 3141593, scale_milli: 1000 },
+      base_state_sha256: version.state_sha256,
+      saved_entry: savedEntry(e),
+    });
+    edits += 1;
+  }
+  current = await advance(current);
+  if (current.input_seq !== inputs) throw new Error(`the society consumed input ${current.input_seq}, not ${inputs}`);
+  return current;
+}
+
+// ------------------------------------------------------------------------------------------------
+// One open of the release build
+// ------------------------------------------------------------------------------------------------
+const cdp = new Cdp(await debuggerTarget());
+await cdp.open();
+await cdp.send('Page.enable');
+await cdp.send('Runtime.enable');
+await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+
+async function evaluate(expression) {
+  const result = await cdp.send('Runtime.evaluate', { expression, awaitPromise: true, returnByValue: true, userGesture: true });
+  if (result.exceptionDetails) {
+    throw new Error(`evaluate failed: ${result.exceptionDetails.exception?.description ?? result.exceptionDetails.text}`);
+  }
+  return result.result.value;
+}
+async function waitFor(expression, timeoutMs, what) {
+  const deadline = Date.now() + timeoutMs;
+  let last;
+  while (Date.now() < deadline) {
+    try { last = await evaluate(expression); if (last) return last; } catch (error) { last = error.message; }
+    await sleep(50);
+  }
+  throw new Error(`timed out after ${timeoutMs} ms waiting for ${what} (last: ${JSON.stringify(last)})`);
+}
+
+await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: `
+  window.__oc = { submit: null, shown: null, errors: [] };
+  addEventListener('error', (e) => window.__oc.errors.push(String(e.message).slice(0, 300)));
+  document.addEventListener('click', (e) => {
+    if (window.__oc.submit === null && e.target instanceof Element && e.target.closest('button.credential-submit')) {
+      window.__oc.submit = performance.now();
+    }
+  }, true);
+  const poll = setInterval(() => {
+    const canvas = document.querySelector('canvas');
+    const tick = canvas && canvas.dataset.societyTick;
+    if (tick !== undefined && tick !== null && Number(tick) === window.__ocExpect) {
+      window.__oc.shown = performance.now();
+      window.__oc.tick = Number(tick);
+      window.__oc.rendered = Number(canvas.dataset.societyRendered);
+      clearInterval(poll);
+    }
+  }, 10);
+` });
+
+async function openOnce(expectTick) {
+  await cdp.send('Page.navigate', { url: 'about:blank' });
+  await sleep(300);
+  await cdp.send('Page.navigate', { url: previewUrl });
+  await waitFor(`document.readyState !== 'loading' && !!document.querySelector('form.credential-gate input[type=password]')`, 30_000, 'the access form');
+  await evaluate(`(() => { window.__ocExpect = ${expectTick}; document.querySelector('form.credential-gate input[type=password]').focus(); return true; })()`);
+  await cdp.send('Input.insertText', { text: token });
+  const at = await waitFor(`(() => { const b = document.querySelector('button.credential-submit'); if (!b || b.disabled) return null;
+    const r = b.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; })()`, 10_000, 'the submit button');
+  for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) {
+    await cdp.send('Input.dispatchMouseEvent', { type, x: at.x, y: at.y, button: 'left', clickCount: 1 });
+  }
+  await waitFor('window.__oc && window.__oc.submit !== null', 10_000, 'the submit mark');
+  await waitFor('window.__oc.shown !== null', 90_000, 'the inhabitants handed to the renderer');
+  await sleep(1500);
+  const marks = await evaluate(`(() => {
+    const reads = performance.getEntriesByType('resource')
+      .filter((e) => /\\/api\\/world\\/versions\\/[^/]+\\/society(\\/events|\\/control)?\\?/.test(e.name))
+      .map((e) => ({ path: new URL(e.name).pathname.replace(/\\/versions\\/[^/]+\\//, '/versions/{id}/'),
+        start: e.startTime, end: e.responseEnd, duration: e.duration, bytes: e.transferSize }));
+    return { submit: window.__oc.submit, shown: window.__oc.shown, tick: window.__oc.tick, rendered: window.__oc.rendered, errors: window.__oc.errors, reads };
+  })()`);
+  if (marks.tick !== expectTick) throw new Error(`the page showed minute ${marks.tick}, not ${expectTick}`);
+  const read = (suffix) => marks.reads.filter((r) => r.path.endsWith(suffix))
+    .reduce((first, r) => (first === null || r.start < first.start ? r : first), null);
+  const societyRead = read('/society'), events = read('/society/events'), control = read('/society/control');
+  const us = (ms) => (ms === null || ms === undefined ? null : Math.round(ms * 1000));
+  const firsts = [societyRead, events, control];
+  return {
+    submit_to_shown_us: us(marks.shown - marks.submit),
+    submit_to_reads_done_us: firsts.every((r) => r !== null) ? us(Math.max(...firsts.map((r) => r.end)) - marks.submit) : null,
+    society_read_us: us(societyRead?.duration), events_read_us: us(events?.duration), control_read_us: us(control?.duration),
+    society_read_bytes: societyRead?.bytes ?? null, events_read_bytes: events?.bytes ?? null,
+    rendered: marks.rendered, reads_seen: marks.reads.length, page_errors: marks.errors,
+  };
+}
+
+function quantile(values, q) {
+  const ordered = values.filter((v) => v !== null).sort((a, b) => a - b);
+  return ordered.length ? ordered[Math.min(ordered.length - 1, Math.max(0, Math.ceil(q * ordered.length) - 1))] : null;
+}
+const summary = (values) => ({ n: values.length, p50_us: quantile(values, 0.5), p95_us: quantile(values, 0.95),
+  min_us: quantile(values, 0), max_us: quantile(values, 1) });
+
+function idleDuring() {
+  const file = process.env.LANE_IDLE_SAMPLES;
+  if (!file) return null;
+  const values = readFileSync(file, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line))
+    .filter((v) => v.t >= STARTED).map((v) => v.idle);
+  return { samples: values.length, mean: values.length ? Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) / 10 : null,
+    min: values.length ? Math.min(...values) : null };
+}
+
+const record = { label, preview: previewUrl, worktree: state.worktree, tree: state.tree, run_id: state.run_id,
+  api_imported_exulanica_from: state.api_imported_exulanica_from, population: null, ticks,
+  load_before: loadavg(), started_at: new Date().toISOString(), points: [] };
+const version = await cdp.send('Browser.getVersion');
+record.browser = { product: version.product, revision: version.revision, userAgent: version.userAgent };
+
+let current = await setup();
+record.population = current.population_size;
+record.world = world;
+await openOnce(current.current_tick);  // warms the HTTP cache for the build's files; not counted
+for (const size of sizes) {
+  current = await growTo(size);
+  const runs = [];
+  for (let i = 0; i < opens; i += 1) runs.push(await openOnce(current.current_tick));
+  const point = { inputs: size, tick: current.current_tick,
+    submit_to_shown: summary(runs.map((r) => r.submit_to_shown_us)),
+    submit_to_reads_done: summary(runs.map((r) => r.submit_to_reads_done_us)),
+    society_read: summary(runs.map((r) => r.society_read_us)),
+    events_read: summary(runs.map((r) => r.events_read_us)),
+    control_read: summary(runs.map((r) => r.control_read_us)),
+    runs, load_after: loadavg() };
+  record.points.push(point);
+  console.log(JSON.stringify({ label, inputs: size, tick: point.tick, shown_p50_us: point.submit_to_shown.p50_us,
+    shown_max_us: point.submit_to_shown.max_us, reads_done_p50_us: point.submit_to_reads_done.p50_us,
+    society_p50_us: point.society_read.p50_us,
+    events_p50_us: point.events_read.p50_us, control_p50_us: point.control_read.p50_us }));
+  writeFileSync(out, JSON.stringify(record, null, 1));
+}
+record.idle_during = idleDuring();
+record.load_after = loadavg();
+record.finished_at = new Date().toISOString();
+writeFileSync(out, JSON.stringify(record, null, 1));
+if (record.idle_during && record.idle_during.mean !== null && record.idle_during.mean < 50) {
+  console.log('discarded: mean idle below 50 percent during the run');
+  process.exit(75);
+}
+process.exit(0);

@@ -15,9 +15,13 @@ from exulanica.api.society_decision_runtime import request_decision
 from exulanica.world.models import DEFAULT_WORLD_ID
 from exulanica.world.society import UnavailableSocietyInput
 from exulanica.world.society_decision_repository import SocietyDecisionRepository
+from exulanica.world.society_engines import DEFAULT_ENGINE, ENGINES, society_engine
+from exulanica.world.society_presence import PresenceRefused
 from exulanica.world.society_repository import SocietyRepository
 
 router = APIRouter(prefix="/world", tags=["society"])
+#: The profiles a society can be created with: the engine table's, in its order.
+EngineProfile = Literal[tuple(engine.engine for engine in ENGINES)]  # type: ignore[valid-type]
 
 #: Which saved world the authored version belongs to. A person's own world is not the default
 #: one, and the repository refuses a version that does not belong to the world named here, so a
@@ -32,18 +36,21 @@ class CreateSocietyBody(BaseModel):
     place_id: uuid.UUID | None = None
     region_id: Annotated[str, Field(min_length=1, max_length=500)]
     seed: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
-    profile: Literal[
-        "exulanica-society/v1",
-        "exulanica-society/v2",
-        "exulanica-society/v3",
-        "exulanica-society/v4",
-    ] = "exulanica-society/v1"
+    #: Every engine the engine table states, and its default; nothing here restates the list.
+    profile: EngineProfile = DEFAULT_ENGINE  # type: ignore[valid-type]
 
 
 class AdvanceSocietyBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     base_tick: Annotated[int, Field(ge=0)]
     base_state_sha256: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
+
+
+class PresenceBody(AdvanceSocietyBody):
+    """Send everyone away, or bring them back, against the state the person was shown."""
+
+    idempotency_key: uuid.UUID
+    presence: Literal["away", "here"]
 
 
 class DecisionBody(AdvanceSocietyBody):
@@ -98,11 +105,7 @@ def create_society(
         with connection.transaction():
             document = None
             place_id = body.place_id
-            if body.profile in (
-                "exulanica-society/v2",
-                "exulanica-society/v3",
-                "exulanica-society/v4",
-            ):
+            if society_engine(body.profile).takes_inputs:
                 provider = getattr(request.app.state, "society_initial_input", None)
                 if provider is None:
                     raise UnavailableSocietyInput(
@@ -203,6 +206,39 @@ def advance_society(
         ),
         invalid_status=409,
     )
+
+
+@router.post("/versions/{version_id}/society/presence")
+def change_society_presence(
+    version_id: uuid.UUID,
+    body: PresenceBody,
+    connection: ScopedConnection,
+    session: CurrentSession,
+    request: Request,
+    world_id: WorldId = DEFAULT_WORLD_ID,
+) -> Any:
+    """One recorded minute in which everyone leaves, or the same people arrive again.
+
+    The request names only what the person wants and the state they saw; the server resolves the
+    world, the society, the rights and the minute. A refusal names what stands in the way.
+    """
+
+    def change() -> Any:
+        try:
+            return _repository(connection, session, request, world_id).change_presence(
+                version_id,
+                wanted=body.presence,
+                request_id=body.idempotency_key,
+                requested_by=session.actor,
+                base_tick=body.base_tick,
+                base_state_sha256=body.base_state_sha256,
+            )
+        except PresenceRefused as exc:
+            return JSONResponse(
+                status_code=409, content={"code": exc.code, "detail": exc.detail or exc.code}
+            )
+
+    return _call(change, invalid_status=409)
 
 
 @router.get("/versions/{version_id}/society/events")

@@ -1,0 +1,83 @@
+"""Diagnosis, not a timing figure: where an events read spends its time when its events name older
+inputs. Ungated; its times only compare one call's parts with each other.
+
+    .venv/bin/python -B .exulanica/lane-society/diag_events.py OUT.txt
+
+Builds the release run's world in process (open_prod.mjs): one Marker plate at (0, 500), yaw pi,
+profile v2 at the product's population, ten minutes, then the plate moved back and forth by 100 mm
+and one minute consuming the queued inputs, to 25, 100 and 400 stored inputs. For each size it
+writes how many distinct inputs the page of events names and how many authorizations the read
+made, then cProfile's top entries for one events() call at 400.
+"""
+import cProfile
+import io
+import pstats
+import sys
+import time
+from pathlib import Path
+
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+import open_cost  # noqa: E402
+from exulanica.world.objects import AuthoredObject, ObjectOrigin, Transform  # noqa: E402
+from exulanica.world.starter import AUTHORED_STARTER_REGION_ID, create_starter_authorities  # noqa: E402
+
+out = Path(sys.argv[1])
+lines = []
+h = open_cost.Harness()
+try:
+    with h.database.session(h.workspace) as c:
+        world_id = "world:authored:diagnosis"
+        with c.transaction():
+            _, _, vid = create_starter_authorities(c, workspace_id=h.workspace, actor=h.actor,
+                                                   title="My world", world_id=world_id)
+        objects = h.objects(c, world_id)
+        version = objects.version(vid)
+        objects.add_object(vid, AuthoredObject(
+            object_id="object:cushion", asset_sha256=h.plate.content_sha256, region_id=AUTHORED_STARTER_REGION_ID,
+            transform=Transform(0, 0, 500, 3_141_593, 1000), origin=ObjectOrigin("authored", "fictional")),
+            base_state_sha256=version.state_sha256, actor=h.actor)
+        with c.transaction():
+            place = h.runtime.saved_world_place(c, h.session, vid)
+            document = h.runtime.initial_input(c, h.session, vid, None, AUTHORED_STARTER_REGION_ID)
+            society = h.societies(c, world_id).create(
+                vid, place_id=place, region_id=AUTHORED_STARTER_REGION_ID, seed=open_cost.SEED,
+                actor=h.actor, profile=open_cost.PROFILE, initial_input=document)
+        repo = h.societies(c, world_id)
+
+        def step(s):
+            return repo.advance(vid, base_tick=s["current_tick"], base_state_sha256=s["state_sha256"])
+
+        for _ in range(10):
+            society = step(society)
+        edits = 0
+        for size in (25, 100, 400):
+            for i in range(edits, size - 1):
+                current = objects.version(vid)
+                objects.move_object(vid, "object:cushion",
+                                    Transform(100 if i % 2 == 0 else 0, 0, 500, 3_141_593, 1000),
+                                    base_state_sha256=current.state_sha256, actor=h.actor)
+            edits = size - 1
+            society = step(society)
+            c.commit()
+            calls = []
+            authorize = repo.input_authorizer
+            repo.input_authorizer = lambda doc: (calls.append(doc["input_seq"]), authorize(doc))[1]
+            t0 = time.perf_counter()
+            events = repo.events(vid, limit=256)
+            t1 = time.perf_counter()
+            repo.input_authorizer = authorize
+            named = sorted({e["document"]["input_seq"] for e in events})
+            lines.append(f"inputs {size}: {len(events)} events naming {len(named)} distinct inputs "
+                         f"(lowest {named[0]}, highest {named[-1]}); {len(calls)} authorizations; "
+                         f"one call {1000 * (t1 - t0):.1f} ms")
+        profile = cProfile.Profile()
+        profile.enable()
+        repo.events(vid, limit=256)
+        profile.disable()
+        text = io.StringIO()
+        pstats.Stats(profile, stream=text).sort_stats("cumulative").print_stats(18)
+        lines.append(text.getvalue())
+finally:
+    h.close()
+out.write_text("\n".join(lines) + "\n")
+print("\n".join(lines[:3]))

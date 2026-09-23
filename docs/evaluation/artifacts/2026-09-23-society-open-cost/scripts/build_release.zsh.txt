@@ -1,0 +1,42 @@
+#!/bin/zsh
+# Lane F (society): build the app for release into prod-dist beside this script and record what was
+# built. Ignored evidence script.
+#
+#   zsh build_release.zsh
+#
+# The environment is emptied except HOME and PATH, so no VITE_ variable, and no token, reaches the
+# bundle; the app directory holds no .env file. runs/open-prod/build.json names the tree (head,
+# working diff digest, untracked file digest), the Vite version and every emitted file's digest.
+emulate -L zsh
+W=<worktree>
+L=$W/.exulanica/lane-society
+APP=$W/web/packages/app
+OUT=$L/prod-dist
+mkdir -p $L/runs/open-prod
+started=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+(cd $APP && env -i HOME=$HOME PATH=$PATH ./node_modules/.bin/vite build --outDir $OUT --emptyOutDir) \
+  > $L/runs/open-prod/build.log 2>&1 || { print -r -- "build failed"; tail -30 $L/runs/open-prod/build.log; exit 1 }
+if grep -rq "VITE_EXULANICA_TOKEN" $OUT 2>/dev/null; then print -r -- "the bundle names the token variable"; fi
+head=$(git -C $W rev-parse HEAD)
+diff_sha=$(git -C $W --no-optional-locks diff HEAD --binary | shasum -a 256 | cut -d' ' -f1)
+untracked_sha=$(cd $W && git --no-optional-locks ls-files --others --exclude-standard | sort | xargs shasum -a 256 | shasum -a 256 | cut -d' ' -f1)
+vite=$($APP/node_modules/.bin/vite --version)
+W=$W OUT=$OUT STARTED=$started HEAD_SHA=$head DIFF_SHA=$diff_sha UNTRACKED_SHA=$untracked_sha VITE=$vite python3 - <<'EOF'
+import hashlib, json, os
+from pathlib import Path
+out = Path(os.environ["OUT"])
+files = sorted(p for p in out.rglob("*") if p.is_file())
+build = {
+    "command": "vite build --outDir prod-dist --emptyOutDir, from web/packages/app, environment emptied but HOME and PATH",
+    "vite": os.environ["VITE"],
+    "started_at": os.environ["STARTED"],
+    "tree": {"head": os.environ["HEAD_SHA"], "working_diff_sha256": os.environ["DIFF_SHA"],
+             "untracked_files_sha256": os.environ["UNTRACKED_SHA"]},
+    "files": [{"path": p.relative_to(out).as_posix(), "byte_size": p.stat().st_size,
+               "sha256": hashlib.sha256(p.read_bytes()).hexdigest()} for p in files],
+}
+index = next(f for f in build["files"] if f["path"] == "index.html")
+build["index_html_sha256"] = index["sha256"]
+Path(os.environ["W"], ".exulanica/lane-society/runs/open-prod/build.json").write_text(json.dumps(build, indent=1))
+print("built", len(files), "files; index.html", index["sha256"][:16], "tree diff", os.environ["DIFF_SHA"][:16])
+EOF

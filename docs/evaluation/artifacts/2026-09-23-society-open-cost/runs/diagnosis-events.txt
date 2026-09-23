@@ -1,0 +1,30 @@
+inputs 25: 66 events naming 14 distinct inputs (lowest 1, highest 25); 15 authorizations; one call 57.9 ms
+inputs 100: 148 events naming 52 distinct inputs (lowest 1, highest 100); 53 authorizations; one call 229.6 ms
+inputs 400: 256 events naming 128 distinct inputs (lowest 102, highest 356); 129 authorizations; one call 707.4 ms
+         5552969 function calls (4977500 primitive calls) in 1.306 seconds
+
+   Ordered by: cumulative time
+   List reduced from 283 to 18 due to restriction <18>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+        1    0.000    0.000    1.339    1.339 <worktree>/exulanica/world/society_repository.py:677(events)
+      129    0.000    0.000    0.931    0.007 <worktree>/exulanica/world/society_repository.py:115(_authorize)
+      129    0.000    0.000    0.931    0.007 <worktree>/.exulanica/lane-society/open_cost.py:111(<lambda>)
+      129    0.010    0.000    0.930    0.007 <worktree>/exulanica/api/society_runtime.py:580(authorize)
+      258    0.001    0.000    0.718    0.003 <worktree>/exulanica/world/society_planner.py:389(validate_society_input)
+      258    0.149    0.001    0.717    0.003 <worktree>/exulanica/world/society_planner.py:96(_validate_society_input)
+      129    0.006    0.000    0.552    0.004 <worktree>/exulanica/api/society_runtime.py:855(_authored_authorize)
+     1161    0.003    0.000    0.420    0.000 <worktree>/exulanica/world/society.py:60(society_state_sha256)
+     1419    0.002    0.000    0.418    0.000 <worktree>/exulanica/canonical.py:70(canonical_json)
+        2    0.000    0.000    0.405    0.202 <worktree>/exulanica/world/society_repository.py:292(_inputs)
+      258    0.000    0.000    0.400    0.002 <worktree>/exulanica/world/society_planner.py:92(input_sha256)
+      129    0.000    0.000    0.350    0.003 <worktree>/exulanica/world/society_repository.py:229(_validate_scope)
+576888/1419    0.247    0.000    0.342    0.000 <worktree>/exulanica/canonical.py:46(_check)
+      129    0.001    0.000    0.297    0.002 <worktree>/exulanica/api/society_runtime.py:755(_authored_version)
+      129    0.003    0.000    0.296    0.002 <worktree>/exulanica/world/object_repository.py:315(version)
+     2071    0.176    0.000    0.295    0.000 <worktree>/.venv/lib/python3.11/site-packages/psycopg/connection.py:476(wait)
+     1813    0.002    0.000    0.286    0.000 <worktree>/.venv/lib/python3.11/site-packages/psycopg/connection.py:277(execute)
+     1813    0.002    0.000    0.271    0.000 <worktree>/.venv/lib/python3.11/site-packages/psycopg/cursor.py:100(execute)
+
+
+

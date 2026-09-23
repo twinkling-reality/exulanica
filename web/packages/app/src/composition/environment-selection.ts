@@ -315,6 +315,9 @@ export function mountEnvironmentSelection(
   const inhabitantsPanel = buildWorldInhabitants({
     onBringIn: () => void bringInInhabitants(),
     onAdvance: () => void stepPlayback(),
+    // The person's own requests; the server records each as one minute of the world's history.
+    onSendAway: () => void changePresence('away'),
+    onBringBack: () => void changePresence('here'),
   });
   let previewState: OwnedSocietyState | null = null;
   let recording: LivingSocietyRecording | null = null;
@@ -475,7 +478,7 @@ export function mountEnvironmentSelection(
         ['Plane / origin', 'Simulation · synthetic'],
         ['Visibility', crowd()?.visibleInhabitantIds.includes(id) ? 'In the nearby display' : 'Outside the nearby display; identity is retained'],
         ['Current activity', v2 && inhabitant.action ? `${inhabitant.action.kind} · ${inhabitant.action.status}: ${inhabitant.action.reason}` : 'Unavailable'],
-        ['Goal / destination', v2 && goal ? `${goal.kind} · ${goal.target_id}: ${goal.reason}` : 'Unavailable'],
+        ['Goal / destination', v2 && goal ? (goal.target_id === null ? 'Making room at a busy place' : `${goal.kind} · ${goal.target_id}: ${goal.reason}`) : 'Unavailable'],
         ['Recorded event details', eventText || (liveSociety?.view.eventsAvailable ? 'No event references for this activity.' : 'Event documents unavailable in this view.')],
         ['Event references', v2 ? inhabitant.explanation?.event_ids.join(', ') || 'No recorded event references' : 'Unavailable'],
         ['Producer', state.profile ?? 'Static preview fixture'],
@@ -1351,6 +1354,14 @@ export function mountEnvironmentSelection(
       current = null;
       authoredWorldFailure = objectWriteFailure(error);
     }
+  }
+
+  /** The person's own request to send everyone away or bring them back. */
+  async function changePresence(wanted: 'away' | 'here'): Promise<void> {
+    if (savedWorld === null || liveSociety === null || phase === 'disposed') return;
+    await (wanted === 'away' ? liveSociety.sendAway() : liveSociety.bringBack());
+    if ((phase as string) === 'disposed') return;
+    await refreshPlayback();
   }
 
   /** The person's own request. Nothing else creates a saved world's society. */

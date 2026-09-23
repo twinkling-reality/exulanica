@@ -1,0 +1,22 @@
+vite v6.4.3 building for production...
+transforming...
+✓ 1511 modules transformed.
+rendering chunks...
+computing gzip size...
+../../../.exulanica/lane-society/prod-dist/index.html                                        2.27 kB │ gzip:   1.10 kB
+../../../.exulanica/lane-society/prod-dist/assets/flatiron-owned-district-BtzrqgXV.json    232.45 kB │ gzip:  75.43 kB
+../../../.exulanica/lane-society/prod-dist/assets/district-interpretation-rwMLKtnK.json    773.09 kB │ gzip:  32.12 kB
+../../../.exulanica/lane-society/prod-dist/assets/main-BPbid1NS.css                          4.90 kB │ gzip:   1.36 kB
+../../../.exulanica/lane-society/prod-dist/assets/index-CwVm5hhV.css                       140.18 kB │ gzip:  25.18 kB
+../../../.exulanica/lane-society/prod-dist/assets/preview-point-maps-BhxaVbKQ.js             0.48 kB │ gzip:   0.34 kB
+../../../.exulanica/lane-society/prod-dist/assets/media-sampler-DfaVH_uv.js                  0.74 kB │ gzip:   0.47 kB
+../../../.exulanica/lane-society/prod-dist/assets/preview-media-BKmSDqIM.js                  1.40 kB │ gzip:   0.57 kB
+../../../.exulanica/lane-society/prod-dist/assets/index-CfD_TUA9.js                          3.14 kB │ gzip:   1.41 kB
+../../../.exulanica/lane-society/prod-dist/assets/preview-graph-BIMQ7_wh.js                  5.94 kB │ gzip:   1.17 kB
+../../../.exulanica/lane-society/prod-dist/assets/main-IpmSEd-o.js                       2,664.11 kB │ gzip: 749.25 kB
+
+(!) Some chunks are larger than 500 kB after minification. Consider:
+- Using dynamic import() to code-split the application
+- Use build.rollupOptions.output.manualChunks to improve chunking: https://rollupjs.org/configuration-options/#output-manualchunks
+- Adjust chunk size limit for this warning via build.chunkSizeWarningLimit.
+✓ built in 3.66s

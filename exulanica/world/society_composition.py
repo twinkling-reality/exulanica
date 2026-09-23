@@ -11,8 +11,10 @@ import math
 import uuid
 from collections.abc import Callable, Mapping, Sequence
 from copy import deepcopy
-from typing import Any
+from typing import Any, Final
 
+from exulanica.canonical import canonical_json
+from exulanica.store.base import ContentAddressedStore
 from exulanica.world.assets import reviewed_assets
 from exulanica.world.authored_delta import AlternateVersion, version_delta_sha256
 from exulanica.world.objects import object_document
@@ -94,9 +96,9 @@ def _registration_reason(
     return None
 
 
-def validate_reviewed_affordances(mapping: Mapping[str, dict[str, Any]]) -> None:
-    actual = {asset.asset_key: asset.content_sha256 for asset in reviewed_assets()}
-    expected_fields = {
+#: The fields of one reviewed affordance assignment, the one statement of them.
+_ASSIGNMENT_FIELDS: Final = frozenset(
+    {
         "asset_key",
         "affordance",
         "duration_ticks",
@@ -104,8 +106,45 @@ def validate_reviewed_affordances(mapping: Mapping[str, dict[str, Any]]) -> None
         "blocks_navigation",
         "reach_mm",
     }
+)
+
+
+def validate_recorded_registry(mapping: Any) -> None:
+    """Refuse anything that is not shaped like an affordance registry a runtime composed with.
+
+    A stored input names the registry it was composed under by digest, and that registry may
+    predate today's reviewed catalog, so it is held to the registry's shape and bounds rather
+    than to the assets reviewed now: an asset reviewed since, or a reach changed since, must not
+    make an older registry unreadable.
+    """
+    if not isinstance(mapping, dict):
+        raise ValueError("a registry maps asset digests to assignments")
     for digest, row in mapping.items():
-        if not isinstance(row, dict) or set(row) != expected_fields:
+        if (
+            not isinstance(digest, str)
+            or len(digest) != 64
+            or any(c not in "0123456789abcdef" for c in digest)
+            or not isinstance(row, dict)
+            or set(row) != _ASSIGNMENT_FIELDS
+            or not isinstance(row["asset_key"], str)
+            or not row["asset_key"]
+            or row["affordance"] not in DURATIONS
+            or type(row["duration_ticks"]) is not int
+            or row["duration_ticks"] != DURATIONS[row["affordance"]]
+            or type(row["blocks_navigation"]) is not bool
+            or type(row["reach_mm"]) is not int
+            or not 1 <= row["reach_mm"] <= 10000
+            or not isinstance(row["footprint_half_extents_mm"], list)
+            or len(row["footprint_half_extents_mm"]) != 2
+            or any(type(v) is not int or v < 0 for v in row["footprint_half_extents_mm"])
+        ):
+            raise ValueError("invalid recorded society affordance assignment")
+
+
+def validate_reviewed_affordances(mapping: Mapping[str, dict[str, Any]]) -> None:
+    actual = {asset.asset_key: asset.content_sha256 for asset in reviewed_assets()}
+    for digest, row in mapping.items():
+        if not isinstance(row, dict) or set(row) != _ASSIGNMENT_FIELDS:
             raise ValueError("invalid reviewed society affordance assignment")
         expected = _REVIEWED.get(row["asset_key"])
         if (
@@ -250,6 +289,18 @@ def _outward(value: float) -> int:
     return math.ceil(value) if value > 0 else math.floor(value)
 
 
+def turned_point(center: Point, offset: tuple[float, float], yaw_microradians: int) -> Point:
+    """A point given in an object's own frame, turned by its yaw about its centre.
+
+    The same turn and the same outward rounding as ``footprint_ring``: the point moves to the
+    whole millimetre away from the centre, never toward it.
+    """
+    theta = yaw_microradians / 1_000_000
+    c, s = math.cos(theta), math.sin(theta)
+    dx, dz = offset
+    return (center[0] + _outward(dx * c + dz * s), center[1] + _outward(-dx * s + dz * c))
+
+
 def footprint_ring(
     center: Point, half_extents: Sequence[int], yaw_microradians: int
 ) -> list[Point]:
@@ -352,6 +403,47 @@ def composed_objects(
     return objects, obstacles, reason
 
 
+def clearance_test(
+    obstacles: Sequence[Obstacle],
+    *,
+    clearance_mm: int,
+    supports: Supports,
+    segment_blocked: SegmentBlocked,
+) -> Callable[..., bool]:
+    """Whether a straight segment is supported and clear of every obstacle but one excluded."""
+
+    def clear(a: Point, b: Point, excluded: str | None = None) -> bool:
+        return bool(supports(a, b, clearance_mm)) and not any(
+            segment_blocked(a, b, ring, clearance_mm)
+            for identity, ring in obstacles
+            if identity != excluded
+        )
+
+    return clear
+
+
+def prune_navigation(nav: dict[str, Any], clear: Callable[..., bool]) -> None:
+    """Drop every node, edge and declared destination the obstacles no longer leave usable.
+
+    ``nav`` is mutated in place, so a route nobody can walk is never kept.
+    """
+    nav["nodes"] = [
+        n for n in nav["nodes"] if clear(tuple(n["position_mm"]), tuple(n["position_mm"]))
+    ]
+    nodes = {n["node_id"]: n for n in nav["nodes"]}
+    nav["edges"] = [
+        e
+        for e in nav["edges"]
+        if e["from_node_id"] in nodes
+        and e["to_node_id"] in nodes
+        and clear(
+            tuple(nodes[e["from_node_id"]]["position_mm"]),
+            tuple(nodes[e["to_node_id"]]["position_mm"]),
+        )
+    ]
+    nav["destinations"] = [d for d in nav["destinations"] if d["node_id"] in nodes]
+
+
 def affordance_targets(
     nav: dict[str, Any],
     objects: Sequence[ComposedObject],
@@ -370,30 +462,13 @@ def affordance_targets(
     targets: list[dict[str, Any]] = []
     unavailable_affordances: list[dict[str, Any]] = []
     reason: str | None = None
-    clearance = nav["clearance_mm"]
-
-    def clear(a: Point, b: Point, excluded: str | None = None) -> bool:
-        return bool(supports(a, b, clearance)) and not any(
-            segment_blocked(a, b, ring, clearance)
-            for identity, ring in obstacles
-            if identity != excluded
-        )
-
-    nav["nodes"] = [
-        n for n in nav["nodes"] if clear(tuple(n["position_mm"]), tuple(n["position_mm"]))
-    ]
-    nodes = {n["node_id"]: n for n in nav["nodes"]}
-    nav["edges"] = [
-        e
-        for e in nav["edges"]
-        if e["from_node_id"] in nodes
-        and e["to_node_id"] in nodes
-        and clear(
-            tuple(nodes[e["from_node_id"]]["position_mm"]),
-            tuple(nodes[e["to_node_id"]]["position_mm"]),
-        )
-    ]
-    nav["destinations"] = [d for d in nav["destinations"] if d["node_id"] in nodes]
+    clear = clearance_test(
+        obstacles,
+        clearance_mm=nav["clearance_mm"],
+        supports=supports,
+        segment_blocked=segment_blocked,
+    )
+    prune_navigation(nav, clear)
     for dest in nav["destinations"]:
         targets.append(
             {
@@ -517,11 +592,14 @@ def object_dependency_refs(
 
 
 def reviewed_affordance_registry(reach_mm: int = REVIEWED_REACH_MM) -> dict[str, dict[str, Any]]:
-    """The whole reviewed catalog as an affordance registry, keyed by asset content digest.
+    """The reviewed catalog as an affordance registry, keyed by asset content digest.
 
     A host that has made no narrower choice registers this. It adds no asset and no activity:
     every entry comes from the reviewed catalog and the reviewed footprint/action table above,
-    and the durations are the policy's own.
+    and the durations are the policy's own. A reviewed asset the table gives no footprint is
+    left out rather than guessed at, so an instance still starts when a new asset is reviewed;
+    a placed copy of it is then refused by name as ``unknown_active_asset``, and
+    ``test_every_reviewed_asset_has_a_society_assignment`` fails until the table states it.
     """
     registry = {
         asset.content_sha256: {
@@ -533,6 +611,24 @@ def reviewed_affordance_registry(reach_mm: int = REVIEWED_REACH_MM) -> dict[str,
             "reach_mm": reach_mm,
         }
         for asset in reviewed_assets()
+        if asset.asset_key in _REVIEWED
     }
     validate_reviewed_affordances(registry)
     return registry
+
+
+def keep_registry(
+    store: ContentAddressedStore, registry: Mapping[str, dict[str, Any]]
+) -> tuple[bytes, str]:
+    """Keep an affordance registry in the content-addressed store under its own digest.
+
+    A registry is reviewed catalog data derived from the reviewed assets, like the asset bytes
+    ``seed_reviewed_assets`` keeps there, and none of a person's content, so no tombstone governs
+    it. An input records the registry it was composed under and is authorised against that one
+    later, so a reviewed asset added or a reach changed is a new registry beside the old, never a
+    rewrite of it. Writing the same bytes again stores nothing new. Returns the canonical bytes
+    and their digest.
+    """
+    data = canonical_json(dict(registry))
+    store.put_bytes(data)
+    return data, hashlib.sha256(data).hexdigest()

@@ -31,7 +31,7 @@ from exulanica.world.society_action_repository import SocietyActionRepository
 from exulanica.world.society_actions import ActionIntent
 from exulanica.world.society_authored_ground import LATTICE_MM, NAVIGATION_PROFILE
 from exulanica.world.society_composition import reviewed_affordance_registry
-from exulanica.world.society_input_policy import AUTHORED_GROUND_INPUT
+from exulanica.world.society_input_policy import AUTHORED_GROUND_INPUT_V2
 from exulanica.world.society_repository import SocietyRepository
 from exulanica.world.starter import (
     AUTHORED_GROUND_MODULE_VERSION,
@@ -217,7 +217,8 @@ def create_society(world, profile="exulanica-society/v2"):
 def test_an_empty_starter_has_a_walkable_area_and_nothing_to_do_in_it(saved_world):
     document = initial(saved_world)
     navigation = document["navigation"]
-    assert document["profile"] == AUTHORED_GROUND_INPUT
+    # A saved world's new input is composed under the second saved-world profile.
+    assert document["profile"] == AUTHORED_GROUND_INPUT_V2
     assert document["availability"] == "available"
     assert navigation["profile"] == NAVIGATION_PROFILE
     assert document["frame"]["name"] == "authored-ground-local-mm"
@@ -251,12 +252,16 @@ def test_a_rest_object_makes_a_starter_world_inhabitable_and_survives_reload(sav
     assert society["profile"] == profile
     assert target["affordance"] == "rest" and target["origin"] == "authored"
     assert target["object_id"] == "object:cushion"
-    # The access node is 1,000 mm east and 1,000 mm south of the cushion: 1,414 mm, inside the
-    # reviewed reach, on the bounded and the endless ground alike.
-    node = next(n for n in document["navigation"]["nodes"] if n["node_id"] == target["node_id"])
+    # The cushion seats two people side by side on it, one standing spacing apart, and the first
+    # of them joins the lattice 1,000 mm west and 1,000 mm north of the cushion's centre: 1,414 mm,
+    # inside the reviewed reach, on the bounded and the endless ground alike.
+    nodes = {n["node_id"]: n for n in document["navigation"]["nodes"]}
+    node = nodes[target["node_id"]]
     reach = world["registry"][world["plate"].content_sha256]["reach_mm"]
     squared = (node["position_mm"][0] - 3_000) ** 2 + (node["position_mm"][1] - 5_000) ** 2
     assert squared == 2_000_000 <= reach**2
+    places = [nodes[place]["position_mm"] for place in target["place_node_ids"]]
+    assert places == [[2_650, 5_000], [3_350, 5_000]]
 
     subject = uuid.UUID(society["state"]["inhabitants"][0]["id"])
     request_id = uuid.uuid4()
@@ -301,7 +306,9 @@ def test_a_rest_object_makes_a_starter_world_inhabitable_and_survives_reload(sav
         )
     else:
         pytest.fail(f"the directed rest never completed: {person['action']}")
-    assert person["position_mm"] == node["position_mm"]
+    # It rests at one of the cushion's own places, not at the lattice node it walked in from.
+    assert person["location"]["node_id"] in target["place_node_ids"]
+    assert person["position_mm"] == nodes[person["location"]["node_id"]]["position_mm"]
     # The need rises by one a tick and a completed rest takes 500 off it, so the whole walk is
     # one arithmetic identity rather than a number that merely looks lower.
     assert person["need_milli"] == need_before + state["current_tick"] - 500
@@ -352,7 +359,20 @@ def test_an_accepted_edit_appends_one_input_in_its_own_transaction(saved_world):
     blocked = "ground:-00004000:+00000000|ground:-00004000:+00002000"
     assert blocked in {edge["edge_id"] for edge in document["navigation"]["edges"]}
     assert blocked not in {edge["edge_id"] for edge in latest["navigation"]["edges"]}
-    assert latest["navigation"]["nodes"] == document["navigation"]["nodes"]
+
+    # The lattice keeps every node; what the post adds are the places its visitors stand at.
+    def lattice(input_document):
+        return [
+            node
+            for node in input_document["navigation"]["nodes"]
+            if node["subject_id"] == AUTHORED_STARTER_ELEMENT_ID
+        ]
+
+    assert lattice(latest) == lattice(document)
+    [post] = [t for t in latest["targets"] if t["object_id"] == "object:post"]
+    assert {n["node_id"] for n in latest["navigation"]["nodes"]} - {
+        n["node_id"] for n in document["navigation"]["nodes"]
+    } == set(post["place_node_ids"])
     assert society_repository(world).replay(world["binding"].version_id)["replay_verified"]
 
 

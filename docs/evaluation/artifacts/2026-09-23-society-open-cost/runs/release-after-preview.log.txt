@@ -1,0 +1,182 @@
+  ➜  Local:   http://localhost:19229/
+  ➜  Network: use --host to expose
+11:55:56 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:55:57 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:55:57 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:55:58 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:55:58 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:55:59 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:55:59 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:00 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:00 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:01 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:01 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:02 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:02 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:03 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:03 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:04 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:04 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:05 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:05 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:06 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:07 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:07 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:08 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:08 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:09 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:09 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:10 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:10 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:11 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:11 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:12 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:12 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:13 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:13 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:14 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:14 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:15 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:15 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:16 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:16 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:17 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:17 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:18 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:18 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:19 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:19 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:20 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:20 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:21 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:22 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:22 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:23 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:23 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:24 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:24 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:25 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:25 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:26 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:26 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)
+11:56:27 AM [vite] http proxy error: /healthz
+Error: connect ECONNREFUSED 127.0.0.1:19226
+    at TCPConnectWrap.afterConnect [as oncomplete] (node:net:1705:16)

@@ -13,6 +13,7 @@
  */
 
 import type { SocietyAffordance, SocietyPlaces, SocietySnapshot } from '../society-api.js';
+import { societyEngine } from '../society-engines.js';
 import { el, replace } from './dom.js';
 import './world-inhabitants.css';
 
@@ -35,9 +36,19 @@ export interface InhabitedObject {
 }
 
 export type PlaceStatus =
-  | { readonly kind: 'usable'; readonly affordance: SocietyAffordance; readonly targetId: string }
+  | { readonly kind: 'usable'; readonly affordance: SocietyAffordance; readonly targetId: string; readonly room: number | null }
   | { readonly kind: 'unreachable'; readonly affordance: SocietyAffordance; readonly outsideArea: boolean }
+  | { readonly kind: 'unusable'; readonly affordance: SocietyAffordance; readonly reason: string }
   | { readonly kind: 'not-noticed' };
+
+/** The server's reason no inhabitant uses an object, other than being out of reach, in words. */
+const UNUSABLE_WORDS: Readonly<Record<string, string>> = {
+  authored_object_moves: 'Inhabitants do not use this while it moves.',
+  authored_object_off_ground: 'Inhabitants cannot use this: it is not resting on the ground.',
+  unsupported_active_behaviour: 'Inhabitants do not use this: they cannot tell where its movement takes it.',
+};
+const UNREACHABLE = 'authored_affordance_unreachable';
+const ACTIVITY_WORDS: Readonly<Record<SocietyAffordance, string>> = { rest: 'rest', visit: 'visit' };
 
 export interface PlaceRow {
   readonly object: InhabitedObject;
@@ -88,8 +99,16 @@ export function placeRows(objects: readonly InhabitedObject[], places: SocietyPl
     let status: PlaceStatus;
     let words: string;
     if (target !== undefined) {
-      status = { kind: 'usable', affordance: target.affordance, targetId: target.targetId };
-      words = target.affordance === 'rest' ? 'Inhabitants can rest here.' : 'Inhabitants can visit here.';
+      // Where the input states places, only that many use it at once and each has room.
+      const room = target.placeNodeIds.length === 0 ? null : target.placeNodeIds.length;
+      status = { kind: 'usable', affordance: target.affordance, targetId: target.targetId, room };
+      const activity = ACTIVITY_WORDS[target.affordance];
+      words = room === null
+        ? `Inhabitants can ${activity} here.`
+        : `Inhabitants can ${activity} here, ${room === 1 ? 'one' : room} at a time.`;
+    } else if (unreachable !== undefined && unreachable.reason !== UNREACHABLE) {
+      status = { kind: 'unusable', affordance: unreachable.affordance, reason: unreachable.reason };
+      words = UNUSABLE_WORDS[unreachable.reason] ?? 'Inhabitants cannot use this.';
     } else if (unreachable !== undefined) {
       const outside = outsideArea(object, places);
       status = { kind: 'unreachable', affordance: unreachable.affordance, outsideArea: outside };
@@ -104,8 +123,21 @@ export function placeRows(objects: readonly InhabitedObject[], places: SocietyPl
   });
 }
 
-/** A refusal of the request to bring inhabitants in, in words. The code stays in the detail line. */
+/** Why the server would not send everyone away or bring them back, by the name it gave. */
+const PRESENCE_WORDS: Readonly<Record<string, string>> = {
+  nobody_to_send_away: 'Nobody is here to send away.',
+  already_here: 'They are already here.',
+  a_request_is_waiting: 'Someone was just asked to go somewhere. Advance one minute first, then ask again.',
+  nowhere_to_arrive: 'They cannot come back yet: there is nowhere in this world they could reach. Put a Marker '
+    + 'plate for them to rest on, or a Marker cube or pillar to visit, near where you arrive, then ask again.',
+  stale_society_state: 'This world changed while you were deciding. Look again, then ask again.',
+  engine_keeps_its_people: 'The inhabitants of this world cannot be sent away.',
+};
+
+/** A refusal of the person's request, in words. The code stays in the detail line. */
 export function refusalWords(refusal: NonNullable<InhabitantsView['refusal']>): string {
+  const presence = PRESENCE_WORDS[refusal.code];
+  if (presence !== undefined) return presence;
   if (/reachable targets/.test(refusal.detail)) {
     return 'Nobody came in: there is nowhere in this world they could reach yet. Put a Marker plate '
       + 'for them to rest on, or a Marker cube or pillar to visit, near where you arrive, then ask again.';
@@ -118,6 +150,10 @@ export interface WorldInhabitantsPanel {
   readonly root: HTMLElement;
   readonly bringIn: HTMLButtonElement;
   readonly advance: HTMLButtonElement;
+  /** Shown while people live here: the person's request to send everyone away. */
+  readonly sendAway: HTMLButtonElement;
+  /** Shown while they are away: the person's request to bring the same people back. */
+  readonly bringBack: HTMLButtonElement;
   /** Say what is true now: nobody yet, a refusal, or who lives here and where they can go. */
   render(state: {
     readonly society: InhabitantsView;
@@ -134,6 +170,8 @@ export interface WorldInhabitantsPanel {
 export function buildWorldInhabitants(handlers: {
   readonly onBringIn: () => void;
   readonly onAdvance: () => void;
+  readonly onSendAway: () => void;
+  readonly onBringBack: () => void;
 }): WorldInhabitantsPanel {
   const heading = el('h3', { text: 'Inhabitants' });
   const summary = el('p', { class: 'world-inhabitants-summary', role: 'status', 'aria-live': 'polite' });
@@ -152,6 +190,9 @@ export function buildWorldInhabitants(handlers: {
   const refusalDetails = el('details', { hidden: true }, [el('summary', { text: 'Details' }), refusalCode]);
   const bringIn = el('button', { type: 'button', text: 'Bring in inhabitants' }) as HTMLButtonElement;
   const advance = el('button', { type: 'button', text: 'Advance one minute' }) as HTMLButtonElement;
+  const sendAway = el('button', { type: 'button', text: 'Send everyone away' }) as HTMLButtonElement;
+  const bringBack = el('button', { type: 'button', text: 'Bring them back' }) as HTMLButtonElement;
+  const presenceHelp = el('p', { class: 'world-help', hidden: true });
   const advanceWhy = el('p', { class: 'world-help', hidden: true });
   const area = el('p', { class: 'world-help', hidden: true });
   const placesHeading = el('h4', { text: 'Where they can go', hidden: true });
@@ -164,9 +205,11 @@ export function buildWorldInhabitants(handlers: {
   });
   bringIn.addEventListener('click', () => handlers.onBringIn());
   advance.addEventListener('click', () => handlers.onAdvance());
+  sendAway.addEventListener('click', () => handlers.onSendAway());
+  bringBack.addEventListener('click', () => handlers.onBringBack());
   const root = el('section', { class: 'world-inhabitants', 'aria-label': 'Inhabitants' }, [
-    heading, summary, about, need, refusal, refusalDetails, bringIn, advance, advanceWhy, area,
-    placesHeading, placesList, select,
+    heading, summary, about, need, refusal, refusalDetails, bringIn, bringBack, advance, advanceWhy,
+    sendAway, presenceHelp, area, placesHeading, placesList, select,
   ]);
   root.dataset['state'] = 'idle';
 
@@ -180,15 +223,30 @@ export function buildWorldInhabitants(handlers: {
       refusal.textContent = refusalWords(society.refusal);
       refusalCode.textContent = `${society.refusal.code}: ${society.refusal.detail}`;
     }
+    // Sent away, the world still has its society and its history, and nobody in it. Whether its
+    // people can be sent away at all is the engine table's to say.
+    const away = present && snapshot.presence.status === 'away';
+    const here = present && !away;
+    const movable = present && societyEngine(snapshot.state.profile).presence;
     need.hidden = present;
     bringIn.hidden = present;
     bringIn.disabled = society.busy || society.status === 'unauthorized';
     bringIn.textContent = society.busy && !present ? 'Bringing them in…' : 'Bring in inhabitants';
-    advance.hidden = !present;
+    advance.hidden = !here;
     advance.disabled = society.busy || advanceBlocked !== null;
-    advanceWhy.hidden = !present || advanceBlocked === null;
+    advanceWhy.hidden = !here || advanceBlocked === null;
     advanceWhy.textContent = advanceBlocked ?? '';
-    select.hidden = !present;
+    sendAway.hidden = !here || !movable;
+    sendAway.disabled = society.busy;
+    bringBack.hidden = !away;
+    bringBack.disabled = society.busy;
+    presenceHelp.hidden = !movable;
+    presenceHelp.textContent = away
+      ? 'Bringing them back is a new arrival: the same people come in at spread starting places in '
+        + 'the world as it is when you ask, with nothing in hand. Their time here before they left '
+        + 'stays in the history.'
+      : 'Sending everyone away is kept in this world\'s history. You can bring the same people back later.';
+    select.hidden = !here;
     if (!present) {
       summary.textContent = society.status === 'absent' || society.status === 'idle'
         ? 'Nobody lives here yet.'
@@ -200,8 +258,10 @@ export function buildWorldInhabitants(handlers: {
       return;
     }
     const people = snapshot.populationSize;
-    summary.textContent = `${people} inhabitants live here. ${walked} walked in the last minute. `
-      + `Simulated minute ${snapshot.currentTick}.`;
+    summary.textContent = away
+      ? `Nobody lives here now: you sent everyone away at simulated minute ${snapshot.presence.sinceTick}.`
+      : `${people} inhabitants live here. ${walked} walked in the last minute. `
+        + `Simulated minute ${snapshot.currentTick}.`;
     const places = snapshot.places;
     const words = places === null ? null : areaWords(places);
     area.hidden = words === null;
@@ -213,6 +273,7 @@ export function buildWorldInhabitants(handlers: {
       const item = el('li', {}, [el('strong', { text: row.label }), document.createTextNode(` ${row.words}`)]);
       item.dataset['objectId'] = row.object.objectId;
       item.dataset['status'] = row.status.kind;
+      if (row.status.kind === 'unusable') item.dataset['reason'] = row.status.reason;
       return item;
     }));
   };
@@ -221,11 +282,13 @@ export function buildWorldInhabitants(handlers: {
     root,
     bringIn,
     advance,
+    sendAway,
+    bringBack,
     render,
     unavailable(reason) {
       root.dataset['state'] = 'unavailable';
       summary.textContent = reason;
-      for (const node of [need, refusal, refusalDetails, bringIn, advance, advanceWhy, area, placesHeading, placesList, select]) {
+      for (const node of [need, refusal, refusalDetails, bringIn, bringBack, advance, advanceWhy, sendAway, presenceHelp, area, placesHeading, placesList, select]) {
         node.hidden = true;
       }
     },

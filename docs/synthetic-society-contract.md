@@ -7,10 +7,12 @@ The default `exulanica-society/v1` retains seeded synthetic motion. Opt-in
 versioned authored inputs. Opt-in `exulanica-society/v3` adds a bounded synthetic cast with
 local observations, communicated beliefs and explicitly requested, validated model proposals.
 `exulanica-society/v4`, the living society, adds catalogued routines, occupancy and a
-population sized to its place; the browser creates new live societies in the owned district with
-it, and a person's own saved world gets a v2 society when the person asks for one. All profiles are
-fictional simulation, separate from personal evidence. They do not model real residents, infer
-demographic facts or demonstrate general social intelligence.
+population sized to its place; the browser creates live societies in the owned district with it,
+and a person's own saved world gets a v2 society when the person asks for one. In a saved world
+each destination gives its occupants places of their own, an object the society cannot use
+costs only its own activity, and the person can send everyone away and bring them back. All
+profiles are fictional simulation, separate from personal evidence. They do not model real
+residents, infer demographic facts or demonstrate general social intelligence.
 
 <details>
 <summary>Sections</summary>
@@ -53,6 +55,10 @@ playing v2/v3 society under the bounded lease policy below; persistence alone st
 Implementation:
 
 - shared identity, draws, events and digests: `exulanica/world/society.py`;
+- which engines exist and what each can do: `exulanica/world/society-engines.v1.json`, read by
+  `exulanica/world/society_engines.py`;
+- sending a society's people away and bringing them back:
+  `exulanica/world/society_presence.py`;
 - the frozen v1 engine and the fixed tables stored v1 to v3 histories depend on:
   `exulanica/world/society_legacy.py`;
 - the v4 living society: `exulanica/world/society_living.py`, its routine catalogs
@@ -76,10 +82,10 @@ Implementation:
 
 ## Identity, branches and compatibility
 
-The v1 to v3 population is 128 over a district; their pure initializer accepts 100–512 there. A
-society on a saved world's own ground starts with 8 (below). V4 sizes its population to its place
-(below). The population is canonical state, independent of how many
-people a renderer draws. Inhabitant UUIDv5 identities derive from
+The v1 to v3 population is 128 over a district; their pure initializer accepts 100 to 512 there.
+A society on a saved world's own ground starts with 8 (below). V4 sizes its population to its
+place (below). Each engine's bounds are stated once, in the engine table (below). The population
+is canonical state, independent of how many people a renderer draws. Inhabitant UUIDv5 identities derive from
 society identity and ordinal. The same society ID/seed/population preserves those identities across
 profiles, but a stored society's profile and seed cannot change. The society UUID derives from its
 authored version UUID with the existing `exulanica-society/v1` identity domain, including for v2 and v3.
@@ -89,6 +95,36 @@ UUID; the authored version supplies its user-facing name. Same-named objects in 
 different targets. This slice does not fork existing simulation history. To opt in when a version
 already has another profile, create a new authored version and a new society. No implicit migration,
 identity substitution, tick reset or history rewrite occurs.
+
+## Engines and what each can do
+
+`exulanica/world/society-engines.v1.json` states which engine profiles exist and, for each,
+whether it consumes authorised inputs, whether the playback worker may play it (and the refusal it
+gives when not), whether it takes directed actions, model decisions or experiments, whether the
+person whose world it lives in may send its people away, whether it can stand on a saved world's
+own ground, which state shape it writes and how many people it may hold, with a reason per row.
+`exulanica/world/society_engines.py` reads and checks it, and every list of engines derives from
+it: the runtime's edit hook, the repositories' dispatch and population check, the playback
+control, directed actions, decisions, experiments, the creation route's choices and default, and
+the selection query, which receives the lists as bound array parameters rather than SQL text.
+An engine the table does not state is refused by name wherever it is looked up.
+
+| Engine | Inputs | Playback | Directed actions | Model decisions | Sent away | Saved world | Population |
+| --- | --- | --- | --- | --- | --- | --- | --- |
+| `exulanica-society/v1` | no | no | no | no | no | no | 100 to 512 |
+| `exulanica-society/v2` | yes | yes | yes | no | yes | yes | 1 to 512 |
+| `exulanica-society/v3` | yes | yes | yes | yes | no | yes | 1 to 512 |
+| `exulanica-society/v4` | yes | yes | no | no | no | no | 1 to 65,536 |
+
+The browser reads the same file: `pnpm run society-engines:sync` writes it byte for byte, with the
+union of its profiles, into `web/packages/app/src/society-engines.generated.ts`, which
+`society-engines.ts` parses; the society client takes each snapshot's reader and population bounds
+from it. Where a copy cannot derive, it is held to the table by a test in
+`tests/test_society_engine_table.py`: every migration check, trigger and index that names an
+engine is read back from the live schema and compared with the capability it encodes, the
+population check is parsed engine by engine, no Python module outside the table may restate an
+engine list as SQL text, and the display's own profile union in atlas-react is held to the table's
+at typecheck (`web/packages/app/test/society-engines.test.ts`).
 
 V1 initialization and successful transitions remain byte-compatible, pinned by deterministic digest
 vectors. V1's home/work nodes are labels; its motion ignores them and has no obstacle or arrival
@@ -129,17 +165,25 @@ are distributed deterministically among declared nodes in components containing 
 
 ## Goals, routes and actions
 
-Each tick is one simulated minute. Travel budget is 60,000 mm per tick, at most one metre per
-simulated second. Shortest routes minimize integer edge length with lexicographic node-path ties (in every profile).
-A scalar need of at least 750 prefers rest; otherwise visit is preferred. Among reachable candidates,
+Each tick is one simulated minute. The travel budget is the one the state records at creation,
+`movement_budget_mm_per_tick`, which is 60,000 mm (`MOVEMENT_BUDGET_MM`), at most one metre per
+simulated second; an advance reads the state's figure, never the module's, so a stored society
+walks at the budget it was created with. Shortest routes minimize integer edge length with
+lexicographic node-path ties (in every profile).
+A scalar need of at least 750 (`NEED_PREFERS_REST_MILLI`) prefers rest; otherwise visit is
+preferred. Among reachable candidates,
 the policy prefers a different target from the last completed one, then lower route cost and target
 ID. This is a small deterministic utility policy, not learned preference or biography.
 
 Only two object affordances are supported: `visit` takes one subsequent tick; `rest` takes three.
 Arrival starts the action timer and does not spend its first tick. Each subsequent tick validates
 availability and access position before progressing. Completion reduces the scalar need by 20 for
-a visit or 500 for rest, clamped at zero. No capacity, crowd avoidance, resource depletion,
-conversation or newly learned relationship is implied by the v2 movement policy. Existing role/household/relationship fields
+a visit or 500 for rest (`RELIEF_MILLI`), clamped at zero. These figures are part of what
+`exulanica-society/v2` is; a v2 history through twelve minutes and 24 completed activities is
+pinned by its state digest, produced by the code before places existed
+(`tests/test_society_destination_room.py`). Over an input that states no places, no capacity,
+crowd avoidance, resource depletion, conversation or newly learned relationship is implied by the
+v2 movement policy; over one that does, the rules under "Room at a destination" apply. Existing role/household/relationship fields
 remain explicitly synthetic labels and do not create extra supported activities.
 
 The existing envelope and synthetic inhabitant fields remain. V2 adds:
@@ -209,9 +253,15 @@ stored input document for authorized adapters; no new browser endpoint is introd
 A world a person saved has no district. Its spatial authority is the flat authored ground its own
 structural snapshot states: one authored region, an elevation, a spawn point and, depending on
 the ground module version, either a horizontal extent or an explicit statement that it has none.
-`exulanica.society-composition/authored-ground-v1` projects that ground, and the reviewed objects
-the person placed on it, into `exulanica.society-input/authored-ground-v1`, which the same v2
-policy, persistence and replay consume unchanged. There is no second engine and no second
+`exulanica.society-composition/authored-ground-v2` projects that ground, and the reviewed objects
+the person placed on it, into `exulanica.society-input/authored-ground-v2`, which the same v2
+policy, persistence and replay consume. Every input composed for a saved world uses it. The first
+saved-world pair, `exulanica.society-composition/authored-ground-v1` and
+`exulanica.society-input/authored-ground-v1`, is never composed again and is never rewritten: a
+stored input of that profile is authorised by its stored bytes and replays with its own semantics,
+and a society holding such inputs receives inputs of the second profile from its next edit on. A
+society's input profile only moves forward along that order; a successor of an earlier saved-world
+profile than its predecessor is refused. There is no second engine and no second
 affordance vocabulary: `visit` and `rest` remain the only two activities, and the reviewed
 footprint, collision and reach table is the one the district projection already uses.
 
@@ -282,16 +332,91 @@ people in the same places and replay, which rebuilds the first state from the se
 and input 1, starts them there too. A district input states no arrival point and keeps its
 original starting rule and its floor of 100 people.
 
-This society has no capacity. With one reachable target, every idle inhabitant chooses it, walks
-to its access node and stands there with the others, drawn overlapping; with a few targets they
-share them the same way. That is the v2 policy's own absorbing state, the one the living society
-was built to remove, and it is a limitation of a saved world's society, not of its drawing.
+Under the first saved-world profile a society had no capacity: with one reachable target every
+idle inhabitant chose it, walked to its access node and stood there with the others. The second
+profile gives every destination room (below).
 
-The profile records local failures, like `exulanica.society-composition/v2`: an object with no
-reachable access node loses its own activity to `unavailable_affordances` and takes nothing else
-with it. An object off the declared ground plane, in another region, carrying a behaviour,
-scaled, or of an unsupported origin still makes the whole input unavailable with its object
-named.
+### One object at a time
+
+The second profile decides every object on its own
+(`exulanica/world/society_authored_ground.py`, `_objects_one_by_one`). An object the society cannot
+use loses its own activity to `unavailable_affordances`, with the reason, and takes nothing else
+with it; the rest of the world stays usable.
+
+| An object that | Blocks walking | Offers its activity | Recorded as |
+| --- | --- | --- | --- |
+| is turned | its reviewed footprint, turned with it | yes | used |
+| is scaled | its reviewed footprint at its scale, rounded up to the millimetre | yes | used |
+| does not rest on the ground plane | its footprint where it stands on the plan | no | `authored_object_off_ground` |
+| moves (`motion.bounded-path` version 1) | everywhere its motion covers: the convex hull of its footprint at both ends of the path | no | `authored_object_moves` |
+| blocks nothing and carries a behaviour with no rule | nothing | no | `unsupported_active_behaviour` |
+| has no access node or place it can be reached at | its footprint | no | `authored_affordance_unreachable` |
+
+An object off the ground plane still blocks its footprint because the society does not know
+whether a body passes under it; it does not ask how tall the object is. A bounded path runs along
+one axis of the region from where the object was placed and back, as the renderer moves it
+(`web/packages/atlas-core/src/behaviour/bounded-motion.ts`), and travel along the vertical axis
+leaves the plan footprint where it is. The society holds no motion phase: an object that moves is
+treated as covering its whole path at every minute.
+
+What still makes the whole input unavailable, with the object named, is what leaves the society
+unable to say where it may walk: an asset with no reviewed footprint (`unknown_active_asset`), a
+behaviour with no rule on an object that blocks walking (`unsupported_active_behaviour`), an object
+in another region, an origin or a transform no writer produces, and obstacles that leave no node.
+
+An environment placement is named in the input's `unread_placements` with the reason
+`environment_placement_has_no_authored_frame` and changes nothing else. A saved world's ground
+states no surveyed origin to place an admitted source against, and the renderer draws such
+placements only inside the owned district
+(`web/packages/app/src/composition/environment-selection.ts`, `setAuthoredInstances`), never in a
+saved world. The list is bounded and empty whenever the input is unavailable.
+
+A saved world's snapshot has one element, its ground. An override that keeps the ground exactly
+where the snapshot places it changes nothing the society reads; one that hides or moves the ground
+changes what everyone stands on and makes the input unavailable as
+`unsupported_ground_override:<element>`. No public route writes an override.
+
+Under the first saved-world profile an object off the ground plane, in another region, carrying a
+behaviour, scaled, or of an unsupported origin, any environment placement and any override made
+the whole input unavailable with the object named; its stored inputs keep saying so.
+
+### Room at a destination
+
+Every activity in a second-profile input states the places its occupants stand at
+(`destination_places`), and a place holds one person.
+
+| An object that | Holds | Where |
+| --- | --- | --- |
+| a person can walk on (blocks nothing, like the Marker plate) | a row along its own x axis, one standing spacing apart, as many as have their centres on it | on the object |
+| blocks walking (the Marker cube and pillar) | one person in front of each face | a navigation clearance and a standing radius out from the face |
+
+The standing spacing and radius are the society-policy catalog's `standing_spacing_mm` (700) and
+`standing_radius_mm` (340), the figures the living society keeps, read when the input is composed
+and recorded in its `navigation.standing_spacing_mm`, so replay never reads the catalog. Places turn
+and scale with their object. A place is kept only when it lies in the area, clear of every
+obstacle, at least a standing spacing from every place kept before it, and within the object's
+reviewed reach of a lattice node it can be walked to from in a straight clear line; it becomes a
+leaf node joined by one edge to the nearest such node. Validation refuses an input whose places
+stand closer than its stated spacing. A reviewed Marker plate holds two, a cube or a pillar four,
+fewer where a place does not fit.
+
+Over such an input the v2 policy keeps room (`exulanica/world/society_planner.py`):
+
+- a person takes an activity only where one of its places is free of anybody standing there or on
+  the way there, and walks to that place;
+- a person never takes up again, unasked, the activity whose place it is standing at, so somebody
+  waiting gets a turn;
+- a person who has finished at a place and has nothing else to do walks to the nearest node where
+  nobody stands or is headed and that is not a place, the node a place is joined to, or within a
+  standing spacing of a place (`goal: {kind: "make_room", target_id: null}`), and waits there;
+- nobody starts on, or next to, a destination;
+- a person sent somewhere by a directed request is promised its place before the minute, in
+  request order, and a request to a destination with no free place is refused `destination_full`.
+
+Measured over three seeds and 240 minutes with eight people (`tests/test_society_destination_room.py`):
+no two people standing still are closer than 700 mm, a destination never holds more people than
+its places, and with one two-place plate every one of the eight rests, none more than twice as
+often as any other. An input that states no places takes exactly the path it always took.
 
 An object stands at whatever yaw the person placed it at, and placing one in front of yourself
 turns it to face you. Its centre and its reach do not turn with it. A blocking object's obstacle
@@ -349,8 +474,10 @@ occupancy and stated surface heights out of its place contract, and a flat autho
 states none of them, so creation says that rather than publishing a place of empty answers.
 
 Migration 0094 admits the third input profile and applies the bounded, availability-consistent
-local-record rule 0057 wrote for `exulanica.society-input/v2` to it unchanged. Migration 0095 lets a
-v2 or v3 society hold 1 to 512 people, keeping v1 at 100 to 512 and v4 as 0075 left it. A row does
+local-record rule 0057 wrote for `exulanica.society-input/v2` to it unchanged. Migration 0098 admits
+the fourth, `exulanica.society-input/authored-ground-v2`, under the same rule, and holds its
+`unread_placements` to it too. Migration 0095 lets a v2 or v3 society hold 1 to 512 people, keeping
+v1 at 100 to 512 and v4 as 0075 left it. A row does
 not say which kind of ground its society stands on, so the district's floor of 100 is held by the
 initializer that every creation and every replay passes through.
 
@@ -401,6 +528,95 @@ withdrawn or unavailable dependencies return unavailable rather than reviving pr
 This is deterministic replay with immutable input/event/transition history and current snapshots,
 not a claim that events alone reconstruct all state. Losing required input bytes prevents exact
 replay and must be reported.
+
+A read of the society, its events or its playback, and a step, load and validate only the inputs
+they show or consume (`SocietyRepository._inputs`): the input the state consumed, any queued after
+it, and those the events on the page name, each held to its own row's sequence and digest, after a
+count confirms the stored inputs run from one with no gap. Each input was validated against the
+one before it when it was recorded, the table takes no update or delete, and replay validates the
+whole chain again from the first input, so nothing a read skips goes unchecked. Opening never
+replays: the browser calls no replay route, and the server's reads rebuild no state.
+
+Measured in the release build (`docs/evaluation/2026-09-23-society-open-cost.json`), the moment
+a world's inhabitants are handed to the renderer, and the society and playback reads, do not grow
+with the number of stored inputs. The events read still does: it authorizes every input its page
+of events names (`SocietyRepository.events`), and each authorization reads the authored version
+with its whole edit list (`SocietyRuntime._authored_version`), so a page that names many inputs
+costs more the longer the world's edit history. Edits consumed in one minute leave events naming
+most of those inputs; a page holds at most 256 events.
+
+The record's figures are medians in milliseconds over five opens per size, on a starter world with
+one Marker plate and eight inhabitants whose history grew by moving the plate, each size's edits
+consumed in one minute. "World shown" runs from submitting the access form to the page handing the
+society's current minute to the renderer. "Validating every stored input" is the same tree with
+the read change above reversed, measured beside it to show what the change removes; at 400 inputs
+its events read left no timing entry within 1.5 s of the world being shown, so it is unmeasured.
+
+| Stored inputs | 1 | 25 | 100 | 400 |
+| --- | --- | --- | --- | --- |
+| World shown, reads validating every stored input | 233 | 285 | 460 | 1425 |
+| World shown, reads as described | 261 | 286 | 287 | 267 |
+| Society read, validating every stored input | 15 | 62 | 236 | 1094 |
+| Society read, as described | 16 | 22 | 21 | 19 |
+| Events read, validating every stored input | 20 | 157 | 586 | no entry 1.5 s after the world was shown |
+| Events read, as described | 24 | 104 | 318 | 761 |
+
+## Versions that survive upgrades
+
+A routine catalog is published beside the versions before it and never edited in place
+(`exulanica/world/society_catalogs.py`). Schemas are keyed by catalog id and version, the directory
+holds a file for every schema and no file without one, and a model reads one version of each
+catalog: a society being created reads `ROUTINE_VERSIONS`, and a stored society reads the versions
+it recorded, so its digest and its replay do not move when a later version is published.
+`tests/test_society_versions_survive_upgrades.py` publishes a second version of a catalog beside the
+first and holds a stored living society to advancing and replaying across it, and pins the digest
+of every released catalog file.
+
+A stored input names the affordance registry it was composed under by digest. The runtime keeps
+every registry it composes with in its content-addressed store under that digest, and authorises a
+stored input against the registry the input names, read back and held to a registry's shape, not
+against the registry it holds itself (`exulanica/api/society_runtime.py`, `_recorded_registry`).
+Reviewing another asset or changing the reach is a registry the stored inputs never named, and they
+keep authorising; an instance whose store never held an input's registry refuses it as unavailable,
+as it refuses missing asset bytes. A reviewed asset the society's footprint table does not state is
+left out of the registry, so an instance still starts, and a placed copy of it is refused by name;
+`test_every_reviewed_asset_has_a_society_assignment` fails until the table states it.
+
+## Sending inhabitants away
+
+The person whose world it is can send everyone away and bring them back
+(`exulanica/world/society_presence.py`), in a v2 society; the engine table says which engines
+allow it. Each is one recorded minute of the society, bound to the request that asked for it:
+
+- Sending everyone away is a transition in which every person emits a `departed` event, in order,
+  with where they stood; the state then holds nobody and says so,
+  `presence: {status: "away", since_tick, request_id, request_sha256}`. Time goes on while they
+  are away, with nobody in it.
+- Bringing them back is a transition in which the same people, with the same identities and names
+  derived from the society's seed, arrive at the starting places a genesis gives them over the
+  world as it is then, with no goal, each emitting an `arrived` event. It is a new arrival, never an
+  undo: nothing of what they did before they left is restored, and nothing about the departure is
+  erased.
+
+Every state before the departure, its events and its transitions stay where they were, so replay
+rebuilds every minute on both sides of both changes from the stored request and inputs, and the
+authored version they lived in is untouched by their leaving. A world reopened while they are away
+has nobody in it.
+
+`POST /world/versions/{version_id}/society/presence?world_id=W` accepts exactly
+`{idempotency_key, presence: "away" | "here", base_tick, base_state_sha256}` and answers with the
+society. The server resolves the world, the society, the rights and the minute under the same lock
+and compare-and-swap as a step. An exact retry answers with the society as it is. A request against
+a state that has moved on is `409 stale_society_state`. A request the state cannot honour is a
+`409` naming why: `nobody_to_send_away`, `already_here`, `a_request_is_waiting` (a directed request
+waits for the next ordinary minute), `nowhere_to_arrive` (no reachable place over the world as it
+is), or `engine_keeps_its_people`. Migration 0098 adds `world_society_presence`, one append-only
+row per such minute, bound to its transition, with forced row-level security; its trigger holds the
+row to the minute it took and to an engine that allows it.
+
+In a person's own saved world the People nearby panel offers "Send everyone away" while they are
+there, for a society whose engine allows it, and "Bring them back" while they are not, says which
+is the case and since which simulated minute, and says a refusal in words.
 
 ## Server integration and HTTP
 
@@ -559,6 +775,15 @@ spacing and every refusal), a simulated day on that tile with five more flats be
 front door, and a real-engine preview recording that replays frame for frame. PostgreSQL cases cover v4 creation, advance, reload, replay, withdrawal,
 playback through the worker on admitted Flatiron inputs, and selection labels without names.
 
+Saved-world fixtures cover per-object decisions at non-default yaw, scale, height, behaviour,
+placement and override against the first profile's refusal of the same world
+(`tests/test_society_saved_world_objects.py`), room at a destination over many minutes
+(`tests/test_society_destination_room.py`), versions surviving a catalog bump and a registry
+change on PostgreSQL (`tests/test_society_versions_survive_upgrades.py`), the engine table against
+every copy of it (`tests/test_society_engine_table.py`), reads that load only what they show
+(`tests/test_society_open_cost.py`), and sending everyone away and back through replay, reopening
+and HTTP (`tests/test_society_send_away.py`).
+
 V3 pure fixtures cover local information boundaries, transmission delay, remembered choices,
 vacated locations, stale hearsay, wait, proposal rejection and replay. Authenticated PostgreSQL
 cases exercise committed reservations, pending/completed retries, stale input/state admission,
@@ -691,7 +916,10 @@ the stored request and original inputs; it never calls a model or treats the req
 completed movement.
 
 There is no cancellation, expiry or mid-action interruption in this version. A request can direct
-only the next eligible goal and ordinary navigation/action checks remain authoritative. It cannot
+only the next eligible goal and ordinary navigation/action checks remain authoritative. Over an
+input that states places, a request is refused `destination_full` when every place of its target is
+held by somebody else, and an applied request is promised its place before the minute, so nobody
+choosing freely in the same minute takes it first. It cannot
 teleport, cross unsupported space, undo completed actions or simulation history, or replace a
 withdrawn target. The browser has a control on a declared visit or rest destination that issues
 one typed `perform` request through this API and shows the returned pending or consumed record, or
@@ -728,7 +956,8 @@ resources blocks and the 300 m wander bound those profiles hash now live only in
 values live in versioned catalogs under `assets/catalogs/society/`, in the city grammar's
 catalog envelope, each entry with a licence and a stated reason. A society records the catalog
 versions and their digest, and refuses to advance under a different digest, so a routine change
-is a new catalog version. Five needs (rest, leisure, a meal, shopping, sleep) grow each simulated
+is another catalog version, published beside the one stored societies read (see "Versions that
+survive upgrades"). Five needs (rest, leisure, a meal, shopping, sleep) grow each simulated
 minute at their catalogued rate. Activities relieve one need each, have a duration range and an
 opening window, and take place at a destination, at home, at work (a shift, which outranks every
 need while due) or at any open standing spot (walking and pausing, which needs only the graph).
@@ -868,8 +1097,15 @@ features; v4 refuses them.
 
 **Rendering.** A saved world's inhabitants are drawn by the same crowd, hung from the authored
 region's root, which is the frame their input states positions in and the frame the person's
-objects are placed in. The crowd does not read an action's kind: an inhabitant resting is drawn
-standing where it rests, because no seated pose exists, and its panel says so.
+objects are placed in. A resting inhabitant is one whose `action.kind` is `rest` with
+`action.status` `active`, and it rests at its own place, a standing spacing from anybody else. The
+crowd hands the kind of an action under way to whatever draws the person, as `activity` in
+`CrowdPose` (`web/packages/atlas-react/src/playcanvas/society/types.ts`), once the path recorded for
+the minute has been walked. A renderable whose catalog declares a posture for that activity draws
+it: resting is drawn sitting on the ground in front of the destination, not on a seat surface. An
+activity with no declared posture, such as making room, is drawn standing, and so is everybody
+drawn by a renderable with no postures. While everyone is away the state holds nobody, so the crowd
+draws nobody.
 
 The app draws the whole population by distance: up to 24 nearest outdoor
 inhabitants as full characters (the native character runtime's resident limit) and every other

@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from collections.abc import Callable
+from collections.abc import Callable, Iterable
 from typing import Any
 
 import psycopg
@@ -29,7 +29,13 @@ from exulanica.world.society_actions import (
     validate_action_request,
 )
 from exulanica.world.society_decisions import validate_decision_receipt
-from exulanica.world.society_input_policy import AUTHORED_GROUND_INPUT
+from exulanica.world.society_engines import (
+    DEFAULT_ENGINE,
+    INPUT_ENGINES,
+    UnknownSocietyEngine,
+    society_engine,
+)
+from exulanica.world.society_input_policy import is_authored_ground
 from exulanica.world.society_legacy import advance_society, initial_society
 from exulanica.world.society_living import (
     LIVING_PROFILE,
@@ -47,14 +53,20 @@ from exulanica.world.society_planner import (
     validate_input_successor,
     validate_society_input,
 )
+from exulanica.world.society_presence import (
+    PresenceRefused,
+    change_presence,
+    presence_request,
+    validate_presence_request,
+)
 from exulanica.world.society_social import (
     SOCIAL_PROFILE,
     advance_social_society,
     initial_social_society,
 )
 
-#: Profiles that consume authorized district inputs and record transition receipts.
-INPUT_PROFILES = (PURPOSEFUL_PROFILE, SOCIAL_PROFILE, LIVING_PROFILE)
+#: Profiles that consume authorized inputs and record transition receipts, from the engine table.
+INPUT_PROFILES = INPUT_ENGINES
 
 
 def consumed_places(document: dict[str, Any]) -> dict[str, Any]:
@@ -113,7 +125,7 @@ class SocietyRepository:
         region_id: str,
         seed: str,
         actor: uuid.UUID,
-        profile: str = SOCIETY_ENGINE_VERSION,
+        profile: str = DEFAULT_ENGINE,
         initial_input: dict[str, Any] | None = None,
     ) -> dict[str, Any]:
         with self.connection.transaction():
@@ -133,27 +145,34 @@ class SocietyRepository:
                     )
                 return self.snapshot(version_id)
             society_id = uuid.uuid5(version_id, "exulanica-society/v1")
-            if profile == SOCIETY_ENGINE_VERSION:
+            # An engine the table does not state is refused by name before anything is written.
+            engine = society_engine(profile)
+            if not engine.takes_inputs:
                 if initial_input is not None:
-                    raise ValueError("v1 cannot consume district inputs")
-                state = initial_society(society_id, seed)
-            elif profile in INPUT_PROFILES:
+                    raise ValueError(f"{profile} cannot consume district inputs")
+                state = initial_society(
+                    society_id,
+                    seed,
+                    minimum_population=engine.population_minimum,
+                    maximum_population=engine.population_maximum,
+                )
+            else:
                 if initial_input is None:
-                    raise UnavailableSocietyInput("v2 requires a server-authorized initial input")
-                if profile == LIVING_PROFILE and initial_input["profile"] == AUTHORED_GROUND_INPUT:
+                    raise UnavailableSocietyInput(
+                        f"{profile} requires a server-authorized initial input"
+                    )
+                if is_authored_ground(initial_input["profile"]) and not engine.saved_world:
                     # The living society reads streets, occupancy and stated surface heights out
                     # of its place. A saved world's ground states a flat rectangle and none of
                     # those, so this refuses rather than publishing a place of empty answers.
-                    raise ValueError(
-                        "the living society has no place contract for an authored ground"
-                    )
+                    raise ValueError(f"{profile} has no place contract for an authored ground")
                 self._validate_scope(version_id, initial_input)
                 self._authorize(initial_input)
                 # A saved world's own ground holds a handful of people; a district, its full
                 # population. Read at the moment of creation, so a measurement can set another.
                 population = (
                     society_authored_ground.AUTHORED_GROUND_POPULATION
-                    if initial_input["profile"] == AUTHORED_GROUND_INPUT
+                    if is_authored_ground(initial_input["profile"])
                     else SOCIETY_POPULATION
                 )
                 if profile == LIVING_PROFILE:
@@ -162,20 +181,26 @@ class SocietyRepository:
                     state = initial_living_society(
                         society_id, seed, place, routine, branch_id=str(version_id)
                     )
-                else:
-                    initializer = (
-                        initial_social_society
-                        if profile == SOCIAL_PROFILE
-                        else initial_purposeful_society
+                elif profile == SOCIAL_PROFILE:
+                    state = initial_social_society(
+                        society_id, seed, initial_input, population=population
                     )
-                    state = initializer(society_id, seed, initial_input, population=population)
-            else:
-                raise ValueError("unsupported society engine version")
+                elif profile == PURPOSEFUL_PROFILE:
+                    state = initial_purposeful_society(
+                        society_id, seed, initial_input, population=population
+                    )
+                else:
+                    raise UnknownSocietyEngine(f"no genesis is implemented for {profile}")
             population = (
                 state["population"]["size"]
                 if profile == LIVING_PROFILE
                 else len(state["inhabitants"])
             )
+            if not engine.holds(population):
+                raise ValueError(
+                    f"{profile} holds {engine.population_minimum} to "
+                    f"{engine.population_maximum} inhabitants, not {population}"
+                )
             row = self.connection.execute(
                 "insert into world_society(workspace_id,society_id,world_id,version_id,place_id,"
                 "region_id,engine_version,seed,population_size,tick_seconds,"
@@ -251,7 +276,58 @@ class SocietyRepository:
             (self.workspace_id, row["society_id"]),
         ).fetchall()
 
+    def _chain(self, row: dict) -> int:
+        """The newest input sequence, after checking the stored inputs run from one with no gap."""
+        found = self.connection.execute(
+            "select count(*) as n,min(input_seq) as low,max(input_seq) as high "
+            "from world_society_input where workspace_id=%s and society_id=%s",
+            (self.workspace_id, row["society_id"]),
+        ).fetchone()
+        if not found["n"] or found["low"] != 1:
+            raise ValueError("missing society genesis input")
+        if found["high"] != found["n"]:
+            raise ValueError("society input chain has a gap")
+        return int(found["high"])
+
+    def _inputs(self, row: dict, sequences: Iterable[int]) -> dict[int, dict]:
+        """The stored inputs with these sequence numbers, each held to its own row and validated.
+
+        Every input was validated against the one before it when it was recorded, the table takes
+        no update or delete, and replay checks the whole chain again from the first input. So a
+        read loads and validates the inputs it shows or consumes, never the history behind them;
+        what the history adds to a read is the one count ``_chain`` makes over its rows.
+        """
+        wanted = sorted(set(sequences))
+        rows = self.connection.execute(
+            "select input_seq,document,document_sha256 from world_society_input "
+            "where workspace_id=%s and society_id=%s and input_seq=any(%s) order by input_seq",
+            (self.workspace_id, row["society_id"], wanted),
+        ).fetchall()
+        if [value["input_seq"] for value in rows] != wanted:
+            raise ValueError("a stored society input is missing")
+        documents = {}
+        for value in rows:
+            document = value["document"]
+            self._validate_scope(row["version_id"], document)
+            if (
+                document["input_seq"] != value["input_seq"]
+                or document["document_sha256"] != value["document_sha256"]
+            ):
+                raise ValueError("stored input binding mismatch")
+            documents[value["input_seq"]] = document
+        return documents
+
+    def _pending_inputs(self, row: dict) -> list[dict]:
+        """The input the state consumed and every input queued after it, in order.
+
+        What a step consumes. The engine checks each queued input against the one before it.
+        """
+        first = row["state"]["input_seq"]
+        documents = self._inputs(row, range(first, self._chain(row) + 1))
+        return [documents[sequence] for sequence in sorted(documents)]
+
     def _validated_inputs(self, row: dict) -> list[dict]:
+        """Every stored input from the first, each checked against the one before it: replay's."""
         rows = self._input_rows(row)
         if not rows or rows[0]["input_seq"] != 1:
             raise ValueError("missing society genesis input")
@@ -279,15 +355,23 @@ class SocietyRepository:
         if row["engine_version"] in INPUT_PROFILES:
             # A historical snapshot is not a current rights grant. Authorizer checks dependencies
             # of the current state plus queued input. Historical replay checks every input below.
-            documents = self._validated_inputs(row)
-            current = documents[row["state"]["input_seq"] - 1]
+            consumed, latest = row["state"]["input_seq"], self._chain(row)
+            memories = (
+                [
+                    memory["input_seq"]
+                    for agent in row["state"]["social"]["agents"].values()
+                    for memory in [*agent["observations"], *agent["beliefs"].values()]
+                ]
+                if row["engine_version"] == SOCIAL_PROFILE
+                else []
+            )
+            documents = self._inputs(row, [consumed, latest, *memories])
+            current = documents[consumed]
             self._authorize(current)
-            if documents[-1] != current:
-                self._authorize(documents[-1])
-            if row["engine_version"] == SOCIAL_PROFILE:
-                for agent in row["state"]["social"]["agents"].values():
-                    for memory in [*agent["observations"], *agent["beliefs"].values()]:
-                        self._authorize(documents[memory["input_seq"] - 1])
+            if latest != consumed:
+                self._authorize(documents[latest])
+            for sequence in memories:
+                self._authorize(documents[sequence])
         snapshot = self._snapshot(row)
         if places and current is not None:
             snapshot["places"] = consumed_places(current)
@@ -355,16 +439,14 @@ class SocietyRepository:
             if row["engine_version"] == SOCIETY_ENGINE_VERSION:
                 state, events = advance_society(row["state"], row["seed"])
             elif row["engine_version"] == LIVING_PROFILE:
-                documents = self._validated_inputs(row)
-                inputs = documents[row["state"]["input_seq"] - 1 :]
+                inputs = self._pending_inputs(row)
                 self._authorize(inputs[-1])
                 routine = routine_for(row["state"])
                 state, events = advance_living_society(
                     row["state"], row["seed"], living_places(inputs, routine), routine
                 )
             elif row["engine_version"] in (PURPOSEFUL_PROFILE, SOCIAL_PROFILE):
-                documents = self._validated_inputs(row)
-                inputs = documents[row["state"]["input_seq"] - 1 :]
+                inputs = self._pending_inputs(row)
                 # The latest authorized unavailable input must be able to pause the engine
                 # even when earlier dependencies are now withdrawn. Historical replay/reads
                 # still authorize every materialized input separately.
@@ -414,50 +496,9 @@ class SocietyRepository:
                     events,
                 )
             else:
-                raise ValueError("unsupported society engine version")
-            digest = society_state_sha256(state)
-            self.connection.execute(
-                "update world_society set current_tick=%s,state=%s,state_sha256=%s "
-                "where workspace_id=%s and society_id=%s",
-                (state["tick"], Jsonb(state), digest, self.workspace_id, row["society_id"]),
-            )
-            for event in events:
-                self.connection.execute(
-                    "insert into "
-                    "world_society_event(workspace_id,society_id,event_id,tick,event_kind,"
-                    "subject_id,object_id,place_id,document,document_sha256) "
-                    "values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-                    (
-                        self.workspace_id,
-                        row["society_id"],
-                        event.event_id,
-                        event.tick,
-                        event.kind,
-                        event.subject_id,
-                        event.object_id,
-                        row["place_id"],
-                        Jsonb(event.document),
-                        event_document_sha256(event),
-                    ),
-                )
+                raise UnknownSocietyEngine(f"unsupported society engine {row['engine_version']!r}")
+            self._record(row, state, events)
             if row["engine_version"] in INPUT_PROFILES:
-                self.connection.execute(
-                    "insert into "
-                    "world_society_transition(workspace_id,society_id,tick,from_input_seq,"
-                    "to_input_seq,previous_state_sha256,state_sha256,event_ids,events_sha256) "
-                    "values(%s,%s,%s,%s,%s,%s,%s,%s,%s)",
-                    (
-                        self.workspace_id,
-                        row["society_id"],
-                        state["tick"],
-                        row["state"]["input_seq"],
-                        state["input_seq"],
-                        row["state_sha256"],
-                        digest,
-                        Jsonb([str(e.event_id) for e in events]),
-                        society_state_sha256(ordered_events_document(events)),
-                    ),
-                )
                 if row["engine_version"] == SOCIAL_PROFILE:
                     for sequence, disposition in processed:
                         self.connection.execute(
@@ -481,6 +522,158 @@ class SocietyRepository:
                     )
             return self.snapshot(version_id)
 
+    def _record(self, row: dict, state: dict[str, Any], events: tuple[SocietyEvent, ...]) -> None:
+        """Commit one minute: the new state, its events and, for an input engine, its receipt."""
+        digest = society_state_sha256(state)
+        self.connection.execute(
+            "update world_society set current_tick=%s,state=%s,state_sha256=%s "
+            "where workspace_id=%s and society_id=%s",
+            (state["tick"], Jsonb(state), digest, self.workspace_id, row["society_id"]),
+        )
+        for event in events:
+            self.connection.execute(
+                "insert into "
+                "world_society_event(workspace_id,society_id,event_id,tick,event_kind,"
+                "subject_id,object_id,place_id,document,document_sha256) "
+                "values(%s,%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                (
+                    self.workspace_id,
+                    row["society_id"],
+                    event.event_id,
+                    event.tick,
+                    event.kind,
+                    event.subject_id,
+                    event.object_id,
+                    row["place_id"],
+                    Jsonb(event.document),
+                    event_document_sha256(event),
+                ),
+            )
+        if row["engine_version"] in INPUT_PROFILES:
+            self.connection.execute(
+                "insert into "
+                "world_society_transition(workspace_id,society_id,tick,from_input_seq,"
+                "to_input_seq,previous_state_sha256,state_sha256,event_ids,events_sha256) "
+                "values(%s,%s,%s,%s,%s,%s,%s,%s,%s)",
+                (
+                    self.workspace_id,
+                    row["society_id"],
+                    state["tick"],
+                    row["state"]["input_seq"],
+                    state["input_seq"],
+                    row["state_sha256"],
+                    digest,
+                    Jsonb([str(e.event_id) for e in events]),
+                    society_state_sha256(ordered_events_document(events)),
+                ),
+            )
+
+    def change_presence(
+        self,
+        version_id: uuid.UUID,
+        *,
+        wanted: str,
+        request_id: uuid.UUID,
+        requested_by: uuid.UUID,
+        base_tick: int,
+        base_state_sha256: str,
+    ) -> dict[str, Any]:
+        """Send everyone away, or bring them back: one recorded minute, bound to this request.
+
+        The person asks; this decides, under the same lock and compare-and-swap as a step. An
+        exact retry of a recorded request returns the society as it is; a request against a state
+        that has moved on is stale; one the state cannot honour is refused by name.
+        """
+        with self.connection.transaction():
+            self._lock()
+            row = self._row(version_id, lock=True)
+            if row is None:
+                raise UnknownSociety("society is unavailable")
+            if not society_engine(row["engine_version"]).presence:
+                raise PresenceRefused(
+                    "engine_keeps_its_people",
+                    f"the people of an {row['engine_version']} society are not sent away",
+                )
+            recorded = self.connection.execute(
+                "select document from world_society_presence where workspace_id=%s "
+                "and society_id=%s and request_id=%s",
+                (self.workspace_id, row["society_id"], request_id),
+            ).fetchone()
+            if recorded is not None:
+                document = recorded["document"]
+                if (
+                    document["presence"] != wanted
+                    or document["base_tick"] != base_tick
+                    or document["base_state_sha256"] != base_state_sha256
+                    or document["requested_by"] != str(requested_by)
+                ):
+                    raise StaleSocietyState("this request id was used for another request")
+                return self.snapshot(version_id)
+            if row["current_tick"] != base_tick or row["state_sha256"] != base_state_sha256:
+                raise StaleSocietyState("society changed; reload before asking")
+            if society_state_sha256(row["state"]) != row["state_sha256"]:
+                raise ValueError("stored society state digest mismatch")
+            waiting = self.connection.execute(
+                "select 1 from world_society_action_request request "
+                "left join world_society_transition_action consumed "
+                "using(workspace_id,society_id,action_seq) "
+                "where request.workspace_id=%s and request.society_id=%s "
+                "and consumed.action_seq is null limit 1",
+                (self.workspace_id, row["society_id"]),
+            ).fetchone()
+            if waiting is not None:
+                # A directed request is consumed by the next ordinary minute; this minute would
+                # pass it by and leave it bound to a state that no longer exists.
+                raise PresenceRefused("a_request_is_waiting")
+            inputs = self._pending_inputs(row)
+            self._authorize(inputs[-1])
+            request = presence_request(
+                row["state"],
+                request_id=request_id,
+                requested_by=requested_by,
+                wanted=wanted,  # type: ignore[arg-type]
+            )
+            state, events = change_presence(
+                row["state"], row["seed"], inputs, request, population=row["population_size"]
+            )
+            self._record(row, state, events)
+            self.connection.execute(
+                "insert into world_society_presence(workspace_id,society_id,tick,request_id,"
+                "requested_by,presence,document,document_sha256) "
+                "values(%s,%s,%s,%s,%s,%s,%s,%s)",
+                (
+                    self.workspace_id,
+                    row["society_id"],
+                    state["tick"],
+                    request_id,
+                    requested_by,
+                    wanted,
+                    Jsonb(request),
+                    request["document_sha256"],
+                ),
+            )
+            return self.snapshot(version_id)
+
+    def _presences(self, row: dict) -> dict[int, dict[str, Any]]:
+        """Every recorded presence request, by the tick of the minute it took."""
+        rows = self.connection.execute(
+            "select tick,document,document_sha256 from world_society_presence "
+            "where workspace_id=%s and society_id=%s order by tick",
+            (self.workspace_id, row["society_id"]),
+        ).fetchall()
+        requests = {}
+        for value in rows:
+            document = value["document"]
+            validate_presence_request(document)
+            if (
+                document["document_sha256"] != value["document_sha256"]
+                or document["base_tick"] + 1 != value["tick"]
+                or document["branch_id"] != str(row["version_id"])
+            ):
+                raise ValueError("stored presence request binding mismatch")
+            requests[value["tick"]] = document
+        return requests
+
     def events(self, version_id: uuid.UUID, *, limit: int = 256) -> tuple[dict[str, Any], ...]:
         self.snapshot(version_id)  # Current authorization applies to event materialization too.
         row = self._row(version_id)
@@ -492,9 +685,10 @@ class SocietyRepository:
             (self.workspace_id, row["society_id"], max(1, min(limit, 256))),
         ).fetchall()
         if row["engine_version"] in INPUT_PROFILES:
-            documents = self._validated_inputs(row)
-            for seq in {value["document"]["input_seq"] for value in rows}:
-                self._authorize(documents[seq - 1])
+            shown = {value["document"]["input_seq"] for value in rows}
+            documents = self._inputs(row, shown)
+            for sequence in sorted(shown):
+                self._authorize(documents[sequence])
         return tuple(dict(value) for value in rows)
 
     def replay(self, version_id: uuid.UUID) -> dict[str, Any]:
@@ -534,6 +728,7 @@ class SocietyRepository:
                 ).fetchall()
                 if len(transitions) != row["current_tick"]:
                     raise ValueError("missing or extra society transition")
+                presences = self._presences(row)
                 for transition in transitions:
                     previous_state = state
                     if (
@@ -554,6 +749,28 @@ class SocietyRepository:
                     ]
                     if any(value["tick"] != transition["tick"] for value in transition_actions):
                         raise ValueError("society action transition binding mismatch")
+                    presence_request_document = presences.get(transition["tick"])
+                    if presence_request_document is not None:
+                        # A minute somebody sent everyone away or brought them back: regenerated
+                        # from the stored request and inputs, and it consumed no directed request.
+                        if transition_actions:
+                            raise ValueError("a presence minute cannot consume a directed request")
+                        state, events = change_presence(
+                            state,
+                            row["seed"],
+                            inputs,
+                            presence_request_document,
+                            population=row["population_size"],
+                        )
+                        if (
+                            transition["state_sha256"] != society_state_sha256(state)
+                            or transition["event_ids"] != [str(e.event_id) for e in events]
+                            or transition["events_sha256"]
+                            != society_state_sha256(ordered_events_document(events))
+                        ):
+                            raise ValueError("society transition replay mismatch")
+                        expected_events.extend(events)
+                        continue
                     requests = [value["document"] for value in transition_actions]
                     goal_policy, action_dispositions = action_goal_policies(
                         state, inputs[-1], requests
@@ -614,7 +831,7 @@ class SocietyRepository:
                     ):
                         raise ValueError("pending society action is not bound to current state")
             else:
-                raise ValueError("unsupported society engine version")
+                raise UnknownSocietyEngine(f"unsupported society engine {row['engine_version']!r}")
             self._verify_events(row, expected_events)
             if society_state_sha256(state) != row["state_sha256"] or state != row["state"]:
                 raise ValueError("stored society state does not match deterministic replay")

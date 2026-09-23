@@ -15,18 +15,32 @@ from exulanica.world.society import (
     SocietyEvent,
     society_state_sha256,
 )
+from exulanica.world.society_engines import society_engine
 from exulanica.world.society_input_policy import (
     AUTHORED_GROUND_INPUT,
+    AUTHORED_GROUND_INPUT_V2,
+    AUTHORED_GROUND_INPUTS,
     LOCAL_FAILURE_INPUTS,
     LOCAL_INPUT,
+    UNREAD_PLACEMENT_REASONS,
+    is_authored_ground,
     validate_local_affordances,
+    validate_unread_placements,
 )
 from exulanica.world.society_legacy import initial_society
 
 PURPOSEFUL_PROFILE = "exulanica-society/v2"
 INPUT_PROFILE = "exulanica.society-input/v1"
+#: The travel budget a new society records in its state, 60 m per one-minute tick: at most a
+#: metre each simulated second. A stored society walks at the budget its own state records.
 MOVEMENT_BUDGET_MM = 60_000
+#: The two reviewed activities and how many ticks each takes after arrival.
 DURATIONS = {"visit": 1, "rest": 3}
+#: The v2 policy's own utility figures: a need at or above this prefers rest to a visit, and a
+#: completed activity lowers the need by its relief. They are part of what exulanica-society/v2
+#: is, so a stored v2 history replays under exactly these; a different figure is a new profile.
+NEED_PREFERS_REST_MILLI = 750
+RELIEF_MILLI = {"visit": 20, "rest": 500}
 #: Every input profile the policy consumes, and the navigation and frame each one declares.
 #: A district projection states the geodetic origin its millimetres are measured from; a saved
 #: world's authored ground has no surveyed origin and states none rather than inventing one.
@@ -35,12 +49,17 @@ NAVIGATION_PROFILES = {
     INPUT_PROFILE: "bounded-sidewalk-graph/v1",
     LOCAL_INPUT: "bounded-sidewalk-graph/v1",
     AUTHORED_GROUND_INPUT: "authored-ground-lattice/v1",
+    AUTHORED_GROUND_INPUT_V2: "authored-ground-lattice/v1",
 }
 FRAME_NAMES = {
     INPUT_PROFILE: "flatiron-local-mm",
     LOCAL_INPUT: "flatiron-local-mm",
     AUTHORED_GROUND_INPUT: "authored-ground-local-mm",
+    AUTHORED_GROUND_INPUT_V2: "authored-ground-local-mm",
 }
+#: Input profiles whose activities state the places their occupants stand at. A society advancing
+#: over one keeps each place to one person and keeps people waiting clear of every place.
+PLACE_INPUTS = (AUTHORED_GROUND_INPUT_V2,)
 CLEARANCE_MM = 450
 #: The fewest inhabitants a society over a district starts with. The database no longer holds a
 #: v2 or v3 population to this, because a row cannot tell a district from a saved world's own
@@ -96,6 +115,8 @@ def _validate_society_input(document: dict[str, Any]) -> None:
     _require(isinstance(document, dict), "invalid society input fields")
     if document.get("profile") in LOCAL_FAILURE_INPUTS:
         fields.add("unavailable_affordances")
+    if document.get("profile") in UNREAD_PLACEMENT_REASONS:
+        fields.add("unread_placements")
     _require(set(document) == fields, "invalid society input fields")
     profile = document["profile"]
     _require(profile in NAVIGATION_PROFILES, "unsupported society input profile")
@@ -149,8 +170,10 @@ def _validate_society_input(document: dict[str, Any]) -> None:
         "destinations",
         "unavailable_reason",
     }
-    if profile == AUTHORED_GROUND_INPUT:
+    if is_authored_ground(profile):
         navigation_fields.update(("walkable_area", "arrival_mm"))
+    if profile in PLACE_INPUTS:
+        navigation_fields.add("standing_spacing_mm")
     _require(isinstance(nav, dict) and set(nav) == navigation_fields, "invalid navigation fields")
     _require(
         nav["profile"] == NAVIGATION_PROFILES[profile] and nav["clearance_mm"] == CLEARANCE_MM,
@@ -179,7 +202,7 @@ def _validate_society_input(document: dict[str, Any]) -> None:
         _require(node["node_id"] not in nodes, "duplicate node")
         nodes[node["node_id"]] = node
     _require(list(nodes) == sorted(nodes), "nodes must be sorted")
-    if profile == AUTHORED_GROUND_INPUT:
+    if is_authored_ground(profile):
         _validate_walkable_area(nav["walkable_area"], nodes.values(), nav["clearance_mm"])
         arrival = nav["arrival_mm"]
         _require(
@@ -240,23 +263,22 @@ def _validate_society_input(document: dict[str, Any]) -> None:
         isinstance(document["targets"], list) and len(document["targets"]) <= 4096,
         "target bound exceeded",
     )
+    target_fields = {
+        "target_id",
+        "subject_id",
+        "node_id",
+        "affordance",
+        "duration_ticks",
+        "origin",
+        "object_id",
+        "version_id",
+        "enabled",
+    }
+    if profile in PLACE_INPUTS:
+        target_fields.add("place_node_ids")
     target_ids = []
     for target in document["targets"]:
-        _require(
-            set(target)
-            == {
-                "target_id",
-                "subject_id",
-                "node_id",
-                "affordance",
-                "duration_ticks",
-                "origin",
-                "object_id",
-                "version_id",
-                "enabled",
-            },
-            "invalid target fields",
-        )
+        _require(set(target) == target_fields, "invalid target fields")
         _require(
             _text(target["target_id"]) and _text(target["subject_id"]) and _text(target["node_id"]),
             "invalid target reference",
@@ -282,8 +304,12 @@ def _validate_society_input(document: dict[str, Any]) -> None:
         )
         target_ids.append(target["target_id"])
     _require(target_ids == sorted(set(target_ids)), "targets must be unique and sorted")
+    if profile in PLACE_INPUTS:
+        _validate_places(document, nodes)
     if profile in LOCAL_FAILURE_INPUTS:
         validate_local_affordances(document, DURATIONS)
+    if profile in UNREAD_PLACEMENT_REASONS:
+        validate_unread_placements(document)
     refs = document["dependency_refs"]
     _require(isinstance(refs, list) and len(refs) <= 8192, "dependency bound exceeded")
     for ref in refs:
@@ -297,6 +323,38 @@ def _validate_society_input(document: dict[str, Any]) -> None:
     keys = [(r["kind"], r["identity"], r["sha256"]) for r in refs]
     _require(keys == sorted(set(keys)), "dependencies must be unique and sorted")
     _require(input_sha256(document) == document["document_sha256"], "society input digest mismatch")
+
+
+def _validate_places(document: dict[str, Any], nodes: dict[str, Any]) -> None:
+    """Every activity names where its occupants stand, and no two of them stand too close.
+
+    A place is a node of the input's own graph, belongs to one activity only, and lies at least
+    the stated standing spacing from every other place, so an input cannot seat two people inside
+    one another however the society fills it.
+    """
+    spacing = document["navigation"]["standing_spacing_mm"]
+    _require(_integer(spacing, 1, 10**6), "invalid standing spacing")
+    seen: list[str] = []
+    for target in document["targets"]:
+        places = target["place_node_ids"]
+        _require(
+            isinstance(places, list)
+            and bool(places)
+            and len(places) <= 4096
+            and all(_text(node) and node in nodes for node in places),
+            "invalid destination places",
+        )
+        seen.extend(places)
+    _require(len(seen) == len(set(seen)), "a place belongs to one activity")
+    positions = [nodes[node]["position_mm"] for node in seen]
+    for index, point in enumerate(positions):
+        _require(
+            all(
+                (point[0] - other[0]) ** 2 + (point[1] - other[1]) ** 2 >= spacing**2
+                for other in positions[index + 1 :]
+            ),
+            "two places stand closer than the standing spacing",
+        )
 
 
 def _validate_walkable_area(area: Any, nodes: Any, clearance_mm: int) -> None:
@@ -340,7 +398,18 @@ def validate_input_successor(previous: dict[str, Any], current: dict[str, Any]) 
     _require(current["input_seq"] == previous["input_seq"] + 1, "input sequence gap")
     for key in ("world_id", "version_id", "district_id", "frame", "base_artifact_sha256"):
         _require(current[key] == previous[key], f"input changed immutable {key}")
-    if current["profile"] == AUTHORED_GROUND_INPUT:
+    if is_authored_ground(previous["profile"]) or is_authored_ground(current["profile"]):
+        _require(
+            is_authored_ground(previous["profile"]) and is_authored_ground(current["profile"]),
+            "a saved world's society reads only its own ground's inputs",
+        )
+        # A composition policy moves forward: a society that has consumed a later profile's input
+        # never goes back to an earlier one.
+        _require(
+            AUTHORED_GROUND_INPUTS.index(current["profile"])
+            >= AUTHORED_GROUND_INPUTS.index(previous["profile"]),
+            "input profile moved backwards",
+        )
         # A society's area is part of what the society is, like its seed. An edit changes what is
         # in the area, never where the area is.
         _require(
@@ -389,15 +458,12 @@ def _paths(start: str, adjacent: dict) -> dict[str, tuple[int, tuple[str, ...]]]
     return best
 
 
-def initial_purposeful_society(
-    society_id: uuid.UUID,
-    seed: str,
-    document: dict[str, Any],
-    *,
-    population: int = SOCIETY_POPULATION,
-) -> dict[str, Any]:
-    validate_society_input(document)
-    _require(document["input_seq"] == 1, "genesis requires input sequence 1")
+def _spawn_nodes(document: dict[str, Any]) -> tuple[dict[str, Any], list[str], bool]:
+    """The nodes a newcomer may be placed at over this input, and whether it is a saved world's.
+
+    Only declared nodes in components containing reviewed targets. This is placement of people
+    who are not yet there, never recovery or teleportation of anybody who is.
+    """
     _require(
         document["availability"] == "available"
         and document["navigation"]["unavailable_reason"] is None,
@@ -406,14 +472,12 @@ def initial_purposeful_society(
     nodes, adjacent, _ = _graph(document)
     targets = [t for t in document["targets"] if t["enabled"]]
     _require(bool(nodes) and bool(targets), "initial society requires reachable targets")
-    # Spawn only at declared nodes in components containing reviewed targets. This is initial
-    # placement, never recovery/teleportation of an existing subject.
     reachable = set()
     for target in targets:
         if target["node_id"] not in reachable:
             reachable.update(_paths(target["node_id"], adjacent))
     spawn_nodes = sorted(reachable)
-    authored = document["profile"] == AUTHORED_GROUND_INPUT
+    authored = is_authored_ground(document["profile"])
     if authored:
         # A saved world: nobody starts where a person arrives or beside it, and the few who live
         # there start spread across the area in node order rather than in its first column.
@@ -424,20 +488,35 @@ def initial_purposeful_society(
             if (nodes[node]["position_mm"][0] - ax) ** 2 + (nodes[node]["position_mm"][1] - az) ** 2
             > ARRIVAL_CLEARANCE_MM**2
         ]
-        _require(bool(spawn_nodes), "no reachable place to start clear of the arrival point")
+        if document["profile"] in PLACE_INPUTS:
+            # Nobody starts at a destination: not on a place, not where it joins the lattice and
+            # not within a standing spacing of one.
+            crowded = standing_exclusions(document)
+            spawn_nodes = [node for node in spawn_nodes if node not in crowded]
+        _require(
+            bool(spawn_nodes),
+            "no reachable place to start clear of the arrival point and every destination",
+        )
+    return nodes, spawn_nodes, authored
+
+
+def _newcomers(
+    society_id: uuid.UUID,
+    seed: str,
+    document: dict[str, Any],
+    *,
+    population: int,
+    engine_profile: str,
+) -> dict[str, Any]:
+    """The seeded people of a society, each placed at a starting node over ``document``."""
+    nodes, spawn_nodes, authored = _spawn_nodes(document)
+    engine = society_engine(engine_profile)
     state = initial_society(
         society_id,
         seed,
         population=population,
-        minimum_population=1 if authored else DISTRICT_MINIMUM_POPULATION,
-    )
-    state.update(
-        profile=PURPOSEFUL_PROFILE,
-        branch_id=document["version_id"],
-        input_seq=1,
-        input_sha256=document["document_sha256"],
-        movement_budget_mm_per_tick=MOVEMENT_BUDGET_MM,
-        seed_sha256=seed,
+        minimum_population=engine.population_minimum if authored else DISTRICT_MINIMUM_POPULATION,
+        maximum_population=engine.population_maximum,
     )
     for person in state["inhabitants"]:
         node = (
@@ -469,6 +548,114 @@ def initial_purposeful_society(
             route_geometry_sha256=None,
         )
     return state
+
+
+def initial_purposeful_society(
+    society_id: uuid.UUID,
+    seed: str,
+    document: dict[str, Any],
+    *,
+    population: int = SOCIETY_POPULATION,
+    engine_profile: str = PURPOSEFUL_PROFILE,
+) -> dict[str, Any]:
+    """A purposeful genesis over input 1, within ``engine_profile``'s population bounds."""
+    validate_society_input(document)
+    _require(document["input_seq"] == 1, "genesis requires input sequence 1")
+    state = _newcomers(
+        society_id, seed, document, population=population, engine_profile=engine_profile
+    )
+    state.update(
+        profile=PURPOSEFUL_PROFILE,
+        branch_id=document["version_id"],
+        input_seq=1,
+        input_sha256=document["document_sha256"],
+        movement_budget_mm_per_tick=MOVEMENT_BUDGET_MM,
+        seed_sha256=seed,
+    )
+    return state
+
+
+def arriving_inhabitants(
+    society_id: uuid.UUID,
+    seed: str,
+    document: dict[str, Any],
+    *,
+    population: int,
+    engine_profile: str = PURPOSEFUL_PROFILE,
+) -> list[dict[str, Any]]:
+    """The same seeded people, placed over ``document`` by the rule a genesis places them by.
+
+    For inhabitants who were sent away and are brought back: the same identities and names, at
+    spread starting places over the world as it is now, with no goal. What they did before they
+    left stays in the history; nothing of it is restored.
+    """
+    validate_society_input(document)
+    return _newcomers(
+        society_id, seed, document, population=population, engine_profile=engine_profile
+    )["inhabitants"]
+
+
+def standing_exclusions(document: dict[str, Any]) -> frozenset[str]:
+    """The nodes nobody waits or starts at in an input whose activities state places.
+
+    Every place, the lattice node each place is joined to, and every node within a standing
+    spacing of a place: a person standing at any of them would stand in the way of, or inside,
+    somebody using a destination.
+    """
+    navigation = document["navigation"]
+    spacing = navigation["standing_spacing_mm"]
+    positions = {node["node_id"]: node["position_mm"] for node in navigation["nodes"]}
+    places = {node for target in document["targets"] for node in target["place_node_ids"]}
+    excluded = set(places)
+    for edge in navigation["edges"]:
+        if edge["to_node_id"] in places:
+            excluded.add(edge["from_node_id"])
+        if edge["from_node_id"] in places:
+            excluded.add(edge["to_node_id"])
+    for node, (x, z) in positions.items():
+        if any(
+            (x - positions[place][0]) ** 2 + (z - positions[place][1]) ** 2 < spacing**2
+            for place in places
+        ):
+            excluded.add(node)
+    return frozenset(excluded)
+
+
+def held_nodes(people: list[dict], me: dict) -> set[str]:
+    """Where everybody else stands or is on the way to, as the minute has left them so far."""
+    held = set()
+    for other in people:
+        if other is me:
+            continue
+        if other["goal"] is not None and other["route"] is not None:
+            held.add(other["route"]["destination_node_id"])
+        if other["location"]["edge"] is None:
+            held.add(other["location"]["node_id"])
+    return held
+
+
+def _place_for(
+    target: dict, policy: dict | None, paths: dict, held: set[str], here: str | None
+) -> str | None:
+    """The place a person takes at an activity, or None when it has no room for them.
+
+    A person directed there takes the place its request was promised before the step; anybody
+    else takes the place it stands at, or the first one nobody holds.
+    """
+    if policy and policy.get("preferred_target_id") == target["target_id"]:
+        promise = policy.get("place_node_id")
+        if promise is not None:
+            return promise if promise in paths else None
+    return _free_place(target, paths, held, here)
+
+
+def _free_place(target: dict, paths: dict, held: set[str], here: str | None) -> str | None:
+    """The place a person takes at an activity: the one it stands at, else the first free one."""
+    if here in target["place_node_ids"]:
+        return here
+    return next(
+        (node for node in target["place_node_ids"] if node in paths and node not in held), None
+    )
 
 
 def _location_valid(person: dict, nodes: dict, edges: dict) -> bool:
@@ -520,6 +707,10 @@ def advance_purposeful_society(
     )
     for prior, current in pairwise(inputs):
         validate_input_successor(prior, current)
+    # The budget is the one the state recorded at creation, so a society walks at the speed it
+    # was created with however the module constant for new societies moves.
+    budget_per_tick = state["movement_budget_mm_per_tick"]
+    _require(_integer(budget_per_tick, 1, 10**9), "invalid movement budget")
     result = deepcopy(state)
     tick = state["tick"] + 1
     result["tick"] = tick
@@ -602,6 +793,13 @@ def advance_purposeful_society(
                     "route_geometry_sha256"
                 ] != society_state_sha256(doc["navigation"]):
                     reason = "route_invalidated"
+            elif person["goal"] is not None and (
+                not _route_valid(person, nodes, edges)
+                or person["route_geometry_sha256"] != society_state_sha256(doc["navigation"])
+            ):
+                # Only a walk to make room has a goal and no target, and only a place-stating
+                # input starts one: it holds to a changed graph no more than a goal does.
+                reason = "route_invalidated"
             if reason:
                 person["action"] = {
                     "kind": "idle",
@@ -620,6 +818,14 @@ def advance_purposeful_society(
     nodes, adjacent, edges = _graph(doc)
     targets = [t for t in doc["targets"] if t["enabled"]]
     paths_cache = {}
+    # An input that states where each activity's occupants stand keeps every place to one person
+    # and keeps people who are waiting clear of every place.
+    places_mode = doc["profile"] in PLACE_INPUTS
+    place_target: dict[str, str] = {}
+    crowded: frozenset[str] = frozenset()
+    if places_mode:
+        place_target = {node: t["target_id"] for t in targets for node in t["place_node_ids"]}
+        crowded = standing_exclusions(doc)
     for person in result["inhabitants"]:
         person["need_milli"] = min(1000, person["need_milli"] + 1)
         unavailable = doc["unavailable_reason"] or doc["navigation"]["unavailable_reason"]
@@ -652,60 +858,108 @@ def advance_purposeful_society(
                 candidates = [
                     t for t in candidates if t["target_id"] in policy["allowed_target_ids"]
                 ]
-            if not candidates:
+            reachable = candidates
+            held: set[str] = set()
+            standing_at = None
+            asked = policy.get("preferred_target_id") if policy else None
+            if places_mode:
+                # A person never takes up again, unasked, the activity whose place it is standing
+                # at, so somebody waiting gets a turn; an activity needs a place nobody else holds.
+                held = held_nodes(result["inhabitants"], person) | {
+                    other["place_node_id"]
+                    for subject, other in (goal_policy or {}).items()
+                    if subject != person["id"] and "place_node_id" in other
+                }
+                standing_at = place_target.get(loc["node_id"]) if loc["edge"] is None else None
+                candidates = [
+                    t
+                    for t in reachable
+                    if (t["target_id"] != standing_at or t["target_id"] == asked)
+                    and _place_for(t, policy, paths, held, loc["node_id"]) is not None
+                ]
+            target = None
+            if candidates:
+                preferred = "rest" if person["need_milli"] >= NEED_PREFERS_REST_MILLI else "visit"
+                target = min(
+                    candidates,
+                    key=lambda t: (
+                        bool(policy and policy.get("preferred_target_id"))
+                        and t["target_id"] != policy["preferred_target_id"],
+                        t["affordance"] != preferred,
+                        t["target_id"] == person["last_completed_target_id"],
+                        paths[t["node_id"]][0],
+                        t["target_id"],
+                    ),
+                )
+                destination = (
+                    _place_for(target, policy, paths, held, loc["node_id"])
+                    if places_mode
+                    else target["node_id"]
+                )
+                goal = {
+                    "kind": target["affordance"],
+                    "target_id": target["target_id"],
+                    "reason": "remembered_target_selected"
+                    if policy and target["target_id"] == policy.get("preferred_target_id")
+                    else "restore_need"
+                    if target["affordance"] == "rest"
+                    else "visit_place",
+                }
+            elif standing_at is not None:
+                # Somebody who has finished at a place and has nothing else to do steps away to
+                # the nearest node where nobody stands, is headed or would be in the way.
+                waiting = min(
+                    (
+                        (paths[node][0], node)
+                        for node in paths
+                        if node not in crowded and node not in held
+                    ),
+                    default=None,
+                )
+                if waiting is None:
+                    block(person, "no_room_to_wait", doc)
+                    continue
+                destination = waiting[1]
+                goal = {"kind": "make_room", "target_id": None, "reason": "making_room"}
+            else:
                 reason = "no_reachable_affordance" if targets else "no_enabled_affordance"
                 if policy is not None and targets:
                     reason = "no_known_reachable_affordance"
+                if places_mode and reachable:
+                    reason = "no_room_at_destination"
                 block(person, reason, doc)
                 continue
-            preferred = "rest" if person["need_milli"] >= 750 else "visit"
-            target = min(
-                candidates,
-                key=lambda t: (
-                    bool(policy and policy.get("preferred_target_id"))
-                    and t["target_id"] != policy["preferred_target_id"],
-                    t["affordance"] != preferred,
-                    t["target_id"] == person["last_completed_target_id"],
-                    paths[t["node_id"]][0],
-                    t["target_id"],
-                ),
-            )
-            path = list(paths[target["node_id"]][1])
+            path = list(paths[destination][1])
             progress = 0
             if loc["edge"]:
                 path.insert(0, loc["edge"]["from_node_id"])
                 progress = loc["edge"]["progress_mm"]
             person["route_geometry_sha256"] = society_state_sha256(doc["navigation"])
-            person["goal"] = {
-                "kind": target["affordance"],
-                "target_id": target["target_id"],
-                "reason": "remembered_target_selected"
-                if policy and target["target_id"] == policy.get("preferred_target_id")
-                else "restore_need"
-                if target["affordance"] == "rest"
-                else "visit_place",
-            }
+            person["goal"] = goal
             person["target"] = deepcopy(target)
             person["route"] = {
                 "node_ids": path,
                 "edge_index": 0,
                 "edge_progress_mm": progress,
-                "destination_node_id": target["node_id"],
+                "destination_node_id": destination,
                 "input_sha256": doc["document_sha256"],
             }
             person["action"] = {
                 "kind": "move",
                 "status": "active",
-                "target_id": target["target_id"],
+                "target_id": None if target is None else target["target_id"],
                 "remaining_ticks": 0,
-                "reason": "following_reachable_route",
+                "reason": "following_reachable_route" if target is not None else "making_room",
             }
             person["blocked_key"] = None
             emit(person, "goal_selected", person["goal"]["reason"], "goal_selected", doc)
         target = person["target"]
         if person["action"]["kind"] in DURATIONS and person["action"]["status"] == "active":
             # These are subsequent ticks; arrival never spends the first action tick.
-            if person["location"]["node_id"] != target["node_id"]:
+            standing_node = (
+                person["route"]["destination_node_id"] if places_mode else target["node_id"]
+            )
+            if person["location"]["node_id"] != standing_node:
                 block(person, "action_precondition_failed", doc)
                 continue
             person["action"]["remaining_ticks"] -= 1
@@ -714,7 +968,7 @@ def advance_purposeful_society(
                 person["action"]["reason"] = "reviewed_duration_elapsed"
                 person["last_completed_target_id"] = target["target_id"]
                 person["need_milli"] = max(
-                    0, person["need_milli"] - (500 if target["affordance"] == "rest" else 20)
+                    0, person["need_milli"] - RELIEF_MILLI[target["affordance"]]
                 )
                 emit(
                     person,
@@ -725,7 +979,7 @@ def advance_purposeful_society(
                 )
             continue
         route = person["route"]
-        budget = MOVEMENT_BUDGET_MM
+        budget = budget_per_tick
         while route["edge_index"] < len(route["node_ids"]) - 1 and budget > 0:
             index = route["edge_index"]
             a, b = route["node_ids"][index : index + 2]
@@ -759,7 +1013,16 @@ def advance_purposeful_society(
                         "progress_mm": progress,
                     },
                 }
-        if route["edge_index"] == len(route["node_ids"]) - 1:
+        if route["edge_index"] == len(route["node_ids"]) - 1 and target is None:
+            person["action"] = {
+                "kind": "idle",
+                "status": "completed",
+                "target_id": None,
+                "remaining_ticks": 0,
+                "reason": "made_room",
+            }
+            emit(person, "route_progressed", "made_room", "waiting", doc)
+        elif route["edge_index"] == len(route["node_ids"]) - 1:
             person["action"] = {
                 "kind": target["affordance"],
                 "status": "active",

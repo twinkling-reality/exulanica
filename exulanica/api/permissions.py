@@ -545,6 +545,7 @@ _WORLD_WRITES: Final = _every(
     "POST /world/versions/{version_id}/society/control/steps",
     "POST /world/versions/{version_id}/society/experiments",
     "POST /world/versions/{version_id}/society/experiments/{experiment_id}/attempts",
+    "POST /world/versions/{version_id}/society/presence",
     "POST /world/versions/{version_id}/society/steps",
 )
 

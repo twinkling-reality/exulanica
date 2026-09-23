@@ -23,8 +23,8 @@ from exulanica.world.society_actions import (
     build_action_request,
     validate_action_request,
 )
-from exulanica.world.society_planner import PURPOSEFUL_PROFILE, validate_society_input
-from exulanica.world.society_social import SOCIAL_PROFILE
+from exulanica.world.society_engines import society_engine
+from exulanica.world.society_planner import validate_society_input
 
 
 class SocietyActionRepository:
@@ -61,8 +61,8 @@ class SocietyActionRepository:
         ).fetchone()
         if row is None:
             raise UnknownSociety("society is unavailable")
-        if row["engine_version"] not in (PURPOSEFUL_PROFILE, SOCIAL_PROFILE):
-            raise ValueError("user actions require a v2 or v3 society")
+        if not society_engine(row["engine_version"]).directed_actions:
+            raise ValueError(f"{row['engine_version']} takes no user actions")
         if society_state_sha256(row["state"]) != row["state_sha256"]:
             raise ValueError("stored society state digest mismatch")
         return row

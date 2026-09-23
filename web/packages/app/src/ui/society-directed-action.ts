@@ -14,6 +14,7 @@ import {
   type SocietySnapshot,
 } from '../society-api.js';
 import { el } from './dom.js';
+import { societyEngine } from '../society-engines.js';
 
 export type SocietyDirectedActionGate =
   | { readonly ok: true }
@@ -27,15 +28,16 @@ export function societyDirectedActionGate(
   if (snapshot === null) {
     return { ok: false, reason: 'Connect a persisted society before requesting a directed action.' };
   }
-  // The browser society client materializes v2 purposeful state for directed actions. v3 is
-  // accepted by the HTTP API but is not a held browser snapshot shape here; v4 living societies
-  // refuse this control rather than inventing a different action kind.
-  if (snapshot.state.profile !== 'exulanica-society/v2') {
+  // Which engines take directed actions is the engine table's to say. The living society, and
+  // any engine the table does not give them, refuses this control rather than inventing an
+  // action kind it does not have.
+  const engine = societyEngine(snapshot.state.profile);
+  if (!engine.directedActions) {
     return {
       ok: false,
-      reason: snapshot.state.profile === 'exulanica-society/v4'
-        ? 'Directed actions require a v2 society. This world uses the living society profile.'
-        : 'Directed actions require a v2 society.',
+      reason: engine.stateFamily === 'living'
+        ? 'Directed actions need a society that takes them. This world uses the living society profile.'
+        : 'Directed actions need a society that takes them.',
     };
   }
   if (!subjectId) {

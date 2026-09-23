@@ -1,0 +1,137 @@
+--- before-tree/exulanica/world/society_repository.py	2026-09-23 09:17:31
++++ after-tree/exulanica/world/society_repository.py	2026-09-23 09:39:51
+@@ -3,7 +3,7 @@
+ from __future__ import annotations
+ 
+ import uuid
+-from collections.abc import Callable
++from collections.abc import Callable, Iterable
+ from typing import Any
+ 
+ import psycopg
+@@ -268,9 +268,60 @@
+             "select input_seq,document,document_sha256 from world_society_input "
+             "where workspace_id=%s and society_id=%s order by input_seq",
+             (self.workspace_id, row["society_id"]),
++        ).fetchall()
++
++    def _chain(self, row: dict) -> int:
++        """The newest input sequence, after checking the stored inputs run from one with no gap."""
++        found = self.connection.execute(
++            "select count(*) as n,min(input_seq) as low,max(input_seq) as high "
++            "from world_society_input where workspace_id=%s and society_id=%s",
++            (self.workspace_id, row["society_id"]),
++        ).fetchone()
++        if not found["n"] or found["low"] != 1:
++            raise ValueError("missing society genesis input")
++        if found["high"] != found["n"]:
++            raise ValueError("society input chain has a gap")
++        return int(found["high"])
++
++    def _inputs(self, row: dict, sequences: Iterable[int]) -> dict[int, dict]:
++        """The stored inputs with these sequence numbers, each held to its own row and validated.
++
++        Every input was validated against the one before it when it was recorded, the table takes
++        no update or delete, and replay checks the whole chain again from the first input. So a
++        read loads the inputs it shows or consumes, never the history behind them: a world's
++        thousandth edit costs the next read nothing.
++        """
++        wanted = sorted(set(sequences))
++        rows = self.connection.execute(
++            "select input_seq,document,document_sha256 from world_society_input "
++            "where workspace_id=%s and society_id=%s and input_seq=any(%s) order by input_seq",
++            (self.workspace_id, row["society_id"], wanted),
+         ).fetchall()
++        if [value["input_seq"] for value in rows] != wanted:
++            raise ValueError("a stored society input is missing")
++        documents = {}
++        for value in rows:
++            document = value["document"]
++            self._validate_scope(row["version_id"], document)
++            if (
++                document["input_seq"] != value["input_seq"]
++                or document["document_sha256"] != value["document_sha256"]
++            ):
++                raise ValueError("stored input binding mismatch")
++            documents[value["input_seq"]] = document
++        return documents
++
++    def _pending_inputs(self, row: dict) -> list[dict]:
++        """The input the state consumed and every input queued after it, in order.
++
++        What a step consumes. The engine checks each queued input against the one before it.
++        """
++        first = row["state"]["input_seq"]
++        documents = self._inputs(row, range(first, self._chain(row) + 1))
++        return [documents[sequence] for sequence in sorted(documents)]
+ 
+     def _validated_inputs(self, row: dict) -> list[dict]:
++        """Every stored input from the first, each checked against the one before it: replay's."""
+         rows = self._input_rows(row)
+         if not rows or rows[0]["input_seq"] != 1:
+             raise ValueError("missing society genesis input")
+@@ -298,15 +349,23 @@
+         if row["engine_version"] in INPUT_PROFILES:
+             # A historical snapshot is not a current rights grant. Authorizer checks dependencies
+             # of the current state plus queued input. Historical replay checks every input below.
+-            documents = self._validated_inputs(row)
+-            current = documents[row["state"]["input_seq"] - 1]
++            consumed, latest = row["state"]["input_seq"], self._chain(row)
++            memories = (
++                [
++                    memory["input_seq"]
++                    for agent in row["state"]["social"]["agents"].values()
++                    for memory in [*agent["observations"], *agent["beliefs"].values()]
++                ]
++                if row["engine_version"] == SOCIAL_PROFILE
++                else []
++            )
++            documents = self._inputs(row, [consumed, latest, *memories])
++            current = documents[consumed]
+             self._authorize(current)
+-            if documents[-1] != current:
+-                self._authorize(documents[-1])
+-            if row["engine_version"] == SOCIAL_PROFILE:
+-                for agent in row["state"]["social"]["agents"].values():
+-                    for memory in [*agent["observations"], *agent["beliefs"].values()]:
+-                        self._authorize(documents[memory["input_seq"] - 1])
++            if latest != consumed:
++                self._authorize(documents[latest])
++            for sequence in memories:
++                self._authorize(documents[sequence])
+         snapshot = self._snapshot(row)
+         if places and current is not None:
+             snapshot["places"] = consumed_places(current)
+@@ -374,16 +433,14 @@
+             if row["engine_version"] == SOCIETY_ENGINE_VERSION:
+                 state, events = advance_society(row["state"], row["seed"])
+             elif row["engine_version"] == LIVING_PROFILE:
+-                documents = self._validated_inputs(row)
+-                inputs = documents[row["state"]["input_seq"] - 1 :]
++                inputs = self._pending_inputs(row)
+                 self._authorize(inputs[-1])
+                 routine = routine_for(row["state"])
+                 state, events = advance_living_society(
+                     row["state"], row["seed"], living_places(inputs, routine), routine
+                 )
+             elif row["engine_version"] in (PURPOSEFUL_PROFILE, SOCIAL_PROFILE):
+-                documents = self._validated_inputs(row)
+-                inputs = documents[row["state"]["input_seq"] - 1 :]
++                inputs = self._pending_inputs(row)
+                 # The latest authorized unavailable input must be able to pause the engine
+                 # even when earlier dependencies are now withdrawn. Historical replay/reads
+                 # still authorize every materialized input separately.
+@@ -511,9 +568,10 @@
+             (self.workspace_id, row["society_id"], max(1, min(limit, 256))),
+         ).fetchall()
+         if row["engine_version"] in INPUT_PROFILES:
+-            documents = self._validated_inputs(row)
+-            for seq in {value["document"]["input_seq"] for value in rows}:
+-                self._authorize(documents[seq - 1])
++            shown = {value["document"]["input_seq"] for value in rows}
++            documents = self._inputs(row, shown)
++            for sequence in sorted(shown):
++                self._authorize(documents[sequence])
+         return tuple(dict(value) for value in rows)
+ 
+     def replay(self, version_id: uuid.UUID) -> dict[str, Any]:

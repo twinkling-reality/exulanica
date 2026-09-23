@@ -1,0 +1,9 @@
+quiet-slot: waiting for the machine-wide slot at 09:49:21 from <frozen-copy-after>
+quiet-slot: slot taken at 10:20:47; load 16.62 21.18 25.52
+{"inputs": 1, "ticks": 10, "open": {"n": 8, "p50_us": 14815, "p95_us": 15484, "max_us": 15484, "min_us": 14169}, "step": {"n": 10, "p50_us": 17373, "p95_us": 44995, "max_us": 44995, "min_us": 16766}, "replay_us": 47157}
+{"inputs": 25, "ticks": 10, "open": {"n": 8, "p50_us": 13804, "p95_us": 14855, "max_us": 14855, "min_us": 11307}, "step": {"n": 10, "p50_us": 17792, "p95_us": 68333, "max_us": 68333, "min_us": 17311}, "replay_us": 164033}
+{"inputs": 100, "ticks": 10, "open": {"n": 8, "p50_us": 14040, "p95_us": 22352, "max_us": 22352, "min_us": 12931}, "step": {"n": 10, "p50_us": 25298, "p95_us": 264107, "max_us": 264107, "min_us": 17956}, "replay_us": 588317}
+{"inputs": 400, "ticks": 10, "open": {"n": 8, "p50_us": 18772, "p95_us": 19578, "max_us": 19578, "min_us": 17976}, "step": {"n": 10, "p50_us": 22266, "p95_us": 876695, "max_us": 876695, "min_us": 20802}, "replay_us": 2951426}
+gate: exit 0 pre idle 76
+quiet-slot: finished at 10:21:15 with exit 0; load 16.78 20.61 25.15
+exit 0

@@ -1,0 +1,118 @@
+{
+ "command": "vite build --outDir prod-dist --emptyOutDir, from web/packages/app, environment emptied but HOME and PATH",
+ "vite": "vite/6.4.3 darwin-arm64 node-v24.15.0",
+ "started_at": "2026-09-23T14:53:02Z",
+ "tree": {
+  "head": "e9dee3c288dbb3fb7a066bfb40b31143207fc11e",
+  "working_diff_sha256": "87c0be2ac090cd29a8eaedfec82e68e9a32aa47aaca2cd6098acdba143c933a2",
+  "untracked_files_sha256": "a44f3617c8b372af6ba620222ca8f747b344e821ed2b5057a9eee122f602515d"
+ },
+ "files": [
+  {
+   "path": "apple-touch-icon.png",
+   "byte_size": 23004,
+   "sha256": "12b66d96f7736b6f868f4af4f99babcb0789eb746840f4bc228229c4d69c9506"
+  },
+  {
+   "path": "assets/district-interpretation-rwMLKtnK.json",
+   "byte_size": 773086,
+   "sha256": "a89db5df543848fa815d285545805991ecfd7e91f1b97915d28620501f1c197f"
+  },
+  {
+   "path": "assets/flatiron-owned-district-BtzrqgXV.json",
+   "byte_size": 232454,
+   "sha256": "22fbde04028124ded8cb5e6bf08642706ed845a946f627499e8245aae9d28580"
+  },
+  {
+   "path": "assets/index-CfD_TUA9.js",
+   "byte_size": 3143,
+   "sha256": "2d82fa8348fecf7fc38dbb0a2705462348a4efaab37d53d4f207b5b1d250b7a4"
+  },
+  {
+   "path": "assets/index-CwVm5hhV.css",
+   "byte_size": 140183,
+   "sha256": "544fe99b4bd2838826221c78d7df707efb5904e0f1e80f6b3a6bbf711e062701"
+  },
+  {
+   "path": "assets/main-BPbid1NS.css",
+   "byte_size": 4903,
+   "sha256": "46d1c04b974b638474f3fd1556622c2b784eacfb28404961cd0d7455a353d370"
+  },
+  {
+   "path": "assets/main-IpmSEd-o.js",
+   "byte_size": 2664112,
+   "sha256": "b688fb5cc6cab001ff716ad23bed5018ed3ef03e13e6d520e8e7e181e48b6b57"
+  },
+  {
+   "path": "assets/media-sampler-DfaVH_uv.js",
+   "byte_size": 742,
+   "sha256": "3a47fdf789433cff520c9624418fe35b4304086850a9a41b187c51059b76b871"
+  },
+  {
+   "path": "assets/preview-graph-BIMQ7_wh.js",
+   "byte_size": 5937,
+   "sha256": "cf9e4cf57b98180588f9dfa9fe80a4c5a47c2e4afd6113cc2fa8feda51934d78"
+  },
+  {
+   "path": "assets/preview-media-BKmSDqIM.js",
+   "byte_size": 1399,
+   "sha256": "240767a68936b9c1da0c2e55a4d1602c059183e6983ea69a5d939d0f7e4ea47b"
+  },
+  {
+   "path": "assets/preview-point-maps-BhxaVbKQ.js",
+   "byte_size": 475,
+   "sha256": "d12424608a5d062a65cea29bfb39fd80da435db60d597039d5cc048ea150f488"
+  },
+  {
+   "path": "favicon-32.png",
+   "byte_size": 1448,
+   "sha256": "01e4cbabfebe1ba4564b36f04c54adbc18abeec754164853a830a3302e3ecc86"
+  },
+  {
+   "path": "favicon.svg",
+   "byte_size": 53078,
+   "sha256": "11fe463030dd198afffdc3ead15d4373aecd458d136158b4d3d1ba0743893572"
+  },
+  {
+   "path": "fixtures/memory/glasshouse-courtyard.jpg",
+   "byte_size": 469969,
+   "sha256": "23a88a3ca60731360cc5e791d1e4770017f696567fba643cd60a0fa7cb533de6"
+  },
+  {
+   "path": "fixtures/memory/glasshouse-courtyard.opm",
+   "byte_size": 3812696,
+   "sha256": "939ebd1b36d49bc0f6a2f190bfa4030c8f91cf2f59276ed48c13f62a339f5f27"
+  },
+  {
+   "path": "fixtures/memory/glasshouse-studio.jpg",
+   "byte_size": 367021,
+   "sha256": "69924d0b70103e8d524eac92a92b03dfe7168b89a690edf765f6ec568b5d6413"
+  },
+  {
+   "path": "fixtures/memory/lakeshore-kite.jpg",
+   "byte_size": 342987,
+   "sha256": "aace577dd3b09c08233a06d012660ec09aa99fa90585487afa5fed6c512b6431"
+  },
+  {
+   "path": "icon-192.png",
+   "byte_size": 25355,
+   "sha256": "4efc7e8165f0f753d2900f8de4a011c24432a6f210e63bb5976d934842554bbf"
+  },
+  {
+   "path": "icon-512.png",
+   "byte_size": 153257,
+   "sha256": "55c949ddcd39c7ef87937ad2fa23afdb69708ee974d25be88217f64758652237"
+  },
+  {
+   "path": "index.html",
+   "byte_size": 2272,
+   "sha256": "44f7cef6dc29918da901af54d2f309fc093b1dcedb32325a45dc7a2ec607ef1e"
+  },
+  {
+   "path": "site.webmanifest",
+   "byte_size": 393,
+   "sha256": "58836d305fd298c205ab053749157710d4b35f2d0f702f7da2015c98c1af5ea5"
+  }
+ ],
+ "index_html_sha256": "44f7cef6dc29918da901af54d2f309fc093b1dcedb32325a45dc7a2ec607ef1e"
+}

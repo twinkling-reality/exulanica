@@ -8,12 +8,14 @@ from dataclasses import dataclass
 from typing import Any, Final, Literal
 
 from exulanica.world.society import SOCIETY_NAMESPACE, SocietyEvent, society_state_sha256
+from exulanica.world.society_engines import ACTION_ENGINES
 from exulanica.world.society_planner import (
+    PLACE_INPUTS,
     PURPOSEFUL_PROFILE,
     advance_purposeful_society,
+    held_nodes,
     validate_society_input,
 )
-from exulanica.world.society_social import SOCIAL_PROFILE
 
 ACTION_REQUEST_PROFILE: Final = "exulanica.society-action-request/v1"
 ACTION_EVENT_KIND: Final = "user_action_requested"
@@ -188,7 +190,24 @@ def _request_reason(
         return "stale", "canonical_target_changed"
     if not _reachable(person, document, target):
         return "rejected", "target_unreachable"
+    if document["profile"] in PLACE_INPUTS and all(
+        place in held_nodes(state["inhabitants"], person) for place in target["place_node_ids"]
+    ):
+        # Every place at the destination is taken by somebody else, so there is no room to send
+        # this person to; the request says so rather than leaving it standing in a queue.
+        return "rejected", "destination_full"
     return "applied", "validated_user_target"
+
+
+def _promised_place(
+    state: dict[str, Any], person: dict[str, Any], target: dict[str, Any], promised: set[str]
+) -> str | None:
+    """The place a directed person takes: the one it stands at, else the first nobody holds."""
+    location = person["location"]
+    if location["edge"] is None and location["node_id"] in target["place_node_ids"]:
+        return str(location["node_id"])
+    held = held_nodes(state["inhabitants"], person) | promised
+    return next((place for place in target["place_node_ids"] if place not in held), None)
 
 
 def build_action_request(
@@ -202,9 +221,7 @@ def build_action_request(
 ) -> dict[str, Any]:
     """Resolve IDs to a frozen canonical target; clients never supply space or target records."""
     validate_society_input(document)
-    _require(
-        state.get("profile") in (PURPOSEFUL_PROFILE, SOCIAL_PROFILE), "actions require v2 or v3"
-    )
+    _require(state.get("profile") in ACTION_ENGINES, "this society takes no user actions")
     _require(
         state.get("branch_id") == document["version_id"], "society input belongs to another branch"
     )
@@ -244,11 +261,14 @@ def action_goal_policies(
 ) -> tuple[dict[str, dict[str, Any]], tuple[ActionDisposition, ...]]:
     """Produce the existing planner seam plus deterministic audit dispositions for one step."""
     validate_society_input(document)
-    _require(
-        state.get("profile") in (PURPOSEFUL_PROFILE, SOCIAL_PROFILE), "actions require v2 or v3"
-    )
+    _require(state.get("profile") in ACTION_ENGINES, "this society takes no user actions")
     policies: dict[str, dict[str, Any]] = {}
     dispositions = []
+    # Where an input states places, each applied request is promised its place before the step,
+    # in request order, so a person sent somewhere is never beaten to the last place by somebody
+    # choosing for themselves in the same minute, and two requests never share one place.
+    promised: set[str] = set()
+    people = _people(state)
     for request in requests:
         validate_action_request(request)
         _require(request["branch_id"] == state["branch_id"], "action request branch mismatch")
@@ -256,11 +276,19 @@ def action_goal_policies(
         subject = request["subject_id"]
         if disposition == "applied" and subject in policies:
             disposition, reason = "superseded", "subject_already_directed"
+        place = None
+        if disposition == "applied" and document["profile"] in PLACE_INPUTS:
+            place = _promised_place(state, people[subject], request["target"], promised)
+            if place is None:
+                disposition, reason = "rejected", "destination_full"
         if disposition == "applied":
             policies[subject] = {
                 "allowed_target_ids": [request["target"]["target_id"]],
                 "preferred_target_id": request["target"]["target_id"],
             }
+            if place is not None:
+                policies[subject]["place_node_id"] = place
+                promised.add(place)
         dispositions.append(
             ActionDisposition(
                 uuid.UUID(request["request_id"]),

@@ -34,7 +34,9 @@ CAST_SIZE = 3
 def initial_social_society(
     society_id: uuid.UUID, seed: str, document: dict, *, population: int = SOCIETY_POPULATION
 ) -> dict:
-    state = initial_purposeful_society(society_id, seed, document, population=population)
+    state = initial_purposeful_society(
+        society_id, seed, document, population=population, engine_profile=SOCIAL_PROFILE
+    )
     cast = [p["id"] for p in state["inhabitants"][:CAST_SIZE]]
     state["profile"] = SOCIAL_PROFILE
     state["social"] = {
@@ -379,7 +381,8 @@ def advance_social_society(
         target["target_id"]: target for target in latest["targets"] if target["enabled"] is True
     }
     for subject, policy in (external_goal_policy or {}).items():
-        if subject not in people_by_id or set(policy) != {
+        # A directed request over an input that states places also carries its promised place.
+        if subject not in people_by_id or set(policy) - {"place_node_id"} != {
             "allowed_target_ids",
             "preferred_target_id",
         }:
