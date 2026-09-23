@@ -461,14 +461,15 @@ export function mountEnvironmentSelection(
       ? 'Unavailable'
       : `${state.input_seq === undefined ? 'Sequence unavailable' : `Sequence ${state.input_seq}`} · ${state.input_sha256}`;
     const nativeCharacter = representation ? deps.state.atlas?.binding.nativeCharacters?.inspect(representation.subject) : null;
-    // Resting is the simulation's state. The figure is drawn standing because no seated pose exists.
+    // Resting is the simulation's state. A catalog person sits on the ground in front of the
+    // place; the abstract figure stands.
     const resting = v2 && inhabitant.action?.kind === 'rest' && inhabitant.action.status === 'active';
     inspector.show({
       subject: id,
       title: inhabitant.display_name ?? `Synthetic ${inhabitant.role ?? 'inhabitant'}`,
       description: 'A fictional inhabitant of this world. This is not a remembered person.',
       activity: v2
-        ? `${inhabitant.explanation?.summary ?? 'Explanation unavailable.'}${resting ? ' Drawn standing, because there is no seated pose yet.' : ''}`
+        ? `${inhabitant.explanation?.summary ?? 'Explanation unavailable.'}${resting ? ' Drawn sitting on the ground in front of the place.' : ''}`
         : 'No persisted goal or action is available in this preview or legacy society.',
       details: [
         ['Plane / origin', 'Simulation · synthetic'],

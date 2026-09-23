@@ -95,10 +95,11 @@ describe('a saved world draws its inhabitants over its authored region', () => {
       `district:${atlas.ownedDistrict !== null}`,
     ].join('\n');
     // The whole scene graph after a society and five frames, recorded on 7e6144ea before the
-    // authored-region crowd was added. A district builds no authored crowd and sends the native
-    // character runtime exactly the frames it did.
+    // authored-region crowd was added, and again when inhabitants became catalog people (drawn
+    // as their far form while their containers load; this test registers no loader). A district
+    // builds no authored crowd and sends the native character runtime exactly the frames it did.
     expect(createHash('sha256').update(text).digest('hex'))
-      .toBe('8f77ccb3369ad28a961216073bad5aea42720f1fd8633c14a366ae9e389e5010');
+      .toBe('aa14da25824f0aee39cd386af173a1a85fb7d68317c96c6d5a2b57b0bbad53ae');
     expect(atlas.authoredSociety).toBeNull();
   });
 

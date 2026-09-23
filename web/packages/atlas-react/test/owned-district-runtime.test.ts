@@ -5,6 +5,7 @@ import {
   OwnedDistrictRuntime,
   type OwnedSocietyState,
 } from '../src/playcanvas/owned-district-runtime.js';
+import { NEAR_INHABITANT_BUDGET } from '../src/playcanvas/character/budget.js';
 import type { OwnedDistrict } from '@exulanica/atlas-core';
 
 function setup() {
@@ -104,10 +105,10 @@ describe('owned runtime population representation', () => {
     const state = population(0);
     expect(runtime.setSociety(state, [0, 0])).toBe(128);
     expect(state.inhabitants).toHaveLength(128);
-    expect(runtime.societyCounts).toMatchObject({ population: 128, near: 24, far: 104, indoors: 0 });
+    expect(runtime.societyCounts).toMatchObject({ population: 128, near: NEAR_INHABITANT_BUDGET, far: 128 - NEAR_INHABITANT_BUDGET, indoors: 0 });
     expect(runtime.inhabitantDetail('person-0')).toBe('near');
     expect(runtime.inhabitantDetail('person-127')).toBe('far');
-    expect(runtime.nativeCharacterFrames(1 / 60, false)).toHaveLength(24);
+    expect(runtime.nativeCharacterFrames(1 / 60, false)).toHaveLength(NEAR_INHABITANT_BUDGET);
     runtime.refreshNearby([127, 0]);
     expect(runtime.inhabitantDetail('person-127')).toBe('near');
     expect(runtime.inhabitantDetail('person-0')).toBe('far');
