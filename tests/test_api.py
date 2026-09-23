@@ -1331,8 +1331,10 @@ def test_the_other_two_model_failures_get_their_own_codes(deployment, failure, s
     else:
         budget = BudgetGuard(ceiling_usd=Decimal("5.00"), max_calls=10)
 
+    # The planner asks once more after a reply cut off at the token limit, so both of its attempts
+    # are cut off here: the second is what reaches the handler.
     transport = FakeTransport(
-        [] if failure == "budget" else [TruncatedResponseError("max_tokens landed mid-answer")]
+        [] if failure == "budget" else [TruncatedResponseError("max_tokens landed mid-answer")] * 2
     )
     app = deployment.client.app
     app.state.services = dataclasses.replace(

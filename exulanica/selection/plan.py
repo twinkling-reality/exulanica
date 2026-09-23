@@ -301,16 +301,27 @@ class SelectionPlan(BaseModel):
                 f"mode {self.entities.mode!s} is a statement about several entities and needs "
                 "at least two of them; over one entity it is the same query as 'any'"
             )
+        # These refusals are also what the planner's one repair sends back to the model, so each
+        # names the field and says where a search for photographed things belongs instead. The
+        # planner was measured choosing this intent for "what does the sign say at" a place, and
+        # repeating the refused plan when the refusal did not say which rule it broke.
         if self.intent is Intent.CONTENT:
             if self.content is None or self.place is None:
-                raise ValueError("content selections require both content and place selectors")
+                raise ValueError(
+                    "content selections require both content and place selectors. A search for "
+                    "anything visible or written in photographs is a captures or entities "
+                    "selection"
+                )
             if self.entities is not None or self.time or self.capture is not None:
                 raise ValueError(
                     "entity, time, and capture filters do not apply to cross-content selections"
                 )
             if self.semantic_query is not None:
                 raise ValueError(
-                    "cross-content place membership is relational and does not use semantic text"
+                    "semantic_query must be null in a content selection: cross-content place "
+                    "membership is relational and does not use semantic text. A search for "
+                    "anything visible or written in photographs is a captures or entities "
+                    "selection, with the place's id in the place selector"
                 )
         elif self.content is not None:
             raise ValueError("the content selector applies only to the content intent")

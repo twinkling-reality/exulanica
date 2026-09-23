@@ -1,0 +1,2537 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "already_seen_before_this_was_written": [
+      "The development split's 100 draws on the base commit, summarised under development below, including every whole answer and the plan schema's reasons.",
+      "Ten further draws of one development question on a two-entity catalogue.",
+      "The client change that makes a refusal name its rule (built and tested before this record); it is part of the candidate.",
+      "The held-out questions below were written by the author of the change, after the diagnosis and before the change. No model output exists for any of them."
+    ],
+    "arms": {
+      "baseline": "exulanica/ at the base commit, exported unchanged with git archive and imported ahead of the worktree",
+      "candidate": "exulanica/ in this lane's worktree once the change is frozen. Every run records the SHA-256 of the files that decide a plan.",
+      "candidate_may_change": [
+        "the planner prompt and its PROMPT_VERSION",
+        "the wording of the plan validator's refusals",
+        "the planner's repair message",
+        "the client's refusal message (already changed; see above)"
+      ],
+      "candidate_may_not_change": "what SelectionPlan accepts. Every answer either arm receives is re-validated by both arms' SelectionPlan after the run, and one disagreement fails the no_loosening gate.",
+      "development_use": "the change may be revised on the development split as often as needed. The held-out split sees only the frozen change."
+    },
+    "base_commit": "5c0a05ba8e6e3ea64832084abe8b2356b2335536",
+    "decisions": {
+      "a_no_regression_gate_fails": "reported as a failure, with the questions that moved",
+      "all_gates_pass": "the change is this lane's result and goes to root with these numbers",
+      "baseline_place_rate_at_least_6000_bp": "the held-out split did not reproduce the defect, so no improvement is claimed from it, whatever the candidate scores",
+      "latency_or_cost_fails": "reported as a failure of that gate; the rates are still reported",
+      "no_loosening_fails": "the change is withdrawn: it passed by accepting plans the base commit refuses",
+      "place_rate_or_improvement_fails": "reported as a failure. The held-out split is not used to revise the change. Root decides whether a partial improvement is worth taking.",
+      "provider_errors_over_10_percent_of_an_arms_draws": "the run is void and is reported as void, not scored"
+    },
+    "definitions": {
+      "cost": "provider-reported tokens times the manifest's listed prices, every attempt included",
+      "intents": "captures and entities resolve the same photographs and give the composer the same packet, so a question about what photographs show accepts either. content is the cross-content listing and is right only for an explicit request for related material.",
+      "latency": "wall milliseconds of one propose_plan call, repair included",
+      "query_rule": "a null query passes when the question allows null. A query passes when it has at least one word after stop words, every word is in the question's allowed list, and, when the question names required words, at least one of them is present. Words are lowercase letter runs, plural-folded by the scorer's stem function.",
+      "rate": "right draws over draws, per kind. A draw ending in a provider error (not a refusal) is excluded and counted separately.",
+      "right_plan": "the planner returned a plan (no refusal after its repair), every id in it is in the catalogue with a place selector holding places only, and it is the plan the question asks for: an accepted intent, exactly the expected place and entity ids, an accepted entity mode and content scope, no time window, no capture property, epistemic confirmed, and a semantic query allowed by the question's query rule",
+      "stop_words": [
+        "a",
+        "an",
+        "and",
+        "at",
+        "by",
+        "for",
+        "from",
+        "in",
+        "of",
+        "on",
+        "or",
+        "the",
+        "to",
+        "with"
+      ]
+    },
+    "development": {
+      "question_set": {
+        "catalogue": [
+          {
+            "class": "place",
+            "id": "1200b66b-8f6a-58f6-8fb0-e0a1c9adeb64",
+            "name": "Lantern House"
+          },
+          {
+            "class": "place",
+            "id": "abadf897-c0d2-596f-b3d0-adbedb1e5979",
+            "name": "Harbour Steps"
+          },
+          {
+            "class": "place",
+            "id": "bdaa8d04-6117-529d-9a61-1bc25034d077",
+            "name": "Kestrel Mill"
+          },
+          {
+            "class": "person",
+            "id": "d9d9ede3-426a-5f34-8e07-d90af0820e58",
+            "name": "Maria Estrada"
+          },
+          {
+            "class": "person",
+            "id": "b29e7059-e56c-5307-b6d1-959db186dc0e",
+            "name": "Tomasz Rudnik"
+          },
+          {
+            "class": "person",
+            "id": "5ae76433-f616-52e5-b702-aa8431b09a5c",
+            "name": "Ines Varga"
+          },
+          {
+            "class": "object",
+            "id": "59a66d52-d7c2-57e5-8bca-28a2654cf248",
+            "name": "Blue Kayak"
+          }
+        ],
+        "questions": [
+          {
+            "expect": {
+              "entities": [],
+              "intents": [
+                "captures",
+                "entities"
+              ],
+              "modes": [
+                "any"
+              ],
+              "place": [
+                "1200b66b-8f6a-58f6-8fb0-e0a1c9adeb64"
+              ],
+              "query": {
+                "allowed": [
+                  "sign",
+                  "signage",
+                  "text",
+                  "writing",
+                  "written",
+                  "word",
+                  "lettering",
+                  "board",
+                  "notice",
+                  "name",
+                  "nameplate"
+                ],
+                "null": true,
+                "required": [
+                  "sign"
+                ]
+              },
+              "scopes": []
+            },
+            "id": "D-P1",
+            "kind": "place",
+            "text": "What does the sign say at Lantern House?"
+          },
+          {
+            "expect": {
+              "entities": [],
+              "intents": [
+                "captures",
+                "entities"
+              ],
+              "modes": [
+                "any"
+              ],
+              "place": [
+                "1200b66b-8f6a-58f6-8fb0-e0a1c9adeb64"
+              ],
+              "query": {
+                "allowed": [],
+                "null": true,
+                "required": []
+              },
+              "scopes": []
+            },
+            "id": "D-P2",
+            "kind": "place",
+            "text": "What do my photographs show at Lantern House?"
+          },
+          {
+            "expect": {
+              "entities": [],
+              "intents": [
+                "captures",
+                "entities"
+              ],
+              "modes": [
+                "any"
+              ],
+              "place": [
+                "1200b66b-8f6a-58f6-8fb0-e0a1c9adeb64"
+              ],
+              "query": {
+                "allowed": [],
+                "null": true,
+                "required": []
+              },
+              "scopes": []
+            },
+            "id": "D-P3",
+            "kind": "place",
+            "text": "Which of my photographs were taken at Lantern House?"
+          },
+          {
+            "expect": {
+              "entities": [],
+              "intents": [
+                "captures",
+                "entities"
+              ],
+              "modes": [
+                "any"
+              ],
+              "place": [
+                "bdaa8d04-6117-529d-9a61-1bc25034d077"
+              ],
+              "query": {
+                "allowed": [
+                  "sign",
+                  "signage",
+                  "text",
+                  "writing",
+                  "written",
+                  "word",
+                  "lettering",
+                  "board",
+                  "notice",
+                  "name",
+                  "nameplate",
+                  "outside"
+                ],
+                "null": true,
+                "required": [
+                  "board",
+                  "written",
+                  "writing",
+                  "text"
+                ]
+              },
+              "scopes": []
+            },
+            "id": "D-P4",
+            "kind": "place",
+            "text": "What is written on the board outside Kestrel Mill?"
+          },
+          {
+            "expect": {
+              "entities": [],
+              "intents": [
+                "captures",
+                "entities"
+              ],
+              "modes": [
+                "any"
+              ],
+              "place": [
+                "abadf897-c0d2-596f-b3d0-adbedb1e5979"
+              ],
+              "query": {
+                "allowed": [
+                  "people",
+                  "person"
+                ],
+                "null": true,
+                "required": []
+              },
+              "scopes": []
+            },
+            "id": "D-P5",
+            "kind": "place",
+            "text": "Who was with me at Harbour Steps?"
+          },
+          {
+            "expect": {
+              "entities": [],
+              "intents": [
+                "captures",
+                "entities"
+              ],
+              "modes": [
+                "any"
+              ],
+              "place": [
+                "bdaa8d04-6117-529d-9a61-1bc25034d077"
+              ],
+              "query": {
+                "allowed": [
+                  "door",
+                  "front",
+                  "colour",
+                  "color"
+                ],
+                "null": true,
+                "required": [
+                  "door"
+                ]
+              },
+              "scopes": []
+            },
+            "id": "D-P6",
+            "kind": "place",
+            "text": "What colour is the front door at Kestrel Mill?"
+          },
+          {
+            "expect": {
+              "entities": [],
+              "intents": [
+                "content"
+              ],
+              "modes": [
+                "any"
+              ],
+              "place": [
+                "abadf897-c0d2-596f-b3d0-adbedb1e5979"
+              ],
+              "query": {
+                "allowed": [],
+                "null": true,
+                "required": []
+              },
+              "scopes": [
+                "related"
+              ]
+            },
+            "id": "D-P7",
+            "kind": "place",
+            "text": "Show me everything related to Harbour Steps, including imported maps and my own edits."
+          },
+          {
+            "expect": {
+              "entities": [],
+              "intents": [
+                "captures",
+                "entities"
+              ],
+              "modes": [
+                "any"
+              ],
+              "place": [
+                "abadf897-c0d2-596f-b3d0-adbedb1e5979"
+              ],
+              "query": {
+                "allowed": [
+                  "sign",
+                  "signage",
+                  "text",
+                  "writing",
+                  "written",
+                  "word",
+                  "lettering",
+                  "board",
+                  "notice",
+                  "name",
+                  "nameplate",
+                  "wall",
+                  "graffiti"
+                ],
+                "null": true,
+                "required": [
+                  "text",
+                  "wall",
+                  "writing"
+                ]
+              },
+              "scopes": []
+            },
+            "id": "D-P8",
+            "kind": "place",
+            "text": "Is there any text on the walls at Harbour Steps?"
+          },
+          {
+            "expect": {
+              "entities": [
+                "d9d9ede3-426a-5f34-8e07-d90af0820e58"
+              ],
+              "intents": [
+                "captures",
+                "entities"
+              ],
+              "modes": [
+                "any"
+              ],
+              "place": [],
+              "query": {
+                "allowed": [],
+                "null": true,
+                "required": []
+              },
+              "scopes": []
+            },
+            "id": "D-H1",
+            "kind": "person",
+            "text": "Which of my photographs show Maria Estrada?"
+          },
+          {
+            "expect": {
+              "entities": [
+                "d9d9ede3-426a-5f34-8e07-d90af0820e58"
+              ],
+              "intents": [
+                "captures",
+                "entities"
+              ],
+              "modes": [
+                "any"
+              ],
+              "place": [],
+              "query": {
+                "allowed": [
+                  "wearing",
+                  "wear",
+                  "clothing",
+                  "clothes",
+                  "outfit"
+                ],
+                "null": true,
+                "required": [
+                  "wearing",
+                  "clothing",
+                  "clothes",
+                  "outfit"
+                ]
+              },
+              "scopes": []
+            },
+            "id": "D-H2",
+            "kind": "person",
+            "text": "What was Maria wearing?"
+          },
+          {
+            "expect": {
+              "entities": [
+                "b29e7059-e56c-5307-b6d1-959db186dc0e"
+              ],
+              "intents": [
+                "captures",
+                "entities"
+              ],
+              "modes": [
+                "any"
+              ],
+              "place": [],
+              "query": {
+                "allowed": [
+                  "sign",
+                  "signage",
+                  "text",
+                  "writing",
+                  "written",
+                  "word",
+                  "lettering",
+                  "board",
+                  "notice",
+                  "name",
+                  "nameplate",
+                  "behind"
+                ],
+                "null": true,
+                "required": [
+                  "sign"
+                ]
+              },
+              "scopes": []
+            },
+            "id": "D-H3",
+            "kind": "person",
+            "text": "What does the sign behind Tomasz say?"
+          },
+          {
+            "expect": {
+              "entities": [
+                "d9d9ede3-426a-5f34-8e07-d90af0820e58",
+                "b29e7059-e56c-5307-b6d1-959db186dc0e"
+              ],
+              "intents": [
+                "captures",
+                "entities"
+              ],
+              "modes": [
+                "together"
+              ],
+              "place": [],
+              "query": {
+                "allowed": [],
+                "null": true,
+                "required": []
+              },
+              "scopes": []
+            },
+            "id": "D-H4",
+            "kind": "person",
+            "text": "Show me photos of Maria and Tomasz together."
+          },
+          {
+            "expect": {
+              "entities": [
+                "5ae76433-f616-52e5-b702-aa8431b09a5c"
+              ],
+              "intents": [
+                "captures",
+                "entities"
+              ],
+              "modes": [
+                "any"
+              ],
+              "place": [],
+              "query": {
+                "allowed": [
+                  "sign",
+                  "signage",
+                  "text",
+                  "writing",
+                  "written",
+                  "word",
+                  "lettering",
+                  "board",
+                  "notice",
+                  "name",
+                  "nameplate",
+                  "shirt",
+                  "t",
+                  "tshirt",
+                  "clothing"
+                ],
+                "null": true,
+                "required": [
+                  "shirt"
+                ]
+              },
+              "scopes": []
+            },
+            "id": "D-H5",
+            "kind": "person",
+            "text": "What is written on Ines Varga's shirt?"
+          },
+          {
+            "expect": {
+              "entities": [
+                "5ae76433-f616-52e5-b702-aa8431b09a5c"
+              ],
+              "intents": [
+                "captures",
+                "entities"
+              ],
+              "modes": [
+                "any"
+              ],
+              "place": [],
+              "query": {
+                "allowed": [],
+                "null": true,
+                "required": []
+              },
+              "scopes": []
+            },
+            "id": "D-H6",
+            "kind": "person",
+            "text": "Which photographs have Ines in them?"
+          },
+          {
+            "expect": {
+              "entities": [],
+              "intents": [
+                "captures",
+                "entities"
+              ],
+              "modes": [
+                "any"
+              ],
+              "place": [],
+              "query": {
+                "allowed": [
+                  "red",
+                  "bicycle",
+                  "bike"
+                ],
+                "null": false,
+                "required": [
+                  "bicycle",
+                  "bike"
+                ]
+              },
+              "scopes": []
+            },
+            "id": "D-C1",
+            "kind": "content",
+            "text": "Which photographs show a red bicycle?"
+          },
+          {
+            "expect": {
+              "entities": [],
+              "intents": [
+                "captures",
+                "entities"
+              ],
+              "modes": [
+                "any"
+              ],
+              "place": [],
+              "query": {
+                "allowed": [
+                  "sign",
+                  "signage",
+                  "text",
+                  "writing",
+                  "written",
+                  "word",
+                  "lettering",
+                  "board",
+                  "notice",
+                  "name",
+                  "nameplate",
+                  "bakery",
+                  "shop"
+                ],
+                "null": false,
+                "required": [
+                  "sign"
+                ]
+              },
+              "scopes": []
+            },
+            "id": "D-C2",
+            "kind": "content",
+            "text": "What does the sign on the bakery say?"
+          },
+          {
+            "expect": {
+              "entities": [],
+              "intents": [
+                "captures",
+                "entities"
+              ],
+              "modes": [
+                "any"
+              ],
+              "place": [],
+              "query": {
+                "allowed": [
+                  "sign",
+                  "signage",
+                  "text",
+                  "writing",
+                  "written",
+                  "word",
+                  "lettering",
+                  "board",
+                  "notice",
+                  "name",
+                  "nameplate",
+                  "chalkboard",
+                  "menu",
+                  "chalk"
+                ],
+                "null": false,
+                "required": [
+                  "chalkboard",
+                  "menu"
+                ]
+              },
+              "scopes": []
+            },
+            "id": "D-C3",
+            "kind": "content",
+            "text": "What is written on the chalkboard menu?"
+          },
+          {
+            "expect": {
+              "entities": [],
+              "intents": [
+                "captures",
+                "entities"
+              ],
+              "modes": [
+                "any"
+              ],
+              "place": [],
+              "query": {
+                "allowed": [
+                  "boat",
+                  "harbour",
+                  "harbor",
+                  "boats"
+                ],
+                "null": false,
+                "required": [
+                  "boat"
+                ]
+              },
+              "scopes": []
+            },
+            "id": "D-C4",
+            "kind": "content",
+            "text": "Find pictures of boats in a harbour."
+          },
+          {
+            "expect": {
+              "entities": [],
+              "intents": [
+                "captures",
+                "entities"
+              ],
+              "modes": [
+                "any"
+              ],
+              "place": [],
+              "query": {
+                "allowed": [
+                  "sign",
+                  "signage",
+                  "text",
+                  "writing",
+                  "written",
+                  "word",
+                  "lettering",
+                  "board",
+                  "notice",
+                  "name",
+                  "nameplate",
+                  "painted",
+                  "paint",
+                  "shop",
+                  "window",
+                  "words"
+                ],
+                "null": false,
+                "required": [
+                  "window",
+                  "painted",
+                  "shop"
+                ]
+              },
+              "scopes": []
+            },
+            "id": "D-C5",
+            "kind": "content",
+            "text": "What words are painted on the shop window?"
+          },
+          {
+            "expect": {
+              "entities": [],
+              "intents": [
+                "captures",
+                "entities"
+              ],
+              "modes": [
+                "any"
+              ],
+              "place": [],
+              "query": {
+                "allowed": [],
+                "null": true,
+                "required": []
+              },
+              "scopes": []
+            },
+            "id": "D-C6",
+            "kind": "content",
+            "text": "How many photographs do I have?"
+          }
+        ],
+        "split": "development"
+      },
+      "runs": {
+        "dev-baseline-1.json": {
+          "arm": "baseline-5c0a05ba",
+          "by_kind": {
+            "all": {
+              "draws": 100,
+              "plans": 80,
+              "refused": 20,
+              "repaired": 33,
+              "right": 75,
+              "usd": "0.03879400",
+              "wall_ms_p50": 1580,
+              "wall_ms_p95": 5352
+            },
+            "content": {
+              "draws": 30,
+              "plans": 30,
+              "refused": 0,
+              "repaired": 6,
+              "right": 30,
+              "usd": "0.00942620",
+              "wall_ms_p50": 887,
+              "wall_ms_p95": 2230
+            },
+            "person": {
+              "draws": 30,
+              "plans": 30,
+              "refused": 0,
+              "repaired": 2,
+              "right": 30,
+              "usd": "0.00929460",
+              "wall_ms_p50": 1341,
+              "wall_ms_p95": 3248
+            },
+            "place": {
+              "draws": 40,
+              "plans": 20,
+              "refused": 20,
+              "repaired": 25,
+              "right": 15,
+              "usd": "0.02007320",
+              "wall_ms_p50": 2561,
+              "wall_ms_p95": 6399
+            }
+          },
+          "by_question": [
+            {
+              "asked": "What does the sign say at [place A]?",
+              "draws": 5,
+              "first_attempts": [
+                {
+                  "content_scope": "memories_only",
+                  "count": 5,
+                  "entities": 0,
+                  "intent": "content",
+                  "mode": null,
+                  "place": true,
+                  "refused_because": [
+                    "<root>: Value error, cross-content place membership is relational and does not use semantic text"
+                  ],
+                  "semantic_query": "sign text"
+                }
+              ],
+              "id": "D-P1",
+              "kind": "place",
+              "repairs": [
+                {
+                  "content_scope": "memories_only",
+                  "count": 5,
+                  "entities": 0,
+                  "intent": "content",
+                  "mode": null,
+                  "place": true,
+                  "refused_because": [
+                    "<root>: Value error, cross-content place membership is relational and does not use semantic text"
+                  ],
+                  "semantic_query": "sign text"
+                }
+              ],
+              "right": 0,
+              "text": "What does the sign say at Lantern House?"
+            },
+            {
+              "asked": "What do my photographs show at [place A]?",
+              "draws": 5,
+              "first_attempts": [
+                {
+                  "content_scope": null,
+                  "count": 5,
+                  "entities": 0,
+                  "intent": "captures",
+                  "mode": null,
+                  "place": true,
+                  "refused_because": [],
+                  "semantic_query": null
+                }
+              ],
+              "id": "D-P2",
+              "kind": "place",
+              "repairs": [],
+              "right": 5,
+              "text": "What do my photographs show at Lantern House?"
+            },
+            {
+              "asked": "Which of my photographs were taken at [place A]?",
+              "draws": 5,
+              "first_attempts": [
+                {
+                  "content_scope": null,
+                  "count": 5,
+                  "entities": 0,
+                  "intent": "captures",
+                  "mode": null,
+                  "place": true,
+                  "refused_because": [],
+                  "semantic_query": null
+                }
+              ],
+              "id": "D-P3",
+              "kind": "place",
+              "repairs": [],
+              "right": 5,
+              "text": "Which of my photographs were taken at Lantern House?"
+            },
+            {
+              "asked": "What is written on the board outside [place A]?",
+              "draws": 5,
+              "first_attempts": [
+                {
+                  "content_scope": "memories_only",
+                  "count": 4,
+                  "entities": 0,
+                  "intent": "content",
+                  "mode": null,
+                  "place": true,
+                  "refused_because": [
+                    "<root>: Value error, cross-content place membership is relational and does not use semantic text"
+                  ],
+                  "semantic_query": "written board"
+                },
+                {
+                  "content_scope": "memories_only",
+                  "count": 1,
+                  "entities": 0,
+                  "intent": "content",
+                  "mode": null,
+                  "place": true,
+                  "refused_because": [
+                    "<root>: Value error, cross-content place membership is relational and does not use semantic text"
+                  ],
+                  "semantic_query": "written on board"
+                }
+              ],
+              "id": "D-P4",
+              "kind": "place",
+              "repairs": [
+                {
+                  "content_scope": "memories_only",
+                  "count": 4,
+                  "entities": 0,
+                  "intent": "content",
+                  "mode": null,
+                  "place": true,
+                  "refused_because": [
+                    "<root>: Value error, cross-content place membership is relational and does not use semantic text"
+                  ],
+                  "semantic_query": "written board"
+                },
+                {
+                  "content_scope": "memories_only",
+                  "count": 1,
+                  "entities": 0,
+                  "intent": "content",
+                  "mode": null,
+                  "place": true,
+                  "refused_because": [
+                    "<root>: Value error, cross-content place membership is relational and does not use semantic text"
+                  ],
+                  "semantic_query": "written on board"
+                }
+              ],
+              "right": 0,
+              "text": "What is written on the board outside Kestrel Mill?"
+            },
+            {
+              "asked": "Who was with me at [place A]?",
+              "draws": 5,
+              "first_attempts": [
+                {
+                  "content_scope": null,
+                  "count": 5,
+                  "entities": 1,
+                  "intent": "entities",
+                  "mode": "together",
+                  "place": true,
+                  "refused_because": [
+                    "<root>: Value error, mode together is a statement about several entities and needs at least two of them; over one entity it is the same query as 'any'"
+                  ],
+                  "semantic_query": null
+                }
+              ],
+              "id": "D-P5",
+              "kind": "place",
+              "repairs": [
+                {
+                  "content_scope": null,
+                  "count": 5,
+                  "entities": 1,
+                  "intent": "entities",
+                  "mode": "any",
+                  "place": true,
+                  "refused_because": [],
+                  "semantic_query": null
+                }
+              ],
+              "right": 0,
+              "text": "Who was with me at Harbour Steps?"
+            },
+            {
+              "asked": "What colour is the front door at [place A]?",
+              "draws": 5,
+              "first_attempts": [
+                {
+                  "content_scope": "memories_only",
+                  "count": 5,
+                  "entities": 0,
+                  "intent": "content",
+                  "mode": null,
+                  "place": true,
+                  "refused_because": [
+                    "<root>: Value error, cross-content place membership is relational and does not use semantic text"
+                  ],
+                  "semantic_query": "front door colour"
+                }
+              ],
+              "id": "D-P6",
+              "kind": "place",
+              "repairs": [
+                {
+                  "content_scope": "memories_only",
+                  "count": 5,
+                  "entities": 0,
+                  "intent": "content",
+                  "mode": null,
+                  "place": true,
+                  "refused_because": [
+                    "<root>: Value error, cross-content place membership is relational and does not use semantic text"
+                  ],
+                  "semantic_query": "front door colour"
+                }
+              ],
+              "right": 0,
+              "text": "What colour is the front door at Kestrel Mill?"
+            },
+            {
+              "asked": "Show me everything related to [place A], including imported maps and my own edits.",
+              "draws": 5,
+              "first_attempts": [
+                {
+                  "content_scope": "related",
+                  "count": 5,
+                  "entities": 0,
+                  "intent": "content",
+                  "mode": null,
+                  "place": true,
+                  "refused_because": [],
+                  "semantic_query": null
+                }
+              ],
+              "id": "D-P7",
+              "kind": "place",
+              "repairs": [],
+              "right": 5,
+              "text": "Show me everything related to Harbour Steps, including imported maps and my own edits."
+            },
+            {
+              "asked": "Is there any text on the walls at [place A]?",
+              "draws": 5,
+              "first_attempts": [
+                {
+                  "content_scope": "memories_only",
+                  "count": 4,
+                  "entities": 0,
+                  "intent": "content",
+                  "mode": null,
+                  "place": true,
+                  "refused_because": [
+                    "<root>: Value error, cross-content place membership is relational and does not use semantic text"
+                  ],
+                  "semantic_query": "text on walls"
+                },
+                {
+                  "content_scope": "memories_only",
+                  "count": 1,
+                  "entities": 0,
+                  "intent": "content",
+                  "mode": null,
+                  "place": true,
+                  "refused_because": [
+                    "<root>: Value error, cross-content place membership is relational and does not use semantic text"
+                  ],
+                  "semantic_query": "text on wall"
+                }
+              ],
+              "id": "D-P8",
+              "kind": "place",
+              "repairs": [
+                {
+                  "content_scope": "memories_only",
+                  "count": 4,
+                  "entities": 0,
+                  "intent": "content",
+                  "mode": null,
+                  "place": true,
+                  "refused_because": [
+                    "<root>: Value error, cross-content place membership is relational and does not use semantic text"
+                  ],
+                  "semantic_query": "text on walls"
+                },
+                {
+                  "content_scope": "memories_only",
+                  "count": 1,
+                  "entities": 0,
+                  "intent": "content",
+                  "mode": null,
+                  "place": true,
+                  "refused_because": [
+                    "<root>: Value error, cross-content place membership is relational and does not use semantic text"
+                  ],
+                  "semantic_query": "text on wall"
+                }
+              ],
+              "right": 0,
+              "text": "Is there any text on the walls at Harbour Steps?"
+            },
+            {
+              "asked": "Which of my photographs show [person A]?",
+              "draws": 5,
+              "first_attempts": [
+                {
+                  "content_scope": null,
+                  "count": 5,
+                  "entities": 1,
+                  "intent": "captures",
+                  "mode": "any",
+                  "place": false,
+                  "refused_because": [],
+                  "semantic_query": null
+                }
+              ],
+              "id": "D-H1",
+              "kind": "person",
+              "repairs": [],
+              "right": 5,
+              "text": "Which of my photographs show Maria Estrada?"
+            },
+            {
+              "asked": "What was [person A] wearing?",
+              "draws": 5,
+              "first_attempts": [
+                {
+                  "content_scope": null,
+                  "count": 5,
+                  "entities": 1,
+                  "intent": "entities",
+                  "mode": "any",
+                  "place": false,
+                  "refused_because": [],
+                  "semantic_query": "wearing"
+                }
+              ],
+              "id": "D-H2",
+              "kind": "person",
+              "repairs": [],
+              "right": 5,
+              "text": "What was Maria wearing?"
+            },
+            {
+              "asked": "What does the sign behind [person A] say?",
+              "draws": 5,
+              "first_attempts": [
+                {
+                  "content_scope": null,
+                  "count": 4,
+                  "entities": 1,
+                  "intent": "captures",
+                  "mode": "any",
+                  "place": false,
+                  "refused_because": [],
+                  "semantic_query": "sign text"
+                },
+                {
+                  "content_scope": "memories_only",
+                  "count": 1,
+                  "entities": 0,
+                  "intent": "content",
+                  "mode": null,
+                  "place": false,
+                  "refused_because": [
+                    "<root>: Value error, content selections require both content and place selectors"
+                  ],
+                  "semantic_query": "sign text"
+                }
+              ],
+              "id": "D-H3",
+              "kind": "person",
+              "repairs": [
+                {
+                  "content_scope": null,
+                  "count": 1,
+                  "entities": 1,
+                  "intent": "captures",
+                  "mode": "any",
+                  "place": false,
+                  "refused_because": [],
+                  "semantic_query": "sign text"
+                }
+              ],
+              "right": 5,
+              "text": "What does the sign behind Tomasz say?"
+            },
+            {
+              "asked": "Show me photos of [person B] and [person A] together.",
+              "draws": 5,
+              "first_attempts": [
+                {
+                  "content_scope": null,
+                  "count": 5,
+                  "entities": 2,
+                  "intent": "captures",
+                  "mode": "together",
+                  "place": false,
+                  "refused_because": [],
+                  "semantic_query": null
+                }
+              ],
+              "id": "D-H4",
+              "kind": "person",
+              "repairs": [],
+              "right": 5,
+              "text": "Show me photos of Maria and Tomasz together."
+            },
+            {
+              "asked": "What is written on [person A]'s shirt?",
+              "draws": 5,
+              "first_attempts": [
+                {
+                  "content_scope": null,
+                  "count": 4,
+                  "entities": 1,
+                  "intent": "captures",
+                  "mode": "any",
+                  "place": false,
+                  "refused_because": [],
+                  "semantic_query": "text on shirt"
+                },
+                {
+                  "content_scope": "memories_only",
+                  "count": 1,
+                  "entities": 0,
+                  "intent": "content",
+                  "mode": null,
+                  "place": false,
+                  "refused_because": [
+                    "<root>: Value error, content selections require both content and place selectors"
+                  ],
+                  "semantic_query": "text on shirt"
+                }
+              ],
+              "id": "D-H5",
+              "kind": "person",
+              "repairs": [
+                {
+                  "content_scope": null,
+                  "count": 1,
+                  "entities": 1,
+                  "intent": "captures",
+                  "mode": "any",
+                  "place": false,
+                  "refused_because": [],
+                  "semantic_query": "text on shirt"
+                }
+              ],
+              "right": 5,
+              "text": "What is written on Ines Varga's shirt?"
+            },
+            {
+              "asked": "Which photographs have [person A] in them?",
+              "draws": 5,
+              "first_attempts": [
+                {
+                  "content_scope": null,
+                  "count": 5,
+                  "entities": 1,
+                  "intent": "captures",
+                  "mode": "any",
+                  "place": false,
+                  "refused_because": [],
+                  "semantic_query": null
+                }
+              ],
+              "id": "D-H6",
+              "kind": "person",
+              "repairs": [],
+              "right": 5,
+              "text": "Which photographs have Ines in them?"
+            },
+            {
+              "asked": "Which photographs show a red bicycle?",
+              "draws": 5,
+              "first_attempts": [
+                {
+                  "content_scope": null,
+                  "count": 5,
+                  "entities": 0,
+                  "intent": "captures",
+                  "mode": null,
+                  "place": false,
+                  "refused_because": [],
+                  "semantic_query": "red bicycle"
+                }
+              ],
+              "id": "D-C1",
+              "kind": "content",
+              "repairs": [],
+              "right": 5,
+              "text": "Which photographs show a red bicycle?"
+            },
+            {
+              "asked": "What does the sign on the bakery say?",
+              "draws": 5,
+              "first_attempts": [
+                {
+                  "content_scope": "memories_only",
+                  "count": 5,
+                  "entities": 0,
+                  "intent": "content",
+                  "mode": null,
+                  "place": false,
+                  "refused_because": [
+                    "<root>: Value error, content selections require both content and place selectors"
+                  ],
+                  "semantic_query": "sign bakery"
+                }
+              ],
+              "id": "D-C2",
+              "kind": "content",
+              "repairs": [
+                {
+                  "content_scope": null,
+                  "count": 5,
+                  "entities": 0,
+                  "intent": "captures",
+                  "mode": null,
+                  "place": false,
+                  "refused_because": [],
+                  "semantic_query": "sign bakery"
+                }
+              ],
+              "right": 5,
+              "text": "What does the sign on the bakery say?"
+            },
+            {
+              "asked": "What is written on the chalkboard menu?",
+              "draws": 5,
+              "first_attempts": [
+                {
+                  "content_scope": null,
+                  "count": 4,
+                  "entities": 0,
+                  "intent": "captures",
+                  "mode": null,
+                  "place": false,
+                  "refused_because": [],
+                  "semantic_query": "written chalkboard menu"
+                },
+                {
+                  "content_scope": "memories_only",
+                  "count": 1,
+                  "entities": 0,
+                  "intent": "content",
+                  "mode": null,
+                  "place": false,
+                  "refused_because": [
+                    "<root>: Value error, content selections require both content and place selectors"
+                  ],
+                  "semantic_query": "written chalkboard menu"
+                }
+              ],
+              "id": "D-C3",
+              "kind": "content",
+              "repairs": [
+                {
+                  "content_scope": null,
+                  "count": 1,
+                  "entities": 0,
+                  "intent": "captures",
+                  "mode": null,
+                  "place": false,
+                  "refused_because": [],
+                  "semantic_query": "written chalkboard menu"
+                }
+              ],
+              "right": 5,
+              "text": "What is written on the chalkboard menu?"
+            },
+            {
+              "asked": "Find pictures of boats in a harbour.",
+              "draws": 5,
+              "first_attempts": [
+                {
+                  "content_scope": null,
+                  "count": 5,
+                  "entities": 0,
+                  "intent": "captures",
+                  "mode": null,
+                  "place": false,
+                  "refused_because": [],
+                  "semantic_query": "boat harbour"
+                }
+              ],
+              "id": "D-C4",
+              "kind": "content",
+              "repairs": [],
+              "right": 5,
+              "text": "Find pictures of boats in a harbour."
+            },
+            {
+              "asked": "What words are painted on the shop window?",
+              "draws": 5,
+              "first_attempts": [
+                {
+                  "content_scope": null,
+                  "count": 5,
+                  "entities": 0,
+                  "intent": "captures",
+                  "mode": null,
+                  "place": false,
+                  "refused_because": [],
+                  "semantic_query": "words painted shop window"
+                }
+              ],
+              "id": "D-C5",
+              "kind": "content",
+              "repairs": [],
+              "right": 5,
+              "text": "What words are painted on the shop window?"
+            },
+            {
+              "asked": "How many photographs do I have?",
+              "draws": 5,
+              "first_attempts": [
+                {
+                  "content_scope": null,
+                  "count": 5,
+                  "entities": 0,
+                  "intent": "captures",
+                  "mode": null,
+                  "place": false,
+                  "refused_because": [],
+                  "semantic_query": null
+                }
+              ],
+              "id": "D-C6",
+              "kind": "content",
+              "repairs": [],
+              "right": 5,
+              "text": "How many photographs do I have?"
+            }
+          ],
+          "draws_per_question": 5,
+          "package_files": {
+            "models/client.py": "6a6ee237f480923f18d985087eb33bad643a733747e77a89c3a3e355f89281d3",
+            "models/models.manifest.json": "1675ece6c6af31ec11637d5f87d8fdc6f0c82c9ffe8d822b4043d138c79bb466",
+            "models/response.py": "ad842a3da5d2698b71ff6f7586568b27eb2055252a0eefdcebafde04da34095c",
+            "models/schema.py": "1066f981bfe352ff42d4824b041a46bc2747211bd183202f68660c466f28a94c",
+            "selection/plan.py": "a53a3d6675598ad0185527bffab7d71cb73be8702c8c3ee72116dfed6f45589f",
+            "selection/question.py": "db49df2b184883e81d3fbe8a680483239aeb60c97ce30c507a2c0f7139f6de40",
+            "selection/saved_names.py": "be968ba4c2b5f51dd0d20a9afdbb1fc1bd14c02d0685806eaa45cf39e53e4d7c"
+          },
+          "prompt_version": "selection-5",
+          "question_set_sha256": "b872df322e147831ddf54d9a376cfd8b934653dcbb37c3978d07c1b1959150f8",
+          "spend": {
+            "billed_calls": 133,
+            "cache_hits": 0,
+            "calls": 133,
+            "input_tokens": 150620,
+            "output_tokens": 14450,
+            "reasoning_tokens": 0,
+            "usd_avoided_by_cache": "0E-8",
+            "usd_estimate": "0.03879400"
+          },
+          "started_at": "2026-09-23T00:41:21+00:00"
+        },
+        "dev-baseline-lane-m.json": {
+          "arm": "baseline-5c0a05ba-lane-m-catalogue",
+          "by_kind": {
+            "all": {
+              "draws": 10,
+              "plans": 0,
+              "refused": 10,
+              "repaired": 10,
+              "right": 0,
+              "usd": "0.00552460",
+              "wall_ms_p50": 2552,
+              "wall_ms_p95": 14372
+            },
+            "place": {
+              "draws": 10,
+              "plans": 0,
+              "refused": 10,
+              "repaired": 10,
+              "right": 0,
+              "usd": "0.00552460",
+              "wall_ms_p50": 2552,
+              "wall_ms_p95": 14372
+            }
+          },
+          "by_question": [
+            {
+              "asked": "What does the sign say at [place A]?",
+              "draws": 10,
+              "first_attempts": [
+                {
+                  "content_scope": "memories_only",
+                  "count": 10,
+                  "entities": 0,
+                  "intent": "content",
+                  "mode": null,
+                  "place": true,
+                  "refused_because": [
+                    "<root>: Value error, cross-content place membership is relational and does not use semantic text"
+                  ],
+                  "semantic_query": "sign text"
+                }
+              ],
+              "id": "D-P1",
+              "kind": "place",
+              "repairs": [
+                {
+                  "content_scope": "memories_only",
+                  "count": 10,
+                  "entities": 0,
+                  "intent": "content",
+                  "mode": null,
+                  "place": true,
+                  "refused_because": [
+                    "<root>: Value error, cross-content place membership is relational and does not use semantic text"
+                  ],
+                  "semantic_query": "sign text"
+                }
+              ],
+              "right": 0,
+              "text": "What does the sign say at Lantern House?"
+            }
+          ],
+          "draws_per_question": 10,
+          "package_files": {
+            "models/client.py": "6a6ee237f480923f18d985087eb33bad643a733747e77a89c3a3e355f89281d3",
+            "models/models.manifest.json": "1675ece6c6af31ec11637d5f87d8fdc6f0c82c9ffe8d822b4043d138c79bb466",
+            "models/response.py": "ad842a3da5d2698b71ff6f7586568b27eb2055252a0eefdcebafde04da34095c",
+            "models/schema.py": "1066f981bfe352ff42d4824b041a46bc2747211bd183202f68660c466f28a94c",
+            "selection/plan.py": "a53a3d6675598ad0185527bffab7d71cb73be8702c8c3ee72116dfed6f45589f",
+            "selection/question.py": "db49df2b184883e81d3fbe8a680483239aeb60c97ce30c507a2c0f7139f6de40",
+            "selection/saved_names.py": "be968ba4c2b5f51dd0d20a9afdbb1fc1bd14c02d0685806eaa45cf39e53e4d7c"
+          },
+          "prompt_version": "selection-5",
+          "question_set_sha256": "7f9e0dd8aab81d0d400db0aef485d767cb476c997c5a11c63643e0b47795eb45",
+          "spend": {
+            "billed_calls": 20,
+            "cache_hits": 0,
+            "calls": 20,
+            "input_tokens": 20180,
+            "output_tokens": 2481,
+            "reasoning_tokens": 0,
+            "usd_avoided_by_cache": "0E-8",
+            "usd_estimate": "0.00552460"
+          },
+          "started_at": "2026-09-23T00:45:43+00:00"
+        }
+      }
+    },
+    "gates": {
+      "content_no_regression": {
+        "candidate_minus_baseline_min_bp": -1000
+      },
+      "cost": {
+        "candidate_mean_max_percent_of_baseline_mean": 125,
+        "candidate_mean_usd_per_draw_max": "0.0006"
+      },
+      "latency": {
+        "candidate_p95_max_percent_of_baseline_p95": 125,
+        "candidate_p95_ms_max": 8000
+      },
+      "no_loosening": {
+        "disagreements_max": 0
+      },
+      "person_no_regression": {
+        "candidate_minus_baseline_min_bp": -1000
+      },
+      "place_improvement": {
+        "candidate_minus_baseline_min_bp": 3000
+      },
+      "place_rate": {
+        "candidate_min_bp": 9000,
+        "meaning": "right draws over the 60 place draws"
+      },
+      "units": "rates in basis points of draws (10000 is every draw); ratios in percent"
+    },
+    "held_out": {
+      "catalogue": [
+        {
+          "class": "place",
+          "id": "cb88e76d-13f4-5c80-ae39-2c8f615bdf81",
+          "name": "Copperfield Arcade"
+        },
+        {
+          "class": "person",
+          "id": "eb6db221-c6a9-5507-842b-c71a00011a22",
+          "name": "Ottilie Brandt"
+        },
+        {
+          "class": "place",
+          "id": "64ed0016-f583-54a1-a2ee-145b638b5b52",
+          "name": "Wrenmoor Lighthouse"
+        },
+        {
+          "class": "person",
+          "id": "a9011e39-e585-55b5-9030-bbe34dd6cb30",
+          "name": "Kwame Mensah"
+        },
+        {
+          "class": "place",
+          "id": "fe74f5a3-435c-55a1-a2d8-38f5a3cda48d",
+          "name": "Saltmarsh Chapel"
+        },
+        {
+          "class": "object",
+          "id": "59c38dba-e5da-5184-af8e-65e86a39385c",
+          "name": "Halvard Sledge"
+        },
+        {
+          "class": "person",
+          "id": "8377d3d1-02c3-52e5-bea1-c398daa32ce0",
+          "name": "Soren Lindqvist"
+        },
+        {
+          "class": "place",
+          "id": "3a1226b0-5f21-54b1-aa44-949a9c3d1879",
+          "name": "Tidewater Row"
+        },
+        {
+          "class": "person",
+          "id": "ee4744f9-ee3a-598f-8635-e776e818aa2c",
+          "name": "Priya Raman"
+        },
+        {
+          "class": "place",
+          "id": "3f0f24b0-98f9-55c5-88da-fab705cb9a24",
+          "name": "Ashgrove Orchard"
+        },
+        {
+          "class": "object",
+          "id": "06d9979e-261f-5b30-b3e9-ce2201590e71",
+          "name": "Kittiwake Dinghy"
+        }
+      ],
+      "questions": [
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [
+              "cb88e76d-13f4-5c80-ae39-2c8f615bdf81"
+            ],
+            "query": {
+              "allowed": [
+                "sign",
+                "signage",
+                "text",
+                "writing",
+                "written",
+                "word",
+                "lettering",
+                "notice",
+                "name",
+                "above",
+                "door"
+              ],
+              "null": true,
+              "required": [
+                "sign"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "H-P01",
+          "kind": "place",
+          "text": "What does the sign above the door at Copperfield Arcade say?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [
+              "fe74f5a3-435c-55a1-a2d8-38f5a3cda48d"
+            ],
+            "query": {
+              "allowed": [
+                "sign",
+                "signage",
+                "text",
+                "writing",
+                "written",
+                "word",
+                "lettering",
+                "notice",
+                "name",
+                "plaque",
+                "inscription"
+              ],
+              "null": true,
+              "required": [
+                "plaque",
+                "written",
+                "writing",
+                "text"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "H-P02",
+          "kind": "place",
+          "text": "What is written on the plaque at Saltmarsh Chapel?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [
+              "64ed0016-f583-54a1-a2ee-145b638b5b52"
+            ],
+            "query": {
+              "allowed": [],
+              "null": true,
+              "required": []
+            },
+            "scopes": []
+          },
+          "id": "H-P03",
+          "kind": "place",
+          "text": "What can I see in my photos of Wrenmoor Lighthouse?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [
+              "3a1226b0-5f21-54b1-aa44-949a9c3d1879"
+            ],
+            "query": {
+              "allowed": [],
+              "null": true,
+              "required": []
+            },
+            "scopes": []
+          },
+          "id": "H-P04",
+          "kind": "place",
+          "text": "Which photographs did I take at Tidewater Row?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [
+              "3f0f24b0-98f9-55c5-88da-fab705cb9a24"
+            ],
+            "query": {
+              "allowed": [
+                "people",
+                "person"
+              ],
+              "null": true,
+              "required": []
+            },
+            "scopes": []
+          },
+          "id": "H-P05",
+          "kind": "place",
+          "text": "Who was I with at Ashgrove Orchard?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [
+              "3a1226b0-5f21-54b1-aa44-949a9c3d1879"
+            ],
+            "query": {
+              "allowed": [
+                "shutter",
+                "colour",
+                "color",
+                "window"
+              ],
+              "null": true,
+              "required": [
+                "shutter"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "H-P06",
+          "kind": "place",
+          "text": "What colour are the shutters at Tidewater Row?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [
+              "64ed0016-f583-54a1-a2ee-145b638b5b52"
+            ],
+            "query": {
+              "allowed": [
+                "sign",
+                "signage",
+                "text",
+                "writing",
+                "written",
+                "word",
+                "lettering",
+                "notice",
+                "name",
+                "timetable",
+                "schedule",
+                "posted",
+                "board"
+              ],
+              "null": true,
+              "required": [
+                "timetable",
+                "schedule"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "H-P07",
+          "kind": "place",
+          "text": "Is there a timetable posted at Wrenmoor Lighthouse?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "content"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [
+              "cb88e76d-13f4-5c80-ae39-2c8f615bdf81"
+            ],
+            "query": {
+              "allowed": [],
+              "null": true,
+              "required": []
+            },
+            "scopes": [
+              "related"
+            ]
+          },
+          "id": "H-P08",
+          "kind": "place",
+          "text": "Show me everything connected to Copperfield Arcade, including imported maps and anything I authored."
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "content"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [
+              "3f0f24b0-98f9-55c5-88da-fab705cb9a24"
+            ],
+            "query": {
+              "allowed": [],
+              "null": true,
+              "required": []
+            },
+            "scopes": [
+              "related"
+            ]
+          },
+          "id": "H-P09",
+          "kind": "place",
+          "text": "What else is related to Ashgrove Orchard across my memories, the imported map and my edits?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [
+              "cb88e76d-13f4-5c80-ae39-2c8f615bdf81"
+            ],
+            "query": {
+              "allowed": [
+                "sign",
+                "signage",
+                "text",
+                "writing",
+                "written",
+                "word",
+                "lettering",
+                "notice",
+                "name",
+                "menu",
+                "board"
+              ],
+              "null": true,
+              "required": [
+                "menu"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "H-P10",
+          "kind": "place",
+          "text": "What does the menu board say at Copperfield Arcade?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [
+              "3f0f24b0-98f9-55c5-88da-fab705cb9a24"
+            ],
+            "query": {
+              "allowed": [
+                "flower",
+                "blossom"
+              ],
+              "null": true,
+              "required": [
+                "flower"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "H-P11",
+          "kind": "place",
+          "text": "Are there any flowers in my photos from Ashgrove Orchard?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [
+              "fe74f5a3-435c-55a1-a2d8-38f5a3cda48d"
+            ],
+            "query": {
+              "allowed": [
+                "sign",
+                "signage",
+                "text",
+                "writing",
+                "written",
+                "word",
+                "lettering",
+                "notice",
+                "name",
+                "wall",
+                "painted",
+                "painting",
+                "paint",
+                "mural"
+              ],
+              "null": true,
+              "required": [
+                "wall",
+                "painted",
+                "painting",
+                "mural"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "H-P12",
+          "kind": "place",
+          "text": "What's painted on the wall at Saltmarsh Chapel?"
+        },
+        {
+          "expect": {
+            "entities": [
+              "eb6db221-c6a9-5507-842b-c71a00011a22"
+            ],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [],
+              "null": true,
+              "required": []
+            },
+            "scopes": []
+          },
+          "id": "H-H01",
+          "kind": "person",
+          "text": "Which photographs show Ottilie Brandt?"
+        },
+        {
+          "expect": {
+            "entities": [
+              "a9011e39-e585-55b5-9030-bbe34dd6cb30"
+            ],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [
+                "hold",
+                "holding",
+                "held",
+                "object",
+                "item"
+              ],
+              "null": true,
+              "required": [
+                "hold",
+                "holding",
+                "held"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "H-H02",
+          "kind": "person",
+          "text": "What was Kwame holding?"
+        },
+        {
+          "expect": {
+            "entities": [
+              "8377d3d1-02c3-52e5-bea1-c398daa32ce0",
+              "ee4744f9-ee3a-598f-8635-e776e818aa2c"
+            ],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "together"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [],
+              "null": true,
+              "required": []
+            },
+            "scopes": []
+          },
+          "id": "H-H03",
+          "kind": "person",
+          "text": "Show me pictures of Soren and Priya together."
+        },
+        {
+          "expect": {
+            "entities": [
+              "ee4744f9-ee3a-598f-8635-e776e818aa2c"
+            ],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [
+                "sign",
+                "signage",
+                "text",
+                "writing",
+                "written",
+                "word",
+                "lettering",
+                "notice",
+                "name",
+                "badge"
+              ],
+              "null": true,
+              "required": [
+                "badge"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "H-H04",
+          "kind": "person",
+          "text": "What does Priya Raman's badge say?"
+        },
+        {
+          "expect": {
+            "entities": [
+              "eb6db221-c6a9-5507-842b-c71a00011a22",
+              "a9011e39-e585-55b5-9030-bbe34dd6cb30"
+            ],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "together"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [],
+              "null": true,
+              "required": []
+            },
+            "scopes": []
+          },
+          "id": "H-H05",
+          "kind": "person",
+          "text": "Which photos have both Ottilie and Kwame in them?"
+        },
+        {
+          "expect": {
+            "entities": [
+              "8377d3d1-02c3-52e5-bea1-c398daa32ce0"
+            ],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [
+                "wearing",
+                "wear",
+                "boat",
+                "clothing",
+                "clothes",
+                "outfit"
+              ],
+              "null": true,
+              "required": [
+                "wearing",
+                "boat",
+                "clothing",
+                "outfit"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "H-H06",
+          "kind": "person",
+          "text": "What was Soren wearing on the boat?"
+        },
+        {
+          "expect": {
+            "entities": [
+              "a9011e39-e585-55b5-9030-bbe34dd6cb30"
+            ],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [
+                "smile",
+                "smiling"
+              ],
+              "null": true,
+              "required": [
+                "smile",
+                "smiling"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "H-H07",
+          "kind": "person",
+          "text": "Find photographs of Kwame Mensah smiling."
+        },
+        {
+          "expect": {
+            "entities": [
+              "ee4744f9-ee3a-598f-8635-e776e818aa2c"
+            ],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [],
+              "null": true,
+              "required": []
+            },
+            "scopes": []
+          },
+          "id": "H-H08",
+          "kind": "person",
+          "text": "Where have I photographed Priya?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [
+                "yellow",
+                "umbrella"
+              ],
+              "null": false,
+              "required": [
+                "umbrella"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "H-C01",
+          "kind": "content",
+          "text": "Which photographs show a yellow umbrella?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [
+                "sign",
+                "signage",
+                "text",
+                "writing",
+                "written",
+                "word",
+                "lettering",
+                "notice",
+                "name",
+                "railway",
+                "station",
+                "train"
+              ],
+              "null": false,
+              "required": [
+                "sign"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "H-C02",
+          "kind": "content",
+          "text": "What does the sign at the railway station say?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [
+                "sign",
+                "signage",
+                "text",
+                "writing",
+                "written",
+                "word",
+                "lettering",
+                "notice",
+                "name",
+                "blackboard",
+                "chalkboard"
+              ],
+              "null": false,
+              "required": [
+                "blackboard",
+                "chalkboard"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "H-C03",
+          "kind": "content",
+          "text": "What is written on the blackboard?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [
+                "lighthouse",
+                "sunset"
+              ],
+              "null": false,
+              "required": [
+                "lighthouse"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "H-C04",
+          "kind": "content",
+          "text": "Find pictures of a lighthouse at sunset."
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [
+                "dog",
+                "beach"
+              ],
+              "null": false,
+              "required": [
+                "dog"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "H-C05",
+          "kind": "content",
+          "text": "Are there photos of dogs on the beach?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [
+                "sign",
+                "signage",
+                "text",
+                "writing",
+                "written",
+                "word",
+                "lettering",
+                "notice",
+                "name",
+                "graffiti",
+                "bridge",
+                "under"
+              ],
+              "null": false,
+              "required": [
+                "graffiti"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "H-C06",
+          "kind": "content",
+          "text": "What does the graffiti under the bridge say?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [],
+              "null": true,
+              "required": []
+            },
+            "scopes": []
+          },
+          "id": "H-C07",
+          "kind": "content",
+          "text": "When did I take my first photograph?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [
+                "sign",
+                "signage",
+                "text",
+                "writing",
+                "written",
+                "word",
+                "lettering",
+                "notice",
+                "name",
+                "handwritten",
+                "handwriting",
+                "note"
+              ],
+              "null": false,
+              "required": [
+                "note"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "H-C08",
+          "kind": "content",
+          "text": "Show me the photos with a handwritten note in them."
+        }
+      ],
+      "split": "held-out"
+    },
+    "model": {
+      "cache": "none: the client is built without one, as the API builds it",
+      "endpoint": "https://api.tokenfactory.nebius.com",
+      "fallback": "deepseek-ai/DeepSeek-V4-Flash-0731, which the client uses only when the primary is withdrawn",
+      "primary": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "revision": null,
+      "revision_note": "hosted; the provider exposes no revision",
+      "role": "structured_extraction",
+      "temperature": "0.0, the product's default; draws still vary"
+    },
+    "not_covered": [
+      "Whether the right plan finds the right photograph: retrieval, the text join and the packet are not exercised. Only the plan is scored.",
+      "The plan's limit is not scored, so a right plan with a null query and a limit of one may still hand the composer the wrong photograph at a place with several.",
+      "The composer and the answer a person reads.",
+      "Any model but the structured-extraction primary, any language but English, and catalogues larger than eleven entities.",
+      "Questions naming a place that is not saved, or naming two places.",
+      "Real personal data: every name is invented."
+    ],
+    "premise": "MEASURED on the development split, base commit, 100 draws: place questions about something visible or written there were refused 20 of 20. Every first attempt chose intent content with content scope memories_only and a semantic query, which SelectionPlan refuses ('cross-content place membership is relational and does not use semantic text'), and every repair returned the same plan: the refusal the repair carried quoted the answer and never named the rule. Without a place the same pull appears (a sign question chose content on 5 of 5 first attempts) and the repair recovers it. 'Who was with me at' a place put an unnamed person into the entity filter 5 of 5 times. Person questions were right 30 of 30 and plain content questions 30 of 30.",
+    "procedure": {
+      "cap_usd_per_run": "0.50, stated in the environment and on the command line",
+      "counts": {
+        "content": 8,
+        "person": 8,
+        "place": 12,
+        "questions": 28
+      },
+      "draws_per_question_per_arm": 5,
+      "order": "ten runs of one draw of every held-out question, alternating baseline and candidate, baseline first, so the two arms share the provider's conditions",
+      "scorer": {
+        "path": "scripts/measure_planner_reliability.py",
+        "sha256": "7d8ce7724e1c4935d572aac04d92d73e765394455be6038bf44e4cf8910b69fe"
+      }
+    },
+    "profile_note": "Pre-registration of the Companion planner reliability experiment. Written after the development diagnosis and before any change to the planner's prompt, plan validation or repair; no model has been sent any held-out question.",
+    "question": "Does a change to the planner make it return the right plan for worded questions about a place, without making person or plain content questions worse, within a latency and cost ceiling?",
+    "scorer_controls": {
+      "right_plans_accepted": 28,
+      "wrong_plan_kinds": [
+        "framing_word",
+        "guesses",
+        "invented_person",
+        "no_plan",
+        "other_place",
+        "time_added",
+        "wrong_intent"
+      ],
+      "wrong_plans_refused": 196
+    }
+  },
+  "record_sha256": "2c111d6f2179debb14188b4a4181dcec4204c7ae2cf6e9ea446746000f87d241"
+}

@@ -1,0 +1,1065 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "already_seen_before_this_was_written": [
+      "Every result of the first experiment, bound above. Its held-out split is spent.",
+      "The development split's results for the first candidate's five versions.",
+      "The questions below were written by the author of the change, after the first outcome and before the second change. No model output exists for any of them."
+    ],
+    "arms": {
+      "baseline": "exulanica/ at the base commit, exported unchanged with git archive and imported ahead of the worktree",
+      "candidate": "exulanica/ in this lane's worktree once the change is frozen. Every run records the SHA-256 of the files that decide a plan.",
+      "candidate_may_change": [
+        "the planner prompt and its PROMPT_VERSION",
+        "the wording of the plan validator's refusals",
+        "the planner's repair message",
+        "the client's refusal message (already changed; see above)",
+        "the planner's removal of placeholders from the semantic query, to cover the spellings of the placeholders assigned in that request with or without brackets",
+        "the planner's handling of a reply cut off at the token limit"
+      ],
+      "candidate_may_not_change": "what SelectionPlan accepts. Every answer either arm receives is re-validated by both arms' SelectionPlan after the run, and one disagreement fails the no_loosening gate.",
+      "development_use": "the development split may be used as a smoke test of the change; it is not evidence. The held-out split below sees only the frozen change."
+    },
+    "base_commit": "5c0a05ba8e6e3ea64832084abe8b2356b2335536",
+    "decisions": {
+      "a_no_regression_gate_fails": "reported as a failure, with the questions that moved",
+      "all_gates_pass": "the change is this lane's result and goes to root with these numbers",
+      "baseline_place_rate_at_least_6000_bp": "the held-out split did not reproduce the defect, so no improvement is claimed from it, whatever the candidate scores",
+      "latency_or_cost_fails": "reported as a failure of that gate; the rates are still reported",
+      "no_loosening_fails": "the change is withdrawn: it passed by accepting plans the base commit refuses",
+      "per_question_no_collapse_fails": "reported as a failure, naming the question",
+      "place_rate_or_improvement_fails": "reported as a failure. The held-out split is not used to revise the change. Root decides whether a partial improvement is worth taking.",
+      "provider_errors_over_10_percent_of_an_arms_draws": "the run is void and is reported as void, not scored"
+    },
+    "definitions": {
+      "cost": "provider-reported tokens times the manifest's listed prices, every attempt included",
+      "intents": "captures and entities resolve the same photographs and give the composer the same packet, so a question about what photographs show accepts either. content is the cross-content listing and is right only for an explicit request for related material.",
+      "latency": "wall milliseconds of one propose_plan call, repair included",
+      "query_rule": "a null query passes when the question allows null. A query passes when it has at least one word after stop words, every word is in the question's allowed list, and, when the question names required words, at least one of them is present. Words are lowercase letter runs, plural-folded by the scorer's stem function.",
+      "rate": "right draws over draws, per kind. A reply cut off at the token limit is a failed draw. A draw ending in a transport or provider error is excluded and counted separately.",
+      "right_plan": "the planner returned a plan (no refusal after its repair), every id in it is in the catalogue with a place selector holding places only, and it is the plan the question asks for: an accepted intent, exactly the expected place and entity ids, an accepted entity mode and content scope, no time window, no capture property, epistemic confirmed, and a semantic query allowed by the question's query rule",
+      "stop_words": [
+        "a",
+        "an",
+        "and",
+        "at",
+        "by",
+        "for",
+        "from",
+        "in",
+        "of",
+        "on",
+        "or",
+        "the",
+        "to",
+        "with"
+      ]
+    },
+    "gates": {
+      "content_no_regression": {
+        "candidate_minus_baseline_min_bp": -1000
+      },
+      "cost": {
+        "candidate_mean_max_percent_of_baseline_mean": 125,
+        "candidate_mean_usd_per_draw_max": "0.0006"
+      },
+      "latency": {
+        "candidate_p95_max_percent_of_baseline_p95": 125,
+        "candidate_p95_ms_max": 8000
+      },
+      "no_loosening": {
+        "disagreements_max": 0
+      },
+      "per_question_no_collapse": {
+        "baseline_min_right": 4,
+        "candidate_max_right_counted_as_collapse": 1,
+        "meaning": "no question the baseline gets right in at least 4 of its 5 draws may be right in at most 1 of the candidate's 5"
+      },
+      "person_no_regression": {
+        "candidate_minus_baseline_min_bp": -1000
+      },
+      "place_improvement": {
+        "candidate_minus_baseline_min_bp": 3000
+      },
+      "place_rate": {
+        "candidate_min_bp": 9000,
+        "meaning": "right draws over the 60 place draws"
+      },
+      "units": "rates in basis points of draws (10000 is every draw); ratios in percent"
+    },
+    "held_out": {
+      "catalogue": [
+        {
+          "class": "place",
+          "id": "5ed57c21-788b-5bb2-b0ac-1154fb348f66",
+          "name": "Brackenfield Market"
+        },
+        {
+          "class": "person",
+          "id": "9ca2b241-66e9-513d-b56e-c4f021d11d3d",
+          "name": "Ilse Marchetti"
+        },
+        {
+          "class": "place",
+          "id": "b3fc3abf-8cce-5724-9e77-8414c1b2d6d5",
+          "name": "Hollowmere Station"
+        },
+        {
+          "class": "person",
+          "id": "cdf61748-1198-5210-81de-65251d213a17",
+          "name": "Tobias Achterberg"
+        },
+        {
+          "class": "place",
+          "id": "af1f1fdd-d532-5d8f-969c-c7ab2284fb81",
+          "name": "Silverbirch Quay"
+        },
+        {
+          "class": "object",
+          "id": "5c759977-ce14-552d-9616-53c45f901c2c",
+          "name": "Juniper Tandem"
+        },
+        {
+          "class": "person",
+          "id": "dab584d9-e5c5-56a7-a458-a368fa11adea",
+          "name": "Nadia Okonkwo"
+        },
+        {
+          "class": "place",
+          "id": "5070fa75-f4a9-5635-9c60-e35fa19ccddf",
+          "name": "Foxglove Terrace"
+        },
+        {
+          "class": "person",
+          "id": "f54a3292-8d3a-5a43-a56b-aaf595dc9754",
+          "name": "Rafael Quintero"
+        },
+        {
+          "class": "place",
+          "id": "93860161-8800-5e11-8eb8-afda9cec2f53",
+          "name": "Cinder Lane Baths"
+        },
+        {
+          "class": "object",
+          "id": "44fdcdde-a42d-54ac-a53f-d0b40c98645b",
+          "name": "Ostrander Kite"
+        }
+      ],
+      "questions": [
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [
+              "5ed57c21-788b-5bb2-b0ac-1154fb348f66"
+            ],
+            "query": {
+              "allowed": [
+                "sign",
+                "signage",
+                "text",
+                "writing",
+                "written",
+                "word",
+                "lettering",
+                "notice",
+                "name",
+                "notice",
+                "entrance"
+              ],
+              "null": true,
+              "required": [
+                "notice"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "S-P01",
+          "kind": "place",
+          "text": "What does the notice by the entrance to Brackenfield Market say?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [
+              "b3fc3abf-8cce-5724-9e77-8414c1b2d6d5"
+            ],
+            "query": {
+              "allowed": [
+                "sign",
+                "signage",
+                "text",
+                "writing",
+                "written",
+                "word",
+                "lettering",
+                "notice",
+                "name",
+                "platform",
+                "above"
+              ],
+              "null": true,
+              "required": [
+                "written",
+                "writing",
+                "text",
+                "platform"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "S-P02",
+          "kind": "place",
+          "text": "What is written above the platform at Hollowmere Station?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [
+              "af1f1fdd-d532-5d8f-969c-c7ab2284fb81"
+            ],
+            "query": {
+              "allowed": [],
+              "null": true,
+              "required": []
+            },
+            "scopes": []
+          },
+          "id": "S-P03",
+          "kind": "place",
+          "text": "What do my pictures from Silverbirch Quay show?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [
+              "5070fa75-f4a9-5635-9c60-e35fa19ccddf"
+            ],
+            "query": {
+              "allowed": [],
+              "null": true,
+              "required": []
+            },
+            "scopes": []
+          },
+          "id": "S-P04",
+          "kind": "place",
+          "text": "Which of my photos were taken at Foxglove Terrace?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [
+              "93860161-8800-5e11-8eb8-afda9cec2f53"
+            ],
+            "query": {
+              "allowed": [
+                "people",
+                "person"
+              ],
+              "null": true,
+              "required": []
+            },
+            "scopes": []
+          },
+          "id": "S-P05",
+          "kind": "place",
+          "text": "Who did I meet at Cinder Lane Baths?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [
+              "5ed57c21-788b-5bb2-b0ac-1154fb348f66"
+            ],
+            "query": {
+              "allowed": [
+                "awning",
+                "colour",
+                "color"
+              ],
+              "null": true,
+              "required": [
+                "awning"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "S-P06",
+          "kind": "place",
+          "text": "What colour is the awning at Brackenfield Market?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [
+              "b3fc3abf-8cce-5724-9e77-8414c1b2d6d5"
+            ],
+            "query": {
+              "allowed": [
+                "map",
+                "wall"
+              ],
+              "null": true,
+              "required": [
+                "map"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "S-P07",
+          "kind": "place",
+          "text": "Is there a map on the wall at Hollowmere Station?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "content"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [
+              "af1f1fdd-d532-5d8f-969c-c7ab2284fb81"
+            ],
+            "query": {
+              "allowed": [],
+              "null": true,
+              "required": []
+            },
+            "scopes": [
+              "related"
+            ]
+          },
+          "id": "S-P08",
+          "kind": "place",
+          "text": "Find everything linked to Silverbirch Quay across my memories, imported maps and my authored changes."
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "content"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [
+              "5070fa75-f4a9-5635-9c60-e35fa19ccddf"
+            ],
+            "query": {
+              "allowed": [],
+              "null": true,
+              "required": []
+            },
+            "scopes": [
+              "related"
+            ]
+          },
+          "id": "S-P09",
+          "kind": "place",
+          "text": "Show me all related material for Foxglove Terrace, including imported geography and my edits."
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [
+              "5070fa75-f4a9-5635-9c60-e35fa19ccddf"
+            ],
+            "query": {
+              "allowed": [
+                "sign",
+                "signage",
+                "text",
+                "writing",
+                "written",
+                "word",
+                "lettering",
+                "notice",
+                "name",
+                "street"
+              ],
+              "null": true,
+              "required": [
+                "sign"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "S-P10",
+          "kind": "place",
+          "text": "What does the street sign say at Foxglove Terrace?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [
+              "af1f1fdd-d532-5d8f-969c-c7ab2284fb81"
+            ],
+            "query": {
+              "allowed": [
+                "boat"
+              ],
+              "null": true,
+              "required": [
+                "boat"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "S-P11",
+          "kind": "place",
+          "text": "Are there any boats in my photos of Silverbirch Quay?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [
+              "93860161-8800-5e11-8eb8-afda9cec2f53"
+            ],
+            "query": {
+              "allowed": [
+                "sign",
+                "signage",
+                "text",
+                "writing",
+                "written",
+                "word",
+                "lettering",
+                "notice",
+                "name",
+                "menu"
+              ],
+              "null": true,
+              "required": [
+                "menu"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "S-P12",
+          "kind": "place",
+          "text": "What's on the menu at Cinder Lane Baths?"
+        },
+        {
+          "expect": {
+            "entities": [
+              "9ca2b241-66e9-513d-b56e-c4f021d11d3d"
+            ],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [],
+              "null": true,
+              "required": []
+            },
+            "scopes": []
+          },
+          "id": "S-H01",
+          "kind": "person",
+          "text": "Which photographs show Ilse Marchetti?"
+        },
+        {
+          "expect": {
+            "entities": [
+              "cdf61748-1198-5210-81de-65251d213a17"
+            ],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [
+                "carry",
+                "carrying",
+                "carried",
+                "object",
+                "item"
+              ],
+              "null": true,
+              "required": [
+                "carry",
+                "carrying",
+                "carried"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "S-H02",
+          "kind": "person",
+          "text": "What was Tobias carrying?"
+        },
+        {
+          "expect": {
+            "entities": [
+              "dab584d9-e5c5-56a7-a458-a368fa11adea",
+              "f54a3292-8d3a-5a43-a56b-aaf595dc9754"
+            ],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "together"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [],
+              "null": true,
+              "required": []
+            },
+            "scopes": []
+          },
+          "id": "S-H03",
+          "kind": "person",
+          "text": "Show me photos of Nadia and Rafael together."
+        },
+        {
+          "expect": {
+            "entities": [
+              "f54a3292-8d3a-5a43-a56b-aaf595dc9754"
+            ],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [
+                "sign",
+                "signage",
+                "text",
+                "writing",
+                "written",
+                "word",
+                "lettering",
+                "notice",
+                "name",
+                "t",
+                "shirt",
+                "tshirt"
+              ],
+              "null": true,
+              "required": [
+                "shirt",
+                "tshirt"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "S-H04",
+          "kind": "person",
+          "text": "What does Rafael Quintero's T-shirt say?"
+        },
+        {
+          "expect": {
+            "entities": [
+              "9ca2b241-66e9-513d-b56e-c4f021d11d3d",
+              "cdf61748-1198-5210-81de-65251d213a17"
+            ],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "together"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [],
+              "null": true,
+              "required": []
+            },
+            "scopes": []
+          },
+          "id": "S-H05",
+          "kind": "person",
+          "text": "Which pictures have both Ilse and Tobias in them?"
+        },
+        {
+          "expect": {
+            "entities": [
+              "dab584d9-e5c5-56a7-a458-a368fa11adea"
+            ],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [
+                "wearing",
+                "wear",
+                "wedding",
+                "clothes",
+                "clothing",
+                "outfit",
+                "dress"
+              ],
+              "null": true,
+              "required": [
+                "wearing",
+                "wedding",
+                "outfit",
+                "dress"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "S-H06",
+          "kind": "person",
+          "text": "What was Nadia wearing at the wedding?"
+        },
+        {
+          "expect": {
+            "entities": [
+              "f54a3292-8d3a-5a43-a56b-aaf595dc9754"
+            ],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [
+                "laugh",
+                "laughing"
+              ],
+              "null": true,
+              "required": [
+                "laugh",
+                "laughing"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "S-H07",
+          "kind": "person",
+          "text": "Find photos of Rafael laughing."
+        },
+        {
+          "expect": {
+            "entities": [
+              "cdf61748-1198-5210-81de-65251d213a17"
+            ],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [],
+              "null": true,
+              "required": []
+            },
+            "scopes": []
+          },
+          "id": "S-H08",
+          "kind": "person",
+          "text": "Where have I photographed Tobias?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [
+                "green",
+                "tent"
+              ],
+              "null": false,
+              "required": [
+                "tent"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "S-C01",
+          "kind": "content",
+          "text": "Which photographs show a green tent?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [
+                "sign",
+                "signage",
+                "text",
+                "writing",
+                "written",
+                "word",
+                "lettering",
+                "notice",
+                "name",
+                "banner",
+                "road"
+              ],
+              "null": false,
+              "required": [
+                "banner"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "S-C02",
+          "kind": "content",
+          "text": "What does the banner over the road say?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [
+                "sign",
+                "signage",
+                "text",
+                "writing",
+                "written",
+                "word",
+                "lettering",
+                "notice",
+                "name",
+                "whiteboard",
+                "board"
+              ],
+              "null": false,
+              "required": [
+                "whiteboard"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "S-C03",
+          "kind": "content",
+          "text": "What is written on the whiteboard?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [
+                "waterfall",
+                "winter",
+                "snow"
+              ],
+              "null": false,
+              "required": [
+                "waterfall"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "S-C04",
+          "kind": "content",
+          "text": "Find pictures of a waterfall in winter."
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [
+                "cat",
+                "windowsill",
+                "window",
+                "sill"
+              ],
+              "null": false,
+              "required": [
+                "cat"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "S-C05",
+          "kind": "content",
+          "text": "Are there photos of cats on a windowsill?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [
+                "sign",
+                "signage",
+                "text",
+                "writing",
+                "written",
+                "word",
+                "lettering",
+                "notice",
+                "name",
+                "plaque",
+                "statue"
+              ],
+              "null": false,
+              "required": [
+                "plaque"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "S-C06",
+          "kind": "content",
+          "text": "What does the plaque on the statue say?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [],
+              "null": true,
+              "required": []
+            },
+            "scopes": []
+          },
+          "id": "S-C07",
+          "kind": "content",
+          "text": "How many photos are in my library?"
+        },
+        {
+          "expect": {
+            "entities": [],
+            "intents": [
+              "captures",
+              "entities"
+            ],
+            "modes": [
+              "any"
+            ],
+            "place": [],
+            "query": {
+              "allowed": [
+                "sign",
+                "signage",
+                "text",
+                "writing",
+                "written",
+                "word",
+                "lettering",
+                "notice",
+                "name",
+                "hand",
+                "painted",
+                "handpainted",
+                "paint"
+              ],
+              "null": false,
+              "required": [
+                "sign"
+              ]
+            },
+            "scopes": []
+          },
+          "id": "S-C08",
+          "kind": "content",
+          "text": "Show me photos with a hand-painted sign."
+        }
+      ],
+      "split": "held-out-2"
+    },
+    "model": {
+      "cache": "none: the client is built without one, as the API builds it",
+      "endpoint": "https://api.tokenfactory.nebius.com",
+      "fallback": "deepseek-ai/DeepSeek-V4-Flash-0731, which the client uses only when the primary is withdrawn",
+      "primary": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+      "revision": null,
+      "revision_note": "hosted; the provider exposes no revision",
+      "role": "structured_extraction",
+      "temperature": "0.0, the product's default; draws still vary"
+    },
+    "not_covered": [
+      "Whether the right plan finds the right photograph: retrieval, the text join and the packet are not exercised. Only the plan is scored.",
+      "The plan's limit is not scored, so a right plan with a null query and a limit of one may still hand the composer the wrong photograph at a place with several.",
+      "The composer and the answer a person reads.",
+      "Any model but the structured-extraction primary, any language but English, and catalogues larger than eleven entities.",
+      "Questions naming a place that is not saved, or naming two places.",
+      "Real personal data: every name is invented."
+    ],
+    "predecessor_records": [
+      {
+        "path": "docs/evaluation/2026-09-22-companion-planner-outcome.json",
+        "record_sha256": "91d23a2c7555ecc26bbeffebd6c4673fea43c744bfff16f0f6d1b095215e12cf"
+      }
+    ],
+    "premise": "The first experiment, bound above, passed every gate and found two faults in its candidate: on 'Which photographs show' a person, the redacted name reached the semantic query without its brackets in 4 of 5 draws where the base commit left it null, which the aggregate person gate did not show; and a cross-content plan ran on in whitespace to the token limit in 2 of 5 draws, which answer_question does not catch.",
+    "procedure": {
+      "cap_usd_per_run": "0.50, stated in the environment and on the command line",
+      "counts": {
+        "content": 8,
+        "person": 8,
+        "place": 12,
+        "questions": 28
+      },
+      "draws_per_question_per_arm": 5,
+      "order": "ten runs of one draw of every held-out question, alternating baseline and candidate, baseline first, so the two arms share the provider's conditions",
+      "scorer": {
+        "path": "scripts/measure_planner_reliability.py",
+        "sha256": "7d8ce7724e1c4935d572aac04d92d73e765394455be6038bf44e4cf8910b69fe"
+      }
+    },
+    "profile_note": "Pre-registration of the second Companion planner reliability experiment. Written after the first experiment's outcome and before the second change exists; no model has been sent any question below.",
+    "question": "Does a change to the planner make it return the right plan for worded questions about a place, without making person or plain content questions worse, within a latency and cost ceiling?",
+    "scorer_controls": {
+      "right_plans_accepted": 28,
+      "wrong_plan_kinds": [
+        "framing_word",
+        "guesses",
+        "invented_person",
+        "no_plan",
+        "other_place",
+        "time_added",
+        "wrong_intent"
+      ],
+      "wrong_plans_refused": 196
+    }
+  },
+  "record_sha256": "a2e1bf147fd46e9b13062dfc95988632f2f924135a50c3a3022d07bbebfad0f1"
+}

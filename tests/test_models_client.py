@@ -7,6 +7,7 @@ and nothing spends credits.
 from __future__ import annotations
 
 import json
+import uuid
 
 import pytest
 from exulanica.models.client import ModelClient
@@ -24,7 +25,7 @@ from exulanica.models.manifest import Role
 from exulanica.models.messages import image_part
 from exulanica.models.reasoning import split_reasoning
 from exulanica.models.transport import HttpResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, model_validator
 
 from model_fakes import chat_body, model_not_found
 
@@ -310,6 +311,51 @@ def test_structured_output_rejects_a_body_that_does_not_validate(client, transpo
     transport.default = ok(chat_body('{"subject": "waterfall", "count": "two"}'))
     with pytest.raises(StructuredOutputError):
         client.structured(Role.REASONING_CHEAP, MESSAGES, Sighting, prompt_version="v1")
+
+
+class Tally(BaseModel):
+    """Two rules the JSON Schema sent to the endpoint cannot carry, as ``SelectionPlan`` has."""
+
+    kind: str
+    note: str | None
+    subjects: list[uuid.UUID]
+    total: int
+
+    @model_validator(mode="after")
+    def _a_tally_carries_no_note(self) -> Tally:
+        if self.kind == "tally" and self.note is not None:
+            raise ValueError("a tally carries no note")
+        return self
+
+
+@pytest.mark.parametrize(
+    ("answer", "reason"),
+    [
+        (
+            {"kind": "tally", "note": "n" * 400, "subjects": [], "total": 3},
+            "<root>: Value error, a tally carries no note",
+        ),
+        (
+            {"kind": "count", "note": "n" * 400, "subjects": ["not-an-id"], "total": 3},
+            "subjects/0: Input should be a valid UUID",
+        ),
+    ],
+)
+def test_a_refusal_names_the_rule_and_quotes_the_answer_past_it(client, transport, answer, reason):
+    """The endpoint enforces the JSON Schema. A model validator and a string format run only here.
+
+    Measured on the Companion's planner: an answer passed the JSON Schema check and a model
+    validator refused it, and the refusal kept a count of errors and the first 300 characters of
+    a pretty-printed answer, which stopped before the refused field. The planner sends that
+    refusal back to the model as its one repair, so the repair could not say what to fix.
+    """
+    transport.default = ok(chat_body(json.dumps(answer, indent=2)))
+    with pytest.raises(StructuredOutputError) as refused:
+        client.structured(Role.REASONING_CHEAP, MESSAGES, Tally, prompt_version="v1")
+    message = str(refused.value)
+    assert reason in message, message
+    # The quoted answer reaches the field after the long one, 400 characters in.
+    assert '"total": 3' in message, message
 
 
 def test_structured_output_rejects_prose(client, transport):

@@ -35,6 +35,7 @@ what the packet asked for, and the model has no tool to call and no state it can
 from __future__ import annotations
 
 import datetime as dt
+import re
 import uuid
 from collections.abc import Callable, Iterable, Mapping
 from contextlib import suppress
@@ -127,7 +128,26 @@ __all__ = [
 #:     uncitable and the answer was an ``UNANSWERABLE_AMBIGUOUS`` abstention telling the user to
 #:     "confirm them, or ask again for confirmed matches only" about a question that had nothing
 #:     to do with confidence. Another field filled because the form had a slot for it.
-PROMPT_VERSION: Final = "selection-5"
+#:
+#: ``selection-6`` fixes the planner's place questions. Measured with invented catalogues against
+#: the live endpoint; the records are ``docs/evaluation/2026-09-22-companion-planner-*.json``:
+#:
+#: *   **Every question about something visible or written at a named place was refused.** The
+#:     plan came back as intent 'content' with a semantic query, which ``SelectionPlan`` refuses,
+#:     and the repair returned the same plan, 20 draws of 20. The intent rules now say such a
+#:     question is 'captures' or 'entities' with the place in ``place``, and that a 'content'
+#:     selection is never the answer to it.
+#: *   **The query rule keeps the words "content terms", on purpose.** Two wordings that avoided
+#:     the intent's name there let the question's own verb into the query ("sign say", up to 5
+#:     draws of 5). A query of three words needs two of them in a caption, so a verb that is in
+#:     no caption can drop the right photograph. "Content terms" is what reduces "what does the
+#:     sign say" to "sign" or "sign text".
+#: *   **Framing verbs still reached the query on place questions** once they planned, "say" and
+#:     "show" in 2 draws of 5 each, so two examples show the verb dropped and a query left null.
+#: *   **"Who was with me at" a place filtered by a person nobody named**, 5 draws of 5: the model
+#:     stood somebody from the catalogue in for "me". An id is now only for what the question
+#:     names.
+PROMPT_VERSION: Final = "selection-6"
 
 #: How many entities the planner may be shown. A bound, because the catalogue goes into a prompt
 #: and a library with a thousand named people would otherwise cost more than the answer.
@@ -493,9 +513,11 @@ Selection: a filled-in form describing what to look for. You do not answer the q
 do not see any photographs.
 
 Rules you cannot break, because the form has no field for breaking them:
-- Reference people, objects and places ONLY by an id from the catalogue below. If the question \
-names somebody who is not in the catalogue, leave the entity dimension empty rather than \
-guessing an id.
+- Reference people, objects and places ONLY by an id from the catalogue below, and only the ones \
+the question names. A question that names nobody, such as "who was I with?", takes no entity \
+id: never pick somebody from the catalogue to stand in for "me" or "who". If the question names \
+somebody who is not in the catalogue, leave the entity dimension empty rather than guessing an \
+id.
 - Distil `semantic_query` to content terms only when the question concerns visible or written \
 content. Remove question framing (what, where, which, show me, my photos), stop words, and \
 unspecified references such as this place. Keep meaningful nouns, descriptive adjectives and \
@@ -503,6 +525,8 @@ actions, without inventing objects or a location. Never copy the whole question.
   "What is this place, and what are the people wearing?" -> "people wearing"
   "Where are the snow-covered mountains?" -> "snow mountain"
   "Which photographs show a volcanic crater?" -> "volcanic crater"
+  "What does the label on the jar say?" -> "label jar"
+  "What do my photographs show?" -> null
 Leave it null for counts, dates, or questions with no visual content terms.
 - Choose mode 'together' only when the question means the entities were in one photograph at \
 one moment. Choose 'all' when it means each of them appears somewhere in the selection. Choose \
@@ -511,12 +535,15 @@ one moment. Choose 'all' when it means each of them appears somewhere in the sel
 id, or none, the only valid mode is 'any'. A form with one id and mode 'all' is refused outright \
 and the question goes unanswered.
 - Choose intent 'entities' when the question asks WHO or WHAT appears, and 'captures' when it \
-asks WHICH photographs.
+asks WHICH photographs, or about anything visible or written in them. A question about a named \
+place is one of these two as well, with the place's id in `place`; its `semantic_query` follows \
+the rule above, like any other question's.
 - Choose intent 'content' only for a request to find related material across memories, imported \
-geography, and authored versions. It requires a place id and a `content` selector. Use scope \
-'related' for the broad union and 'memories_only' when the request explicitly asks only for \
-personal memories. A content selection cannot carry entity, time, capture, or semantic-text \
-filters; leave those empty.
+geography, and authored versions, and never for a question about anything visible or written \
+in photographs, whether or not it names a place. It requires a place id and a `content` \
+selector. Use scope 'related' for the broad union and 'memories_only' when the request \
+explicitly asks only for personal memories. A content selection cannot carry entity, time, \
+capture, or semantic-text filters: leave those empty and `semantic_query` null.
 - Times are absolute instants with an offset. `time` is a LIST of windows and it is NOT \
 nullable: when the question gives no time, the answer is the empty list [], never null and never \
 a window standing in for one.
@@ -640,17 +667,27 @@ def _catalogue_line(choice: EntityChoice, placeholders: Mapping[uuid.UUID, str])
 _PLACEHOLDER_TEXT: Final = PLACEHOLDER
 
 
-def _without_placeholders(plan: SelectionPlan) -> SelectionPlan:
-    """A placeholder is never a search term.
+def _without_placeholders(plan: SelectionPlan, labels: Iterable[str]) -> SelectionPlan:
+    """A placeholder is never a search term, however the model spelled it.
 
     The text dimension is joined, not ranked, so a placeholder the model copied into
     ``semantic_query`` would search for a class word and a letter and quietly discard every
     photograph that does not contain them. A named entity belongs in its own dimension, by id.
+
+    Measured on the live planner, which also copies a placeholder without its brackets and in
+    lower case: "person a" for "[person A]", in 4 draws of 5 on "Which photographs show" a named
+    person. So each placeholder this request assigned, ``labels``, is removed in any case and with
+    or without brackets. Only those: elsewhere a class word followed by a letter is ordinary text.
     """
-    if not plan.semantic_query or not _PLACEHOLDER_TEXT.search(plan.semantic_query):
+    if not plan.semantic_query:
         return plan
-    remaining = " ".join(_PLACEHOLDER_TEXT.sub(" ", plan.semantic_query).split())
-    return plan.model_copy(update={"semantic_query": remaining or None})
+    remaining = _PLACEHOLDER_TEXT.sub(" ", plan.semantic_query)
+    for label in labels:
+        spelled = r"\s+".join(re.escape(word) for word in label.strip("[]").split())
+        remaining = re.sub(rf"(?<!\w)\[?{spelled}\]?(?!\w)", " ", remaining, flags=re.IGNORECASE)
+    if remaining == plan.semantic_query:
+        return plan
+    return plan.model_copy(update={"semantic_query": " ".join(remaining.split()) or None})
 
 
 def propose_plan(
@@ -729,7 +766,7 @@ def propose_plan(
             )
             if log is not None:
                 log.record(proposed.call)
-            return _without_placeholders(proposed.value)
+            return _without_placeholders(proposed.value, asked.placeholders.values())
         except StructuredOutputError as rejected:
             if attempt == PLANNER_ATTEMPTS:
                 raise
@@ -740,6 +777,23 @@ def propose_plan(
                         "That form was refused:\n"
                         f"{rejected}\n\nFill it in again, fixing exactly that. Change nothing "
                         "else about what the question is asking for."
+                    ),
+                }
+            )
+        except TruncatedResponseError:
+            # Measured on the live planner: a cross-content plan written correctly as far as its
+            # scope and then whitespace until the token limit, in 2 draws of 5 on one question. A
+            # plan is a small fraction of the role's limit, so this is the model running on, not
+            # a budget too small for the answer, and asking again is the repair it needs. It
+            # counts against the same attempts, and a second failure is raised as it always was.
+            if attempt == PLANNER_ATTEMPTS:
+                raise
+            messages.append(
+                {
+                    "role": "user",
+                    "content": (
+                        "That form ran on past its end and was cut off before it was complete. "
+                        "Fill it in again, and stop at its closing brace."
                     ),
                 }
             )

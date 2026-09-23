@@ -89,6 +89,28 @@ _FORBIDDEN_PARAMS: Final = frozenset(
     {"guided_json", "guided_regex", "guided_choice", "guided_grammar"}
 )
 
+#: How much of a refused answer its refusal quotes. A caller that repairs sends the refusal back to
+#: the model, so it must reach past the field that failed. It used to stop at 300 characters, which
+#: on the planner's pretty-printed plan fell before ``semantic_query``, the field that was refused.
+_ANSWER_EXCERPT_CHARS: Final = 1000
+
+#: How many of a refusal's reasons it names, the same bound the JSON Schema check uses.
+_MAX_REFUSAL_REASONS: Final = 8
+
+
+def _refusal_reasons(exc: ValidationError) -> str:
+    """Each reason a schema refused an answer, with where it applies, in the schema's own words.
+
+    A rule the JSON Schema cannot express, such as a Pydantic model validator, is checked only
+    here, after the endpoint has accepted the answer. Its message is the one statement of which
+    rule was broken, so a refusal without it names nothing to fix.
+    """
+    errors = exc.errors(include_url=False)
+    return "; ".join(
+        f"{'/'.join(str(part) for part in error['loc']) or '<root>'}: {error['msg']}"
+        for error in errors[:_MAX_REFUSAL_REASONS]
+    )
+
 
 class ModelClient:
     """Role-routed access to the OpenAI-compatible endpoint."""
@@ -396,9 +418,9 @@ class ModelClient:
             value = schema.model_validate(parsed)
         except ValidationError as exc:
             raise StructuredOutputError(
-                f"{call.model_id} returned JSON that does not satisfy {schema.__name__} under "
-                f"strict json_schema: {exc.error_count()} error(s). Answer was "
-                f"{call.answer[:300]!r}"
+                f"{call.model_id} returned JSON that passed the json_schema check and that "
+                f"{schema.__name__} refuses, in {exc.error_count()} place(s): "
+                f"{_refusal_reasons(exc)}. Answer was {call.answer[:_ANSWER_EXCERPT_CHARS]!r}"
             ) from exc
         return StructuredResult(value=value, call=call)
 

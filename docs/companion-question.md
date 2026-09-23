@@ -1490,3 +1490,105 @@ return all three photographs; `icy landscape` returns two, `reflective strips cl
 `penguin beach` none. `cold weather clothing` and `protective headgear` also return none: those
 are observed lexical misses, not evidence that live embeddings would recover them. All ten
 visual queries return zero on the volcanic workspace with no captions.
+
+## 17. Place questions and the planner
+
+A question about a named place reaches the planner with the name replaced by a placeholder, and
+the catalogue line carrying that placeholder gives the place's id (section 2). A right plan
+carries that id in `place`, chooses an intent whose answer is composed from the photographs, and
+holds a semantic query only for something visible or written that the question asks about.
+
+### The fault on `selection-5`
+
+Every question about something visible or written at a named place failed. The planner chose the
+cross-content intent `content`, with scope `memories_only` and a semantic query such as "sign
+text", and `SelectionPlan` refuses a semantic query on a content selection. The refusal that the
+planner's one repair sent back quoted the model's answer and did not name the rule, and the model
+returned the same plan: 20 draws of 20 on the development split, after which the Companion said
+it did not understand the question. On the same split, "Who was with me at" a place filtered by a
+person the question never named in 5 draws of 5. Person questions, and questions naming no saved
+entity, were right in 60 draws of 60.
+
+### The planner's rules for a place question
+
+| Part | Behaviour | Code |
+| --- | --- | --- |
+| Refusal text | Names each reason the schema class gave, with its location, and quotes the answer to 1000 characters | `exulanica/models/client.py`, `ModelClient.structured` |
+| Content selection refusals | Name the field, and say that a search for anything visible or written in photographs is a captures or entities selection | `exulanica/selection/plan.py`, `SelectionPlan` |
+| Intent | A question about a named place is `captures` or `entities`; `content` is only for a request for related material across memories, imported geography and authored versions | `_PLANNER_SYSTEM` in `exulanica/selection/question.py`, `selection-6` |
+| Entities | An id only for an entity the question names; "who was I with?" names nobody | same |
+| Query examples | "What does the label on the jar say?" gives "label jar"; "What do my photographs show?" leaves the query null | same |
+| Placeholder scrub | Every placeholder the request assigned is removed from the semantic query, with or without brackets, in any case | `_without_placeholders` |
+| Cut-off reply | A plan cut off at the token limit is asked for once more, within the same two attempts | `propose_plan` |
+
+What `SelectionPlan` accepts is unchanged. Each experiment below validates every answer that
+either arm received with the base commit's plan class and with this one, and the two agree on
+every answer.
+
+The query rule keeps the words "content terms", although they share a word with the intent.
+Removing that overlap was tried on the development split and made the plans worse: two wordings
+that spoke of search terms let the question's own verb into the query ("sign say", in up to 5
+draws of 5). PostgreSQL's English configuration keeps "say" as a lexeme, and a query of three
+lexemes needs two of them in a caption, so a verb in no caption can drop the right photograph.
+
+### Measured result
+
+Two pre-registered experiments, each on its own held-out split of 28 questions with invented
+names (12 about a place, 8 about a person, 8 naming no saved entity), 5 draws per question for the
+base commit and for the change, run alternately and scored once by
+`scripts/measure_planner_reliability.py` against the structured-extraction primary,
+`Qwen/Qwen3-235B-A22B-Instruct-2507`. A draw is right when the plan names exactly the expected
+ids, an intent that answers the question, no filter the question did not ask for, and a semantic
+query the question allows.
+
+| Right plans | Base commit | Change |
+| --- | --- | --- |
+| First split, place | 20 of 60 | 57 of 60 |
+| First split, person | 34 of 40 | 35 of 40 |
+| First split, no saved name | 39 of 40 | 40 of 40 |
+| Second split, place | 34 of 60 | 55 of 60 |
+| Second split, person | 37 of 40 | 40 of 40 |
+| Second split, no saved name | 30 of 40 | 37 of 40 |
+
+The change measured on the first split had neither the placeholder scrub nor the cut-off retry.
+That experiment passed every gate and found two faults. On "Which photographs show" a named
+person, the planner wrote the placeholder without its brackets as the query in 4 draws of 5, and
+PostgreSQL reads "person a" as the lexeme `person`, so only the person's photographs whose text
+says "person" would have been kept. And a cross-content plan ran on in whitespace to the token
+limit in 2 draws of 5, which `answer_question` does not catch. The scrub and the retry answer
+those two faults. The second split measures the change with both, under one more gate: no
+question the base commit answers in at least 4 draws of 5 may fall to at most 1 of 5. Neither
+mechanism fired on that split, where no query held a placeholder and no reply was cut off, so
+what supports them is their scripted tests and, for the scrub, which is deterministic, one check
+after the fact: applied to the first split's recorded plans, it changes exactly the four
+placeholder queries, each to a right plan, and nothing else.
+
+On the second split the change made no refusal, no repair and no cut-off reply in 140 draws, where
+the base commit was refused 26 times and repaired 52. The 95th percentile of one planning call,
+repair included, was 4411 ms on the base commit and 2739 ms with the change; the mean cost of
+planning one question was 0.00043545 and 0.00033474 US dollars, from the provider's reported
+tokens and the manifest's prices.
+
+### What this does not establish
+
+* Only plans are scored. Retrieval, the text join, the packet, the composer and the answer a
+  person reads are not exercised, and neither is the plan's `limit`: a right plan with a null
+  query and a limit of one can still hand the composer the wrong photograph at a place with
+  several.
+* "What's on the menu at" a place is planned as the cross-content listing by the base commit and
+  by the change, in 5 draws of 5 each. That plan is accepted and answers with what is related to
+  the place, not with what the menu says.
+* One model, English questions, catalogues of eleven entities and invented names.
+* No answer about a person's own place is measured end to end. A place-class entity has one
+  producer, the vision role's place proposal, and the production vision instruction proposed no
+  place from any of 8 legible place names
+  ([model and service selection](model-and-service-selection.md)), so both experiments supply
+  catalogues that already hold place entities.
+
+The records are `docs/evaluation/2026-09-22-companion-planner-preregistration.json`,
+`docs/evaluation/2026-09-22-companion-planner-outcome.json`,
+`docs/evaluation/2026-09-22-companion-planner-2-preregistration.json` and
+`docs/evaluation/2026-09-22-companion-planner-2-outcome.json`. They are written by
+`scripts/write_planner_reliability_preregistration.py`,
+`scripts/write_planner_reliability_2_preregistration.py` and
+`scripts/write_planner_reliability_outcome.py`.

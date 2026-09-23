@@ -41,8 +41,10 @@ from exulanica.selection import (
     AnswerRejected,
     CaptureWindow,
     ClauseType,
+    EntitySelector,
     EpistemicScope,
     Intent,
+    PlaceSelector,
     SelectionPlan,
     Session,
     abstain,
@@ -57,6 +59,7 @@ from exulanica.selection.packet import MAX_PACKET_ITEMS
 from exulanica.selection.question import CallLog, answer_question, compose_answer
 from exulanica.store.local import LocalContentAddressedStore
 from exulanica.store.resolve import resolve_original_bytes
+from pydantic import ValidationError
 
 from conftest import (
     DEFAULT_PAYLOAD,
@@ -625,6 +628,7 @@ def test_the_planner_is_offered_the_empty_value_the_schema_actually_accepts():
 @pytest.mark.parametrize(("question", "terms"), [
     ("What is this place, and what are the people wearing?", "people wearing"),
     ("Where are the snow-covered mountains?", "snow mountain"),
+    ("What does the label on the jar say?", "label jar"),
 ])
 def test_planner_content_examples_fit_the_schema(question, terms):
     from exulanica.models.schema import response_format_for
@@ -636,7 +640,7 @@ def test_planner_content_examples_fit_the_schema(question, terms):
     assert plan.semantic_query == terms
     assert f'"{question}" -> "{terms}"' in _PLANNER_SYSTEM
     assert "Never copy the whole question" in _PLANNER_SYSTEM
-    assert PROMPT_VERSION == "selection-5"
+    assert PROMPT_VERSION == "selection-6"
 
 
 def test_the_planner_is_told_a_window_cannot_start_and_end_at_the_same_instant():
@@ -667,6 +671,34 @@ def test_the_planner_is_told_when_epistemic_scope_is_not_its_choice():
     for scope in EpistemicScope:
         assert scope.value in _PLANNER_SYSTEM, f"the prompt does not say when to choose {scope}"
     assert "unless the question ASKS about guesses" in _PLANNER_SYSTEM
+
+
+def test_the_planner_is_told_a_question_about_a_place_is_not_a_content_selection():
+    """Measured 20 draws of 20 on ``selection-5``: every question about something visible or
+    written at a named place came back as intent 'content' with a semantic query, which
+    ``SelectionPlan`` refuses, and the repair returned the same plan.
+
+    The query rule keeps "content terms" although it shares a word with the intent. Two wordings
+    that avoided it let the question's verb into the query ("sign say") in up to 5 draws of 5,
+    and two examples hold the verbs that still leaked once place questions planned.
+    """
+    from exulanica.selection.question import _PLANNER_SYSTEM
+
+    assert "A question about a named place is one of these two as well" in _PLANNER_SYSTEM
+    assert "never for a question about anything visible or written" in _PLANNER_SYSTEM
+    assert "Distil `semantic_query` to content terms" in _PLANNER_SYSTEM
+    assert '"What do my photographs show?" -> null' in _PLANNER_SYSTEM
+
+
+def test_the_planner_is_told_an_id_is_only_for_what_the_question_names():
+    """Measured 5 draws of 5 on ``selection-5``: asked "Who was with me at [place A]?", the
+    planner put a catalogue person the question never named into the entity filter, which keeps
+    only the photographs of that one person.
+    """
+    from exulanica.selection.question import _PLANNER_SYSTEM
+
+    assert "only the ones the question names" in _PLANNER_SYSTEM
+    assert "never pick somebody from the catalogue" in _PLANNER_SYSTEM
 
 
 def test_the_composer_is_told_its_clause_type_is_not_prose():
@@ -1064,6 +1096,49 @@ def test_a_plan_that_breaks_a_rule_the_schema_cannot_express_is_repaired_once(an
     assert answered.transport.call_count == 2, "the refusal was never sent back to the model"
 
 
+def test_the_repair_tells_the_planner_which_rule_refused_its_plan(answered):
+    """A repair that does not say what was refused asks the model to guess, and it guessed wrong.
+
+    Measured on main against the live planner, on "What does the sign say at [place A]?": the
+    plan came back as a CONTENT selection carrying a semantic query, which a model validator
+    refuses after the endpoint has accepted it. The refusal the client raised kept a count of
+    errors and the first 300 characters of the answer, which stopped before the refused field, and
+    that refusal is the whole of what the repair sends. The rule's own words must reach the model.
+    """
+    from exulanica.selection.question import propose_plan
+
+    place = uuid.uuid4()
+    refused = {
+        "intent": "content",
+        "entities": None,
+        "time": [],
+        "place": {"ids": [str(place)]},
+        "capture": None,
+        "content": {"scope": "memories_only", "after": None},
+        "epistemic": "confirmed",
+        "semantic_query": "sign text",
+        "limit": 10,
+    }
+    with pytest.raises(ValidationError) as rule:
+        SelectionPlan.model_validate(refused)
+    reasons = [error["msg"] for error in rule.value.errors()]
+    good = SelectionPlan(intent=Intent.CAPTURES, place=PlaceSelector(ids=[place]), limit=5)
+    client = answered.client(
+        [
+            HttpResponse(
+                status_code=200, text=json.dumps(chat_body(json.dumps(refused, indent=2)))
+            ),
+            HttpResponse(status_code=200, text=json.dumps(chat_body(good.model_dump_json()))),
+        ]
+    )
+    plan = propose_plan(client, "What does the sign say at [place A]?", (), names=())
+    assert plan == good
+    repair = answered.transport.requests[1]["payload"]["messages"][-1]["content"]
+    for reason in reasons:
+        assert reason in repair, repair
+    assert '"semantic_query": "sign text"' in repair, "the refused value is not quoted"
+
+
 def test_a_plan_that_fails_twice_refuses_rather_than_answering_a_different_question(answered):
     """There is no honest default plan, so the floor here is a refusal and not a fallback.
 
@@ -1095,6 +1170,100 @@ def test_a_plan_that_fails_twice_refuses_rather_than_answering_a_different_quest
     with pytest.raises(StructuredOutputError):
         propose_plan(client, "which photographs?", (), names=())
     assert answered.transport.call_count == 2, "it retried more than once, or not at all"
+
+
+def _planner_client(*bodies: str | dict) -> tuple[ModelClient, FakeTransport]:
+    """The real client over scripted replies; a string is a reply's content, a dict a whole body."""
+    transport = FakeTransport(
+        [
+            HttpResponse(
+                status_code=200,
+                text=json.dumps(body if isinstance(body, dict) else chat_body(body)),
+            )
+            for body in bodies
+        ]
+    )
+    client = ModelClient(api_key="test-key-not-real", transport=transport, budget=_budget())
+    return client, transport
+
+
+@pytest.mark.parametrize(
+    ("query", "kept"),
+    [
+        ("person a", None),
+        ("Person A", None),
+        ("[person A]", None),
+        ("sign behind person a", "sign behind"),
+        ("person holding a sign", "person holding a sign"),
+    ],
+)
+def test_a_placeholder_is_never_a_search_term_in_any_spelling(query, kept):
+    """Measured on the live planner: asked "Which photographs show" a named person, it wrote the
+    redacted name without its brackets, "person a", as the semantic query in 4 draws of 5. The
+    text dimension is an inner join, so that query keeps only the person's photographs whose text
+    says "person". Every spelling of a placeholder this request assigned is removed; ordinary text
+    that only resembles one is kept.
+    """
+    from exulanica.selection.question import EntityChoice, propose_plan
+    from exulanica.selection.saved_names import SavedName
+
+    person = uuid.uuid4()
+    plan = SelectionPlan(
+        intent=Intent.CAPTURES, entities=EntitySelector(ids=[person]), semantic_query=query
+    )
+    client, _ = _planner_client(plan.model_dump_json())
+    proposed = propose_plan(
+        client,
+        "Which photographs show Ottilie Brandt?",
+        (EntityChoice(person, "person", "Ottilie Brandt"),),
+        names=(SavedName(person, "person", "Ottilie Brandt"),),
+    )
+    assert proposed.semantic_query == kept
+    assert proposed.entities is not None and proposed.entities.ids == [person]
+
+
+def test_a_placeholder_the_request_did_not_assign_is_ordinary_text():
+    """Only this request's placeholders are removed. Nobody is named here, so "person a" is words
+    the model chose, and removing a class word and a letter everywhere would strip real text.
+    """
+    from exulanica.selection.question import propose_plan
+
+    plan = SelectionPlan(intent=Intent.CAPTURES, semantic_query="person a")
+    client, _ = _planner_client(plan.model_dump_json())
+    proposed = propose_plan(client, "Which photographs show a person?", (), names=())
+    assert proposed.semantic_query == "person a"
+
+
+def _cut_off() -> dict:
+    """A reply the token limit cut: a plan begun correctly, then whitespace, as measured."""
+    begun = '{\n  "intent": "content",\n  "content": {\n    "scope": "related"'
+    return chat_body(begun + " \t" * 40, finish_reason="length")
+
+
+def test_a_plan_cut_off_at_the_token_limit_is_asked_for_once_more():
+    """Measured on the live planner: a cross-content plan written correctly as far as its scope,
+    then whitespace until the token limit, in 2 draws of 5 on one question. The client raises
+    ``TruncatedResponseError``, which ``answer_question`` does not catch, so without this the
+    question failed outright on a slip that a second attempt recovers.
+    """
+    from exulanica.selection.question import propose_plan
+
+    good = SelectionPlan(intent=Intent.CAPTURES, limit=5)
+    client, transport = _planner_client(_cut_off(), good.model_dump_json())
+    assert propose_plan(client, "which photographs?", (), names=()) == good
+    assert transport.call_count == 2
+    assert "cut off" in transport.requests[1]["payload"]["messages"][-1]["content"]
+
+
+def test_a_plan_cut_off_twice_is_still_raised():
+    """The retry shares the planner's two attempts: a second cut-off is raised, not retried."""
+    from exulanica.models.errors import TruncatedResponseError
+    from exulanica.selection.question import propose_plan
+
+    client, transport = _planner_client(_cut_off(), _cut_off())
+    with pytest.raises(TruncatedResponseError):
+        propose_plan(client, "which photographs?", (), names=())
+    assert transport.call_count == 2
 
 
 # -- the citation binds to a stored span_digest ------------------------------------------------
