@@ -15,7 +15,6 @@ import type {
   LocalVec3,
   IslandId,
   MapPresentationState,
-  NavigationSurface,
   NavigationWorld,
   NeighborhoodId,
   NeighborhoodIndex,
@@ -50,11 +49,7 @@ import {
   atlasMapPose,
   atlasVec3,
   buildAnchorTable,
-  RECOVERY_MARGIN_AU,
   buildNeighborhoodIndex,
-  buildNavigationWorld,
-  navigationRegionForIsland,
-  ownedDistrictNavigation,
   classifySpatialPhase,
   enterAtlasMap,
   exitAtlasMap,
@@ -88,6 +83,16 @@ import {
   DEFAULT_FOCUS_CONFIG,
 } from '@exulanica/atlas-core';
 import { OwnedDistrictRuntime } from './owned-district-runtime.js';
+import { WorldAtmosphere, atmosphereFor, installDisplaySpaceFog, openAtmosphere } from './atmosphere.js';
+import {
+  authoredFieldSupport,
+  authoredRegionOf,
+  describeWorldKind,
+  worldNavigation,
+  type AuthoredRegion,
+  type OwnedDistrictGround,
+  type WorldKind,
+} from './world-kind.js';
 import { AuthoredRegionSociety } from './society/authored-society.js';
 import type { GeneratedTileAttachment, GeneratedTileMount } from './generated-tile/binding-contract.js';
 import { PlayerAvatar } from './player-avatar.js';
@@ -96,7 +101,6 @@ import {
   DAWN_THEME,
   DEFAULT_WORLD_ART_PROFILE,
   WORLD_STYLE_CATALOG,
-  unitRgb,
   worldArtProfile,
   type PresentationTheme,
   type WorldArtProfile,
@@ -436,11 +440,7 @@ export interface AtlasBindingOptions {
   /** Optional visualization-only Google reference. It never participates in Atlas interaction. */
   readonly googleTiles?: GoogleTilesConfig;
   /** Admitted owned geography. One semantic document drives rendering and collision. */
-  readonly ownedDistrict?: {
-    readonly document: OwnedDistrict;
-    readonly residentBytes: number;
-    readonly interpretation?: import('@exulanica/atlas-core').DistrictInterpretation;
-  };
+  readonly ownedDistrict?: OwnedDistrictGround;
   /**
    * Development evaluation of one baked generated tile, reachable only from the preview route.
    * Replaces the owned district: the tile supplies the ground, the collision and the opening
@@ -449,162 +449,6 @@ export interface AtlasBindingOptions {
   readonly generatedTile?: GeneratedTileMount;
   /** Optional current rights/record refinements for known renderer subjects. */
   readonly representationSubjects?: readonly RepresentationSubject[];
-}
-
-/**
- * How far this renderer carries a person across a ground that states no extent.
- *
- * MEASURED, not chosen. A position reaches the GPU as a 32-bit float, and the render origin only
- * moves when the active neighborhood changes, which in a world whose scene holds no regions never
- * happens. So the whole walk is drawn at its true distance from the world origin, and the smallest
- * position change the pipeline can represent is the float32 step at that distance: 0.12 mm at
- * 2 km, 0.98 mm at 8.192 km, 1.95 mm at 16.4 km. 8192 metres is the farthest distance at which the
- * drawn position still resolves the millimetre, which is the unit every stored coordinate in this
- * product is written in, so it is the farthest distance at which the renderer can still put a
- * person exactly where the world says they are.
- *
- * It is a property of this renderer and not of the world. A descriptor states that its ground has
- * no edge; this states how much of that ground the current pipeline can honestly draw, and it
- * moves when the pipeline does, with no stored world changing and nothing to migrate.
- */
-export const AUTHORED_ENDLESS_GROUND_SUPPORTED_RADIUS_M = 8192;
-
-/**
- * The ground an authored region states.
- *
- * `flat` describes a surface whose perimeter is a real edge, such as a place rebuilt from
- * photographs. `endless` states there is no perimeter, so it carries no extent to read.
- */
-export type AuthoredGround =
-  | {
-      readonly kind: 'flat';
-      readonly halfWidthMm: number;
-      readonly halfDepthMm: number;
-      readonly elevationMm: number;
-    }
-  | {
-      readonly kind: 'endless';
-      readonly elevationMm: number;
-    };
-
-export interface AuthoredRegion {
-  readonly regionId: IslandId;
-  readonly module: {
-    readonly key: 'region.authored-ground';
-    readonly version: 1 | 2;
-  };
-  readonly ground: AuthoredGround;
-  /** Ground-contact pose in the authored region frame, in fixed-point wire units. */
-  readonly spawn: {
-    readonly xMm: number;
-    readonly yMm: number;
-    readonly zMm: number;
-    readonly yawMicroradians: number;
-  };
-}
-
-/*
- * FOG IN THE SPACE THE SKY IS DRAWN IN.
- *
- * The engine's lit materials end by fogging, then tone mapping, then encoding: fog is mixed in
- * linear light and the result goes through ACES with the scene's exposure. The origin sky and the
- * camera's clear colour are written raw. So fully fogged ground reached the screen as the fog
- * colour tone-mapped, which is greyer than the same colour written raw: 232 against a sky of 254
- * in the default look, measured, and a hard horizon line wherever open ground runs to the sky.
- * These replace the lit end chunk so a surface is tone-mapped and encoded first and then mixed
- * toward the fog colour exactly as authored, which is how the sky arrives on the screen. The mix
- * uses the engine's own fog factor, so start, end and blend-mode handling are unchanged.
- */
-const DISPLAY_SPACE_FOG_END_GLSL = `
-    gl_FragColor.rgb = combineColor(litArgs_albedo, litArgs_sheen_specularity, litArgs_clearcoat_specularity);
-    gl_FragColor.rgb += litArgs_emission;
-    gl_FragColor.rgb = toneMap(gl_FragColor.rgb);
-    gl_FragColor.rgb = gammaCorrectOutput(gl_FragColor.rgb);
-    #if (FOG != NONE)
-        gl_FragColor.rgb = mix(gammaCorrectOutput(fog_color * dBlendModeFogFactor), gl_FragColor.rgb, getFogFactor());
-    #endif
-`;
-const DISPLAY_SPACE_FOG_END_WGSL = `
-    var finalRgb: vec3f = combineColor(litArgs_albedo, litArgs_sheen_specularity, litArgs_clearcoat_specularity);
-    finalRgb = finalRgb + litArgs_emission;
-    finalRgb = toneMap(finalRgb);
-    finalRgb = gammaCorrectOutput(finalRgb);
-    #if (FOG != NONE)
-        finalRgb = mix(gammaCorrectOutput(uniform.fog_color * dBlendModeFogFactor), finalRgb, getFogFactor());
-    #endif
-    output.color = vec4f(finalRgb, output.color.a);
-`;
-
-/**
- * Make every lit material on this device fog in display space.
- *
- * THE ORDERING IS LOAD-BEARING, AT BOTH ENDS. Call it after `app.init` and before the first frame.
- * `app.init` registers the engine's default chunks over whatever the map held, so an earlier call
- * is silently undone (`display-space-fog.test.ts` shows it). And the map is read when a program is
- * built, so a program already built keeps the chunk it was built with: measured, setting this map
- * after the scene had drawn left the ground on the old order even with every material's variants
- * cleared. Between the two, nothing has compiled and every program is built with it.
- *
- * Particles and Gaussian splats have end chunks of their own and still fog before tone mapping.
- */
-export function installDisplaySpaceFog(device: pc.GraphicsDevice): void {
-  pc.ShaderChunks.get(device, pc.SHADERLANGUAGE_GLSL).set('endPS', DISPLAY_SPACE_FOG_END_GLSL);
-  pc.ShaderChunks.get(device, pc.SHADERLANGUAGE_WGSL).set('endPS', DISPLAY_SPACE_FOG_END_WGSL);
-}
-
-/**
- * The colour the sky shows at eye level: the composed world's own sky when it is drawing one,
- * otherwise the colour the camera clears to, which is then the whole sky.
- */
-export function skyColourAtEyeLevel(
-  world: Pick<ComposedWorld, 'skyHorizonColour'>,
-  clear: pc.Color | undefined,
-): readonly [number, number, number] {
-  return world.skyHorizonColour()
-    ?? (clear === undefined ? [1, 1, 1] : [clear.r, clear.g, clear.b]);
-}
-
-/** Where an authored ground has a walking surface, in metres, for the navigation contract. */
-export function authoredGroundSurface(ground: AuthoredGround): NavigationSurface {
-  const elevation = ground.elevationMm / 1000;
-  const sample = Object.freeze({
-    height: elevation,
-    normal: Object.freeze({ x: 0, y: 1, z: 0 }),
-  });
-  if (ground.kind === 'endless') {
-    const radius = AUTHORED_ENDLESS_GROUND_SUPPORTED_RADIUS_M;
-    return Object.freeze({
-      sample: (x: number, z: number) => (Math.hypot(x, z) <= radius ? sample : null),
-    });
-  }
-  const halfWidth = ground.halfWidthMm / 1000;
-  const halfDepth = ground.halfDepthMm / 1000;
-  return Object.freeze({
-    sample: (x: number, z: number) =>
-      Math.abs(x) <= halfWidth && Math.abs(z) <= halfDepth ? sample : null,
-  });
-}
-
-/**
- * The walkable field an endless authored ground admits.
- *
- * `buildNavigationWorld` sizes its field from the scene's regions, and a starter world has none,
- * so it lands on its 90 metre floor. That floor was the second wall standing behind the first: a
- * sampler with no rectangle still leaves a person compressed at 90 metres and returned at 138.
- *
- * Both radii sit INSIDE the distance the surface answers for, by the same margin the resident
- * field already puts between its soft band and its hard envelope. A walk is therefore returned
- * while there is still described ground underneath it, which is what makes the refusal honest:
- * the field this renderer can carry ran out, not the ground. Every position movement can reach,
- * including the compressed overshoot, is a position the surface answers.
- */
-export function endlessAuthoredNavigation(world: NavigationWorld): NavigationWorld {
-  const recoveryRadius = AUTHORED_ENDLESS_GROUND_SUPPORTED_RADIUS_M - RECOVERY_MARGIN_AU;
-  return Object.freeze({
-    ...world,
-    fieldRadius: recoveryRadius - RECOVERY_MARGIN_AU,
-    recoveryRadius,
-  });
 }
 
 export interface FrameReport {
@@ -714,8 +558,8 @@ export class AtlasBinding {
   readonly ownedDistrict: OwnedDistrictRuntime | null;
   /** The mounted evaluation tile, if the preview route asked for one. */
   generatedTile: GeneratedTileAttachment | null = null;
-  /** Whether lit materials fog in display space, toward the sky's own colour. */
-  private displaySpaceFog = false;
+  /** The clear colours, ambient light, fog and sun, kept in step with the profile and the Map. */
+  private readonly atmosphere: WorldAtmosphere;
   private representationController: RepresentationRuntime | null = null;
   get representation(): RepresentationRuntime {
     return this.representationController ??= new RepresentationRuntime();
@@ -779,8 +623,6 @@ export class AtlasBinding {
   /** When the lens settle window closes, on the binding's own clock. Negative means closed. */
   private proofLensSettleUntil = -1;
   private styleProposalSequence = 0;
-  private readonly skyClearColor = new pc.Color();
-  private readonly mapClearColor = new pc.Color();
 
   onFrame: ((report: FrameReport) => void) | null = null;
   onResidencyActions: ((actions: readonly ResidencyAction[]) => void) | null = null;
@@ -920,7 +762,7 @@ export class AtlasBinding {
     this.environmentRoot = environmentRoot;
     this.renderRoot = renderRoot;
     this.ownedDistrict = ownedDistrict;
-    this.setClearColours(initialProfile);
+    this.atmosphere = new WorldAtmosphere(app, camera.camera!, composedWorld, initialProfile);
     this.residencyCatalog = residencyCatalog;
     this.residencyBudget = residencyBudget;
     this.emphasis = neutralEmphasis(table);
@@ -962,15 +804,7 @@ export class AtlasBinding {
   static async create(options: AtlasBindingOptions): Promise<AtlasBinding> {
     const theme = options.theme ?? DAWN_THEME;
     const initialArtProfile = options.artProfile ?? DEFAULT_WORLD_ART_PROFILE;
-    if (options.ownedDistrict !== undefined && options.generatedTile !== undefined) {
-      throw new TypeError('A generated tile replaces the owned district; pass one or the other');
-    }
-    if (options.authoredRegion !== undefined &&
-        (options.ownedDistrict !== undefined || options.generatedTile !== undefined)) {
-      throw new TypeError('An authored starter region cannot replace geographic ground');
-    }
-    const cityActive = options.ownedDistrict !== undefined || options.generatedTile !== undefined ||
-      (options.googleTiles?.enabled === true && options.googleTiles.apiKey.length > 0);
+    const kind = describeWorldKind(options);
     const device = await pc.createGraphicsDevice(options.canvas, {
       deviceTypes: [...(options.deviceTypes ?? ['webgl2'])],
       antialias: true,
@@ -996,12 +830,8 @@ export class AtlasBinding {
     // Error, which is why `scene-objects.ts` converts it before a status line sees it.
     appOptions.resourceHandlers = [pc.TextureHandler, pc.GSplatHandler, pc.ContainerHandler];
     app.init(appOptions);
-    // A generated tile draws its sky as a skybox, and the engine tone-maps skyboxes, so its sky and
-    // its fog already share one pipeline and meet without a line. Fog moves to display space only
-    // where the sky is written raw. Decided here, before any material exists, for the reason
-    // `installDisplaySpaceFog` gives.
-    const displaySpaceFog = options.generatedTile === undefined;
-    if (displaySpaceFog) installDisplaySpaceFog(device);
+    // Before any material exists, for the reason `installDisplaySpaceFog` gives.
+    if (kind.displaySpaceFog) installDisplaySpaceFog(device);
     app.setCanvasFillMode(pc.FILLMODE_NONE);
     app.setCanvasResolution(pc.RESOLUTION_AUTO);
     /*
@@ -1016,83 +846,25 @@ export class AtlasBinding {
     device.maxPixelRatio = Math.min(globalThis.devicePixelRatio ?? 1, options.maxPixelRatio ?? 1.5);
 
     const camera = new pc.Entity('atlas-camera');
-    const [skyR, skyG, skyB] = unitRgb(initialArtProfile.palette.sky);
-    camera.addComponent('camera', {
-      fov: options.fov ?? 70,
-      nearClip: 0.08,
-      farClip: cityActive ? 15_000 : 1200,
-      clearColor: cityActive
-        ? new pc.Color(0.79, 0.85, 0.88, 1)
-        : new pc.Color(skyR, skyG, skyB, 1),
-    });
-    if (camera.camera !== undefined && camera.camera !== null) {
-      camera.camera.toneMapping = pc.TONEMAP_ACES;
-    }
+    camera.addComponent('camera', { fov: options.fov ?? 70, nearClip: 0.08 });
     app.root.addChild(camera);
-
-    const [hazeR, hazeG, hazeB] = unitRgb(initialArtProfile.palette.haze);
-    app.scene.ambientLight = cityActive
-      ? new pc.Color(0.64, 0.69, 0.74)
-      : new pc.Color(hazeR * 0.58, hazeG * 0.58, hazeB * 0.58);
-    app.scene.exposure = cityActive ? 1.12 : 1.06;
-    app.scene.fog.type = pc.FOG_LINEAR;
-    // The clear colour for now: `syncFogToSky` aims the fog at the world's own sky once it exists.
-    const initialSky = camera.camera?.clearColor ?? new pc.Color(hazeR, hazeG, hazeB);
-    app.scene.fog.color.set(initialSky.r, initialSky.g, initialSky.b);
-    app.scene.fog.start = cityActive ? 110 : 46;
-    app.scene.fog.end = cityActive ? 820 : 220;
-
-    const worldLight = new pc.Entity('atlas-directional-light');
-    const [lr, lg, lb] = unitRgb(initialArtProfile.palette.sun);
-    worldLight.addComponent('light', {
-      type: 'directional',
-      color: new pc.Color(lr, lg, lb),
-      intensity: cityActive ? 1.1 : 1.65,
-      castShadows: true,
-      shadowDistance: cityActive ? 120 : 72,
-      normalOffsetBias: cityActive ? 0.25 : 0,
-      shadowBias: cityActive ? 0.2 : 0.05,
-      shadowResolution: 2048,
-    });
-    worldLight.setEulerAngles(52, -38, 0);
-    app.root.addChild(worldLight);
-    if(cityActive){
-      const skyFill=new pc.Entity('district-sky-fill');
-      skyFill.addComponent('light',{type:'directional',color:new pc.Color(.70,.82,1),intensity:.72,castShadows:false});
-      skyFill.setEulerAngles(28,145,0);app.root.addChild(skyFill);
-    }
+    openAtmosphere(app, camera.camera!, atmosphereFor(kind), initialArtProfile);
 
     const table = buildAnchorTable(options.scene);
     const environmentRoot = new pc.Entity('geographic-environment');
     app.root.addChild(environmentRoot);
     const renderRoot = new pc.Entity('atlas-render-origin');
     app.root.addChild(renderRoot);
-    const authoredGround = options.authoredRegion?.ground;
-    const authoredSurface = authoredGround === undefined
-      ? undefined
-      : authoredGroundSurface(authoredGround);
-    const navigationWorld = options.generatedTile !== undefined
-      ? options.generatedTile.navigationWorld
-      : options.ownedDistrict === undefined
-      ? authoredGround?.kind === 'endless'
-        ? endlessAuthoredNavigation(buildNavigationWorld(options.scene, authoredSurface))
-        : buildNavigationWorld(options.scene, authoredSurface)
-      // The district owns the ground and the blockers; the scene owns where the memories are. Both
-      // are already drawn in the same coordinate space, so withholding the regions from the
-      // navigation world did not keep them apart, it only made them unreachable.
-      : ownedDistrictNavigation(
-        options.ownedDistrict.document,
-        options.scene.islands.map(navigationRegionForIsland),
-      );
-    const ownedDistrict = options.ownedDistrict === undefined
-      ? null
-      : new OwnedDistrictRuntime(
+    const navigationWorld = worldNavigation(kind, options.scene);
+    const ownedDistrict = kind.ground.form === 'owned-district'
+      ? new OwnedDistrictRuntime(
         device,
         environmentRoot,
-        options.ownedDistrict.document,
-        options.ownedDistrict.residentBytes,
-        options.ownedDistrict.interpretation,
-      );
+        kind.ground.district.document,
+        kind.ground.district.residentBytes,
+        kind.ground.district.interpretation,
+      )
+      : null;
     const neighborhoodIndex = buildNeighborhoodIndex(options.scene);
     const explicitPointMaps = options.placedPointMaps ?? [];
     const explicitlyPlacedIslands = new Set(explicitPointMaps.map((value) => value.islandId));
@@ -1161,23 +933,9 @@ export class AtlasBinding {
       initialArtProfile,
       theme,
       options.reducedMotion ?? false,
-      /*
-       * An endless ground is still an authored starter, so the field is told so rather than given
-       * nothing: given nothing, it drew the photo-world landscape, whose shader never samples a
-       * shadow map, and objects placed on it cast no shadow. It is given an elevation and no
-       * extent, because it has none, and the field draws its walking face without a rim.
-       */
-      authoredGround === undefined
-        ? undefined
-        : authoredGround.kind === 'endless'
-          ? Object.freeze({ kind: 'endless' as const, elevation: authoredGround.elevationMm / 1000 })
-          : Object.freeze({
-              halfWidth: authoredGround.halfWidthMm / 1000,
-              halfDepth: authoredGround.halfDepthMm / 1000,
-              elevation: authoredGround.elevationMm / 1000,
-            }),
+      authoredFieldSupport(authoredRegionOf(kind), camera.camera!.farClip),
     );
-    if (options.ownedDistrict !== undefined || options.generatedTile !== undefined) field.entity.enabled = false;
+    field.entity.enabled = kind.fieldVisible;
     renderRoot.addChild(field.entity);
     const topology = composeAtlasWorld(options.scene, {
       availableReconstruction,
@@ -1235,11 +993,12 @@ export class AtlasBinding {
     const objectRoots = new Map<IslandId, pc.Entity>();
     let authoredPointMaps: AuthoredPointMaps | null = null;
     let authoredSociety: AuthoredRegionSociety | null = null;
-    if (options.authoredRegion !== undefined) {
-      const root = new pc.Entity(`authored-region:${options.authoredRegion.regionId}`);
-      root.setLocalPosition(0, options.authoredRegion.ground.elevationMm / 1000, 0);
+    const authoredRegion = authoredRegionOf(kind);
+    if (authoredRegion !== null) {
+      const root = new pc.Entity(`authored-region:${authoredRegion.regionId}`);
+      root.setLocalPosition(0, authoredRegion.ground.elevationMm / 1000, 0);
       renderRoot.addChild(root);
-      objectRoots.set(options.authoredRegion.regionId, root);
+      objectRoots.set(authoredRegion.regionId, root);
       authoredSociety = new AuthoredRegionSociety(device, root);
       if (options.authoredPointMaps !== undefined && options.authoredPointMaps.length > 0) {
         // Built after the root is in the graph, because each print's world-space camera is read
@@ -1318,30 +1077,12 @@ export class AtlasBinding {
       }
     }
 
-    const start = options.generatedTile !== undefined
-      ? { ...options.generatedTile.start }
-      : options.ownedDistrict !== undefined
-      ? ownedDistrictCameraState(navigationWorld, options.ownedDistrict.document)
-      : options.authoredRegion !== undefined
-        ? {
-            x: options.authoredRegion.spawn.xMm / 1000,
-            y: options.authoredRegion.spawn.yMm / 1000 + navigationWorld.eyeHeight,
-            z: options.authoredRegion.spawn.zMm / 1000,
-            yaw: options.authoredRegion.spawn.yawMicroradians / 1_000_000,
-            pitch: 0,
-          }
-      : cityActive
-        ? cityCameraState('overview')
-        : initialAtlasCameraState(options.scene, navigationWorld);
-
-    // The Google-tiles entry is an aerial overview, not a stance. Everything else starts on foot.
-    const aerialStart = options.ownedDistrict === undefined && options.generatedTile === undefined && cityActive;
     const controls = new FirstPersonControls(
       options.canvas,
-      start,
-      cityActive ? { ...DEFAULT_CONTROLS, moveSpeed: 1.65, sprintMultiplier: 2.7, accelTime: .16 } : DEFAULT_CONTROLS,
+      worldStart(kind, options.scene, navigationWorld),
+      kind.city ? { ...DEFAULT_CONTROLS, moveSpeed: 1.65, sprintMultiplier: 2.7, accelTime: .16 } : DEFAULT_CONTROLS,
       navigationWorld,
-      { groundStart: !aerialStart },
+      { groundStart: !kind.aerialStart },
     );
     controls.onCameraToggle = () => { binding.setCameraMode(binding.cameraMode === 'first-person' ? 'third-person' : 'first-person'); };
     controls.setSensitivityMultiplier(options.sensitivityMultiplier ?? 1);
@@ -1402,18 +1143,16 @@ export class AtlasBinding {
     );
     binding.authoredPointMaps = authoredPointMaps;
     binding.authoredSociety = authoredSociety;
-    if (options.ownedDistrict !== undefined) binding.renderRoot.enabled = false;
-    if (options.generatedTile !== undefined) {
-      binding.renderRoot.enabled = false;
-      binding.generatedTile = options.generatedTile.attach({ app, environmentRoot, camera });
+    binding.renderRoot.enabled = kind.memoryLayerVisible;
+    if (kind.ground.form === 'generated-tile') {
+      binding.generatedTile = kind.ground.tile.attach({ app, environmentRoot, camera });
     }
-    if (options.googleTiles?.enabled === true && options.googleTiles.apiKey.length > 0) {
-      binding.renderRoot.enabled = false;
+    if (kind.google !== null) {
       binding.googleTiles = createGoogleTilesEnvironment(
         app,
         environmentRoot,
         options.overlayParent,
-        options.googleTiles,
+        kind.google,
         {
           invalidate: () => binding.invalidate(),
           unavailable: () => binding.invalidate(),
@@ -1422,10 +1161,7 @@ export class AtlasBinding {
       void binding.googleTiles.attach();
     }
     binding.initializeRepresentation(options.representationSubjects ?? []);
-    // After every render root is on or off, because whether the world's own sky is drawn depends
-    // on it: the city and the tile switch the composed world off and their sky is the clear colour.
-    binding.displaySpaceFog = displaySpaceFog;
-    if (displaySpaceFog) binding.syncFogToSky();
+    binding.atmosphere.fogInDisplaySpace(kind.displaySpaceFog);
     return binding;
   }
 
@@ -1989,29 +1725,6 @@ export class AtlasBinding {
     this.dirty = false;
   }
 
-  private setClearColours(profile: WorldArtProfile): void {
-    const [skyR, skyG, skyB] = unitRgb(profile.palette.sky);
-    this.skyClearColor.set(skyR, skyG, skyB, 1);
-    const [groundR, groundG, groundB] = unitRgb(profile.palette.terrain);
-    const [surfaceR, surfaceG, surfaceB] = unitRgb(profile.palette.terrainLift);
-    this.mapClearColor.set(
-      groundR * 0.72 + surfaceR * 0.28,
-      groundG * 0.72 + surfaceG * 0.28,
-      groundB * 0.72 + surfaceB * 0.28,
-      1,
-    );
-  }
-
-  /**
-   * Aim the fog at the colour the sky shows at eye level: the composed world's own sky when it is
-   * drawing one, otherwise the colour the camera clears to. With fog mixed in display space, far
-   * ground then arrives on the screen as exactly the sky beside it.
-   */
-  private syncFogToSky(): void {
-    const [r, g, b] = skyColourAtEyeLevel(this.composedWorld, this.camera.camera?.clearColor);
-    this.app.scene.fog.color.set(r, g, b);
-  }
-
   private setProfileVisuals(profile: WorldArtProfile): void {
     this.invalidate();
     this.composedWorld.setProfile(profile);
@@ -2019,19 +1732,7 @@ export class AtlasBinding {
     this.regionRelief.applyProfile(profile);
     this.field.setProfile(profile);
     this.objects.setProfile(profile);
-    this.setClearColours(profile);
-    if (this.camera.camera !== undefined && this.camera.camera !== null) {
-      this.camera.camera.clearColor.copy(
-        this.mapState === null ? this.skyClearColor : this.mapClearColor,
-      );
-    }
-    const [hazeR, hazeG, hazeB] = unitRgb(profile.palette.haze);
-    this.app.scene.ambientLight.set(hazeR * 0.58, hazeG * 0.58, hazeB * 0.58);
-    if (this.displaySpaceFog) this.syncFogToSky();
-    else this.app.scene.fog.color.set(hazeR, hazeG, hazeB);
-    const [sunR, sunG, sunB] = unitRgb(profile.palette.sun);
-    const light = (this.app.root.findByName('atlas-directional-light') as pc.Entity | null)?.light;
-    if (light !== undefined && light !== null) light.color.set(sunR, sunG, sunB);
+    this.atmosphere.setProfile(profile, this.mapState !== null);
   }
 
   previewArtProfile(
@@ -2298,10 +1999,7 @@ export class AtlasBinding {
     this.composedWorld.setMapActive(active);
     this.regionMass.setMapActive(active);
     this.regionRelief.setMapActive(active);
-    if (this.camera.camera !== undefined && this.camera.camera !== null) {
-      this.camera.camera.clearColor.copy(active ? this.mapClearColor : this.skyClearColor);
-    }
-    if (this.displaySpaceFog) this.syncFogToSky();
+    this.atmosphere.setMapActive(active);
     if (active) {
       this.cancelDirectNavigation();
       const s = this.controls.state;
@@ -2947,6 +2645,31 @@ export class AtlasBinding {
     }
     this.app.destroy();
   }
+}
+
+/** Where the session opens in this kind of world. The Google entry is an aerial overview. */
+function worldStart(kind: WorldKind, scene: AtlasScene, navigationWorld: NavigationWorld): CameraState {
+  const ground = kind.ground;
+  switch (ground.form) {
+    case 'generated-tile':
+      return { ...ground.tile.start };
+    case 'owned-district':
+      return ownedDistrictCameraState(navigationWorld, ground.district.document);
+    case 'authored-endless':
+    case 'authored-flat': {
+      const spawn = ground.region.spawn;
+      return {
+        x: spawn.xMm / 1000,
+        y: spawn.yMm / 1000 + navigationWorld.eyeHeight,
+        z: spawn.zMm / 1000,
+        yaw: spawn.yawMicroradians / 1_000_000,
+        pitch: 0,
+      };
+    }
+    case 'scene-regions':
+      return kind.google !== null ? cityCameraState('overview') : initialAtlasCameraState(scene, navigationWorld);
+  }
+  throw new TypeError(`No start for a world standing on ${(ground as { form: string }).form}`);
 }
 
 /**

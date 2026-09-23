@@ -1,0 +1,46 @@
+"""Run one timing-sensitive command inside quiet-slot (and gpu-slot with --gpu), with retries.
+
+    python3 slot.py [--gpu] -- COMMAND...
+
+Lane W's slot.py with one change: instead of refusing unless HEAD is lane W's measured commit, it
+refuses unless the product tree still matches the digest tree.py pinned before the first run
+(this lane measures its own uncommitted tree). Inside the slots, gated.py refuses unless CPU idle
+is at least 70 percent over 10 s, and the command discards itself if its mean idle while running
+falls below 50 percent; either exits 75, and the run is retried after a pause outside the slots,
+three attempts at most. Any other exit ends it.
+"""
+
+from __future__ import annotations
+
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+BIN = Path("<MAIN_CHECKOUT>/.exulanica/bin")
+PAUSE_SECONDS = 300
+
+
+def main() -> None:
+    arguments = sys.argv[1:]
+    gpu = "--gpu" in arguments[: arguments.index("--")]
+    command = arguments[arguments.index("--") + 1:]
+    if subprocess.run([sys.executable, str(HERE / "tree.py"), "check"]).returncode != 0:
+        raise SystemExit(3)
+    wrapped = [str(BIN / "quiet-slot"), *([str(BIN / "gpu-slot")] if gpu else []),
+               sys.executable, str(HERE / "gated.py"), "--", *command]
+    for attempt in range(1, 4):
+        started = time.strftime("%H:%M:%S")
+        done = subprocess.run(wrapped, cwd=HERE)
+        print(f"slot.py: attempt {attempt} started {started} exited {done.returncode}", flush=True)
+        if done.returncode != 75:
+            raise SystemExit(done.returncode)
+        if attempt < 3:
+            time.sleep(PAUSE_SECONDS)
+    print("slot.py: three attempts refused for load; recorded as not measured", flush=True)
+    raise SystemExit(75)
+
+
+if __name__ == "__main__":
+    main()

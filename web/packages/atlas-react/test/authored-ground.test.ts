@@ -72,7 +72,8 @@ describe('authored ground geometry', () => {
     expect(Math.max(...triples.map(([x]) => x!))).toBeLessThanOrEqual(11.68);
     expect(Math.min(...triples.map(([, , z]) => z!))).toBeGreaterThanOrEqual(-7.68);
     expect(Math.max(...triples.map(([, , z]) => z!))).toBeLessThanOrEqual(7.68);
-    expect(new Set(triples.map(([, y]) => y!))).toEqual(new Set([1.258]));
+    // On the face itself: what keeps them over it and under objects is the depth order, not a lift.
+    expect(new Set(triples.map(([, y]) => y!))).toEqual(new Set([1.25]));
 
     // Every mark centre sits on an integer metre of the authored spacing.
     const centresX = new Set<number>();
@@ -223,7 +224,7 @@ describe('an endless authored ground', () => {
   };
 
   it('is the floor objects stand on: lit, shadow-receiving, and at the authored elevation', () => {
-    const { app, field } = build({ kind: 'endless', elevation: 0.4 });
+    const { app, field } = build({ kind: 'endless', elevation: 0.4, reach: 1200 });
     const instances = field.entity.render!.meshInstances;
     // The walking face alone. A rim, a fascia or metre marks would all be drawn from a
     // rectangle, and this ground has none to draw them from.
@@ -248,7 +249,7 @@ describe('an endless authored ground', () => {
   });
 
   it('follows the saved appearance with no rim to key it on', () => {
-    const { app, field } = build({ kind: 'endless', elevation: 0 });
+    const { app, field } = build({ kind: 'endless', elevation: 0, reach: 1200 });
     field.setProfile(SURVEY_RELIEF);
     const surface = field.entity.render!.meshInstances[0]!.material as pc.StandardMaterial;
     expect([surface.diffuse.r, surface.diffuse.g, surface.diffuse.b])
@@ -267,10 +268,57 @@ describe('an endless authored ground', () => {
     app.destroy();
   });
 
+  it('reaches exactly the camera\'s view past the farthest point a walk can stand', () => {
+    const { app, field } = build({ kind: 'endless', elevation: 0, reach: 1200 });
+    const positions: number[] = [];
+    field.entity.render!.meshInstances[0]!.mesh.getPositions(positions);
+    const xs = positions.filter((_, index) => index % 3 === 0);
+    const recovery = buildNavigationWorld(makeScene([], 1, 1)).recoveryRadius;
+    expect(Math.max(...xs)).toBeCloseTo(recovery + 1200, 3);
+    expect(Math.min(...xs)).toBeCloseTo(-(recovery + 1200), 3);
+    app.destroy();
+  });
+
+  it('draws the face behind whatever lies on it, and the metre marks between the two', () => {
+    const bounded = build({ halfWidth: 12, halfDepth: 8, elevation: 0 });
+    const [face, rim, marks] = bounded.field.entity.render!.meshInstances.map((instance) => instance.material);
+    const endless = build({ kind: 'endless', elevation: 0, reach: 1200 });
+    const endlessFace = endless.field.entity.render!.meshInstances[0]!.material;
+    // Objects keep the engine's default of no offset; the face and rim are drawn furthest back.
+    for (const surface of [face!, rim!, endlessFace]) {
+      expect(surface.depthBias).toBeGreaterThan(marks!.depthBias);
+      expect(surface.slopeDepthBias).toBeGreaterThan(marks!.slopeDepthBias);
+    }
+    expect(marks!.depthBias).toBeGreaterThan(0);
+    expect(marks!.slopeDepthBias).toBeGreaterThan(0);
+    bounded.app.destroy();
+    endless.app.destroy();
+  });
+
   it('draws past anywhere a walk can see, and refuses a reach it cannot draw', () => {
-    const surface = endlessAuthoredGroundSurface(0, 40_000);
+    const surface = endlessAuthoredGroundSurface(0, 40_000, 1200);
     expect(Math.max(...surface.positions.filter((_, index) => index % 3 === 0))).toBe(40_000);
-    expect(() => endlessAuthoredGroundSurface(Number.NaN, 10)).toThrow('finite elevation');
-    expect(() => endlessAuthoredGroundSurface(0, 0)).toThrow('positive drawn reach');
+    expect(() => endlessAuthoredGroundSurface(Number.NaN, 10, 1200)).toThrow('finite elevation');
+    expect(() => endlessAuthoredGroundSurface(0, 0, 1200)).toThrow('positive drawn reach');
+    expect(() => endlessAuthoredGroundSurface(0, 10, 0)).toThrow('positive cell size');
+  });
+
+  it('draws the face in cells no wider than the camera\'s reach, covering it once', () => {
+    const surface = endlessAuthoredGroundSurface(0.4, 9344, 1200);
+    const xs = new Set(surface.positions.filter((_, index) => index % 3 === 0));
+    const columns = [...xs].sort((a, b) => a - b);
+    // 16 cells of 1168 m: the fewest whose width stays within the 1200 m reach.
+    expect(columns).toHaveLength(17);
+    expect(columns.slice(1).every((x, index) => x - columns[index]! <= 1200)).toBe(true);
+    expect(surface.indices).toHaveLength(16 * 16 * 6);
+    // Every triangle faces up (counter-clockwise seen from above), so none is culled from above.
+    for (let index = 0; index < surface.indices.length; index += 3) {
+      const [a, b, c] = [0, 1, 2].map((k) => surface.indices[index + k]! * 3);
+      const ux = surface.positions[b!]! - surface.positions[a!]!;
+      const uz = surface.positions[b! + 2]! - surface.positions[a! + 2]!;
+      const vx = surface.positions[c!]! - surface.positions[a!]!;
+      const vz = surface.positions[c! + 2]! - surface.positions[a! + 2]!;
+      expect(uz * vx - ux * vz).toBeGreaterThan(0);
+    }
   });
 });

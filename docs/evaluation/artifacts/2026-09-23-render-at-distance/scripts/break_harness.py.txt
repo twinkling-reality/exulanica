@@ -1,0 +1,43 @@
+"""Break checks for the binding harness: each mutation must make its suite fail; the file is restored."""
+import hashlib, subprocess, sys
+from pathlib import Path
+
+WEB = Path('<WORKTREE>/web')
+SRC = WEB / 'packages/atlas-react/src/playcanvas'
+FILES = {name: (SRC / name).read_bytes() for name in ('atlas-binding.ts', 'atmosphere.ts')}
+DIGESTS = {name: hashlib.sha256(data).hexdigest() for name, data in FILES.items()}
+MUTANTS = [
+    ('starter shadow bias', "    shadowBias: 0.2,\n  }),\n  skyFill: null,", "    shadowBias: 0.21,\n  }),\n  skyFill: null,",
+     'packages/atlas-react/test/binding/create-world-kinds.test.ts', 'atmosphere.ts'),
+    ('estimates flatten after objects update', "    this.authoredPointMaps?.frame(this.camera.getPosition());\n    this.objects.update(dt);\n",
+     "    this.objects.update(dt);\n    this.authoredPointMaps?.frame(this.camera.getPosition());\n",
+     'packages/atlas-react/test/binding/frame-order.test.ts', 'atlas-binding.ts'),
+    ('engine destroyed before the field', "    this.field.destroy();\n", "    this.app.destroy();\n    this.field.destroy();\n",
+     'packages/atlas-react/test/binding/lifecycle-order.test.ts', 'atlas-binding.ts'),
+    ('map keeps the sky clear colour', "this.camera.clearColor.copy(active ? this.#mapClear : this.#skyClear);",
+     "this.camera.clearColor.copy(this.#skyClear);",
+     'packages/atlas-react/test/binding/appearance-and-map.test.ts', 'atmosphere.ts'),
+    ('map lock dropped', "      this.mapState === null &&\n", "", 'packages/atlas-react/test/binding/mode-locks.test.ts', 'atlas-binding.ts'),
+    ('one more line', "export class AtlasBinding {\n", "export class AtlasBinding {\n\n", 'packages/atlas-react/test/binding/line-budget.test.ts', 'atlas-binding.ts'),
+    ('starter objects hidden after the Map', "allocated.get(resident.object.islandId) !== 'stub'",
+     "(allocated.get(resident.object.islandId) ?? 'stub') !== 'stub'",
+     'packages/atlas-react/test/binding/object-residency.test.ts', '../playcanvas/scene-objects.ts'),
+]
+try:
+    for name, old, new, suite, file in MUTANTS:
+        target = SRC / file
+        FILES.setdefault(file, target.read_bytes())
+        DIGESTS.setdefault(file, hashlib.sha256(FILES[file]).hexdigest())
+        text = FILES[file].decode()
+        assert text.count(old) == 1, (name, text.count(old))
+        target.write_text(text.replace(old, new))
+        done = subprocess.run(['./node_modules/.bin/vitest', 'run', suite], cwd=WEB, capture_output=True, text=True,
+                              env={**__import__('os').environ, 'CI': 'true'})
+        tail = [l for l in done.stdout.splitlines() if 'Tests' in l]
+        print(f"{name}: exit {done.returncode} {tail[-1].strip() if tail else ''}", flush=True)
+        target.write_bytes(FILES[file])
+finally:
+    for file, data in FILES.items():
+        (SRC / file).write_bytes(data)
+        assert hashlib.sha256((SRC / file).read_bytes()).hexdigest() == DIGESTS[file]
+    print('restored', {file: digest[:12] for file, digest in DIGESTS.items()})

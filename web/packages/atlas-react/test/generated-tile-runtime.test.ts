@@ -49,6 +49,13 @@ const sha256 = async (bytes: Uint8Array): Promise<string> => createHash('sha256'
 const noSets = async (): Promise<Uint8Array> => { throw new Error('this test fetches no texture set'); };
 /** The capsule the grammar states, for the hand-built envelopes below. */
 const CITY_V2_CAPSULE: TileCapsule = { radiusM: 0.34, heightM: 1.9, eyeHeightM: 1.62 };
+/**
+ * How long a test that loads this fixture may take. Every load verifies each container it is
+ * given by digesting it whole, which is seconds of work, not the tenth of a second vitest's 5 s
+ * default is sized for. MEASURED: the two neighbour tests below took 1.95 s each alone, and 6.0
+ * and 6.6 s in a whole web run at a load average of 23 to 29, where they timed out.
+ */
+const VERIFIED_LOAD_TIMEOUT_MS = 30_000;
 
 let baked: Uint8Array;
 let tile: LoadedGeneratedTile;
@@ -173,7 +180,7 @@ describe('loading a baked tile through tess\'s decoder', () => {
     await expect(loadGeneratedTile({ name: 'short', bytes: truncated, manifest, fetchSet: noSets, digest: subtle }))
       .rejects.toThrow(/refused/);
     // Four loads of a container whose navigation envelope is now carved, each digesting it whole.
-  }, 30_000);
+  }, VERIFIED_LOAD_TIMEOUT_MS);
 
   it('refuses every tile on a page without crypto.subtle', async () => {
     await expect(loadGeneratedTile({ name: 'x', bytes: baked, manifest, fetchSet: noSets, digest: null }))
@@ -707,7 +714,7 @@ describe('a neighbouring tile reaching the runtime', () => {
       name: 'tile-conformance', bytes: baked, manifest, fetchSet: noSets, digest: subtle,
       neighbours: [{ name: 'the tile east', bytes: tampered }],
     })).rejects.toThrow(/^Neighbour the tile east refused/);
-  });
+  }, VERIFIED_LOAD_TIMEOUT_MS);
 
   it('refuses a world that would draw one record twice, naming the record and both tiles', async () => {
     // THE FIXTURE AS ITS OWN NEIGHBOUR, which is the smallest world that draws a building twice.
@@ -719,7 +726,7 @@ describe('a neighbouring tile reaching the runtime', () => {
       name: 'tile-conformance', bytes: baked, manifest, fetchSet: noSets, digest: subtle,
       neighbours: [{ name: 'a second copy', bytes: baked }],
     })).rejects.toThrow(/tile-conformance and a second copy both draw the city\.block record identity .*draw it twice/);
-  });
+  }, VERIFIED_LOAD_TIMEOUT_MS);
 });
 
 /**

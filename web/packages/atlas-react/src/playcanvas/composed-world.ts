@@ -69,15 +69,28 @@ interface ShaderDesc {
   fragmentGLSL?: string;
 }
 
+/*
+ * THE SKY IS A DIRECTION, NOT A PLACE.
+ *
+ * Its entity gives it an orientation and nothing else: the view's rotation turns it and the
+ * view's translation is dropped, so the eye is at its centre wherever a person stands, and its
+ * depth is the far plane, as the engine's own skybox writes it, so everything drawn at any
+ * distance stands in front of it. Placed as a 540 metre sphere where the world opened, it was left
+ * behind a short sprint from there and the sky became the camera's clear colour.
+ */
 const SKY_VERTEX_GLSL = /* glsl */ `
 attribute vec3 aPosition;
 uniform mat4 matrix_model;
-uniform mat4 matrix_viewProjection;
+uniform mat4 matrix_view;
+uniform mat4 matrix_projection;
 varying vec3 vDirection;
 
 void main(void) {
     vDirection = normalize(aPosition);
-    gl_Position = matrix_viewProjection * matrix_model * vec4(aPosition, 1.0);
+    mat4 view = matrix_view;
+    view[3][0] = view[3][1] = view[3][2] = 0.0;
+    gl_Position = matrix_projection * view * vec4(mat3(matrix_model) * aPosition, 1.0);
+    gl_Position.z = gl_Position.w - 1.0e-7;
 }
 `;
 
@@ -294,30 +307,9 @@ function atInstance(
   return group;
 }
 
-function openingFrame(topology: WorldTopologySnapshot): {
-  x: number;
-  z: number;
-  yaw: number;
-  forwardX: number;
-  forwardZ: number;
-  rightX: number;
-  rightZ: number;
-} {
-  const foundations = topology.instances.filter((instance) => instance.role === 'region-foundation');
-  const first = foundations[0];
-  if (first === undefined) {
-    return { x: 0, z: 0, yaw: 0, forwardX: 0, forwardZ: -1, rightX: 1, rightZ: 0 };
-  }
-  const yaw = first.transform.yaw;
-  return {
-    x: first.transform.position.x,
-    z: first.transform.position.z,
-    yaw,
-    forwardX: -Math.sin(yaw),
-    forwardZ: -Math.cos(yaw),
-    rightX: Math.cos(yaw),
-    rightZ: -Math.sin(yaw),
-  };
+/** The yaw of the region foundation the world opens on, or 0 for a world with none. */
+function openingYaw(topology: WorldTopologySnapshot): number {
+  return topology.instances.find((instance) => instance.role === 'region-foundation')?.transform.yaw ?? 0;
 }
 
 function addOriginEnvironment(
@@ -327,19 +319,24 @@ function addOriginEnvironment(
   shadow: pc.StandardMaterial,
   sky: pc.ShaderMaterial,
 ): pc.Entity {
-  const frame = openingFrame(topology);
-  const yawDegrees = (frame.yaw * 180) / Math.PI;
+  const yawDegrees = (openingYaw(topology) * 180) / Math.PI;
   const environment = new pc.Entity('origin-environment');
   root.addChild(environment);
 
+  // Turned to the opening frame and nothing more: the shader draws it around the eye at the far
+  // plane, so its entity has no position that means anything and is never culled by one.
   const skyEntity = new pc.Entity('origin-sky');
-  skyEntity.setPosition(frame.x, 0, frame.z);
-  skyEntity.setLocalScale(540, 540, 540);
   skyEntity.setEulerAngles(0, yawDegrees, 0);
   const skyInstance = new pc.MeshInstance(meshes.sky, sky, skyEntity);
-  skyInstance.castShadow = false;
-  skyInstance.receiveShadow = false;
-  skyEntity.addComponent('render', { meshInstances: [skyInstance] });
+  skyInstance.cull = false;
+  // Not an object, so it casts and receives no shadow. The render component's flags are the ones
+  // the engine applies to its instances: set on the instance alone, the sky cast one, and its
+  // 540 metre bounds stretched the sun's shadow depth range near the opening point.
+  skyEntity.addComponent('render', {
+    meshInstances: [skyInstance],
+    castShadows: false,
+    receiveShadows: false,
+  });
   environment.addChild(skyEntity);
 
   // The origin profile has no decorative horizon geometry. The water/sky seam is the only

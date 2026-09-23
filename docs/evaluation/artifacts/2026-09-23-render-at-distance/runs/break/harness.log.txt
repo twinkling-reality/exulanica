@@ -1,0 +1,11 @@
+# break_harness.py on product tree 84b95583843c, 2026-09-23T15:09:57-0400
+# terminal colour codes removed from vitest's summary lines; nothing else changed
+starter shadow bias: exit 1       Tests  4 failed | 6 passed (10)
+estimates flatten after objects update: exit 1       Tests  1 failed | 6 passed (7)
+engine destroyed before the field: exit 1       Tests  9 failed (9)
+map keeps the sky clear colour: exit 1       Tests  4 failed | 1 passed (5)
+map lock dropped: exit 1       Tests  1 failed | 2 passed (3)
+one more line: exit 1       Tests  1 failed | 1 passed (2)
+starter objects hidden after the Map: exit 1       Tests  1 failed | 1 passed (2)
+restored {'atlas-binding.ts': 'c4e00838a844', 'atmosphere.ts': '1c27706097c5', '../playcanvas/scene-objects.ts': '2c624abdef0e'}
+break_harness.py exit 0

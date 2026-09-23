@@ -1,0 +1,167 @@
+// Exploratory: the cube's shadow on itself and on the ground, per arm, at every distance mark.
+//
+//   node probe-shadow.mjs --app URL --arms base,skynocast,... [--marks 0,40,...]
+//
+// Three renders per capture, in one task each: WITH (as drawn), OWN (the cube casting no shadow)
+// and WITHOUT (the cube hidden). Masks use lane W's > 3 levels rule:
+//   object   = OWN vs WITHOUT             where the cube itself is drawn
+//   shadow   = WITH vs OWN                what the cube's shadow changes
+//   self     = shadow inside the face box (x 672..767, y 510..627): the cube shading itself
+//   ground   = shadow outside the object mask: the shadow it casts on the ground
+//   gap      = rows between the object's lowest drawn row and the ground shadow's nearest row
+// Face steps are lane W's: luminance steps >= 6 along row 569 of WITH.
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import zlib from 'node:zlib';
+import { launch, sleep } from './cdp.mjs';
+import { reachBinding } from './w-original/binding.mjs';
+
+const HERE = dirname(new URL(import.meta.url).pathname);
+const arg = (name, fallback) => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : fallback; };
+const app = arg('app', 'http://localhost:19222/');
+const out = arg('out', join(HERE, 'runs', 'probe-shadow'));
+const arms = arg('arms', 'base').split(',');
+const marks = arg('marks', '0,40,80,1000,4000,8000').split(',').map(Number);
+mkdirSync(out, { recursive: true });
+const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+const INSTRUMENT = readFileSync(join(HERE, 'w-original', 'instrument-15ef8cd9.js'), 'utf8');
+const CUBE_Z = { 0: 0.5, 40: -39.5, 80: -79.5, 1000: -999.5, 4000: -3999.5, 8000: -7999.5 };
+
+function crc32(buffer) {
+  let c = ~0;
+  for (let i = 0; i < buffer.length; i += 1) { c ^= buffer[i]; for (let k = 0; k < 8; k += 1) c = (c >>> 1) ^ (0xedb88320 & -(c & 1)); }
+  return ~c >>> 0;
+}
+function png(width, height, rgba) {
+  const raw = Buffer.alloc((width * 4 + 1) * height);
+  for (let y = 0; y < height; y += 1) { raw[y * (width * 4 + 1)] = 0; rgba.copy(raw, y * (width * 4 + 1) + 1, y * width * 4, (y + 1) * width * 4); }
+  const chunk = (type, data) => { const l = Buffer.alloc(4); l.writeUInt32BE(data.length); const b = Buffer.concat([Buffer.from(type), data]); const c = Buffer.alloc(4); c.writeUInt32BE(crc32(b)); return Buffer.concat([l, b, c]); };
+  const h = Buffer.alloc(13); h.writeUInt32BE(width, 0); h.writeUInt32BE(height, 4); h[8] = 8; h[9] = 6;
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', h), chunk('IDAT', zlib.deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
+}
+
+const PAGE = String.raw`(() => {
+  const P = window.__probe = {};
+  P.grab = () => {
+    const app = __ws.app; const gl = app.graphicsDevice.gl;
+    app.render();
+    const prev = gl.getParameter(gl.READ_FRAMEBUFFER_BINDING);
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+    const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
+    const px = new Uint8Array(w * h * 4);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, prev);
+    const td = new Uint8Array(w * h * 4);
+    for (let y = 0; y < h; y += 1) td.set(px.subarray((h - 1 - y) * w * 4, (h - y) * w * 4), y * w * 4);
+    return { w, h, px: td };
+  };
+  const diff = (a, b, i) => Math.max(Math.abs(a[i] - b[i]), Math.abs(a[i + 1] - b[i + 1]), Math.abs(a[i + 2] - b[i + 2]));
+  const lum = (p, i) => Math.floor((299 * p[i] + 587 * p[i + 1] + 114 * p[i + 2]) / 1000);
+  P.measure = (node) => {
+    const renders = node.findComponents('render');
+    const withIt = P.grab();
+    const cast = renders.map((r) => r.castShadows);
+    for (const r of renders) r.castShadows = false;
+    const own = P.grab();
+    renders.forEach((r, i) => { r.castShadows = cast[i]; });
+    node.enabled = false;
+    const without = P.grab();
+    node.enabled = true;
+    const { w, h } = withIt;
+    let object = 0, self = 0, ground = 0, objectLowest = -1, groundTop = h, sky = new Set();
+    const objectMask = new Uint8Array(w * h);
+    for (let y = 0; y < h; y += 1) for (let x = 0; x < w; x += 1) {
+      const i = (y * w + x) * 4;
+      if (diff(own.px, without.px, i) > 3) { objectMask[y * w + x] = 1; object += 1; if (y > objectLowest) objectLowest = y; }
+    }
+    for (let y = 0; y < h; y += 1) for (let x = 0; x < w; x += 1) {
+      const i = (y * w + x) * 4;
+      if (diff(withIt.px, own.px, i) <= 3) continue;
+      if (x >= 672 && x < 768 && y >= 510 && y < 628) self += 1;
+      if (!objectMask[y * w + x]) { ground += 1; if (y < groundTop) groundTop = y; }
+    }
+    // the shadow's nearest row to the base, in the columns the object occupies at its lowest row
+    let gap = null;
+    for (let y = 0; y < 286; y += 1) sky.add(withIt.px.slice((y * w + 720) * 4, (y * w + 720) * 4 + 3).join(','));
+    const row = []; for (let x = 672; x < 768; x += 1) row.push(lum(withIt.px, (569 * w + x) * 4));
+    let steps = 0; for (let i = 1; i < row.length; i += 1) if (Math.abs(row[i] - row[i - 1]) >= 6) steps += 1;
+    // attachment: is any ground-shadow pixel 4-adjacent to an object pixel?
+    let touching = 0;
+    for (let y = 1; y < h - 1; y += 1) for (let x = 1; x < w - 1; x += 1) {
+      const k = y * w + x; if (!objectMask[k]) continue;
+      for (const n of [k - 1, k + 1, k - w, k + w]) {
+        if (objectMask[n]) continue; const i = n * 4;
+        if (diff(withIt.px, own.px, i) > 3) { touching += 1; break; }
+      }
+    }
+    P.last = { withIt, own, without };
+    return { object, self, ground, touching, object_lowest_row: objectLowest, ground_top_row: groundTop === h ? null : groundTop, face_steps: steps, sky_distinct: sky.size };
+  };
+  P.crop = (img, x0, y0, cw, ch) => { const o = new Uint8Array(cw * ch * 4);
+    for (let y = 0; y < ch; y += 1) o.set(img.px.subarray(((y0 + y) * img.w + x0) * 4, ((y0 + y) * img.w + x0 + cw) * 4), y * cw * 4);
+    let s = ''; for (let i = 0; i < o.length; i += 32768) s += String.fromCharCode.apply(null, o.subarray(i, i + 32768)); return btoa(s); };
+  return true;
+})()`;
+
+const SKY = `(() => { const s = __ws.app.root.findByName('origin-sky'); return s && s.render; })()`;
+const LIGHT = `__ws.app.root.findByName('atlas-directional-light').light`;
+const ARMS = {
+  base: [],
+  skynocast: ['sky'],
+  'skynocast-nob05': ['sky', 'nob:0.05'],
+  'skynocast-nob10': ['sky', 'nob:0.1'],
+  'skynocast-nob25': ['sky', 'nob:0.25'],
+  'skynocast-sb20': ['sky', 'sb:0.2'],
+  'skynocast-city': ['sky', 'nob:0.25', 'sb:0.2'],
+  'nob10': ['nob:0.1'],
+};
+function setupExpression(parts) {
+  const lines = ['const report = {};', `const L = ${LIGHT};`, 'report.before = { nob: L.normalOffsetBias, sb: L.shadowBias };'];
+  for (const part of parts) {
+    if (part === 'sky') lines.push(`{ const r = ${SKY}; r.castShadows = false; r.receiveShadows = false; report.sky = r.meshInstances.map(m => m.castShadow); }`);
+    else if (part.startsWith('nob:')) lines.push(`L.normalOffsetBias = ${Number(part.slice(4))}; report.nob = L.normalOffsetBias;`);
+    else if (part.startsWith('sb:')) lines.push(`L.shadowBias = ${Number(part.slice(3))}; report.sb = L.shadowBias;`);
+    else throw new Error(`unknown arm part ${part}`);
+  }
+  lines.push('return report;');
+  return `(() => { ${lines.join(' ')} })()`;
+}
+const RESET = `(() => { const L = ${LIGHT}; L.normalOffsetBias = P0.nob; L.shadowBias = P0.sb; const r = ${SKY}; r.castShadows = true; r.receiveShadows = true; return true; })()`;
+
+const { cdp, kill } = await launch({ port: 19223, profile: join(HERE, 'profiles', `shadow-${stamp}`) });
+const result = { app, stamp, arms: {}, notes: [] };
+try {
+  await cdp.send('Page.enable'); await cdp.send('Runtime.enable');
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+  await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: INSTRUMENT });
+  await cdp.send('Page.navigate', { url: app });
+  await cdp.waitFor(`typeof __ws === 'object' && __ws.app !== null && __ws.sceneObjects().length === 6`, 120_000, 'six cubes');
+  await reachBinding(cdp);
+  await cdp.evaluate(PAGE);
+  await cdp.evaluate(`(() => { const L = ${LIGHT}; window.P0 = { nob: L.normalOffsetBias, sb: L.shadowBias }; return true; })()`);
+  result.light_as_built = await cdp.evaluate('window.P0');
+  const byZ = new Map((await cdp.evaluate('__ws.sceneObjects()')).map((o) => [Math.round(o[3] * 1000), o[0]]));
+  for (const arm of arms) {
+    const report = await cdp.evaluate(setupExpression(ARMS[arm]));
+    const rows = [];
+    result.arms[arm] = { report, rows };
+    for (const mark of marks) {
+      const z = CUBE_Z[mark];
+      const id = byZ.get(Math.round(z * 1000));
+      await cdp.evaluate(`(() => { for (const o of __ws.app.root.find(x => typeof x.name === 'string' && x.name.startsWith('authored-object:'))) o.enabled = o.name === 'authored-object:${id}'; const s = __wsBinding.controls.state; s.x = 0; s.z = ${z} + 3; s.yaw = 0; s.pitch = -0.25; __wsBinding.invalidate(); return true; })()`);
+      await sleep(400);
+      const stats = await cdp.evaluate(`window.__probe.measure(__ws.app.root.findByName('authored-object:${id}'))`);
+      const crop = Buffer.from(await cdp.evaluate('window.__probe.crop(window.__probe.last.withIt, 620, 470, 280, 200)'), 'base64');
+      writeFileSync(join(out, `${stamp}-${arm}-${mark}.png`), png(280, 200, crop));
+      rows.push({ mark, ...stats });
+      console.log(arm, mark, JSON.stringify(stats));
+    }
+    await cdp.evaluate(`(() => { for (const o of __ws.app.root.find(x => typeof x.name === 'string' && x.name.startsWith('authored-object:'))) o.enabled = true; return true; })()`);
+    await cdp.evaluate(RESET);
+  }
+} catch (error) {
+  result.error = String(error.stack ?? error); console.error(result.error);
+} finally {
+  writeFileSync(join(out, `${stamp}.json`), JSON.stringify(result, null, 1));
+  kill();
+}

@@ -1,0 +1,32 @@
+"""Break checks for the world-kind and atmosphere contracts; the binding is restored by digest."""
+import hashlib, os, subprocess
+from pathlib import Path
+
+WEB = Path('<WORKTREE>/web')
+TARGET = WEB / 'packages/atlas-react/src/playcanvas/atlas-binding.ts'
+original = TARGET.read_bytes()
+digest = hashlib.sha256(original).hexdigest()
+ANCHOR = "    binding.atmosphere.fogInDisplaySpace(kind.displaySpaceFog);\n"
+MUTANTS = [
+    ('kind read from the options', ANCHOR + "    if (options.ownedDistrict !== undefined) binding.invalidate();\n",
+     'packages/atlas-react/test/binding/world-kind.test.ts'),
+    ('authored ground kind read', ANCHOR + "    void options.scene.islands.map((island) => island.islandId);\n    void authoredRegionOf(kind)?.ground.kind;\n",
+     'packages/atlas-react/test/binding/world-kind.test.ts'),
+    ('exposure set in the binding', ANCHOR + "    app.scene.exposure = 1.06;\n",
+     'packages/atlas-react/test/binding/atmosphere.test.ts'),
+    ('light colour set in the binding', ANCHOR + "    void camera.light;\n",
+     'packages/atlas-react/test/binding/atmosphere.test.ts'),
+]
+try:
+    for name, new, suite in MUTANTS:
+        text = original.decode()
+        assert text.count(ANCHOR) == 1
+        TARGET.write_text(text.replace(ANCHOR, new))
+        done = subprocess.run(['./node_modules/.bin/vitest', 'run', suite], cwd=WEB, capture_output=True, text=True,
+                              env={**os.environ, 'CI': 'true'})
+        tail = [l for l in done.stdout.splitlines() if 'Tests' in l]
+        print(f"{name}: exit {done.returncode} {tail[-1].strip() if tail else ''}", flush=True)
+finally:
+    TARGET.write_bytes(original)
+    assert hashlib.sha256(TARGET.read_bytes()).hexdigest() == digest
+    print('restored', digest[:12])

@@ -892,12 +892,20 @@ export class SceneObjectRuntime {
    * over ground that is not being drawn: the one impression this whole placement path exists to
    * avoid. On the Map vantage nothing region-local is drawn at all.
    */
+  /**
+   * Draw each object when the ground under it is drawn, and nothing under the Map.
+   *
+   * A residency plan gives every region it governs an entry, at least `stub`, so a region with no
+   * entry is one it does not govern: an authored starter region, whose ground is always drawn.
+   * Reading a missing entry as `stub` hid every object in a starter world on the first replan
+   * after it was placed, which leaving the Map causes.
+   */
   setResidency(allocated: ReadonlyMap<IslandId, string>, map: boolean): void {
     let changed = false;
     for (const resident of this.#resident.values()) {
       const districtRoot = this.#regionOverrides.get(resident.object.islandId);
       const enabled = !map && (districtRoot !== undefined
-        ? districtRoot.enabled : (allocated.get(resident.object.islandId) ?? 'stub') !== 'stub');
+        ? districtRoot.enabled : allocated.get(resident.object.islandId) !== 'stub');
       changed ||= resident.entity.enabled !== enabled;
       resident.entity.enabled = enabled;
     }

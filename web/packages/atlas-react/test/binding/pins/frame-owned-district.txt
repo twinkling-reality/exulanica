@@ -1,0 +1,37 @@
+first frame
+controls.update
+ownedDistrict.refreshNearby
+ownedDistrict.tickSociety
+binding.updateAuthoredSociety
+binding.syncNativeCharacterFrames
+ownedDistrict.nativeCharacterFrames
+nativeCharacters.syncFrames
+followCamera.solve
+camera.setPosition
+camera.setRotation
+binding.applyResidencyPresentation
+binding.publishRepresentation
+objects.update
+binding.settleProofLens
+motes.update
+field.update
+overlay.update
+onFrame
+
+second frame
+controls.update
+ownedDistrict.refreshNearby
+ownedDistrict.tickSociety
+binding.updateAuthoredSociety
+binding.syncNativeCharacterFrames
+ownedDistrict.nativeCharacterFrames
+nativeCharacters.syncFrames
+followCamera.solve
+camera.setPosition
+camera.setRotation
+objects.update
+binding.settleProofLens
+motes.update
+field.update
+overlay.update
+onFrame

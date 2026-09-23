@@ -1,0 +1,33 @@
+first frame
+controls.update
+binding.updateAuthoredSociety
+binding.syncNativeCharacterFrames
+nativeCharacters.syncFrames
+followCamera.solve
+camera.setPosition
+camera.setRotation
+binding.applyResidencyPresentation
+binding.publishRepresentation
+objects.update
+binding.settleProofLens
+motes.update
+field.update
+googleTiles.update
+overlay.update
+onFrame
+
+second frame
+controls.update
+binding.updateAuthoredSociety
+binding.syncNativeCharacterFrames
+nativeCharacters.syncFrames
+followCamera.solve
+camera.setPosition
+camera.setRotation
+objects.update
+binding.settleProofLens
+motes.update
+field.update
+googleTiles.update
+overlay.update
+onFrame

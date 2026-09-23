@@ -1,0 +1,304 @@
+{
+ "port": "19222",
+ "worktree": "<WORKTREE>",
+ "browser": "Chrome/153.0.8010.53",
+ "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Max, Unspecified Version)",
+ "repeats": 2,
+ "identical_across_repeats": true,
+ "scenes": [
+  {
+   "scene": "flat-starter",
+   "sha256": "1d5bbad87684f8c2839e01b19a5e67b5219f4c73c7a32059a6360c27680e589a",
+   "drawnPixels": 144000,
+   "skyColours": 16,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "endless-starter",
+   "sha256": "ec3c99d92fe3613555a9e0548b06d50fc8a39c8b7a882394dc54d52f0025879c",
+   "drawnPixels": 144000,
+   "skyColours": 16,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "endless-starter-looking-up",
+   "sha256": "9bbfa97f92bfcac346add2159eac644d2e2745a6d45a05966252650b3c45ac13",
+   "drawnPixels": 144000,
+   "skyColours": 15,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "endless-cube-arrival",
+   "sha256": "97b77bea76268bec492e3ea3889bb14f0eb0612a8cf986689e2cbc7cc699d0ab",
+   "drawnPixels": 144000,
+   "skyColours": 15,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "endless-cube-after-map",
+   "sha256": "97b77bea76268bec492e3ea3889bb14f0eb0612a8cf986689e2cbc7cc699d0ab",
+   "drawnPixels": 144000,
+   "skyColours": 15,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "endless-cube-8km",
+   "sha256": "68b48c86166c803cba9f132e317941f7330b996eaeb1ae26586d472a5ac5e0e6",
+   "drawnPixels": 144000,
+   "skyColours": 15,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "endless-plate",
+   "sha256": "f0411abe2b2363e368bae713f4c97049508759d6caff6578dfb47f884ca33149",
+   "drawnPixels": 144000,
+   "skyColours": 17,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "flat-plate",
+   "sha256": "1ad8bf6181fbba6e628041b660d4792761ebf634bdbf2ab3e8843eb2aca451c2",
+   "drawnPixels": 144000,
+   "skyColours": 17,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "estimate",
+   "sha256": "a64c4c03d416e35549ab89e919f5d7a4fb2a98319cc7daee32fa835ea810d7ca",
+   "drawnPixels": 144000,
+   "skyColours": 16,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "regions",
+   "sha256": "0e33541baa80cc6f382eed716ce4a182928d8f4a366c687fe0a015450f580cfd",
+   "drawnPixels": 144000,
+   "skyColours": 30,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "regions-map",
+   "sha256": "98d0b3f285179a0e88b4c5f720c67118e5375f8e9501f27d56a98b4cfc7eef1c",
+   "drawnPixels": 16883,
+   "skyColours": 2,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "district",
+   "sha256": "30d702072643f793afdbe8294fa8398b228653dcbb66844ad44ed8ba07144279",
+   "drawnPixels": 1176,
+   "skyColours": 1,
+   "width": 480,
+   "height": 300
+  }
+ ],
+ "runs": [
+  [
+   {
+    "scene": "flat-starter",
+    "sha256": "1d5bbad87684f8c2839e01b19a5e67b5219f4c73c7a32059a6360c27680e589a",
+    "drawnPixels": 144000,
+    "skyColours": 16,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-starter",
+    "sha256": "ec3c99d92fe3613555a9e0548b06d50fc8a39c8b7a882394dc54d52f0025879c",
+    "drawnPixels": 144000,
+    "skyColours": 16,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-starter-looking-up",
+    "sha256": "9bbfa97f92bfcac346add2159eac644d2e2745a6d45a05966252650b3c45ac13",
+    "drawnPixels": 144000,
+    "skyColours": 15,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-cube-arrival",
+    "sha256": "97b77bea76268bec492e3ea3889bb14f0eb0612a8cf986689e2cbc7cc699d0ab",
+    "drawnPixels": 144000,
+    "skyColours": 15,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-cube-after-map",
+    "sha256": "97b77bea76268bec492e3ea3889bb14f0eb0612a8cf986689e2cbc7cc699d0ab",
+    "drawnPixels": 144000,
+    "skyColours": 15,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-cube-8km",
+    "sha256": "68b48c86166c803cba9f132e317941f7330b996eaeb1ae26586d472a5ac5e0e6",
+    "drawnPixels": 144000,
+    "skyColours": 15,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-plate",
+    "sha256": "f0411abe2b2363e368bae713f4c97049508759d6caff6578dfb47f884ca33149",
+    "drawnPixels": 144000,
+    "skyColours": 17,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "flat-plate",
+    "sha256": "1ad8bf6181fbba6e628041b660d4792761ebf634bdbf2ab3e8843eb2aca451c2",
+    "drawnPixels": 144000,
+    "skyColours": 17,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "estimate",
+    "sha256": "a64c4c03d416e35549ab89e919f5d7a4fb2a98319cc7daee32fa835ea810d7ca",
+    "drawnPixels": 144000,
+    "skyColours": 16,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "regions",
+    "sha256": "0e33541baa80cc6f382eed716ce4a182928d8f4a366c687fe0a015450f580cfd",
+    "drawnPixels": 144000,
+    "skyColours": 30,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "regions-map",
+    "sha256": "98d0b3f285179a0e88b4c5f720c67118e5375f8e9501f27d56a98b4cfc7eef1c",
+    "drawnPixels": 16883,
+    "skyColours": 2,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "district",
+    "sha256": "30d702072643f793afdbe8294fa8398b228653dcbb66844ad44ed8ba07144279",
+    "drawnPixels": 1176,
+    "skyColours": 1,
+    "width": 480,
+    "height": 300
+   }
+  ],
+  [
+   {
+    "scene": "flat-starter",
+    "sha256": "1d5bbad87684f8c2839e01b19a5e67b5219f4c73c7a32059a6360c27680e589a",
+    "drawnPixels": 144000,
+    "skyColours": 16,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-starter",
+    "sha256": "ec3c99d92fe3613555a9e0548b06d50fc8a39c8b7a882394dc54d52f0025879c",
+    "drawnPixels": 144000,
+    "skyColours": 16,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-starter-looking-up",
+    "sha256": "9bbfa97f92bfcac346add2159eac644d2e2745a6d45a05966252650b3c45ac13",
+    "drawnPixels": 144000,
+    "skyColours": 15,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-cube-arrival",
+    "sha256": "97b77bea76268bec492e3ea3889bb14f0eb0612a8cf986689e2cbc7cc699d0ab",
+    "drawnPixels": 144000,
+    "skyColours": 15,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-cube-after-map",
+    "sha256": "97b77bea76268bec492e3ea3889bb14f0eb0612a8cf986689e2cbc7cc699d0ab",
+    "drawnPixels": 144000,
+    "skyColours": 15,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-cube-8km",
+    "sha256": "68b48c86166c803cba9f132e317941f7330b996eaeb1ae26586d472a5ac5e0e6",
+    "drawnPixels": 144000,
+    "skyColours": 15,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-plate",
+    "sha256": "f0411abe2b2363e368bae713f4c97049508759d6caff6578dfb47f884ca33149",
+    "drawnPixels": 144000,
+    "skyColours": 17,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "flat-plate",
+    "sha256": "1ad8bf6181fbba6e628041b660d4792761ebf634bdbf2ab3e8843eb2aca451c2",
+    "drawnPixels": 144000,
+    "skyColours": 17,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "estimate",
+    "sha256": "a64c4c03d416e35549ab89e919f5d7a4fb2a98319cc7daee32fa835ea810d7ca",
+    "drawnPixels": 144000,
+    "skyColours": 16,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "regions",
+    "sha256": "0e33541baa80cc6f382eed716ce4a182928d8f4a366c687fe0a015450f580cfd",
+    "drawnPixels": 144000,
+    "skyColours": 30,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "regions-map",
+    "sha256": "98d0b3f285179a0e88b4c5f720c67118e5375f8e9501f27d56a98b4cfc7eef1c",
+    "drawnPixels": 16883,
+    "skyColours": 2,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "district",
+    "sha256": "30d702072643f793afdbe8294fa8398b228653dcbb66844ad44ed8ba07144279",
+    "drawnPixels": 1176,
+    "skyColours": 1,
+    "width": 480,
+    "height": 300
+   }
+  ]
+ ]
+}

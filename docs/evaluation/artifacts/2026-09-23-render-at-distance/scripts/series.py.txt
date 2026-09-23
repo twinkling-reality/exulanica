@@ -1,0 +1,186 @@
+"""Run one object series end to end with the registered stop rules applied mechanically.
+
+    python3 series.py --layout spread|clustered --counts 0,10,50,200,1000 [--start-at N]
+
+For each count: grow the world to it through the product routes (build_world.py, inside
+quiet-slot), then measure the point (wsdrive.mjs, inside quiet-slot then gpu-slot), summarise it,
+and decide which metrics continue:
+- a budgeted metric over its budget at two consecutive registered counts stops for larger counts;
+- the series stops when every budgeted metric has stopped, at its last count, when the next build
+  is estimated to take more than 60 minutes at the measured rate, or when the product refuses.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+from summarize import summarise  # noqa: E402
+
+STATE = "<RUNTIME>/state.json"
+APP = "http://localhost:19224/"
+ARRIVAL = '{"x_mm": 0, "z_mm": 4000, "yaw": 0}'
+BUDGETS = {
+    "open_first_frame": 2_000_000, "open_complete_world": 2_000_000,
+    "placement_ack": 250_000, "undo_ack": 250_000,
+    "frame_work_walking": 16_700, "frame_work_looking": 16_700,
+}
+
+
+def values(summary: dict) -> dict:
+    """Each budgeted metric's registered statistic at this point, or None when not measured."""
+    out: dict = {}
+    if "open" in summary:
+        out["open_first_frame"] = summary["open"]["warm_first_frame_median_us"]
+        out["open_complete_world"] = summary["open"]["warm_complete_world_median_us"]
+    if "placeundo" in summary:
+        out["placement_ack"] = summary["placeundo"]["placement_ack_us_median"]
+        out["undo_ack"] = summary["placeundo"]["undo_ack_us_median"]
+    if "walk" in summary:
+        out["frame_work_walking"] = summary["walk"]["pooled_p95_us"]
+    if "look" in summary:
+        out["frame_work_looking"] = summary["look"]["pooled_p95_us"]
+    if "reload" in summary:
+        out["reload_identical"] = summary["reload"]["identical"]
+    return out
+
+
+def over(metric: str, value) -> bool:
+    if metric == "reload_identical":
+        return value is False
+    return value is not None and value > BUDGETS[metric]
+
+
+def adopt(ledger: dict, count: int, name: str, measured: dict, how: str) -> None:
+    """Record a point and advance each metric's streak of consecutive counts over budget."""
+    for metric, value in measured.items():
+        if over(metric, value):
+            ledger["exceed_streak"][metric] = ledger["exceed_streak"].get(metric, 0) + 1
+        else:
+            ledger["exceed_streak"][metric] = 0
+        if ledger["exceed_streak"][metric] >= 2:
+            ledger["stopped_metrics"].setdefault(metric, count)
+    ledger["points"].append({"count": count, "measured": True, "file": name, "phases": how,
+                             "values": measured, "recorded_at": time.strftime("%H:%M:%S")})
+
+
+def live_objects() -> int:
+    """The saved world's live object count, read through the product's own route."""
+    import urllib.parse
+    import urllib.request
+    state = json.loads(Path(STATE).read_text())
+    token = Path(state["token_file"]).read_text().strip()
+    base = f"http://127.0.0.1:{state['ports']['api']}"
+    def get(path: str):
+        request = urllib.request.Request(base + path, headers={"Authorization": f"Bearer {token}"})
+        with urllib.request.urlopen(request) as reply:
+            return json.loads(reply.read())
+    entries = get("/world-entries")
+    if not entries:
+        # A fresh workspace has no saved world until something asks for one; ask the way the app
+        # does on its first open, so no measured open ever includes making the starter.
+        request = urllib.request.Request(
+            base + "/world-entries/starter", data=json.dumps({"title": "My world"}).encode(),
+            method="POST", headers={"Authorization": f"Bearer {token}",
+                                    "Content-Type": "application/json"})
+        with urllib.request.urlopen(request) as reply:
+            entries = [json.loads(reply.read())]
+    entry = entries[0]
+    query = "?world_id=" + urllib.parse.quote(entry["world_id"], safe="")
+    version = get(f"/world/versions/{entry['authored_version_id']}{query}")
+    return sum(1 for o in version["objects"] if not o["removed"])
+
+
+def run(command: list[str], log: Path) -> int:
+    with log.open("a") as handle:
+        handle.write(f"\n$ {' '.join(command)}\n")
+        handle.flush()
+        return subprocess.run(command, cwd=HERE, stdout=handle, stderr=subprocess.STDOUT).returncode
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--layout", required=True)
+    parser.add_argument("--counts", default="0,10,50,200,1000")
+    parser.add_argument("--start-at", type=int, default=None)
+    args = parser.parse_args()
+    counts = [int(c) for c in args.counts.split(",")]
+    folder = HERE / "runs" / args.layout
+    folder.mkdir(parents=True, exist_ok=True)
+    log = folder / "series.log"
+    ledger_path = folder / "series-ledger.json"
+    ledger = json.loads(ledger_path.read_text()) if ledger_path.exists() else {
+        "layout": args.layout, "points": [], "stopped_metrics": {}, "exceed_streak": {}}
+    build_log = folder / "build.jsonl"
+    for index, count in enumerate(counts):
+        if args.start_at is not None and count < args.start_at:
+            continue
+        label = f"{args.layout}-{count}"
+        if any(p["count"] == count and p["measured"] for p in ledger["points"]):
+            continue
+        finished = [f for f in sorted(folder.glob(f"{label}-*.json"))
+                    if not f.name.endswith(("-discarded.json", "-invalid.json"))
+                    and json.loads(f.read_text()).get("measurement", True)
+                    and json.loads(f.read_text()).get("finished_at")]
+        if finished:
+            # A point measured by an earlier invocation is adopted, never measured twice.
+            summary = summarise(finished[-1])
+            adopt(ledger, count, finished[-1].name, values(summary), "adopted")
+            ledger_path.write_text(json.dumps(ledger, indent=1))
+            continue
+        if count > 0:
+            # The 60-minute rule, from the last measured build rate.
+            rows = [json.loads(l) for l in build_log.read_text().splitlines()] if build_log.exists() else []
+            placements = [r for r in rows if "apply_us" in r]
+            if placements:
+                recent = placements[-20:]
+                per = sum(r["apply_us"] + r["preview_us"] for r in recent) / len(recent)
+                have = max(r["index"] for r in placements) + 1
+                estimate_s = per * (count - have) / 1e6
+                if estimate_s > 3600:
+                    ledger["stopped"] = f"building to {count} was estimated at {estimate_s:.0f} s"
+                    break
+        phases = ["open"]
+        stopped = ledger["stopped_metrics"]
+        if not (stopped.get("placement_ack") and stopped.get("undo_ack")):
+            phases.append("placeundo")
+        if not stopped.get("reload_identical"):
+            phases.append("reload")
+        if not stopped.get("frame_work_walking"):
+            phases.append("walk")
+        if not stopped.get("frame_work_looking"):
+            phases.append("look")
+        opens = "0" if stopped.get("open_first_frame") and stopped.get("open_complete_world") else "5"
+        before = set(folder.glob(f"{label}-*.json"))
+        # Build (when short) and measure in one slot acquisition: step.py refuses a wrong count.
+        code = run(["python3", "slot.py", "--gpu", "--", "python3", "step.py", "--layout",
+                    args.layout, "--count", str(count), "--phases", ",".join(phases),
+                    "--opens", opens], log)
+        produced = sorted(set(folder.glob(f"{label}-*.json")) - before)
+        produced = [p for p in produced if not p.name.endswith(("-discarded.json", "-invalid.json"))]
+        if code != 0 or not produced:
+            ledger["points"].append({"count": count, "measured": False, "exit": code})
+            ledger_path.write_text(json.dumps(ledger, indent=1))
+            ledger["stopped"] = f"the point at {count} exited {code} with no result"
+            break
+        summary = summarise(produced[-1])
+        measured = values(summary)
+        adopt(ledger, count, produced[-1].name, measured, ",".join(phases))
+        ledger_path.write_text(json.dumps(ledger, indent=1))
+        print(f"{label}: {json.dumps(measured)}", flush=True)
+        budgeted = set(BUDGETS) | {"reload_identical"}
+        if budgeted <= set(stopped):
+            ledger["stopped"] = f"every budgeted metric stopped by {count}"
+            break
+    ledger["finished_at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+    ledger_path.write_text(json.dumps(ledger, indent=1))
+
+
+if __name__ == "__main__":
+    main()

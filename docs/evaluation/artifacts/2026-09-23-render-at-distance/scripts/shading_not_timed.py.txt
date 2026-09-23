@@ -1,0 +1,67 @@
+"""shading.py's two measurements over the sessions the idle gate threw out, for their pixels only.
+
+    .venv/bin/python shading_not_timed.py     prints JSON; writes runs/distance/shading-not-timed.json
+
+The idle gate rules on timing: a session whose machine was busier than the gate allows is not a
+frame-time measurement. Its captures are still engine renders read back with readPixels at the
+same relative pose, which CPU load does not change, so the sky column and the lit face are read
+from them exactly as shading.py reads accepted sessions: its constants and its luminance, imported
+rather than restated. Every row says the timing is not measured, and carries the gate's figures.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+
+from PIL import Image
+
+from shading import CLEAR, FACE_X, FACE_Y, FOLDER, MIDDLE_ROW, SKY_COLUMN, SKY_ROWS, luminance
+
+
+def main() -> None:
+    results = []
+    for session in sorted(FOLDER.glob("distance-*-discarded.json")):
+        document = json.loads(session.read_text())
+        endless = document.get("phases", {}).get("endless", {})
+        if not (document.get("measurement") and endless.get("ok")):
+            continue
+        stem = session.name[:-len("-discarded.json")]
+        names = " ".join(p.name for p in FOLDER.glob(f"{stem}-mark-*"))
+        marks = sorted({int(m) for m in re.findall(rf"{re.escape(stem)}-mark-(\d+)-with\.png", names)})
+        arrival = Image.open(FOLDER / f"{stem}-mark-0-with.png").convert("RGB")
+        references = {row["mark_m"]: row for row in endless["value"]["references"]}
+        legs = {row["mark_m"]: row for row in endless["value"]["legs"]}
+        gate = document.get("gate_during") or {}
+        for mark in marks:
+            without = Image.open(FOLDER / f"{stem}-mark-{mark}-without.png").convert("RGB")
+            sky = [without.getpixel((SKY_COLUMN, y)) for y in SKY_ROWS]
+            withit = Image.open(FOLDER / f"{stem}-mark-{mark}-with.png").convert("RGB")
+            differing = sum(
+                1 for x in FACE_X for y in FACE_Y
+                if max(abs(a - b) for a, b in zip(withit.getpixel((x, y)), arrival.getpixel((x, y)))) > 8)
+            row = [luminance(withit.getpixel((x, MIDDLE_ROW))) for x in FACE_X]
+            steps = sum(1 for a, b in zip(row, row[1:]) if abs(a - b) >= 6)
+            reference = references[mark]
+            compared = reference.get("compared_with_mark_0") or {}
+            results.append({
+                "session": stem.split("-2026")[0], "file": session.name, "mark_m": mark,
+                "timing": "not measured: the idle gate discarded this session",
+                "gate_discarded": document.get("discarded"),
+                "idle_before_percent": (document.get("gate_pre") or {}).get("idle"),
+                "idle_during_mean_tenths": gate.get("mean_tenths"), "idle_during_min_percent": gate.get("min"),
+                "reached_mm": legs[mark]["reached_mm"] if mark in legs else 0,
+                "sky_distinct_colours": len(set(sky)), "sky_all_clear_colour": all(p == CLEAR for p in sky),
+                "face_pixels": len(FACE_X) * len(FACE_Y), "face_differing_from_arrival": differing,
+                "face_middle_row_steps": steps,
+                "object_free_frame_differing_millionths": compared.get("without_object_differing_millionths"),
+                "object_only_iou_millionths": compared.get("object_only_iou_millionths"),
+                "object_only_shift_millipixels": reference.get("object_only_centroid_shift_millipixels"),
+                "registered_drawn_error_millipixels": reference.get("centroid_shift_millipixels"),
+            })
+    (FOLDER / "shading-not-timed.json").write_text(json.dumps(results, indent=1) + "\n")
+    print(json.dumps(results, indent=1))
+
+
+if __name__ == "__main__":
+    main()

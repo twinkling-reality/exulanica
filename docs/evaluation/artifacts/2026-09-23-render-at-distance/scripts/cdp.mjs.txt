@@ -1,0 +1,94 @@
+// Minimal headless Chrome over CDP with Node's own WebSocket, for this lane's probes.
+// Close and error listeners reject pending calls by name (memory: a dead socket reads as a slow call).
+import { spawn } from 'node:child_process';
+import { mkdirSync, rmSync } from 'node:fs';
+
+export const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+export const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+
+export async function launch({ port, profile, width = 1440, height = 900 }) {
+  rmSync(profile, { recursive: true, force: true });
+  mkdirSync(profile, { recursive: true });
+  const chrome = spawn(CHROME, [
+    '--headless=new', `--remote-debugging-port=${port}`, `--user-data-dir=${profile}`,
+    `--window-size=${width},${height}`, '--no-first-run', '--no-default-browser-check',
+    '--disable-extensions', '--disable-background-networking', '--disable-sync',
+    '--password-store=basic', '--use-mock-keychain', '--disable-renderer-backgrounding',
+    '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows',
+    '--disable-component-update', '--disable-default-apps', '--disable-client-side-phishing-detection',
+    '--disable-features=OptimizationHints,OptimizationGuideModelDownloading,OptimizationGuideOnDeviceModel,Translate,MediaRouter',
+    'about:blank',
+  ], { stdio: 'ignore', detached: true });
+  const kill = () => { try { process.kill(-chrome.pid, 'SIGTERM'); } catch { /* gone */ } };
+  process.on('exit', kill);
+  process.on('SIGINT', () => { kill(); process.exit(130); });
+  let target = null;
+  for (let i = 0; i < 120 && target === null; i += 1) {
+    try {
+      const list = await (await fetch(`http://127.0.0.1:${port}/json/list`)).json();
+      target = list.find((t) => t.type === 'page') ?? null;
+    } catch { /* not up */ }
+    if (target === null) await sleep(250);
+  }
+  if (target === null) throw new Error('headless Chrome exposed no page');
+  const cdp = new Cdp(target.webSocketDebuggerUrl);
+  await cdp.open();
+  return { cdp, kill };
+}
+
+export class Cdp {
+  constructor(url) {
+    this.socket = new WebSocket(url);
+    this.next = 1;
+    this.pending = new Map();
+    this.handlers = [];
+    this.closed = null;
+    this.socket.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      if (message.id && this.pending.has(message.id)) {
+        const waiter = this.pending.get(message.id);
+        this.pending.delete(message.id);
+        if (message.error) waiter.reject(new Error(`${message.error.message} ${message.error.data ?? ''}`));
+        else waiter.resolve(message.result);
+      } else if (message.method) {
+        for (const handler of this.handlers) handler(message.method, message.params);
+      }
+    };
+    this.socket.onclose = (event) => {
+      this.closed = `the CDP socket closed (code ${event.code})`;
+      for (const [id, waiter] of this.pending) { this.pending.delete(id); waiter.reject(new Error(this.closed)); }
+    };
+  }
+  open() { return new Promise((ok, fail) => { this.socket.onopen = ok; this.socket.onerror = fail; }); }
+  send(method, params = {}, timeoutMs = 120_000) {
+    if (this.closed) return Promise.reject(new Error(this.closed));
+    const id = this.next++;
+    this.socket.send(JSON.stringify({ id, method, params }));
+    return new Promise((ok, reject) => {
+      const timer = setTimeout(() => { this.pending.delete(id); reject(new Error(`${method} did not answer within ${timeoutMs} ms`)); }, timeoutMs);
+      this.pending.set(id, {
+        resolve: (value) => { clearTimeout(timer); ok(value); },
+        reject: (error) => { clearTimeout(timer); reject(error); },
+      });
+    });
+  }
+  on(handler) { this.handlers.push(handler); }
+  async evaluate(expression, timeoutMs = 120_000) {
+    const reply = await this.send('Runtime.evaluate', {
+      expression, awaitPromise: true, returnByValue: true,
+    }, timeoutMs);
+    if (reply.exceptionDetails) {
+      throw new Error(`evaluate failed: ${reply.exceptionDetails.exception?.description ?? reply.exceptionDetails.text}`);
+    }
+    return reply.result.value;
+  }
+  async waitFor(expression, timeoutMs, what, everyMs = 50) {
+    const deadline = Date.now() + timeoutMs;
+    let last;
+    while (Date.now() < deadline) {
+      try { last = await this.evaluate(expression); if (last) return last; } catch (error) { last = error.message; }
+      await sleep(everyMs);
+    }
+    throw new Error(`timed out after ${timeoutMs} ms waiting for ${what} (last: ${JSON.stringify(last)?.slice(0, 300)})`);
+  }
+}

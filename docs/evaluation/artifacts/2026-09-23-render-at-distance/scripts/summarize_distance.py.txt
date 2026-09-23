@@ -1,0 +1,94 @@
+"""The distance series as lane W's record reports it, from this lane's accepted sessions.
+
+    python3 summarize_distance.py          prints JSON; writes runs/distance/series.json
+
+Reads every accepted session (measurement true, the endless phase ok, not discarded or invalid)
+under runs/distance and shading.json beside them (shading.py), and gives per mark the same fields
+lane W's record gives per mark, one value per repeat in session order: sky colours and whether the
+sky band is all clear colour, the lit face's differing pixels and middle-row steps against the
+session's own arrival, the silhouette comparisons, and the sprint's frame work. Integers only.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+FOLDER = HERE / "runs" / "distance"
+
+
+def accepted() -> list[Path]:
+    out = []
+    for path in sorted(FOLDER.glob("distance-*-*.json")):
+        if path.name.endswith(("-discarded.json", "-invalid.json")) or path.name in ("shading.json", "series.json"):
+            continue
+        document = json.loads(path.read_text())
+        if document.get("measurement") and document.get("phases", {}).get("endless", {}).get("ok"):
+            out.append(path)
+    return out
+
+
+def main() -> None:
+    shading = {(row["session"], row["mark_m"]): row
+               for row in json.loads((FOLDER / "shading.json").read_text())}
+    marks: dict[int, dict[str, list]] = {}
+    sessions = []
+    for path in accepted():
+        raw = json.loads(path.read_text())
+        stem = path.name[:-len(".json")].split("-2026")[0]
+        value = raw["phases"]["endless"]["value"]
+        legs = {leg["mark_m"]: leg for leg in value["legs"]}
+        gate = raw.get("gate_during") or {}
+        sessions.append({
+            "session": stem, "file": path.name,
+            "file_sha256": hashlib.sha256(path.read_bytes()).hexdigest(),
+            "idle_before_percent": (raw.get("gate_pre") or {}).get("idle"),
+            "idle_during_mean_tenths": gate.get("mean_tenths"),
+            "idle_during_min_percent": gate.get("min"),
+            "driver_sha256": raw["driver_sha256"], "instrument_sha256": raw["instrument_sha256"],
+            "build": raw["build"], "tree": raw.get("tree"),
+        })
+        for reference in value["references"]:
+            mark = reference["mark_m"]
+            if mark == 0:
+                continue
+            leg = legs[mark]
+            compared = reference["compared_with_mark_0"]
+            shade = shading[(stem, mark)]
+            row = marks.setdefault(mark, {key: [] for key in (
+                "sky_distinct_colours", "sky_all_clear_colour", "lit_face_differing_pixels",
+                "lit_face_middle_row_steps", "iou_millionths", "object_only_iou_millionths",
+                "registered_drawn_error_millipixels", "object_only_shift_millipixels",
+                "object_free_frame_differing_millionths", "sprint_frames", "sprint_seconds_milli",
+                "sprint_work_p50_us", "sprint_work_p95_us", "sprint_work_max_us",
+                "sprint_frames_over_16700_us", "last_ten_seconds_work_p95_us")})
+            row["sky_distinct_colours"].append(shade["sky_distinct_colours"])
+            row["sky_all_clear_colour"].append(shade["sky_all_clear_colour"])
+            row["lit_face_differing_pixels"].append(shade["face_differing_from_arrival"])
+            row["lit_face_middle_row_steps"].append(shade["face_middle_row_steps"])
+            row["iou_millionths"].append(compared["iou_millionths"])
+            row["object_only_iou_millionths"].append(compared["object_only_iou_millionths"])
+            row["registered_drawn_error_millipixels"].append(reference["centroid_shift_millipixels"])
+            row["object_only_shift_millipixels"].append(reference["object_only_centroid_shift_millipixels"])
+            row["object_free_frame_differing_millionths"].append(compared["without_object_differing_millionths"])
+            row["sprint_frames"].append(leg["leg"]["frames"])
+            row["sprint_seconds_milli"].append(round(leg["seconds"] * 1000))
+            row["sprint_work_p50_us"].append(leg["leg"]["work_p50_us"])
+            row["sprint_work_p95_us"].append(leg["leg"]["work_p95_us"])
+            row["sprint_work_max_us"].append(leg["leg"]["work_max_us"])
+            row["sprint_frames_over_16700_us"].append(leg["leg"]["over_16700_us"])
+            row["last_ten_seconds_work_p95_us"].append(leg["last_ten_seconds"]["work_p95_us"])
+    arrival = sorted({row["sky_distinct_colours"] for key, row in shading.items() if key[1] == 0})
+    series = {"arrival_sky_distinct_colours": arrival,
+              "lit_face_pixels": next(iter(shading.values()))["face_pixels"],
+              "marks": [{"mark_m": mark, "repeats": len(row["sprint_frames"]), **row}
+                        for mark, row in sorted(marks.items())],
+              "sessions": sessions}
+    (FOLDER / "series.json").write_text(json.dumps(series, indent=1) + "\n")
+    print(json.dumps(series, indent=1))
+
+
+if __name__ == "__main__":
+    main()

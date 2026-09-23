@@ -97,8 +97,8 @@ about that world, not a consequence of the module gaining a version.
 
 No extent is stored, because the limit is not a property of the world. It is a property of the
 renderer drawing it, and the browser binding states it as
-`AUTHORED_ENDLESS_GROUND_SUPPORTED_RADIUS_M`, currently **8192 metres**. It moves when the renderer
-does, and no stored world changes when it does.
+`AUTHORED_ENDLESS_GROUND_SUPPORTED_RADIUS_M` in `web/packages/atlas-react/src/playcanvas/world-kind.ts`,
+**8192 metres**. It moves when the renderer does, and no stored world changes when it does.
 
 The number is measured, not chosen. A position reaches the GPU as a 32-bit float. The render origin
 rebases only when the active neighborhood changes, neighborhoods are built from the scene's regions,
@@ -123,15 +123,41 @@ step is read out of the bits rather than restated, the render origin is shown no
 scene with no regions, and the walk is run through the world's own movement resolver one 23
 millimetre frame at a time, from the origin to 8 kilometres, without a recovery.
 
-The radius promises positions and walking, not the rest of the picture. Measured on a release build
-and recorded in the [world scale record](evaluation/2026-09-22-world-scale-baseline.json): out to 8
-kilometres each object is drawn within about a pixel of the same place in the frame, and the frame
-work of a sprint stays within 0.7 ms at the 95th percentile. Two things do not hold. The sky is a
-sphere of radius 540 metres placed where the world opened
-(`web/packages/atlas-react/src/playcanvas/composed-world.ts`), and nothing moves it, so at 1, 4 and 8
-kilometres the sky above the horizon is one flat colour instead of its gradient; where between 80
-metres and 1 kilometre that begins is not measured. And at 4 and 8 kilometres the lit faces of
-objects carry diagonal bands that they do not have at 1 kilometre, for a reason not established.
+The radius promises positions and walking, and the rest of the picture holds with them to 8
+kilometres. Measured on a release build and recorded in the
+[render at distance record](evaluation/2026-09-23-render-at-distance.json), which repeats the walk of
+the [world scale record](evaluation/2026-09-22-world-scale-baseline.json): at 40 and 80 metres and at
+1, 4 and 8 kilometres the sky above the horizon keeps the gradient it has at arrival (29 colours
+down one column at every mark), a placed cube's lit face differs from its arrival in none of the
+11,328 pixels measured on it, and without the cube the whole frame differs from the arrival frame in
+no pixel by more than three levels. The cube is drawn on the same pixels as at arrival, give or take
+one pixel at its edge. What moves between positions is the outline of its shadow, as the shadow
+map's texels fall differently at each: it shifts the centre of cube and shadow together by 0.4 to
+4.1 pixels, near the origin as much as far from it. Frame work while sprinting stays within 0.9 ms
+at the 95th percentile at 1 and 4 kilometres. At 8 kilometres the record holds the pixels and no
+frame time, because every 8 kilometre session ran on a machine too busy for its idle gate.
+
+The sky is a direction rather than a place: `web/packages/atlas-react/src/playcanvas/composed-world.ts`
+draws it around the eye at the far plane, so no walk leaves it. A sky placed where the world opened
+is what the world scale record measured going flat from 1 kilometre.
+
+The sun's shadow holds because it does not depend on what else is in view. The engine fits a
+directional shadow's depth range to the shadow casters in view and offsets every receiver by a fixed
+ten-thousandth of that range, so with one half-metre cube in view the offset is a tenth of a
+millimetre, too little to keep a smooth-shaded face from shadowing itself. The starter's sun
+therefore carries a shadow bias of 0.2 (`web/packages/atlas-react/src/playcanvas/atmosphere.ts`),
+which offsets each caster in the shadow pass by an amount that grows with its slope to the light,
+and the sky casts no shadow. A sky drawn as a caster stretches the range to about two kilometres
+wherever it is in the shadow's view and hides the fault there, which is why the world scale record
+found bands only at 4 and 8 kilometres. The float32 step did not band them: drawing the whole walk
+around the render origin left the bands where they were, and the render origin does not move in a
+world with no regions.
+
+The endless walking face holds its depth order at the same distances. It is drawn as a grid of cells
+no wider than the camera's reach, out to the recovery radius plus that reach, and its depth is
+offset behind anything lying on it (`web/packages/atlas-react/src/playcanvas/world-field.ts`), so a
+plate placed flat on the ground draws whole at every pose the record sweeps, at the origin and at 8
+kilometres.
 
 ### The spawn on a ground with no extents
 

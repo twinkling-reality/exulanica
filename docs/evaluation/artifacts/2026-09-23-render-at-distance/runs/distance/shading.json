@@ -1,0 +1,65 @@
+[
+ {
+  "session": "distance-0-1000",
+  "mark_m": 0,
+  "sky_distinct_colours": 29,
+  "sky_all_clear_colour": false,
+  "face_pixels": 11328,
+  "face_differing_from_arrival": 0,
+  "face_middle_row_steps": 0
+ },
+ {
+  "session": "distance-0-1000",
+  "mark_m": 1000,
+  "sky_distinct_colours": 29,
+  "sky_all_clear_colour": false,
+  "face_pixels": 11328,
+  "face_differing_from_arrival": 0,
+  "face_middle_row_steps": 0
+ },
+ {
+  "session": "distance-0-4000",
+  "mark_m": 0,
+  "sky_distinct_colours": 29,
+  "sky_all_clear_colour": false,
+  "face_pixels": 11328,
+  "face_differing_from_arrival": 0,
+  "face_middle_row_steps": 0
+ },
+ {
+  "session": "distance-0-4000",
+  "mark_m": 4000,
+  "sky_distinct_colours": 29,
+  "sky_all_clear_colour": false,
+  "face_pixels": 11328,
+  "face_differing_from_arrival": 0,
+  "face_middle_row_steps": 0
+ },
+ {
+  "session": "distance-0-controls",
+  "mark_m": 0,
+  "sky_distinct_colours": 29,
+  "sky_all_clear_colour": false,
+  "face_pixels": 11328,
+  "face_differing_from_arrival": 0,
+  "face_middle_row_steps": 0
+ },
+ {
+  "session": "distance-0-controls",
+  "mark_m": 40,
+  "sky_distinct_colours": 29,
+  "sky_all_clear_colour": false,
+  "face_pixels": 11328,
+  "face_differing_from_arrival": 0,
+  "face_middle_row_steps": 0
+ },
+ {
+  "session": "distance-0-controls",
+  "mark_m": 80,
+  "sky_distinct_colours": 29,
+  "sky_all_clear_colour": false,
+  "face_pixels": 11328,
+  "face_differing_from_arrival": 0,
+  "face_middle_row_steps": 0
+ }
+]

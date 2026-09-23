@@ -1,0 +1,164 @@
+// Reproduce the marker plate against the ground: how much of the plate is drawn, pose by pose.
+//
+//   node probe-plate.mjs --port 19222 --out DIR [--label NAME]
+//
+// For each ground (endless, flat) a real binding on WebGL2 in headless Chrome, a marker plate
+// placed through the object runtime at (0, 0) on the endless ground and (2, 0) on the flat one,
+// and a camera sweep: from 1.5 m to 40 m south of the plate in 0.25 m steps at eye height,
+// aimed at the plate's centre. At every pose, three renders in one task:
+//   WITH     as drawn
+//   WITHOUT  the plate hidden
+//   ALONE    the ground field hidden (nothing behind the plate but sky)
+// footprint = ALONE vs ALONE-without-plate (> 3 levels), interior pixels only (all four
+//             neighbours in it too), so antialiased edges are not counted.
+// drawn     = footprint pixels where WITH differs from WITHOUT (> 3 levels): the plate shows.
+// clean     = footprint pixels where WITH matches ALONE (<= 3 levels): nothing of the ground
+//             shows through or over the plate.
+// A plate drawn whole has drawn/footprint = clean/footprint = 1 at every pose.
+//
+// Arms (runtime changes to the ground, for measuring alternatives): --bias units,slope on the
+// walking face; --face-half H (one quad); --face-grid N,H (an N x N grid); --legacy (the ground as
+// it was before this lane: one quad of max(2200, recovery x 4.8), no offsets, marks lifted 8 mm).
+import { mkdirSync, writeFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { launch, sleep } from './cdp.mjs';
+
+const HERE = dirname(new URL(import.meta.url).pathname);
+const arg = (name, fallback) => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : fallback; };
+const port = arg('port', '19222');
+const out = arg('out', join(HERE, 'runs', 'probe-plate'));
+const label = arg('label', 'run');
+const bias = arg('bias') === undefined ? null : arg('bias').split(',').map(Number);
+const faceHalf = arg('face-half') === undefined ? null : Number(arg('face-half'));
+const faceGrid = arg('face-grid') === undefined ? null : arg('face-grid').split(',').map(Number);
+const legacy = process.argv.includes('--legacy');
+const grounds = arg('grounds', 'authored-endless:0,authored-flat:2').split(',').map((g) => { const [k, x, z] = g.split(':'); return [k, Number(x), Number(z ?? 0)]; });
+mkdirSync(out, { recursive: true });
+const WEB = '/@fs<WORKTREE>/web';
+
+const PAGE = String.raw`(async (kind, plateX, bias, faceHalf, plateZ, faceGrid, legacy) => {
+  const { AtlasBinding } = await import('${WEB}/packages/atlas-react/src/playcanvas/atlas-binding.ts');
+  const { decodeOpm } = await import('${WEB}/packages/atlas-react/src/playcanvas/opm.ts');
+  const kinds = await import('${WEB}/packages/atlas-react/test/binding/world-kinds.ts');
+  const { makeScene } = await import('${WEB}/packages/atlas-core/src/index.ts');
+  const opm = decodeOpm(await (await fetch('${WEB}/packages/atlas-react/test/fixtures/python-writer.opm')).arrayBuffer());
+  const W = 640, H = 400;
+  const canvas = document.createElement('canvas');
+  canvas.style.cssText = 'position:fixed;left:0;top:0;width:' + W + 'px;height:' + H + 'px';
+  const overlay = document.createElement('div');
+  document.body.append(canvas, overlay);
+  const binding = await AtlasBinding.create({ canvas, overlayParent: overlay, deviceTypes: ['webgl2'],
+    scene: makeScene([], 1, 1), pointMaps: new Map(), maxPixelRatio: 1, reducedMotion: true, overlay: false,
+    ...kinds.worldOptions(kind, opm) });
+  binding.app.autoRender = false;
+  binding.app.resizeCanvas(W, H);
+  binding.update(1 / 60, 1000);
+  const bytes = await (await fetch('${WEB}/packages/graph-client/test/fixtures/cc0.marker-plate.glb')).arrayBuffer();
+  const digest = [...new Uint8Array(await crypto.subtle.digest('SHA-256', bytes))].map(b => b.toString(16).padStart(2, '0')).join('');
+  await binding.objects.place({ objectId: 'plate', islandId: kinds.STARTER_REGION,
+    asset: { assetKey: 'cc0.marker-plate', mediaType: 'model/gltf-binary', contentSha256: digest, byteSize: bytes.byteLength },
+    transform: { xMm: plateX * 1000, yMm: 0, zMm: plateZ * 1000, yawMicroradians: 0, scaleMilli: 1000 }, behaviour: null }, bytes);
+  const plate = binding.app.root.findByName('authored-object:plate');
+  if (faceHalf !== null) {
+    const mi = binding.field.entity.render.meshInstances[0];
+    const Mesh = mi.mesh.constructor; const m = new Mesh(binding.device);
+    const h = faceHalf;
+    m.setPositions([-h, 0, -h, h, 0, -h, h, 0, h, -h, 0, h]); m.setNormals([0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0]);
+    m.setIndices([0, 2, 1, 0, 3, 2]); m.update();
+    mi.mesh = m;
+  }
+  if (legacy) {
+    // The ground as it was drawn before this lane: an endless face of ONE quad reaching
+    // max(2200, 4.8 x the recovery radius), no depth offsets anywhere, and on a bounded ground the
+    // metre marks lifted 8 mm off the face.
+    const instances = binding.field.entity.render.meshInstances;
+    if (kind === 'authored-endless') {
+      const mi = instances[0]; const Mesh = mi.mesh.constructor; const m = new Mesh(binding.device);
+      const h = Math.max(2200, binding.navigationWorld.recoveryRadius * 4.8);
+      m.setPositions([-h, 0, -h, h, 0, -h, h, 0, h, -h, 0, h]); m.setNormals([0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0]);
+      m.setIndices([0, 2, 1, 0, 3, 2]); m.update(); mi.mesh = m;
+    }
+    for (const mi of instances) { mi.material.depthBias = 0; mi.material.slopeDepthBias = 0; mi.material.update(); }
+    if (kind === 'authored-flat') {
+      const marks = instances[2]; const pos = []; marks.mesh.getPositions(pos);
+      for (let i = 1; i < pos.length; i += 3) pos[i] += 0.008;
+      marks.mesh.setPositions(pos); marks.mesh.update();
+    }
+  }
+  if (faceGrid !== null) {
+    const mi = binding.field.entity.render.meshInstances[0];
+    const Mesh = mi.mesh.constructor; const m = new Mesh(binding.device);
+    const [n, half] = faceGrid; const pos = [], nor = [], idx = [];
+    for (let j = 0; j <= n; j += 1) for (let i = 0; i <= n; i += 1) { pos.push(-half + 2 * half * i / n, 0, -half + 2 * half * j / n); nor.push(0, 1, 0); }
+    for (let j = 0; j < n; j += 1) for (let i = 0; i < n; i += 1) { const a = j * (n + 1) + i, b = a + 1, c = a + n + 2, d = a + n + 1; idx.push(a, c, b, a, d, c); }
+    m.setPositions(pos); m.setNormals(nor); m.setIndices(idx); m.update();
+    mi.mesh = m;
+  }
+  if (bias !== null) {
+    const face = binding.field.entity.render.meshInstances[0].material;
+    face.depthBias = bias[0]; face.slopeDepthBias = bias[1]; face.update();
+  }
+  const field = binding.field.entity;
+  const gl = binding.device.gl;
+  const grab = () => { binding.app.render(); gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+    const px = new Uint8Array(W * H * 4); gl.readPixels(0, 0, W, H, gl.RGBA, gl.UNSIGNED_BYTE, px); return px; };
+  const differs = (a, b, i) => Math.abs(a[i] - b[i]) > 3 || Math.abs(a[i + 1] - b[i + 1]) > 3 || Math.abs(a[i + 2] - b[i + 2]) > 3;
+  const rows = [];
+  for (let back = 1.5; back <= 40.0001; back += 0.25) {
+    const s = binding.controls.state;
+    const eye = binding.navigationWorld.eyeHeight;
+    s.x = plateX + 0.3; s.z = plateZ + back; s.yaw = Math.atan2(0.3, back); s.pitch = -Math.atan2(eye, Math.hypot(0.3, back));
+    binding.update(1 / 60, 2000);
+    const withIt = grab();
+    plate.enabled = false; const without = grab(); plate.enabled = true;
+    field.enabled = false; const alone = grab();
+    plate.enabled = false; const empty = grab(); plate.enabled = true; field.enabled = true;
+    // The footprint's interior: pixels whose four neighbours are footprint too, so an edge that
+    // antialiasing blends with whatever is behind the plate is not counted either way.
+    const mask = new Uint8Array(W * H);
+    for (let k = 0; k < W * H; k += 1) mask[k] = differs(alone, empty, k * 4) ? 1 : 0;
+    let footprint = 0, drawn = 0, clean = 0;
+    for (let y = 1; y < H - 1; y += 1) for (let x = 1; x < W - 1; x += 1) {
+      const k = y * W + x;
+      if (!mask[k] || !mask[k - 1] || !mask[k + 1] || !mask[k - W] || !mask[k + W]) continue;
+      footprint += 1;
+      if (differs(withIt, without, k * 4)) drawn += 1;
+      if (!differs(withIt, alone, k * 4)) clean += 1;
+    }
+    rows.push([Math.round(back * 100) / 100, footprint, drawn, clean]);
+  }
+  binding.destroy(); canvas.remove(); overlay.remove();
+  const gi = gl.getExtension ? null : null;
+  return rows;
+})`;
+
+const { cdp, kill } = await launch({ port: 19223, profile: join(HERE, 'profiles', `plate-${label}`) });
+const result = { label, port, grounds: {} };
+try {
+  await cdp.send('Page.enable'); await cdp.send('Runtime.enable');
+  await cdp.send('Page.navigate', { url: `http://localhost:${port}/@vite/env` });
+  await sleep(1500);
+  result.renderer = await cdp.evaluate(`(() => { const gl = document.createElement('canvas').getContext('webgl2'); const i = gl.getExtension('WEBGL_debug_renderer_info'); return gl.getParameter(i.UNMASKED_RENDERER_WEBGL); })()`);
+  result.bias = bias; result.faceHalf = faceHalf; result.faceGrid = faceGrid; result.legacy = legacy;
+  for (const [kind, x, z] of grounds) {
+    const rows = await cdp.evaluate(`${PAGE}(${JSON.stringify(kind)}, ${x}, ${JSON.stringify(bias)}, ${JSON.stringify(faceHalf)}, ${z}, ${JSON.stringify(faceGrid)}, ${legacy})`, 600_000);
+    const fractions = rows.filter(([, f]) => f > 0).map(([, f, d]) => d / f);
+    const under = rows.filter(([, f, d]) => f > 0 && d / f < 0.99);
+    const cleanFractions = rows.filter(([, f]) => f > 0).map(([, f, , c]) => c / f);
+    const key = `${kind}@${x},${z}`;
+    result.grounds[key] = {
+      poses: rows.length, footprintless: rows.filter(([, f]) => f === 0).length,
+      min: Math.min(...fractions), mean: fractions.reduce((a, b) => a + b, 0) / fractions.length,
+      under_0_99: under.length,
+      clean_min: Math.min(...cleanFractions), clean_mean: cleanFractions.reduce((a, b) => a + b, 0) / cleanFractions.length,
+      clean_under_0_99: cleanFractions.filter((c) => c < 0.99).length,
+      worst: [...rows].sort((a, b) => a[2] / a[1] - b[2] / b[1]).slice(0, 5), rows,
+    };
+    console.log(key, JSON.stringify({ ...result.grounds[key], rows: undefined, worst: undefined }));
+  }
+} catch (error) {
+  result.error = String(error.stack ?? error); console.error(result.error);
+} finally {
+  writeFileSync(join(out, `${label}.json`), JSON.stringify(result, null, 1));
+  kill();
+}

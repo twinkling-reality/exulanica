@@ -1,0 +1,122 @@
+{
+ "camera": {
+  "fov": 70,
+  "near": 0.08,
+  "far": 1200,
+  "clear": [
+   0.635294,
+   0.831373,
+   0.87451,
+   1
+  ],
+  "toneMapping": 3
+ },
+ "scene": {
+  "ambient": [
+   0.58,
+   0.568627,
+   0.552706,
+   1
+  ],
+  "exposure": 1.06,
+  "fog": {
+   "type": "linear",
+   "colour": [
+    1,
+    0.992157,
+    0.976471,
+    1
+   ],
+   "start": 46,
+   "end": 220
+  },
+  "skybox": false
+ },
+ "lights": [
+  {
+   "entity": "atlas-directional-light",
+   "type": "directional",
+   "colour": [
+    1,
+    0.964706,
+    0.8,
+    1
+   ],
+   "intensity": 1.65,
+   "castShadows": true,
+   "shadowDistance": 72,
+   "normalOffsetBias": 0,
+   "shadowBias": 0.2,
+   "shadowResolution": 2048,
+   "shadowType": 0,
+   "numCascades": 1,
+   "euler": [
+    52,
+    -38,
+    0
+   ]
+  }
+ ],
+ "endChunk": "display-space",
+ "displaySpaceFog": true,
+ "maxPixelRatio": 1,
+ "navigation": {
+  "centre": [
+   0,
+   0
+  ],
+  "fieldRadius": 90,
+  "recoveryRadius": 138,
+  "eyeHeight": 1.62,
+  "regions": 0,
+  "surface": {
+   "origin": 0,
+   "at100m": null,
+   "at8100m": null,
+   "at8200m": null
+  }
+ },
+ "start": {
+  "x": 0,
+  "y": 1.62,
+  "z": 4,
+  "yaw": 0,
+  "pitch": 0
+ },
+ "controls": {
+  "sensitivity": 0.0022,
+  "moveSpeed": 9,
+  "sprintMultiplier": 2.6,
+  "accelTime": 0.12,
+  "eyeHeight": 1.62,
+  "enabled": true
+ },
+ "renderOrigin": [
+  0,
+  0,
+  0
+ ],
+ "roots": {
+  "renderRoot": true,
+  "environmentRoot": []
+ },
+ "composedWorld": {
+  "profile": "origin-landscape",
+  "skyHorizon": [
+   1,
+   0.992157,
+   0.976471
+  ],
+  "topologyInstances": 1
+ },
+ "present": {
+  "ownedDistrict": false,
+  "generatedTile": false,
+  "googleTiles": false,
+  "authoredSociety": true,
+  "authoredPointMaps": false,
+  "overlay": true,
+  "mapOverlay": true,
+  "motes": 0
+ }
+}

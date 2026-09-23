@@ -1,0 +1,2997 @@
+{
+ "profile": "exulanica.digest-bound-record/v1",
+ "record": {
+  "artifacts": {
+   "directory": "docs/evaluation/artifacts/2026-09-23-render-at-distance",
+   "files": [
+    {
+     "byte_size": 308617,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/captures/8km-with-reference.png",
+     "sha256": "cb614159c6a781c768db792931dc3ff76a145f221fc4fa43a4bd3ddbada20c18"
+    },
+    {
+     "byte_size": 308884,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/captures/arrival-with-reference.png",
+     "sha256": "5cef7f2752f0e85dd655fd8ecb8405267f01d995e856ee54330e487a3897c357"
+    },
+    {
+     "byte_size": 78106,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/captures/endless-cube-after-map-before-after.png",
+     "sha256": "c35198e4fbf1b8936e367821a96d5b1eda44d108e0076ac92ff54751d2527486"
+    },
+    {
+     "byte_size": 87448,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/captures/flat-plate-before-after.png",
+     "sha256": "a62ee86b2fadeaadad1417a4a9b4b595dd2b99b256769b75920e5b87c7e55589"
+    },
+    {
+     "byte_size": 13660,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/band-cause/arms.json",
+     "sha256": "fba2d693f707b2a5fadb74e1186ee2d9e18c16939c7df82960e81c683189ab84"
+    },
+    {
+     "byte_size": 6901,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/band-cause/casters.json",
+     "sha256": "e552e7fc06144341ce4e2bd4f2c144ac59649d271e9986e0c6265443e621d362"
+    },
+    {
+     "byte_size": 10374,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/band-cause/shadow-arms.json",
+     "sha256": "eab4a7ee99731141dec15416765afad4a1a7143fde89373b58e39a530f990168"
+    },
+    {
+     "byte_size": 5295,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/band-cause/shadow-camera.json",
+     "sha256": "2d5e6357aebbaeb4b4c7963500286ad0111542161eb7e4c6c07d0f3f91befa54"
+    },
+    {
+     "byte_size": 499,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/break/contracts.log.txt",
+     "sha256": "3bcc20a2a5ef1217a97bb1bafa72d6bf52c942196e9260844f66fbb8df428ce9"
+    },
+    {
+     "byte_size": 806,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/break/harness.log.txt",
+     "sha256": "79ef7bcbc3b3ad3c63f384dc014831b725b1cc9270af288d83a2e5a916ed6cdd"
+    },
+    {
+     "byte_size": 91653,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/distance/distance-0-1000-2026-09-23T15-02-31-017Z-discarded.json",
+     "sha256": "ce46c90afe544a2d53eba629eb9240c63a221c7c9c819034dbb12f8cd5901988"
+    },
+    {
+     "byte_size": 96799,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/distance/distance-0-1000-2026-09-23T15-27-15-615Z.json",
+     "sha256": "ac93780f35868959d5df21970e314872f2b89ba9e911f6ebd0a1b6fc8779cc21"
+    },
+    {
+     "byte_size": 285271,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/distance/distance-0-4000-2026-09-23T15-46-06-737Z.json",
+     "sha256": "9b71cee11301b4ae0893651eb01b443987bbbf4676dfc27a1f8b076a246326cc"
+    },
+    {
+     "byte_size": 14525,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/distance/distance-0-8000-2026-09-23T15-51-27-999Z-stopped.json",
+     "sha256": "5f9108bf6ce5dcc39d2fc3e43e5179c50c5d02fc7df9937918c497fb8eb3534f"
+    },
+    {
+     "byte_size": 535744,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/distance/distance-0-8000-2026-09-23T18-28-19-498Z-discarded.json",
+     "sha256": "76eab156cfb3fe187d54ef154c06cf36a1055f9d4129f3d17bcd3fbcd7714807"
+    },
+    {
+     "byte_size": 491754,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/distance/distance-0-8000-2026-09-23T18-47-23-995Z-discarded.json",
+     "sha256": "494b3746ee0956cfb2bea79740fc68f3564f92176bb36edb9ca342cb298282b2"
+    },
+    {
+     "byte_size": 517223,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/distance/distance-0-8000-2026-09-23T18-59-25-047Z-discarded.json",
+     "sha256": "f04111423da9dc282429a623ea385bf9a74f096572024bf9ca884ff2f2ee878e"
+    },
+    {
+     "byte_size": 36901,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/distance/distance-0-controls-2026-09-23T14-21-25-338Z.json",
+     "sha256": "6e65d8f792802757e6b4625b151f5c548794536b3911248f3a1215ebd03c3a9d"
+    },
+    {
+     "byte_size": 5343,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/distance/gates.jsonl.txt",
+     "sha256": "c79a4b4e4419750cf399072d87f19d408290f38f6d3b614593c7ec288abc18a2"
+    },
+    {
+     "byte_size": 5779,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/distance/series.json",
+     "sha256": "f9596468cff3089cd7d63ece61ed8c6cf06836aa8ebe21dd671574fa127bea96"
+    },
+    {
+     "byte_size": 5812,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/distance/shading-not-timed.json",
+     "sha256": "9c981990016e3d0a4e2fd294b22f26a1fbec79a29d4bdbe531972e31f8242d20"
+    },
+    {
+     "byte_size": 1465,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/distance/shading.json",
+     "sha256": "a90291e25d309c8422503dbfaf8eedcdf6627178cfa78ec1c4b3cc2bc86bd3ac"
+    },
+    {
+     "byte_size": 6903,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/pixels/baseline-e9dee3c2.json",
+     "sha256": "2c6850169e2e62e49d7202354fe99cde8500f2ad9867c1efc0d1c96e73fa02d7"
+    },
+    {
+     "byte_size": 8121,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/pixels/final.json",
+     "sha256": "56ee1a1f172f1f4e563f253137d9b2381be2189b1245224b2840ff20b9f1fa30"
+    },
+    {
+     "byte_size": 8121,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/pixels/fixes-1.json",
+     "sha256": "56ee1a1f172f1f4e563f253137d9b2381be2189b1245224b2840ff20b9f1fa30"
+    },
+    {
+     "byte_size": 7680,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/pixels/sky-bias.json",
+     "sha256": "00b9df989e632ec51d2f14a83f719edfca983b26c29b5245752ed81735fa4c03"
+    },
+    {
+     "byte_size": 8121,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/pixels/step-5a.json",
+     "sha256": "56ee1a1f172f1f4e563f253137d9b2381be2189b1245224b2840ff20b9f1fa30"
+    },
+    {
+     "byte_size": 8121,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/pixels/step-5d.json",
+     "sha256": "56ee1a1f172f1f4e563f253137d9b2381be2189b1245224b2840ff20b9f1fa30"
+    },
+    {
+     "byte_size": 16372,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/plate/arm-facegrid_16_9344_bias_1_1.json",
+     "sha256": "ff2c85bc648831dd59f4e3b1d4f30354a0891853c8a01903574ff8e490ac65e7"
+    },
+    {
+     "byte_size": 16271,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/plate/arm-facehalf_1500_bias_0_0.json",
+     "sha256": "9e757ba5edf0c092733237a7d7171d3616a40bc582a370e2afa7d5bb53c3d665"
+    },
+    {
+     "byte_size": 16356,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/plate/arm-facehalf_1500_bias_1_1.json",
+     "sha256": "21741ba6aff3b5c6097c9aae38b2bf2cabb5a573e5fa7609d74b52730bdf7c8a"
+    },
+    {
+     "byte_size": 16350,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/plate/arm-legacy_bias_0_16.json",
+     "sha256": "e92696a9f59dfd3a2cf9622cea0a87e6e76de3c38203b5d345ea4abda940767c"
+    },
+    {
+     "byte_size": 16252,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/plate/arm-legacy_bias_1_1.json",
+     "sha256": "fa20affdbc12c69e4d0776e11b1b6f27645a1b60a8af3bfe955fd493a67059a0"
+    },
+    {
+     "byte_size": 16151,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/plate/arm-legacy_bias_64_0.json",
+     "sha256": "c8cb1d88ae7c9773c13f8c727ccaa2034e759cc687805731a6f96391def007dc"
+    },
+    {
+     "byte_size": 33783,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/plate/record-final-0c1abce8d3c4.json",
+     "sha256": "e107ff749bf0aa138bd6b48735e48b5271899a57a09650b34d666f5fd2849be8"
+    },
+    {
+     "byte_size": 33154,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/plate/record-legacy-0c1abce8d3c4.json",
+     "sha256": "846a5968a949567c80e600bb1c67340f8c2a84af37639adbcb135c71262b679d"
+    },
+    {
+     "byte_size": 144840,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/web/atlas-react-package.log.txt",
+     "sha256": "8bc25c04cbc645f9b7dd12612a159d2f4a48b9f199f0d03e336fe42ca8ce50d3"
+    },
+    {
+     "byte_size": 1764,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/scripts/break_contracts.py.txt",
+     "sha256": "5bce2c94d0df136144ce46bf71a4be2d08c8d233ef825fc9fbca2d0eb586cfe2"
+    },
+    {
+     "byte_size": 3031,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/scripts/break_harness.py.txt",
+     "sha256": "8e76613e972e9a942e32443b460f770f8838933b728108e44ef56df8870d74d6"
+    },
+    {
+     "byte_size": 4527,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/scripts/cdp.mjs.txt",
+     "sha256": "dfad24f881f7c514494ff306e662176417f22fe81043545c8b9982247f366303"
+    },
+    {
+     "byte_size": 4897,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/scripts/place.py.txt",
+     "sha256": "f681fbf744c53c5de9f1e00afd2b34d0e06c3afb9e843f90cebfe094f4d9b3ec"
+    },
+    {
+     "byte_size": 2908,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/scripts/preview.py.txt",
+     "sha256": "b34e603103924dbf026a8df356737fd8a984c63e9efd64dc3b4bb81754767504"
+    },
+    {
+     "byte_size": 12276,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/scripts/probe-bands.mjs.txt",
+     "sha256": "ca9d09442459657af8ed33b68eca29821de82fb7929a09cd855459418cc37aa2"
+    },
+    {
+     "byte_size": 4104,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/scripts/probe-casters.mjs.txt",
+     "sha256": "2b131416b6d43c3411f6229c97e13d98247ae0e1be929298de3b9cbbc64727ab"
+    },
+    {
+     "byte_size": 3908,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/scripts/probe-internals.mjs.txt",
+     "sha256": "f0890c8bf3136f16d5f56271b1c455731548b9c93a7c518155b984ccbcc51c2f"
+    },
+    {
+     "byte_size": 10419,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/scripts/probe-plate.as-run-0c1abce8d3c4.mjs.txt",
+     "sha256": "c4ed98fe049ed8df68e9b827b71f280dc7422aa70cd1a94a74e656fc7024c5a3"
+    },
+    {
+     "byte_size": 9999,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/scripts/probe-shadow.mjs.txt",
+     "sha256": "ee22c46ac076823c917341f8584924ca1aada77dbb37f1da02c9835886b9d3f4"
+    },
+    {
+     "byte_size": 8900,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/scripts/series.py.txt",
+     "sha256": "9554e44e48cf3acd54f0ce84ff18efe5e9fd7617cad6de41b49233029ebc6951"
+    },
+    {
+     "byte_size": 3808,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/scripts/shading_not_timed.py.txt",
+     "sha256": "e889978b1ad3bc603c0a6de4b8d708082335276e0beb38afdbb3e61d0964b6aa"
+    },
+    {
+     "byte_size": 1836,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/scripts/slot.py.txt",
+     "sha256": "53a78c7d62bbf928f80c75ff9d9cc0c8d11e7b97ed5b958a1600210fc8b26cde"
+    },
+    {
+     "byte_size": 5064,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/scripts/summarize_distance.py.txt",
+     "sha256": "c897478ee0a086d92b894049576d70d75a245f5c3640f75c733102ffefb2c38e"
+    },
+    {
+     "byte_size": 2128,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/scripts/tree.py.txt",
+     "sha256": "ed1e8dc0a81ce997e4642416a39dbf88c6c681768747b985759cd4d0bed3139f"
+    },
+    {
+     "byte_size": 44915,
+     "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/scripts/write_record.py.txt",
+     "sha256": "4085e65a7cf048802feef05926a3e1fc79576f0e1f7da9ec4262a5b4f24bc852"
+    }
+   ],
+   "substitutions": [
+    {
+     "as_run": "the path of the measuring worktree",
+     "published": "<WORKTREE>"
+    },
+    {
+     "as_run": "the path of the main checkout",
+     "published": "<MAIN_CHECKOUT>"
+    },
+    {
+     "as_run": "the session scratch directory",
+     "published": "<SCRATCH>"
+    },
+    {
+     "as_run": "the slot-4 runtime directory",
+     "published": "<RUNTIME>"
+    },
+    {
+     "as_run": "the per-user temporary directory",
+     "published": "<TMPDIR>"
+    }
+   ]
+  },
+  "band_cause": {
+   "arms": {
+    "base": [
+     {
+      "camera_render_z_mm": 3500,
+      "lit_face_differing_pixels": null,
+      "lit_face_middle_row_steps": 0,
+      "mark_m": 0,
+      "sky_distinct_colours": 30
+     },
+     {
+      "camera_render_z_mm": -36500,
+      "lit_face_differing_pixels": 0,
+      "lit_face_middle_row_steps": 0,
+      "mark_m": 40,
+      "sky_distinct_colours": 28
+     },
+     {
+      "camera_render_z_mm": -76500,
+      "lit_face_differing_pixels": 0,
+      "lit_face_middle_row_steps": 0,
+      "mark_m": 80,
+      "sky_distinct_colours": 23
+     },
+     {
+      "camera_render_z_mm": -996500,
+      "lit_face_differing_pixels": 0,
+      "lit_face_middle_row_steps": 0,
+      "mark_m": 1000,
+      "sky_distinct_colours": 1
+     },
+     {
+      "camera_render_z_mm": -3996500,
+      "lit_face_differing_pixels": 6754,
+      "lit_face_middle_row_steps": 6,
+      "mark_m": 4000,
+      "sky_distinct_colours": 1
+     },
+     {
+      "camera_render_z_mm": -7996500,
+      "lit_face_differing_pixels": 7539,
+      "lit_face_middle_row_steps": 4,
+      "mark_m": 8000,
+      "sky_distinct_colours": 1
+     }
+    ],
+    "nocast": [
+     {
+      "camera_render_z_mm": 3500,
+      "lit_face_differing_pixels": null,
+      "lit_face_middle_row_steps": 0,
+      "mark_m": 0,
+      "sky_distinct_colours": 30
+     },
+     {
+      "camera_render_z_mm": -36500,
+      "lit_face_differing_pixels": 0,
+      "lit_face_middle_row_steps": 0,
+      "mark_m": 40,
+      "sky_distinct_colours": 28
+     },
+     {
+      "camera_render_z_mm": -76500,
+      "lit_face_differing_pixels": 0,
+      "lit_face_middle_row_steps": 0,
+      "mark_m": 80,
+      "sky_distinct_colours": 23
+     },
+     {
+      "camera_render_z_mm": -996500,
+      "lit_face_differing_pixels": 0,
+      "lit_face_middle_row_steps": 0,
+      "mark_m": 1000,
+      "sky_distinct_colours": 1
+     },
+     {
+      "camera_render_z_mm": -3996500,
+      "lit_face_differing_pixels": 0,
+      "lit_face_middle_row_steps": 0,
+      "mark_m": 4000,
+      "sky_distinct_colours": 1
+     },
+     {
+      "camera_render_z_mm": -7996500,
+      "lit_face_differing_pixels": 0,
+      "lit_face_middle_row_steps": 0,
+      "mark_m": 8000,
+      "sky_distinct_colours": 1
+     }
+    ],
+    "nolightshadow": [
+     {
+      "camera_render_z_mm": 3500,
+      "lit_face_differing_pixels": null,
+      "lit_face_middle_row_steps": 0,
+      "mark_m": 0,
+      "sky_distinct_colours": 30
+     },
+     {
+      "camera_render_z_mm": -36500,
+      "lit_face_differing_pixels": 0,
+      "lit_face_middle_row_steps": 0,
+      "mark_m": 40,
+      "sky_distinct_colours": 28
+     },
+     {
+      "camera_render_z_mm": -76500,
+      "lit_face_differing_pixels": 0,
+      "lit_face_middle_row_steps": 0,
+      "mark_m": 80,
+      "sky_distinct_colours": 23
+     },
+     {
+      "camera_render_z_mm": -996500,
+      "lit_face_differing_pixels": 0,
+      "lit_face_middle_row_steps": 0,
+      "mark_m": 1000,
+      "sky_distinct_colours": 1
+     },
+     {
+      "camera_render_z_mm": -3996500,
+      "lit_face_differing_pixels": 0,
+      "lit_face_middle_row_steps": 0,
+      "mark_m": 4000,
+      "sky_distinct_colours": 1
+     },
+     {
+      "camera_render_z_mm": -7996500,
+      "lit_face_differing_pixels": 0,
+      "lit_face_middle_row_steps": 0,
+      "mark_m": 8000,
+      "sky_distinct_colours": 1
+     }
+    ],
+    "noreceive": [
+     {
+      "camera_render_z_mm": 3500,
+      "lit_face_differing_pixels": null,
+      "lit_face_middle_row_steps": 0,
+      "mark_m": 0,
+      "sky_distinct_colours": 30
+     },
+     {
+      "camera_render_z_mm": -36500,
+      "lit_face_differing_pixels": 0,
+      "lit_face_middle_row_steps": 0,
+      "mark_m": 40,
+      "sky_distinct_colours": 28
+     },
+     {
+      "camera_render_z_mm": -76500,
+      "lit_face_differing_pixels": 0,
+      "lit_face_middle_row_steps": 0,
+      "mark_m": 80,
+      "sky_distinct_colours": 23
+     },
+     {
+      "camera_render_z_mm": -996500,
+      "lit_face_differing_pixels": 0,
+      "lit_face_middle_row_steps": 0,
+      "mark_m": 1000,
+      "sky_distinct_colours": 1
+     },
+     {
+      "camera_render_z_mm": -3996500,
+      "lit_face_differing_pixels": 0,
+      "lit_face_middle_row_steps": 0,
+      "mark_m": 4000,
+      "sky_distinct_colours": 1
+     },
+     {
+      "camera_render_z_mm": -7996500,
+      "lit_face_differing_pixels": 0,
+      "lit_face_middle_row_steps": 0,
+      "mark_m": 8000,
+      "sky_distinct_colours": 1
+     }
+    ],
+    "rebased": [
+     {
+      "camera_render_z_mm": 3500,
+      "lit_face_differing_pixels": null,
+      "lit_face_middle_row_steps": 0,
+      "mark_m": 0,
+      "sky_distinct_colours": 30
+     },
+     {
+      "camera_render_z_mm": 27500,
+      "lit_face_differing_pixels": 0,
+      "lit_face_middle_row_steps": 0,
+      "mark_m": 40,
+      "sky_distinct_colours": 28
+     },
+     {
+      "camera_render_z_mm": -12500,
+      "lit_face_differing_pixels": 0,
+      "lit_face_middle_row_steps": 0,
+      "mark_m": 80,
+      "sky_distinct_colours": 23
+     },
+     {
+      "camera_render_z_mm": 27500,
+      "lit_face_differing_pixels": 0,
+      "lit_face_middle_row_steps": 0,
+      "mark_m": 1000,
+      "sky_distinct_colours": 1
+     },
+     {
+      "camera_render_z_mm": -28500,
+      "lit_face_differing_pixels": 6932,
+      "lit_face_middle_row_steps": 6,
+      "mark_m": 4000,
+      "sky_distinct_colours": 1
+     },
+     {
+      "camera_render_z_mm": 3500,
+      "lit_face_differing_pixels": 7017,
+      "lit_face_middle_row_steps": 5,
+      "mark_m": 8000,
+      "sky_distinct_colours": 1
+     }
+    ]
+   },
+   "casters": {
+    "1km": {
+     "casters": [
+      {
+       "max_mm": [
+        250,
+        500,
+        -999250
+       ],
+       "min_mm": [
+        -250,
+        0,
+        -999750
+       ],
+       "node": "authored-object:render-probe-0003"
+      },
+      {
+       "max_mm": [
+        540000,
+        540000,
+        540000
+       ],
+       "min_mm": [
+        -540000,
+        -540000,
+        -540000
+       ],
+       "node": "origin-sky"
+      }
+     ],
+     "shadow_depth_range_mm": 2145199
+    },
+    "4km": {
+     "casters": [
+      {
+       "max_mm": [
+        250,
+        500,
+        -3999250
+       ],
+       "min_mm": [
+        -250,
+        0,
+        -3999750
+       ],
+       "node": "authored-object:render-probe-0004"
+      }
+     ],
+     "shadow_depth_range_mm": 1061
+    },
+    "8km": {
+     "casters": [
+      {
+       "max_mm": [
+        250,
+        500,
+        -7999250
+       ],
+       "min_mm": [
+        -250,
+        0,
+        -7999750
+       ],
+       "node": "authored-object:render-probe-0005"
+      }
+     ],
+     "shadow_depth_range_mm": 1061
+    },
+    "arrival": {
+     "casters": [
+      {
+       "max_mm": [
+        250,
+        500,
+        750
+       ],
+       "min_mm": [
+        -250,
+        0,
+        250
+       ],
+       "node": "authored-object:render-probe-0000"
+      },
+      {
+       "max_mm": [
+        540000,
+        540000,
+        540000
+       ],
+       "min_mm": [
+        -540000,
+        -540000,
+        -540000
+       ],
+       "node": "origin-sky"
+      }
+     ],
+     "shadow_depth_range_mm": 1859712
+    }
+   },
+   "shadow_arms": {
+    "base": {
+     "applied": {
+      "before_milli": {
+       "nob": 0,
+       "sb": 50
+      }
+     },
+     "marks": [
+      {
+       "ground_shadow_pixels": 5677,
+       "ground_shadow_top_row": 543,
+       "lit_face_middle_row_steps": 0,
+       "mark_m": 0,
+       "self_shadow_pixels": 0,
+       "shadow_touching_object_pixels": 85,
+       "sky_distinct_colours": 30
+      },
+      {
+       "ground_shadow_pixels": 5886,
+       "ground_shadow_top_row": 543,
+       "lit_face_middle_row_steps": 0,
+       "mark_m": 40,
+       "self_shadow_pixels": 0,
+       "shadow_touching_object_pixels": 84,
+       "sky_distinct_colours": 28
+      },
+      {
+       "ground_shadow_pixels": 5643,
+       "ground_shadow_top_row": 542,
+       "lit_face_middle_row_steps": 0,
+       "mark_m": 80,
+       "self_shadow_pixels": 0,
+       "shadow_touching_object_pixels": 85,
+       "sky_distinct_colours": 23
+      },
+      {
+       "ground_shadow_pixels": 5320,
+       "ground_shadow_top_row": 543,
+       "lit_face_middle_row_steps": 0,
+       "mark_m": 1000,
+       "self_shadow_pixels": 0,
+       "shadow_touching_object_pixels": 83,
+       "sky_distinct_colours": 1
+      },
+      {
+       "ground_shadow_pixels": 5874,
+       "ground_shadow_top_row": 545,
+       "lit_face_middle_row_steps": 6,
+       "mark_m": 4000,
+       "self_shadow_pixels": 9157,
+       "shadow_touching_object_pixels": 198,
+       "sky_distinct_colours": 1
+      },
+      {
+       "ground_shadow_pixels": 5912,
+       "ground_shadow_top_row": 542,
+       "lit_face_middle_row_steps": 4,
+       "mark_m": 8000,
+       "self_shadow_pixels": 9099,
+       "shadow_touching_object_pixels": 213,
+       "sky_distinct_colours": 1
+      }
+     ]
+    },
+    "skynocast": {
+     "applied": {
+      "before_milli": {
+       "nob": 0,
+       "sb": 50
+      },
+      "sky": [
+       false
+      ]
+     },
+     "marks": [
+      {
+       "ground_shadow_pixels": 6633,
+       "ground_shadow_top_row": 543,
+       "lit_face_middle_row_steps": 5,
+       "mark_m": 0,
+       "self_shadow_pixels": 9291,
+       "shadow_touching_object_pixels": 207,
+       "sky_distinct_colours": 30
+      },
+      {
+       "ground_shadow_pixels": 7007,
+       "ground_shadow_top_row": 543,
+       "lit_face_middle_row_steps": 5,
+       "mark_m": 40,
+       "self_shadow_pixels": 8591,
+       "shadow_touching_object_pixels": 204,
+       "sky_distinct_colours": 28
+      },
+      {
+       "ground_shadow_pixels": 6525,
+       "ground_shadow_top_row": 542,
+       "lit_face_middle_row_steps": 5,
+       "mark_m": 80,
+       "self_shadow_pixels": 9258,
+       "shadow_touching_object_pixels": 218,
+       "sky_distinct_colours": 23
+      },
+      {
+       "ground_shadow_pixels": 6553,
+       "ground_shadow_top_row": 543,
+       "lit_face_middle_row_steps": 6,
+       "mark_m": 1000,
+       "self_shadow_pixels": 9394,
+       "shadow_touching_object_pixels": 227,
+       "sky_distinct_colours": 1
+      },
+      {
+       "ground_shadow_pixels": 5874,
+       "ground_shadow_top_row": 545,
+       "lit_face_middle_row_steps": 6,
+       "mark_m": 4000,
+       "self_shadow_pixels": 9157,
+       "shadow_touching_object_pixels": 198,
+       "sky_distinct_colours": 1
+      },
+      {
+       "ground_shadow_pixels": 5912,
+       "ground_shadow_top_row": 542,
+       "lit_face_middle_row_steps": 4,
+       "mark_m": 8000,
+       "self_shadow_pixels": 9099,
+       "shadow_touching_object_pixels": 213,
+       "sky_distinct_colours": 1
+      }
+     ]
+    },
+    "skynocast-city": {
+     "applied": {
+      "before_milli": {
+       "nob": 0,
+       "sb": 50
+      },
+      "nob": 250000,
+      "sb": 200000,
+      "sky": [
+       false
+      ]
+     },
+     "marks": [
+      {
+       "ground_shadow_pixels": 3023,
+       "ground_shadow_top_row": 559,
+       "lit_face_middle_row_steps": 0,
+       "mark_m": 0,
+       "self_shadow_pixels": 0,
+       "shadow_touching_object_pixels": 70,
+       "sky_distinct_colours": 30
+      },
+      {
+       "ground_shadow_pixels": 3307,
+       "ground_shadow_top_row": 559,
+       "lit_face_middle_row_steps": 0,
+       "mark_m": 40,
+       "self_shadow_pixels": 0,
+       "shadow_touching_object_pixels": 71,
+       "sky_distinct_colours": 28
+      },
+      {
+       "ground_shadow_pixels": 3030,
+       "ground_shadow_top_row": 559,
+       "lit_face_middle_row_steps": 0,
+       "mark_m": 80,
+       "self_shadow_pixels": 0,
+       "shadow_touching_object_pixels": 70,
+       "sky_distinct_colours": 23
+      },
+      {
+       "ground_shadow_pixels": 3070,
+       "ground_shadow_top_row": 559,
+       "lit_face_middle_row_steps": 0,
+       "mark_m": 1000,
+       "self_shadow_pixels": 0,
+       "shadow_touching_object_pixels": 70,
+       "sky_distinct_colours": 1
+      },
+      {
+       "ground_shadow_pixels": 2690,
+       "ground_shadow_top_row": 561,
+       "lit_face_middle_row_steps": 0,
+       "mark_m": 4000,
+       "self_shadow_pixels": 0,
+       "shadow_touching_object_pixels": 69,
+       "sky_distinct_colours": 1
+      },
+      {
+       "ground_shadow_pixels": 2892,
+       "ground_shadow_top_row": 558,
+       "lit_face_middle_row_steps": 0,
+       "mark_m": 8000,
+       "self_shadow_pixels": 0,
+       "shadow_touching_object_pixels": 72,
+       "sky_distinct_colours": 1
+      }
+     ]
+    },
+    "skynocast-nob05": {
+     "applied": {
+      "before_milli": {
+       "nob": 0,
+       "sb": 50
+      },
+      "nob": 50000,
+      "sky": [
+       false
+      ]
+     },
+     "marks": [
+      {
+       "ground_shadow_pixels": 6073,
+       "ground_shadow_top_row": 546,
+       "lit_face_middle_row_steps": 2,
+       "mark_m": 0,
+       "self_shadow_pixels": 5155,
+       "shadow_touching_object_pixels": 197,
+       "sky_distinct_colours": 30
+      },
+      {
+       "ground_shadow_pixels": 6634,
+       "ground_shadow_top_row": 546,
+       "lit_face_middle_row_steps": 2,
+       "mark_m": 40,
+       "self_shadow_pixels": 4942,
+       "shadow_touching_object_pixels": 220,
+       "sky_distinct_colours": 28
+      },
+      {
+       "ground_shadow_pixels": 6010,
+       "ground_shadow_top_row": 545,
+       "lit_face_middle_row_steps": 2,
+       "mark_m": 80,
+       "self_shadow_pixels": 5445,
+       "shadow_touching_object_pixels": 202,
+       "sky_distinct_colours": 23
+      },
+      {
+       "ground_shadow_pixels": 6020,
+       "ground_shadow_top_row": 546,
+       "lit_face_middle_row_steps": 1,
+       "mark_m": 1000,
+       "self_shadow_pixels": 5543,
+       "shadow_touching_object_pixels": 216,
+       "sky_distinct_colours": 1
+      },
+      {
+       "ground_shadow_pixels": 5498,
+       "ground_shadow_top_row": 548,
+       "lit_face_middle_row_steps": 2,
+       "mark_m": 4000,
+       "self_shadow_pixels": 5111,
+       "shadow_touching_object_pixels": 209,
+       "sky_distinct_colours": 1
+      },
+      {
+       "ground_shadow_pixels": 5500,
+       "ground_shadow_top_row": 545,
+       "lit_face_middle_row_steps": 2,
+       "mark_m": 8000,
+       "self_shadow_pixels": 5698,
+       "shadow_touching_object_pixels": 220,
+       "sky_distinct_colours": 1
+      }
+     ]
+    },
+    "skynocast-nob10": {
+     "applied": {
+      "before_milli": {
+       "nob": 0,
+       "sb": 50
+      },
+      "nob": 100000,
+      "sky": [
+       false
+      ]
+     },
+     "marks": [
+      {
+       "ground_shadow_pixels": 5576,
+       "ground_shadow_top_row": 549,
+       "lit_face_middle_row_steps": 0,
+       "mark_m": 0,
+       "self_shadow_pixels": 188,
+       "shadow_touching_object_pixels": 208,
+       "sky_distinct_colours": 30
+      },
+      {
+       "ground_shadow_pixels": 6094,
+       "ground_shadow_top_row": 549,
+       "lit_face_middle_row_steps": 1,
+       "mark_m": 40,
+       "self_shadow_pixels": 219,
+       "shadow_touching_object_pixels": 209,
+       "sky_distinct_colours": 28
+      },
+      {
+       "ground_shadow_pixels": 5428,
+       "ground_shadow_top_row": 548,
+       "lit_face_middle_row_steps": 0,
+       "mark_m": 80,
+       "self_shadow_pixels": 260,
+       "shadow_touching_object_pixels": 201,
+       "sky_distinct_colours": 23
+      },
+      {
+       "ground_shadow_pixels": 5516,
+       "ground_shadow_top_row": 549,
+       "lit_face_middle_row_steps": 0,
+       "mark_m": 1000,
+       "self_shadow_pixels": 267,
+       "shadow_touching_object_pixels": 215,
+       "sky_distinct_colours": 1
+      },
+      {
+       "ground_shadow_pixels": 4919,
+       "ground_shadow_top_row": 551,
+       "lit_face_middle_row_steps": 1,
+       "mark_m": 4000,
+       "self_shadow_pixels": 237,
+       "shadow_touching_object_pixels": 192,
+       "sky_distinct_colours": 1
+      },
+      {
+       "ground_shadow_pixels": 5107,
+       "ground_shadow_top_row": 549,
+       "lit_face_middle_row_steps": 0,
+       "mark_m": 8000,
+       "self_shadow_pixels": 374,
+       "shadow_touching_object_pixels": 219,
+       "sky_distinct_colours": 1
+      }
+     ]
+    },
+    "skynocast-nob25": {
+     "applied": {
+      "before_milli": {
+       "nob": 0,
+       "sb": 50
+      },
+      "nob": 250000,
+      "sky": [
+       false
+      ]
+     },
+     "marks": [
+      {
+       "ground_shadow_pixels": 3959,
+       "ground_shadow_top_row": 559,
+       "lit_face_middle_row_steps": 0,
+       "mark_m": 0,
+       "self_shadow_pixels": 0,
+       "shadow_touching_object_pixels": 194,
+       "sky_distinct_colours": 30
+      },
+      {
+       "ground_shadow_pixels": 4416,
+       "ground_shadow_top_row": 559,
+       "lit_face_middle_row_steps": 0,
+       "mark_m": 40,
+       "self_shadow_pixels": 0,
+       "shadow_touching_object_pixels": 188,
+       "sky_distinct_colours": 28
+      },
+      {
+       "ground_shadow_pixels": 3843,
+       "ground_shadow_top_row": 559,
+       "lit_face_middle_row_steps": 0,
+       "mark_m": 80,
+       "self_shadow_pixels": 0,
+       "shadow_touching_object_pixels": 202,
+       "sky_distinct_colours": 23
+      },
+      {
+       "ground_shadow_pixels": 4227,
+       "ground_shadow_top_row": 559,
+       "lit_face_middle_row_steps": 0,
+       "mark_m": 1000,
+       "self_shadow_pixels": 0,
+       "shadow_touching_object_pixels": 212,
+       "sky_distinct_colours": 1
+      },
+      {
+       "ground_shadow_pixels": 3359,
+       "ground_shadow_top_row": 561,
+       "lit_face_middle_row_steps": 0,
+       "mark_m": 4000,
+       "self_shadow_pixels": 0,
+       "shadow_touching_object_pixels": 180,
+       "sky_distinct_colours": 1
+      },
+      {
+       "ground_shadow_pixels": 3658,
+       "ground_shadow_top_row": 558,
+       "lit_face_middle_row_steps": 0,
+       "mark_m": 8000,
+       "self_shadow_pixels": 0,
+       "shadow_touching_object_pixels": 201,
+       "sky_distinct_colours": 1
+      }
+     ]
+    },
+    "skynocast-sb20": {
+     "applied": {
+      "before_milli": {
+       "nob": 0,
+       "sb": 50
+      },
+      "sb": 200000,
+      "sky": [
+       false
+      ]
+     },
+     "marks": [
+      {
+       "ground_shadow_pixels": 5767,
+       "ground_shadow_top_row": 543,
+       "lit_face_middle_row_steps": 0,
+       "mark_m": 0,
+       "self_shadow_pixels": 6,
+       "shadow_touching_object_pixels": 86,
+       "sky_distinct_colours": 30
+      },
+      {
+       "ground_shadow_pixels": 5999,
+       "ground_shadow_top_row": 543,
+       "lit_face_middle_row_steps": 0,
+       "mark_m": 40,
+       "self_shadow_pixels": 0,
+       "shadow_touching_object_pixels": 90,
+       "sky_distinct_colours": 28
+      },
+      {
+       "ground_shadow_pixels": 5761,
+       "ground_shadow_top_row": 542,
+       "lit_face_middle_row_steps": 0,
+       "mark_m": 80,
+       "self_shadow_pixels": 8,
+       "shadow_touching_object_pixels": 86,
+       "sky_distinct_colours": 23
+      },
+      {
+       "ground_shadow_pixels": 5448,
+       "ground_shadow_top_row": 543,
+       "lit_face_middle_row_steps": 0,
+       "mark_m": 1000,
+       "self_shadow_pixels": 8,
+       "shadow_touching_object_pixels": 87,
+       "sky_distinct_colours": 1
+      },
+      {
+       "ground_shadow_pixels": 5253,
+       "ground_shadow_top_row": 545,
+       "lit_face_middle_row_steps": 0,
+       "mark_m": 4000,
+       "self_shadow_pixels": 5,
+       "shadow_touching_object_pixels": 87,
+       "sky_distinct_colours": 1
+      },
+      {
+       "ground_shadow_pixels": 5260,
+       "ground_shadow_top_row": 542,
+       "lit_face_middle_row_steps": 0,
+       "mark_m": 8000,
+       "self_shadow_pixels": 8,
+       "shadow_touching_object_pixels": 89,
+       "sky_distinct_colours": 1
+      }
+     ]
+    }
+   },
+   "shadow_camera": {
+    "8km": {
+     "camera_render_z_mm": -7996500,
+     "render_root_z_mm": 0,
+     "shadow_depth_range_mm": 1061
+    },
+    "8km-rebased": {
+     "camera_render_z_mm": 3500,
+     "render_root_z_mm": 8000000,
+     "shadow_depth_range_mm": 1061
+    },
+    "arrival": {
+     "camera_render_z_mm": 3500,
+     "render_root_z_mm": 0,
+     "shadow_depth_range_mm": 1859712
+    },
+    "arrival-again": {
+     "camera_render_z_mm": 3500,
+     "render_root_z_mm": 0,
+     "shadow_depth_range_mm": 1859712
+    }
+   }
+  },
+  "captures": [
+   {
+    "as_run": "distance-0-8000-2026-09-23T18-28-19-498Z-mark-0-with.png",
+    "byte_size": 308884,
+    "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/captures/arrival-with-reference.png",
+    "sha256": "5cef7f2752f0e85dd655fd8ecb8405267f01d995e856ee54330e487a3897c357",
+    "what": "The arrival point of a release-build 8 km session on the changed tree, with its reference cube before the camera: the sky above the horizon is a gradient and the lit face is smooth. The idle gate discarded this session for timing; its pixels are engine renders the load does not change."
+   },
+   {
+    "as_run": "distance-0-8000-2026-09-23T18-28-19-498Z-mark-8000-with.png",
+    "byte_size": 308617,
+    "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/captures/8km-with-reference.png",
+    "sha256": "cb614159c6a781c768db792931dc3ff76a145f221fc4fa43a4bd3ddbada20c18",
+    "what": "The same session 8 km along the sprint with a new reference cube at the same relative pose: the sky is the same gradient and the lit face carries no band."
+   },
+   {
+    "as_run": "baseline-e9dee3c2/flat-plate.png beside fixes-1/flat-plate.png",
+    "byte_size": 87448,
+    "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/captures/flat-plate-before-after.png",
+    "sha256": "a62ee86b2fadeaadad1417a4a9b4b595dd2b99b256769b75920e5b87c7e55589",
+    "what": "A reviewed marker plate on a bounded starter ground, GPU pixel scene, before (left: the metre marks drawn over it) and after (right: the plate over them)."
+   },
+   {
+    "as_run": "baseline-e9dee3c2/endless-cube-after-map.png beside fixes-1/endless-cube-after-map.png",
+    "byte_size": 78106,
+    "path": "docs/evaluation/artifacts/2026-09-23-render-at-distance/captures/endless-cube-after-map-before-after.png",
+    "sha256": "c35198e4fbf1b8936e367821a96d5b1eda44d108e0076ac92ff54751d2527486",
+    "what": "A cube placed on an endless starter ground and then the Map opened and closed, GPU pixel scene, before (left: the cube is gone) and after (right: the cube is drawn)."
+   }
+  ],
+  "claims": {
+   "assumed": [
+    "Headless Chrome on this machine stands for a headed browser with a compositor and a display, as the world scale record assumed.",
+    "The development server's debug engine draws shadows, fog and the sky as the release engine does: the cause was found on the former, and the release build measures the result.",
+    "The half-metre marker cube stands for other lit objects under the sun; the pillar and other shapes were not measured at distance."
+   ],
+   "inferred": [
+    "The bands the world scale record measured are the cube shadowing its own lit face: the same arms remove them, and the same pose on the same tree reproduces its pixel counts.",
+    "They appeared from 4 km and not at 1 km because the old sky's shadow column still reached the camera's view slice at 1 km and not at 4 km; which point between 1 and 4 km that happens at was not measured.",
+    "The float32 step at 8 km, 0.49 mm, is not what banded the faces: moving the whole walk to the render origin left the bands where they were. It stays the limit the supported radius is stated from.",
+    "A slope-scaled offset of 16 on the old single-quad face also drew the plate whole (1,000,000 millionths at the worst pose); it was not shipped, because an offset that large also pushes the ground behind geometry lying just under it, by an amount not measured here.",
+    "A placed object in a starter world disappeared after the Map because the object runtime read a region with no residency entry as stubbed, and residency governs only the scene's regions; any replan after placement did it, including one from a change in frame-time pressure.",
+    "The controls' 95th percentile (1,800 to 3,200 us) comes from a few long frames in a session at 59.3 per cent CPU idle; the 1 km session on the same build at 79.9 per cent measured 700 us. That the long frames are the machine's load and not the change is inferred, not measured."
+   ],
+   "measured": [
+    "On a release build along the world scale record's walk, the sky band above the horizon held 29 colours down one column at every mark (40 m, 80 m, 1,000 m, 4,000 m, 8,000 m), against 29 at arrival, and was never the clear colour (before: 1 colour, the clear colour, at 1, 4 and 8 km, and 21 to 27 at the controls).",
+    "The reference cube's lit face differed from its arrival capture in 0 of 11,328 pixels at 4 and 8 km, and in 0 at the controls and at 1 km, with 0 luminance steps along its middle row (before: 6,859 to 7,292 pixels at 4 and 8 km).",
+    "Without the reference cube, the frame at every mark differed from the arrival frame in 0 millionths of its pixels (before: 21,903 to 74,410 at the controls and 318,889 at 1, 4 and 8 km).",
+    "The cube drawn with its shadow off covered the arrival's pixels at every mark (999,930 to 1,000,000 millionths intersection over union, centroid 0 to 4 millipixels away); with its shadow, the silhouette's centroid moved 448 to 2,354 millipixels at 1 to 8 km and 2,461 to 4,084 at the controls (before: 795 to 3,180 and 541 to 3,543).",
+    "Frame work while sprinting, from sessions the idle gate accepted: 1,000 m: 700 us at the 95th percentile, 400 us median, at 79.9 per cent CPU idle; 4,000 m: 900 us at the 95th percentile, 400 us median, at 62.4 per cent CPU idle (before: 500 to 700 us at the 95th percentile).",
+    "The 8 km session was refused by the idle gate 3 times: CPU idle during the session averaged 45.6, 37.2, 17.2 per cent against the gate's 50. No frame-work figure is given for 8 km; its pixels above come from those sessions' captures, which the gate does not rule on.",
+    "The 40 and 80 m controls ran at 59.3 per cent CPU idle and measured 1,800 to 3,200 us at the 95th percentile, with single frames of 43,700 to 78,400 us (before: 500 to 700 us).",
+    "On the tree before any change (development server), the reference cube's lit face differed from its arrival capture in 6,754 pixels at 4 km and 7,539 at 8 km, and in none at 40 m, 80 m or 1 km, where the world scale record's release build measured 6,859 to 7,292 and none.",
+    "With the sun's shadows off, with the cube not receiving shadow, or with the cube not casting it, the face differed in 0 pixels at every mark.",
+    "With the render origin moved to the cube at 8 km, so that the camera was drawn at z 3,500 mm exactly as at arrival, the face still differed in 6,932 pixels at 4 km and 7,017 at 8 km.",
+    "The sun's shadow depth range was 1,859,712 mm at arrival and 2,145,199 mm at 1 km, where the shadow casters were the cube and the old sky (origin-sky), and 1,061 mm at 4 and 8 km, where the cube was the only caster.",
+    "With the old sky casting no shadow, the cube shadowed its own lit face at every mark including arrival (8,591 to 9,394 pixels); with the sun's caster-pass bias at 0.2 as well, 0 to 8 pixels at every mark, and its ground shadow 5,253 to 5,999 pixels against 5,320 to 5,886 before at 1 km or nearer.",
+    "A marker plate on the ground as it was drawn before this change was drawn on a mean of 44.5 per cent of its interior over 53 poses at the endless ground's origin (31 poses under 99 per cent) and 48.4 per cent on a bounded ground, where it was never drawn clean (155 of 155 poses); on the changed ground it was drawn whole and clean at every pose at 4 of 4 positions (authored-endless@0,-8000, authored-endless@0,0, authored-flat@-3,2, authored-flat@2,0).",
+    "The two neighbour-tile tests timed out at 5,000 ms in a whole web run (6,003 and 6,575 ms) and passed in the next under the stated timeout (6,661 and 6,226 ms).",
+    "On the delivered tree the binding harness and the suites the change touches passed 121 of 121 tests in 15 files, and each of 11 planted faults made its suite fail (11 caught).",
+    "The world-kind and atmosphere modules moved no pixel: 12 and 12 of 12 GPU scenes byte-identical to the frames before them; the fixes moved 11 of 12 and left 1 unchanged (district)."
+   ],
+   "observed_by_eye": [
+    "Face crops of the probe arms at 0, 1 and 8 km: smooth before at 0 and 1 km and banded at 8 km; banded at every mark with the old sky's shadow off; smooth at every mark with the caster-pass bias at 0.2, with a ground shadow of the same shape as before.",
+    "The GPU pixel scenes before and after: the flat plate under the metre marks and then over them, and the cube gone after the Map and then drawn.",
+    "The two bound release-build captures, from an 8 km session the idle gate discarded for timing: a gradient sky and a smooth lit face at the arrival point and at 8 km."
+   ]
+  },
+  "departures": [
+   {
+    "done": "slot.py refused unless the product tree matched a digest pinned before the first session, which includes the contents of untracked product files, because the changed modules are untracked files in the measured tree",
+    "registered": "the world scale record's slot.py refused unless HEAD was its measured commit",
+    "what": "the tree check before each release-build session",
+    "why": "this record measures an uncommitted tree"
+   },
+   {
+    "done": "the band, shadow and plate probes ran on the development server's debug engine, and only the before-and-after walk on the release build",
+    "registered": "not registered",
+    "what": "where the cause was found",
+    "why": "the probes change engine state at runtime and read internals, which the release build's minified engine makes impractical; nothing in them is a timing"
+   },
+   {
+    "done": "e9dee3c2 with the changes, 14 commits later, of which 3 change browser source (predecessor_record.commits_between_changing_browser_source), among them inhabitants drawn in the browser and motion for placed objects",
+    "registered": "the world scale record's measured commit 7e6144ea",
+    "what": "the tree the walk is compared against",
+    "why": "the changes were made on the head of the main line. The sky and the bands were reproduced on that head before any change (band_cause), so they compare; frame work before and after does not separate these changes from the commits between"
+   }
+  ],
+  "distance": {
+   "before_and_after": [
+    {
+     "after_from_sessions_not_timed": {
+      "lit_face_differing_pixels": [],
+      "lit_face_middle_row_steps": [],
+      "registered_drawn_error_millipixels": [],
+      "sessions": [],
+      "sky_distinct_colours": [],
+      "sprint_work_p95_us": "not measured"
+     },
+     "lit_face_differing_pixels": {
+      "after": [
+       0
+      ],
+      "before": [
+       0,
+       0,
+       0
+      ]
+     },
+     "lit_face_middle_row_steps": {
+      "after": [
+       0
+      ],
+      "before": [
+       0,
+       0,
+       0
+      ]
+     },
+     "mark_m": 40,
+     "registered_drawn_error_millipixels": {
+      "after": [
+       4084
+      ],
+      "before": [
+       2271,
+       541,
+       3543
+      ]
+     },
+     "sky_distinct_colours": {
+      "after": [
+       29
+      ],
+      "before": [
+       27,
+       26,
+       26
+      ]
+     },
+     "sprint_work_p95_us": {
+      "after": [
+       3200
+      ],
+      "before": [
+       700,
+       700,
+       600
+      ]
+     }
+    },
+    {
+     "after_from_sessions_not_timed": {
+      "lit_face_differing_pixels": [],
+      "lit_face_middle_row_steps": [],
+      "registered_drawn_error_millipixels": [],
+      "sessions": [],
+      "sky_distinct_colours": [],
+      "sprint_work_p95_us": "not measured"
+     },
+     "lit_face_differing_pixels": {
+      "after": [
+       0
+      ],
+      "before": [
+       0,
+       0,
+       0
+      ]
+     },
+     "lit_face_middle_row_steps": {
+      "after": [
+       0
+      ],
+      "before": [
+       0,
+       0,
+       0
+      ]
+     },
+     "mark_m": 80,
+     "registered_drawn_error_millipixels": {
+      "after": [
+       2461
+      ],
+      "before": [
+       909,
+       1786,
+       1540
+      ]
+     },
+     "sky_distinct_colours": {
+      "after": [
+       29
+      ],
+      "before": [
+       23,
+       23,
+       21
+      ]
+     },
+     "sprint_work_p95_us": {
+      "after": [
+       1800
+      ],
+      "before": [
+       600,
+       500,
+       500
+      ]
+     }
+    },
+    {
+     "after_from_sessions_not_timed": {
+      "lit_face_differing_pixels": [
+       0
+      ],
+      "lit_face_middle_row_steps": [
+       0
+      ],
+      "registered_drawn_error_millipixels": [
+       535
+      ],
+      "sessions": [
+       "distance-0-1000-2026-09-23T15-02-31-017Z-discarded.json"
+      ],
+      "sky_distinct_colours": [
+       29
+      ],
+      "sprint_work_p95_us": "not measured"
+     },
+     "lit_face_differing_pixels": {
+      "after": [
+       0
+      ],
+      "before": [
+       0,
+       0,
+       0
+      ]
+     },
+     "lit_face_middle_row_steps": {
+      "after": [
+       0
+      ],
+      "before": [
+       0,
+       0,
+       0
+      ]
+     },
+     "mark_m": 1000,
+     "registered_drawn_error_millipixels": {
+      "after": [
+       1472
+      ],
+      "before": [
+       1084,
+       797,
+       795
+      ]
+     },
+     "sky_distinct_colours": {
+      "after": [
+       29
+      ],
+      "before": [
+       1,
+       1,
+       1
+      ]
+     },
+     "sprint_work_p95_us": {
+      "after": [
+       700
+      ],
+      "before": [
+       700,
+       700,
+       500
+      ]
+     }
+    },
+    {
+     "after_from_sessions_not_timed": {
+      "lit_face_differing_pixels": [],
+      "lit_face_middle_row_steps": [],
+      "registered_drawn_error_millipixels": [],
+      "sessions": [],
+      "sky_distinct_colours": [],
+      "sprint_work_p95_us": "not measured"
+     },
+     "lit_face_differing_pixels": {
+      "after": [
+       0
+      ],
+      "before": [
+       7065,
+       6982,
+       6859
+      ]
+     },
+     "lit_face_middle_row_steps": {
+      "after": [
+       0
+      ],
+      "before": [
+       6,
+       5,
+       5
+      ]
+     },
+     "mark_m": 4000,
+     "registered_drawn_error_millipixels": {
+      "after": [
+       1771
+      ],
+      "before": [
+       3180,
+       1505,
+       2683
+      ]
+     },
+     "sky_distinct_colours": {
+      "after": [
+       29
+      ],
+      "before": [
+       1,
+       1,
+       1
+      ]
+     },
+     "sprint_work_p95_us": {
+      "after": [
+       900
+      ],
+      "before": [
+       600,
+       700,
+       600
+      ]
+     }
+    },
+    {
+     "after_from_sessions_not_timed": {
+      "lit_face_differing_pixels": [
+       0,
+       0,
+       0
+      ],
+      "lit_face_middle_row_steps": [
+       0,
+       0,
+       0
+      ],
+      "registered_drawn_error_millipixels": [
+       2354,
+       448,
+       929
+      ],
+      "sessions": [
+       "distance-0-8000-2026-09-23T18-28-19-498Z-discarded.json",
+       "distance-0-8000-2026-09-23T18-47-23-995Z-discarded.json",
+       "distance-0-8000-2026-09-23T18-59-25-047Z-discarded.json"
+      ],
+      "sky_distinct_colours": [
+       29,
+       29,
+       29
+      ],
+      "sprint_work_p95_us": "not measured"
+     },
+     "lit_face_differing_pixels": {
+      "after": null,
+      "before": [
+       7021,
+       7292,
+       7242
+      ]
+     },
+     "lit_face_middle_row_steps": {
+      "after": null,
+      "before": [
+       7,
+       6,
+       4
+      ]
+     },
+     "mark_m": 8000,
+     "registered_drawn_error_millipixels": {
+      "after": null,
+      "before": [
+       3080,
+       3102,
+       2874
+      ]
+     },
+     "sky_distinct_colours": {
+      "after": null,
+      "before": [
+       1,
+       1,
+       1
+      ]
+     },
+     "sprint_work_p95_us": {
+      "after": null,
+      "before": [
+       700,
+       700,
+       500
+      ]
+     }
+    }
+   ],
+   "series": {
+    "arrival_sky_distinct_colours": [
+     29
+    ],
+    "lit_face_pixels": 11328,
+    "marks": [
+     {
+      "iou_millionths": [
+       953590
+      ],
+      "last_ten_seconds_work_p95_us": [
+       3200
+      ],
+      "lit_face_differing_pixels": [
+       0
+      ],
+      "lit_face_middle_row_steps": [
+       0
+      ],
+      "mark_m": 40,
+      "object_free_frame_differing_millionths": [
+       0
+      ],
+      "object_only_iou_millionths": [
+       1000000
+      ],
+      "object_only_shift_millipixels": [
+       0
+      ],
+      "registered_drawn_error_millipixels": [
+       4084
+      ],
+      "repeats": 1,
+      "sky_all_clear_colour": [
+       false
+      ],
+      "sky_distinct_colours": [
+       29
+      ],
+      "sprint_frames": [
+       120
+      ],
+      "sprint_frames_over_16700_us": [
+       1
+      ],
+      "sprint_seconds_milli": [
+       2078
+      ],
+      "sprint_work_max_us": [
+       78400
+      ],
+      "sprint_work_p50_us": [
+       600
+      ],
+      "sprint_work_p95_us": [
+       3200
+      ]
+     },
+     {
+      "iou_millionths": [
+       962862
+      ],
+      "last_ten_seconds_work_p95_us": [
+       1800
+      ],
+      "lit_face_differing_pixels": [
+       0
+      ],
+      "lit_face_middle_row_steps": [
+       0
+      ],
+      "mark_m": 80,
+      "object_free_frame_differing_millionths": [
+       0
+      ],
+      "object_only_iou_millionths": [
+       1000000
+      ],
+      "object_only_shift_millipixels": [
+       0
+      ],
+      "registered_drawn_error_millipixels": [
+       2461
+      ],
+      "repeats": 1,
+      "sky_all_clear_colour": [
+       false
+      ],
+      "sky_distinct_colours": [
+       29
+      ],
+      "sprint_frames": [
+       109
+      ],
+      "sprint_frames_over_16700_us": [
+       1
+      ],
+      "sprint_seconds_milli": [
+       1857
+      ],
+      "sprint_work_max_us": [
+       43700
+      ],
+      "sprint_work_p50_us": [
+       500
+      ],
+      "sprint_work_p95_us": [
+       1800
+      ]
+     },
+     {
+      "iou_millionths": [
+       974887
+      ],
+      "last_ten_seconds_work_p95_us": [
+       600
+      ],
+      "lit_face_differing_pixels": [
+       0
+      ],
+      "lit_face_middle_row_steps": [
+       0
+      ],
+      "mark_m": 1000,
+      "object_free_frame_differing_millionths": [
+       0
+      ],
+      "object_only_iou_millionths": [
+       1000000
+      ],
+      "object_only_shift_millipixels": [
+       0
+      ],
+      "registered_drawn_error_millipixels": [
+       1472
+      ],
+      "repeats": 1,
+      "sky_all_clear_colour": [
+       false
+      ],
+      "sky_distinct_colours": [
+       29
+      ],
+      "sprint_frames": [
+       2587
+      ],
+      "sprint_frames_over_16700_us": [
+       1
+      ],
+      "sprint_seconds_milli": [
+       43218
+      ],
+      "sprint_work_max_us": [
+       48300
+      ],
+      "sprint_work_p50_us": [
+       400
+      ],
+      "sprint_work_p95_us": [
+       700
+      ]
+     },
+     {
+      "iou_millionths": [
+       967173
+      ],
+      "last_ten_seconds_work_p95_us": [
+       600
+      ],
+      "lit_face_differing_pixels": [
+       0
+      ],
+      "lit_face_middle_row_steps": [
+       0
+      ],
+      "mark_m": 4000,
+      "object_free_frame_differing_millionths": [
+       0
+      ],
+      "object_only_iou_millionths": [
+       999930
+      ],
+      "object_only_shift_millipixels": [
+       4
+      ],
+      "registered_drawn_error_millipixels": [
+       1771
+      ],
+      "repeats": 1,
+      "sky_all_clear_colour": [
+       false
+      ],
+      "sky_distinct_colours": [
+       29
+      ],
+      "sprint_frames": [
+       10265
+      ],
+      "sprint_frames_over_16700_us": [
+       9
+      ],
+      "sprint_seconds_milli": [
+       171280
+      ],
+      "sprint_work_max_us": [
+       49900
+      ],
+      "sprint_work_p50_us": [
+       400
+      ],
+      "sprint_work_p95_us": [
+       900
+      ]
+     }
+    ],
+    "pixels_not_timed": [
+     {
+      "face_differing_from_arrival": 0,
+      "face_middle_row_steps": 0,
+      "face_pixels": 11328,
+      "file": "distance-0-1000-2026-09-23T15-02-31-017Z-discarded.json",
+      "gate_discarded": "mean CPU idle during the run 45.1 percent over 26 samples is below 50",
+      "idle_before_percent": 82,
+      "idle_during_mean_tenths": 451,
+      "idle_during_min_percent": 0,
+      "mark_m": 1000,
+      "object_free_frame_differing_millionths": 0,
+      "object_only_iou_millionths": 1000000,
+      "object_only_shift_millipixels": 0,
+      "reached_mm": 1001334,
+      "registered_drawn_error_millipixels": 535,
+      "session": "distance-0-1000",
+      "sky_all_clear_colour": false,
+      "sky_distinct_colours": 29,
+      "timing": "not measured: the idle gate discarded this session"
+     },
+     {
+      "face_differing_from_arrival": 0,
+      "face_middle_row_steps": 0,
+      "face_pixels": 11328,
+      "file": "distance-0-8000-2026-09-23T18-28-19-498Z-discarded.json",
+      "gate_discarded": "mean CPU idle during the run 45.6 percent over 177 samples is below 50",
+      "idle_before_percent": 78,
+      "idle_during_mean_tenths": 456,
+      "idle_during_min_percent": 0,
+      "mark_m": 8000,
+      "object_free_frame_differing_millionths": 0,
+      "object_only_iou_millionths": 999930,
+      "object_only_shift_millipixels": 4,
+      "reached_mm": 8002636,
+      "registered_drawn_error_millipixels": 2354,
+      "session": "distance-0-8000",
+      "sky_all_clear_colour": false,
+      "sky_distinct_colours": 29,
+      "timing": "not measured: the idle gate discarded this session"
+     },
+     {
+      "face_differing_from_arrival": 0,
+      "face_middle_row_steps": 0,
+      "face_pixels": 11328,
+      "file": "distance-0-8000-2026-09-23T18-47-23-995Z-discarded.json",
+      "gate_discarded": "mean CPU idle during the run 37.2 percent over 189 samples is below 50",
+      "idle_before_percent": 73,
+      "idle_during_mean_tenths": 372,
+      "idle_during_min_percent": 0,
+      "mark_m": 8000,
+      "object_free_frame_differing_millionths": 0,
+      "object_only_iou_millionths": 1000000,
+      "object_only_shift_millipixels": 0,
+      "reached_mm": 8001357,
+      "registered_drawn_error_millipixels": 448,
+      "session": "distance-0-8000",
+      "sky_all_clear_colour": false,
+      "sky_distinct_colours": 29,
+      "timing": "not measured: the idle gate discarded this session"
+     },
+     {
+      "face_differing_from_arrival": 0,
+      "face_middle_row_steps": 0,
+      "face_pixels": 11328,
+      "file": "distance-0-8000-2026-09-23T18-59-25-047Z-discarded.json",
+      "gate_discarded": "mean CPU idle during the run 17.2 percent over 180 samples is below 50",
+      "idle_before_percent": 73,
+      "idle_during_mean_tenths": 172,
+      "idle_during_min_percent": 0,
+      "mark_m": 8000,
+      "object_free_frame_differing_millionths": 0,
+      "object_only_iou_millionths": 999930,
+      "object_only_shift_millipixels": 4,
+      "reached_mm": 8002657,
+      "registered_drawn_error_millipixels": 929,
+      "session": "distance-0-8000",
+      "sky_all_clear_colour": false,
+      "sky_distinct_colours": 29,
+      "timing": "not measured: the idle gate discarded this session"
+     }
+    ],
+    "sessions": [
+     {
+      "build": "release",
+      "driver_sha256": "bb58f83eb49f8b6ee617a4b9367d705e747ead99867d8c481574303003343cb3",
+      "file": "distance-0-1000-2026-09-23T15-27-15-615Z.json",
+      "file_sha256": "ac93780f35868959d5df21970e314872f2b89ba9e911f6ebd0a1b6fc8779cc21",
+      "idle_before_percent": 78,
+      "idle_during_mean_tenths": 799,
+      "idle_during_min_percent": 47,
+      "instrument_sha256": "15ef8cd98872740c147ddcc55e821d26eca2cf64960622ed9b833584c3276424",
+      "session": "distance-0-1000",
+      "tree": {
+       "branch": "lane/0923-render",
+       "changed_paths": "59",
+       "diff_head_bytes": "53307",
+       "diff_head_sha256": "af344d8983d3e896e3d70b9ec9661830874d21ca878ee1d6d357800099be3179",
+       "head": "e9dee3c288dbb3fb7a066bfb40b31143207fc11e",
+       "status_sha256": "5491a05377ef0786a2a0274b248b8dcb5bcaa508292b01da522b6bfe1a7add08"
+      }
+     },
+     {
+      "build": "release",
+      "driver_sha256": "bb58f83eb49f8b6ee617a4b9367d705e747ead99867d8c481574303003343cb3",
+      "file": "distance-0-4000-2026-09-23T15-46-06-737Z.json",
+      "file_sha256": "9b71cee11301b4ae0893651eb01b443987bbbf4676dfc27a1f8b076a246326cc",
+      "idle_before_percent": 80,
+      "idle_during_mean_tenths": 624,
+      "idle_during_min_percent": 15,
+      "instrument_sha256": "15ef8cd98872740c147ddcc55e821d26eca2cf64960622ed9b833584c3276424",
+      "session": "distance-0-4000",
+      "tree": {
+       "branch": "lane/0923-render",
+       "changed_paths": "59",
+       "diff_head_bytes": "53307",
+       "diff_head_sha256": "af344d8983d3e896e3d70b9ec9661830874d21ca878ee1d6d357800099be3179",
+       "head": "e9dee3c288dbb3fb7a066bfb40b31143207fc11e",
+       "status_sha256": "5491a05377ef0786a2a0274b248b8dcb5bcaa508292b01da522b6bfe1a7add08"
+      }
+     },
+     {
+      "build": "release",
+      "driver_sha256": "bb58f83eb49f8b6ee617a4b9367d705e747ead99867d8c481574303003343cb3",
+      "file": "distance-0-controls-2026-09-23T14-21-25-338Z.json",
+      "file_sha256": "6e65d8f792802757e6b4625b151f5c548794536b3911248f3a1215ebd03c3a9d",
+      "idle_before_percent": 78,
+      "idle_during_mean_tenths": 593,
+      "idle_during_min_percent": 47,
+      "instrument_sha256": "15ef8cd98872740c147ddcc55e821d26eca2cf64960622ed9b833584c3276424",
+      "session": "distance-0-controls",
+      "tree": {
+       "branch": "lane/0923-render",
+       "changed_paths": "59",
+       "diff_head_bytes": "53307",
+       "diff_head_sha256": "af344d8983d3e896e3d70b9ec9661830874d21ca878ee1d6d357800099be3179",
+       "head": "e9dee3c288dbb3fb7a066bfb40b31143207fc11e",
+       "status_sha256": "5491a05377ef0786a2a0274b248b8dcb5bcaa508292b01da522b6bfe1a7add08"
+      }
+     }
+    ],
+    "sessions_not_accepted": [
+     "distance-0-1000-2026-09-23T15-02-31-017Z-discarded.json",
+     "distance-0-8000-2026-09-23T15-51-27-999Z-stopped.json",
+     "distance-0-8000-2026-09-23T18-28-19-498Z-discarded.json",
+     "distance-0-8000-2026-09-23T18-47-23-995Z-discarded.json",
+     "distance-0-8000-2026-09-23T18-59-25-047Z-discarded.json"
+    ]
+   }
+  },
+  "harness": {
+   "atlas_react_package_on_the_delivered_tree": {
+    "log_bytes": 144885,
+    "log_sha256": "7e05c0bd71481a339e8c706d7303a74a7a73f0964327250bad0b32905e775c56",
+    "published": "docs/evaluation/artifacts/2026-09-23-render-at-distance/runs/web/atlas-react-package.log.txt",
+    "totals": [
+     "Test Files  84 passed | 1 skipped (85)",
+     "Tests  603 passed | 6 skipped (609)"
+    ]
+   },
+   "break_checks": {
+    "contracts.log.txt": {
+     "caught": 4,
+     "mutants": 4,
+     "sha256": "3bcc20a2a5ef1217a97bb1bafa72d6bf52c942196e9260844f66fbb8df428ce9"
+    },
+    "harness.log.txt": {
+     "caught": 7,
+     "mutants": 7,
+     "sha256": "79ef7bcbc3b3ad3c63f384dc014831b725b1cc9270af288d83a2e5a916ed6cdd"
+    }
+   },
+   "focused_suites_on_the_delivered_tree": {
+    "failed": 0,
+    "passed": 121,
+    "skipped": 0,
+    "suites": {
+     "web/packages/atlas-react/test/authored-ground.test.ts": {
+      "passed": 12,
+      "tests": 12
+     },
+     "web/packages/atlas-react/test/authored-society.test.ts": {
+      "passed": 4,
+      "tests": 4
+     },
+     "web/packages/atlas-react/test/binding/appearance-and-map.test.ts": {
+      "passed": 5,
+      "tests": 5
+     },
+     "web/packages/atlas-react/test/binding/atmosphere.test.ts": {
+      "passed": 4,
+      "tests": 4
+     },
+     "web/packages/atlas-react/test/binding/create-world-kinds.test.ts": {
+      "passed": 10,
+      "tests": 10
+     },
+     "web/packages/atlas-react/test/binding/frame-order.test.ts": {
+      "passed": 7,
+      "tests": 7
+     },
+     "web/packages/atlas-react/test/binding/lifecycle-order.test.ts": {
+      "passed": 9,
+      "tests": 9
+     },
+     "web/packages/atlas-react/test/binding/line-budget.test.ts": {
+      "passed": 2,
+      "tests": 2
+     },
+     "web/packages/atlas-react/test/binding/mode-locks.test.ts": {
+      "passed": 3,
+      "tests": 3
+     },
+     "web/packages/atlas-react/test/binding/object-residency.test.ts": {
+      "passed": 2,
+      "tests": 2
+     },
+     "web/packages/atlas-react/test/binding/society-drive.test.ts": {
+      "passed": 3,
+      "tests": 3
+     },
+     "web/packages/atlas-react/test/binding/world-kind.test.ts": {
+      "passed": 6,
+      "tests": 6
+     },
+     "web/packages/atlas-react/test/display-space-fog.test.ts": {
+      "passed": 7,
+      "tests": 7
+     },
+     "web/packages/atlas-react/test/endless-authored-ground.test.ts": {
+      "passed": 12,
+      "tests": 12
+     },
+     "web/packages/atlas-react/test/generated-tile-runtime.test.ts": {
+      "passed": 35,
+      "tests": 35
+     }
+    },
+    "tests": 121
+   },
+   "typecheck_and_boundaries_on_the_delivered_tree": {
+    "boundaries": [
+     "\u2714 no dependency violations found (823 modules, 3041 dependencies cruised)"
+    ],
+    "typecheck": [
+     "# pnpm run typecheck (tsc --build --force) exit 0, 2026-09-23T15:13, product tree 84b95583843c"
+    ],
+    "typecheck_log_sha256": "51c1baab4804545f5784baeb002f73d331b4d4a5a4f9541c4df92f010b34f0a4"
+   },
+   "whole_web_run": {
+    "log_bytes": 59105,
+    "log_sha256": "905a93b80d63734f5701f19a1eb194b747ea3ec5330aa8a87a71ada2bc79dd12",
+    "totals": [
+     "Test Files  286 passed | 2 skipped (288)",
+     "Tests  3190 passed | 7 skipped (3197)"
+    ],
+    "tree": "the product tree before a comments-only edit to atmosphere.ts and world-field.ts; the release bundle built from both trees has the same content hash"
+   }
+  },
+  "how_to_rerun": [
+   "Scripts: copy scripts/*.txt to their names without .txt and reverse the substitutions; the world scale record's driver, instrument, binding reach, gate, distance, shading and summarize scripts run byte-identical (scripts.world_scale_scripts_run_unchanged).",
+   "Start an isolated runtime on the changed tree (the acceptance launcher, one slot), build the app with vite build and serve it with preview.py up; place.py puts marker cubes where the band probes look.",
+   "Band cause: node probe-bands.mjs --arms base,nolightshadow,noreceive,nocast,rebased; node probe-internals.mjs; node probe-casters.mjs; node probe-shadow.mjs --arms base,skynocast,skynocast-sb20 (each through gpu-slot, on the tree before the change).",
+   "Plate: node probe-plate.as-run-0c1abce8d3c4.mjs --legacy, then without it, over the four grounds, through gpu-slot.",
+   "GPU pixel scenes: node web/packages/atlas-react/test/binding/gpu/run_binding_pixels.mjs --port <vite port> --worktree <worktree> --repeat 2 --plate, through gpu-slot.",
+   "Distance: python3 tree.py pin, then python3 distance.py --repeats 3, then shading.py, shading_not_timed.py and summarize_distance.py."
+  ],
+  "incidents": [
+   {
+    "detail": "Once while another timing measurement had the machine and once while all work on it stopped. No session was running the first time; the second stop ended an 8 km session at 5.8 km, whose file is kept, marked stopped and counted by nothing. The second resume ran on a restarted runtime, a new run with an empty world, serving the same release bundle; every session opens its own arrival reference.",
+    "what": "the walk paused twice between sessions"
+   },
+   {
+    "detail": "The copied series.py imports the world scale record's summarize.py, which had not been copied; nothing ran and nothing was written. It was copied unchanged and the series started again.",
+    "what": "the first attempt of the distance series stopped before any session"
+   },
+   {
+    "detail": "It waited behind two full test-suite runs on the machine; while a full suite holds that slot no timed measurement can run, so it was built while one held it. The build is not a timing.",
+    "what": "the release build ran outside the quiet slot"
+   }
+  ],
+  "machine": {
+   "hardware_model": "Mac17,6",
+   "logical_cpus": 18,
+   "memory_bytes": 68719476736,
+   "node": "v24.15.0",
+   "os": "macOS 26.7",
+   "python": "3.11.6"
+  },
+  "measured_tree": {
+   "base_commit": "e9dee3c288dbb3fb7a066bfb40b31143207fc11e",
+   "diff_bytes": 53376,
+   "product_sha256": "84b95583843cfd902415da8982df007485b3c157b2cfa6dac6b55114686c9607",
+   "untracked_product_files": 49
+  },
+  "not_measured": [
+   "Motion at distance (swimming or jitter): only still frames were captured, as in the world scale record.",
+   "Frame work at 8 km: every 8 km session was discarded by the idle gate (claims.measured gives the idle figures), and the machine's load came from work outside this measurement, so no 8 km timing is claimed.",
+   "Repeats: the world scale record walked each mark three times; this walk has one accepted session per mark from 40 m to 4 km and none at 8 km. The second and third repeats were not run.",
+   "Objects other than the marker cube at distance, and light directions other than the one sun.",
+   "The plate sweep walks one line of 155 poses per position; other directions and heights were not swept.",
+   "The sky in a generated tile's or a Google reference's world by pixels: its sky is a skybox or the clear colour, and neither was changed.",
+   "Other machines, GPUs and drivers, a headed browser and a production deployment."
+  ],
+  "pixels": {
+   "baseline-e9dee3c2": {
+    "browser": "Chrome/153.0.8010.53",
+    "identical_across_repeats": true,
+    "plate_sweeps": [],
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Max, Unspecified Version)",
+    "repeats": 2,
+    "scenes": {
+     "district": {
+      "drawn_pixels": 1176,
+      "sha256": "30d702072643f793afdbe8294fa8398b228653dcbb66844ad44ed8ba07144279"
+     },
+     "endless-cube-8km": {
+      "drawn_pixels": 98400,
+      "sha256": "53ae507fa42fa4e657be471c3383fc70455566fe0254a60e1167c79eb9029c05"
+     },
+     "endless-cube-after-map": {
+      "drawn_pixels": 144000,
+      "sha256": "b2b0f523de97b5976ebf8f9f74f0a8d2ae48fa26d740986d30e1c966686d39ef"
+     },
+     "endless-cube-arrival": {
+      "drawn_pixels": 144000,
+      "sha256": "40aa5b2e326746cd2c7504f2ca076139335f7fa02fe90c31ae81cabe70d22f26"
+     },
+     "endless-plate": {
+      "drawn_pixels": 144000,
+      "sha256": "30bd8098c7d8c7a240d4ded4b083ba8c4eba1b4a22235d745811e74be652cf2e"
+     },
+     "endless-starter": {
+      "drawn_pixels": 144000,
+      "sha256": "0a771eea195993c64fed242d8a365022bd9d7f87785124fc5099eb48b08cd089"
+     },
+     "endless-starter-looking-up": {
+      "drawn_pixels": 144000,
+      "sha256": "7b9f4725419527cd514fabcdc2a2bd00636468803ddbc35afe6ec6f9ba7c0028"
+     },
+     "estimate": {
+      "drawn_pixels": 144000,
+      "sha256": "469dcf1c94d3d211632ea737a18e851267403666803589b44206eff2984e414a"
+     },
+     "flat-plate": {
+      "drawn_pixels": 144000,
+      "sha256": "736ad7b078b20f3bd54343370fb1539258041e7a91dc3ef2fa7713d324510929"
+     },
+     "flat-starter": {
+      "drawn_pixels": 144000,
+      "sha256": "b59e299aa2e4dcdfdbdb6522c0901c8848ad166d5f1537e23a6c15f9ec9df1f0"
+     },
+     "regions": {
+      "drawn_pixels": 144000,
+      "sha256": "1149d349016c75aab6f39f760c252b2df0253a7b41f961d21ab90be021aa8629"
+     },
+     "regions-map": {
+      "drawn_pixels": 16883,
+      "sha256": "a3ab2f929d795babdff664f16aaf58940c6e1d08c6b8112d026718caacd3e1f1"
+     }
+    },
+    "what": "the tree at e9dee3c2 before any change, with objects placed after the first frame"
+   },
+   "final": {
+    "browser": "Chrome/153.0.8010.53",
+    "byte_identical_to_step_5d": 12,
+    "identical_across_repeats": true,
+    "plate_sweeps": [
+     {
+      "clean_min_millionths": 1000000,
+      "drawn_min_millionths": 1000000,
+      "ground": "authored-endless@0,0",
+      "measured": 53,
+      "poses": 155,
+      "under_whole": 0
+     },
+     {
+      "clean_min_millionths": 1000000,
+      "drawn_min_millionths": 1000000,
+      "ground": "authored-endless@0,-8000000",
+      "measured": 53,
+      "poses": 155,
+      "under_whole": 0
+     },
+     {
+      "clean_min_millionths": 1000000,
+      "drawn_min_millionths": 1000000,
+      "ground": "authored-flat@2000,0",
+      "measured": 155,
+      "poses": 155,
+      "under_whole": 0
+     }
+    ],
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Max, Unspecified Version)",
+    "repeats": 2,
+    "scenes": {
+     "district": {
+      "drawn_pixels": 1176,
+      "sha256": "30d702072643f793afdbe8294fa8398b228653dcbb66844ad44ed8ba07144279",
+      "sky_colours": 1
+     },
+     "endless-cube-8km": {
+      "drawn_pixels": 144000,
+      "sha256": "efdfda8ac74feca36aeb26837d3dc0b7fea520e3bdf246f525e76c8e252028a7",
+      "sky_colours": 15
+     },
+     "endless-cube-after-map": {
+      "drawn_pixels": 144000,
+      "sha256": "ad448410cdcffc8c4db226a0bc299a80a5fc032f5439583200c98c56bf7236bb",
+      "sky_colours": 15
+     },
+     "endless-cube-arrival": {
+      "drawn_pixels": 144000,
+      "sha256": "ad448410cdcffc8c4db226a0bc299a80a5fc032f5439583200c98c56bf7236bb",
+      "sky_colours": 15
+     },
+     "endless-plate": {
+      "drawn_pixels": 144000,
+      "sha256": "f0411abe2b2363e368bae713f4c97049508759d6caff6578dfb47f884ca33149",
+      "sky_colours": 17
+     },
+     "endless-starter": {
+      "drawn_pixels": 144000,
+      "sha256": "ec3c99d92fe3613555a9e0548b06d50fc8a39c8b7a882394dc54d52f0025879c",
+      "sky_colours": 16
+     },
+     "endless-starter-looking-up": {
+      "drawn_pixels": 144000,
+      "sha256": "9bbfa97f92bfcac346add2159eac644d2e2745a6d45a05966252650b3c45ac13",
+      "sky_colours": 15
+     },
+     "estimate": {
+      "drawn_pixels": 144000,
+      "sha256": "45b4441f746130d25081362a62a248af4fd4037a09632a55af7f2616bddd3826",
+      "sky_colours": 16
+     },
+     "flat-plate": {
+      "drawn_pixels": 144000,
+      "sha256": "2028f11330d00821068099d9dd4f94b8753bf674a5d28e09d22659ac5f3fcb9f",
+      "sky_colours": 17
+     },
+     "flat-starter": {
+      "drawn_pixels": 144000,
+      "sha256": "b69886f0e172b1d02127f8afe388b9143f881f98dc4fd5721df00ff362151062",
+      "sky_colours": 16
+     },
+     "regions": {
+      "drawn_pixels": 144000,
+      "sha256": "0e33541baa80cc6f382eed716ce4a182928d8f4a366c687fe0a015450f580cfd",
+      "sky_colours": 30
+     },
+     "regions-map": {
+      "drawn_pixels": 16883,
+      "sha256": "98d0b3f285179a0e88b4c5f720c67118e5375f8e9501f27d56a98b4cfc7eef1c",
+      "sky_colours": 2
+     }
+    },
+    "what": "the delivered tree, which differs from step-5d by comments only"
+   },
+   "fixes-1": {
+    "browser": "Chrome/153.0.8010.53",
+    "identical_across_repeats": true,
+    "plate_sweeps": [
+     {
+      "clean_min_millionths": 1000000,
+      "drawn_min_millionths": 1000000,
+      "ground": "authored-endless@0,0",
+      "measured": 53,
+      "poses": 155,
+      "under_whole": 0
+     },
+     {
+      "clean_min_millionths": 1000000,
+      "drawn_min_millionths": 1000000,
+      "ground": "authored-endless@0,-8000000",
+      "measured": 53,
+      "poses": 155,
+      "under_whole": 0
+     },
+     {
+      "clean_min_millionths": 1000000,
+      "drawn_min_millionths": 1000000,
+      "ground": "authored-flat@2000,0",
+      "measured": 155,
+      "poses": 155,
+      "under_whole": 0
+     }
+    ],
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Max, Unspecified Version)",
+    "repeats": 2,
+    "scenes": {
+     "district": {
+      "drawn_pixels": 1176,
+      "sha256": "30d702072643f793afdbe8294fa8398b228653dcbb66844ad44ed8ba07144279",
+      "sky_colours": 1
+     },
+     "endless-cube-8km": {
+      "drawn_pixels": 144000,
+      "sha256": "efdfda8ac74feca36aeb26837d3dc0b7fea520e3bdf246f525e76c8e252028a7",
+      "sky_colours": 15
+     },
+     "endless-cube-after-map": {
+      "drawn_pixels": 144000,
+      "sha256": "ad448410cdcffc8c4db226a0bc299a80a5fc032f5439583200c98c56bf7236bb",
+      "sky_colours": 15
+     },
+     "endless-cube-arrival": {
+      "drawn_pixels": 144000,
+      "sha256": "ad448410cdcffc8c4db226a0bc299a80a5fc032f5439583200c98c56bf7236bb",
+      "sky_colours": 15
+     },
+     "endless-plate": {
+      "drawn_pixels": 144000,
+      "sha256": "f0411abe2b2363e368bae713f4c97049508759d6caff6578dfb47f884ca33149",
+      "sky_colours": 17
+     },
+     "endless-starter": {
+      "drawn_pixels": 144000,
+      "sha256": "ec3c99d92fe3613555a9e0548b06d50fc8a39c8b7a882394dc54d52f0025879c",
+      "sky_colours": 16
+     },
+     "endless-starter-looking-up": {
+      "drawn_pixels": 144000,
+      "sha256": "9bbfa97f92bfcac346add2159eac644d2e2745a6d45a05966252650b3c45ac13",
+      "sky_colours": 15
+     },
+     "estimate": {
+      "drawn_pixels": 144000,
+      "sha256": "45b4441f746130d25081362a62a248af4fd4037a09632a55af7f2616bddd3826",
+      "sky_colours": 16
+     },
+     "flat-plate": {
+      "drawn_pixels": 144000,
+      "sha256": "2028f11330d00821068099d9dd4f94b8753bf674a5d28e09d22659ac5f3fcb9f",
+      "sky_colours": 17
+     },
+     "flat-starter": {
+      "drawn_pixels": 144000,
+      "sha256": "b69886f0e172b1d02127f8afe388b9143f881f98dc4fd5721df00ff362151062",
+      "sky_colours": 16
+     },
+     "regions": {
+      "drawn_pixels": 144000,
+      "sha256": "0e33541baa80cc6f382eed716ce4a182928d8f4a366c687fe0a015450f580cfd",
+      "sky_colours": 30
+     },
+     "regions-map": {
+      "drawn_pixels": 16883,
+      "sha256": "98d0b3f285179a0e88b4c5f720c67118e5375f8e9501f27d56a98b4cfc7eef1c",
+      "sky_colours": 2
+     }
+    },
+    "what": "after the plate's depth order and the endless face grid as well: the reference for 5a and 5d"
+   },
+   "moved_from_baseline": [
+    "endless-cube-8km",
+    "endless-cube-after-map",
+    "endless-cube-arrival",
+    "endless-plate",
+    "endless-starter",
+    "endless-starter-looking-up",
+    "estimate",
+    "flat-plate",
+    "flat-starter",
+    "regions",
+    "regions-map"
+   ],
+   "sky-bias": {
+    "browser": "Chrome/153.0.8010.53",
+    "identical_across_repeats": true,
+    "plate_sweeps": [],
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Max, Unspecified Version)",
+    "repeats": 2,
+    "scenes": {
+     "district": {
+      "drawn_pixels": 1176,
+      "sha256": "30d702072643f793afdbe8294fa8398b228653dcbb66844ad44ed8ba07144279",
+      "sky_colours": 1
+     },
+     "endless-cube-8km": {
+      "drawn_pixels": 144000,
+      "sha256": "68b48c86166c803cba9f132e317941f7330b996eaeb1ae26586d472a5ac5e0e6",
+      "sky_colours": 15
+     },
+     "endless-cube-after-map": {
+      "drawn_pixels": 144000,
+      "sha256": "97b77bea76268bec492e3ea3889bb14f0eb0612a8cf986689e2cbc7cc699d0ab",
+      "sky_colours": 15
+     },
+     "endless-cube-arrival": {
+      "drawn_pixels": 144000,
+      "sha256": "97b77bea76268bec492e3ea3889bb14f0eb0612a8cf986689e2cbc7cc699d0ab",
+      "sky_colours": 15
+     },
+     "endless-plate": {
+      "drawn_pixels": 144000,
+      "sha256": "f0411abe2b2363e368bae713f4c97049508759d6caff6578dfb47f884ca33149",
+      "sky_colours": 17
+     },
+     "endless-starter": {
+      "drawn_pixels": 144000,
+      "sha256": "ec3c99d92fe3613555a9e0548b06d50fc8a39c8b7a882394dc54d52f0025879c",
+      "sky_colours": 16
+     },
+     "endless-starter-looking-up": {
+      "drawn_pixels": 144000,
+      "sha256": "9bbfa97f92bfcac346add2159eac644d2e2745a6d45a05966252650b3c45ac13",
+      "sky_colours": 15
+     },
+     "estimate": {
+      "drawn_pixels": 144000,
+      "sha256": "a64c4c03d416e35549ab89e919f5d7a4fb2a98319cc7daee32fa835ea810d7ca",
+      "sky_colours": 16
+     },
+     "flat-plate": {
+      "drawn_pixels": 144000,
+      "sha256": "1ad8bf6181fbba6e628041b660d4792761ebf634bdbf2ab3e8843eb2aca451c2",
+      "sky_colours": 17
+     },
+     "flat-starter": {
+      "drawn_pixels": 144000,
+      "sha256": "1d5bbad87684f8c2839e01b19a5e67b5219f4c73c7a32059a6360c27680e589a",
+      "sky_colours": 16
+     },
+     "regions": {
+      "drawn_pixels": 144000,
+      "sha256": "0e33541baa80cc6f382eed716ce4a182928d8f4a366c687fe0a015450f580cfd",
+      "sky_colours": 30
+     },
+     "regions-map": {
+      "drawn_pixels": 16883,
+      "sha256": "98d0b3f285179a0e88b4c5f720c67118e5375f8e9501f27d56a98b4cfc7eef1c",
+      "sky_colours": 2
+     }
+    },
+    "what": "after the sky and the starter's shadow bias, and the object residency fix"
+   },
+   "step-5a": {
+    "browser": "Chrome/153.0.8010.53",
+    "byte_identical_to_fixes_1": 12,
+    "identical_across_repeats": true,
+    "plate_sweeps": [
+     {
+      "clean_min_millionths": 1000000,
+      "drawn_min_millionths": 1000000,
+      "ground": "authored-endless@0,0",
+      "measured": 53,
+      "poses": 155,
+      "under_whole": 0
+     },
+     {
+      "clean_min_millionths": 1000000,
+      "drawn_min_millionths": 1000000,
+      "ground": "authored-endless@0,-8000000",
+      "measured": 53,
+      "poses": 155,
+      "under_whole": 0
+     },
+     {
+      "clean_min_millionths": 1000000,
+      "drawn_min_millionths": 1000000,
+      "ground": "authored-flat@2000,0",
+      "measured": 155,
+      "poses": 155,
+      "under_whole": 0
+     }
+    ],
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Max, Unspecified Version)",
+    "repeats": 2,
+    "scenes": {
+     "district": {
+      "drawn_pixels": 1176,
+      "sha256": "30d702072643f793afdbe8294fa8398b228653dcbb66844ad44ed8ba07144279",
+      "sky_colours": 1
+     },
+     "endless-cube-8km": {
+      "drawn_pixels": 144000,
+      "sha256": "efdfda8ac74feca36aeb26837d3dc0b7fea520e3bdf246f525e76c8e252028a7",
+      "sky_colours": 15
+     },
+     "endless-cube-after-map": {
+      "drawn_pixels": 144000,
+      "sha256": "ad448410cdcffc8c4db226a0bc299a80a5fc032f5439583200c98c56bf7236bb",
+      "sky_colours": 15
+     },
+     "endless-cube-arrival": {
+      "drawn_pixels": 144000,
+      "sha256": "ad448410cdcffc8c4db226a0bc299a80a5fc032f5439583200c98c56bf7236bb",
+      "sky_colours": 15
+     },
+     "endless-plate": {
+      "drawn_pixels": 144000,
+      "sha256": "f0411abe2b2363e368bae713f4c97049508759d6caff6578dfb47f884ca33149",
+      "sky_colours": 17
+     },
+     "endless-starter": {
+      "drawn_pixels": 144000,
+      "sha256": "ec3c99d92fe3613555a9e0548b06d50fc8a39c8b7a882394dc54d52f0025879c",
+      "sky_colours": 16
+     },
+     "endless-starter-looking-up": {
+      "drawn_pixels": 144000,
+      "sha256": "9bbfa97f92bfcac346add2159eac644d2e2745a6d45a05966252650b3c45ac13",
+      "sky_colours": 15
+     },
+     "estimate": {
+      "drawn_pixels": 144000,
+      "sha256": "45b4441f746130d25081362a62a248af4fd4037a09632a55af7f2616bddd3826",
+      "sky_colours": 16
+     },
+     "flat-plate": {
+      "drawn_pixels": 144000,
+      "sha256": "2028f11330d00821068099d9dd4f94b8753bf674a5d28e09d22659ac5f3fcb9f",
+      "sky_colours": 17
+     },
+     "flat-starter": {
+      "drawn_pixels": 144000,
+      "sha256": "b69886f0e172b1d02127f8afe388b9143f881f98dc4fd5721df00ff362151062",
+      "sky_colours": 16
+     },
+     "regions": {
+      "drawn_pixels": 144000,
+      "sha256": "0e33541baa80cc6f382eed716ce4a182928d8f4a366c687fe0a015450f580cfd",
+      "sky_colours": 30
+     },
+     "regions-map": {
+      "drawn_pixels": 16883,
+      "sha256": "98d0b3f285179a0e88b4c5f720c67118e5375f8e9501f27d56a98b4cfc7eef1c",
+      "sky_colours": 2
+     }
+    },
+    "what": "after the world-kind module (5a), meant to move no pixel"
+   },
+   "step-5d": {
+    "browser": "Chrome/153.0.8010.53",
+    "byte_identical_to_fixes_1": 12,
+    "identical_across_repeats": true,
+    "plate_sweeps": [
+     {
+      "clean_min_millionths": 1000000,
+      "drawn_min_millionths": 1000000,
+      "ground": "authored-endless@0,0",
+      "measured": 53,
+      "poses": 155,
+      "under_whole": 0
+     },
+     {
+      "clean_min_millionths": 1000000,
+      "drawn_min_millionths": 1000000,
+      "ground": "authored-endless@0,-8000000",
+      "measured": 53,
+      "poses": 155,
+      "under_whole": 0
+     },
+     {
+      "clean_min_millionths": 1000000,
+      "drawn_min_millionths": 1000000,
+      "ground": "authored-flat@2000,0",
+      "measured": 155,
+      "poses": 155,
+      "under_whole": 0
+     }
+    ],
+    "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Max, Unspecified Version)",
+    "repeats": 2,
+    "scenes": {
+     "district": {
+      "drawn_pixels": 1176,
+      "sha256": "30d702072643f793afdbe8294fa8398b228653dcbb66844ad44ed8ba07144279",
+      "sky_colours": 1
+     },
+     "endless-cube-8km": {
+      "drawn_pixels": 144000,
+      "sha256": "efdfda8ac74feca36aeb26837d3dc0b7fea520e3bdf246f525e76c8e252028a7",
+      "sky_colours": 15
+     },
+     "endless-cube-after-map": {
+      "drawn_pixels": 144000,
+      "sha256": "ad448410cdcffc8c4db226a0bc299a80a5fc032f5439583200c98c56bf7236bb",
+      "sky_colours": 15
+     },
+     "endless-cube-arrival": {
+      "drawn_pixels": 144000,
+      "sha256": "ad448410cdcffc8c4db226a0bc299a80a5fc032f5439583200c98c56bf7236bb",
+      "sky_colours": 15
+     },
+     "endless-plate": {
+      "drawn_pixels": 144000,
+      "sha256": "f0411abe2b2363e368bae713f4c97049508759d6caff6578dfb47f884ca33149",
+      "sky_colours": 17
+     },
+     "endless-starter": {
+      "drawn_pixels": 144000,
+      "sha256": "ec3c99d92fe3613555a9e0548b06d50fc8a39c8b7a882394dc54d52f0025879c",
+      "sky_colours": 16
+     },
+     "endless-starter-looking-up": {
+      "drawn_pixels": 144000,
+      "sha256": "9bbfa97f92bfcac346add2159eac644d2e2745a6d45a05966252650b3c45ac13",
+      "sky_colours": 15
+     },
+     "estimate": {
+      "drawn_pixels": 144000,
+      "sha256": "45b4441f746130d25081362a62a248af4fd4037a09632a55af7f2616bddd3826",
+      "sky_colours": 16
+     },
+     "flat-plate": {
+      "drawn_pixels": 144000,
+      "sha256": "2028f11330d00821068099d9dd4f94b8753bf674a5d28e09d22659ac5f3fcb9f",
+      "sky_colours": 17
+     },
+     "flat-starter": {
+      "drawn_pixels": 144000,
+      "sha256": "b69886f0e172b1d02127f8afe388b9143f881f98dc4fd5721df00ff362151062",
+      "sky_colours": 16
+     },
+     "regions": {
+      "drawn_pixels": 144000,
+      "sha256": "0e33541baa80cc6f382eed716ce4a182928d8f4a366c687fe0a015450f580cfd",
+      "sky_colours": 30
+     },
+     "regions-map": {
+      "drawn_pixels": 16883,
+      "sha256": "98d0b3f285179a0e88b4c5f720c67118e5375f8e9501f27d56a98b4cfc7eef1c",
+      "sky_colours": 2
+     }
+    },
+    "what": "after the atmosphere module (5d), meant to move no pixel"
+   },
+   "unchanged_from_baseline": [
+    "district"
+   ]
+  },
+  "plate": {
+   "arm-facegrid_16_9344_bias_1_1": {
+    "arm": {
+     "bias": [
+      1,
+      1
+     ],
+     "face_grid": [
+      16,
+      9344
+     ],
+     "face_half_m": null,
+     "legacy": false
+    },
+    "grounds": {
+     "authored-endless@0,-8000": {
+      "clean_mean_millionths": 1000000,
+      "clean_min_millionths": 1000000,
+      "drawn_mean_millionths": 1000000,
+      "drawn_min_millionths": 1000000,
+      "poses": 155,
+      "poses_clean_under_99_percent": 0,
+      "poses_drawn_under_99_percent": 0,
+      "poses_with_an_interior": 53
+     },
+     "authored-endless@0,0": {
+      "clean_mean_millionths": 1000000,
+      "clean_min_millionths": 1000000,
+      "drawn_mean_millionths": 1000000,
+      "drawn_min_millionths": 1000000,
+      "poses": 155,
+      "poses_clean_under_99_percent": 0,
+      "poses_drawn_under_99_percent": 0,
+      "poses_with_an_interior": 53
+     }
+    }
+   },
+   "arm-facehalf_1500_bias_0_0": {
+    "arm": {
+     "bias": [
+      0,
+      0
+     ],
+     "face_grid": null,
+     "face_half_m": 1500,
+     "legacy": false
+    },
+    "grounds": {
+     "authored-endless@0,-8000": {
+      "clean_mean_millionths": 1000000,
+      "clean_min_millionths": 1000000,
+      "drawn_mean_millionths": 1000000,
+      "drawn_min_millionths": 1000000,
+      "poses": 155,
+      "poses_clean_under_99_percent": 0,
+      "poses_drawn_under_99_percent": 0,
+      "poses_with_an_interior": 53
+     },
+     "authored-endless@0,0": {
+      "clean_mean_millionths": 480632,
+      "clean_min_millionths": 0,
+      "drawn_mean_millionths": 509954,
+      "drawn_min_millionths": 0,
+      "poses": 155,
+      "poses_clean_under_99_percent": 30,
+      "poses_drawn_under_99_percent": 30,
+      "poses_with_an_interior": 53
+     }
+    }
+   },
+   "arm-facehalf_1500_bias_1_1": {
+    "arm": {
+     "bias": [
+      1,
+      1
+     ],
+     "face_grid": null,
+     "face_half_m": 1500,
+     "legacy": false
+    },
+    "grounds": {
+     "authored-endless@0,-8000": {
+      "clean_mean_millionths": 1000000,
+      "clean_min_millionths": 1000000,
+      "drawn_mean_millionths": 1000000,
+      "drawn_min_millionths": 1000000,
+      "poses": 155,
+      "poses_clean_under_99_percent": 0,
+      "poses_drawn_under_99_percent": 0,
+      "poses_with_an_interior": 53
+     },
+     "authored-endless@0,0": {
+      "clean_mean_millionths": 1000000,
+      "clean_min_millionths": 1000000,
+      "drawn_mean_millionths": 1000000,
+      "drawn_min_millionths": 1000000,
+      "poses": 155,
+      "poses_clean_under_99_percent": 0,
+      "poses_drawn_under_99_percent": 0,
+      "poses_with_an_interior": 53
+     }
+    }
+   },
+   "arm-legacy_bias_0_16": {
+    "arm": {
+     "bias": [
+      0,
+      16
+     ],
+     "face_grid": null,
+     "face_half_m": null,
+     "legacy": true
+    },
+    "grounds": {
+     "authored-endless@0,-8000": {
+      "clean_mean_millionths": 1000000,
+      "clean_min_millionths": 1000000,
+      "drawn_mean_millionths": 1000000,
+      "drawn_min_millionths": 1000000,
+      "poses": 155,
+      "poses_clean_under_99_percent": 0,
+      "poses_drawn_under_99_percent": 0,
+      "poses_with_an_interior": 53
+     },
+     "authored-endless@0,0": {
+      "clean_mean_millionths": 1000000,
+      "clean_min_millionths": 1000000,
+      "drawn_mean_millionths": 1000000,
+      "drawn_min_millionths": 1000000,
+      "poses": 155,
+      "poses_clean_under_99_percent": 0,
+      "poses_drawn_under_99_percent": 0,
+      "poses_with_an_interior": 53
+     }
+    }
+   },
+   "arm-legacy_bias_1_1": {
+    "arm": {
+     "bias": [
+      1,
+      1
+     ],
+     "face_grid": null,
+     "face_half_m": null,
+     "legacy": true
+    },
+    "grounds": {
+     "authored-endless@0,-8000": {
+      "clean_mean_millionths": 777968,
+      "clean_min_millionths": 0,
+      "drawn_mean_millionths": 780202,
+      "drawn_min_millionths": 0,
+      "poses": 155,
+      "poses_clean_under_99_percent": 14,
+      "poses_drawn_under_99_percent": 14,
+      "poses_with_an_interior": 53
+     },
+     "authored-endless@0,0": {
+      "clean_mean_millionths": 766802,
+      "clean_min_millionths": 0,
+      "drawn_mean_millionths": 773585,
+      "drawn_min_millionths": 0,
+      "poses": 155,
+      "poses_clean_under_99_percent": 14,
+      "poses_drawn_under_99_percent": 12,
+      "poses_with_an_interior": 53
+     }
+    }
+   },
+   "arm-legacy_bias_64_0": {
+    "arm": {
+     "bias": [
+      64,
+      0
+     ],
+     "face_grid": null,
+     "face_half_m": null,
+     "legacy": true
+    },
+    "grounds": {
+     "authored-endless@0,-8000": {
+      "clean_mean_millionths": 531717,
+      "clean_min_millionths": 0,
+      "drawn_mean_millionths": 541253,
+      "drawn_min_millionths": 0,
+      "poses": 155,
+      "poses_clean_under_99_percent": 27,
+      "poses_drawn_under_99_percent": 26,
+      "poses_with_an_interior": 53
+     },
+     "authored-endless@0,0": {
+      "clean_mean_millionths": 445336,
+      "clean_min_millionths": 0,
+      "drawn_mean_millionths": 450104,
+      "drawn_min_millionths": 0,
+      "poses": 155,
+      "poses_clean_under_99_percent": 31,
+      "poses_drawn_under_99_percent": 31,
+      "poses_with_an_interior": 53
+     }
+    }
+   },
+   "record-final-0c1abce8d3c4": {
+    "arm": {
+     "bias": null,
+     "face_grid": null,
+     "face_half_m": null,
+     "legacy": false
+    },
+    "grounds": {
+     "authored-endless@0,-8000": {
+      "clean_mean_millionths": 1000000,
+      "clean_min_millionths": 1000000,
+      "drawn_mean_millionths": 1000000,
+      "drawn_min_millionths": 1000000,
+      "poses": 155,
+      "poses_clean_under_99_percent": 0,
+      "poses_drawn_under_99_percent": 0,
+      "poses_with_an_interior": 53
+     },
+     "authored-endless@0,0": {
+      "clean_mean_millionths": 1000000,
+      "clean_min_millionths": 1000000,
+      "drawn_mean_millionths": 1000000,
+      "drawn_min_millionths": 1000000,
+      "poses": 155,
+      "poses_clean_under_99_percent": 0,
+      "poses_drawn_under_99_percent": 0,
+      "poses_with_an_interior": 53
+     },
+     "authored-flat@-3,2": {
+      "clean_mean_millionths": 1000000,
+      "clean_min_millionths": 1000000,
+      "drawn_mean_millionths": 1000000,
+      "drawn_min_millionths": 1000000,
+      "poses": 155,
+      "poses_clean_under_99_percent": 0,
+      "poses_drawn_under_99_percent": 0,
+      "poses_with_an_interior": 155
+     },
+     "authored-flat@2,0": {
+      "clean_mean_millionths": 1000000,
+      "clean_min_millionths": 1000000,
+      "drawn_mean_millionths": 1000000,
+      "drawn_min_millionths": 1000000,
+      "poses": 155,
+      "poses_clean_under_99_percent": 0,
+      "poses_drawn_under_99_percent": 0,
+      "poses_with_an_interior": 155
+     }
+    }
+   },
+   "record-legacy-0c1abce8d3c4": {
+    "arm": {
+     "bias": null,
+     "face_grid": null,
+     "face_half_m": null,
+     "legacy": true
+    },
+    "grounds": {
+     "authored-endless@0,-8000": {
+      "clean_mean_millionths": 476232,
+      "clean_min_millionths": 0,
+      "drawn_mean_millionths": 496792,
+      "drawn_min_millionths": 0,
+      "poses": 155,
+      "poses_clean_under_99_percent": 30,
+      "poses_drawn_under_99_percent": 29,
+      "poses_with_an_interior": 53
+     },
+     "authored-endless@0,0": {
+      "clean_mean_millionths": 441647,
+      "clean_min_millionths": 0,
+      "drawn_mean_millionths": 445075,
+      "drawn_min_millionths": 0,
+      "poses": 155,
+      "poses_clean_under_99_percent": 31,
+      "poses_drawn_under_99_percent": 31,
+      "poses_with_an_interior": 53
+     },
+     "authored-flat@-3,2": {
+      "clean_mean_millionths": 351662,
+      "clean_min_millionths": 0,
+      "drawn_mean_millionths": 498431,
+      "drawn_min_millionths": 0,
+      "poses": 155,
+      "poses_clean_under_99_percent": 155,
+      "poses_drawn_under_99_percent": 132,
+      "poses_with_an_interior": 155
+     },
+     "authored-flat@2,0": {
+      "clean_mean_millionths": 376642,
+      "clean_min_millionths": 0,
+      "drawn_mean_millionths": 484432,
+      "drawn_min_millionths": 0,
+      "poses": 155,
+      "poses_clean_under_99_percent": 155,
+      "poses_drawn_under_99_percent": 129,
+      "poses_with_an_interior": 155
+     }
+    }
+   }
+  },
+  "predecessor_record": {
+   "commits_between": 14,
+   "commits_between_changing_browser_source": [
+    "b90a426f Let a person give a placed object motion, change it, remove it and undo each step",
+    "68866e21 Let a person bring a few inhabitants into their own world and direct one to rest there",
+    "c5803ca6 Require permission to see a person's photographs before placing a 3D estimate made from one"
+   ],
+   "file_sha256": "3376f997a3767e0006b47dcc319b1d9b537029ed08142602cc65474a830824c6",
+   "measured_commit": "7e6144ea80847dd235a870ba14f4b7fbcf95dba0",
+   "path": "docs/evaluation/2026-09-22-world-scale-baseline.json",
+   "record_sha256": "7cd4ead5e3cb75043b7d398ab097d6654af369bcf4c12ce0e843662675da658c",
+   "why": "The world scale baseline measured the flat sky from 1 km and the banded lit faces at 4 and 8 km that this record finds the cause of, and its distance protocol is the one this record repeats on the changed tree."
+  },
+  "profile": "exulanica.render-at-distance/v1",
+  "scripts": {
+   "copied": {
+    "break_contracts.py": "5bce2c94d0df136144ce46bf71a4be2d08c8d233ef825fc9fbca2d0eb586cfe2",
+    "break_harness.py": "8e76613e972e9a942e32443b460f770f8838933b728108e44ef56df8870d74d6",
+    "cdp.mjs": "dfad24f881f7c514494ff306e662176417f22fe81043545c8b9982247f366303",
+    "place.py": "f681fbf744c53c5de9f1e00afd2b34d0e06c3afb9e843f90cebfe094f4d9b3ec",
+    "preview.py": "b34e603103924dbf026a8df356737fd8a984c63e9efd64dc3b4bb81754767504",
+    "probe-bands.mjs": "ca9d09442459657af8ed33b68eca29821de82fb7929a09cd855459418cc37aa2",
+    "probe-casters.mjs": "2b131416b6d43c3411f6229c97e13d98247ae0e1be929298de3b9cbbc64727ab",
+    "probe-internals.mjs": "f0890c8bf3136f16d5f56271b1c455731548b9c93a7c518155b984ccbcc51c2f",
+    "probe-plate.as-run-0c1abce8d3c4.mjs": "c4ed98fe049ed8df68e9b827b71f280dc7422aa70cd1a94a74e656fc7024c5a3",
+    "probe-shadow.mjs": "ee22c46ac076823c917341f8584924ca1aada77dbb37f1da02c9835886b9d3f4",
+    "series.py": "9554e44e48cf3acd54f0ce84ff18efe5e9fd7617cad6de41b49233029ebc6951",
+    "shading_not_timed.py": "e889978b1ad3bc603c0a6de4b8d708082335276e0beb38afdbb3e61d0964b6aa",
+    "slot.py": "53a78c7d62bbf928f80c75ff9d9cc0c8d11e7b97ed5b958a1600210fc8b26cde",
+    "summarize_distance.py": "c897478ee0a086d92b894049576d70d75a245f5c3640f75c733102ffefb2c38e",
+    "tree.py": "ed1e8dc0a81ce997e4642416a39dbf88c6c681768747b985759cd4d0bed3139f",
+    "write_record.py": "4085e65a7cf048802feef05926a3e1fc79576f0e1f7da9ec4262a5b4f24bc852"
+   },
+   "world_scale_scripts_run_unchanged": {
+    "binding.mjs": {
+     "published_with_the_world_scale_record": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/binding.mjs.txt",
+     "same_after_substitutions": true,
+     "sha256": "6fd355aae6dac6dff45fc45455cc797c2b1d2fb944d1ae5641fb2c89d139ba57"
+    },
+    "distance.py": {
+     "published_with_the_world_scale_record": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/distance.py.txt",
+     "same_after_substitutions": true,
+     "sha256": "2f51cb5d85b36cb45975346e30bc27beae89efc7311cd7f3a6420cfc21879811"
+    },
+    "gated.py": {
+     "published_with_the_world_scale_record": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/gated.py.txt",
+     "same_after_substitutions": true,
+     "sha256": "f755dbb3d29bc9fcdc80cd1fce4e01c563dd9d43f0512b20a42663d70c0fda47"
+    },
+    "instrument.js": {
+     "published_with_the_world_scale_record": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/as-run/instrument-15ef8cd9.js.txt",
+     "sha256": "15ef8cd98872740c147ddcc55e821d26eca2cf64960622ed9b833584c3276424"
+    },
+    "shading.py": {
+     "published_with_the_world_scale_record": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/shading.py.txt",
+     "same_after_substitutions": true,
+     "sha256": "1651dcffaac2559b8b231c3198699933412aca8feb167e45de59fd316c53bfed"
+    },
+    "summarize.py": {
+     "published_with_the_world_scale_record": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/summarize.py.txt",
+     "same_after_substitutions": true,
+     "sha256": "f14a4754ad264f1bd30b6a752ef8dc0ad0e15b3d67ccc5a198d03f9e5fee8305"
+    },
+    "wsdrive.mjs": {
+     "published_with_the_world_scale_record": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/wsdrive.mjs.txt",
+     "same_after_substitutions": true,
+     "sha256": "bb58f83eb49f8b6ee617a4b9367d705e747ead99867d8c481574303003343cb3"
+    }
+   }
+  },
+  "subject": "Why a starter world's sky went flat and its lit faces banded far from where it opened, what hid a placed plate and placed objects, what timed two tile tests out, and whether the fixes hold on a release build along the world scale record's walk.",
+  "tile_load": {
+   "run_1": {
+    "log_bytes": 511776,
+    "log_sha256": "29fc881508e73b6ca5fb9e3536654577618afba1d91ff61db1cf9a3740ce0c0d",
+    "neighbour_tests": {
+     "is checked against its own digest like any other ground, and refused by name": {
+      "milliseconds": 6003,
+      "passed": false
+     },
+     "refuses a world that would draw one record twice, naming the record and both tiles": {
+      "milliseconds": 6575,
+      "passed": false
+     }
+    },
+    "totals": [
+     "Test Files  3 failed | 281 passed | 2 skipped (286)",
+     "Tests  4 failed | 3176 passed | 7 skipped (3187)"
+    ],
+    "what": "before: whole web run, default 5 s timeout"
+   },
+   "run_2": {
+    "log_bytes": 509796,
+    "log_sha256": "bf0adfb48f61e77e47483233a0c8e36aa60c42ad01252f8c4b6605cbb3301727",
+    "neighbour_tests": {
+     "is checked against its own digest like any other ground, and refused by name": {
+      "milliseconds": 6661,
+      "passed": true
+     },
+     "refuses a world that would draw one record twice, naming the record and both tiles": {
+      "milliseconds": 6226,
+      "passed": true
+     }
+    },
+    "totals": [
+     "Test Files  1 failed | 283 passed | 2 skipped (286)",
+     "Tests  1 failed | 3179 passed | 7 skipped (3187)"
+    ],
+    "what": "after: whole web run, VERIFIED_LOAD_TIMEOUT_MS"
+   }
+  },
+  "written_at": "2026-09-23T19:13:35+00:00"
+ },
+ "record_sha256": "6a2d92ed1dc33b7198a3b807745369b2472997f4dc485156667a7069228f8b06"
+}

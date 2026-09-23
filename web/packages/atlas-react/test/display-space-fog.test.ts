@@ -10,7 +10,7 @@ import { describe, expect, it } from 'vitest';
 import * as pc from 'playcanvas';
 import { composeAtlasWorld, makeScene } from '@exulanica/atlas-core';
 import { ORIGIN_LANDSCAPE, SURVEY_RELIEF, unitRgb } from '@exulanica/presentation';
-import { installDisplaySpaceFog, skyColourAtEyeLevel } from '../src/playcanvas/atlas-binding.js';
+import { installDisplaySpaceFog, skyColourAtEyeLevel } from '../src/playcanvas/atmosphere.js';
 import { createComposedWorld } from '../src/playcanvas/composed-world.js';
 
 function device(): pc.GraphicsDevice {

@@ -1,0 +1,20 @@
+Untitled|true|0,0,0|0,0,0|1,1,1|
+  atlas-camera|true|0,0,0|0,0,0|1,1,1|camera
+  atlas-directional-light|true|0,0,0|52,-38,0|1,1,1|light
+  geographic-environment|true|0,0,0|0,0,0|1,1,1|
+  atlas-render-origin|true|0,0,0|0,0,0|1,1,1|
+    atlas-world-field|true|0,0,0|0,0,0|1,1,1|render|render -R [-RF:standard:Untitled:offset 2/2]
+      atlas-map-user-marker|false|0,0,0|0,0,0|1,1,1|render|render CR [CRF:standard:Untitled]
+        atlas-map-user-body|false|0,0.02,0|0,0,0|1,1,1|render|render CR [CRF:standard:Untitled]
+      atlas-placement-landing-marker|false|0,0,0|0,0,0|1,1,1|render|render CR [CRF:standard:Untitled]
+    atlas-region-relief|true|0,0,0|0,0,0|1,1,1|
+    atlas-region-mass|true|0,0,0|0,0,0|1,1,1|
+    atlas-composed-world|true|0,0,0|0,0,0|1,1,1|
+      world-profile:origin-landscape|true|0,0,0|0,0,0|1,1,1|
+        origin-environment|true|0,0,0|0,0,0|1,1,1|
+          origin-sky|true|0,0,0|0,0,0|1,1,1|render|render -- [---:shader:Untitled]
+      world-profile:survey-relief|false|0,0,0|0,0,0|1,1,1|
+    authored-region:region:starter|true|0,0,0|0,0,0|1,1,1|
+      authored-region-society|true|0,0,0|0,0,0|1,1,1|
+        society-far-figures|true|0,0,0|0,0,0|1,1,1|
+      authored-point-map:estimate:harness|true|1.5,1.62,-3|0,0,0|1,1,1|render|render CR [CRF:shader:Untitled]

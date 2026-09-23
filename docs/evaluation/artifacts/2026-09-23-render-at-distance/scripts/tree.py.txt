@@ -1,0 +1,51 @@
+"""The product tree a run measures, as one digest, pinned before the first run and checked before each.
+
+    python3 tree.py pin      write measured-tree.json from the tree as it is now
+    python3 tree.py check    exit 3 unless the tree still matches measured-tree.json
+
+The launcher's own identity (state.json "tree") digests `git diff HEAD` and the NAMES of untracked
+files; this also digests the CONTENTS of every untracked file under the product paths, because
+this lane's new modules are untracked until root integrates them.
+"""
+from __future__ import annotations
+
+import hashlib
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+WORKTREE = HERE.parents[2]
+PRODUCT = ["exulanica", "web/packages", "migrations", "pyproject.toml", "web/package.json"]
+PIN = HERE / "measured-tree.json"
+
+
+def identity() -> dict:
+    run = lambda *a: subprocess.run(list(a), cwd=WORKTREE, capture_output=True, check=True).stdout
+    head = run("git", "rev-parse", "HEAD").decode().strip()
+    diff = run("git", "diff", "HEAD", "--binary", "--", *PRODUCT)
+    untracked = sorted(run("git", "ls-files", "--others", "--exclude-standard", "--", *PRODUCT)
+                       .decode().splitlines())
+    digest = hashlib.sha256()
+    digest.update(diff)
+    for name in untracked:
+        digest.update(name.encode() + b"\0")
+        digest.update(hashlib.sha256((WORKTREE / name).read_bytes()).digest())
+    return {"head": head, "diff_bytes": len(diff), "untracked_product_files": len(untracked),
+            "product_sha256": digest.hexdigest()}
+
+
+if __name__ == "__main__":
+    now = identity()
+    if sys.argv[1] == "pin":
+        PIN.write_text(json.dumps(now, indent=1) + "\n")
+        print(json.dumps(now))
+    elif sys.argv[1] == "check":
+        pinned = json.loads(PIN.read_text())
+        if pinned != now:
+            print(f"tree.py: the product tree changed since it was pinned:\n{pinned}\n{now}")
+            raise SystemExit(3)
+        print(f"tree.py: product tree {now['product_sha256'][:12]} as pinned")
+    else:
+        raise SystemExit("usage: tree.py pin|check")

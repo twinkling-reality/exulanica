@@ -1,0 +1,565 @@
+"""Write docs/evaluation/2026-09-23-render-at-distance.json and its artifacts, from the run files.
+
+    .venv/bin/python .exulanica/lane-render/write_record.py      (from the worktree root)
+
+Every number in the record is read from a run file here, never typed: the band-cause probes, the
+plate sweeps, the GPU pixel scenes, the web suite logs, the release-build distance sessions and
+the world scale record, which is this record's predecessor. Integers only (the record's digest input
+refuses floats). Scripts and run files are copied beside the record with the machine's paths
+replaced by the placeholders listed under artifacts.substitutions.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import platform
+import re
+import shutil
+import subprocess
+import sys
+from pathlib import Path
+
+ROOT = Path(__file__).resolve().parents[2]
+sys.path.insert(0, str(ROOT))
+from exulanica.canonical import canonical_json  # noqa: E402
+from exulanica.evaluation.visual_gate import _FORBIDDEN_TEXT  # noqa: E402
+
+LANE = ROOT / ".exulanica" / "lane-render"
+DIST = LANE / "distance"
+RUNS = LANE / "runs"
+NAME = "2026-09-23-render-at-distance"
+RECORD = ROOT / "docs" / "evaluation" / f"{NAME}.json"
+ARTIFACTS = ROOT / "docs" / "evaluation" / "artifacts" / NAME
+REL_ARTIFACTS = f"docs/evaluation/artifacts/{NAME}"
+PREDECESSOR = ROOT / "docs" / "evaluation" / "2026-09-22-world-scale-baseline.json"
+W_SCRIPTS = "docs/evaluation/artifacts/2026-09-22-world-scale/scripts"
+
+# The machine's own paths, derived from where this worktree is, never written out here.
+MAIN_CHECKOUT = ROOT.parent / ("ori" + "mera")
+WORLD_SCALE_WORKTREE = ROOT.parent / "exulanica-0922-world-scale"
+SCRATCH = "claude-501/" + "-".join(("", *MAIN_CHECKOUT.parts[1:]))
+SUBSTITUTIONS = [
+    (str(ROOT), "<WORKTREE>"),
+    (str(MAIN_CHECKOUT), "<MAIN_CHECKOUT>"),
+    (f"/private/tmp/{SCRATCH}", "<SCRATCH>"),
+    (f"/tmp/{SCRATCH}", "<SCRATCH>"),
+    (f"/tmp/exulanica-0922-acceptance/{ROOT.name}", "<RUNTIME>"),
+]
+
+
+#: Run files and the record: the evidence gate's own list, and what else identifies this machine
+#: or the project's withdrawn name. Scripts name an Authorization header by design, so, as the world scale
+#: record's publisher decided, they are held only to the home directory, the withdrawn name and the dash.
+FORBIDDEN = (*_FORBIDDEN_TEXT, "ori" + "mera", "file" + "://", chr(0x2014))
+FORBIDDEN_IN_SCRIPTS = (str(Path.home()), "ori" + "mera", chr(0x2014))
+
+
+def sanitise(text: str, name: str = "", script: bool = False) -> str:
+    for old, new in SUBSTITUTIONS:
+        text = text.replace(old, new)
+    text = re.sub(r"/var/folders/[^/\s\"']+/[^/\s\"']+/T", "<TMPDIR>", text)
+    refused = [phrase for phrase in (FORBIDDEN_IN_SCRIPTS if script else FORBIDDEN) if phrase in text]
+    if refused:
+        where = text.index(refused[0])
+        raise SystemExit(f"{name} still carries {refused[0]!r}: {text[max(0, where - 60):where + 60]!r}")
+    return text
+
+
+def sha(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def load_slotted(path: Path) -> dict:
+    """A runner's JSON with the slot wrapper's own lines (gpu-slot: ...) removed."""
+    lines = [line for line in path.read_text().splitlines() if not line.startswith(("gpu-slot:", "quiet-slot:"))]
+    return json.loads("\n".join(lines))
+
+
+def millionths(value: float) -> int:
+    return round(value * 1_000_000)
+
+
+def mm(value: float) -> int:
+    return round(value * 1000)
+
+
+published: list[dict] = []
+
+
+def publish(source: Path, target: str, *, text: bool = True, script: bool = False) -> dict:
+    """Copy one file beside the record and bind it by digest."""
+    destination = ARTIFACTS / target
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    if text:
+        destination.write_text(sanitise(source.read_text(), source.name, script))
+    else:
+        shutil.copyfile(source, destination)
+    entry = {"path": f"{REL_ARTIFACTS}/{target}", "byte_size": destination.stat().st_size,
+             "sha256": sha(destination)}
+    published.append(entry)
+    return entry
+
+
+def publish_json(document: object, target: str) -> dict:
+    destination = ARTIFACTS / target
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(sanitise(json.dumps(document, indent=1) + "\n", target))
+    entry = {"path": f"{REL_ARTIFACTS}/{target}", "byte_size": destination.stat().st_size,
+             "sha256": sha(destination)}
+    published.append(entry)
+    return entry
+
+
+# -- the band cause (dev server, tree e9dee3c2 unchanged, before any product change) ----------------
+
+def band_cause() -> dict:
+    arms_run = json.loads(sorted((RUNS / "probe-bands").glob("*.json"))[0].read_text())
+    publish(sorted((RUNS / "probe-bands").glob("*.json"))[0], "runs/band-cause/arms.json")
+    arms = {}
+    for arm, rows in arms_run["arms"].items():
+        arms[arm] = [{"mark_m": row["mark"], "sky_distinct_colours": row["sky_distinct"],
+                      "lit_face_differing_pixels": row["face_differing"], "lit_face_middle_row_steps": row["face_steps"],
+                      "camera_render_z_mm": mm(row["camera"]["render"][2])} for row in rows]
+    internals = sorted((RUNS / "probe-internals").glob("*.json"))
+    shadow_camera, casters = {}, {}
+    for path in internals:
+        run = json.loads(path.read_text())
+        lists_casters = "casters" in run["rows"][0]["dump"]
+        publish(path, f"runs/band-cause/{'casters' if lists_casters else 'shadow-camera'}.json")
+        for row in run["rows"]:
+            dump = row["dump"]
+            if lists_casters:
+                casters[row["label"]] = {
+                    "shadow_depth_range_mm": mm(dump["shadowCamera"]["far"]),
+                    "casters": [{"node": c["node"], "min_mm": [mm(v) for v in c["min"]], "max_mm": [mm(v) for v in c["max"]]}
+                                for c in dump["casters"]]}
+            else:
+                shadow_camera[row["label"]] = {
+                    "shadow_depth_range_mm": mm(dump["shadowCamera"]["far"]),
+                    "camera_render_z_mm": mm(dump["camera"][14]),
+                    "render_root_z_mm": mm(dump["renderRoot"][2])}
+    shadow_path = sorted((RUNS / "probe-shadow").glob("*.json"))[0]
+    publish(shadow_path, "runs/band-cause/shadow-arms.json")
+    shadow = json.loads(shadow_path.read_text())
+    shadow_arms = {arm: {"applied": data["report"], "marks": [
+        {"mark_m": row["mark"], "self_shadow_pixels": row["self"], "ground_shadow_pixels": row["ground"],
+         "shadow_touching_object_pixels": row["touching"], "ground_shadow_top_row": row["ground_top_row"],
+         "lit_face_middle_row_steps": row["face_steps"], "sky_distinct_colours": row["sky_distinct"]}
+        for row in data["rows"]]} for arm, data in shadow["arms"].items()}
+    for arm in shadow_arms.values():
+        applied = arm["applied"]
+        arm["applied"] = {key: (millionths(value) if isinstance(value, float) else value)
+                          for key, value in applied.items() if key != "before"}
+        arm["applied"]["before_milli"] = {k: round(v * 1000) for k, v in applied["before"].items()}
+    return {"arms": arms, "shadow_camera": shadow_camera, "casters": casters, "shadow_arms": shadow_arms}
+
+
+# -- the plate on the ground ---------------------------------------------------------------------------
+
+def plate() -> dict:
+    out = {}
+    for path in sorted((RUNS / "probe-plate").glob("record-*-0c1abce8d3c4.json")) + \
+            sorted((RUNS / "probe-plate").glob("arm-*.json")):
+        run = json.loads(path.read_text())
+        publish(path, f"runs/plate/{path.name}")
+        grounds = {}
+        for key, value in run["grounds"].items():
+            grounds[key] = {"poses": value["poses"], "poses_with_an_interior": value["poses"] - value["footprintless"],
+                            "drawn_min_millionths": millionths(value["min"]),
+                            "drawn_mean_millionths": millionths(value["mean"]),
+                            "poses_drawn_under_99_percent": value["under_0_99"],
+                            "clean_min_millionths": millionths(value["clean_min"]),
+                            "clean_mean_millionths": millionths(value["clean_mean"]),
+                            "poses_clean_under_99_percent": value["clean_under_0_99"]}
+        out[path.name[:-len(".json")]] = {"arm": {"legacy": run.get("legacy", False), "bias": run.get("bias"),
+                                                  "face_half_m": run.get("faceHalf"), "face_grid": run.get("faceGrid")},
+                                          "grounds": grounds}
+    return out
+
+
+# -- the GPU pixel scenes -----------------------------------------------------------------------------
+
+PIXEL_RUNS = [
+    ("baseline-e9dee3c2", "the tree at e9dee3c2 before any change, with objects placed after the first frame"),
+    ("sky-bias", "after the sky and the starter's shadow bias, and the object residency fix"),
+    ("fixes-1", "after the plate's depth order and the endless face grid as well: the reference for 5a and 5d"),
+    ("step-5a", "after the world-kind module (5a), meant to move no pixel"),
+    ("step-5d", "after the atmosphere module (5d), meant to move no pixel"),
+    ("final", "the delivered tree, which differs from step-5d by comments only"),
+]
+
+
+def pixels() -> dict:
+    runs = {}
+    for name, what in PIXEL_RUNS:
+        document = load_slotted(RUNS / "pixels" / f"{name}.json")
+        publish_json(document, f"runs/pixels/{name}.json")
+        runs[name] = {"what": what, "browser": document["browser"], "renderer": document["renderer"],
+                      "repeats": document["repeats"], "identical_across_repeats": document["identical_across_repeats"],
+                      "scenes": {s["scene"]: {"sha256": s["sha256"], "drawn_pixels": s["drawnPixels"],
+                                              **({"sky_colours": s["skyColours"]} if "skyColours" in s else {})}
+                                 for s in document["scenes"]},
+                      "plate_sweeps": [{"ground": p["ground"], "poses": p["poses"], "measured": p["measured"],
+                                        "drawn_min_millionths": millionths(p["drawnMin"]),
+                                        "clean_min_millionths": millionths(p["cleanMin"]),
+                                        "under_whole": p["underWhole"]}
+                                       for p in (document.get("plate_sweeps") or [])]}
+    reference = runs["fixes-1"]["scenes"]
+    for step in ("step-5a", "step-5d"):
+        runs[step]["byte_identical_to_fixes_1"] = sum(
+            1 for scene, value in runs[step]["scenes"].items() if value["sha256"] == reference[scene]["sha256"])
+    runs["final"]["byte_identical_to_step_5d"] = sum(
+        1 for scene, value in runs["final"]["scenes"].items() if value["sha256"] == runs["step-5d"]["scenes"][scene]["sha256"])
+    baseline = runs["baseline-e9dee3c2"]["scenes"]
+    final = runs["final"]["scenes"]
+    runs["moved_from_baseline"] = sorted(s for s in final if final[s]["sha256"] != baseline[s]["sha256"])
+    runs["unchanged_from_baseline"] = sorted(s for s in final if final[s]["sha256"] == baseline[s]["sha256"])
+    return runs
+
+
+# -- the tile load timeouts ------------------------------------------------------------------------------
+
+def tile_flake() -> dict:
+    out = {}
+    for n, what in ((1, "before: whole web run, default 5 s timeout"), (2, "after: whole web run, VERIFIED_LOAD_TIMEOUT_MS")):
+        log = RUNS / "web" / f"web-whole-{n}.log.txt"
+        text = log.read_text()
+        tests = {}
+        for line in text.splitlines():
+            match = re.match(r"^ +([✓×]) packages/atlas-react/test/generated-tile-runtime\.test\.ts > a neighbouring tile reaching the runtime > (.+?) (\d+)ms$", line)
+            if match:
+                tests[match.group(2)] = {"passed": match.group(1) == "✓", "milliseconds": int(match.group(3))}
+        totals = [line.strip() for line in text.splitlines() if line.strip().startswith(("Test Files", "Tests "))]
+        out[f"run_{n}"] = {"what": what, "log_sha256": sha(log), "log_bytes": log.stat().st_size,
+                           "neighbour_tests": tests, "totals": totals}
+    return out
+
+
+# -- the release-build distance series ------------------------------------------------------------------
+
+def distance_series() -> dict:
+    series_path = DIST / "runs" / "distance" / "series.json"
+    if not series_path.exists():
+        return {"status": "not run"}
+    series = json.loads(series_path.read_text())
+    folder = DIST / "runs" / "distance"
+    for path in sorted(folder.glob("distance-*.json")):
+        publish(path, f"runs/distance/{path.name}")
+    # Sessions the idle gate threw out: bound above like every other run file, counted by nothing.
+    series["sessions_not_accepted"] = [path.name for path in sorted(folder.glob("distance-*.json"))
+                                       if path.name.endswith(("-discarded.json", "-invalid.json", "-stopped.json"))]
+    publish(folder / "shading.json", "runs/distance/shading.json")
+    publish(series_path, "runs/distance/series.json")
+    # The captures of sessions the idle gate discarded, read by shading_not_timed.py: pixels only.
+    not_timed = folder / "shading-not-timed.json"
+    if not_timed.exists():
+        publish(not_timed, "runs/distance/shading-not-timed.json")
+        series["pixels_not_timed"] = [row for row in json.loads(not_timed.read_text()) if row["mark_m"] != 0]
+    gates = DIST / "runs" / "gates.jsonl"
+    if gates.exists():
+        publish(gates, "runs/distance/gates.jsonl.txt")
+    return series
+
+
+def before_after(series: dict) -> list[dict]:
+    before = json.loads(PREDECESSOR.read_text())["record"]["series"]["distance"]["marks"]
+    after = {row["mark_m"]: row for row in series.get("marks", [])}
+    not_timed: dict[int, list[dict]] = {}
+    for row in series.get("pixels_not_timed", []):
+        not_timed.setdefault(row["mark_m"], []).append(row)
+    rows = []
+    for old in before:
+        new = after.get(old["mark_m"])
+        extra = not_timed.get(old["mark_m"], [])
+        rows.append({"mark_m": old["mark_m"],
+                     "sky_distinct_colours": {"before": old["sky_distinct_colours"], "after": new and new["sky_distinct_colours"]},
+                     "lit_face_differing_pixels": {"before": old["lit_face_differing_pixels"], "after": new and new["lit_face_differing_pixels"]},
+                     "lit_face_middle_row_steps": {"before": old["lit_face_middle_row_steps"], "after": new and new["lit_face_middle_row_steps"]},
+                     "registered_drawn_error_millipixels": {"before": old["registered_drawn_error_millipixels"], "after": new and new["registered_drawn_error_millipixels"]},
+                     "sprint_work_p95_us": {"before": old["sprint_work_p95_us"], "after": new and new["sprint_work_p95_us"]},
+                     "after_from_sessions_not_timed": {
+                         "sessions": [row["file"] for row in extra],
+                         "sky_distinct_colours": [row["sky_distinct_colours"] for row in extra],
+                         "lit_face_differing_pixels": [row["face_differing_from_arrival"] for row in extra],
+                         "lit_face_middle_row_steps": [row["face_middle_row_steps"] for row in extra],
+                         "registered_drawn_error_millipixels": [row["registered_drawn_error_millipixels"] for row in extra],
+                         "sprint_work_p95_us": "not measured"}})
+    return rows
+
+
+def scripts() -> dict:
+    lane = [LANE / name for name in ("probe-bands.mjs", "probe-internals.mjs", "probe-casters.mjs", "probe-shadow.mjs",
+                                     "probe-plate.as-run-0c1abce8d3c4.mjs", "cdp.mjs", "place.py",
+                                     "break_harness.py", "break_contracts.py", "write_record.py")]
+    distance = [DIST / name for name in ("tree.py", "slot.py", "series.py", "preview.py", "summarize_distance.py",
+                                         "shading_not_timed.py")]
+    copied = {}
+    for path in lane + distance:
+        entry = publish(path, f"scripts/{path.name}.txt", script=True)
+        copied[path.name] = entry["sha256"]
+    unchanged = {}
+    w = ROOT / W_SCRIPTS
+    for name in ("wsdrive.mjs", "binding.mjs", "gated.py", "distance.py", "shading.py", "summarize.py"):
+        ours = DIST / name
+        theirs = w / f"{name}.txt"
+        restored = theirs.read_text()
+        for old, new in (("<WORKTREE>", str(WORLD_SCALE_WORKTREE)), ("<MAIN_CHECKOUT>", str(MAIN_CHECKOUT))):
+            restored = restored.replace(old, new)
+        unchanged[name] = {"sha256": sha(ours), "published_with_the_world_scale_record": f"{W_SCRIPTS}/{name}.txt",
+                           "same_after_substitutions": restored == ours.read_text()}
+    instrument = DIST / "instrument.js"
+    unchanged["instrument.js"] = {"sha256": sha(instrument),
+                                  "published_with_the_world_scale_record": f"{W_SCRIPTS}/as-run/instrument-15ef8cd9.js.txt"}
+    return {"copied": copied, "world_scale_scripts_run_unchanged": unchanged}
+
+
+def machine() -> dict:
+    run = lambda *a: subprocess.run(list(a), capture_output=True, text=True, check=True).stdout.strip()
+    return {"hardware_model": run("sysctl", "-n", "hw.model"), "logical_cpus": int(run("sysctl", "-n", "hw.logicalcpu")),
+            "memory_bytes": int(run("sysctl", "-n", "hw.memsize")), "os": f"macOS {run('sw_vers', '-productVersion')}",
+            "node": run("node", "--version"), "python": platform.python_version()}
+
+
+
+# -- the binding harness ---------------------------------------------------------------------------------
+
+def harness() -> dict:
+    suites = json.loads((RUNS / "web" / "lane-suites.json").read_text())
+    files = {}
+    for result in suites["testResults"]:
+        name = "web/" + result["name"].split("/web/", 1)[1]
+        files[name] = {"tests": len(result["assertionResults"]),
+                       "passed": sum(1 for a in result["assertionResults"] if a["status"] == "passed")}
+    breaks = {}
+    for log in sorted((RUNS / "break").glob("*.log.txt")) if (RUNS / "break").exists() else []:
+        entry = publish(log, f"runs/break/{log.name}")
+        lines = [line for line in log.read_text().splitlines() if ": exit " in line]
+        breaks[log.name] = {"mutants": len(lines), "caught": sum(1 for line in lines if ": exit 1 " in line or line.endswith(": exit 1")),
+                            "sha256": entry["sha256"]}
+    ansi = re.compile(r"\x1b\[[0-9;]*m")
+
+    def totals(name: str) -> dict:
+        log = RUNS / "web" / name
+        text = ansi.sub("", log.read_text())
+        return {"log_sha256": sha(log), "log_bytes": log.stat().st_size,
+                "totals": [line.strip() for line in text.splitlines() if line.strip().startswith(("Test Files", "Tests "))]}
+
+    package = publish(RUNS / "web" / "atlas-react-package.log.txt", "runs/web/atlas-react-package.log.txt")
+    return {"focused_suites_on_the_delivered_tree": {"suites": files, "tests": suites["numTotalTests"],
+                                                     "passed": suites["numPassedTests"], "failed": suites["numFailedTests"],
+                                                     "skipped": suites["numPendingTests"]},
+            "atlas_react_package_on_the_delivered_tree": {**totals("atlas-react-package.log.txt"), "published": package["path"]},
+            "typecheck_and_boundaries_on_the_delivered_tree": {
+                "typecheck_log_sha256": sha(RUNS / "web" / "typecheck.log.txt"),
+                "typecheck": [line for line in (RUNS / "web" / "typecheck.log.txt").read_text().splitlines() if " exit " in line],
+                "boundaries": [line.strip() for line in (RUNS / "web" / "boundaries.log.txt").read_text().splitlines()
+                               if "dependency violations" in line]},
+            "break_checks": breaks,
+            "whole_web_run": {**totals("web-whole-3.log.txt"),
+                              "tree": "the product tree before a comments-only edit to atmosphere.ts and world-field.ts; the release bundle built from both trees has the same content hash"}}
+
+
+# -- the words: every number in them is read from the record built above ------------------------------
+
+def span(values) -> str:
+    values = [v for v in values if v is not None]
+    low, high = min(values), max(values)
+    return f"{low:,}" if low == high else f"{low:,} to {high:,}"
+
+
+def distance_marks(record: dict) -> dict:
+    return {row["mark_m"]: row for row in record["distance"]["series"].get("marks", [])}
+
+
+def captures(record: dict) -> list[dict]:
+    folder = DIST / "runs" / "distance"
+    sessions = sorted(row["file"] for row in record["distance"]["series"].get("pixels_not_timed", [])
+                      if row["mark_m"] == 8000)
+    if not sessions:
+        return []
+    stem = sessions[0][:-len("-discarded.json")]
+    bound = []
+    for mark, name, what in (
+            (0, "arrival-with-reference.png", "The arrival point of a release-build 8 km session on the changed tree, with its reference cube before the camera: the sky above the horizon is a gradient and the lit face is smooth. The idle gate discarded this session for timing; its pixels are engine renders the load does not change."),
+            (8000, "8km-with-reference.png", "The same session 8 km along the sprint with a new reference cube at the same relative pose: the sky is the same gradient and the lit face carries no band.")):
+        source = folder / f"{stem}-mark-{mark}-with.png"
+        entry = publish(source, f"captures/{name}", text=False)
+        bound.append({**entry, "as_run": source.name, "what": what})
+    for scene, what in (("flat-plate", "A reviewed marker plate on a bounded starter ground, GPU pixel scene, before (left: the metre marks drawn over it) and after (right: the plate over them)."),
+                        ("endless-cube-after-map", "A cube placed on an endless starter ground and then the Map opened and closed, GPU pixel scene, before (left: the cube is gone) and after (right: the cube is drawn).")):
+        from PIL import Image
+        before = Image.open(RUNS / "pixels" / "baseline-e9dee3c2" / f"{scene}.png").convert("RGB")
+        after = Image.open(RUNS / "pixels" / "fixes-1" / f"{scene}.png").convert("RGB")
+        pair = Image.new("RGB", (before.width + after.width + 8, before.height), (255, 255, 255))
+        pair.paste(before, (0, 0))
+        pair.paste(after, (before.width + 8, 0))
+        target = LANE / "runs" / "pixels" / f"{scene}-before-after.png"
+        pair.save(target, optimize=False)
+        entry = publish(target, f"captures/{scene}-before-after.png", text=False)
+        bound.append({**entry, "as_run": f"baseline-e9dee3c2/{scene}.png beside fixes-1/{scene}.png", "what": what})
+    return bound
+
+
+def narrative(record: dict) -> dict:
+    band = record["band_cause"]
+    arms = {arm: {row["mark_m"]: row for row in rows} for arm, rows in band["arms"].items()}
+    shadow = {arm: {row["mark_m"]: row for row in data["marks"]} for arm, data in band["shadow_arms"].items()}
+    ranges = band["shadow_camera"]
+    casters = band["casters"]
+    plate = record["plate"]
+    legacy = plate["record-legacy-0c1abce8d3c4"]["grounds"]
+    final = plate["record-final-0c1abce8d3c4"]["grounds"]
+    pixels = record["pixels"]
+    tile = record["tile_load"]
+    marks = distance_marks(record)
+    far = [m for m in (1000, 4000, 8000) if m in marks]
+    controls = [m for m in (40, 80) if m in marks]
+    before_marks = {row["mark_m"]: row for row in json.loads(PREDECESSOR.read_text())["record"]["series"]["distance"]["marks"]}
+    tile_before = " and ".join(f"{test['milliseconds']:,}" for test in tile["run_1"]["neighbour_tests"].values())
+    tile_after = " and ".join(f"{test['milliseconds']:,}" for test in tile["run_2"]["neighbour_tests"].values())
+
+    measured = [
+        f"On the tree before any change (development server), the reference cube's lit face differed from its arrival capture in {arms['base'][4000]['lit_face_differing_pixels']:,} pixels at 4 km and {arms['base'][8000]['lit_face_differing_pixels']:,} at 8 km, and in none at 40 m, 80 m or 1 km, where the world scale record's release build measured {span(v for m in (4000, 8000) for v in before_marks[m]['lit_face_differing_pixels'])} and none.",
+        f"With the sun's shadows off, with the cube not receiving shadow, or with the cube not casting it, the face differed in {span(v for arm in ('nolightshadow', 'noreceive', 'nocast') for v in (row['lit_face_differing_pixels'] for row in band['arms'][arm]))} pixels at every mark.",
+        f"With the render origin moved to the cube at 8 km, so that the camera was drawn at z {arms['rebased'][8000]['camera_render_z_mm']:,} mm exactly as at arrival, the face still differed in {arms['rebased'][4000]['lit_face_differing_pixels']:,} pixels at 4 km and {arms['rebased'][8000]['lit_face_differing_pixels']:,} at 8 km.",
+        f"The sun's shadow depth range was {ranges['arrival']['shadow_depth_range_mm']:,} mm at arrival and {casters['1km']['shadow_depth_range_mm']:,} mm at 1 km, where the shadow casters were the cube and the old sky ({'origin-sky' if any(c['node'] == 'origin-sky' for c in casters['arrival']['casters']) else 'absent'}), and {casters['4km']['shadow_depth_range_mm']:,} mm at 4 and 8 km, where the cube was the only caster.",
+        f"With the old sky casting no shadow, the cube shadowed its own lit face at every mark including arrival ({span(r['self_shadow_pixels'] for r in shadow['skynocast'].values())} pixels); with the sun's caster-pass bias at 0.2 as well, {span(r['self_shadow_pixels'] for r in shadow['skynocast-sb20'].values())} pixels at every mark, and its ground shadow {span(r['ground_shadow_pixels'] for r in shadow['skynocast-sb20'].values())} pixels against {span(shadow['base'][m]['ground_shadow_pixels'] for m in (0, 40, 80, 1000))} before at 1 km or nearer.",
+        f"A marker plate on the ground as it was drawn before this change was drawn on a mean of {legacy['authored-endless@0,0']['drawn_mean_millionths'] / 10_000:.1f} per cent of its interior over {legacy['authored-endless@0,0']['poses_with_an_interior']} poses at the endless ground's origin ({legacy['authored-endless@0,0']['poses_drawn_under_99_percent']} poses under 99 per cent) and {legacy['authored-flat@2,0']['drawn_mean_millionths'] / 10_000:.1f} per cent on a bounded ground, where it was never drawn clean ({legacy['authored-flat@2,0']['poses_clean_under_99_percent']} of {legacy['authored-flat@2,0']['poses']} poses); on the changed ground it was drawn whole and clean at every pose at {sum(1 for g in final.values() if g['drawn_min_millionths'] == 1_000_000 and g['clean_min_millionths'] == 1_000_000)} of {len(final)} positions ({', '.join(sorted(final))}).",
+        f"The two neighbour-tile tests timed out at 5,000 ms in a whole web run ({tile_before} ms) and passed in the next under the stated timeout ({tile_after} ms).",
+        f"On the delivered tree the binding harness and the suites the change touches passed {record['harness']['focused_suites_on_the_delivered_tree']['passed']} of {record['harness']['focused_suites_on_the_delivered_tree']['tests']} tests in {len(record['harness']['focused_suites_on_the_delivered_tree']['suites'])} files, and each of {sum(b['mutants'] for b in record['harness']['break_checks'].values())} planted faults made its suite fail ({sum(b['caught'] for b in record['harness']['break_checks'].values())} caught).",
+        f"The world-kind and atmosphere modules moved no pixel: {pixels['step-5a']['byte_identical_to_fixes_1']} and {pixels['step-5d']['byte_identical_to_fixes_1']} of {len(pixels['step-5d']['scenes'])} GPU scenes byte-identical to the frames before them; the fixes moved {len(pixels['moved_from_baseline'])} of {len(pixels['step-5d']['scenes'])} and left {len(pixels['unchanged_from_baseline'])} unchanged ({', '.join(pixels['unchanged_from_baseline'])}).",
+    ]
+    series = record["distance"]["series"]
+    not_timed: dict[int, list[dict]] = {}
+    for row in series.get("pixels_not_timed", []):
+        not_timed.setdefault(row["mark_m"], []).append(row)
+
+    def both(mark: int, accepted_key: str, not_timed_key: str) -> list:
+        return (list(marks[mark][accepted_key]) if mark in marks else []) + [r[not_timed_key] for r in not_timed.get(mark, [])]
+
+    every_mark = sorted(set(marks) | set(not_timed))
+    refused_8km = sorted(not_timed.get(8000, []), key=lambda r: r["file"])
+    idle_percent = lambda tenths: f"{tenths / 10:.1f}"
+
+    def session_idle(suffix: str) -> str:
+        return ", ".join(idle_percent(s["idle_during_mean_tenths"]) for s in series["sessions"] if s["session"].endswith(suffix))
+
+    def timed(mark: int) -> str:
+        return (f"{mark:,} m: {span(marks[mark]['sprint_work_p95_us'])} us at the 95th percentile, "
+                f"{span(marks[mark]['sprint_work_p50_us'])} us median, at {session_idle(f'-{mark}')} per cent CPU idle")
+    if every_mark:
+        measured.insert(0, f"On a release build along the world scale record's walk, the sky band above the horizon held {span(v for m in every_mark for v in both(m, 'sky_distinct_colours', 'sky_distinct_colours'))} colours down one column at every mark ({', '.join(f'{m:,} m' for m in every_mark)}), against {span(series['arrival_sky_distinct_colours'])} at arrival, and was never the clear colour (before: {span(v for m in (1000, 4000, 8000) for v in before_marks[m]['sky_distinct_colours'])} colour, the clear colour, at 1, 4 and 8 km, and {span(v for m in (40, 80) for v in before_marks[m]['sky_distinct_colours'])} at the controls).")
+        measured.insert(1, f"The reference cube's lit face differed from its arrival capture in {span(v for m in (4000, 8000) for v in both(m, 'lit_face_differing_pixels', 'face_differing_from_arrival'))} of {series['lit_face_pixels']:,} pixels at 4 and 8 km, and in {span(v for m in (40, 80, 1000) for v in both(m, 'lit_face_differing_pixels', 'face_differing_from_arrival'))} at the controls and at 1 km, with {span(v for m in every_mark for v in both(m, 'lit_face_middle_row_steps', 'face_middle_row_steps'))} luminance steps along its middle row (before: {span(v for m in (4000, 8000) for v in before_marks[m]['lit_face_differing_pixels'])} pixels at 4 and 8 km).")
+        measured.insert(2, f"Without the reference cube, the frame at every mark differed from the arrival frame in {span(v for m in every_mark for v in both(m, 'object_free_frame_differing_millionths', 'object_free_frame_differing_millionths'))} millionths of its pixels (before: {span(v for m in (40, 80) for v in before_marks[m]['object_free_frame_differing_millionths'])} at the controls and {span(v for m in (1000, 4000, 8000) for v in before_marks[m]['object_free_frame_differing_millionths'])} at 1, 4 and 8 km).")
+        measured.insert(3, f"The cube drawn with its shadow off covered the arrival's pixels at every mark ({span(v for m in every_mark for v in both(m, 'object_only_iou_millionths', 'object_only_iou_millionths'))} millionths intersection over union, centroid {span(v for m in every_mark for v in both(m, 'object_only_shift_millipixels', 'object_only_shift_millipixels'))} millipixels away); with its shadow, the silhouette's centroid moved {span(v for m in (1000, 4000, 8000) for v in both(m, 'registered_drawn_error_millipixels', 'registered_drawn_error_millipixels'))} millipixels at 1 to 8 km and {span(v for m in (40, 80) for v in both(m, 'registered_drawn_error_millipixels', 'registered_drawn_error_millipixels'))} at the controls (before: {span(v for m in (1000, 4000, 8000) for v in before_marks[m]['registered_drawn_error_millipixels'])} and {span(v for m in (40, 80) for v in before_marks[m]['registered_drawn_error_millipixels'])}).")
+        timed_far = [m for m in (1000, 4000) if m in marks]
+        measured.insert(4, f"Frame work while sprinting, from sessions the idle gate accepted: {'; '.join(timed(m) for m in timed_far)} (before: {span(v for m in (1000, 4000) for v in before_marks[m]['sprint_work_p95_us'])} us at the 95th percentile).")
+        measured.insert(5, f"The 8 km session was refused by the idle gate {len(refused_8km)} times: CPU idle during the session averaged {', '.join(idle_percent(r['idle_during_mean_tenths']) for r in refused_8km)} per cent against the gate's 50. No frame-work figure is given for 8 km; its pixels above come from those sessions' captures, which the gate does not rule on.")
+        measured.insert(6, f"The 40 and 80 m controls ran at {session_idle('-controls')} per cent CPU idle and measured {span(v for m in (40, 80) for v in marks[m]['sprint_work_p95_us'])} us at the 95th percentile, with single frames of {span(v for m in (40, 80) for v in marks[m]['sprint_work_max_us'])} us (before: {span(v for m in (40, 80) for v in before_marks[m]['sprint_work_p95_us'])} us).")
+    inferred = [
+        "The bands the world scale record measured are the cube shadowing its own lit face: the same arms remove them, and the same pose on the same tree reproduces its pixel counts.",
+        "They appeared from 4 km and not at 1 km because the old sky's shadow column still reached the camera's view slice at 1 km and not at 4 km; which point between 1 and 4 km that happens at was not measured.",
+        "The float32 step at 8 km, 0.49 mm, is not what banded the faces: moving the whole walk to the render origin left the bands where they were. It stays the limit the supported radius is stated from.",
+        f"A slope-scaled offset of 16 on the old single-quad face also drew the plate whole ({span(g['drawn_min_millionths'] for g in plate['arm-legacy_bias_0_16']['grounds'].values())} millionths at the worst pose); it was not shipped, because an offset that large also pushes the ground behind geometry lying just under it, by an amount not measured here.",
+        "A placed object in a starter world disappeared after the Map because the object runtime read a region with no residency entry as stubbed, and residency governs only the scene's regions; any replan after placement did it, including one from a change in frame-time pressure.",
+    ]
+    if every_mark and 1000 in marks and 40 in marks:
+        inferred.append(f"The controls' 95th percentile ({span(v for m in (40, 80) for v in marks[m]['sprint_work_p95_us'])} us) comes from a few long frames in a session at {session_idle('-controls')} per cent CPU idle; the 1 km session on the same build at {session_idle('-1000')} per cent measured {span(marks[1000]['sprint_work_p95_us'])} us. That the long frames are the machine's load and not the change is inferred, not measured.")
+    observed = [
+        "Face crops of the probe arms at 0, 1 and 8 km: smooth before at 0 and 1 km and banded at 8 km; banded at every mark with the old sky's shadow off; smooth at every mark with the caster-pass bias at 0.2, with a ground shadow of the same shape as before.",
+        "The GPU pixel scenes before and after: the flat plate under the metre marks and then over them, and the cube gone after the Map and then drawn.",
+    ]
+    if not_timed.get(8000):
+        observed.append("The two bound release-build captures, from an 8 km session the idle gate discarded for timing: a gradient sky and a smooth lit face at the arrival point and at 8 km.")
+    assumed = [
+        "Headless Chrome on this machine stands for a headed browser with a compositor and a display, as the world scale record assumed.",
+        "The development server's debug engine draws shadows, fog and the sky as the release engine does: the cause was found on the former, and the release build measures the result.",
+        "The half-metre marker cube stands for other lit objects under the sun; the pillar and other shapes were not measured at distance.",
+    ]
+    return {
+        "subject": "Why a starter world's sky went flat and its lit faces banded far from where it opened, what hid a placed plate and placed objects, what timed two tile tests out, and whether the fixes hold on a release build along the world scale record's walk.",
+        "claims": {"measured": measured, "inferred": inferred, "observed_by_eye": observed, "assumed": assumed},
+        "not_measured": [
+            "Motion at distance (swimming or jitter): only still frames were captured, as in the world scale record.",
+            "Frame work at 8 km: every 8 km session was discarded by the idle gate (claims.measured gives the idle figures), and the machine's load came from work outside this measurement, so no 8 km timing is claimed.",
+            "Repeats: the world scale record walked each mark three times; this walk has one accepted session per mark from 40 m to 4 km and none at 8 km. The second and third repeats were not run.",
+            "Objects other than the marker cube at distance, and light directions other than the one sun.",
+            "The plate sweep walks one line of 155 poses per position; other directions and heights were not swept.",
+            "The sky in a generated tile's or a Google reference's world by pixels: its sky is a skybox or the clear colour, and neither was changed.",
+            "Other machines, GPUs and drivers, a headed browser and a production deployment.",
+        ],
+        "departures": [
+            {"what": "the tree check before each release-build session", "registered": "the world scale record's slot.py refused unless HEAD was its measured commit", "done": "slot.py refused unless the product tree matched a digest pinned before the first session, which includes the contents of untracked product files, because the changed modules are untracked files in the measured tree", "why": "this record measures an uncommitted tree"},
+            {"what": "where the cause was found", "registered": "not registered", "done": "the band, shadow and plate probes ran on the development server's debug engine, and only the before-and-after walk on the release build", "why": "the probes change engine state at runtime and read internals, which the release build's minified engine makes impractical; nothing in them is a timing"},
+            {"what": "the tree the walk is compared against", "registered": f"the world scale record's measured commit {record['predecessor_record']['measured_commit'][:8]}",
+             "done": f"{record['measured_tree']['base_commit'][:8]} with the changes, {record['predecessor_record']['commits_between']} commits later, of which {len(record['predecessor_record']['commits_between_changing_browser_source'])} change browser source (predecessor_record.commits_between_changing_browser_source), among them inhabitants drawn in the browser and motion for placed objects",
+             "why": "the changes were made on the head of the main line. The sky and the bands were reproduced on that head before any change (band_cause), so they compare; frame work before and after does not separate these changes from the commits between"},
+        ],
+        "incidents": [
+            {"what": "the walk paused twice between sessions", "detail": "Once while another timing measurement had the machine and once while all work on it stopped. No session was running the first time; the second stop ended an 8 km session at 5.8 km, whose file is kept, marked stopped and counted by nothing. The second resume ran on a restarted runtime, a new run with an empty world, serving the same release bundle; every session opens its own arrival reference."},
+            {"what": "the first attempt of the distance series stopped before any session", "detail": "The copied series.py imports the world scale record's summarize.py, which had not been copied; nothing ran and nothing was written. It was copied unchanged and the series started again."},
+            {"what": "the release build ran outside the quiet slot", "detail": "It waited behind two full test-suite runs on the machine; while a full suite holds that slot no timed measurement can run, so it was built while one held it. The build is not a timing."},
+        ],
+        "how_to_rerun": [
+            "Scripts: copy scripts/*.txt to their names without .txt and reverse the substitutions; the world scale record's driver, instrument, binding reach, gate, distance, shading and summarize scripts run byte-identical (scripts.world_scale_scripts_run_unchanged).",
+            "Start an isolated runtime on the changed tree (the acceptance launcher, one slot), build the app with vite build and serve it with preview.py up; place.py puts marker cubes where the band probes look.",
+            "Band cause: node probe-bands.mjs --arms base,nolightshadow,noreceive,nocast,rebased; node probe-internals.mjs; node probe-casters.mjs; node probe-shadow.mjs --arms base,skynocast,skynocast-sb20 (each through gpu-slot, on the tree before the change).",
+            "Plate: node probe-plate.as-run-0c1abce8d3c4.mjs --legacy, then without it, over the four grounds, through gpu-slot.",
+            "GPU pixel scenes: node web/packages/atlas-react/test/binding/gpu/run_binding_pixels.mjs --port <vite port> --worktree <worktree> --repeat 2 --plate, through gpu-slot.",
+            "Distance: python3 tree.py pin, then python3 distance.py --repeats 3, then shading.py, shading_not_timed.py and summarize_distance.py.",
+        ],
+    }
+
+def main() -> None:
+    if ARTIFACTS.exists():
+        shutil.rmtree(ARTIFACTS)
+    ARTIFACTS.mkdir(parents=True)
+    predecessor = json.loads(PREDECESSOR.read_text())
+    tree = json.loads((DIST / "measured-tree.json").read_text())
+    series = distance_series()
+    record = {
+        "profile": "exulanica.render-at-distance/v1",
+        "written_at": subprocess.run(["date", "-u", "+%Y-%m-%dT%H:%M:%S+00:00"], capture_output=True, text=True).stdout.strip(),
+        "predecessor_record": {"path": "docs/evaluation/2026-09-22-world-scale-baseline.json",
+                               "record_sha256": predecessor["record_sha256"], "file_sha256": sha(PREDECESSOR),
+                               "measured_commit": predecessor["record"]["measured_commit"],
+                               "commits_between": int(subprocess.run(
+                                   ["git", "rev-list", "--count", f"{predecessor['record']['measured_commit']}..{tree['head']}"],
+                                   cwd=ROOT, capture_output=True, text=True, check=True).stdout),
+                               "commits_between_changing_browser_source": subprocess.run(
+                                   ["git", "log", "--format=%h %s", f"{predecessor['record']['measured_commit']}..{tree['head']}",
+                                    "--", "web/packages/atlas-react/src", "web/packages/app/src"],
+                                   cwd=ROOT, capture_output=True, text=True, check=True).stdout.splitlines(),
+                               "why": "The world scale baseline measured the flat sky from 1 km and the banded lit faces at 4 and 8 km that this record finds the cause of, and its distance protocol is the one this record repeats on the changed tree."},
+        "measured_tree": {"base_commit": tree["head"], "product_sha256": tree["product_sha256"],
+                          "diff_bytes": tree["diff_bytes"], "untracked_product_files": tree["untracked_product_files"]},
+        "machine": machine(),
+        "band_cause": band_cause(),
+        "plate": plate(),
+        "pixels": pixels(),
+        "tile_load": tile_flake(),
+        "distance": {"series": series, "before_and_after": before_after(series)},
+        "scripts": scripts(),
+        "harness": harness(),
+    }
+    record.update(narrative(record))
+    record["captures"] = captures(record)
+    paths = [entry["path"] for entry in published]
+    if len(paths) != len(set(paths)):
+        raise SystemExit("an artifact was bound twice")
+    record["artifacts"] = {"directory": REL_ARTIFACTS, "files": sorted(published, key=lambda e: e["path"]),
+                           "substitutions": [{"as_run": "the path of the measuring worktree", "published": "<WORKTREE>"},
+                                             {"as_run": "the path of the main checkout", "published": "<MAIN_CHECKOUT>"},
+                                             {"as_run": "the session scratch directory", "published": "<SCRATCH>"},
+                                             {"as_run": "the slot-4 runtime directory", "published": "<RUNTIME>"},
+                                             {"as_run": "the per-user temporary directory", "published": "<TMPDIR>"}]}
+    sanitise(json.dumps(record), "the record")
+    document = {"profile": "exulanica.digest-bound-record/v1", "record": record,
+                "record_sha256": hashlib.sha256(canonical_json(record)).hexdigest()}
+    RECORD.write_text(json.dumps(document, indent=1, sort_keys=True) + "\n")
+    print(f"wrote {RECORD.relative_to(ROOT)} record_sha256 {document['record_sha256']}; {len(published)} artifacts")
+
+
+if __name__ == "__main__":
+    main()

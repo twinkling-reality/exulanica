@@ -1,0 +1,947 @@
+
+[1m[7m[36m RUN [39m[27m[22m [36mv2.1.9 [39m[90m<WORKTREE>/web[39m
+
+ [32m✓[39m packages/atlas-react/test/controls.test.ts[2m > [22mcamera-relative movement intent[2m > [22mmaps forward through camera yaw
+ [32m✓[39m packages/atlas-react/test/controls.test.ts[2m > [22mcamera-relative movement intent[2m > [22mmaps backward through camera yaw
+ [32m✓[39m packages/atlas-react/test/controls.test.ts[2m > [22mcamera-relative movement intent[2m > [22mmaps left through camera yaw
+ [32m✓[39m packages/atlas-react/test/controls.test.ts[2m > [22mcamera-relative movement intent[2m > [22mmaps right through camera yaw
+ [32m✓[39m packages/atlas-react/test/controls.test.ts[2m > [22mcamera-relative movement intent[2m > [22mmaps forward at a quarter turn through camera yaw
+ [32m✓[39m packages/atlas-react/test/controls.test.ts[2m > [22mcamera-relative movement intent[2m > [22mmaps backward at a quarter turn through camera yaw
+ [32m✓[39m packages/atlas-react/test/controls.test.ts[2m > [22mcamera-relative movement intent[2m > [22mmaps forward at a half turn through camera yaw
+ [32m✓[39m packages/atlas-react/test/controls.test.ts[2m > [22mcamera-relative movement intent[2m > [22mnormalizes diagonal intent -1,-1
+ [32m✓[39m packages/atlas-react/test/controls.test.ts[2m > [22mcamera-relative movement intent[2m > [22mnormalizes diagonal intent -1,1
+ [32m✓[39m packages/atlas-react/test/controls.test.ts[2m > [22mcamera-relative movement intent[2m > [22mnormalizes diagonal intent 1,-1
+ [32m✓[39m packages/atlas-react/test/controls.test.ts[2m > [22mcamera-relative movement intent[2m > [22mnormalizes diagonal intent 1,1
+ [32m✓[39m packages/atlas-react/test/controls.test.ts[2m > [22mfirst-person keyboard ownership[2m > [22mstops residual velocity as soon as pointer lock is released
+ [32m✓[39m packages/atlas-react/test/controls.test.ts[2m > [22mfirst-person keyboard ownership[2m > [22mnever swallows native button activation
+ [32m✓[39m packages/atlas-react/test/controls.test.ts[2m > [22mfirst-person keyboard ownership[2m > [22mdoes not summon behind a disabled system surface
+ [32m✓[39m packages/atlas-react/test/controls.test.ts[2m > [22mfirst-person keyboard ownership[2m > [22mgives an active system surface exclusive ownership of WASD
+ [32m✓[39m packages/atlas-react/test/controls.test.ts[2m > [22mfirst-person keyboard ownership[2m > [22mclears held movement when a system surface opens and closes
+ [32m✓[39m packages/atlas-react/test/controls.test.ts[2m > [22mfirst-person keyboard ownership[2m > [22mkeeps left click for camera look and requires a keyboard interaction gesture
+ [32m✓[39m packages/atlas-react/test/controls.test.ts[2m > [22mfirst-person keyboard ownership[2m > [22muses X as the one keyboard summon contract
+ [32m✓[39m packages/atlas-react/test/controls.test.ts[2m > [22mfirst-person keyboard ownership[2m > [22mpublishes recovery once after returning from outside the resident field
+ [32m✓[39m packages/atlas-react/test/controls.test.ts[2m > [22mfirst-person keyboard ownership[2m > [22mleaves a declared aerial start pose alone and still seeds recovery on the ground
+ [32m✓[39m packages/atlas-react/test/controls.test.ts[2m > [22mfirst-person keyboard ownership[2m > [22mgrounds the initial pose and seeds a safe position from the surface
+ [32m✓[39m packages/atlas-react/test/controls.test.ts[2m > [22mplayer keyboard fallback and camera switch[2m > [22mmoves at pedestrian speed without pointer lock and stops while typing
+ [32m✓[39m packages/atlas-react/test/controls.test.ts[2m > [22mexplicit movement assistance[2m > [22muses ordinary movement and stops when typing or the window loses focus
+[90mstdout[2m | packages/atlas-react/test/generated-tile-glazing.test.ts[2m > [22m[2ma glazing set as a material[2m > [22m[2mreflects by its index of refraction, transmits what is drawn behind it by the transmission map, and writes no depth
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/display-space-fog.test.ts[2m > [22m[2mthe lit end chunk once display-space fog is installed[2m > [22m[2mfogs after tone mapping and encoding, in both shading languages
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/display-space-fog.test.ts[2m > [22m[2mthe lit end chunk once display-space fog is installed[2m > [22m[2mleaves another device on the engine default
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+Powered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/display-space-fog.test.ts[2m > [22m[2mthe lit end chunk once display-space fog is installed[2m > [22m[2mwould be undone if it ran before the engine registers its defaults
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/display-space-fog.test.ts[2m > [22m[2mthe colour the sky shows at eye level, and the fog colour taken from it[2m > [22m[2mis paper in the default look, whose sky is a diffuse canvas meeting the horizon at paper
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/display-space-fog.test.ts[2m > [22m[2mthe colour the sky shows at eye level, and the fog colour taken from it[2m > [22m[2mis the clear colour in survey relief, which draws no sky of its own
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/display-space-fog.test.ts[2m > [22m[2mthe colour the sky shows at eye level, and the fog colour taken from it[2m > [22m[2mis the haze shelf when the same sky is a layered horizon
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/display-space-fog.test.ts[2m > [22m[2mthe colour the sky shows at eye level, and the fog colour taken from it[2m > [22m[2mfalls back to the clear colour whenever the sky is not drawn: the Map, or a render root that is off
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/display-space-fog.test.ts[2m > [22mthe lit end chunk once display-space fog is installed[2m > [22mfogs after tone mapping and encoding, in both shading languages
+ [32m✓[39m packages/atlas-react/test/display-space-fog.test.ts[2m > [22mthe lit end chunk once display-space fog is installed[2m > [22mleaves another device on the engine default
+ [32m✓[39m packages/atlas-react/test/display-space-fog.test.ts[2m > [22mthe lit end chunk once display-space fog is installed[2m > [22mwould be undone if it ran before the engine registers its defaults
+ [32m✓[39m packages/atlas-react/test/display-space-fog.test.ts[2m > [22mthe colour the sky shows at eye level, and the fog colour taken from it[2m > [22mis paper in the default look, whose sky is a diffuse canvas meeting the horizon at paper
+ [32m✓[39m packages/atlas-react/test/display-space-fog.test.ts[2m > [22mthe colour the sky shows at eye level, and the fog colour taken from it[2m > [22mis the clear colour in survey relief, which draws no sky of its own
+ [32m✓[39m packages/atlas-react/test/display-space-fog.test.ts[2m > [22mthe colour the sky shows at eye level, and the fog colour taken from it[2m > [22mis the haze shelf when the same sky is a layered horizon
+ [32m✓[39m packages/atlas-react/test/display-space-fog.test.ts[2m > [22mthe colour the sky shows at eye level, and the fog colour taken from it[2m > [22mfalls back to the clear colour whenever the sky is not drawn: the Map, or a render root that is off
+[90mstdout[2m | packages/atlas-react/test/authored-ground.test.ts[2m > [22m[2mauthored ground geometry[2m > [22m[2mreceives shadows, draws the scale cue, and follows saved or previewed world appearance
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/authored-ground.test.ts[2m > [22m[2mauthored ground geometry[2m > [22m[2mshows a placement landing mark distinct from the Map pose marker
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/authored-ground.test.ts[2m > [22m[2man endless authored ground[2m > [22m[2mis the floor objects stand on: lit, shadow-receiving, and at the authored elevation
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/authored-ground.test.ts[2m > [22m[2man endless authored ground[2m > [22m[2mfollows the saved appearance with no rim to key it on
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/authored-ground.test.ts[2m > [22m[2man endless authored ground[2m > [22m[2mleaves a world with no authored ground on the landscape it always had
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/authored-ground.test.ts[2m > [22m[2man endless authored ground[2m > [22m[2mreaches exactly the camera's view past the farthest point a walk can stand
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/authored-ground.test.ts[2m > [22m[2man endless authored ground[2m > [22m[2mdraws the face behind whatever lies on it, and the metre marks between the two
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+Powered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/authored-ground.test.ts[2m > [22mauthored ground geometry[2m > [22mends at the descriptor bounds and keeps the walking face at its elevation
+ [32m✓[39m packages/atlas-react/test/authored-ground.test.ts[2m > [22mauthored ground geometry[2m > [22mlays metre marks and origin axes inside the walking face
+ [32m✓[39m packages/atlas-react/test/authored-ground.test.ts[2m > [22mauthored ground geometry[2m > [22mrefuses support that cannot describe a finite positive rectangle
+ [32m✓[39m packages/atlas-react/test/authored-ground.test.ts[2m > [22mauthored ground geometry[2m > [22mreceives shadows, draws the scale cue, and follows saved or previewed world appearance
+ [32m✓[39m packages/atlas-react/test/authored-ground.test.ts[2m > [22mauthored ground geometry[2m > [22mshows a placement landing mark distinct from the Map pose marker
+ [32m✓[39m packages/atlas-react/test/authored-ground.test.ts[2m > [22man endless authored ground[2m > [22mis the floor objects stand on: lit, shadow-receiving, and at the authored elevation
+ [32m✓[39m packages/atlas-react/test/authored-ground.test.ts[2m > [22man endless authored ground[2m > [22mfollows the saved appearance with no rim to key it on
+ [32m✓[39m packages/atlas-react/test/authored-ground.test.ts[2m > [22man endless authored ground[2m > [22mleaves a world with no authored ground on the landscape it always had
+ [32m✓[39m packages/atlas-react/test/authored-ground.test.ts[2m > [22man endless authored ground[2m > [22mreaches exactly the camera's view past the farthest point a walk can stand
+ [32m✓[39m packages/atlas-react/test/authored-ground.test.ts[2m > [22man endless authored ground[2m > [22mdraws the face behind whatever lies on it, and the metre marks between the two
+ [32m✓[39m packages/atlas-react/test/authored-ground.test.ts[2m > [22man endless authored ground[2m > [22mdraws past anywhere a walk can see, and refuses a reach it cannot draw
+ [32m✓[39m packages/atlas-react/test/authored-ground.test.ts[2m > [22man endless authored ground[2m > [22mdraws the face in cells no wider than the camera's reach, covering it once
+[90mstdout[2m | packages/atlas-react/test/world-module-form.test.ts[2m > [22m[2ma declared form has to produce something[2m > [22m[2mdraws geometry for living-buds
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/world-module-form.test.ts[2m > [22m[2ma declared form has to produce something[2m > [22m[2mdraws geometry for survey-stakes
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/world-module-form.test.ts[2m > [22m[2ma landmark has no body until a grammar record gives it one[2m > [22m[2mdraws nothing for a located region's landmark instance
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/world-module-form.test.ts[2m > [22m[2mcomposed world grounding[2m > [22m[2mstands on the flat datum by default
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/world-module-form.test.ts[2m > [22m[2mcomposed world grounding[2m > [22m[2mstands on the caller's ground when the caller owns it
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+Powered by PlayCanvas 2.21.4 e287e0c
+Powered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/generated-tile-glazing.test.ts[2m > [22m[2mthe scene colour copy glazing needs[2m > [22m[2mis off until glazing asks for it, and holds for a camera frame created later
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+Powered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/world-module-form.test.ts[2m > [22ma declared form has to produce something[2m > [22mdraws geometry for living-buds
+ [32m✓[39m packages/atlas-react/test/world-module-form.test.ts[2m > [22ma declared form has to produce something[2m > [22mdraws geometry for survey-stakes
+ [32m✓[39m packages/atlas-react/test/world-module-form.test.ts[2m > [22ma declared form has to produce something[2m > [22mwould have caught the forms that are registered but drawn by nothing
+ [32m✓[39m packages/atlas-react/test/world-module-form.test.ts[2m > [22ma landmark has no body until a grammar record gives it one[2m > [22mdraws nothing for a located region's landmark instance
+ [32m✓[39m packages/atlas-react/test/world-module-form.test.ts[2m > [22ma landmark has no body until a grammar record gives it one[2m > [22mlets no landmark module declare a form
+ [32m✓[39m packages/atlas-react/test/world-module-form.test.ts[2m > [22mthe catalog and the renderer agree on what a world can be built from[2m > [22mdraws every form a module is allowed to declare
+ [32m✓[39m packages/atlas-react/test/world-module-form.test.ts[2m > [22mthe catalog and the renderer agree on what a world can be built from[2m > [22mdeclares every form it draws, so no shape exists only in the renderer
+ [32m✓[39m packages/atlas-react/test/world-module-form.test.ts[2m > [22mthe catalog and the renderer agree on what a world can be built from[2m > [22muses the same form names the world style profiles use
+ [32m✓[39m packages/atlas-react/test/world-module-form.test.ts[2m > [22mthe catalog and the renderer agree on what a world can be built from[2m > [22mkeeps every declared form legal for the role that declares it
+ [32m✓[39m packages/atlas-react/test/world-module-form.test.ts[2m > [22mthe catalog and the renderer agree on what a world can be built from[2m > [22mleaves the canonical modules under the world style, not the catalog
+ [32m✓[39m packages/atlas-react/test/world-module-form.test.ts[2m > [22mcomposed world grounding[2m > [22mstands on the flat datum by default
+ [32m✓[39m packages/atlas-react/test/world-module-form.test.ts[2m > [22mcomposed world grounding[2m > [22mstands on the caller's ground when the caller owns it
+ [32m✓[39m packages/atlas-react/test/generated-tile-glazing.test.ts[2m > [22ma glazing set as a material[2m > [22mreflects by its index of refraction, transmits what is drawn behind it by the transmission map, and writes no depth
+ [32m✓[39m packages/atlas-react/test/generated-tile-glazing.test.ts[2m > [22ma glazing set as a material[2m > [22mreflects ((n - 1) / (n + 1))^2 face on, rising to the gloss at grazing incidence
+ [32m✓[39m packages/atlas-react/test/generated-tile-glazing.test.ts[2m > [22ma glazing set as a material[2m > [22mlays transmission in red and roughness in green
+ [32m✓[39m packages/atlas-react/test/generated-tile-glazing.test.ts[2m > [22ma glazing set as a material[2m > [22mkeeps shadows for opaque and cutout, and casts none for glazing or decal
+ [32m✓[39m packages/atlas-react/test/generated-tile-glazing.test.ts[2m > [22mthe scene colour copy glazing needs[2m > [22mis off until glazing asks for it, and holds for a camera frame created later
+ [32m✓[39m packages/atlas-react/test/generated-tile-materials.test.ts[2m > [22mgenerated tile UV rule[2m > [22mrepeats a set once per physical extent, from the extent and nothing else
+ [32m✓[39m packages/atlas-react/test/generated-tile-materials.test.ts[2m > [22mgenerated tile UV rule[2m > [22mapplies the record size to the repeat length, so a larger size repeats less often
+ [32m✓[39m packages/atlas-react/test/generated-tile-materials.test.ts[2m > [22mgenerated tile UV rule[2m > [22mrotates by the city vocabulary's formula, in millimetres, keeping the set's proportions
+ [32m✓[39m packages/atlas-react/test/generated-tile-materials.test.ts[2m > [22mgenerated tile UV rule[2m > [22mshifts by the offsets along the texture's own axes, after the rotation
+ [32m✓[39m packages/atlas-react/test/generated-tile-materials.test.ts[2m > [22mgenerated tile UV rule[2m > [22mlays the unavailable pattern at the look's own physical size, upright on walls and ground
+ [32m✓[39m packages/atlas-react/test/generated-tile-materials.test.ts[2m > [22mgenerated tile UV rule[2m > [22mflips PlayCanvas tangent handedness once, so +Y of a normal map points toward row 0
+ [32m✓[39m packages/atlas-react/test/generated-tile-materials.test.ts[2m > [22mgenerated tile materials from texture sets[2m > [22mbinds base colour, normal and the three orm channels, and leaves the height map unused
+ [32m✓[39m packages/atlas-react/test/generated-tile-materials.test.ts[2m > [22mgenerated tile materials from texture sets[2m > [22muploads each set once however many surfaces name it
+ [32m✓[39m packages/atlas-react/test/generated-tile-materials.test.ts[2m > [22mgenerated tile materials from texture sets[2m > [22mdraws the stated unavailable surface for an unpinned id, bad bytes, or a failed fetch
+ [32m✓[39m packages/atlas-react/test/generated-tile-materials.test.ts[2m > [22mgenerated tile materials from texture sets[2m > [22mrefuses every set on a page without crypto.subtle
+ [32m✓[39m packages/atlas-react/test/generated-tile-materials.test.ts[2m > [22mgenerated tile materials from texture sets[2m > [22muploads the height map only when the look turns parallax on
+ [32m✓[39m packages/atlas-react/test/generated-tile-materials.test.ts[2m > [22mdrawing a set by its material class[2m > [22mdraws a set of every class the closed list names, by its class
+ [32m✓[39m packages/atlas-react/test/generated-tile-materials.test.ts[2m > [22mdrawing a set by its material class[2m > [22mbinds a two-component normal with its z rebuilt, and a three-component normal as stored
+ [32m✓[39m packages/atlas-react/test/generated-tile-materials.test.ts[2m > [22mdrawing a set by its material class[2m > [22mprepares and verifies a set of any class; drawing it is the binding's decision
+ [32m✓[39m packages/atlas-react/test/generated-tile-materials.test.ts[2m > [22mthe unavailable pattern[2m > [22mis two tones, neither of which covers the surface alone
+ [32m✓[39m packages/atlas-react/test/generated-tile-materials.test.ts[2m > [22mthe unavailable pattern[2m > [22mwrites the word into the band across its middle
+ [32m✓[39m packages/atlas-react/test/generated-tile-materials.test.ts[2m > [22msurface batches[2m > [22mbuilds exactly the triangles it is given, with UVs and tangents
+ [32m✓[39m packages/atlas-react/test/generated-tile-materials.test.ts[2m > [22msurface batches[2m > [22mrefuses a batch it would have to repair
+ [32m✓[39m packages/atlas-react/test/generated-tile-cutout.test.ts[2m > [22mcutout mip levels keep their coverage[2m > [22mkeeps the share of covered texels at coverage_permille on every level, to the nearest texel, where plain averaging thins out
+ [32m✓[39m packages/atlas-react/test/generated-tile-cutout.test.ts[2m > [22mcutout mip levels keep their coverage[2m > [22maverages colour by coverage, so empty texels do not darken the leaves
+ [32m✓[39m packages/atlas-react/test/generated-tile-cutout.test.ts[2m > [22ma cutout set as a material[2m > [22mtests coverage at the class cutoff, never blends, writes depth, and lights both faces
+[90mstdout[2m | packages/atlas-react/test/owned-district-unavailable.test.ts[2m > [22m[2mowned district unavailable surfaces[2m > [22m[2mdraws the recorded extent, the datum and the sidewalks, and nothing invented
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/owned-district-unavailable.test.ts[2m > [22m[2mowned district unavailable surfaces[2m > [22m[2mgives every building the same treatment whatever its material index, name or batch id
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/owned-district-unavailable.test.ts[2m > [22m[2mowned district unavailable surfaces[2m > [22m[2mdraws recorded sidewalks hatched and outlined, not as a paving material
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/owned-district-unavailable.test.ts[2m > [22m[2mowned district unavailable surfaces[2m > [22m[2mdraws the ground as lines, not as a surface
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/owned-district-unavailable.test.ts[2m > [22m[2mowned district unavailable surfaces[2m > [22m[2mnames the absence in words a panel can show
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/owned-district-unavailable.test.ts[2m > [22m[2mowned district unavailable surfaces[2m > [22m[2mdoes not draw the interpretation’s generated facade grids or parapets
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+Powered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/owned-district-unavailable.test.ts[2m > [22m[2mowned district unavailable surfaces[2m > [22m[2mplaces a fictional authored instance without a sky lantern
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/owned-district-unavailable.test.ts[2m > [22m[2mowned district unavailable surfaces[2m > [22m[2mtells authored instances apart only by their recorded role, with no material of their own
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/owned-district-unavailable.test.ts[2m > [22m[2mowned district unavailable surfaces[2m > [22m[2mdraws the interpretation’s generated markers in the generated-marker tint and nothing else
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/owned-district-unavailable.test.ts[2m > [22mowned district unavailable surfaces[2m > [22mdraws the recorded extent, the datum and the sidewalks, and nothing invented
+ [32m✓[39m packages/atlas-react/test/owned-district-unavailable.test.ts[2m > [22mowned district unavailable surfaces[2m > [22mgives every building the same treatment whatever its material index, name or batch id
+ [32m✓[39m packages/atlas-react/test/owned-district-unavailable.test.ts[2m > [22mowned district unavailable surfaces[2m > [22mdraws recorded sidewalks hatched and outlined, not as a paving material
+ [32m✓[39m packages/atlas-react/test/owned-district-unavailable.test.ts[2m > [22mowned district unavailable surfaces[2m > [22mdraws the ground as lines, not as a surface
+ [32m✓[39m packages/atlas-react/test/owned-district-unavailable.test.ts[2m > [22mowned district unavailable surfaces[2m > [22mnames the absence in words a panel can show
+ [32m✓[39m packages/atlas-react/test/owned-district-unavailable.test.ts[2m > [22mowned district unavailable surfaces[2m > [22mdoes not draw the interpretation’s generated facade grids or parapets
+ [32m✓[39m packages/atlas-react/test/owned-district-unavailable.test.ts[2m > [22mowned district unavailable surfaces[2m > [22mplaces a fictional authored instance without a sky lantern
+ [32m✓[39m packages/atlas-react/test/owned-district-unavailable.test.ts[2m > [22mowned district unavailable surfaces[2m > [22mtells authored instances apart only by their recorded role, with no material of their own
+ [32m✓[39m packages/atlas-react/test/owned-district-unavailable.test.ts[2m > [22mowned district unavailable surfaces[2m > [22mdraws the interpretation’s generated markers in the generated-marker tint and nothing else
+[90mstdout[2m | packages/atlas-react/test/data-view/authored-object-representation.test.ts[2m > [22m[2mauthored-object representation[2m > [22m[2mregisters every reviewed marker as one authored subject with generated surface samples
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/first-person-gesture.test.ts[2m > [22mfirst-person tool gesture[2m > [22mplays once, ends without leaving an overlay, and restarts cleanly after interruption
+ [32m✓[39m packages/atlas-react/test/first-person-gesture.test.ts[2m > [22mfirst-person tool gesture[2m > [22mskips and interrupts the presentation when camera, motion preference, or availability disallows it
+ [32m✓[39m packages/atlas-react/test/first-person-gesture.test.ts[2m > [22mfirst-person tool gesture[2m > [22mrefuses a missing source clip and releases the borrowed asset
+[90mstdout[2m | packages/atlas-react/test/society-crowd.test.ts[2m > [22m[2msociety crowd[2m > [22m[2mwalks each inhabitant at its recorded speed and stops where the recorded path ends
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/society-crowd.test.ts[2m > [22m[2msociety crowd[2m > [22m[2mcounts people indoors without drawing or placing them anywhere else
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/society-crowd.test.ts[2m > [22m[2msociety crowd[2m > [22m[2mnever truncates the population and keeps full detail within the native limit
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/society-crowd.test.ts[2m > [22m[2msociety crowd[2m > [22m[2mshows reduced motion and out-of-sequence snapshots at their recorded end points
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/society-crowd.test.ts[2m > [22m[2msociety crowd[2m > [22m[2mplaces every full character every frame and poses the farther ones on fewer frames
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/society-crowd.test.ts[2m > [22m[2msociety crowd[2m > [22m[2mcarries an abstract character to its new point without solving or skinning a new pose
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/society-crowd.test.ts[2m > [22m[2msociety crowd[2m > [22m[2mposes a selected inhabitant every frame whatever the cadence for its rank
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/society-crowd.test.ts[2m > [22m[2msociety crowd[2m > [22m[2mcounts the bytes a renderable owns and the bytes the shared host holds, never one instead of the other
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+Powered by PlayCanvas 2.21.4 e287e0c
+Powered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/society-crowd.test.ts[2m > [22m[2msociety crowd[2m > [22m[2mdraws far figures with one instanced draw per palette
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/society-crowd.test.ts[2m > [22m[2ma place that states heights[2m > [22m[2mrefuses a walker standing on a stated surface, because this crowd draws the ground plane
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/data-view/authored-object-representation.test.ts[2m > [22m[2mauthored-object representation[2m > [22m[2mkeeps the surface and points in one frame through pose, motion and region transforms
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/data-view/authored-object-representation.test.ts[2m > [22m[2mauthored-object representation[2m > [22m[2mkeeps a transformed static multi-mesh fixture one bounded authored subject
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/binding/frame-order.test.ts[2m > [22m[2mthe order of work inside a frame[2m > [22m[2mruns authored-endless's first and second frames in the pinned order
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/binding/appearance-and-map.test.ts[2m > [22m[2mappearance and the Map, step by step[2m > [22m[2mchanges authored-endless as pinned
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/data-view/authored-object-representation.test.ts[2m > [22m[2mauthored-object representation[2m > [22m[2mhides both forms with residency and refuses an animated mesh without hiding it
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/binding/frame-order.test.ts[2m > [22m[2mthe order of work inside a frame[2m > [22m[2mruns authored-with-estimate's first and second frames in the pinned order
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/binding/frame-order.test.ts[2m > [22mthe order of work inside a frame[2m > [22mruns authored-endless's first and second frames in the pinned order
+ [32m✓[39m packages/atlas-react/test/data-view/authored-object-representation.test.ts[2m > [22mauthored-object representation[2m > [22mregisters every reviewed marker as one authored subject with generated surface samples
+ [32m✓[39m packages/atlas-react/test/data-view/authored-object-representation.test.ts[2m > [22mauthored-object representation[2m > [22mkeeps the surface and points in one frame through pose, motion and region transforms
+ [32m✓[39m packages/atlas-react/test/data-view/authored-object-representation.test.ts[2m > [22mauthored-object representation[2m > [22mkeeps a transformed static multi-mesh fixture one bounded authored subject
+ [32m✓[39m packages/atlas-react/test/data-view/authored-object-representation.test.ts[2m > [22mauthored-object representation[2m > [22mhides both forms with residency and refuses an animated mesh without hiding it
+ [32m✓[39m packages/atlas-react/test/society-crowd.test.ts[2m > [22msociety crowd[2m > [22mwalks each inhabitant at its recorded speed and stops where the recorded path ends
+ [32m✓[39m packages/atlas-react/test/society-crowd.test.ts[2m > [22msociety crowd[2m > [22mcounts people indoors without drawing or placing them anywhere else
+ [32m✓[39m packages/atlas-react/test/society-crowd.test.ts[2m > [22msociety crowd[2m > [22mnever truncates the population and keeps full detail within the native limit
+ [32m✓[39m packages/atlas-react/test/society-crowd.test.ts[2m > [22msociety crowd[2m > [22mshows reduced motion and out-of-sequence snapshots at their recorded end points
+ [32m✓[39m packages/atlas-react/test/society-crowd.test.ts[2m > [22msociety crowd[2m > [22mplaces every full character every frame and poses the farther ones on fewer frames
+ [32m✓[39m packages/atlas-react/test/society-crowd.test.ts[2m > [22msociety crowd[2m > [22mcarries an abstract character to its new point without solving or skinning a new pose
+ [32m✓[39m packages/atlas-react/test/society-crowd.test.ts[2m > [22msociety crowd[2m > [22mposes a selected inhabitant every frame whatever the cadence for its rank
+ [32m✓[39m packages/atlas-react/test/society-crowd.test.ts[2m > [22msociety crowd[2m > [22mcounts the bytes a renderable owns and the bytes the shared host holds, never one instead of the other
+ [32m✓[39m packages/atlas-react/test/society-crowd.test.ts[2m > [22msociety crowd[2m > [22mdraws far figures with one instanced draw per palette
+ [32m✓[39m packages/atlas-react/test/society-crowd.test.ts[2m > [22ma place that states heights[2m > [22mrefuses a walker standing on a stated surface, because this crowd draws the ground plane
+[90mstdout[2m | packages/atlas-react/test/binding/appearance-and-map.test.ts[2m > [22m[2mappearance and the Map, step by step[2m > [22m[2mchanges personal-regions as pinned
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/binding/appearance-and-map.test.ts[2m > [22mappearance and the Map, step by step[2m > [22mchanges authored-endless as pinned
+[90mstdout[2m | packages/atlas-react/test/binding/frame-order.test.ts[2m > [22m[2mthe order of work inside a frame[2m > [22m[2mruns personal-regions's first and second frames in the pinned order
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/binding/frame-order.test.ts[2m > [22mthe order of work inside a frame[2m > [22mruns authored-with-estimate's first and second frames in the pinned order
+[90mstdout[2m | packages/atlas-react/test/binding/appearance-and-map.test.ts[2m > [22m[2mappearance and the Map, step by step[2m > [22m[2mchanges owned-district as pinned
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/binding/appearance-and-map.test.ts[2m > [22mappearance and the Map, step by step[2m > [22mchanges personal-regions as pinned
+[90mstdout[2m | packages/atlas-react/test/binding/frame-order.test.ts[2m > [22m[2mthe order of work inside a frame[2m > [22m[2mruns owned-district's first and second frames in the pinned order
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/binding/frame-order.test.ts[2m > [22mthe order of work inside a frame[2m > [22mruns personal-regions's first and second frames in the pinned order
+ [32m✓[39m packages/atlas-react/test/scene-inspection.test.ts[2m > [22mbounded reconstruction inspection[2m > [22muses accepted cameras without any OPM and preserves exact capture, receipt, calibration, and order
+ [32m✓[39m packages/atlas-react/test/scene-inspection.test.ts[2m > [22mbounded reconstruction inspection[2m > [22mopens a loaded trained scene without maps and restores the prior projection after calibrated inspection
+ [32m✓[39m packages/atlas-react/test/scene-inspection.test.ts[2m > [22mbounded reconstruction inspection[2m > [22mpreserves the source projection and transforms fitted camera axes exactly once
+ [32m✓[39m packages/atlas-react/test/scene-inspection.test.ts[2m > [22mbounded reconstruction inspection[2m > [22mnever joins different scenes or invents a midpoint for opposing cameras
+ [32m✓[39m packages/atlas-react/test/scene-inspection.test.ts[2m > [22mbounded reconstruction inspection[2m > [22mkeeps inspection out of walking and restores the exact original pose and field of view
+[90mstdout[2m | packages/atlas-react/test/binding/frame-order.test.ts[2m > [22m[2mthe order of work inside a frame[2m > [22m[2mruns google-reference's first and second frames in the pinned order
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/binding/frame-order.test.ts[2m > [22mthe order of work inside a frame[2m > [22mruns owned-district's first and second frames in the pinned order
+[90mstdout[2m | packages/atlas-react/test/binding/appearance-and-map.test.ts[2m > [22m[2mappearance and the Map, step by step[2m > [22m[2maims the fog at the sky it draws, and at the clear colour where it draws none
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/binding/appearance-and-map.test.ts[2m > [22m[2mappearance and the Map, step by step[2m > [22m[2mpasses a theme to every collaborator that draws in theme colours
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/binding/appearance-and-map.test.ts[2m > [22mappearance and the Map, step by step[2m > [22mchanges owned-district as pinned
+ [32m✓[39m packages/atlas-react/test/binding/appearance-and-map.test.ts[2m > [22mappearance and the Map, step by step[2m > [22maims the fog at the sky it draws, and at the clear colour where it draws none
+ [32m✓[39m packages/atlas-react/test/binding/appearance-and-map.test.ts[2m > [22mappearance and the Map, step by step[2m > [22mpasses a theme to every collaborator that draws in theme colours
+[90mstdout[2m | packages/atlas-react/test/binding/frame-order.test.ts[2m > [22m[2mthe order of work inside a frame[2m > [22m[2mmoves the render origin before anything reads the camera in the first frame of a world of regions
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/binding/frame-order.test.ts[2m > [22m[2mthe order of work inside a frame[2m > [22m[2mmoves before it draws: controls first, the frame report last
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+Powered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/binding/frame-order.test.ts[2m > [22mthe order of work inside a frame[2m > [22mruns google-reference's first and second frames in the pinned order
+ [32m✓[39m packages/atlas-react/test/binding/frame-order.test.ts[2m > [22mthe order of work inside a frame[2m > [22mmoves the render origin before anything reads the camera in the first frame of a world of regions
+ [32m✓[39m packages/atlas-react/test/binding/frame-order.test.ts[2m > [22mthe order of work inside a frame[2m > [22mmoves before it draws: controls first, the frame report last
+[90mstdout[2m | packages/atlas-react/test/binding/society-drive.test.ts[2m > [22m[2mthe society drive[2m > [22m[2mtells a saved world's crowd where the person stands and what time it is, every frame
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/binding/society-drive.test.ts[2m > [22m[2mthe society drive[2m > [22m[2mdrives an owned district's crowd the same way and publishes its drawing once a second
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/binding/society-drive.test.ts[2m > [22m[2mthe society drive[2m > [22m[2mbuilds no crowd where there is no society to hold: a world of regions, a tile, a reference
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+Powered by PlayCanvas 2.21.4 e287e0c
+Powered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/binding/society-drive.test.ts[2m > [22mthe society drive[2m > [22mtells a saved world's crowd where the person stands and what time it is, every frame[33m 333[2mms[22m[39m
+ [32m✓[39m packages/atlas-react/test/binding/society-drive.test.ts[2m > [22mthe society drive[2m > [22mdrives an owned district's crowd the same way and publishes its drawing once a second
+ [32m✓[39m packages/atlas-react/test/binding/society-drive.test.ts[2m > [22mthe society drive[2m > [22mbuilds no crowd where there is no society to hold: a world of regions, a tile, a reference
+[90mstdout[2m | packages/atlas-react/test/owned-district-runtime.test.ts[2m > [22m[2mowned runtime population representation[2m > [22m[2mhands the native frame the facing the solver resolved, not a transform readback
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/owned-district-runtime.test.ts[2m > [22m[2mowned runtime population representation[2m > [22m[2mclears unavailable residents and cannot repopulate from retained state
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/owned-district-runtime.test.ts[2m > [22m[2mowned runtime population representation[2m > [22m[2mdraws the whole population by distance and moves full detail with the observer
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/owned-district-runtime.test.ts[2m > [22m[2mowned runtime population representation[2m > [22m[2mpicks the interpolated subject along the recorded corner and resets across branches
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/owned-district-runtime.test.ts[2m > [22m[2mowned runtime population representation[2m > [22m[2mdraws co-located inhabitants where the simulation put them and keeps a selection near
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/authored-society.test.ts[2m > [22m[2ma saved world draws its inhabitants over its authored region[2m > [22m[2mbuilds exactly what an owned-district world built before it existed
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/authored-society.test.ts[2m > [22m[2ma saved world draws its inhabitants over its authored region[2m > [22m[2mdraws each inhabitant at its stated point in the region the objects are placed in
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/authored-society.test.ts[2m > [22m[2ma saved world draws its inhabitants over its authored region[2m > [22m[2mhands every full character it draws to the native character runtime each frame
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/authored-society.test.ts[2m > [22m[2ma saved world draws its inhabitants over its authored region[2m > [22m[2mis released with the binding
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/owned-district-runtime.test.ts[2m > [22mowned runtime population representation[2m > [22mhands the native frame the facing the solver resolved, not a transform readback
+ [32m✓[39m packages/atlas-react/test/owned-district-runtime.test.ts[2m > [22mowned runtime population representation[2m > [22mclears unavailable residents and cannot repopulate from retained state[33m 411[2mms[22m[39m
+ [32m✓[39m packages/atlas-react/test/owned-district-runtime.test.ts[2m > [22mowned runtime population representation[2m > [22mdraws the whole population by distance and moves full detail with the observer
+ [32m✓[39m packages/atlas-react/test/owned-district-runtime.test.ts[2m > [22mowned runtime population representation[2m > [22mpicks the interpolated subject along the recorded corner and resets across branches
+ [32m✓[39m packages/atlas-react/test/owned-district-runtime.test.ts[2m > [22mowned runtime population representation[2m > [22mdraws co-located inhabitants where the simulation put them and keeps a selection near
+ [32m✓[39m packages/atlas-react/test/authored-society.test.ts[2m > [22ma saved world draws its inhabitants over its authored region[2m > [22mbuilds exactly what an owned-district world built before it existed[33m 341[2mms[22m[39m
+ [32m✓[39m packages/atlas-react/test/authored-society.test.ts[2m > [22ma saved world draws its inhabitants over its authored region[2m > [22mdraws each inhabitant at its stated point in the region the objects are placed in
+ [32m✓[39m packages/atlas-react/test/authored-society.test.ts[2m > [22ma saved world draws its inhabitants over its authored region[2m > [22mhands every full character it draws to the native character runtime each frame
+ [32m✓[39m packages/atlas-react/test/authored-society.test.ts[2m > [22ma saved world draws its inhabitants over its authored region[2m > [22mis released with the binding
+ [32m✓[39m packages/atlas-react/test/generated-tile-decal.test.ts[2m > [22ma decal set as a material[2m > [22mblends by coverage, tests depth without writing it, is pulled in front of its surface, and casts no shadow
+ [32m✓[39m packages/atlas-react/test/generated-tile-decal.test.ts[2m > [22ma decal set as a material[2m > [22mdraws after opaque and cutout surfaces and before glazing among blended surfaces
+ [32m✓[39m packages/atlas-react/test/google-tiles-attribution.test.ts[2m > [22mvisible Google tile attribution[2m > [22mreads copyright metadata while rejecting external glTF resources
+ [32m✓[39m packages/atlas-react/test/google-tiles-attribution.test.ts[2m > [22mvisible Google tile attribution[2m > [22morders unique visible attribution by frequency, first visibility, then lexical value
+ [32m✓[39m packages/atlas-react/test/google-tiles-attribution.test.ts[2m > [22mvisible Google tile attribution[2m > [22mkeeps Google attribution and end-user links in a distinct surface
+ [32m✓[39m packages/atlas-react/test/anchor-overlay-photograph.test.ts[2m > [22mthe open-photograph prompt[2m > [22moffers E beside the reticle while the visitor looks into a photograph, and says what E does
+ [32m✓[39m packages/atlas-react/test/anchor-overlay-photograph.test.ts[2m > [22mthe open-photograph prompt[2m > [22mis gone when the visitor looks away or is not walking
+ [32m✓[39m packages/atlas-react/test/anchor-overlay-photograph.test.ts[2m > [22mthe open-memory prompt[2m > [22moffers E beside the reticle while the visitor stands inside a memory
+ [32m✓[39m packages/atlas-react/test/anchor-overlay-photograph.test.ts[2m > [22mthe open-memory prompt[2m > [22mis gone on leaving the memory or on leaving traversal
+ [32m✓[39m packages/atlas-react/test/anchor-overlay-photograph.test.ts[2m > [22mthe open-memory prompt[2m > [22myields the one prompt slot to a photograph under the reticle
+ [32m✓[39m packages/atlas-react/test/google-tiles-coexistence.test.ts[2m > [22mAtlas interaction coexistence with mocked Google tiles[2m > [22mleaves first-person movement, Interact, Companion and authored runtime ownership intact
+[90mstdout[2m | packages/atlas-react/test/binding/lifecycle-order.test.ts[2m > [22m[2mwhat destroy takes down, in order[2m > [22m[2mdestroys authored-endless in the pinned order
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/binding/lifecycle-order.test.ts[2m > [22m[2mwhat destroy takes down, in order[2m > [22m[2mdestroys authored-with-estimate in the pinned order
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/binding/lifecycle-order.test.ts[2m > [22mwhat destroy takes down, in order[2m > [22mdestroys authored-endless in the pinned order
+[90mstdout[2m | packages/atlas-react/test/binding/lifecycle-order.test.ts[2m > [22m[2mwhat destroy takes down, in order[2m > [22m[2mdestroys authored-flat in the pinned order
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/binding/lifecycle-order.test.ts[2m > [22mwhat destroy takes down, in order[2m > [22mdestroys authored-with-estimate in the pinned order
+ [32m✓[39m packages/atlas-react/test/opm.test.ts[2m > [22mthe .opm loader[2m > [22mreads the header and exposes zero-copy views over the same buffer
+ [32m✓[39m packages/atlas-react/test/opm.test.ts[2m > [22mthe .opm loader[2m > [22mrejects a file that is not an .opm
+ [32m✓[39m packages/atlas-react/test/opm.test.ts[2m > [22mthe .opm loader[2m > [22mrefuses an OPM/1 container by name and says what produces the version it reads
+ [32m✓[39m packages/atlas-react/test/opm.test.ts[2m > [22mthe .opm loader[2m > [22mskips a section this client has never heard of rather than refusing the file
+ [32m✓[39m packages/atlas-react/test/opm.test.ts[2m > [22mthe .opm loader[2m > [22mrefuses a section it does know whose shape it does not
+ [32m✓[39m packages/atlas-react/test/opm.test.ts[2m > [22mthe .opm loader[2m > [22mtakes the zero-copy path when the sections are contiguous
+ [32m✓[39m packages/atlas-react/test/opm.test.ts[2m > [22mthe .opm loader[2m > [22mpacks twenty bytes a point, which is what the engine has to be given
+ [32m✓[39m packages/atlas-react/test/opm.test.ts[2m > [22mthe .opm loader[2m > [22mrepacks, and says so, when the sections are not contiguous
+ [32m✓[39m packages/atlas-react/test/opm.test.ts[2m > [22mthe .opm loader[2m > [22mderives a footprint radius that encloses every corner of the bounds
+ [32m✓[39m packages/atlas-react/test/opm.test.ts[2m > [22mthe .opm loader[2m > [22mderives an observed panel envelope from source camera facts, not Atlas placement
+ [32m✓[39m packages/atlas-react/test/opm.test.ts[2m > [22mthe .opm loader[2m > [22mrefuses a structurally valid header whose source aspect contradicts the camera
+ [32m✓[39m packages/atlas-react/test/opm.test.ts[2m > [22mthe .opm loader[2m > [22mrefuses a file that does not say what its alpha channel holds
+ [32m✓[39m packages/atlas-react/test/opm.test.ts[2m > [22mthe .opm loader[2m > [22mthe model grid against the photograph[2m > [22maccepts 400x300 unprojected from a 400x300 grid
+ [32m✓[39m packages/atlas-react/test/opm.test.ts[2m > [22mthe .opm loader[2m > [22mthe model grid against the photograph[2m > [22maccepts 1500x1000 unprojected from a 512x341 grid
+ [32m✓[39m packages/atlas-react/test/opm.test.ts[2m > [22mthe .opm loader[2m > [22mthe model grid against the photograph[2m > [22maccepts 1500x1000 unprojected from a 512x342 grid
+ [32m✓[39m packages/atlas-react/test/opm.test.ts[2m > [22mthe .opm loader[2m > [22mthe model grid against the photograph[2m > [22maccepts 1000x1000 unprojected from a 400x400 grid
+ [32m✓[39m packages/atlas-react/test/opm.test.ts[2m > [22mthe .opm loader[2m > [22mthe model grid against the photograph[2m > [22maccepts 3000x2 unprojected from a 512x1 grid
+ [32m✓[39m packages/atlas-react/test/opm.test.ts[2m > [22mthe .opm loader[2m > [22mthe model grid against the photograph[2m > [22mrefuses a 512x343 grid, whose two dimensions imply different scales
+ [32m✓[39m packages/atlas-react/test/opm.test.ts[2m > [22mthe .opm loader[2m > [22mthe model grid against the photograph[2m > [22mrefuses a 512x512 grid, whose two dimensions imply different scales
+ [32m✓[39m packages/atlas-react/test/opm.test.ts[2m > [22mthe .opm loader[2m > [22mthe model grid against the photograph[2m > [22mrefuses a 513x341 grid, whose two dimensions imply different scales
+[90mstdout[2m | packages/atlas-react/test/binding/lifecycle-order.test.ts[2m > [22m[2mwhat destroy takes down, in order[2m > [22m[2mdestroys personal-regions in the pinned order
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/binding/lifecycle-order.test.ts[2m > [22mwhat destroy takes down, in order[2m > [22mdestroys authored-flat in the pinned order
+[90mstdout[2m | packages/atlas-react/test/binding/lifecycle-order.test.ts[2m > [22m[2mwhat destroy takes down, in order[2m > [22m[2mdestroys owned-district in the pinned order
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/binding/lifecycle-order.test.ts[2m > [22mwhat destroy takes down, in order[2m > [22mdestroys personal-regions in the pinned order
+[90mstdout[2m | packages/atlas-react/test/binding/lifecycle-order.test.ts[2m > [22m[2mwhat destroy takes down, in order[2m > [22m[2mdestroys generated-tile in the pinned order
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/binding/lifecycle-order.test.ts[2m > [22m[2mwhat destroy takes down, in order[2m > [22m[2mdestroys google-reference in the pinned order
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/binding/lifecycle-order.test.ts[2m > [22mwhat destroy takes down, in order[2m > [22mdestroys owned-district in the pinned order
+ [32m✓[39m packages/atlas-react/test/binding/lifecycle-order.test.ts[2m > [22mwhat destroy takes down, in order[2m > [22mdestroys generated-tile in the pinned order
+ [32m✓[39m packages/atlas-react/test/binding/lifecycle-order.test.ts[2m > [22mwhat destroy takes down, in order[2m > [22mdestroys google-reference in the pinned order
+[90mstdout[2m | packages/atlas-react/test/binding/lifecycle-order.test.ts[2m > [22m[2mwhat destroy takes down, in order[2m > [22m[2mdestroys authored-and-google in the pinned order
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/representation-runtime.test.ts[2m > [22mbounded representation runtime[2m > [22mrefuses a contract v2 subject under a version 1 style, or a kind the style declares no colour for
+ [32m✓[39m packages/atlas-react/test/representation-runtime.test.ts[2m > [22mbounded representation runtime[2m > [22mblends, reverses without reallocating, then restores and disposes exactly once
+ [32m✓[39m packages/atlas-react/test/representation-runtime.test.ts[2m > [22mbounded representation runtime[2m > [22mcounts every live allocation and frees budget across unregister and re-register
+ [32m✓[39m packages/atlas-react/test/representation-runtime.test.ts[2m > [22mbounded representation runtime[2m > [22mregisters bounded metadata without allocating points or controlling the aggregate draw
+ [32m✓[39m packages/atlas-react/test/representation-runtime.test.ts[2m > [22mbounded representation runtime[2m > [22mrefuses metadata that could masquerade as an isolated draw or has no spatial bounds
+ [32m✓[39m packages/atlas-react/test/representation-runtime.test.ts[2m > [22mbounded representation runtime[2m > [22mscales every demand by one factor and never beyond a subject's cap
+ [32m✓[39m packages/atlas-react/test/representation-runtime.test.ts[2m > [22mbounded representation runtime[2m > [22mprepares a bounded number of points per update and keeps the surface until they arrive
+ [32m✓[39m packages/atlas-react/test/representation-runtime.test.ts[2m > [22mbounded representation runtime[2m > [22mtells each allocation its palette colour, treatment and selection emphasis
+ [32m✓[39m packages/atlas-react/test/representation-runtime.test.ts[2m > [22mbounded representation runtime[2m > [22mholds its budgets to the measured limits
+ [32m✓[39m packages/atlas-react/test/representation-runtime.test.ts[2m > [22mbounded representation runtime[2m > [22mlets withdrawal and existing parent visibility defeat requested point fallback
+ [32m✓[39m packages/atlas-react/test/representation-runtime.test.ts[2m > [22mbounded representation runtime[2m > [22mkeeps borrowed native points outside allocation accounting
+ [32m✓[39m packages/atlas-react/test/representation-runtime.test.ts[2m > [22mbounded representation runtime[2m > [22mdoes not allocate an endpoint-only point form for an intermediate slider value
+ [32m✓[39m packages/atlas-react/test/representation-runtime.test.ts[2m > [22mbounded representation runtime[2m > [22mrejects allocations that exceed the granted point or byte allowance
+ [32m✓[39m packages/atlas-react/test/representation-runtime.test.ts[2m > [22mbounded representation runtime[2m > [22mrefuses identity changes and use after destruction
+[90mstdout[2m | packages/atlas-react/test/binding/object-residency.test.ts[2m > [22m[2mplaced objects and residency[2m > [22m[2mdraws a starter world's objects again when the Map closes
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/binding/object-residency.test.ts[2m > [22m[2mplaced objects and residency[2m > [22m[2mdraws a scene region's objects exactly when residency gives the region a drawn stage
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstderr[2m | packages/atlas-react/test/binding/object-residency.test.ts[2m > [22m[2mplaced objects and residency[2m > [22m[2mdraws a scene region's objects exactly when residency gives the region a drawn stage
+[22m[39mMaterial: MeshInstance.mesh is null, default material cannot be assigned to the MeshInstance
+
+ [32m✓[39m packages/atlas-react/test/binding/object-residency.test.ts[2m > [22mplaced objects and residency[2m > [22mdraws a starter world's objects again when the Map closes
+ [32m✓[39m packages/atlas-react/test/binding/object-residency.test.ts[2m > [22mplaced objects and residency[2m > [22mdraws a scene region's objects exactly when residency gives the region a drawn stage
+[90mstdout[2m | packages/atlas-react/test/data-view/points.test.ts[2m > [22m[2mdata view point draw[2m > [22m[2muploads exactly the given samples in the point-map layout, under the borrowed node
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/data-view/points.test.ts[2m > [22m[2mdata view point draw[2m > [22m[2mrefuses empty and non-finite buffers rather than drawing part of one
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/data-view/points.test.ts[2m > [22mdata view point draw[2m > [22muploads exactly the given samples in the point-map layout, under the borrowed node
+ [32m✓[39m packages/atlas-react/test/data-view/points.test.ts[2m > [22mdata view point draw[2m > [22mrefuses empty and non-finite buffers rather than drawing part of one
+ [32m✓[39m packages/atlas-react/test/data-view/points.test.ts[2m > [22mdata view point draw[2m > [22mkeeps the point-map program unchanged unless the data view asks for its define
+[90mstdout[2m | packages/atlas-react/test/binding/mode-locks.test.ts[2m > [22m[2mthe movement locks[2m > [22m[2mlets no lock re-enable walking while another holds it
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/binding/mode-locks.test.ts[2m > [22m[2mthe movement locks[2m > [22m[2mholds walking off for a journey and gives it back on arrival, unless the application took it
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/binding/mode-locks.test.ts[2m > [22m[2mthe movement locks[2m > [22m[2mkeeps walking with a free cursor, through the conversation switch, not the lock
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/binding/mode-locks.test.ts[2m > [22mthe movement locks[2m > [22mlets no lock re-enable walking while another holds it
+ [32m✓[39m packages/atlas-react/test/binding/mode-locks.test.ts[2m > [22mthe movement locks[2m > [22mholds walking off for a journey and gives it back on arrival, unless the application took it
+ [32m✓[39m packages/atlas-react/test/binding/mode-locks.test.ts[2m > [22mthe movement locks[2m > [22mkeeps walking with a free cursor, through the conversation switch, not the lock
+[90mstdout[2m | packages/atlas-react/test/character-follow.test.ts[2m > [22m[2mcarrying a person between poses[2m > [22m[2mis the same person, posed once at the end, as one posed on every frame of the gap
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/character-follow.test.ts[2m > [22m[2mcarrying a person between poses[2m > [22m[2mrefuses a position that is not a place, and ignores a carry after destruction
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/character-follow.test.ts[2m > [22mcarrying a person between poses[2m > [22mis the same person, posed once at the end, as one posed on every frame of the gap
+ [32m✓[39m packages/atlas-react/test/character-follow.test.ts[2m > [22mcarrying a person between poses[2m > [22mrefuses a position that is not a place, and ignores a carry after destruction
+ [32m✓[39m packages/atlas-react/test/map-region-overlay.test.ts[2m > [22mMap region targets[2m > [22muses stable creation order and sends the exact island id
+ [32m✓[39m packages/atlas-react/test/map-region-overlay.test.ts[2m > [22mMap region targets[2m > [22mexists only while Map is active
+[90mstdout[2m | packages/atlas-react/test/binding/create-world-kinds.test.ts[2m > [22m[2mwhat the binding builds for each kind of world[2m > [22m[2mbuilds authored-endless as pinned
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/binding/create-world-kinds.test.ts[2m > [22m[2mwhat the binding builds for each kind of world[2m > [22m[2mbuilds authored-with-estimate as pinned
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/binding/create-world-kinds.test.ts[2m > [22mwhat the binding builds for each kind of world[2m > [22mbuilds authored-endless as pinned
+[90mstdout[2m | packages/atlas-react/test/binding/create-world-kinds.test.ts[2m > [22m[2mwhat the binding builds for each kind of world[2m > [22m[2mbuilds authored-flat as pinned
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/binding/create-world-kinds.test.ts[2m > [22mwhat the binding builds for each kind of world[2m > [22mbuilds authored-with-estimate as pinned
+[90mstdout[2m | packages/atlas-react/test/binding/create-world-kinds.test.ts[2m > [22m[2mwhat the binding builds for each kind of world[2m > [22m[2mbuilds personal-regions as pinned
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/binding/create-world-kinds.test.ts[2m > [22mwhat the binding builds for each kind of world[2m > [22mbuilds authored-flat as pinned
+[90mstdout[2m | packages/atlas-react/test/binding/create-world-kinds.test.ts[2m > [22m[2mwhat the binding builds for each kind of world[2m > [22m[2mbuilds owned-district as pinned
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/binding/create-world-kinds.test.ts[2m > [22mwhat the binding builds for each kind of world[2m > [22mbuilds personal-regions as pinned
+[90mstdout[2m | packages/atlas-react/test/binding/lifecycle-order.test.ts[2m > [22m[2mwhat destroy takes down, in order[2m > [22m[2mremoves every dataset key it wrote on the canvas
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/binding/lifecycle-order.test.ts[2m > [22mwhat destroy takes down, in order[2m > [22mdestroys authored-and-google in the pinned order
+ [32m✓[39m packages/atlas-react/test/binding/lifecycle-order.test.ts[2m > [22mwhat destroy takes down, in order[2m > [22mremoves every dataset key it wrote on the canvas[33m 731[2mms[22m[39m
+[90mstdout[2m | packages/atlas-react/test/binding/create-world-kinds.test.ts[2m > [22m[2mwhat the binding builds for each kind of world[2m > [22m[2mbuilds generated-tile as pinned
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/binding/create-world-kinds.test.ts[2m > [22mwhat the binding builds for each kind of world[2m > [22mbuilds owned-district as pinned
+[90mstdout[2m | packages/atlas-react/test/binding/create-world-kinds.test.ts[2m > [22m[2mwhat the binding builds for each kind of world[2m > [22m[2mbuilds google-reference as pinned
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/binding/create-world-kinds.test.ts[2m > [22mwhat the binding builds for each kind of world[2m > [22mbuilds generated-tile as pinned
+[90mstdout[2m | packages/atlas-react/test/binding/create-world-kinds.test.ts[2m > [22m[2mwhat the binding builds for each kind of world[2m > [22m[2mbuilds authored-and-google as pinned
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/binding/create-world-kinds.test.ts[2m > [22mwhat the binding builds for each kind of world[2m > [22mbuilds google-reference as pinned
+ [32m✓[39m packages/atlas-react/test/generated-tile-route.test.ts[2m > [22mlisting a city[2m > [22mreads every field the route documents, and carries the credential
+ [32m✓[39m packages/atlas-react/test/generated-tile-route.test.ts[2m > [22mlisting a city[2m > [22mrefuses a seed that is not 64 hex characters before it asks anything
+ [32m✓[39m packages/atlas-react/test/generated-tile-route.test.ts[2m > [22mlisting a city[2m > [22mrefuses a list whose entry is missing a digest rather than reading a tile it cannot check
+ [32m✓[39m packages/atlas-react/test/generated-tile-route.test.ts[2m > [22mlisting a city[2m > [22mfinds a tile by coordinate, and answers null where the city has none
+ [32m✓[39m packages/atlas-react/test/generated-tile-route.test.ts[2m > [22mfetching a container[2m > [22mverifies the bytes against the digest, and reports what crossed the network
+ [32m✓[39m packages/atlas-react/test/generated-tile-route.test.ts[2m > [22mfetching a container[2m > [22mrefuses bytes whose digest is not the one the route named, with both digests said
+ [32m✓[39m packages/atlas-react/test/generated-tile-route.test.ts[2m > [22mfetching a container[2m > [22mrefuses a container that arrives with no digest to check it against
+ [32m✓[39m packages/atlas-react/test/generated-tile-route.test.ts[2m > [22mfetching a container[2m > [22masks for nothing at all when it already holds the digest the list names
+ [32m✓[39m packages/atlas-react/test/generated-tile-route.test.ts[2m > [22mfetching a container[2m > [22msends If-None-Match and uses what it holds if the route ever answers 304
+ [32m✓[39m packages/atlas-react/test/generated-tile-route.test.ts[2m > [22mfetching a container[2m > [22mskips a faulted tile without a request, because the list already said so
+ [32m✓[39m packages/atlas-react/test/generated-tile-route.test.ts[2m > [22mfetching a container[2m > [22mtreats an unknown key and a permissionless credential alike, on the pair the route keeps stable
+ [32m✓[39m packages/atlas-react/test/generated-tile-route.test.ts[2m > [22mfetching a container[2m > [22mcarries the route's own code for a fault, a missing file and a ceiling
+ [32m✓[39m packages/atlas-react/test/generated-tile-route.test.ts[2m > [22mfetching a container[2m > [22mrefuses bytes served as something other than a container
+ [32m✓[39m packages/atlas-react/test/generated-tile-route.test.ts[2m > [22mfetching a container[2m > [22mrefuses a container whose length is not the length its row records
+ [32m✓[39m packages/atlas-react/test/data-view/overlay-plan.test.ts[2m > [22mdata view overlay plan[2m > [22mdraws boxes from own bounds and tags from own id and label, led by the subject's kind
+ [32m✓[39m packages/atlas-react/test/data-view/overlay-plan.test.ts[2m > [22mdata view overlay plan[2m > [22mrefuses every overlay for a subject without bounds, and says why
+ [32m✓[39m packages/atlas-react/test/data-view/overlay-plan.test.ts[2m > [22mdata view overlay plan[2m > [22mrefuses a label tag without its own label, and keeps the id tag
+ [32m✓[39m packages/atlas-react/test/data-view/overlay-plan.test.ts[2m > [22mdata view overlay plan[2m > [22mrefuses a mark whose bounds have no frame in the view
+ [32m✓[39m packages/atlas-react/test/data-view/overlay-plan.test.ts[2m > [22mdata view overlay plan[2m > [22mdraws nothing for a withdrawn or hidden subject, whatever the slider and overlays say
+ [32m✓[39m packages/atlas-react/test/data-view/overlay-plan.test.ts[2m > [22mdata view overlay plan[2m > [22mnever presents an aggregate batch as an object
+ [32m✓[39m packages/atlas-react/test/data-view/overlay-plan.test.ts[2m > [22mdata view overlay plan[2m > [22mlinks a selected subject only to subjects of the same scene
+ [32m✓[39m packages/atlas-react/test/data-view/overlay-plan.test.ts[2m > [22mdata view overlay plan[2m > [22mdarkens the ground only while points are actually drawn
+ [32m✓[39m packages/atlas-react/test/data-view/overlay-plan.test.ts[2m > [22mdata view overlay plan[2m > [22mknows the twelve edges and four top corners of the corner order it is given
+ [32m✓[39m packages/atlas-react/test/generated-tile-walk-world.test.ts[2m > [22mwhich tiles a walk's world is[2m > [22mtakes the tile it stands on and every one within the route's own reach, nearest first
+ [32m✓[39m packages/atlas-react/test/generated-tile-walk-world.test.ts[2m > [22mwhich tiles a walk's world is[2m > [22mnames every square within reach that the world has no ground for
+ [32m✓[39m packages/atlas-react/test/generated-tile-walk-world.test.ts[2m > [22mwhich tiles a walk's world is[2m > [22mtells a square the store knows nothing about from one whose bake failed
+ [32m✓[39m packages/atlas-react/test/generated-tile-walk-world.test.ts[2m > [22mwhich tiles a walk's world is[2m > [22mrefuses to lay out a world on a tile of no size, rather than dividing by it
+ [32m✓[39m packages/atlas-react/test/generated-tile-walk-world.test.ts[2m > [22mwhich tiles a walk's world is[2m > [22mtakes the reach from the whole square when the walk states no pose
+ [32m✓[39m packages/atlas-react/test/generated-tile-walk-world.test.ts[2m > [22mwhich tiles a walk's world is[2m > [22mrefuses a stated pose that is not on the tile it says it stands on
+ [32m✓[39m packages/atlas-react/test/generated-tile-walk-world.test.ts[2m > [22mwhich tiles a walk's world is[2m > [22mreads only the level of detail the walk is at
+ [32m✓[39m packages/atlas-react/test/scene-segment-overlay.test.ts[2m > [22mthe segment overlay is exactly nothing when it is off[2m > [22mtouches nothing at all when it was never applied
+ [32m✓[39m packages/atlas-react/test/scene-segment-overlay.test.ts[2m > [22mthe segment overlay is exactly nothing when it is off[2m > [22minstalls one modifier and two textures on the region drawn, and nothing on another
+ [32m✓[39m packages/atlas-react/test/scene-segment-overlay.test.ts[2m > [22mthe segment overlay is exactly nothing when it is off[2m > [22mputs back no modifier and no parameter when switched off, if the lens never ran
+ [32m✓[39m packages/atlas-react/test/scene-segment-overlay.test.ts[2m > [22mthe segment overlay is exactly nothing when it is off[2m > [22mputs back the lens modifier and keeps the lens value when the lens was there first
+ [32m✓[39m packages/atlas-react/test/scene-segment-overlay.test.ts[2m > [22mthe segment overlay is exactly nothing when it is off[2m > [22mmoves with the visitor: the region left is put back as it was
+ [32m✓[39m packages/atlas-react/test/scene-segment-overlay.test.ts[2m > [22mthe segment overlay is exactly nothing when it is off[2m > [22mdraws a point map as one indexed draw per slot over its own samples, and one draw again when off
+ [32m✓[39m packages/atlas-react/test/scene-segment-overlay.test.ts[2m > [22mwhat the overlay refuses, and why it says so[2m > [22mrefuses a tint whose indices could not have been computed against these bytes
+ [32m✓[39m packages/atlas-react/test/scene-segment-overlay.test.ts[2m > [22mwhat the overlay refuses, and why it says so[2m > [22mdoes not tint point maps a region draws as trained geometry, or assets it does not draw at all
+ [32m✓[39m packages/atlas-react/test/scene-segment-overlay.test.ts[2m > [22mwhere the tinted samples are, for a click[2m > [22mreports atlas positions through the scene transform and the region placement
+ [32m✓[39m packages/atlas-react/test/scene-segment-overlay.test.ts[2m > [22mwhere the tinted samples are, for a click[2m > [22msays it holds no positions for a trained scene whose centres stayed on the GPU
+ [32m✓[39m packages/atlas-react/test/scene-segment-overlay.test.ts[2m > [22mthe numbers the overlay hands the renderer[2m > [22mgives a sample to the first tint that names it
+ [32m✓[39m packages/atlas-react/test/scene-segment-overlay.test.ts[2m > [22mthe numbers the overlay hands the renderer[2m > [22mleaves slot 0 all zero, which is what makes a sample in no segment an exact identity
+ [32m✓[39m packages/atlas-react/test/scene-segment-overlay.test.ts[2m > [22mthe numbers the overlay hands the renderer[2m > [22mgroups a point order untinted first, preserving each sample index
+ [32m✓[39m packages/atlas-react/test/scene-segment-overlay.test.ts[2m > [22mthe numbers the overlay hands the renderer[2m > [22mkeeps the lens arithmetic, reads the splat by its own index, and defines every hook
+ [32m✓[39m packages/atlas-react/test/scene-segment-overlay.test.ts[2m > [22mthe proof lens and the overlay share one modifier slot without taking it from each other[2m > [22minstalls the lens as before when no overlay is on
+ [32m✓[39m packages/atlas-react/test/scene-segment-overlay.test.ts[2m > [22mthe proof lens and the overlay share one modifier slot without taking it from each other[2m > [22mkeeps the segment modifier when the lens arrives second, and hands the lens its own when the overlay leaves
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mthe reviewed assets this client will actually meet[2m > [22maccepts all three, and their bytes are the ones the published version names
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22ma container the glTF parser would complete over the network is refused first[2m > [22mrefuses an external buffer, which loadBuffers would fetch
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22ma container the glTF parser would complete over the network is refused first[2m > [22mrefuses an external image, which createImages would fetch cross-origin
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22ma container the glTF parser would complete over the network is refused first[2m > [22mrefuses a data-URI buffer as well, so the registry byte count still bounds the decode
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22ma container the glTF parser would complete over the network is refused first[2m > [22mrefuses a compressed container, whose decoder would be fetched and run
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22ma container the glTF parser would complete over the network is refused first[2m > [22mrefuses any other required extension rather than letting the parser drop what it cannot read
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22ma container the glTF parser would complete over the network is refused first[2m > [22mtolerates an ignorable extension that is only listed as used
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22ma container the glTF parser would complete over the network is refused first[2m > [22mrefuses an image that resolves to neither a buffer view nor a URI
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22ma container the glTF parser would complete over the network is refused first[2m > [22mrefuses a header that lies about its own length, which the parser ignores
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22ma container the glTF parser would complete over the network is refused first[2m > [22mrefuses the chunk length the parser reads past without returning
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22ma container the glTF parser would complete over the network is refused first[2m > [22mrefuses the wrong magic, the wrong version and the wrong chunk order
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22ma container the glTF parser would complete over the network is refused first[2m > [22mrefuses a truncated container, a non-JSON chunk and a non-2.0 asset version
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22ma container the glTF parser would complete over the network is refused first[2m > [22mrefuses a buffer larger than the BIN chunk that must hold it
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mbytes reach the decoder only authenticated, hashed and counted[2m > [22mreads the reviewed bytes from the asset key and sends the bearer
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mbytes reach the decoder only authenticated, hashed and counted[2m > [22mescapes an asset key into the path rather than interpolating it raw
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mbytes reach the decoder only authenticated, hashed and counted[2m > [22mrefuses a registry row with no digest rather than loading an unchecked container
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mbytes reach the decoder only authenticated, hashed and counted[2m > [22mrefuses a registry row with no byte count
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mbytes reach the decoder only authenticated, hashed and counted[2m > [22mrefuses bytes whose hash is not the one the registry named
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mbytes reach the decoder only authenticated, hashed and counted[2m > [22mrefuses a body whose length is not the one the registry named
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mbytes reach the decoder only authenticated, hashed and counted[2m > [22mrefuses a media type it cannot open
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mbytes reach the decoder only authenticated, hashed and counted[2m > [22mrefuses everything when the page cannot compute a hash at all
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mbytes reach the decoder only authenticated, hashed and counted[2m > [22mrefuses a container that fails validation even when its hash is right
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mbytes reach the decoder only authenticated, hashed and counted[2m > [22mpropagates an unauthenticated response as a failure
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mthe container reaches the native handler as bytes, never as a URL[2m > [22msupplies verified bytes in memory and keeps them owned until disposal
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mthe container reaches the native handler as bytes, never as a URL[2m > [22mturns the registry’s bare-string error into a message a status line can show
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mplacement is region-local fixed point[2m > [22mconverts an atlas point into region millimetres, which atlas-core refuses to do
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mplacement is region-local fixed point[2m > [22mround-trips region millimetres back to atlas metres for a supplied landing mark
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mplacement is region-local fixed point[2m > [22mlands the confirm mark where a turned, scaled region will draw the pose, facing its way
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mplacement is region-local fixed point[2m > [22mproduces whole millimetres, microradians and thousandths
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mplacement is region-local fixed point[2m > [22mkeeps the ground contact inside the supported minimum field of view
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mplacement is region-local fixed point[2m > [22mkeeps yaw non-negative and inside one turn, as the transform bound requires
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mplacement is region-local fixed point[2m > [22mstands at a caller-supplied ground when the frame did not measure one
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mplacement is region-local fixed point[2m > [22mfaces region -Z when the visitor is looking straight down
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mplacement is region-local fixed point[2m > [22mstands an anchored placement at the anchor’s foot, facing the visitor
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mplacement is region-local fixed point[2m > [22mnudges by whole millimetres and keeps every field an integer
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22ma placed catalog object is inspected as what it is[2m > [22mclaims a display record and its reviewed-asset identity, and no source records
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mthe runtime places, moves and animates what a surface already committed[2m > [22mplaces an object under its region, converting fixed point to metres
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mthe runtime places, moves and animates what a surface already committed[2m > [22mgives only material-less geometry a matte fallback that follows world appearance
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mthe runtime places, moves and animates what a surface already committed[2m > [22mapplies yaw and scale from the fixed-point fields
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mthe runtime places, moves and animates what a surface already committed[2m > [22mstill places the object when its behaviour is one this client cannot run, and says why
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mthe runtime places, moves and animates what a surface already committed[2m > [22mrefuses a behaviour at an unreviewed version the same way
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mthe runtime places, moves and animates what a surface already committed[2m > [22mreports a clamped parameter rather than travelling further than declared
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mthe runtime places, moves and animates what a surface already committed[2m > [22mrefuses a region this world does not draw instead of dropping the object silently
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mthe runtime places, moves and animates what a surface already committed[2m > [22mruns on the frame clock in seconds, holds, and resets exactly
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mthe runtime places, moves and animates what a surface already committed[2m > [22mrefuses a control on an object with no runnable motion, in words
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mthe runtime places, moves and animates what a surface already committed[2m > [22mmoves an object to a new authored pose and returns its motion to rest
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mthe runtime places, moves and animates what a surface already committed[2m > [22mdraws an object only where its region’s body is drawn
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mthe runtime places, moves and animates what a surface already committed[2m > [22muses a separate authorized district root and clears its objects when withdrawn
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mthe runtime places, moves and animates what a surface already committed[2m > [22munloads the asset and destroys the entity on remove and on teardown
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mthe runtime places, moves and animates what a surface already committed[2m > [22mreplaces an object placed twice under the same id rather than stacking two
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mthe runtime places, moves and animates what a surface already committed[2m > [22mkeeps the newest same-id placement whichever deferred decode finishes first
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mthe runtime places, moves and animates what a surface already committed[2m > [22mcancels pending-only placement on remove, authority clear, region change and destroy
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mthe runtime places, moves and animates what a surface already committed[2m > [22mreleases representation before entity destruction and keeps refusal local to data view
+ [32m✓[39m packages/atlas-react/test/scene-objects.test.ts[2m > [22mthe runtime places, moves and animates what a surface already committed[2m > [22minvalidates visible changes and requests frames only while bounded motion runs
+ [32m✓[39m packages/atlas-react/test/character-catalog-data.test.ts[2m > [22mcommitted character catalog[2m > [22mis the same document as assets/characters/catalog.json
+ [32m✓[39m packages/atlas-react/test/character-catalog-data.test.ts[2m > [22mcommitted character catalog[2m > [22mvalidates, and names every family, base, material and population it offers
+ [32m✓[39m packages/atlas-react/test/character-catalog-data.test.ts[2m > [22mcommitted character catalog[2m > [22mkeeps every asset key unique and every file one container
+ [32m✓[39m packages/atlas-react/test/character-catalog-data.test.ts[2m > [22mcatalog validation refuses[2m > [22man unknown profile or revision
+ [32m✓[39m packages/atlas-react/test/character-catalog-data.test.ts[2m > [22mcatalog validation refuses[2m > [22ma malformed or oversized container reference
+ [32m✓[39m packages/atlas-react/test/character-catalog-data.test.ts[2m > [22mcatalog validation refuses[2m > [22ma duplicated asset key across entries
+ [32m✓[39m packages/atlas-react/test/character-catalog-data.test.ts[2m > [22mcatalog validation refuses[2m > [22ma part naming an unknown material, slot or morph target
+ [32m✓[39m packages/atlas-react/test/character-catalog-data.test.ts[2m > [22mcatalog validation refuses[2m > [22mtwo parts claiming the same body surface bit
+ [32m✓[39m packages/atlas-react/test/character-catalog-data.test.ts[2m > [22mcatalog validation refuses[2m > [22ma height default outside its range
+ [32m✓[39m packages/atlas-react/test/character-catalog-data.test.ts[2m > [22mcatalog validation refuses[2m > [22ma population weight for a part the base does not have
+ [32m✓[39m packages/atlas-react/test/character-catalog-data.test.ts[2m > [22mcatalog validation refuses[2m > [22ma population draw that could leave a required slot empty
+ [32m✓[39m packages/atlas-react/test/character-catalog-data.test.ts[2m > [22mcatalog validation refuses[2m > [22ma zero or fractional weight
+ [32m✓[39m packages/atlas-react/test/character-catalog-data.test.ts[2m > [22mcatalog validation refuses[2m > [22ma height distribution beyond the base
+ [32m✓[39m packages/atlas-react/test/character-catalog-data.test.ts[2m > [22mdesigned looks[2m > [22mare the same document as assets/characters/looks.json
+ [32m✓[39m packages/atlas-react/test/character-catalog-data.test.ts[2m > [22mdesigned looks[2m > [22mgive every body a default over itself and the player a designed default
+ [32m✓[39m packages/atlas-react/test/character-catalog-data.test.ts[2m > [22mdesigned looks[2m > [22mrefuse a look outside the catalog, a missing body default and a default over the wrong body
+ [32m✓[39m packages/atlas-react/test/google-tiles-environment.test.ts[2m > [22mGoogle tiles environment lifecycle[2m > [22mundoes the PlayCanvas glTF axis conversion before applying ECEF transforms
+ [32m✓[39m packages/atlas-react/test/google-tiles-environment.test.ts[2m > [22mGoogle tiles environment lifecycle[2m > [22mloads only after an explicit view update and tears every runtime resource down
+ [32m✓[39m packages/atlas-react/test/google-tiles-environment.test.ts[2m > [22mGoogle tiles environment lifecycle[2m > [22msupports repeated independent attach and detach without accumulating provider state
+ [32m✓[39m packages/atlas-react/test/google-tiles-environment.test.ts[2m > [22mGoogle tiles environment lifecycle[2m > [22mkeeps additive parent content visible while children refine
+ [32m✓[39m packages/atlas-react/test/google-tiles-environment.test.ts[2m > [22mGoogle tiles environment lifecycle[2m > [22mfails closed when the mocked provider network is unavailable
+ [32m✓[39m packages/atlas-react/test/google-tiles-environment.test.ts[2m > [22mGoogle tiles environment lifecycle[2m > [22mprioritizes nearby region centres instead of source order
+ [32m✓[39m packages/atlas-react/test/google-tiles-environment.test.ts[2m > [22mGoogle tiles environment lifecycle[2m > [22mpreserves the glTF root transform beneath the local-frame wrapper
+[90mstdout[2m | packages/atlas-react/test/binding/create-world-kinds.test.ts[2m > [22m[2mwhat the binding builds for each kind of world[2m > [22m[2mbuilds the same world twice from the same options
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+Powered by PlayCanvas 2.21.4 e287e0c
+Powered by PlayCanvas 2.21.4 e287e0c
+Powered by PlayCanvas 2.21.4 e287e0c
+Powered by PlayCanvas 2.21.4 e287e0c
+Powered by PlayCanvas 2.21.4 e287e0c
+Powered by PlayCanvas 2.21.4 e287e0c
+Powered by PlayCanvas 2.21.4 e287e0c
+Powered by PlayCanvas 2.21.4 e287e0c
+Powered by PlayCanvas 2.21.4 e287e0c
+Powered by PlayCanvas 2.21.4 e287e0c
+Powered by PlayCanvas 2.21.4 e287e0c
+Powered by PlayCanvas 2.21.4 e287e0c
+Powered by PlayCanvas 2.21.4 e287e0c
+Powered by PlayCanvas 2.21.4 e287e0c
+Powered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/binding/create-world-kinds.test.ts[2m > [22mwhat the binding builds for each kind of world[2m > [22mbuilds authored-and-google as pinned
+ [32m✓[39m packages/atlas-react/test/binding/create-world-kinds.test.ts[2m > [22mwhat the binding builds for each kind of world[2m > [22mbuilds the same world twice from the same options[33m 328[2mms[22m[39m
+ [32m✓[39m packages/atlas-react/test/binding/create-world-kinds.test.ts[2m > [22mwhat the binding builds for each kind of world[2m > [22mrefuses a generated tile beside an owned district, and an authored region over either
+ [32m✓[39m packages/atlas-react/test/physical-residency.test.ts[2m > [22mphysical residency execution[2m > [22mfetches, decodes, uploads, publishes, downgrades, and disposes in order
+ [32m✓[39m packages/atlas-react/test/physical-residency.test.ts[2m > [22mphysical residency execution[2m > [22mnever publishes a stale fetch even when the transport resolves after cancellation
+ [32m✓[39m packages/atlas-react/test/physical-residency.test.ts[2m > [22mphysical residency execution[2m > [22mkeeps missing, unavailable, unsupported, and deleted states distinct
+ [32m✓[39m packages/atlas-react/test/physical-residency.test.ts[2m > [22mphysical residency execution[2m > [22mreuploads retained decoded data after context restore and requires the Index on failure
+ [32m✓[39m packages/atlas-react/test/physical-residency.test.ts[2m > [22mauthenticated asset range observation[2m > [22mkeeps the bearer out of the URL and records an honored partial response
+ [32m✓[39m packages/atlas-react/test/physical-residency.test.ts[2m > [22mauthenticated asset range observation[2m > [22muses the account cookie without sending an explicit empty bearer
+ [32m✓[39m packages/atlas-react/test/physical-residency.test.ts[2m > [22mauthenticated asset range observation[2m > [22mreports a server that ignored Range instead of claiming streaming
+ [32m✓[39m packages/atlas-react/test/depth-surface.test.ts[2m > [22mdepthSurfaceIndices[2m > [22mjoins every neighbouring cell of a continuous surface into two triangles
+ [32m✓[39m packages/atlas-react/test/depth-surface.test.ts[2m > [22mdepthSurfaceIndices[2m > [22mnever lets a near sample and a far one share surface, keeping them as seams instead
+ [32m✓[39m packages/atlas-react/test/depth-surface.test.ts[2m > [22mdepthSurfaceIndices[2m > [22mkeeps a gentle slope and cuts just past the documented ratio
+ [32m✓[39m packages/atlas-react/test/depth-surface.test.ts[2m > [22mdepthSurfaceIndices[2m > [22mleaves a hole where the model gave no sample, such as the sky
+ [32m✓[39m packages/atlas-react/test/depth-surface.test.ts[2m > [22mdepthSurfaceIndices[2m > [22mfills a ragged band of empty cells with seams between the real samples on either side
+ [32m✓[39m packages/atlas-react/test/depth-surface.test.ts[2m > [22mdepthSurfaceIndices[2m > [22mleaves a gap wider than the bridge limit empty, as the sky is
+ [32m✓[39m packages/atlas-react/test/depth-surface.test.ts[2m > [22mdepthSurfaceIndices[2m > [22mdraws points instead for a file that is not a single photograph’s grid
+ [32m✓[39m packages/atlas-react/test/endless-authored-ground.test.ts[2m > [22mthe float32 limit the supported radius is taken from[2m > [22mstill resolves one millimetre at the supported radius and stops resolving it past there
+ [32m✓[39m packages/atlas-react/test/endless-authored-ground.test.ts[2m > [22mthe float32 limit the supported radius is taken from[2m > [22mmeasures the step the drawn position rounds to across the walk
+ [32m✓[39m packages/atlas-react/test/endless-authored-ground.test.ts[2m > [22mthe float32 limit the supported radius is taken from[2m > [22mnever rebases the render origin in a world whose scene holds no regions
+ [32m✓[39m packages/atlas-react/test/endless-authored-ground.test.ts[2m > [22mthe walking surface an authored ground states[2m > [22manswers everywhere out to the supported radius
+ [32m✓[39m packages/atlas-react/test/endless-authored-ground.test.ts[2m > [22mthe walking surface an authored ground states[2m > [22manswers on a circle, not a square, so no direction runs further than another
+ [32m✓[39m packages/atlas-react/test/endless-authored-ground.test.ts[2m > [22mthe walking surface an authored ground states[2m > [22mcarries the stated elevation rather than assuming zero
+ [32m✓[39m packages/atlas-react/test/endless-authored-ground.test.ts[2m > [22mthe walking surface an authored ground states[2m > [22mleaves a ground that really has edges exactly where its edges are
+ [32m✓[39m packages/atlas-react/test/endless-authored-ground.test.ts[2m > [22mthe field an endless authored ground admits[2m > [22mreplaces the empty-scene floor that was the second wall behind the sampler
+ [32m✓[39m packages/atlas-react/test/endless-authored-ground.test.ts[2m > [22mthe field an endless authored ground admits[2m > [22mkeeps every reachable point inside the surface the ground answers for
+ [32m✓[39m packages/atlas-react/test/endless-authored-ground.test.ts[2m > [22mwalking out of the old starter world[2m > [22mbounces at 24 metres on the ground module version 1 still states
+ [32m✓[39m packages/atlas-react/test/endless-authored-ground.test.ts[2m > [22mwalking out of the old starter world[2m > [22mwalks the whole supported radius on an endless ground without being returned[33m 351[2mms[22m[39m
+ [32m✓[39m packages/atlas-react/test/endless-authored-ground.test.ts[2m > [22mwalking out of the old starter world[2m > [22mresists through the last stretch and then returns, naming the field rather than the ground
+ [32m✓[39m packages/atlas-react/test/native-character-runtime.test.ts[2m > [22mnative residency and current permission[2m > [22mdraws the nearest people in full up to the measured budget, the rest in far form, and releases an old branch
+ [32m✓[39m packages/atlas-react/test/character-look.test.ts[2m > [22mdeterministic inhabitant looks[2m > [22mreproduces the shared draw vectors the backend also reads
+ [32m✓[39m packages/atlas-react/test/character-look.test.ts[2m > [22mdeterministic inhabitant looks[2m > [22mgives an identity the same look and the same renderable bytes every time
+ [32m✓[39m packages/atlas-react/test/character-look.test.ts[2m > [22mdeterministic inhabitant looks[2m > [22mignores society, branch and every other field of the identity
+ [32m✓[39m packages/atlas-react/test/character-look.test.ts[2m > [22mdeterministic inhabitant looks[2m > [22mspreads a thousand inhabitants across every body, garment, hairstyle, skin and height
+ [32m✓[39m packages/atlas-react/test/character-look.test.ts[2m > [22mexact integer draws[2m > [22mcomputes integer square roots exactly at the edges
+ [32m✓[39m packages/atlas-react/test/character-look.test.ts[2m > [22mexact integer draws[2m > [22mkeeps triangular draws inside the range and weighted draws independent of key order
+ [32m✓[39m packages/atlas-react/test/character-look.test.ts[2m > [22mlook validation and description[2m > [22mrefuses a look that is not exactly a recipe over its catalog
+ [32m✓[39m packages/atlas-react/test/character-look.test.ts[2m > [22mlook validation and description[2m > [22mdescribes a near person with every container and a far person with none
+ [32m✓[39m packages/atlas-react/test/native-character-runtime.test.ts[2m > [22mnative residency and current permission[2m > [22mhands a full place to someone nearer only for a clear gain, wearing their latest appearance
+ [32m✓[39m packages/atlas-react/test/native-character-runtime.test.ts[2m > [22mnative residency and current permission[2m > [22mrestores fallback on withdrawal and hides both representations on denied or failed presence checks
+ [32m✓[39m packages/atlas-react/test/native-character-runtime.test.ts[2m > [22mnative residency and current permission[2m > [22mdoes not restore a native instance automatically when a withdrawn source becomes available again
+ [32m✓[39m packages/atlas-react/test/native-character-runtime.test.ts[2m > [22mnative resident subscriptions[2m > [22mstarts with an immutable current snapshot and ignores pose, visibility and order changes
+ [32m✓[39m packages/atlas-react/test/native-character-runtime.test.ts[2m > [22mnative resident subscriptions[2m > [22mnotifies after the entire mutation and permits immediate installation, including replacement at the same identity
+ [32m✓[39m packages/atlas-react/test/native-character-runtime.test.ts[2m > [22mnative resident subscriptions[2m > [22munsubscribes repeated callbacks independently
+ [32m✓[39m packages/atlas-react/test/native-character-runtime.test.ts[2m > [22mnative resident subscriptions[2m > [22mstops dispatch when a listener destroys the runtime and stays quiet afterward
+ [32m✓[39m packages/atlas-react/test/native-character-runtime.test.ts[2m > [22mnative resident subscriptions[2m > [22mhands its byte authority to the catalog people of the same application
+ [32m✓[39m packages/atlas-react/test/representation-binding.test.ts[2m > [22mPlayCanvas representation binding[2m > [22minherits existing ancestor visibility without changing the hierarchy
+ [32m✓[39m packages/atlas-react/test/representation-binding.test.ts[2m > [22mPlayCanvas representation binding[2m > [22msamples exact finite mesh vertices in the borrowed frame
+ [32m✓[39m packages/atlas-react/test/representation-binding.test.ts[2m > [22mPlayCanvas representation binding[2m > [22mfills sparse triangle surfaces with bounded deterministic presentation samples[33m 304[2mms[22m[39m
+ [32m✓[39m packages/atlas-react/test/representation-binding.test.ts[2m > [22mPlayCanvas representation binding[2m > [22mmeasures the surface a sampled draw would cover, and the mesh's own extent
+ [32m✓[39m packages/atlas-react/test/representation-binding.test.ts[2m > [22mPlayCanvas representation binding[2m > [22mbounds retained address sampling by the retained buffer, not by triangle sampling
+ [32m✓[39m packages/atlas-react/test/representation-binding.test.ts[2m > [22mPlayCanvas representation binding[2m > [22mprojects explicit-frame bounds through the existing node transform
+ [32m✓[39m packages/atlas-react/test/representation-binding.test.ts[2m > [22mPlayCanvas representation binding[2m > [22mclones a standard material for blending and restores every borrowed state
+ [32m✓[39m packages/atlas-react/test/representation-binding.test.ts[2m > [22mPlayCanvas representation binding[2m > [22masks for points in proportion to the surface it samples
+ [32m✓[39m packages/atlas-react/test/representation-binding.test.ts[2m > [22mPlayCanvas representation binding[2m > [22mkeeps one object-wide point allowance and rolls back a partial group allocation
+ [32m✓[39m packages/atlas-react/test/representation-binding.test.ts[2m > [22mPlayCanvas representation binding[2m > [22mrefuses skinned, morphing, non-standard and oversized draws
+ [32m✓[39m packages/atlas-react/test/representation-binding.test.ts[2m > [22mPlayCanvas representation binding[2m > [22mvalidates current subject records atomically before changing rights or metadata
+ [32m✓[39m packages/atlas-react/test/data-view/external-registration.test.ts[2m > [22mexternal representation subjects[2m > [22mnotifies selection clearing when intent or refresh discovers changed availability
+ [32m✓[39m packages/atlas-react/test/data-view/external-registration.test.ts[2m > [22mexternal representation subjects[2m > [22mregisters each owned-district building as metadata and clears selection on withdrawal
+ [32m✓[39m packages/atlas-react/test/data-view/external-registration.test.ts[2m > [22mexternal representation subjects[2m > [22mregisters a caller's own draw under the same rules, and places its box through the node
+ [32m✓[39m packages/atlas-react/test/data-view/external-registration.test.ts[2m > [22mexternal representation subjects[2m > [22mrefuses a boxless subject a box, and refuses the whole set when one entry is wrong
+ [32m✓[39m packages/atlas-react/test/data-view/external-registration.test.ts[2m > [22mexternal representation subjects[2m > [22munregisters by itself when the node it was registered against is destroyed
+ [32m✓[39m packages/atlas-react/test/data-view/external-registration.test.ts[2m > [22mexternal representation subjects[2m > [22mrolls back default and frame bookkeeping when registry insertion throws
+ [32m✓[39m packages/atlas-react/test/python-writer.test.ts[2m > [22ma point map written by the Python reconstruction path[2m > [22mdecodes with this binding, with no special case for who wrote it
+ [32m✓[39m packages/atlas-react/test/python-writer.test.ts[2m > [22ma point map written by the Python reconstruction path[2m > [22mtakes the zero-copy path, which is the whole reason the writer packs the way it does
+ [32m✓[39m packages/atlas-react/test/python-writer.test.ts[2m > [22ma point map written by the Python reconstruction path[2m > [22mexposes the three sections as views the engine can upload without touching a point
+ [32m✓[39m packages/atlas-react/test/python-writer.test.ts[2m > [22ma point map written by the Python reconstruction path[2m > [22mcarries a flags channel the Python writer filled and left every reserved bit of at zero
+ [32m✓[39m packages/atlas-react/test/python-writer.test.ts[2m > [22ma point map written by the Python reconstruction path[2m > [22mreads a world in this binding's own frame: up is +Y and the camera looks down -Z
+ [32m✓[39m packages/atlas-react/test/python-writer.test.ts[2m > [22ma point map written by the Python reconstruction path[2m > [22mhas a footprint the layout solver can be given
+ [32m✓[39m packages/atlas-react/test/generated-tile-look.test.ts[2m > [22mgenerated tile look descriptor[2m > [22mvalidates version 1, carries an id and a version, and is frozen
+ [32m✓[39m packages/atlas-react/test/generated-tile-look.test.ts[2m > [22mgenerated tile look descriptor[2m > [22mholds fog onset to the architecture target of 40 to 60 m
+ [32m✓[39m packages/atlas-react/test/generated-tile-look.test.ts[2m > [22mgenerated tile look descriptor[2m > [22mhas no switch that turns the probe or the contact shadowing off
+ [32m✓[39m packages/atlas-react/test/generated-tile-look.test.ts[2m > [22mgenerated tile look descriptor[2m > [22mrefuses unknown keys, missing keys, wrong kinds and out-of-range values anywhere
+ [32m✓[39m packages/atlas-react/test/generated-tile-look.test.ts[2m > [22mgenerated tile look descriptor[2m > [22mkeeps the height map off unless parallax is on
+ [32m✓[39m packages/atlas-react/test/generated-tile-look.test.ts[2m > [22mgenerated tile look descriptor[2m > [22mreturns a copy, so the caller cannot change a validated look
+ [32m✓[39m packages/atlas-react/test/generated-tile-look.test.ts[2m > [22mgenerated tile look descriptor[2m > [22mpoints the sun down and toward its azimuth
+ [32m✓[39m packages/atlas-react/test/semantics.test.ts[2m > [22mper-point semantic state[2m > [22mnever treats a person as geometry
+ [32m✓[39m packages/atlas-react/test/semantics.test.ts[2m > [22mper-point semantic state[2m > [22mmarks proposed segments as unconfirmed and asserted surface as not
+ [32m✓[39m packages/atlas-react/test/semantics.test.ts[2m > [22mper-point semantic state[2m > [22mnever calls reconstructed geometry capture-supported
+ [32m✓[39m packages/atlas-react/test/semantics.test.ts[2m > [22mper-point semantic state[2m > [22mkeeps the four provenance classes visually distinct rather than collapsing them
+ [32m✓[39m packages/atlas-react/test/semantics.test.ts[2m > [22mper-point semantic state[2m > [22mcarries confidence as a per-segment floor the shader multiplies into per-point alpha
+ [32m✓[39m packages/atlas-react/test/semantics.test.ts[2m > [22mper-point semantic state[2m > [22mignores segment ids outside the uniform table rather than writing past it
+ [32m✓[39m packages/atlas-react/test/google-tiles-provider.test.ts[2m > [22mGoogle tiles provider admission[2m > [22madmits only exact official HTTPS 3D Tiles URLs
+ [32m✓[39m packages/atlas-react/test/google-tiles-provider.test.ts[2m > [22mGoogle tiles provider admission[2m > [22mpropagates the root session and key without exposing either in failures
+ [32m✓[39m packages/atlas-react/test/google-tiles-provider.test.ts[2m > [22mGoogle tiles provider admission[2m > [22muses ordinary HTTP caching and never requests offline persistence or prefetch
+ [32m✓[39m packages/atlas-react/test/character-digest.test.ts[2m > [22msynchronous SHA-256[2m > [22mreproduces the standard vectors
+ [32m✓[39m packages/atlas-react/test/character-digest.test.ts[2m > [22msynchronous SHA-256[2m > [22magrees with the platform across every padding boundary
+ [32m✓[39m packages/atlas-react/test/character-digest.test.ts[2m > [22msynchronous SHA-256[2m > [22mhashes only the viewed bytes of a subarray
+ [32m✓[39m packages/atlas-react/test/character-digest.test.ts[2m > [22mcanonical JSON[2m > [22msorts keys at every depth and writes no whitespace
+ [32m✓[39m packages/atlas-react/test/character-digest.test.ts[2m > [22mcanonical JSON[2m > [22mescapes quotes and backslashes the way the backend does
+ [32m✓[39m packages/atlas-react/test/character-digest.test.ts[2m > [22mcanonical JSON[2m > [22mmatches the backend bytes and digest of the same value
+ [32m✓[39m packages/atlas-react/test/character-digest.test.ts[2m > [22mcanonical JSON[2m > [22mrefuses anything that could serialise two ways
+ [32m✓[39m packages/atlas-react/test/player-camera.test.ts[2m > [22mplayer camera presentation[2m > [22mframes an owned district from its actual translated bounds
+ [32m✓[39m packages/atlas-react/test/player-camera.test.ts[2m > [22mplayer camera presentation[2m > [22mswitches without mutating player pose
+ [32m✓[39m packages/atlas-react/test/player-camera.test.ts[2m > [22mplayer camera presentation[2m > [22mshortens the boom before a building behind the player
+ [32m✓[39m packages/atlas-react/test/player-camera.test.ts[2m > [22mplayer camera presentation[2m > [22maims at the body rather than over its head
+ [32m✓[39m packages/atlas-react/test/player-camera.test.ts[2m > [22mplayer camera presentation[2m > [22mcarries a raised ground plane through to the aim line
+ [32m✓[39m packages/atlas-react/test/player-camera.test.ts[2m > [22mplayer camera presentation[2m > [22mkeeps the camera above visible ground when looking up
+ [32m✓[39m packages/atlas-react/test/player-camera.test.ts[2m > [22mplayer camera presentation[2m > [22mcollapses against an obstruction at once and reaches back out over time
+ [32m✓[39m packages/atlas-react/test/player-camera.test.ts[2m > [22mplayer camera presentation[2m > [22mkeeps the boom rigid under reduced motion
+ [32m✓[39m packages/atlas-react/test/player-camera.test.ts[2m > [22mplayer camera presentation[2m > [22moffers an over-the-shoulder offset without it being on
+ [32m✓[39m packages/atlas-react/test/player-camera.test.ts[2m > [22mplayer camera presentation[2m > [22mnever drives the boom inside the body, and says when the player is in the way
+ [32m✓[39m packages/atlas-react/test/player-camera.test.ts[2m > [22mplayer camera presentation[2m > [22mkeeps the player drawn at the closest framing the product offers
+ [32m✓[39m packages/atlas-react/test/region-relief.test.ts[2m > [22mthe relief a region shows on the Map[2m > [22mbins over the extent the geometry occupies, not a disc around the origin
+ [32m✓[39m packages/atlas-react/test/region-relief.test.ts[2m > [22mthe relief a region shows on the Map[2m > [22mleaves an unobserved cell empty rather than filling it with a zero height
+ [32m✓[39m packages/atlas-react/test/region-relief.test.ts[2m > [22mthe relief a region shows on the Map[2m > [22mdrops points the map itself marked as barely sampled
+ [32m✓[39m packages/atlas-react/test/region-relief.test.ts[2m > [22mthe relief a region shows on the Map[2m > [22mcarries the mean height and the mean support of the samples in a cell
+ [32m✓[39m packages/atlas-react/test/region-relief.test.ts[2m > [22mthe relief a region shows on the Map[2m > [22mreports nothing for a map with no extent rather than dividing by zero
+ [32m✓[39m packages/atlas-react/test/native-character.test.ts[2m > [22mnative character boundaries[2m > [22mrequires the exact named source rig and all three calibrated clips
+ [32m✓[39m packages/atlas-react/test/native-character.test.ts[2m > [22mnative character boundaries[2m > [22mrejects appearance fields outside asset metadata
+ [32m✓[39m packages/atlas-react/test/native-character.test.ts[2m > [22mnative character boundaries[2m > [22muses resolved displacement, with no walking into a wall or gait on discontinuity
+ [32m✓[39m packages/atlas-react/test/native-character.test.ts[2m > [22mnative character boundaries[2m > [22mfails closed on presence while unavailable source permits only fallback
+ [32m✓[39m packages/atlas-react/test/native-character.test.ts[2m > [22mpinned shared character bundle[2m > [22mshares one load, isolates cancellation, and unloads only the final lease
+ [32m✓[39m packages/atlas-react/test/native-character.test.ts[2m > [22mpinned shared character bundle[2m > [22mrejects wrong bytes and conflicting reference metadata
+ [32m✓[39m packages/atlas-react/test/native-character.test.ts[2m > [22mpinned shared character bundle[2m > [22mdestroys pending work without publishing a container
+ [32m✓[39m packages/atlas-react/test/binding/world-kind.test.ts[2m > [22mdescribeWorldKind[2m > [22mdescribes every combination the app passes
+ [32m✓[39m packages/atlas-react/test/binding/world-kind.test.ts[2m > [22mdescribeWorldKind[2m > [22mreads a Google configuration as off unless it is switched on with a key
+ [32m✓[39m packages/atlas-react/test/binding/world-kind.test.ts[2m > [22mdescribeWorldKind[2m > [22mcarries the ground it names, so nothing downstream reads the options again
+ [32m✓[39m packages/atlas-react/test/binding/world-kind.test.ts[2m > [22mdescribeWorldKind[2m > [22mrefuses the two combinations no world can be, by name
+ [32m✓[39m packages/atlas-react/test/binding/world-kind.test.ts[2m > [22mwhere the world kind is read[2m > [22mis never in the binding
+ [32m✓[39m packages/atlas-react/test/binding/world-kind.test.ts[2m > [22mwhere the world kind is read[2m > [22mis in the one module that decides it (the control: the scan does find a kind read)
+ [32m✓[39m packages/atlas-react/test/scene-splats.test.ts[2m > [22mnative authenticated trained scene boundary[2m > [22maccepts exact pinned compressor output with streamed STORE descriptors
+ [32m✓[39m packages/atlas-react/test/scene-splats.test.ts[2m > [22mnative authenticated trained scene boundary[2m > [22mrejects missing textures before native parsing can make unauthenticated subrequests
+ [32m✓[39m packages/atlas-react/test/scene-splats.test.ts[2m > [22mnative authenticated trained scene boundary[2m > [22mrefuses truncated archives, bad descriptors, and non-affine transforms
+ [32m✓[39m packages/atlas-react/test/scene-splats.test.ts[2m > [22mnative authenticated trained scene boundary[2m > [22msupplies verified bytes in memory to the native gsplat loader and keeps them owned until disposal
+ [32m✓[39m packages/atlas-react/test/scene-splats.test.ts[2m > [22mnative authenticated trained scene boundary[2m > [22mremoves failed native resources and never invokes the loader for an invalid bundle
+ [32m✓[39m packages/atlas-react/test/point-shader-single-view.test.ts[2m > [22msingle-view relief[2m > [22mdeclares the same four uniforms on both graphics paths
+ [32m✓[39m packages/atlas-react/test/point-shader-single-view.test.ts[2m > [22msingle-view relief[2m > [22mflattens along the camera rays and keeps the frame on both paths, each behind its switch
+ [32m✓[39m packages/atlas-react/test/point-shader-single-view.test.ts[2m > [22msingle-view relief[2m > [22mpaints the back of the print one card colour, with nothing per point left on it
+ [32m✓[39m packages/atlas-react/test/point-shader-single-view.test.ts[2m > [22msingle-view relief[2m > [22mbounds the parallax over a range the renderer documents
+ [32m✓[39m packages/atlas-react/test/point-shader-single-view.test.ts[2m > [22mreliefFor[2m > [22mkeeps the full relief while the parallax stays within the limit
+ [32m✓[39m packages/atlas-react/test/point-shader-single-view.test.ts[2m > [22mreliefFor[2m > [22mflattens exactly enough to hold the parallax at the limit, from any direction
+ [32m✓[39m packages/atlas-react/test/point-shader-single-view.test.ts[2m > [22mreliefFor[2m > [22mis a flat print with no parallax at all from far away
+ [32m✓[39m packages/atlas-react/test/point-shader-single-view.test.ts[2m > [22mreliefFor[2m > [22mis the back of the print from anywhere beyond its plane
+ [32m✓[39m packages/atlas-react/test/nyc-semantic-overlay.test.ts[2m > [22mindependent NYC Open Data semantic geometry[2m > [22mconverts pinned CRS84 integers into the reference local east/south frame
+ [32m✓[39m packages/atlas-react/test/nyc-semantic-overlay.test.ts[2m > [22mindependent NYC Open Data semantic geometry[2m > [22mselects only the independent footprint and its stable identity
+ [32m✓[39m packages/atlas-react/test/nyc-semantic-overlay.test.ts[2m > [22mindependent NYC Open Data semantic geometry[2m > [22mhas no Google tile object in its input or selection contract
+ [32m✓[39m packages/atlas-react/test/nyc-semantic-overlay.test.ts[2m > [22mindependent NYC Open Data semantic geometry[2m > [22mbuilds only exact closed line edges for a concave exterior and its hole
+ [32m✓[39m packages/atlas-react/test/character-budget.test.ts[2m > [22mthe near character budget[2m > [22mis the largest measured count whose frame work stays within half a 60 Hz frame on a quiet machine
+ [32m✓[39m packages/atlas-react/test/character-foundation.test.ts[2m > [22mcontinuous shared character foundation[2m > [22mquickly turns toward camera-relative forward travel
+ [32m✓[39m packages/atlas-react/test/character-foundation.test.ts[2m > [22mcontinuous shared character foundation[2m > [22mfaces live camera-relative intent while integrated velocity catches up
+ [32m✓[39m packages/atlas-react/test/character-foundation.test.ts[2m > [22mcontinuous shared character foundation[2m > [22mturns toward backward intent instead of displaying a forward-running body
+ [32m✓[39m packages/atlas-react/test/character-foundation.test.ts[2m > [22mcontinuous shared character foundation[2m > [22mproduces a single closed connected skin with finite normals at both detail levels[33m 1161[2mms[22m[39m
+ [32m✓[39m packages/atlas-react/test/character-foundation.test.ts[2m > [22mcontinuous shared character foundation[2m > [22mkeeps contact ankles fixed in world space through acceleration, curves, running and stopping across body presets
+ [32m✓[39m packages/atlas-react/test/character-foundation.test.ts[2m > [22mcontinuous shared character foundation[2m > [22mkeeps deformed foot soles finite and near ground when stopped
+ [32m✓[39m packages/atlas-react/test/character-foundation.test.ts[2m > [22mcontinuous shared character foundation[2m > [22mkeeps synthetic presets stable under sorting and population capping
+ [32m✓[39m packages/atlas-react/test/source-presentation.test.ts[2m > [22ma session opens looking at the ground, not above it[2m > [22mnever pitches the opening camera up
+ [32m✓[39m packages/atlas-react/test/source-presentation.test.ts[2m > [22marrival at a reconstructed region[2m > [22mstarts where the first photograph was taken and looks where that camera looked
+ [32m✓[39m packages/atlas-react/test/source-presentation.test.ts[2m > [22marrival at a reconstructed region[2m > [22mkeeps the offset framing for regions without a recovered viewing direction
+ [32m✓[39m packages/atlas-react/test/source-presentation.test.ts[2m > [22mresidency of a region with many placed point maps[2m > [22mlets one region always afford its full stage while several still compete
+ [32m✓[39m packages/atlas-react/test/google-tiles-residency.test.ts[2m > [22mGoogle tile runtime bounds[2m > [22mbounds concurrency and cancels queued and active work on disposal
+ [32m✓[39m packages/atlas-react/test/google-tiles-residency.test.ts[2m > [22mGoogle tile runtime bounds[2m > [22mevicts least-recent runtime resources by count and bytes
+ [32m✓[39m packages/atlas-react/test/google-tiles-residency.test.ts[2m > [22mGoogle tile runtime bounds[2m > [22mrejects a single resource larger than the runtime budget
+ [32m✓[39m packages/atlas-react/test/residency-occupancy.test.ts[2m > [22mresidencyFrameInputs[2m > [22mcarries the occupied region into the view
+ [32m✓[39m packages/atlas-react/test/residency-occupancy.test.ts[2m > [22mresidencyFrameInputs[2m > [22mreplans on a region crossing inside one neighborhood at unchanged tiers
+ [32m✓[39m packages/atlas-react/test/residency-occupancy.test.ts[2m > [22mresidencyFrameInputs[2m > [22mdoes not replan when nothing spatial changed
+ [32m✓[39m packages/atlas-react/test/residency-occupancy.test.ts[2m > [22ma trained scene under representation pressure[2m > [22mkeeps drawing the region the visitor stands in at pressure level 3
+ [32m✓[39m packages/atlas-react/test/residency-occupancy.test.ts[2m > [22ma trained scene under representation pressure[2m > [22mstill stubs every region once the visitor is between them
+ [32m✓[39m packages/atlas-react/test/frame-policy.test.ts[2m > [22mframe policy[2m > [22mdraws whenever the camera has moved
+ [32m✓[39m packages/atlas-react/test/frame-policy.test.ts[2m > [22mframe policy[2m > [22mdraws while direct travel owns the camera
+ [32m✓[39m packages/atlas-react/test/frame-policy.test.ts[2m > [22mframe policy[2m > [22mdraws for a change no pose reports, such as a profile or Map swap
+ [32m✓[39m packages/atlas-react/test/frame-policy.test.ts[2m > [22mframe policy[2m > [22mskips an identical frame on a still camera
+ [32m✓[39m packages/atlas-react/test/frame-policy.test.ts[2m > [22mframe policy[2m > [22mkeeps ambient motion running at the idle cadence
+ [32m✓[39m packages/atlas-react/test/frame-policy.test.ts[2m > [22mframe policy[2m > [22mstill ticks over when reduced motion has stilled the world
+ [32m✓[39m packages/atlas-react/test/frame-policy.test.ts[2m > [22mframe policy[2m > [22mdraws before anything has ever been drawn
+ [32m✓[39m packages/atlas-react/test/motes.test.ts[2m > [22mwhat gets a mote[2m > [22mnever gives a person one, because that would be a person in world geometry
+ [32m✓[39m packages/atlas-react/test/motes.test.ts[2m > [22mwhat gets a mote[2m > [22mgives one to every kind that is world content
+ [32m✓[39m packages/atlas-react/test/motes.test.ts[2m > [22mwhat gets a mote[2m > [22muses a different hard silhouette for every world-content kind
+ [32m✓[39m packages/atlas-react/test/motes.test.ts[2m > [22mwhat gets a mote[2m > [22mdraws a mote with a hard silhouette rather than a fade
+ [32m✓[39m packages/atlas-react/test/interaction-affordance.test.ts[2m > [22mthe staged world interaction affordance[2m > [22mdraws no interface when the reticle has no candidate
+ [32m✓[39m packages/atlas-react/test/interaction-affordance.test.ts[2m > [22mthe staged world interaction affordance[2m > [22mshows only the sigil while focus dwell is still settling
+ [32m✓[39m packages/atlas-react/test/interaction-affordance.test.ts[2m > [22mthe staged world interaction affordance[2m > [22mshows the distance sigil before the interactable enters the aim cone
+ [32m✓[39m packages/atlas-react/test/interaction-affordance.test.ts[2m > [22mthe staged world interaction affordance[2m > [22mshows only the key when the settled target is not yet close
+ [32m✓[39m packages/atlas-react/test/interaction-affordance.test.ts[2m > [22mthe staged world interaction affordance[2m > [22mexpands to the full verb at the authored close-approach distance
+ [32m✓[39m packages/atlas-react/test/interaction-affordance.test.ts[2m > [22mthe staged world interaction affordance[2m > [22mnever labels a stale incumbent after the reticle chooses another candidate
+ [32m✓[39m packages/atlas-react/test/data-view/generated-subjects-city-v2.test.ts[2m > [22mgenerated subject contract v2 over real city containers[2m > [22mreads fields whose shape is the same in every version on its list
+ [32m✓[39m packages/atlas-react/test/data-view/generated-subjects-city-v2.test.ts[2m > [22mgenerated subject contract v2 over real city containers[2m > [22mreads exactly the city grammar versions the tessellator reads
+ [32m✓[39m packages/atlas-react/test/data-view/generated-subjects-city-v2.test.ts[2m > [22mgenerated subject contract v2 over real city containers[2m > [22mreads tess's owd/3 development golden: every owned drawn record a subject, every halo record none
+ [32m✓[39m packages/atlas-react/test/data-view/generated-subjects-city-v2.test.ts[2m > [22mgenerated subject contract v2 over real city containers[2m > [22mreads the city v2 fixture tile baked by tess, and lists every dressing under a subject that exists[33m 2644[2mms[22m[39m
+ [32m✓[39m packages/atlas-react/test/district-surfaces.test.ts[2m > [22msource-preserving district surfaces[2m > [22mpreserves courtyard area regardless of winding
+ [32m✓[39m packages/atlas-react/test/district-surfaces.test.ts[2m > [22msource-preserving district surfaces[2m > [22mdoes not fill a concave missing corner
+ [32m✓[39m packages/atlas-react/test/district-surfaces.test.ts[2m > [22msource-preserving district surfaces[2m > [22mhits courtyard walls and rejects rays above the mass
+ [32m✓[39m packages/atlas-react/test/binding/atmosphere.test.ts[2m > [22mthe two looks[2m > [22mare the composed world's and the city's, as data
+ [32m✓[39m packages/atlas-react/test/binding/atmosphere.test.ts[2m > [22mthe two looks[2m > [22mis chosen by city scale alone
+ [32m✓[39m packages/atlas-react/test/binding/atmosphere.test.ts[2m > [22mwhere the binding sets its light and air[2m > [22mis never in the binding itself
+ [32m✓[39m packages/atlas-react/test/binding/atmosphere.test.ts[2m > [22mwhere the binding sets its light and air[2m > [22mis in the atmosphere module (the control: the scan does find a call)
+ [32m✓[39m packages/atlas-react/test/character-choices.test.ts[2m > [22mcharacter choices[2m > [22mdress an unchosen player in the designed default and keep choices per application
+ [32m✓[39m packages/atlas-react/test/character-choices.test.ts[2m > [22mcharacter choices[2m > [22mtell only the subject whose look changed, until it stops listening
+ [32m✓[39m packages/atlas-react/test/google-tiles-frame.test.ts[2m > [22mGoogle geographic display frame[2m > [22mround trips a local metre offset without changing source geography
+ [32m✓[39m packages/atlas-react/test/google-tiles-frame.test.ts[2m > [22mGoogle geographic display frame[2m > [22mconverts ECEF translation to small local values before rendering
+ [32m✓[39m packages/atlas-react/test/google-tiles-frame.test.ts[2m > [22mGoogle geographic display frame[2m > [22mrebases only transient renderer coordinates
+ [32m✓[39m packages/atlas-react/test/source-media.test.ts[2m > [22msource-only Atlas regions[2m > [22muses explicit authorized topology sources without inventing occurrence anchors
+ [32m✓[39m packages/atlas-react/test/generated-tile-obstruction-rings.test.ts[2m > [22mcarrying a tile's route obstruction rings[2m > [22mnames the record the ring came from, because a run record binds identities and not shapes
+ [32m✓[39m packages/atlas-react/test/generated-tile-obstruction-rings.test.ts[2m > [22mcarrying a tile's route obstruction rings[2m > [22mputs the ring in the renderer's frame: x east in metres, z south, flat at the datum
+ [32m✓[39m packages/atlas-react/test/generated-tile-obstruction-rings.test.ts[2m > [22mcarrying a tile's route obstruction rings[2m > [22mrefuses a region that bounds nothing, and says so rather than thinning the set silently
+ [32m✓[39m packages/atlas-react/test/generated-tile-obstruction-rings.test.ts[2m > [22mcarrying a tile's route obstruction rings[2m > [22mrefuses a region that names no record, since an id that names nothing cannot be bound
+ [32m✓[39m packages/atlas-react/test/generated-tile-obstruction-rings.test.ts[2m > [22mcarrying a tile's route obstruction rings[2m > [22mcarries every ring a tile states, in the order the tile states them
+ [32m✓[39m packages/atlas-react/test/google-tiles-config.test.ts[2m > [22mGoogle tiles configuration[2m > [22muses the one independently chosen NYC reference frame
+ [32m✓[39m packages/atlas-react/test/google-tiles-config.test.ts[2m > [22mGoogle tiles configuration[2m > [22mrequires both the explicit feature flag and a key
+ [32m✓[39m packages/atlas-react/test/google-tiles-config.test.ts[2m > [22mGoogle tiles configuration[2m > [22mdoes not enable approximate truthy flag values
+ [32m✓[39m packages/atlas-react/test/society-presentation.test.ts[2m > [22mpersisted society path display[2m > [22mfollows a corner instead of cutting through the enclosed building
+ [32m✓[39m packages/atlas-react/test/society-presentation.test.ts[2m > [22mpersisted society path display[2m > [22mhandles stationary, repeated and bounded endpoints
+ [32m✓[39m packages/atlas-react/test/authored-point-maps.test.ts[2m > [22man authored placement transform[2m > [22mdivides the wire units once and turns yaw into degrees
+ [32m✓[39m packages/atlas-react/test/authored-point-maps.test.ts[2m > [22man authored placement transform[2m > [22mcarries a scale that is a multiple, not a measurement
+ [32m✓[39m packages/atlas-react/test/authored-point-maps.test.ts[2m > [22mthe print depth over flat authored ground[2m > [22mpulls a tall frame in until its lower edge clears the ground
+ [32m✓[39m packages/atlas-react/test/authored-point-maps.test.ts[2m > [22mthe print depth over flat authored ground[2m > [22mleaves a narrow frame at the depth that was asked for
+ [32m✓[39m packages/atlas-react/test/authored-point-maps.test.ts[2m > [22mthe print depth over flat authored ground[2m > [22mshrinks with the placement scale, because a scaled print is a taller frame
+ [32m✓[39m packages/atlas-react/test/authored-point-maps.test.ts[2m > [22mthe print depth over flat authored ground[2m > [22mdraws a print flat at the standpoint rather than buried when it sits on the ground
+ [32m✓[39m packages/atlas-react/test/authored-point-maps.test.ts[2m > [22mthe print depth over flat authored ground[2m > [22mgives back what was asked for when the frame says nothing usable
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22mloading a baked tile through tess's decoder[2m > [22mdraws only what the container draws, and states every record it does not
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22mloading a baked tile through tess's decoder[2m > [22mmaps every drawn triangle back to its record, and nothing else
+ [32m✓[39m packages/atlas-react/test/character-gait.test.ts[2m > [22mgait for a resolved ground speed[2m > [22mstands still at rest and never mixes standing into a walk at walking pace
+ [32m✓[39m packages/atlas-react/test/character-gait.test.ts[2m > [22mgait for a resolved ground speed[2m > [22mmoves a planted foot exactly as fast as the ground at every speed
+ [32m✓[39m packages/atlas-react/test/character-gait.test.ts[2m > [22mgait for a resolved ground speed[2m > [22mchanges gait continuously as speed changes
+ [32m✓[39m packages/atlas-react/test/scene-point-maps.test.ts[2m > [22mposed scene point maps[2m > [22mapplies local scale, proper rotation and translation in the recorded order
+ [32m✓[39m packages/atlas-react/test/scene-point-maps.test.ts[2m > [22mposed scene point maps[2m > [22mcomputes one footprint over every transformed member instead of choosing the first map
+ [32m✓[39m packages/atlas-react/test/scene-point-maps.test.ts[2m > [22mposed scene point maps[2m > [22mrefuses a non-affine or non-finite placement before it reaches the engine
+ [32m✓[39m packages/atlas-react/test/scene-point-maps.test.ts[2m > [22mposed scene point maps[2m > [22mrefuses undeclared scale, shear, and reflection instead of drawing a different GPU transform
+ [32m✓[39m packages/atlas-react/test/generated-tile-walk-world.test.ts[2m > [22mfetching a walk's world[2m > [22masks the route for each neighbour and reports what crossed the network
+ [32m✓[39m packages/atlas-react/test/character-preview.test.ts[2m > [22mmetric character inspection stage[2m > [22mshows supported heights at different extents with one frame and no default clipping
+ [32m✓[39m packages/atlas-react/test/character-preview.test.ts[2m > [22mmetric character inspection stage[2m > [22mkeeps a user-selected zoom independent of generated body height
+ [32m✓[39m packages/atlas-react/test/character-preview.test.ts[2m > [22mmetric character inspection stage[2m > [22mlifts the inspection target for a close face view
+ [32m✓[39m packages/atlas-react/test/generated-tile-walk-world.test.ts[2m > [22mfetching a walk's world[2m > [22mcosts no request at all for a neighbour already held at the digest its row names
+ [32m✓[39m packages/atlas-react/test/generated-tile-walk-world.test.ts[2m > [22mfetching a walk's world[2m > [22mrefuses a row whose container says it is a different tile
+ [32m✓[39m packages/atlas-react/test/parametric-character-asset.test.ts[2m > [22mprepared editable human[2m > [22mcontains the declared rig, verified bytes and playable native motion
+ [32m✓[39m packages/atlas-react/test/binding/line-budget.test.ts[2m > [22mthe binding line budget[2m > [22mholds atlas-binding.ts at or under its budget, and the budget within reach of the file
+ [32m✓[39m packages/atlas-react/test/binding/line-budget.test.ts[2m > [22mthe playcanvas barrel[2m > [22mexports exactly the pinned names
+ [32m✓[39m packages/atlas-react/test/world-motion.test.ts[2m > [22mworld ambient motion[2m > [22mlets a bounded style tempo change cadence
+ [32m✓[39m packages/atlas-react/test/world-motion.test.ts[2m > [22mworld ambient motion[2m > [22mlets reduced motion override every style tempo
+ [32m✓[39m packages/atlas-react/test/generated-tile-walk-world.test.ts[2m > [22mfetching a walk's world[2m > [22mrefuses a container that belongs to another city, which the coordinates alone do not settle
+ [32m✓[39m packages/atlas-react/test/world-field-buffers.test.ts[2m > [22mscalable world-field buffers[2m > [22mallocates every region and relationship trace instead of truncating at a presentation cap
+ [32m✓[39m packages/atlas-react/test/generated-tile-walk-world.test.ts[2m > [22mfetching a walk's world[2m > [22mstops the walk when a tile the store says it has cannot be served
+ [32m✓[39m packages/atlas-react/test/presentation-theme.test.ts[2m > [22mrenderer presentation theme[2m > [22mchanges mote RGB with the shared palette while retaining confirmation dimming
+ [32m✓[39m packages/atlas-react/test/presentation-theme.test.ts[2m > [22mrenderer presentation theme[2m > [22mderives a stable empty-world map pose without fabricating an island
+[90mstdout[2m | packages/atlas-react/test/player-facing.test.ts[2m > [22m[2mthe drawn character faces where the solver says[2m > [22m[2mreports every heading, including the rear half a transform readback destroys
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/player-facing.test.ts[2m > [22m[2mthe drawn character faces where the solver says[2m > [22m[2mdoes not agree with the Euler readback past a quarter turn, which is the point
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/player-facing.test.ts[2m > [22mthe drawn character faces where the solver says[2m > [22mreports every heading, including the rear half a transform readback destroys[33m 3973[2mms[22m[39m
+ [32m✓[39m packages/atlas-react/test/player-facing.test.ts[2m > [22mthe drawn character faces where the solver says[2m > [22mdoes not agree with the Euler readback past a quarter turn, which is the point
+ [32m✓[39m packages/atlas-react/test/generated-tile-walk-world.test.ts[2m > [22mthe obstacles of a world of several tiles[2m > [22msays which tile stated every ring, on rings a real container really makes
+ [32m✓[39m packages/atlas-react/test/generated-tile-walk-world.test.ts[2m > [22mthe obstacles of a world of several tiles[2m > [22mkeeps one copy of a building two tiles both state, and says nothing disagreed
+ [32m✓[39m packages/atlas-react/test/generated-tile-walk-world.test.ts[2m > [22mthe obstacles of a world of several tiles[2m > [22mreports a record two tiles state differently, rather than leaving both copies unexplained
+[90mstdout[2m | packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22m[2mdrawing a tile into the Atlas scene[2m > [22m[2madds exactly the drawn triangles under the environment root, and removes them again
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22m[2mthe camera frame waits for a canvas with a size[2m > [22m[2mbuilds no render targets at 0 by 0, builds them once on the first resize, and removes them on dispose
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22m[2mthe camera frame waits for a canvas with a size[2m > [22m[2mbuilds the frame at once when the canvas already has a size
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22mloading a baked tile through tess's decoder[2m > [22mrefuses a tile whose bytes are not what its records bake to[33m 3274[2mms[22m[39m
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22mloading a baked tile through tess's decoder[2m > [22mrefuses every tile on a page without crypto.subtle
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22mstanding on the tile's own nav_envelope[2m > [22msamples support from the envelope and opens standing on it, eye 1.62 m above it
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22mstanding on the tile's own nav_envelope[2m > [22mwalks across the terrain at its sampled height
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22mthe route obstruction rings a tile states[2m > [22mstates them on the tile, named by record, for a route rule to read
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22mthe route obstruction rings a tile states[2m > [22mKEEPS THEM OUT OF THE NAVIGATION WORLD, because that field stops bodies
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22mthe route obstruction rings a tile states[2m > [22mproves that field really does block, so the emptiness above is load bearing
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22mthe route obstruction rings a tile states[2m > [22mstates what it refused, so a smaller set is never silent
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22mwhere a resolved move puts the eye[2m > [22mstands the eye exactly the stated eye height above the support it sampled, after a move
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22ma tile whose nav_envelope is there but empty[2m > [22msays the projection is there and holds no triangle, and still stands nobody on it
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22ma tile with no nav_envelope[2m > [22mhas no support anywhere, says so, and opens at a stated viewpoint outside the tile
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22ma tile with no nav_envelope[2m > [22mkeeps a blocked walker exactly where the viewpoint is, with the no-surface reason
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22mdrawing per surface[2m > [22mbatches surfaces by what they are drawn with, not by record, and places each by its own material and orientation
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22mdrawing per surface[2m > [22mrefuses a surface triangle that reaches outside its surface, and a textured surface with no placement
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22mthe frame and the capsule a tile's grammar states[2m > [22mbuilds the person to the grammar's own capsule clearance measures, and to no other numbers
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22mthe frame and the capsule a tile's grammar states[2m > [22mrefuses to guess a capsule the grammar does not state, or two that disagree
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22mthe frame and the capsule a tile's grammar states[2m > [22mplaces only city_local millimetres with x east, y north and z up
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22mpicking a tile[2m > [22mfinds the drawn triangle under a ray, its record and the distance along a unit ray
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22msupport from a nav_envelope[2m > [22msamples the envelope's own height, exactly, and nothing off it
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22msupport from a nav_envelope[2m > [22mstands the capsule on it and lets a 150 mm kerb be climbed but not a 200 mm step
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22msupport from a nav_envelope[2m > [22mrefuses an envelope with nothing walkable in it
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22mdrawing a tile into the Atlas scene[2m > [22madds exactly the drawn triangles under the environment root, and removes them again
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22mthe camera frame waits for a canvas with a size[2m > [22mbuilds no render targets at 0 by 0, builds them once on the first resize, and removes them on dispose
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22mthe camera frame waits for a canvas with a size[2m > [22mbuilds the frame at once when the canvas already has a size
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22ma neighbouring tile reaching the runtime[2m > [22mis checked against its own digest like any other ground, and refused by name[33m 2191[2mms[22m[39m
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22ma neighbouring tile reaching the runtime[2m > [22mrefuses a world that would draw one record twice, naming the record and both tiles[33m 2099[2mms[22m[39m
+[90mstdout[2m | packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22m[2ma world of several tiles, drawn[2m > [22m[2mdraws the neighbour, and counts each tile under its own name rather than adding them up
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+[90mstdout[2m | packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22m[2ma world of several tiles, drawn[2m > [22m[2mputs the neighbour where its own container says it is, with no offset applied anywhere
+[22m[39mPowered by PlayCanvas 2.21.4 e287e0c
+
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22ma world of several tiles, drawn[2m > [22mdraws the neighbour, and counts each tile under its own name rather than adding them up
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22ma world of several tiles, drawn[2m > [22mputs the neighbour where its own container says it is, with no offset applied anywhere
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22ma world of several tiles, drawn[2m > [22mleaves what is identified, picked and reported undressed as the drawn tile's own[33m 616[2mms[22m[39m
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22ma world of more than one tile[2m > [22mcarries the ground past the tile edge, and moves nothing about where the walk opens
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22ma world of more than one tile[2m > [22mis exactly its tiles added up, which is the count that can fail
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22ma world of more than one tile[2m > [22mreaches over the neighbour, so a step past the edge is ground and not a recovery
+ [32m✓[39m packages/atlas-react/test/generated-tile-runtime.test.ts[2m > [22ma world of more than one tile[2m > [22mnames a neighbour that held nothing, rather than leaving it out
+
+[2m Test Files [22m [1m[32m84 passed[39m[22m[2m | [22m[33m1 skipped[39m[90m (85)[39m
+[2m      Tests [22m [1m[32m603 passed[39m[22m[2m | [22m[33m6 skipped[39m[90m (609)[39m
+[2m   Start at [22m 15:11:36
+[2m   Duration [22m 16.99s[2m (transform 4.81s, setup 0ms, collect 65.33s, tests 33.67s, environment 8.39s, prepare 4.93s)[22m
+

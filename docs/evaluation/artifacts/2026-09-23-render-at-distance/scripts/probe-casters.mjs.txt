@@ -1,0 +1,61 @@
+// Exploratory: dump the transforms the shadow pass uses at the arrival cube and at the 8 km cube,
+// with and without a hand-made render-origin rebase, after one real frame each.
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { launch, sleep } from './cdp.mjs';
+import { reachBinding } from './w-original/binding.mjs';
+
+const HERE = dirname(new URL(import.meta.url).pathname);
+const out = join(HERE, 'runs', 'probe-internals');
+mkdirSync(out, { recursive: true });
+const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+const INSTRUMENT = readFileSync(join(HERE, 'w-original', 'instrument-15ef8cd9.js'), 'utf8');
+const app = process.argv[2] ?? 'http://localhost:19222/';
+
+const DUMP = String.raw`(() => {
+  const app = __ws.app; const b = __wsBinding;
+  const m = (node) => Array.from(node.getWorldTransform().data).map((v) => +v.toPrecision(9));
+  const lightEntity = app.root.findByName('atlas-directional-light');
+  const light = lightEntity.light.light;
+  const cam = b.camera.camera.camera;
+  const rd = light._renderData.find((r) => r.camera === cam) ?? light._renderData[0];
+  const sc = rd?.shadowCamera;
+  const cube = app.root.find((n) => typeof n.name === 'string' && n.name.startsWith('authored-object:') && n.enabled)[0];
+  return {
+    renderRoot: b.renderRoot.getPosition().toArray(),
+    camera: m(b.camera),
+    cube: cube ? { name: cube.name, world: m(cube), aabb: cube.findComponents('render')[0].meshInstances[0].aabb.center.toArray() } : null,
+    light: { numCascades: light.numCascades, shadowType: light.shadowType, bias: light.shadowBias, normalBias: light.normalOffsetBias, cascadeDistances: Array.from(light._shadowCascadeDistances ?? []), renderData: light._renderData.length },
+    shadowCamera: sc ? { world: m(sc._node), orthoHeight: sc.orthoHeight, near: sc.nearClip, far: sc.farClip, projectionCompensation: rd.projectionCompensation } : null,
+    casters: (rd?.visibleCasters ?? []).map((mi) => ({ node: mi.node?.name, parent: mi.node?.parent?.name, mesh: mi.mesh?.name ?? null, cast: mi.castShadow, min: mi.aabb.getMin().toArray().map((v) => +v.toFixed(2)), max: mi.aabb.getMax().toArray().map((v) => +v.toFixed(2)) })),
+  };
+})()`;
+
+const { cdp, kill } = await launch({ port: 19223, profile: join(HERE, 'profiles', `internals-${stamp}`) });
+const result = { stamp, rows: [] };
+try {
+  await cdp.send('Page.enable'); await cdp.send('Runtime.enable');
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+  await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: INSTRUMENT });
+  await cdp.send('Page.navigate', { url: app });
+  await cdp.waitFor(`typeof __ws === 'object' && __ws.app !== null && __ws.sceneObjects().length === 6`, 120_000, 'cubes');
+  await reachBinding(cdp);
+  for (const [label, z, rebase] of [['arrival', 0.5, false], ['1km', -999.5, false], ['4km', -3999.5, false], ['8km', -7999.5, false]]) {
+    const oz = rebase ? Math.round(z / 64) * 64 : 0;
+    await cdp.evaluate(`(() => { const b = __wsBinding;
+      b.renderOriginState = Object.freeze({ origin: { x: 0, y: 0, z: ${oz} }, neighborhoodId: null, revision: ${rebase ? 99 : 0} });
+      b.renderRoot.setPosition(0, 0, ${-oz}); b.environmentRoot.setPosition(0, 0, ${-oz});
+      for (const o of __ws.app.root.find(x => typeof x.name === 'string' && x.name.startsWith('authored-object:'))) o.enabled = Math.abs(o.getLocalPosition().z - (${z})) < 0.01;
+      const s = b.controls.state; s.x = 0; s.z = ${z} + 3; s.yaw = 0; s.pitch = -0.25; b.invalidate(); return true; })()`);
+    await sleep(500);
+    await cdp.evaluate('(() => { __ws.app.render(); return true; })()');
+    const dump = await cdp.evaluate(DUMP);
+    result.rows.push({ label, dump });
+    console.log(label, 'far', dump.shadowCamera?.far, JSON.stringify(dump.casters));
+  }
+} catch (error) {
+  result.error = String(error.stack ?? error); console.error(result.error);
+} finally {
+  writeFileSync(join(out, `${stamp}.json`), JSON.stringify(result, null, 1));
+  kill();
+}

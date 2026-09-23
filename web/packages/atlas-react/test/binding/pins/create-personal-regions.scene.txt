@@ -1,0 +1,23 @@
+Untitled|true|0,0,0|0,0,0|1,1,1|
+  atlas-camera|true|0,0,0|0,0,0|1,1,1|camera
+  atlas-directional-light|true|0,0,0|52,-38,0|1,1,1|light
+  geographic-environment|true|0,0,0|0,0,0|1,1,1|
+  atlas-render-origin|true|0,0,0|0,0,0|1,1,1|
+    atlas-world-field|true|135,-0.035,-70|0,0,0|1,1,1|render|render -- [--F:shader:Untitled]
+      atlas-map-user-marker|false|0,0,0|0,0,0|1,1,1|render|render CR [CRF:standard:Untitled]
+        atlas-map-user-body|false|0,0.02,0|0,0,0|1,1,1|render|render CR [CRF:standard:Untitled]
+      atlas-placement-landing-marker|false|0,0,0|0,0,0|1,1,1|render|render CR [CRF:standard:Untitled]
+    atlas-region-relief|true|0,0,0|0,0,0|1,1,1|
+    atlas-region-mass|true|0,0,0|0,0,0|1,1,1|
+      region-mass:region:first/anchor-0|true|118.618087,2.264616,-81.18096|0,0,0|1.539939,4.529232,1.539939|render|render CR [CRF:standard:Untitled]
+      region-mass:region:first/anchor-1|true|119.366853,2.264616,-81.497533|0,0,0|1.539939,4.529232,1.539939|render|render CR [CRF:standard:Untitled]
+      region-mass:region:second/anchor-0|true|148.267286,2.264616,-60.549593|0,0,0|1.539939,4.529232,1.539939|render|render CR [CRF:standard:Untitled]
+    atlas-composed-world|true|0,0,0|0,0,0|1,1,1|
+      world-profile:origin-landscape|true|0,0,0|0,0,0|1,1,1|
+        origin-environment|true|0,0,0|0,0,0|1,1,1|
+          origin-sky|true|0,0,0|0,0,0|1,1,1|render|render -- [---:shader:Untitled]
+      world-profile:survey-relief|false|0,0,0|0,0,0|1,1,1|
+    island:region:first|true|120,0,-80|0,22.918312,0|1,1,1|
+      point-map:legacy:region:first:0|true|0,0,0|0,0,0|1,1,1|render|render CR [CRF:shader:Untitled]
+    island:region:second|true|150,0,-60|0,45.836624,0|1,1,1|
+    atlas-anchors|true|0,0,0|0,0,0|1,1,1|render|render CR [CRF:shader:Untitled]

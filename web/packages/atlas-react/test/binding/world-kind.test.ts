@@ -1,0 +1,87 @@
+/**
+ * The binding asks what kind of world it is drawing in one place, and nowhere else.
+ *
+ * `describeWorldKind` turns the options into one description: the ground and its data, the Google
+ * reference, city scale, where fog is mixed, how the session opens and what is drawn at first.
+ * The table below pins it for every combination the app can pass, and the scan below keeps the
+ * binding from asking the options again: a kind read written into `atlas-binding.ts` fails here
+ * even when every pinned world still builds the same.
+ */
+import { readFileSync } from 'node:fs';
+import { describe, expect, it } from 'vitest';
+import {
+  authoredFieldSupport,
+  authoredRegionOf,
+  describeWorldKind,
+  type WorldKindOptions,
+} from '../../src/playcanvas/world-kind.js';
+import { DISTRICT_DOCUMENT, ENDLESS_REGION, FLAT_REGION, GOOGLE_ON, stubTileMount } from './world-kinds.js';
+
+const district = { document: DISTRICT_DOCUMENT as never, residentBytes: 100 };
+const flags = (options: WorldKindOptions) => {
+  const { ground, google, ...rest } = describeWorldKind(options);
+  return { form: ground.form, google: google !== null, ...rest };
+};
+
+describe('describeWorldKind', () => {
+  it('describes every combination the app passes', () => {
+    expect(flags({})).toEqual({ form: 'scene-regions', google: false, city: false,
+      displaySpaceFog: true, aerialStart: false, fieldVisible: true, memoryLayerVisible: true });
+    expect(flags({ authoredRegion: ENDLESS_REGION })).toEqual({ form: 'authored-endless', google: false,
+      city: false, displaySpaceFog: true, aerialStart: false, fieldVisible: true, memoryLayerVisible: true });
+    expect(flags({ authoredRegion: FLAT_REGION })).toEqual({ form: 'authored-flat', google: false,
+      city: false, displaySpaceFog: true, aerialStart: false, fieldVisible: true, memoryLayerVisible: true });
+    expect(flags({ ownedDistrict: district })).toEqual({ form: 'owned-district', google: false,
+      city: true, displaySpaceFog: true, aerialStart: false, fieldVisible: false, memoryLayerVisible: false });
+    expect(flags({ generatedTile: stubTileMount() })).toEqual({ form: 'generated-tile', google: false,
+      city: true, displaySpaceFog: false, aerialStart: false, fieldVisible: false, memoryLayerVisible: false });
+    expect(flags({ googleTiles: GOOGLE_ON })).toEqual({ form: 'scene-regions', google: true,
+      city: true, displaySpaceFog: true, aerialStart: true, fieldVisible: true, memoryLayerVisible: false });
+    // Decided explicitly, as it was built before: authored ground and spawn, an aerial start and
+    // the memory layer (with that ground) hidden under the reference.
+    expect(flags({ authoredRegion: ENDLESS_REGION, googleTiles: GOOGLE_ON })).toEqual({
+      form: 'authored-endless', google: true, city: true, displaySpaceFog: true, aerialStart: true,
+      fieldVisible: true, memoryLayerVisible: false });
+  });
+
+  it('reads a Google configuration as off unless it is switched on with a key', () => {
+    expect(describeWorldKind({ googleTiles: { ...GOOGLE_ON, enabled: false } }).google).toBeNull();
+    expect(describeWorldKind({ googleTiles: { ...GOOGLE_ON, apiKey: '' } }).google).toBeNull();
+    expect(describeWorldKind({ googleTiles: GOOGLE_ON }).google).toBe(GOOGLE_ON);
+  });
+
+  it('carries the ground it names, so nothing downstream reads the options again', () => {
+    const tile = stubTileMount();
+    const described = describeWorldKind({ generatedTile: tile });
+    expect(described.ground).toEqual({ form: 'generated-tile', tile });
+    expect(authoredRegionOf(describeWorldKind({ authoredRegion: FLAT_REGION }))).toBe(FLAT_REGION);
+    expect(authoredRegionOf(described)).toBeNull();
+    expect(authoredFieldSupport(FLAT_REGION, 1200)).toEqual({ halfWidth: 12, halfDepth: 8, elevation: 0 });
+    expect(authoredFieldSupport(ENDLESS_REGION, 1200)).toEqual({ kind: 'endless', elevation: 0, reach: 1200 });
+    expect(authoredFieldSupport(null, 1200)).toBeUndefined();
+  });
+
+  it('refuses the two combinations no world can be, by name', () => {
+    expect(() => describeWorldKind({ ownedDistrict: district, generatedTile: stubTileMount() }))
+      .toThrow('A generated tile replaces the owned district; pass one or the other');
+    expect(() => describeWorldKind({ authoredRegion: ENDLESS_REGION, ownedDistrict: district }))
+      .toThrow('An authored starter region cannot replace geographic ground');
+    expect(() => describeWorldKind({ authoredRegion: FLAT_REGION, generatedTile: stubTileMount() }))
+      .toThrow('An authored starter region cannot replace geographic ground');
+  });
+});
+
+/** Every way of asking the options, or an authored ground, what kind of world this is. */
+const KIND_READ = /options\.(authoredRegion|ownedDistrict|generatedTile|googleTiles)\b|\.ground\.kind\b/g;
+
+describe('where the world kind is read', () => {
+  const read = (file: string) => readFileSync(new URL(`../../src/playcanvas/${file}`, import.meta.url), 'utf8');
+
+  it('is never in the binding', () => {
+    expect(read('atlas-binding.ts').match(KIND_READ) ?? []).toEqual([]);
+  });
+
+  it('is in the one module that decides it (the control: the scan does find a kind read)', () => {
+    expect((read('world-kind.ts').match(KIND_READ) ?? []).length).toBeGreaterThan(0);
+  });
+});

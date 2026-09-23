@@ -1,0 +1,14 @@
+objects.destroy
+representation.destroy
+nativeCharacters.destroy
+ownedDistrict.destroy
+controls.destroy
+overlay.destroy
+mapOverlay.destroy
+motes.destroy
+field.destroy
+composedWorld.destroy
+regionMass.destroy
+regionRelief.destroy
+segmentOverlay.destroy
+app.destroy

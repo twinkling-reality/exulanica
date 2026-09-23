@@ -1,0 +1,8 @@
+# break_contracts.py on product tree 84b95583843c, 2026-09-23T15:10:23-0400
+# terminal colour codes removed from vitest's summary lines; nothing else changed
+kind read from the options: exit 1       Tests  1 failed | 5 passed (6)
+authored ground kind read: exit 1       Tests  1 failed | 5 passed (6)
+exposure set in the binding: exit 1       Tests  1 failed | 3 passed (4)
+light colour set in the binding: exit 1       Tests  1 failed | 3 passed (4)
+restored c4e00838a844
+break_contracts.py exit 0

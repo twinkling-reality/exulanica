@@ -1,0 +1,567 @@
+{
+ "app": "http://localhost:19222/",
+ "stamp": "2026-09-23T12-39-02-612Z",
+ "arms": {
+  "base": {
+   "report": {
+    "before": {
+     "nob": 0,
+     "sb": 0.05
+    }
+   },
+   "rows": [
+    {
+     "mark": 0,
+     "object": 14238,
+     "self": 0,
+     "ground": 5677,
+     "touching": 85,
+     "object_lowest_row": 635,
+     "ground_top_row": 543,
+     "face_steps": 0,
+     "sky_distinct": 30
+    },
+    {
+     "mark": 40,
+     "object": 13920,
+     "self": 0,
+     "ground": 5886,
+     "touching": 84,
+     "object_lowest_row": 632,
+     "ground_top_row": 543,
+     "face_steps": 0,
+     "sky_distinct": 28
+    },
+    {
+     "mark": 80,
+     "object": 14344,
+     "self": 0,
+     "ground": 5643,
+     "touching": 85,
+     "object_lowest_row": 636,
+     "ground_top_row": 542,
+     "face_steps": 0,
+     "sky_distinct": 23
+    },
+    {
+     "mark": 1000,
+     "object": 13920,
+     "self": 0,
+     "ground": 5320,
+     "touching": 83,
+     "object_lowest_row": 632,
+     "ground_top_row": 543,
+     "face_steps": 0,
+     "sky_distinct": 1
+    },
+    {
+     "mark": 4000,
+     "object": 14344,
+     "self": 9157,
+     "ground": 5874,
+     "touching": 198,
+     "object_lowest_row": 636,
+     "ground_top_row": 545,
+     "face_steps": 6,
+     "sky_distinct": 1
+    },
+    {
+     "mark": 8000,
+     "object": 14238,
+     "self": 9099,
+     "ground": 5912,
+     "touching": 213,
+     "object_lowest_row": 635,
+     "ground_top_row": 542,
+     "face_steps": 4,
+     "sky_distinct": 1
+    }
+   ]
+  },
+  "skynocast": {
+   "report": {
+    "before": {
+     "nob": 0,
+     "sb": 0.05
+    },
+    "sky": [
+     false
+    ]
+   },
+   "rows": [
+    {
+     "mark": 0,
+     "object": 14238,
+     "self": 9291,
+     "ground": 6633,
+     "touching": 207,
+     "object_lowest_row": 635,
+     "ground_top_row": 543,
+     "face_steps": 5,
+     "sky_distinct": 30
+    },
+    {
+     "mark": 40,
+     "object": 13920,
+     "self": 8591,
+     "ground": 7007,
+     "touching": 204,
+     "object_lowest_row": 632,
+     "ground_top_row": 543,
+     "face_steps": 5,
+     "sky_distinct": 28
+    },
+    {
+     "mark": 80,
+     "object": 14344,
+     "self": 9258,
+     "ground": 6525,
+     "touching": 218,
+     "object_lowest_row": 636,
+     "ground_top_row": 542,
+     "face_steps": 5,
+     "sky_distinct": 23
+    },
+    {
+     "mark": 1000,
+     "object": 13920,
+     "self": 9394,
+     "ground": 6553,
+     "touching": 227,
+     "object_lowest_row": 632,
+     "ground_top_row": 543,
+     "face_steps": 6,
+     "sky_distinct": 1
+    },
+    {
+     "mark": 4000,
+     "object": 14344,
+     "self": 9157,
+     "ground": 5874,
+     "touching": 198,
+     "object_lowest_row": 636,
+     "ground_top_row": 545,
+     "face_steps": 6,
+     "sky_distinct": 1
+    },
+    {
+     "mark": 8000,
+     "object": 14238,
+     "self": 9099,
+     "ground": 5912,
+     "touching": 213,
+     "object_lowest_row": 635,
+     "ground_top_row": 542,
+     "face_steps": 4,
+     "sky_distinct": 1
+    }
+   ]
+  },
+  "skynocast-nob05": {
+   "report": {
+    "before": {
+     "nob": 0,
+     "sb": 0.05
+    },
+    "sky": [
+     false
+    ],
+    "nob": 0.05
+   },
+   "rows": [
+    {
+     "mark": 0,
+     "object": 14238,
+     "self": 5155,
+     "ground": 6073,
+     "touching": 197,
+     "object_lowest_row": 635,
+     "ground_top_row": 546,
+     "face_steps": 2,
+     "sky_distinct": 30
+    },
+    {
+     "mark": 40,
+     "object": 13920,
+     "self": 4942,
+     "ground": 6634,
+     "touching": 220,
+     "object_lowest_row": 632,
+     "ground_top_row": 546,
+     "face_steps": 2,
+     "sky_distinct": 28
+    },
+    {
+     "mark": 80,
+     "object": 14344,
+     "self": 5445,
+     "ground": 6010,
+     "touching": 202,
+     "object_lowest_row": 636,
+     "ground_top_row": 545,
+     "face_steps": 2,
+     "sky_distinct": 23
+    },
+    {
+     "mark": 1000,
+     "object": 13920,
+     "self": 5543,
+     "ground": 6020,
+     "touching": 216,
+     "object_lowest_row": 632,
+     "ground_top_row": 546,
+     "face_steps": 1,
+     "sky_distinct": 1
+    },
+    {
+     "mark": 4000,
+     "object": 14344,
+     "self": 5111,
+     "ground": 5498,
+     "touching": 209,
+     "object_lowest_row": 636,
+     "ground_top_row": 548,
+     "face_steps": 2,
+     "sky_distinct": 1
+    },
+    {
+     "mark": 8000,
+     "object": 14238,
+     "self": 5698,
+     "ground": 5500,
+     "touching": 220,
+     "object_lowest_row": 635,
+     "ground_top_row": 545,
+     "face_steps": 2,
+     "sky_distinct": 1
+    }
+   ]
+  },
+  "skynocast-nob10": {
+   "report": {
+    "before": {
+     "nob": 0,
+     "sb": 0.05
+    },
+    "sky": [
+     false
+    ],
+    "nob": 0.1
+   },
+   "rows": [
+    {
+     "mark": 0,
+     "object": 14238,
+     "self": 188,
+     "ground": 5576,
+     "touching": 208,
+     "object_lowest_row": 635,
+     "ground_top_row": 549,
+     "face_steps": 0,
+     "sky_distinct": 30
+    },
+    {
+     "mark": 40,
+     "object": 13920,
+     "self": 219,
+     "ground": 6094,
+     "touching": 209,
+     "object_lowest_row": 632,
+     "ground_top_row": 549,
+     "face_steps": 1,
+     "sky_distinct": 28
+    },
+    {
+     "mark": 80,
+     "object": 14344,
+     "self": 260,
+     "ground": 5428,
+     "touching": 201,
+     "object_lowest_row": 636,
+     "ground_top_row": 548,
+     "face_steps": 0,
+     "sky_distinct": 23
+    },
+    {
+     "mark": 1000,
+     "object": 13920,
+     "self": 267,
+     "ground": 5516,
+     "touching": 215,
+     "object_lowest_row": 632,
+     "ground_top_row": 549,
+     "face_steps": 0,
+     "sky_distinct": 1
+    },
+    {
+     "mark": 4000,
+     "object": 14344,
+     "self": 237,
+     "ground": 4919,
+     "touching": 192,
+     "object_lowest_row": 636,
+     "ground_top_row": 551,
+     "face_steps": 1,
+     "sky_distinct": 1
+    },
+    {
+     "mark": 8000,
+     "object": 14238,
+     "self": 374,
+     "ground": 5107,
+     "touching": 219,
+     "object_lowest_row": 635,
+     "ground_top_row": 549,
+     "face_steps": 0,
+     "sky_distinct": 1
+    }
+   ]
+  },
+  "skynocast-nob25": {
+   "report": {
+    "before": {
+     "nob": 0,
+     "sb": 0.05
+    },
+    "sky": [
+     false
+    ],
+    "nob": 0.25
+   },
+   "rows": [
+    {
+     "mark": 0,
+     "object": 14238,
+     "self": 0,
+     "ground": 3959,
+     "touching": 194,
+     "object_lowest_row": 635,
+     "ground_top_row": 559,
+     "face_steps": 0,
+     "sky_distinct": 30
+    },
+    {
+     "mark": 40,
+     "object": 13920,
+     "self": 0,
+     "ground": 4416,
+     "touching": 188,
+     "object_lowest_row": 632,
+     "ground_top_row": 559,
+     "face_steps": 0,
+     "sky_distinct": 28
+    },
+    {
+     "mark": 80,
+     "object": 14344,
+     "self": 0,
+     "ground": 3843,
+     "touching": 202,
+     "object_lowest_row": 636,
+     "ground_top_row": 559,
+     "face_steps": 0,
+     "sky_distinct": 23
+    },
+    {
+     "mark": 1000,
+     "object": 13920,
+     "self": 0,
+     "ground": 4227,
+     "touching": 212,
+     "object_lowest_row": 632,
+     "ground_top_row": 559,
+     "face_steps": 0,
+     "sky_distinct": 1
+    },
+    {
+     "mark": 4000,
+     "object": 14344,
+     "self": 0,
+     "ground": 3359,
+     "touching": 180,
+     "object_lowest_row": 636,
+     "ground_top_row": 561,
+     "face_steps": 0,
+     "sky_distinct": 1
+    },
+    {
+     "mark": 8000,
+     "object": 14238,
+     "self": 0,
+     "ground": 3658,
+     "touching": 201,
+     "object_lowest_row": 635,
+     "ground_top_row": 558,
+     "face_steps": 0,
+     "sky_distinct": 1
+    }
+   ]
+  },
+  "skynocast-sb20": {
+   "report": {
+    "before": {
+     "nob": 0,
+     "sb": 0.05
+    },
+    "sky": [
+     false
+    ],
+    "sb": 0.2
+   },
+   "rows": [
+    {
+     "mark": 0,
+     "object": 14238,
+     "self": 6,
+     "ground": 5767,
+     "touching": 86,
+     "object_lowest_row": 635,
+     "ground_top_row": 543,
+     "face_steps": 0,
+     "sky_distinct": 30
+    },
+    {
+     "mark": 40,
+     "object": 13920,
+     "self": 0,
+     "ground": 5999,
+     "touching": 90,
+     "object_lowest_row": 632,
+     "ground_top_row": 543,
+     "face_steps": 0,
+     "sky_distinct": 28
+    },
+    {
+     "mark": 80,
+     "object": 14344,
+     "self": 8,
+     "ground": 5761,
+     "touching": 86,
+     "object_lowest_row": 636,
+     "ground_top_row": 542,
+     "face_steps": 0,
+     "sky_distinct": 23
+    },
+    {
+     "mark": 1000,
+     "object": 13920,
+     "self": 8,
+     "ground": 5448,
+     "touching": 87,
+     "object_lowest_row": 632,
+     "ground_top_row": 543,
+     "face_steps": 0,
+     "sky_distinct": 1
+    },
+    {
+     "mark": 4000,
+     "object": 14344,
+     "self": 5,
+     "ground": 5253,
+     "touching": 87,
+     "object_lowest_row": 636,
+     "ground_top_row": 545,
+     "face_steps": 0,
+     "sky_distinct": 1
+    },
+    {
+     "mark": 8000,
+     "object": 14238,
+     "self": 8,
+     "ground": 5260,
+     "touching": 89,
+     "object_lowest_row": 635,
+     "ground_top_row": 542,
+     "face_steps": 0,
+     "sky_distinct": 1
+    }
+   ]
+  },
+  "skynocast-city": {
+   "report": {
+    "before": {
+     "nob": 0,
+     "sb": 0.05
+    },
+    "sky": [
+     false
+    ],
+    "nob": 0.25,
+    "sb": 0.2
+   },
+   "rows": [
+    {
+     "mark": 0,
+     "object": 14238,
+     "self": 0,
+     "ground": 3023,
+     "touching": 70,
+     "object_lowest_row": 635,
+     "ground_top_row": 559,
+     "face_steps": 0,
+     "sky_distinct": 30
+    },
+    {
+     "mark": 40,
+     "object": 13920,
+     "self": 0,
+     "ground": 3307,
+     "touching": 71,
+     "object_lowest_row": 632,
+     "ground_top_row": 559,
+     "face_steps": 0,
+     "sky_distinct": 28
+    },
+    {
+     "mark": 80,
+     "object": 14344,
+     "self": 0,
+     "ground": 3030,
+     "touching": 70,
+     "object_lowest_row": 636,
+     "ground_top_row": 559,
+     "face_steps": 0,
+     "sky_distinct": 23
+    },
+    {
+     "mark": 1000,
+     "object": 13920,
+     "self": 0,
+     "ground": 3070,
+     "touching": 70,
+     "object_lowest_row": 632,
+     "ground_top_row": 559,
+     "face_steps": 0,
+     "sky_distinct": 1
+    },
+    {
+     "mark": 4000,
+     "object": 14344,
+     "self": 0,
+     "ground": 2690,
+     "touching": 69,
+     "object_lowest_row": 636,
+     "ground_top_row": 561,
+     "face_steps": 0,
+     "sky_distinct": 1
+    },
+    {
+     "mark": 8000,
+     "object": 14238,
+     "self": 0,
+     "ground": 2892,
+     "touching": 72,
+     "object_lowest_row": 635,
+     "ground_top_row": 558,
+     "face_steps": 0,
+     "sky_distinct": 1
+    }
+   ]
+  }
+ },
+ "notes": [],
+ "light_as_built": {
+  "nob": 0,
+  "sb": 0.05
+ }
+}

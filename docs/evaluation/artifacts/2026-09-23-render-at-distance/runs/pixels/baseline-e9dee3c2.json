@@ -1,0 +1,268 @@
+{
+ "port": "19222",
+ "worktree": "<WORKTREE>",
+ "browser": "Chrome/153.0.8010.53",
+ "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Max, Unspecified Version)",
+ "repeats": 2,
+ "identical_across_repeats": true,
+ "scenes": [
+  {
+   "scene": "flat-starter",
+   "sha256": "b59e299aa2e4dcdfdbdb6522c0901c8848ad166d5f1537e23a6c15f9ec9df1f0",
+   "drawnPixels": 144000,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "endless-starter",
+   "sha256": "0a771eea195993c64fed242d8a365022bd9d7f87785124fc5099eb48b08cd089",
+   "drawnPixels": 144000,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "endless-starter-looking-up",
+   "sha256": "7b9f4725419527cd514fabcdc2a2bd00636468803ddbc35afe6ec6f9ba7c0028",
+   "drawnPixels": 144000,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "endless-cube-arrival",
+   "sha256": "40aa5b2e326746cd2c7504f2ca076139335f7fa02fe90c31ae81cabe70d22f26",
+   "drawnPixels": 144000,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "endless-cube-after-map",
+   "sha256": "b2b0f523de97b5976ebf8f9f74f0a8d2ae48fa26d740986d30e1c966686d39ef",
+   "drawnPixels": 144000,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "endless-cube-8km",
+   "sha256": "53ae507fa42fa4e657be471c3383fc70455566fe0254a60e1167c79eb9029c05",
+   "drawnPixels": 98400,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "endless-plate",
+   "sha256": "30bd8098c7d8c7a240d4ded4b083ba8c4eba1b4a22235d745811e74be652cf2e",
+   "drawnPixels": 144000,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "flat-plate",
+   "sha256": "736ad7b078b20f3bd54343370fb1539258041e7a91dc3ef2fa7713d324510929",
+   "drawnPixels": 144000,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "estimate",
+   "sha256": "469dcf1c94d3d211632ea737a18e851267403666803589b44206eff2984e414a",
+   "drawnPixels": 144000,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "regions",
+   "sha256": "1149d349016c75aab6f39f760c252b2df0253a7b41f961d21ab90be021aa8629",
+   "drawnPixels": 144000,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "regions-map",
+   "sha256": "a3ab2f929d795babdff664f16aaf58940c6e1d08c6b8112d026718caacd3e1f1",
+   "drawnPixels": 16883,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "district",
+   "sha256": "30d702072643f793afdbe8294fa8398b228653dcbb66844ad44ed8ba07144279",
+   "drawnPixels": 1176,
+   "width": 480,
+   "height": 300
+  }
+ ],
+ "runs": [
+  [
+   {
+    "scene": "flat-starter",
+    "sha256": "b59e299aa2e4dcdfdbdb6522c0901c8848ad166d5f1537e23a6c15f9ec9df1f0",
+    "drawnPixels": 144000,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-starter",
+    "sha256": "0a771eea195993c64fed242d8a365022bd9d7f87785124fc5099eb48b08cd089",
+    "drawnPixels": 144000,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-starter-looking-up",
+    "sha256": "7b9f4725419527cd514fabcdc2a2bd00636468803ddbc35afe6ec6f9ba7c0028",
+    "drawnPixels": 144000,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-cube-arrival",
+    "sha256": "40aa5b2e326746cd2c7504f2ca076139335f7fa02fe90c31ae81cabe70d22f26",
+    "drawnPixels": 144000,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-cube-after-map",
+    "sha256": "b2b0f523de97b5976ebf8f9f74f0a8d2ae48fa26d740986d30e1c966686d39ef",
+    "drawnPixels": 144000,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-cube-8km",
+    "sha256": "53ae507fa42fa4e657be471c3383fc70455566fe0254a60e1167c79eb9029c05",
+    "drawnPixels": 98400,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-plate",
+    "sha256": "30bd8098c7d8c7a240d4ded4b083ba8c4eba1b4a22235d745811e74be652cf2e",
+    "drawnPixels": 144000,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "flat-plate",
+    "sha256": "736ad7b078b20f3bd54343370fb1539258041e7a91dc3ef2fa7713d324510929",
+    "drawnPixels": 144000,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "estimate",
+    "sha256": "469dcf1c94d3d211632ea737a18e851267403666803589b44206eff2984e414a",
+    "drawnPixels": 144000,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "regions",
+    "sha256": "1149d349016c75aab6f39f760c252b2df0253a7b41f961d21ab90be021aa8629",
+    "drawnPixels": 144000,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "regions-map",
+    "sha256": "a3ab2f929d795babdff664f16aaf58940c6e1d08c6b8112d026718caacd3e1f1",
+    "drawnPixels": 16883,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "district",
+    "sha256": "30d702072643f793afdbe8294fa8398b228653dcbb66844ad44ed8ba07144279",
+    "drawnPixels": 1176,
+    "width": 480,
+    "height": 300
+   }
+  ],
+  [
+   {
+    "scene": "flat-starter",
+    "sha256": "b59e299aa2e4dcdfdbdb6522c0901c8848ad166d5f1537e23a6c15f9ec9df1f0",
+    "drawnPixels": 144000,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-starter",
+    "sha256": "0a771eea195993c64fed242d8a365022bd9d7f87785124fc5099eb48b08cd089",
+    "drawnPixels": 144000,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-starter-looking-up",
+    "sha256": "7b9f4725419527cd514fabcdc2a2bd00636468803ddbc35afe6ec6f9ba7c0028",
+    "drawnPixels": 144000,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-cube-arrival",
+    "sha256": "40aa5b2e326746cd2c7504f2ca076139335f7fa02fe90c31ae81cabe70d22f26",
+    "drawnPixels": 144000,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-cube-after-map",
+    "sha256": "b2b0f523de97b5976ebf8f9f74f0a8d2ae48fa26d740986d30e1c966686d39ef",
+    "drawnPixels": 144000,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-cube-8km",
+    "sha256": "53ae507fa42fa4e657be471c3383fc70455566fe0254a60e1167c79eb9029c05",
+    "drawnPixels": 98400,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-plate",
+    "sha256": "30bd8098c7d8c7a240d4ded4b083ba8c4eba1b4a22235d745811e74be652cf2e",
+    "drawnPixels": 144000,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "flat-plate",
+    "sha256": "736ad7b078b20f3bd54343370fb1539258041e7a91dc3ef2fa7713d324510929",
+    "drawnPixels": 144000,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "estimate",
+    "sha256": "469dcf1c94d3d211632ea737a18e851267403666803589b44206eff2984e414a",
+    "drawnPixels": 144000,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "regions",
+    "sha256": "1149d349016c75aab6f39f760c252b2df0253a7b41f961d21ab90be021aa8629",
+    "drawnPixels": 144000,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "regions-map",
+    "sha256": "a3ab2f929d795babdff664f16aaf58940c6e1d08c6b8112d026718caacd3e1f1",
+    "drawnPixels": 16883,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "district",
+    "sha256": "30d702072643f793afdbe8294fa8398b228653dcbb66844ad44ed8ba07144279",
+    "drawnPixels": 1176,
+    "width": 480,
+    "height": 300
+   }
+  ]
+ ]
+}

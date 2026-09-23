@@ -232,6 +232,11 @@ export interface AuthoredGroundSupport {
 export interface EndlessAuthoredGroundSupport {
   readonly kind: 'endless';
   readonly elevation: number;
+  /**
+   * How far the camera sees, in metres: its far clip. The drawn face reaches this far past the
+   * farthest point a walk can stand, and no farther, because its size is its depth precision.
+   */
+  readonly reach: number;
 }
 
 /**
@@ -245,30 +250,57 @@ function isEndlessAuthoredGroundSupport(
 }
 
 /**
- * The walking face of an endless authored ground: one flat quad at the authored elevation.
+ * The walking face of an endless authored ground: a flat grid at the authored elevation.
  *
  * `halfExtent` is how far the drawn surface reaches, which is not an edge the ground has. It is
  * sized by the caller past everything the camera can see from anywhere a walk can reach, so the
- * quad's own border is always behind the far clip and the fog, and never reads as a place.
+ * grid's own border is always behind the far clip and the fog, and never reads as a place.
+ *
+ * The grid's cells are no wider than `cellSize`, which the caller sets to the camera's reach.
+ * One quad across the whole extent was tried first: its depth, interpolated from corners
+ * kilometres away, missed its own plane by more than any small offset, so an object lying on the
+ * face lost to it at some poses (see the depth order below). Cells as wide as the view hold it.
  */
 export function endlessAuthoredGroundSurface(
   elevation: number,
   halfExtent: number,
+  cellSize: number,
 ): MeshGeometryData {
   if (!Number.isFinite(elevation) || !Number.isFinite(halfExtent) || halfExtent <= 0) {
     throw new Error(
       'an endless authored ground needs a finite elevation and a positive drawn reach',
     );
   }
+  if (!Number.isFinite(cellSize) || cellSize <= 0) {
+    throw new Error('an endless authored ground needs a positive cell size');
+  }
+  const cells = Math.ceil((2 * halfExtent) / cellSize);
+  const positions: number[] = [];
+  const normals: number[] = [];
+  const indices: number[] = [];
+  for (let row = 0; row <= cells; row += 1) {
+    for (let column = 0; column <= cells; column += 1) {
+      positions.push(
+        -halfExtent + (2 * halfExtent * column) / cells,
+        elevation,
+        -halfExtent + (2 * halfExtent * row) / cells,
+      );
+      normals.push(0, 1, 0);
+    }
+  }
+  for (let row = 0; row < cells; row += 1) {
+    for (let column = 0; column < cells; column += 1) {
+      const corner = row * (cells + 1) + column;
+      const across = corner + 1;
+      const far = corner + cells + 2;
+      const down = corner + cells + 1;
+      indices.push(corner, far, across, corner, down, far);
+    }
+  }
   return Object.freeze({
-    positions: Object.freeze([
-      -halfExtent, elevation, -halfExtent,
-      halfExtent, elevation, -halfExtent,
-      halfExtent, elevation, halfExtent,
-      -halfExtent, elevation, halfExtent,
-    ]),
-    normals: Object.freeze([0, 1, 0, 0, 1, 0, 0, 1, 0, 0, 1, 0]),
-    indices: Object.freeze([0, 2, 1, 0, 3, 2]),
+    positions: Object.freeze(positions),
+    normals: Object.freeze(normals),
+    indices: Object.freeze(indices),
   });
 }
 
@@ -281,8 +313,25 @@ export function endlessAuthoredGroundSurface(
  */
 export const AUTHORED_GROUND_SCALE_SPACING_M = 1;
 
-/** How far above the walking elevation the scale marks sit, so they do not z-fight the surface. */
-const AUTHORED_GROUND_SCALE_LIFT_M = 0.008;
+/*
+ * THE ORDER OF THINGS THAT LIE ON THE WALKING FACE, IN THE DEPTH BUFFER.
+ *
+ * Objects rest on the walking face at its own elevation: a reviewed marker plate is a square of
+ * no thickness lying there. Two surfaces at one depth tie, and the depth buffer then picks per
+ * pixel, which is a plate that flickers as the camera moves or is not drawn at all. So the face
+ * and its rim are drawn behind anything coplanar by a polygon offset (a constant in depth-buffer
+ * units and a factor of the surface's own depth slope), and the metre marks lie on the face,
+ * drawn behind by less: over the face and under whatever rests on it.
+ *
+ * MEASURED on WebGL2 (ANGLE Metal) over a camera sweep of 155 poses aimed at a plate: with no
+ * offset, on the endless face, the plate's interior was drawn on 44 per cent of its area on
+ * average over the poses where it had one, and not at all from 1.5 to 3 metres; with this offset
+ * and the endless face drawn in cells no wider than its reach, it was drawn whole at every pose,
+ * at the origin and at 8 km. The slope factor is what separates them: a constant alone, up to 64
+ * units, left the plate as it was.
+ */
+const AUTHORED_FACE_DEPTH_OFFSET = 2;
+const AUTHORED_MARK_DEPTH_OFFSET = 1;
 
 export interface MeshGeometryData {
   readonly positions: readonly number[];
@@ -329,7 +378,7 @@ export function authoredGroundScaleCue(
     });
   }
 
-  const y = elevation + AUTHORED_GROUND_SCALE_LIFT_M;
+  const y = elevation;
   const positions: number[] = [];
   const normals: number[] = [];
   const indices: number[] = [];
@@ -573,11 +622,15 @@ function authoredGroundMaterial(
     material.blendType = pc.BLEND_NORMAL;
     material.opacity = 0.88;
     material.depthWrite = false;
+    material.depthBias = AUTHORED_MARK_DEPTH_OFFSET;
+    material.slopeDepthBias = AUTHORED_MARK_DEPTH_OFFSET;
   } else {
     material.useLighting = true;
     // A slightly glossier walking face catches directional light; the rim stays matte so the
     // perimeter reads as structure rather than a second shine competing with objects.
     material.gloss = kind === 'boundary' ? 0.06 : 0.22;
+    material.depthBias = AUTHORED_FACE_DEPTH_OFFSET;
+    material.slopeDepthBias = AUTHORED_FACE_DEPTH_OFFSET;
   }
   const apply = (next: WorldArtProfile): void => {
     if (kind === 'scaleCue') {
@@ -628,20 +681,28 @@ export function createWorldField(
     authoredSupport === undefined || isEndlessAuthoredGroundSupport(authoredSupport)
       ? undefined
       : authoredSupport;
+  const endless = authoredSupport !== undefined && isEndlessAuthoredGroundSupport(authoredSupport)
+    ? authoredSupport
+    : null;
   const authoredElevation = authoredSupport?.elevation ?? 0;
   const entity = new pc.Entity('atlas-world-field');
   const buffers = worldFieldBufferShape(world);
   // The navigable/recovery radii remain visible in the material, but the physical draw surface
   // extends beyond the far clip so its square edge can never masquerade as a platform boundary.
-  const visualHalfExtent = Math.max(2200, world.recoveryRadius * 4.8);
+  // An endless face reaches exactly that far past the walk: at 4.8 times its recovery radius it
+  // was one quad 78 km across, whose depth could not hold an object lying on it (see the depth
+  // order above).
+  const visualHalfExtent = endless !== null
+    ? world.recoveryRadius + endless.reach
+    : Math.max(2200, world.recoveryRadius * 4.8);
   // 220 segments is ~193k triangles for a surface whose relief, contours, regions and traces are
   // all computed per pixel. The mesh only has to carry the height field well enough that the
   // silhouette and the horizon read correctly, and 96 does that at a fifth of the geometry.
   const authoredGeometry = rectangle === undefined ? null : authoredGroundGeometry(rectangle);
   const mesh = authoredGeometry !== null
     ? createMesh(device, authoredGeometry.surface)
-    : authoredStarter
-      ? createMesh(device, endlessAuthoredGroundSurface(authoredElevation, visualHalfExtent))
+    : endless !== null
+      ? createMesh(device, endlessAuthoredGroundSurface(authoredElevation, visualHalfExtent, endless.reach))
       : createLandscapeMesh(device, world, visualHalfExtent, 96);
   const material = new pc.ShaderMaterial({
     uniqueName: `exulanica-grounded-world-field:${buffers.regionCapacity}:${buffers.traceCapacity}`,

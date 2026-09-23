@@ -16,7 +16,7 @@ import {
   AUTHORED_ENDLESS_GROUND_SUPPORTED_RADIUS_M,
   authoredGroundSurface,
   endlessAuthoredNavigation,
-} from '../src/playcanvas/atlas-binding.js';
+} from '../src/playcanvas/world-kind.js';
 
 /**
  * A ground that states it has no extent, and the distance this renderer can honestly carry a

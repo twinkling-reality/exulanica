@@ -1,0 +1,330 @@
+{
+ "port": "19222",
+ "worktree": "<WORKTREE>",
+ "browser": "Chrome/153.0.8010.53",
+ "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Max, Unspecified Version)",
+ "repeats": 2,
+ "identical_across_repeats": true,
+ "scenes": [
+  {
+   "scene": "flat-starter",
+   "sha256": "b69886f0e172b1d02127f8afe388b9143f881f98dc4fd5721df00ff362151062",
+   "drawnPixels": 144000,
+   "skyColours": 16,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "endless-starter",
+   "sha256": "ec3c99d92fe3613555a9e0548b06d50fc8a39c8b7a882394dc54d52f0025879c",
+   "drawnPixels": 144000,
+   "skyColours": 16,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "endless-starter-looking-up",
+   "sha256": "9bbfa97f92bfcac346add2159eac644d2e2745a6d45a05966252650b3c45ac13",
+   "drawnPixels": 144000,
+   "skyColours": 15,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "endless-cube-arrival",
+   "sha256": "ad448410cdcffc8c4db226a0bc299a80a5fc032f5439583200c98c56bf7236bb",
+   "drawnPixels": 144000,
+   "skyColours": 15,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "endless-cube-after-map",
+   "sha256": "ad448410cdcffc8c4db226a0bc299a80a5fc032f5439583200c98c56bf7236bb",
+   "drawnPixels": 144000,
+   "skyColours": 15,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "endless-cube-8km",
+   "sha256": "efdfda8ac74feca36aeb26837d3dc0b7fea520e3bdf246f525e76c8e252028a7",
+   "drawnPixels": 144000,
+   "skyColours": 15,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "endless-plate",
+   "sha256": "f0411abe2b2363e368bae713f4c97049508759d6caff6578dfb47f884ca33149",
+   "drawnPixels": 144000,
+   "skyColours": 17,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "flat-plate",
+   "sha256": "2028f11330d00821068099d9dd4f94b8753bf674a5d28e09d22659ac5f3fcb9f",
+   "drawnPixels": 144000,
+   "skyColours": 17,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "estimate",
+   "sha256": "45b4441f746130d25081362a62a248af4fd4037a09632a55af7f2616bddd3826",
+   "drawnPixels": 144000,
+   "skyColours": 16,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "regions",
+   "sha256": "0e33541baa80cc6f382eed716ce4a182928d8f4a366c687fe0a015450f580cfd",
+   "drawnPixels": 144000,
+   "skyColours": 30,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "regions-map",
+   "sha256": "98d0b3f285179a0e88b4c5f720c67118e5375f8e9501f27d56a98b4cfc7eef1c",
+   "drawnPixels": 16883,
+   "skyColours": 2,
+   "width": 480,
+   "height": 300
+  },
+  {
+   "scene": "district",
+   "sha256": "30d702072643f793afdbe8294fa8398b228653dcbb66844ad44ed8ba07144279",
+   "drawnPixels": 1176,
+   "skyColours": 1,
+   "width": 480,
+   "height": 300
+  }
+ ],
+ "plate_sweeps": [
+  {
+   "ground": "authored-endless@0,0",
+   "poses": 155,
+   "measured": 53,
+   "drawnMin": 1,
+   "cleanMin": 1,
+   "underWhole": 0
+  },
+  {
+   "ground": "authored-endless@0,-8000000",
+   "poses": 155,
+   "measured": 53,
+   "drawnMin": 1,
+   "cleanMin": 1,
+   "underWhole": 0
+  },
+  {
+   "ground": "authored-flat@2000,0",
+   "poses": 155,
+   "measured": 155,
+   "drawnMin": 1,
+   "cleanMin": 1,
+   "underWhole": 0
+  }
+ ],
+ "runs": [
+  [
+   {
+    "scene": "flat-starter",
+    "sha256": "b69886f0e172b1d02127f8afe388b9143f881f98dc4fd5721df00ff362151062",
+    "drawnPixels": 144000,
+    "skyColours": 16,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-starter",
+    "sha256": "ec3c99d92fe3613555a9e0548b06d50fc8a39c8b7a882394dc54d52f0025879c",
+    "drawnPixels": 144000,
+    "skyColours": 16,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-starter-looking-up",
+    "sha256": "9bbfa97f92bfcac346add2159eac644d2e2745a6d45a05966252650b3c45ac13",
+    "drawnPixels": 144000,
+    "skyColours": 15,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-cube-arrival",
+    "sha256": "ad448410cdcffc8c4db226a0bc299a80a5fc032f5439583200c98c56bf7236bb",
+    "drawnPixels": 144000,
+    "skyColours": 15,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-cube-after-map",
+    "sha256": "ad448410cdcffc8c4db226a0bc299a80a5fc032f5439583200c98c56bf7236bb",
+    "drawnPixels": 144000,
+    "skyColours": 15,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-cube-8km",
+    "sha256": "efdfda8ac74feca36aeb26837d3dc0b7fea520e3bdf246f525e76c8e252028a7",
+    "drawnPixels": 144000,
+    "skyColours": 15,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-plate",
+    "sha256": "f0411abe2b2363e368bae713f4c97049508759d6caff6578dfb47f884ca33149",
+    "drawnPixels": 144000,
+    "skyColours": 17,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "flat-plate",
+    "sha256": "2028f11330d00821068099d9dd4f94b8753bf674a5d28e09d22659ac5f3fcb9f",
+    "drawnPixels": 144000,
+    "skyColours": 17,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "estimate",
+    "sha256": "45b4441f746130d25081362a62a248af4fd4037a09632a55af7f2616bddd3826",
+    "drawnPixels": 144000,
+    "skyColours": 16,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "regions",
+    "sha256": "0e33541baa80cc6f382eed716ce4a182928d8f4a366c687fe0a015450f580cfd",
+    "drawnPixels": 144000,
+    "skyColours": 30,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "regions-map",
+    "sha256": "98d0b3f285179a0e88b4c5f720c67118e5375f8e9501f27d56a98b4cfc7eef1c",
+    "drawnPixels": 16883,
+    "skyColours": 2,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "district",
+    "sha256": "30d702072643f793afdbe8294fa8398b228653dcbb66844ad44ed8ba07144279",
+    "drawnPixels": 1176,
+    "skyColours": 1,
+    "width": 480,
+    "height": 300
+   }
+  ],
+  [
+   {
+    "scene": "flat-starter",
+    "sha256": "b69886f0e172b1d02127f8afe388b9143f881f98dc4fd5721df00ff362151062",
+    "drawnPixels": 144000,
+    "skyColours": 16,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-starter",
+    "sha256": "ec3c99d92fe3613555a9e0548b06d50fc8a39c8b7a882394dc54d52f0025879c",
+    "drawnPixels": 144000,
+    "skyColours": 16,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-starter-looking-up",
+    "sha256": "9bbfa97f92bfcac346add2159eac644d2e2745a6d45a05966252650b3c45ac13",
+    "drawnPixels": 144000,
+    "skyColours": 15,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-cube-arrival",
+    "sha256": "ad448410cdcffc8c4db226a0bc299a80a5fc032f5439583200c98c56bf7236bb",
+    "drawnPixels": 144000,
+    "skyColours": 15,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-cube-after-map",
+    "sha256": "ad448410cdcffc8c4db226a0bc299a80a5fc032f5439583200c98c56bf7236bb",
+    "drawnPixels": 144000,
+    "skyColours": 15,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-cube-8km",
+    "sha256": "efdfda8ac74feca36aeb26837d3dc0b7fea520e3bdf246f525e76c8e252028a7",
+    "drawnPixels": 144000,
+    "skyColours": 15,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "endless-plate",
+    "sha256": "f0411abe2b2363e368bae713f4c97049508759d6caff6578dfb47f884ca33149",
+    "drawnPixels": 144000,
+    "skyColours": 17,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "flat-plate",
+    "sha256": "2028f11330d00821068099d9dd4f94b8753bf674a5d28e09d22659ac5f3fcb9f",
+    "drawnPixels": 144000,
+    "skyColours": 17,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "estimate",
+    "sha256": "45b4441f746130d25081362a62a248af4fd4037a09632a55af7f2616bddd3826",
+    "drawnPixels": 144000,
+    "skyColours": 16,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "regions",
+    "sha256": "0e33541baa80cc6f382eed716ce4a182928d8f4a366c687fe0a015450f580cfd",
+    "drawnPixels": 144000,
+    "skyColours": 30,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "regions-map",
+    "sha256": "98d0b3f285179a0e88b4c5f720c67118e5375f8e9501f27d56a98b4cfc7eef1c",
+    "drawnPixels": 16883,
+    "skyColours": 2,
+    "width": 480,
+    "height": 300
+   },
+   {
+    "scene": "district",
+    "sha256": "30d702072643f793afdbe8294fa8398b228653dcbb66844ad44ed8ba07144279",
+    "drawnPixels": 1176,
+    "skyColours": 1,
+    "width": 480,
+    "height": 300
+   }
+  ]
+ ]
+}

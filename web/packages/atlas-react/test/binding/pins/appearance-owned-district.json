@@ -1,0 +1,296 @@
+{
+ "built": {
+  "clear": [
+   0.79,
+   0.85,
+   0.88
+  ],
+  "fog": [
+   0.79,
+   0.85,
+   0.88
+  ],
+  "ambient": [
+   0.64,
+   0.69,
+   0.74
+  ],
+  "sun": [
+   1,
+   0.964706,
+   0.8
+  ],
+  "profile": "origin-landscape",
+  "layers": [
+   "world-profile:origin-landscape:false",
+   "world-profile:survey-relief:false"
+  ],
+  "skyHorizon": null,
+  "map": false,
+  "mapMarker": false,
+  "regionMass": false,
+  "regionRelief": false,
+  "overlayHidden": true,
+  "mapOverlayHidden": true,
+  "controlsEnabled": true,
+  "pose": {
+   "x": 0,
+   "y": 1.62,
+   "z": 0,
+   "yaw": 0,
+   "pitch": 0
+  }
+ },
+ "mapOn": {
+  "clear": [
+   0.895686,
+   0.953725,
+   0.919216
+  ],
+  "fog": [
+   0.895686,
+   0.953725,
+   0.919216
+  ],
+  "ambient": [
+   0.64,
+   0.69,
+   0.74
+  ],
+  "sun": [
+   1,
+   0.964706,
+   0.8
+  ],
+  "profile": "origin-landscape",
+  "layers": [
+   "world-profile:origin-landscape:false",
+   "world-profile:survey-relief:false"
+  ],
+  "skyHorizon": null,
+  "map": true,
+  "mapMarker": false,
+  "regionMass": false,
+  "regionRelief": false,
+  "overlayHidden": true,
+  "mapOverlayHidden": false,
+  "controlsEnabled": false,
+  "pose": {
+   "x": 0,
+   "y": 28,
+   "z": 19.605811,
+   "yaw": 0,
+   "pitch": -0.959931
+  }
+ },
+ "mapFrame": {
+  "clear": [
+   0.895686,
+   0.953725,
+   0.919216
+  ],
+  "fog": [
+   0.895686,
+   0.953725,
+   0.919216
+  ],
+  "ambient": [
+   0.64,
+   0.69,
+   0.74
+  ],
+  "sun": [
+   1,
+   0.964706,
+   0.8
+  ],
+  "profile": "origin-landscape",
+  "layers": [
+   "world-profile:origin-landscape:false",
+   "world-profile:survey-relief:false"
+  ],
+  "skyHorizon": null,
+  "map": true,
+  "mapMarker": false,
+  "regionMass": false,
+  "regionRelief": false,
+  "overlayHidden": false,
+  "mapOverlayHidden": false,
+  "controlsEnabled": false,
+  "pose": {
+   "x": 0,
+   "y": 28,
+   "z": 19.605811,
+   "yaw": 0,
+   "pitch": -0.959931
+  }
+ },
+ "mapOff": {
+  "clear": [
+   0.635294,
+   0.831373,
+   0.87451
+  ],
+  "fog": [
+   0.635294,
+   0.831373,
+   0.87451
+  ],
+  "ambient": [
+   0.64,
+   0.69,
+   0.74
+  ],
+  "sun": [
+   1,
+   0.964706,
+   0.8
+  ],
+  "profile": "origin-landscape",
+  "layers": [
+   "world-profile:origin-landscape:false",
+   "world-profile:survey-relief:false"
+  ],
+  "skyHorizon": null,
+  "map": false,
+  "mapMarker": false,
+  "regionMass": false,
+  "regionRelief": false,
+  "overlayHidden": false,
+  "mapOverlayHidden": true,
+  "controlsEnabled": true,
+  "pose": {
+   "x": 0,
+   "y": 1.62,
+   "z": 0,
+   "yaw": 0,
+   "pitch": 0
+  }
+ },
+ "surveyRelief": {
+  "clear": [
+   0.85098,
+   0.87451,
+   0.862745
+  ],
+  "fog": [
+   0.85098,
+   0.87451,
+   0.862745
+  ],
+  "ambient": [
+   0.416235,
+   0.436706,
+   0.423059
+  ],
+  "sun": [
+   0.905882,
+   0.811765,
+   0.615686
+  ],
+  "profile": "survey-relief",
+  "layers": [
+   "world-profile:origin-landscape:false",
+   "world-profile:survey-relief:false"
+  ],
+  "skyHorizon": null,
+  "map": false,
+  "mapMarker": false,
+  "regionMass": false,
+  "regionRelief": false,
+  "overlayHidden": false,
+  "mapOverlayHidden": true,
+  "controlsEnabled": true,
+  "pose": {
+   "x": 0,
+   "y": 1.62,
+   "z": 0,
+   "yaw": 0,
+   "pitch": 0
+  }
+ },
+ "surveyReliefMapOn": {
+  "clear": [
+   0.426824,
+   0.441412,
+   0.41349
+  ],
+  "fog": [
+   0.426824,
+   0.441412,
+   0.41349
+  ],
+  "ambient": [
+   0.416235,
+   0.436706,
+   0.423059
+  ],
+  "sun": [
+   0.905882,
+   0.811765,
+   0.615686
+  ],
+  "profile": "survey-relief",
+  "layers": [
+   "world-profile:origin-landscape:false",
+   "world-profile:survey-relief:false"
+  ],
+  "skyHorizon": null,
+  "map": true,
+  "mapMarker": false,
+  "regionMass": false,
+  "regionRelief": false,
+  "overlayHidden": true,
+  "mapOverlayHidden": false,
+  "controlsEnabled": false,
+  "pose": {
+   "x": 0,
+   "y": 28,
+   "z": 19.605811,
+   "yaw": 0,
+   "pitch": -0.959931
+  }
+ },
+ "originLandscape": {
+  "clear": [
+   0.635294,
+   0.831373,
+   0.87451
+  ],
+  "fog": [
+   0.635294,
+   0.831373,
+   0.87451
+  ],
+  "ambient": [
+   0.58,
+   0.568627,
+   0.552706
+  ],
+  "sun": [
+   1,
+   0.964706,
+   0.8
+  ],
+  "profile": "origin-landscape",
+  "layers": [
+   "world-profile:origin-landscape:false",
+   "world-profile:survey-relief:false"
+  ],
+  "skyHorizon": null,
+  "map": false,
+  "mapMarker": false,
+  "regionMass": false,
+  "regionRelief": false,
+  "overlayHidden": false,
+  "mapOverlayHidden": true,
+  "controlsEnabled": true,
+  "pose": {
+   "x": 0,
+   "y": 1.62,
+   "z": 0,
+   "yaw": 0,
+   "pitch": 0
+  }
+ }
+}

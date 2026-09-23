@@ -1,0 +1,164 @@
+// Exploratory: what makes the lit face of a placed cube band at 4 and 8 km?
+//
+//   node probe-bands.mjs --app URL --out DIR --arms base,nolightshadow,... [--full]
+//
+// The world must hold marker cubes at x 0 and z = 0.5, -39.5, -79.5, -999.5, -3999.5, -7999.5 m
+// (place.py). For each arm and each cube: every other cube is hidden, the camera stands 3 m south
+// of the cube facing north and 0.25 rad down (lane W's relative pose), frames run, then one task
+// renders and reads the whole frame. Face and sky statistics use lane W's shading.py boxes on the
+// 1440 x 900 frame: face x 672..767, y 510..627 against the same arm's arrival capture (> 8 levels
+// in any channel; luminance steps >= 6 along row 569); sky column x 720, rows 0..285.
+import { readFileSync, writeFileSync, mkdirSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import zlib from 'node:zlib';
+import crypto from 'node:crypto';
+import { launch, sleep } from './cdp.mjs';
+import { reachBinding } from './w-original/binding.mjs';
+
+const HERE = dirname(new URL(import.meta.url).pathname);
+const arg = (name, fallback) => { const i = process.argv.indexOf(`--${name}`); return i > 0 ? process.argv[i + 1] : fallback; };
+const app = arg('app', 'http://localhost:19222/');
+const out = arg('out', join(HERE, 'runs', 'probe-bands'));
+const arms = arg('arms', 'base').split(',');
+const full = process.argv.includes('--full');
+const marks = arg('marks', '0,40,80,1000,4000,8000').split(',').map(Number);
+mkdirSync(out, { recursive: true });
+const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+const INSTRUMENT = readFileSync(join(HERE, 'w-original', 'instrument-15ef8cd9.js'), 'utf8');
+const CUBE_Z = { 0: 0.5, 40: -39.5, 80: -79.5, 1000: -999.5, 4000: -3999.5, 8000: -7999.5 };
+
+function crc32(buffer) {
+  let c = ~0;
+  for (let i = 0; i < buffer.length; i += 1) { c ^= buffer[i]; for (let k = 0; k < 8; k += 1) c = (c >>> 1) ^ (0xedb88320 & -(c & 1)); }
+  return ~c >>> 0;
+}
+function png(width, height, rgbaTopDown) {
+  const raw = Buffer.alloc((width * 4 + 1) * height);
+  for (let y = 0; y < height; y += 1) { raw[y * (width * 4 + 1)] = 0; rgbaTopDown.copy(raw, y * (width * 4 + 1) + 1, y * width * 4, (y + 1) * width * 4); }
+  const chunk = (type, data) => { const l = Buffer.alloc(4); l.writeUInt32BE(data.length); const b = Buffer.concat([Buffer.from(type), data]); const c = Buffer.alloc(4); c.writeUInt32BE(crc32(b)); return Buffer.concat([l, b, c]); };
+  const h = Buffer.alloc(13); h.writeUInt32BE(width, 0); h.writeUInt32BE(height, 4); h[8] = 8; h[9] = 6;
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', h), chunk('IDAT', zlib.deflateSync(raw)), chunk('IEND', Buffer.alloc(0))]);
+}
+
+const PAGE = String.raw`(() => {
+  const P = window.__probe = window.__probe || {};
+  const W = 1440, H = 900;
+  P.grab = () => {
+    const app = __ws.app; const gl = app.graphicsDevice.gl;
+    app.render();
+    const prev = gl.getParameter(gl.READ_FRAMEBUFFER_BINDING);
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+    const w = gl.drawingBufferWidth, h = gl.drawingBufferHeight;
+    const px = new Uint8Array(w * h * 4);
+    gl.readPixels(0, 0, w, h, gl.RGBA, gl.UNSIGNED_BYTE, px);
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, prev);
+    // top-down rows
+    const td = new Uint8Array(w * h * 4);
+    for (let y = 0; y < h; y += 1) td.set(px.subarray((h - 1 - y) * w * 4, (h - y) * w * 4), y * w * 4);
+    return { w, h, px: td };
+  };
+  const at = (img, x, y) => { const i = (y * img.w + x) * 4; return [img.px[i], img.px[i + 1], img.px[i + 2]]; };
+  const lum = (p) => Math.floor((299 * p[0] + 587 * p[1] + 114 * p[2]) / 1000);
+  P.stats = (img, arrival) => {
+    const sky = new Set(); let allClear = true;
+    for (let y = 0; y < 286; y += 1) { const p = at(img, 720, y); sky.add(p.join(',')); if (!(p[0] === 162 && p[1] === 212 && p[2] === 223)) allClear = false; }
+    let differing = null;
+    if (arrival) { differing = 0; for (let x = 672; x < 768; x += 1) for (let y = 510; y < 628; y += 1) {
+      const a = at(img, x, y), b = at(arrival, x, y);
+      if (Math.max(Math.abs(a[0] - b[0]), Math.abs(a[1] - b[1]), Math.abs(a[2] - b[2])) > 8) differing += 1; } }
+    const row = []; for (let x = 672; x < 768; x += 1) row.push(lum(at(img, x, 569)));
+    let steps = 0; for (let i = 1; i < row.length; i += 1) if (Math.abs(row[i] - row[i - 1]) >= 6) steps += 1;
+    return { sky_distinct: sky.size, sky_all_clear: allClear, face_differing: differing, face_steps: steps,
+      face_row: row };
+  };
+  P.crop = (img, x0, y0, w, h) => { const out = new Uint8Array(w * h * 4);
+    for (let y = 0; y < h; y += 1) out.set(img.px.subarray(((y0 + y) * img.w + x0) * 4, ((y0 + y) * img.w + x0 + w) * 4), y * w * 4);
+    let s = ''; for (let i = 0; i < out.length; i += 32768) s += String.fromCharCode.apply(null, out.subarray(i, i + 32768)); return btoa(s); };
+  P.chunk = (img, offset, length) => { const b = img.px.subarray(offset, offset + length);
+    let s = ''; for (let i = 0; i < b.length; i += 32768) s += String.fromCharCode.apply(null, b.subarray(i, i + 32768)); return btoa(s); };
+  return true;
+})()`;
+
+// Arms: each a page-side setup and teardown, returning a report of what it applied.
+const ARMS = {
+  base: { setup: '({ applied: "nothing" })', teardown: 'true' },
+  nolightshadow: {
+    setup: `(() => { const l = __ws.app.root.findByName('atlas-directional-light').light; P.saved = l.castShadows; l.castShadows = false; return { applied: 'light.castShadows false', was: P.saved }; })()`,
+    teardown: `(() => { __ws.app.root.findByName('atlas-directional-light').light.castShadows = P.saved; return true; })()`,
+  },
+  noreceive: {
+    setup: `(() => { const n = []; for (const o of __ws.app.root.find(x => typeof x.name === 'string' && x.name.startsWith('authored-object:'))) for (const r of o.findComponents('render')) for (const mi of r.meshInstances) { mi.receiveShadow = false; n.push(1); } return { applied: 'cube receiveShadow false', instances: n.length }; })()`,
+    teardown: `(() => { for (const o of __ws.app.root.find(x => typeof x.name === 'string' && x.name.startsWith('authored-object:'))) for (const r of o.findComponents('render')) for (const mi of r.meshInstances) mi.receiveShadow = true; return true; })()`,
+  },
+  nocast: {
+    setup: `(() => { const n = []; for (const o of __ws.app.root.find(x => typeof x.name === 'string' && x.name.startsWith('authored-object:'))) for (const r of o.findComponents('render')) for (const mi of r.meshInstances) { mi.castShadow = false; n.push(1); } return { applied: 'cube castShadow false', instances: n.length }; })()`,
+    teardown: `(() => { for (const o of __ws.app.root.find(x => typeof x.name === 'string' && x.name.startsWith('authored-object:'))) for (const r of o.findComponents('render')) for (const mi of r.meshInstances) mi.castShadow = true; return true; })()`,
+  },
+  // A render origin moved to the cube's grid cell: the binding's own rebase path, driven by hand.
+  rebased: { perCube: true, setup: 'REBASE', teardown: 'UNREBASE' },
+};
+
+const { cdp, kill } = await launch({ port: 19223, profile: join(HERE, 'profiles', `probe-${stamp}`) });
+const result = { app, stamp, arms: {}, notes: [] };
+try {
+  await cdp.send('Page.enable'); await cdp.send('Runtime.enable');
+  await cdp.send('Emulation.setDeviceMetricsOverride', { width: 1440, height: 900, deviceScaleFactor: 1, mobile: false });
+  await cdp.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+  await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: INSTRUMENT });
+  cdp.on((method, params) => { if (method === 'Runtime.exceptionThrown') result.notes.push(String(params.exceptionDetails?.exception?.description ?? params.exceptionDetails?.text).slice(0, 300)); });
+  await cdp.send('Page.navigate', { url: app });
+  await cdp.waitFor(`typeof __ws === 'object' && __ws.app !== null && __ws.sceneObjects().length === ${Object.keys(CUBE_Z).length}`, 120_000, 'six cubes resident');
+  result.binding_variable = await reachBinding(cdp);
+  await cdp.evaluate(PAGE);
+  result.gpu = await cdp.evaluate(`(() => { const gl = __ws.app.graphicsDevice.gl; const i = gl.getExtension('WEBGL_debug_renderer_info'); return { renderer: gl.getParameter(i.UNMASKED_RENDERER_WEBGL), buffer: [gl.drawingBufferWidth, gl.drawingBufferHeight], antialias: gl.getContextAttributes().antialias, depthBits: gl.getParameter(gl.DEPTH_BITS) }; })()`);
+  result.objects = await cdp.evaluate('__ws.sceneObjects()');
+  const byZ = new Map(result.objects.map((o) => [Math.round(o[3] * 1000), o[0]]));
+  for (const arm of arms) {
+    const spec = ARMS[arm];
+    if (spec === undefined) throw new Error(`unknown arm ${arm}`);
+    const rows = [];
+    result.arms[arm] = rows;
+    for (const mark of marks) {
+      const z = CUBE_Z[mark];
+      const id = byZ.get(Math.round(z * 1000));
+      if (id === undefined) throw new Error(`no cube at z ${z}`);
+      const setup = spec.setup === 'REBASE'
+        ? `(() => { const b = __wsBinding; const oz = Math.round(${z} / 64) * 64;
+            b.renderOriginState = Object.freeze({ origin: { x: 0, y: 0, z: oz }, neighborhoodId: null, revision: 99 });
+            b.renderRoot.setPosition(0, 0, -oz); b.environmentRoot.setPosition(0, 0, -oz); b.field.setRenderOrigin(0, oz);
+            return { applied: 'render origin z ' + oz }; })()`
+        : spec.setup;
+      const teardown = spec.teardown === 'UNREBASE'
+        ? `(() => { const b = __wsBinding; b.renderOriginState = Object.freeze({ origin: { x: 0, y: 0, z: 0 }, neighborhoodId: null, revision: 0 });
+            b.renderRoot.setPosition(0, 0, 0); b.environmentRoot.setPosition(0, 0, 0); b.field.setRenderOrigin(0, 0); return true; })()`
+        : spec.teardown;
+      const report = await cdp.evaluate(`(() => { const P = window.__probe; return ${setup}; })()`);
+      await cdp.evaluate(`(() => { for (const o of __ws.app.root.find(x => typeof x.name === 'string' && x.name.startsWith('authored-object:'))) o.enabled = o.name === 'authored-object:${id}'; return true; })()`);
+      await cdp.evaluate(`(() => { const s = __wsBinding.controls.state; s.x = 0; s.z = ${z} + 3; s.yaw = 0; s.pitch = -0.25; __wsBinding.invalidate(); return true; })()`);
+      await sleep(400);
+      await cdp.waitFor('__ws.lastFrameEnd !== null', 5000, 'a frame');
+      const camera = await cdp.evaluate(`(() => { const c = __wsBinding.camera; const p = c.getPosition(); return { render: [p.x, p.y, p.z], state: [__wsBinding.controls.state.x, __wsBinding.controls.state.y, __wsBinding.controls.state.z] }; })()`);
+      const stats = await cdp.evaluate(`(() => { const P = window.__probe; const img = P.grab(); if (${mark} === 0) P.arrival = img; P.last = img; const s = P.stats(img, ${mark} === 0 ? null : P.arrival); return s; })()`);
+      if (mark !== 0 && stats.face_differing === null) throw new Error('no arrival capture');
+      const crop = Buffer.from(await cdp.evaluate('window.__probe.crop(window.__probe.last, 640, 480, 160, 180)'), 'base64');
+      const cropFile = join(out, `${stamp}-${arm}-${mark}-face.png`);
+      writeFileSync(cropFile, png(160, 180, crop));
+      if (full && (mark === 0 || mark === 8000)) {
+        const parts = [];
+        for (let offset = 0; offset < 1440 * 900 * 4; offset += 1_000_000) parts.push(Buffer.from(await cdp.evaluate(`window.__probe.chunk(window.__probe.last, ${offset}, 1000000)`), 'base64'));
+        writeFileSync(join(out, `${stamp}-${arm}-${mark}-full.png`), png(1440, 900, Buffer.concat(parts)));
+      }
+      await cdp.evaluate(`(() => { const P = window.__probe; return ${teardown}; })()`);
+      await cdp.evaluate(`(() => { for (const o of __ws.app.root.find(x => typeof x.name === 'string' && x.name.startsWith('authored-object:'))) o.enabled = true; return true; })()`);
+      const { face_row, ...summary } = stats;
+      rows.push({ mark, cube: id, report, camera, ...summary, face_row_sha256: crypto.createHash('sha256').update(JSON.stringify(face_row)).digest('hex').slice(0, 12) });
+      console.log(arm, mark, JSON.stringify(summary));
+    }
+  }
+} catch (error) {
+  result.error = String(error.stack ?? error);
+  console.error(result.error);
+} finally {
+  writeFileSync(join(out, `${stamp}.json`), JSON.stringify(result, null, 1));
+  kill();
+}

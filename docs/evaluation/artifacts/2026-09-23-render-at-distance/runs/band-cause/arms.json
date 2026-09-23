@@ -1,0 +1,821 @@
+{
+ "app": "http://localhost:19222/",
+ "stamp": "2026-09-23T12-33-50-178Z",
+ "arms": {
+  "base": [
+   {
+    "mark": 0,
+    "cube": "render-probe-0000",
+    "report": {
+     "applied": "nothing"
+    },
+    "camera": {
+     "render": [
+      0,
+      1.6200000047683716,
+      3.5
+     ],
+     "state": [
+      0,
+      1.62,
+      3.5
+     ]
+    },
+    "sky_distinct": 30,
+    "sky_all_clear": false,
+    "face_differing": null,
+    "face_steps": 0,
+    "face_row_sha256": "b3b6cbf9a9c9"
+   },
+   {
+    "mark": 40,
+    "cube": "render-probe-0001",
+    "report": {
+     "applied": "nothing"
+    },
+    "camera": {
+     "render": [
+      0,
+      1.6200000047683716,
+      -36.5
+     ],
+     "state": [
+      0,
+      1.62,
+      -36.5
+     ]
+    },
+    "sky_distinct": 28,
+    "sky_all_clear": false,
+    "face_differing": 0,
+    "face_steps": 0,
+    "face_row_sha256": "b3b6cbf9a9c9"
+   },
+   {
+    "mark": 80,
+    "cube": "render-probe-0002",
+    "report": {
+     "applied": "nothing"
+    },
+    "camera": {
+     "render": [
+      0,
+      1.6200000047683716,
+      -76.5
+     ],
+     "state": [
+      0,
+      1.62,
+      -76.5
+     ]
+    },
+    "sky_distinct": 23,
+    "sky_all_clear": false,
+    "face_differing": 0,
+    "face_steps": 0,
+    "face_row_sha256": "b3b6cbf9a9c9"
+   },
+   {
+    "mark": 1000,
+    "cube": "render-probe-0003",
+    "report": {
+     "applied": "nothing"
+    },
+    "camera": {
+     "render": [
+      0,
+      1.6200000047683716,
+      -996.5
+     ],
+     "state": [
+      0,
+      1.62,
+      -996.5
+     ]
+    },
+    "sky_distinct": 1,
+    "sky_all_clear": true,
+    "face_differing": 0,
+    "face_steps": 0,
+    "face_row_sha256": "b3b6cbf9a9c9"
+   },
+   {
+    "mark": 4000,
+    "cube": "render-probe-0004",
+    "report": {
+     "applied": "nothing"
+    },
+    "camera": {
+     "render": [
+      0,
+      1.6200000047683716,
+      -3996.5
+     ],
+     "state": [
+      0,
+      1.62,
+      -3996.5
+     ]
+    },
+    "sky_distinct": 1,
+    "sky_all_clear": true,
+    "face_differing": 6754,
+    "face_steps": 6,
+    "face_row_sha256": "7fcb7cc258fd"
+   },
+   {
+    "mark": 8000,
+    "cube": "render-probe-0005",
+    "report": {
+     "applied": "nothing"
+    },
+    "camera": {
+     "render": [
+      0,
+      1.6200000047683716,
+      -7996.5
+     ],
+     "state": [
+      0,
+      1.62,
+      -7996.5
+     ]
+    },
+    "sky_distinct": 1,
+    "sky_all_clear": true,
+    "face_differing": 7539,
+    "face_steps": 4,
+    "face_row_sha256": "a99b0f0df449"
+   }
+  ],
+  "nolightshadow": [
+   {
+    "mark": 0,
+    "cube": "render-probe-0000",
+    "report": {
+     "applied": "light.castShadows false",
+     "was": true
+    },
+    "camera": {
+     "render": [
+      0,
+      1.6200000047683716,
+      3.5
+     ],
+     "state": [
+      0,
+      1.62,
+      3.5
+     ]
+    },
+    "sky_distinct": 30,
+    "sky_all_clear": false,
+    "face_differing": null,
+    "face_steps": 0,
+    "face_row_sha256": "b3b6cbf9a9c9"
+   },
+   {
+    "mark": 40,
+    "cube": "render-probe-0001",
+    "report": {
+     "applied": "light.castShadows false",
+     "was": true
+    },
+    "camera": {
+     "render": [
+      0,
+      1.6200000047683716,
+      -36.5
+     ],
+     "state": [
+      0,
+      1.62,
+      -36.5
+     ]
+    },
+    "sky_distinct": 28,
+    "sky_all_clear": false,
+    "face_differing": 0,
+    "face_steps": 0,
+    "face_row_sha256": "b3b6cbf9a9c9"
+   },
+   {
+    "mark": 80,
+    "cube": "render-probe-0002",
+    "report": {
+     "applied": "light.castShadows false",
+     "was": true
+    },
+    "camera": {
+     "render": [
+      0,
+      1.6200000047683716,
+      -76.5
+     ],
+     "state": [
+      0,
+      1.62,
+      -76.5
+     ]
+    },
+    "sky_distinct": 23,
+    "sky_all_clear": false,
+    "face_differing": 0,
+    "face_steps": 0,
+    "face_row_sha256": "b3b6cbf9a9c9"
+   },
+   {
+    "mark": 1000,
+    "cube": "render-probe-0003",
+    "report": {
+     "applied": "light.castShadows false",
+     "was": true
+    },
+    "camera": {
+     "render": [
+      0,
+      1.6200000047683716,
+      -996.5
+     ],
+     "state": [
+      0,
+      1.62,
+      -996.5
+     ]
+    },
+    "sky_distinct": 1,
+    "sky_all_clear": true,
+    "face_differing": 0,
+    "face_steps": 0,
+    "face_row_sha256": "b3b6cbf9a9c9"
+   },
+   {
+    "mark": 4000,
+    "cube": "render-probe-0004",
+    "report": {
+     "applied": "light.castShadows false",
+     "was": true
+    },
+    "camera": {
+     "render": [
+      0,
+      1.6200000047683716,
+      -3996.5
+     ],
+     "state": [
+      0,
+      1.62,
+      -3996.5
+     ]
+    },
+    "sky_distinct": 1,
+    "sky_all_clear": true,
+    "face_differing": 0,
+    "face_steps": 0,
+    "face_row_sha256": "b3b6cbf9a9c9"
+   },
+   {
+    "mark": 8000,
+    "cube": "render-probe-0005",
+    "report": {
+     "applied": "light.castShadows false",
+     "was": true
+    },
+    "camera": {
+     "render": [
+      0,
+      1.6200000047683716,
+      -7996.5
+     ],
+     "state": [
+      0,
+      1.62,
+      -7996.5
+     ]
+    },
+    "sky_distinct": 1,
+    "sky_all_clear": true,
+    "face_differing": 0,
+    "face_steps": 0,
+    "face_row_sha256": "b3b6cbf9a9c9"
+   }
+  ],
+  "noreceive": [
+   {
+    "mark": 0,
+    "cube": "render-probe-0000",
+    "report": {
+     "applied": "cube receiveShadow false",
+     "instances": 6
+    },
+    "camera": {
+     "render": [
+      0,
+      1.6200000047683716,
+      3.5
+     ],
+     "state": [
+      0,
+      1.62,
+      3.5
+     ]
+    },
+    "sky_distinct": 30,
+    "sky_all_clear": false,
+    "face_differing": null,
+    "face_steps": 0,
+    "face_row_sha256": "b3b6cbf9a9c9"
+   },
+   {
+    "mark": 40,
+    "cube": "render-probe-0001",
+    "report": {
+     "applied": "cube receiveShadow false",
+     "instances": 6
+    },
+    "camera": {
+     "render": [
+      0,
+      1.6200000047683716,
+      -36.5
+     ],
+     "state": [
+      0,
+      1.62,
+      -36.5
+     ]
+    },
+    "sky_distinct": 28,
+    "sky_all_clear": false,
+    "face_differing": 0,
+    "face_steps": 0,
+    "face_row_sha256": "b3b6cbf9a9c9"
+   },
+   {
+    "mark": 80,
+    "cube": "render-probe-0002",
+    "report": {
+     "applied": "cube receiveShadow false",
+     "instances": 6
+    },
+    "camera": {
+     "render": [
+      0,
+      1.6200000047683716,
+      -76.5
+     ],
+     "state": [
+      0,
+      1.62,
+      -76.5
+     ]
+    },
+    "sky_distinct": 23,
+    "sky_all_clear": false,
+    "face_differing": 0,
+    "face_steps": 0,
+    "face_row_sha256": "b3b6cbf9a9c9"
+   },
+   {
+    "mark": 1000,
+    "cube": "render-probe-0003",
+    "report": {
+     "applied": "cube receiveShadow false",
+     "instances": 6
+    },
+    "camera": {
+     "render": [
+      0,
+      1.6200000047683716,
+      -996.5
+     ],
+     "state": [
+      0,
+      1.62,
+      -996.5
+     ]
+    },
+    "sky_distinct": 1,
+    "sky_all_clear": true,
+    "face_differing": 0,
+    "face_steps": 0,
+    "face_row_sha256": "b3b6cbf9a9c9"
+   },
+   {
+    "mark": 4000,
+    "cube": "render-probe-0004",
+    "report": {
+     "applied": "cube receiveShadow false",
+     "instances": 6
+    },
+    "camera": {
+     "render": [
+      0,
+      1.6200000047683716,
+      -3996.5
+     ],
+     "state": [
+      0,
+      1.62,
+      -3996.5
+     ]
+    },
+    "sky_distinct": 1,
+    "sky_all_clear": true,
+    "face_differing": 0,
+    "face_steps": 0,
+    "face_row_sha256": "b3b6cbf9a9c9"
+   },
+   {
+    "mark": 8000,
+    "cube": "render-probe-0005",
+    "report": {
+     "applied": "cube receiveShadow false",
+     "instances": 6
+    },
+    "camera": {
+     "render": [
+      0,
+      1.6200000047683716,
+      -7996.5
+     ],
+     "state": [
+      0,
+      1.62,
+      -7996.5
+     ]
+    },
+    "sky_distinct": 1,
+    "sky_all_clear": true,
+    "face_differing": 0,
+    "face_steps": 0,
+    "face_row_sha256": "b3b6cbf9a9c9"
+   }
+  ],
+  "nocast": [
+   {
+    "mark": 0,
+    "cube": "render-probe-0000",
+    "report": {
+     "applied": "cube castShadow false",
+     "instances": 6
+    },
+    "camera": {
+     "render": [
+      0,
+      1.6200000047683716,
+      3.5
+     ],
+     "state": [
+      0,
+      1.62,
+      3.5
+     ]
+    },
+    "sky_distinct": 30,
+    "sky_all_clear": false,
+    "face_differing": null,
+    "face_steps": 0,
+    "face_row_sha256": "b3b6cbf9a9c9"
+   },
+   {
+    "mark": 40,
+    "cube": "render-probe-0001",
+    "report": {
+     "applied": "cube castShadow false",
+     "instances": 6
+    },
+    "camera": {
+     "render": [
+      0,
+      1.6200000047683716,
+      -36.5
+     ],
+     "state": [
+      0,
+      1.62,
+      -36.5
+     ]
+    },
+    "sky_distinct": 28,
+    "sky_all_clear": false,
+    "face_differing": 0,
+    "face_steps": 0,
+    "face_row_sha256": "b3b6cbf9a9c9"
+   },
+   {
+    "mark": 80,
+    "cube": "render-probe-0002",
+    "report": {
+     "applied": "cube castShadow false",
+     "instances": 6
+    },
+    "camera": {
+     "render": [
+      0,
+      1.6200000047683716,
+      -76.5
+     ],
+     "state": [
+      0,
+      1.62,
+      -76.5
+     ]
+    },
+    "sky_distinct": 23,
+    "sky_all_clear": false,
+    "face_differing": 0,
+    "face_steps": 0,
+    "face_row_sha256": "b3b6cbf9a9c9"
+   },
+   {
+    "mark": 1000,
+    "cube": "render-probe-0003",
+    "report": {
+     "applied": "cube castShadow false",
+     "instances": 6
+    },
+    "camera": {
+     "render": [
+      0,
+      1.6200000047683716,
+      -996.5
+     ],
+     "state": [
+      0,
+      1.62,
+      -996.5
+     ]
+    },
+    "sky_distinct": 1,
+    "sky_all_clear": true,
+    "face_differing": 0,
+    "face_steps": 0,
+    "face_row_sha256": "b3b6cbf9a9c9"
+   },
+   {
+    "mark": 4000,
+    "cube": "render-probe-0004",
+    "report": {
+     "applied": "cube castShadow false",
+     "instances": 6
+    },
+    "camera": {
+     "render": [
+      0,
+      1.6200000047683716,
+      -3996.5
+     ],
+     "state": [
+      0,
+      1.62,
+      -3996.5
+     ]
+    },
+    "sky_distinct": 1,
+    "sky_all_clear": true,
+    "face_differing": 0,
+    "face_steps": 0,
+    "face_row_sha256": "b3b6cbf9a9c9"
+   },
+   {
+    "mark": 8000,
+    "cube": "render-probe-0005",
+    "report": {
+     "applied": "cube castShadow false",
+     "instances": 6
+    },
+    "camera": {
+     "render": [
+      0,
+      1.6200000047683716,
+      -7996.5
+     ],
+     "state": [
+      0,
+      1.62,
+      -7996.5
+     ]
+    },
+    "sky_distinct": 1,
+    "sky_all_clear": true,
+    "face_differing": 0,
+    "face_steps": 0,
+    "face_row_sha256": "b3b6cbf9a9c9"
+   }
+  ],
+  "rebased": [
+   {
+    "mark": 0,
+    "cube": "render-probe-0000",
+    "report": {
+     "applied": "render origin z 0"
+    },
+    "camera": {
+     "render": [
+      0,
+      1.6200000047683716,
+      3.5
+     ],
+     "state": [
+      0,
+      1.62,
+      3.5
+     ]
+    },
+    "sky_distinct": 30,
+    "sky_all_clear": false,
+    "face_differing": null,
+    "face_steps": 0,
+    "face_row_sha256": "b3b6cbf9a9c9"
+   },
+   {
+    "mark": 40,
+    "cube": "render-probe-0001",
+    "report": {
+     "applied": "render origin z -64"
+    },
+    "camera": {
+     "render": [
+      0,
+      1.6200000047683716,
+      27.5
+     ],
+     "state": [
+      0,
+      1.62,
+      -36.5
+     ]
+    },
+    "sky_distinct": 28,
+    "sky_all_clear": false,
+    "face_differing": 0,
+    "face_steps": 0,
+    "face_row_sha256": "b3b6cbf9a9c9"
+   },
+   {
+    "mark": 80,
+    "cube": "render-probe-0002",
+    "report": {
+     "applied": "render origin z -64"
+    },
+    "camera": {
+     "render": [
+      0,
+      1.6200000047683716,
+      -12.5
+     ],
+     "state": [
+      0,
+      1.62,
+      -76.5
+     ]
+    },
+    "sky_distinct": 23,
+    "sky_all_clear": false,
+    "face_differing": 0,
+    "face_steps": 0,
+    "face_row_sha256": "b3b6cbf9a9c9"
+   },
+   {
+    "mark": 1000,
+    "cube": "render-probe-0003",
+    "report": {
+     "applied": "render origin z -1024"
+    },
+    "camera": {
+     "render": [
+      0,
+      1.6200000047683716,
+      27.5
+     ],
+     "state": [
+      0,
+      1.62,
+      -996.5
+     ]
+    },
+    "sky_distinct": 1,
+    "sky_all_clear": true,
+    "face_differing": 0,
+    "face_steps": 0,
+    "face_row_sha256": "b3b6cbf9a9c9"
+   },
+   {
+    "mark": 4000,
+    "cube": "render-probe-0004",
+    "report": {
+     "applied": "render origin z -3968"
+    },
+    "camera": {
+     "render": [
+      0,
+      1.6200000047683716,
+      -28.5
+     ],
+     "state": [
+      0,
+      1.62,
+      -3996.5
+     ]
+    },
+    "sky_distinct": 1,
+    "sky_all_clear": true,
+    "face_differing": 6932,
+    "face_steps": 6,
+    "face_row_sha256": "b4634f2e830b"
+   },
+   {
+    "mark": 8000,
+    "cube": "render-probe-0005",
+    "report": {
+     "applied": "render origin z -8000"
+    },
+    "camera": {
+     "render": [
+      0,
+      1.6200000047683716,
+      3.5
+     ],
+     "state": [
+      0,
+      1.62,
+      -7996.5
+     ]
+    },
+    "sky_distinct": 1,
+    "sky_all_clear": true,
+    "face_differing": 7017,
+    "face_steps": 5,
+    "face_row_sha256": "da1ac5e97947"
+   }
+  ]
+ },
+ "notes": [],
+ "binding_variable": "binding",
+ "gpu": {
+  "renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Max, Unspecified Version)",
+  "buffer": [
+   1440,
+   900
+  ],
+  "antialias": false,
+  "depthBits": 32
+ },
+ "objects": [
+  [
+   "render-probe-0000",
+   0,
+   0,
+   0.5,
+   180,
+   -0.00001984784346267331,
+   180
+  ],
+  [
+   "render-probe-0001",
+   0,
+   0,
+   -39.5,
+   180,
+   -0.00001984784346267331,
+   180
+  ],
+  [
+   "render-probe-0002",
+   0,
+   0,
+   -79.5,
+   180,
+   -0.00001984784346267331,
+   180
+  ],
+  [
+   "render-probe-0003",
+   0,
+   0,
+   -999.5,
+   180,
+   -0.00001984784346267331,
+   180
+  ],
+  [
+   "render-probe-0004",
+   0,
+   0,
+   -3999.5,
+   180,
+   -0.00001984784346267331,
+   180
+  ],
+  [
+   "render-probe-0005",
+   0,
+   0,
+   -7999.5,
+   180,
+   -0.00001984784346267331,
+   180
+  ]
+ ]
+}

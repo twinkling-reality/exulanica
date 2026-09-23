@@ -1,0 +1,17 @@
+Untitled|true|0,0,0|0,0,0|1,1,1|
+  atlas-camera|true|0,0,0|0,0,0|1,1,1|camera
+  atlas-directional-light|true|0,0,0|52,-38,0|1,1,1|light
+  district-sky-fill|true|0,0,0|-152,35,180|1,1,1|light
+  geographic-environment|true|0,0,0|0,0,0|1,1,1|
+  atlas-render-origin|false|0,0,0|0,0,0|1,1,1|
+    atlas-world-field|false|0,-0.035,0|0,0,0|1,1,1|render|render -- [--F:shader:Untitled]
+      atlas-map-user-marker|false|0,0,0|0,0,0|1,1,1|render|render CR [CRF:standard:Untitled]
+        atlas-map-user-body|false|0,0.02,0|0,0,0|1,1,1|render|render CR [CRF:standard:Untitled]
+      atlas-placement-landing-marker|false|0,0,0|0,0,0|1,1,1|render|render CR [CRF:standard:Untitled]
+    atlas-region-relief|false|0,0,0|0,0,0|1,1,1|
+    atlas-region-mass|false|0,0,0|0,0,0|1,1,1|
+    atlas-composed-world|false|0,0,0|0,0,0|1,1,1|
+      world-profile:origin-landscape|false|0,0,0|0,0,0|1,1,1|
+        origin-environment|false|0,0,0|0,0,0|1,1,1|
+          origin-sky|false|0,0,0|0,0,0|1,1,1|render|render -- [---:shader:Untitled]
+      world-profile:survey-relief|false|0,0,0|0,0,0|1,1,1|
