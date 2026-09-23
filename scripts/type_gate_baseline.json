@@ -1,0 +1,37 @@
+{
+  "profile": "exulanica.type-gate-baseline/v1",
+  "code": "union-attr",
+  "checker": {
+    "mypy": "2.3.1",
+    "target": "exulanica",
+    "arguments": [
+      "--python-version",
+      "3.11",
+      "--ignore-missing-imports",
+      "--no-pretty"
+    ]
+  },
+  "counts": {
+    "exulanica/api/dependencies.py": 1,
+    "exulanica/api/routes/evidence.py": 4,
+    "exulanica/environment/owned_district.py": 1,
+    "exulanica/evaluation/questions.py": 8,
+    "exulanica/evaluation/scorers.py": 1,
+    "exulanica/grammar/grammars/city/catalogs.py": 1,
+    "exulanica/grammar/grammars/city/document.py": 2,
+    "exulanica/graph/review_sources.py": 1,
+    "exulanica/graph/world_read_views.py": 5,
+    "exulanica/ingest/exif.py": 2,
+    "exulanica/ingest/model_rights.py": 1,
+    "exulanica/ingest/personal_admission.py": 3,
+    "exulanica/materials/catalog.py": 1,
+    "exulanica/models/transport.py": 1,
+    "exulanica/orchestration/demonstration.py": 1,
+    "exulanica/selection/question.py": 1,
+    "exulanica/traffic/simulation.py": 1,
+    "exulanica/world/saved_entries.py": 1,
+    "exulanica/world/society_living.py": 2,
+    "exulanica/world_package/dataset.py": 1,
+    "exulanica/world_package/training_inputs.py": 1
+  }
+}

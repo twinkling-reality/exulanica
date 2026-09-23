@@ -35,6 +35,13 @@ reorganisation strands them silently and the strand cannot be repaired afterward
 **Rule 3, relative links between documents.** The same rot as rule 1, in the form the documentation
 actually uses most.
 
+**Rule 4, code named in backticks.** A document names code the way a reader types it, as
+``exulanica/...`` in backticks, and a file that moves leaves that name behind. Rules 1 and 3 read
+only ``docs/`` paths and markdown links, so MEASURED 2026-09-23: a removed module's path written
+back into a contract passed every one of them. The documents read are the public reading surface,
+the root README and every tracked markdown file under ``docs/`` except the evaluation records,
+which are immutable and keep the paths they were written with.
+
 WHAT IS ALLOWED TO DANGLE, and why two lists rather than one. Every unresolved reference is named
 below with its reason, so a new one fails loudly, and the two lists are separate because the right
 response to each is the opposite of the other. ``ALLOWED_DANGLING`` is a reference this tree cannot
@@ -66,6 +73,7 @@ import subprocess
 from pathlib import Path
 
 import pytest
+from exulanica.env import env_get, env_name
 
 ROOT = Path(__file__).resolve().parents[1]
 
@@ -186,6 +194,37 @@ _DOC_PATH = re.compile(
 _MD_LINK = re.compile(r"\]\(([A-Za-z0-9][A-Za-z0-9/._-]*\.md)(?:#[^)]*)?\)")
 
 
+#: The environment variable that chooses which files the guard reads, and its choices.
+#:
+#: ``tracked``, the default, is what git tracks, which is what a clone of the commit holds.
+#: ``with-untracked`` adds every untracked file git would add, so a change can be checked before
+#: it is committed: a new record is invisible to the default until then, and on 2026-09-23 one
+#: passed this guard untracked and failed it on fourteen paths once committed. Ignored files are
+#: read in neither, because nothing commits them.
+#:
+#:     EXULANICA_DOCUMENTATION_GUARD=with-untracked uv run pytest tests/test_documentation_links.py
+#:
+#: The generated catalog test is the exception: ``scripts/generate_docs_index.py`` lists what git
+#: tracks in either mode, so a document added to a catalogued family still needs the catalog
+#: regenerated once it is committed.
+GUARD_SCOPE = "DOCUMENTATION_GUARD"
+_LISTINGS: dict[str, tuple[str, ...]] = {
+    "tracked": ("git", "ls-files", "-z"),
+    "with-untracked": ("git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"),
+}
+
+
+def _listing() -> tuple[str, ...]:
+    """The git command that lists the files this run reads, or a refusal naming the choices."""
+    scope = env_get(GUARD_SCOPE, default="tracked")
+    if scope not in _LISTINGS:
+        raise ValueError(
+            f"{env_name(GUARD_SCOPE)}={scope!r} is not a scope this guard reads; use one of: "
+            + ", ".join(_LISTINGS)
+        )
+    return _LISTINGS[scope]
+
+
 def _tracked() -> frozenset[str]:
     """Every path this repository holds, which is the only thing a documentation link can name.
 
@@ -195,10 +234,11 @@ def _tracked() -> frozenset[str]:
     three such paths and failed the merged suite. That half was already right. The other half is
     what a named path is allowed to resolve TO, and asking the disk there was wrong for the same
     reason in the other direction. A skip-list of directory names is replaced by reading the
-    index, because git lists none of them.
+    index, because git lists none of them. With the untracked scope above, "holds" means what
+    the next commit of this checkout would hold.
     """
     listed = subprocess.run(
-        ["git", "ls-files", "-z"], cwd=ROOT, check=True, capture_output=True
+        list(_listing()), cwd=ROOT, check=True, capture_output=True
     ).stdout.decode()
     return frozenset(filter(None, listed.split("\0")))
 
@@ -267,6 +307,120 @@ def _relative_references() -> list[tuple[str, str, str]]:
             target = os.path.normpath(os.path.join(base, link))
             found.append((rel, link, link if target.startswith("..") else target))
     return found
+
+
+#: Rule 4 reads a span in backticks as a repository path when it has a slash and starts with a
+#: directory the repository tracks, other than ``docs/``, which rule 1 reads. A space, an elision,
+#: a wildcard, a placeholder or code punctuation makes it a pattern or prose instead.
+_CODE_SPAN = re.compile(r"`([^`\n]+)`")
+_NOT_A_PATH = re.compile(r"\s|\.\.\.|[*?\[\]{}<>$=()'\",;|\\]")
+#: A line, a line range, a member or an anchor after the path, which a reader drops to open it.
+_LOCATION = re.compile(r"(?:::[\w.]+|#[\w-]+|(?::\d+(?:-\d+)?)+)$")
+#: The repository's front page, read with the documents under ``docs/``.
+_FRONT_PAGE = "README.md"
+
+#: A document that names files relative to the package it describes rather than to the repository,
+#: and that package. A name in it resolves against either.
+NAMED_RELATIVE_TO: dict[str, str] = {
+    "docs/generated-appearance.md": "ml/appearance",
+}
+
+#: A (document, path) whose file the repository deliberately does not hold, and why. Any other name
+#: that resolves nowhere is a stale reference.
+NAMED_ABSENT_BY_DESIGN: dict[tuple[str, str], str] = {}
+
+
+def _reading_surface(tracked: frozenset[str]) -> list[str]:
+    """The documents rule 4 reads: the front page and ``docs/``, without the evaluation records."""
+    front = [_FRONT_PAGE] if _FRONT_PAGE in tracked else []
+    documents = [
+        rel
+        for rel in tracked
+        if rel.startswith("docs/") and rel.endswith(".md")
+        and not rel.startswith("docs/evaluation/")
+    ]
+    return sorted(front + documents)
+
+
+def _code_paths(text: str, tops: frozenset[str]) -> set[str]:
+    """The repository paths ``text`` names in backticks, without a line, member or anchor."""
+    found = set()
+    for span in _CODE_SPAN.findall(text):
+        span = span.strip()
+        if "/" not in span or _NOT_A_PATH.search(span):
+            continue
+        path = _LOCATION.sub("", span).rstrip("/")
+        top = path.split("/", 1)[0]
+        if top in tops and top != "docs":
+            found.add(path)
+    return found
+
+
+def _held(tracked: frozenset[str]) -> frozenset[str]:
+    """Every tracked file and every directory one lies under: what a code path may name."""
+    directories = {
+        rel.rsplit("/", depth)[0] for rel in tracked for depth in range(1, rel.count("/") + 1)
+    }
+    return tracked | directories
+
+
+def _unresolved_code_paths() -> list[tuple[str, str]]:
+    """Each (document, path) rule 4 reads that resolves nowhere and that nothing explains."""
+    tracked = _tracked()
+    held = _held(tracked)
+    tops = frozenset(rel.split("/", 1)[0] for rel in tracked if "/" in rel)
+    unresolved = []
+    for document in _reading_surface(tracked):
+        base = NAMED_RELATIVE_TO.get(document)
+        text = (ROOT / document).read_text(encoding="utf-8", errors="replace")
+        for path in sorted(_code_paths(text, tops)):
+            if path in held or (base is not None and f"{base}/{path}" in held):
+                continue
+            if (document, path) not in NAMED_ABSENT_BY_DESIGN:
+                unresolved.append((document, path))
+    return unresolved
+
+
+def _repository_with_one_of_each(at: Path) -> Path:
+    """A repository holding a committed file, an untracked one and an ignored one."""
+    at.mkdir(parents=True)
+    git = ["git", "-C", str(at), "-c", "commit.gpgsign=false"]
+    subprocess.run(["git", "init", "-q", "-b", "trunk", str(at)], check=True)
+    subprocess.run([*git, "config", "user.email", "guard@local"], check=True)
+    subprocess.run([*git, "config", "user.name", "Guard"], check=True)
+    (at / ".gitignore").write_text("ignored.md\n")
+    (at / "committed.md").write_text("committed\n")
+    subprocess.run([*git, "add", "."], check=True)
+    subprocess.run([*git, "commit", "-qm", "one"], check=True)
+    (at / "untracked.md").write_text("about to be committed\n")
+    (at / "ignored.md").write_text("never committed\n")
+    return at
+
+
+@pytest.mark.parametrize(
+    "scope, extra",
+    [(None, set()), ("tracked", set()), ("with-untracked", {"untracked.md"})],
+    ids=["unset", "tracked", "with-untracked"],
+)
+def test_the_scope_decides_whether_a_file_about_to_be_committed_is_read(
+    tmp_path, monkeypatch, scope, extra
+):
+    """The default reads what a clone holds; the untracked scope adds what the next commit would.
+
+    An ignored file is read in neither, and the default is what an unset variable means.
+    """
+    monkeypatch.setitem(globals(), "ROOT", _repository_with_one_of_each(tmp_path / "repo"))
+    if scope is None:
+        monkeypatch.delenv(env_name(GUARD_SCOPE), raising=False)
+    else:
+        monkeypatch.setenv(env_name(GUARD_SCOPE), scope)
+    assert _tracked() == {".gitignore", "committed.md", *extra}
+
+
+def test_a_scope_the_guard_does_not_know_is_refused_by_name(monkeypatch):
+    monkeypatch.setenv(env_name(GUARD_SCOPE), "everything")
+    with pytest.raises(ValueError, match="use one of: tracked, with-untracked"):
+        _tracked()
 
 
 def test_a_named_path_keeps_its_whole_suffix():
@@ -340,6 +494,110 @@ def test_relative_links_between_documents_resolve():
     assert not broken, (
         "relative documentation links that do not resolve:\n  " + "\n  ".join(sorted(broken))
     )
+
+
+def test_every_code_path_a_document_names_in_backticks_is_in_the_repository():
+    """Rule 4. A name a reader copies into a terminal has to open something."""
+    unresolved = _unresolved_code_paths()
+    assert not unresolved, (
+        "code paths named in backticks that this repository does not hold:\n"
+        + "\n".join(f"  {path}  named by {document}" for document, path in unresolved)
+    )
+
+
+def test_a_code_path_is_read_from_backticks_and_a_pattern_or_prose_is_not():
+    """What rule 4 counts as a path, on text of its own.
+
+    The documentation example is assembled from ``root`` because rule 1 scans this file.
+    """
+    root = "docs"
+    tops = frozenset({"docs", "exulanica", "tests", "web"})
+    text = (
+        "Moved away: `exulanica/selection/saved_names.py`, `tests/test_gone.py:12-14`,"
+        " `exulanica/world/objects.py::ObjectRepository.undo` and `web/packages/app/`."
+        " Not paths: `exulanica/migrations/0037_...sql`, `tests/test_*.py`,"
+        " `exulanica/<module>.py`, `uv run pytest tests/x.py`, `exulanica.world.objects`,"
+        f" `a/b.py` under no tracked directory, and `{root}/contract.md`, which rule 1 reads."
+    )
+    assert _code_paths(text, tops) == {
+        "exulanica/selection/saved_names.py",
+        "tests/test_gone.py",
+        "exulanica/world/objects.py",
+        "web/packages/app",
+    }
+
+
+def test_a_stale_code_path_fails_rule_4_until_the_repository_says_why(tmp_path, monkeypatch):
+    """The positive control, run through the rule itself on a repository of its own.
+
+    A stale name fails, in a document under ``docs/`` and on the front page; the same name inside
+    an evaluation record is not read; a package-relative name resolves once its document names the
+    package; and a deliberate absence passes once it is written down with its reason.
+    """
+    repository = tmp_path / "repo"
+    (repository / "docs" / "evaluation").mkdir(parents=True)
+    (repository / "exulanica").mkdir()
+    (repository / "pkg" / "tests").mkdir(parents=True)
+    (repository / "tests").mkdir()
+    (repository / "exulanica" / "present.py").write_text("")
+    (repository / "tests" / "test_other.py").write_text("")
+    (repository / "pkg" / "tests" / "test_x.py").write_text("")
+    stale = "exulanica/selection/saved_names.py"
+    root = "docs"
+    contract, record = f"{root}/contract.md", f"{root}/evaluation/record.md"
+    names = f"`exulanica/present.py`, `{stale}` and `tests/test_x.py`."
+    (repository / contract).write_text(names + "\n")
+    (repository / record).write_text(f"`{stale}`\n")
+    (repository / "README.md").write_text(f"See `{stale}`.\n")
+    git = ["git", "-C", str(repository), "-c", "commit.gpgsign=false"]
+    subprocess.run(["git", "init", "-q", "-b", "trunk", str(repository)], check=True)
+    subprocess.run([*git, "add", "."], check=True)
+    monkeypatch.setitem(globals(), "ROOT", repository)
+    monkeypatch.delenv(env_name(GUARD_SCOPE), raising=False)
+    monkeypatch.setitem(globals(), "NAMED_RELATIVE_TO", {})
+    monkeypatch.setitem(globals(), "NAMED_ABSENT_BY_DESIGN", {})
+    assert _unresolved_code_paths() == [
+        ("README.md", stale),
+        (contract, stale),
+        (contract, "tests/test_x.py"),
+    ]
+    monkeypatch.setitem(globals(), "NAMED_RELATIVE_TO", {contract: "pkg"})
+    monkeypatch.setitem(
+        globals(),
+        "NAMED_ABSENT_BY_DESIGN",
+        {(contract, stale): "a test", ("README.md", stale): "a test"},
+    )
+    assert _unresolved_code_paths() == []
+
+
+def test_each_package_a_document_names_paths_relative_to_is_still_needed():
+    """An entry whose document no longer names anything relative to its package explains nothing."""
+    tracked = _tracked()
+    held = _held(tracked)
+    tops = frozenset(rel.split("/", 1)[0] for rel in tracked if "/" in rel)
+    unneeded = []
+    for document, base in NAMED_RELATIVE_TO.items():
+        text = (ROOT / document).read_text(encoding="utf-8") if document in tracked else ""
+        if not any(
+            path not in held and f"{base}/{path}" in held for path in _code_paths(text, tops)
+        ):
+            unneeded.append(f"{document} -> {base}")
+    assert not unneeded, "these entries resolve no name any more:\n  " + "\n  ".join(unneeded)
+
+
+def test_each_code_path_absent_by_design_is_still_named_and_still_absent():
+    """The same pruning as the lists above: an arrived file or a dropped name ends its entry."""
+    tracked = _tracked()
+    held = _held(tracked)
+    tops = frozenset(rel.split("/", 1)[0] for rel in tracked if "/" in rel)
+    stale = []
+    for (document, path), reason in NAMED_ABSENT_BY_DESIGN.items():
+        text = (ROOT / document).read_text(encoding="utf-8") if document in tracked else ""
+        if path in held:
+            stale.append(f"{path} is in the repository now; it was listed because: {reason}")
+        elif path not in _code_paths(text, tops):
+            stale.append(f"{document} no longer names {path}")
+    assert not stale, "\n".join(stale)
 
 
 def test_no_document_named_inside_an_immutable_record_has_been_moved_away():
@@ -475,6 +733,9 @@ def test_the_lists_of_unresolved_references_have_not_grown_silently():
     the change belongs to, and the number here is edited deliberately in the same commit.
     """
     assert (len(ALLOWED_DANGLING), len(_OPERATOR_PROCESS), len(_LOCAL_CAMPAIGN)) == (12, 12, 18)
+    assert (len(NAMED_RELATIVE_TO), len(NAMED_ABSENT_BY_DESIGN)) == (1, 0), (
+        "rule 4's explanations changed size; edit this line in the same change, and say why"
+    )
     assert len(KEPT_OUT_OF_THE_REPOSITORY) == len(_OPERATOR_PROCESS) + len(_LOCAL_CAMPAIGN), (
         "a path is in both tuples, and dict.fromkeys silently kept one reason for it"
     )

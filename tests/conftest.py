@@ -25,6 +25,7 @@ from typing import Any
 import pytest
 from exulanica.corpus.photograph import TO_SENSOR_TRANSPOSE
 from exulanica.db import DATABASE_URL_ENV
+from exulanica.db.registries import REGISTRY_TABLES
 from exulanica.ingest.vision import VisionObservation, VisionResult
 from exulanica.migrations import migrations
 from exulanica.models.budget import BudgetGuard
@@ -307,24 +308,9 @@ def workspace_id() -> uuid.UUID:
 
 #: Seeded by the migration, not by a test, and every assertion write reads it. Truncating it
 #: would empty the vocabulary and every later insert would be refused by a guard doing its job.
-_PRESERVED_TABLES = frozenset(
-    {
-        "predicate",
-        "schema_migrations",
-        "stage_registry",
-        "interaction_capability_registry",
-        "world_object_behaviour_registry",
-        "world_reviewed_asset",
-        "world_art_profile_parameter",
-        "world_art_profile_registry",
-        "world_style_capability_registry",
-        "world_style_module_registry",
-        "world_style_module_capability",
-        "world_art_profile_module",
-        "world_texture_set",
-        "world_texture_set_class",
-    }
-)
+#: The registries are named once, in ``exulanica.db.registries``; beside them the harness keeps
+#: ``schema_migrations`` and the pipeline's stage catalogue, ``stage_registry``.
+_PRESERVED_TABLES = frozenset({*REGISTRY_TABLES, "schema_migrations", "stage_registry"})
 
 #: Emptied with DELETE rather than TRUNCATE, because migration 0013 puts a BEFORE TRUNCATE
 #: trigger on both. That trigger is not decoration and this is not a workaround for it: measured

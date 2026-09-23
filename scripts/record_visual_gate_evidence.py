@@ -122,13 +122,20 @@ EARLIER_RECONCILIATIONS = (
     "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v4.json",
 )
 SUPERSEDED_RECONCILIATION = EARLIER_RECONCILIATIONS[-1]
-RECONCILIATION = ROOT / "docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v5.json"
-RECONCILIATION_ARTIFACTS = (
-    ROOT / "docs/evaluation/artifacts/2026-09-16-visual-gate-key-reconciliation-v5"
+# The documents the verbs write, RELATIVE to ROOT and resolved by _under_root when a verb runs.
+# They were once bound to the root at import, so a caller that pointed ROOT at a scratch copy
+# still wrote through the retained paths, and the baseline verb's --replace would have removed
+# the retained artifacts directory below. An absolute path set here by a caller is kept as given,
+# because joining one to ROOT leaves it unchanged, and is refused unless it is under ROOT.
+RECONCILIATION = Path("docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v5.json")
+RECONCILIATION_ARTIFACTS = Path(
+    "docs/evaluation/artifacts/2026-09-16-visual-gate-key-reconciliation-v5"
 )
 RUBRIC_COPY = RECONCILIATION_ARTIFACTS / "visual-gate-rubric.md"
-BASELINE = ROOT / "docs/evaluation/2026-09-15-flatiron-owned-district-baseline.json"
-ARTIFACTS = ROOT / "docs/evaluation/artifacts/2026-09-15-flatiron-owned-district-baseline"
+BASELINE = Path("docs/evaluation/2026-09-15-flatiron-owned-district-baseline.json")
+ARTIFACTS = Path("docs/evaluation/artifacts/2026-09-15-flatiron-owned-district-baseline")
+#: The one directory whose children a verb may remove: the artifacts it is about to rewrite.
+REMOVABLE_UNDER = Path("docs/evaluation/artifacts")
 FORBIDDEN = ("/Users/", "Bearer ", "api-token")
 JUDGEMENT_PROFILE = JUDGEMENT_ANSWERS_PROFILE
 
@@ -139,8 +146,38 @@ def _git(*arguments: str) -> str:
     ).stdout.strip()
 
 
+def _under_root(path: Path | str) -> Path:
+    """``path`` resolved against the document root as it is now, refused if it leads outside it.
+
+    Every path a verb writes or removes comes through here. ROOT is read when this runs, so a
+    caller that points ROOT at a scratch copy moves every write with it, and a path that still
+    leads out, through ``..``, a link or an absolute path, stops the verb before it writes.
+    """
+    root = ROOT.resolve()
+    resolved = (root / path).resolve()
+    if resolved != root and root not in resolved.parents:
+        raise SystemExit(f"refusing to write or remove {path}: it is outside the document root {root}")
+    return resolved
+
+
+def _remove_directory(path: Path | str, *, cleanup: bool = False) -> None:
+    """Remove an artifacts directory a verb is about to rewrite, and refuse anything else by name.
+
+    Only a directory directly under docs/evaluation/artifacts/ of the root in use qualifies: not
+    the root, not docs/evaluation itself, and not a link out of the tree, which resolves elsewhere.
+    ``cleanup`` removes what a failed verb had written so far, ignoring what is already gone.
+    """
+    resolved = _under_root(path)
+    if resolved.parent != _under_root(REMOVABLE_UNDER):
+        raise SystemExit(
+            f"refusing to remove {path}: a verb removes only a directory directly under "
+            f"{REMOVABLE_UNDER.as_posix()}/ of the document root"
+        )
+    shutil.rmtree(resolved, ignore_errors=cleanup)
+
+
 def _relative(path: Path) -> str:
-    return path.resolve().relative_to(ROOT).as_posix()
+    return _under_root(path).relative_to(ROOT.resolve()).as_posix()
 
 
 def _refuse_forbidden(text: str, where: str) -> None:
@@ -158,6 +195,7 @@ def _write(
     lines: list[str] | tuple[str, ...] = (),
     shown: list[str] | tuple[str, ...] = (),
 ) -> None:
+    path = _under_root(path)
     if path.exists() and not replace:
         raise SystemExit(
             f"{_relative(path)} exists. A retained record is not rewritten; pass --replace only "
@@ -181,7 +219,7 @@ def _write_private(relative: str, data: bytes, *, replace: bool) -> None:
     )
     if ignored.returncode != 0:
         raise SystemExit(f"{relative} would not be ignored by git; the judge's words stay private")
-    path = ROOT / relative
+    path = _under_root(relative)
     if path.exists() and path.read_bytes() != data and not replace:
         raise SystemExit(
             f"{relative} exists with other words; pass --replace only for a record that has never "
@@ -251,9 +289,9 @@ def reconciliation(arguments: argparse.Namespace) -> int:
             )
         retained[record.label] = json.loads(record_path.read_bytes())
         briefs[record.label] = brief_path.read_bytes()
-    if RECONCILIATION_ARTIFACTS.exists() and not arguments.replace:
+    if _under_root(RECONCILIATION_ARTIFACTS).exists() and not arguments.replace:
         raise SystemExit(f"{_relative(RECONCILIATION_ARTIFACTS)} exists; it is not rewritten")
-    if RECONCILIATION.exists() and not arguments.replace:
+    if _under_root(RECONCILIATION).exists() and not arguments.replace:
         raise SystemExit(f"{_relative(RECONCILIATION)} exists. A retained record is not rewritten.")
     corridors, earlier = _scored_before_revision()
     rubric = (ROOT / RUBRIC_PATH).read_bytes()
@@ -286,14 +324,14 @@ def reconciliation(arguments: argparse.Namespace) -> int:
         raise SystemExit(f"nothing is written: {error}") from error
     if document["record"]["judgeWords"]["sha256"] != hashlib.sha256(companion).hexdigest():
         raise SystemExit("the private companion is not the one the record binds")
-    RECONCILIATION_ARTIFACTS.mkdir(parents=True, exist_ok=True)
-    RUBRIC_COPY.write_bytes(rubric)
-    if RUBRIC_COPY.read_bytes() != rubric:
+    _under_root(RECONCILIATION_ARTIFACTS).mkdir(parents=True, exist_ok=True)
+    _under_root(RUBRIC_COPY).write_bytes(rubric)
+    if _under_root(RUBRIC_COPY).read_bytes() != rubric:
         raise SystemExit("the rubric did not copy byte for byte")
     _write_private(companion_path, companion, replace=arguments.replace)
     words, lines = _private_words(companion)
     _write(RECONCILIATION, document, replace=arguments.replace, private=words, lines=lines)
-    written = RECONCILIATION.read_bytes()
+    written = _under_root(RECONCILIATION).read_bytes()
     print(
         f"{_relative(RECONCILIATION)} {len(written)} bytes, "
         f"sha256 {hashlib.sha256(written).hexdigest()}, record_sha256 {document['record_sha256']}, "
@@ -423,7 +461,7 @@ def _key_sets_measured_alike() -> set[str]:
     revision that does not state its measurements unchanged.
     """
     alike = {GATE_KEY_SET_VERSION}
-    record = json.loads(RECONCILIATION.read_bytes())["record"]
+    record = json.loads(_under_root(RECONCILIATION).read_bytes())["record"]
     while True:
         supersedes = record.get("supersedes", {})
         if supersedes.get("measurementsUnchanged") is not True:
@@ -520,8 +558,8 @@ def _rubric() -> tuple[bytes, str]:
     """The rubric on disk, which must be the one the current reconciliation record fixed."""
     rubric = (ROOT / RUBRIC_PATH).read_bytes()
     digest = hashlib.sha256(rubric).hexdigest()
-    fixed = json.loads(RECONCILIATION.read_bytes())["record"]["judgedKey"]
-    if fixed["rubricSha256"] != digest or RUBRIC_COPY.read_bytes() != rubric:
+    fixed = json.loads(_under_root(RECONCILIATION).read_bytes())["record"]["judgedKey"]
+    if fixed["rubricSha256"] != digest or _under_root(RUBRIC_COPY).read_bytes() != rubric:
         raise SystemExit(
             f"{RUBRIC_PATH} is not the rubric {_relative(RECONCILIATION)} fixed; a changed rubric "
             "needs a new reconciliation record before anything is scored against it"
@@ -608,6 +646,7 @@ def _judgement(path: Path, rubric: bytes) -> tuple[JudgedAnswers, dict[str, Any]
 
 
 def _copy(source: Path, target: Path) -> Path:
+    target = _under_root(target)
     shutil.copyfile(source, target)
     if source.read_bytes() != target.read_bytes():
         raise SystemExit(f"{target.name} did not copy byte for byte")
@@ -807,11 +846,12 @@ def baseline(arguments: argparse.Namespace) -> int:
     if role["superuser"] or role["bypassRls"] or role["ownsRowLevelSecurityTable"]:
         raise SystemExit(f"the API role is privileged: {role}")
 
-    if ARTIFACTS.exists():
+    artifacts = _under_root(ARTIFACTS)
+    if artifacts.exists():
         if not arguments.replace:
             raise SystemExit(f"{_relative(ARTIFACTS)} exists; retained artifacts are not rewritten")
-        shutil.rmtree(ARTIFACTS)
-    ARTIFACTS.mkdir(parents=True)
+        _remove_directory(ARTIFACTS)
+    artifacts.mkdir(parents=True)
     run_dir = run_path.parent
     repeat_dir = repeat_path.parent
 
@@ -819,7 +859,7 @@ def baseline(arguments: argparse.Namespace) -> int:
     for index, capture in enumerate(run["captures"], start=1):
         target = _copy(
             run_dir / capture["file"],
-            ARTIFACTS / f"capture-{index:02d}-route-{capture['label']}.png",
+            artifacts / f"capture-{index:02d}-route-{capture['label']}.png",
         )
         bound = _bind(target, label=capture["label"], pose=_pose(capture["pose"]))
         if bound["sha256"] != capture["sha256"]:
@@ -829,7 +869,7 @@ def baseline(arguments: argparse.Namespace) -> int:
     for index, capture in enumerate(repeat["captures"], start=1):
         target = _copy(
             repeat_dir / capture["file"],
-            ARTIFACTS / f"repeat-capture-{index:02d}-route-{capture['label']}.png",
+            artifacts / f"repeat-capture-{index:02d}-route-{capture['label']}.png",
         )
         repeat_captures.append(_bind(target, label=capture["label"], pose=_pose(capture["pose"])))
 
@@ -842,7 +882,7 @@ def baseline(arguments: argparse.Namespace) -> int:
     for name, document in written.items():
         text = json.dumps(_no_floats(document), indent=2, ensure_ascii=False) + "\n"
         _refuse_forbidden(text, name)
-        (ARTIFACTS / name).write_text(text, encoding="utf-8")
+        (artifacts / name).write_text(text, encoding="utf-8")
     for label, directory, source in (
         ("route-trace.json", run_dir, run_path.name.replace("-run.json", "-trace.json")),
         (
@@ -851,13 +891,13 @@ def baseline(arguments: argparse.Namespace) -> int:
             repeat_path.name.replace("-run.json", "-trace.json"),
         ),
     ):
-        _copy(directory / source, ARTIFACTS / label)
+        _copy(directory / source, artifacts / label)
     checks_log = Path(arguments.checks_log).resolve()
     checks_text = checks_log.read_text(encoding="utf-8")
     _refuse_forbidden(checks_text, checks_log.name)
-    (ARTIFACTS / "checks.log.txt").write_text(checks_text, encoding="utf-8")
+    (artifacts / "checks.log.txt").write_text(checks_text, encoding="utf-8")
 
-    artifacts = [_bind(RUBRIC_COPY)]
+    bound_artifacts = [_bind(RUBRIC_COPY)]
     for name in (
         "browser-metrics.json",
         "gate-measurements.json",
@@ -867,9 +907,9 @@ def baseline(arguments: argparse.Namespace) -> int:
         "repeat-route-trace.json",
         "checks.log.txt",
     ):
-        artifacts.append(_bind(ARTIFACTS / name))
-    artifacts += captures
-    artifacts += repeat_captures
+        bound_artifacts.append(_bind(artifacts / name))
+    bound_artifacts += captures
+    bound_artifacts += repeat_captures
 
     mechanical_differences = {
         spelling: _differences(run["mechanical"][spelling], repeat["mechanical"][spelling])
@@ -1101,7 +1141,7 @@ def baseline(arguments: argparse.Namespace) -> int:
                 *(_binding(path) for path in reversed(EARLIER_RECONCILIATIONS)),
                 *(_binding(record.path) for record in RETAINED_RECORDS),
             ],
-            artifacts=artifacts,
+            artifacts=bound_artifacts,
             captures=captures,
             rubric_sha256=rubric_sha,
             browser={
@@ -1342,7 +1382,7 @@ def baseline(arguments: argparse.Namespace) -> int:
             },
         )
     except GateEvidenceError as error:
-        shutil.rmtree(ARTIFACTS, ignore_errors=True)
+        _remove_directory(ARTIFACTS, cleanup=True)
         raise SystemExit(f"nothing is written: {error}") from error
     companion_path, companion = judge_words_file(
         _relative(BASELINE), judged, judged_detail["answeredAgainst"]["rubricVersion"]
@@ -1352,7 +1392,7 @@ def baseline(arguments: argparse.Namespace) -> int:
     _write_private(companion_path, companion, replace=arguments.replace)
     private = [reply["words"] for reply in judge_words(judged) if reply["words"] is not None]
     _write(BASELINE, document, replace=arguments.replace, private=private)
-    written_bytes = BASELINE.read_bytes()
+    written_bytes = _under_root(BASELINE).read_bytes()
     print(
         f"{_relative(BASELINE)} {len(written_bytes)} bytes, "
         f"sha256 {hashlib.sha256(written_bytes).hexdigest()}, "
@@ -2073,7 +2113,7 @@ def corridor(arguments: argparse.Namespace) -> int:
             raise SystemExit(
                 f"{_relative(artifacts_dir)} exists; retained artifacts are not rewritten"
             )
-        shutil.rmtree(artifacts_dir)
+        _remove_directory(artifacts_dir)
     artifacts_dir.mkdir(parents=True)
     run_dir = run_path.parent
     captures = []
@@ -2146,7 +2186,9 @@ def corridor(arguments: argparse.Namespace) -> int:
             asked_as=asked_as,
             scored=scored,
             supplement=supplement,
-            blocker=_rubric_equivalence(json.loads(BASELINE.read_bytes())["record"], rubric_sha),
+            blocker=_rubric_equivalence(
+                json.loads(_under_root(BASELINE).read_bytes())["record"], rubric_sha
+            ),
             rubric_sha256=rubric_sha,
             record_path=relative_record,
         )
@@ -2201,7 +2243,7 @@ def corridor(arguments: argparse.Namespace) -> int:
     )
     report = run["validationReport"]
     measurement = report["measurement"]
-    baseline_document = json.loads(BASELINE.read_bytes())
+    baseline_document = json.loads(_under_root(BASELINE).read_bytes())
     try:
         document = visual_gate_record(
             profile=CORRIDOR_PROFILE,
@@ -2281,7 +2323,7 @@ def corridor(arguments: argparse.Namespace) -> int:
             },
         )
     except GateEvidenceError as error:
-        shutil.rmtree(artifacts_dir, ignore_errors=True)
+        _remove_directory(artifacts_dir, cleanup=True)
         raise SystemExit(f"nothing is written: {error}") from error
     companion_path, companion = judge_words_file(
         relative_record, judged, judged_detail["answeredAgainst"]["rubricVersion"]

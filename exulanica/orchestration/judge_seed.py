@@ -56,6 +56,7 @@ from psycopg import sql
 
 from exulanica.canonical import canonical_json
 from exulanica.db.migrate import provision_workspace
+from exulanica.db.registries import REGISTRY_TABLES
 from exulanica.db.roles import grant_workspace_partition
 from exulanica.errors import ExulanicaError
 from exulanica.evidence.blob import BlobId
@@ -105,30 +106,21 @@ class SeedRefused(ExulanicaError):
 
 #: Tables with no ``workspace_id`` that migrations fill, and that this archive therefore omits.
 #:
-#: Every one is a registry: reviewed art profiles, capability vocabularies, the predicate list,
-#: the stage catalogue, the reviewed object assets. ``exulanica-db`` recreates them from the
+#: Every registry is one: reviewed art profiles, capability vocabularies, the predicate list, the
+#: reviewed object assets and texture pins, all named once in
+#: :data:`exulanica.db.registries.REGISTRY_TABLES`. ``exulanica-db`` recreates them from the
 #: migration that inserted them, so carrying them would let a restore install a vocabulary that
 #: disagrees with the schema it is installing into. The manifest records a digest over their
 #: contents instead, and :func:`restore_seed` compares it before writing anything, which turns a
 #: disagreement into a refusal rather than into an object that resolves to different bytes.
 #:
-#: This is the same set ``tests/conftest.py`` preserves across its per-test truncation, and for
-#: the same reason: emptying them empties the vocabulary and every later insert is then refused
-#: by a guard doing its job.
+#: ``tests/conftest.py`` preserves the same registries across its per-test truncation, for the
+#: same reason: emptying them empties the vocabulary and every later insert is then refused by a
+#: guard doing its job. The sets differ outside the registries: ``baked_tile`` is global here and
+#: truncated there, and the harness also keeps ``schema_migrations`` and ``stage_registry``.
 GLOBAL_TABLES: Final[Mapping[str, str]] = {
+    **REGISTRY_TABLES,
     "baked_tile": "tiles baked offline from a generated city, keyed by their inputs",
-    "interaction_capability_registry": "migration-provided interaction vocabulary",
-    "predicate": "migration-provided predicate vocabulary",
-    "world_art_profile_module": "migration-provided reviewed art profile",
-    "world_art_profile_parameter": "migration-provided reviewed art profile",
-    "world_art_profile_registry": "migration-provided reviewed art profile",
-    "world_object_behaviour_registry": "migration-provided reviewed object behaviours",
-    "world_reviewed_asset": "migration-provided reviewed object assets",
-    "world_style_capability_registry": "migration-provided style capability vocabulary",
-    "world_style_module_capability": "migration-provided style capability vocabulary",
-    "world_style_module_registry": "migration-provided style capability vocabulary",
-    "world_texture_set": "migration-provided reviewed texture set pins",
-    "world_texture_set_class": "migration-provided reviewed texture set classes",
 }
 
 #: Tables that belong to a deployment rather than to a workspace, and must not cross.

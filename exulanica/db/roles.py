@@ -61,6 +61,7 @@ import psycopg
 from psycopg import sql
 
 from exulanica.db.account_roles import ACCOUNT_TABLES, revoke_account_access
+from exulanica.db.registries import REGISTRY_TABLES
 from exulanica.errors import ExulanicaError
 
 __all__ = [
@@ -91,23 +92,13 @@ EXECUTOR_ROLE: Final = "exulanica_ro"
 #: have, and the privilege is a READ: see :func:`provision_purge_role`.
 PURGE_ROLE: Final = "exulanica_purge"
 
-#: Tables the runtime may read and may not write. See the module docstring for why each.
+#: Tables the runtime may read and may not write. See the module docstring for why each. Every
+#: registry table in :data:`exulanica.db.registries.REGISTRY_TABLES` is one; the rest are these.
 READ_ONLY_TABLES: Final = (
+    *REGISTRY_TABLES,
     "restore_control",
     "restore_replay_receipt",
-    "interaction_capability_registry",
-    "predicate",
     "schema_migrations",
-    "world_art_profile_parameter",
-    "world_art_profile_registry",
-    "world_art_profile_module",
-    "world_style_capability_registry",
-    "world_style_module_capability",
-    "world_style_module_registry",
-    "world_object_behaviour_registry",
-    "world_reviewed_asset",
-    "world_texture_set",
-    "world_texture_set_class",
     "baked_tile",
     "saved_world_source_current_membership",
 )

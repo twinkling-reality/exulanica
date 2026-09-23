@@ -15,6 +15,12 @@ from exulanica.world_package.package import load_private_key
 
 pytestmark = [
     pytest.mark.postgres,
+    # The dry run creates, migrates and drops one scratch schema in the pinned reference copy,
+    # through writable_reference_url, and reads the copy's public rows. A per-worker private
+    # server is not that copy, and the copy is shared, so this runs in phase 2 of
+    # scripts/run_backend_suite.py, serially, where the runner lists the copy's schemas before
+    # and after. In phase 1 it ran beside the parallel workers and wrote into the copy there.
+    pytest.mark.reference_copy,
     pytest.mark.skipif(not env_get("TEST_DATABASE_URL"), reason="requires permitted test database"),
 ]
 

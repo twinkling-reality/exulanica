@@ -1,0 +1,81 @@
+# Every skip the backend suite runner accepts, with the reason pytest reports for it.
+#
+# scripts/run_backend_suite.py reads this before it starts, prints every skip a phase reports
+# with its reason, and fails a run that skipped a test no entry here names, or skipped a named
+# test for a reason other than the one written here. A skip is a test that did not run, and a
+# skip nobody decided on has hidden real failures behind a green run, so adding one is a line in
+# this file that a reviewer reads, not something a run absorbs.
+#
+# An entry is allowed, not required: a tree that can run the test runs it. `only_without` names
+# a path, relative to the repository root, whose absence is the reason for the skip; in a tree
+# that holds the path, the skip is not accepted, because there the test has what it needs.
+#
+# `test` is the pytest node id. `reason` is the skip message exactly as pytest reports it.
+# tests/test_backend_suite.py checks that every entry names a test pytest collects.
+
+profile = "exulanica.expected-skips/v1"
+
+# The synthetic evaluation corpus is generated on demand and is not part of any checkout.
+[[skip]]
+test = "tests/test_evaluation.py::test_the_manifest_is_keyed_by_the_hash_ingest_computes"
+reason = "the synthetic corpus has not been generated"
+
+[[skip]]
+test = "tests/test_evaluation.py::test_the_manifest_records_which_frames_can_be_placed_on_a_timeline"
+reason = "the synthetic corpus has not been generated"
+
+# Creating a database is an explicit permission, not something a test URL implies.
+[[skip]]
+test = "tests/test_evaluation_replay.py::test_clean_replay_uses_a_new_database_and_keeps_the_gate_blocked"
+reason = "set EXULANICA_TEST_ALLOW_DATABASE_CREATION=1 to permit creating a disposable database; EXULANICA_TEST_DATABASE_URL alone does not authorize it"
+
+# The pinned character preparation environment is an optional install.
+[[skip]]
+test = "tests/test_parametric_character.py::test_declared_target_pairs_exist_in_pinned_source"
+reason = "Optional pinned preparation environment is not installed"
+
+# Draft texture outputs exist only where a draft maker has written some.
+[[skip]]
+test = "tests/test_texture_drafts.py::test_a_draft_maker_manifest_is_well_formed_here_too[none]"
+reason = "no draft maker manifests are written just now, so there is nothing here to check"
+
+[[skip]]
+test = "tests/test_texture_drafts.py::test_a_draft_recipe_is_valid_here_too[none]"
+reason = "no draft sets are written just now, so there is nothing here to check"
+
+# The judge's words are kept only on the machine they were given on, in the ignored directory
+# below. A checkout without it skips these seven; a checkout with it runs them.
+[[skip]]
+test = "tests/test_visual_gate.py::test_the_retained_baseline_is_decided_again_from_its_private_companion"
+reason = "the judge's words are kept only on the machine they were given on, and this checkout has no private companion for the Flatiron baseline"
+only_without = ".exulanica/judge-words"
+
+[[skip]]
+test = "tests/test_visual_gate_judge_words.py::test_every_fingerprint_matches_the_private_companion[docs/evaluation/2026-09-15-flatiron-owned-district-baseline.json]"
+reason = "the judge's words are kept only on the machine they were given on, and this checkout has no private companion for 2026-09-15-flatiron-owned-district-baseline.json"
+only_without = ".exulanica/judge-words"
+
+[[skip]]
+test = "tests/test_visual_gate_judge_words.py::test_every_fingerprint_matches_the_private_companion[docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v3.json]"
+reason = "the judge's words are kept only on the machine they were given on, and this checkout has no private companion for 2026-09-16-visual-gate-key-reconciliation-v3.json"
+only_without = ".exulanica/judge-words"
+
+[[skip]]
+test = "tests/test_visual_gate_judge_words.py::test_every_fingerprint_matches_the_private_companion[docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v4.json]"
+reason = "the judge's words are kept only on the machine they were given on, and this checkout has no private companion for 2026-09-16-visual-gate-key-reconciliation-v4.json"
+only_without = ".exulanica/judge-words"
+
+[[skip]]
+test = "tests/test_visual_gate_judge_words.py::test_every_fingerprint_matches_the_private_companion[docs/evaluation/2026-09-16-visual-gate-key-reconciliation-v5.json]"
+reason = "the judge's words are kept only on the machine they were given on, and this checkout has no private companion for 2026-09-16-visual-gate-key-reconciliation-v5.json"
+only_without = ".exulanica/judge-words"
+
+[[skip]]
+test = "tests/test_visual_gate_judge_words.py::test_the_rule_reads_the_judges_own_replies_as_the_records_state"
+reason = "the judge's words are kept only on the machine they were given on, and this checkout has no private companion for 2026-09-16-visual-gate-key-reconciliation-v3.json"
+only_without = ".exulanica/judge-words"
+
+[[skip]]
+test = "tests/test_visual_gate_judge_words.py::test_no_tracked_file_carries_the_judges_words"
+reason = "the judge's words are kept only on the machine they were given on, and this checkout has no private companion for any record"
+only_without = ".exulanica/judge-words"

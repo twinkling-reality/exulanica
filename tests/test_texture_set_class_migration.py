@@ -22,6 +22,7 @@ from pathlib import Path
 
 import psycopg
 import pytest
+from exulanica.db.registries import REGISTRY_TABLES
 from exulanica.db.roles import EXECUTOR_ROLE, READ_ONLY_TABLES, RUNTIME_ROLE, provision_runtime_role
 from exulanica.env import env_get
 from exulanica.materials.classes import MATERIAL_CLASSES, TEXTURE_SET_PROFILES, allowed_channels
@@ -74,11 +75,11 @@ def test_the_runtime_roles_it_grants_to_are_the_provisioned_ones():
 
 
 def test_the_shared_registrations_name_the_table():
+    # REGISTRY_TABLES feeds the harness's preserved set too; tests/test_registry_tables.py holds
+    # each place that acts on the registries to all of them.
+    assert TABLE in REGISTRY_TABLES
     assert TABLE in READ_ONLY_TABLES
     assert TABLE in GLOBAL_TABLES
-    conftest = (ROOT / "tests" / "conftest.py").read_text()
-    preserved = re.search(r"_PRESERVED_TABLES[^=]*=\s*frozenset\(\s*\{(.*?)\}", conftest, re.S)
-    assert preserved is not None and f'"{TABLE}"' in preserved.group(1)
 
 
 # -- a schema this module migrates for itself --------------------------------------------------

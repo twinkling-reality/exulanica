@@ -82,7 +82,7 @@ HISTORICAL_MIGRATION_CHECKSUMS = {
 }
 
 
-#: Numbers assigned to concurrent branches that have not landed yet.
+#: Numbers assigned to concurrent branches that have not landed yet, one file each.
 #:
 #: A hole in the sequence is normally a file somebody lost, and the assertion below is what
 #: catches that. On a repository where numbers are handed out centrally across parallel
@@ -96,15 +96,35 @@ HISTORICAL_MIGRATION_CHECKSUMS = {
 #: only the first, and the next boot refuses to start citing checksum drift on a schema that has
 #: already forked. A hole is visible and harmless. A collision is invisible and is not.
 #:
-#: Every entry here is a reservation: it is deleted by whoever lands the number.
-RESERVED_ELSEWHERE: dict[str, str] = {
-    "0064": "assigned to the grammar lane's catalogs; 0065 landed above it with the texture sets",
-    "0067": "edit lane",
-    "0068": "edit lane",
-    "0069": "edit lane",
-    "0070": "precinct anchor lane",
-    "0071": "lenses lane",
-}
+#: A reservation is the file ``tests/migration_reservations/NNNN.txt``, holding who has the
+#: number. One file per number, because two branches that each reserve a number then add two
+#: files and edit no line in common, where two entries in one mapping here were a merge conflict
+#: every time. It is deleted by whoever lands the number, and a test below fails until it is.
+RESERVATIONS = ROOT / "tests" / "migration_reservations"
+_RESERVATION = re.compile(r"^(\d{4})\.txt$")
+
+
+def _reservations() -> dict[str, str]:
+    """Every reserved number and who holds it, refusing a file that does not say both."""
+    if not RESERVATIONS.is_dir():
+        # git keeps no empty directory, so a tree with nothing reserved has none.
+        return {}
+    reserved: dict[str, str] = {}
+    for path in sorted(RESERVATIONS.iterdir()):
+        if path.name.startswith("."):
+            continue  # a file manager's own record, never a reservation
+        match = _RESERVATION.match(path.name)
+        if match is None:
+            raise ValueError(f"{path} is not a reservation: name it NNNN.txt for its number")
+        holder = path.read_text(encoding="utf-8").strip()
+        if not holder:
+            raise ValueError(f"{path} reserves {match.group(1)} and does not say for whom")
+        reserved[match.group(1)] = holder
+    return reserved
+
+
+#: Read from ``tests/migration_reservations``: reserve a number by adding a file there.
+RESERVED_ELSEWHERE: dict[str, str] = _reservations()
 
 
 def test_the_migrations_are_numbered_and_ordered():
@@ -127,6 +147,23 @@ def test_the_migrations_are_numbered_and_ordered():
     assert len(files) >= 8, "a migration went missing from the directory"
 
 
+def test_a_reservation_is_a_file_naming_its_number_and_who_holds_it(tmp_path, monkeypatch):
+    """The reader of the directory above, on a directory of its own."""
+    monkeypatch.setitem(globals(), "RESERVATIONS", tmp_path / "absent")
+    assert _reservations() == {}
+    monkeypatch.setitem(globals(), "RESERVATIONS", tmp_path)
+    (tmp_path / "0099.txt").write_text("the lane that holds it\n", encoding="utf-8")
+    (tmp_path / ".DS_Store").write_bytes(b"\x00")
+    assert _reservations() == {"0099": "the lane that holds it"}
+    (tmp_path / "0100.txt").write_text("\n", encoding="utf-8")
+    with pytest.raises(ValueError, match="does not say for whom"):
+        _reservations()
+    (tmp_path / "0100.txt").unlink()
+    (tmp_path / "0100.md").write_text("a lane\n", encoding="utf-8")
+    with pytest.raises(ValueError, match=r"name it NNNN\.txt"):
+        _reservations()
+
+
 def test_every_reserved_number_is_still_actually_missing():
     """A reservation that outlived its branch is a hole nobody is filling.
 
@@ -136,8 +173,9 @@ def test_every_reserved_number_is_still_actually_missing():
     present = {migration.version for migration in migrations()}
     landed = sorted(present & set(RESERVED_ELSEWHERE))
     assert not landed, (
-        f"{landed} has landed, so delete it from RESERVED_ELSEWHERE and let the contiguity "
-        "assertion cover it again."
+        f"{landed} has landed, so delete "
+        + ", ".join(f"tests/migration_reservations/{number}.txt" for number in landed)
+        + " and let the contiguity assertion cover it again."
     )
 
 
