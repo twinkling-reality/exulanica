@@ -127,6 +127,8 @@ of whoever is watching.
 - [ ] A fresh tenant has been created, so the session starts from the state a visitor will see.
 - [ ] The seed hash is recorded alongside the session, so what was shown can be reproduced rather
       than only described.
+- [ ] The automated rehearsal (section 5) ran from a clean start on the build being shown, and no
+      step the demonstration relies on failed or was not reachable.
 
 **Consent and privacy**
 
@@ -134,3 +136,60 @@ of whoever is watching.
 - [ ] No credential, balance, personal file path or unrelated notification appears on screen.
 - [ ] The browser runs a clean profile: no bookmarks bar, no extensions, no unrelated tabs, neutral
       window title.
+
+---
+
+## 5. Automated rehearsal
+
+`scripts/rehearsal/` repeats the first demonstration in the real application without a person
+clicking through it, and reports which step of which
+[delivery gate](product-direction.md#delivery-gates-for-the-first-demonstration) and
+[first-milestone deliverable](product-direction.md#first-milestone) works. Its step list,
+`scripts/rehearsal/steps.json`, is data. Each step is one action a person takes, with the results
+that must be observable after it on the page, in the API and after a reload, and the owner area a
+failure routes to. The gates are read from the product roadmap itself; `tests/test_rehearsal_steps.py`
+fails when a gate there has no step, when a step names no observable result, and when a runnable
+step has no driver.
+
+**Running it.**
+
+```bash
+python3 scripts/rehearsal/rehearse.py --worktree <worktree> --slot <n> --out <new directory> --model-env <environment file>
+```
+
+- `--worktree` is the tree whose application is rehearsed. It needs its own `.venv` and web
+  packages. The runtime comes from the acceptance launcher, a development tool kept on the
+  development machine outside the repository (`--launcher` names another copy): it starts that
+  tree's private database, a fresh synthetic workspace with its own token, and the API, on the
+  port block `--slot` chooses.
+- The application is built for production into the run directory and served with `vite preview` on
+  the slot's spare port. No development token is built in, so every page load passes the
+  application's own access-token gate. Account sign-in is not exercised.
+- Each browser session is one headless Chrome with one page, driven over the DevTools protocol, and
+  waits its turn behind the development machine's GPU slot where that machine provides one.
+- `--model-env` names the environment file that holds the hosted-model key. A child process reads
+  only `NEBIUS_API_KEY` from it and hands it to the launcher by environment. Without it, the steps
+  that call a hosted model are reported not reachable. They also stop starting once the spend the
+  product reports reaches the step list's `spend.bound_usd`, and a step list whose estimates exceed
+  `spend.ask_before_usd` is refused before anything runs.
+
+**Reading the result.** The run directory holds `result.json`, described by
+`scripts/rehearsal/result.schema.json`, a `summary.txt` table, one screenshot per observed moment
+and each browser session's log. Every step appears once, in step-list order:
+
+| Status | Meaning |
+| --- | --- |
+| passed | Every observable the step list declares for it was checked and held. A runner that checks less, or something undeclared, fails the step. |
+| failed | The observation, the screenshots, the API reads and the page's own requests are in the step's evidence. |
+| not_reachable | A step it requires did not pass, its browser session ended first, or no hosted model was configured. The reason says which. |
+| not_available | The step list declares that the product cannot attempt it, and says why. |
+
+The gate table gives each gate the worst status of its steps and names its first failed step with
+that step's owner area. The command exits 0 only when every step passed or is declared not
+available, and 3 when the run directory holds the workspace token.
+
+**What it does not do.** It does not observe a person or record demonstration footage, and it
+measures no frame time. The photo drawer grants only the depth right, so the rehearsal grants the
+vision, embedding and composer rights through `POST /personal-admission`, and it confirms the
+proposed place through the identity routes rather than through the application. Every photograph it
+uses is a synthetic drawing.

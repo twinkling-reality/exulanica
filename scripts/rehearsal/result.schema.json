@@ -1,0 +1,389 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "exulanica.rehearsal-result/v1",
+  "title": "One rehearsal run of the first demonstration",
+  "description": "Written by scripts/rehearsal/rehearse.py as result.json in the run directory. Every step of the step list appears exactly once, in step-list order, with one of four statuses; the gate table names the first failed step of each gate the owning document states.",
+  "type": "object",
+  "required": [
+    "profile",
+    "steps_profile",
+    "steps_version",
+    "run",
+    "summary",
+    "steps",
+    "gates"
+  ],
+  "additionalProperties": false,
+  "properties": {
+    "profile": {
+      "const": "exulanica.rehearsal-result/v1"
+    },
+    "steps_profile": {
+      "const": "exulanica.rehearsal-steps/v1"
+    },
+    "steps_version": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "run": {
+      "type": "object",
+      "description": "Which trees, runtime, build, access path, model configuration and browser sessions this run used. Paths under the home directory are written as <home>.",
+      "required": [
+        "started_at",
+        "finished_at",
+        "rehearsal_tree",
+        "steps_sha256"
+      ],
+      "properties": {
+        "started_at": {
+          "type": "string"
+        },
+        "finished_at": {
+          "type": "string"
+        },
+        "rehearsal_tree": {
+          "$ref": "#/$defs/tree"
+        },
+        "application_tree": {
+          "type": [
+            "object",
+            "null"
+          ]
+        },
+        "steps_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "rehearsal_files": {
+          "type": "object",
+          "description": "SHA-256 of every file of the rehearsal directory that ran, by name.",
+          "additionalProperties": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "summary": {
+      "type": "object",
+      "required": [
+        "passed",
+        "failed",
+        "not_reachable",
+        "not_available"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "passed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "failed": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "not_reachable": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "not_available": {
+          "type": "integer",
+          "minimum": 0
+        }
+      }
+    },
+    "steps": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/step"
+      }
+    },
+    "gates": {
+      "type": "array",
+      "minItems": 1,
+      "items": {
+        "$ref": "#/$defs/gate"
+      }
+    }
+  },
+  "$defs": {
+    "tree": {
+      "type": "object",
+      "required": [
+        "head",
+        "diff_head_sha256"
+      ],
+      "properties": {
+        "head": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "diff_head_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "status": {
+      "enum": [
+        "passed",
+        "failed",
+        "not_reachable",
+        "not_available"
+      ]
+    },
+    "step": {
+      "type": "object",
+      "required": [
+        "id",
+        "action",
+        "gates",
+        "owner_area",
+        "expect",
+        "status",
+        "observations",
+        "evidence"
+      ],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "action": {
+          "type": "string",
+          "minLength": 1
+        },
+        "gates": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "string"
+          }
+        },
+        "session": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "owner_area": {
+          "type": "string",
+          "minLength": 1
+        },
+        "expect": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "kind",
+              "id",
+              "says"
+            ],
+            "properties": {
+              "kind": {
+                "enum": [
+                  "page",
+                  "api",
+                  "reload"
+                ]
+              },
+              "id": {
+                "type": "string"
+              },
+              "says": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "reason": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "observations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "ok"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "ok": {
+                "type": "boolean"
+              },
+              "observed": {}
+            }
+          }
+        },
+        "evidence": {
+          "type": "object",
+          "description": "The step's own evidence: screenshots (paths relative to the run directory, with SHA-256), the API reads and writes the driver made with the run's token, the /api/ requests the page made while the step ran, console errors and notes.",
+          "properties": {
+            "screenshots": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "required": [
+                  "file",
+                  "sha256",
+                  "scope"
+                ],
+                "properties": {
+                  "file": {
+                    "type": "string"
+                  },
+                  "sha256": {
+                    "type": "string",
+                    "pattern": "^[0-9a-f]{64}$"
+                  },
+                  "scope": {
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "api": {
+              "type": "array"
+            },
+            "network": {
+              "type": "array"
+            },
+            "console": {
+              "type": "array"
+            },
+            "notes": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "spend_usd": {
+          "type": "string",
+          "pattern": "^[0-9]+(\\.[0-9]+)?$"
+        },
+        "started_at": {
+          "type": "string"
+        },
+        "finished_at": {
+          "type": "string"
+        }
+      },
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "status": {
+                "enum": [
+                  "failed",
+                  "not_reachable",
+                  "not_available"
+                ]
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "reason"
+            ],
+            "properties": {
+              "reason": {
+                "type": "string",
+                "minLength": 1
+              }
+            }
+          }
+        }
+      ]
+    },
+    "gate": {
+      "type": "object",
+      "required": [
+        "gate",
+        "name",
+        "document",
+        "heading",
+        "status",
+        "steps",
+        "first_failure"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "gate": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "document": {
+          "type": "string"
+        },
+        "heading": {
+          "type": "string"
+        },
+        "status": {
+          "$ref": "#/$defs/status"
+        },
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "type": "object",
+            "required": [
+              "id",
+              "status"
+            ],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "status": {
+                "$ref": "#/$defs/status"
+              }
+            }
+          }
+        },
+        "first_failure": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "required": [
+                "step",
+                "reason",
+                "owner_area"
+              ],
+              "properties": {
+                "step": {
+                  "type": "string"
+                },
+                "reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "owner_area": {
+                  "type": "string"
+                }
+              }
+            }
+          ]
+        }
+      }
+    }
+  }
+}
