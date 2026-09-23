@@ -76,25 +76,59 @@ false, and Super exposed an internal packet field name in answer text. They were
 Nano and cost more. The rubric was applied by an automated reviewer rather than the blinded human
 review the roadmap requires, so the answer-quality half of this comparison is still owed. For
 observations, MiniCPM had a higher combined rate of omitted and unsupported objects than M3 and
-reported a person on two photographs with nobody in them, so M3 stays. Because MiniCPM is the
-fallback, a provider error on the primary can turn an ordinary photograph into a proposed place:
-on unsigned photographs it returned generic scene labels such as "outdoor urban area" as places.
+reported a person on two photographs with nobody in them, so M3 stays. On unsigned photographs
+MiniCPM, the fallback, returned generic scene labels such as "outdoor urban area" as places; the
+place proposal policy below refuses all three it returned, because no sign in those frames reads
+any of their words.
 
-Whether the vision role proposes a place at all depends on how the prompt asks for it. The place
-instruction phrased as an exception inside a prohibition produced no proposal from any of 8
-legible place names while transcribing every one. A rewrite that asks for the proposal directly
-proposed all 8 and invented no place across 12 negative photographs, including product, slogan
-and name-on-a-shirt text, but proposed the visible word of a partly covered board at medium
-confidence on 2 of 3 such boards. Its [pre-registered gate](evaluation/2026-09-22-vision-place-proposal-preregistration.json)
-allows no false proposal, so the rewrite [did not pass](evaluation/2026-09-22-vision-place-proposal-outcome.json).
-Asked alone whether a sign is whole or partly hidden, the same model answered all 24 boards of a
-[probe](evaluation/2026-09-22-sign-completeness-probe-outcome.json) correctly. Inside the
-observation it did not use that judgement for a board with a tree in front of it: in a
-[second experiment](evaluation/2026-09-22-vision-place-proposal-b-outcome.json), two further
-wordings, one asking the completeness question as its own schema field before the label, still
-judged both such boards whole, while judging every board cut by the frame correctly. The
-place-class memory entity has no other producer, so this instruction decides whether a grounded
-answer about a person's own place is possible.
+A place proposal is the only producer of a place-class memory entity, so what it lets through is
+what a person is later asked to confirm. The vision role proposes; a versioned policy in code,
+[`exulanica/ingest/place_proposal.py`](../exulanica/ingest/place_proposal.py), decides whether the
+proposal is written and under which label:
+
+| Check | What it keeps or refuses |
+| --- | --- |
+| Label rule | The label keeps only words the observation transcribed from text it marked as signage, compared case-folded and spelled as the transcription spells them. A label left with no word refuses the proposal. |
+| Sign question | Asked in a separate call only when a word survives: the probe's question, word for word, about the most prominent sign. A sign judged partly hidden or absent refuses the proposal, and so does an answer from a model the policy has not admitted, such as the fallback. |
+| Pairing | Every word the label keeps must be among the words the sign question read, so the sign judged is the one carrying the name. |
+
+A sign question that fails withholds the proposal and keeps the rest of the observation. The
+stored observation keeps the model's reply verbatim, with the decision, its named outcome and the
+policy's digest beside it, and the digest is part of the vision stage's reprocessing key.
+
+Each check answers a measured failure. The production instruction, phrased as an exception inside
+a prohibition, proposed no place from any of 8 legible place names while transcribing every one.
+A rewrite that asks for the proposal directly proposed all 8, and also the visible word of a
+partly covered board at medium confidence on 2 of 3 such boards, which its
+[pre-registered gate](evaluation/2026-09-22-vision-place-proposal-preregistration.json) does not
+allow ([outcome](evaluation/2026-09-22-vision-place-proposal-outcome.json)). Asked inside the
+observation, as an instruction or as a schema field answered before the label, the model judged
+boards with a tree in front of them whole
+([second experiment](evaluation/2026-09-22-vision-place-proposal-b-outcome.json)); asked alone, it
+judged all 24 boards of a [probe](evaluation/2026-09-22-sign-completeness-probe-outcome.json)
+correctly. Asked alone as a second call, it caught every partly hidden board of a held-out split,
+but the observation had already written "Ashcombe (partial)" as a label, a word no sign in the
+frame carries ([third experiment](evaluation/2026-09-22-vision-place-proposal-c-outcome.json)).
+
+The policy passed every gate [pre-registered](evaluation/2026-09-23-vision-place-proposal-d-preregistration.json)
+for it, on a held-out split of 44 synthetic photographs scored once
+([outcome](evaluation/2026-09-23-vision-place-proposal-d-outcome.json)). No photograph received a
+proposal it should not have: none of 26 with a covered, cut, hidden or absent place name, or with
+a product, slogan or personal name, and no wrong name on any of 18 whole place names. It wrote 14
+of those 18 exactly, the registered minimum; the production instruction wrote none. Applied to the
+same recorded replies without re-running any model, the observation's own proposals would have
+put a place on 13 photographs that should have none or named one wrongly, the label rule alone on
+12, and every check but pairing on 1: a nameplate the observation misread as "FENWAY CHAMBERS"
+where the sign question read "FENWY CHAMBERS". The sign question costs about 820 input tokens a
+proposing photograph; the design cost 1.28 times the production instruction on that split.
+
+What the policy does not do. It refuses a place name whenever another sign in the frame is more
+prominent: all 3 held-out scenes with a slogan banner behind a street sign lost their name. It
+proposes nothing from a landmark with no
+legible name, and it cannot tell a place name from other text on a sign: a product or slogan on a
+board passes every check if the observation proposes it, and the observation proposed nothing on
+all 6 such photographs of the experiment. The measurements are synthetic drawings of one style,
+with the fallback disabled; the fallback's sign judgement is refused by name, never measured.
 
 ### Quality and runtime requirements, updated 2026-09-13
 

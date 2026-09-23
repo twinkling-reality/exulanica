@@ -1,0 +1,1830 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "adoption": "Adopted in exulanica/ingest/vision.py for every photograph observed after this change. The vision stage's reprocessing key moves with it. A derivative job is queued only by intake, personal admission and reference admission, so no stored observation is re-run by the change itself; re-admitting an existing capture is a new paid call per photograph that writes a new observation, and is a separate decision.",
+    "cost_micro_usd": {
+      "development": {
+        "baseline": 18726,
+        "candidate": 23303,
+        "candidate_sign_questions": 3632
+      },
+      "held_out": {
+        "baseline": 48123,
+        "candidate": 61416,
+        "candidate_sign_questions": 8092
+      },
+      "total": 151568
+    },
+    "design_as_run": {
+      "candidate_prompt_sha256": "e325bbd857d287806519a0104e9606e7115c1940fd934131b3959ff32587b243",
+      "matches_registration": true,
+      "place_proposal_policy_sha256": "4f62bfdf8d9812f65f4f68fc33d90c039ef55004c6214811b92f7927567104d7",
+      "revisions_on_development": [],
+      "why_no_revision": "the development run passed every gate and showed no defect: every check refused what it exists to refuse"
+    },
+    "development": {
+      "baseline_prompt_sha256": "b4e29d53011598d952a2398cf800eaeb2579584b5a8318928fafd1dc2cfbf919",
+      "baseline_summary": {
+        "failed_calls": 0,
+        "false_proposals": 0,
+        "invented_places": 0,
+        "labels_with_dropped_words": 0,
+        "latency_ms_p95": 4906,
+        "micro_usd_total": 18726,
+        "negative_of": 10,
+        "outcomes": {},
+        "people_reported_where_none_drawn": 0,
+        "person_name_with_trace": 1,
+        "photographs": 17,
+        "positive_of": 7,
+        "positive_pass": 0,
+        "second_calls": 0,
+        "sign_checks_failed": 0,
+        "text_scenes": 14,
+        "text_transcribed": 14
+      },
+      "candidate_prompt_sha256": "e325bbd857d287806519a0104e9606e7115c1940fd934131b3959ff32587b243",
+      "candidate_rows": [
+        {
+          "arm": "positive",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_development-01-nameplate.jpg",
+          "invented_place": false,
+          "kind": "nameplate",
+          "latency_ms": 4947,
+          "micro_usd": 1343,
+          "outcome": "written",
+          "positive_pass": true,
+          "proposed_confidence": "high",
+          "proposed_label": "Arken Gallery",
+          "sign_judgement": {
+            "completeness": "whole",
+            "readable_text": "ARKEN GALLERY"
+          },
+          "written_label": "ARKEN GALLERY"
+        },
+        {
+          "arm": "positive",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_development-02-nameplate_tree_beside.jpg",
+          "invented_place": false,
+          "kind": "nameplate_tree_beside",
+          "latency_ms": 5647,
+          "micro_usd": 1554,
+          "outcome": "written",
+          "positive_pass": true,
+          "proposed_confidence": "high",
+          "proposed_label": "Bowscale Rooms",
+          "sign_judgement": {
+            "completeness": "whole",
+            "readable_text": "BOWSCALE ROOMS"
+          },
+          "written_label": "BOWSCALE ROOMS"
+        },
+        {
+          "arm": "positive",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_development-03-street_sign.jpg",
+          "invented_place": false,
+          "kind": "street_sign",
+          "latency_ms": 5768,
+          "micro_usd": 1478,
+          "outcome": "written",
+          "positive_pass": true,
+          "proposed_confidence": "high",
+          "proposed_label": "Catterlen Rise",
+          "sign_judgement": {
+            "completeness": "whole",
+            "readable_text": "CATTERLEN RISE"
+          },
+          "written_label": "CATTERLEN RISE"
+        },
+        {
+          "arm": "positive",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_development-04-street_sign.jpg",
+          "invented_place": false,
+          "kind": "street_sign",
+          "latency_ms": 4885,
+          "micro_usd": 1392,
+          "outcome": "written",
+          "positive_pass": true,
+          "proposed_confidence": "high",
+          "proposed_label": "Dently Vale",
+          "sign_judgement": {
+            "completeness": "whole",
+            "readable_text": "DENTLY VALE"
+          },
+          "written_label": "DENTLY VALE"
+        },
+        {
+          "arm": "positive",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_development-05-park_sign.jpg",
+          "invented_place": false,
+          "kind": "park_sign",
+          "latency_ms": 5049,
+          "micro_usd": 1463,
+          "outcome": "written",
+          "positive_pass": true,
+          "proposed_confidence": "high",
+          "proposed_label": "Elsmor Copse",
+          "sign_judgement": {
+            "completeness": "whole",
+            "readable_text": "ELSMOR COPSE"
+          },
+          "written_label": "ELSMOR COPSE"
+        },
+        {
+          "arm": "positive",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_development-06-station_sign.jpg",
+          "invented_place": false,
+          "kind": "station_sign",
+          "latency_ms": 4902,
+          "micro_usd": 1395,
+          "outcome": "written",
+          "positive_pass": true,
+          "proposed_confidence": "high",
+          "proposed_label": "Fellgarth Parkway",
+          "sign_judgement": {
+            "completeness": "whole",
+            "readable_text": "FELLGARTH PARKWAY"
+          },
+          "written_label": "FELLGARTH PARKWAY"
+        },
+        {
+          "arm": "positive",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_development-07-two_signs.jpg",
+          "invented_place": false,
+          "kind": "two_signs",
+          "latency_ms": 5834,
+          "micro_usd": 1770,
+          "outcome": "judged_sign_does_not_carry_the_name",
+          "positive_pass": false,
+          "proposed_confidence": "high",
+          "proposed_label": "Gilla Passage",
+          "sign_judgement": {
+            "completeness": "whole",
+            "readable_text": "FREE REFILLS"
+          },
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_development-08-covered_last.jpg",
+          "invented_place": false,
+          "kind": "covered_last",
+          "latency_ms": 7074,
+          "micro_usd": 1403,
+          "outcome": "sign_partly_hidden",
+          "positive_pass": null,
+          "proposed_confidence": "medium",
+          "proposed_label": "Hartweld",
+          "sign_judgement": {
+            "completeness": "partly_hidden",
+            "readable_text": "HARTWELD"
+          },
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_development-09-covered_first.jpg",
+          "invented_place": false,
+          "kind": "covered_first",
+          "latency_ms": 5471,
+          "micro_usd": 1500,
+          "outcome": "sign_partly_hidden",
+          "positive_pass": null,
+          "proposed_confidence": "high",
+          "proposed_label": "Tannery",
+          "sign_judgement": {
+            "completeness": "partly_hidden",
+            "readable_text": "TANNERY"
+          },
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 2,
+          "dropped_words": [
+            "sign",
+            "on",
+            "building",
+            "partially",
+            "obscured",
+            "by",
+            "tree"
+          ],
+          "false_proposal": false,
+          "file": "place_d_development-10-covered_middle.jpg",
+          "invented_place": false,
+          "kind": "covered_middle",
+          "latency_ms": 6363,
+          "micro_usd": 1560,
+          "outcome": "sign_partly_hidden",
+          "positive_pass": null,
+          "proposed_confidence": "low",
+          "proposed_label": "MARR...OLME (sign on building, partially obscured by tree)",
+          "sign_judgement": {
+            "completeness": "partly_hidden",
+            "readable_text": "MARR OLME"
+          },
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 1,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_development-11-hidden.jpg",
+          "invented_place": false,
+          "kind": "hidden",
+          "latency_ms": 3567,
+          "micro_usd": 984,
+          "outcome": "nothing_proposed",
+          "positive_pass": null,
+          "proposed_confidence": null,
+          "proposed_label": null,
+          "sign_judgement": null,
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_development-12-cut.jpg",
+          "invented_place": false,
+          "kind": "cut",
+          "latency_ms": 5084,
+          "micro_usd": 1290,
+          "outcome": "sign_partly_hidden",
+          "positive_pass": null,
+          "proposed_confidence": "low",
+          "proposed_label": "Ousewick",
+          "sign_judgement": {
+            "completeness": "partly_hidden",
+            "readable_text": "OUSEWICK CA"
+          },
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_development-13-cut.jpg",
+          "invented_place": false,
+          "kind": "cut",
+          "latency_ms": 7500,
+          "micro_usd": 1432,
+          "outcome": "sign_partly_hidden",
+          "positive_pass": null,
+          "proposed_confidence": "low",
+          "proposed_label": "Plumworth Aq...",
+          "sign_judgement": {
+            "completeness": "partly_hidden",
+            "readable_text": "PLUMWORTH AQ"
+          },
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 1,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_development-14-no_text.jpg",
+          "invented_place": false,
+          "kind": "no_text",
+          "latency_ms": 3258,
+          "micro_usd": 977,
+          "outcome": "nothing_proposed",
+          "positive_pass": null,
+          "proposed_confidence": null,
+          "proposed_label": null,
+          "sign_judgement": null,
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 1,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_development-15-product.jpg",
+          "invented_place": false,
+          "kind": "product",
+          "latency_ms": 4387,
+          "micro_usd": 1204,
+          "outcome": "nothing_proposed",
+          "positive_pass": null,
+          "proposed_confidence": null,
+          "proposed_label": null,
+          "sign_judgement": null,
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 1,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_development-16-person_name.jpg",
+          "invented_place": false,
+          "kind": "person_name",
+          "latency_ms": 4096,
+          "micro_usd": 1068,
+          "outcome": "nothing_proposed",
+          "positive_pass": null,
+          "proposed_confidence": null,
+          "proposed_label": null,
+          "sign_judgement": null,
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_development-17-two_signs_cut.jpg",
+          "invented_place": false,
+          "kind": "two_signs_cut",
+          "latency_ms": 6414,
+          "micro_usd": 1490,
+          "outcome": "sign_partly_hidden",
+          "positive_pass": null,
+          "proposed_confidence": "low",
+          "proposed_label": "Quarnwood",
+          "sign_judgement": {
+            "completeness": "partly_hidden",
+            "readable_text": "QUARNWOOD B"
+          },
+          "written_label": null
+        }
+      ],
+      "candidate_summary": {
+        "failed_calls": 0,
+        "false_proposals": 0,
+        "invented_places": 0,
+        "labels_with_dropped_words": 1,
+        "latency_ms_p95": 7500,
+        "micro_usd_total": 23303,
+        "negative_of": 10,
+        "outcomes": {
+          "judged_sign_does_not_carry_the_name": 1,
+          "nothing_proposed": 4,
+          "sign_partly_hidden": 6,
+          "written": 6
+        },
+        "people_reported_where_none_drawn": 0,
+        "person_name_with_trace": 1,
+        "photographs": 17,
+        "positive_of": 7,
+        "positive_pass": 6,
+        "second_calls": 13,
+        "sign_checks_failed": 0,
+        "text_scenes": 14,
+        "text_transcribed": 14
+      },
+      "counterfactuals_on_recorded_replies": {
+        "label_rule_alone": {
+          "false_proposals": 6,
+          "invented_places": 0,
+          "photographs_that_differ_from_the_run": [
+            {
+              "false_proposal": false,
+              "file": "place_d_development-07-two_signs.jpg",
+              "positive_pass": true,
+              "written_label": "GILLA PASSAGE"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_development-08-covered_last.jpg",
+              "positive_pass": null,
+              "written_label": "HARTWELD"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_development-09-covered_first.jpg",
+              "positive_pass": null,
+              "written_label": "TANNERY"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_development-10-covered_middle.jpg",
+              "positive_pass": null,
+              "written_label": "MARR...OLME"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_development-12-cut.jpg",
+              "positive_pass": null,
+              "written_label": "OUSEWICK"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_development-13-cut.jpg",
+              "positive_pass": null,
+              "written_label": "PLUMWORTH AQ"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_development-17-two_signs_cut.jpg",
+              "positive_pass": null,
+              "written_label": "QUARNWOOD"
+            }
+          ],
+          "positive_pass": 7
+        },
+        "observation_alone": {
+          "false_proposals": 6,
+          "invented_places": 1,
+          "photographs_that_differ_from_the_run": [
+            {
+              "false_proposal": false,
+              "file": "place_d_development-01-nameplate.jpg",
+              "positive_pass": true,
+              "written_label": "Arken Gallery"
+            },
+            {
+              "false_proposal": false,
+              "file": "place_d_development-02-nameplate_tree_beside.jpg",
+              "positive_pass": true,
+              "written_label": "Bowscale Rooms"
+            },
+            {
+              "false_proposal": false,
+              "file": "place_d_development-03-street_sign.jpg",
+              "positive_pass": true,
+              "written_label": "Catterlen Rise"
+            },
+            {
+              "false_proposal": false,
+              "file": "place_d_development-04-street_sign.jpg",
+              "positive_pass": true,
+              "written_label": "Dently Vale"
+            },
+            {
+              "false_proposal": false,
+              "file": "place_d_development-05-park_sign.jpg",
+              "positive_pass": true,
+              "written_label": "Elsmor Copse"
+            },
+            {
+              "false_proposal": false,
+              "file": "place_d_development-06-station_sign.jpg",
+              "positive_pass": true,
+              "written_label": "Fellgarth Parkway"
+            },
+            {
+              "false_proposal": false,
+              "file": "place_d_development-07-two_signs.jpg",
+              "positive_pass": true,
+              "written_label": "Gilla Passage"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_development-08-covered_last.jpg",
+              "positive_pass": null,
+              "written_label": "Hartweld"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_development-09-covered_first.jpg",
+              "positive_pass": null,
+              "written_label": "Tannery"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_development-10-covered_middle.jpg",
+              "positive_pass": null,
+              "written_label": "MARR...OLME (sign on building, partially obscured by tree)"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_development-12-cut.jpg",
+              "positive_pass": null,
+              "written_label": "Ousewick"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_development-13-cut.jpg",
+              "positive_pass": null,
+              "written_label": "Plumworth Aq..."
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_development-17-two_signs_cut.jpg",
+              "positive_pass": null,
+              "written_label": "Quarnwood"
+            }
+          ],
+          "positive_pass": 7
+        },
+        "without_pairing": {
+          "false_proposals": 0,
+          "invented_places": 0,
+          "photographs_that_differ_from_the_run": [
+            {
+              "false_proposal": false,
+              "file": "place_d_development-07-two_signs.jpg",
+              "positive_pass": true,
+              "written_label": "GILLA PASSAGE"
+            }
+          ],
+          "positive_pass": 7
+        }
+      },
+      "gates": {
+        "all_pass": true,
+        "checks": {
+          "cost_at_most_twice": true,
+          "latency_p95": true,
+          "no_failed_calls": true,
+          "no_false_proposal": true,
+          "no_more_people_where_none_drawn": true,
+          "person_traces_not_worse": true,
+          "positive_minimum": true,
+          "text_not_worse_by_more_than_one": true
+        },
+        "positive_minimum_used": 6
+      },
+      "sign_question_micro_usd_from_reported_usage": 3632
+    },
+    "fallback_generic_labels_under_the_label_rule": {
+      "assumed_signage": "every text drawn in those frames, transcribed as signage: the bottom-edge notice. The record holds no transcription, so a sign the fallback invented is not covered.",
+      "labels": [
+        {
+          "file": "held_out-05.jpg",
+          "label": "outdoor urban area",
+          "written_label": null
+        },
+        {
+          "file": "held_out-08.jpg",
+          "label": "outdoor urban or suburban area",
+          "written_label": null
+        },
+        {
+          "file": "held_out-10.jpg",
+          "label": "outdoor urban or suburban area",
+          "written_label": null
+        }
+      ],
+      "source": "docs/evaluation/2026-09-22-model-selection-outcome.json"
+    },
+    "findings": [
+      "Of 4 held-out misses, 3 are scenes with a slogan banner behind the street blade, where the sign question judged the banner, the most prominent sign, and the pairing check refused the name it did not read. The other is a nameplate the observation read as 'Fenway Chambers', in its transcription and its label, where the sign question read 'FENWY CHAMBERS'. The pairing check refused it because the judged sign does not carry every word of the label. Without that check the misread name is written, and the no-false-proposal gate allows none (counterfactuals_on_recorded_replies.without_pairing).",
+      "The label rule refused 1 held-out proposal outright, 'Grimsbury' (covered_middle). Across both splits it removed words no transcription carries from 'Ludworthy Col[lege]' (lege); 'MARR...OLME (sign on building, partially obscured by tree)' (sign, on, building, partially, obscured, by, tree). The sign question then refused each of those.",
+      "The sign question judged partly hidden every negative on which the observation's proposal survived the label rule: 11 on the held-out split and 6 on development. No refusal came from a failed call.",
+      "The observation proposed no place on these held-out negative kinds: hidden, no_text, person_name, product, slogan, two_signs_covered.",
+      "The candidate transcribed 1 held-out photograph's text worse than the baseline, the misread above. The gate allows one."
+    ],
+    "held_out": {
+      "baseline_prompt_sha256": "b4e29d53011598d952a2398cf800eaeb2579584b5a8318928fafd1dc2cfbf919",
+      "baseline_summary": {
+        "failed_calls": 0,
+        "false_proposals": 0,
+        "invented_places": 0,
+        "labels_with_dropped_words": 0,
+        "latency_ms_p95": 5527,
+        "micro_usd_total": 48123,
+        "negative_of": 26,
+        "outcomes": {},
+        "people_reported_where_none_drawn": 0,
+        "person_name_with_trace": 3,
+        "photographs": 44,
+        "positive_of": 18,
+        "positive_pass": 0,
+        "second_calls": 0,
+        "sign_checks_failed": 0,
+        "text_scenes": 38,
+        "text_transcribed": 38
+      },
+      "candidate_prompt_sha256": "e325bbd857d287806519a0104e9606e7115c1940fd934131b3959ff32587b243",
+      "candidate_rows": [
+        {
+          "arm": "positive",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-01-nameplate.jpg",
+          "invented_place": false,
+          "kind": "nameplate",
+          "latency_ms": 5348,
+          "micro_usd": 1614,
+          "outcome": "written",
+          "positive_pass": true,
+          "proposed_confidence": "high",
+          "proposed_label": "Belweth Lodge",
+          "sign_judgement": {
+            "completeness": "whole",
+            "readable_text": "BELWETH LODGE"
+          },
+          "written_label": "BELWETH LODGE"
+        },
+        {
+          "arm": "positive",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-02-nameplate.jpg",
+          "invented_place": false,
+          "kind": "nameplate",
+          "latency_ms": 5267,
+          "micro_usd": 1599,
+          "outcome": "written",
+          "positive_pass": true,
+          "proposed_confidence": "high",
+          "proposed_label": "Corvane Hostel",
+          "sign_judgement": {
+            "completeness": "whole",
+            "readable_text": "CORVANE HOSTEL"
+          },
+          "written_label": "CORVANE HOSTEL"
+        },
+        {
+          "arm": "positive",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-03-nameplate.jpg",
+          "invented_place": false,
+          "kind": "nameplate",
+          "latency_ms": 5301,
+          "micro_usd": 1616,
+          "outcome": "written",
+          "positive_pass": true,
+          "proposed_confidence": "high",
+          "proposed_label": "Dray Pavilion",
+          "sign_judgement": {
+            "completeness": "whole",
+            "readable_text": "DRAY PAVILION"
+          },
+          "written_label": "DRAY PAVILION"
+        },
+        {
+          "arm": "positive",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-04-nameplate_tree_beside.jpg",
+          "invented_place": false,
+          "kind": "nameplate_tree_beside",
+          "latency_ms": 5297,
+          "micro_usd": 1509,
+          "outcome": "judged_sign_does_not_carry_the_name",
+          "positive_pass": false,
+          "proposed_confidence": "high",
+          "proposed_label": "Fenway Chambers",
+          "sign_judgement": {
+            "completeness": "whole",
+            "readable_text": "FENWY CHAMBERS"
+          },
+          "written_label": null
+        },
+        {
+          "arm": "positive",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-05-nameplate_tree_beside.jpg",
+          "invented_place": false,
+          "kind": "nameplate_tree_beside",
+          "latency_ms": 5181,
+          "micro_usd": 1573,
+          "outcome": "written",
+          "positive_pass": true,
+          "proposed_confidence": "high",
+          "proposed_label": "Goldthorne Inn",
+          "sign_judgement": {
+            "completeness": "whole",
+            "readable_text": "GOLDTHORNE INN"
+          },
+          "written_label": "GOLDTHORNE INN"
+        },
+        {
+          "arm": "positive",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-06-street_sign.jpg",
+          "invented_place": false,
+          "kind": "street_sign",
+          "latency_ms": 5576,
+          "micro_usd": 1575,
+          "outcome": "written",
+          "positive_pass": true,
+          "proposed_confidence": "high",
+          "proposed_label": "Isling Avenue",
+          "sign_judgement": {
+            "completeness": "whole",
+            "readable_text": "ISLING AVENUE"
+          },
+          "written_label": "ISLING AVENUE"
+        },
+        {
+          "arm": "positive",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-07-street_sign.jpg",
+          "invented_place": false,
+          "kind": "street_sign",
+          "latency_ms": 5003,
+          "micro_usd": 1364,
+          "outcome": "written",
+          "positive_pass": true,
+          "proposed_confidence": "high",
+          "proposed_label": "Kilmarrow Way",
+          "sign_judgement": {
+            "completeness": "whole",
+            "readable_text": "KILMARROW WAY"
+          },
+          "written_label": "KILMARROW WAY"
+        },
+        {
+          "arm": "positive",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-08-street_sign.jpg",
+          "invented_place": false,
+          "kind": "street_sign",
+          "latency_ms": 5156,
+          "micro_usd": 1359,
+          "outcome": "written",
+          "positive_pass": true,
+          "proposed_confidence": "high",
+          "proposed_label": "Langton Close",
+          "sign_judgement": {
+            "completeness": "whole",
+            "readable_text": "LANGTON CLOSE"
+          },
+          "written_label": "LANGTON CLOSE"
+        },
+        {
+          "arm": "positive",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-09-street_sign.jpg",
+          "invented_place": false,
+          "kind": "street_sign",
+          "latency_ms": 4542,
+          "micro_usd": 1255,
+          "outcome": "written",
+          "positive_pass": true,
+          "proposed_confidence": "high",
+          "proposed_label": "Mossvale Drive",
+          "sign_judgement": {
+            "completeness": "whole",
+            "readable_text": "MOSSVALE DRIVE"
+          },
+          "written_label": "MOSSVALE DRIVE"
+        },
+        {
+          "arm": "positive",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-10-park_sign.jpg",
+          "invented_place": false,
+          "kind": "park_sign",
+          "latency_ms": 4740,
+          "micro_usd": 1403,
+          "outcome": "written",
+          "positive_pass": true,
+          "proposed_confidence": "medium",
+          "proposed_label": "Nettley Green",
+          "sign_judgement": {
+            "completeness": "whole",
+            "readable_text": "NETTLEY GREEN"
+          },
+          "written_label": "NETTLEY GREEN"
+        },
+        {
+          "arm": "positive",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-11-park_sign.jpg",
+          "invented_place": false,
+          "kind": "park_sign",
+          "latency_ms": 6738,
+          "micro_usd": 1496,
+          "outcome": "written",
+          "positive_pass": true,
+          "proposed_confidence": "medium",
+          "proposed_label": "Oswy Heath",
+          "sign_judgement": {
+            "completeness": "whole",
+            "readable_text": "OSWY HEATH"
+          },
+          "written_label": "OSWY HEATH"
+        },
+        {
+          "arm": "positive",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-12-park_sign.jpg",
+          "invented_place": false,
+          "kind": "park_sign",
+          "latency_ms": 4652,
+          "micro_usd": 1388,
+          "outcome": "written",
+          "positive_pass": true,
+          "proposed_confidence": "high",
+          "proposed_label": "Pinder Woods",
+          "sign_judgement": {
+            "completeness": "whole",
+            "readable_text": "PINDER WOODS"
+          },
+          "written_label": "PINDER WOODS"
+        },
+        {
+          "arm": "positive",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-13-station_sign.jpg",
+          "invented_place": false,
+          "kind": "station_sign",
+          "latency_ms": 5119,
+          "micro_usd": 1386,
+          "outcome": "written",
+          "positive_pass": true,
+          "proposed_confidence": "high",
+          "proposed_label": "Rushmer Junction",
+          "sign_judgement": {
+            "completeness": "whole",
+            "readable_text": "RUSHMER JUNCTION"
+          },
+          "written_label": "RUSHMER JUNCTION"
+        },
+        {
+          "arm": "positive",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-14-station_sign.jpg",
+          "invented_place": false,
+          "kind": "station_sign",
+          "latency_ms": 4975,
+          "micro_usd": 1403,
+          "outcome": "written",
+          "positive_pass": true,
+          "proposed_confidence": "high",
+          "proposed_label": "Stavendale Halt",
+          "sign_judgement": {
+            "completeness": "whole",
+            "readable_text": "STAVENDALE HALT"
+          },
+          "written_label": "STAVENDALE HALT"
+        },
+        {
+          "arm": "positive",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-15-station_sign.jpg",
+          "invented_place": false,
+          "kind": "station_sign",
+          "latency_ms": 4718,
+          "micro_usd": 1398,
+          "outcome": "written",
+          "positive_pass": true,
+          "proposed_confidence": "high",
+          "proposed_label": "TREGALLO CENTRAL",
+          "sign_judgement": {
+            "completeness": "whole",
+            "readable_text": "TREGALLO CENTRAL"
+          },
+          "written_label": "TREGALLO CENTRAL"
+        },
+        {
+          "arm": "positive",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-16-two_signs.jpg",
+          "invented_place": false,
+          "kind": "two_signs",
+          "latency_ms": 7120,
+          "micro_usd": 1460,
+          "outcome": "judged_sign_does_not_carry_the_name",
+          "positive_pass": false,
+          "proposed_confidence": "high",
+          "proposed_label": "Ulver Parade",
+          "sign_judgement": {
+            "completeness": "whole",
+            "readable_text": "GRAND OPENING"
+          },
+          "written_label": null
+        },
+        {
+          "arm": "positive",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-17-two_signs.jpg",
+          "invented_place": false,
+          "kind": "two_signs",
+          "latency_ms": 7938,
+          "micro_usd": 1650,
+          "outcome": "judged_sign_does_not_carry_the_name",
+          "positive_pass": false,
+          "proposed_confidence": "high",
+          "proposed_label": "Varn Square",
+          "sign_judgement": {
+            "completeness": "whole",
+            "readable_text": "HAPPY HOUR"
+          },
+          "written_label": null
+        },
+        {
+          "arm": "positive",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-18-two_signs.jpg",
+          "invented_place": false,
+          "kind": "two_signs",
+          "latency_ms": 5997,
+          "micro_usd": 1750,
+          "outcome": "judged_sign_does_not_carry_the_name",
+          "positive_pass": false,
+          "proposed_confidence": "high",
+          "proposed_label": "WYNDCOL WALK",
+          "sign_judgement": {
+            "completeness": "whole",
+            "readable_text": "BACK SOON"
+          },
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-19-covered_last.jpg",
+          "invented_place": false,
+          "kind": "covered_last",
+          "latency_ms": 5197,
+          "micro_usd": 1587,
+          "outcome": "sign_partly_hidden",
+          "positive_pass": null,
+          "proposed_confidence": "medium",
+          "proposed_label": "Aberglen",
+          "sign_judgement": {
+            "completeness": "partly_hidden",
+            "readable_text": "ABERGLEN"
+          },
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-20-covered_last.jpg",
+          "invented_place": false,
+          "kind": "covered_last",
+          "latency_ms": 4808,
+          "micro_usd": 1425,
+          "outcome": "sign_partly_hidden",
+          "positive_pass": null,
+          "proposed_confidence": "high",
+          "proposed_label": "BRAKEN",
+          "sign_judgement": {
+            "completeness": "partly_hidden",
+            "readable_text": "BRAKEN"
+          },
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-21-covered_last.jpg",
+          "invented_place": false,
+          "kind": "covered_last",
+          "latency_ms": 5362,
+          "micro_usd": 1503,
+          "outcome": "sign_partly_hidden",
+          "positive_pass": null,
+          "proposed_confidence": "low",
+          "proposed_label": "Culler",
+          "sign_judgement": {
+            "completeness": "partly_hidden",
+            "readable_text": "CULLER"
+          },
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-22-covered_first.jpg",
+          "invented_place": false,
+          "kind": "covered_first",
+          "latency_ms": 5597,
+          "micro_usd": 1442,
+          "outcome": "sign_partly_hidden",
+          "positive_pass": null,
+          "proposed_confidence": "low",
+          "proposed_label": "Forge",
+          "sign_judgement": {
+            "completeness": "partly_hidden",
+            "readable_text": "FORGE"
+          },
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-23-covered_first.jpg",
+          "invented_place": false,
+          "kind": "covered_first",
+          "latency_ms": 7746,
+          "micro_usd": 1520,
+          "outcome": "sign_partly_hidden",
+          "positive_pass": null,
+          "proposed_confidence": "medium",
+          "proposed_label": "Smithy",
+          "sign_judgement": {
+            "completeness": "partly_hidden",
+            "readable_text": "SMITHY"
+          },
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 1,
+          "dropped_words": [
+            "Grimsbury"
+          ],
+          "false_proposal": false,
+          "file": "place_d_held_out-24-covered_middle.jpg",
+          "invented_place": false,
+          "kind": "covered_middle",
+          "latency_ms": 7178,
+          "micro_usd": 1189,
+          "outcome": "no_word_read_from_a_sign",
+          "positive_pass": null,
+          "proposed_confidence": "low",
+          "proposed_label": "Grimsbury",
+          "sign_judgement": null,
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 1,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-25-hidden.jpg",
+          "invented_place": false,
+          "kind": "hidden",
+          "latency_ms": 3473,
+          "micro_usd": 1013,
+          "outcome": "nothing_proposed",
+          "positive_pass": null,
+          "proposed_confidence": null,
+          "proposed_label": null,
+          "sign_judgement": null,
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 1,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-26-hidden.jpg",
+          "invented_place": false,
+          "kind": "hidden",
+          "latency_ms": 4137,
+          "micro_usd": 1053,
+          "outcome": "nothing_proposed",
+          "positive_pass": null,
+          "proposed_confidence": null,
+          "proposed_label": null,
+          "sign_judgement": null,
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-27-cut.jpg",
+          "invented_place": false,
+          "kind": "cut",
+          "latency_ms": 6995,
+          "micro_usd": 1443,
+          "outcome": "sign_partly_hidden",
+          "positive_pass": null,
+          "proposed_confidence": "low",
+          "proposed_label": "Jesmondvale W...",
+          "sign_judgement": {
+            "completeness": "partly_hidden",
+            "readable_text": "JESMONDVALE"
+          },
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-28-cut.jpg",
+          "invented_place": false,
+          "kind": "cut",
+          "latency_ms": 5487,
+          "micro_usd": 1503,
+          "outcome": "sign_partly_hidden",
+          "positive_pass": null,
+          "proposed_confidence": "low",
+          "proposed_label": "Keldhollow Obse...",
+          "sign_judgement": {
+            "completeness": "partly_hidden",
+            "readable_text": "KELDHOLLOW OBSE"
+          },
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 2,
+          "dropped_words": [
+            "lege"
+          ],
+          "false_proposal": false,
+          "file": "place_d_held_out-29-cut.jpg",
+          "invented_place": false,
+          "kind": "cut",
+          "latency_ms": 7995,
+          "micro_usd": 1429,
+          "outcome": "sign_partly_hidden",
+          "positive_pass": null,
+          "proposed_confidence": "low",
+          "proposed_label": "Ludworthy Col[lege]",
+          "sign_judgement": {
+            "completeness": "partly_hidden",
+            "readable_text": "LUDWORTHY COL"
+          },
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-30-cut.jpg",
+          "invented_place": false,
+          "kind": "cut",
+          "latency_ms": 5733,
+          "micro_usd": 1539,
+          "outcome": "sign_partly_hidden",
+          "positive_pass": null,
+          "proposed_confidence": "low",
+          "proposed_label": "MELBRAITH ESP",
+          "sign_judgement": {
+            "completeness": "partly_hidden",
+            "readable_text": "MELBRAITH ESP"
+          },
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 1,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-31-no_text.jpg",
+          "invented_place": false,
+          "kind": "no_text",
+          "latency_ms": 3739,
+          "micro_usd": 929,
+          "outcome": "nothing_proposed",
+          "positive_pass": null,
+          "proposed_confidence": null,
+          "proposed_label": null,
+          "sign_judgement": null,
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 1,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-32-no_text.jpg",
+          "invented_place": false,
+          "kind": "no_text",
+          "latency_ms": 3355,
+          "micro_usd": 982,
+          "outcome": "nothing_proposed",
+          "positive_pass": null,
+          "proposed_confidence": null,
+          "proposed_label": null,
+          "sign_judgement": null,
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 1,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-33-no_text.jpg",
+          "invented_place": false,
+          "kind": "no_text",
+          "latency_ms": 4225,
+          "micro_usd": 1092,
+          "outcome": "nothing_proposed",
+          "positive_pass": null,
+          "proposed_confidence": null,
+          "proposed_label": null,
+          "sign_judgement": null,
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 1,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-34-product.jpg",
+          "invented_place": false,
+          "kind": "product",
+          "latency_ms": 3307,
+          "micro_usd": 979,
+          "outcome": "nothing_proposed",
+          "positive_pass": null,
+          "proposed_confidence": null,
+          "proposed_label": null,
+          "sign_judgement": null,
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 1,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-35-product.jpg",
+          "invented_place": false,
+          "kind": "product",
+          "latency_ms": 3275,
+          "micro_usd": 1028,
+          "outcome": "nothing_proposed",
+          "positive_pass": null,
+          "proposed_confidence": null,
+          "proposed_label": null,
+          "sign_judgement": null,
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 1,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-36-product.jpg",
+          "invented_place": false,
+          "kind": "product",
+          "latency_ms": 3382,
+          "micro_usd": 1125,
+          "outcome": "nothing_proposed",
+          "positive_pass": null,
+          "proposed_confidence": null,
+          "proposed_label": null,
+          "sign_judgement": null,
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 1,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-37-slogan.jpg",
+          "invented_place": false,
+          "kind": "slogan",
+          "latency_ms": 3605,
+          "micro_usd": 1237,
+          "outcome": "nothing_proposed",
+          "positive_pass": null,
+          "proposed_confidence": null,
+          "proposed_label": null,
+          "sign_judgement": null,
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 1,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-38-slogan.jpg",
+          "invented_place": false,
+          "kind": "slogan",
+          "latency_ms": 3541,
+          "micro_usd": 1264,
+          "outcome": "nothing_proposed",
+          "positive_pass": null,
+          "proposed_confidence": null,
+          "proposed_label": null,
+          "sign_judgement": null,
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 1,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-39-person_name.jpg",
+          "invented_place": false,
+          "kind": "person_name",
+          "latency_ms": 5205,
+          "micro_usd": 2067,
+          "outcome": "nothing_proposed",
+          "positive_pass": null,
+          "proposed_confidence": null,
+          "proposed_label": null,
+          "sign_judgement": null,
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 1,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-40-person_name.jpg",
+          "invented_place": false,
+          "kind": "person_name",
+          "latency_ms": 6536,
+          "micro_usd": 1782,
+          "outcome": "nothing_proposed",
+          "positive_pass": null,
+          "proposed_confidence": null,
+          "proposed_label": null,
+          "sign_judgement": null,
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 1,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-41-person_name.jpg",
+          "invented_place": false,
+          "kind": "person_name",
+          "latency_ms": 4265,
+          "micro_usd": 1235,
+          "outcome": "nothing_proposed",
+          "positive_pass": null,
+          "proposed_confidence": null,
+          "proposed_label": null,
+          "sign_judgement": null,
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-42-two_signs_cut.jpg",
+          "invented_place": false,
+          "kind": "two_signs_cut",
+          "latency_ms": 5252,
+          "micro_usd": 1424,
+          "outcome": "sign_partly_hidden",
+          "positive_pass": null,
+          "proposed_confidence": "low",
+          "proposed_label": "Quernholt",
+          "sign_judgement": {
+            "completeness": "partly_hidden",
+            "readable_text": "QUERNHOLT B"
+          },
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 2,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-43-two_signs_cut.jpg",
+          "invented_place": false,
+          "kind": "two_signs_cut",
+          "latency_ms": 5631,
+          "micro_usd": 1550,
+          "outcome": "sign_partly_hidden",
+          "positive_pass": null,
+          "proposed_confidence": "low",
+          "proposed_label": "Skelthwaite",
+          "sign_judgement": {
+            "completeness": "partly_hidden",
+            "readable_text": "SKELTHWAITE C"
+          },
+          "written_label": null
+        },
+        {
+          "arm": "negative",
+          "calls": 1,
+          "dropped_words": [],
+          "false_proposal": false,
+          "file": "place_d_held_out-44-two_signs_covered.jpg",
+          "invented_place": false,
+          "kind": "two_signs_covered",
+          "latency_ms": 3585,
+          "micro_usd": 1278,
+          "outcome": "nothing_proposed",
+          "positive_pass": null,
+          "proposed_confidence": null,
+          "proposed_label": null,
+          "sign_judgement": null,
+          "written_label": null
+        }
+      ],
+      "candidate_summary": {
+        "failed_calls": 0,
+        "false_proposals": 0,
+        "invented_places": 0,
+        "labels_with_dropped_words": 2,
+        "latency_ms_p95": 7746,
+        "micro_usd_total": 61416,
+        "negative_of": 26,
+        "outcomes": {
+          "judged_sign_does_not_carry_the_name": 4,
+          "no_word_read_from_a_sign": 1,
+          "nothing_proposed": 14,
+          "sign_partly_hidden": 11,
+          "written": 14
+        },
+        "people_reported_where_none_drawn": 0,
+        "person_name_with_trace": 3,
+        "photographs": 44,
+        "positive_of": 18,
+        "positive_pass": 14,
+        "second_calls": 29,
+        "sign_checks_failed": 0,
+        "text_scenes": 38,
+        "text_transcribed": 37
+      },
+      "counterfactuals_on_recorded_replies": {
+        "label_rule_alone": {
+          "false_proposals": 12,
+          "invented_places": 2,
+          "photographs_that_differ_from_the_run": [
+            {
+              "false_proposal": true,
+              "file": "place_d_held_out-04-nameplate_tree_beside.jpg",
+              "positive_pass": false,
+              "written_label": "FENWAY CHAMBERS"
+            },
+            {
+              "false_proposal": false,
+              "file": "place_d_held_out-16-two_signs.jpg",
+              "positive_pass": true,
+              "written_label": "ULVER PARADE"
+            },
+            {
+              "false_proposal": false,
+              "file": "place_d_held_out-17-two_signs.jpg",
+              "positive_pass": true,
+              "written_label": "VARN SQUARE"
+            },
+            {
+              "false_proposal": false,
+              "file": "place_d_held_out-18-two_signs.jpg",
+              "positive_pass": true,
+              "written_label": "WYNDCOL WALK"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_held_out-19-covered_last.jpg",
+              "positive_pass": null,
+              "written_label": "ABERGLEN"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_held_out-20-covered_last.jpg",
+              "positive_pass": null,
+              "written_label": "BRAKEN"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_held_out-21-covered_last.jpg",
+              "positive_pass": null,
+              "written_label": "CULLER"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_held_out-22-covered_first.jpg",
+              "positive_pass": null,
+              "written_label": "FORGE"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_held_out-23-covered_first.jpg",
+              "positive_pass": null,
+              "written_label": "SMITHY"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_held_out-27-cut.jpg",
+              "positive_pass": null,
+              "written_label": "JESMONDVALE W"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_held_out-28-cut.jpg",
+              "positive_pass": null,
+              "written_label": "KELDHOLLOW OBSE"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_held_out-29-cut.jpg",
+              "positive_pass": null,
+              "written_label": "LUDWORTHY COL"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_held_out-30-cut.jpg",
+              "positive_pass": null,
+              "written_label": "MELBRAITH ESP"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_held_out-42-two_signs_cut.jpg",
+              "positive_pass": null,
+              "written_label": "QUERNHOLT"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_held_out-43-two_signs_cut.jpg",
+              "positive_pass": null,
+              "written_label": "SKELTHWAITE"
+            }
+          ],
+          "positive_pass": 17
+        },
+        "observation_alone": {
+          "false_proposals": 13,
+          "invented_places": 4,
+          "photographs_that_differ_from_the_run": [
+            {
+              "false_proposal": false,
+              "file": "place_d_held_out-01-nameplate.jpg",
+              "positive_pass": true,
+              "written_label": "Belweth Lodge"
+            },
+            {
+              "false_proposal": false,
+              "file": "place_d_held_out-02-nameplate.jpg",
+              "positive_pass": true,
+              "written_label": "Corvane Hostel"
+            },
+            {
+              "false_proposal": false,
+              "file": "place_d_held_out-03-nameplate.jpg",
+              "positive_pass": true,
+              "written_label": "Dray Pavilion"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_held_out-04-nameplate_tree_beside.jpg",
+              "positive_pass": false,
+              "written_label": "Fenway Chambers"
+            },
+            {
+              "false_proposal": false,
+              "file": "place_d_held_out-05-nameplate_tree_beside.jpg",
+              "positive_pass": true,
+              "written_label": "Goldthorne Inn"
+            },
+            {
+              "false_proposal": false,
+              "file": "place_d_held_out-06-street_sign.jpg",
+              "positive_pass": true,
+              "written_label": "Isling Avenue"
+            },
+            {
+              "false_proposal": false,
+              "file": "place_d_held_out-07-street_sign.jpg",
+              "positive_pass": true,
+              "written_label": "Kilmarrow Way"
+            },
+            {
+              "false_proposal": false,
+              "file": "place_d_held_out-08-street_sign.jpg",
+              "positive_pass": true,
+              "written_label": "Langton Close"
+            },
+            {
+              "false_proposal": false,
+              "file": "place_d_held_out-09-street_sign.jpg",
+              "positive_pass": true,
+              "written_label": "Mossvale Drive"
+            },
+            {
+              "false_proposal": false,
+              "file": "place_d_held_out-10-park_sign.jpg",
+              "positive_pass": true,
+              "written_label": "Nettley Green"
+            },
+            {
+              "false_proposal": false,
+              "file": "place_d_held_out-11-park_sign.jpg",
+              "positive_pass": true,
+              "written_label": "Oswy Heath"
+            },
+            {
+              "false_proposal": false,
+              "file": "place_d_held_out-12-park_sign.jpg",
+              "positive_pass": true,
+              "written_label": "Pinder Woods"
+            },
+            {
+              "false_proposal": false,
+              "file": "place_d_held_out-13-station_sign.jpg",
+              "positive_pass": true,
+              "written_label": "Rushmer Junction"
+            },
+            {
+              "false_proposal": false,
+              "file": "place_d_held_out-14-station_sign.jpg",
+              "positive_pass": true,
+              "written_label": "Stavendale Halt"
+            },
+            {
+              "false_proposal": false,
+              "file": "place_d_held_out-16-two_signs.jpg",
+              "positive_pass": true,
+              "written_label": "Ulver Parade"
+            },
+            {
+              "false_proposal": false,
+              "file": "place_d_held_out-17-two_signs.jpg",
+              "positive_pass": true,
+              "written_label": "Varn Square"
+            },
+            {
+              "false_proposal": false,
+              "file": "place_d_held_out-18-two_signs.jpg",
+              "positive_pass": true,
+              "written_label": "WYNDCOL WALK"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_held_out-19-covered_last.jpg",
+              "positive_pass": null,
+              "written_label": "Aberglen"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_held_out-20-covered_last.jpg",
+              "positive_pass": null,
+              "written_label": "BRAKEN"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_held_out-21-covered_last.jpg",
+              "positive_pass": null,
+              "written_label": "Culler"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_held_out-22-covered_first.jpg",
+              "positive_pass": null,
+              "written_label": "Forge"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_held_out-23-covered_first.jpg",
+              "positive_pass": null,
+              "written_label": "Smithy"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_held_out-24-covered_middle.jpg",
+              "positive_pass": null,
+              "written_label": "Grimsbury"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_held_out-27-cut.jpg",
+              "positive_pass": null,
+              "written_label": "Jesmondvale W..."
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_held_out-28-cut.jpg",
+              "positive_pass": null,
+              "written_label": "Keldhollow Obse..."
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_held_out-29-cut.jpg",
+              "positive_pass": null,
+              "written_label": "Ludworthy Col[lege]"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_held_out-30-cut.jpg",
+              "positive_pass": null,
+              "written_label": "MELBRAITH ESP"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_held_out-42-two_signs_cut.jpg",
+              "positive_pass": null,
+              "written_label": "Quernholt"
+            },
+            {
+              "false_proposal": true,
+              "file": "place_d_held_out-43-two_signs_cut.jpg",
+              "positive_pass": null,
+              "written_label": "Skelthwaite"
+            }
+          ],
+          "positive_pass": 17
+        },
+        "without_pairing": {
+          "false_proposals": 1,
+          "invented_places": 1,
+          "photographs_that_differ_from_the_run": [
+            {
+              "false_proposal": true,
+              "file": "place_d_held_out-04-nameplate_tree_beside.jpg",
+              "positive_pass": false,
+              "written_label": "FENWAY CHAMBERS"
+            },
+            {
+              "false_proposal": false,
+              "file": "place_d_held_out-16-two_signs.jpg",
+              "positive_pass": true,
+              "written_label": "ULVER PARADE"
+            },
+            {
+              "false_proposal": false,
+              "file": "place_d_held_out-17-two_signs.jpg",
+              "positive_pass": true,
+              "written_label": "VARN SQUARE"
+            },
+            {
+              "false_proposal": false,
+              "file": "place_d_held_out-18-two_signs.jpg",
+              "positive_pass": true,
+              "written_label": "WYNDCOL WALK"
+            }
+          ],
+          "positive_pass": 17
+        }
+      },
+      "gates": {
+        "all_pass": true,
+        "checks": {
+          "cost_at_most_twice": true,
+          "latency_p95": true,
+          "no_failed_calls": true,
+          "no_false_proposal": true,
+          "no_more_people_where_none_drawn": true,
+          "person_traces_not_worse": true,
+          "positive_minimum": true,
+          "text_not_worse_by_more_than_one": true
+        },
+        "positive_minimum_used": 14
+      },
+      "sign_question_micro_usd_from_reported_usage": 8092
+    },
+    "not_established": [
+      "Recall on real photographs, where a place name often shares the frame with other signs: every scene here with a more prominent second sign lost its place name.",
+      "Any rate. Zero false proposals in 44 photographs bounds the true rate loosely, and the photographs are synthetic drawings of one style.",
+      "The fallback model's sign judgement, which the policy refuses by name and which was never exercised: the fallback was disabled in both arms.",
+      "Landmarks, signage in other languages or scripts, and names split across two transcriptions."
+    ],
+    "predecessor_record": {
+      "path": "docs/evaluation/2026-09-23-vision-place-proposal-d-preregistration.json",
+      "record_sha256": "ad48079ca932abee14ba38125e45c501e5cc5465a6fff324c0c15628fc02657d"
+    },
+    "verdict": "PASSED every pre-registered gate on the held-out split, scored once. 0 of 44 photographs received a written proposal it should not have: none of the 26 negatives, and no wrong name on a positive. 14 of 18 whole place names were written exactly, against a registered minimum of 14. The baseline wrote 0 of the 18."
+  },
+  "record_sha256": "4e331fbd73c57c1ed9ed9198f77e3e6d1b42bd19d1da13998ef30c343220ede3"
+}

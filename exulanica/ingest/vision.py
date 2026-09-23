@@ -23,6 +23,12 @@ Three properties are structural rather than documented:
     of face geometry rather than on the photograph. So detection proceeds and derivation does
     not, and the recurrence thesis gets a data path without anyone deciding P-1 by accident.
 
+A proposed place is the model's suggestion and nothing more. Whether it is written, and under
+what label, is decided in code by ``exulanica.ingest.place_proposal``: the label keeps only words
+the observation transcribed from a sign, and a second call asks, on its own, whether that sign is
+whole. The stored payload is the model's reply verbatim either way, and the decision is stored
+beside it.
+
 The prompt carries a per-request nonce. That is a mitigation and it is described as one: OWASP
 LLM01:2025 states plainly that its mitigations are mitigations rather than a complete fix,
 "because injection is inherent to how generative models process input". The real defence is
@@ -35,12 +41,25 @@ from __future__ import annotations
 import hashlib
 import secrets
 from dataclasses import dataclass
+from decimal import Decimal
 from typing import Any, Final, Literal, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from exulanica.canonical import canonical_json
 from exulanica.errors import ExulanicaError
+from exulanica.ingest.place_proposal import (
+    PLACE_PROPOSAL_POLICY,
+    SIGN_QUESTION,
+    SIGN_SCHEMA,
+    SIGN_SCHEMA_NAME,
+    SIGN_SYSTEM,
+    SignJudgement,
+    decide,
+    read_label,
+)
 from exulanica.models.client import ModelClient
+from exulanica.models.errors import ModelError
 from exulanica.models.handoff import ModelHandoff
 from exulanica.models.manifest import Role
 from exulanica.models.messages import image_part
@@ -59,11 +78,16 @@ __all__ = [
     "VisionResult",
     "build_messages",
     "prompt_digest",
+    "sign_messages",
     "validate_observation",
 ]
 
 SCHEMA_VERSION: Final = 2
-PROMPT_VERSION: Final = 2
+#: A label for the prompt generation, recorded on every observation beside ``prompt_digest()``.
+#: It keys nothing: reprocessing follows the digest, which moves on any edit whether or not
+#: this does. Version 3 asks for a place proposal from a place name read in the frame, where
+#: version 2 granted one as the tail of a prohibition and the model declined it.
+PROMPT_VERSION: Final = 3
 OBSERVATION_SCHEMA_NAME: Final = "exulanica_photo_observation_v2"
 
 #: Labels that denote a human being, used ONLY to read observations written under schema
@@ -228,9 +252,11 @@ OBSERVATION_SCHEMA: Final[dict[str, Any]] = {
         "proposed_place": {
             "type": ["object", "null"],
             "description": (
-                "A place this photograph might show, ONLY when visible signage or a "
-                "distinctive landmark supports it. Null otherwise. This is a proposal for a "
-                "human to confirm, never a statement of fact."
+                "Where this photograph may have been taken, proposed for the account holder to "
+                "confirm or reject. Fill it when text in the frame names a place, such as a "
+                "name on a building or a street, station, park or venue sign, or when a "
+                "distinctive landmark identifies one. Null when nothing in the frame names a "
+                "place. A proposal, never a statement of fact."
             ),
             "properties": {
                 "label": {"type": "string"},
@@ -430,8 +456,18 @@ Rules:
 leg or a shoulder at the edge of the frame, somebody reflected in a window, somebody on a screen \
 in the photograph. Give the location and the part only, never a description. When you are unsure \
 whether something is part of a person, include it with low confidence.
-- Never state a date, a time, or a location as fact. Propose a place only when signage or a \
-distinctive landmark in the image supports it, and say what supports it.
+- Never state a date or a time as fact, and never state where the photograph was taken as fact.
+- `proposed_place` is how you suggest where the photograph was taken, for the account holder to \
+confirm or reject. Fill it whenever text in the frame names a place: a name on a building, or a \
+street, station, park or venue sign. Use the name you read as the label, `signage` as the basis, \
+and quote the words you read as the supporting evidence. A distinctive landmark supports a \
+proposal in the same way, with `landmark` as the basis.
+- Leave `proposed_place` null when nothing in the frame names a place. Text that names a product, \
+an advertisement, a slogan, a person or anything else that is not a place is not a place name. \
+Before proposing, check whether the whole sign is visible. If anything covers part of it, or it \
+runs out of the frame, either leave `proposed_place` null or propose only the words you can \
+actually read, with low confidence, and say in the supporting evidence that the sign is partly \
+hidden. Never complete a name you cannot see.
 - Describe only what is in the frame. Do not fill gaps with what is usually true.
 - Use the qualitative confidence bands. Never emit a percentage.
 - Reply with one JSON object matching the schema and nothing else.
@@ -441,9 +477,49 @@ distinctive landmark in the image supports it, and say what supports it.
 _USER_TEXT: Final = "Describe this photograph as an observation record matching the schema."
 
 
+def sign_messages(image_bytes: bytes, media_type: str) -> list[dict[str, Any]]:
+    """The sign question and the image, exactly as the probe asked it.
+
+    Asked only when a proposal's label survives the label rule
+    (``exulanica.ingest.place_proposal``). Asked inside the observation, as an instruction or as a
+    schema field answered before the label, the model judged a board with a tree in front of it
+    whole; asked alone, it judged all 24 boards of the probe correctly. So it is asked alone.
+    """
+    return [
+        {"role": "system", "content": SIGN_SYSTEM},
+        {
+            "role": "user",
+            "content": [
+                {"type": "text", "text": SIGN_QUESTION},
+                image_part(image_bytes, media_type=media_type),
+            ],
+        },
+    ]
+
+
 def prompt_digest() -> str:
-    """SHA-256 of the prompt template, so a silent edit is visible in the ledger."""
-    return hashlib.sha256((_SYSTEM_TEMPLATE + _USER_TEXT).encode("utf-8")).hexdigest()
+    """SHA-256 of everything that decides what this stage writes from a photograph.
+
+    The system template, the user text and the observation schema with its name, and the place
+    proposal policy, whose digest covers the sign question, its schema and the rule that decides
+    which proposal is written. The schema belongs here because its descriptions are instructions
+    the model reads beside the prompt: the place proposal was declined for as long as the
+    schema's description of it led with "ONLY when", whatever the prompt said. The policy belongs
+    here because changing it changes which place a stored observation's photograph is said to
+    show. This digest is the vision stage's reprocessing key (``vision_stage_params``), so anything
+    it did not cover could change while every stored observation stayed keyed as if it had not.
+    """
+    return hashlib.sha256(
+        canonical_json(
+            {
+                "system_template": _SYSTEM_TEMPLATE,
+                "user_text": _USER_TEXT,
+                "observation_schema_name": OBSERVATION_SCHEMA_NAME,
+                "observation_schema": OBSERVATION_SCHEMA,
+                "place_proposal_policy_sha256": PLACE_PROPOSAL_POLICY.digest(),
+            }
+        )
+    ).hexdigest()
 
 
 def build_messages(image_bytes: bytes, media_type: str) -> list[dict[str, Any]]:
@@ -483,6 +559,25 @@ class VisionResult:
     attempts: int
     tried: tuple[str, ...]
     latency_ms: int
+    #: Model calls that returned a result: two when a proposal's label survived the label rule
+    #: and the sign question was answered. A sign question that failed is not counted, and
+    #: whatever the provider charged for it is in the client's budget but not in ``cost``.
+    calls: int = 1
+    #: The place proposal decision (``exulanica.ingest.place_proposal``), stored beside the
+    #: verbatim payload so a withheld proposal says why. ``None`` from a model that makes none.
+    place_check: dict[str, Any] | None = None
+
+
+def _summed(first: dict[str, Any], second: dict[str, Any]) -> dict[str, Any]:
+    """Two calls' usage as one, so a stage that records one cost records both."""
+    total = dict(first)
+    for key in ("input_tokens", "output_tokens", "reasoning_tokens", "cached_input_tokens"):
+        total[key] = int(first.get(key) or 0) + int(second.get(key) or 0)
+    total["usd_estimate"] = str(
+        Decimal(str(first.get("usd_estimate", "0"))) + Decimal(str(second.get("usd_estimate", "0")))
+    )
+    total["cache_hit"] = bool(first.get("cache_hit")) and bool(second.get("cache_hit"))
+    return total
 
 
 class VisionModel(Protocol):
@@ -516,6 +611,11 @@ _PROMPT_CACHE_VERSION: Final = f"photo-observation-v{PROMPT_VERSION}"
 #: Measured: 277 prompt tokens at 256px, 772 at 768px. Used only to size the budget guard's
 #: pre-call reservation, never for accounting, which reads the usage the provider reported.
 _IMAGE_TOKEN_ESTIMATE: Final = 800
+
+#: How much of a failed sign question's error message a stored observation keeps: enough for the
+#: client's own sentence naming what failed, and bounded so a provider's error body cannot grow
+#: every stored artifact.
+_FAILURE_CHARS: Final = 400
 
 
 class NebiusVisionModel:
@@ -590,13 +690,69 @@ class NebiusVisionModel:
         # be a second parse of the same text with a second chance of disagreeing with the first.
         payload = dict(call.payload or {})
         observation = validate_observation(payload)
+        cost = call.usage.as_cost_json()
+        attempts, tried = call.attempts, tuple(call.tried)
+        latency_s = call.usage.latency_s
+        calls = 1
+
+        # The model proposes; ``place_proposal`` decides. ``payload`` stays the verbatim record of
+        # what the model said, and the observation the stage writes from carries the proposal
+        # only if the policy writes it, under the label the policy wrote.
+        proposed = observation.proposed_place
+        reading = (
+            None
+            if proposed is None
+            else read_label(
+                proposed.label,
+                [entry.text for entry in observation.legible_text if entry.is_signage],
+            )
+        )
+        judgement: SignJudgement | None = None
+        sign_usage: dict[str, Any] | None = None
+        if reading is not None and reading.label is not None:
+            try:
+                check = self._client.chat(
+                    Role.VISION,
+                    sign_messages(image_bytes, media_type),
+                    prompt_version=f"{_PROMPT_CACHE_VERSION}-sign-{prompt_digest()[:12]}",
+                    temperature=0.0,
+                    response_format=response_format_for_schema(SIGN_SCHEMA, SIGN_SCHEMA_NAME),
+                    image_prompt_tokens=_IMAGE_TOKEN_ESTIMATE,
+                    use_cache=False,
+                )
+            except ModelError as exc:
+                # Degrade, never fail. The caption, the objects, the text and the people are no
+                # less true because the second question went unanswered, and failing the
+                # photograph for them would throw away an observation already paid for. Only
+                # the proposal is withheld, because nothing established that its sign is whole.
+                judgement = SignJudgement(
+                    answer=None,
+                    model_id=None,
+                    failure=f"{type(exc).__name__}: {str(exc)[:_FAILURE_CHARS]}",
+                )
+            else:
+                judgement = SignJudgement(answer=dict(check.payload or {}), model_id=check.model_id)
+                sign_usage = check.usage.as_cost_json()
+                cost = _summed(cost, sign_usage)
+                attempts += check.attempts
+                tried = tried + tuple(model for model in check.tried if model not in tried)
+                latency_s += check.usage.latency_s
+                calls += 1
+        decision = decide(reading, judgement)
+        written = (
+            proposed.model_copy(update={"label": decision.label})
+            if decision.writes and proposed is not None
+            else None
+        )
         return VisionResult(
-            observation=observation,
+            observation=observation.model_copy(update={"proposed_place": written}),
             payload=payload,
             model_id=call.model_id,
             model_ref=call.model_ref,
-            cost=call.usage.as_cost_json(),
-            attempts=call.attempts,
-            tried=call.tried,
-            latency_ms=round(call.usage.latency_s * 1000),
+            cost=cost,
+            attempts=attempts,
+            tried=tried,
+            latency_ms=round(latency_s * 1000),
+            calls=calls,
+            place_check={**decision.record(), "sign_usage": sign_usage},
         )

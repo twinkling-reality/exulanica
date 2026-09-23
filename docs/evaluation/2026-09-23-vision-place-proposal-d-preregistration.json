@@ -1,0 +1,602 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "adoption_condition": "Passing is the condition for adopting the design in exulanica/ingest/vision.py, not the adoption. Adopting it moves the vision stage's reprocessing key: a new capture is observed under the new design, and reprocessing an existing capture is a new paid call that writes a new observation. This record decides nothing about existing captures.",
+    "already_seen_before_this_was_written": [
+      "Every result of the first three experiments and of the probe, bound above or by their own records. All their splits are spent and none is used here.",
+      "Contact sheets of both splits below, drawings only. One drawing fault was corrected before this record: the street blade position inherited from the earlier corpus put a blade's left edge outside the frame at some indices (6 pixels at held-out index 8), so every whole sign is now drawn at least 24 pixels inside the frame and the generator refuses a drawing that is not. No model output of any kind exists for either split.",
+      "The candidate's automated tests, which script every model reply and make no call."
+    ],
+    "base_commit": "e9dee3c2",
+    "baseline": {
+      "prompt_sha256": "b4e29d53011598d952a2398cf800eaeb2579584b5a8318928fafd1dc2cfbf919",
+      "what": "exulanica/ingest/vision.py at the base commit, which proposes a place as the tail of a prohibition and decides nothing about it"
+    },
+    "candidate": {
+      "decision": [
+        "1. The observation call, exactly as production makes it.",
+        "2. The label rule: the proposal's label keeps each word found among the words of the observation's legible_text entries marked is_signage; the written label is the transcription's own text: the exact span of one transcription when the kept words are consecutive words of it in the label's order, otherwise the transcribed spellings joined by single spaces. A label left with no word refuses the proposal and no second call is made.",
+        "3. The sign question, only when a word survives: the probe's system text, question and schema, word for word, in a separate call on the same image.",
+        "4. The proposal is written only when the answer comes from an admitted judge, says a sign is present and whole, and every folded word the label keeps is among the folded words of the judgement's readable_text. Every other case is a named refusal in the policy.",
+        "5. A sign question that fails withholds the proposal and keeps the rest of the observation; the photograph does not fail.",
+        "6. The stored observation keeps the model's reply verbatim, with the decision and the policy digest beside it."
+      ],
+      "observation": "the first experiment's frozen wording, byte-identical: its digest over system text, user text and schema is a0f2b94c6e384d5bea46930520c2646821f299927be8d80afd69c18b1d123c9a. The candidate's digest also covers the schema's name and the policy.",
+      "place_proposal_policy": {
+        "policy_id": "place-proposal",
+        "record": {
+          "admitted_judges": [
+            {
+              "evidence": "docs/evaluation/2026-09-22-sign-completeness-probe-outcome.json",
+              "model_id": "MiniMaxAI/MiniMax-M3"
+            }
+          ],
+          "completeness": {
+            "no_sign": "no_sign_seen",
+            "partly_hidden": "sign_partly_hidden",
+            "whole": null
+          },
+          "label_source": "the proposal's label keeps each word found among the words of the observation's legible_text entries marked is_signage; the written label is the transcription's own text: the exact span of one transcription when the kept words are consecutive words of it in the label's order, otherwise the transcribed spellings joined by single spaces",
+          "outcomes": [
+            {
+              "code": "written",
+              "meaning": "the proposal passed both checks and its label is written",
+              "writes": true
+            },
+            {
+              "code": "nothing_proposed",
+              "meaning": "the observation proposed no place",
+              "writes": false
+            },
+            {
+              "code": "no_word_read_from_a_sign",
+              "meaning": "no word of the label is among the words the observation transcribed as signage",
+              "writes": false
+            },
+            {
+              "code": "sign_check_failed",
+              "meaning": "the call asking whether the sign is whole did not return",
+              "writes": false
+            },
+            {
+              "code": "sign_judge_not_admitted",
+              "meaning": "the sign was judged by a model whose judgement this policy has not admitted",
+              "writes": false
+            },
+            {
+              "code": "no_sign_seen",
+              "meaning": "the judgement found no sign with writing on it",
+              "writes": false
+            },
+            {
+              "code": "sign_partly_hidden",
+              "meaning": "the judgement found the sign partly hidden or cut off by the edge of the photograph",
+              "writes": false
+            },
+            {
+              "code": "unknown_completeness_answer",
+              "meaning": "the judgement gave a completeness answer this policy has no meaning for",
+              "writes": false
+            },
+            {
+              "code": "judged_sign_does_not_carry_the_name",
+              "meaning": "a word of the label is not among the words the judgement read on the sign it judged",
+              "writes": false
+            }
+          ],
+          "pairing": "every folded word the label keeps is among the folded words of the judgement's readable_text",
+          "policy_id": "place-proposal",
+          "sign_question": "Is there a sign with writing on it in this photograph? If there is, is the whole sign visible, or is part of it hidden behind something or cut off by the edge of the photograph? Transcribe the words you can read.",
+          "sign_schema": {
+            "additionalProperties": false,
+            "properties": {
+              "completeness": {
+                "enum": [
+                  "whole",
+                  "partly_hidden",
+                  "no_sign"
+                ],
+                "type": "string"
+              },
+              "readable_text": {
+                "type": "string"
+              },
+              "sign_present": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "sign_present",
+              "completeness",
+              "readable_text"
+            ],
+            "type": "object"
+          },
+          "sign_schema_name": "exulanica_sign_completeness_v1",
+          "sign_system": "You look at one photograph and answer one question about the most prominent sign with writing on it. Report only what is visible. Do not guess at anything you cannot see. Reply with one JSON object matching the schema and nothing else.",
+          "version": 1,
+          "word_folding": "Unicode NFKC, then casefold, then apostrophes removed",
+          "word_pattern": "[^\\W_]+(?:['\\u2019][^\\W_]+)*"
+        },
+        "sha256": "4f62bfdf8d9812f65f4f68fc33d90c039ef55004c6214811b92f7927567104d7",
+        "version": 1
+      },
+      "prompt_sha256_at_registration": "e325bbd857d287806519a0104e9606e7115c1940fd934131b3959ff32587b243",
+      "revisions_allowed_on_development": 1,
+      "source_sha256_at_registration": {
+        "exulanica/ingest/place_proposal.py": "476c31d0c2fe6e35e1847e46d96f2edd3be026a2c3aed256811a1ca919375aa1",
+        "exulanica/ingest/stages/vision.py": "ef6d543d7f3eebb0691f20e5076b8cc76571bad933575a6d0d2512cc2b76546c",
+        "exulanica/ingest/vision.py": "c09a014018ad5a0591b43b8d7f78743f05e0802d7a1dc476ab8494749fbe0613",
+        "scripts/make_place_proposal_d_photographs.py": "cf15efc114ee4eb6b0cb3c6daa6ebb47de1b4440ecaca3dd50408910c6a4bff9",
+        "scripts/measure_place_proposal_d.py": "4c1f8d06a6dca53cd2426b32169ce4c832fe24eab4ebab85308d70c0eb24d9dd"
+      }
+    },
+    "corpus": {
+      "drawn_by": "scripts/make_place_proposal_d_photographs.py",
+      "new_words": "no word of any text drawn in either split appears in any split drawn for the earlier experiments, or in the other split; the generator refuses otherwise. The notice every scene carries at its bottom edge is the exception."
+    },
+    "definitions": {
+      "false_proposal": "on a negative photograph, any written proposal at any confidence; on a positive photograph, a written proposal whose label's words are not exactly the place name's words, whether a word is added, missing or misread",
+      "ignored_words": [
+        "A",
+        "AN",
+        "AND",
+        "AT",
+        "OF",
+        "THE"
+      ],
+      "invented_place": "the false proposals whose label carries a word no text in the frame shows, a covered or cut-away word counting as not shown, and any proposal on a no_text photograph. Reported beside the gate, never instead of it.",
+      "negative_kinds": "covered_last, covered_first, covered_middle, hidden, cut, two_signs_cut and two_signs_covered carry a place board that is not whole; no_text, product, slogan and person_name carry no place name at all",
+      "positive_pass": "on a positive photograph, a proposal is written and its label's words are exactly the drawn place name's words",
+      "scored": "the observation each arm's stage writes from: the candidate's after the policy's decision, the baseline's validated payload",
+      "text_transcribed": "on a photograph showing whole words (a whole visible word of the place board, or any word of other text), every such word is among the words of legible_text",
+      "two_signs": "a whole place name on a street blade, with a whole banner carrying a slogan on the building behind it; positive, and counted in the recall target",
+      "words": "upper-cased, split at every character that is not A to Z, the ignored words removed, compared as sets"
+    },
+    "gates": {
+      "calls": "no observation call and no sign question fails in the candidate arm",
+      "cost": "the candidate's total at most twice the baseline's, from the provider's reported usage as the client's budget records it",
+      "latency_ms": {
+        "per_photograph_p95_max": 30000
+      },
+      "latency_note": "per photograph, both calls together when there are two",
+      "negative": {
+        "max_false_proposals": 0,
+        "over": "every photograph of the split, positive and negative",
+        "why_zero": "an invented or wrong place becomes a memory entity a person is asked to confirm, and it is the failure a person is least able to notice, so none is traded for recall. Zero in a split of this size is a gate, not an estimate of a rate: it bounds the true rate only loosely."
+      },
+      "order": "the no-false-proposal gate is checked first and a failure there ends the evaluation as a failure; the positive number is then reported and cannot rescue it",
+      "positive": {
+        "development_min_pass": 6,
+        "development_of": 7,
+        "held_out_min_pass": 14,
+        "held_out_of": 18,
+        "rule": "three quarters of the positive photographs, rounded up, as in every earlier experiment"
+      },
+      "regression_against_baseline_same_run": [
+        "photographs with their words transcribed: candidate at least baseline minus 1",
+        "person_name photographs with at least one person trace: candidate at least baseline",
+        "person traces reported on photographs where no person was drawn: candidate at most baseline"
+      ]
+    },
+    "input": "the rendition production sends: exulanica.ingest.derivatives.render over the upright image with the registry's rendition parameters. Both arms receive the same bytes.",
+    "model": {
+      "call": "NebiusVisionModel.observe from each arm's own module: its messages, schema, temperature 0 and no response cache",
+      "calls_per_photograph": "baseline one; candidate one, or two when a label survives",
+      "determinism": "not claimed. Temperature 0 on a serverless endpoint does not promise identical output, which is one reason every threshold is in whole photographs.",
+      "fallback": "disabled for both arms, on an in-memory copy of the manifest, so a provider failure is recorded as a failure rather than answered by another model in one arm only. The policy refuses a sign judgement from any model it has not admitted, and that refusal is tested with scripted replies, not measured here.",
+      "model_id": "MiniMaxAI/MiniMax-M3",
+      "role": "vision"
+    },
+    "not_covered": [
+      "A landmark with no legible name. The policy refuses every such proposal by construction, because no sign reads it.",
+      "Personal photographs and real photographs. Automated work uses synthetic drawings.",
+      "Any model other than the vision primary.",
+      "Signage in other languages or scripts, and a name transcribed as two entries, which the label rule joins but this corpus does not draw."
+    ],
+    "predecessor_records": [
+      {
+        "path": "docs/evaluation/2026-09-22-vision-place-proposal-c-outcome.json",
+        "record_sha256": "c8ca67bd04942512ff10ff1dd306c8ffe16757e76e3369684a8979e74c95635a"
+      },
+      {
+        "path": "docs/evaluation/2026-09-22-sign-completeness-probe-outcome.json",
+        "record_sha256": "e6031553cee8f706369c00b5dfaa99bafdaaf7fb47a73733a1e9ce97568e356f"
+      }
+    ],
+    "premise": [
+      "The third experiment's one held-out failure was a label word the observation wrote ('Ashcombe (partial)'), not a completeness judgement; its completeness question judged every partly hidden board partly hidden.",
+      "Asked inside the observation, as an instruction or as a schema field answered first, the model judged boards with a tree in front of them whole (the second experiment); asked alone it judged 24 of 24 probe boards correctly. So the completeness judgement is a second call, as the third experiment asked it.",
+      "A rule written in code bounds whatever the observation writes: it can only remove."
+    ],
+    "profile_note": "Pre-registration of the fourth place-proposal experiment. Written before any call was made on either split below, by either arm.",
+    "question": "Does a place proposal made by the vision role and decided by the written place proposal policy name the place from a whole legible place name, without ever writing a place the photograph does not show?",
+    "splits": {
+      "development": {
+        "ground_truth_file": "ground-truth-place_d_development.json",
+        "ground_truth_sha256": "555908768d83a3579fb0840483f08f71d409264562c5bb59e3f27fb3b9d620c7",
+        "negative": 10,
+        "photographs": [
+          {
+            "arm": "positive",
+            "file": "place_d_development-01-nameplate.jpg",
+            "kind": "nameplate",
+            "sha256": "5b7406d2f1f3a432dbcf742a98f4d2ab4eaf47ef5d5b9f70c04f969d43e1f828"
+          },
+          {
+            "arm": "positive",
+            "file": "place_d_development-02-nameplate_tree_beside.jpg",
+            "kind": "nameplate_tree_beside",
+            "sha256": "0a4d923f441c2adcd9b57b5e83c89f471246d9c704d078e70e77ed21f7a4e260"
+          },
+          {
+            "arm": "positive",
+            "file": "place_d_development-03-street_sign.jpg",
+            "kind": "street_sign",
+            "sha256": "b1fa1baa84e1373d70aa19912d7e14972388e5f0061393d3cea25c29a49edd4e"
+          },
+          {
+            "arm": "positive",
+            "file": "place_d_development-04-street_sign.jpg",
+            "kind": "street_sign",
+            "sha256": "29eb0f39fecef16b515ce13d3ac29be7e4e873c1e47d0c01288d803efa09e1c0"
+          },
+          {
+            "arm": "positive",
+            "file": "place_d_development-05-park_sign.jpg",
+            "kind": "park_sign",
+            "sha256": "c15721734392da7282d4f03653e2258eb2af1cc8e7c4e74c782455a69473d439"
+          },
+          {
+            "arm": "positive",
+            "file": "place_d_development-06-station_sign.jpg",
+            "kind": "station_sign",
+            "sha256": "9a8b4474e33b89a32cd80cc94736a5b32402d6d539f70560ff2f873991bb4aee"
+          },
+          {
+            "arm": "positive",
+            "file": "place_d_development-07-two_signs.jpg",
+            "kind": "two_signs",
+            "sha256": "1296b85fe2d1aefeb47e98f1fb0884d2f4ab48b4c90653bf5383d75be1d8c886"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_development-08-covered_last.jpg",
+            "kind": "covered_last",
+            "sha256": "463d3fe5c33a295970fcabad73e3ac470121853a98b565faa5920d7e5ea744b4"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_development-09-covered_first.jpg",
+            "kind": "covered_first",
+            "sha256": "c6952168c6850170ada255585abd69bc3d530c24724ffedba644d0d3cd4a8334"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_development-10-covered_middle.jpg",
+            "kind": "covered_middle",
+            "sha256": "d9871cd4a7e8ac89eaeb8c2f62cb8e21e55116ffadb3a182ff09d794b7d7e52c"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_development-11-hidden.jpg",
+            "kind": "hidden",
+            "sha256": "4e8e7a8c69b060104e8c6cf3247f732f5404e938fb180262ee85f4c059c73632"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_development-12-cut.jpg",
+            "kind": "cut",
+            "sha256": "00da0e4960b5d7f1957669ce8a29fc56bfb62b35a825dd1fd82584123e914b6f"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_development-13-cut.jpg",
+            "kind": "cut",
+            "sha256": "e3137bcdf6d3c5b833387f7b368af7733ec39178c62ce99831a399024e842784"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_development-14-no_text.jpg",
+            "kind": "no_text",
+            "sha256": "b9ff761ffe5722a0a7795dc12a8df68f5d766da652e62b944c1e25de0e9f827c"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_development-15-product.jpg",
+            "kind": "product",
+            "sha256": "735a404edc27cc83f0d870b5577d19f14119f736cdd8e38c46f4652dc19f3fc3"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_development-16-person_name.jpg",
+            "kind": "person_name",
+            "sha256": "94bb2fff2861420533f3b0ce71ea312c4c4b384dd4d4bbe4e967b1cad79642ff"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_development-17-two_signs_cut.jpg",
+            "kind": "two_signs_cut",
+            "sha256": "20fc39e37daf869bcb9f2892e34d1c823e6eb3672674781b7eebc00dba3efdc6"
+          }
+        ],
+        "positive": 7,
+        "use": "run once by both arms with the design as registered. The design may be revised once, only to correct a defect that run shows, and the revision is run on this split again before the held-out split. A design that fails a development gate ends the experiment without a held-out run."
+      },
+      "held_out": {
+        "ground_truth_file": "ground-truth-place_d_held_out.json",
+        "ground_truth_sha256": "6e69be6c004538001138a2e5d99261970c17a65bc56ebbb78fcc585d8191ef8c",
+        "negative": 26,
+        "photographs": [
+          {
+            "arm": "positive",
+            "file": "place_d_held_out-01-nameplate.jpg",
+            "kind": "nameplate",
+            "sha256": "bdf98ef27303b5ad1c342660b7fb5d1a55dd49760fa58c5e2954738992210011"
+          },
+          {
+            "arm": "positive",
+            "file": "place_d_held_out-02-nameplate.jpg",
+            "kind": "nameplate",
+            "sha256": "d577d6d3b5f62f22b6976a1c03b6d5474b5949552bbd15047d36d07594ed40ab"
+          },
+          {
+            "arm": "positive",
+            "file": "place_d_held_out-03-nameplate.jpg",
+            "kind": "nameplate",
+            "sha256": "c4cc6b1837a25d2acae896c00cc530550774ff30171013cfea88290069f8b743"
+          },
+          {
+            "arm": "positive",
+            "file": "place_d_held_out-04-nameplate_tree_beside.jpg",
+            "kind": "nameplate_tree_beside",
+            "sha256": "438710710e885552f431b85145e4d2407c8ac43df1893f6ffb58f81382aeba39"
+          },
+          {
+            "arm": "positive",
+            "file": "place_d_held_out-05-nameplate_tree_beside.jpg",
+            "kind": "nameplate_tree_beside",
+            "sha256": "5afc87301c0010945026c87fd720cd2998f95fe72bee3c96af1cfe417d380909"
+          },
+          {
+            "arm": "positive",
+            "file": "place_d_held_out-06-street_sign.jpg",
+            "kind": "street_sign",
+            "sha256": "b9e782803e2396c9c58bef237816e9932b1112ee0967d2a9683adf497d7fe4ec"
+          },
+          {
+            "arm": "positive",
+            "file": "place_d_held_out-07-street_sign.jpg",
+            "kind": "street_sign",
+            "sha256": "f0b65cd8fd5fcd5918ab475d8f18242b4ef9de6a3a99ae7383b630390a045fc1"
+          },
+          {
+            "arm": "positive",
+            "file": "place_d_held_out-08-street_sign.jpg",
+            "kind": "street_sign",
+            "sha256": "4a8db4e0858a1480b1e74a94066e5a80f4f0030ee951d162ed8361844cb5faf1"
+          },
+          {
+            "arm": "positive",
+            "file": "place_d_held_out-09-street_sign.jpg",
+            "kind": "street_sign",
+            "sha256": "1c89699b2f50f0278dc2d10c6fdf3bfb6f97334c5384554bac6059d0e211ca62"
+          },
+          {
+            "arm": "positive",
+            "file": "place_d_held_out-10-park_sign.jpg",
+            "kind": "park_sign",
+            "sha256": "a50c066fdf1f6adbdfbd83c30de226717970004edd6b9d7473b3a9a3694ea460"
+          },
+          {
+            "arm": "positive",
+            "file": "place_d_held_out-11-park_sign.jpg",
+            "kind": "park_sign",
+            "sha256": "525af0fda6cdbc271ccf815df3dcb3943a0bbc994b93e88670fdd7396ed12bc0"
+          },
+          {
+            "arm": "positive",
+            "file": "place_d_held_out-12-park_sign.jpg",
+            "kind": "park_sign",
+            "sha256": "b1fcb6baa1566131ec1540df87d985aa0ababe578b15a2880edb7d29eebf1c46"
+          },
+          {
+            "arm": "positive",
+            "file": "place_d_held_out-13-station_sign.jpg",
+            "kind": "station_sign",
+            "sha256": "e7fa30776512cd6113c008aa46aee1b2fb7c543cba2036013859595102da0822"
+          },
+          {
+            "arm": "positive",
+            "file": "place_d_held_out-14-station_sign.jpg",
+            "kind": "station_sign",
+            "sha256": "dc28f9ffc7f0c60a564b5a30f90e42afb2a7e5b6c62941a5ebf9ac4531e69ec2"
+          },
+          {
+            "arm": "positive",
+            "file": "place_d_held_out-15-station_sign.jpg",
+            "kind": "station_sign",
+            "sha256": "6133069ea6f45fdb39bd80aeb12491a238c7c7fa0b56f7ac79a50a835e5870be"
+          },
+          {
+            "arm": "positive",
+            "file": "place_d_held_out-16-two_signs.jpg",
+            "kind": "two_signs",
+            "sha256": "a0ef2c578903fdebfe9635b71859326e0aede313a0e85c051838e987aecc1af7"
+          },
+          {
+            "arm": "positive",
+            "file": "place_d_held_out-17-two_signs.jpg",
+            "kind": "two_signs",
+            "sha256": "887e0411f38ec63fcc6195bcb1afcd918a13daff15eedd83b270d8ae4aa8bdd5"
+          },
+          {
+            "arm": "positive",
+            "file": "place_d_held_out-18-two_signs.jpg",
+            "kind": "two_signs",
+            "sha256": "f39efe767fed9618787e9be603b58d4065cb165dfe23bb5af2a64985e1f80656"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_held_out-19-covered_last.jpg",
+            "kind": "covered_last",
+            "sha256": "a3217f5f64f2d750ada60ec0d2c7c9efc2022df165702827613afacfcf8eed7e"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_held_out-20-covered_last.jpg",
+            "kind": "covered_last",
+            "sha256": "eed728de7c42fb01cc6e821f745b07bef344abcdd75db7cea621d370dc060320"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_held_out-21-covered_last.jpg",
+            "kind": "covered_last",
+            "sha256": "7df9c1956daa4fe4b31310287011916ba9ae980c0518adb6263b2d2e5f019eaa"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_held_out-22-covered_first.jpg",
+            "kind": "covered_first",
+            "sha256": "9bea1c06a32f770eaebf4ff01844e49195f9d8812a37aa38f310fa1592b79d1d"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_held_out-23-covered_first.jpg",
+            "kind": "covered_first",
+            "sha256": "8d2dce8ab76c618c9b16e9713db4bc378dd6f17bc70a5cafe7a3314c24ea07be"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_held_out-24-covered_middle.jpg",
+            "kind": "covered_middle",
+            "sha256": "7cab3fdf638637db9092fb670c7c257d4ca79744fe6f901708afa7b44e2a4bff"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_held_out-25-hidden.jpg",
+            "kind": "hidden",
+            "sha256": "bae83adaf6bdeb756378cfe803a900fa0e49e79cfe766fd351df8716186dca23"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_held_out-26-hidden.jpg",
+            "kind": "hidden",
+            "sha256": "b72d83212686f612c751a4e8ba385e6ad0d293146f010188cf97e87300da3b1b"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_held_out-27-cut.jpg",
+            "kind": "cut",
+            "sha256": "9a011bb8d99f34dd3f62d690904f2b361ec0af2f3df596a3b7ff25520af1787d"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_held_out-28-cut.jpg",
+            "kind": "cut",
+            "sha256": "ae9e29bdc302dc1f726bd6012560500f4796f02bf9d6c0f95e0c39b6c5d988f2"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_held_out-29-cut.jpg",
+            "kind": "cut",
+            "sha256": "3ae0068e6c5eb741a9d9a30c030350ad8ea5361af2bb3e2031849cf6cc8d32e9"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_held_out-30-cut.jpg",
+            "kind": "cut",
+            "sha256": "03fcf260a1ff0197b9e77db17939a9955e24ee8d3e5455f45aae16dbb2258f64"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_held_out-31-no_text.jpg",
+            "kind": "no_text",
+            "sha256": "0b56aca72abcd2527e6211391058e26ea35ec95c8ab1d73f452fc9981ae9b8ec"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_held_out-32-no_text.jpg",
+            "kind": "no_text",
+            "sha256": "e7cc5f6b2124b8f017e758485948f861966eec52a07957bbaa55cead246ae7c7"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_held_out-33-no_text.jpg",
+            "kind": "no_text",
+            "sha256": "f899962c3dc84467806d4d6b1feb4f288628451eb82fdedc57b2fe163ab222c1"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_held_out-34-product.jpg",
+            "kind": "product",
+            "sha256": "bf03880abf731edb78c42a17923e05bb30d90b0f71dca6bb87e0c899c8cd9524"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_held_out-35-product.jpg",
+            "kind": "product",
+            "sha256": "06bdcdeec62ccde4a56c2556ba5d9bc0f5269a4a2b81297da5659c22af33cbcd"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_held_out-36-product.jpg",
+            "kind": "product",
+            "sha256": "dcd23d63b204a9978da33f23f5ab211834b18db2c884adb18316bec52b7d1fe7"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_held_out-37-slogan.jpg",
+            "kind": "slogan",
+            "sha256": "a6087b03f7adac9ea3e0e34e87ffc21b6c55852eb07eb4f8f69def025414e937"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_held_out-38-slogan.jpg",
+            "kind": "slogan",
+            "sha256": "98cdf33db0999daf28f1a5c367ec42cf166b6d749d70e605e0d7efb142993c9b"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_held_out-39-person_name.jpg",
+            "kind": "person_name",
+            "sha256": "c5baf53cf804da0a6d59ba18390fc1f5fa36c674d8bbbdff9e6f6f2cae57aa7b"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_held_out-40-person_name.jpg",
+            "kind": "person_name",
+            "sha256": "35a090f72df6ad01d89128a809c103ff6d1ddeb75be116f843226b39c16805a8"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_held_out-41-person_name.jpg",
+            "kind": "person_name",
+            "sha256": "5897ee61318de806f4ec3893e7d271ba15814580b6490981bb55c55b068d8abf"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_held_out-42-two_signs_cut.jpg",
+            "kind": "two_signs_cut",
+            "sha256": "d90ab1be1621e3d4887e526d3b32e805929cfc4c8786b83e385085daba5453ae"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_held_out-43-two_signs_cut.jpg",
+            "kind": "two_signs_cut",
+            "sha256": "d1addb9451260639530d86e5a43415d27771896827ef365da2a990260486a04a"
+          },
+          {
+            "arm": "negative",
+            "file": "place_d_held_out-44-two_signs_covered.jpg",
+            "kind": "two_signs_covered",
+            "sha256": "2e482944b65570b08190e4203cb028f5f1af565e38bd9f53ea6328a7efe26c1e"
+          }
+        ],
+        "positive": 18,
+        "use": "scored once by both arms, with the design frozen at the end of development. A failure is recorded as a failure, and nothing is revised against these photographs."
+      }
+    }
+  },
+  "record_sha256": "ad48079ca932abee14ba38125e45c501e5cc5465a6fff324c0c15628fc02657d"
+}

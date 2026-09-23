@@ -182,7 +182,7 @@ def run(
             result.attempts,
             result.tried,
         )
-        outcome.model_calls += 1
+        outcome.model_calls += result.calls
         outcome.input_tokens += int(result.cost.get("input_tokens", 0))
         outcome.output_tokens += int(result.cost.get("output_tokens", 0))
         outcome.usd_estimate += Decimal(str(result.cost.get("usd_estimate", "0")))
@@ -207,6 +207,10 @@ def run(
                 "epistemic_class": "inference",
             },
             "observation": result.payload,
+            # Whether the proposal in the observation above is written, and under which label,
+            # with the rule's digest and the sign question's verbatim answer. The rows below are
+            # written from the decision, so a withheld proposal says here why it was withheld.
+            "place_check": result.place_check,
             # Recorded so the artifact says what the detector called the people it saw.
             # None of these strings is a name and none of them can become one: `occurrence`
             # has no column for a name, and `entity.display_name` is refused by trigger
