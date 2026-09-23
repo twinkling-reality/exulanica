@@ -48,6 +48,8 @@ from exulanica.world.starter import (
     AUTHORED_GROUND_V1_HALF_WIDTH_MM,
     AUTHORED_GROUND_V1_MODULE_VERSION,
     AUTHORED_GROUND_V1_STREAMING_KEY,
+    AUTHORED_SPAWN_X_MM,
+    AUTHORED_SPAWN_Z_MM,
     _authored_starter_candidate,
     authored_starter_candidate,
 )
@@ -78,6 +80,8 @@ def ground(**changes) -> SocietyGround:
         ground_kind="flat",
         elevation_mm=0,
         area=bounded(),
+        arrival_x_mm=AUTHORED_SPAWN_X_MM,
+        arrival_z_mm=AUTHORED_SPAWN_Z_MM,
     )
     return replace(base, **changes)
 

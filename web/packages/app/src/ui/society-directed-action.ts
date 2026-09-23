@@ -113,10 +113,17 @@ export function buildSocietyDirectedAction(options: {
   readonly targetId: string;
   readonly affordance: SocietyActionAffordance;
   readonly onRecord?: (record: SocietyActionRecord) => void;
+  /** The button's words, when the place has a name a person knows it by. */
+  readonly label?: string;
+  /** How a returned record is said. The full simulation record when omitted. */
+  readonly describeRecord?: (record: SocietyActionRecord) => string;
+  /** What the status says while the control is available and nothing has been asked yet. */
+  readonly idleText?: string;
 }): SocietyDirectedActionControl {
-  const label = options.affordance === 'rest'
+  const label = options.label ?? (options.affordance === 'rest'
     ? 'Direct selected inhabitant to rest here'
-    : 'Direct selected inhabitant to visit here';
+    : 'Direct selected inhabitant to visit here');
+  const describe = options.describeRecord ?? describeSocietyActionRecord;
   const button = el('button', { type: 'button', text: label }) as HTMLButtonElement;
   const status = el('p', {
     role: 'status',
@@ -139,6 +146,7 @@ export function buildSocietyDirectedAction(options: {
     if (!gate.ok) status.textContent = gate.reason;
     else {
       status.textContent = outcome?.text
+        ?? options.idleText
         ?? 'Issues one typed perform request to the society action API. '
           + 'The returned record is a synthetic simulation event, not personal evidence.';
     }
@@ -163,7 +171,7 @@ export function buildSocietyDirectedAction(options: {
         targetId: options.targetId,
         affordance: options.affordance,
       });
-      outcome = { heldFor, text: describeSocietyActionRecord(record) };
+      outcome = { heldFor, text: describe(record) };
       options.onRecord?.(record);
       return record;
     } catch (error) {

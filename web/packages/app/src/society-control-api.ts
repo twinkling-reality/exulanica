@@ -3,7 +3,8 @@
  *
  * Speaks `/world/versions/{id}/society/control` (`exulanica/api/routes/society_control.py`).
  * Importing this client never starts a worker. `configure` writes mode and speed;
- * `step` advances one leased tick bound to the displayed snapshot.
+ * `step` advances one leased tick bound to the displayed snapshot. A saved world is named with
+ * `worldId` and every request carries it, as the society client's do.
  */
 
 import { Transport, type TransportOptions } from '@exulanica/graph-client';
@@ -63,9 +64,18 @@ export function parseSocietyControl(value: unknown, versionId: string): SocietyP
   });
 }
 
+export interface SocietyControlClientOptions extends TransportOptions {
+  /** The saved world the versions belong to. Omitted, requests name no world: the default one. */
+  readonly worldId?: string;
+}
+
 export class SocietyControlClient {
   readonly #transport: Transport;
-  constructor(options: TransportOptions) { this.#transport = new Transport(options); }
+  readonly #worldId: string | undefined;
+  constructor(options: SocietyControlClientOptions) {
+    this.#transport = new Transport(options);
+    this.#worldId = options.worldId;
+  }
 
   read(versionId: string): Promise<SocietyPlaybackControl> {
     return this.#transport.getJson<unknown>(this.#path(versionId))
@@ -86,7 +96,7 @@ export class SocietyControlClient {
     if (snapshot.versionId !== control.versionId || snapshot.societyId !== control.societyId) {
       return Promise.reject(new Error('Society playback state does not match the displayed world'));
     }
-    return this.#transport.postJson<unknown>(`${this.#path(control.versionId)}/steps`, {
+    return this.#transport.postJson<unknown>(this.#path(control.versionId, '/steps'), {
       base_revision: control.revision, base_tick: snapshot.currentTick,
       base_state_sha256: snapshot.stateSha256,
     }).then(value => {
@@ -98,7 +108,8 @@ export class SocietyControlClient {
     });
   }
 
-  #path(versionId: string): string {
-    return `/world/versions/${encodeURIComponent(versionId)}/society/control`;
+  #path(versionId: string, suffix = ''): string {
+    const path = `/world/versions/${encodeURIComponent(versionId)}/society/control${suffix}`;
+    return this.#worldId === undefined ? path : `${path}?world_id=${encodeURIComponent(this.#worldId)}`;
   }
 }

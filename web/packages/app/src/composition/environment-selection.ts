@@ -18,7 +18,11 @@ import {
   recordingState,
   type LivingSocietyRecording,
 } from '../society-preview-presentation.js';
-import { SocietyClient, type SocietySnapshot } from '../society-api.js';
+import {
+  SocietyClient,
+  type SocietyActionRecord,
+  type SocietySnapshot,
+} from '../society-api.js';
 import {
   SocietyControlClient,
   type SocietyPlaybackControl,
@@ -40,6 +44,11 @@ import {
   buildSocietyDirectedAction,
   type SocietyDirectedActionControl,
 } from '../ui/society-directed-action.js';
+import {
+  buildWorldInhabitants,
+  placeRows,
+  type InhabitedObject,
+} from '../ui/world-inhabitants.js';
 import { buildWorldWorkspace } from '../ui/world-workspace.js';
 import '../ui/living-world-inspector.css';
 import { createLivingWorldInspector } from '../ui/living-world-inspector.js';
@@ -255,8 +264,11 @@ export function mountEnvironmentSelection(
   const districtAbort = new AbortController();
   const districtClient = deps.societyDistrictClient ?? new SocietyDistrictClient({ ...deps.credentials, signal: districtAbort.signal });
   const controlAbort = new AbortController();
+  // A saved world's playback lives in that world, so its requests name it.
+  const mountedEntry = deps.env.preview ? null : deps.state.activeWorldEntry;
   const controlClient = deps.societyControlClient ?? new SocietyControlClient({
     ...deps.credentials, signal: controlAbort.signal,
+    ...(mountedEntry?.authoredScene == null ? {} : { worldId: mountedEntry.worldId }),
   });
   let districtView: SocietyDistrictView | null = null;
   let districtEpoch = 0;
@@ -292,6 +304,18 @@ export function mountEnvironmentSelection(
   // re-gates a destination's directed-action control; it never swaps one view for the other.
   let inspectedInhabitant: string | null = null;
   let directedAction: SocietyDirectedActionControl | null = null;
+  /**
+   * The saved world this mount serves, when it serves one. Its inhabitants are drawn over its
+   * authored region and it has no district: nothing below that reads a district applies to it.
+   */
+  let savedWorld: { readonly worldId: string; readonly versionId: string; readonly regionId: string } | null = null;
+  /** One directed-action control per usable place, kept across re-renders of the same person. */
+  const savedWorldActions = new Map<string, SocietyDirectedActionControl>();
+  let savedWorldActionClient: SocietyClient | null = null;
+  const inhabitantsPanel = buildWorldInhabitants({
+    onBringIn: () => void bringInInhabitants(),
+    onAdvance: () => void stepPlayback(),
+  });
   let previewState: OwnedSocietyState | null = null;
   let recording: LivingSocietyRecording | null = null;
   let recordingFrame = 0;
@@ -368,13 +392,19 @@ export function mountEnvironmentSelection(
     directedAction = null;
   }
 
+  /** The crowd this world draws: the owned district's, or a saved world's over its own region. */
+  function crowd() {
+    const binding = deps.state.atlas?.binding;
+    return binding?.ownedDistrict ?? binding?.authoredSociety ?? null;
+  }
+
   function inhabitantLabel(inhabitant: OwnedSocietyState['inhabitants'][number]): string {
     const place = deps.state.atlas?.binding.ownedDistrict?.district.name ?? 'this place';
     return inhabitant.display_name ?? (inhabitant.role ? `A ${inhabitant.role}` : `A person in ${place}`);
   }
 
   function reflectCrowd(): void {
-    const runtime = deps.state.atlas?.binding.ownedDistrict;
+    const runtime = crowd();
     const canvas = deps.env.canvas;
     const state = society?.state ?? previewState;
     if (!runtime || !canvas || !state) { crowdStatus.textContent = ''; return; }
@@ -391,9 +421,10 @@ export function mountEnvironmentSelection(
 
   function reflectNearby(): void {
     const state = society?.state ?? previewState;
-    const visible = new Set(deps.state.atlas?.binding.ownedDistrict?.visibleInhabitantIds ?? []);
+    const visible = new Set(crowd()?.visibleInhabitantIds ?? []);
     inhabitantsList.hidden = !state || visible.size === 0;
-    workspace.setNearby(state ? visible.size : 0);
+    // In a saved world nobody lives in yet, the inhabitants section says so; this line would repeat it.
+    workspace.setNearby(state ? visible.size : 0, savedWorld !== null && state === null);
     inhabitantsList.replaceChildren(el('option', {value: '', text: 'Inspect a nearby inhabitant'}));
     for (const inhabitant of state?.inhabitants ?? []) {
       if (visible.has(inhabitant.id)) inhabitantsList.append(el('option', {value: inhabitant.id, text: `${inhabitantLabel(inhabitant)} · ${inhabitant.id.slice(0, 8)}`}));
@@ -403,7 +434,7 @@ export function mountEnvironmentSelection(
   }
 
   function inspectInhabitant(id: string, reveal = true): void {
-    deps.state.atlas?.binding.ownedDistrict?.revealInhabitant(id);deps.state.atlas?.binding.invalidate();
+    crowd()?.revealInhabitant(id);deps.state.atlas?.binding.invalidate();
     const state = society?.state ?? previewState;
     const inhabitant = state?.inhabitants.find(held => held.id === id);
     if (!inhabitant || !state) return;
@@ -420,7 +451,7 @@ export function mountEnvironmentSelection(
     if (state.profile === 'exulanica-society/v4') { inspectLivingInhabitant(inhabitant, state); return; }
     const v2 = state.profile === 'exulanica-society/v2';
     const goal = inhabitant.goal && 'kind' in inhabitant.goal ? inhabitant.goal : null;
-    const representation = deps.state.atlas?.binding.ownedDistrict?.inhabitantRepresentation(id);
+    const representation = crowd()?.inhabitantRepresentation(id);
     const liveInspection = liveSociety?.inspect(id);
     const eventText = liveInspection
       ? liveInspection.events.map(event => `Tick ${event.tick}: ${event.document.summary} [${event.event_id}]`).join(' ')
@@ -430,14 +461,18 @@ export function mountEnvironmentSelection(
       ? 'Unavailable'
       : `${state.input_seq === undefined ? 'Sequence unavailable' : `Sequence ${state.input_seq}`} · ${state.input_sha256}`;
     const nativeCharacter = representation ? deps.state.atlas?.binding.nativeCharacters?.inspect(representation.subject) : null;
+    // Resting is the simulation's state. The figure is drawn standing because no seated pose exists.
+    const resting = v2 && inhabitant.action?.kind === 'rest' && inhabitant.action.status === 'active';
     inspector.show({
       subject: id,
       title: inhabitant.display_name ?? `Synthetic ${inhabitant.role ?? 'inhabitant'}`,
       description: 'A fictional inhabitant of this world. This is not a remembered person.',
-      activity: v2 ? inhabitant.explanation?.summary ?? 'Explanation unavailable.' : 'No persisted goal or action is available in this preview or legacy society.',
+      activity: v2
+        ? `${inhabitant.explanation?.summary ?? 'Explanation unavailable.'}${resting ? ' Drawn standing, because there is no seated pose yet.' : ''}`
+        : 'No persisted goal or action is available in this preview or legacy society.',
       details: [
         ['Plane / origin', 'Simulation · synthetic'],
-        ['Visibility', deps.state.atlas?.binding.ownedDistrict?.visibleInhabitantIds.includes(id) ? 'In the nearby display' : 'Outside the nearby display; identity is retained'],
+        ['Visibility', crowd()?.visibleInhabitantIds.includes(id) ? 'In the nearby display' : 'Outside the nearby display; identity is retained'],
         ['Current activity', v2 && inhabitant.action ? `${inhabitant.action.kind} · ${inhabitant.action.status}: ${inhabitant.action.reason}` : 'Unavailable'],
         ['Goal / destination', v2 && goal ? `${goal.kind} · ${goal.target_id}: ${goal.reason}` : 'Unavailable'],
         ['Recorded event details', eventText || (liveSociety?.view.eventsAvailable ? 'No event references for this activity.' : 'Event documents unavailable in this view.')],
@@ -451,18 +486,75 @@ export function mountEnvironmentSelection(
         ['Routine digest', 'Unavailable'],
         ['Input binding', inputBinding],
         ['Permitted use', 'Inspect simulation state; not historical evidence'],
-        ['Shared position', `${deps.state.atlas?.binding.ownedDistrict?.coincidentInhabitants(inhabitant.id).length ?? 1} inhabitants at this position, all drawn where the simulation placed them.`],
+        ['Shared position', `${crowd()?.coincidentInhabitants(inhabitant.id).length ?? 1} inhabitants at this position, all drawn where the simulation placed them.`],
         ...characterDisplayDetails(nativeCharacter, representation?.representationId, NEAR_CHARACTER_BUDGET),
         ['Unavailable dependencies', v2 ? 'Personal evidence and model explanation not established by this view.' : 'Routes, goals, event history and authenticated persistence unavailable.'],
       ],
     });
+    if (savedWorld !== null && v2) addSavedWorldActions();
+  }
+
+  /** The person's objects, as the inhabitants panel names and places them. */
+  function savedObjects(): readonly InhabitedObject[] | null {
+    if (current === null) return null;
+    return current.objects.filter((object) => !object.removed).map((object) => ({
+      objectId: object.objectId, title: object.asset.title,
+      xMm: object.transform.xMm, zMm: object.transform.zMm,
+    }));
+  }
+
+  /** How a directed action is said in a person's own world: what happens, not its receipt. */
+  function plainRecord(place: string, affordance: 'visit' | 'rest') {
+    const verb = affordance === 'rest' ? 'rest at' : 'visit';
+    return (record: SocietyActionRecord): string => {
+      if (record.status === 'pending') {
+        return `Asked to ${verb} ${place}. They set off at the next simulated minute. This is simulation, not a memory.`;
+      }
+      const disposition = record.consumption?.disposition ?? 'unknown';
+      return disposition === 'applied'
+        ? `Taken up at simulated minute ${record.consumption?.tick}: they are on their way to ${verb} ${place}.`
+        : `Not taken up at simulated minute ${record.consumption?.tick} (${disposition.replaceAll('_', ' ')}).`;
+    };
+  }
+
+  /**
+   * On a selected inhabitant of a saved world: one action per place they can use. Each control is
+   * kept per place, so a refresh that re-renders this person keeps what the last request said.
+   */
+  function addSavedWorldActions(): void {
+    const world = savedWorld;
+    const places = society?.places;
+    if (world === null || !places) return;
+    const client = deps.societyClient
+      ?? (savedWorldActionClient ??= new SocietyClient({ ...deps.credentials, worldId: world.worldId }));
+    const usable = new Set<string>();
+    for (const row of placeRows(savedObjects() ?? [], places)) {
+      if (row.status.kind !== 'usable') continue;
+      const { targetId, affordance } = row.status;
+      usable.add(targetId);
+      let control = savedWorldActions.get(targetId);
+      if (control === undefined) {
+        control = buildSocietyDirectedAction({
+          client, getSnapshot: () => society, getSubjectId: () => selectedInhabitant,
+          targetId, affordance,
+          label: affordance === 'rest' ? `Rest at ${row.label}` : `Visit ${row.label}`,
+          describeRecord: plainRecord(row.label, affordance),
+          idleText: 'Asks this simulated person to go there next. It is recorded as simulation, never as something that happened.',
+        });
+        control.root.classList.add('world-inhabitants-action');
+        savedWorldActions.set(targetId, control);
+      }
+      control.reflect();
+      inspector.addAction(control.root);
+    }
+    for (const targetId of [...savedWorldActions.keys()]) if (!usable.has(targetId)) savedWorldActions.delete(targetId);
   }
 
   function inspectLivingInhabitant(
     inhabitant: OwnedSocietyState['inhabitants'][number],
     state: OwnedSocietyState,
   ): void {
-    const runtime = deps.state.atlas?.binding.ownedDistrict;
+    const runtime = crowd();
     const representation = runtime?.inhabitantRepresentation(inhabitant.id);
     const nativeCharacter = representation ? deps.state.atlas?.binding.nativeCharacters?.inspect(representation.subject) : null;
     const goal = inhabitant.goal && 'activity' in inhabitant.goal ? inhabitant.goal : null;
@@ -964,6 +1056,7 @@ export function mountEnvironmentSelection(
     if (control === null) {
       playbackStatus.textContent = 'Playback controls are not connected.';
       playbackMode.disabled = true; playbackSpeed.disabled = true; advanceSociety.disabled = true;
+      renderInhabitantsPanel();
       return;
     }
     playbackSpeed.value = String(control.speed);
@@ -972,13 +1065,39 @@ export function mountEnvironmentSelection(
     playbackStatus.textContent = control.mode === 'playing'
       ? `Saved as playing at ${control.speed}×. When the playback worker is online, it waits at least ${control.tickIntervalMs} ms after each completed batch. Persisted tick ${control.currentTick}.${control.reason ? ` ${control.reason}` : ''}`
       : `Paused at persisted tick ${control.currentTick}. Speed is set to ${control.speed}×.${eligibility}`;
-    playbackMode.disabled = controlBusy || districtView === null
+    playbackMode.disabled = controlBusy || !scopeReady()
       || (!control.playEligible && control.mode === 'paused');
     playbackSpeed.disabled = controlBusy;
-    advanceSociety.disabled = controlBusy || districtView === null
+    advanceSociety.disabled = controlBusy || !scopeReady()
       || control.mode !== 'paused' || !control.playEligible
       || !liveSociety?.view.snapshot || !liveSociety.view.eventsAvailable;
     refreshSociety.disabled = controlBusy || liveSociety?.view.busy === true;
+    renderInhabitantsPanel();
+  }
+
+  /** Whether the world the society lives in is connected: a saved world, or a placed district. */
+  function scopeReady(): boolean {
+    return savedWorld !== null || districtView !== null;
+  }
+
+  /** Why the inhabitants panel cannot advance a minute right now, or null when it can. */
+  function advanceBlocked(): string | null {
+    const control = societyControl;
+    if (controlBusy) return 'Advancing…';
+    if (control === null) return 'Playback controls are not connected.';
+    if (control.mode === 'playing') return 'Pause the simulation to advance one minute by hand.';
+    if (!liveSociety?.view.eventsAvailable) return 'Reconnect to this world\'s inhabitants first.';
+    return null;
+  }
+
+  function renderInhabitantsPanel(): void {
+    if (savedWorld === null || liveSociety === null) return;
+    const view = liveSociety.view;
+    const walked = view.snapshot?.state.inhabitants
+      .filter((person) => (person.motion_path_mm?.length ?? 0) > 1).length ?? 0;
+    inhabitantsPanel.render({
+      society: view, objects: savedObjects(), walked, advanceBlocked: advanceBlocked(),
+    });
   }
 
   function scheduleControlPoll(): void {
@@ -1028,7 +1147,9 @@ export function mountEnvironmentSelection(
       || controlBusy || control.mode !== 'paused') return;
     stopControlPoll(); controlBusy = true; reflectPlayback();
     try {
-      if (!await refreshDistrict()) throw new Error('Authorized district placement is unavailable.');
+      if (savedWorld === null && !await refreshDistrict()) {
+        throw new Error('Authorized district placement is unavailable.');
+      }
       const result = await controlClient.step(control, snapshot);
       societyControl = result.control;
       await liveSociety?.refresh();
@@ -1134,6 +1255,13 @@ export function mountEnvironmentSelection(
   }
 
   async function afterAuthoredEdit(versionId: string): Promise<void> {
+    if (savedWorld !== null) {
+      if (phase === 'disposed' || versionId !== savedWorld.versionId || !liveSociety) return;
+      await readSavedVersion();
+      await liveSociety.afterAuthoredEdit();
+      renderInhabitantsPanel();
+      return;
+    }
     if (phase === 'disposed' || deps.env.preview || current?.versionId !== versionId || !liveSociety) return;
     await refreshDistrict();
     await liveSociety?.afterAuthoredEdit();
@@ -1176,7 +1304,118 @@ export function mountEnvironmentSelection(
     atlas.invalidate();
   }
 
+  /** A saved world's society, drawn over its authored region; no district gates it. */
+  function reflectSavedWorldSociety(view: LiveSocietyView): void {
+    if (phase === 'disposed') return;
+    const atlas = deps.state.atlas?.binding;
+    const runtime = atlas?.authoredSociety ?? null;
+    society = view.snapshot;
+    liveStatus.textContent = `${society ? `Persisted tick ${society.currentTick}. ` : ''}${view.message}`;
+    liveControls.dataset['state'] = view.status;
+    refreshSociety.disabled = view.busy;
+    const canvas = deps.env.canvas;
+    if (society === null || runtime === null) {
+      runtime?.clearSociety();
+      renderedSnapshot = null;
+      if (selectedInhabitant) { selectedInhabitant = null; clearInspector(); selected.textContent = 'Selected inhabitant is unavailable.'; }
+      delete canvas.dataset.societyPopulation;
+      delete canvas.dataset.societyRendered;
+      delete canvas.dataset.societyTick;
+    } else {
+      // Event and status updates must not restart the interpolation of the same state.
+      if (renderedSnapshot?.stateSha256 !== society.stateSha256 || renderedSnapshot?.societyId !== society.societyId) {
+        runtime.setSociety(society.state, [atlas!.controls.state.x, atlas!.controls.state.z]);
+        renderedSnapshot = society;
+      }
+      canvas.dataset.societyPopulation = String(society.populationSize);
+      canvas.dataset.societyRendered = String(runtime.drawnInhabitantCount);
+      canvas.dataset.societyTick = String(society.currentTick);
+      if (selectedInhabitant !== null && inspectedInhabitant === selectedInhabitant) {
+        inspectInhabitant(selectedInhabitant, false);
+      }
+    }
+    for (const control of savedWorldActions.values()) control.reflect();
+    reflectNearby();
+    reflectPlayback();
+    atlas?.invalidate();
+  }
+
+  async function readSavedVersion(): Promise<void> {
+    const world = savedWorld;
+    if (world === null) return;
+    try {
+      current = (await worldClient.connect(world.versionId)).version;
+      authoredWorldFailure = null;
+    } catch (error) {
+      current = null;
+      authoredWorldFailure = objectWriteFailure(error);
+    }
+  }
+
+  /** The person's own request. Nothing else creates a saved world's society. */
+  async function bringInInhabitants(): Promise<void> {
+    if (savedWorld === null || liveSociety === null || phase === 'disposed') return;
+    await liveSociety.bringIn();
+    if ((phase as string) === 'disposed') return;
+    await refreshPlayback();
+  }
+
+  async function attachSavedWorld(entry: NonNullable<SessionState['activeWorldEntry']>): Promise<void> {
+    const scene = entry.authoredScene!;
+    savedWorld = { worldId: entry.worldId, versionId: entry.authoredVersionId, regionId: scene.region.regionId };
+    root.dataset['state'] = 'ready';
+    workspace.setAvailability(true);
+    const heading = workspace.nearby.firstElementChild;
+    if (heading) heading.after(inhabitantsPanel.root); else workspace.nearby.prepend(inhabitantsPanel.root);
+    const atlas = deps.state.atlas?.binding;
+    if (atlas?.authoredSociety == null) {
+      inhabitantsPanel.unavailable('This world is not drawn here, so nobody can be shown in it.');
+      return;
+    }
+    await readSavedVersion();
+    if ((phase as string) === 'disposed') return;
+    attachedControls = atlas.controls;
+    priorInteract = atlas.controls.onInteract;
+    installedInteract = () => {
+      const ray = atlas.interactionRay?.();
+      const position = ray ? { x: ray.origin[0], y: ray.origin[1], z: ray.origin[2] } : atlas.controls.state;
+      const forward = ray ? { x: ray.direction[0], y: ray.direction[1], z: ray.direction[2] } : atlas.controls.forward?.() ?? atlas.camera.forward;
+      const inhabitantId = atlas.authoredSociety?.pickInhabitant(
+        [position.x, position.y, position.z], [forward.x, forward.y, forward.z]);
+      if (inhabitantId) { inspectInhabitant(inhabitantId); return; }
+      priorInteract?.();
+    };
+    atlas.controls.onInteract = installedInteract;
+    phase = 'attached';
+    liveSociety = createLiveSociety({
+      preview: false, credentials: deps.credentials, worldId: entry.worldId,
+      versionId: entry.authoredVersionId, placeId: null, regionId: scene.region.regionId,
+      // Directed actions are a v2 foundation, and the living society has no place contract for
+      // an authored ground. Opening the world never creates anything; the person asks.
+      profile: 'exulanica-society/v2', createOnConnect: false, places: true,
+      ...(deps.societyClient ? { client: deps.societyClient } : {}),
+      onChange: reflectSavedWorldSociety,
+    });
+    await liveSociety.connect();
+    if ((phase as string) === 'disposed') return;
+    await refreshPlayback();
+    if ((phase as string) === 'disposed') return;
+    renderInhabitantsPanel();
+    reflectNearby();
+    atlas.invalidate();
+  }
+
   async function attach(): Promise<void> {
+    const entry = deps.state.activeWorldEntry;
+    if (!deps.env.preview && entry?.authoredScene != null) {
+      try {
+        await attachSavedWorld(entry);
+      } catch (error) {
+        if (phase !== 'disposed') phase = 'idle';
+        inhabitantsPanel.unavailable(`Inhabitants are unavailable. ${error instanceof Error ? error.message : String(error)}`);
+      }
+      return;
+    }
     if (admissionId === null) {
       root.dataset['state'] = 'unavailable';
       workspace.setAvailability(false);
@@ -1332,7 +1571,8 @@ export function mountEnvironmentSelection(
       stopControlPoll();
       if (!deps.env.preview) clearDistrict();
       liveSociety?.dispose();
-      if (liveSociety || recording) deps.state.atlas?.binding.ownedDistrict?.clearSociety();
+      if (liveSociety || recording) crowd()?.clearSociety();
+      savedWorldActions.clear();
       recording = null;
       recordingPlaying = false;
       liveSociety = null;

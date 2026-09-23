@@ -81,10 +81,11 @@ DERIVATIVE_WORKER_ENV: Final = env_name("DERIVATIVE_WORKER")
 #: ``society_control_workspaces`` remain an independent, narrower enablement path.
 SOCIETY_CONTROL_WORKER_ENV: Final = env_name("SOCIETY_CONTROL_WORKER")
 
-#: A JSON file naming the saved worlds this instance will let hold inhabitants. Absent, no
-#: saved world holds one and creating a society in one answers 424 with the reason. A saved
-#: world is never registered by default: a society is a simulation running inside somebody's
-#: own world, and turning it on is the host's decision rather than a consequence of saving.
+#: A JSON file of host registrations for saved worlds, each naming the place its society binds.
+#: Optional: a person can bring inhabitants into a saved world of their own without one, and the
+#: society then binds a place derived from the world itself. A registration here takes
+#: precedence for the version it names. Nothing is ever registered or created by saving a world;
+#: a society exists only once somebody asks for it.
 SOCIETY_AUTHORED_WORLDS_ENV: Final = env_name("SOCIETY_AUTHORED_WORLDS")
 
 #: The registration file's own profile, so a file written for a later shape is refused here
@@ -113,7 +114,8 @@ class Services:
     runs_derivative_worker: bool = False
     #: Independent of the database and blob backups, set by the offline restore protocol.
     restore_state_path: Path | None = None
-    #: Optional explicit scoped district/affordance adapter, configured by the host.
+    #: The society composition and authorization adapter. ``build_services`` always configures
+    #: one; district bindings and host saved-world registrations are the host's to add.
     society_runtime: SocietyRuntime | None = None
     #: Explicit server-selected provider for bounded social choices. No automatic promotion.
     society_decision_provider: SocietyDecisionProvider | None = None
@@ -198,10 +200,16 @@ class Services:
             )
         if self.society_runtime is None:
             notes.append(
-                f"{SOCIETY_AUTHORED_WORLDS_ENV} names no registration file, so no saved world "
-                "holds inhabitants here and creating a society in one answers 424. Nothing "
-                "already saved is affected: a society is a simulation started on top of a "
-                "world, never part of the world itself."
+                "no society runtime is configured, so no world holds inhabitants here and "
+                "creating a society answers 424. Nothing already saved is affected: a society "
+                "is a simulation started on top of a world, never part of the world itself."
+            )
+        elif not self.society_control_enabled:
+            notes.append(
+                "a person can bring inhabitants into a saved world of their own, and nothing "
+                "else does: no world holds a society until its owner asks for one. "
+                f"{SOCIETY_CONTROL_WORKER_ENV} is off, so a society advances only when "
+                "somebody advances it, one simulated minute at a time."
             )
         if self.runs_derivative_worker:
             notes.append(
@@ -298,7 +306,7 @@ def build_services(
         materials=_material_runtime(data_dir, environ),
         character_appearance=_character_appearance_runtime(store, environ),
         tiles=tile_store(data_dir),
-        society_runtime=_authored_world_society_runtime(store, environ),
+        society_runtime=_society_runtime(store, environ),
         runs_derivative_worker=_enabled(env_get("DERIVATIVE_WORKER", environ)),
         runs_society_control_worker=_explicitly_enabled(env_get("SOCIETY_CONTROL_WORKER", environ)),
         restore_state_path=(
@@ -307,32 +315,33 @@ def build_services(
     )
 
 
-def _authored_world_society_runtime(
-    store: ContentAddressedStore, environ: Mapping[str, str]
-) -> SocietyRuntime | None:
-    """The saved worlds this instance will let hold inhabitants, or None when none were named.
+def _society_runtime(store: ContentAddressedStore, environ: Mapping[str, str]) -> SocietyRuntime:
+    """The society runtime every instance serves, inert until somebody asks for inhabitants.
 
-    ``EXULANICA_SOCIETY_AUTHORED_WORLDS`` names a JSON file of explicit registrations. Each
-    names a workspace, a saved world, its authored version, that version's structural snapshot,
-    the authored region of that snapshot and the workspace place identity the society row binds.
-    Nothing is inferred: a file that names a world whose snapshot is not an authored starter, or
-    whose region is not that snapshot's own, fails at the first request with the reason rather
-    than composing something else.
+    It composes a saved world over the ground the world's own snapshot declares when its owner
+    brings inhabitants in, and it creates, starts and schedules nothing by itself. District
+    bindings are never inferred.
 
-    A missing file is an absence and ``warnings`` says so. A file that is present and malformed
-    stops startup, because an instance that silently serves no society after being told to serve
-    one is the failure this refuses to become.
+    ``EXULANICA_SOCIETY_AUTHORED_WORLDS`` optionally names a JSON file of host registrations,
+    each naming a workspace, a saved world, its authored version, that version's structural
+    snapshot, the authored region of that snapshot and the workspace place identity the society
+    row binds, and optionally the reviewed reach. Nothing in it is inferred: a file that names a
+    world whose snapshot is not an authored starter, or whose region is not that snapshot's own,
+    fails at the first request with the reason rather than composing something else. A file that
+    is present and malformed stops startup, because an instance that silently ignores a
+    registration it was given is the failure this refuses to become.
     """
     path = env_get("SOCIETY_AUTHORED_WORLDS", environ)
-    if not path:
-        return None
-    document = json.loads(Path(path).read_bytes())
-    if not isinstance(document, dict) or document.get("profile") != AUTHORED_WORLDS_PROFILE:
-        raise ValueError(
-            f"{SOCIETY_AUTHORED_WORLDS_ENV} must name a {AUTHORED_WORLDS_PROFILE} file"
-        )
-    reach_mm = document.get("reach_mm", REVIEWED_REACH_MM)
-    bindings = [AuthoredWorldSocietyBinding.model_validate(row) for row in document["worlds"]]
+    reach_mm = REVIEWED_REACH_MM
+    bindings: list[AuthoredWorldSocietyBinding] = []
+    if path:
+        document = json.loads(Path(path).read_bytes())
+        if not isinstance(document, dict) or document.get("profile") != AUTHORED_WORLDS_PROFILE:
+            raise ValueError(
+                f"{SOCIETY_AUTHORED_WORLDS_ENV} must name a {AUTHORED_WORLDS_PROFILE} file"
+            )
+        reach_mm = document.get("reach_mm", REVIEWED_REACH_MM)
+        bindings = [AuthoredWorldSocietyBinding.model_validate(row) for row in document["worlds"]]
     return SocietyRuntime(
         store=store,
         authored_bindings=bindings,

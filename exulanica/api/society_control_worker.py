@@ -12,6 +12,7 @@ import psycopg
 from exulanica.api.society_runtime import SocietyRuntime
 from exulanica.db.session import Database
 from exulanica.selection.validation import Session
+from exulanica.world.models import DEFAULT_WORLD_ID
 from exulanica.world.society_control_repository import SocietyControlRepository
 from exulanica.world.society_controls import LeaseLost, validate_settings
 
@@ -74,11 +75,15 @@ class SocietyControlWorker:
         return tuple(sorted(resolved, key=str))
 
     def _repository(
-        self, connection: psycopg.Connection, workspace: uuid.UUID
+        self,
+        connection: psycopg.Connection,
+        workspace: uuid.UUID,
+        world_id: str,
     ) -> SocietyControlRepository:
         return SocietyControlRepository(
             connection,
             workspace,
+            world_id=world_id,
             base_tick_interval_ms=self.base_tick_interval_ms,
             input_authorizer=lambda actor, doc: self.runtime.authorize(
                 connection, Session(workspace_id=workspace, actor=actor), doc
@@ -96,14 +101,17 @@ class SocietyControlWorker:
 
     def _run_authorized_once(self, workspace: uuid.UUID) -> dict | None:
         """Run after the caller captured one fresh, immutable round snapshot."""
+        # The claim considers every world in the workspace, a person's saved worlds as well as
+        # the default one, whatever world the claiming repository is scoped to, and names the
+        # world it was taken in. It runs only in that world.
         with self.database.session(workspace) as connection:
-            claim = self._repository(connection, workspace).claim()
+            claim = self._repository(connection, workspace, DEFAULT_WORLD_ID).claim()
         if claim is None:
             return None
         # Committed lease survives process death. No connection is retained between phases.
         try:
             with self.database.session(workspace) as connection:
-                return self._repository(connection, workspace).execute(claim)
+                return self._repository(connection, workspace, claim.world_id).execute(claim)
         except LeaseLost:
             return {"status": "lease_lost"}
 

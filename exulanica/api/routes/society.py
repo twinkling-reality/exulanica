@@ -10,7 +10,7 @@ from fastapi import APIRouter, Query, Request
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, ConfigDict, Field
 
-from exulanica.api.dependencies import CurrentSession, ScopedConnection
+from exulanica.api.dependencies import CurrentSession, ScopedConnection, get_services
 from exulanica.api.society_decision_runtime import request_decision
 from exulanica.world.models import DEFAULT_WORLD_ID
 from exulanica.world.society import UnavailableSocietyInput
@@ -27,7 +27,9 @@ WorldId = Annotated[str, Query(min_length=1, max_length=200)]
 
 class CreateSocietyBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
-    place_id: uuid.UUID
+    #: Omitted when a person brings inhabitants into their own saved world: the server resolves
+    #: that world's place itself, and a client never names one it did not read from the server.
+    place_id: uuid.UUID | None = None
     region_id: Annotated[str, Field(min_length=1, max_length=500)]
     seed: Annotated[str, Field(pattern=r"^[0-9a-f]{64}$")]
     profile: Literal[
@@ -91,21 +93,38 @@ def create_society(
 ) -> Any:
     def create() -> dict:
         repo = _repository(connection, session, request, world_id)
-        document = None
-        if body.profile in ("exulanica-society/v2", "exulanica-society/v3", "exulanica-society/v4"):
-            provider = getattr(request.app.state, "society_initial_input", None)
-            if provider is None:
-                raise UnavailableSocietyInput("purposeful society input adapter is not configured")
-            document = provider(connection, session, version_id, body.place_id, body.region_id)
-        return repo.create(
-            version_id,
-            place_id=body.place_id,
-            region_id=body.region_id,
-            seed=body.seed,
-            actor=session.actor,
-            profile=body.profile,
-            initial_input=document,
-        )
+        # One transaction: a saved world's place, its first input and its society are made
+        # together or not at all, so a refusal such as nothing reachable leaves nothing behind.
+        with connection.transaction():
+            document = None
+            place_id = body.place_id
+            if body.profile in (
+                "exulanica-society/v2",
+                "exulanica-society/v3",
+                "exulanica-society/v4",
+            ):
+                provider = getattr(request.app.state, "society_initial_input", None)
+                if provider is None:
+                    raise UnavailableSocietyInput(
+                        "purposeful society input adapter is not configured"
+                    )
+                if place_id is None:
+                    runtime = get_services(request).society_runtime
+                    if runtime is None:
+                        raise UnavailableSocietyInput("saved-world society is not configured")
+                    place_id = runtime.saved_world_place(connection, session, version_id)
+                document = provider(connection, session, version_id, place_id, body.region_id)
+            elif place_id is None:
+                raise ValueError("a society without inputs needs a place_id")
+            return repo.create(
+                version_id,
+                place_id=place_id,
+                region_id=body.region_id,
+                seed=body.seed,
+                actor=session.actor,
+                profile=body.profile,
+                initial_input=document,
+            )
 
     return _call(create)
 
@@ -158,9 +177,13 @@ def society(
     session: CurrentSession,
     request: Request,
     world_id: WorldId = DEFAULT_WORLD_ID,
+    places: Annotated[bool, Query()] = False,
 ) -> Any:
+    """The current state. ``places`` adds where inhabitants can go, as its consumed input says."""
     return _call(
-        lambda: _repository(connection, session, request, world_id).snapshot(version_id),
+        lambda: _repository(connection, session, request, world_id).snapshot(
+            version_id, places=places
+        ),
         invalid_status=409,
     )
 

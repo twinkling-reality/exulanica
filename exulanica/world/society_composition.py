@@ -7,6 +7,7 @@ world layer below environment and avoids a second polygon/collision implementati
 from __future__ import annotations
 
 import hashlib
+import math
 import uuid
 from collections.abc import Callable, Mapping, Sequence
 from copy import deepcopy
@@ -251,6 +252,39 @@ def build_society_input(
     return document
 
 
+def _outward(value: float) -> int:
+    """A turned corner's coordinate, moved to the whole millimetre away from the centre."""
+    return math.ceil(value) if value > 0 else math.floor(value)
+
+
+def footprint_ring(
+    center: Point, half_extents: Sequence[int], yaw_microradians: int
+) -> list[Point]:
+    """An object's reviewed footprint about its centre, turned by its yaw, as a closed ring.
+
+    The object is drawn turned by its yaw about the vertical axis, which carries its own x axis to
+    (cos, -sin) and its z axis to (sin, cos) in the region's frame, and its footprint turns with
+    it. A turned corner falls between whole millimetres; each coordinate is moved outward, away
+    from the centre, so the ring only ever grows, by less than a millimetre on each axis, and
+    never opens a route through what the object covers. Unturned, the ring is exactly the
+    reviewed rectangle. For the reviewed catalog's blocking footprints no nonzero microradian yaw
+    brings a turned corner within 1e-8 mm of a whole millimetre, so the outward step is decided
+    far above any difference between two machines' arithmetic.
+    """
+    x, z = center
+    hx, hz = half_extents
+    corners = ((-hx, -hz), (hx, -hz), (hx, hz), (-hx, hz))
+    if yaw_microradians == 0:
+        ring = [(x + dx, z + dz) for dx, dz in corners]
+    else:
+        theta = yaw_microradians / 1_000_000
+        c, s = math.cos(theta), math.sin(theta)
+        ring = [
+            (x + _outward(dx * c + dz * s), z + _outward(-dx * s + dz * c)) for dx, dz in corners
+        ]
+    return [*ring, ring[0]]
+
+
 def composed_objects(
     version: AlternateVersion,
     reviewed_affordances: Mapping[str, dict[str, Any]],
@@ -264,6 +298,10 @@ def composed_objects(
     ``translation_mm`` is the registered frame offset. Its vertical component states where that
     plane sits, so an object anywhere else is refused rather than floated onto it. Returns the
     usable objects with their composed centres, their collision rings, and the first refusal.
+
+    A saved world's own ground takes an object at any yaw: its centre and its reach do not turn,
+    and its footprint turns with it (``footprint_ring``). A district projection keeps refusing a
+    turned object, as its pinned inputs were composed.
     """
     objects: list[ComposedObject] = []
     obstacles: list[Obstacle] = []
@@ -294,7 +332,10 @@ def composed_objects(
                 )
             )
         ) or (
-            obj.transform.yaw_microradians != 0
+            (
+                obj.transform.yaw_microradians != 0
+                and composition_profile != AUTHORED_GROUND_COMPOSITION
+            )
             or obj.transform.scale_milli != 1000
             or obj.transform.y_mm + ty != 0
         ):
@@ -305,18 +346,14 @@ def composed_objects(
         center = (obj.transform.x_mm + tx, obj.transform.z_mm + tz)
         objects.append((obj, reviewed, center))
         if reviewed["blocks_navigation"]:
-            hx, hz = reviewed["footprint_half_extents_mm"]
-            x, z = center
             obstacles.append(
                 (
                     obj.object_id,
-                    [
-                        (x - hx, z - hz),
-                        (x + hx, z - hz),
-                        (x + hx, z + hz),
-                        (x - hx, z + hz),
-                        (x - hx, z - hz),
-                    ],
+                    footprint_ring(
+                        center,
+                        reviewed["footprint_half_extents_mm"],
+                        obj.transform.yaw_microradians,
+                    ),
                 )
             )
     return objects, obstacles, reason

@@ -303,7 +303,26 @@ class SocietyControlRepository:
             )
             return {"control": self.read(version_id), "society": after, "receipt": receipt}
 
+    def _in_world(self, world_id: str) -> SocietyControlRepository:
+        """This repository's connection and authority, scoped to another world of the workspace."""
+        if world_id == self.world_id:
+            return self
+        return SocietyControlRepository(
+            self.connection,
+            self.workspace_id,
+            world_id=world_id,
+            input_authorizer=self.input_authorizer,
+            base_tick_interval_ms=self.base_tick_interval_ms,
+        )
+
     def claim(self) -> ControlClaim | None:
+        """Lease the oldest due playing society in this workspace, whichever world holds it.
+
+        Playback is fair across a workspace, not across one of its worlds: the default world and
+        every saved world a person made compete for the same one claim per round, by due time
+        and then society identity. The claim names the world it was taken in, and ``execute``
+        runs it only there.
+        """
         with self.connection.transaction():
             locked = self.connection.execute(
                 "select pg_try_advisory_xact_lock(hashtextextended(%s,880024)) as held",
@@ -312,19 +331,20 @@ class SocietyControlRepository:
             if not locked:
                 return None
             row = self.connection.execute(
-                "select c.*,s.version_id from world_society_control c join "
+                "select c.*,s.version_id,s.world_id from world_society_control c join "
                 "world_society s using(workspace_id,society_id) "
-                "where c.workspace_id=%s and s.world_id=%s and "
+                "where c.workspace_id=%s and "
                 "c.mode='playing' and c.next_due_at<=clock_timestamp() "
                 "and (c.lease_token is null or c.lease_expires_at<=clock_timestamp()) "
                 "order by c.next_due_at,c.society_id for update of c skip locked limit 1",
-                (self.workspace_id, self._society().world_id),
+                (self.workspace_id,),
             ).fetchone()
             if row is None:
                 return None
-            society = self._scope(row["version_id"])
+            scoped = self._in_world(row["world_id"])
+            society = scoped._scope(row["version_id"])
             if row["claim_attempts"] >= MAX_CLAIM_ATTEMPTS:
-                self._pause_error(
+                scoped._pause_error(
                     society,
                     "lease_recovery_limit",
                     "lease_recovery_exhausted",
@@ -360,12 +380,13 @@ class SocietyControlRepository:
                 },
             )
             return ControlClaim(
-                self.workspace_id,
-                row["society_id"],
-                row["version_id"],
-                token,
-                row["revision"],
-                row["changed_by"],
+                workspace_id=self.workspace_id,
+                world_id=row["world_id"],
+                society_id=row["society_id"],
+                version_id=row["version_id"],
+                token=token,
+                revision=row["revision"],
+                actor=row["changed_by"],
             )
 
     def _pause_error(self, society: dict, reason: str, kind: str, details: dict) -> dict:
@@ -391,6 +412,8 @@ class SocietyControlRepository:
     def execute(self, claim: ControlClaim) -> dict:
         if claim.workspace_id != self.workspace_id:
             raise LeaseLost("playback claim belongs to another workspace")
+        if claim.world_id != self.world_id:
+            raise LeaseLost("playback claim belongs to another world")
         with self.connection.transaction():
             society = self._scope(claim.version_id)
             control = self._control(society["society_id"])

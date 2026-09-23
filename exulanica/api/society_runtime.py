@@ -8,6 +8,12 @@ One runtime serves two kinds of registration. A district binding composes an adm
 interpretation of real city sources. An authored-world binding composes a saved world over the
 flat ground its own structural snapshot declares, with no admitted source and no district.
 A version is registered under one kind or the other, never both.
+
+A saved world needs no host registration. When the person asks for inhabitants in a version
+whose snapshot is the built-in authored starter, the binding is derived from that world itself:
+its region is the snapshot's own and its place identity is derived from the version, the way the
+society's identity already is. A host registration for the same version takes precedence, and a
+version whose snapshot is anything else derives nothing.
 """
 
 from __future__ import annotations
@@ -16,7 +22,7 @@ import hashlib
 import json
 import uuid
 from collections.abc import Mapping, Sequence
-from typing import Annotated, Any, Literal
+from typing import Annotated, Any, Final, Literal
 
 import psycopg
 from psycopg.rows import dict_row
@@ -60,6 +66,19 @@ Millimetre = Annotated[StrictInt, Field(ge=-1_000_000_000, le=1_000_000_000)]
 _OPERATIONS = ("display", "persist", "modify", "compose")
 #: The engine profiles that consume ordered inputs, and so react to an accepted authored edit.
 _INPUT_ENGINES = ("exulanica-society/v2", "exulanica-society/v3", "exulanica-society/v4")
+
+#: The name a saved world's society place is derived under, from the authored version's identity,
+#: exactly as the society's own identity is derived under ``exulanica-society/v1``. The place names
+#: where in the workspace the society lives; it claims nothing about anywhere on the Earth.
+SAVED_WORLD_PLACE_NAME: Final = "exulanica-society/saved-world-place/v1"
+#: The prefix of a derived binding's identity. The whole binding is a function of the authored
+#: version and its snapshot, so a runtime built again from nothing derives it byte for byte.
+SAVED_WORLD_BINDING_PREFIX: Final = "exulanica.society-saved-world/v1:"
+
+
+def saved_world_place_id(version_id: uuid.UUID) -> uuid.UUID:
+    """The place identity a saved world's society binds, derived from its authored version."""
+    return uuid.uuid5(version_id, SAVED_WORLD_PLACE_NAME)
 
 
 class RuntimeSourceBinding(BaseModel):
@@ -167,18 +186,60 @@ class SocietyRuntime:
             raise UnavailableSocietyInput("society frame binding is not configured for this scope")
         return binding
 
-    def _authored_binding(
-        self, session: Session, version_id: uuid.UUID
-    ) -> AuthoredWorldSocietyBinding:
-        binding = self._authored.get((session.workspace_id, version_id))
-        if binding is None:
-            raise UnavailableSocietyInput(
-                "authored-world society binding is not configured for this scope"
-            )
-        return binding
+    def _authored_scope(
+        self, connection: psycopg.Connection, session: Session, version_id: uuid.UUID
+    ) -> tuple[AuthoredWorldSocietyBinding, SocietyGround]:
+        """The saved world's binding and the ground it composes over. Call under ``_lock``.
+
+        A host registration wins. Without one, a version whose structural snapshot is the
+        built-in authored starter derives its binding from the world itself; any other version
+        is refused with the reason, and a version registered as a district composes one way only.
+        """
+        registered = self._authored.get((session.workspace_id, version_id))
+        if registered is not None:
+            return registered, self._authored_ground(connection, session, registered)
+        if (session.workspace_id, version_id) in self._bindings:
+            raise UnavailableSocietyInput("this version is registered to compose a district")
+        row = connection.execute(
+            "select world_id,source_snapshot_id from world_alternate_version "
+            "where workspace_id=%s and version_id=%s",
+            (session.workspace_id, version_id),
+        ).fetchone()
+        if row is None:
+            raise UnavailableSocietyInput("this workspace holds no authored version by that id")
+        ground = self._read_ground(connection, session, row["world_id"], row["source_snapshot_id"])
+        binding = AuthoredWorldSocietyBinding(
+            binding_id=f"{SAVED_WORLD_BINDING_PREFIX}{version_id}",
+            workspace_id=session.workspace_id,
+            world_id=row["world_id"],
+            version_id=version_id,
+            source_snapshot_id=row["source_snapshot_id"],
+            place_id=saved_world_place_id(version_id),
+            region_id=ground.region_id,
+        )
+        return binding, ground
+
+    def saved_world_place(
+        self, connection: psycopg.Connection, session: Session, version_id: uuid.UUID
+    ) -> uuid.UUID:
+        """The place a saved world's society binds, made on the person's own request.
+
+        Call inside the transaction that creates the society, so a refusal leaves no place
+        behind. A host registration names a place the host made; a derived one is made here,
+        once, and asking again finds the same row.
+        """
+        with connection.transaction():
+            self._lock(connection, session)
+            binding, _ = self._authored_scope(connection, session, version_id)
+            if binding.binding_id.startswith(SAVED_WORLD_BINDING_PREFIX):
+                connection.execute(
+                    "insert into place(workspace_id,place_id) values(%s,%s) on conflict do nothing",
+                    (session.workspace_id, binding.place_id),
+                )
+            return binding.place_id
 
     @staticmethod
-    def _lock(connection: psycopg.Connection, session: Session) -> None:
+    def _lock(connection: psycopg.Connection, session: Session, *, assets: bool = True) -> None:
         connection.row_factory = dict_row
         set_workspace(connection, session.workspace_id)
         # Same order as authored edits/structural invalidation, then source withdrawal exclusion.
@@ -186,7 +247,8 @@ class SocietyRuntime:
             "select pg_advisory_xact_lock(hashtextextended(%s,880024))",
             (str(session.workspace_id),),
         )
-        connection.execute("select asset_read_lock()")
+        if assets:
+            connection.execute("select asset_read_lock()")
 
     def _version(
         self, connection: psycopg.Connection, session: Session, binding: SocietyRuntimeBinding
@@ -437,10 +499,11 @@ class SocietyRuntime:
         connection: psycopg.Connection,
         session: Session,
         version_id: uuid.UUID,
-        place_id: uuid.UUID,
+        place_id: uuid.UUID | None,
         region_id: str,
     ) -> dict:
-        if (session.workspace_id, version_id) in self._authored:
+        """The first input a new society consumes; ``place_id`` None names a saved world's own."""
+        if (session.workspace_id, version_id) not in self._bindings:
             return self._authored_initial_input(
                 connection, session, version_id, place_id, region_id
             )
@@ -537,7 +600,7 @@ class SocietyRuntime:
         self, connection: psycopg.Connection, session: Session, version_id: uuid.UUID
     ) -> None:
         """Run inside each accepted edit transaction, after its immutable edit row is appended."""
-        if (session.workspace_id, version_id) in self._authored:
+        if (session.workspace_id, version_id) not in self._bindings:
             self._authored_world_edit(connection, session, version_id)
             return
         with connection.transaction():
@@ -577,24 +640,25 @@ class SocietyRuntime:
     # interpretation checks above apply; the checks that do are the version's own scope, the
     # snapshot the ground was read from, and the reviewed assets the placed objects use.
 
-    def _authored_ground(
+    def _read_ground(
         self,
         connection: psycopg.Connection,
         session: Session,
-        binding: AuthoredWorldSocietyBinding,
+        world_id: str,
+        snapshot_id: uuid.UUID,
     ) -> SocietyGround:
         row = connection.execute(
             "select composer_key,composer_version,topology,placement,snapshot_sha256 "
             "from world_structure_snapshot where workspace_id=%s and world_id=%s "
             "and snapshot_id=%s",
-            (session.workspace_id, binding.world_id, binding.source_snapshot_id),
+            (session.workspace_id, world_id, snapshot_id),
         ).fetchone()
         if row is None:
             raise UnavailableSocietyInput("registered structural snapshot is unavailable")
         try:
-            ground = authored_ground_from_snapshot(
-                world_id=binding.world_id,
-                snapshot_id=binding.source_snapshot_id,
+            return authored_ground_from_snapshot(
+                world_id=world_id,
+                snapshot_id=snapshot_id,
                 snapshot_sha256=row["snapshot_sha256"],
                 composer_key=row["composer_key"],
                 composer_version=row["composer_version"],
@@ -603,6 +667,16 @@ class SocietyRuntime:
             )
         except InvalidStructuralData as exc:
             raise UnavailableSocietyInput(f"authored ground is unreadable: {exc}") from exc
+
+    def _authored_ground(
+        self,
+        connection: psycopg.Connection,
+        session: Session,
+        binding: AuthoredWorldSocietyBinding,
+    ) -> SocietyGround:
+        ground = self._read_ground(
+            connection, session, binding.world_id, binding.source_snapshot_id
+        )
         if ground.region_id != binding.region_id:
             raise UnavailableSocietyInput("registered region is not this world's authored region")
         return ground
@@ -690,27 +764,28 @@ class SocietyRuntime:
         connection: psycopg.Connection,
         session: Session,
         version_id: uuid.UUID,
-        place_id: uuid.UUID,
+        place_id: uuid.UUID | None,
         region_id: str,
     ) -> dict:
-        binding = self._authored_binding(session, version_id)
-        if place_id != binding.place_id or region_id != binding.region_id:
-            raise UnavailableSocietyInput("requested place/region has no configured binding")
         with connection.transaction():
             self._lock(connection, session)
-            ground = self._authored_ground(connection, session, binding)
+            binding, ground = self._authored_scope(connection, session, version_id)
+            requested = binding.place_id if place_id is None else place_id
+            if requested != binding.place_id or region_id != binding.region_id:
+                raise UnavailableSocietyInput("requested place/region has no configured binding")
             version = self._authored_version(connection, session, binding)
             return self._authored_compose(connection, binding, ground, version, 1)
 
     def _authored_authorize(
         self, connection: psycopg.Connection, session: Session, document: dict
     ) -> None:
-        binding = self._authored_binding(session, uuid.UUID(document["version_id"]))
-        if document["world_id"] != binding.world_id:
-            raise UnavailableSocietyInput("society input scope binding drift")
         with connection.transaction():
             self._lock(connection, session)
-            ground = self._authored_ground(connection, session, binding)
+            binding, ground = self._authored_scope(
+                connection, session, uuid.UUID(document["version_id"])
+            )
+            if document["world_id"] != binding.world_id:
+                raise UnavailableSocietyInput("society input scope binding drift")
             if (
                 document["district_id"] != ground.place_id
                 or document["district_document_sha256"] != ground.document_sha256
@@ -785,7 +860,10 @@ class SocietyRuntime:
         self, connection: psycopg.Connection, session: Session, version_id: uuid.UUID
     ) -> None:
         with connection.transaction():
-            self._lock(connection, session)
+            # Every accepted edit in every world reaches here. The asset read lock is global, so
+            # it is taken only once this version is known to hold a society that reads assets,
+            # in the same order as always: workspace first, then assets.
+            self._lock(connection, session, assets=False)
             row = connection.execute(
                 "select society_id,world_id,place_id,region_id,engine_version from world_society "
                 "where workspace_id=%s and version_id=%s",
@@ -793,7 +871,19 @@ class SocietyRuntime:
             ).fetchone()
             if row is None or row["engine_version"] not in _INPUT_ENGINES:
                 return
-            binding = self._authored_binding(session, version_id)
+            connection.execute("select asset_read_lock()")
+            genesis = connection.execute(
+                "select document->>'profile' as profile from world_society_input "
+                "where workspace_id=%s and society_id=%s and input_seq=1",
+                (session.workspace_id, row["society_id"]),
+            ).fetchone()
+            if genesis is None or genesis["profile"] != AUTHORED_GROUND_INPUT:
+                # A district society whose host registration is gone. Its edits need that
+                # registration, exactly as they always have.
+                raise UnavailableSocietyInput(
+                    "society frame binding is not configured for this scope"
+                )
+            binding, ground = self._authored_scope(connection, session, version_id)
             if (row["world_id"], row["place_id"], row["region_id"]) != (
                 binding.world_id,
                 binding.place_id,
@@ -807,7 +897,6 @@ class SocietyRuntime:
             ).fetchone()["seq"]
             if last is None:
                 raise UnavailableSocietyInput("society input history is unavailable")
-            ground = self._authored_ground(connection, session, binding)
             version = self._authored_version(connection, session, binding)
             document = self._authored_compose(connection, binding, ground, version, last + 1)
             SocietyRepository(

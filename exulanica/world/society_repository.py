@@ -9,6 +9,7 @@ from typing import Any
 import psycopg
 from psycopg.types.json import Jsonb
 
+from exulanica.world import society_authored_ground
 from exulanica.world.models import DEFAULT_WORLD_ID
 from exulanica.world.society import (
     SOCIETY_ENGINE_VERSION,
@@ -54,6 +55,29 @@ from exulanica.world.society_social import (
 
 #: Profiles that consume authorized district inputs and record transition receipts.
 INPUT_PROFILES = (PURPOSEFUL_PROFILE, SOCIAL_PROFILE, LIVING_PROFILE)
+
+
+def consumed_places(document: dict[str, Any]) -> dict[str, Any]:
+    """Where inhabitants can go, as the input a society's current state consumed states it.
+
+    Read from the one input the state names, already authorized with it, and copied rather than
+    derived: the targets an inhabitant can be directed to, each object activity the input says no
+    inhabitant can reach, and the area the society walks. A queued input that no step has consumed
+    yet is not described here, because nothing in the society has acted on it.
+    """
+    navigation = document["navigation"]
+    return {
+        "input_seq": document["input_seq"],
+        "input_sha256": document["document_sha256"],
+        "availability": document["availability"],
+        "unavailable_reason": document["unavailable_reason"],
+        "walkable_area": navigation.get("walkable_area"),
+        "clearance_mm": navigation["clearance_mm"],
+        "targets": [dict(target) for target in document["targets"]],
+        "unavailable_affordances": [
+            dict(record) for record in document.get("unavailable_affordances", [])
+        ],
+    }
 
 
 class SocietyRepository:
@@ -125,6 +149,13 @@ class SocietyRepository:
                     )
                 self._validate_scope(version_id, initial_input)
                 self._authorize(initial_input)
+                # A saved world's own ground holds a handful of people; a district, its full
+                # population. Read at the moment of creation, so a measurement can set another.
+                population = (
+                    society_authored_ground.AUTHORED_GROUND_POPULATION
+                    if initial_input["profile"] == AUTHORED_GROUND_INPUT
+                    else SOCIETY_POPULATION
+                )
                 if profile == LIVING_PROFILE:
                     routine = current_routine()
                     [place] = living_places([initial_input], routine)
@@ -137,11 +168,13 @@ class SocietyRepository:
                         if profile == SOCIAL_PROFILE
                         else initial_purposeful_society
                     )
-                    state = initializer(society_id, seed, initial_input)
+                    state = initializer(society_id, seed, initial_input, population=population)
             else:
                 raise ValueError("unsupported society engine version")
             population = (
-                state["population"]["size"] if profile == LIVING_PROFILE else SOCIETY_POPULATION
+                state["population"]["size"]
+                if profile == LIVING_PROFILE
+                else len(state["inhabitants"])
             )
             row = self.connection.execute(
                 "insert into world_society(workspace_id,society_id,world_id,version_id,place_id,"
@@ -236,11 +269,13 @@ class SocietyRepository:
             documents.append(document)
         return documents
 
-    def snapshot(self, version_id: uuid.UUID) -> dict[str, Any]:
+    def snapshot(self, version_id: uuid.UUID, *, places: bool = False) -> dict[str, Any]:
+        """The current state; ``places`` adds, for a society with inputs, where inhabitants go."""
         self._lock()
         row = self._row(version_id)
         if row is None:
             raise UnknownSociety("society is unavailable")
+        current = None
         if row["engine_version"] in INPUT_PROFILES:
             # A historical snapshot is not a current rights grant. Authorizer checks dependencies
             # of the current state plus queued input. Historical replay checks every input below.
@@ -253,7 +288,10 @@ class SocietyRepository:
                 for agent in row["state"]["social"]["agents"].values():
                     for memory in [*agent["observations"], *agent["beliefs"].values()]:
                         self._authorize(documents[memory["input_seq"] - 1])
-        return self._snapshot(row)
+        snapshot = self._snapshot(row)
+        if places and current is not None:
+            snapshot["places"] = consumed_places(current)
+        return snapshot
 
     def _decisions(self, row: dict) -> list[dict]:
         rows = self.connection.execute(

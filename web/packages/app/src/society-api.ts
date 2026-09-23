@@ -3,10 +3,14 @@
  *
  * Speaks `/world/versions/{id}/society` (`exulanica/api/routes/society.py`) and
  * `/world/versions/{id}/society/actions` (`exulanica/api/routes/society_actions.py`).
- * `connect` reads an existing society or creates one; `advance` posts one step against the
- * tick and digest the caller already holds; `requestAction` records a typed `go_to` or
- * `perform` against a canonical target. This module does not start playback or request a
- * model decision.
+ * `connect` reads an existing society or creates one; `create` only creates, for a person who
+ * asked; `advance` posts one step against the tick and digest the caller already holds;
+ * `requestAction` records a typed `go_to` or `perform` against a canonical target. This module
+ * does not start playback or request a model decision.
+ *
+ * A saved world is named with `worldId`, and every request then carries it as `world_id`: the
+ * server reads a version only in the world the request names, so without it a saved world's
+ * version reads as missing rather than as somebody else's.
  */
 
 import { ApiError, Transport, type TransportOptions } from '@exulanica/graph-client';
@@ -20,6 +24,53 @@ export interface SocietySnapshot {
   readonly currentTick: number;
   readonly stateSha256: string;
   readonly state: OwnedSocietyState;
+  /** Where inhabitants can go, when the read asked for it; null otherwise. */
+  readonly places: SocietyPlaces | null;
+}
+
+export type SocietyAffordance = 'visit' | 'rest';
+
+/** One activity an inhabitant can be directed to, as the consumed input states it. */
+export interface SocietyPlace {
+  readonly targetId: string;
+  readonly subjectId: string;
+  /** The authored object the activity belongs to, or null for a district's own destination. */
+  readonly objectId: string | null;
+  readonly affordance: SocietyAffordance;
+  readonly durationTicks: number;
+  readonly enabled: boolean;
+}
+
+/** An object's activity the input says no inhabitant can reach, with the server's reason. */
+export interface SocietyUnreachablePlace {
+  readonly targetId: string;
+  readonly objectId: string;
+  readonly affordance: SocietyAffordance;
+  readonly reason: string;
+}
+
+/** The area a society walks, and whether the ground states it or the society declared it. */
+export interface SocietyWalkableArea {
+  readonly source: 'ground' | 'declared';
+  readonly centreMm: readonly [number, number];
+  readonly halfWidthMm: number;
+  readonly halfDepthMm: number;
+}
+
+/**
+ * Where inhabitants can go, copied from the one input the society's current state consumed.
+ * An input queued by an edit that no step has consumed yet is not described: nothing in the
+ * society has acted on it.
+ */
+export interface SocietyPlaces {
+  readonly inputSeq: number;
+  readonly inputSha256: string;
+  readonly available: boolean;
+  readonly unavailableReason: string | null;
+  readonly walkableArea: SocietyWalkableArea | null;
+  readonly clearanceMm: number;
+  readonly targets: readonly SocietyPlace[];
+  readonly unreachable: readonly SocietyUnreachablePlace[];
 }
 
 const record = (value: unknown): Readonly<Record<string, unknown>> => {
@@ -130,6 +181,68 @@ function livingPresentation(row: Readonly<Record<string, unknown>>, state: Reado
   };
 }
 
+const affordance = (value: unknown): value is SocietyAffordance => value === 'visit' || value === 'rest';
+
+/** The places a read carries, bound to the input the snapshot says its state consumed. */
+function placesOf(row: Readonly<Record<string, unknown>>): SocietyPlaces | null {
+  if (row['places'] === undefined || row['places'] === null) return null;
+  const places = record(row['places']);
+  const targets = places['targets'], unreachable = places['unavailable_affordances'];
+  const area = places['walkable_area'];
+  if (!integer(places['input_seq'], 1) || places['input_seq'] !== row['input_seq'] ||
+      !digest(places['input_sha256']) || places['input_sha256'] !== row['input_sha256'] ||
+      !['available', 'unavailable'].includes(String(places['availability'])) ||
+      !(places['unavailable_reason'] === null || textValue(places['unavailable_reason'])) ||
+      !integer(places['clearance_mm']) || !Array.isArray(targets) || !Array.isArray(unreachable)) {
+    throw new Error('Invalid society places');
+  }
+  let walkableArea: SocietyWalkableArea | null = null;
+  if (area !== null && area !== undefined) {
+    const held = record(area);
+    if (!['ground', 'declared'].includes(String(held['source'])) || !point(held['centre_mm']) ||
+        !integer(held['half_width_mm'], 1) || !integer(held['half_depth_mm'], 1)) {
+      throw new Error('Invalid society walkable area');
+    }
+    walkableArea = Object.freeze({
+      source: held['source'] as 'ground' | 'declared',
+      centreMm: held['centre_mm'] as readonly [number, number],
+      halfWidthMm: held['half_width_mm'] as number,
+      halfDepthMm: held['half_depth_mm'] as number,
+    });
+  }
+  return Object.freeze({
+    inputSeq: places['input_seq'] as number,
+    inputSha256: places['input_sha256'] as string,
+    available: places['availability'] === 'available',
+    unavailableReason: places['unavailable_reason'] as string | null,
+    walkableArea,
+    clearanceMm: places['clearance_mm'] as number,
+    targets: Object.freeze(targets.map((value) => {
+      const target = record(value);
+      if (!textValue(target['target_id']) || !textValue(target['subject_id']) ||
+          !(target['object_id'] === null || textValue(target['object_id'])) ||
+          !affordance(target['affordance']) || !integer(target['duration_ticks'], 1) ||
+          typeof target['enabled'] !== 'boolean') throw new Error('Invalid society place');
+      return Object.freeze({
+        targetId: target['target_id'], subjectId: target['subject_id'],
+        objectId: target['object_id'] as string | null, affordance: target['affordance'],
+        durationTicks: target['duration_ticks'] as number, enabled: target['enabled'] as boolean,
+      });
+    })),
+    unreachable: Object.freeze(unreachable.map((value) => {
+      const held = record(value);
+      if (!textValue(held['target_id']) || !textValue(held['object_id']) ||
+          !affordance(held['affordance']) || !textValue(held['reason'])) {
+        throw new Error('Invalid unreachable society place');
+      }
+      return Object.freeze({
+        targetId: held['target_id'], objectId: held['object_id'],
+        affordance: held['affordance'], reason: held['reason'],
+      });
+    })),
+  });
+}
+
 export function parseSociety(value: unknown): SocietySnapshot {
   const row = record(value);
   const state = record(row['state']);
@@ -141,13 +254,15 @@ export function parseSociety(value: unknown): SocietySnapshot {
     return Object.freeze({
       societyId: row['society_id'], versionId: row['version_id'], placeId: row['place_id'],
       populationSize: row['population_size'] as number, currentTick: row['current_tick'], stateSha256: row['state_sha256'],
-      state: livingPresentation(row, state),
+      state: livingPresentation(row, state), places: placesOf(row),
     });
   }
   const inhabitants = state['inhabitants'];
   const v2 = state['profile'] === 'exulanica-society/v2';
+  // A purposeful society on a saved world's own ground holds a handful of people; the legacy
+  // society always holds at least 100.
   if (!textValue(row['society_id']) || !textValue(row['version_id']) || !textValue(row['place_id']) ||
-      !integer(row['population_size'], 100) || row['population_size'] > 512 ||
+      !integer(row['population_size'], v2 ? 1 : 100) || row['population_size'] > 512 ||
       !integer(row['current_tick']) || state['tick'] !== row['current_tick'] ||
       !digest(row['state_sha256']) || !Array.isArray(inhabitants) || inhabitants.length !== row['population_size'] ||
       (state['profile'] !== undefined && state['profile'] !== 'exulanica-society/v1' && !v2)) throw new Error('Invalid society response');
@@ -188,7 +303,7 @@ export function parseSociety(value: unknown): SocietySnapshot {
   return Object.freeze({
     societyId: row['society_id'], versionId: row['version_id'], placeId: row['place_id'],
     populationSize: row['population_size'], currentTick: row['current_tick'], stateSha256: row['state_sha256'],
-    state: state as unknown as OwnedSocietyState,
+    state: state as unknown as OwnedSocietyState, places: v2 ? placesOf(row) : null,
   });
 }
 
@@ -334,49 +449,76 @@ export function parseSocietyActionRecord(value: unknown, versionId: string): Soc
   });
 }
 
+export interface SocietyClientOptions extends TransportOptions {
+  /** The saved world the versions belong to. Omitted, requests name no world: the default one. */
+  readonly worldId?: string;
+}
+
 export class SocietyClient {
   private readonly transport: Transport;
+  private readonly worldId: string | undefined;
 
-  constructor(options: TransportOptions) {
+  constructor(options: SocietyClientOptions) {
     this.transport = new Transport(options);
+    this.worldId = options.worldId;
+  }
+
+  /** A society route, with the saved world named when there is one. */
+  private path(versionId: string, suffix = ''): string {
+    const path = `/world/versions/${encodeURIComponent(versionId)}/society${suffix}`;
+    return this.worldId === undefined ? path : `${path}?world_id=${encodeURIComponent(this.worldId)}`;
   }
 
   async connect(
     versionId: string,
-    placeId: string,
+    placeId: string | null,
     regionId: string,
     profile: SocietyProfile = 'exulanica-society/v2',
   ): Promise<SocietySnapshot> {
-    const path = `/world/versions/${encodeURIComponent(versionId)}/society`;
     try {
       return await this.read(versionId);
     } catch (error) {
       if (!(error instanceof ApiError) || error.status !== 404) throw error;
-      return boundSnapshot(await this.transport.postJson<unknown>(path, {
-        place_id: placeId,
-        region_id: regionId,
-        seed: '7a'.repeat(32),
-        profile,
-      }), versionId);
+      return this.create(versionId, placeId, regionId, profile);
     }
   }
 
-  read(versionId: string): Promise<SocietySnapshot> {
+  /**
+   * Create this version's society, or read back the one already there. A null place asks the
+   * server for a saved world's own, which it derives from the version; the client never makes one.
+   */
+  create(
+    versionId: string,
+    placeId: string | null,
+    regionId: string,
+    profile: SocietyProfile = 'exulanica-society/v2',
+  ): Promise<SocietySnapshot> {
+    return this.transport.postJson<unknown>(this.path(versionId), {
+      ...(placeId === null ? {} : { place_id: placeId }),
+      region_id: regionId,
+      seed: '7a'.repeat(32),
+      profile,
+    }).then(value => boundSnapshot(value, versionId));
+  }
+
+  /** The current state; `places` also reads where inhabitants can go. */
+  read(versionId: string, options: { readonly places?: boolean } = {}): Promise<SocietySnapshot> {
     return this.transport.getJson<unknown>(
-      `/world/versions/${encodeURIComponent(versionId)}/society`,
+      this.path(versionId),
+      options.places === true ? { places: 'true' } : undefined,
     ).then(value => boundSnapshot(value, versionId));
   }
 
   events(snapshot: SocietySnapshot): Promise<readonly SocietyEvent[]> {
     return this.transport.getJson<unknown>(
-      `/world/versions/${encodeURIComponent(snapshot.versionId)}/society/events`,
+      this.path(snapshot.versionId, '/events'),
       { limit: '256' },
     ).then(value => parseSocietyEvents(value, snapshot));
   }
 
   advance(snapshot: SocietySnapshot): Promise<SocietySnapshot> {
     return this.transport.postJson<unknown>(
-      `/world/versions/${encodeURIComponent(snapshot.versionId)}/society/steps`,
+      this.path(snapshot.versionId, '/steps'),
       {
         base_tick: snapshot.currentTick,
         base_state_sha256: snapshot.stateSha256,
@@ -401,7 +543,7 @@ export class SocietyClient {
       return Promise.reject(new Error('perform requires a visit or rest affordance'));
     }
     return this.transport.postJson<unknown>(
-      `/world/versions/${encodeURIComponent(snapshot.versionId)}/society/actions`,
+      this.path(snapshot.versionId, '/actions'),
       {
         idempotency_key: idempotencyKey,
         base_tick: snapshot.currentTick,

@@ -88,6 +88,7 @@ import {
   DEFAULT_FOCUS_CONFIG,
 } from '@exulanica/atlas-core';
 import { OwnedDistrictRuntime } from './owned-district-runtime.js';
+import { AuthoredRegionSociety } from './society/authored-society.js';
 import type { GeneratedTileAttachment, GeneratedTileMount } from './generated-tile/binding-contract.js';
 import { PlayerAvatar } from './player-avatar.js';
 import { FollowCamera, playerCameraAimHeight, type PlayerCameraMode } from './player-camera.js';
@@ -649,6 +650,12 @@ export class AtlasBinding {
    * tile is: it hangs off a root the factory built and needs nothing else the binding holds.
    */
   authoredPointMaps: AuthoredPointMaps | null = null;
+  /**
+   * The inhabitants of a saved world, over its authored region, or null without one. Attached
+   * after construction for the same reason, and null in a district, a generated tile or a
+   * personal world, so none of them builds or runs anything it did not before.
+   */
+  authoredSociety: AuthoredRegionSociety | null = null;
   readonly table: AnchorTable;
   readonly emphasis: EmphasisBuffers;
   readonly islands: readonly IslandVisual[];
@@ -1227,11 +1234,13 @@ export class AtlasBinding {
 
     const objectRoots = new Map<IslandId, pc.Entity>();
     let authoredPointMaps: AuthoredPointMaps | null = null;
+    let authoredSociety: AuthoredRegionSociety | null = null;
     if (options.authoredRegion !== undefined) {
       const root = new pc.Entity(`authored-region:${options.authoredRegion.regionId}`);
       root.setLocalPosition(0, options.authoredRegion.ground.elevationMm / 1000, 0);
       renderRoot.addChild(root);
       objectRoots.set(options.authoredRegion.regionId, root);
+      authoredSociety = new AuthoredRegionSociety(device, root);
       if (options.authoredPointMaps !== undefined && options.authoredPointMaps.length > 0) {
         // Built after the root is in the graph, because each print's world-space camera is read
         // once here rather than recomputed every frame.
@@ -1392,6 +1401,7 @@ export class AtlasBinding {
       ownedDistrict,
     );
     binding.authoredPointMaps = authoredPointMaps;
+    binding.authoredSociety = authoredSociety;
     if (options.ownedDistrict !== undefined) binding.renderRoot.enabled = false;
     if (options.generatedTile !== undefined) {
       binding.renderRoot.enabled = false;
@@ -1957,7 +1967,7 @@ export class AtlasBinding {
     const s = this.controls.state;
     const r = this.renderedPose;
     return shouldDrawFrame({
-      dirty: this.dirty || this.objects.animating || (this.ownedDistrict?.societyAnimating ?? false) || (this.playerCameraMode==='third-person' && !this.reducedMotion),
+      dirty: this.dirty || this.objects.animating || (this.ownedDistrict?.societyAnimating ?? false) || (this.authoredSociety?.societyAnimating ?? false) || (this.playerCameraMode==='third-person' && !this.reducedMotion),
       navigating: this.navigationTransition !== null,
       poseChanged:
         s.x !== r.x || s.y !== r.y || s.z !== r.z ||
@@ -2574,9 +2584,28 @@ export class AtlasBinding {
     this.onNavigationArrive?.(transition.target);
   }
 
+  /** A saved world's inhabitants: the district's per-frame steps, for the authored region. */
+  private updateAuthoredSociety(dt: number, nowMs: number): void {
+    const society = this.authoredSociety;
+    if (society === null) return;
+    society.refreshNearby([this.controls.state.x, this.controls.state.z]);
+    society.tickSociety(this.reducedMotion ? Number.MAX_SAFE_INTEGER : nowMs);
+    if (Math.floor(nowMs / 1000) === Math.floor((nowMs - dt * 1000) / 1000)) return;
+    const canvas = this.device.canvas;
+    if (!(canvas instanceof HTMLCanvasElement)) return;
+    canvas.dataset.societyRendered = String(society.drawnInhabitantCount);
+    canvas.dataset.societyNearby = String(society.visibleInhabitantIds.length);
+    const signature = society.visibleInhabitantIds.join('|');
+    if (signature !== this.nearbySignature) {
+      this.nearbySignature = signature;
+      canvas.dispatchEvent(new Event('society-nearby-change'));
+    }
+  }
+
   private syncNativeCharacterFrames(dt:number,navigating=false):void{
     if(!this.nativeCharacters)return;
-    const frames=[...(this.ownedDistrict?.nativeCharacterFrames(dt,this.reducedMotion)??[])];
+    const frames=[...(this.ownedDistrict?.nativeCharacterFrames(dt,this.reducedMotion)??[]),
+      ...(this.authoredSociety?.nativeCharacterFrames(dt,this.reducedMotion)??[])];
     if(this.playerAvatar){
       const avatar=this.playerAvatar,s=this.controls.state;
       frames.push({subject:avatar.representation.subject,parent:this.environmentRoot,fallback:avatar.root,
@@ -2605,6 +2634,7 @@ export class AtlasBinding {
     else if (this.inspection === null) this.controls.update(dt);
     this.ownedDistrict?.refreshNearby([this.controls.state.x, this.controls.state.z]);
     this.ownedDistrict?.tickSociety(this.reducedMotion ? Number.MAX_SAFE_INTEGER : nowMs);
+    this.updateAuthoredSociety(dt, nowMs);
     if (this.ownedDistrict && Math.floor(nowMs / 1000) !== Math.floor((nowMs - dt * 1000) / 1000)) {
       const canvas = this.device.canvas;
       if (canvas instanceof HTMLCanvasElement) {
@@ -2894,6 +2924,8 @@ export class AtlasBinding {
     this.nativeCharacters?.destroy();
     this.playerAvatar?.destroy();
     this.ownedDistrict?.destroy();
+    this.authoredSociety?.destroy();
+    this.authoredSociety = null;
     this.generatedTile?.dispose();
     this.generatedTile = null;
     this.googleTiles?.dispose();

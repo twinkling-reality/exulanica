@@ -356,15 +356,17 @@ def test_an_accepted_edit_appends_one_input_in_its_own_transaction(saved_world):
     assert society_repository(world).replay(world["binding"].version_id)["replay_verified"]
 
 
-def test_an_unregistered_world_and_a_composed_snapshot_are_refused(saved_world):
+def test_another_place_another_workspace_and_a_composed_snapshot_are_refused(saved_world):
     world = saved_world
+    # Without a host registration a saved world still has exactly one place its society can
+    # bind, the one derived from its own version. Naming the host fixture's place is refused.
     absent = SocietyRuntime(
         store=world["store"], authored_bindings=[], reviewed_affordances=world["registry"]
     )
-    with pytest.raises(UnavailableSocietyInput, match="not configured"):
+    with pytest.raises(UnavailableSocietyInput, match="has no configured binding"):
         initial(world, absent)
     other = Session(workspace_id=uuid.uuid4(), actor=uuid.uuid4())
-    with pytest.raises(UnavailableSocietyInput, match="not configured"):
+    with pytest.raises(UnavailableSocietyInput, match="holds no authored version"):
         world["runtime"].initial_input(
             world["connection"],
             other,
@@ -423,7 +425,7 @@ def test_one_version_cannot_be_registered_two_ways(saved_world):
         )
 
 
-def test_a_registration_file_is_the_only_way_a_saved_world_is_registered(
+def test_every_instance_serves_saved_worlds_and_a_registration_file_still_takes_precedence(
     saved_world, tmp_path, monkeypatch
 ):
     world = saved_world
@@ -444,9 +446,12 @@ def test_a_registration_file_is_the_only_way_a_saved_world_is_registered(
     )
     monkeypatch.delenv("EXULANICA_SOCIETY_AUTHORED_WORLDS", raising=False)
 
+    # No file: the instance still serves a saved world whose owner asks for inhabitants, and
+    # its readiness says that nothing holds or advances a society until somebody asks.
     silent = build_services()
-    assert silent.society_runtime is None
-    assert any(SOCIETY_AUTHORED_WORLDS_ENV in note for note in silent.warnings)
+    assert silent.society_runtime is not None
+    assert not any(SOCIETY_AUTHORED_WORLDS_ENV in note for note in silent.warnings)
+    assert any("no world holds a society until its owner asks" in n for n in silent.warnings)
 
     registrations = tmp_path / "authored-worlds.json"
     registrations.write_text(
@@ -501,7 +506,7 @@ def test_an_edit_whose_society_cannot_be_recomposed_leaves_the_world_alone(saved
         reviewed_affordances=world["registry"],
     )
     with (
-        pytest.raises(UnavailableSocietyInput, match="society scope disagrees"),
+        pytest.raises(UnavailableSocietyInput, match="not this world's authored region"),
         world["connection"].transaction(),
     ):
         objects_repository(world, misregistered).add_object(

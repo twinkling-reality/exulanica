@@ -42,6 +42,13 @@ FRAME_NAMES = {
     AUTHORED_GROUND_INPUT: "authored-ground-local-mm",
 }
 CLEARANCE_MM = 450
+#: The fewest inhabitants a society over a district starts with. The database no longer holds a
+#: v2 or v3 population to this, because a row cannot tell a district from a saved world's own
+#: ground; the initializer, which every creation and every replay passes through, does.
+DISTRICT_MINIMUM_POPULATION = 100
+#: No inhabitant of a saved world starts on, or within this many millimetres of, the point a
+#: person arrives at, so the first view of a world is never somebody's back.
+ARRIVAL_CLEARANCE_MM = 2_000
 
 
 def _integer(value: Any, minimum: int, maximum: int) -> bool:
@@ -143,7 +150,7 @@ def _validate_society_input(document: dict[str, Any]) -> None:
         "unavailable_reason",
     }
     if profile == AUTHORED_GROUND_INPUT:
-        navigation_fields.add("walkable_area")
+        navigation_fields.update(("walkable_area", "arrival_mm"))
     _require(isinstance(nav, dict) and set(nav) == navigation_fields, "invalid navigation fields")
     _require(
         nav["profile"] == NAVIGATION_PROFILES[profile] and nav["clearance_mm"] == CLEARANCE_MM,
@@ -174,6 +181,13 @@ def _validate_society_input(document: dict[str, Any]) -> None:
     _require(list(nodes) == sorted(nodes), "nodes must be sorted")
     if profile == AUTHORED_GROUND_INPUT:
         _validate_walkable_area(nav["walkable_area"], nodes.values(), nav["clearance_mm"])
+        arrival = nav["arrival_mm"]
+        _require(
+            isinstance(arrival, list)
+            and len(arrival) == 2
+            and all(_integer(v, -(10**9), 10**9) for v in arrival),
+            "invalid arrival point",
+        )
     _require(isinstance(nav["edges"], list) and len(nav["edges"]) <= 65536, "edge bound exceeded")
     edge_ids = []
     pairs = set()
@@ -333,6 +347,11 @@ def validate_input_successor(previous: dict[str, Any], current: dict[str, Any]) 
             current["navigation"]["walkable_area"] == previous["navigation"]["walkable_area"],
             "input changed immutable walkable_area",
         )
+        # Where a person arrives is the snapshot's own and cannot move under a society either.
+        _require(
+            current["navigation"]["arrival_mm"] == previous["navigation"]["arrival_mm"],
+            "input changed immutable arrival_mm",
+        )
     old, new = previous["authored_state"], current["authored_state"]
     _require(new["edit_seq"] >= old["edit_seq"], "authored edit order regressed")
     _require(
@@ -394,7 +413,24 @@ def initial_purposeful_society(
         if target["node_id"] not in reachable:
             reachable.update(_paths(target["node_id"], adjacent))
     spawn_nodes = sorted(reachable)
-    state = initial_society(society_id, seed, population=population)
+    authored = document["profile"] == AUTHORED_GROUND_INPUT
+    if authored:
+        # A saved world: nobody starts where a person arrives or beside it, and the few who live
+        # there start spread across the area in node order rather than in its first column.
+        ax, az = document["navigation"]["arrival_mm"]
+        spawn_nodes = [
+            node
+            for node in spawn_nodes
+            if (nodes[node]["position_mm"][0] - ax) ** 2 + (nodes[node]["position_mm"][1] - az) ** 2
+            > ARRIVAL_CLEARANCE_MM**2
+        ]
+        _require(bool(spawn_nodes), "no reachable place to start clear of the arrival point")
+    state = initial_society(
+        society_id,
+        seed,
+        population=population,
+        minimum_population=1 if authored else DISTRICT_MINIMUM_POPULATION,
+    )
     state.update(
         profile=PURPOSEFUL_PROFILE,
         branch_id=document["version_id"],
@@ -404,7 +440,11 @@ def initial_purposeful_society(
         seed_sha256=seed,
     )
     for person in state["inhabitants"]:
-        node = spawn_nodes[person["ordinal"] % len(spawn_nodes)]
+        node = (
+            spawn_nodes[person["ordinal"] * len(spawn_nodes) // population]
+            if authored
+            else spawn_nodes[person["ordinal"] % len(spawn_nodes)]
+        )
         point = nodes[node]["position_mm"]
         person.update(
             position_mm=list(point),

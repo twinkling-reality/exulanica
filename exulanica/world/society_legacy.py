@@ -42,15 +42,17 @@ def initial_society(
     seed: str,
     *,
     population: int = SOCIETY_POPULATION,
+    minimum_population: int = 100,
 ) -> dict[str, Any]:
+    """The seeded population. ``minimum_population`` is the caller's profile's own floor."""
     if (
         not isinstance(seed, str)
         or len(seed) != 64
         or any(c not in "0123456789abcdef" for c in seed)
     ):
         raise ValueError("society seed must be a lowercase SHA-256")
-    if population < 100 or population > 512:
-        raise ValueError("society population must be between 100 and 512")
+    if population < minimum_population or population > 512:
+        raise ValueError(f"society population must be between {minimum_population} and 512")
     inhabitants = []
     first, last = LEGACY_FIRST_NAMES, LEGACY_LAST_NAMES
     for ordinal in range(population):

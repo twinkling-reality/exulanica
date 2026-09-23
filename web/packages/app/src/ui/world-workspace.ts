@@ -143,8 +143,9 @@ export function buildWorldWorkspace(parts: {
       availability.hidden = ready;
       if (!ready) nearbyState.textContent = 'Nearby people are unavailable in this view.';
     },
-    setNearby(count: number) {
-      nearbyState.hidden = count > 0;
+    /** `saidElsewhere`: another section of this panel already says nobody is here. */
+    setNearby(count: number, saidElsewhere = false) {
+      nearbyState.hidden = count > 0 || saidElsewhere;
       nearbyState.textContent = 'No people are in the nearby display. Move through the world to explore.';
     },
     openPanel(name: 'nearby' | 'authoring' | 'details') { open(name); },

@@ -7,7 +7,8 @@ The default `exulanica-society/v1` retains seeded synthetic motion. Opt-in
 versioned authored inputs. Opt-in `exulanica-society/v3` adds a bounded synthetic cast with
 local observations, communicated beliefs and explicitly requested, validated model proposals.
 `exulanica-society/v4`, the living society, adds catalogued routines, occupancy and a
-population sized to its place; the browser creates new live societies with it. All profiles are
+population sized to its place; the browser creates new live societies in the owned district with
+it, and a person's own saved world gets a v2 society when the person asks for one. All profiles are
 fictional simulation, separate from personal evidence. They do not model real residents, infer
 demographic facts or demonstrate general social intelligence.
 
@@ -52,8 +53,9 @@ Implementation:
 
 ## Identity, branches and compatibility
 
-The v1 to v3 population is 128; their pure initializer accepts 100–512. V4 sizes its
-population to its place (below). The population is canonical state, independent of how many
+The v1 to v3 population is 128 over a district; their pure initializer accepts 100–512 there. A
+society on a saved world's own ground starts with 8 (below). V4 sizes its population to its place
+(below). The population is canonical state, independent of how many
 people a renderer draws. Inhabitant UUIDv5 identities derive from
 society identity and ordinal. The same society ID/seed/population preserves those identities across
 profiles, but a stored society's profile and seed cannot change. The society UUID derives from its
@@ -245,11 +247,39 @@ in a saved world comes from a reviewed object with an affordance, so a starter w
 has a walkable area and nothing to do in it, and society creation refuses with
 `initial society requires reachable targets` until the person puts something there.
 
+A society on a saved world's own ground starts with `AUTHORED_GROUND_POPULATION`, 8 people,
+where a district starts with 128: an area about 23 metres across with 121 places to stand would
+otherwise have people standing on top of each other from the first minute. The repository reads
+the figure when it creates a society, so a measurement can set another in-process. The authored
+input's `navigation` states `arrival_mm`, the point a person arrives at, read from the snapshot's
+own spawn; like the walkable area it is refused as changed by a successor. Nobody starts on it or
+within 2,000 mm of it: the initializer takes the reachable nodes outside that distance in node
+order and spreads the population evenly across them, so the same seed always starts the same
+people in the same places and replay, which rebuilds the first state from the seed, the population
+and input 1, starts them there too. A district input states no arrival point and keeps its
+original starting rule and its floor of 100 people.
+
+This society has no capacity. With one reachable target, every idle inhabitant chooses it, walks
+to its access node and stands there with the others, drawn overlapping; with a few targets they
+share them the same way. That is the v2 policy's own absorbing state, the one the living society
+was built to remove, and it is a limitation of a saved world's society, not of its drawing.
+
 The profile records local failures, like `exulanica.society-composition/v2`: an object with no
 reachable access node loses its own activity to `unavailable_affordances` and takes nothing else
-with it. An object off the declared ground plane, in another region, carrying a behaviour, rotated
-or scaled, or of an unsupported origin still makes the whole input unavailable with its object
-named. So does an area smaller than the navigation clearance
+with it. An object off the declared ground plane, in another region, carrying a behaviour,
+scaled, or of an unsupported origin still makes the whole input unavailable with its object
+named.
+
+An object stands at whatever yaw the person placed it at, and placing one in front of yourself
+turns it to face you. Its centre and its reach do not turn with it. A blocking object's obstacle
+is its reviewed footprint turned about its centre by the yaw, the way the renderer turns the
+object: its own x axis goes to (cos, -sin) and its z axis to (sin, cos) in the region's frame.
+Each turned corner coordinate is rounded outward, away from the centre, to the whole millimetre,
+so the obstacle grows by less than a millimetre on each axis and never opens a route through what
+the object covers; unturned, it is exactly the reviewed rectangle. For the reviewed catalog's
+blocking footprints no nonzero microradian yaw brings a turned corner within 1e-8 mm of a whole
+millimetre, so that rounding does not depend on a machine's arithmetic. The district projections
+keep refusing a turned object as `unsupported_object_transform`. So does an area smaller than the navigation clearance
 (`walkable_area_smaller_than_clearance`), a version whose snapshot is not the registered one
 (`authored_ground_snapshot_mismatch`), an invalidated source and a structural override. An
 unavailable input carries no nodes, edges, destinations, targets or local records.
@@ -259,15 +289,36 @@ and in nothing else. It is personal evidence drawn in the world; it is neither g
 an obstacle nor an activity, so the society's area, lattice and targets are the same with or
 without it.
 
-Registration is explicit and scoped, and it is not something saving a world does. A host registers
+A saved world holds inhabitants only because the person asked, and saving a world never registers
+it. The request is the ordinary society creation, `POST /world/versions/{id}/society` with the
+saved world named as `world_id`, a v2 or v3 profile and no `place_id`. For a version whose
+structural snapshot is the built-in authored starter, the server derives what the society binds
+from the world itself: an `AuthoredWorldSocietyBinding` with identity
+`exulanica.society-saved-world/v1:<version_id>`, the snapshot's own authored region, and the place
+identity `uuid5(version_id, "exulanica-society/saved-world-place/v1")`, derived from the authored
+version exactly as the society's own identity is derived under `exulanica-society/v1`. The place
+names where in the workspace the society lives and claims nothing about the Earth. The place row,
+the first input and the society are created in one transaction, so a refusal, such as a world with
+nothing reachable in it or a v4 profile, leaves none of them behind. Asking again returns the same
+society and creates nothing. A version whose snapshot is anything else derives nothing and is
+refused with the reason. Because the whole binding is a function of the version and its snapshot,
+a runtime built again from nothing derives it byte for byte and authorises the stored inputs.
+
+Every instance serves this, and nothing is created, started or scheduled until somebody asks:
+`/readyz` says that no world holds a society until its owner asks for one, and that without the
+playback worker a society advances only when somebody advances it. A host can still register
 `AuthoredWorldSocietyBinding` rows naming a workspace, saved world, authored version, that
 version's structural snapshot, the authored region and the workspace place identity the society
-row binds. `EXULANICA_SOCIETY_AUTHORED_WORLDS` names a
-`exulanica.society-authored-worlds/v1` JSON file of them; absent, no saved world holds inhabitants
-and `/readyz` says so. A version is registered as a district or as an authored world, never both,
-and registering one supplies no bytes: an instance whose blob store lacks a reviewed asset composes
-an unavailable input that says so. `GET /world/versions/{id}/society/district` answers 404 for a
-saved world, because there is no district to present.
+row binds: `EXULANICA_SOCIETY_AUTHORED_WORLDS` names an `exulanica.society-authored-worlds/v1` JSON
+file of them, and a registration there takes precedence for the version it names. A version
+composes as a district or as an authored world, never both, and neither kind of binding supplies
+bytes: an instance whose blob store lacks a reviewed asset composes an unavailable input that says
+so. `GET /world/versions/{id}/society/district` answers 404 for a saved world, because there is no
+district to present.
+
+An object edit in any world reaches the runtime in its own transaction. The asset read lock is one
+lock for the whole database, so the runtime takes it only for a version that holds a society whose
+inputs read assets; an edit in a world with no society waits on nothing global.
 
 `exulanica-society/v2` and `exulanica-society/v3` consume an authored ground, and typed directed
 actions work over it. `exulanica-society/v4` refuses one: the living society reads streets,
@@ -275,7 +326,10 @@ occupancy and stated surface heights out of its place contract, and a flat autho
 states none of them, so creation says that rather than publishing a place of empty answers.
 
 Migration 0094 admits the third input profile and applies the bounded, availability-consistent
-local-record rule 0057 wrote for `exulanica.society-input/v2` to it unchanged.
+local-record rule 0057 wrote for `exulanica.society-input/v2` to it unchanged. Migration 0095 lets a
+v2 or v3 society hold 1 to 512 people, keeping v1 at 100 to 512 and v4 as 0075 left it. A row does
+not say which kind of ground its society stands on, so the district's floor of 100 is held by the
+initializer that every creation and every replay passes through.
 
 ## Authored edits and inability to act
 
@@ -335,6 +389,13 @@ Every society, action and playback route takes the saved world as a `world_id` q
 defaulting to the default world, exactly as the world object routes do. The repositories scope
 their reads to workspace, world and version together, so a version that does not belong to the
 named world reads as an unavailable version rather than reaching another world's society.
+
+`GET /world/versions/{id}/society?places=true` adds `places` to a society with inputs: the input
+sequence and digest the current state consumed, its availability and reason, the walkable area and
+clearance, the targets an inhabitant can be directed to, and each object activity the input names
+as `authored_affordance_unreachable`. They are copied from that one authorised input; an input a
+later edit queued is not described until a step consumes it. Without the parameter the read is
+unchanged.
 
 The application supplies `society_initial_input(connection, session, version_id, place_id, region_id)`
 and `society_input_authorizer(connection, session, document)` on application state. The repository
@@ -541,7 +602,9 @@ controls. A subsequent user configuration adopts the host's current base. Render
 between committed positions, but must not fabricate future goals, actions or positions as evidence.
 
 A worker claims one due society per configured workspace per round, ordered by oldest due time
-then stable society identity. Claims skip a workspace whose edit lock is busy. PostgreSQL
+then stable society identity, across every world the workspace holds: the default world and each
+saved world compete for the same claim. The claim names the world it was taken in, and it is
+executed only by a repository scoped to that world. Claims skip a workspace whose edit lock is busy. PostgreSQL
 `clock_timestamp()` is authoritative; clients cannot supply deadlines. Claiming commits a random
 lease token, the control revision, initiating actor and a 30-second expiry before work starts on a
 fresh connection. Execution checks workspace, branch, revision, token and deadline before and after
@@ -613,16 +676,23 @@ an explicit unavailable or refused state. It re-checks its gate whenever the per
 refreshes. Living (v4) societies refuse it because directed actions are a v2/v3 foundation.
 Simulated action records stay labeled as simulation and are never presented as personal evidence.
 
-The control is implemented and unit-tested (`web/packages/app/test/society-directed-action.test.ts`,
+In a person's own saved world the control is reached like this. Opening the world reads its
+society and creates nothing; the People nearby panel says when nobody lives there yet, what
+inhabitants need, and offers "Bring in inhabitants", which is the creation request above. Once
+they live there, the panel lists every object with what the consumed input says of it (somewhere
+to rest or visit, out of reach, or not yet noticed until the next simulated minute), and "Advance
+one minute" performs one control step. A chosen inhabitant's panel carries one request per usable
+place. Every request names the saved world. The placement of this panel is provisional.
+
+In the owned district the control is implemented and unit-tested
+(`web/packages/app/test/society-directed-action.test.ts`,
 `web/packages/app/test/environment-selection.test.ts`), and no shipped configuration reaches it:
 
 | Prerequisite | What the shipped app does instead |
 | --- | --- |
 | The owned district's interpretation, which publishes the destinations | Saved and starter worlds open without the owned district, and its interpretation is read only by a caller that supplies current dependency resolution |
 | A mounted control | The development preview (`?preview=1`) omits it |
-| A held v2 or v3 society | `build_services` configures no society runtime, so creating a v2, v3 or v4 society answers 424 `unavailable_society_input`, and a v1 society does not accept directed actions |
-| A society on the opened world | Society routes resolve versions only in the default world, and a starter's version belongs to its own `world:authored:<uuid>` world |
-| A profile the API directs | The browser creates a new society as v4 (`web/packages/app/src/composition/live-society.ts`), and the API accepts directed actions for v2 and v3 only |
+| A held v2 or v3 society | A district needs a host district binding, and the browser creates a district society as v4 (`web/packages/app/src/composition/live-society.ts`), for which the API accepts no directed actions |
 
 ## V4 living society: routines, places and occupancy
 
@@ -773,7 +843,12 @@ index and the input and event binding triggers. V4 uses the existing input, even
 tables, playback controls and replay. Typed user actions and model decisions remain v2/v3 and v3
 features; v4 refuses them.
 
-**Rendering.** The app draws the whole population by distance: up to 24 nearest outdoor
+**Rendering.** A saved world's inhabitants are drawn by the same crowd, hung from the authored
+region's root, which is the frame their input states positions in and the frame the person's
+objects are placed in. The crowd does not read an action's kind: an inhabitant resting is drawn
+standing where it rests, because no seated pose exists, and its panel says so.
+
+The app draws the whole population by distance: up to 24 nearest outdoor
 inhabitants as full characters (the native character runtime's resident limit) and every other
 outdoor inhabitant within 700 m as a simple instanced figure of the same identity, one draw call
 per palette. Indoor inhabitants are counted, not drawn. People at the same position are all drawn

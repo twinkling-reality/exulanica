@@ -63,6 +63,13 @@ LATTICE_MM: Final = 2_000
 #: records that activity as unreachable rather than stretching its area to meet it.
 DECLARED_HALF_EXTENT_MM: Final = 12_000
 
+#: How many inhabitants a society on a saved world's own ground starts with. The area is a square
+#: about 23 metres across with 121 places to stand, and a population sized for a district (128)
+#: would stand people on top of each other from the first minute. A handful reads as people living
+#: somewhere. The repository reads this at the moment it creates a society, so a measurement can
+#: set another value in-process; a district keeps ``SOCIETY_POPULATION``.
+AUTHORED_GROUND_POPULATION: Final = 8
+
 AreaSource = Literal["ground", "declared"]
 
 
@@ -108,6 +115,9 @@ class SocietyGround:
     ground_kind: Literal["flat", "endless"]
     elevation_mm: int
     area: WalkableArea
+    #: Where a person arrives in this world, on the ground plane: the snapshot's own spawn.
+    arrival_x_mm: int
+    arrival_z_mm: int
 
     @property
     def place_id(self) -> str:
@@ -131,6 +141,7 @@ class SocietyGround:
             "ground_kind": self.ground_kind,
             "elevation_mm": self.elevation_mm,
             "walkable_area": self.area.document(),
+            "arrival_mm": [self.arrival_x_mm, self.arrival_z_mm],
             "clearance_mm": CLEARANCE_MM,
             "lattice_mm": LATTICE_MM,
         }
@@ -246,6 +257,8 @@ def ground_navigation(ground: SocietyGround) -> dict[str, Any]:
         "profile": NAVIGATION_PROFILE,
         "clearance_mm": CLEARANCE_MM,
         "walkable_area": area.document(),
+        # Where a person arrives. Inhabitants never start on it or beside it; see the initializer.
+        "arrival_mm": [ground.arrival_x_mm, ground.arrival_z_mm],
         "nodes": nodes,
         "edges": edges,
         "destinations": [],
@@ -422,4 +435,6 @@ def authored_ground_from_snapshot(
         ground_kind=kind,
         elevation_mm=stated.elevation_mm,
         area=area,
+        arrival_x_mm=region.spawn.x_mm,
+        arrival_z_mm=region.spawn.z_mm,
     )

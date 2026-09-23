@@ -46,6 +46,9 @@ def ticks_due(now: dt.datetime, due_at: dt.datetime, interval_ms: int) -> int:
 @dataclass(frozen=True)
 class ControlClaim:
     workspace_id: uuid.UUID
+    #: The world the claimed society belongs to. A workspace holds the default world and every
+    #: saved world a person made, and the claim is only executed in the world it was taken in.
+    world_id: str
     society_id: uuid.UUID
     version_id: uuid.UUID
     token: uuid.UUID
