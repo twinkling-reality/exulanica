@@ -212,6 +212,59 @@ bootstrap owner, confirms that `exulanica_app` is not an owner, a superuser or B
 the runtime roles. The application never connects as the superuser; the owner URL it prints is for
 migrations and provisioning, and the API refuses to start on it.
 
+This is a test server, and every test server is disposable. It lives in the system temporary
+directory beside the per-worker servers, runs with `fsync` and `full_page_writes` off, and `serve`
+migrates it on every call without a backup. Keep nothing in it you would miss. `serve`,
+`Server.start` and `sweep` refuse a data directory that `exulanica-local-db` made, so a durable
+database reached through a link or a copy is never run as a test server.
+
+### A database for a personal install
+
+A world someone builds on their own computer lives in a PostgreSQL database that
+`exulanica-local-db` ([`exulanica/db/local/`](../exulanica/db/local/__init__.py)) keeps: durable,
+backed up, restored only into an empty directory and upgraded only on request. It needs the same
+PostgreSQL 18 with pgvector as the tests. Every command names its directory; none has a default.
+
+```bash
+uv run exulanica-local-db init --directory ~/Exulanica/database     # create, migrate, start; prints the URLs
+uv run exulanica-local-db start --directory ~/Exulanica/database    # never migrates; says what is pending
+uv run exulanica-local-db stop --directory ~/Exulanica/database     # stops, then takes a backup
+uv run exulanica-local-db status --directory ~/Exulanica/database
+uv run exulanica-local-db backup --directory ~/Exulanica/database
+uv run exulanica-local-db verify --directory ~/Exulanica/database   # restores the newest backup to check it
+uv run exulanica-local-db upgrade --directory ~/Exulanica/database  # backup, rehearsal, migration, backup
+uv run exulanica-local-db restore --directory ~/Exulanica/restored <backup>.pgdump
+```
+
+- **Where it lives.** The directory holds `data/`, `backups/` and `server.log`. `init` and
+  `restore` refuse a directory inside the system temporary directory (`TMPDIR`, or the platform's
+  default), `/tmp` or `/var/tmp`, anything under the test servers' directory, and a directory
+  that already holds files. Durability settings stay at PostgreSQL's defaults. The server listens
+  on the loopback interface only and trusts every connection from this computer, as a default
+  Homebrew install does, so it is not a boundary between people who share one computer.
+- **Backups.** `stop` takes one after the server stops, `backup` takes one on request, and
+  `upgrade` takes one before and one after. Each is a custom-format `pg_dump` with its SHA-256
+  (`.pgdump.sha256`, which `shasum -a 256 -c` reads) and a manifest (`.json`) holding every
+  table's row count and the applied migrations, read in the dump's own snapshot, and the
+  database's roles without their passwords. Nothing deletes a backup. They share a disk with the
+  database, so copy `backups/` elsewhere to survive the loss of that disk.
+- **Verify and restore.** `verify` checks the digest, restores the dump into a scratch server
+  under the system temporary directory, compares its row counts and migrations with the
+  manifest, and deletes the copy. `restore` does the same into an empty or absent directory and
+  leaves it running on the port the backed-up database served, or on `--port`.
+- **Upgrade.** `upgrade` refuses while another client is connected, so stop the API and the
+  workers first. It restarts the server on a private port, backs up, applies the pending
+  migrations and role provisioning to a scratch copy of that backup with the schema check the API
+  runs at boot, and migrates the real database only after that rehearsal passes. A failed
+  rehearsal leaves the database untouched. A migration that fails after a passing rehearsal
+  leaves the server stopped and names the backup to restore.
+
+A refusal prints `refused (<name>)` and exits 2; a step that was attempted and failed prints
+`failed (<name>)` and exits 1. The names are listed in
+[`refusals.py`](../exulanica/db/local/refusals.py). The photographs and other files a world
+cites are in the content-addressed store (`EXULANICA_DATA_DIR`), which this command does not back
+up.
+
 ### Running the API
 
 For a new, explicitly selected development database, first run `uv run exulanica-db` with
@@ -220,9 +273,10 @@ pending migrations and provisions runtime roles; it is not a read-only check. Us
 for migrations and role provisioning. Configure `EXULANICA_APP_ROLE_PASSWORD`,
 `EXULANICA_EXECUTOR_ROLE_PASSWORD` and `EXULANICA_PURGE_ROLE_PASSWORD` when password authentication
 is used, then switch to the non-owner runtime URL below. See [deployment](deployment.md) for the
-full configuration. Existing retained databases require a separately reviewed backup and
-activation path, not an implicit startup upgrade. That procedure is operator process and is not
-in this repository.
+full configuration. A database made by `exulanica-local-db` is upgraded only by its `upgrade`
+command. Other existing databases, such as a retained reference copy, need a separately reviewed
+backup and activation path rather than an implicit startup upgrade; that procedure is not in this
+repository.
 
 Three environment variables, and the API refuses to start without the first two rather than
 defaulting to something:

@@ -253,6 +253,29 @@ decide it, because arguments one and three stand regardless of the answer.
 | Fly.io, technically fine and cheap | Not Nebius. The project constraint is that the system runs on Nebius Token Factory or Nebius AI Cloud, and that constraint is not negotiable. Kept as an unused break-glass configuration only |
 | Cloudflare R2 as the asset origin | Free egress would save roughly $2 to $10 across the project. Rejected because keeping the origin on Nebius keeps the platform constraint literally true. An edge cache in front of the Nebius origin is compatible with this and is recommended |
 
+### 3.4 A personal install on one computer
+
+A person running Exulanica on their own computer runs the same PostgreSQL 18 with pgvector as a
+deployment, in a cluster that `exulanica-local-db` creates and keeps; the steps are in
+[development setup](development-setup.md#a-database-for-a-personal-install). The deployment's rules
+hold there too: the API connects as `exulanica_app` and refuses the owner, migrations run only on
+request and as the owner, and a backup is trusted once it has been restored. The command makes
+each of those a step it takes rather than a practice to remember:
+
+| Concern | Deployment | Personal install |
+| --- | --- | --- |
+| Where the data lives | A network-attached SSD volume (section 3.1) | A directory the person names; one inside a temporary directory or the test servers' directory is refused |
+| Backups | A nightly dump to object storage | A dump with its SHA-256 and a row-count manifest on every stop and before and after every upgrade, in `backups/` on the same disk until copied elsewhere |
+| Proving a backup | OPEN (section 9.4) | `verify` restores one into a scratch server and compares it with its manifest |
+| Upgrading | The one-shot migration service | `upgrade` backs up, rehearses the pending migrations on a scratch copy, migrates, and backs up again |
+| Restoring | From the nightly dump (section 9.3) | `restore`, only into an empty directory |
+
+The servers `scripts/test_postgres.py` starts, for the test suite and for `serve`, are test
+servers and are disposable: they run with `fsync` off in the system temporary directory, each
+worker's server is deleted when the worker exits, and `serve` migrates its server on every call
+without a backup. They refuse a data directory the local command made, and nothing that should be
+kept belongs on one.
+
 ---
 
 ## 4. Static assets and large derived files

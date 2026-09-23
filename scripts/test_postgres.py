@@ -33,6 +33,10 @@ commands, and the application connects as the non-owner runtime role, never as t
 The binaries are PostgreSQL 18, found the way ``tests/test_restore_replay.py`` finds them:
 ``EXULANICA_POSTGRES_BIN`` first, then the Homebrew and Debian locations, then ``PATH``. An
 older server is refused rather than used, because the schema needs ``uuidv7()``.
+
+Every server here is disposable, and ``serve``, ``Server.start`` and ``sweep`` refuse a data
+directory ``exulanica-local-db`` made (``refuse_local_database``). A personal install's database
+runs under that command instead, durable and backed up.
 """
 
 from __future__ import annotations
@@ -48,7 +52,6 @@ import shutil
 import socket
 import subprocess
 import sys
-import tempfile
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -84,9 +87,34 @@ def base_directory() -> Path:
     """Every server this module makes lives under here, so ``sweep`` can find all of them.
 
     The ``.noindex`` suffix keeps Spotlight out: a full parallel run creates and rewrites tens of
-    thousands of relation files, and indexing them would compete with the tests for CPU.
+    thousands of relation files, and indexing them would compete with the tests for CPU. The path
+    is defined in ``exulanica.db.local.locations``, because ``exulanica-local-db`` refuses to keep
+    a real database under it and the two must name the same directory.
     """
-    return Path(tempfile.gettempdir()) / "exulanica-test-postgres.noindex"
+    from exulanica.db.local.locations import base_for_test_servers
+
+    return base_for_test_servers()
+
+
+def is_local_database(server: Server) -> bool:
+    """Whether ``exulanica-local-db`` made this data directory: its marker travels with it."""
+    from exulanica.db.local.locations import LOCAL_DATABASE_MARKER
+
+    return (server.data / LOCAL_DATABASE_MARKER).exists()
+
+
+def refuse_local_database(server: Server) -> None:
+    """Refuse a data directory ``exulanica-local-db`` made, which holds somebody's world.
+
+    Everything this module does to a server is right for a disposable one and wrong for that one:
+    ``fsync`` off, a migration on every ``serve`` with no backup first, deletion by ``sweep``. The
+    marker lives inside the data directory, so a link or a copy placed here is refused too.
+    """
+    if is_local_database(server):
+        raise RuntimeError(
+            f"{server.data} is a local database made by exulanica-local-db, not a test server; "
+            "refusing to start or serve it here. Run it with exulanica-local-db."
+        )
 
 
 @functools.cache
@@ -206,6 +234,7 @@ class Server:
 
     def start(self, port: int | None = None) -> None:
         """Start on ``port``, or on a free one, retrying when another process takes it first."""
+        refuse_local_database(self)
         attempts = [port] if port else [None] * 5
         failure = ""
         for wanted in attempts:
@@ -356,6 +385,9 @@ def sweep() -> list[Path]:
         if _alive(owner):
             continue
         server = Server(root)
+        if is_local_database(server):
+            # Never deleted here, whatever its name: see refuse_local_database.
+            continue
         with contextlib.suppress(Exception):
             server.stop()
         shutil.rmtree(root, ignore_errors=True)
@@ -388,6 +420,7 @@ def serve(stream=sys.stdout) -> int:
     from exulanica.db.roles import RUNTIME_ROLE, assert_runtime_role
 
     server = lane_server()
+    refuse_local_database(server)
     if not server.data.is_dir():
         server.initialise()
     if not server.running():

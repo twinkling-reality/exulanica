@@ -141,6 +141,10 @@ exulanica-identity = "exulanica.identity.cli:main"
 # `uv run exulanica-db`. Brings a database up to the schema and the roles this code expects, in the
 # one correct order. A deployment runs it before the API starts.
 exulanica-db = "exulanica.db.cli:main"
+# `uv run exulanica-local-db init --directory <dir>`. A personal install's own PostgreSQL cluster:
+# durable, backed up on every stop, restored only into an empty directory, and upgraded only on
+# request, after a rehearsal on a scratch copy. Never in a temporary or test-server directory.
+exulanica-local-db = "exulanica.db.local.cli:main"
 # `uv run exulanica-eval run --corpus <dir> --workspace <uuid>`. Measures what can be measured and
 # says what stopped the rest. Read docs/evaluation-methodology.md section 3 before quoting it.
 exulanica-eval = "exulanica.evaluation.cli:main"
