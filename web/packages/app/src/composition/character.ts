@@ -14,8 +14,9 @@ import {
   type CharacterLook as PersonLook,
   type NativeCharacterRuntime,
 } from '@exulanica/atlas-react/playcanvas';
+import { readBrowserAccount } from '../account-session.js';
 import { characterByteLoader, parseCharacterLooks, workspaceCharacterLoader, type CharacterLook, type CharacterSelection } from '../character-catalog.js';
-import { PreviewLookStore, StaleLookError, type LookStore, type SavedChoice, type SavedLooks } from '../character-looks-store.js';
+import { PreviewLookStore, StaleLookError, WorkspaceLookStore, worldLookTarget, type LookStore, type SavedChoice, type SavedLooks } from '../character-looks-store.js';
 import { buildCharacterStudio, type PeopleChoice } from '../ui/character-studio.js';
 import { el } from '../ui/dom.js';
 import type { AppEnvironment, SessionState } from './session-state.js';
@@ -51,9 +52,11 @@ export function defaultLookChoice(current: SavedChoice | null): SavedChoice {
 export function mountCharacter(deps: { env: AppEnvironment; state: SessionState; onClose(): void }) {
   const { env, state } = deps;
   const lifetime = new AbortController();
-  // Saved looks. The preview keeps them in this browser; a signed-in world has no look store here
-  // yet and keeps the designed default.
-  const lookStore: LookStore | null = env.preview ? new PreviewLookStore(defaultLookChoice) : null;
+  // Saved looks. The preview keeps them in this browser. A saved or starter world keeps them in the
+  // authenticated history of its version when the session belongs to an account; anywhere else they
+  // last for the visit, and the studio says which (see `followWorld`).
+  let lookStore: LookStore = env.preview ? new PreviewLookStore(defaultLookChoice) : new PreviewLookStore(defaultLookChoice, null);
+  let lookStoreNote = env.preview ? 'Saved in this browser for this preview.' : 'Kept for this visit.';
   let saved: SavedLooks = { revision: 0, current: null };
   let disposed = false;
   let opened = false;
@@ -68,10 +71,14 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
   const previewFiles = new Map<string, string>();
   let previewLoader: CharacterByteLoader | null = null;
   let crowd: CharacterCrowdEvaluation | null = null;
-  const loadCharacterBytes: CharacterByteLoader = (reference, signal) =>
-    previewLoader !== null && previewFiles.has(reference.contentSha256)
-      ? previewLoader(reference, signal)
-      : characterByteLoader([...generatedLooks.values()])(reference, signal);
+  // A signed-in world fetches every catalog container as a reviewed asset of the session's own API.
+  const loadCharacterBytes: CharacterByteLoader = (reference, signal) => {
+    if (previewLoader !== null && previewFiles.has(reference.contentSha256)) return previewLoader(reference, signal);
+    const generated = [...generatedLooks.values()];
+    const isGenerated = generated.some(item => item.generated && item.descriptor.asset.contentSha256 === reference.contentSha256);
+    if (!isGenerated && !env.preview && state.credentials) return workspaceCharacterLoader(state.credentials)(reference, signal);
+    return characterByteLoader(generated)(reference, signal);
+  };
   let catalogPromise: Promise<readonly CharacterLook[]> | null = null;
   let preview: CharacterPreview | null = null;
   let previewPromise: Promise<CharacterPreview> | null = null;
@@ -245,7 +252,7 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
     const revision = ++previewRevision;
     try {
       view.setPeopleStatus('Loading this person…', false);
-      await ensurePreviewSources();
+      if (env.preview) await ensurePreviewSources();
       const renderer = await ensurePreview();
       if (revision !== previewRevision || disposed) return;
       await renderer.showLook(look);
@@ -270,17 +277,45 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
     if (binding) CharacterChoices.forApp(binding.app).set(PLAYER, choice.kind === 'catalog' ? { kind: 'catalog', look: choice.look } : { kind: 'abstract' });
   }
   async function reflectSaved(): Promise<void> {
-    if (!lookStore) return;
     view.setHistory(await lookStore.history());
   }
+  let actorPromise: Promise<string | null> | null = null;
+  /** The account the session belongs to, or null for a session opened without one. */
+  function accountActor(): Promise<string | null> {
+    actorPromise ??= readBrowserAccount().then(
+      account => (account.kind === 'authenticated' ? account.session.actor : null),
+      () => null,
+    );
+    return actorPromise;
+  }
+  /**
+   * Saved looks follow the world open now: a saved or starter world keeps them with its version,
+   * as the signed-in account's avatar. The owned district holds no version the client can name,
+   * and a session opened with an operator token names no account, so there they last for the visit.
+   */
+  async function followWorld(): Promise<void> {
+    if (env.preview || !state.credentials) return;
+    const entry = state.activeWorldEntry;
+    const where = worldLookTarget(entry, entry ? await accountActor() : null);
+    if (where.target) {
+      lookStore = new WorkspaceLookStore(state.credentials, where.target);
+      lookStoreNote = 'Saved to this world.';
+    } else {
+      lookStore = new PreviewLookStore(defaultLookChoice, null);
+      lookStoreNote = where.missing === 'account'
+        ? 'Kept for this visit: saving looks to this world needs an account sign-in.'
+        : 'Kept for this visit: this place has no saved version to keep looks with.';
+    }
+    saved = { revision: 0, current: null };
+  }
   async function applyChoice(choice: PeopleChoice): Promise<void> {
-    if (applying || disposed || !lookStore) return;
+    if (applying || disposed) return;
     applying = true;
     view.setPeopleStatus('Applying your look…', false);
     try {
       await wear(choice);
       if (disposed) return;
-      saved = await lookStore.save(choice, saved.revision);
+      if (lookStore.keeps(choice)) saved = await lookStore.save(choice, saved.revision);
       await reflectSaved();
       binding?.setCameraMode('third-person');
       binding?.setCameraFraming(2.4);
@@ -296,7 +331,7 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
     } finally { applying = false; }
   }
   async function resetLook(restoreRevision?: number): Promise<void> {
-    if (applying || disposed || !lookStore) return;
+    if (applying || disposed) return;
     try {
       saved = await lookStore.reset(saved.revision, restoreRevision);
       const choice = saved.current!.choice;
@@ -318,25 +353,24 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
   }
   async function open(): Promise<void> {
     try {
-      await ensureCatalog();
-      if (!opened || disposed) return;
-      const selection = state.characterSelection ?? { lookId: catalog[0]!.lookId, appearance: {} };
-      const retained = generatedLooks.get(selection.lookId);
-      if (retained && !catalog.some(item => item.lookId === retained.lookId)) catalog = [...catalog.filter(item => !item.familyId), retained];
-      view.setCatalog(catalog, selection);
-      if (lookStore) {
-        saved = await lookStore.read();
+      if (env.preview) {
+        // Premade examples and the generated body builder exist only on the development preview.
+        await ensureCatalog();
         if (!opened || disposed) return;
-        const choice = peopleChoice();
-        view.setPeople(CHARACTER_CATALOG, DESIGNED_LOOKS, choice);
-        view.setSaveNote('Saved in this browser for this preview.');
-        await reflectSaved();
-        if (choice.kind === 'catalog') await showPerson(choice.look);
-        else if (choice.kind === 'stylized') await showSelection(choice.selection);
-        else view.setPeopleStatus('You are wearing the abstract figure.', true);
-        return;
+        const selection = state.characterSelection ?? { lookId: catalog[0]!.lookId, appearance: {} };
+        const retained = generatedLooks.get(selection.lookId);
+        if (retained && !catalog.some(item => item.lookId === retained.lookId)) catalog = [...catalog.filter(item => !item.familyId), retained];
+        view.setCatalog(catalog, selection);
       }
-      await showSelection(selection);
+      saved = await lookStore.read();
+      if (!opened || disposed) return;
+      const choice = peopleChoice();
+      view.setPeople(CHARACTER_CATALOG, DESIGNED_LOOKS, choice);
+      view.setSaveNote(lookStoreNote);
+      await reflectSaved();
+      if (choice.kind === 'catalog') await showPerson(choice.look);
+      else if (choice.kind === 'stylized') await showSelection(choice.selection);
+      else view.setPeopleStatus('You are wearing the abstract figure.', true);
     } catch (error) {
       if (!disposed) view.setFailure(error instanceof Error ? error.message : 'Character looks are unavailable.');
     }
@@ -396,8 +430,17 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
       crowd = null;
       binding = atlas;
       if (!env.preview) {
-        // A signed-in world draws the same catalog people from its reviewed assets.
+        // A signed-in world draws the same catalog people from its reviewed assets, and the player
+        // wears what this world keeps for them.
         if (state.credentials) native = atlas.enableNativeCharacters(workspaceCharacterLoader(state.credentials));
+        try {
+          await followWorld();
+          saved = await lookStore.read();
+          if (disposed || binding !== atlas || !saved.current) return;
+          await wear(saved.current.choice);
+        } catch (error) {
+          if (!disposed) view.setPeopleStatus(error instanceof Error ? error.message : 'Your saved look could not be read.', true);
+        }
         return;
       }
       try {
@@ -411,7 +454,7 @@ export function mountCharacter(deps: { env: AppEnvironment; state: SessionState;
         // Ensure the existing player presentation exists without changing the active camera. It
         // wears the catalog's designed default until the person chooses otherwise.
         atlas.setCameraMode(atlas.cameraMode);
-        saved = lookStore ? await lookStore.read() : saved;
+        saved = await lookStore.read();
         if (disposed || !saved.current) return;
         await wear(saved.current.choice);
       } catch (error) {

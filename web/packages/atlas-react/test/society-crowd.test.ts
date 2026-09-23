@@ -3,6 +3,10 @@ import { describe, expect, it, vi } from 'vitest';
 import * as pc from 'playcanvas';
 import { SocietyCrowd, type PoseInterval } from '../src/playcanvas/society/crowd.js';
 import { CharacterHost } from '../src/playcanvas/character/host.js';
+import { NEAR_CHARACTER_BUDGET, NEAR_INHABITANT_BUDGET, PLAYER_NEAR_PLACES } from '../src/playcanvas/character/budget.js';
+import { CHARACTER_CATALOG } from '../src/playcanvas/character/catalog-data.js';
+import { FAR_REGIONS, farAppearance } from '../src/playcanvas/character/far.js';
+import { inhabitantLookOf } from '../src/playcanvas/character/inhabitant.js';
 import { abstractInhabitantRenderable } from '../src/playcanvas/society/near-character.js';
 import type {
   CrowdPose,
@@ -117,12 +121,14 @@ function cadenceScenario(poseInterval?: PoseInterval) {
   }));
   crowd.set(v4(0, people(0)), [0, 0], { nowMs: 0, intervalMs: 60_000 });
   crowd.set(v4(1, people(1)), [0, 0], { nowMs: 0, intervalMs: 60_000 });
-  const near = Array.from({ length: 24 }, (_, i) => `p${String(i).padStart(3, '0')}`);
+  const near = Array.from({ length: Math.min(30, NEAR_INHABITANT_BUDGET) }, (_, i) => `p${String(i).padStart(3, '0')}`);
   expect(crowd.drawnIds.slice(0, crowd.counts.near)).toEqual(near);
   const total = () => near.reduce((sum, id) => sum + poses.get(id)!.length, 0);
   const run = (from: number, frames: number) => {
-    const posesBefore = new Map(near.map((id) => [id, poses.get(id)!.length]));
-    const followsBefore = new Map(near.map((id) => [id, follows.get(id)!]));
+    // Everyone ever drawn in full, so a person who becomes near during a window is counted too.
+    const known = () => [...poses.keys()];
+    const posesBefore = new Map(known().map((id) => [id, poses.get(id)!.length]));
+    const followsBefore = new Map(known().map((id) => [id, follows.get(id)!]));
     const perFrame: number[] = [];
     for (let frame = 1; frame <= frames; frame += 1) {
       const held = total();
@@ -136,8 +142,8 @@ function cadenceScenario(poseInterval?: PoseInterval) {
     }
     return {
       perFrame,
-      poses: new Map(near.map((id) => [id, poses.get(id)!.slice(posesBefore.get(id)!)])),
-      follows: new Map(near.map((id) => [id, follows.get(id)! - followsBefore.get(id)!])),
+      poses: new Map(known().map((id) => [id, poses.get(id)!.slice(posesBefore.get(id) ?? 0)])),
+      follows: new Map(known().map((id) => [id, follows.get(id)! - (followsBefore.get(id) ?? 0)])),
     };
   };
   return { crowd, app, poses, follows, near, people, run };
@@ -198,13 +204,13 @@ describe('society crowd', () => {
     }));
     const counts = crowd.set(v4(0, people), [0, 0]);
     expect(counts.population).toBe(500);
-    expect(counts.near).toBe(24);
-    expect(counts.far).toBe(500 - 24 - people.filter((p) => p.position_mm[0] > 700_000).length);
+    expect(counts.near).toBe(NEAR_INHABITANT_BUDGET);
+    expect(counts.far).toBe(500 - NEAR_INHABITANT_BUDGET - people.filter((p) => p.position_mm[0] > 700_000).length);
     expect(counts.drawn).toBe(counts.near + counts.far);
-    expect(crowd.nativeFrames(1 / 60, false)).toHaveLength(24);
+    expect(crowd.nativeFrames(1 / 60, false)).toHaveLength(NEAR_INHABITANT_BUDGET);
     crowd.select('p450');
     expect(crowd.detailOf('p450')).toBe('near');
-    expect(crowd.counts.near).toBe(24);
+    expect(crowd.counts.near).toBe(NEAR_INHABITANT_BUDGET);
     crowd.destroy();
     app.destroy();
   });
@@ -237,8 +243,11 @@ describe('society crowd', () => {
       // Each pose after the first carries the whole time since the one before it.
       for (const pose of window.poses.get(id)!.slice(1)) expect(pose.deltaSeconds).toBeCloseTo(1 / expected, 9);
     });
-    // Staggered, so no frame carries more than its share: 4 + 8 / 2 + 12 / 3.
-    expect(new Set(window.perFrame)).toEqual(new Set([12]));
+    // Staggered: over the window every rank is posed its share, and no frame carries more than
+    // one pose above any other.
+    const share = near.reduce((sum, _id, rank) => sum + 60 / (rank < 4 ? 1 : rank < 12 ? 2 : 3), 0);
+    expect(window.perFrame.reduce((a, b) => a + b, 0)).toBe(share);
+    expect(Math.max(...window.perFrame) - Math.min(...window.perFrame)).toBeLessThanOrEqual(1);
     // Ranks follow the observer: p023 is now nearest and p011 is 12 m away, rank 18.
     crowd.refresh([23, 0]);
     const moved = run(60, 60);
@@ -297,29 +306,35 @@ describe('society crowd', () => {
       synthetic: true as const,
       position_mm: [i * 1000, 0] as const,
     }));
+    // A 5x1 RGBA palette per distinct far colouring.
+    const palettes = (ids: readonly string[]) => new Set(ids.map((id) => {
+      const palette = farAppearance(CHARACTER_CATALOG, inhabitantLookOf(id)).palette;
+      return FAR_REGIONS.map((region) => palette[region]).join('');
+    })).size * FAR_REGIONS.length * 4;
     const shared = vi.spyOn(CharacterHost, 'residentFor');
     shared.mockReturnValue({ geometryBytes: 0, textureBytes: 0 });
 
-    // Nobody drawn in full: far figures cost geometry and no character textures at all.
+    // Nobody drawn in full: far figures cost their shared sculpt and a 5x1 palette each.
     const far = setup(fakeFactory([]), 0);
     far.crowd.set(v4(0, people), [0, 0]);
     expect(far.crowd.residentBytes).toBeGreaterThan(0);
-    expect(far.crowd.textureResidentBytes).toBe(0);
+    expect(far.crowd.textureResidentBytes).toBe(palettes(people.map((person) => person.id)));
 
     // Four drawn in full by renderables that own their geometry: each one's bytes are added.
     const owning = setup(fakeFactory([]), 4);
     expect(owning.crowd.set(v4(0, people), [0, 0])).toMatchObject({ near: 4, far: 2 });
-    expect(owning.crowd.textureResidentBytes).toBe(4 * 1);
     // Whatever the two far figures cost, read while the shared host holds nothing.
     const figures = owning.crowd.residentBytes - 4 * 10;
+    const figureTextures = owning.crowd.textureResidentBytes - 4 * 1;
     expect(figures).toBeGreaterThan(0);
+    expect(figureTextures).toBe(palettes(owning.crowd.drawnIds.slice(4)));
 
     // The same four drawn from shared containers: they report nothing of their own, so the crowd
     // adds what the shared host holds, once for the whole crowd rather than once for each person.
     shared.mockReturnValue({ geometryBytes: 4096, textureBytes: 2048 });
     const fromHost = setup(sharedContainerFactory(), 4);
     expect(fromHost.crowd.set(v4(0, people), [0, 0])).toMatchObject({ near: 4, far: 2 });
-    expect(fromHost.crowd.textureResidentBytes).toBe(2048);
+    expect(fromHost.crowd.textureResidentBytes).toBe(figureTextures + 2048);
 
     // Same population and the same split, so the far figures cost the same in both: what is left
     // over is exactly what each kind reports, and neither kind reports the other's bytes.
@@ -330,7 +345,7 @@ describe('society crowd', () => {
     for (const { crowd, app } of [far, owning, fromHost]) { crowd.destroy(); app.destroy(); }
   });
 
-  it('draws far figures with one instanced draw per palette', () => {
+  it('draws everyone beyond the full places in the far form of their own look', () => {
     const { crowd, app, root } = setup(undefined, 0);
     const people = Array.from({ length: 64 }, (_, i) => ({
       id: `synthetic-${i}`,
@@ -339,15 +354,144 @@ describe('society crowd', () => {
     }));
     const counts = crowd.set(v4(0, people), [0, 0]);
     expect(counts).toMatchObject({ near: 0, far: 64 });
-    const groups = root.findByName('society-far-figures')!.children as pc.Entity[];
-    expect(groups.length).toBeGreaterThan(0);
-    expect(groups.length).toBeLessThanOrEqual(4);
-    const instances = groups.flatMap((g) => g.render!.meshInstances);
-    expect(instances.reduce((sum, mi) => sum + mi.instancingCount, 0)).toBe(64);
+    const figures = root.findByName('society-far-figures')!.children as pc.Entity[];
+    expect(figures).toHaveLength(64);
+    for (const [i, figure] of figures.entries()) {
+      const id = `synthetic-${i}`;
+      const expected = farAppearance(CHARACTER_CATALOG, inhabitantLookOf(id));
+      expect(crowd.farAppearance(id)).toEqual(expected);
+      // Each figure is drawn by its own palette material and stands where the person stands.
+      const body = figure.findByName('character-far-body') as pc.Entity;
+      expect(body.render!.meshInstances[0]!.material.name).toBe(`far-person:${FAR_REGIONS.map((region) => expected.palette[region]).join('')}`);
+      expect(figure.getLocalPosition().x).toBeCloseTo(i * 3, 6);
+    }
     expect(crowd.residentBytes).toBeGreaterThan(0);
     crowd.clear();
     expect(crowd.counts).toEqual({ population: 0, outdoors: 0, indoors: 0, near: 0, far: 0, drawn: 0 });
-    expect(instances.reduce((sum, mi) => sum + mi.instancingCount, 0)).toBe(0);
+    expect(root.findByName('society-far-figures')!.children).toHaveLength(0);
+    crowd.destroy();
+    app.destroy();
+  });
+
+  it('keeps the player a place in the budget and gives the inhabitants the rest', () => {
+    expect(NEAR_INHABITANT_BUDGET + PLAYER_NEAR_PLACES).toBe(NEAR_CHARACTER_BUDGET);
+    const { crowd, app } = setup(fakeFactory([]), NEAR_CHARACTER_BUDGET + 10);
+    const people = Array.from({ length: NEAR_CHARACTER_BUDGET + 10 }, (_, i) => ({
+      id: `p${String(i).padStart(3, '0')}`,
+      synthetic: true as const,
+      position_mm: [i * 500, 0] as const,
+    }));
+    expect(crowd.set(v4(0, people), [0, 0]).near).toBe(NEAR_INHABITANT_BUDGET);
+    crowd.destroy();
+    app.destroy();
+  });
+
+  it('hands a person the activity their state names once they have walked there, never one read from motion', () => {
+    const log: Parameters<typeof fakeFactory>[0] = [];
+    const { crowd, app } = setup(fakeFactory(log));
+    const person = (id: string, tick: number, action?: { kind: string; status: 'active' | 'completed' | 'blocked' }) => ({
+      id,
+      synthetic: true as const,
+      position_mm: [tick ? 6000 : 0, 0] as const,
+      motion_path_mm: tick ? [[0, 0], [6000, 0]] as const : [[0, 0]] as const,
+      walk_speed_mm_per_tick: 60_000,
+      ...(action ? { action: { ...action, reason: 'test' } } : {}),
+    });
+    crowd.set(v4(0, [person('rests', 0), person('walks', 0), person('done', 0)]), [0, 0], { nowMs: 0, intervalMs: 60_000 });
+    crowd.set(v4(1, [
+      person('rests', 1, { kind: 'rest', status: 'active' }),
+      person('walks', 1),
+      person('done', 1, { kind: 'rest', status: 'completed' }),
+    ]), [0, 0], { nowMs: 0, intervalMs: 60_000 });
+    const last = (id: string) => (log.find((entry) => (entry.identity as { inhabitantId: string }).inhabitantId === id)!.poses.at(-1) as { activity?: string | null });
+    // On the way there the state already says "rest"; the person is drawn walking until they arrive.
+    crowd.update(3_000);
+    expect(crowd.positionOf('rests')![0]).toBeCloseTo(3, 6);
+    expect(last('rests').activity).toBeNull();
+    expect(crowd.activityOf('rests')).toBeNull();
+    crowd.update(7_000);
+    expect(crowd.positionOf('rests')).toEqual([6, 0]);
+    expect(last('rests').activity).toBe('rest');
+    expect(crowd.activityOf('rests')).toBe('rest');
+    // Arriving and standing still is not resting unless the state says so, and a finished rest is over.
+    expect(crowd.positionOf('walks')).toEqual([6, 0]);
+    expect(last('walks').activity).toBeNull();
+    expect(last('done').activity).toBeNull();
+    crowd.destroy();
+    app.destroy();
+  });
+});
+
+describe('facing', () => {
+  it('turns a person the way their recorded travel went in both forms, and keeps turning once they stop', () => {
+    const east = (tick: number) => ({
+      id: 'east', synthetic: true as const,
+      position_mm: [tick ? 800 : 0, 0] as const,
+      motion_path_mm: tick ? [[0, 0], [800, 0]] as const : [[0, 0]] as const,
+    });
+    // Heading +X is a quarter turn clockwise seen from above: -90 degrees about +Y, -Z forward.
+    const expected = -90;
+    for (const nearLimit of [1, 0]) {
+      // The catalog person, as the crowd draws by default; with no loader it shows its far form.
+      const { crowd, app, root } = setup(undefined, nearLimit);
+      crowd.set(v4(0, [east(0)]), [0, 0], { nowMs: 0, intervalMs: 1 });
+      crowd.set(v4(1, [east(1)]), [0, 0], { nowMs: 0, intervalMs: 1 });
+      // The whole step is walked in one frame, then the person stands there.
+      for (let frame = 0; frame < 120; frame += 1) crowd.update(16 * (frame + 1));
+      expect(crowd.positionOf('east')).toEqual([0.8, 0]);
+      const drawn = nearLimit
+        ? root.findByName('synthetic:east')!
+        : root.findByName('society-far-figures')!.children[0]!;
+      expect(drawn.getLocalEulerAngles().y, `near limit ${nearLimit}`).toBeCloseTo(expected, 3);
+      crowd.destroy();
+      app.destroy();
+    }
+  });
+});
+
+describe('recorded paths', () => {
+  it('are walked wherever the snapshot records them, whatever profile names it', () => {
+    const { crowd, app } = setup(fakeFactory([]));
+    const at = (tick: number, x: number, withPath: boolean) => ({
+      profile: 'exulanica-society/v3', society_id: 'society', branch_id: 'branch', tick,
+      inhabitants: [{
+        id: 'walker', synthetic: true as const, position_mm: [x, 0] as const,
+        ...(withPath ? { motion_path_mm: [[0, 0], [x, 0]] as const } : {}),
+      }],
+    }) as unknown as OwnedSocietyState;
+    crowd.set(at(0, 0, true), [0, 0], { nowMs: 0, intervalMs: 1000 });
+    crowd.set(at(1, 8000, true), [0, 0], { nowMs: 0, intervalMs: 1000 });
+    crowd.update(500);
+    const midway = crowd.positionOf('walker')![0];
+    expect(midway).toBeGreaterThan(0);
+    expect(midway).toBeLessThan(8);
+    // A snapshot that records no path shows each person at their recorded point at once.
+    crowd.set(at(2, 16_000, false), [0, 0], { nowMs: 0, intervalMs: 1000 });
+    expect(crowd.positionOf('walker')).toEqual([16, 0]);
+    crowd.destroy();
+    app.destroy();
+  });
+});
+
+describe('a resting person beyond the full places', () => {
+  it('is drawn in the far form of the posture their state names, once they have arrived', () => {
+    const { crowd, app, root } = setup(fakeFactory([]), 0);
+    const person = (tick: number) => ({
+      id: 'resting', synthetic: true as const,
+      position_mm: [tick ? 6000 : 0, 0] as const,
+      motion_path_mm: tick ? [[0, 0], [6000, 0]] as const : [[0, 0]] as const,
+      walk_speed_mm_per_tick: 60_000,
+      ...(tick ? { action: { kind: 'rest', status: 'active' as const, reason: 'arrived_at_access_node' } } : {}),
+    });
+    crowd.set(v4(0, [person(0)]), [0, 0], { nowMs: 0, intervalMs: 60_000 });
+    crowd.set(v4(1, [person(1)]), [0, 0], { nowMs: 0, intervalMs: 60_000 });
+    const height = () => ((root.findByName('society-far-figures')!.children[0] as pc.Entity)
+      .findByName('character-far-body') as pc.Entity).render!.meshInstances[0]!.mesh.aabb.getMax().y;
+    crowd.update(3_000);
+    const walking = height();
+    crowd.update(7_000);
+    expect(crowd.activityOf('resting')).toBe('rest');
+    expect(height()).toBeLessThan(walking * 0.65);
     crowd.destroy();
     app.destroy();
   });

@@ -31,6 +31,11 @@ export interface CrowdEvaluationOptions {
   readonly nearBudget: number;
   /** Walking lanes, each walked by one person at one of the evaluation speeds. */
   readonly walkers?: number;
+  /**
+   * People among those standing who are shown doing an activity, as a society states one, so the
+   * posture the catalog draws for it can be looked at: the first `count` standing figures.
+   */
+  readonly performing?: { readonly count: number; readonly activity: string };
 }
 
 /** Slow walk, walk, brisk walk and run, metres per second. */
@@ -41,6 +46,7 @@ const SOCIETY = 'character-evaluation';
 
 interface Figure {
   readonly renderable: CharacterRenderable;
+  readonly activity: string | null;
   readonly home: readonly [number, number];
   readonly lane: { readonly from: readonly [number, number]; readonly to: readonly [number, number]; readonly speed: number; readonly phase: number } | null;
 }
@@ -87,6 +93,7 @@ export class CharacterCrowdEvaluation {
         const half = LANE_METRES / 2;
         this.figures.push({
           renderable,
+          activity: null,
           home: centre,
           lane: {
             from: [centre[0] - across[0] * half, centre[1] - across[1] * half],
@@ -102,6 +109,7 @@ export class CharacterCrowdEvaluation {
         const stagger = row % 2 === 0 ? 0 : 0.6;
         this.figures.push({
           renderable,
+          activity: index < (options.performing?.count ?? 0) ? options.performing!.activity : null,
           home: [s.x + forward[0] * ahead + across[0] * (column * 1.25 + stagger), s.z + forward[1] * ahead + across[1] * (column * 1.25 + stagger)],
           lane: null,
         });
@@ -153,7 +161,7 @@ export class CharacterCrowdEvaluation {
     for (const { figure, x, z, yaw } of placed) {
       const detail: CharacterDetail = near.has(figure) ? 'near' : 'far';
       if (figure.renderable.detail !== detail) figure.renderable.setDetail(detail);
-      figure.renderable.pose({ position: [x, this.ground(x, z), z], yaw, deltaSeconds: dt, discontinuity });
+      figure.renderable.pose({ position: [x, this.ground(x, z), z], yaw, deltaSeconds: dt, discontinuity, activity: figure.activity });
     }
   }
 

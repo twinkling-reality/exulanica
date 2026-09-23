@@ -1,10 +1,12 @@
 /**
  * Controls for a catalog look, built from the catalog itself.
  *
- * Every control is a declared slot, material, colour or parameter of the family: adding a
- * hairstyle or a garment to the catalog adds a button here and never a code path. A change always
- * yields a whole, valid look over one body. Choosing the other body keeps every choice that body
- * also offers and takes that body's designed default for the rest.
+ * Every control is a declared slot, material, colour or parameter of the family, placed on the
+ * studio step, in the order and with the words the catalog gives it: adding a hairstyle, a garment,
+ * a slot or a parameter to the catalog adds a control here and never a code path. A slot the body
+ * offers one choice for is not offered as a choice. A change always yields a whole, valid look over
+ * one body. Choosing the other body keeps every choice that body also offers and takes that body's
+ * designed default for the rest.
  */
 import type { CharacterCatalog, CharacterLook, DesignedLooks } from '@exulanica/atlas-react/playcanvas';
 import { checkedLook, designedLook, lookOverBase, sameLook } from '../character-look.js';
@@ -86,35 +88,83 @@ export function buildLookEditor(catalog: CharacterCatalog, looks: DesignedLooks,
     }
   }
 
+  type Offered =
+    | { readonly kind: 'slot'; readonly key: string; readonly shown: Family['slots'][number] }
+    | { readonly kind: 'parameter'; readonly key: string; readonly shown: Family['parameters'][number] };
+
+  /** Every slot and parameter the family declares, in the section and order it declares them. */
+  function offered(section: string): Offered[] {
+    const all: Offered[] = [
+      ...family.slots.map((shown) => ({ kind: 'slot' as const, key: shown.slot, shown })),
+      ...family.parameters.map((shown) => ({ kind: 'parameter' as const, key: shown.key, shown })),
+    ];
+    return all
+      .filter((entry) => entry.shown.section === section)
+      .sort((a, b) => a.shown.order - b.shown.order || (a.key < b.key ? -1 : 1));
+  }
+
+  function parameterControl(parameter: Family['parameters'][number]): HTMLElement {
+    const bounds = parameter.unit === 'mm' ? base().heightMillimetres : parameter;
+    const wording = parameter.wording;
+    const format = (value: number): string => {
+      if (parameter.unit === 'mm') return `${Math.round(value / 10)} cm`;
+      if (wording) return value === 0 ? wording.neutral : value > 0 ? wording.positive : wording.negative;
+      return String(value);
+    };
+    return slider(parameter.label, parameter.key, bounds.min, bounds.max, parameter.step ?? 1, look.parameters[parameter.key]!, format);
+  }
+
+  /** A slot's control, or null when the current body offers only one choice for it. */
+  function slotControl(slot: Family['slots'][number]): HTMLElement | null {
+    const swatch = slot.display === 'swatch';
+    switch (slot.kind) {
+      case 'part': {
+        const buttons = partButtons(slot.slot);
+        return buttons.length > 1 ? group(slot.label, slot.slot, buttons) : null;
+      }
+      case 'material': {
+        const ids = base().materials[slot.slot] ?? [];
+        if (ids.length < 2) return null;
+        return group(slot.label, slot.slot, ids.map((id) => {
+          const material = family.materials.find((candidate) => candidate.materialId === id)!;
+          return choice(materialLabel(id), look.materials[slot.slot] === id,
+            () => change({ ...look, materials: { ...look.materials, [slot.slot]: id } }), swatch ? material.averageColour : undefined);
+        }));
+      }
+      case 'colour': {
+        const colours = family.colours[slot.slot] ?? [];
+        if (colours.length < 2) return null;
+        return group(slot.label, slot.slot, colours.map((colour) =>
+          choice(colour.label, look.colours[slot.slot] === colour.key,
+            () => change({ ...look, colours: { ...look.colours, [slot.slot]: colour.key } }), swatch ? colour.rgb : undefined)));
+      }
+      default: {
+        const unknown: never = slot.kind;
+        throw new TypeError(`The studio has no control for a ${String(unknown)} slot`);
+      }
+    }
+  }
+
+  function controls(section: string): HTMLElement[] {
+    return offered(section).flatMap((entry) => {
+      const node = entry.kind === 'parameter' ? parameterControl(entry.shown) : slotControl(entry.shown);
+      return node ? [node] : [];
+    });
+  }
+
   function renderSections(): void {
-    const current = base();
-    const shape = (key: string) => family.parameters.find((parameter) => parameter.key === key)!;
     replace(sections.body, [
       group('Start from', 'designed', looks.looks.map((entry) => choice(entry.label, sameLook(entry.look, look), () => change(entry.look)))),
       group('Body', 'base', family.bases.map((candidate) => choice(candidate.label, candidate.baseId === look.baseId, () => change(lookOverBase(catalog, looks, look, candidate.baseId))))),
-      slider('Height', 'heightMillimetres', current.heightMillimetres.min, current.heightMillimetres.max, 10, look.parameters['heightMillimetres']!, (value) => `${Math.round(value / 10)} cm`),
-      slider(shape('fullness').label, 'fullness', shape('fullness').min, shape('fullness').max, 50, look.parameters['fullness']!, (value) => (value === 0 ? 'Average' : value > 0 ? 'Fuller' : 'Slimmer')),
-      slider(shape('muscle').label, 'muscle', shape('muscle').min, shape('muscle').max, 50, look.parameters['muscle']!, (value) => (value === 0 ? 'Average' : value > 0 ? 'More defined' : 'Softer')),
-      group('Skin', 'skin', (current.materials['skin'] ?? []).map((id, index) => {
-        const material = family.materials.find((candidate) => candidate.materialId === id)!;
-        return choice(`Skin tone ${index + 1}`, look.materials['skin'] === id, () => change({ ...look, materials: { ...look.materials, skin: id } }), material.averageColour);
-      })),
+      ...controls('body'),
       el('p', { class: 'character-session-note', text: 'Body shape and height are choices for a fictional person, not measurements of anyone.' }),
     ]);
     replace(sections.face, [
-      group('Eye colour', 'eyeColour', (current.materials['eyeColour'] ?? []).map((id) =>
-        choice(materialLabel(id), look.materials['eyeColour'] === id, () => change({ ...look, materials: { ...look.materials, eyeColour: id } })))),
-      group('Brows', 'brows', partButtons('brows')),
+      ...controls('face'),
       el('div', { class: 'character-likeness-note' }, [el('h3', { text: 'From a photo or camera' }),
         el('p', { text: 'Not available yet. This preview cannot scan your face or fit your likeness from an image.' })]),
     ]);
-    replace(sections.style, [
-      group('Hair', 'hair', partButtons('hair')),
-      group('Hair colour', 'hairColour', (family.colours['hairColour'] ?? []).map((colour) =>
-        choice(colour.label, look.colours['hairColour'] === colour.key, () => change({ ...look, colours: { ...look.colours, hairColour: colour.key } }), colour.rgb))),
-      group('Clothing', 'outfit', partButtons('outfit')),
-      group('Shoes', 'shoes', partButtons('shoes')),
-    ]);
+    replace(sections.style, controls('style'));
   }
 
   render();

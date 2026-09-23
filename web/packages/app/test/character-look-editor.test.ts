@@ -26,6 +26,43 @@ describe('catalog look editor', () => {
     expect(document.body.textContent).toContain('cannot scan your face');
   });
 
+  it('places every control on the step, in the order and with the words the catalog declares', () => {
+    const { editor } = setup();
+    const family = CHARACTER_CATALOG.families[0]!;
+    const base = family.bases.find((candidate) => candidate.baseId === editor.look.baseId)!;
+    const choices = (slot: string) => {
+      const declared = family.slots.find((candidate) => candidate.slot === slot)!;
+      if (declared.kind === 'part') return base.parts.filter((part) => part.slot === slot).length + (declared.optional ? 1 : 0);
+      if (declared.kind === 'material') return base.materials[slot]!.length;
+      return family.colours[slot]!.length;
+    };
+    for (const section of ['body', 'face', 'style'] as const) {
+      const expected = [
+        ...family.slots.filter((slot) => slot.section === section && choices(slot.slot) > 1).map((slot) => ({ key: slot.slot, order: slot.order })),
+        ...family.parameters.filter((parameter) => parameter.section === section).map((parameter) => ({ key: parameter.key, order: parameter.order })),
+      ].sort((a, b) => a.order - b.order).map((entry) => entry.key);
+      const shown = [...editor.sections[section].querySelectorAll<HTMLElement>('[data-control], [data-parameter]')]
+        .map((node) => node.dataset['control'] ?? node.dataset['parameter']!)
+        .filter((key) => key !== 'designed' && key !== 'base');
+      expect(shown, section).toEqual(expected);
+    }
+    // A body offers one pair of eyes and one set of lashes: neither is a choice.
+    expect(document.querySelector('[data-control="eyes"]')).toBeNull();
+    expect(document.querySelector('[data-control="lashes"]')).toBeNull();
+    const fullness = family.parameters.find((parameter) => parameter.key === 'fullness')!;
+    expect(document.querySelector('[data-parameter="fullness"]')!.closest('label')!.querySelector('output')!.textContent).toBe(fullness.wording!.neutral);
+  });
+
+  it('moves a control when the catalog moves it, with no code of its own', () => {
+    const moved = JSON.parse(JSON.stringify(CHARACTER_CATALOG)) as typeof CHARACTER_CATALOG;
+    const brows = moved.families[0]!.slots.find((slot) => slot.slot === 'brows')! as { section: string; order: number };
+    brows.section = 'style';
+    brows.order = 1;
+    const editor = buildLookEditor(moved, DESIGNED_LOOKS, () => undefined);
+    expect(editor.sections.face.querySelector('[data-control="brows"]')).toBeNull();
+    expect(editor.sections.style.querySelector('[data-control]')!.getAttribute('data-control')).toBe('brows');
+  });
+
   it('changes one choice at a time and always hands over a valid look', () => {
     const { editor, onChange, button, within } = setup();
     const outfit = within('outfit').find((node) => node.getAttribute('aria-pressed') === 'false')!;

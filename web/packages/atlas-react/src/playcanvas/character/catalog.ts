@@ -40,7 +40,23 @@ export interface CatalogClip {
 
 export type CatalogSlotKind = 'part' | 'material' | 'colour';
 
-export interface CatalogSlot {
+/** The studio steps a choice is offered on. */
+export const STUDIO_SECTIONS = ['body', 'face', 'style'] as const;
+export type StudioSection = (typeof STUDIO_SECTIONS)[number];
+
+/** How the studio offers a slot or parameter: where, in what order, and in what words. */
+export interface StudioPresentation {
+  readonly section: StudioSection;
+  readonly order: number;
+  /** Swatches show each choice's colour; otherwise choices are named. */
+  readonly display?: 'swatch';
+  /** Slider step, in the parameter's own unit. */
+  readonly step?: number;
+  /** Words for a signed morph weight below, at and above zero. */
+  readonly wording?: { readonly negative: string; readonly neutral: string; readonly positive: string };
+}
+
+export interface CatalogSlot extends StudioPresentation {
   readonly slot: string;
   readonly label: string;
   readonly kind: CatalogSlotKind;
@@ -49,7 +65,7 @@ export interface CatalogSlot {
   readonly appliesTo?: string;
 }
 
-export interface CatalogParameter {
+export interface CatalogParameter extends StudioPresentation {
   readonly key: string;
   readonly label: string;
   /** `mm` is standing height, bounded per base; `milli` values are morph weights in thousandths. */
@@ -80,6 +96,27 @@ export interface CatalogPart {
   readonly source: CatalogSource;
 }
 
+/** Joints a posture's far form follows, measured on the baked clip. */
+export const POSTURE_JOINTS = [
+  'pelvis', 'chest', 'neck', 'head',
+  'leftHip', 'leftKnee', 'leftAnkle', 'leftToe', 'leftShoulder', 'leftElbow', 'leftWrist',
+  'rightHip', 'rightKnee', 'rightAnkle', 'rightToe', 'rightShoulder', 'rightElbow', 'rightWrist',
+] as const;
+export type PostureJoint = (typeof POSTURE_JOINTS)[number];
+
+/** A posture on one base: its clip, and where its joints are at the clip's first frame. */
+export interface CatalogBasePosture {
+  readonly clip: CatalogClip;
+  /** Millimetres in the asset's own frame: +Y up, the body facing +Z. */
+  readonly jointsMillimetres: Readonly<Record<PostureJoint, readonly [number, number, number]>>;
+}
+
+/** The fitted body's widths at rest, measured by the preparation, which the far form is built to. */
+export interface CatalogFarForm {
+  readonly shoulderWidthMillimetres: number;
+  readonly hipWidthMillimetres: number;
+}
+
 export interface CatalogBase {
   readonly baseId: string;
   readonly label: string;
@@ -93,6 +130,9 @@ export interface CatalogBase {
   readonly morphTargets: readonly string[];
   readonly bodyNode: string;
   readonly bodyTriangles: number;
+  readonly farForm: CatalogFarForm;
+  /** Every posture the family declares, fitted to this base. */
+  readonly postures: Readonly<Record<string, CatalogBasePosture>>;
   readonly parts: readonly CatalogPart[];
   /** Materials each material slot may use on this base. */
   readonly materials: Readonly<Record<string, readonly string[]>>;
@@ -111,6 +151,8 @@ export interface CatalogMaterial {
   readonly roughnessMilli: number;
   readonly tint?: 'normalised';
   readonly averageColour: string;
+  /** Every mesh drawn with this material carries its baked ambient occlusion as vertex colour. */
+  readonly vertexOcclusion?: true;
   readonly source: CatalogSource;
 }
 
@@ -133,6 +175,13 @@ export interface CatalogFamily {
   readonly colours: Readonly<Record<string, readonly CatalogColour[]>>;
   readonly bases: readonly CatalogBase[];
   readonly materials: readonly CatalogMaterial[];
+  /** Postures besides standing and moving, each baked on every base. */
+  readonly postures: readonly { readonly key: string; readonly label: string }[];
+  /**
+   * How an activity the simulation states is drawn: activity key to posture key. An activity
+   * named nowhere here is drawn standing.
+   */
+  readonly activityPostures: Readonly<Record<string, string>>;
 }
 
 /** Weighted choices for a named draw domain. Weights are positive integers. */
@@ -177,6 +226,13 @@ function checkAsset(asset: CatalogAssetRef, path: string): void {
   if (!/^[a-z0-9][a-z0-9._/-]*\.glb$/.test(asset.file) || asset.file.includes('..')) fail(path, 'file path is malformed');
 }
 
+function checkPresentation(shown: StudioPresentation, path: string): void {
+  if (!STUDIO_SECTIONS.includes(shown.section)) fail(path, 'studio section is unknown');
+  if (!Number.isSafeInteger(shown.order)) fail(path, 'studio order must be an integer');
+  if (shown.step !== undefined && !(Number.isSafeInteger(shown.step) && shown.step > 0)) fail(path, 'studio step must be a positive integer');
+  if (shown.display !== undefined && shown.display !== 'swatch') fail(path, 'studio display is unknown');
+}
+
 function unique<T>(values: readonly T[], path: string): void {
   if (new Set(values).size !== values.length) fail(path, 'identifiers must be unique');
 }
@@ -209,6 +265,13 @@ export function validateCharacterCatalog(catalog: CharacterCatalog): CharacterCa
       if (parameter.unit === 'milli' && (parameter.min < -1000 || parameter.max > 1000)) fail(`${at} parameter ${parameter.key}`, 'morph weights stay within one full target');
     }
     if (family.parameters.filter((p) => p.unit === 'mm').length !== 1) fail(at, 'exactly one height parameter is required');
+    for (const shown of [...family.slots.map((s) => ({ key: s.slot, ...s })), ...family.parameters]) checkPresentation(shown, `${at} ${shown.key}`);
+    unique(family.postures.map((p) => p.key), `${at} postures`);
+    for (const posture of family.postures) if (!KEY.test(posture.key)) fail(`${at} posture ${posture.key}`, 'key is malformed');
+    for (const [activity, posture] of Object.entries(family.activityPostures)) {
+      if (!KEY.test(activity)) fail(`${at} activity ${activity}`, 'key is malformed');
+      if (!family.postures.some((p) => p.key === posture)) fail(`${at} activity ${activity}`, `unknown posture ${posture}`);
+    }
     for (const slot of family.slots) {
       if (slot.kind === 'part' && slot.appliesTo !== undefined) fail(`${at} slot ${slot.slot}`, 'part slots apply to themselves');
       if (slot.kind !== 'part' && slot.appliesTo !== 'body' && !family.slots.some((s) => s.kind === 'part' && s.slot === slot.appliesTo)) fail(`${at} slot ${slot.slot}`, 'must apply to a part slot or the body');
@@ -220,6 +283,19 @@ export function validateCharacterCatalog(catalog: CharacterCatalog): CharacterCa
       assetKeys.push(base.asset.assetKey);
       const { min, max, default: fallback } = base.heightMillimetres;
       if (!(min <= fallback && fallback <= max)) fail(where, 'height default is outside its range');
+      for (const width of [base.farForm.shoulderWidthMillimetres, base.farForm.hipWidthMillimetres]) {
+        if (!Number.isSafeInteger(width) || width <= 0 || width > base.restHeightMillimetres) fail(where, 'far form widths are malformed');
+      }
+      const postureKeys = Object.keys(base.postures).sort();
+      const declared = family.postures.map((p) => p.key).sort();
+      if (postureKeys.length !== declared.length || postureKeys.some((k, i) => k !== declared[i])) fail(where, 'postures must be exactly the family\'s');
+      for (const [key, posture] of Object.entries(base.postures)) {
+        if (!Number.isSafeInteger(posture.clip.durationMilli) || posture.clip.durationMilli <= 0 || posture.clip.speedMillimetresPerSecond !== 0) fail(`${where} posture ${key}`, 'clip is malformed');
+        for (const joint of POSTURE_JOINTS) {
+          const point = posture.jointsMillimetres[joint];
+          if (!point || point.length !== 3 || !point.every(Number.isSafeInteger)) fail(`${where} posture ${key}`, `joint ${joint} is malformed`);
+        }
+      }
       unique(base.parts.map((p) => p.partId), `${where} parts`);
       const bits = base.parts.flatMap((p) => (p.hideBit === undefined ? [] : [p.hideBit]));
       unique(bits, `${where} hide bits`);
@@ -296,6 +372,11 @@ export function catalogBase(family: CatalogFamily, baseId: string): CatalogBase 
   const base = family.bases.find((b) => b.baseId === baseId);
   if (!base) throw new TypeError(`Unknown ${family.familyId} base ${baseId}`);
   return base;
+}
+
+/** The posture an activity is drawn in, or null for standing. */
+export function activityPosture(family: CatalogFamily, activity: string | null | undefined): string | null {
+  return activity ? family.activityPostures[activity] ?? null : null;
 }
 
 export function catalogMaterial(family: CatalogFamily, materialId: string): CatalogMaterial {

@@ -1,4 +1,8 @@
-"""Revisioned authored appearance on existing workspace/version/subject authority."""
+"""Revisioned authored appearance on existing workspace/world/version/subject authority.
+
+The world is always named by the caller: appearance history is kept per world version, and a
+workspace holds several worlds.
+"""
 
 from __future__ import annotations
 
@@ -29,7 +33,6 @@ from exulanica.world.character_appearance import (
     validate_recipe,
 )
 from exulanica.world.errors import UnknownWorldResource
-from exulanica.world.models import DEFAULT_WORLD_ID
 from exulanica.world.object_repository import WorldObjectRepository
 from exulanica.world.society import UnknownSociety
 from exulanica.world.society_repository import SocietyRepository
@@ -47,7 +50,7 @@ class CharacterAppearanceRepository:
         society_input_authorizer: Callable[[dict[str, Any]], None] | None = None,
         store: ContentAddressedStore | None = None,
         catalog: Mapping[str, Any] | None = None,
-        world_id: str = DEFAULT_WORLD_ID,
+        world_id: str,
     ) -> None:
         self.connection, self.workspace_id, self.actor = connection, workspace_id, actor
         self.world_id, self.store, self.catalog = world_id, store, catalog

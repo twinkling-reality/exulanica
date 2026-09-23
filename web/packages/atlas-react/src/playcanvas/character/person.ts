@@ -22,10 +22,19 @@ export interface PersonPose {
   readonly deltaSeconds: number;
   readonly reducedMotion: boolean;
   readonly discontinuity: boolean;
+  /** A posture the family declares, or null to stand and move. */
+  readonly posture: string | null;
 }
 
 const LOCOMOTION = 'Locomotion';
 const SPEED = 'speed';
+/** Integer parameter naming the posture held: 0 stands and moves, k + 1 the family's k-th posture. */
+const POSTURE = 'posture';
+/**
+ * How long settling into a posture or rising from it takes. A chosen presentation time: the
+ * clips cross-fade over it, so a person lowers into a seat rather than snapping into one.
+ */
+const POSTURE_BLEND_SECONDS = 0.8;
 /** Half the distance between the feet: how far a foot travels per radian of turning in place. */
 const TURN_RADIUS_METRES = 0.18;
 
@@ -64,6 +73,11 @@ export function gaitFor(speed: number, walk: number, run: number): { readonly bl
   return { blend: run, cadence: speed / run };
 }
 
+/** A state's name holds no dot: `assignAnimation` reads a dot as a path into a blend tree. */
+function postureState(key: string): string {
+  return `Posture:${key}`;
+}
+
 export class CharacterPerson {
   readonly root: pc.Entity;
   private model: pc.Entity | null = null;
@@ -77,6 +91,10 @@ export class CharacterPerson {
   private runSpeed = 2.5;
   private scale = 1;
   private visible = true;
+  private postures: readonly string[] = [];
+  private posture: string | null = null;
+  /** Until the first update, a held posture is taken at once rather than settled into. */
+  private fresh = true;
 
   private constructor(readonly description: CharacterRenderableDescription, app: pc.AppBase) {
     this.root = new pc.Entity(`character:${description.lookSha256.slice(0, 12)}`, app);
@@ -187,6 +205,7 @@ export class CharacterPerson {
 
     this.walkSpeed = (base.clips.walk.speedMillimetresPerSecond / 1000) * this.scale;
     this.runSpeed = (base.clips.run.speedMillimetresPerSecond / 1000) * this.scale;
+    this.postures = family.postures.map((posture) => posture.key);
     this.installAnimation(baseContainer, base);
     this.footLock = new FootLock(model, rootBone);
   }
@@ -201,6 +220,7 @@ export class CharacterPerson {
     const model = this.model!;
     model.addComponent('anim', { activate: true });
     const anim = model.anim!;
+    const held = (index: number) => [{ parameterName: POSTURE, predicate: pc.ANIM_EQUAL_TO, value: index }];
     anim.loadStateGraph({
       layers: [{
         name: 'Base',
@@ -221,16 +241,32 @@ export class CharacterPerson {
               ],
             },
           },
+          ...this.postures.map((key) => ({ name: postureState(key), loop: true, speed: 1 })),
         ],
-        transitions: [{ from: 'START', to: LOCOMOTION }],
+        transitions: [
+          { from: 'START', to: LOCOMOTION },
+          ...this.postures.flatMap((key, index) => [
+            { from: LOCOMOTION, to: postureState(key), time: POSTURE_BLEND_SECONDS, conditions: held(index + 1) },
+            { from: postureState(key), to: LOCOMOTION, time: POSTURE_BLEND_SECONDS, conditions: held(0) },
+          ]),
+        ],
       }],
-      parameters: { [SPEED]: { name: SPEED, type: pc.ANIM_PARAMETER_FLOAT, value: 0 } },
+      parameters: {
+        [SPEED]: { name: SPEED, type: pc.ANIM_PARAMETER_FLOAT, value: 0 },
+        [POSTURE]: { name: POSTURE, type: pc.ANIM_PARAMETER_INTEGER, value: 0 },
+      },
     });
     const tracks = new Map(container.resource.animations.map((asset) => [(asset.resource as pc.AnimTrack).name, asset.resource as pc.AnimTrack]));
-    for (const kind of ['idle', 'walk', 'run'] as const) {
-      const track = tracks.get(base.clips[kind].name);
-      if (!track) throw new Error(`Base container is missing ${base.clips[kind].name}`);
-      anim.assignAnimation(`${LOCOMOTION}.${kind}`, track);
+    const track = (name: string) => {
+      const found = tracks.get(name);
+      if (!found) throw new Error(`Base container is missing ${name}`);
+      return found;
+    };
+    for (const kind of ['idle', 'walk', 'run'] as const) anim.assignAnimation(`${LOCOMOTION}.${kind}`, track(base.clips[kind].name));
+    for (const key of this.postures) {
+      const posture = base.postures[key];
+      if (!posture) throw new Error(`Base ${base.baseId} has no ${key} posture`);
+      anim.assignAnimation(postureState(key), track(posture.clip.name));
     }
   }
 
@@ -248,10 +284,32 @@ export class CharacterPerson {
     if (!visible) this.footLock?.reset();
   }
 
+  /** The posture held now, or null for standing and moving. */
+  get heldPosture(): string | null {
+    return this.posture;
+  }
+
   /** Advance the gait from resolved motion. Called after the animation update. */
   update(pose: PersonPose): void {
     if (this.disposed || !this.model?.anim || !this.visible) return;
     const anim = this.model.anim;
+    if (pose.posture !== this.posture) {
+      const index = pose.posture === null ? 0 : this.postures.indexOf(pose.posture) + 1;
+      if (index === 0 && pose.posture !== null) throw new TypeError(`Unknown posture ${pose.posture}`);
+      anim.setInteger(POSTURE, index);
+      // Someone first drawn, or moved without travelling, is shown as they are, not getting there.
+      if (this.fresh || pose.discontinuity) anim.baseLayer?.transition(pose.posture === null ? LOCOMOTION : postureState(pose.posture), 0);
+      this.posture = pose.posture;
+      this.footLock?.reset();
+    }
+    this.fresh = false;
+    if (this.posture !== null) {
+      // A held posture plays its own clip; the gait and the contact lock rest until it ends.
+      this.smoothedSpeed = 0;
+      anim.setFloat(SPEED, 0);
+      anim.speed = pose.reducedMotion ? 0 : 1;
+      return;
+    }
     const target = pose.reducedMotion || pose.discontinuity
       ? 0
       : Math.hypot(pose.speed, pose.turnRate * TURN_RADIUS_METRES * this.scale);

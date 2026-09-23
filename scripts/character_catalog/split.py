@@ -3,7 +3,8 @@
 Every output keeps the same skeleton nodes and inverse bind matrices, so the runtime can bind a
 wearable to the base's bones by name. Only core glTF 2.0 encodings are used: skin weights become
 normalized unsigned bytes and texture coordinates normalized unsigned shorts, which needs no
-extension and no decoder. Morph normal deltas are kept on the body alone.
+extension and no decoder. Morph normal deltas are kept on the body alone, and a mesh's baked
+ambient occlusion (``COLOR_0``) travels with it as normalized unsigned bytes.
 """
 
 import struct
@@ -61,7 +62,7 @@ class Writer:
     def _view(self, payload, target=None):
         return self.buffer.add(payload, target)
 
-    def copy_accessor(self, index, component=None, normalized=False, target=None):
+    def copy_accessor(self, index, component=None, normalized=False, target=None, weights=False):
         src = self.source["accessors"][index]
         component = component or src["componentType"]
         out = {"componentType": component, "count": src["count"], "type": src["type"]}
@@ -72,12 +73,19 @@ class Writer:
                 out[key] = src[key]
         if "bufferView" in src:
             values = accessor_values(self.source, self.binary, index)
-            if src["type"] == "VEC4" and component == 5121 and normalized:
+            if src["type"] == "VEC4" and component == 5121 and normalized and weights:
                 values = _quantize_weights(values)
             elif component == 5123 and normalized:
                 if min(values) < 0 or max(values) > 1:
                     raise ValueError("normalized texture coordinates must lie in [0, 1]")
                 values = [round(v * 65535) for v in values]
+            elif component == 5121 and normalized:
+                # Colours arrive as floats or as normalized integers; either way they are [0, 1].
+                scale = {5126: 1, 5121: 1 / 255, 5123: 1 / 65535}[src["componentType"]]
+                values = [v * scale for v in values]
+                if min(values) < 0 or max(values) > 1:
+                    raise ValueError("normalized colours must lie in [0, 1]")
+                values = [round(v * 255) for v in values]
             elif component in (5121, 5123, 5125) and src["componentType"] == 5126:
                 values = [round(v) for v in values]
             out["bufferView"] = self._view(_encode(values, component), target)
@@ -147,6 +155,9 @@ class Writer:
             attributes = {}
             for key, index in primitive["attributes"].items():
                 if key == "WEIGHTS_0":
+                    attributes[key] = self.copy_accessor(index, 5121, True, ARRAY_BUFFER, weights=True)
+                elif key == "COLOR_0":
+                    # Ambient occlusion in every channel: a normalized byte is its whole precision.
                     attributes[key] = self.copy_accessor(index, 5121, True, ARRAY_BUFFER)
                 elif key == "TEXCOORD_0":
                     values = accessor_values(self.source, self.binary, index)

@@ -27,6 +27,31 @@
     "Wave": "HumanWave"
   },
   "idleClip": "Idle",
+  "postures": {
+    "seated": {
+      "label": "Sitting",
+      "clip": "HumanSit",
+      "reason": "A rest on the ground, knees up and forearms across the knees, so a resting person needs no seat to exist. Distances are shares of the base's rest height; the pelvis settles until the skinned seat touches the ground.",
+      "feetForward": 0.33,
+      "feetApart": 0.085,
+      "kneeOut": 0.25,
+      "kneeUp": 1.0,
+      "handForward": 0.06,
+      "handOut": 0.0,
+      "handAbove": -0.005,
+      "elbowOut": 0.8,
+      "elbowBack": 0.1,
+      "wristDropDegrees": 55,
+      "pelvisTiltDegrees": 12,
+      "trunkLeanDegrees": 22,
+      "breathDegrees": 1.2,
+      "breathSeconds": 4.0,
+      "seatSink": 0.003
+    }
+  },
+  "activityPostures": {
+    "rest": "seated"
+  },
   "morphs": [
     {
       "key": "fullness-up",
@@ -735,5 +760,96 @@
       0,
       500
     ]
+  },
+  "assetRevisions": {
+    "containers": 2,
+    "materials": 1,
+    "reason": "Containers carry the seated clip and baked occlusion from revision 2; material packs are unchanged, so their reviewed imports stay valid."
+  },
+  "occlusion": {
+    "rays": 48,
+    "reachShare": 0.08,
+    "liftMetres": 0.0015,
+    "floor": 0.4,
+    "kinds": [
+      "clothes",
+      "hair"
+    ],
+    "materialKinds": [
+      "skin",
+      "outfit",
+      "shoes",
+      "hair"
+    ],
+    "detachedBones": [
+      "ForeArm",
+      "Hand"
+    ],
+    "reason": "Scene light here is a flat ambient colour and one sun, so without occlusion every fold, armpit and hair layer is lit alike. Baked at rest per vertex: 48 fixed rays over the hemisphere, 8 per cent of rest height long (about 13 cm), never darker than 0.4."
+  },
+  "studio": {
+    "eyes": {
+      "section": "face",
+      "order": 5
+    },
+    "eyeColour": {
+      "section": "face",
+      "order": 10
+    },
+    "brows": {
+      "section": "face",
+      "order": 20
+    },
+    "lashes": {
+      "section": "face",
+      "order": 30
+    },
+    "heightMillimetres": {
+      "section": "body",
+      "order": 20,
+      "step": 10
+    },
+    "fullness": {
+      "section": "body",
+      "order": 30,
+      "step": 50,
+      "wording": {
+        "negative": "Slimmer",
+        "neutral": "Average",
+        "positive": "Fuller"
+      }
+    },
+    "muscle": {
+      "section": "body",
+      "order": 40,
+      "step": 50,
+      "wording": {
+        "negative": "Softer",
+        "neutral": "Average",
+        "positive": "More defined"
+      }
+    },
+    "skin": {
+      "section": "body",
+      "order": 50,
+      "display": "swatch"
+    },
+    "hair": {
+      "section": "style",
+      "order": 10
+    },
+    "hairColour": {
+      "section": "style",
+      "order": 20,
+      "display": "swatch"
+    },
+    "outfit": {
+      "section": "style",
+      "order": 30
+    },
+    "shoes": {
+      "section": "style",
+      "order": 40
+    }
   }
 }

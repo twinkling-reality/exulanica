@@ -6,9 +6,9 @@
  * either returns to the default or restores an earlier revision without rewriting history.
  *
  * The preview keeps its history in this browser. A signed-in world keeps catalog looks on the
- * server as recipes over one body's family (`/world/versions/{version}/characters/avatar/{actor}
- * /appearance`); the abstract figure and stylized examples are not recipes, so a signed-in person
- * choosing one keeps that choice in this browser beside their saved recipe.
+ * server as recipes over one body's family, per world version (`/world/versions/{version}/characters
+ * /avatar/{actor}/appearance?world_id={world}`); the abstract figure and stylized examples are not
+ * recipes, so they are worn without being saved there.
  */
 import { ApiError, Transport, type TransportOptions } from '@exulanica/graph-client';
 import {
@@ -45,6 +45,8 @@ export class StaleLookError extends Error {
 }
 
 export interface LookStore {
+  /** Whether this store keeps a choice of this kind; one it does not keep is worn unsaved. */
+  keeps(choice: SavedChoice): boolean;
   read(): Promise<SavedLooks>;
   /** Newest first. */
   history(): Promise<readonly SavedRevision[]>;
@@ -191,6 +193,10 @@ export class PreviewLookStore implements LookStore {
     return { revision: current?.revision ?? 0, current };
   }
 
+  keeps(): boolean {
+    return true;
+  }
+
   private append(choice: SavedChoice, baseRevision: number, operation: SavedRevision['operation'], restoredFromRevision: number | null): SavedLooks {
     // Another tab may have written since this page loaded.
     const stored = this.load();
@@ -235,19 +241,52 @@ interface WireFamily {
   readonly family: { readonly family_id: string; readonly default_seed: number };
 }
 
+/** Where a signed-in person's saved looks live: one world version, as one actor. */
+export interface WorkspaceLookTarget {
+  readonly worldId: string;
+  readonly versionId: string;
+  readonly actor: string;
+}
+
+/**
+ * Where saved looks live in a signed-in world: the open world's version, as the account's avatar.
+ * A world opened without a saved entry has no version the client can name, and a session opened
+ * without an account names no avatar; both keep looks for the visit and say which.
+ */
+export function worldLookTarget(
+  entry: { readonly worldId: string; readonly authoredVersionId: string } | null,
+  actor: string | null,
+): { readonly target: WorkspaceLookTarget } | { readonly target: null; readonly missing: 'version' | 'account' } {
+  if (entry === null) return { target: null, missing: 'version' };
+  if (actor === null) return { target: null, missing: 'account' };
+  return { target: { worldId: entry.worldId, versionId: entry.authoredVersionId, actor } };
+}
+
 /** A signed-in person's catalog looks, saved through the authenticated appearance routes. */
 export class WorkspaceLookStore implements LookStore {
   private readonly transport: Transport;
   private readonly path: string;
+  private readonly world: string;
   private families: Promise<readonly WireFamily[]> | null = null;
 
   constructor(
     options: TransportOptions,
-    target: { readonly versionId: string; readonly actor: string },
+    target: WorkspaceLookTarget,
     private readonly catalog: CharacterCatalog = CHARACTER_CATALOG,
   ) {
     this.transport = new Transport(options);
     this.path = `/world/versions/${encodeURIComponent(target.versionId)}/characters/avatar/${encodeURIComponent(target.actor)}/appearance`;
+    // Every operation names the world its version belongs to; a workspace holds several.
+    this.world = `world_id=${encodeURIComponent(target.worldId)}`;
+  }
+
+  private at(suffix = ''): string {
+    return `${this.path}${suffix}?${this.world}`;
+  }
+
+  /** The server keeps recipes over catalog bodies; the abstract figure and examples are not recipes. */
+  keeps(choice: SavedChoice): boolean {
+    return choice.kind === 'catalog';
   }
 
   private revision(wire: WireRevision): SavedRevision | null {
@@ -262,7 +301,7 @@ export class WorkspaceLookStore implements LookStore {
   }
 
   private async family(look: CharacterLook): Promise<WireFamily> {
-    this.families ??= this.transport.getJson<readonly WireFamily[]>(`${this.path}/families`).catch((error: unknown) => {
+    this.families ??= this.transport.getJson<readonly WireFamily[]>(this.at('/families')).catch((error: unknown) => {
       this.families = null;
       throw error;
     });
@@ -276,11 +315,11 @@ export class WorkspaceLookStore implements LookStore {
   }
 
   async read(): Promise<SavedLooks> {
-    return this.looks(await this.transport.getJson(this.path));
+    return this.looks(await this.transport.getJson(this.at()));
   }
 
   async history(): Promise<readonly SavedRevision[]> {
-    const rows = await this.transport.getJson<readonly WireRevision[]>(`${this.path}/history`);
+    const rows = await this.transport.getJson<readonly WireRevision[]>(this.at('/history'));
     return rows.flatMap((row) => {
       const revision = this.revision(row);
       return revision === null ? [] : [revision];
@@ -291,7 +330,7 @@ export class WorkspaceLookStore implements LookStore {
     if (choice.kind !== 'catalog') throw new Error('Only people from the catalog are saved to your world.');
     const family = await this.family(choice.look);
     try {
-      return this.looks(await this.transport.putJson(this.path, {
+      return this.looks(await this.transport.putJson(this.at(), {
         base_revision: baseRevision,
         recipe: {
           family_id: family.family.family_id,
@@ -307,7 +346,7 @@ export class WorkspaceLookStore implements LookStore {
 
   async reset(baseRevision: number, restoreRevision?: number): Promise<SavedLooks> {
     try {
-      return this.looks(await this.transport.postJson(`${this.path}/reset`, {
+      return this.looks(await this.transport.postJson(this.at('/reset'), {
         base_revision: baseRevision,
         ...(restoreRevision === undefined ? {} : { restore_revision: restoreRevision }),
       }));

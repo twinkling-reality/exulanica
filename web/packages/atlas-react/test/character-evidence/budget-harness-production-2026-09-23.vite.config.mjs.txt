@@ -1,0 +1,35 @@
+// Production build of the character budget harness. No bare imports: this file lives outside the
+// web workspace, so it describes the build as a plain object.
+import { fileURLToPath } from 'node:url';
+import { resolve } from 'node:path';
+
+const HERE = fileURLToPath(new URL('.', import.meta.url));
+const WORKTREE = resolve(HERE, '../../..');
+const builds = new Set();
+
+export default {
+  root: HERE,
+  base: './',
+  // The committed character containers, copied beside the page so the loader can fetch them.
+  publicDir: resolve(WORKTREE, 'assets/characters'),
+  logLevel: 'info',
+  build: { target: 'es2022', outDir: resolve(HERE, '../bench-final-dist'), emptyOutDir: true },
+  preview: { host: '127.0.0.1', port: 19219, strictPort: true },
+  plugins: [{
+    // Records which PlayCanvas build the bundle was made from: `playcanvas` is the release build,
+    // `playcanvas.dbg` the debug build a development server resolves.
+    name: 'record-engine-build',
+    transform(_code, id) {
+      const match = /\/playcanvas\/build\/([^/]+)\//.exec(id);
+      if (match) builds.add(match[1]);
+      return null;
+    },
+    generateBundle() {
+      this.emitFile({
+        type: 'asset',
+        fileName: 'engine-build.json',
+        source: `${JSON.stringify({ playcanvasBuildDirectories: [...builds].sort(), mode: process.env.NODE_ENV ?? null })}\n`,
+      });
+    },
+  }],
+};

@@ -1,0 +1,161 @@
+/**
+ * Frame cost of catalog people on a PRODUCTION build.
+ *
+ * Mounts the real Atlas through the app's own mountAtlas over the Flatiron owned district, the
+ * world the development preview opened for the 2026-09-17 budget run, in third person with the
+ * player wearing the designed default person. Character containers are the committed files this
+ * build copies beside the page, fetched by a byte loader the page registers the same way the app
+ * does (enableNativeCharacters), and verified by length and SHA-256 by the character host as in the
+ * product. The CDP driver mounts CharacterCrowdEvaluation with one near budget at a time and reads
+ * the measurement back through window.__bench.
+ *
+ * Frame work is the main thread's own time from the engine's frameupdate to its frameend, as in
+ * the 2026-09-17 harness; presented frame intervals are read from requestAnimationFrame.
+ */
+import { mountAtlas } from '../../../web/packages/app/src/atlas.ts';
+import { ownedDistrict } from '../../../web/packages/app/src/config.ts';
+import { DEFAULT_PREFERENCES } from '../../../web/packages/app/src/preferences.ts';
+import { themeForPreferences } from '../../../web/packages/app/src/theme.ts';
+import { worldArtProfile } from '../../../web/packages/presentation/src/index.ts';
+import { makeScene } from '../../../web/packages/atlas-core/src/index.ts';
+import {
+  CHARACTER_CATALOG,
+  CharacterCrowdEvaluation,
+  CharacterHost,
+} from '../../../web/packages/atlas-react/src/playcanvas/index.ts';
+
+const files = new Map<string, string>();
+for (const family of CHARACTER_CATALOG.families) {
+  for (const base of family.bases) {
+    files.set(base.asset.contentSha256, base.asset.file);
+    for (const part of base.parts) if (part.asset) files.set(part.asset.contentSha256, part.asset.file);
+  }
+  for (const material of family.materials) files.set(material.asset.contentSha256, material.asset.file);
+}
+
+async function loadCommitted(reference: { readonly contentSha256: string }, signal: AbortSignal): Promise<ArrayBuffer> {
+  const file = files.get(reference.contentSha256);
+  if (file === undefined) throw new Error(`no committed container ${reference.contentSha256}`);
+  const response = await fetch(`./${file}`, { signal });
+  if (!response.ok) throw new Error(`${file}: HTTP ${response.status}`);
+  return response.arrayBuffer();
+}
+
+const canvas = document.getElementById('atlas') as HTMLCanvasElement;
+const overlay = document.getElementById('overlay') as HTMLElement;
+const preferences = DEFAULT_PREFERENCES;
+const district = await ownedDistrict({});
+const atlas = await mountAtlas(canvas, overlay, makeScene([], 1, 1), undefined, {
+  theme: themeForPreferences(preferences, false),
+  fieldOfView: preferences.fieldOfView,
+  mouseSensitivity: preferences.mouseSensitivity,
+  artProfile: worldArtProfile(preferences.worldArtProfile, preferences.worldArtProfileVersion, preferences.worldStyleParameters),
+  artProfileParameters: preferences.worldStyleParameters,
+  reducedMotion: false,
+  ownedDistrict: district,
+});
+const binding = atlas.binding;
+const app = binding.app;
+binding.enableNativeCharacters(loadCommitted as Parameters<typeof binding.enableNativeCharacters>[0]);
+binding.setCameraMode('third-person');
+
+let crowd: CharacterCrowdEvaluation | null = null;
+
+function quantile(values: readonly number[], fraction: number): number {
+  const sorted = [...values].sort((a, b) => a - b);
+  return Math.round(sorted[Math.min(sorted.length - 1, Math.floor(fraction * sorted.length))]! * 100) / 100;
+}
+
+const bench = {
+  ready: true,
+  async environment() {
+    const gl = document.createElement('canvas').getContext('webgl2')!;
+    const info = gl.getExtension('WEBGL_debug_renderer_info');
+    const engine = await (await fetch('./engine-build.json')).json();
+    return {
+      userAgent: navigator.userAgent,
+      gpu: info ? gl.getParameter(info.UNMASKED_RENDERER_WEBGL) : null,
+      viewport: [innerWidth, innerHeight],
+      canvas: [canvas.width, canvas.height],
+      devicePixelRatio,
+      logicalCpus: navigator.hardwareConcurrency,
+      engine,
+      district: canvas.dataset['ownedDistrict'] ?? null,
+      cameraMode: binding.cameraMode,
+    };
+  },
+  mount(nearBudget: number, count = 128, walkers = 8) {
+    crowd?.destroy();
+    crowd = CharacterCrowdEvaluation.mount(binding, { count, nearBudget, walkers });
+    return crowd.counts;
+  },
+  counts() {
+    return crowd?.counts ?? null;
+  },
+  host() {
+    const host = CharacterHost.forApp(app, CHARACTER_CATALOG);
+    return {
+      containers: host.residentContainers,
+      encodedBytes: host.residentEncodedBytes,
+      geometryBytes: host.residentGeometryBytes,
+      textureBytes: host.residentTextureBytes,
+    };
+  },
+  measure(seconds: number) {
+    return new Promise((resolve) => {
+      const intervals: number[] = [], work: number[] = [], draws: number[] = [], triangles: number[] = [];
+      let last: number | null = null;
+      let startWork = 0;
+      const onUpdate = () => { startWork = performance.now(); };
+      const onEnd = () => {
+        work.push(performance.now() - startWork);
+        draws.push(app.stats.drawCalls.total);
+        triangles.push(app.stats.frame.triangles);
+      };
+      app.on('frameupdate', onUpdate);
+      app.on('frameend', onEnd);
+      const end = performance.now() + seconds * 1000;
+      const tick = (time: number) => {
+        if (last !== null) intervals.push(time - last);
+        last = time;
+        if (time < end) {
+          requestAnimationFrame(tick);
+          return;
+        }
+        app.off('frameupdate', onUpdate);
+        app.off('frameend', onEnd);
+        // Who is on screen: people whose head is inside the camera frustum, by the form drawn.
+        const camera = (app.root.findByName('atlas-camera') as unknown as { camera: { frustum: { containsPoint(p: unknown): boolean } } }).camera;
+        const crowdRoot = app.root.findByName('character-evaluation-crowd');
+        const Vec3 = app.root.getPosition().constructor as new (x: number, y: number, z: number) => unknown;
+        let nearShown = 0, farShown = 0;
+        for (const person of crowdRoot?.children ?? []) {
+          const p = person.getPosition();
+          if (!camera.frustum.containsPoint(new Vec3(p.x, p.y + 1.0, p.z))) continue;
+          if (person.children.some((child) => child.name.startsWith('character:') && (child as unknown as { enabled: boolean }).enabled)) nearShown++;
+          else farShown++;
+        }
+        resolve({
+          frames: intervals.length,
+          frameP50Ms: quantile(intervals, 0.5),
+          frameP95Ms: quantile(intervals, 0.95),
+          frameP99Ms: quantile(intervals, 0.99),
+          frameMaxMs: quantile(intervals, 1),
+          framesOver16_7Ms: intervals.filter((v) => v > 17.5).length,
+          framesOver33Ms: intervals.filter((v) => v > 34).length,
+          workFrames: work.length,
+          workP50Ms: quantile(work, 0.5),
+          workP95Ms: quantile(work, 0.95),
+          workP99Ms: quantile(work, 0.99),
+          drawCallsP50: quantile(draws, 0.5),
+          trianglesP50: quantile(triangles, 0.5),
+          visible: { near: nearShown, far: farShown },
+          jsHeapMb: Math.round(((performance as unknown as { memory?: { usedJSHeapSize: number } }).memory?.usedJSHeapSize ?? 0) / 1048576),
+        });
+      };
+      requestAnimationFrame(tick);
+    });
+  },
+};
+
+(window as unknown as { __bench: typeof bench }).__bench = bench;

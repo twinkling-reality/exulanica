@@ -1,0 +1,83 @@
+// Frame cost of catalog people on the production build of the budget harness, at 1440x900: one
+// crowd of 128, a different number drawn as full characters each configuration, everyone else as
+// distant forms. Run inside quiet-slot, gpu-slot and gated.py (in that order) with the harness
+// served by `vite preview`. Prints one JSON line per configuration.
+//
+//   node measure-budget.mjs ORIGIN CDP_PORT BUDGETS SECONDS ORDER LABEL
+//
+// ORDER is `up` or `down`: the budgets are measured in that order, so repeats can alternate.
+// Before every configuration the machine must be at least 70 percent idle over 10 s (iostat),
+// retried for up to 240 s; the configuration is marked refused otherwise. While it measures, the
+// idle samples gated.py writes (WS_IDLE_SAMPLES) are averaged over the measured window and a
+// configuration under 50 percent is marked discarded. Both rules are the machine-wide timing gate.
+import { setTimeout as sleep } from 'node:timers/promises';
+import { execFileSync, execSync } from 'node:child_process';
+import { readFileSync, existsSync } from 'node:fs';
+import { launch, navigate } from './cdp.mjs';
+
+const [, , origin, portText, budgetsText, secondsText, order = 'up', label = 'run'] = process.argv;
+const budgets = budgetsText.split(',').map(Number);
+if (order === 'down') budgets.reverse();
+const seconds = Number(secondsText);
+const PRE_IDLE = 70;
+const DURING_IDLE = 50;
+const PRE_WAIT_SECONDS = 240;
+const load = () => execSync('uptime').toString().replace(/.*load averages?: /, '').trim();
+const out = (value) => console.log(JSON.stringify(value));
+
+function intervalIdle(windowSeconds) {
+  const text = execFileSync('iostat', ['-C', '-w', String(windowSeconds), '-c', '2', '-n', '0']).toString();
+  const rows = text.split('\n').filter((line) => /^\s*\d/.test(line)).map((line) => line.trim().split(/\s+/));
+  return Number(rows[rows.length - 1][2]);
+}
+
+function idleDuring(startS, endS) {
+  const file = process.env.WS_IDLE_SAMPLES;
+  if (!file || !existsSync(file)) return { mean: null, samples: 0 };
+  const samples = readFileSync(file, 'utf8').split('\n').filter(Boolean).map((line) => JSON.parse(line))
+    .filter((s) => s.t >= startS && s.t <= endS + 2).map((s) => s.idle);
+  return { mean: samples.length ? Math.round((samples.reduce((a, b) => a + b, 0) / samples.length) * 10) / 10 : null, samples: samples.length, min: samples.length ? Math.min(...samples) : null };
+}
+
+const browser = await launch({ port: Number(portText), profile: new URL(`../runs/profile-${portText}`, import.meta.url).pathname });
+try {
+  await navigate(browser, `${origin}/index.html`, { settleMs: 500 });
+  for (let i = 0; i < 240; i += 1) {
+    if (await browser.evaluate('window.__bench?.ready === true').catch(() => false)) break;
+    await sleep(500);
+  }
+  out({ label, environment: await browser.evaluate('window.__bench.environment()'), budgets, seconds, order, startedAt: new Date().toISOString() });
+  for (const budget of budgets) {
+    const pre = [];
+    const deadline = Date.now() + PRE_WAIT_SECONDS * 1000;
+    let passed = false;
+    while (true) {
+      const idle = intervalIdle(10);
+      pre.push(idle);
+      if (idle >= PRE_IDLE) { passed = true; break; }
+      if (Date.now() >= deadline) break;
+    }
+    if (!passed) {
+      out({ label, nearBudget: budget, verdict: `refused: idle ${pre[pre.length - 1]} below ${PRE_IDLE} for ${PRE_WAIT_SECONDS} s`, preIdle: pre });
+      continue;
+    }
+    const loadBefore = load();
+    await browser.evaluate(`window.__bench.mount(${budget}, 128, 8)`);
+    let counts = null;
+    for (let i = 0; i < 480; i += 1) {
+      counts = await browser.evaluate('window.__bench.counts()');
+      if (counts.pending === 0) break;
+      await sleep(250);
+    }
+    await sleep(3000);
+    const startS = Date.now() / 1000;
+    const result = await browser.evaluate(`window.__bench.measure(${seconds})`, { timeout: (seconds + 30) * 1000 });
+    const endS = Date.now() / 1000;
+    const idle = idleDuring(startS, endS);
+    const host = await browser.evaluate('window.__bench.host()');
+    const verdict = idle.mean !== null && idle.mean < DURING_IDLE ? `discarded: idle ${idle.mean} below ${DURING_IDLE}` : 'accepted';
+    out({ label, nearBudget: budget, crowd: 128, counts, preIdle: pre, idleDuring: idle, loadBefore, loadAfter: load(), ...result, host, verdict });
+  }
+} finally {
+  await browser.close();
+}

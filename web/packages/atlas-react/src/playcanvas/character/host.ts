@@ -200,11 +200,18 @@ interface BuiltMaterial {
 
 const HOSTS = new WeakMap<pc.AppBase, CharacterHost>();
 
-/** The application that owns `device`, found by its canvas identity, or null. */
+/**
+ * The application that owns `device`, or null.
+ *
+ * Found by its canvas identity; a canvas without an id can only be matched to the current
+ * application, and only when that application draws with this very device. Every application the
+ * product mounts names its canvas, so the second rule serves pages with one application, such as a
+ * test's, and never picks between two.
+ */
 export function applicationOf(device: pc.GraphicsDevice): pc.AppBase | null {
   const canvas = device.canvas as HTMLCanvasElement | OffscreenCanvas;
   const id = 'id' in canvas ? canvas.id : '';
-  const app = id ? pc.AppBase.getApplication(id) : undefined;
+  const app = id ? pc.AppBase.getApplication(id) : pc.AppBase.getApplication();
   return app && app.graphicsDevice === device ? app : null;
 }
 
@@ -392,6 +399,14 @@ export class CharacterHost {
           built.alphaToCoverage = this.app.graphicsDevice.samples > 1;
         }
         built.cull = material.doubleSided ? pc.CULLFACE_NONE : pc.CULLFACE_BACK;
+        // A shell seen from inside (hair, brows, lashes) is lit from its own side, not the far one.
+        built.twoSidedLighting = material.doubleSided;
+        if (material.vertexOcclusion) {
+          // Baked ambient occlusion rides in every channel of the vertex colour; it shades ambient
+          // light and, by the engine's default, specular.
+          built.aoVertexColor = true;
+          built.aoVertexColorChannel = 'r';
+        }
         built.useMetalness = true;
         built.metalness = 0;
         built.gloss = 1 - material.roughnessMilli / 1000;

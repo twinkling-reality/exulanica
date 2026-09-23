@@ -1,0 +1,19 @@
+#!/bin/zsh
+# Remaining budget repeats as short commands, each through quiet-slot, gpu-slot and the idle gate,
+# so the machine-wide slots are held a few minutes at a time. Usage: budget-repeats.sh LABEL ORDER GROUP...
+# where each GROUP is a comma-separated list of near budgets measured in one command.
+emulate -L zsh
+setopt no_bg_nice
+tools=TOOLS  # substituted: the directory holding this runner, measure-budget.mjs and gated.py
+bin=SLOTS  # substituted: the directory of the machine's quiet-slot and gpu-slot commands
+label=$1; order=$2; shift 2
+cd $tools
+for group in "$@"; do
+  for attempt in 1 2 3; do
+    $bin/quiet-slot $bin/gpu-slot python3 gated.py -- node measure-budget.mjs http://127.0.0.1:19219 19218 $group 20 $order $label >> ../runs/budget-$label.jsonl 2>> ../runs/budget-$label.err
+    rc=$?
+    print -r -- "group $group attempt $attempt exit $rc at $(date '+%H:%M:%S')" >> ../runs/budget-$label.err
+    [[ $rc -ne 75 ]] && break
+    sleep 180
+  done
+done

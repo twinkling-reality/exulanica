@@ -11,6 +11,12 @@ extremes, so garments follow the body. Materials are named placeholders; the cat
 reviewed material packs to them at runtime. A per-vertex ``_HIDE`` bitmask on the body records
 which wearables cover each body vertex, replacing MakeHuman's delete groups without needing a
 separate body mesh per outfit.
+
+Declared postures are baked as further clips on the same skeleton (``posture.py``), and every
+occlusion-bearing mesh carries its ambient occlusion at rest as a colour attribute named
+``Occlusion`` (exported as ``COLOR_0``): the share of a fixed hemisphere of rays that leave the
+surface unobstructed, cast against that mesh and the body. The far form's shoulder and hip widths
+are measured on the fitted body.
 """
 
 import json
@@ -21,7 +27,10 @@ from pathlib import Path
 import bpy
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from retarget import transfer_motion
+import posture as postures
+from mathutils import Vector
+from mathutils.bvhtree import BVHTree
+from retarget import FPS, transfer_motion
 
 KINDS = {
     "clothes": "Clothes",
@@ -128,6 +137,144 @@ def bake(obj, body, rig):
     rig.data.pose_position = "POSE"
     for face in mesh.polygons:
         face.use_smooth = True
+
+
+def _hemisphere(count):
+    """``count`` fixed directions over the +Z hemisphere, cosine weighted (a Fibonacci spiral)."""
+    golden = math.pi * (3.0 - math.sqrt(5.0))
+    directions = []
+    for index in range(count):
+        radius = math.sqrt((index + 0.5) / count)
+        angle = index * golden
+        directions.append(Vector((radius * math.cos(angle), radius * math.sin(angle), math.sqrt(max(0.0, 1.0 - radius * radius)))))
+    return directions
+
+
+def _dominant(obj):
+    """Each vertex's strongest bone name, or None."""
+    groups = {g.index: g.name for g in obj.vertex_groups}
+    names = []
+    for vertex in obj.data.vertices:
+        strongest = max(vertex.groups, key=lambda element: element.weight, default=None)
+        names.append(groups.get(strongest.group) if strongest else None)
+    return names
+
+
+def _world_surface(objects, keep):
+    """World-space vertices and the polygons ``keep(obj, dominant bones)`` admits, as one list."""
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    vertices, polygons = [], []
+    for obj in objects:
+        evaluated = obj.evaluated_get(depsgraph)
+        mesh = evaluated.to_mesh()
+        offset = len(vertices)
+        vertices.extend(obj.matrix_world @ v.co for v in mesh.vertices)
+        bones = _dominant(obj)
+        polygons.extend(
+            [offset + i for i in polygon.vertices]
+            for polygon in mesh.polygons
+            if keep([bones[i] for i in polygon.vertices])
+        )
+        evaluated.to_mesh_clear()
+    return vertices, polygons
+
+
+def bake_occlusion(obj, occluders, settings, rest_height):
+    """Store ambient occlusion at rest on ``obj`` as the ``Occlusion`` colour attribute.
+
+    For each vertex a fixed set of rays over the hemisphere about its normal is cast against
+    ``occluders``; the stored value is the share that travel ``reachShare`` of the rest height
+    unobstructed, raised to ``floor`` at the least. Surface the rest pose holds apart from the
+    body only by chance (the declared ``detachedBones``: forearms and hands hang beside the hips
+    at rest and swing away when walking) occludes nothing but itself. Returns the mean and the
+    share of darkened vertices, for the preparation receipt.
+    """
+    detached = tuple(settings["detachedBones"])
+
+    def is_detached(bone):
+        return bone is not None and any(part in bone for part in detached)
+
+    def tree(keep):
+        vertices, polygons = _world_surface(occluders, keep)
+        return BVHTree.FromPolygons(vertices, polygons, all_triangles=False, epsilon=0.0)
+
+    everything = tree(lambda bones: True)
+    attached = tree(lambda bones: not all(is_detached(b) for b in bones))
+    directions = _hemisphere(settings["rays"])
+    reach = settings["reachShare"] * rest_height
+    lift = settings["liftMetres"]
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    evaluated = obj.evaluated_get(depsgraph)
+    mesh = evaluated.to_mesh()
+    bones = _dominant(obj)
+    values = []
+    for vertex in mesh.vertices:
+        origin = obj.matrix_world @ vertex.co
+        normal = (obj.matrix_world.to_3x3() @ vertex.normal).normalized()
+        tangent = normal.orthogonal().normalized()
+        bitangent = normal.cross(tangent)
+        start = origin + normal * lift
+        against = everything if is_detached(bones[vertex.index]) else attached
+        open_rays = 0
+        for d in directions:
+            ray = tangent * d.x + bitangent * d.y + normal * d.z
+            hit, *_ = against.ray_cast(start, ray, reach)
+            if hit is None:
+                open_rays += 1
+        values.append(max(settings["floor"], open_rays / len(directions)))
+    evaluated.to_mesh_clear()
+    if len(values) != len(obj.data.vertices):
+        raise ValueError(f"occlusion for {obj.name} does not match its vertices")
+    attribute = obj.data.color_attributes.new(name="Occlusion", type="FLOAT_COLOR", domain="POINT")
+    attribute.data.foreach_set("color", [c for value in values for c in (value, value, value, 1.0)])
+    return {
+        "meanMilli": round(1000 * sum(values) / len(values)),
+        "darkenedMilli": round(1000 * sum(1 for v in values if v < 0.9) / len(values)),
+    }
+
+
+def far_widths(body, rest_height):
+    """Shoulder and hip widths of the fitted body at rest, for the far form's build."""
+    rig = body.find_armature()
+    joints = {b.name: rig.matrix_world @ b.head_local for b in rig.data.bones}
+    groups = {g.index: g.name for g in body.vertex_groups}
+    band = 0.012 * rest_height
+
+    def width(height, excluded):
+        xs = []
+        for vertex in body.data.vertices:
+            strongest = max(vertex.groups, key=lambda element: element.weight, default=None)
+            name = groups.get(strongest.group) if strongest else None
+            if name is None or any(part in name for part in excluded):
+                continue
+            point = body.matrix_world @ vertex.co
+            if abs(point.z - height) <= band:
+                xs.append(point.x)
+        return round((max(xs) - min(xs)) * 1000)
+
+    return {
+        "shoulderWidthMillimetres": width(joints["mixamorig:LeftArm"].z, ("Hand", "ForeArm")),
+        "hipWidthMillimetres": width(joints["mixamorig:LeftUpLeg"].z, ("Hand", "ForeArm", "Arm")),
+    }
+
+
+def idle_floor(rig, body, config):
+    """The lowest point of the body in the idle clip's first frame, which the renderer lifts to its ground."""
+    held = [(track, track.mute) for track in rig.animation_data.nla_tracks]
+    for track, _ in held:
+        track.mute = True
+    rig.animation_data.action = bpy.data.actions[config["clips"][config["idleClip"]]]
+    bpy.context.scene.frame_set(0)
+    bpy.context.view_layer.update()
+    depsgraph = bpy.context.evaluated_depsgraph_get()
+    evaluated = body.evaluated_get(depsgraph)
+    mesh = evaluated.to_mesh()
+    floor = min((evaluated.matrix_world @ v.co).z for v in mesh.vertices)
+    evaluated.to_mesh_clear()
+    rig.animation_data.action = None
+    for track, mute in held:
+        track.mute = mute
+    return floor
 
 
 def build(config):
@@ -250,6 +397,28 @@ def build(config):
 
     calibration = transfer_motion(rig, config["animation"], config["mpfb"], config["clips"])
 
+    rest_points = [body.matrix_world @ v for v in base_positions["body"]]
+    rest_height = max(p.z for p in rest_points) - min(p.z for p in rest_points)
+    posture_measurements = {
+        key: postures.bake(rig, body, spec, rest_height, spec["clip"], FPS, ground=idle_floor(rig, body, config))
+        for key, spec in sorted(config.get("postures", {}).items())
+    }
+    for bone in rig.pose.bones:
+        bone.rotation_quaternion.identity()
+        bone.location = (0.0, 0.0, 0.0)
+        bone.scale = (1.0, 1.0, 1.0)
+    bpy.context.view_layer.update()
+    widths = far_widths(body, rest_height)
+    occlusion = {}
+    rig.data.pose_position = "REST"
+    bpy.context.view_layer.update()
+    occluding = {w[0]["node"]: w[1] for w in wearables if w[0]["kind"] in config["occlusion"]["kinds"]}
+    occlusion["body"] = bake_occlusion(body, [body], config["occlusion"], rest_height)
+    for node, obj in sorted(occluding.items()):
+        occlusion[node] = bake_occlusion(obj, [body, obj], config["occlusion"], rest_height)
+    rig.data.pose_position = "POSE"
+    bpy.context.view_layer.update()
+
     # Height and ground from the idle's first frame, measured on the actual skinned surface.
     scene = bpy.context.scene
     for track in rig.animation_data.nla_tracks:
@@ -290,6 +459,9 @@ def build(config):
         export_morph_tangent=False,
         export_try_sparse_sk=True,
         export_attributes=True,
+        export_vertex_color="NAME",
+        export_vertex_color_name="Occlusion",
+        export_all_vertex_colors=False,
         export_yup=True,
         export_apply=False,
         export_image_format="NONE",
@@ -318,6 +490,9 @@ def build(config):
             node: sum(1 for v in hidden if v & (1 << bit)) for node, bit in hide_bits.items()
         },
         "bones": [b.name for b in rig.data.bones],
+        "postures": posture_measurements,
+        "farWidths": widths,
+        "occlusion": occlusion,
     }
     for value in metadata["jointMotionMetres"].values():
         if not math.isfinite(value):

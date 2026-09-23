@@ -173,16 +173,52 @@ def test_family_revisions_ignore_population_tuning_and_follow_the_body_they_desc
     tuned["population"][0]["colours"]["hairColour"]["grey"] += 5
     tuned["revision"] += 1
     assert [f.sha256 for f in catalog_recipe_families(tuned, LOOKS)] == [f.sha256 for f in before]
-    relabelled = copy.deepcopy(CATALOG)
-    masculine = relabelled["families"][0]["bases"][1]
-    masculine["parts"][0]["label"] = "Renamed eyes"
-    after = catalog_recipe_families(relabelled, LOOKS)
+    narrowed = copy.deepcopy(CATALOG)
+    masculine = narrowed["families"][0]["bases"][1]
+    masculine["heightMillimetres"]["max"] -= 10
+    after = catalog_recipe_families(narrowed, LOOKS)
     assert after[0].sha256 == before[0].sha256
     assert after[1].sha256 != before[1].sha256
-    family, base = relabelled["families"][0], masculine
-    assert after[1].sources[0].content_sha256 == catalog_base_schema_sha256(
-        relabelled, family, base
+    family, base = narrowed["families"][0], masculine
+    assert after[1].sources[0].content_sha256 == catalog_base_schema_sha256(narrowed, family, base)
+
+
+def test_a_rebuilt_or_relabelled_body_keeps_every_saved_look_valid():
+    """How an id is drawn is not what a saved look means.
+
+    A rebuilt container, a new clip, a better material pack, a relabelled part or a truer hair
+    colour value leaves the family revision alone, so looks saved before an improvement still
+    resolve after it; removing a part a look may name does not.
+    """
+    before = [f.sha256 for f in catalog_recipe_families(CATALOG, LOOKS)]
+    redrawn = copy.deepcopy(CATALOG)
+    family = redrawn["families"][0]
+    for base in family["bases"]:
+        base["asset"]["contentSha256"] = "0" * 64
+        base["clips"]["idle"]["durationMilli"] += 1
+        for part in base["parts"]:
+            part["label"] = "Renamed"
+            part.get("asset", {})["contentSha256"] = "1" * 64
+    for material in family["materials"]:
+        material["asset"]["contentSha256"] = "2" * 64
+        material["roughnessMilli"] = 500
+    family["colours"]["hairColour"][0]["rgb"] = "#000000"
+    assert [f.sha256 for f in catalog_recipe_families(redrawn, LOOKS)] == before
+    removed = copy.deepcopy(CATALOG)
+    masculine = removed["families"][0]["bases"][1]
+    worn = {
+        part
+        for entry in LOOKS["looks"]
+        if entry["look"]["baseId"] == "masculine"
+        for part in entry["look"]["parts"].values()
+    }
+    victim = next(
+        p for p in masculine["parts"] if p["slot"] == "outfit" and p["partId"] not in worn
     )
+    masculine["parts"].remove(victim)
+    after = [f.sha256 for f in catalog_recipe_families(removed, LOOKS)]
+    assert after[0] == before[0]
+    assert after[1] != before[1]
 
 
 @pytest.mark.parametrize(

@@ -3,6 +3,10 @@
 Integration hook: optionally provide Services.character_appearance = CharacterAppearanceRuntime
 and include this router. Source authorization is host-owned and mandatory.
 ``app.state.society_input_authorizer`` is the authority for current synthetic society inputs.
+
+Every operation names the world its version belongs to (``world_id``, required). A workspace
+holds several worlds, a saved starter world among them, and appearance history is kept per world
+version, so a caller that left the world out would read or write another world's history.
 """
 
 from __future__ import annotations
@@ -56,10 +60,11 @@ router = APIRouter(prefix="/world", tags=["character-appearance"])
 _PATH = "/versions/{version_id}/characters/{subject_kind}/{subject_id}/appearance"
 _HEADERS = {"Cache-Control": "private, no-store"}
 Kind = Literal["avatar", "synthetic-inhabitant"]
+WorldId = Annotated[str, Query(min_length=1, max_length=200)]
 
 
 def _repo(
-    request: Request, connection: psycopg.Connection, session: Session
+    request: Request, connection: psycopg.Connection, session: Session, world_id: str
 ) -> CharacterAppearanceRepository:
     runtime = getattr(get_services(request), "character_appearance", None)
     if runtime is None:
@@ -76,6 +81,7 @@ def _repo(
         else lambda doc: authorizer(connection, session, doc),
         store=runtime.store,
         catalog=runtime.catalog,
+        world_id=world_id,
     )
 
 
@@ -83,6 +89,7 @@ def _call(
     request: Request,
     connection: psycopg.Connection,
     session: Session,
+    world_id: str,
     kind: Kind,
     subject_id: uuid.UUID,
     society_id: uuid.UUID | None,
@@ -92,7 +99,7 @@ def _call(
 
     try:
         subject = CharacterSubject(kind=kind, subject_id=subject_id, society_id=society_id)
-        result = operation(_repo(request, connection, session), subject)
+        result = operation(_repo(request, connection, session, world_id), subject)
         return JSONResponse(content=jsonable_encoder(result), headers=_HEADERS)
     except UnknownWorldResource:
         status, code, detail = 404, "unknown_reference", "no such authorized character appearance"
@@ -123,12 +130,14 @@ def read(
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
+    world_id: WorldId,
     society_id: uuid.UUID | None = None,
 ) -> Any:
     return _call(
         request,
         connection,
         session,
+        world_id,
         subject_kind,
         subject_id,
         society_id,
@@ -145,12 +154,14 @@ def save(
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
+    world_id: WorldId,
     society_id: uuid.UUID | None = None,
 ) -> Any:
     return _call(
         request,
         connection,
         session,
+        world_id,
         subject_kind,
         subject_id,
         society_id,
@@ -169,12 +180,14 @@ def reset(
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
+    world_id: WorldId,
     society_id: uuid.UUID | None = None,
 ) -> Any:
     return _call(
         request,
         connection,
         session,
+        world_id,
         subject_kind,
         subject_id,
         society_id,
@@ -195,6 +208,7 @@ def history(
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
+    world_id: WorldId,
     society_id: uuid.UUID | None = None,
     before_revision: Annotated[int | None, Query(ge=1)] = None,
     limit: Annotated[int, Query(ge=1, le=100)] = 50,
@@ -203,6 +217,7 @@ def history(
         request,
         connection,
         session,
+        world_id,
         subject_kind,
         subject_id,
         society_id,
@@ -220,12 +235,14 @@ def families(
     connection: ScopedConnection,
     session: CurrentSession,
     request: Request,
+    world_id: WorldId,
     society_id: uuid.UUID | None = None,
 ) -> Any:
     return _call(
         request,
         connection,
         session,
+        world_id,
         subject_kind,
         subject_id,
         society_id,

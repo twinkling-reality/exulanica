@@ -195,6 +195,7 @@ export function buildCharacterStudio(handlers: CharacterStudioHandlers) {
     el('summary', { text: 'Premade examples' }),
     el('p', { text: 'These are separate, complete characters used to test the world. Their names describe their outfits; they are not clothes for your editable character.' }), choices,
   ]);
+  examples.hidden = true;
   motion.append(el('label', { class: 'character-gesture-setting' }, [gestures, el('span', { text: 'Hand gestures' })]), gestureNote, examples);
   const rotation = el('input', { type: 'range', min: '-180', max: '180', value: '0', 'aria-label': 'Rotate character' });
   rotation.addEventListener('input', () => handlers.onRotate(Number(rotation.value) * Math.PI / 180));
@@ -278,6 +279,8 @@ export function buildCharacterStudio(handlers: CharacterStudioHandlers) {
     }
   }
   function reflectChoices() {
+    // Premade examples come only from the development preview; elsewhere there are none to show.
+    examples.hidden = catalog.length === 0;
     replace(choices, catalog.map(look => {
       const button = el('button', { type: 'button', text: look.familyId ? 'Return to my editable character' : look.label,
         'data-look': look.lookId, 'aria-pressed': String(look.lookId === selection?.lookId) });

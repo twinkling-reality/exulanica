@@ -5,9 +5,10 @@
 import * as pc from 'playcanvas';
 import type { CharacterSubject } from '@exulanica/atlas-core';
 import type { CharacterHost } from './host.js';
+import { activityPosture, catalogFamily, type CatalogFamily } from './catalog.js';
 import { describeLook, type CharacterDetail, type CharacterLook, type CharacterRenderableDescription } from './look.js';
 import { CharacterPerson } from './person.js';
-import { FarPerson, type FarPalette } from './far.js';
+import { FarPerson, farAppearance, type FarAppearance } from './far.js';
 
 export interface CharacterPose {
   /** Ground contact point in metres, in the parent entity's space. */
@@ -18,6 +19,12 @@ export interface CharacterPose {
   readonly reducedMotion?: boolean;
   /** A relocation: nothing is animated across it. */
   readonly discontinuity?: boolean;
+  /**
+   * What the person is doing where they stand, as the simulation states it: the kind of an action
+   * under way, such as `rest`, or null for none. The catalog decides how an activity is drawn; an
+   * activity it declares no posture for is drawn standing. Never inferred from motion.
+   */
+  readonly activity?: string | null;
 }
 
 export type CharacterRenderableStatus = 'pending' | 'ready' | 'unavailable';
@@ -53,6 +60,19 @@ export interface CharacterRenderable {
 
 /** Tag on every renderable root, so older display paths leave these subjects alone. */
 export const CHARACTER_RENDERABLE_TAG = 'character-renderable';
+
+/** The root's name: who it draws, in the form the abstract figure's roots use. */
+function rootName(subject: CharacterSubject): string {
+  switch (subject.kind) {
+    case 'player': return `player:${subject.playerId}`;
+    case 'synthetic-inhabitant': return `synthetic:${subject.inhabitantId}`;
+    case 'scene-person': return `scene-person:${subject.sceneId}:${subject.personRegionId}`;
+    default: {
+      const unknown: never = subject;
+      throw new TypeError(`No character root name for ${JSON.stringify(unknown)}`);
+    }
+  }
+}
 const TURN_SECONDS = 0.14;
 const MOVING_METRES_PER_SECOND = 0.05;
 
@@ -78,6 +98,8 @@ export class LayeredCharacterRenderable implements CharacterRenderable {
   private readonly unsubscribe: () => void;
   private readonly nearDescription: CharacterRenderableDescription;
   private readonly farDescription: CharacterRenderableDescription;
+  private readonly family: CatalogFamily;
+  private posture: string | null = null;
 
   constructor(
     private readonly host: CharacterHost,
@@ -88,19 +110,12 @@ export class LayeredCharacterRenderable implements CharacterRenderable {
   ) {
     this.nearDescription = describeLook(host.catalog, look, 'near');
     this.farDescription = describeLook(host.catalog, look, 'far');
+    this.family = catalogFamily(host.catalog, look.familyId);
     this.lookSha256 = this.nearDescription.lookSha256;
-    this.root = new pc.Entity(`character:${subject.kind}`, host.app);
+    this.root = new pc.Entity(rootName(subject), host.app);
     this.root.tags.add(CHARACTER_RENDERABLE_TAG);
     parent.addChild(this.root);
-    const colours = this.farDescription.farColours;
-    const palette: FarPalette = {
-      skin: colours.skin,
-      hair: colours.hair ?? colours.skin,
-      upper: colours.upper,
-      lower: colours.lower,
-      shoes: colours.shoes,
-    };
-    this.far = new FarPerson(host.app, look.baseId, this.standingHeight, palette);
+    this.far = new FarPerson(host.app, farAppearance(host.catalog, look));
     this.root.addChild(this.far.root);
     this.wanted = detail;
     this.unsubscribe = host.onLoader(() => this.ensureNear());
@@ -135,6 +150,16 @@ export class LayeredCharacterRenderable implements CharacterRenderable {
 
   get resolvedSpeed(): number {
     return this.speed;
+  }
+
+  /** What this person's far form draws. */
+  get farAppearance(): FarAppearance {
+    return this.far.appearance;
+  }
+
+  /** The posture drawn for the activity last stated, or null for standing and moving. */
+  get drawnPosture(): string | null {
+    return this.posture;
   }
 
   get drawnForm(): CharacterDetail | 'hidden' {
@@ -227,8 +252,10 @@ export class LayeredCharacterRenderable implements CharacterRenderable {
     this.root.setLocalPosition(x, y, z);
     this.root.setLocalEulerAngles(0, (heading * 180) / Math.PI, 0);
     const reduced = pose.reducedMotion === true;
+    this.posture = activityPosture(this.family, pose.activity);
+    this.far.setPosture(this.posture);
     this.far.update(this.speed, dt, reduced);
-    this.near?.update({ speed: this.speed, turnRate: this.turnRate, deltaSeconds: dt, reducedMotion: reduced, discontinuity });
+    this.near?.update({ speed: this.speed, turnRate: this.turnRate, deltaSeconds: dt, reducedMotion: reduced, discontinuity, posture: this.posture });
   }
 
   // Members the district runtime reads from its display avatars. They keep that code unchanged.

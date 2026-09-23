@@ -2,23 +2,33 @@ import type * as pc from 'playcanvas';
 import type { NativeCharacterFrame } from '../native-character-runtime.js';
 import { sampleMotionPath } from '../society-presentation.js';
 import { FarFigures } from './far-figures.js';
-import { abstractInhabitantRenderable } from './near-character.js';
-import { NEAR_CHARACTER_BUDGET } from '../character/budget.js';
+import { NEAR_INHABITANT_BUDGET } from '../character/budget.js';
 import { CharacterHost } from '../character/host.js';
-import type { CrowdRenderable, CrowdRenderableFactory, OwnedSocietyState } from './types.js';
+import { inhabitantRenderable } from '../character/inhabitant.js';
+import type { CharacterPose } from '../character/renderable.js';
+import type { FarAppearance } from '../character/far.js';
+import type { CrowdRenderable, CrowdRenderableFactory, OwnedSocietyState, SocietyInhabitantSnapshot } from './types.js';
 
 /**
  * The whole synthetic population, drawn by distance.
  *
  * The population is canonical state and is never truncated here. Every outdoor inhabitant is
- * placed along its own recorded motion path; the nearest are full characters and everyone
- * else is a simple far figure of the same person. People inside premises are counted, not drawn,
+ * placed along its own recorded motion path; the nearest are full catalog people and everyone
+ * else is the far form of the same person's look. People inside premises are counted, not drawn,
  * because interiors are not rendered. Two people standing on the same point are both drawn
  * there: where a society puts people is the simulation's occupancy rule, not the renderer's.
  *
  * Motion follows the recorded path only. A v4 inhabitant walks from the start of the tick at its
  * own recorded speed and stops where the path ends; an older snapshot without a speed is eased
  * along its path over the whole interval. No position is invented between path points.
+ * Everyone faces the way their recorded path last took them and keeps that facing when they
+ * stop, in either form, so a person first drawn in full after arriving, or again after a spell
+ * in the far form, faces as their far figure did.
+ *
+ * What a person is doing comes from the state too, never from how they move: an inhabitant whose
+ * state names an active action (`action.kind` with `status` active) is handed that activity once
+ * the path recorded for the tick has been walked, so a person asked to rest walks there and then
+ * sits. How an activity is drawn is the character catalog's decision.
  *
  * Everyone is drawn on the ground plane. A recorded point is a plan point and the height each
  * walker is drawn at is 0, which is the ground a tile bake draws; a person who states the height
@@ -27,17 +37,18 @@ import type { CrowdRenderable, CrowdRenderableFactory, OwnedSocietyState } from 
  * and in the far figures must be read from the person instead of written.
  *
  * Detail by distance applies to time as well as shape. Every drawn inhabitant is placed at its
- * recorded point every frame, but a full character's limbs are solved and skinned on the CPU, so
- * only the nearest few are posed every frame; the rest are posed every second or third frame and
- * carried to their recorded point in between. A selected inhabitant is posed every frame.
+ * recorded point every frame, but only the nearest few full characters are posed every frame;
+ * the rest are posed every second or third frame and carried to their recorded point in between.
+ * A selected inhabitant is posed every frame.
  */
 export interface CrowdOptions {
-  /** Full characters at most; the measured character budget (NEAR_CHARACTER_BUDGET) is the ceiling. */
+  /** Full characters at most; the inhabitants' share of the measured budget is the ceiling. */
   readonly nearLimit?: number;
   /** Full characters only within this many metres of the observer. */
   readonly nearRadius?: number;
   /** Far figures only within this many metres of the observer. */
   readonly farRadius?: number;
+  /** Who draws a person in full; the catalog person unless a caller supplies another. */
   readonly factory?: CrowdRenderableFactory;
   /** Frames between poses for the full character at this nearness rank (0 is nearest). */
   readonly poseInterval?: PoseInterval;
@@ -62,19 +73,28 @@ interface Walker {
   /** Metres per interval, or null when the snapshot records no speed. */
   readonly speed: number | null;
   readonly indoors: boolean;
+  /** The activity the state says this person is performing, or null when it names none. */
+  readonly activity: string | null;
   position: readonly [number, number];
   facing: number;
+  /** Whether the path recorded for this tick has been walked to its end. */
+  arrived: boolean;
 }
 
-/** The measured ceiling on people drawn in full at once, the player's own body included. */
-const NEAR_LIMIT = NEAR_CHARACTER_BUDGET;
+/**
+ * The inhabitants' share of the measured budget: everyone drawn in full counts, and the player's
+ * own body holds its place whenever it is on screen (`PLAYER_NEAR_PLACES`).
+ */
+const NEAR_LIMIT = NEAR_INHABITANT_BUDGET;
 const REFRESH_METRES = 4;
 const DEFAULT_INTERVAL_MS = 1_850;
 /**
- * The nearest 4 are posed every frame, the next 8 every second frame and the rest every third:
- * 12 poses a frame instead of 24. Measured in the preview at 1440x900, one abstract character's
- * pose costs about 0.53 ms of main-thread time, almost all of it CPU skinning, so posing all 24
- * every frame left the main thread busy for nearly the whole 16.7 ms frame.
+ * The nearest 4 are posed every frame, the next 8 every second frame and the rest every third.
+ * Measured in the development preview at 1440x900: an abstract figure's pose costs about 0.53 ms of
+ * main-thread time, almost all of it CPU skinning, and a catalog person's about 2.6 microseconds,
+ * because the engine animates and skins every drawn person whether or not it was posed
+ * (test/character-evidence/follow-saving-2026-09-17.log.txt). The cadence is what makes the abstract
+ * figure affordable and costs a catalog person nothing it would notice.
  */
 const POSE_INTERVAL: PoseInterval = (rank) => (rank < 4 ? 1 : rank < 12 ? 2 : 3);
 
@@ -88,9 +108,15 @@ function polyline(path: readonly (readonly [number, number])[]): { lengths: numb
   return { lengths, total: lengths.reduce((a, b) => a + b, 0) };
 }
 
+/** Facing in radians about +Y with -Z forward, the renderable's convention; held when not moving. */
 function heading(a: readonly [number, number], b: readonly [number, number], held: number): number {
   const dx = b[0] - a[0], dz = b[1] - a[1];
-  return Math.hypot(dx, dz) < 1e-6 ? held : Math.atan2(dx, dz);
+  return Math.hypot(dx, dz) < 1e-6 ? held : Math.atan2(-dx, -dz);
+}
+
+/** The activity a snapshot states for a person: the kind of an action that is under way. */
+function stateActivity(person: SocietyInhabitantSnapshot): string | null {
+  return person.action?.status === 'active' ? person.action.kind : null;
 }
 
 export class SocietyCrowd {
@@ -125,7 +151,7 @@ export class SocietyCrowd {
     private readonly root: pc.Entity,
     options: CrowdOptions = {},
   ) {
-    this.factory = options.factory ?? abstractInhabitantRenderable;
+    this.factory = options.factory ?? inhabitantRenderable;
     this.nearLimit = Math.max(0, Math.min(NEAR_LIMIT, options.nearLimit ?? NEAR_LIMIT));
     this.nearRadius = options.nearRadius ?? 60;
     this.farRadius = options.farRadius ?? 700;
@@ -153,7 +179,9 @@ export class SocietyCrowd {
     this.intervalMs = Math.max(1, options.intervalMs ?? DEFAULT_INTERVAL_MS);
     this.startedAtMs = options.nowMs ?? performance.now();
     this.lastFrameMs = this.startedAtMs;
-    const pathful = state.profile === 'exulanica-society/v2' || state.profile === 'exulanica-society/v4';
+    // Whether this snapshot records paths is read from the snapshot: every engine that reads its
+    // input writes each person's path, and a legacy state carries none, so no profile is listed here.
+    const pathful = state.inhabitants.every((person) => Array.isArray(person.motion_path_mm));
     const walkers = new Map<string, Walker>();
     let moving = false;
     for (const person of state.inhabitants) {
@@ -176,8 +204,10 @@ export class SocietyCrowd {
         total,
         speed: person.walk_speed_mm_per_tick === undefined ? null : person.walk_speed_mm_per_tick / 1000,
         indoors: person.indoors === true,
+        activity: stateActivity(person),
         position: path[0]!,
         facing: previous?.facing ?? 0,
+        arrived: total === 0,
       };
       moving ||= total > 0;
       walkers.set(person.id, walker);
@@ -263,6 +293,17 @@ export class SocietyCrowd {
     return this.walkers.get(id)?.position ?? null;
   }
 
+  /** What an inhabitant's far figure draws: the far form of that person's own look. */
+  farAppearance(id: string): FarAppearance {
+    return this.far.appearanceOf(id);
+  }
+
+  /** The activity drawn for an inhabitant now: the state's, once its recorded path is walked. */
+  activityOf(id: string): string | null {
+    const walker = this.walkers.get(id);
+    return walker?.arrived ? walker.activity : null;
+  }
+
   /** Inhabitants presented at exactly this inhabitant's point, including itself. */
   sharing(id: string): readonly string[] {
     const held = this.walkers.get(id);
@@ -297,7 +338,7 @@ export class SocietyCrowd {
   }
 
   get textureResidentBytes(): number {
-    let bytes = 0;
+    let bytes = this.far.textureResidentBytes;
     for (const renderable of this.near.values()) bytes += renderable.textureResidentBytes ?? 0;
     return bytes + CharacterHost.residentFor(this.device).textureBytes;
   }
@@ -339,7 +380,7 @@ export class SocietyCrowd {
       const walker = this.walkers.get(id);
       if (!walker) continue;
       const [x, z] = walker.position;
-      const height = renderable?.standingHeight ?? 1.8;
+      const height = renderable?.standingHeight ?? this.far.appearanceOf(id).heightMetres;
       const distance = hit([x - 0.34, 0, z - 0.34], [x + 0.34, height, z + 0.34]);
       if (distance !== null && distance < nearest) {
         nearest = distance;
@@ -391,11 +432,14 @@ export class SocietyCrowd {
       const walker = this.walkers.get(id)!;
       // Posed at once, so a new full character is drawn and pickable before the next frame.
       renderable.setVisible(!walker.indoors);
-      renderable.pose({
+      const pose: CharacterPose = {
         position: [walker.position[0], 0, walker.position[1]],
+        yaw: walker.facing,
         deltaSeconds: 1 / 60,
         discontinuity: true,
-      });
+        activity: walker.arrived ? walker.activity : null,
+      };
+      renderable.pose(pose);
       this.near.set(id, renderable);
       this.discontinuity = true;
     }
@@ -408,12 +452,14 @@ export class SocietyCrowd {
     const eased = fraction * fraction * (3 - 2 * fraction);
     for (const walker of this.walkers.values()) {
       let position = walker.path[walker.path.length - 1]!;
+      let travelled = 1;
       if (walker.total > 0 && Number.isFinite(elapsed)) {
-        const travelled = walker.speed === null ? eased : Math.min(1, (fraction * walker.speed) / walker.total);
+        travelled = walker.speed === null ? eased : Math.min(1, (fraction * walker.speed) / walker.total);
         position = sampleMotionPath(walker.path, travelled);
       }
       walker.facing = heading(walker.position, position, walker.facing);
       walker.position = position;
+      walker.arrived = travelled >= 1;
     }
     this.frame += 1;
     for (const [id, renderable] of this.near) {
@@ -428,7 +474,15 @@ export class SocietyCrowd {
       const interval = id === this.selectedId ? 1 : Math.max(1, Math.floor(this.poseInterval(slot.rank)));
       const due = discontinuity || !renderable.follow || interval === 1 || (this.frame + slot.rank) % interval === 0;
       if (due) {
-        renderable.pose({ position, deltaSeconds: slot.pendingSeconds, reducedMotion: reduced, discontinuity });
+        const pose: CharacterPose = {
+          position,
+          yaw: walker.facing,
+          deltaSeconds: slot.pendingSeconds,
+          reducedMotion: reduced,
+          discontinuity,
+          activity: walker.arrived ? walker.activity : null,
+        };
+        renderable.pose(pose);
         slot.pendingSeconds = 0;
       } else {
         renderable.follow!(position);
@@ -437,8 +491,16 @@ export class SocietyCrowd {
     this.far.update(
       this.farIds.map((id) => {
         const walker = this.walkers.get(id)!;
-        return { id, x: walker.position[0], z: walker.position[1], facing: walker.facing };
+        return {
+          id,
+          x: walker.position[0],
+          z: walker.position[1],
+          facing: walker.facing,
+          activity: walker.arrived ? walker.activity : null,
+        };
       }),
+      dt,
+      reduced,
     );
   }
 }

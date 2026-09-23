@@ -7,6 +7,8 @@ import {
   lookFromRecipe,
   recipeFamilyId,
   recipeParameters,
+  worldLookTarget,
+  type LookStore,
   type SavedChoice,
 } from '../src/character-looks-store.js';
 
@@ -76,6 +78,23 @@ describe('the preview look store', () => {
   });
 });
 
+describe('where a signed-in world keeps looks', () => {
+  it('is the open world version, as the account, and nowhere without either', () => {
+    const entry = { worldId: 'world:authored:1', authoredVersionId: 'v-1' };
+    expect(worldLookTarget(entry, 'actor-1')).toEqual({ target: { worldId: 'world:authored:1', versionId: 'v-1', actor: 'actor-1' } });
+    expect(worldLookTarget(entry, null)).toEqual({ target: null, missing: 'account' });
+    expect(worldLookTarget(null, 'actor-1')).toEqual({ target: null, missing: 'version' });
+  });
+
+  it('keeps only catalog people on the server and anything in the visit store', () => {
+    const store = new WorkspaceLookStore({ baseUrl: 'https://world.example/api', token: 't', fetch: vi.fn() }, { worldId: 'w', versionId: 'v', actor: 'a' });
+    expect(store.keeps({ kind: 'catalog', look: look('suit-masculine') })).toBe(true);
+    expect(store.keeps({ kind: 'abstract' })).toBe(false);
+    const visit: LookStore = new PreviewLookStore(defaults, null);
+    expect(visit.keeps({ kind: 'abstract' })).toBe(true);
+  });
+});
+
 describe('the signed-in look store', () => {
   const family = (familyId: string) => ({ family_sha256: 'a'.repeat(64), family: { family_id: familyId, default_seed: 0 } });
   const revision = (n: number, chosen: CharacterLook) => ({
@@ -90,15 +109,17 @@ describe('the signed-in look store', () => {
       const url = String(input);
       init ??= {};
       calls.push({ method: init.method ?? 'GET', url, body: init.body ? JSON.parse(String(init.body)) : null });
-      if (url.endsWith('/families')) return Response.json([family('makehuman-people/v1/feminine'), family('makehuman-people/v1/masculine')]);
+      if (url.includes('/families?')) return Response.json([family('makehuman-people/v1/feminine'), family('makehuman-people/v1/masculine')]);
       if (init.method === 'PUT') return Response.json({ revision: 1, current: revision(1, chosen) });
       return Response.json({ revision: 1, current: revision(1, chosen) });
     });
-    const store = new WorkspaceLookStore({ baseUrl: 'https://world.example/api', token: 't', fetch }, { versionId: 'v 1', actor: 'actor-1' });
+    const store = new WorkspaceLookStore({ baseUrl: 'https://world.example/api', token: 't', fetch }, { worldId: 'world:authored:1', versionId: 'v 1', actor: 'actor-1' });
     const saved = await store.save({ kind: 'catalog', look: chosen }, 0);
     expect(saved.current?.choice).toEqual({ kind: 'catalog', look: chosen });
     const put = calls.find((call) => call.method === 'PUT')!;
-    expect(put.url).toBe('https://world.example/api/world/versions/v%201/characters/avatar/actor-1/appearance');
+    expect(put.url).toBe('https://world.example/api/world/versions/v%201/characters/avatar/actor-1/appearance?world_id=world%3Aauthored%3A1');
+    // Every call names the world, the families and the reads included.
+    expect(calls.every((call) => call.url.endsWith('?world_id=world%3Aauthored%3A1'))).toBe(true);
     expect(put.body).toEqual({
       base_revision: 0,
       recipe: { family_id: 'makehuman-people/v1/feminine', family_sha256: 'a'.repeat(64), parameters: recipeParameters(chosen), seed: 0 },
@@ -108,10 +129,10 @@ describe('the signed-in look store', () => {
   });
 
   it('turns a conflicting write into a reload request', async () => {
-    const fetch = vi.fn(async (input: RequestInfo | URL) => String(input).endsWith('/families')
+    const fetch = vi.fn(async (input: RequestInfo | URL) => String(input).includes('/families?')
       ? Response.json([family('makehuman-people/v1/masculine')])
       : Response.json({ code: 'stale_appearance', detail: 'appearance changed; reload before saving' }, { status: 409 }));
-    const store = new WorkspaceLookStore({ baseUrl: 'https://world.example/api', token: 't', fetch }, { versionId: 'v', actor: 'a' });
+    const store = new WorkspaceLookStore({ baseUrl: 'https://world.example/api', token: 't', fetch }, { worldId: 'w', versionId: 'v', actor: 'a' });
     await expect(store.save({ kind: 'catalog', look: look('suit-masculine') }, 3)).rejects.toBeInstanceOf(StaleLookError);
     await expect(store.reset(3)).rejects.toBeInstanceOf(StaleLookError);
   });

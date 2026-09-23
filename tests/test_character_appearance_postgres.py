@@ -66,6 +66,7 @@ def appearance(world, repository):
         actor,
         families=(family(),),
         authorize_family=lambda definition: True,
+        world_id=objects.world_id,
     )
     subject = CharacterSubject(kind="avatar", subject_id=actor)
     repository.connection.commit()
@@ -90,6 +91,7 @@ def test_save_reopen_reset_and_history_are_durable(appearance, spine_schema):
             repo.actor,
             families=(family(),),
             authorize_family=lambda definition: True,
+            world_id=repo.world_id,
         )
         assert reopened.read(version, subject) == first
         default = reopened.reset(version, subject, base_revision=1)
@@ -118,6 +120,7 @@ def test_concurrent_first_save_has_one_winner(appearance, spine_schema):
                 repo.actor,
                 families=(family(),),
                 authorize_family=lambda definition: True,
+                world_id=repo.world_id,
             )
             barrier.wait(timeout=5)
             try:
@@ -162,7 +165,12 @@ def test_actor_workspace_and_version_are_not_interchangeable(appearance, spine_s
             action()
     with another_connection(spine_schema, uuid.uuid4()) as conn:
         alien = CharacterAppearanceRepository(
-            conn, uuid.uuid4(), repo.actor, families=(family(),), authorize_family=lambda f: True
+            conn,
+            uuid.uuid4(),
+            repo.actor,
+            families=(family(),),
+            authorize_family=lambda f: True,
+            world_id=repo.world_id,
         )
         with pytest.raises(UnknownWorldResource):
             alien.read(version, subject)
@@ -360,7 +368,8 @@ def test_source_tombstone_denies_subject_without_erasing_history(repository, tmp
         structural_candidate(graph="appearance-source", evidence_span_id=evidence["span_id"]),
     )
     actor = uuid.uuid4()
-    version = WorldObjectRepository(repository.connection, repository.workspace_id).create_version(
+    objects = WorldObjectRepository(repository.connection, repository.workspace_id)
+    version = objects.create_version(
         source_snapshot_id=snapshot.snapshot_id, title="Source-bound avatar", created_by=actor
     )
     repo = CharacterAppearanceRepository(
@@ -369,6 +378,7 @@ def test_source_tombstone_denies_subject_without_erasing_history(repository, tmp
         actor,
         families=(family(),),
         authorize_family=lambda f: True,
+        world_id=objects.world_id,
     )
     subject = CharacterSubject(kind="avatar", subject_id=actor)
     repo.save(version.version_id, subject, recipe(), base_revision=0)

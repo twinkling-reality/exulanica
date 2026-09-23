@@ -1,4 +1,4 @@
-export { inhabitantRenderable, inhabitantLook, INHABITANT_DRAW_DOMAIN, type InhabitantIdentity } from './inhabitant.js';
+export { inhabitantRenderable, inhabitantLook, inhabitantLookOf, INHABITANT_DRAW_DOMAIN, type InhabitantIdentity } from './inhabitant.js';
 export type { CharacterRenderable, CharacterPose, CharacterRenderableStatus } from './renderable.js';
 export { LayeredCharacterRenderable, CHARACTER_RENDERABLE_TAG } from './renderable.js';
 export {
@@ -36,4 +36,5 @@ export { CharacterHost, type CharacterAssetLoader } from './host.js';
 export { canonicalJson, canonicalSha256, sha256Hex } from './digest.js';
 export { CharacterCrowdEvaluation, EVALUATION_SPEEDS, type CrowdEvaluationHost, type CrowdEvaluationOptions } from './evaluation.js';
 export { CharacterChoices, type CharacterChoice } from './choices.js';
-export { NEAR_CHARACTER_BUDGET } from './budget.js';
+export { NEAR_CHARACTER_BUDGET, NEAR_INHABITANT_BUDGET, PLAYER_NEAR_PLACES } from './budget.js';
+export { farAppearance, type FarAppearance } from './far.js';

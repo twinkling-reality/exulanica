@@ -51,7 +51,8 @@
 #shell .character-look-list { display: flex; flex-direction: column; align-items: stretch; }
 #shell .character-look-list button { text-align: left; font: 400 26px/1.2 var(--ui-font-display); letter-spacing: -.03em; padding: 16px 10px; border-radius: 0; }
 #shell .character-look-list button[aria-pressed='true'] { background: #ffffff70; color: #263940; box-shadow: inset 0 0 0 1px #9faeb3; }
-#shell .character-description { position: absolute; top: 29%; right: 4%; width: 235px; }
+/* Bounded above the preview controls like the sidebar; a long saved-looks list scrolls. */
+#shell .character-description { position: absolute; top: 29%; right: 4%; bottom: 110px; width: 235px; overflow-y: auto; }
 #shell .character-description h2 { margin: 0 0 12px; font: 400 32px/1.2 var(--ui-font-display); letter-spacing: -.03em; }
 #shell .character-description > p { line-height: 1.6; }
 #shell .character-description .character-status { min-height: 42px; margin-block: 28px 20px; padding-top: 20px; border-top: 1px solid #b9c4c7; font-size: 13px; }
@@ -90,7 +91,7 @@
 @media (max-height: 690px) {
   #shell .character-header { top: 22px; }
   #shell .character-sidebar { top: 22%; bottom: 70px; gap: 16px; }
-  #shell .character-description { top: 22%; }
+  #shell .character-description { top: 22%; bottom: 70px; }
   #shell .character-description .character-status { margin-block: 14px 8px; padding-top: 12px; }
   #shell .character-preview-controls { bottom: 12px; }
 }

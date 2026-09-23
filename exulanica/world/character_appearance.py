@@ -378,35 +378,51 @@ def draw_look(catalog: Mapping[str, Any], domain: str, subject_id: str) -> dict[
     return look
 
 
+#: What a slot means to a saved look: its key, kind, whether it may be empty and what it applies to.
+_SLOT_MEANING = ("slot", "kind", "optional", "appliesTo")
+
+
 def catalog_base_schema_sha256(
     catalog: Mapping[str, Any], family: Mapping[str, Any], base: Mapping[str, Any]
 ) -> str:
-    """Digest of what a saved look over one base depends on.
+    """Digest of what a saved look over one base means: its vocabulary, not how it is drawn.
 
-    Population weights, draw domains and the other bases are left out, so tuning the street
-    population or adding to another body never turns a saved look into an unknown revision.
+    A recipe names a part, material or colour by catalog id per slot and carries height and morph
+    weights inside declared bounds; those ids and bounds are all it depends on. How an id is drawn
+    (container bytes, clips, textures, labels, colour values, far colours) is left out, so a
+    rebuilt container, a new clip or better materials never turn a saved look into an unknown
+    revision; the render status of a saved look is resolved against the current catalog instead.
+    Population weights, draw domains and the other bases are left out too, so tuning the street
+    population or adding to another body does not either. Removing a part a look may name, or
+    narrowing a bound, does change it.
     """
-    used = {part["material"] for part in base["parts"]}
-    used.update(material for ids in base["materials"].values() for material in ids)
     return document_sha256(
         {
             "profile": catalog["profile"],
             "catalogId": catalog["catalogId"],
             "family": {
-                key: family[key]
-                for key in (
-                    "familyId",
-                    "kind",
-                    "rigId",
-                    "joints",
-                    "licence",
-                    "slots",
-                    "parameters",
-                    "colours",
-                )
+                "familyId": family["familyId"],
+                "kind": family["kind"],
+                "rigId": family["rigId"],
+                "slots": [
+                    {key: slot[key] for key in _SLOT_MEANING if key in slot}
+                    for slot in family["slots"]
+                ],
+                "parameters": [
+                    {key: parameter[key] for key in ("key", "unit", "min", "max")}
+                    for parameter in family["parameters"]
+                ],
+                "colours": {
+                    slot: [colour["key"] for colour in colours]
+                    for slot, colours in family["colours"].items()
+                },
             },
-            "base": base,
-            "materials": [m for m in family["materials"] if m["materialId"] in used],
+            "base": {
+                "baseId": base["baseId"],
+                "heightMillimetres": base["heightMillimetres"],
+                "parts": sorted([part["slot"], part["partId"]] for part in base["parts"]),
+                "materials": {slot: list(ids) for slot, ids in base["materials"].items()},
+            },
         }
     )
 

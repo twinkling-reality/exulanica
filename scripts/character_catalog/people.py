@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parents[2]
 CHARACTERS = ROOT / "assets/characters"
 FAMILY_ROOT = CHARACTERS / "makehuman-people-v1"
 SCRIPTS = Path(__file__).resolve().parent
-PREPARATION_SCRIPTS = ["glb.py", "packs.py", "people.py", "people_blender.py", "retarget.py", "split.py"]
+PREPARATION_SCRIPTS = ["glb.py", "packs.py", "people.py", "people_blender.py", "posture.py", "retarget.py", "split.py"]
 PRODUCER = "makehuman-people-prepare/1"
 FAMILY_ID = "makehuman-people/v1"
 DRAW_DOMAIN = "street-population/v1"
@@ -39,6 +39,12 @@ SLOT_LABELS = {
     "lashes": "Eyelashes",
     "eyes": "Eyes",
 }
+#: Posture joints the far form follows, in the order a reader lists them.
+POSTURE_JOINTS = (
+    "pelvis", "chest", "neck", "head",
+    "leftHip", "leftKnee", "leftAnkle", "leftToe", "leftShoulder", "leftElbow", "leftWrist",
+    "rightHip", "rightKnee", "rightAnkle", "rightToe", "rightShoulder", "rightElbow", "rightWrist",
+)
 
 
 def sha256_bytes(data):
@@ -85,6 +91,11 @@ def base_config(definition, base, source, output, metadata, cache):
         "wearables": wearables,
         "clips": definition["clips"],
         "idleClip": definition["idleClip"],
+        "postures": {
+            key: {k: v for k, v in spec.items() if k != "label"}
+            for key, spec in definition.get("postures", {}).items()
+        },
+        "occlusion": definition["occlusion"],
         "output": str(output),
         "metadata": str(metadata),
     }
@@ -101,7 +112,13 @@ def build_base(definition, base, source, blender, workdir):
     # Reuse a finished build only for identical inputs and identical Blender-side scripts.
     stamp = sha256_bytes(
         json.dumps(
-            [config, sha256_file(SCRIPTS / "people_blender.py"), sha256_file(SCRIPTS / "retarget.py"), sha256_file(blender)],
+            [
+                config,
+                sha256_file(SCRIPTS / "people_blender.py"),
+                sha256_file(SCRIPTS / "retarget.py"),
+                sha256_file(SCRIPTS / "posture.py"),
+                sha256_file(blender),
+            ],
             sort_keys=True,
         ).encode()
     )
@@ -145,7 +162,7 @@ def material_jobs(definition, assets):
         for index, skin in enumerate(base["skins"], start=1):
             jobs[f"skin/{skin}"] = {
                 "kind": "skin",
-                "label": f"Skin {base['baseId']} {index}",
+                "label": f"Skin tone {index}",
                 "mhmat": assets / "skins" / skin / f"{skin}.mhmat",
                 "settings": settings["skin"],
                 "source": f"skins/{skin}",
@@ -295,7 +312,7 @@ def prepare(source, blender, workdir, output=FAMILY_ROOT, inputs=None):
         )
         relative = f"materials/{name}.glb"
         write(relative, data)
-        ref = asset_ref(f"makehuman.people.material.{name}.v1", f"makehuman-people-v1/{relative}", data)
+        ref = asset_ref(f"makehuman.people.material.{name}.v{definition['assetRevisions']['materials']}", f"makehuman-people-v1/{relative}", data)
         processed[material_id] = image
         entry = {
             "materialId": material_id,
@@ -313,6 +330,9 @@ def prepare(source, blender, workdir, output=FAMILY_ROOT, inputs=None):
             entry["alphaCutoffMilli"] = info["alphaCutoffMilli"]
         if info["tint"]:
             entry["tint"] = info["tint"]
+        if job["kind"] in definition["occlusion"]["materialKinds"]:
+            # Every mesh this material draws carries baked occlusion in its vertex colour.
+            entry["vertexOcclusion"] = True
         materials.append(entry)
         manifests.append(import_manifest(ref, f"People material {material_id}", f"CC0 MakeHuman {job['kind']} textures prepared for fitted people.", licence_sha, MPFB_URL, revision))
 
@@ -329,7 +349,8 @@ def prepare(source, blender, workdir, output=FAMILY_ROOT, inputs=None):
         split = split_base(data, face_nodes)
         base_bytes = split.pop("base")
         write(f"bases/{base_id}.glb", base_bytes)
-        base_ref = asset_ref(f"makehuman.people.{base_id}.base.v1", f"makehuman-people-v1/bases/{base_id}.glb", base_bytes)
+        revision_tag = f"v{definition['assetRevisions']['containers']}"
+        base_ref = asset_ref(f"makehuman.people.{base_id}.base.{revision_tag}", f"makehuman-people-v1/bases/{base_id}.glb", base_bytes)
         manifests.append(import_manifest(base_ref, f"People {base_id} base", "Fitted CC0 MakeHuman body, face and skeleton with Quaternius CC0 locomotion.", licence_sha, MPFB_URL, revision))
         triangles, body_triangles = hide_mask_triangles(base_bytes)
         parts = []
@@ -353,7 +374,7 @@ def prepare(source, blender, workdir, output=FAMILY_ROOT, inputs=None):
                 part_bytes = split[node]
                 relative = f"parts/{base_id}/{key_name(node)}.glb"
                 write(relative, part_bytes)
-                part["asset"] = asset_ref(f"makehuman.people.{base_id}.{key_name(node)}.v1", f"makehuman-people-v1/{relative}", part_bytes)
+                part["asset"] = asset_ref(f"makehuman.people.{base_id}.{key_name(node)}.{revision_tag}", f"makehuman-people-v1/{relative}", part_bytes)
                 manifests.append(import_manifest(part["asset"], f"People {base_id} {slot} {name}", f"CC0 MakeHuman {slot} fitted to the {base_id} base.", licence_sha, MPFB_URL, revision))
                 part["farColours"] = far_colours(part_bytes, processed[material_id])
             else:
@@ -372,6 +393,22 @@ def prepare(source, blender, workdir, output=FAMILY_ROOT, inputs=None):
                 "name": definition["clips"][source_name],
                 "durationMilli": round(clip["durationSeconds"] * 1000),
                 "speedMillimetresPerSecond": rest_speed(clip) if kind in ("walk", "run") else 0,
+            }
+        base_postures = {}
+        for key, spec in sorted(definition.get("postures", {}).items()):
+            measured = metadata["postures"][key]
+            placed = measured["joints"]
+            base_postures[key] = {
+                "clip": {
+                    "name": spec["clip"],
+                    "durationMilli": round(measured["durationSeconds"] * 1000),
+                    "speedMillimetresPerSecond": 0,
+                },
+                # The asset's own frame (Y up, facing +Z), millimetres, at the clip's first frame.
+                "jointsMillimetres": {
+                    name: [round(placed[name][0] * 1000), round(placed[name][2] * 1000), round(-placed[name][1] * 1000)]
+                    for name in POSTURE_JOINTS
+                },
             }
         document, _ = read_glb(base_bytes)
         skin_joints = [document["nodes"][j]["name"] for j in document["skins"][0]["joints"]]
@@ -392,6 +429,8 @@ def prepare(source, blender, workdir, output=FAMILY_ROOT, inputs=None):
             "morphTargets": [m["key"] for m in definition["morphs"]],
             "bodyNode": "body",
             "bodyTriangles": body_triangles,
+            "farForm": metadata["farWidths"],
+            "postures": base_postures,
             "parts": parts,
             "materials": {
                 "skin": [f"skin/{s}" for s in base["skins"]],
@@ -408,16 +447,23 @@ def prepare(source, blender, workdir, output=FAMILY_ROOT, inputs=None):
             "muscle": dict(zip(("min", "mode", "max"), spread["muscle"], strict=True)),
         }
 
+    studio = definition["studio"]
+
+    def presented(key, entry):
+        """A slot or parameter with the studio's declared section, order and wording for it."""
+        shown = studio[key]
+        return {**entry, **{k: shown[k] for k in ("section", "order", "step", "display", "wording") if k in shown}}
+
     parameters = [
-        {"key": "heightMillimetres", "label": "Height", "unit": "mm", "min": min(b["heightMillimetres"]["min"] for b in definition["bases"]), "max": max(b["heightMillimetres"]["max"] for b in definition["bases"])},
-        {"key": "fullness", "label": definition["parameters"]["fullness"]["label"], "unit": "milli", "min": definition["parameters"]["fullness"]["min"], "max": definition["parameters"]["fullness"]["max"], "negative": "fullness-down", "positive": "fullness-up"},
-        {"key": "muscle", "label": definition["parameters"]["muscle"]["label"], "unit": "milli", "min": definition["parameters"]["muscle"]["min"], "max": definition["parameters"]["muscle"]["max"], "negative": "muscle-down", "positive": "muscle-up"},
+        presented("heightMillimetres", {"key": "heightMillimetres", "label": "Height", "unit": "mm", "min": min(b["heightMillimetres"]["min"] for b in definition["bases"]), "max": max(b["heightMillimetres"]["max"] for b in definition["bases"])}),
+        presented("fullness", {"key": "fullness", "label": definition["parameters"]["fullness"]["label"], "unit": "milli", "min": definition["parameters"]["fullness"]["min"], "max": definition["parameters"]["fullness"]["max"], "negative": "fullness-down", "positive": "fullness-up"}),
+        presented("muscle", {"key": "muscle", "label": definition["parameters"]["muscle"]["label"], "unit": "milli", "min": definition["parameters"]["muscle"]["min"], "max": definition["parameters"]["muscle"]["max"], "negative": "muscle-down", "positive": "muscle-up"}),
     ]
-    slots = [{"slot": s, "label": SLOT_LABELS[s], "kind": "part", "optional": s == "hair"} for s in ("outfit", "shoes", "hair", "brows", "lashes", "eyes")]
+    slots = [presented(s, {"slot": s, "label": SLOT_LABELS[s], "kind": "part", "optional": s == "hair"}) for s in ("outfit", "shoes", "hair", "brows", "lashes", "eyes")]
     slots += [
-        {"slot": "skin", "label": "Skin", "kind": "material", "optional": False, "appliesTo": "body"},
-        {"slot": "eyeColour", "label": "Eye colour", "kind": "material", "optional": False, "appliesTo": "eyes"},
-        {"slot": "hairColour", "label": "Hair colour", "kind": "colour", "optional": False, "appliesTo": "hair"},
+        presented("skin", {"slot": "skin", "label": "Skin", "kind": "material", "optional": False, "appliesTo": "body"}),
+        presented("eyeColour", {"slot": "eyeColour", "label": "Eye colour", "kind": "material", "optional": False, "appliesTo": "eyes"}),
+        presented("hairColour", {"slot": "hairColour", "label": "Hair colour", "kind": "colour", "optional": False, "appliesTo": "hair"}),
     ]
     family = {
         "familyId": FAMILY_ID,
@@ -432,6 +478,10 @@ def prepare(source, blender, workdir, output=FAMILY_ROOT, inputs=None):
         "colours": {"hairColour": definition["hairColours"]},
         "bases": bases,
         "materials": materials,
+        "postures": [
+            {"key": key, "label": spec["label"]} for key, spec in sorted(definition.get("postures", {}).items())
+        ],
+        "activityPostures": dict(sorted(definition.get("activityPostures", {}).items())),
     }
     population = {
         "domain": DRAW_DOMAIN,
@@ -455,6 +505,12 @@ def prepare(source, blender, workdir, output=FAMILY_ROOT, inputs=None):
                 "jointMotionMetres": m["jointMotionMetres"],
                 "bodyHiddenVertexCounts": m["bodyHiddenVertexCounts"],
                 "clipStanceSamples": {k: v["stanceSpeedSamples"] for k, v in m["clips"].items()},
+                "postures": {
+                    key: {k: v for k, v in posture.items() if k != "joints"}
+                    for key, posture in m.get("postures", {}).items()
+                },
+                "occlusion": m.get("occlusion", {}),
+                "farWidths": m.get("farWidths", {}),
             }
             for base_id, m in metadata_all.items()
         },

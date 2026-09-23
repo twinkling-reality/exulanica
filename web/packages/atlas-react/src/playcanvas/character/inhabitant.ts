@@ -23,7 +23,12 @@ export interface InhabitantIdentity {
 
 /** The look an inhabitant is drawn with, without any renderer. */
 export function inhabitantLook(identity: InhabitantIdentity): CharacterLook {
-  return drawLook(CHARACTER_CATALOG, INHABITANT_DRAW_DOMAIN, identity.inhabitantId);
+  return inhabitantLookOf(identity.inhabitantId);
+}
+
+/** The same look from the stable id alone, which is all the draw reads. */
+export function inhabitantLookOf(inhabitantId: string): CharacterLook {
+  return drawLook(CHARACTER_CATALOG, INHABITANT_DRAW_DOMAIN, inhabitantId);
 }
 
 /**

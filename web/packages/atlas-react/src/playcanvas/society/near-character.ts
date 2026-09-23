@@ -4,8 +4,10 @@ import { abstractCharacter, syntheticCharacterStyle } from '../character-shape.j
 import type { CrowdPose, CrowdRenderable, CrowdRenderableFactory, InhabitantIdentity } from './types.js';
 
 /**
- * The near-detail inhabitant until the character lane's catalog renderable lands: the existing
- * abstract character, keyed only by synthetic identity. It never reads simulation state.
+ * The abstract figure as a crowd's full-detail person, for a caller that asks for it by name.
+ *
+ * A crowd draws catalog people unless it is given this factory. Keyed only by synthetic identity,
+ * it never reads simulation state, and it has no seated posture: it draws every activity standing.
  */
 class AbstractInhabitant implements CrowdRenderable {
   private readonly avatar: PlayerAvatar;

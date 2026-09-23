@@ -65,6 +65,18 @@ describe('catalog validation refuses', () => {
     refuses((c) => { c.families[0].materials[0].asset.mediaType = 'model/gltf+json'; }, /only GLB/);
   });
 
+  it('a posture a base lacks, an activity drawn in no posture, or a malformed joint', () => {
+    refuses((c) => { c.families[0].bases[0].postures = {}; }, /postures must be exactly/);
+    refuses((c) => { c.families[0].activityPostures.rest = 'kneeling'; }, /unknown posture kneeling/);
+    refuses((c) => { c.families[0].bases[1].postures.seated.jointsMillimetres.leftKnee = [0, 1.5, 2]; }, /joint leftKnee is malformed/);
+    refuses((c) => { c.families[0].bases[0].farForm.hipWidthMillimetres = 0; }, /far form widths/);
+  });
+
+  it('a slot or parameter the studio cannot place', () => {
+    refuses((c) => { c.families[0].slots[0].section = 'hat'; }, /studio section is unknown/);
+    refuses((c) => { c.families[0].parameters[0].step = 0; }, /studio step/);
+  });
+
   it('a duplicated asset key across entries', () => {
     refuses((c) => { c.families[0].materials[1].asset.assetKey = c.families[0].materials[0].asset.assetKey; }, /asset keys/);
   });
