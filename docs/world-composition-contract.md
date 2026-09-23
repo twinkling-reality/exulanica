@@ -3,14 +3,14 @@
 Status: **DECISION** for product and architecture direction; **PARTIAL** implementation.
 Existing API, schema, and package contracts describe the supported surface; this document
 does not extend them.
-The Iceland journey is the product example: import a permitted
-place, combine it with personal memories, and create a fantasy variation.
+The Iceland journey illustrates one composition path: import a permitted place, combine it with
+personal media and create a fantasy variation. It is not a prerequisite for world creation.
 
 ## Purpose and authority
 
-A person can build an interactive world from their memories, selected real-world
-places and objects, and fictional creations; describe changes in ordinary
-language; and find the resulting content through the same query and filter model.
+A person can create an interactive world from imagination, personal media or permitted imports.
+These independent creation paths can also be combined. The target experience supports direct and
+assisted editing, shared query and inspection, and reusable content with stable identity.
 Earth is a source of usable environmental content inside this experience, not a
 separate orbital map or a navigation-only replacement for the interactive world.
 
@@ -20,10 +20,8 @@ prior product plans. Existing API/schema/package contracts describe the supporte
 surface; this document does not silently extend them. Implementation evidence is retained in scoped evaluation records, including the
 [experience integration](evaluation/2026-09-12-experience-integration.json) and
 [Earth scope correction](evaluation/2026-09-12-earth-experience-correction.json).
-A new task must read the product direction, this contract, the relevant live
-API/data contracts and the scoped evaluation records before writing its brief.
 
-The World Memory Model is the system's representation and behavior across memory,
+The personal world model is the system's representation and behavior across memory,
 creation and interaction. It is not a claim that one trained neural network
 already understands or generates an entire world. WMP is a signed projection of
 authorized state, not the live database or a runnable scene by itself.

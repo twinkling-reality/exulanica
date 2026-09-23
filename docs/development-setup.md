@@ -353,4 +353,4 @@ The API and application start separately. `?preview=1` selects a development-onl
 synthetic fixture, not the authenticated backend or a personal-world acceptance run. Stop the
 landing server before starting the application on its default port, or use the port printed by
 Vite. There is no single command that starts Exulanica end to end.
-See [capability status](README.md#capability-status) and the [product roadmap](product-direction.md).
+See [capability boundaries](README.md#capability-boundaries) and the [product roadmap](product-direction.md).

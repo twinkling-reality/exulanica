@@ -1,16 +1,24 @@
 # World creation
 
-Build an interactive world from your memories, selected real-world places and
-fictional additions. Describe changes in ordinary language, preserve originals,
-and find your content through shared place, person, time and origin filters.
+Create a persistent world from imagination, personal media or permitted imports. Shape its
+architecture, landscape and aesthetic, then add objects, inhabitants and supported behavior.
+The goal includes familiar places, dream landscapes and fantasy worlds with their own rules
+and sense of time. These are product requirements, not a claim that every creation tool exists.
 
-For example, bring a permitted Icelandic landscape into a personal world, combine
-it with your Iceland memories, and create a fantasy variation. A query for Iceland
-should find those related materials together while identifying which are personal
-memories, imports or creations. Putting a landscape beside another place changes
-your arrangement, not their real geographic relationship.
+Returning users open their saved world. A person without one begins in an owned starter space,
+with naming, media intake and creation inside the workspace. Direct controls and the Companion,
+an AI partner for exploring and creating, use the same supported editing operations.
+
+Sources can be combined without losing their origins. For example, an imported Icelandic
+landscape, personal media and a fictional castle can belong to one authored world. Moving them
+beside each other does not change real geographic relationships or establish a personal visit.
+The [composition contract](../world-composition-contract.md) defines this target journey.
 
 ## Existing capability
+
+[Authored starter worlds](../saved-world-entry.md) provide a source-independent starting space.
+Reference photographs can be attached without replacing authored edits; attachment alone does not
+reconstruct or place scene geometry.
 
 Reviewed appearance controls and bounded language-driven appearance proposals
 have preview/apply/rollback contracts. Source snapshots, alternate versions,

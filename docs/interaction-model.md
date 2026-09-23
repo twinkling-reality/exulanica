@@ -5,8 +5,10 @@ Status: mixed. Every claim carries exactly one label, per the convention in
 alternative rejected), **ASSUMPTION** (with the experiment that settles it), **OPEN**.
 
 Retrieval date for every VERIFIED claim on this page: **2026-08-27**.
-Scope, corpus and product claims live in
-[product-specification.md](product-specification.md) and are not restated here.
+Product scope and delivery order live in [product-direction.md](product-direction.md).
+[Product research and constraints](product-specification.md) retains evidence and reconstruction
+research. [Saved-world entry](saved-world-entry.md) defines the implemented entry flow; historical
+first-run assumptions below do not replace it.
 
 **Read section 2.1 first.** Two verified platform facts remove design freedom that a reader would
 otherwise assume exists, and most of this document is downstream of them.

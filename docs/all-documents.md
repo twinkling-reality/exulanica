@@ -53,7 +53,7 @@ What the system is. Edited when the system changes.
 - [place-identity](place-identity.md) : PLACE PLANE AND SYNTHETIC ALIGNMENT. The vocabulary and tables are decided and the
 - [platform-findings](platform-findings.md) : mixed, labelled per finding. Runtime observations come from scripts/verifyplatform.py
 - [privacy-consent-threat-model](privacy-consent-threat-model.md) : mixed. Every claim below carries exactly one label: VERIFIED (primary source URL and
-- [product-direction](product-direction.md) : This roadmap defines delivery milestones and their acceptance criteria
+- [product-direction](product-direction.md) : Exulanica is a persistent, programmable personal world model. This document owns product scope
 - [product-specification](product-specification.md) : mixed. Every claim carries exactly one label, per the convention in
 - [reconstruction-findings](reconstruction-findings.md) : Single-photograph findings on glasshouse-courtyard.jpg plus a retained-bowl geometry observation
 - [reconstruction-quality-gate](reconstruction-quality-gate.md) : POINT-MAP VALIDATORS AND VERSION-2 POSE POLICY. The real-corpus quality gate is not
@@ -91,12 +91,12 @@ Written for somebody choosing to use the product.
 
 6 documents.
 
-- [companion](capabilities/companion.md) : Someone to share your world with, who gets to know you through what you create and experience together
+- [companion](capabilities/companion.md) : The Companion is your AI partner within the world: someone to explore and create with, who helps
 - [developer-client](capabilities/developer-client.md) : A program outside the application can use a person's world through the public API, with nothing
 - [scene-reconstruction](capabilities/scene-reconstruction.md) : Build 3D places from the media associated with your experiences
 - [simulation](capabilities/simulation.md) : Give created objects movement, interactions, and rules for responding to the world
 - [world-api](capabilities/world-api.md) : Connect tools to personal world state through authenticated read and write interfaces
-- [world-creation](capabilities/world-creation.md) : Build an interactive world from your memories, selected real-world places and
+- [world-creation](capabilities/world-creation.md) : Create a persistent world from imagination, personal media or permitted imports. Shape its
 
 ## Decision records
 

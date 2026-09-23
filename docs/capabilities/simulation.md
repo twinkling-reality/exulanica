@@ -4,10 +4,15 @@ Give created objects movement, interactions, and rules for responding to the wor
 
 ## Scope
 
-The first supported runtime behavior is one behavior with trigger, stop, and reset controls.
-Physics, collisions, dynamic objects, and more complex behavior are separate work.
-Bounded object motion and a deterministic synthetic society exist; the renderer and generation
-receipts do not implement a general simulation system.
+The product goal is configurable behavior for objects, environments and synthetic inhabitants.
+A world can support creative play, ongoing social activity, model-driven tasks or controlled
+experiments, according to its declared capabilities. A/B comparisons are one application of this
+runtime rather than its organizing limit.
+
+The implementation supplies bounded object motion and deterministic society profiles. The
+[society contract](../synthetic-society-contract.md) defines their supported actions, navigation,
+state, replay and deployment requirements. General physics, user-defined world rules, richer
+relationships and arbitrary model controllers require additional implementation and validation.
 
 Behavior definitions belong to reviewed runtime capabilities. Saved world state references those
 capabilities and their parameters. The API changes supported state; the runtime executes it.

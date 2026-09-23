@@ -1,12 +1,14 @@
-# The Exulanica world-memory model
+# Personal world model architecture
 
 Status: **DECISION AND RESEARCH PROGRAM**. Evidence, graph, reconstruction,
 spatial-authority, authored-version, World Read, generated-receipt, and package contracts implement
 parts of this architecture. Exulanica does not claim a learned general world model, reliable
 physical prediction, autonomous open-world simulation, or complete object-level scene memory.
 
-This document is the canonical technical meaning of **Personal World Memory
-Model**. Product priority remains in [product-direction.md](product-direction.md); exact wire,
+This document defines the architecture of the **personal world model**. World memory is its
+retained state and history, supporting creation, inspection, synthetic life and programmable
+interaction. The product is broader than remembering personal experiences. Product priority
+remains in [product-direction.md](product-direction.md); exact wire,
 database, and package behavior remains in the corresponding implementation contracts.
 
 ## 1. The research position

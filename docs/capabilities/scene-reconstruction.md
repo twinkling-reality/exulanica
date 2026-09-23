@@ -2,7 +2,8 @@
 
 Build 3D places from the media associated with your experiences.
 
-Reconstruction supplies the starting places in a personal world. Names confirmed by the user
+Reconstruction is one way to supply places for a personal world; authored and synthetic creation
+are independent paths. Names confirmed by the user
 connect people and objects across experiences. Reconstruction remains linked to its source;
 rendered geometry does not establish historical facts.
 

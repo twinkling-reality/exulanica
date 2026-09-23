@@ -1,65 +1,36 @@
 # Exulanica documentation
 
-The public reading surface is this hub, the [capability guides](#capability-guides), the
-[decision records](#decision-records), and the generated [catalog](all-documents.md).
-Living contracts at `docs/` root are the specifications. Edit them when the system changes.
-
-This page is the map. The catalog is the inventory. Product scope and delivery order live in
-[product-direction.md](product-direction.md). How prose names things lives in
-[documentation-standard.md](documentation-standard.md).
-
-## How to read this tree
-
-A new developer or agent needs four documents before the long tail:
-
-| Order | Document | Why |
-| --- | --- | --- |
-| 1 | [product-direction.md](product-direction.md) | What the product is, what is on main, and what remains delivery work |
-| 2 | [development-setup.md](development-setup.md) | How to install extras, run tests, and start the API and preview |
-| 3 | [world-memory-model.md](world-memory-model.md) | What Personal World Memory Model means technically |
-| 4 | [architecture-overview.md](architecture-overview.md) | Modular monolith, storage, and deployment shape |
-
-Then pick a surface from the [capability guides](#capability-guides) or a row in
-[Contracts](#contracts). Wire contracts, Atlas, reconstruction operations, and visual-gate
-documents live at `docs/` root and appear in the [catalog](all-documents.md). They are not a
-second roadmap.
-
-The root [README](../README.md) is the product landing and install commands. It does not replace
-this hub.
+Exulanica is a persistent, programmable personal world model. Create from imagination, personal
+media or permitted imports; inspect and reshape the world; populate it with synthetic life; and
+build applications, simulations and experiments using its supported data and actions.
+The [root README](../README.md) introduces the experience and preview setup.
 
 ## Start here
 
-**Product.** [product-direction.md](product-direction.md) owns scope and delivery order.
-[world-composition-contract.md](world-composition-contract.md) is the intended world semantics:
-memories, permitted real-world selections, and authored variations in one interactive world.
-The intended living-world experience adds synthetic inhabitants whose activities respond to that
-world and develop a persistent simulated history; the
-[society contract](synthetic-society-contract.md) separates this ambition from the bounded
-implementation. [product-specification.md](product-specification.md) sections 1 to 4 and 11
-retain research-backed limits. Those pages are subordinate to the roadmap.
+| Goal | Read |
+| --- | --- |
+| Understand the product and delivery order | [Product roadmap](product-direction.md) |
+| Run the application or contribute code | [Development setup](development-setup.md) and [architecture overview](architecture-overview.md) |
+| Understand world data and model boundaries | [Personal world model architecture](world-memory-model.md) and [composition contract](world-composition-contract.md) |
+| Build against a world | [World API](capabilities/world-api.md), [developer client](capabilities/developer-client.md) and [World Memory Package](world-memory-package.md) |
+| Find a supported feature | [Capability guides](#capability-guides) and their owning [contracts](#contracts) |
 
-**World-memory architecture.** [world-memory-model.md](world-memory-model.md) defines what
-Personal World Memory Model means: epistemically typed, temporal, branching state with multiple
-task-specific representations. It also defines the experiments required before Exulanica may
-claim a learned predictive world model.
+The **Companion** is the person's AI partner within the world, helping with exploration, creation
+and understanding events. Its [guide](capabilities/companion.md) separates that role from the
+implemented tools. Synthetic inhabitants have their own state and behavior, described in the
+[society contract](synthetic-society-contract.md).
 
-**Use the product.** The [capability guides](#capability-guides) describe what exists and what
-does not. [world-memory-package.md](world-memory-package.md) is the portable package profile.
+Living contracts define supported behavior. The [product roadmap](product-direction.md) owns
+scope and priorities; the [catalog](all-documents.md) inventories public documents. The
+[product research archive](product-specification.md) preserves research constraints, and the
+[engineering archive](frontier-roadmap.md) retains earlier dependencies. Neither archive is a
+second product specification.
 
-**Build or extend it.** [architecture-overview.md](architecture-overview.md) sections 1 to 3 for
-system shape. [documentation-standard.md](documentation-standard.md) for how documents, comments,
-and docstrings name things. [model-and-service-selection.md](model-and-service-selection.md)
-section 0 for the implemented model stack; sections 1 to 8 are historical rationale.
-[domain-and-evidence-model.md](domain-and-evidence-model.md) sections 1 and 4 for the evidence
-address and schema. [runtime-verification.md](runtime-verification.md) before client code: it
-records platform behaviour that otherwise causes silent bugs.
-[security-floor.md](security-floor.md) for the closed permission vocabulary.
-
-**Decisions.** Start from the living contract that the decision still governs, not from a
-number. The [decision records](#decision-records) keep rejected alternatives. Then
-[license-matrix.md](license-matrix.md) for ship and do-not-ship verdicts.
-[frontier-roadmap.md](frontier-roadmap.md) is an engineering archive; it does not own product
-scope.
+For engineering work, consult [model selection](model-and-service-selection.md) for implemented
+callers and evaluation evidence, [domain and evidence](domain-and-evidence-model.md) for schema
+and source addresses, [runtime verification](runtime-verification.md) for executed platform
+behavior, and [security](security-floor.md) for the permission vocabulary. Reusable models and
+assets also follow the [license matrix](license-matrix.md).
 
 ## Capability guides
 
@@ -73,24 +44,13 @@ in the matching contract, not in a brief.
 - [World API](capabilities/world-api.md)
 - [Developer client](capabilities/developer-client.md)
 
-## Capability status
+## Capability boundaries
 
-This status describes the implementation separately from the product experience in the root
-README. It does not promote delivery-roadmap items to shipped claims.
-
-| Surface | In the tree | Not established |
-| --- | --- | --- |
-| World Memory Package | Ordinary profile `exulanica-wmp-1.0`; opt-in authored-world 1.0 and environment-instances 1.0 extensions; opt-in training profile `exulanica-wmp-training-1.1` | A general learned simulation runtime; a complete society projection |
-| World Read / Write | Scene and place bundles; generation receipts; `Intent.CONTENT` over confirmed-place memories, admitted environment sources and features, and authored environment instances | The Iceland-class personal journey; authored objects as a CONTENT kind; people, capture-time, processing-state, or semantic-text filters on CONTENT |
-| Authored objects | Add, move, remove, undo, and alternate versions, with code and synthetic checks | Real-scene acceptance; arbitrary world branching |
-| Developer client | A standard-library Python client that reads a saved world, discovers the supported edits from the server and places an object with motion through a token limited to world reads and writes; a recorded run on a synthetic starter world | A client in another language; stale-base reconciliation inside this client |
-| Accounts | Optional Google account sessions, account-owned workspaces, authenticated district reads | Configured live-provider deployment and a completed account-deletion lifecycle |
-| Simulation | Persisted deterministic v2, v3, and v4 profiles; composition default `exulanica.society-composition/v1`; typed `go_to` and `perform` HTTP requests; a browser destination control for `perform` on held v2 societies, implemented and unit-tested, which no shipped configuration reaches | Learned dynamics; natural social behavior; directed actions on living (v4) societies; production worker configuration; an inhabited saved world the browser can reach |
-| Character | Version-scoped appearance history; catalog people for the player and inhabitants | Source-linked likeness; production family configuration; movement and visual acceptance |
-| Language editing | Bounded conversational appearance preview, apply, and rollback | General structural language editing |
-
-Preview recordings, fixtures, and local tests establish mechanics only. Optional account and
-society foundations still require deployment configuration and live acceptance.
+The capability guides and living contracts describe implemented operations and material limits.
+Scoped [evaluation records](evaluation/) identify what each execution demonstrated. A fixture or
+local test establishes its stated mechanics; it does not establish deployment, visual quality or
+the full product journey. A signed package is a partial, capability-declared snapshot, not proof
+that another application can run every behavior.
 
 ## Contracts
 
@@ -99,8 +59,8 @@ not a claim that every other root document is secondary law.
 
 | Document | Role |
 | --- | --- |
-| [world-memory-model.md](world-memory-model.md) | Canonical world-memory architecture and research program |
-| [world-composition-contract.md](world-composition-contract.md) | Memories, imported geography, and authored variations |
+| [world-memory-model.md](world-memory-model.md) | Personal world model architecture and research program |
+| [world-composition-contract.md](world-composition-contract.md) | Personal media, permitted imports and authored worlds |
 | [world-objects-contract.md](world-objects-contract.md) | Alternate versions and authored objects |
 | [saved-world-entry.md](saved-world-entry.md) | Durable personal-world selection and exact version reopening |
 | [world-memory-package.md](world-memory-package.md) | Portable signed world snapshot |

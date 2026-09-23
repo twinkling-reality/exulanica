@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="432" viewBox="0 0 1200 432" role="img" aria-labelledby="title desc">
+  <title id="title">A world to create, inspect and build with</title>
+  <desc id="desc">Product direction. Personal media, imagination and permitted imports connect to a persistent world of identity, space, time, rules and history. Explore and build, inspect and edit, simulate inhabitants, and apply models inside the world.</desc>
+  <defs>
+    <pattern id="grid" width="24" height="24" patternUnits="userSpaceOnUse">
+      <circle cx="1" cy="1" r="1" fill="#597365" opacity=".12"/>
+    </pattern>
+    <linearGradient id="world" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#234c43"/>
+      <stop offset="1" stop-color="#142c28"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="432" rx="18" fill="#f2f5ef"/>
+  <rect width="1200" height="432" rx="18" fill="url(#grid)"/>
+  <g font-family="Arial, Helvetica, sans-serif">
+    <text x="44" y="44" font-size="12" font-weight="700" letter-spacing="2.5" fill="#466756">EXULANICA / PRODUCT DIRECTION</text>
+    <text x="44" y="84" font-size="29" font-weight="600" fill="#203a32">One world. Many ways to build.</text>
+    <g fill="none" stroke="#9fb2a3" stroke-width="1.5">
+      <path d="M290 164H342V249H390M290 249H390M290 334H342V249"/>
+      <path d="M720 249H775V149H820M775 216H820M775 282H820M775 349H820M775 249V349"/>
+    </g>
+    <g fill="#fff" stroke="#d1dbce">
+      <rect x="44" y="133" width="246" height="62" rx="9"/>
+      <rect x="44" y="218" width="246" height="62" rx="9"/>
+      <rect x="44" y="303" width="246" height="62" rx="9"/>
+      <rect x="820" y="122" width="336" height="55" rx="9"/>
+      <rect x="820" y="189" width="336" height="55" rx="9"/>
+      <rect x="820" y="255" width="336" height="55" rx="9"/>
+      <rect x="820" y="322" width="336" height="55" rx="9"/>
+    </g>
+    <g font-size="18" fill="#294438">
+      <text x="66" y="171">Personal media</text>
+      <text x="66" y="256">Imagination and design</text>
+      <text x="66" y="341">Permitted imports</text>
+      <text x="843" y="156">Explore and build</text>
+      <text x="843" y="223">Inspect and edit world data</text>
+      <text x="843" y="289">Simulate inhabitants and scenarios</text>
+      <text x="843" y="356">Apply models inside the world</text>
+    </g>
+    <rect x="390" y="122" width="330" height="255" rx="14" fill="url(#world)"/>
+    <g fill="none" stroke="#8bbaa1" stroke-width="1" opacity=".8">
+      <ellipse cx="555" cy="188" rx="39" ry="39"/>
+      <ellipse cx="555" cy="188" rx="17" ry="39"/>
+      <ellipse cx="555" cy="188" rx="39" ry="14"/>
+      <path d="M516 188H594M555 149V227"/>
+    </g>
+    <circle cx="583" cy="177" r="4" fill="#ded88f"/>
+    <circle cx="537" cy="211" r="3" fill="#bbd8bd"/>
+    <text x="555" y="266" text-anchor="middle" font-size="25" font-weight="600" fill="#f5f8ef">Your persistent world</text>
+    <text x="555" y="303" text-anchor="middle" font-size="16" fill="#b9d0c2">Identity · Space · Time</text>
+    <text x="555" y="328" text-anchor="middle" font-size="16" fill="#b9d0c2">Rules · Edits · History</text>
+    <text x="44" y="408" font-size="13" fill="#526d5c">Create → explore → customize → build → reuse</text>
+    <text x="1156" y="408" text-anchor="end" font-size="12" fill="#526d5c">See capability contracts for supported operations.</text>
+  </g>
+</svg>

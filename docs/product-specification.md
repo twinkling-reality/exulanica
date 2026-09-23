@@ -1,4 +1,4 @@
-# Product specification
+# Product research and constraints
 
 Authority: [product-direction.md](product-direction.md) owns product scope and delivery
 order. This page keeps measured limits and earlier decisions.
@@ -11,24 +11,24 @@ Retrieval date for every VERIFIED claim on this page: **2026-08-27**, except the
 notices cited in section 8, which were re-read on **2026-08-28** and carry that date inline.
 Where a disagreement is unresolved, it is preserved here as unresolved.
 
-Companion document: [interaction-model.md](interaction-model.md) covers the spatial and interaction
-design. This page covers what the product is, what it does, and what it deliberately does not do.
+[Interaction design](interaction-model.md) covers spatial and interaction behavior. This archive
+retains source-backed research and earlier implementation decisions. It does not define the
+complete product or delivery sequence.
 
 ---
 
 ## 1. What Exulanica is
 
-**DECISION, updated 2026-09-08.** Exulanica is a Personal World Memory Model for building a
-customizable world from personal experiences and extending it through creation. Movement and
-interaction are the longer-term simulation ambition. The current authority for product scope and
-delivery order is [product-direction.md](product-direction.md). The canonical technical meaning
-of World Memory Model is [world-memory-model.md](world-memory-model.md): epistemically typed,
-temporal, branching state with multiple task representations. The present system is a descriptive
-world-memory substrate, not yet a learned general predictive world model.
+Exulanica is a persistent, programmable personal world model: create from imagination, personal
+media or permitted imports, shape the world's appearance and behavior, and use its structured state
+for applications, simulations and experiments. The [product roadmap](product-direction.md) owns
+scope and delivery order. The [world model architecture](world-memory-model.md) defines stable
+identity, typed state, history and task-specific representations.
 
-The remaining sections retain earlier implementation decisions and research. Still-image intake
-is a current implementation boundary, not the product identity. The earlier memory-exploration MVP
-is superseded by the creative-world demonstration in the linked direction document.
+The research below addresses evidence and reconstruction constraints within that broader product.
+Still-image intake is an implementation boundary, not the product identity. A source-independent
+authored world is a valid creation path; a general learned predictive capability requires separate
+validation. The [first milestone](product-direction.md#first-milestone) defines connected acceptance.
 
 Three constraints continue to apply:
 

@@ -2,16 +2,16 @@
 
 **Product authority:** read [product-direction.md](product-direction.md)
 and [world-composition-contract.md](world-composition-contract.md) before using the
-historical architecture below. The intended system combines memories, permitted
-real-world selections and authored/fantasy variations in one interactive and
-queryable world. The production renderer is PlayCanvas; earlier statements below
+historical architecture below. The intended system supports independent creation from imagination,
+personal media and permitted imports, with synthetic life and programmable interaction over one
+persistent, inspectable world. The production renderer is PlayCanvas; earlier statements below
 that renderer selection is open are historical. The composition contract identifies
 unimplemented geography, retrieval and editing extensions; it does not change
 existing API or package compatibility by itself.
 
-**World-memory authority:** read
+**World model authority:** read
 [world-memory-model.md](world-memory-model.md) for the canonical technical meaning
-of Personal World Memory Model. No renderer scene, mesh, splat, semantic graph,
+of the personal world model. No renderer scene, mesh, splat, semantic graph,
 embedding, generated video or latent tensor is the whole world. Consequential state
 is epistemically typed and addressable; task representations are derived artifacts
 with declared preserved properties and permitted uses. The implementation
@@ -25,7 +25,7 @@ Personal evidence, authored changes and simulated events retain separate provena
 authority. Model proposals must pass domain validation before changing durable state;
 society replay consumes recorded accepted decisions rather than repeating inference.
 Expensive derived assets are retained and versioned independently of their renderer.
-See [model and service selection](model-and-service-selection.md#0-current-stack-and-selection-decision)
+See [model and service selection](model-and-service-selection.md#0-implemented-stack-and-selection-decision)
 for the implemented baseline and candidate comparisons.
 
 **Storage:** the running service uses a local content-addressed

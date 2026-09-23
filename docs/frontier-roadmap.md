@@ -1,4 +1,4 @@
-# Frontier roadmap: adaptive personal world memory
+# Engineering archive: world memory foundations
 
 Status: engineering archive. [product-direction.md](product-direction.md) owns product
 scope and delivery order. This page keeps the earlier exit-gated engineering sequence
@@ -9,25 +9,20 @@ Read [product-direction.md](product-direction.md) and
 
 ## 1. North-star output
 
-The product direction is [personal worlds, creation, and later simulation](product-direction.md).
-Build your own world from your life, then change what's possible inside it.
-That direction supersedes the earlier reconstruction-only and competitive "stateless imagination"
-framing. The numbered work below preserves the existing engineering history and dependencies;
-it is not the complete creative-world delivery sequence.
+The [product roadmap](product-direction.md) defines a persistent, programmable personal world:
+create from imagination, personal media or permitted imports, add synthetic life, inspect the
+underlying data and build projects using supported world capabilities. Reconstruction is one
+creation path. The numbered sequence below preserves engineering history and dependencies for
+world memory; it is not the complete product plan or a mandatory onboarding sequence.
 
-The [unified composition contract](world-composition-contract.md), added
-2026-09-12, makes imported geography, personal memories and authored/fantasy
-variations part of one editable, queryable world. Its Iceland example and staged
-acceptance supersede a separate Earth-viewer interpretation. Code and
-scoped evaluation records still determine implementation status.
+The [composition contract](world-composition-contract.md) defines how these sources and authored
+variations share an editable, queryable world. The authoritative
+[first milestone](product-direction.md#first-milestone) covers world entry, durable edits,
+inspection, supported interaction and independent developer use, with separate acceptance for
+personal-media reconstruction. Scope-specific evaluation records establish implementation claims.
 
-The first-milestone gate is a reconstructed place, an alternate version, one created object,
-and one bounded interaction, with saved state and a concrete developer read/edit path. See the
-[new delivery gates](product-direction.md#first-milestone).
-General simulation, unconstrained creation, and compatible runtime packages remain outside the first-milestone gate.
-
-Original evidence, identity, topology, appearance, and package machinery remain foundations.
-Creative changes must preserve their source history without being restricted to reproducing it.
+Original evidence, identity, topology, appearance and package machinery remain foundations.
+Creative changes preserve source history without being restricted to reproducing it.
 
 ### 1.1 Public product and runtime naming
 
