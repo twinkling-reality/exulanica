@@ -968,7 +968,7 @@ def answer_question(
         and plan.semantic_query
         and has_embeddings(connection, session.workspace_id, client)
     ):
-        # The query goes to the hosted embedding role, and a plan the caller supplies is embedded
+        # The query goes to the hosted vector role, and a plan the caller supplies is embedded
         # as the caller wrote it, which can name anybody. So every saved name is replaced in it,
         # as in what the planner and the composer are sent.
         query = redact_names(
