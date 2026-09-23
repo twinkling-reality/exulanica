@@ -1,8 +1,10 @@
 import type { Turn, TurnOption } from '@exulanica/companion-runtime';
 import type { CompanionAnswer } from '../companion-ask-api.js';
+import type { PlaceNameRightsSource } from '../place-name-rights-api.js';
 import { buildCompanionComposer, type CompanionComposer } from './companion-composer.js';
 import { commandAction, el, replace } from './dom.js';
 import { say } from './copy.js';
+import { buildPlaceNameRights } from './place-name-rights.js';
 
 export interface CompanionChoiceHandlers {
   readonly onSelect: (optionId: string) => void;
@@ -18,16 +20,23 @@ export interface CompanionChoiceRail {
   /** Direct starter-world actions plus the ordinary read-only question path. */
   renderStarter(actions: CompanionStarterActions): void;
   /**
-   * What a person can do with an answer: open what it cited, or ask something else.
+   * What a person can do with an answer: open what it cited, ask something else, and decide where
+   * the name of each place the answer is about may go.
    *
-   * There is deliberately nothing else. An answer is a READ, and every control the rail offers
-   * a turn exists to build an update proposal; offering one here would put the answer path one
-   * click from the write path it is defined as not having.
+   * Nothing that changes the library or the world. An answer is a READ, and every control the rail
+   * offers a turn exists to build an update proposal; offering one here would put the answer path
+   * one click from the write path it is defined as not having. The place name control records a
+   * consent decision through its own route and changes nothing the answer read.
    */
   renderAnswer(answer: CompanionAnswer, onBack: () => void): void;
   pressNumber(index: number): boolean;
   /** Whether the current turn cites anything, so `E` knows if it has a job. */
   openEvidence(): boolean;
+}
+
+export interface CompanionChoiceRailOptions {
+  /** Where the places an answer is about may send their names. Absent: no such control. */
+  readonly placeNames?: PlaceNameRightsSource;
 }
 
 export interface CompanionStarterActions {
@@ -70,6 +79,7 @@ function singleChoice(
 
 export function buildCompanionChoiceRail(
   handlers: CompanionChoiceHandlers,
+  options: CompanionChoiceRailOptions = {},
 ): CompanionChoiceRail {
   const root = el('section', {
     class: 'companion-choice-rail',
@@ -243,6 +253,18 @@ export function buildCompanionChoiceRail(
     // question, and making a person reopen `Other…` to ask it would be a form. Revealed and not
     // focused: the answer has just been written into a live region and moving focus into a text
     // field would take a screen reader off it.
+    const placeNames = options.placeNames;
+    if (placeNames !== undefined && (answer.places ?? []).length > 0) {
+      content.push(el('div', {
+        class: 'companion-answer-places',
+        'aria-label': 'Places this answer is about',
+      }, (answer.places ?? []).map((entityId) => buildPlaceNameRights(
+        entityId,
+        placeNames,
+        { headingLevel: 3, quietWhenMissing: true },
+      ).root)));
+    }
+
     content.push(el('div', { class: 'companion-rail-foot companion-answer-foot' }, [
       back,
       composer.root,

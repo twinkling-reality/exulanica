@@ -516,6 +516,56 @@ Destruction is the separate cascade this section describes, and it has not been 
 maps yet; what holds today is that nothing serves them. A map published before the binding existed
 is unaffected, because nothing here invents a right for a photograph processed before rights did.
 
+
+### 4.5 Where a place's name may go
+
+**DECISION.** A name exists in this product only because the account holder typed it, and the
+account holder decides where it may go. A person's name never goes to a hosted model, with or
+without any right, and nothing in this section can release one. A place's confirmed name goes to a
+hosted model only while the account holder who named that place allows that use, asked for each
+place. Rejected alternatives: one switch covering every place, rejected because a home or a clinic
+is a place somebody may never want named outside the product; and borrowing a photograph's personal
+model right (migration 0073), rejected because a place name is an annotation on an entity many
+photographs link to, so one photograph's permission would release a name the account holder never
+allowed on its own, and withdrawing it would not stop the name leaving through another.
+
+The right is stored by migration 0097 and read by
+[`exulanica/consent/place_name_rights.py`](../exulanica/consent/place_name_rights.py); what a
+decision means is stated once, in [`exulanica/consent/place_names.py`](../exulanica/consent/place_names.py).
+
+| Term | Rule |
+| --- | --- |
+| What is offered | One use per hosted model role whose requests can honour a release, declared in [`place-name-uses.v1.json`](../exulanica/consent/place-name-uses.v1.json) with its purpose and the request paths that honour it; an offered use names at least one. It offers the embedding role, which indexes the descriptions of photographs and searches them. The Companion's planner, request classifier, drafters and composer replace every saved name before they send anything, so their roles are not offered. A role absent from that file never receives a place name |
+| What is decided | One use at a time, meaning every model of that role's chain at the manifest's endpoint, because a request to the role can reach the fallback as well as the primary. It is stored per place, model identity and destination |
+| Default | Not allowed. A place with no decision releases nothing, and so does a request that names a model outside the chain it allowed, another destination, or the models of two roles |
+| Record | Append-only events in `place_name_right_event`, forced row-level security. Each allow and each stop is a new row after the last one for its place, model and destination, carrying the digest of the one before it (rule P5). The database refuses an update, a deletion, a row out of sequence and a stop with no grant before it |
+| Notice | The exact words the account holder read, naming every model, the host the name travels to, the purpose and the term, are kept with the grant (rule P6). A grant counts only while the product states the same words for that use: a changed model chain, host, purpose or term needs a new yes |
+| Term | A grant ends after the default term rule P3 states; `tests/test_place_names.py` fails if the uses file and P3 disagree |
+| Who | Only the account holder who stated the place's name may allow it; anyone the workspace session belongs to may stop it, because stopping only ever sends less |
+| Naming | A grant rests on the active naming assertion the place's current name is the cache of. A rename, including one back to the same words, a deletion or the place being merged into another entity stops it. Undoing a merge restores a grant that was never stopped; a stop recorded in between holds |
+| Stop | Takes effect from the next read. The grant it ends stays readable, so what was allowed at any instant has an answer |
+
+**The resolver.** `place_name_released(connection, workspace_id, entity_id, handoff)` answers
+whether one place's name may go to every model a
+[`ModelHandoff`](../exulanica/models/handoff.py) can reach, and `released_place_names(connection,
+workspace_id, handoff)` answers for every place at once. Both default to no and read under the
+same final read check as a photograph's model right: an idle connection, a read-only
+transaction, the global asset read lock and one evaluation instant, released before anything is
+sent. A grant, stop, rename, merge or deletion therefore cannot commit while a name is being
+checked; it is either seen or refused with `busy` until the check has finished. A caller holding an
+open transaction resolves the released names before entering it, or on a fresh connection.
+
+**Where it is decided.** `GET /place-name-rights` and `GET /place-name-rights/{entity_id}` read each
+use's notice and state under `consent.read`; `POST /place-name-rights/{entity_id}/grants` and
+`/withdrawals` record a decision under `consent.write`. A grant sends back the notice it was shown
+and is refused as `notice_changed` if a single character differs. The Library's detail for a named
+place, and the places a Companion answer is about, show each use with its notice, its state in a
+sentence and one button, "Allow" or "Stop sending".
+
+**What it does not do.** A grant permits and sends nothing by itself, and no request path consults
+the resolver, so a grant changes nothing any request carries. Which requests send a released name,
+and how every other saved name is kept out of them, is the redaction boundary's to state.
+
 ---
 
 ## 5. Deletion

@@ -104,7 +104,14 @@ class Deployment:
         """The route's URL: this fixture's real ids where it has them, fresh ones elsewhere."""
         return fill(
             path,
-            {"span_id": self.span_id, "batch_id": self.batch_id, "artifact_id": self.artifact_id},
+            {
+                "span_id": self.span_id,
+                "batch_id": self.batch_id,
+                "artifact_id": self.artifact_id,
+                # The owner's named person: a real entity in the owner's workspace, which a
+                # stranger must not be able to tell from an invented one.
+                "entity_id": self.entity_id,
+            },
         )
 
 

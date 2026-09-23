@@ -1,0 +1,26 @@
+{
+  "profile": "exulanica.place-name-uses/v1",
+  "note": "The uses a place's saved name may be allowed to go to, one per hosted model role, and the notice each is granted against. Nothing outside this list is offered, so a role absent from it never receives a place name. A role is listed only when the requests it serves can honour a release: the Companion's planner, request classifier, drafters and composer replace every saved name before they send anything, so structured_extraction and reasoning_cheap are not offered, and the redaction boundary decides which requests consult the resolver. Each use names in honoured_by the request paths that honour a release, as module:function; an offered use must name at least one, and tests/test_place_names.py refuses one that names none. Each use lists every module in the exulanica package that names its role, and its purpose sentence describes what the ones that send text do with it; tests/test_place_names.py fails when that set of modules changes, so a new caller is read against the sentence before a grant can cover it. Changing the notice, the joiner, the term or a purpose changes the text every existing grant was made against, and those grants stop counting until the account holder allows the new wording.",
+  "notice": "Exulanica may send the name you gave this place to an AI service outside Exulanica, at {host}, when it asks a model there to {purpose}. The model is {models}. This covers this place's name only. It lasts {term_days} days unless you stop it sooner, and stopping takes effect from the next request.",
+  "fallback_joiner": ", or when that one is unavailable, ",
+  "term_days": 90,
+  "term_basis": "Rule P3 of docs/privacy-consent-threat-model.md section 4.1: consent expires, with the default term that rule states, and is renewable. tests/test_place_names.py fails if the two numbers differ.",
+  "uses": [
+    {
+      "role": "embedding",
+      "purpose": "index the descriptions of your photographs and search them for what you ask",
+      "used_by": [
+        "exulanica/api/services.py",
+        "exulanica/epistemics/caption_embeddings.py",
+        "exulanica/ingest/worker_command.py",
+        "exulanica/selection/embeddings.py",
+        "exulanica/selection/question.py",
+        "exulanica/world/society_decisions.py"
+      ],
+      "honoured_by": [
+        "exulanica.epistemics.caption_embeddings:embed_capture",
+        "exulanica.selection.embeddings:embed_query"
+      ]
+    }
+  ]
+}

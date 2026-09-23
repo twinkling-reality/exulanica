@@ -108,6 +108,8 @@ PROBE_OVERRIDES: Final[dict[str, dict[str, Any]]] = {
     "POST /person-subjects/{subject_id}/consents": {
         "json": {"consent_scope": "likeness", "decision": "granted"}
     },
+    "POST /place-name-rights/{entity_id}/grants": {"json": {"use": "embedding", "notice": "x"}},
+    "POST /place-name-rights/{entity_id}/withdrawals": {"json": {"use": "embedding"}},
     "POST /selection": {"json": {"intent": "captures"}},
     "POST /selection/appearance": {"json": {"utterance": "could it be softer in here?"}},
     "POST /selection/ask": {"json": {"question": "where was I?"}},

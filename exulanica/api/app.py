@@ -76,6 +76,7 @@ from exulanica.api.routes import (
     operations,
     person_consent,
     personal_admission,
+    place_name_rights,
     reconstruction_admission,
     scene_segments,
     selection,
@@ -263,6 +264,7 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
     app.include_router(operations.router)
     app.include_router(person_consent.router)
     app.include_router(personal_admission.router)
+    app.include_router(place_name_rights.router)
     app.include_router(reconstruction_admission.router)
     app.include_router(world.router)
     # The authored world under /world, in matching order: reviewed assets and behaviours, versions,

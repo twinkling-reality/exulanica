@@ -130,6 +130,8 @@ INSERT_ONLY_TABLES: Final = (
     # well states the same rule where provisioning can see it, rather than leaving a grant the
     # trigger happens to make unusable.
     "point_map_model_right",
+    # Migration 0097 appends place name decisions and refuses every update and delete.
+    "place_name_right_event",
     "saved_world_source_detach_operation",
     "saved_world_source_detach",
     "place_source_frame",

@@ -1,5 +1,6 @@
 import type { Turn } from '@exulanica/companion-runtime';
 import type { AskUnavailable, CompanionAnswer } from '../companion-ask-api.js';
+import type { PlaceNameRightsSource } from '../place-name-rights-api.js';
 import {
   buildCompanionChoiceRail,
   type CompanionChoiceHandlers,
@@ -41,6 +42,8 @@ export interface CompanionEncounterOptions {
    * with an answer, including keeping it, is the host's to decide.
    */
   readonly onAnswerShown?: (answer: CompanionAnswer) => void;
+  /** Where the places an answer is about may send their names. The rail shows it per place. */
+  readonly placeNames?: PlaceNameRightsSource;
 }
 
 export interface CompanionEncounter {
@@ -141,7 +144,10 @@ export function buildCompanionEncounter(
     dismissButton,
   ]);
   const speech = buildCompanionSpeech({ speakerName });
-  const choices = buildCompanionChoiceRail(handlers);
+  const choices = buildCompanionChoiceRail(
+    handlers,
+    options.placeNames === undefined ? {} : { placeNames: options.placeNames },
+  );
   let state: PanelState = 'enter';
   let lastTurn: Turn | null = null;
   /*

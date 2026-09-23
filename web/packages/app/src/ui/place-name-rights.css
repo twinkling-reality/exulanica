@@ -1,0 +1,20 @@
+/*
+ * Where a place's name can go. Drawn in the Library's detail pane and in the Companion's rail,
+ * whose surfaces differ and are restyled by the active world design. The control therefore takes
+ * its text colour from the surface it sits on and draws every border and fill from that colour,
+ * rather than naming a palette that one of the two surfaces redefines.
+ */
+.place-name-rights { margin-top: 18px; padding-top: 14px; border-top: 1px solid color-mix(in srgb, currentColor 22%, transparent); }
+.place-name-rights[hidden] { display: none; }
+.place-name-title { margin: 0 0 6px; font: 600 17px/1.4 var(--ui-font-display, inherit); overflow-wrap: anywhere; }
+.place-name-lede { margin: 0 0 12px; font-size: 13px; line-height: 1.55; opacity: 0.82; }
+.place-name-uses { display: grid; gap: 12px; margin: 0; padding: 0; list-style: none; }
+.place-name-use { display: grid; gap: 6px; padding: 12px; border: 1px solid color-mix(in srgb, currentColor 24%, transparent); border-radius: 3px; background: color-mix(in srgb, currentColor 6%, transparent); }
+.place-name-use[data-state='allowed'] { border-left: 3px solid currentColor; }
+.place-name-use-title { margin: 0; font: 600 14px/1.4 var(--ui-font-body, inherit); }
+.place-name-notice { margin: 0; font-size: 13px; line-height: 1.55; overflow-wrap: anywhere; }
+.place-name-state { margin: 0; font-size: 13px; line-height: 1.5; font-weight: 600; opacity: 0.82; }
+.place-name-use[data-state='allowed'] .place-name-state { opacity: 1; }
+.place-name-use button { justify-self: start; min-height: 32px; padding: 6px 14px; font: 600 13px/1.2 var(--ui-font-body, inherit); cursor: pointer; }
+.place-name-use button:disabled { cursor: not-allowed; opacity: 0.6; }
+.place-name-status { margin: 10px 0 0; min-height: 1.2em; font-size: 13px; opacity: 0.82; }

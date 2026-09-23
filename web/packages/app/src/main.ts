@@ -58,6 +58,7 @@ import {
 import { CompanionMemoryClient, answerToRemember } from './companion-memory-api.js';
 import type { PersistedMemory } from '@exulanica/companion-runtime';
 import { buildDetail } from './ui/detail.js';
+import { PlaceNameRightsClient } from './place-name-rights-api.js';
 import {
   buildStartupState,
   buildWorldOpeningFailure,
@@ -559,6 +560,9 @@ async function mount(): Promise<void> {
   // `askQuestion` is the read half: free text the parser cannot turn into a change is a question
   // about the library, and this is the only place holding the credential it takes to ask one.
   const companionAsk = new CompanionAskClient(currentCredentials);
+  // Where a place's name may go: read and decided on the two surfaces that show a place's name,
+  // the detail pane and a Companion answer. Not in the preview, which has no decisions to read.
+  const placeNames = preview ? undefined : new PlaceNameRightsClient(currentCredentials);
   let companionCityContext: CompanionCityContext | null = null;
 
   // The one thing the Companion may DO, and it is still not a write. `POST /selection/appearance`
@@ -612,6 +616,7 @@ async function mount(): Promise<void> {
     onFirstUseAction: (action) => {
       if (action.activate === 'summon-companion') runFirstUseAction();
     },
+    ...(placeNames === undefined ? {} : { placeNames }),
     ...(isAuthoredStarter ? {
       starterActions: {
         onAddObject: () => openStarterObjects(),
@@ -772,6 +777,7 @@ async function mount(): Promise<void> {
   }, {
     preview,
     ...(state.previewSourceMedia === undefined ? {} : { sourceMedia: state.previewSourceMedia }),
+    ...(placeNames === undefined ? {} : { placeNames }),
   });
 
   const regionPoints = built.scene.islands.map((island) => ({

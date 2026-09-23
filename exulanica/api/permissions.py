@@ -122,9 +122,10 @@ class Permission(StrEnum):
     INTAKE_WRITE = "intake.write"
     #: Deleting a memory and revoking a confirmed decision.
     DELETION_WRITE = "deletion.write"
-    #: Reading proposed person regions.
+    #: Reading proposed person regions, and where a place's name may go.
     CONSENT_READ = "consent.read"
-    #: Region edits, person subjects, consent transitions and subject links, withdrawals included.
+    #: Region edits, person subjects, consent transitions, subject links and place name
+    #: decisions, withdrawals included.
     CONSENT_WRITE = "consent.write"
     #: Reading personal admission status.
     ADMISSION_READ = "admission.read"
@@ -389,13 +390,16 @@ _DELETIONS: Final = _every(
     "POST /selection/place-bridges/{decision_id}/revoke",
 )
 
-#: Reading proposed person regions.
+#: Reading proposed person regions, and where a place's name may go.
 _CONSENT_READS: Final = _every(
     _requires(_P.CONSENT_READ),
     "GET /person-regions/{capture_id}",
+    "GET /place-name-rights",
+    "GET /place-name-rights/{entity_id}",
 )
 
-#: Region edits, person subjects, consent transitions and subject links, withdrawals included.
+#: Region edits, person subjects, consent transitions, subject links and place name decisions,
+#: withdrawals included.
 _CONSENT_WRITES: Final = _every(
     _requires(_P.CONSENT_WRITE),
     "POST /identity/subjects/link",
@@ -403,6 +407,8 @@ _CONSENT_WRITES: Final = _every(
     "POST /person-regions/{capture_id}/edits",
     "POST /person-subjects",
     "POST /person-subjects/{subject_id}/consents",
+    "POST /place-name-rights/{entity_id}/grants",
+    "POST /place-name-rights/{entity_id}/withdrawals",
 )
 
 #: Reading personal admission status.

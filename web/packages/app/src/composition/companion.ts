@@ -31,6 +31,7 @@ import { resolveCompanionPlacement } from '../ui/companion-placement.js';
 import { buildCompanionStage, type CompanionStage } from '../ui/companion-stage.js';
 import type { ConfirmPanel } from '../ui/confirm.js';
 import type { CompanionStarterActions } from '../ui/companion-choice-rail.js';
+import type { PlaceNameRightsSource } from '../place-name-rights-api.js';
 import type { FirstUsePromptAction } from '../ui/first-use-guidance.js';
 import type { SessionState } from './session-state.js';
 
@@ -105,6 +106,8 @@ export interface CompanionDependencies {
   readonly starterActions?: CompanionStarterActions;
   /** Explicit first-use actions that do not depend on the renderer acquiring pointer lock. */
   readonly onFirstUseAction?: (action: FirstUsePromptAction) => void;
+  /** Where the places an answer is about may send their names; the answer's rail shows it. */
+  readonly placeNames?: PlaceNameRightsSource;
 }
 
 export interface MountedCompanion {
@@ -348,6 +351,7 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
      * problem and not theirs to wait on.
      */
     onDismiss: () => dismiss(),
+    ...(deps.placeNames === undefined ? {} : { placeNames: deps.placeNames }),
     ...(deps.onFirstUseAction === undefined ? {} : {
       onFirstUseAction: deps.onFirstUseAction,
     }),

@@ -156,6 +156,13 @@ export interface CompanionAnswer {
    * Absent or empty when the answer is not about place content.
    */
   readonly content?: CompanionContentSurface;
+  /**
+   * The places this answer is about, as entity ids, once each in first-mention order: each place
+   * the server replaced with a placeholder, each place the plan searched, and each place a content
+   * row belongs to. Ids only. The name is the account holder's own data, and the control that
+   * decides where it may go reads it for itself.
+   */
+  readonly places?: readonly string[];
   readonly provenance: AnswerProvenance;
   readonly promptVersion: string;
   readonly calls: readonly ModelCall[];
@@ -215,6 +222,8 @@ interface WireAnswer {
   readonly deterministic: boolean;
   readonly repaired: boolean;
   readonly execution: { readonly prompt_version: string; readonly calls: readonly WireCall[] };
+  /** Each placeholder the answer may carry, `[place A]`, and the entity it stands for. */
+  readonly names?: Readonly<Record<string, string>>;
 }
 
 interface WirePacketItem {
@@ -256,6 +265,27 @@ export interface CompanionAskOptions extends TransportOptions {
 export interface CompanionCityContext {
   readonly admissionId: string;
   readonly featureId: string;
+}
+
+/** The place placeholder's own prefix, as `exulanica/selection/saved_names.py` writes it. */
+const PLACE_PLACEHOLDER = '[place ';
+
+/** The places an answer is about, from the three things the server says about them. */
+function placesOf(body: WireAnswer, content: CompanionContentSurface | undefined): string[] {
+  const found: string[] = [];
+  const add = (id: unknown): void => {
+    if (typeof id === 'string' && id.length > 0 && !found.includes(id)) found.push(id);
+  };
+  for (const [label, id] of Object.entries(body.names ?? {})) {
+    if (label.startsWith(PLACE_PLACEHOLDER)) add(id);
+  }
+  const plan = body.plan;
+  if (plan !== null && typeof plan === 'object' && !Array.isArray(plan)) {
+    const ids = (plan as { place?: { ids?: unknown } | null }).place?.ids;
+    if (Array.isArray(ids)) ids.forEach(add);
+  }
+  for (const row of content?.rows ?? []) add(row.memoryPlaceEntityId);
+  return found;
 }
 
 export class CompanionAskClient {
@@ -375,6 +405,7 @@ export class CompanionAskClient {
     });
 
     const abstained = body.abstained;
+    const places = placesOf(body, content);
     return {
       question,
       clauses,
@@ -384,6 +415,7 @@ export class CompanionAskClient {
       repaired: body.repaired === true,
       evidence,
       content,
+      ...(places.length === 0 ? {} : { places }),
       provenance: provenanceOf(
         calls,
         body.deterministic === true,

@@ -24,9 +24,11 @@ import type { BandRow, ConfirmationBand } from '@exulanica/companion-runtime';
 import type { EntityDetailView, OccurrenceCitation } from '@exulanica/world-index';
 import { DETAIL_SECTION_ORDER, buildEntityDetail } from '@exulanica/world-index';
 import type { EvidenceCache } from '../evidence.js';
+import type { PlaceNameRightsSource } from '../place-name-rights-api.js';
 import type { SourceMediaCatalog } from '@exulanica/atlas-react/playcanvas';
 import { say } from './copy.js';
 import { el, replace } from './dom.js';
+import { buildPlaceNameRights } from './place-name-rights.js';
 
 export interface DetailHandlers {
   /** The user asks to say who or what a detection is. Produces a proposal, never a write. */
@@ -50,6 +52,12 @@ export interface DetailPresentation {
   /** Synthetic development data has a small source fixture but no write path. */
   readonly preview?: boolean;
   readonly sourceMedia?: SourceMediaCatalog;
+  /**
+   * Where a named place's name may go. When present, a named place's detail shows where its name
+   * can go, directly under the name, with the control to allow or stop each use. Absent in the
+   * synthetic preview, which has no decisions to read and refuses every write.
+   */
+  readonly placeNames?: PlaceNameRightsSource;
 }
 
 export function buildDetail(
@@ -82,7 +90,17 @@ export function buildDetail(
     },
     showEntity(snapshot, entity) {
       const view = buildEntityDetail({ snapshot, entity });
-      show(sectionsOf(view, evidence, handlers, presentation));
+      const sections: (HTMLElement | string)[] = [...sectionsOf(view, evidence, handlers, presentation)];
+      if (entity.kind === 'place' && entity.displayName !== null && presentation.placeNames !== undefined) {
+        // Under the name it is about, and outside world-index's section order, which describes what
+        // is known about a thing rather than what may be done with its name.
+        sections.splice(
+          DETAIL_SECTION_ORDER.indexOf('identity') + 1,
+          0,
+          buildPlaceNameRights(entity.entityId, presentation.placeNames).root,
+        );
+      }
+      show(sections);
     },
     showOccurrence(occurrence) {
       show([

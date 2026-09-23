@@ -6536,6 +6536,256 @@
     }
    }
   },
+  "/place-name-rights": {
+   "get": {
+    "tags": [
+     "place-name-rights"
+    ],
+    "summary": "Every place whose name has a decision, and each use.",
+    "operationId": "every_place_place_name_rights_get",
+    "parameters": [
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "type": "object",
+         "additionalProperties": true,
+         "title": "Response Every Place Place Name Rights Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/place-name-rights/{entity_id}": {
+   "get": {
+    "tags": [
+     "place-name-rights"
+    ],
+    "summary": "Where one place's name may go, and why not.",
+    "operationId": "one_place_place_name_rights__entity_id__get",
+    "parameters": [
+     {
+      "name": "entity_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Entity Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "responses": {
+     "200": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response One Place Place Name Rights  Entity Id  Get"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/place-name-rights/{entity_id}/grants": {
+   "post": {
+    "tags": [
+     "place-name-rights"
+    ],
+    "summary": "Allow",
+    "description": "Allow this place's name to go to every model of one use, against the notice shown.",
+    "operationId": "allow_place_name_rights__entity_id__grants_post",
+    "parameters": [
+     {
+      "name": "entity_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Entity Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/Allow"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Allow Place Name Rights  Entity Id  Grants Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
+  "/place-name-rights/{entity_id}/withdrawals": {
+   "post": {
+    "tags": [
+     "place-name-rights"
+    ],
+    "summary": "Stop",
+    "description": "Stop this place's name going to any model of one use, from the next request on.",
+    "operationId": "stop_place_name_rights__entity_id__withdrawals_post",
+    "parameters": [
+     {
+      "name": "entity_id",
+      "in": "path",
+      "required": true,
+      "schema": {
+       "type": "string",
+       "format": "uuid",
+       "title": "Entity Id"
+      }
+     },
+     {
+      "name": "authorization",
+      "in": "header",
+      "required": false,
+      "schema": {
+       "anyOf": [
+        {
+         "type": "string"
+        },
+        {
+         "type": "null"
+        }
+       ],
+       "title": "Authorization"
+      }
+     }
+    ],
+    "requestBody": {
+     "required": true,
+     "content": {
+      "application/json": {
+       "schema": {
+        "$ref": "#/components/schemas/Stop"
+       }
+      }
+     }
+    },
+    "responses": {
+     "201": {
+      "description": "Successful Response",
+      "content": {
+       "application/json": {
+        "schema": {
+         "title": "Response Stop Place Name Rights  Entity Id  Withdrawals Post"
+        }
+       }
+      }
+     },
+     "422": {
+      "description": "Validation Error",
+      "content": {
+       "application/json": {
+        "schema": {
+         "$ref": "#/components/schemas/HTTPValidationError"
+        }
+       }
+      }
+     }
+    }
+   }
+  },
   "/operations/reconstruction-admission": {
    "post": {
     "tags": [
@@ -10923,6 +11173,28 @@
      "base_state_sha256"
     ],
     "title": "AdvanceSocietyBody"
+   },
+   "Allow": {
+    "properties": {
+     "use": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,62}$",
+      "title": "Use"
+     },
+     "notice": {
+      "type": "string",
+      "maxLength": 2000,
+      "minLength": 1,
+      "title": "Notice"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "use",
+     "notice"
+    ],
+    "title": "Allow"
    },
    "AlternateVersionView": {
     "properties": {
@@ -21206,6 +21478,21 @@
      "base_state_sha256"
     ],
     "title": "StepBody"
+   },
+   "Stop": {
+    "properties": {
+     "use": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9_]{0,62}$",
+      "title": "Use"
+     }
+    },
+    "additionalProperties": false,
+    "type": "object",
+    "required": [
+     "use"
+    ],
+    "title": "Stop"
    },
    "StyleProposalView": {
     "properties": {

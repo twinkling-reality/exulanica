@@ -587,3 +587,14 @@ prevents new source mutations until publication. Other workspaces continue indep
 This closes the gap where a presentation withdrawal could arrive after
 the export read its masks but before the signed bytes became visible. The lock also covers both
 workspaces if an update moves a source row between them.
+
+## A place's name is a separate consent plane
+
+Presentation consent is about a person in a photograph and never releases anything to a model:
+granting `naming` lets a name be drawn beside a person's outline, and a person's name goes to no
+hosted model with or without it. A place's name is the account holder's own annotation, and where it
+may go is their decision, asked for each place and each use. It follows the receipt model of this
+note: default no, each decision an appended receipt naming the account holder and the time, a stop
+recorded as the next receipt rather than an edit, and the exact notice kept with the grant. The
+rules, the storage in migration 0097 and the resolver are in section 4.5 of
+[privacy-consent-threat-model.md](privacy-consent-threat-model.md).
