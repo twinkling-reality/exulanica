@@ -90,24 +90,29 @@ reason. Composing from the permitted part alone would answer about some photogra
 to answer about all of them. A personal photograph admitted without a right for that role is
 therefore answered deterministically, never composed.
 
-**People's names never go to a hosted model, with or without a right.** A person's name exists
-only because the account holder saved it, and every such name is replaced before a request is
-built, by `exulanica/selection/people.py`. A saved name is recognised whole or by any part of at
-least three letters, case-insensitively and as a whole word, and each person recognised gets a
-placeholder, `[person A]`, `[person B]`, stable for the whole request. The planner's catalogue
-lists a person as an id and a class, with the placeholder when the question named them and never
-with a name. The question the planner, the composer, the request classifier and both drafters are
-sent is the redacted one, and so is every line of packet text, because a name can be written on a
-shirt as easily as typed. The answer's `people` field maps each placeholder to its entity so the
-client can restore the name from the account holder's own data. What still works: asking about
-somebody by a name the account holder has saved, which is resolved locally and reaches the plan
-as an id. What is lost: the model can no longer pick a person out from a description. Two
-limitations, stated rather than hidden: a name the account holder has not saved cannot be
-recognised as a person's name, so it leaves as the text it was typed as; and a saved name that is
-also an ordinary word is replaced wherever that word appears. A confirmed place name is still sent
-to the planner by name in the catalogue, although the account holder's rule allows that only under
-a right for the model it goes to; no right that can express it exists yet, so this is an open
-limitation rather than a permitted use.
+**No name the account holder saved goes to a hosted model.** A name exists in this product only
+because the account holder typed it: who a person is, what a place is called. A person's name never
+goes to a hosted model, with or without a right, and a confirmed place name goes only under a right
+the account holder grants for that place and that model. No such right exists yet, so no saved
+name of any kind is sent. Every one is replaced before a request is built, by
+`exulanica/selection/saved_names.py`. A saved name is recognised whole, case-insensitively and as a
+whole word; a person's or a voice's name is also recognised by any part of at least three letters,
+because people are named by first name, while other names are recognised whole only, because
+their parts are ordinary words and a saved "Lantern House" must not turn "photos of the house" into
+a filter on one place. Each entity recognised gets a placeholder of its class, `[person A]`,
+`[place A]`, stable for the whole request. The planner's catalogue lists every entity as an id and
+a class, with its placeholder only when the question named it, and never with a name. The question
+the planner, the composer, the request classifier and both drafters are sent is the redacted one,
+and so is every line of packet text, because a saved name can be painted on a building or written
+on a shirt as easily as typed. The answer's `names` field maps each placeholder to its entity so
+the client can restore the name from the account holder's own data. What still works: asking about
+anything by a name the account holder has saved, which is resolved locally and reaches the plan as
+an id. What is lost: the model can no longer pick a person or a place out from a description. Two
+limitations, stated rather than hidden. A name the account holder has not saved cannot be
+recognised, so it leaves as the text it was typed as. And a saved name that is also an ordinary
+word is replaced wherever that word appears, which for a person includes each part of their name:
+somebody saved as Rose makes "the rose garden" arrive as "the [person A] garden". That is a
+deliberate bias towards privacy, and it can make a question harder for the model to read.
 
 ## 3. Which refusals mean "this was a question"
 

@@ -67,7 +67,6 @@ from exulanica.selection.environment_proposal import (
     draft_environment_operation,
 )
 from exulanica.selection.packet import build_content_packet
-from exulanica.selection.people import redact_people, saved_person_names
 from exulanica.selection.proposal import PROMPT_VERSION as PROPOSAL_PROMPT_VERSION
 from exulanica.selection.proposal import propose_appearance
 from exulanica.selection.question import (
@@ -77,6 +76,7 @@ from exulanica.selection.question import (
     propose_plan,
     requires_model,
 )
+from exulanica.selection.saved_names import redact_names, saved_names
 from exulanica.world import (
     EnvironmentBindingDrift,
     EnvironmentCompositionDenied,
@@ -305,11 +305,11 @@ class AnswerView(BaseModel):
     #: Which models answered, how long they took and what they spent. Additive: nothing above
     #: changed, and a client that ignores this field sees exactly the response it saw before.
     execution: ExecutionView
-    #: Each ``[person A]`` placeholder the answer text may carry, and the entity it stands for.
-    #: People's names are never sent to a hosted model, so a composed answer names somebody only
-    #: by placeholder, and the client restores the name from the account holder's own data.
-    #: Additive, and empty when the answer names nobody.
-    people: dict[str, uuid.UUID] = Field(default_factory=dict)
+    #: Each placeholder the answer text may carry, ``[person A]`` or ``[place A]``, and the entity
+    #: it stands for. No saved name is sent to a hosted model, so a composed answer names a person
+    #: or a place only by placeholder, and the client restores the name from the account holder's
+    #: own data. Additive, and empty when the answer names nothing.
+    names: dict[str, uuid.UUID] = Field(default_factory=dict)
 
 
 def _society_authorizer(
@@ -414,7 +414,7 @@ def plan_from_question(
         client,
         body.question,
         entity_catalogue(connection, session.workspace_id),
-        people=saved_person_names(connection, session.workspace_id),
+        names=saved_names(connection, session.workspace_id),
     )
 
 
@@ -488,7 +488,7 @@ def ask(
         deterministic=outcome.deterministic,
         repaired=outcome.repaired,
         execution=_execution(outcome.calls, outcome.rejections),
-        people=dict(outcome.people),
+        names=dict(outcome.names),
     )
 
 
@@ -1131,10 +1131,8 @@ def environment_proposal(
     ]
     if _has_reversible_edit(version):
         operations.append(EnvironmentOperation.UNDO_LATEST_VERSION_EDIT)
-    # People's names never reach a hosted model; the drafter needs none to pick an operation.
-    utterance = redact_people(
-        body.utterance, saved_person_names(connection, session.workspace_id)
-    ).text
+    # No saved name reaches a hosted model; the drafter needs none to pick an operation.
+    utterance = redact_names(body.utterance, saved_names(connection, session.workspace_id)).text
     decision = draft_environment_operation(client, utterance, operations)
     execution = _execution(decision.calls, (), prompt_version=ENVIRONMENT_PROMPT_VERSION)
     if decision.operation is None:

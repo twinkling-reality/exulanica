@@ -303,7 +303,7 @@ def test_evidence_changed_while_composing_cannot_support_final_answer(
     monkeypatch.setattr(module, "validate", lambda *a, **k: object())
     monkeypatch.setattr(module, "execute", lambda *a, **k: None)
     monkeypatch.setattr(module, "build_packet", lambda *a, **k: next(packets))
-    monkeypatch.setattr(module, "saved_person_names", lambda *a, **k: ())
+    monkeypatch.setattr(module, "saved_names", lambda *a, **k: ())
     answer = Answer(
         clauses=[
             AnswerClause(
@@ -345,7 +345,7 @@ def test_fresh_packet_random_tokens_do_not_invalidate_unchanged_answer(
     monkeypatch.setattr(module, "validate", lambda *a, **k: object())
     monkeypatch.setattr(module, "execute", lambda *a, **k: None)
     monkeypatch.setattr(module, "build_packet", lambda *a, **k: next(packets))
-    monkeypatch.setattr(module, "saved_person_names", lambda *a, **k: ())
+    monkeypatch.setattr(module, "saved_names", lambda *a, **k: ())
     answer = Answer(
         clauses=[
             AnswerClause(

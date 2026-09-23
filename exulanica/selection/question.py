@@ -35,7 +35,6 @@ what the packet asked for, and the model has no tool to call and no state it can
 from __future__ import annotations
 
 import datetime as dt
-import re
 import uuid
 from collections.abc import Callable, Iterable, Mapping
 from contextlib import suppress
@@ -69,8 +68,8 @@ from exulanica.selection.packet import (
     build_content_packet,
     build_packet,
 )
-from exulanica.selection.people import PersonName, redact_people, saved_person_names
 from exulanica.selection.plan import Intent, SelectionPlan
+from exulanica.selection.saved_names import PLACEHOLDER, SavedName, redact_names, saved_names
 from exulanica.selection.validation import (
     RejectionCode,
     SelectionRejected,
@@ -453,10 +452,11 @@ class AnsweredQuestion:
     #: call is absent from a list that is not empty of the planner. ``deterministic`` and
     #: ``rejections`` are what say a discarded attempt happened.
     calls: tuple[ModelCall, ...] = ()
-    #: Each placeholder the answer text may carry, and the person it stands for. People's names
-    #: are replaced before anything reaches a model, so a composed answer can name somebody only
-    #: as ``[person A]``; the client puts the name back from the account holder's own data.
-    people: tuple[tuple[str, uuid.UUID], ...] = ()
+    #: Each placeholder the answer text may carry, and the entity it stands for. Saved names are
+    #: replaced before anything reaches a model, so a composed answer can name a person or a place
+    #: only as ``[person A]`` or ``[place A]``; the client restores the name from the account
+    #: holder's own data.
+    names: tuple[tuple[str, uuid.UUID], ...] = ()
 
 
 def entity_catalogue(
@@ -628,22 +628,24 @@ _EMPTY_CATALOGUE: Final = (
 
 
 def _catalogue_line(choice: EntityChoice, placeholders: Mapping[uuid.UUID, str]) -> str:
-    """One catalogue entry as the planner sees it. A person is an id and a class, never a name."""
-    if choice.entity_class in ("person", "voice"):
-        label = placeholders.get(choice.entity_id)
-        return f"- {choice.entity_id} ({choice.entity_class})" + (f": {label}" if label else "")
-    return f"- {choice.entity_id} ({choice.entity_class}): {choice.display_name}"
+    """One catalogue entry as the planner sees it: an id and a class, never a saved name.
+
+    The placeholder the question was redacted to is added when the question named this entity, so
+    the plan can still refer to it by id.
+    """
+    label = placeholders.get(choice.entity_id)
+    return f"- {choice.entity_id} ({choice.entity_class})" + (f": {label}" if label else "")
 
 
-_PLACEHOLDER_TEXT: Final = re.compile(r"\[person [A-Z]+\]")
+_PLACEHOLDER_TEXT: Final = PLACEHOLDER
 
 
 def _without_placeholders(plan: SelectionPlan) -> SelectionPlan:
-    """A person's placeholder is never a search term.
+    """A placeholder is never a search term.
 
     The text dimension is joined, not ranked, so a placeholder the model copied into
-    ``semantic_query`` would search for the words "person" and a letter and quietly discard every
-    photograph that does not contain them. A person belongs in the entity dimension, by id.
+    ``semantic_query`` would search for a class word and a letter and quietly discard every
+    photograph that does not contain them. A named entity belongs in its own dimension, by id.
     """
     if not plan.semantic_query or not _PLACEHOLDER_TEXT.search(plan.semantic_query):
         return plan
@@ -656,7 +658,7 @@ def propose_plan(
     question: str,
     catalogue: tuple[EntityChoice, ...],
     *,
-    people: Iterable[PersonName],
+    names: Iterable[SavedName],
     placeholders: Mapping[uuid.UUID, str] | None = None,
     now: dt.datetime | None = None,
     log: CallLog | None = None,
@@ -670,11 +672,11 @@ def propose_plan(
     ``log`` collects what the calls actually cost and which model served them. It is optional
     because ``POST /selection/plan`` has nowhere to put the answer and asks for none.
     """
-    # People's names never reach a hosted model. ``people`` is every name the account holder has
-    # saved for a person and is required, so no caller can plan without it; each one recognised
-    # in the question is replaced by its placeholder, and the catalogue names that placeholder
-    # against the person's id so the plan can still refer to them.
-    asked = redact_people(question, people, placeholders)
+    # No saved name reaches a hosted model. ``names`` is every name the account holder has saved
+    # and is required, so no caller can plan without it; each one recognised in the question is
+    # replaced by its placeholder, and the catalogue gives that placeholder against the entity's
+    # id so the plan can still refer to it.
+    asked = redact_names(question, names, placeholders)
     catalogue_text = (
         "\n".join(
             _catalogue_line(choice, asked.placeholders) for choice in catalogue[:MAX_CATALOGUE]
@@ -861,11 +863,11 @@ def answer_question(
         )
     proposed = plan is None
     log = CallLog()
-    # People's names never reach a hosted model, with or without a right. Every name the account
-    # holder has saved for a person is replaced in what the planner and the composer are sent;
-    # an answer that makes no model call has nothing to replace.
-    people = saved_person_names(connection, session.workspace_id) if requires_model(plan) else ()
-    asked = redact_people(question, people)
+    # No saved name reaches a hosted model: a person's never, and a place's only under a right
+    # that does not yet exist. Every name the account holder has saved is replaced in what the
+    # planner and the composer are sent; an answer that makes no model call has nothing to replace.
+    names = saved_names(connection, session.workspace_id) if requires_model(plan) else ()
+    asked = redact_names(question, names)
     if plan is None:
         catalogue = entity_catalogue(connection, session.workspace_id)
         try:
@@ -873,7 +875,7 @@ def answer_question(
                 client,
                 asked.text,
                 catalogue,
-                people=people,
+                names=names,
                 placeholders=asked.placeholders,
                 now=now,
                 log=log,
@@ -985,7 +987,7 @@ def answer_question(
             calls=log.calls,
         )
 
-    sent, placeholders = _without_people(packet, people, asked.placeholders)
+    sent, placeholders = _without_names(packet, names, asked.placeholders)
     answer, deterministic, rejections = compose_answer(client, asked.text, sent, log=log)
     # Composition can take seconds. Re-run the validated dimensions as well as span/claim
     # loading so a withdrawal, deletion or changed count during that wait cannot support the
@@ -1033,28 +1035,28 @@ def answer_question(
         deterministic=deterministic,
         rejections=rejections,
         calls=log.calls,
-        people=tuple((label, entity_id) for entity_id, label in placeholders.items()),
+        names=tuple((label, entity_id) for entity_id, label in placeholders.items()),
     )
 
 
-def _without_people(
+def _without_names(
     packet: EvidencePacket,
-    people: Iterable[PersonName],
+    names: Iterable[SavedName],
     placeholders: Mapping[uuid.UUID, str],
 ) -> tuple[EvidencePacket, Mapping[uuid.UUID, str]]:
-    """The packet as the composer may see it: every saved person name in its text replaced.
+    """The packet as the composer may see it: every saved name in its text replaced.
 
     Tokens are untouched, so a citation in the composed answer still resolves against the packet
-    the caller kept. The text is a sign, a caption or another stored claim, and a person's name
-    can be written on a shirt as easily as typed into a question.
+    the caller kept. The text is a sign, a caption or another stored claim, and a saved name can be
+    painted on a building or written on a shirt as easily as typed into a question.
     """
-    people = tuple(people)
+    names = tuple(names)
     items = []
     for item in packet.items:
         if item.text is None:
             items.append(item)
             continue
-        redacted = redact_people(item.text, people, placeholders)
+        redacted = redact_names(item.text, names, placeholders)
         placeholders = redacted.placeholders
         items.append(replace(item, text=redacted.text))
     return replace(packet, items=tuple(items)), placeholders

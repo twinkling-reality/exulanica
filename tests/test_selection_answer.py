@@ -1011,7 +1011,7 @@ def test_the_planner_asks_the_extraction_role_and_the_measurement_says_why(answe
     client = answered.client(
         [HttpResponse(status_code=200, text=json.dumps(chat_body(plan.model_dump_json())))]
     )
-    propose_plan(client, "which photographs?", (), people=())
+    propose_plan(client, "which photographs?", (), names=())
     called = answered.transport.models_called
     assert called == ["Qwen/Qwen3-235B-A22B-Instruct-2507"], called
 
@@ -1059,7 +1059,7 @@ def test_a_plan_that_breaks_a_rule_the_schema_cannot_express_is_repaired_once(an
             HttpResponse(status_code=200, text=json.dumps(chat_body(good.model_dump_json()))),
         ]
     )
-    plan = propose_plan(client, "which photographs?", (), people=())
+    plan = propose_plan(client, "which photographs?", (), names=())
     assert plan.intent is Intent.CAPTURES
     assert answered.transport.call_count == 2, "the refusal was never sent back to the model"
 
@@ -1093,7 +1093,7 @@ def test_a_plan_that_fails_twice_refuses_rather_than_answering_a_different_quest
         ]
     )
     with pytest.raises(StructuredOutputError):
-        propose_plan(client, "which photographs?", (), people=())
+        propose_plan(client, "which photographs?", (), names=())
     assert answered.transport.call_count == 2, "it retried more than once, or not at all"
 
 
