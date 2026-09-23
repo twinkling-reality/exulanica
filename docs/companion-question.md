@@ -71,16 +71,26 @@ random per request, so the packet's tokens are not the answer's tokens. Matching
 resolve nothing, silently, and every chip would open nothing.
 
 **A citation opens inside the Companion.** A chip, or `E`, draws the masked photograph in the
-Companion's own surface in place of the answer, with the date its citation carries and a way back:
-`Back to the answer`, or Escape, which closes the photograph before it closes the Companion
-(`web/packages/app/src/ui/companion-evidence.ts`, and `showEvidence` in
-`web/packages/app/src/ui/companion-encounter.ts`). A read is drawn only while its photograph is
-still the one open, so going back or opening another before it arrives leaves it undrawn. A
-photograph that does not open, because it was deleted, is not available to this session or needs a
-mask that does not exist, is said in words with the reason the server gave, and nothing is drawn in
-its place: a stand-in picture would claim the evidence exists and looks like that.
-`web/packages/app/test/companion-evidence.test.ts` holds both faces, the late read and the
-keyboard, and the end-to-end run recorded in `docs/evaluation/2026-09-23-companion-place-link-outcome.json` shows both in the running app.
+Companion's own surface in place of the answer or question that cited it, with the date its citation
+carries and a way back: `Back to the answer`, or `Back to the question` for the photograph a
+question is about (`web/packages/app/src/ui/companion-evidence.ts`, and `showEvidence` in
+`web/packages/app/src/ui/companion-encounter.ts`). Escape closes the photograph before it closes the
+Companion, whether or not the keyboard is in the Companion: inside it the Companion's own handler
+takes the key, and outside it the page's handler in
+`web/packages/app/src/composition/input-modes.ts` offers the key to the photograph before dismissing
+the Companion. Going back either way returns the keyboard to what opened the photograph, the
+answer's chip or the question's `Open the source` button. A read is drawn only while its photograph
+is still the one open, so going back, opening another or sending the Companion away before it
+arrives leaves it undrawn, and opening a photograph again while its first read is under way shares
+that read rather than making a second copy (`web/packages/app/src/evidence.ts`). A photograph that
+does not open, because it was deleted, is not available to this session or needs a mask that does
+not exist, is said in words with the reason the server gave, and nothing is drawn in its place: a
+stand-in picture would claim the evidence exists and looks like that. A copy the page has since
+released is said the same way, as "This page no longer holds its copy. Go back and open it again."
+`web/packages/app/test/companion-evidence.test.ts` and
+`web/packages/app/test/evidence-cache.test.ts` hold both faces, the late reads, the shared read and
+the keyboard, and the end-to-end run recorded in
+`docs/evaluation/2026-09-23-companion-place-link-outcome.json` shows both faces in the running app.
 
 **Photograph-derived text reaches the composer only under a personal model right.** A packet
 carries the claims stored about each photograph it cites: a transcribed sign, a described scene, a
@@ -127,20 +137,25 @@ deliberate bias towards privacy, and it can make a question harder for the model
 **The browser puts each name back from the account holder's own library.** One resolver,
 `companionNames` in `web/packages/app/src/companion-names.ts`, draws every clause of an answer and
 every turn's words in the Companion's speech band. For each placeholder the text carries, the
-answer's `names` says which entity it stands for, and the name shown is that entity's
-`displayName` in the graph this session read with the account holder's own credential
-(`GET /graph`), read when the answer is drawn. Only a person's own naming writes that column
-(`display_name` in `exulanica/migrations/0001_spine.sql`), and nothing a model wrote is read as a
-name: not the sentence around a placeholder and not the letters inside one. The composer does not
-always copy a placeholder exactly, and the end-to-end run recorded in `docs/evaluation/2026-09-23-companion-place-link-outcome.json` found `place A` and
-`PLACE A` beside `[place A]`, so an answer's own labels are recognised without their brackets too,
-the class word in any case and the letters as the server wrote them; in text with no `names`, only
-a bracketed placeholder is recognised. A placeholder the page cannot resolve is said in words and
-never shown as brackets:
+answer's `names` says which entity it stands for, and the name shown is that entity's `displayName`
+in the graph this session read with the account holder's own credential (`GET /graph`), read when
+the answer is drawn. Only a person's own naming writes that column (`display_name` in
+`exulanica/migrations/0001_spine.sql`), and nothing a model wrote is read as a name: not the
+sentence around a placeholder and not the letters inside one. The composer does not always copy a
+placeholder exactly, and the end-to-end run recorded in
+`docs/evaluation/2026-09-23-companion-place-link-outcome.json` found `place A` and `PLACE A` beside
+`[place A]`, so an answer's own labels are recognised without their brackets too, the class word in
+lower case, with a capital or in capitals (`place A`, `Place A`, `PLACE A`) and the letters as the
+server wrote them, but only where a label cannot be an ordinary word. A label whose letters could be
+a word, `I` or `O`, `A` after a class word in capitals, or two letters or more, is restored only
+where punctuation or the end of the text follows it, so "the place I visited" keeps its pronoun and
+"taken at place I." is restored. In text with no `names`, only a bracketed placeholder is
+recognised. A placeholder the page cannot resolve is said in words and never shown as brackets:
 
 | Why the name is not shown | What the Companion says |
 | --- | --- |
 | The entity has no name | a place you have not named |
+| The person's consent was withdrawn | a person whose consent was withdrawn |
 | The entity was merged into another | a place you merged into another |
 | The account holder deleted the entity | a place no longer in your library |
 | The library this page read does not hold the entity | a place whose name this page has not loaded |
@@ -148,12 +163,13 @@ never shown as brackets:
 
 The noun follows the placeholder's class, `a person`, `a place`, `an object` and so on, from
 `web/packages/app/src/ui/copy.ts`, and `tests/test_companion_placeholder_parity.py` holds the
-browser's placeholder pattern to the server's. What it does not do: an answer the Companion
-remembers across a reload keeps its text and not its `names`, because `companion_answer` has no
-column for them, so each placeholder in it reads as one this answer does not name; an appearance
-proposal's words arrive with no `names` either; and a name is the entity's current one, so an
-answer kept from before a rename shows the later name, even where the placeholder stood for the
-words on a sign.
+browser's placeholder pattern and naming predicate to the server's. What it does not do: an answer
+the Companion remembers across a reload keeps its text and not its `names`, because
+`companion_answer` has no column for them, so each placeholder in it reads as one this answer does
+not name and none is restored; an appearance proposal's words arrive with no `names` either; and a
+name is the one in the library the page holds when the answer is drawn, so an answer drawn again in
+the same page session, once the page has read a rename, shows the new name, even where the
+placeholder stood for the words on a sign.
 
 **The composer is told where the account holder confirmed a photograph was taken.** A Selection
 filtered by a place holds a photograph because of a confirmed link from the photograph's place
