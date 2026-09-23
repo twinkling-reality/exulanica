@@ -109,6 +109,10 @@ judged all 24 boards of a [probe](evaluation/2026-09-22-sign-completeness-probe-
 correctly. Asked alone as a second call, it caught every partly hidden board of a held-out split,
 but the observation had already written "Ashcombe (partial)" as a label, a word no sign in the
 frame carries ([third experiment](evaluation/2026-09-22-vision-place-proposal-c-outcome.json)).
+That record also counts one whole street sign, Chestnut Road, as judged partly hidden in error.
+The sign is not whole: `scripts/make_place_signage_photographs.py` draws a street blade from
+`x - 190` and places that scene's post at `x = 189`, so the blade's left edge lies one pixel
+outside the frame, and the judgement matched the picture.
 
 The policy passed every gate [pre-registered](evaluation/2026-09-23-vision-place-proposal-d-preregistration.json)
 for it, on a held-out split of 44 synthetic photographs scored once
