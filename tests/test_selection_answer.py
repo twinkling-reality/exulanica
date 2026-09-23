@@ -1204,8 +1204,8 @@ def test_a_placeholder_is_never_a_search_term_in_any_spelling(query, kept):
     says "person". Every spelling of a placeholder this request assigned is removed; ordinary text
     that only resembles one is kept.
     """
+    from exulanica.epistemics.saved_names import SavedName
     from exulanica.selection.question import EntityChoice, propose_plan
-    from exulanica.selection.saved_names import SavedName
 
     person = uuid.uuid4()
     plan = SelectionPlan(

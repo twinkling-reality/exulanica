@@ -11,6 +11,11 @@ photograph. It leaves only through ``before_send``, which every caller supplies 
 handed every model the request can reach and where it goes; the caller decides, and a refusal
 raises before anything is sent. This layer cannot import that decision, which lives in
 ``exulanica.ingest.model_rights``, so it asks for it instead.
+
+The text also carries whatever the photograph showed in writing, and a sign or a shirt can carry a
+name the account holder saved. Every saved name is replaced in what is sent, as it is in the
+Companion's packet (:mod:`exulanica.epistemics.saved_names`). The stored vector is keyed by the
+text as stored, so a name saved after a vector was made does not make it again.
 """
 
 from __future__ import annotations
@@ -25,6 +30,7 @@ from typing import Any
 import psycopg
 from psycopg.pq import TransactionStatus
 
+from exulanica.epistemics.saved_names import redact_names, saved_names
 from exulanica.models.client import ModelClient
 from exulanica.models.handoff import ModelHandoff
 from exulanica.models.manifest import Role
@@ -86,9 +92,10 @@ def embed_capture(
 
     Workspace provisioning must already have created its vector partition. Never create schema
     at runtime. A session lock per capture serializes this pass, and no transaction is open while
-    the model runs. The text is read first; ``before_send`` is then called on the idle connection
-    with the embedding role's whole chain and its endpoint, and a refusal it raises propagates with
-    nothing sent. The write re-reads the text and stores nothing when it changed or went, and the
+    the model runs. The text is read first, with every saved name in it replaced; ``before_send``
+    is then called on the idle connection with the embedding role's whole chain and its endpoint,
+    and a refusal it raises propagates with nothing sent. The write re-reads the text and stores
+    nothing when it changed or went, and the
     insert's tombstone guard refuses a deletion that arrived while the model ran. No response cache
     retains deleted caption text.
 
@@ -124,9 +131,10 @@ def embed_capture(
             )
             if _stored(connection, workspace_id, key):
                 return None
+            sent = redact_names(source["body"], saved_names(connection, workspace_id)).text
         before_send(ModelHandoff.hosted(client.manifest, Role.EMBEDDING))
         result = client.embed(
-            [source["body"]], role=Role.EMBEDDING, prompt_version=PROMPT_VERSION, use_cache=False
+            [sent], role=Role.EMBEDDING, prompt_version=PROMPT_VERSION, use_cache=False
         )
         if result.model_id != model or len(result.vectors) != 1:
             raise ValueError("The embedding role returned an unexpected model or vector count")

@@ -44,6 +44,7 @@ from typing import Any, Final
 
 import psycopg
 
+from exulanica.epistemics.saved_names import PLACEHOLDER, SavedName, redact_names, saved_names
 from exulanica.errors import PrivacyAdmissionError
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import ModelError, StructuredOutputError, TruncatedResponseError
@@ -70,7 +71,6 @@ from exulanica.selection.packet import (
     build_packet,
 )
 from exulanica.selection.plan import Intent, SelectionPlan
-from exulanica.selection.saved_names import PLACEHOLDER, SavedName, redact_names, saved_names
 from exulanica.selection.validation import (
     RejectionCode,
     SelectionRejected,
@@ -968,9 +968,15 @@ def answer_question(
         and plan.semantic_query
         and has_embeddings(connection, session.workspace_id, client)
     ):
+        # The query goes to the hosted embedding role, and a plan the caller supplies is embedded
+        # as the caller wrote it, which can name anybody. So every saved name is replaced in it,
+        # as in what the planner and the composer are sent.
+        query = redact_names(
+            plan.semantic_query, names or saved_names(connection, session.workspace_id)
+        ).text
         # An unavailable vector role leaves lexical retrieval usable.
         with suppress(ModelError):
-            query_vector = embed_query(client, plan.semantic_query, record=log.record_embedding)
+            query_vector = embed_query(client, query, record=log.record_embedding)
     result = execute(
         connection,
         validated,

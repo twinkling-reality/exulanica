@@ -21,7 +21,10 @@ import uuid
 import psycopg
 import pytest
 from exulanica.api.composer_rights import composer_rights_check
+from exulanica.db.migrate import provision_workspace
 from exulanica.epistemics.assertions import AssertionWriter
+from exulanica.epistemics.caption_embeddings import embed_capture
+from exulanica.epistemics.saved_names import saved_names
 from exulanica.identity import IdentityRepository, merge_entities, name_occurrence
 from exulanica.identity.subjects import IdentityError
 from exulanica.ingest.pipeline import PhotoIngestPipeline
@@ -33,7 +36,6 @@ from exulanica.selection.answer import Answer, AnswerClause, ClauseType
 from exulanica.selection.plan import Intent, SelectionPlan
 from exulanica.selection.proposal import propose_appearance
 from exulanica.selection.question import answer_question, entity_catalogue, propose_plan
-from exulanica.selection.saved_names import saved_names
 from exulanica.store.local import LocalContentAddressedStore
 
 from conftest import (
@@ -254,3 +256,86 @@ def test_a_merge_across_classes_leaks_no_name_whether_or_not_it_is_allowed(named
     )
     for body in sent:
         assert not _leaks(body), f"after a {direction} merge, sent: {_leaks(body)}"
+
+
+# -- the embedding role ---------------------------------------------------------------------------
+
+
+def _vector_reply() -> HttpResponse:
+    """One finite, non-zero vector of the size the manifest declares for the embedding role."""
+    vector = [1.0] + [0.0] * 4095
+    return HttpResponse(
+        status_code=200,
+        text=json.dumps({"data": [{"embedding": vector}], "usage": {"prompt_tokens": 20}}),
+    )
+
+
+def _allow(handoff) -> None:
+    """Stands for a granted right. The fixture photograph is synthetic test media."""
+
+
+def _photograph(repository) -> uuid.UUID:
+    (row,) = repository.connection.execute(
+        "select capture_id from capture where workspace_id=%s", (repository.workspace_id,)
+    ).fetchall()
+    return row["capture_id"]
+
+
+def _embed(repository, capture: uuid.UUID) -> tuple[object, FakeTransport]:
+    client, transport = _client([_vector_reply()])
+    embedded = embed_capture(
+        repository.connection, repository.workspace_id, capture, client, before_send=_allow
+    )
+    return embedded, transport
+
+
+def test_no_saved_name_reaches_the_caption_embedding(named):
+    """The caption pass sends a photograph's stored text, and a sign can carry a saved name.
+
+    Measured before the pass replaced them: the request held the sign's text as stored, the
+    person's name and the place's name included.
+    """
+    repository, _, _, _ = named
+    provision_workspace(repository.connection, repository.workspace_id)
+
+    embedded, transport = _embed(repository, _photograph(repository))
+
+    assert embedded is not None
+    (request,) = transport.requests
+    (sent,) = request["payload"]["input"]
+    assert not _leaks(sent), f"sent to the embedding model: {_leaks(sent)}"
+    # Positive controls: the photograph's text reached the request, and each name was replaced by
+    # its placeholder rather than dropped along with the words around it.
+    assert "RUNNING CLUB" in sent
+    assert "[person A]" in sent and "[place A]" in sent
+
+
+def test_no_saved_name_reaches_the_query_embedding_of_a_supplied_plan(named):
+    """A plan the caller supplies is embedded as the caller wrote it, and it can name anybody."""
+    repository, store, session, _ = named
+    provision_workspace(repository.connection, repository.workspace_id)
+    embedded, _ = _embed(repository, _photograph(repository))
+    assert embedded is not None, "no caption vector exists, so no query would be embedded"
+
+    plan = SelectionPlan(intent=Intent.CAPTURES, semantic_query=f"{PERSON} running club at {PLACE}")
+    answer = Answer(
+        clauses=[AnswerClause(text="I have no evidence for that.", type=ClauseType.META)]
+    )
+    client, transport = _client([_vector_reply(), _reply(answer.model_dump_json())])
+    answer_question(
+        repository.connection,
+        client,
+        "Where does the running club meet?",
+        session,
+        plan=plan,
+        store=store,
+        before_compose=composer_rights_check(repository.connection, repository.workspace_id),
+    )
+
+    queries = [r["payload"]["input"] for r in transport.requests if "input" in r["payload"]]
+    assert len(queries) == 1, "the supplied plan's query was not embedded, so this shows nothing"
+    (query,) = queries[0]
+    assert not _leaks(query), f"sent to the embedding model: {_leaks(query)}"
+    # Positive controls: the query's other words went, and each name went as its placeholder.
+    assert "running club" in query
+    assert "[person A]" in query and "[place A]" in query

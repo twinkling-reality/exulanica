@@ -41,6 +41,7 @@ from exulanica.environment import (
     UnknownEnvironmentResource,
 )
 from exulanica.environment.nyc_open_data import PROVIDER_KEY as NYC_OPEN_DATA_PROVIDER_KEY
+from exulanica.epistemics.saved_names import redact_names, saved_names
 from exulanica.models.client import ModelClient
 from exulanica.selection import (
     Abstention,
@@ -76,7 +77,6 @@ from exulanica.selection.question import (
     propose_plan,
     requires_model,
 )
-from exulanica.selection.saved_names import redact_names, saved_names
 from exulanica.world import (
     EnvironmentBindingDrift,
     EnvironmentCompositionDenied,

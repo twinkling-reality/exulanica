@@ -55,11 +55,11 @@ from typing import Annotated, Any, Final, Literal
 import psycopg
 from pydantic import BaseModel, ConfigDict, Field, create_model
 
+from exulanica.epistemics.saved_names import redact_names, saved_names
 from exulanica.models.client import ModelClient
 from exulanica.models.errors import StructuredOutputError, TruncatedResponseError
 from exulanica.models.manifest import Role
 from exulanica.selection.question import CallLog, ModelCall
-from exulanica.selection.saved_names import redact_names, saved_names
 from exulanica.selection.validation import Session
 from exulanica.world import STYLE_REGISTRY, InvalidStyleData, StyleReference, StyleRegistry
 from exulanica.world.registry import ParameterDefinition, ProfileDefinition

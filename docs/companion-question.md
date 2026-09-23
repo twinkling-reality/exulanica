@@ -95,9 +95,9 @@ product only because the account holder typed it: who a person is, what a place 
 person's name never goes to a hosted model, with or without a right, and a confirmed place name goes
 only under a right the account holder grants for that place and that model. No such right exists
 yet, so no saved name of any kind may be sent. In the requests this section describes, every one is
-replaced before the request is built, by `exulanica/selection/saved_names.py`; two requests to the
-embedding role do not apply it, as the paragraph after the limitations states. A saved name is recognised whole, case-insensitively and as a
-whole word; a person's or a voice's name is also recognised by any part of at least three letters,
+replaced before the request is built, by `exulanica/epistemics/saved_names.py`, and so is every
+one in the two requests to the embedding role, as the paragraph after the limitations states. A
+saved name is recognised whole, case-insensitively and as a whole word; a person's or a voice's name is also recognised by any part of at least three letters,
 because people are named by first name, while other names are recognised whole only, because
 their parts are ordinary words and a saved "Lantern House" must not turn "photos of the house" into
 a filter on one place. Each entity recognised gets a placeholder of its class, `[person A]`,
@@ -115,13 +115,17 @@ word is replaced wherever that word appears, which for a person includes each pa
 somebody saved as Rose makes "the rose garden" arrive as "the [person A] garden". That is a
 deliberate bias towards privacy, and it can make a question harder for the model to read.
 
-Two requests to the embedding role do not apply the rule. The caption-vector pass, `embed_capture`
-in `exulanica/epistemics/caption_embeddings.py`, sends a photograph's stored caption, transcribed
-text and place values as they are stored: after its `before_send` right check, and with no call to
-`redact_names`. And `answer_question` in `exulanica/selection/question.py` embeds the
-`semantic_query` of a plan the caller supplies as written. A plan the planner proposes holds no
-saved name, because the planner is sent only the redacted question.
-`tests/test_companion_saved_names.py` counts only the requests it scripts, so it covers neither.
+The two requests to the embedding role apply the same rule. The caption-vector pass,
+`embed_capture` in `exulanica/epistemics/caption_embeddings.py`, replaces every saved name in a
+photograph's stored caption, transcribed text and place values, and its `before_send` right check
+decides whether that replaced text goes at all. `answer_question` in
+`exulanica/selection/question.py` replaces every saved name in the `semantic_query` it embeds,
+which is what a plan the caller supplies needs; a plan the planner proposes holds none, because the
+planner is sent only the redacted question. `tests/test_companion_saved_names.py` holds both
+requests to it with a person and a place saved through `name_occurrence` and written on the
+photograph's sign: the recorded request carries each as its placeholder and still carries the
+sign's other words. With either replacement removed, the recorded request carries both names as
+they are stored.
 
 ## 3. Which refusals mean "this was a question"
 
