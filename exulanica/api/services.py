@@ -44,6 +44,7 @@ from exulanica.api.authorisation import API_TOKENS_ENV, TokenDirectory, load_tok
 from exulanica.api.composer_rights import photograph_text_right
 from exulanica.api.society_control_worker import SocietyControlWorker
 from exulanica.api.society_runtime import AuthoredWorldSocietyBinding, SocietyRuntime
+from exulanica.consent.place_name_rights import released_place_names
 from exulanica.db.session import DATABASE_URL_ENV, Database
 from exulanica.env import env_get, env_name, resolve_data_dir
 from exulanica.epistemics.caption_embeddings import CaptionEmbeddingPass
@@ -150,8 +151,10 @@ class Services:
     runs_society_control_worker: bool = False
     society_base_tick_interval_ms: int = 1000
     #: The place-name right's resolver, asked by every workspace policy this instance attaches
-    #: whether a confirmed place's name may go to a hand-over. The one that releases nothing is
-    #: the account holder's default and what an instance without the right runs.
+    #: whether a confirmed place's name may go to a hand-over. ``build_services`` injects the
+    #: right's own (``exulanica.consent.place_name_rights``); the one that releases nothing is
+    #: the default of a hand-built instance, so an instance nobody wired to the right sends no
+    #: place's name.
     released_place_names: ReleasedPlaces = no_place_released
 
     @property
@@ -330,7 +333,9 @@ def build_services(
 
     ``model_client`` is injectable so a test can supply a scripted one. Everything else comes
     from the environment, because it is deployment configuration rather than a decision the
-    code gets to make.
+    code gets to make, except the place-name right's resolver: every instance reads the right,
+    because what leaves with a place's name is the account holder's decision rather than a
+    deployment's. Routes, the society runtime and the derivative worker all ask this one.
     """
     environ = os.environ if environ is None else environ
     database = Database.from_env(environ)
@@ -366,6 +371,7 @@ def build_services(
         restore_state_path=(
             Path(value) if (value := env_get("RESTORE_STATE_PATH", environ)) else None
         ),
+        released_place_names=released_place_names,
     )
 
 

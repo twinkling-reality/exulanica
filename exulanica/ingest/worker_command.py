@@ -17,6 +17,7 @@ import uuid
 from collections.abc import Mapping
 from typing import Any, Final
 
+from exulanica.consent.place_name_rights import released_place_names
 from exulanica.db.account_workspaces import (
     ACCOUNT_DATABASE_URL_ENV,
     AccountWorkspaceSource,
@@ -121,7 +122,13 @@ def _build_worker(args: argparse.Namespace, environ: Mapping[str, str]) -> Deriv
         parse_workspaces(args.workspace, environ, allow_empty=workspace_source is not None),
         workspace_source=workspace_source,
         vision=vision,
-        embedding_pass=CaptionEmbeddingPass(client) if client is not None else None,
+        # The place-name right's own resolver, as the API's worker has it from build_services: a
+        # place's name goes to the caption request only where its namer allowed the embedding use.
+        embedding_pass=(
+            CaptionEmbeddingPass(client, released_places=released_place_names)
+            if client is not None
+            else None
+        ),
         depth=depth,
         detector=detector,
         segmenter=segmenter,

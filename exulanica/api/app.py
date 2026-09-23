@@ -123,6 +123,7 @@ from exulanica.identity.subjects import (
 )
 from exulanica.models.egress import EgressRefused
 from exulanica.models.errors import BudgetExceededError, ModelError, TruncatedResponseError
+from exulanica.models.policy import HostedRequestRefused, NoHostedRequestPolicy
 from exulanica.selection.validation import RejectionCode, SelectionRejected
 from exulanica.world import (
     InvalidInteractionData,
@@ -391,6 +392,24 @@ def create_app(services: Services | None = None, *, verify: bool = True) -> Fast
         if isinstance(exc, TruncatedResponseError):
             return _problem(500, "model_output_truncated", str(exc))
         return _problem(502, "model_refused", str(exc))
+
+    @app.exception_handler(HostedRequestRefused)
+    async def _hosted_refused(_request: Request, exc: HostedRequestRefused) -> JSONResponse:
+        # The account holder's rules refused a hosted request as it was leaving, and nothing was
+        # sent: a photograph's model right ended after the route checked it, for instance. 409,
+        # the status this API gives a privacy refusal elsewhere: the request was well formed and
+        # authorised, and what refused it is the account holder's current decision, so the same
+        # request is answered once that decision allows it. The detail names which rule refused.
+        return _problem(409, "hosted_request_refused", str(exc))
+
+    @app.exception_handler(NoHostedRequestPolicy)
+    async def _no_hosted_policy(_request: Request, exc: NoHostedRequestPolicy) -> JSONResponse:
+        # A route reached a model through a client nobody attached the workspace's rules to, so
+        # the client refused to send and nothing left. That is a fault in this instance, not in
+        # the caller's request and not upstream: 500, as a configuration mistake on this side is
+        # (``model_output_truncated``), and named, so it cannot be taken for a crash or a model's
+        # refusal.
+        return _problem(500, "no_hosted_request_policy", str(exc))
 
     @app.exception_handler(InvalidStyleData)
     async def _invalid_style(_request: Request, exc: InvalidStyleData) -> JSONResponse:

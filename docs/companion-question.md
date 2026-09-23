@@ -203,12 +203,30 @@ photograph's sign. No request carries either name, system messages included; eve
 transport recorded was admitted by the policy, text for text; and the four paths whose call site
 replaces names itself hold with that replacement disabled.
 
-**Which requests honour a place right.** The Companion's own call sites replace every saved name
-before the boundary sees the text, a released place's included, so the planner, the composer, the
-request classifier and both drafters never carry a place's name. The caption-vector pass and the
-query embedding leave their text to the boundary, so a place whose right names the embedding
-role's models reaches them by name. The resolver that reads the right is injected as
-`Services.released_place_names`; an instance built without it releases no place's name.
+**Which requests honour a place right.** Two do, both the embedding role's, and they are the two
+request paths the uses file names (`exulanica/consent/place-name-uses.v1.json`): the caption-vector
+pass and the embedding of a question's query. Both leave their text to the boundary, so a place
+whose right names the embedding role's whole chain at its endpoint reaches their requests by name,
+and a stop holds it back from the next request. The caption pass sends a photograph's text as it
+is stored, so a sign naming an allowed place goes by that name. The query carries a place's name
+only where the query itself names it, as a plan the caller supplies can: a question asked in words
+is planned from text with every saved name replaced, and a placeholder never becomes a search term.
+A decision changes the requests sent after it and no vector already stored: the index is keyed by
+the text as stored, so a caption embedded before a grant is not sent again, and a vector made while
+the name was allowed stays after a stop. The resolver that reads the right, `released_place_names`
+in `exulanica/consent/place_name_rights.py`, is the one every instance runs: `build_services`
+injects it as `Services.released_place_names`, which the routes, the society runtime and the API's
+derivative worker ask, and `exulanica/ingest/worker_command.py` gives it to the standalone worker's
+caption pass. A `Services` built by hand, as most tests build one, keeps the resolver that releases
+nothing. The Companion's own call sites replace every saved name before the boundary sees the text,
+a released place's included, so the planner, the composer, the request classifier and both drafters
+never carry a place's name, and their roles are not offered: the uses file offers a role only where
+its requests honour a release. The vision stage sends the product's own instruction and the
+photograph, and its policy releases no place's name. `tests/test_place_name_release_paths.py` holds
+this at the transport: an allowed place reaches the embedding requests from both workers and through
+the question route and no other role's request, a request to another destination or one that can
+reach a model the grant does not name carries the placeholder, and each path the uses file names is
+run and must carry the name while it is allowed, so a use cannot be offered while inert.
 
 **What the boundary does not do.** It never rewrites a system message: a system message is product
 instruction, and rewriting one would put `[person A]` for every "may" in every prompt of somebody

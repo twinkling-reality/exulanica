@@ -242,12 +242,20 @@ def test_no_route_that_changes_state_is_satisfied_by_a_read_alone():
         assert any(not p.endswith(".read") for p in rule.permissions), (method, path)
 
 
-def test_every_route_that_can_reach_a_model_requires_model_invoke():
-    """Generated from the route modules' own endpoints, so a new model route cannot slip past.
+#: What in an endpoint's own source says it can reach a model. ``request_decision`` reaches the
+#: society decision provider, which is a model, without the endpoint ever naming a model client.
+#: ``.hosted_model(`` is ``Services.hosted_model``, where every route's model client comes from,
+#: so a route calling it reaches a model whether or not it also calls ``_require_model``.
+MODEL_ROUTE_MARKERS = ("_require_model(", ".model_client", ".hosted_model(", "request_decision(")
 
-    Read through each module's router rather than a second walk of the application; the keys it
-    yields are checked against the application's own sweep.
-    """
+
+def _reaches_a_model(endpoint, markers=MODEL_ROUTE_MARKERS) -> bool:
+    source = inspect.getsource(endpoint)
+    return any(marker in source for marker in markers)
+
+
+def _model_routes(markers=MODEL_ROUTE_MARKERS) -> set[tuple[str, str]]:
+    """Every route whose endpoint reaches a model, read through each route module's router."""
     import exulanica.api.routes as package
 
     found: set[tuple[str, str]] = set()
@@ -257,14 +265,18 @@ def test_every_route_that_can_reach_a_model_requires_model_invoke():
             if not isinstance(router, APIRouter):
                 continue
             for route in router.routes:
-                source = inspect.getsource(route.endpoint)
-                # request_decision reaches the society decision provider, which is a model,
-                # without the endpoint ever naming a model client.
-                if any(
-                    marker in source
-                    for marker in ("_require_model(", ".model_client", "request_decision(")
-                ):
+                if _reaches_a_model(route.endpoint, markers):
                     found.update((method, route.path) for method in route.methods)
+    return found
+
+
+def test_every_route_that_can_reach_a_model_requires_model_invoke():
+    """Generated from the route modules' own endpoints, so a new model route cannot slip past.
+
+    Read through each module's router rather than a second walk of the application; the keys it
+    yields are checked against the application's own sweep.
+    """
+    found = _model_routes()
     assert sorted(found) == [
         ("POST", "/selection/appearance"),
         ("POST", "/selection/ask"),
@@ -276,6 +288,21 @@ def test_every_route_that_can_reach_a_model_requires_model_invoke():
     for key in found:
         rule = ROUTE_RULES[key]
         assert isinstance(rule, Requires) and Permission.MODEL_INVOKE in rule.permissions, key
+
+
+def test_a_route_reaching_a_model_through_the_client_factory_alone_is_counted():
+    """Calling ``Services.hosted_model`` is enough to be a model route.
+
+    Positive control: that marker alone finds a route that calls the factory itself, ``POST
+    /selection/ask``, which does so for a plan it answers without planning. Then an endpoint whose
+    one way to a model is the factory is counted by the markers the sweep above uses.
+    """
+    assert ("POST", "/selection/ask") in _model_routes((".hosted_model(",))
+
+    def reaches_a_model_through_the_factory(services, connection, session):
+        return services.hosted_model(connection, session.workspace_id)
+
+    assert _reaches_a_model(reaches_a_model_through_the_factory)
 
 
 def test_the_refusal_ledger_check_names_exactly_the_vocabulary():

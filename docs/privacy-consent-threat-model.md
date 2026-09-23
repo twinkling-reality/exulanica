@@ -596,9 +596,20 @@ and is refused as `notice_changed` if a single character differs. The Library's 
 place, and the places a Companion answer is about, show each use with its notice, its state in a
 sentence and one button, "Allow" or "Stop sending".
 
-**What it does not do.** A grant permits and sends nothing by itself, and no request path consults
-the resolver, so a grant changes nothing any request carries. Which requests send a released name,
-and how every other saved name is kept out of them, is the redaction boundary's to state.
+**What it does not do.** A grant sends nothing by itself: it lets a place's name stay in a request
+the product sends anyway, and only in a request that honours a release. Those are the two request
+paths the uses file names for the embedding role: the caption-vector pass and the embedding of a
+question's query. Every instance is built with the resolver above, which `build_services`
+([`exulanica/api/services.py`](../exulanica/api/services.py)) gives to the routes, the society
+runtime and the API's derivative worker; the standalone derivative worker gives its caption pass
+the same one ([`exulanica/ingest/worker_command.py`](../exulanica/ingest/worker_command.py)). The
+Companion's planner, request classifier, drafters and composer replace every saved name before
+they send, a released place's included, so a grant never reaches their requests, and the vision
+stage's policy releases no place's name, because no vision use is offered
+([`exulanica/ingest/hosted_policy.py`](../exulanica/ingest/hosted_policy.py)).
+`tests/test_place_name_release_paths.py` holds this wiring at the transport. How every other saved
+name is kept out of a request is the redaction boundary's to state, in `companion-question.md`
+section 2.
 
 ---
 
