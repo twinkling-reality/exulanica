@@ -157,9 +157,9 @@ transformers, ultralytics, mediapipe, onnxruntime, rembg and segment-anything ar
 `opencv-python-headless` resolves to 5.0.0, which removed `cv2.HOGDescriptor` and ships an empty
 `cv2/data`. Nothing was fabricated to fill the gap.
 
-The three new tables brought the count of tables under FORCE row-level security keyed on
-`current_workspace()` from 59 to 62. That number is stated in three docstrings and asserted against
-the live schema, which is the gate that caught them.
+`person_subject`, `person_region` and `person_presentation_consent` are under FORCE row-level
+security keyed on `current_workspace()`. `tests/test_migration.py` lists every such table from a
+migrated schema and fails when a forced table is keyed on anything else.
 
 ### The detector, corrected 2026-09-06
 

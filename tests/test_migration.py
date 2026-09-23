@@ -24,6 +24,7 @@ from __future__ import annotations
 
 import pathlib
 import re
+import subprocess
 
 import exulanica.migrations
 import pytest
@@ -568,39 +569,121 @@ def test_row_level_security_is_forced_not_merely_enabled():
     assert SQL.count("enable row level security") == SQL.count("force  row level security")
 
 
-#: Every file that states in prose how many tables are workspace-isolated. Written out by hand,
-#: because a list built by grepping the tree for the sentence would contain exactly the files
-#: that still carry it and would go quiet on the one that stopped.
-_FILES_STATING_THE_WORKSPACE_POLICY_COUNT = (
-    "exulanica/db/session.py",
-    "exulanica/ingest/spine/__init__.py",
-    "tests/test_ingest_persistence.py",
-    "docs/deployment.md",
+#: How many tables are keyed on ``current_workspace()`` is a fact about the schema. It is derived
+#: below from a migrated schema and written in no file, because every migration that adds a
+#: workspace table moves it: a copy in prose is an edit each such migration has to make by hand,
+#: in the same line of the same files, which is where two branches that each add a table collide.
+#:
+#: The pattern is the sentence that carried the copies, with the number in any spelling it has
+#: had, digits or words. The rest of the sentence says what the number counts, so a sentence about
+#: another set of tables does not match.
+_COUNT_WORDS = (
+    "zero|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|"
+    "fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|"
+    "eighty|ninety|hundred|thousand"
+)
+_WORKSPACE_POLICY_COUNT_CLAIM = re.compile(
+    rf"(?<![\w-])(\d[\d,]*|(?:(?:{_COUNT_WORDS})(?:[\s-]+(?:and[\s-]+)?|(?=\s)))+)"
+    r"\s*tables\s+(?:are\s+)?under\s+FORCE\s+row-level\s+security\s+keyed\s+on\b",
+    re.IGNORECASE,
 )
 
-#: The sentence those files carry. The number is the capture; the rest is the phrase that says
-#: what the number counts, so a file that changed the subject fails rather than matching.
-_WORKSPACE_POLICY_COUNT_CLAIM = re.compile(
-    r"(\d+) tables are under FORCE row-level security keyed on\s+``current_workspace\(\)``"
+#: Kinds of tracked file a sentence can be written in.
+_PROSE_SUFFIXES = frozenset(
+    {".py", ".md", ".sql", ".toml", ".json", ".ts", ".tsx", ".mjs", ".js", ".txt", ".yml", ".yaml"}
 )
+
+#: Retained evaluation records are immutable and state what was measured on the day they were
+#: written, so a count inside one is a measurement with a date rather than a copy of the schema.
+_DATED_RECORDS = "docs/evaluation/"
+
+
+def _stated_counts(text: str) -> list[str]:
+    """Every statement of the workspace-keyed table count in ``text``, as written."""
+    matches = _WORKSPACE_POLICY_COUNT_CLAIM.finditer(text)
+    return [" ".join(match.group(0).split()) for match in matches]
+
+
+def _files_stating_the_count() -> list[str]:
+    """Each file that states the count, with the statement.
+
+    The files are the ones git tracks and the untracked ones it would add, so a statement in a file
+    that is about to be committed fails before the commit rather than after it. Ignored files are
+    not read: nothing commits them.
+    """
+    listed = subprocess.run(
+        ["git", "ls-files", "-z", "--cached", "--others", "--exclude-standard"],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+    ).stdout.decode()
+    found = []
+    for relative in sorted(filter(None, listed.split("\0"))):
+        path = ROOT / relative
+        if relative.startswith(_DATED_RECORDS) or path.suffix not in _PROSE_SUFFIXES:
+            continue
+        if not path.is_file():
+            continue
+        for statement in _stated_counts(path.read_text(encoding="utf-8", errors="replace")):
+            found.append(f"{relative}: {statement}")
+    return found
+
+
+def test_the_count_sentence_is_recognised_in_every_spelling_it_has_had():
+    """The positive control for the guard below, which otherwise passes by finding nothing.
+
+    The examples are assembled at run time because this file is tracked and scanned like any other,
+    and a literal one would be reported as a statement of the count.
+    """
+    subject = "tables are under FORCE row-level security keyed on"
+    for count in ("123", "1,024", "One hundred and twenty", "fifty-nine", "twenty"):
+        assert _stated_counts(f"workspace. {count} {subject}\n    ``current_workspace()``") == [
+            f"{count} {subject}"
+        ]
+    wrapped = f"{123} {subject.replace(' security', chr(10) + '    security')} ``x``"
+    assert _stated_counts(wrapped) == [f"123 {subject}"]
+    for unrelated in (
+        "Every table under FORCE row-level security is keyed on ``current_workspace()``.",
+        "Three tables, all workspace-scoped under FORCE row-level security, all append-only.",
+        "The other nine are under FORCE row-level security, which a superuser bypasses.",
+        "someone tables are under FORCE row-level security keyed on it",
+    ):
+        assert _stated_counts(unrelated) == [], unrelated
+
+
+def test_no_tracked_file_states_how_many_tables_are_keyed_on_the_session_workspace():
+    """The count is derived from the schema, below, and stated in no other place.
+
+    A number written beside the schema is a second source of truth that every migration adding a
+    workspace table has to find and edit by hand. So the prose says what the tables are, and this
+    fails on any tracked file that says how many. Retained evaluation records are not read: each
+    is a dated measurement, and none can be edited.
+    """
+    stated = _files_stating_the_count()
+    assert stated == [], (
+        "these state how many tables are keyed on current_workspace(), which the schema decides "
+        "and test_the_prose_count_of_workspace_isolated_tables_matches_the_schema derives. Say "
+        "what the tables are rather than how many:\n  " + "\n  ".join(stated)
+    )
 
 
 @pytest.mark.postgres
 def test_the_prose_count_of_workspace_isolated_tables_matches_the_schema():
-    """Three docstrings state a number, and this is where the number comes from.
+    """Where the number of workspace-keyed tables comes from, and the only place it is derived.
 
-    The number was twenty, which is the length of the do-block array in 0001, and it was wrong
-    by two for as long as three files repeated it: ``embedding`` is forced a few lines further
-    down in 0001 on its own, and ``intake_batch`` arrives forced in 0003. A count carried in
-    prose drifts every time a migration adds a table, so it is measured against a live schema
-    here rather than remembered in three places.
+    When three files repeated it in prose, the prose was wrong: it said twenty, the length of the
+    do-block array in 0001, while ``embedding`` is forced a few lines further down in 0001 on its
+    own and ``intake_batch`` arrives forced in 0003. Prose states no number, and the test above
+    fails on any tracked file that does. The name of this test says "prose count" because retained
+    evaluation records cite it as the selector of the live count, and a record cannot be edited
+    to follow a rename.
 
-    The count is of tables keyed on ``current_workspace()`` rather than of forced tables
-    imagined as a different set. ``consent_record`` is forced too, and its policy compares
-    ``tenant_id`` (the isolation column 0001 gave that table) to ``current_workspace()``, so
-    it is in the same total. Partitions are excluded: ``embedding_ws_*`` is created per
-    workspace, so counting relations would make the number a function of how many workspaces
-    happened to exist when it was taken.
+    The set is of tables keyed on ``current_workspace()`` rather than of forced tables imagined
+    as a different set. ``consent_record`` is forced too, and its policy compares ``tenant_id``
+    (the isolation column 0001 gave that table) to ``current_workspace()``, so it is in the same
+    set. Partitions are excluded: ``embedding_ws_*`` is created per workspace, so counting
+    relations would make the number a function of how many workspaces happened to exist when it
+    was taken.
     """
     with migrated_schema() as (_psycopg, conn):
         scratch = conn.execute("select current_schema()").fetchone()[0]
@@ -615,21 +698,17 @@ def test_the_prose_count_of_workspace_isolated_tables_matches_the_schema():
     workspace_keyed = sorted({name for name, qual in forced if "current_workspace()" in qual})
     others = sorted({name for name, _ in forced} - set(workspace_keyed))
     assert others == [], (
-        f"{others} are under FORCE row-level security and not keyed on current_workspace(). "
-        "The count below is of the workspace-keyed tables, so a new table in this list is a "
-        "table the sentence in three docstrings does not describe."
+        f"{others} are under FORCE row-level security and not keyed on current_workspace(), so "
+        "the sentence the prose carries, that every forced table is keyed on it, is false."
     )
-    for relative in _FILES_STATING_THE_WORKSPACE_POLICY_COUNT:
-        stated = _WORKSPACE_POLICY_COUNT_CLAIM.findall(
-            (ROOT / relative).read_text(encoding="utf-8")
-        )
-        assert stated, (
-            f"{relative} no longer states how many tables are keyed on current_workspace(), so "
-            "nothing checks the number it used to carry."
-        )
-        assert {int(number) for number in stated} == {len(workspace_keyed)}, (
-            f"{relative} says {stated} and the schema has {len(workspace_keyed)}: {workspace_keyed}"
-        )
+    # The query has to be able to find a table before its silence about the others means anything:
+    # the four named in this docstring are forced by 0001 and 0003 and have been ever since.
+    assert {"capture", "consent_record", "embedding", "intake_batch"} <= set(workspace_keyed), (
+        workspace_keyed
+    )
+    assert _files_stating_the_count() == [], (
+        f"prose states a count; the schema has {len(workspace_keyed)}: {workspace_keyed}"
+    )
 
 
 def test_consent_is_deny_by_default_and_expires():

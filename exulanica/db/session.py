@@ -2,21 +2,19 @@
 
 Neither setting is optional, and neither is a convenience.
 
-*   **``exulanica.workspace_id``.** 123 tables are under FORCE row-level security keyed on
-    ``current_workspace()``, whose policy compares the row's isolation column to
-    ``current_workspace()`` and which reads exactly this setting. Most of those columns are
-    ``workspace_id``. ``consent_record`` compares ``tenant_id``, the name migration 0001 gave
-    the workspace on that table, to the same session workspace. There is no separate tenant
-    session setting. "One hundred and twenty" rather than an ordinal, because an ordinal
-    beside a count that later migrations move is a sentence that goes stale: only the count is
-    measured, by
-    ``test_the_prose_count_of_workspace_isolated_tables_matches_the_schema`` against a live
-    schema, and it reads nothing at all out of a word. A session that does not declare a
-    workspace therefore reads nothing and writes nothing: every SELECT returns empty and every
-    INSERT fails its WITH CHECK. The tombstone and epistemic guards go further and call
-    ``assert_workspace_context()``, which raises rather than failing open, because a guard that
-    silently sees no tombstones is worse than no guard at all. So a connection is only ever
-    handed out with a workspace attached.
+*   **``exulanica.workspace_id``.** Every table under FORCE row-level security has a policy
+    that compares the row's isolation column to ``current_workspace()``, which reads exactly
+    this setting. Most of those columns are ``workspace_id``. ``consent_record`` compares
+    ``tenant_id``, the name migration 0001 gave the workspace on that table, to the same
+    session workspace. There is no separate tenant session setting. How many tables that is
+    belongs to the schema and to no sentence:
+    ``test_the_prose_count_of_workspace_isolated_tables_matches_the_schema`` lists them from a
+    migrated schema, and ``tests/test_migration.py`` fails on prose that states the number. A
+    session that does not declare a workspace therefore reads nothing and writes nothing:
+    every SELECT returns empty and every INSERT fails its WITH CHECK. The tombstone and
+    epistemic guards go further and call ``assert_workspace_context()``, which raises rather
+    than failing open, because a guard that silently sees no tombstones is worse than no guard
+    at all. So a connection is only ever handed out with a workspace attached.
 
 *   **UTC.** PostgreSQL renders ``timestamptz`` in the session time zone, so a connection left
     on the server's local zone hands back ``2026-08-28T13:47-04:00`` for a column the code
