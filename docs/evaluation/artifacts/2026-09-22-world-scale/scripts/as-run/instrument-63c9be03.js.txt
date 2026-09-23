@@ -1,0 +1,348 @@
+// World-scale page instrument. Evaluated before any page script (Page.addScriptToEvaluateOnNewDocument),
+// so it measures the shipped app without changing a product file.
+//
+// What it records, all with performance.now() on the page's own clock:
+// - every requestAnimationFrame callback: frame timestamp, entry, exit, WebGL draw calls issued;
+// - long tasks while recording;
+// - the engine application, captured when its constructor registers it under the canvas id 'atlas'
+//   (AppBase._applications[canvas.id] = this, a plain object), through a one-shot accessor on
+//   Object.prototype that removes itself on capture;
+// - scene-graph additions and removals of nodes named authored-object:* and authored-point-map:*;
+// - trusted clicks and submits, and the first time registered DOM predicates hold, plus the end of
+//   the next animation frame after each.
+(() => {
+  'use strict';
+  const W = window;
+  const now = () => performance.now();
+  const rec = {
+    version: 3,
+    frames: [],            // flat: ts, start, end, draws  (only while recording)
+    recording: false,
+    longtasks: [],         // flat: start, duration (only while recording)
+    drawEnds: [],          // end time of every drawn frame (bounded ring of 20000)
+    draws: 0,
+    firstDraw: null,
+    lastFrameEnd: null,
+    app: null, appAt: null, appCount: 0,
+    graphPatched: false,
+    obj: { adds: 0, removes: 0, events: [] },   // events flat: time, +1/-1
+    pm: { adds: 0, removes: 0, events: [] },
+    marks: {},
+    clicks: [],
+    watchers: [],
+    frameWaiters: [],
+    capture: null,
+    errors: [],
+  };
+  W.__ws = rec;
+  try { performance.setResourceTimingBufferSize(100000); } catch (e) { rec.errors.push(String(e)); }
+
+  // -- WebGL draw calls ----------------------------------------------------------------------------
+  const countDraws = (proto) => {
+    if (!proto) return;
+    for (const name of ['drawElements', 'drawArrays', 'drawElementsInstanced', 'drawArraysInstanced',
+      'drawRangeElements']) {
+      const original = proto[name];
+      if (typeof original !== 'function') continue;
+      proto[name] = function (...args) { rec.draws += 1; return original.apply(this, args); };
+    }
+  };
+  countDraws(W.WebGL2RenderingContext && W.WebGL2RenderingContext.prototype);
+  countDraws(W.WebGLRenderingContext && W.WebGLRenderingContext.prototype);
+
+  // -- animation frames ----------------------------------------------------------------------------
+  const nativeRaf = W.requestAnimationFrame.bind(W);
+  W.requestAnimationFrame = function (callback) {
+    return nativeRaf(function (ts) {
+      const before = rec.draws;
+      const start = now();
+      try {
+        return callback(ts);
+      } finally {
+        const end = now();
+        const drew = rec.draws - before;
+        if (rec.recording) rec.frames.push(ts, start, end, drew);
+        rec.lastFrameEnd = end;
+        if (drew > 0) {
+          if (rec.firstDraw === null) rec.firstDraw = { ts, start, end, draws: drew };
+          if (rec.drawEnds.length >= 40000) rec.drawEnds.splice(0, 20000);
+          rec.drawEnds.push(start, end);
+        }
+        if (rec.frameWaiters.length > 0) {
+          const due = rec.frameWaiters;
+          rec.frameWaiters = [];
+          for (const waiter of due) {
+            if (waiter.drawnOnly && drew === 0) { rec.frameWaiters.push(waiter); continue; }
+            if (start < waiter.after) { rec.frameWaiters.push(waiter); continue; }
+            rec.marks[waiter.name] = end;
+          }
+        }
+      }
+    });
+  };
+  const afterNextFrame = (name, after, drawnOnly) => {
+    rec.frameWaiters.push({ name, after, drawnOnly });
+  };
+  rec.afterNextFrame = afterNextFrame;
+
+  // -- long tasks ----------------------------------------------------------------------------------
+  try {
+    new PerformanceObserver((list) => {
+      if (!rec.recording) return;
+      for (const task of list.getEntries()) rec.longtasks.push(task.startTime, task.duration);
+    }).observe({ entryTypes: ['longtask'] });
+  } catch (e) { rec.errors.push(`longtask: ${e}`); }
+
+  // -- the engine application ----------------------------------------------------------------------
+  // Fields the engine initialises before its constructor body runs. `root` and `graphicsDevice`
+  // do not exist yet when the constructor registers the application, which is the first line of it.
+  const looksLikeApp = (value) => value !== null && typeof value === 'object'
+    && 'autoRender' in value && 'renderNextFrame' in value && value.systems !== undefined
+    && typeof value.render === 'function' && typeof value.start === 'function';
+  const KEY = 'atlas';
+  const capture = (app) => {
+    rec.app = app;
+    rec.appAt = now();
+    rec.appCount += 1;
+    if (Object.prototype.hasOwnProperty.call(Object.prototype, KEY)) delete Object.prototype[KEY];
+    queueMicrotask(() => patchGraph(app));
+  };
+  Object.defineProperty(Object.prototype, KEY, {
+    configurable: true,
+    enumerable: false,
+    get() { return undefined; },
+    set(value) {
+      let stored = value;
+      Object.defineProperty(this, KEY, {
+        configurable: true, enumerable: true,
+        get() { return stored; },
+        set(next) { stored = next; if (looksLikeApp(next)) capture(next); },
+      });
+      if (looksLikeApp(value)) capture(value);
+    },
+  });
+
+  const note = (node, sign) => {
+    const name = node && node.name;
+    if (typeof name !== 'string') return;
+    let bucket = null;
+    if (name.startsWith('authored-object:')) bucket = rec.obj;
+    else if (name.startsWith('authored-point-map:')) bucket = rec.pm;
+    if (bucket === null) return;
+    if (sign > 0) bucket.adds += 1; else bucket.removes += 1;
+    bucket.events.push(now(), sign);
+    checkComplete();
+  };
+  const patchGraph = (app) => {
+    if (!app.root) { setTimeout(() => patchGraph(app), 0); return; }
+    let proto = Object.getPrototypeOf(app.root);
+    while (proto && !Object.prototype.hasOwnProperty.call(proto, 'addChild')) {
+      proto = Object.getPrototypeOf(proto);
+    }
+    if (!proto || proto.__wsPatched) return;
+    Object.defineProperty(proto, '__wsPatched', { value: true });
+    const add = proto.addChild;
+    const insert = proto.insertChild;
+    const remove = proto.removeChild;
+    proto.addChild = function (node) { const r = add.call(this, node); note(node, 1); return r; };
+    if (typeof insert === 'function') {
+      proto.insertChild = function (node, index) { const r = insert.call(this, node, index); note(node, 1); return r; };
+    }
+    proto.removeChild = function (child) { const r = remove.call(this, child); note(child, -1); return r; };
+    rec.graphPatched = now();
+  };
+
+  const findNamed = (prefix) => {
+    const app = rec.app;
+    if (!app || !app.root) return [];
+    return app.root.find((node) => typeof node.name === 'string' && node.name.startsWith(prefix)
+      && node.enabled !== false && node._enabledInHierarchy !== false);
+  };
+  rec.sceneObjects = () => findNamed('authored-object:').map((node) => {
+    const p = node.getPosition();
+    const r = node.getEulerAngles();
+    return [node.name.slice('authored-object:'.length), p.x, p.y, p.z, r.x, r.y, r.z];
+  });
+  rec.scenePointMaps = () => findNamed('authored-point-map:').map((node) => {
+    const p = node.getPosition();
+    return [node.name.slice('authored-point-map:'.length), p.x, p.y, p.z];
+  });
+
+  // -- completion: every expected object and estimate resident, then a drawn frame --------------
+  rec.expected = null;
+  let checkScheduled = false;
+  const checkComplete = () => {
+    const want = rec.expected;
+    if (want === null || rec.marks.completeResident !== undefined || checkScheduled) return;
+    // Walk the scene only when the attachment counts say the world may be complete, so the check
+    // does not add a whole-scene traversal to every one of a thousand attachments it is timing.
+    // Counts can overstate (a destroyed parent detaches children without removeChild), never
+    // understate, so this cannot skip the moment of completion.
+    if (rec.app !== null && (rec.obj.adds - rec.obj.removes < want.objects
+      || rec.pm.adds - rec.pm.removes < want.maps)) return;
+    checkScheduled = true;
+    queueMicrotask(() => {
+      checkScheduled = false;
+      if (rec.marks.completeResident !== undefined || rec.expected === null) return;
+      const objects = findNamed('authored-object:').length;
+      const maps = findNamed('authored-point-map:').length;
+      rec.lastCounts = { objects, maps, at: now() };
+      if (objects === want.objects && maps === want.maps) {
+        rec.marks.completeResident = now();
+        afterNextFrame('completeFrame', rec.marks.completeResident, true);
+      }
+    });
+  };
+  rec.expect = (objects, maps) => {
+    rec.expected = { objects, maps };
+    delete rec.marks.completeResident;
+    delete rec.marks.completeFrame;
+    checkComplete();
+  };
+  rec.recheck = () => checkComplete();
+
+  // -- clicks, submits and DOM predicates ----------------------------------------------------------
+  const label = (target) => {
+    const element = target instanceof Element ? target.closest('button,a,input,[role=button]') ?? target : null;
+    return element ? (element.textContent || element.getAttribute('aria-label') || element.tagName).trim().slice(0, 60) : '';
+  };
+  W.addEventListener('click', (event) => {
+    rec.clicks.push({ t: now(), trusted: event.isTrusted, label: label(event.target) });
+  }, true);
+  // A lost WebGL context is a stop condition for the estimate series; the event does not bubble,
+  // so it is caught in the capture phase.
+  rec.contextLost = [];
+  W.addEventListener('webglcontextlost', (event) => {
+    rec.contextLost.push({ t: now(), target: event.target && event.target.id });
+  }, true);
+  W.addEventListener('submit', (event) => {
+    rec.marks.submit = now();
+    rec.clicks.push({ t: now(), trusted: event.isTrusted, label: 'submit' });
+  }, true);
+
+  const evaluateWatchers = () => {
+    if (rec.watchers.length === 0) return;
+    const t = now();
+    const remaining = [];
+    for (const watcher of rec.watchers) {
+      let held = false;
+      try { held = Boolean(watcher.predicate()); } catch (e) { held = false; }
+      if (held) {
+        rec.marks[watcher.name] = t;
+        afterNextFrame(`${watcher.name}:frame`, t, false);
+      } else {
+        remaining.push(watcher);
+      }
+    }
+    rec.watchers = remaining;
+  };
+  rec.watch = (name, predicateSource) => {
+    delete rec.marks[name];
+    delete rec.marks[`${name}:frame`];
+    // eslint-disable-next-line no-new-func
+    rec.watchers.push({ name, predicate: new Function(`return (${predicateSource});`) });
+    evaluateWatchers();
+  };
+  const startObserver = () => {
+    const target = document.documentElement;
+    if (!target) { setTimeout(startObserver, 0); return; }
+    new MutationObserver(evaluateWatchers).observe(target, {
+      subtree: true, childList: true, characterData: true, attributes: true,
+      attributeFilter: ['hidden', 'class', 'disabled', 'data-kind', 'data-busy', 'aria-busy', 'style'],
+    });
+    rec.observerAt = now();
+  };
+  startObserver();
+  rec.watch('credentialForm', "document.querySelector('form.credential-gate input[type=password]') !== null");
+
+  // -- pixels --------------------------------------------------------------------------------------
+  rec.capturePixels = () => {
+    const app = rec.app;
+    if (!app) throw new Error('no application captured');
+    const gl = app.graphicsDevice.gl;
+    const width = gl.drawingBufferWidth;
+    const height = gl.drawingBufferHeight;
+    app.render();
+    const previous = gl.getParameter(gl.READ_FRAMEBUFFER_BINDING);
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+    const pixels = new Uint8Array(width * height * 4);
+    gl.readPixels(0, 0, width, height, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, previous);
+    rec.capture = { width, height, pixels, at: now() };
+    let nonzero = 0;
+    for (let i = 0; i < pixels.length; i += 4097) if (pixels[i] !== 0) nonzero += 1;
+    return { width, height, sampledNonzero: nonzero };
+  };
+  // The drawn silhouette of one object: render with it and without it, in one task, and keep the
+  // pixels that differ by more than 3 levels. Both images stay on rec for transfer.
+  const grab = () => {
+    const app = rec.app;
+    const gl = app.graphicsDevice.gl;
+    app.render();
+    const previous = gl.getParameter(gl.READ_FRAMEBUFFER_BINDING);
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, null);
+    const pixels = new Uint8Array(gl.drawingBufferWidth * gl.drawingBufferHeight * 4);
+    gl.readPixels(0, 0, gl.drawingBufferWidth, gl.drawingBufferHeight, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+    gl.bindFramebuffer(gl.READ_FRAMEBUFFER, previous);
+    return { width: gl.drawingBufferWidth, height: gl.drawingBufferHeight, pixels };
+  };
+  rec.silhouette = (objectId) => {
+    const node = rec.app.root.findByName(`authored-object:${objectId}`);
+    if (!node) throw new Error(`no scene node for ${objectId}`);
+    const withIt = grab();
+    node.enabled = false;
+    const without = grab();
+    node.enabled = true;
+    rec.app.render();
+    const { width, height } = withIt;
+    let count = 0; let sx = 0; let sy = 0;
+    let minX = width; let minY = height; let maxX = -1; let maxY = -1;
+    const mask = new Uint8Array(width * height);
+    for (let y = 0; y < height; y += 1) {
+      for (let x = 0; x < width; x += 1) {
+        const i = (y * width + x) * 4;
+        const a = withIt.pixels; const b = without.pixels;
+        if (Math.abs(a[i] - b[i]) > 3 || Math.abs(a[i + 1] - b[i + 1]) > 3 || Math.abs(a[i + 2] - b[i + 2]) > 3) {
+          mask[y * width + x] = 1;
+          count += 1; sx += x; sy += y;
+          if (x < minX) minX = x; if (y < minY) minY = y; if (x > maxX) maxX = x; if (y > maxY) maxY = y;
+        }
+      }
+    }
+    rec.silhouettes = rec.silhouettes || {};
+    rec.silhouettes[objectId] = { withIt, without, mask };
+    rec.capture = { width, height, pixels: withIt.pixels, at: now() };
+    return { width, height, count,
+      cx_millipixels: count ? Math.round((sx / count) * 1000) : null,
+      cy_millipixels: count ? Math.round((sy / count) * 1000) : null,
+      bbox: count ? [minX, minY, maxX, maxY] : null };
+  };
+  // Compare two stored silhouettes: intersection over union of their masks, and how much of the
+  // frame without either object differs by more than 3 levels.
+  rec.compareSilhouettes = (a, b) => {
+    const A = rec.silhouettes[a]; const B = rec.silhouettes[b];
+    let both = 0; let either = 0; let groundDiffer = 0;
+    for (let i = 0; i < A.mask.length; i += 1) {
+      if (A.mask[i] && B.mask[i]) both += 1;
+      if (A.mask[i] || B.mask[i]) either += 1;
+      const j = i * 4; const p = A.without.pixels; const q = B.without.pixels;
+      if (Math.abs(p[j] - q[j]) > 3 || Math.abs(p[j + 1] - q[j + 1]) > 3 || Math.abs(p[j + 2] - q[j + 2]) > 3) groundDiffer += 1;
+    }
+    return { iou_millionths: either ? Math.round((both / either) * 1e6) : null,
+      without_object_differing_millionths: Math.round((groundDiffer / A.mask.length) * 1e6) };
+  };
+  rec.useCapture = (objectId, which) => {
+    const stored = rec.silhouettes[objectId];
+    const image = which === 'without' ? stored.without : stored.withIt;
+    rec.capture = { width: image.width, height: image.height, pixels: image.pixels, at: now() };
+    return true;
+  };
+  rec.captureChunk = (offset, length) => {
+    const bytes = rec.capture.pixels.subarray(offset, offset + length);
+    let binary = '';
+    for (let i = 0; i < bytes.length; i += 32768) {
+      binary += String.fromCharCode.apply(null, bytes.subarray(i, i + 32768));
+    }
+    return btoa(binary);
+  };
+})();

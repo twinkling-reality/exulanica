@@ -1,0 +1,85 @@
+"""Start or stop the release build's vite preview on port 19224 for the slot-4 API.
+
+    python3 preview.py up | status | down
+
+Stops only the process it started, checked by pid and command line, like the acceptance launcher.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import signal
+import subprocess
+import sys
+import time
+import urllib.request
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+WORKTREE = HERE.parents[1]
+APP = WORKTREE / "web" / "packages" / "app"
+STATE = HERE / "preview-state.json"
+PORT = 19224
+API = "http://127.0.0.1:19221"
+
+
+def command_of(pid: int) -> str:
+    done = subprocess.run(["ps", "-p", str(pid), "-o", "command="], capture_output=True, text=True)
+    return done.stdout.strip()
+
+
+def up() -> None:
+    if STATE.exists():
+        raise SystemExit(f"{STATE.name} exists; run down first")
+    if not (APP / "dist" / "index.html").exists():
+        raise SystemExit("no dist/index.html; build first")
+    env = {k: v for k, v in os.environ.items()
+           if not k.startswith(("EXULANICA_", "VITE_", "PG", "NEBIUS_", "GOOGLE_"))}
+    env["EXULANICA_API_URL"] = API
+    log = (HERE / "preview.log").open("ab")
+    process = subprocess.Popen(
+        [str(APP / "node_modules" / ".bin" / "vite"), "preview", "--port", str(PORT), "--strictPort"],
+        cwd=APP, env=env, stdout=log, stderr=subprocess.STDOUT, stdin=subprocess.DEVNULL,
+        start_new_session=True,
+    )
+    STATE.write_text(json.dumps({"pid": process.pid, "port": PORT, "api": API,
+                                 "started_at": time.strftime("%Y-%m-%dT%H:%M:%S%z")}))
+    for _ in range(60):
+        try:
+            with urllib.request.urlopen(f"http://localhost:{PORT}/api/healthz", timeout=2) as reply:
+                print("preview up", process.pid, reply.status, reply.read().decode()[:80])
+                return
+        except OSError:
+            time.sleep(0.5)
+    raise SystemExit("preview did not answer /api/healthz within 30 s")
+
+
+def down() -> None:
+    if not STATE.exists():
+        raise SystemExit("no preview state; nothing started here")
+    pid = json.loads(STATE.read_text())["pid"]
+    command = command_of(pid)
+    if command and "vite" in command and "preview" in command:
+        os.killpg(pid, signal.SIGTERM)
+        for _ in range(40):
+            if not command_of(pid):
+                break
+            time.sleep(0.25)
+        else:
+            os.killpg(pid, signal.SIGKILL)
+        print(f"preview pid {pid} stopped")
+    else:
+        print(f"preview pid {pid} is '{command[:80]}', not ours or gone; left alone")
+    STATE.rename(HERE / f"preview-state-stopped-{int(time.time())}.json")
+
+
+def status() -> None:
+    if not STATE.exists():
+        print("not running")
+        return
+    pid = json.loads(STATE.read_text())["pid"]
+    print(pid, command_of(pid) or "gone")
+
+
+{"up": up, "down": down, "status": status}[sys.argv[1]]()

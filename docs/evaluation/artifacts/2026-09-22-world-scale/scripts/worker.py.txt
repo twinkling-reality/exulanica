@@ -1,0 +1,120 @@
+"""Run the product's derivative worker with the local depth model against the slot-4 runtime.
+
+    python3 worker.py run [--once]   # foreground: start the worker, sample memory, log events
+                                     # --once drains the queued work and exits (the product flag)
+    python3 worker.py stop     # SIGTERM to the worker this file started, checked by pid and command
+
+The environment is the operator's shell without anything that could redirect a database, a model
+or a store, plus exactly: the slot's runtime-role database URL (never the owner URL), its data
+directory and workspace, EXULANICA_DEPTH_MODEL=moge and HF_HUB_OFFLINE=1 so the cached checkpoint is
+used and nothing is downloaded. Resident memory is sampled every 0.5 s with ps.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import signal
+import subprocess
+import sys
+import threading
+import time
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+WORKTREE = HERE.parents[1]
+STATE = Path("/tmp/exulanica-0922-acceptance/exulanica-0922-world-scale/state.json")
+OUT = HERE / "runs" / "worker"
+PIDFILE = OUT / "worker.pid"
+
+
+def rss_kib(pid: int) -> int | None:
+    done = subprocess.run(["ps", "-o", "rss=", "-p", str(pid)], capture_output=True, text=True)
+    text = done.stdout.strip()
+    return int(text) if text.isdigit() else None
+
+
+def run() -> None:
+    OUT.mkdir(parents=True, exist_ok=True)
+    # Its wall time is a result, so it runs like every timing run: inside quiet-slot then
+    # gpu-slot, through gated.py (idle >= 70 percent over 10 s before, mean >= 50 during).
+    samples_path = os.environ.get("WS_IDLE_SAMPLES")
+    if samples_path is None and "--dry" not in sys.argv:
+        raise SystemExit("refused: a measured depth run goes through gated.py (WS_IDLE_SAMPLES)")
+    started_epoch = time.time()
+    load_before = [round(v, 2) for v in os.getloadavg()]
+    state = json.loads(STATE.read_text())
+    if "exulanica_app@" not in state["database"]["runtime_url"]:
+        raise SystemExit("the runtime URL does not name the runtime role")
+    env = {k: v for k, v in os.environ.items()
+           if not k.startswith(("EXULANICA_", "PG", "NEBIUS_", "VITE_", "GOOGLE_", "HF_"))}
+    env.update({
+        "EXULANICA_DATABASE_URL": state["database"]["runtime_url"],
+        "EXULANICA_DATA_DIR": state["data_dir"],
+        "EXULANICA_WORKSPACE_IDS": state["workspace_id"],
+        "EXULANICA_DEPTH_MODEL": "moge",
+        "HF_HUB_OFFLINE": "1",
+    })
+    stamp = time.strftime("%Y%m%dT%H%M%S")
+    events = (OUT / f"worker-{stamp}.jsonl").open("w")
+    samples = (OUT / f"worker-{stamp}-rss.jsonl").open("w")
+    started = time.time()
+    process = subprocess.Popen(
+        [str(WORKTREE / ".venv" / "bin" / "exulanica-derivative-worker"), "--poll-seconds", "1",
+         "--name", "world-scale-depth", *(["--once"] if "--once" in sys.argv else [])],
+        cwd=WORKTREE, env=env, stdout=subprocess.PIPE, stderr=subprocess.STDOUT, text=True,
+        start_new_session=True,
+    )
+    PIDFILE.write_text(json.dumps({"pid": process.pid, "started_at": started,
+                                   "events": events.name, "rss": samples.name}))
+    peak = {"kib": 0}
+
+    def sample() -> None:
+        while process.poll() is None:
+            kib = rss_kib(process.pid)
+            if kib is not None:
+                peak["kib"] = max(peak["kib"], kib)
+                samples.write(json.dumps({"t": round(time.time() - started, 3), "rss_kib": kib}) + "\n")
+                samples.flush()
+            time.sleep(0.5)
+
+    threading.Thread(target=sample, daemon=True).start()
+    assert process.stdout is not None
+    for line in process.stdout:
+        events.write(json.dumps({"t": round(time.time() - started, 3), "line": line.rstrip()}) + "\n")
+        events.flush()
+        print(f"{time.time() - started:8.1f} {line.rstrip()[:300]}", flush=True)
+    code = process.wait()
+    during = []
+    if samples_path is not None:
+        until = time.time()
+        during = [json.loads(line)["idle"] for line in Path(samples_path).read_text().splitlines()
+                  if line and started_epoch <= json.loads(line)["t"] <= until]
+    mean = round(sum(during) / len(during), 1) if during else None
+    events.write(json.dumps({"t": round(time.time() - started, 3), "exit": code,
+                             "peak_rss_kib": peak["kib"], "load_before": load_before,
+                             "load_after": [round(v, 2) for v in os.getloadavg()],
+                             "idle_during_mean": mean, "idle_during_samples": len(during),
+                             "timing_valid": mean is None or mean >= 50}) + "\n")
+    events.close()
+    print(f"worker exited {code}; peak RSS {peak['kib']} KiB", flush=True)
+
+
+def stop() -> None:
+    record = json.loads(PIDFILE.read_text())
+    pid = record["pid"]
+    command = subprocess.run(["ps", "-p", str(pid), "-o", "command="], capture_output=True,
+                             text=True).stdout.strip()
+    if "exulanica-derivative-worker" not in command:
+        print(f"pid {pid} is '{command[:80]}', not the worker; left alone")
+        return
+    os.killpg(pid, signal.SIGTERM)
+    for _ in range(120):
+        if not subprocess.run(["ps", "-p", str(pid)], capture_output=True).stdout.strip().count(b"\n"):
+            break
+        time.sleep(0.5)
+    print(f"worker pid {pid} signalled; now: "
+          f"{subprocess.run(['ps', '-p', str(pid), '-o', 'command='], capture_output=True, text=True).stdout.strip() or 'gone'}")
+
+
+{"run": run, "stop": stop}[sys.argv[1]]()

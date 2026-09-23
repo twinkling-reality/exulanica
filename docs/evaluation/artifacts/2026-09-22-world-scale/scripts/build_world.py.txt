@@ -1,0 +1,193 @@
+"""Grow a saved world through the product's own routes, one placement at a time.
+
+    python3 build_world.py --state STATE_JSON --layout spread|clustered --to N [--out JSONL]
+
+The route pair is the one the browser uses: POST /world/versions/{id}/compositions/preview, then
+POST .../compositions/apply carrying the base and the saved-entry binding, so the saved entry's
+cursor advances exactly as it does when a person confirms a placement. Standard library only.
+
+Positions are the first N points of a fixed 1000-point sunflower (Vogel) spiral, so every count
+is a prefix of the next and a world grows outward at constant density:
+  spread:    a disc of radius 500 m centred on the ground origin
+  clustered: a disc of radius 10 m centred 20 m in front of the arrival point, along its facing
+Assets cycle cube, pillar, plate by index; yaw by the golden angle.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import math
+import os
+import sys
+import time
+import urllib.error
+import urllib.request
+from pathlib import Path
+
+TOTAL = 1000
+GOLDEN_ANGLE = math.pi * (3.0 - math.sqrt(5.0))
+ASSETS = ("cc0.marker-cube", "cc0.marker-pillar", "cc0.marker-plate")
+LAYOUTS = {
+    # centre (x_mm, z_mm) and radius in mm; the arrival point and facing are read from the app
+    # and passed in for the clustered layout.
+    "spread": {"radius_mm": 500_000},
+    "clustered": {"radius_mm": 10_000, "ahead_mm": 20_000},
+}
+
+
+class Api:
+    def __init__(self, base: str, token: str) -> None:
+        self.base = base
+        self.token = token
+
+    def call(self, method: str, path: str, body: object | None = None) -> tuple[int, object, int, int]:
+        data = None if body is None else json.dumps(body).encode()
+        request = urllib.request.Request(
+            self.base + path, data=data, method=method,
+            headers={"Authorization": f"Bearer {self.token}",
+                     **({"Content-Type": "application/json"} if data is not None else {})},
+        )
+        started = time.perf_counter_ns()
+        try:
+            with urllib.request.urlopen(request, timeout=600) as reply:
+                raw = reply.read()
+                status = reply.status
+        except urllib.error.HTTPError as error:
+            raw = error.read()
+            status = error.code
+        elapsed_us = (time.perf_counter_ns() - started) // 1000
+        try:
+            parsed = json.loads(raw) if raw else None
+        except json.JSONDecodeError:
+            parsed = raw.decode(errors="replace")
+        return status, parsed, elapsed_us, len(raw)
+
+
+def position(layout: str, index: int, arrival: dict) -> tuple[int, int]:
+    spec = LAYOUTS[layout]
+    radius = spec["radius_mm"] * math.sqrt((index + 0.5) / TOTAL)
+    theta = index * GOLDEN_ANGLE
+    dx, dz = radius * math.cos(theta), radius * math.sin(theta)
+    if layout == "spread":
+        return round(dx), round(dz)
+    yaw = arrival["yaw"]
+    # Facing: the controls walk forward along (-sin(yaw), -cos(yaw)) in x, z.
+    cx = arrival["x_mm"] - spec["ahead_mm"] * math.sin(yaw)
+    cz = arrival["z_mm"] - spec["ahead_mm"] * math.cos(yaw)
+    return round(cx + dx), round(cz + dz)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--state", required=True)
+    parser.add_argument("--layout", choices=sorted(LAYOUTS), required=True)
+    parser.add_argument("--to", type=int, required=True)
+    parser.add_argument("--arrival", help="JSON {x_mm, z_mm, yaw} of the arrival pose (clustered)")
+    parser.add_argument("--out", required=True, help="JSONL of every placement's timings")
+    parser.add_argument("--probe", action="store_true", help="preview one placement and stop")
+    parser.add_argument("--dry", action="store_true", help="skip the load gate; not a measurement")
+    args = parser.parse_args()
+    # The quiet-machine gate is gated.py's; the builder's durations are a result, so it needs it.
+    samples_path = os.environ.get("WS_IDLE_SAMPLES")
+    if not args.dry and not args.probe and samples_path is None:
+        raise SystemExit("refused: a measured build runs through gated.py (WS_IDLE_SAMPLES)")
+    started_epoch = time.time()
+    load_before = [round(v, 2) for v in os.getloadavg()]
+    state = json.loads(Path(args.state).read_text())
+    token = Path(state["token_file"]).read_text().strip()
+    api = Api(f"http://127.0.0.1:{state['ports']['api']}", token)
+    arrival = json.loads(args.arrival) if args.arrival else {"x_mm": 0, "z_mm": 0, "yaw": 0.0}
+
+    status, entry, _, _ = api.call("POST", "/world-entries/starter", {"title": "My world"})
+    if status != 200:
+        raise SystemExit(f"starter: {status} {entry}")
+    world = entry["world_id"]
+    version_id = entry["authored_version_id"]
+    region = entry["authored_scene"]["region"]["region_id"]
+    query = f"?world_id={urllib.parse.quote(world, safe='')}"
+    status, version, _, _ = api.call("GET", f"/world/versions/{version_id}{query}")
+    if status != 200:
+        raise SystemExit(f"version: {status} {version}")
+    live = [o for o in version["objects"] if not o["removed"]]
+    start = len(live)
+    print(f"world {world} version {version_id} region {region} objects {start} "
+          f"edit_seq {version['edit_seq']} entry revision {entry['revision']}", flush=True)
+    if start > args.to:
+        raise SystemExit(f"the world already holds {start} objects, more than {args.to}")
+
+    out = Path(args.out).open("a")
+    base_state = version["state_sha256"]
+    edit_seq = version["edit_seq"]
+    revision = entry["revision"]
+    for index in range(start, args.to):
+        x_mm, z_mm = position(args.layout, index, arrival)
+        placement = {
+            "subject_id": f"scale-{args.layout}-{index:04d}",
+            "region_id": region,
+            "transform": {"x_mm": x_mm, "y_mm": 0, "z_mm": z_mm,
+                          "yaw_microradians": round((index * GOLDEN_ANGLE % (2 * math.pi)) * 1e6),
+                          "scale_milli": 1000},
+            "origin_role": "fictional",
+            "behaviour": None,
+        }
+        body = {"source": {"kind": "reviewed_asset", "asset_key": ASSETS[index % 3]},
+                "placement": placement}
+        p_status, preview, p_us, p_bytes = api.call(
+            "POST", f"/world/versions/{version_id}/compositions/preview{query}",
+            {**body, "base_state_sha256": base_state})
+        if args.probe:
+            print(json.dumps({"status": p_status, "preview": preview}, indent=1)[:4000])
+            return
+        if p_status != 200 or preview.get("blocked_reason") is not None:
+            raise SystemExit(f"preview refused at {index}: {p_status} {json.dumps(preview)[:800]}")
+        a_status, applied, a_us, a_bytes = api.call(
+            "POST", f"/world/versions/{version_id}/compositions/apply{query}",
+            {**body, "base_state_sha256": base_state,
+             "saved_entry": {"entry_id": entry["entry_id"], "base_revision": revision,
+                             "authored_state_sha256": base_state,
+                             "authored_edit_seq": edit_seq}})
+        if a_status not in (200, 201):
+            raise SystemExit(f"apply refused at {index}: {a_status} {json.dumps(applied)[:800]}")
+        base_state = applied["state_sha256"]
+        edit_seq = applied["edit_seq"]
+        revision += 1
+        out.write(json.dumps({"index": index, "objects_before": index, "x_mm": x_mm, "z_mm": z_mm,
+                              "asset": ASSETS[index % 3], "preview_us": p_us,
+                              "preview_bytes": p_bytes, "apply_us": a_us, "apply_bytes": a_bytes,
+                              "apply_status": a_status}) + "\n")
+        if (index + 1) % 50 == 0 or index + 1 == args.to:
+            out.flush()
+            print(f"{index + 1} placed; last preview {p_us} us apply {a_us} us "
+                  f"({a_bytes} bytes)", flush=True)
+    # The entry's cursor must now name what the builder wrote, or the app would refuse to open it.
+    status, check, _, _ = api.call("GET", f"/world-entries/{entry['entry_id']}")
+    if (check["authored_state_sha256"], check["authored_edit_seq"], check["revision"]) != (
+            base_state, edit_seq, revision):
+        raise SystemExit(f"entry cursor disagrees with the builder: {json.dumps(check)[:600]}")
+    during = []
+    if samples_path is not None:
+        until = time.time()
+        during = [json.loads(line)["idle"] for line in Path(samples_path).read_text().splitlines()
+                  if line and started_epoch <= json.loads(line)["t"] <= until]
+    mean = round(sum(during) / len(during), 1) if during else None
+    out.write(json.dumps({"summary": True, "layout": args.layout, "from": start, "to": args.to,
+                          "idle_during_mean": mean, "idle_during_samples": len(during),
+                          # A build shorter than one 2 s sample has no during-run reading; the
+                          # 10 s reading gated.py took immediately before it then governs.
+                          "timing_valid": bool(not args.dry and (mean is None or mean >= 50)),
+                          "idle_note": ("shorter than one 2 s sample; the pre-run reading governs"
+                                        if mean is None else None),
+                          "gate_pre": json.loads(os.environ.get("WS_IDLE_PRE", "null")),
+                          "load_before": load_before,
+                          "load_after": [round(v, 2) for v in os.getloadavg()],
+                          "nice": os.getpriority(os.PRIO_PROCESS, 0),
+                          "measurement": not args.dry}) + "\n")
+    out.flush()
+    print(f"done: {args.to} objects, entry revision {revision}, edit_seq {edit_seq}", flush=True)
+
+
+if __name__ == "__main__":
+    import urllib.parse  # noqa: F401  (used through urllib.parse.quote above)
+
+    main()

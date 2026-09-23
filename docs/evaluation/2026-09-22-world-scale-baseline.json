@@ -1,0 +1,4827 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "artifacts": {
+      "directory": "docs/evaluation/artifacts/2026-09-22-world-scale",
+      "files": [
+        {
+          "byte_size": 228862,
+          "note": "extract of the accepted run; as-run file sha256 e94203f1d1d9216c5b157fba757e8549e391a3c3606ed80b47d298145324095e",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/spread/spread-0-2026-09-22T23-24-55-763Z.json",
+          "sha256": "d35e58e66d0ecb1acb7db5f4b30bd767d746952c0b8ea97928a73b9005fcd89f"
+        },
+        {
+          "byte_size": 231205,
+          "note": "extract of the accepted run; as-run file sha256 7b2a1cf92dacd775830f7ea5bbb5baa86e734fc322a33fa25f49c4af0fdf7ee5",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/spread/spread-10-2026-09-23T00-28-12-440Z.json",
+          "sha256": "b258474c9cf82ed499db19753866f21a38b60ef2d3da310c1d89660195586e09"
+        },
+        {
+          "byte_size": 231171,
+          "note": "extract of the accepted run; as-run file sha256 ccd2955f0908162b616b3b5bf230ff5df540ff5424a146071a00463dd8956d63",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/spread/spread-50-2026-09-23T00-40-43-371Z.json",
+          "sha256": "01e3c56e1f0b077e293b1a46c745948774d0a78031d025dc7e235bb4ed60a9d5"
+        },
+        {
+          "byte_size": 231254,
+          "note": "extract of the accepted run; as-run file sha256 e6f37425108975cc6afed78050442d8c5b88c1420a43a9315ce8110c5883540d",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/spread/spread-200-2026-09-23T00-59-16-249Z.json",
+          "sha256": "2e3fceb10909ee037fee3d8caf6b164f0f8eb237bdd7376825472182d6e08232"
+        },
+        {
+          "byte_size": 237748,
+          "note": "extract of the accepted run; as-run file sha256 ae645e694b43d3f58427e45e2c3f6ac80f19180c6288bb5b8cf4605e4242b103",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/spread/spread-1000-2026-09-23T01-03-26-773Z.json",
+          "sha256": "33589a0467476e0e4000d75cb86653005cfc350a8198d1d86e032b74fa457006"
+        },
+        {
+          "byte_size": 229309,
+          "note": "extract of the accepted run; as-run file sha256 65b178ddaa91beacda92c922f5ff0d8153dc6e6da3cd5982ceca3bce209de2ea",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/clustered/clustered-0-2026-09-23T03-20-16-746Z.json",
+          "sha256": "45de10a7234099be2d6a7ae330844cb222cd33a9aeb08d9ac9dc470a46441d75"
+        },
+        {
+          "byte_size": 231166,
+          "note": "extract of the accepted run; as-run file sha256 19d6b97fd5040f69190596e66ca2f879af8502fba30ab04622271ee0d3d18665",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/clustered/clustered-10-2026-09-23T03-40-44-804Z.json",
+          "sha256": "032de7b88111994e80c3ce337721fc0ea4fa51bf12bcdf2d95c1a24a1cf69b6e"
+        },
+        {
+          "byte_size": 231071,
+          "note": "extract of the accepted run; as-run file sha256 406c8f325f59d09c4ea543cd8074d1d518f033779962f3b45acbbc8254c63d48",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/clustered/clustered-50-2026-09-23T03-43-47-483Z.json",
+          "sha256": "0dd222d41624497469e9b26edc5a313bdea3ea5740c494981f013dc16897e430"
+        },
+        {
+          "byte_size": 231717,
+          "note": "extract of the accepted run; as-run file sha256 6afe01534f0cb626554f5e1bd950e16f8ac368d4578f191ac296348e94381b44",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/clustered/clustered-200-2026-09-23T03-56-07-777Z.json",
+          "sha256": "2959dcc7b5f4d93d9871ed0c0a60df02fbd1e22c7829ab38e61e23a3fb078547"
+        },
+        {
+          "byte_size": 246661,
+          "note": "extract of the accepted run; as-run file sha256 d54942a054731d100cafc96dd4889bba0e8520fd97ecfae8367f19c79d87cdba",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/clustered/clustered-1000-2026-09-23T04-06-16-696Z.json",
+          "sha256": "6046c29bc2348fcfe0e302410e1872b6a45d9af0574e609a646e4159879b7590"
+        },
+        {
+          "byte_size": 231559,
+          "note": "extract of the accepted run; as-run file sha256 d6dc0784d9387deec796e2cdf8ba671ea549960288c7e51a73b280ca5169b803",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/estimates/estimates-1-2026-09-23T05-42-07-009Z.json",
+          "sha256": "063120374e46d7233384bc35819b8ba0c1fcb4cdfd077c5d5d97538c53ef3891"
+        },
+        {
+          "byte_size": 231476,
+          "note": "extract of the accepted run; as-run file sha256 9a6921f9e1c616dd623584459b8eb88f94f42b773d2d5f3ea833cdc98cb5c822",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/estimates/estimates-4-2026-09-23T05-45-29-427Z.json",
+          "sha256": "a1b9ee7cce5932373084d4ecd0d38567e44d99bafc16e2a5659e47719a984e00"
+        },
+        {
+          "byte_size": 233989,
+          "note": "extract of the accepted run; as-run file sha256 95b7be0b3b05e4220da9ed0500e2f889af000f23b67867cb4b860a500ad643c1",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/estimates/estimates-16-2026-09-23T05-49-01-239Z.json",
+          "sha256": "ecd608a151cdfdbc30911d6a3347cd520f5aeebef4954b53533f45d5f37f900d"
+        },
+        {
+          "byte_size": 240289,
+          "note": "extract of the accepted run; as-run file sha256 0ba5a2b6ca6461ee59bcb9a0442f2a2ff2ec565402280cf2584cebbecde9e62f",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/estimates/estimates-32-2026-09-23T05-52-42-519Z.json",
+          "sha256": "1abc3ed12539174ac6222b140c37a3926cbabd9b2b212313f55e50b4657018be"
+        },
+        {
+          "byte_size": 94876,
+          "note": "extract of the accepted run; as-run file sha256 f469c91fce043eba1fe2b9bed55639534778459494070bbad934634edcde3c2b",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/distance/distance-0-1000-2026-09-23T05-02-42-759Z.json",
+          "sha256": "00f6162f2df66228f2558c3d245a5eca12e34fd9087060d2ab86292e1c70c2f0"
+        },
+        {
+          "byte_size": 283037,
+          "note": "extract of the accepted run; as-run file sha256 b839b39f50c588fe70ae0abc8c94dd76e0f3d649ad4fd794f35b4529a48b90bd",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/distance/distance-0-4000-2026-09-23T05-03-43-483Z.json",
+          "sha256": "3511d6b3d951b3a9cb18a6b902460c0ff6fca01e60cf31d02fc46afa412b331b"
+        },
+        {
+          "byte_size": 533653,
+          "note": "extract of the accepted run; as-run file sha256 8963185ba1a71d39fb89a60edb8df25c5de95acab4c983ddee69aad56935dfe2",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/distance/distance-0-8000-2026-09-23T05-06-52-504Z.json",
+          "sha256": "18974690964083134f6d2378a8fcacf3e470bc5b62418e11e4a41d2af44c349b"
+        },
+        {
+          "byte_size": 34336,
+          "note": "extract of the accepted run; as-run file sha256 20942cd501b93f4e93f2edefc94b4cc942ff68e5066e7ca69c0d87a0722cf149",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/distance/distance-0-controls-2026-09-23T05-02-18-196Z.json",
+          "sha256": "9bd41863e28bc2661311d628fff510deccdfe997ecc4e65b8d722f4e0c0c8074"
+        },
+        {
+          "byte_size": 94816,
+          "note": "extract of the accepted run; as-run file sha256 7b623559af0d88395fc4905979b3f5585a3901a02a73ba1e7007498a6baa15dc",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/distance/distance-1-1000-2026-09-23T05-13-17-033Z.json",
+          "sha256": "ee9c0c8cd35cfea3193b0aa37bf7fdd5d9df3d1ca48ebf7cd70b424e3b49d395"
+        },
+        {
+          "byte_size": 283006,
+          "note": "extract of the accepted run; as-run file sha256 0faf49689ed6b9dc99eb304d45c47bee168a93d25f5403260330d8ebc496117b",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/distance/distance-1-4000-2026-09-23T05-14-17-795Z.json",
+          "sha256": "f2d32ee10f4a921099579f81c1812255de84b21a5b92d516d229f5d3bab3668d"
+        },
+        {
+          "byte_size": 534088,
+          "note": "extract of the accepted run; as-run file sha256 70f00bb313fde876104de37d545d40381ad784892acc5aa50f4cf392215fa77a",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/distance/distance-1-8000-2026-09-23T05-17-26-811Z.json",
+          "sha256": "f141725bc22ac43a5c5ae5d54d0caedabd21bb15d3e357611db789403b92d795"
+        },
+        {
+          "byte_size": 34774,
+          "note": "extract of the accepted run; as-run file sha256 3ff5d1f01ca75a3ab35dc9da17344b4ff6e1a4bc5b479a2baa8a2ace565f8076",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/distance/distance-1-controls-2026-09-23T05-12-52-507Z.json",
+          "sha256": "c384f4c57830ad50f45f475394577f29de509aa484a7125760cf3df0426172d9"
+        },
+        {
+          "byte_size": 94838,
+          "note": "extract of the accepted run; as-run file sha256 8aeb99485f4b2f5d59137b98d2534987522f81d446e24cb08a2ff1f52ea19baa",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/distance/distance-2-1000-2026-09-23T05-23-51-235Z.json",
+          "sha256": "991899bda422243f4646a462b2ac4cb1a4f4b68351fdab9024c580587dbc8642"
+        },
+        {
+          "byte_size": 282695,
+          "note": "extract of the accepted run; as-run file sha256 4d80f7f0d80b31dd264d92a9d798a36ba4e49f1ca1c7e56b73bc81335100a695",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/distance/distance-2-4000-2026-09-23T05-24-51-842Z.json",
+          "sha256": "0d8e097ab5530aa3f9bba51a385e002826b7cdff5f423db995caff6df39505a3"
+        },
+        {
+          "byte_size": 533496,
+          "note": "extract of the accepted run; as-run file sha256 ac6510002b8d25c420c36fba148cc09d123f24c101a06d0a862020ac493f809f",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/distance/distance-2-8000-2026-09-23T05-28-00-819Z.json",
+          "sha256": "459576fceaf8742cae5a8a24735084a61a7840c967693c25b707f4f3ebf7a745"
+        },
+        {
+          "byte_size": 34629,
+          "note": "extract of the accepted run; as-run file sha256 1bd39cb6ae706d2d9c96bb064ce25c709d8b6d9cf383af129201e4875c65cd9a",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/distance/distance-2-controls-2026-09-23T05-23-26-819Z.json",
+          "sha256": "118d9c3e4b1b5d35d171bd08a1b2e721ecd3004534ca80428aa4097494ecfc5b"
+        },
+        {
+          "byte_size": 199312,
+          "note": "extract of the accepted run; as-run file sha256 541755d8afe0131e9fe6aebc082ebbac0be2057ec5fb9e4572a4aeaa2f25671a",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/compare/cmp-clustered-200-debug-2026-09-23T04-01-41-902Z.json",
+          "sha256": "e54f7f156d3fadb318d777a78b70c8fb45f4900dab4b02810c4ece93ea25f9c0"
+        },
+        {
+          "byte_size": 198516,
+          "note": "extract of the accepted run; as-run file sha256 57d780db2f46bef045d7024c9b50e4bafe846e25a7f4bd066626257f12d13b35",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/compare/cmp-clustered-200-release-2026-09-23T03-59-15-743Z.json",
+          "sha256": "2763c4def9d5dc08ddcbdde13288cac8cd509546dc4706d4d832b80d9f0fa26d"
+        },
+        {
+          "byte_size": 244469,
+          "note": "extract of the accepted run; as-run file sha256 6096bc600a00c96dc832f2f74b56d9a7d3245ad075b2cdeda1b8e7c60a57032d",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/combined/combined-200-16-2026-09-23T05-57-45-200Z.json",
+          "sha256": "0cb4be9b0a4707394741257656e435f325e83684d87e75c90319abcedcb86f2d"
+        },
+        {
+          "byte_size": 4777,
+          "note": "as-run file sha256 338b5990e5a99b2821a4a458488b1c099356bfc1856567a98f004b35afdf7ac9",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/society/population.json",
+          "sha256": "b1025e9e938c7fd51d640dafc0919bdb96e0b57c1b72be6536196be117d94e3e"
+        },
+        {
+          "byte_size": 21409,
+          "note": "as-run file sha256 c68af02615839eb43ca2d727e005a2a83e99f8fd89630da6aacb65470a483abf",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/society/history.json",
+          "sha256": "52027c17ddc3cca066dd4fc9e7117fad185af768449956325916411d24fda07b"
+        },
+        {
+          "byte_size": 206846,
+          "note": "as-run file sha256 f83d4a0ca0197678c674d8954215c6689706d0fe2388a1d41aa7cb8f1fabddbe",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/spread/build.jsonl",
+          "sha256": "cbab9ff2f0abd80cf5a89bd519c5c3702b85382d579f6d98a927b709204ce15a"
+        },
+        {
+          "byte_size": 205325,
+          "note": "as-run file sha256 67001ec7ca3c326bfb3671f568f4f4488b78d1f1f6b982f377d20783c59f2061",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/clustered/build.jsonl",
+          "sha256": "9e46b8c760cd8dda2630e0a21f2840c007b953502c5d827930c8d69dd3b1d121"
+        },
+        {
+          "byte_size": 13245,
+          "note": "as-run file sha256 0b51f7859aa6b72a9c31b332f7f2db0666d4693824e78cde852cf3ddc3fbd619",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/estimates/steps.jsonl",
+          "sha256": "257d55923abdf7d00c97da520e9f2b707b92b0e4a34fb0e987a22c450c153cbe"
+        },
+        {
+          "byte_size": 29211,
+          "note": "as-run file sha256 e3dc0441a23e947bcff4feefc39893637950841135710dcbea6964d8e84bc829",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/gates.jsonl",
+          "sha256": "5fb3e0f502cd0f211f05ad0a50c5443d00fd4599151e7ff948a8b62be0035af4"
+        },
+        {
+          "byte_size": 2626,
+          "note": "as-run file sha256 09f650e02574fa3af79616769370169fa81fca50e0053ab628946db2df2c303e",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/spread/series-ledger.json",
+          "sha256": "78da87af0d0a5a8881be5b146be5a3cb9dc296f2660e8b953881d631c949f8bd"
+        },
+        {
+          "byte_size": 2367,
+          "note": "as-run file sha256 decd8db432f5390982491f815636016085d1ed152b20bce369b444a6b60beb61",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/clustered/series-ledger.json",
+          "sha256": "104bf95f0608dfbfc76c82dfd8d935c0b4a3d19f5035623a5b2e545836b3a94d"
+        },
+        {
+          "byte_size": 2011,
+          "note": "as-run file sha256 70e3ffdbe9246a07988ac749161a245009031268c9a5433c17c54d12af654e60",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/estimates/series-ledger.json",
+          "sha256": "39e282fad848d73988dfb7329ed7141d75fee4f3dc6eef213b90bf8f8b634ee3"
+        },
+        {
+          "byte_size": 41065,
+          "note": "as-run file sha256 60da2139b5ee3579305f7c52beba94b66d29025ea2547e0b9d5ecc6cdf741ccb",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/combined/build.jsonl",
+          "sha256": "9b94fc6648b6909b1f5900d16d533657881f10e0709d6707e2b43c588d2507b4"
+        },
+        {
+          "byte_size": 2576,
+          "note": "as-run file sha256 5fb5b76dc1d3bec031b6a2bfc352b3a935a7239e373216eea3c747e8ad3a01a3",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/combined/take-back.jsonl",
+          "sha256": "f842556e0f203880693cfdcf255bb0e380fd01a25e442c1b668c010d3af36f79"
+        },
+        {
+          "byte_size": 5634,
+          "note": "as-run file sha256 5d6e138431b33726b53b31f91a3ca3d8f3be29372fa713c10606884a502546fc",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/distance/shading.json",
+          "sha256": "5508f1ebfe44b185ed58e615dfee1c7d13f8cb2333428a5cb50632ce06b6ff86"
+        },
+        {
+          "byte_size": 5457,
+          "note": "as-run file sha256 9e1c4b80db737b0b5237c1c4c898703c96f0b26e0b2c788e10fd8540a470bc9b",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/estimates/point-counts.json",
+          "sha256": "cb99cf6beca061a1e7aefff565ab1ce77f5f66eb94e60970a3b00b6f450de0a2"
+        },
+        {
+          "byte_size": 1795,
+          "note": "as-run file sha256 d4c7efc5fc9b2960a2cd370c7e1a81f42d2f3c1d63716b7d5c6e376ae60926a8",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/worker/worker-20260923T013413-rss.jsonl",
+          "sha256": "9712992d259bf7cfc98e9a3bf6436204edf2d37e7ff21b8f13d175d18069a2bf"
+        },
+        {
+          "byte_size": 1295,
+          "note": "as-run file sha256 a27ac8e7e3812d668f666fcae2eab74b200478e955feb2d3384b519fe0eb913c",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/worker/worker-20260923T013413.jsonl",
+          "sha256": "eda8531d9cf50e0bbac0ab1e8caa3b9d9811b7858f0af15d3b35c695acfb2908"
+        },
+        {
+          "byte_size": 548,
+          "note": "as-run file sha256 3d6ddfd281a84c0faf27a3ed336841a80c589e50dd7c41e4f7b082b4270a6694",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/worker/worker-20260923T014459-rss.jsonl",
+          "sha256": "7e69bdfe91b92ce51654d727361542c458afd32a7fa7ce968abf830298335064"
+        },
+        {
+          "byte_size": 2071,
+          "note": "as-run file sha256 170860a8d7889f5d8aead2d2aaed5b6351b10d1d61dd61262ad978bd9632556d",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/worker/worker-20260923T014459.jsonl",
+          "sha256": "ce4236b52f82442188eb2022f002d800997edffd3b9332a01543de9cb59e7100"
+        },
+        {
+          "byte_size": 856,
+          "note": "as-run file sha256 857bbdbaebf0a6e5b362f2833c954662796fa936a9bd0e7a6ad025fba35b3102",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/worker/worker-20260923T014823-rss.jsonl",
+          "sha256": "8acc4fff36fe45f5c9518decfb4735f9d6a30e92abb5aa92e3562d5cc4e178d8"
+        },
+        {
+          "byte_size": 2074,
+          "note": "as-run file sha256 db88e1897e18412a22af85e3ff8209c90d1079ec5ee65a6926ad5abce3dd1c2a",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/worker/worker-20260923T014823.jsonl",
+          "sha256": "b43ab1cad61d96d1437b4c4dc7e59d196cf654204b35fc9018173c4302464de0"
+        },
+        {
+          "byte_size": 1092,
+          "note": "as-run file sha256 5983f249397819528db9d6a685a0a6ba18902358fa5f54a9e6a01df56154de88",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/worker/worker-20260923T015159-rss.jsonl",
+          "sha256": "a1a7ef8d503d1a63037704fc31bccbcc2520a76cd050f39ff207f3951af4aba3"
+        },
+        {
+          "byte_size": 2069,
+          "note": "as-run file sha256 9cc8443931c41a2be82723ea7da0a76ac40f235e042c8445301834cd6d7405f1",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/worker/worker-20260923T015159.jsonl",
+          "sha256": "99e33555aceb837f8c26d55964bf5375ab525799b970f12094e7bbed10237066"
+        },
+        {
+          "byte_size": 18161,
+          "note": "as-run sha256 7cb6932fc480033d0ea4b0cec2bb6ea9246714565e5e338717de2494144991cc",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/instrument.js.txt",
+          "sha256": "7cb6932fc480033d0ea4b0cec2bb6ea9246714565e5e338717de2494144991cc"
+        },
+        {
+          "byte_size": 47242,
+          "note": "as-run sha256 bb58f83eb49f8b6ee617a4b9367d705e747ead99867d8c481574303003343cb3",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/wsdrive.mjs.txt",
+          "sha256": "bb58f83eb49f8b6ee617a4b9367d705e747ead99867d8c481574303003343cb3"
+        },
+        {
+          "byte_size": 2346,
+          "note": "as-run sha256 6fd355aae6dac6dff45fc45455cc797c2b1d2fb944d1ae5641fb2c89d139ba57",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/binding.mjs.txt",
+          "sha256": "6fd355aae6dac6dff45fc45455cc797c2b1d2fb944d1ae5641fb2c89d139ba57"
+        },
+        {
+          "byte_size": 5239,
+          "note": "as-run sha256 f755dbb3d29bc9fcdc80cd1fce4e01c563dd9d43f0512b20a42663d70c0fda47",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/gated.py.txt",
+          "sha256": "f755dbb3d29bc9fcdc80cd1fce4e01c563dd9d43f0512b20a42663d70c0fda47"
+        },
+        {
+          "byte_size": 2554,
+          "note": "as-run sha256 dd098b0837a9b4e07d983790a9a40bb6ea29d42008ff5f072053d5c98a72c3e6",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/slot.py.txt",
+          "sha256": "a5bdaf57b827890b3edf449a3b2898c9af388a0d5dd37f4dfdb687a124293d02"
+        },
+        {
+          "byte_size": 1962,
+          "note": "as-run sha256 a4aa6356cf84f20525860cafd747c930cfbb97c7eaf97a823b79609c3d81517d",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/step.py.txt",
+          "sha256": "a4aa6356cf84f20525860cafd747c930cfbb97c7eaf97a823b79609c3d81517d"
+        },
+        {
+          "byte_size": 8948,
+          "note": "as-run sha256 a74c2734961690337536ff68fb29f8f85cc87e0e3f19b5e1cdb49765d0112a9b",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/series.py.txt",
+          "sha256": "a74c2734961690337536ff68fb29f8f85cc87e0e3f19b5e1cdb49765d0112a9b"
+        },
+        {
+          "byte_size": 9818,
+          "note": "as-run sha256 22bd0b51c4732957fd7429ae2fc24e0e5475a88f85a482fd44cb3fa34f95ba5a",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/build_world.py.txt",
+          "sha256": "22bd0b51c4732957fd7429ae2fc24e0e5475a88f85a482fd44cb3fa34f95ba5a"
+        },
+        {
+          "byte_size": 6714,
+          "note": "as-run sha256 f14a4754ad264f1bd30b6a752ef8dc0ad0e15b3d67ccc5a198d03f9e5fee8305",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/summarize.py.txt",
+          "sha256": "f14a4754ad264f1bd30b6a752ef8dc0ad0e15b3d67ccc5a198d03f9e5fee8305"
+        },
+        {
+          "byte_size": 18259,
+          "note": "as-run sha256 d39881495f9aeb429bb0f9d20111a69f9cee9214f82c0dbb18d6587c21e3c700",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/society_scale.py.txt",
+          "sha256": "d39881495f9aeb429bb0f9d20111a69f9cee9214f82c0dbb18d6587c21e3c700"
+        },
+        {
+          "byte_size": 1631,
+          "note": "as-run sha256 467b7757e3075e99f45b2b432f4d92f0112c4db8e3da764cc0cd6a97f99dfaf4",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/compare.py.txt",
+          "sha256": "467b7757e3075e99f45b2b432f4d92f0112c4db8e3da764cc0cd6a97f99dfaf4"
+        },
+        {
+          "byte_size": 13665,
+          "note": "as-run sha256 9b4a900ba29ad05a8b14ea824700d68180fa94f84937b9907a317b5c4f7fceb7",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/estimates.py.txt",
+          "sha256": "9b4a900ba29ad05a8b14ea824700d68180fa94f84937b9907a317b5c4f7fceb7"
+        },
+        {
+          "byte_size": 7631,
+          "note": "as-run sha256 7ddeef39f2422d51438ab3368e80e8a7e725fb97dabb90a18d942fcc687ab16d",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/estimates_series.py.txt",
+          "sha256": "7ddeef39f2422d51438ab3368e80e8a7e725fb97dabb90a18d942fcc687ab16d"
+        },
+        {
+          "byte_size": 4517,
+          "note": "as-run sha256 fb1ed8a1993c47db3b75f5ace53c32330e7a219ca863f03ed9c75913effaf4b6",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/rooms.py.txt",
+          "sha256": "fb1ed8a1993c47db3b75f5ace53c32330e7a219ca863f03ed9c75913effaf4b6"
+        },
+        {
+          "byte_size": 5558,
+          "note": "as-run sha256 214cc9037ad58e3a4ff73676989aa52e3fa870757c099fcf2e5975e19af58409",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/worker.py.txt",
+          "sha256": "214cc9037ad58e3a4ff73676989aa52e3fa870757c099fcf2e5975e19af58409"
+        },
+        {
+          "byte_size": 2908,
+          "note": "as-run sha256 8e1078a70bff1eb77cc492cc1099c0409024275e5ab9fa54111e99d828ecf580",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/preview.py.txt",
+          "sha256": "8e1078a70bff1eb77cc492cc1099c0409024275e5ab9fa54111e99d828ecf580"
+        },
+        {
+          "byte_size": 2712,
+          "note": "as-run sha256 2f51cb5d85b36cb45975346e30bc27beae89efc7311cd7f3a6420cfc21879811",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/distance.py.txt",
+          "sha256": "2f51cb5d85b36cb45975346e30bc27beae89efc7311cd7f3a6420cfc21879811"
+        },
+        {
+          "byte_size": 6365,
+          "note": "as-run sha256 8a065a692cc8889533eec1523a167ac244924b8a1625619deaa732377c8c0811",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/combined.py.txt",
+          "sha256": "8a065a692cc8889533eec1523a167ac244924b8a1625619deaa732377c8c0811"
+        },
+        {
+          "byte_size": 3494,
+          "note": "as-run sha256 1651dcffaac2559b8b231c3198699933412aca8feb167e45de59fd316c53bfed",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/shading.py.txt",
+          "sha256": "1651dcffaac2559b8b231c3198699933412aca8feb167e45de59fd316c53bfed"
+        },
+        {
+          "byte_size": 1769,
+          "note": "as-run sha256 e837782952556acb676dfa5eadf25ae832f5b6505e41929105b7fbd3e0bb4baa",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/pointcounts.py.txt",
+          "sha256": "e837782952556acb676dfa5eadf25ae832f5b6505e41929105b7fbd3e0bb4baa"
+        },
+        {
+          "byte_size": 19264,
+          "note": "as-run sha256 46f1637192bfdba0cc4395584f6c4acf312acf24ef67346a6c9ac13beeb6e6fe",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/outcome.py.txt",
+          "sha256": "46f1637192bfdba0cc4395584f6c4acf312acf24ef67346a6c9ac13beeb6e6fe"
+        },
+        {
+          "byte_size": 68449,
+          "note": "as-run sha256 44c5092aef3e48be66c9fead3f4eacd8ea0ad80c588fba49932226d91fd587be",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/write_outcome.py.txt",
+          "sha256": "44c5092aef3e48be66c9fead3f4eacd8ea0ad80c588fba49932226d91fd587be"
+        },
+        {
+          "byte_size": 10493,
+          "note": "as-run sha256 232a49f2fc7e6ea3d6e4b49b925e808f6efc96a6a5a93a999421a7ed81c4ac61",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/publish.py.txt",
+          "sha256": "232a49f2fc7e6ea3d6e4b49b925e808f6efc96a6a5a93a999421a7ed81c4ac61"
+        },
+        {
+          "byte_size": 22386,
+          "note": "as-run sha256 30e71dd34596b32e6a5d34b0c7a9734eba6dadf56c768176c93f148ddf760943",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/write_preregistration.py.txt",
+          "sha256": "db737eb7764e170383e0c334d2ace4d727a2f7fce775865e8419c975eb2bf02f"
+        },
+        {
+          "byte_size": 17492,
+          "note": "as-run sha256 15ef8cd98872740c147ddcc55e821d26eca2cf64960622ed9b833584c3276424",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/as-run/instrument-15ef8cd9.js.txt",
+          "sha256": "15ef8cd98872740c147ddcc55e821d26eca2cf64960622ed9b833584c3276424"
+        },
+        {
+          "byte_size": 15704,
+          "note": "as-run sha256 63c9be03ef33a1fe7cc92cf461d60c59f9d9383a8866843cd4bef391eb749602",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/as-run/instrument-63c9be03.js.txt",
+          "sha256": "63c9be03ef33a1fe7cc92cf461d60c59f9d9383a8866843cd4bef391eb749602"
+        },
+        {
+          "byte_size": 43389,
+          "note": "as-run sha256 d2655157b8e16db18fb944191a8c145e866f04336ebdac17fac29ae8441a69e1",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/scripts/as-run/wsdrive-d2655157.mjs.txt",
+          "sha256": "d2655157b8e16db18fb944191a8c145e866f04336ebdac17fac29ae8441a69e1"
+        },
+        {
+          "byte_size": 310550,
+          "note": "the capture distance-0-8000-2026-09-23T05-06-52-504Z-mark-0-with.png, byte for byte",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/captures/arrival-with-reference.png",
+          "sha256": "e1e4da03c0d529128c39356754a7553ded114c38185904300193618bcb2c7da0"
+        },
+        {
+          "byte_size": 28661,
+          "note": "the capture distance-0-8000-2026-09-23T05-06-52-504Z-mark-8000-with.png, byte for byte",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/captures/8km-with-reference.png",
+          "sha256": "8f095d0d9efed616f672ad2b9845ecf9a49be51951bdcbb1322c0e106f23e789"
+        },
+        {
+          "byte_size": 506856,
+          "note": "the capture combined-200-16-2026-09-23T05-57-45-200Z-reload-after.png, byte for byte",
+          "path": "docs/evaluation/artifacts/2026-09-22-world-scale/captures/combined-arrival.png",
+          "sha256": "43558591082ecf8ad7c10b3b9915e3b4f179ccf49a485dfde508ea65cc62baa1"
+        }
+      ],
+      "raw_samples": "Each run extract keeps every per-frame work sample, every open, every placement and every gate reading; request lists are summarised per route. Distance captures other than the two bound here are not published; shading.json holds what was measured from them.",
+      "scripts_as_run": "scripts/ holds the final version of every driver. The object series ran instrument 63c9be03 and driver d2655157, the distance series instrument 15ef8cd9; those exact versions are under scripts/as-run/. spread-0 ran the instrument before digests were recorded in run files; its timing code is the object series' (the later change added a context-loss note and the digests).",
+      "substitutions": [
+        {
+          "as_run": "the path of the worktree the runs used",
+          "published": "<WORKTREE>"
+        },
+        {
+          "as_run": "the path of the main checkout",
+          "published": "<MAIN_CHECKOUT>"
+        },
+        {
+          "as_run": "U+2014, in scripts only",
+          "published": "the six characters \\u2014"
+        }
+      ]
+    },
+    "captures": [
+      {
+        "as_run": "distance-0-8000-2026-09-23T05-06-52-504Z-mark-0-with.png",
+        "byte_size": 310550,
+        "path": "docs/evaluation/artifacts/2026-09-22-world-scale/captures/arrival-with-reference.png",
+        "sha256": "e1e4da03c0d529128c39356754a7553ded114c38185904300193618bcb2c7da0",
+        "what": "The arrival point of distance session 0-8000 with its reference cube placed before the camera: the sky is drawn as a gradient and the cube's lit face is smooth."
+      },
+      {
+        "as_run": "distance-0-8000-2026-09-23T05-06-52-504Z-mark-8000-with.png",
+        "byte_size": 28661,
+        "path": "docs/evaluation/artifacts/2026-09-22-world-scale/captures/8km-with-reference.png",
+        "sha256": "8f095d0d9efed616f672ad2b9845ecf9a49be51951bdcbb1322c0e106f23e789",
+        "what": "The same relative capture after sprinting 8 km: the sky band is the camera's flat clear colour and the cube's lit face carries diagonal bands."
+      },
+      {
+        "as_run": "combined-200-16-2026-09-23T05-57-45-200Z-reload-after.png",
+        "byte_size": 506856,
+        "path": "docs/evaluation/artifacts/2026-09-22-world-scale/captures/combined-arrival.png",
+        "sha256": "43558591082ecf8ad7c10b3b9915e3b4f179ccf49a485dfde508ea65cc62baa1",
+        "what": "The combined world at the arrival point after its reload: the 16 estimates in two rows of eight, 12 and 16 m ahead, and the spread markers along the horizon."
+      }
+    ],
+    "claims": {
+      "assumed": [
+        "The rates of ordinary use in the ranking rule: two minutes a placed estimate, thirty seconds a placed object, one society tick a second.",
+        "Headless Chrome on this machine stands for a headed browser with a compositor and a display.",
+        "The release build served by vite preview's proxy stands for a production deployment.",
+        "A real photograph's estimate costs what a synthetic one of the same point count costs (193,796 to 195,730 points each here)."
+      ],
+      "inferred": [
+        "Opening crosses 2 s near 31.5 estimates, on the straight line between the medians at 16 and 32.",
+        "The acknowledgement crosses 250 ms at or after about 270 clustered or 345 spread objects, on the chord between 200 and 1000.",
+        "Replay at 128 crosses 2 s near 52 ticks, on the chord between 1 and 60.",
+        "The sky is lost past about 540 m from the opening point, from the sphere's radius in the code; where between 80 m and 1 km was not measured.",
+        "The acknowledgement's growth is the page redrawing every object, from the resident times and the code the pre-registration read; the server's apply is at most 9.5 percent of it at 1000.",
+        "Per-photograph depth time is the worker's ready-to-stopped time divided by the photographs; the worker prints no per-photograph timing.",
+        "The combined world's first frame came 328.0 ms later than the 16 estimates alone; its cause is not established.",
+        "The bands on lit faces at 4 and 8 km are consistent with shadow or depth precision at large coordinates; not established."
+      ],
+      "measured": [
+        "Opening with 16 estimates takes 1,103.6 ms and with 32 2,028.6 ms (median of five warm opens; every warm open at 32 over 2 s).",
+        "The panel acknowledges a placement in 121.7 ms at 200 spread objects and 829.3 ms at 1000; clustered 132.4 ms and 1,469.0 ms.",
+        "Frame work never exceeds 2.0 ms at the 95th percentile in any object point; sprinting to 8 km leaves it within 0.7 ms.",
+        "Every reload at every point showed the saved world: same version, same scene objects, no differing pixels.",
+        "At 1, 4 and 8 km the sky band is one flat colour in all nine sessions; at the arrival point it is a gradient.",
+        "The reference cube's lit face differs from its arrival capture in 6,859 to 7,292 of 11,328 pixels at 4 and 8 km and in none at 1 km or nearer.",
+        "Society replay at 128 inhabitants: 2,291.2 ms after 60 ticks; a tick at 512 inhabitants has a 95th percentile of 513.1 ms.",
+        "The combined world opens its first frame in 1,431.6 ms and its complete world in 1,602.2 ms.",
+        "The depth model ran on MPS; peak resident memory of the depth worker was 2,927,632 to 2,942,144 KiB.",
+        "Each placed estimate holds 193,796 to 195,730 points in 3,877,264 to 3,915,944 bytes."
+      ],
+      "observed_by_eye": [
+        "The two bound distance captures: a gradient sky and a smooth cube at the arrival point; a flat sky and a banded cube face at 8 km.",
+        "The combined capture: two rows of eight estimates ahead and the spread markers along the horizon.",
+        "At spread 1000 the markers are specks along the horizon out to 500 m; the clustered 1000 stands 20 m ahead.",
+        "The registered silhouette's change at 40 and 80 m is the cube's base line and soft shadow."
+      ]
+    },
+    "departures": [
+      {
+        "decided": "before any accepted timing run, with positive controls of both verdicts (runs/control, not published)",
+        "done": "Before a run, at least 70 percent CPU idle averaged over 10 s, read with iostat inside the slots immediately before timing (waiting up to 240 s); during a run, idle sampled every 2 s and the run discarded when its mean fell below 50 percent; the one-minute load still recorded before and after every run; three attempts.",
+        "registered": "the one-minute load is read inside the slot before timing starts and again after; a run whose load before exceeds 8 is discarded and retried, three attempts at most, after which the point is recorded as not measured with its loads",
+        "what": "the quiet-machine gate",
+        "why": "On this shared machine the one-minute load stayed between 13.9 and 16.5 while the CPU was 77 to 88 percent idle: the load counts thousands of threads other processes hold, none of which a measurement can pause, so no run could ever have passed the registered rule. Idle measures the CPU a run competes for directly."
+      },
+      {
+        "decided": "before any accepted distance walk",
+        "done": "Each repeat is four sessions from the arrival point, each with its own open and arrival reference: the controls (40 and 80 m), 1 km, 4 km and 8 km. The 8 km session is the whole 0 to 8 km sprint for frame work.",
+        "registered": "one continuous walk per repeat, stopping at each mark",
+        "what": "distance walks split into one mark per page session",
+        "why": "The headless measuring browser stopped answering during the third sprint of a session after two place-and-take-back cycles, in the first registered attempt and in five dry runs after it: the page kept running while the browser process ran at 80 to 92 percent CPU and no DevTools client could connect. Image transfer, pointer lock, the on-device model service and storage writes were each excluded; the cause was not identified. It is the measuring browser, not the product."
+      },
+      {
+        "decided": "before any registered walk",
+        "done": "Control marks at 40 and 80 m in every repeat, and the silhouette of the object alone (shadow casting off for one frame), both reported as added and never as knees.",
+        "registered": "marks at 1, 4 and 8 km; the silhouette is the capture with the reference minus the capture without it",
+        "what": "control marks and the object-only silhouette",
+        "why": "Dry walks to 40 and 80 m showed the registered silhouette shifting by more than a pixel where float32 spacing is below a hundredth of a millimetre."
+      },
+      {
+        "decided": "before any accepted distance walk",
+        "done": "--disable-component-update, --disable-default-apps, --disable-client-side-phishing-detection and --disable-features for optimisation hints, on-device models, translation and the media router.",
+        "registered": "headless Chrome over the DevTools protocol",
+        "what": "browser switches for the distance sessions",
+        "why": "to rule out background browser work while the hang above was investigated"
+      },
+      {
+        "decided": "before the combined world was built",
+        "done": "200 objects (the largest count at which every object budget passed, in both layouts) in the spread layout plus 16 estimates (the largest passing estimate count). Built in the estimates world: the 16 newest estimates were taken back through the product's undo route, the objects panel's take-back, with the saved-entry binding, one at a time and checked, leaving exactly the first 16 placed; then the 200 objects were placed where spread-200 had them.",
+        "registered": "one world holding at once the largest count of each separate series at which every budgeted metric of that series passed (the smallest registered count where none passed), measured once with open, reload, walking and looking",
+        "what": "the combined world",
+        "why": "The clustered disc (radius 10 m, 20 m ahead of the arrival point) covers the estimates' 4 m grid, so one world holding both would stack them. A distance is not something a world holds. Inhabitants are not held: this runtime's readiness report says no saved world holds inhabitants without a registration file, and the inhabitant series was registered as in-process server cost. The version the combined world opens also lists the 16 taken-back estimates as removed, as it would for a person who took them back."
+      },
+      {
+        "decided": "after the distance data were in; stated as such",
+        "done": "the median of the three repeats at each mark; the sensitivity to that choice is stated",
+        "registered": "no statistic across repeats is named for this metric",
+        "what": "the statistic for the drawn position error",
+        "why": "the median is the statistic registered for every other repeated metric"
+      }
+    ],
+    "how_to_rerun": [
+      "Restore the scripts: copy scripts/*.txt to their names without .txt and reverse the stated substitutions.",
+      "Start an isolated runtime at the measured commit (the acceptance launcher, one slot, --no-derivative-worker for the estimates runtime), build the app with vite build and serve it with preview.py up.",
+      "Objects: python3 series.py --layout spread, then --layout clustered in a fresh runtime (each count runs step.py through slot.py --gpu).",
+      "Debug against release: python3 slot.py --gpu -- python3 compare.py --label cmp-clustered-200 --objects 200, with the development server up.",
+      "Distance: python3 distance.py --repeats 3 in a world with no object.",
+      "Estimates: python3 rooms.py, then python3 estimates_series.py --counts 1,4,16,32 (depth runs through slot.py --gpu -- python3 worker.py run --once).",
+      "Combined: python3 slot.py --gpu -- python3 combined.py --objects 200 --maps 16 --take-back.",
+      "Inhabitants: python3 slot.py -- .venv/bin/python society_scale.py population --out runs/society/population.json --populations 32,128,512,2048 --ticks 60, then society_scale.py history --out runs/society/history.json --checkpoints 1,60,240,1440.",
+      "Analysis: .venv/bin/python shading.py; python3 pointcounts.py DATA_DIR; python3 outcome.py summary; python3 publish.py; .venv/bin/python write_outcome.py."
+    ],
+    "incidents": [
+      {
+        "detail": "An undo click fell below the objects panel's fold, so the world was left holding 11 objects and reload, walking and looking measured 11. The run was set aside, the stray object taken back through the product's undo route, the driver changed to scroll a target into view and to check the world's count through the API, and the point measured again.",
+        "what": "the first spread-10 run was invalid"
+      },
+      {
+        "detail": "The instrument counted only nodes attached one at a time, and a placed estimate is built inside its parent before the parent joins the scene, so open and reload never saw the world complete. The instrument now counts named nodes across every attached subtree; the point was measured again.",
+        "what": "the first estimates-1 run was invalid"
+      },
+      {
+        "detail": "The first estimate placement asked for origin role fictional and was refused: an estimate from the account holder's own photograph is placed as personal. A stale upload file was then offered for a second count and refused as subject_already_present. Nothing was written either time; both are the product's checks working.",
+        "what": "two driver errors refused by the product"
+      },
+      {
+        "detail": "Its mean idle while running was 66.1 percent (minimum 17), within the gate but lower than any other accepted run. The same condition, 60 ticks at 128, was also measured by the population series at 90.1 percent idle: replay 2,085.7 ms there against 2,291.2 ms here, both over the budget.",
+        "what": "the history series ran on a busier machine"
+      },
+      {
+        "detail": "Described under departures; it produced no accepted data and no product change.",
+        "what": "the measuring browser hang"
+      }
+    ],
+    "knees": {
+      "distance": {
+        "drawn_position_error": {
+          "at_the_budget": false,
+          "between": [
+            1000,
+            4000
+          ],
+          "knee": true,
+          "per_run_at_knee": [
+            3180,
+            1505,
+            2683
+          ],
+          "statistic_at_knee": 2683
+        },
+        "drawn_position_error_statistic": "median of the three repeats at a mark",
+        "frame_work_while_sprinting": {
+          "knee": false,
+          "largest_count_within": 8000
+        }
+      },
+      "estimates": {
+        "frame_work_looking": {
+          "knee": false,
+          "largest_count_within": 32
+        },
+        "frame_work_walking": {
+          "knee": false,
+          "largest_count_within": 32
+        },
+        "open_complete_world": {
+          "at_the_budget": false,
+          "between": [
+            16,
+            32
+          ],
+          "knee": true,
+          "per_run_at_knee": [
+            2031500,
+            2011500,
+            2029900,
+            2028600,
+            2027700
+          ],
+          "statistic_at_knee": 2028600
+        },
+        "open_first_frame": {
+          "at_the_budget": false,
+          "between": [
+            16,
+            32
+          ],
+          "knee": true,
+          "per_run_at_knee": [
+            2031500,
+            2011500,
+            2029900,
+            2028600,
+            2027700
+          ],
+          "statistic_at_knee": 2028600
+        },
+        "reload_identical": {
+          "all_identical": true,
+          "counts": [
+            1,
+            4,
+            16,
+            32
+          ]
+        }
+      },
+      "objects_clustered": {
+        "frame_work_looking": {
+          "knee": false,
+          "largest_count_within": 1000
+        },
+        "frame_work_walking": {
+          "knee": false,
+          "largest_count_within": 1000
+        },
+        "open_complete_world": {
+          "knee": false,
+          "largest_count_within": 1000
+        },
+        "open_first_frame": {
+          "knee": false,
+          "largest_count_within": 1000
+        },
+        "placement_ack": {
+          "at_the_budget": false,
+          "between": [
+            200,
+            1000
+          ],
+          "knee": true,
+          "per_run_at_knee": [
+            1576200,
+            1734700,
+            1469000,
+            1078700,
+            773100
+          ],
+          "statistic_at_knee": 1469000
+        },
+        "reload_identical": {
+          "all_identical": true,
+          "counts": [
+            0,
+            10,
+            50,
+            200,
+            1000
+          ]
+        },
+        "undo_ack": {
+          "at_the_budget": false,
+          "between": [
+            200,
+            1000
+          ],
+          "knee": true,
+          "per_run_at_knee": [
+            1689500,
+            1870000,
+            1145400,
+            1090000,
+            764500
+          ],
+          "statistic_at_knee": 1145400
+        }
+      },
+      "objects_spread": {
+        "frame_work_looking": {
+          "knee": false,
+          "largest_count_within": 1000
+        },
+        "frame_work_walking": {
+          "knee": false,
+          "largest_count_within": 1000
+        },
+        "open_complete_world": {
+          "knee": false,
+          "largest_count_within": 1000
+        },
+        "open_first_frame": {
+          "knee": false,
+          "largest_count_within": 1000
+        },
+        "placement_ack": {
+          "at_the_budget": false,
+          "between": [
+            200,
+            1000
+          ],
+          "knee": true,
+          "per_run_at_knee": [
+            723100,
+            829300,
+            771100,
+            970100,
+            965400
+          ],
+          "statistic_at_knee": 829300
+        },
+        "reload_identical": {
+          "all_identical": true,
+          "counts": [
+            0,
+            10,
+            50,
+            200,
+            1000
+          ]
+        },
+        "undo_ack": {
+          "at_the_budget": false,
+          "between": [
+            200,
+            1000
+          ],
+          "knee": true,
+          "per_run_at_knee": [
+            790000,
+            745900,
+            786700,
+            858400,
+            799300
+          ],
+          "statistic_at_knee": 790000
+        }
+      },
+      "society_history_at_128": {
+        "reload_p95": {
+          "knee": false,
+          "largest_count_within": 1440
+        },
+        "replay": {
+          "at_the_budget": false,
+          "between": [
+            1,
+            60
+          ],
+          "knee": true,
+          "per_run_at_knee": [
+            2242308,
+            2291182,
+            2322955
+          ],
+          "statistic_at_knee": 2291182
+        },
+        "tick_p95": {
+          "knee": false,
+          "largest_count_within": 1440
+        }
+      },
+      "society_population_at_60_ticks": {
+        "refused_counts": [
+          32,
+          2048
+        ],
+        "reload_p95": {
+          "knee": false,
+          "largest_count_within": 512
+        },
+        "replay": {
+          "at_the_budget": false,
+          "between": [
+            null,
+            128
+          ],
+          "knee": true,
+          "note": "The smallest registered population, 32, was refused by the engine, so no count below 128 was measured: the knee lies at or below 128, the one population the product creates.",
+          "per_run_at_knee": [
+            2088973,
+            2081243,
+            2085727
+          ],
+          "statistic_at_knee": 2085727
+        },
+        "tick_p95": {
+          "at_the_budget": false,
+          "between": [
+            128,
+            512
+          ],
+          "knee": true,
+          "per_run_at_knee": [],
+          "statistic_at_knee": 513061
+        }
+      }
+    },
+    "machine": {
+      "antialias": false,
+      "browser": "Google Chrome 153.0.8010.53, headless (new mode)",
+      "browser_in_runs": {
+        "jsVersion": "15.3.76.13",
+        "product": "Chrome/153.0.8010.53",
+        "protocolVersion": "1.3",
+        "revision": "@792bf6722e73a45aa9e47c163b9901bdc17f3230",
+        "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/153.0.0.0 Safari/537.36"
+      },
+      "drawing_buffer": [
+        1440,
+        900
+      ],
+      "hardware_model": "Mac17,6",
+      "logical_cpus": 18,
+      "memory_bytes": 68719476736,
+      "node": "v24.15.0",
+      "os": "macOS 26.7",
+      "postgresql": "18.6",
+      "recorded_again": "the same facts and the WebGL renderer string are read again with every run",
+      "webgl_renderer": "ANGLE (Apple, ANGLE Metal Renderer: Apple M5 Max, Unspecified Version)"
+    },
+    "measured_commit": "7e6144ea80847dd235a870ba14f4b7fbcf95dba0",
+    "not_measured": [
+      "Inhabitants drawn in the browser: a saved world's inhabitants are not drawn at this commit, and this runtime holds none.",
+      "Society populations of 32 and 2048: refused by the engine (100 to 512).",
+      "Society costs over HTTP: serialisation, the permission floor and the network.",
+      "Motion at distance (swimming or jitter): only still frames were captured.",
+      "Where between 80 m and 1 km the sky stops, and where between 1 and 4 km the bands start.",
+      "Where exactly between 200 and 1000 objects, and between 16 and 32 estimates, the budgets are crossed: only the registered counts were measured.",
+      "GPU execution time and browser memory: frame work is main-thread time; frame intervals stayed at the display's 16.7 ms where recorded.",
+      "Placing and taking back in the combined world, and the clustered layout combined with estimates.",
+      "More than 1000 objects, 32 estimates, 8 km or 1440 ticks of history.",
+      "Other machines, a headed browser, a production deployment, real photographs."
+    ],
+    "open_questions": [
+      {
+        "answer": "No. The largest 95th percentile of frame work is 2.0 ms, at 1000 objects, against 16.7 ms.",
+        "question": "Whether frame work reaches its knee inside the registered object range.",
+        "register": "MEASURED"
+      },
+      {
+        "answer": "Motion was not measured: the protocol captures still frames. In the still frames the sky is no longer drawn at 1, 4 and 8 km, and the reference cube's lit face carries diagonal bands at 4 and 8 km and not at 1 km. Whether anything swims while moving is not established.",
+        "question": "Whether anything on the ground surface visibly swims or jitters at 1, 4 or 8 km.",
+        "register": "MEASURED pixels, OBSERVED BY EYE bands; motion not measured"
+      },
+      {
+        "answer": "Opening fails first, between 16 and 32 estimates; frame work at 32 is 1.3 ms walking and 1.1 ms looking.",
+        "question": "How many photo estimates a world holds before opening or frame work fails, and which fails first.",
+        "register": "MEASURED"
+      },
+      {
+        "answer": "No. At every measured point (objects 0 to 1000 in both layouts, estimates 1 to 32, the combined world) the authored version, the scene's objects and the pixels at the arrival pose were identical after the reload; the differing pixel share was 0.",
+        "question": "Whether a reload ever shows a different world from the one saved.",
+        "register": "MEASURED"
+      }
+    ],
+    "outcome": {
+      "answer": [
+        "The first limit a person meets is opening a world that holds photo estimates. Opening stays within 2 s up to 16 placed estimates (1,103.6 ms) and exceeds it at 32 (2,028.6 ms, all five warm opens over); it grows by about 57.8 ms an estimate. At the registered two minutes an estimate, that is between 32 and 64 minutes of placing estimates (MEASURED knee, ASSUMED rate).",
+        "The second is the objects panel's acknowledgement of a placement or a take-back: 121.7 ms at 200 spread objects and 829.3 ms at 1000 (1,469.0 ms clustered), against 250 ms. At the registered thirty seconds a placement, that is between 100 and 500 minutes of placing objects (MEASURED knee, ASSUMED rate).",
+        "Frame work never approaches its budget: the largest 95th percentile at any object point is 2.0 ms against 16.7 ms, at 1000 objects, and every sprint to 8 km keeps it within 0.7 ms, with a few single long frames in some legs (see the distance series). Every reload at every count showed the saved world exactly (MEASURED).",
+        "Two limits no budget measures arrive much sooner, and were found answering a registered open question: the sky is no longer drawn at 1 km (MEASURED), past about 540 m from where the world opened by the code (INFERRED, about 23 s of sprinting), and at 4 km objects' lit faces carry diagonal bands they do not have at 1 km (MEASURED).",
+        "The society's replay exceeds 2 s between 1 and 60 ticks of history at 128 inhabitants (2,291.2 ms at 60), and a tick at 512 inhabitants exceeds 250 ms (513.1 ms); no product path reaches either at this commit.",
+        "The combined world, 200 spread objects and 16 estimates at once, passes every budget: first frame 1,431.6 ms, complete world 1,602.2 ms."
+      ],
+      "assumed_rates": {
+        "estimate_seconds": 120,
+        "object_placement_seconds": 30,
+        "society": "playback at speed 1, one tick per second",
+        "walking": "sprint, 23.4 m/s"
+      },
+      "first_limits": [
+        {
+          "budget_us": 2000000,
+          "chord_crossing_estimates_tenths": 315,
+          "chord_crossing_minutes": 63,
+          "growth_per_estimate_us": {
+            "from_16_to_32": 57812,
+            "from_4_to_16": 57433
+          },
+          "knee": {
+            "at_the_budget": false,
+            "between": [
+              16,
+              32
+            ],
+            "knee": true,
+            "per_run_at_knee": [
+              2031500,
+              2011500,
+              2029900,
+              2028600,
+              2027700
+            ],
+            "statistic_at_knee": 2028600
+          },
+          "last_count_within": {
+            "count": 16,
+            "median_us": 1103600
+          },
+          "limit": "Opening a saved world that holds photo estimates takes longer than the 2 s budget.",
+          "metrics": [
+            "open_first_frame_us",
+            "open_complete_world_us"
+          ],
+          "minutes_of_ordinary_use": {
+            "at": "120 s a placed estimate",
+            "from": 32,
+            "to": 64
+          },
+          "rank": 1,
+          "register": "MEASURED knee; INFERRED crossing (straight line between the medians at 16 and 32)",
+          "reproduction": "Place 32 photo estimates into one saved world on the endless ground through the product (intake, the review granting the depth right, the depth worker, then Place for each), reload the page and time the first drawn frame from the operator token's submit; every one of five warm opens took over 2 s.",
+          "series": "estimates",
+          "why_it_grows": "READ by the pre-registration in the code (loadAuthoredPointMaps runs before the renderer mounts) and consistent with what was MEASURED: every placed estimate is fetched and hashed before the renderer mounts, so the first drawn frame waits for all of them and equals the complete world at every count (submit to first frame 1,968.4 ms of the 2,028.6 ms at 32). The point maps are 3,877,264 to 3,915,944 bytes each."
+        },
+        {
+          "budget_us": 250000,
+          "chord_crossings": {
+            "clustered": {
+              "ack_per_object_200_to_1000_us": 1670,
+              "ack_per_object_50_to_200_us": 554,
+              "placement_ack_crossing_tenths": 2704,
+              "undo_ack_crossing_tenths": 3000
+            },
+            "spread": {
+              "ack_per_object_200_to_1000_us": 884,
+              "ack_per_object_50_to_200_us": 370,
+              "placement_ack_crossing_tenths": 3451,
+              "undo_ack_crossing_tenths": 3533
+            }
+          },
+          "first_chord_crossing_minutes": 135,
+          "first_chord_crossing_objects_tenths": 2704,
+          "knee": {
+            "clustered": {
+              "at_the_budget": false,
+              "between": [
+                200,
+                1000
+              ],
+              "knee": true,
+              "per_run_at_knee": [
+                1576200,
+                1734700,
+                1469000,
+                1078700,
+                773100
+              ],
+              "statistic_at_knee": 1469000
+            },
+            "spread": {
+              "at_the_budget": false,
+              "between": [
+                200,
+                1000
+              ],
+              "knee": true,
+              "per_run_at_knee": [
+                723100,
+                829300,
+                771100,
+                970100,
+                965400
+              ],
+              "statistic_at_knee": 829300
+            },
+            "undo_clustered": {
+              "at_the_budget": false,
+              "between": [
+                200,
+                1000
+              ],
+              "knee": true,
+              "per_run_at_knee": [
+                1689500,
+                1870000,
+                1145400,
+                1090000,
+                764500
+              ],
+              "statistic_at_knee": 1145400
+            },
+            "undo_spread": {
+              "at_the_budget": false,
+              "between": [
+                200,
+                1000
+              ],
+              "knee": true,
+              "per_run_at_knee": [
+                790000,
+                745900,
+                786700,
+                858400,
+                799300
+              ],
+              "statistic_at_knee": 790000
+            }
+          },
+          "limit": "The objects panel's report that a placement or its take-back has landed arrives later than the 250 ms budget.",
+          "metrics": [
+            "placement_ack_us",
+            "undo_ack_us"
+          ],
+          "minutes_of_ordinary_use": {
+            "at": "30 s a placed object",
+            "from": 100,
+            "to": 500
+          },
+          "rank": 2,
+          "register": "MEASURED knee; INFERRED crossing (the chord between 200 and 1000; the acknowledgement steepens with count, so if it keeps doing so the true crossing is at or after the chord's)",
+          "reproduction": "Build a saved world of 1000 objects through the product's composition routes, open it, place one object with Place before me and Confirm, and time the panel's settled report; then take it back. All five placements and five take-backs took over 250 ms in both layouts.",
+          "series": "objects, both layouts",
+          "spread_between_runs": "At clustered 1000 the five acknowledgements ranged from 773.1 ms to 1,734.7 ms and fell over the last four; every one is over the budget, so the verdict does not depend on the spread. Its cause is not established.",
+          "why_it_grows": "INFERRED from MEASURED times: the last object becomes resident again only just before the report settles (776.5 ms of 829.3 ms at spread 1000), while the server's apply takes 79.0 ms: the time is the page redrawing every object after each change, the mechanism the pre-registration read in the code (settle awaits redrawAll)."
+        }
+      ],
+      "limits_added_after_registration": [
+        {
+          "defect": "Probable defect: the endless ground has no edge but the sky does. Not fixed here.",
+          "inferred": "The sky is lost past about 540 m from the opening point: 23.1 s of sprinting or 60.0 s of walking. Where between 80 m and 1 km it happens was not measured.",
+          "limit": "The sky stops being drawn once the camera is farther than the sky sphere's radius from where the world opened.",
+          "measured": "In all nine sessions at 1, 4 and 8 km the sky band of the capture is the camera's flat clear colour (one distinct colour in the 286 rows at x 720); at the arrival point it holds 30 colours and at 40 and 80 m it is still a gradient.",
+          "read": "web/packages/atlas-react/src/playcanvas/composed-world.ts places the sky, a unit sphere scaled to 540 m, at the opening frame (setPosition(frame.x, 0, frame.z), setLocalScale(540, 540, 540)) and nothing moves it afterwards; the camera's far clip outside a city is 1,200 m (atlas-binding.ts).",
+          "reproduction": "Open any saved world on the endless ground, hold W and Shift for 30 s, and look ahead: the sky above the horizon is one flat colour.",
+          "why_not_a_knee": "No budget measures the sky; it answers a registered open question and was added after registration."
+        },
+        {
+          "inferred": "Cause not established. Consistent with shadow-map or depth precision at large world coordinates, since the cube's own silhouette stays within about a pixel.",
+          "limit": "Lit faces of objects carry diagonal bands at 4 and 8 km that they do not have at 1 km.",
+          "measured": "The reference cube's lit face (11,328 pixels) differs from its own arrival capture by more than 8 levels in 7,065, 6,982, 6,859 pixels at 4 km and 7,021, 7,292, 7,242 at 8 km (three repeats), and in none at 40 m, 80 m or 1 km.",
+          "reproduction": "Sprint 4 km from the arrival point, place a marker cube with Place before me and look at its lit face at the capture pose.",
+          "why_not_a_knee": "No budget measures shading; added after registration."
+        }
+      ],
+      "limits_no_product_path_reaches": [
+        {
+          "chord_crossing_ticks_tenths": 521,
+          "growth_per_tick_us": 38105,
+          "knee": {
+            "at_the_budget": false,
+            "between": [
+              1,
+              60
+            ],
+            "knee": true,
+            "per_run_at_knee": [
+              2242308,
+              2291182,
+              2322955
+            ],
+            "statistic_at_knee": 2291182
+          },
+          "limit": "Replaying a society's history takes longer than the 2 s budget after less than a minute of playback.",
+          "metric": "society_replay_us, in-process server cost",
+          "minutes_of_ordinary_use": "between 1 s and 1 minute of playback at speed 1 (one tick a second)",
+          "population": 128,
+          "register": "MEASURED knee; INFERRED crossing (chord between 1 and 60 ticks); READ callers",
+          "why_it_follows": "Replay is served only by GET /world/versions/{id}/society/replay (exulanica/api/routes/society.py); no web client code and no server process calls it at the measured commit, and this runtime's readiness report says no saved world holds inhabitants without a registration file. The ranking rule orders limits no product path reaches after those a person meets."
+        },
+        {
+          "hard_ceiling_us": 1000000,
+          "knee": {
+            "at_the_budget": false,
+            "between": [
+              128,
+              512
+            ],
+            "knee": true,
+            "per_run_at_knee": [],
+            "statistic_at_knee": 513061
+          },
+          "limit": "A society tick at 512 inhabitants takes longer than the 250 ms budget.",
+          "metric": "society_tick_p95_us, in-process server cost",
+          "register": "MEASURED",
+          "tick_p95_us": {
+            "128": 154790,
+            "512": 513061
+          },
+          "why_it_follows": "512 inhabitants were made by overriding the creation constant inside the measuring process; the engine and the database accept 512 but no product path creates it at the measured commit (the product makes 128)."
+        }
+      ],
+      "registered_failure_present_at_the_arrival_point": {
+        "knee_as_registered": {
+          "at_the_budget": false,
+          "between": [
+            1000,
+            4000
+          ],
+          "knee": true,
+          "per_run_at_knee": [
+            3180,
+            1505,
+            2683
+          ],
+          "statistic_at_knee": 2683
+        },
+        "metric": "drawn_position_error_millipixels",
+        "statistic_sensitivity": "The registration names no statistic across repeats for this metric; the median is used, as for every other repeated metric. Under the smallest repeat the knee is also between 1 and 4 km; under the largest it would fall before 1 km, since one 1 km repeat exceeds a pixel.",
+        "why_it_is_not_ranked_as_a_scale_limit": "The registered silhouette is the capture with the reference minus the capture without it, so it includes the cube's soft shadow and the line where its base meets the ground. It exceeds a pixel at the 40 and 80 m controls as well, where float32 spacing is below a hundredth of a millimetre, so the change it measures is present within 80 m of the arrival point and is not caused by distance. The object-only silhouette (shadow casting off for one frame, added before any registered walk) moves by at most about two pixels at every mark, with no trend."
+      },
+      "rule": "limits a person meets through the product are ranked by the minutes of ordinary use before they appear; limits no product path reaches at this commit follow them"
+    },
+    "predecessor_record": {
+      "file_sha256": "ae513724ba97be55c8c2399cb4681afa37a8ee7cfd4851844463f0d9063ddd1f",
+      "path": "docs/evaluation/2026-09-22-world-scale-preregistration.json",
+      "record_sha256": "e67bd95cc63729a5ee4adfb4abb906b1d3e3993eaece3b41db6abcfd0b64c406",
+      "why": "The pre-registration: budgets, series, statistics, knee rule, stop rules and ranking rule, written before the first timing run and unchanged since. Every verdict here is judged against it, and every departure from it is listed under departures."
+    },
+    "predictions": [
+      {
+        "evidence": "It is the first budget to fail within the object series, in both layouts, between 200 and 1000. It is not linear from zero: flat to 10 objects (32.4 ms at 0, 32.9 ms at 10), then 0.4 ms more an object from 50 to 200 and 0.9 ms from 200 to 1000 in the spread layout (0.6 ms and 1.7 ms clustered). The time to the last object resident tracks the acknowledgement at every count, as the redraw mechanism predicts.",
+        "prediction": "Placement and undo acknowledgement grow linearly with placed objects: settle awaits redrawAll, which clears every resident object and fetches, hashes, decodes and attaches each one again, one at a time (web/packages/app/src/composition/objects.ts settle, redrawAll, drawEvery; web/packages/atlas-react/src/playcanvas/scene-objects.ts place). Predicted to be the first budget to fail, in both layouts.",
+        "register": "MEASURED",
+        "verdict": "held in part"
+      },
+      {
+        "evidence": "First frame, spread: 120.8 ms at 0, 132.5 ms at 200, 211.0 ms at 1000; clustered 135.8 ms, 154.6 ms, 257.3 ms. Estimates: 238.6 ms at 1 to 2,028.6 ms at 32, and the first frame equals the complete world at every estimate count.",
+        "prediction": "Open to first drawn frame does not grow with objects, which are drawn after the renderer mounts (main.ts calls objects.begin after mountRenderer), and does grow with placed estimates, which are fetched and hashed before it mounts (loadAuthoredPointMaps).",
+        "register": "MEASURED",
+        "verdict": "held for estimates; for objects held to 200 and not at 1000"
+      },
+      {
+        "evidence": "Complete world, spread: 120.8 ms at 0, 170.9 ms at 10, 214.3 ms at 50, 279.8 ms at 200, 628.3 ms at 1000; clustered: 135.8 ms at 0, 160.5 ms at 10, 198.2 ms at 50, 283.0 ms at 200, 935.7 ms at 1000.",
+        "prediction": "Open to complete world grows linearly with objects, for the reason in the first prediction.",
+        "register": "MEASURED",
+        "verdict": "held (it grows; within budget to 1000)"
+      },
+      {
+        "evidence": "Server apply median at the panel placement: spread 14.6 ms at 0 and 79.0 ms at 1000, clustered 122.4 ms at 1000; the build curves show the same growth. The response grows to 1,187,606 bytes at 1000.",
+        "prediction": "The server's apply grows with objects: every edit digests every object (object_repository._append_edit, delta_sha256) and answers with every object and every edit.",
+        "register": "MEASURED",
+        "verdict": "held"
+      },
+      {
+        "evidence": "Walking p95, spread 0.5 ms at 0 and 1.6 ms at 1000; clustered 0.3 ms and 1.9 ms. Draw calls at p50: spread 450, clustered 2003 at 1000.",
+        "prediction": "Frame work while walking grows with objects in view, one entity and draw per object with no instancing, faster clustered than spread.",
+        "register": "MEASURED",
+        "verdict": "held, far inside the budget"
+      },
+      {
+        "evidence": "Replay at 128: 115.1 ms at 1 tick, 2,291.2 ms at 60, 9,628.9 ms at 240, 54,877.4 ms at 1440: close to linear in ticks. At 60 ticks, 8,224.6 ms at 512 against 2,085.7 ms at 128. Tick p95 154.8 ms at 128 and 513.1 ms at 512.",
+        "prediction": "Society replay grows with ticks times population, since replay reruns every tick from the first; a tick grows with population.",
+        "register": "MEASURED",
+        "verdict": "held"
+      },
+      {
+        "evidence": "The registered metric includes the shadow and exceeds a pixel at the 40 and 80 m controls. The object-only shift at 8 km is 993, 494, 495 millipixels in the three repeats; across all marks it takes only values near 0.5, 1 and 2 pixels, one row of the base line moving, with no trend.",
+        "prediction": "Drawn position error for an object stays below a pixel at 8 km: float32 spacing at 8,192 m is 0.977 mm, from the endless ground's own measurement.",
+        "register": "MEASURED; the reading of the base line is OBSERVED BY EYE",
+        "verdict": "not answered by the registered metric; the object stays within about a pixel"
+      }
+    ],
+    "profile": "exulanica.world-scale-baseline/v1",
+    "question": "How large can a saved world grow through the product's own routes before what a person does in it (opening, reloading, placing and undoing, walking, looking around) stops meeting the budgets below, and which limit does a person meet first?",
+    "series": {
+      "combined": {
+        "build": {
+          "apply_bytes_last": 335247,
+          "apply_p50_us": 32543,
+          "apply_p95_us": 36953,
+          "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/combined/build.jsonl",
+          "file_sha256": "60da2139b5ee3579305f7c52beba94b66d29025ea2547e0b9d5ecc6cdf741ccb",
+          "idle_during_mean_tenths": 928,
+          "placements": 200,
+          "preview_p50_us": 5414,
+          "preview_p95_us": 6290,
+          "timing_valid": true
+        },
+        "holds": {
+          "estimates": 16,
+          "layout": "spread",
+          "objects": 200
+        },
+        "point": {
+          "count": 200,
+          "gate": {
+            "idle_before_percent": 97,
+            "idle_during_mean_tenths": 937,
+            "idle_during_min_percent": 83,
+            "idle_during_samples": 86
+          },
+          "load_one_minute_hundredths": [
+            176,
+            140
+          ],
+          "looking": {
+            "draw_calls_p50": [
+              164,
+              164,
+              164
+            ],
+            "per_run_interval_p95_us": [
+              16700,
+              16700,
+              16700
+            ],
+            "per_run_long_tasks": [
+              0,
+              0,
+              0
+            ],
+            "per_run_max_us": [
+              1600,
+              1600,
+              1700
+            ],
+            "per_run_p50_us": [
+              1100,
+              1100,
+              1100
+            ],
+            "per_run_p95_us": [
+              1400,
+              1400,
+              1400
+            ],
+            "pooled_frames": 838,
+            "pooled_frames_over_16700_us": 0,
+            "pooled_max_us": 1700,
+            "pooled_p50_us": 1100,
+            "pooled_p95_us": 1400,
+            "runs_valid": [
+              true,
+              true,
+              true
+            ]
+          },
+          "open": {
+            "cold_complete_world_us": 1679200,
+            "cold_first_frame_us": 1493600,
+            "warm_complete_world_median_us": 1602200,
+            "warm_complete_world_us": [
+              1605700,
+              1602000,
+              1602200,
+              1583500,
+              1614200
+            ],
+            "warm_document_to_form_median_us": 69600,
+            "warm_first_frame_median_us": 1431600,
+            "warm_first_frame_us": [
+              1441600,
+              1431800,
+              1431600,
+              1417400,
+              1426000
+            ],
+            "warm_submit_to_first_frame_median_us": 1361100
+          },
+          "reload": {
+            "control_share_millionths": 0,
+            "identical": true,
+            "pixels_within": true,
+            "reload_share_millionths": 0,
+            "scene_maps": 16,
+            "scene_objects": 200,
+            "scene_same": true,
+            "version_same": true
+          },
+          "run": {
+            "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/combined/combined-200-16-2026-09-23T05-57-45-200Z.json",
+            "as_run_sha256": "6096bc600a00c96dc832f2f74b56d9a7d3245ad075b2cdeda1b8e7c60a57032d"
+          },
+          "walking": {
+            "draw_calls_p50": [
+              219,
+              219,
+              219
+            ],
+            "per_run_interval_p95_us": [
+              16800,
+              16800,
+              16700
+            ],
+            "per_run_long_tasks": [
+              0,
+              0,
+              0
+            ],
+            "per_run_max_us": [
+              2100,
+              1800,
+              1900
+            ],
+            "per_run_p50_us": [
+              1300,
+              1200,
+              1200
+            ],
+            "per_run_p95_us": [
+              1600,
+              1600,
+              1600
+            ],
+            "pooled_frames": 7203,
+            "pooled_frames_over_16700_us": 0,
+            "pooled_max_us": 2100,
+            "pooled_p50_us": 1200,
+            "pooled_p95_us": 1600,
+            "runs_valid": [
+              true,
+              true,
+              true
+            ]
+          }
+        },
+        "take_back": {
+          "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/combined/take-back.jsonl",
+          "estimates_after": [
+            31,
+            30,
+            29,
+            28,
+            27,
+            26,
+            25,
+            24,
+            23,
+            22,
+            21,
+            20,
+            19,
+            18,
+            17,
+            16
+          ],
+          "file_sha256": "5fb5b76dc1d3bec031b6a2bfc352b3a935a7239e373216eea3c747e8ad3a01a3",
+          "server_us": [
+            52754,
+            45260,
+            44062,
+            46995,
+            42753,
+            42557,
+            42866,
+            44861,
+            39559,
+            41307,
+            37451,
+            37644,
+            35625,
+            36077,
+            34752,
+            34457
+          ],
+          "steps": 16
+        }
+      },
+      "distance": {
+        "arrival_sky_distinct_colours": [
+          30
+        ],
+        "lit_face_pixels": 11328,
+        "marks": [
+          {
+            "added_after_registration": true,
+            "iou_millionths": [
+              950355,
+              982986,
+              949501
+            ],
+            "last_ten_seconds_work_p95_us": [
+              700,
+              700,
+              600
+            ],
+            "lit_face_differing_pixels": [
+              0,
+              0,
+              0
+            ],
+            "lit_face_middle_row_steps": [
+              0,
+              0,
+              0
+            ],
+            "mark_m": 40,
+            "object_free_frame_differing_millionths": [
+              21903,
+              22414,
+              22358
+            ],
+            "object_only_iou_millionths": [
+              985110,
+              992610,
+              985110
+            ],
+            "object_only_shift_median_millipixels": 989,
+            "object_only_shift_millipixels": [
+              989,
+              495,
+              989
+            ],
+            "registered_drawn_error_median_millipixels": 2271,
+            "registered_drawn_error_millipixels": [
+              2271,
+              541,
+              3543
+            ],
+            "repeats": 3,
+            "sky_all_clear_colour": [
+              false,
+              false,
+              false
+            ],
+            "sky_distinct_colours": [
+              27,
+              26,
+              26
+            ],
+            "sprint_frames": [
+              124,
+              123,
+              123
+            ],
+            "sprint_frames_over_16700_us": [
+              0,
+              0,
+              0
+            ],
+            "sprint_seconds_milli": [
+              2070,
+              2070,
+              2063
+            ],
+            "sprint_work_max_us": [
+              7000,
+              800,
+              700
+            ],
+            "sprint_work_p50_us": [
+              500,
+              400,
+              400
+            ],
+            "sprint_work_p95_us": [
+              700,
+              700,
+              600
+            ]
+          },
+          {
+            "added_after_registration": true,
+            "iou_millionths": [
+              972759,
+              956598,
+              967271
+            ],
+            "last_ten_seconds_work_p95_us": [
+              600,
+              500,
+              500
+            ],
+            "lit_face_differing_pixels": [
+              0,
+              0,
+              0
+            ],
+            "lit_face_middle_row_steps": [
+              0,
+              0,
+              0
+            ],
+            "mark_m": 80,
+            "object_free_frame_differing_millionths": [
+              69727,
+              74410,
+              72549
+            ],
+            "object_only_iou_millionths": [
+              992610,
+              970221,
+              992610
+            ],
+            "object_only_shift_median_millipixels": 495,
+            "object_only_shift_millipixels": [
+              495,
+              1977,
+              495
+            ],
+            "registered_drawn_error_median_millipixels": 1540,
+            "registered_drawn_error_millipixels": [
+              909,
+              1786,
+              1540
+            ],
+            "repeats": 3,
+            "sky_all_clear_colour": [
+              false,
+              false,
+              false
+            ],
+            "sky_distinct_colours": [
+              23,
+              23,
+              21
+            ],
+            "sprint_frames": [
+              102,
+              112,
+              109
+            ],
+            "sprint_frames_over_16700_us": [
+              0,
+              0,
+              0
+            ],
+            "sprint_seconds_milli": [
+              1707,
+              1867,
+              1817
+            ],
+            "sprint_work_max_us": [
+              2400,
+              700,
+              1200
+            ],
+            "sprint_work_p50_us": [
+              400,
+              300,
+              300
+            ],
+            "sprint_work_p95_us": [
+              600,
+              500,
+              500
+            ]
+          },
+          {
+            "added_after_registration": false,
+            "iou_millionths": [
+              965066,
+              969555,
+              972447
+            ],
+            "last_ten_seconds_work_p95_us": [
+              900,
+              700,
+              600
+            ],
+            "lit_face_differing_pixels": [
+              0,
+              0,
+              0
+            ],
+            "lit_face_middle_row_steps": [
+              0,
+              0,
+              0
+            ],
+            "mark_m": 1000,
+            "object_free_frame_differing_millionths": [
+              318889,
+              318889,
+              318889
+            ],
+            "object_only_iou_millionths": [
+              985040,
+              985110,
+              992610
+            ],
+            "object_only_shift_median_millipixels": 989,
+            "object_only_shift_millipixels": [
+              993,
+              989,
+              495
+            ],
+            "registered_drawn_error_median_millipixels": 797,
+            "registered_drawn_error_millipixels": [
+              1084,
+              797,
+              795
+            ],
+            "repeats": 3,
+            "sky_all_clear_colour": [
+              true,
+              true,
+              true
+            ],
+            "sky_distinct_colours": [
+              1,
+              1,
+              1
+            ],
+            "sprint_frames": [
+              2587,
+              2592,
+              2591
+            ],
+            "sprint_frames_over_16700_us": [
+              0,
+              0,
+              0
+            ],
+            "sprint_seconds_milli": [
+              43141,
+              43230,
+              43209
+            ],
+            "sprint_work_max_us": [
+              10000,
+              8000,
+              12100
+            ],
+            "sprint_work_p50_us": [
+              400,
+              400,
+              300
+            ],
+            "sprint_work_p95_us": [
+              700,
+              700,
+              500
+            ]
+          },
+          {
+            "added_after_registration": false,
+            "iou_millionths": [
+              935460,
+              943323,
+              942471
+            ],
+            "last_ten_seconds_work_p95_us": [
+              400,
+              900,
+              600
+            ],
+            "lit_face_differing_pixels": [
+              7065,
+              6982,
+              6859
+            ],
+            "lit_face_middle_row_steps": [
+              6,
+              5,
+              5
+            ],
+            "mark_m": 4000,
+            "object_free_frame_differing_millionths": [
+              318889,
+              318889,
+              318889
+            ],
+            "object_only_iou_millionths": [
+              992610,
+              970221,
+              992610
+            ],
+            "object_only_shift_median_millipixels": 495,
+            "object_only_shift_millipixels": [
+              495,
+              1977,
+              495
+            ],
+            "registered_drawn_error_median_millipixels": 2683,
+            "registered_drawn_error_millipixels": [
+              3180,
+              1505,
+              2683
+            ],
+            "repeats": 3,
+            "sky_all_clear_colour": [
+              true,
+              true,
+              true
+            ],
+            "sky_distinct_colours": [
+              1,
+              1,
+              1
+            ],
+            "sprint_frames": [
+              10285,
+              10285,
+              10276
+            ],
+            "sprint_frames_over_16700_us": [
+              3,
+              1,
+              2
+            ],
+            "sprint_seconds_milli": [
+              171432,
+              171450,
+              171467
+            ],
+            "sprint_work_max_us": [
+              21500,
+              43900,
+              118000
+            ],
+            "sprint_work_p50_us": [
+              300,
+              400,
+              400
+            ],
+            "sprint_work_p95_us": [
+              600,
+              700,
+              600
+            ]
+          },
+          {
+            "added_after_registration": false,
+            "iou_millionths": [
+              931711,
+              929123,
+              938856
+            ],
+            "last_ten_seconds_work_p95_us": [
+              500,
+              3600,
+              500
+            ],
+            "lit_face_differing_pixels": [
+              7021,
+              7292,
+              7242
+            ],
+            "lit_face_middle_row_steps": [
+              7,
+              6,
+              4
+            ],
+            "mark_m": 8000,
+            "object_free_frame_differing_millionths": [
+              318889,
+              318889,
+              318889
+            ],
+            "object_only_iou_millionths": [
+              985040,
+              992541,
+              992610
+            ],
+            "object_only_shift_median_millipixels": 495,
+            "object_only_shift_millipixels": [
+              993,
+              494,
+              495
+            ],
+            "registered_drawn_error_median_millipixels": 3080,
+            "registered_drawn_error_millipixels": [
+              3080,
+              3102,
+              2874
+            ],
+            "repeats": 3,
+            "sky_all_clear_colour": [
+              true,
+              true,
+              true
+            ],
+            "sky_distinct_colours": [
+              1,
+              1,
+              1
+            ],
+            "sprint_frames": [
+              20534,
+              20509,
+              20528
+            ],
+            "sprint_frames_over_16700_us": [
+              3,
+              29,
+              2
+            ],
+            "sprint_seconds_milli": [
+              342352,
+              342435,
+              342339
+            ],
+            "sprint_work_max_us": [
+              56000,
+              73100,
+              100100
+            ],
+            "sprint_work_p50_us": [
+              400,
+              300,
+              300
+            ],
+            "sprint_work_p95_us": [
+              700,
+              700,
+              500
+            ]
+          }
+        ],
+        "route": "from the arrival pose along its facing, holding W and Shift (23.4 m/s, the controls' sprint), in a world with no other object",
+        "sessions": [
+          {
+            "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/distance/distance-0-1000-2026-09-23T05-02-42-759Z.json",
+            "as_run_sha256": "f469c91fce043eba1fe2b9bed55639534778459494070bbad934634edcde3c2b",
+            "idle_before_percent": 77,
+            "idle_during_mean_tenths": 579,
+            "idle_during_min_percent": 27,
+            "session": "distance-0-1000"
+          },
+          {
+            "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/distance/distance-0-4000-2026-09-23T05-03-43-483Z.json",
+            "as_run_sha256": "b839b39f50c588fe70ae0abc8c94dd76e0f3d649ad4fd794f35b4529a48b90bd",
+            "idle_before_percent": 77,
+            "idle_during_mean_tenths": 672,
+            "idle_during_min_percent": 21,
+            "session": "distance-0-4000"
+          },
+          {
+            "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/distance/distance-0-8000-2026-09-23T05-06-52-504Z.json",
+            "as_run_sha256": "8963185ba1a71d39fb89a60edb8df25c5de95acab4c983ddee69aad56935dfe2",
+            "idle_before_percent": 85,
+            "idle_during_mean_tenths": 849,
+            "idle_during_min_percent": 34,
+            "session": "distance-0-8000"
+          },
+          {
+            "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/distance/distance-0-controls-2026-09-23T05-02-18-196Z.json",
+            "as_run_sha256": "20942cd501b93f4e93f2edefc94b4cc942ff68e5066e7ca69c0d87a0722cf149",
+            "idle_before_percent": 81,
+            "idle_during_mean_tenths": 609,
+            "idle_during_min_percent": 42,
+            "session": "distance-0-controls"
+          },
+          {
+            "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/distance/distance-1-1000-2026-09-23T05-13-17-033Z.json",
+            "as_run_sha256": "7b623559af0d88395fc4905979b3f5585a3901a02a73ba1e7007498a6baa15dc",
+            "idle_before_percent": 86,
+            "idle_during_mean_tenths": 893,
+            "idle_during_min_percent": 74,
+            "session": "distance-1-1000"
+          },
+          {
+            "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/distance/distance-1-4000-2026-09-23T05-14-17-795Z.json",
+            "as_run_sha256": "0faf49689ed6b9dc99eb304d45c47bee168a93d25f5403260330d8ebc496117b",
+            "idle_before_percent": 93,
+            "idle_during_mean_tenths": 851,
+            "idle_during_min_percent": 37,
+            "session": "distance-1-4000"
+          },
+          {
+            "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/distance/distance-1-8000-2026-09-23T05-17-26-811Z.json",
+            "as_run_sha256": "70f00bb313fde876104de37d545d40381ad784892acc5aa50f4cf392215fa77a",
+            "idle_before_percent": 93,
+            "idle_during_mean_tenths": 842,
+            "idle_during_min_percent": 40,
+            "session": "distance-1-8000"
+          },
+          {
+            "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/distance/distance-1-controls-2026-09-23T05-12-52-507Z.json",
+            "as_run_sha256": "3ff5d1f01ca75a3ab35dc9da17344b4ff6e1a4bc5b479a2baa8a2ace565f8076",
+            "idle_before_percent": 92,
+            "idle_during_mean_tenths": 860,
+            "idle_during_min_percent": 81,
+            "session": "distance-1-controls"
+          },
+          {
+            "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/distance/distance-2-1000-2026-09-23T05-23-51-235Z.json",
+            "as_run_sha256": "8aeb99485f4b2f5d59137b98d2534987522f81d446e24cb08a2ff1f52ea19baa",
+            "idle_before_percent": 93,
+            "idle_during_mean_tenths": 916,
+            "idle_during_min_percent": 69,
+            "session": "distance-2-1000"
+          },
+          {
+            "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/distance/distance-2-4000-2026-09-23T05-24-51-842Z.json",
+            "as_run_sha256": "4d80f7f0d80b31dd264d92a9d798a36ba4e49f1ca1c7e56b73bc81335100a695",
+            "idle_before_percent": 95,
+            "idle_during_mean_tenths": 930,
+            "idle_during_min_percent": 54,
+            "session": "distance-2-4000"
+          },
+          {
+            "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/distance/distance-2-8000-2026-09-23T05-28-00-819Z.json",
+            "as_run_sha256": "ac6510002b8d25c420c36fba148cc09d123f24c101a06d0a862020ac493f809f",
+            "idle_before_percent": 96,
+            "idle_during_mean_tenths": 906,
+            "idle_during_min_percent": 42,
+            "session": "distance-2-8000"
+          },
+          {
+            "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/distance/distance-2-controls-2026-09-23T05-23-26-819Z.json",
+            "as_run_sha256": "1bd39cb6ae706d2d9c96bb064ce25c709d8b6d9cf383af129201e4875c65cd9a",
+            "idle_before_percent": 89,
+            "idle_during_mean_tenths": 844,
+            "idle_during_min_percent": 78,
+            "session": "distance-2-controls"
+          }
+        ],
+        "shading_artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/distance/shading.json"
+      },
+      "estimates": {
+        "depth_runs": [
+          {
+            "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/worker/worker-20260923T013413.jsonl",
+            "as_run_sha256": "a27ac8e7e3812d668f666fcae2eab74b200478e955feb2d3384b519fe0eb913c",
+            "exit": 0,
+            "idle_during_mean_tenths": 910,
+            "peak_resident_kib": 2942144,
+            "photographs": 1,
+            "process_start_to_ready_ms": 25989,
+            "ready_to_stopped_ms": 1809,
+            "timing_valid": true
+          },
+          {
+            "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/worker/worker-20260923T014459.jsonl",
+            "as_run_sha256": "170860a8d7889f5d8aead2d2aaed5b6351b10d1d61dd61262ad978bd9632556d",
+            "exit": 0,
+            "idle_during_mean_tenths": 850,
+            "peak_resident_kib": 2941856,
+            "photographs": 3,
+            "process_start_to_ready_ms": 5324,
+            "ready_to_stopped_ms": 2711,
+            "timing_valid": true
+          },
+          {
+            "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/worker/worker-20260923T014823.jsonl",
+            "as_run_sha256": "db88e1897e18412a22af85e3ff8209c90d1079ec5ee65a6926ad5abce3dd1c2a",
+            "exit": 0,
+            "idle_during_mean_tenths": 938,
+            "peak_resident_kib": 2927632,
+            "photographs": 12,
+            "process_start_to_ready_ms": 3851,
+            "ready_to_stopped_ms": 9160,
+            "timing_valid": true
+          },
+          {
+            "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/worker/worker-20260923T015159.jsonl",
+            "as_run_sha256": "9cc8443931c41a2be82723ea7da0a76ac40f235e042c8445301834cd6d7405f1",
+            "exit": 0,
+            "idle_during_mean_tenths": 941,
+            "peak_resident_kib": 2935920,
+            "photographs": 16,
+            "process_start_to_ready_ms": 3830,
+            "ready_to_stopped_ms": 12297,
+            "timing_valid": true
+          }
+        ],
+        "made_through": "POST /intake, then the personal admission review granting the depth right against the server's exact notice (the same step a person takes), the ingest worker with EXULANICA_DEPTH_MODEL=moge and the cached MoGe-2 checkpoint as the runtime role, then POST /world-entries/{id}/source-attachments and compositions preview and apply as photo_point_map on a 4 m grid in front of the arrival point",
+        "placement_server": [
+          {
+            "apply_max_us": 243246,
+            "apply_p50_us": 243246,
+            "apply_response_bytes_last": 54388,
+            "estimates_before_below": 1,
+            "estimates_before_from": 0,
+            "placements": 1,
+            "preview_p50_us": 119721
+          },
+          {
+            "apply_max_us": 239678,
+            "apply_p50_us": 234556,
+            "apply_response_bytes_last": 61184,
+            "estimates_before_below": 4,
+            "estimates_before_from": 1,
+            "placements": 3,
+            "preview_p50_us": 116623
+          },
+          {
+            "apply_max_us": 246828,
+            "apply_p50_us": 234955,
+            "apply_response_bytes_last": 88370,
+            "estimates_before_below": 16,
+            "estimates_before_from": 4,
+            "placements": 12,
+            "preview_p50_us": 113970
+          },
+          {
+            "apply_max_us": 250771,
+            "apply_p50_us": 243308,
+            "apply_response_bytes_last": 124626,
+            "estimates_before_below": 32,
+            "estimates_before_from": 16,
+            "placements": 16,
+            "preview_p50_us": 113828
+          }
+        ],
+        "point_map_container": "opm/2, 20 bytes a point (float32 position, four colour bytes, two uint16 tags)",
+        "point_maps": {
+          "byte_size_max": 3915944,
+          "byte_size_min": 3877264,
+          "byte_size_total": 124718556,
+          "point_count_max": 195730,
+          "point_count_min": 193796,
+          "point_maps": 32
+        },
+        "points": [
+          {
+            "count": 1,
+            "gate": {
+              "idle_before_percent": 74,
+              "idle_during_mean_tenths": 696,
+              "idle_during_min_percent": 31,
+              "idle_during_samples": 80
+            },
+            "load_one_minute_hundredths": [
+              491,
+              522
+            ],
+            "looking": {
+              "draw_calls_p50": [
+                4,
+                4,
+                4
+              ],
+              "per_run_interval_p95_us": [
+                16800,
+                16800,
+                16800
+              ],
+              "per_run_long_tasks": [
+                0,
+                0,
+                0
+              ],
+              "per_run_max_us": [
+                600,
+                800,
+                700
+              ],
+              "per_run_p50_us": [
+                100,
+                400,
+                400
+              ],
+              "per_run_p95_us": [
+                500,
+                600,
+                600
+              ],
+              "pooled_frames": 839,
+              "pooled_frames_over_16700_us": 0,
+              "pooled_max_us": 800,
+              "pooled_p50_us": 300,
+              "pooled_p95_us": 600,
+              "runs_valid": [
+                true,
+                true,
+                true
+              ]
+            },
+            "open": {
+              "cold_complete_world_us": 374800,
+              "cold_first_frame_us": 374800,
+              "warm_complete_world_median_us": 238600,
+              "warm_complete_world_us": [
+                273800,
+                268200,
+                238600,
+                238500,
+                237000
+              ],
+              "warm_document_to_form_median_us": 40900,
+              "warm_first_frame_median_us": 238600,
+              "warm_first_frame_us": [
+                273800,
+                268200,
+                238600,
+                238500,
+                237000
+              ],
+              "warm_submit_to_first_frame_median_us": 220600
+            },
+            "reload": {
+              "control_share_millionths": 0,
+              "identical": true,
+              "pixels_within": true,
+              "reload_share_millionths": 0,
+              "scene_maps": 1,
+              "scene_objects": 0,
+              "scene_same": true,
+              "version_same": true
+            },
+            "run": {
+              "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/estimates/estimates-1-2026-09-23T05-42-07-009Z.json",
+              "as_run_sha256": "d6dc0784d9387deec796e2cdf8ba671ea549960288c7e51a73b280ca5169b803"
+            },
+            "walking": {
+              "draw_calls_p50": [
+                5,
+                5,
+                5
+              ],
+              "per_run_interval_p95_us": [
+                16800,
+                16700,
+                16700
+              ],
+              "per_run_long_tasks": [
+                0,
+                0,
+                0
+              ],
+              "per_run_max_us": [
+                700,
+                400,
+                700
+              ],
+              "per_run_p50_us": [
+                300,
+                200,
+                300
+              ],
+              "per_run_p95_us": [
+                600,
+                300,
+                500
+              ],
+              "pooled_frames": 7200,
+              "pooled_frames_over_16700_us": 0,
+              "pooled_max_us": 700,
+              "pooled_p50_us": 200,
+              "pooled_p95_us": 500,
+              "runs_valid": [
+                true,
+                true,
+                true
+              ]
+            }
+          },
+          {
+            "count": 4,
+            "gate": {
+              "idle_before_percent": 95,
+              "idle_during_mean_tenths": 936,
+              "idle_during_min_percent": 86,
+              "idle_during_samples": 81
+            },
+            "load_one_minute_hundredths": [
+              318,
+              406
+            ],
+            "looking": {
+              "draw_calls_p50": [
+                7,
+                7,
+                7
+              ],
+              "per_run_interval_p95_us": [
+                16700,
+                16700,
+                16800
+              ],
+              "per_run_long_tasks": [
+                0,
+                0,
+                0
+              ],
+              "per_run_max_us": [
+                800,
+                1000,
+                900
+              ],
+              "per_run_p50_us": [
+                200,
+                400,
+                500
+              ],
+              "per_run_p95_us": [
+                700,
+                700,
+                700
+              ],
+              "pooled_frames": 840,
+              "pooled_frames_over_16700_us": 0,
+              "pooled_max_us": 1000,
+              "pooled_p50_us": 400,
+              "pooled_p95_us": 700,
+              "runs_valid": [
+                true,
+                true,
+                true
+              ]
+            },
+            "open": {
+              "cold_complete_world_us": 502100,
+              "cold_first_frame_us": 502100,
+              "warm_complete_world_median_us": 414400,
+              "warm_complete_world_us": [
+                426200,
+                410400,
+                409000,
+                423900,
+                414400
+              ],
+              "warm_document_to_form_median_us": 44500,
+              "warm_first_frame_median_us": 414400,
+              "warm_first_frame_us": [
+                426200,
+                410400,
+                409000,
+                423900,
+                414400
+              ],
+              "warm_submit_to_first_frame_median_us": 367900
+            },
+            "reload": {
+              "control_share_millionths": 0,
+              "identical": true,
+              "pixels_within": true,
+              "reload_share_millionths": 0,
+              "scene_maps": 4,
+              "scene_objects": 0,
+              "scene_same": true,
+              "version_same": true
+            },
+            "run": {
+              "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/estimates/estimates-4-2026-09-23T05-45-29-427Z.json",
+              "as_run_sha256": "9a6921f9e1c616dd623584459b8eb88f94f42b773d2d5f3ea833cdc98cb5c822"
+            },
+            "walking": {
+              "draw_calls_p50": [
+                11,
+                11,
+                11
+              ],
+              "per_run_interval_p95_us": [
+                16700,
+                16800,
+                16700
+              ],
+              "per_run_long_tasks": [
+                0,
+                0,
+                0
+              ],
+              "per_run_max_us": [
+                1100,
+                900,
+                900
+              ],
+              "per_run_p50_us": [
+                300,
+                300,
+                300
+              ],
+              "per_run_p95_us": [
+                800,
+                700,
+                700
+              ],
+              "pooled_frames": 7202,
+              "pooled_frames_over_16700_us": 0,
+              "pooled_max_us": 1100,
+              "pooled_p50_us": 300,
+              "pooled_p95_us": 800,
+              "runs_valid": [
+                true,
+                true,
+                true
+              ]
+            }
+          },
+          {
+            "count": 16,
+            "gate": {
+              "idle_before_percent": 96,
+              "idle_during_mean_tenths": 947,
+              "idle_during_min_percent": 84,
+              "idle_during_samples": 83
+            },
+            "load_one_minute_hundredths": [
+              234,
+              75
+            ],
+            "looking": {
+              "draw_calls_p50": [
+                20,
+                20,
+                20
+              ],
+              "per_run_interval_p95_us": [
+                16800,
+                16800,
+                16700
+              ],
+              "per_run_long_tasks": [
+                0,
+                0,
+                0
+              ],
+              "per_run_max_us": [
+                1200,
+                1000,
+                1100
+              ],
+              "per_run_p50_us": [
+                700,
+                700,
+                700
+              ],
+              "per_run_p95_us": [
+                1000,
+                1000,
+                1000
+              ],
+              "pooled_frames": 837,
+              "pooled_frames_over_16700_us": 0,
+              "pooled_max_us": 1200,
+              "pooled_p50_us": 700,
+              "pooled_p95_us": 1000,
+              "runs_valid": [
+                true,
+                true,
+                true
+              ]
+            },
+            "open": {
+              "cold_complete_world_us": 1180600,
+              "cold_first_frame_us": 1180600,
+              "warm_complete_world_median_us": 1103600,
+              "warm_complete_world_us": [
+                1103600,
+                1101900,
+                1106700,
+                1103500,
+                1106300
+              ],
+              "warm_document_to_form_median_us": 56400,
+              "warm_first_frame_median_us": 1103600,
+              "warm_first_frame_us": [
+                1103600,
+                1101900,
+                1106700,
+                1103500,
+                1106300
+              ],
+              "warm_submit_to_first_frame_median_us": 1049400
+            },
+            "reload": {
+              "control_share_millionths": 0,
+              "identical": true,
+              "pixels_within": true,
+              "reload_share_millionths": 0,
+              "scene_maps": 16,
+              "scene_objects": 0,
+              "scene_same": true,
+              "version_same": true
+            },
+            "run": {
+              "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/estimates/estimates-16-2026-09-23T05-49-01-239Z.json",
+              "as_run_sha256": "95b7be0b3b05e4220da9ed0500e2f889af000f23b67867cb4b860a500ad643c1"
+            },
+            "walking": {
+              "draw_calls_p50": [
+                35,
+                35,
+                35
+              ],
+              "per_run_interval_p95_us": [
+                16700,
+                16700,
+                16700
+              ],
+              "per_run_long_tasks": [
+                0,
+                0,
+                0
+              ],
+              "per_run_max_us": [
+                1500,
+                1100,
+                1200
+              ],
+              "per_run_p50_us": [
+                800,
+                800,
+                800
+              ],
+              "per_run_p95_us": [
+                1100,
+                1000,
+                1000
+              ],
+              "pooled_frames": 7202,
+              "pooled_frames_over_16700_us": 0,
+              "pooled_max_us": 1500,
+              "pooled_p50_us": 800,
+              "pooled_p95_us": 1000,
+              "runs_valid": [
+                true,
+                true,
+                true
+              ]
+            }
+          },
+          {
+            "count": 32,
+            "gate": {
+              "idle_before_percent": 98,
+              "idle_during_mean_tenths": 937,
+              "idle_during_min_percent": 83,
+              "idle_during_samples": 86
+            },
+            "load_one_minute_hundredths": [
+              153,
+              119
+            ],
+            "looking": {
+              "draw_calls_p50": [
+                36,
+                37,
+                36
+              ],
+              "per_run_interval_p95_us": [
+                16700,
+                16800,
+                16700
+              ],
+              "per_run_long_tasks": [
+                0,
+                0,
+                0
+              ],
+              "per_run_max_us": [
+                1300,
+                1300,
+                1200
+              ],
+              "per_run_p50_us": [
+                900,
+                900,
+                800
+              ],
+              "per_run_p95_us": [
+                1200,
+                1100,
+                1100
+              ],
+              "pooled_frames": 840,
+              "pooled_frames_over_16700_us": 0,
+              "pooled_max_us": 1300,
+              "pooled_p50_us": 900,
+              "pooled_p95_us": 1100,
+              "runs_valid": [
+                true,
+                true,
+                true
+              ]
+            },
+            "open": {
+              "cold_complete_world_us": 2095300,
+              "cold_first_frame_us": 2095300,
+              "warm_complete_world_median_us": 2028600,
+              "warm_complete_world_us": [
+                2031500,
+                2011500,
+                2029900,
+                2028600,
+                2027700
+              ],
+              "warm_document_to_form_median_us": 60500,
+              "warm_first_frame_median_us": 2028600,
+              "warm_first_frame_us": [
+                2031500,
+                2011500,
+                2029900,
+                2028600,
+                2027700
+              ],
+              "warm_submit_to_first_frame_median_us": 1968400
+            },
+            "reload": {
+              "control_share_millionths": 0,
+              "identical": true,
+              "pixels_within": true,
+              "reload_share_millionths": 0,
+              "scene_maps": 32,
+              "scene_objects": 0,
+              "scene_same": true,
+              "version_same": true
+            },
+            "run": {
+              "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/estimates/estimates-32-2026-09-23T05-52-42-519Z.json",
+              "as_run_sha256": "0ba5a2b6ca6461ee59bcb9a0442f2a2ff2ec565402280cf2584cebbecde9e62f"
+            },
+            "walking": {
+              "draw_calls_p50": [
+                67,
+                67,
+                67
+              ],
+              "per_run_interval_p95_us": [
+                16700,
+                16700,
+                16700
+              ],
+              "per_run_long_tasks": [
+                0,
+                0,
+                0
+              ],
+              "per_run_max_us": [
+                2100,
+                1400,
+                1500
+              ],
+              "per_run_p50_us": [
+                1000,
+                900,
+                1000
+              ],
+              "per_run_p95_us": [
+                1300,
+                1200,
+                1300
+              ],
+              "pooled_frames": 7203,
+              "pooled_frames_over_16700_us": 0,
+              "pooled_max_us": 2100,
+              "pooled_p50_us": 1000,
+              "pooled_p95_us": 1300,
+              "runs_valid": [
+                true,
+                true,
+                true
+              ]
+            }
+          }
+        ],
+        "stopped": null
+      },
+      "inhabitants": {
+        "history": {
+          "all_ticks": {
+            "max_us": 322250,
+            "min_us": 36170,
+            "n": 1440,
+            "p50_us": 63548,
+            "p95_us": 187625
+          },
+          "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/society/history.json",
+          "as_run_sha256": "c68af02615839eb43ca2d727e005a2a83e99f8fd89630da6aacb65470a483abf",
+          "gate": {
+            "idle_before_percent": 74,
+            "idle_during_mean_tenths": 661,
+            "idle_during_min_percent": 17,
+            "idle_during_samples": 167
+          },
+          "points": [
+            {
+              "events_in_workspace": 256,
+              "made_by_overriding_the_creation_constant": false,
+              "population": 128,
+              "reload_p50_us": 16225,
+              "reload_p95_us": 35702,
+              "reload_state_matches": true,
+              "replay_median_us": 115054,
+              "replay_us": [
+                115054,
+                112244,
+                115442
+              ],
+              "replay_verified": [
+                true,
+                true,
+                true
+              ],
+              "state_bytes": 252359,
+              "tick_max_us": 201808,
+              "tick_p50_us": 201808,
+              "tick_p95_us": 201808,
+              "ticks_elapsed": 1,
+              "ticks_timed": 1
+            },
+            {
+              "events_in_workspace": 5760,
+              "made_by_overriding_the_creation_constant": false,
+              "population": 128,
+              "reload_p50_us": 15868,
+              "reload_p95_us": 34405,
+              "reload_state_matches": true,
+              "replay_median_us": 2291182,
+              "replay_us": [
+                2242308,
+                2291182,
+                2322955
+              ],
+              "replay_verified": [
+                true,
+                true,
+                true
+              ],
+              "state_bytes": 301696,
+              "tick_max_us": 167342,
+              "tick_p50_us": 56153,
+              "tick_p95_us": 160623,
+              "ticks_elapsed": 60,
+              "ticks_timed": 59
+            },
+            {
+              "events_in_workspace": 23040,
+              "made_by_overriding_the_creation_constant": false,
+              "population": 128,
+              "reload_p50_us": 18568,
+              "reload_p95_us": 21332,
+              "reload_state_matches": true,
+              "replay_median_us": 9628865,
+              "replay_us": [
+                9628865,
+                9598234,
+                9955176
+              ],
+              "replay_verified": [
+                true,
+                true,
+                true
+              ],
+              "state_bytes": 301697,
+              "tick_max_us": 202325,
+              "tick_p50_us": 63580,
+              "tick_p95_us": 177484,
+              "ticks_elapsed": 240,
+              "ticks_timed": 180
+            },
+            {
+              "events_in_workspace": 138240,
+              "made_by_overriding_the_creation_constant": false,
+              "population": 128,
+              "reload_p50_us": 19455,
+              "reload_p95_us": 46904,
+              "reload_state_matches": true,
+              "replay_median_us": 54877436,
+              "replay_us": [
+                61712130,
+                54644301,
+                54877436
+              ],
+              "replay_verified": [
+                true,
+                true,
+                true
+              ],
+              "state_bytes": 301698,
+              "tick_max_us": 322250,
+              "tick_p50_us": 63709,
+              "tick_p95_us": 190790,
+              "ticks_elapsed": 1440,
+              "ticks_timed": 1200
+            }
+          ],
+          "product_population": 128,
+          "profile": "exulanica-society/v2",
+          "scope": "in-process server cost through SocietyRuntime and the society repository; HTTP, serialisation and the permission floor excluded"
+        },
+        "population": {
+          "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/society/population.json",
+          "as_run_sha256": "338b5990e5a99b2821a4a458488b1c099356bfc1856567a98f004b35afdf7ac9",
+          "gate": {
+            "idle_before_percent": 95,
+            "idle_during_mean_tenths": 901,
+            "idle_during_min_percent": 87,
+            "idle_during_samples": 26
+          },
+          "points": [
+            {
+              "population": 32,
+              "refused_by_the_engine": "society population must be between 100 and 512"
+            },
+            {
+              "events_in_workspace": 5760,
+              "made_by_overriding_the_creation_constant": false,
+              "population": 128,
+              "reload_p50_us": 15463,
+              "reload_p95_us": 16592,
+              "reload_state_matches": true,
+              "replay_median_us": 2085727,
+              "replay_us": [
+                2088973,
+                2081243,
+                2085727
+              ],
+              "replay_verified": [
+                true,
+                true,
+                true
+              ],
+              "state_bytes": 301696,
+              "tick_max_us": 172022,
+              "tick_p50_us": 55959,
+              "tick_p95_us": 154790,
+              "ticks_elapsed": 60,
+              "ticks_timed": 60
+            },
+            {
+              "events_in_workspace": 28800,
+              "made_by_overriding_the_creation_constant": true,
+              "population": 512,
+              "reload_p50_us": 34199,
+              "reload_p95_us": 51879,
+              "reload_state_matches": true,
+              "replay_median_us": 8224589,
+              "replay_us": [
+                8253381,
+                8200545,
+                8224589
+              ],
+              "replay_verified": [
+                true,
+                true,
+                true
+              ],
+              "state_bytes": 1206330,
+              "tick_max_us": 521449,
+              "tick_p50_us": 153087,
+              "tick_p95_us": 513061,
+              "ticks_elapsed": 60,
+              "ticks_timed": 60
+            },
+            {
+              "population": 2048,
+              "refused_by_the_engine": "society population must be between 100 and 512"
+            }
+          ],
+          "product_population": 128,
+          "profile": "exulanica-society/v2",
+          "scope": "in-process server cost through SocietyRuntime and the society repository; HTTP, serialisation and the permission floor excluded"
+        }
+      },
+      "objects": {
+        "clustered": {
+          "build": {
+            "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/clustered/build.jsonl",
+            "as_run_sha256": "67001ec7ca3c326bfb3671f568f4f4488b78d1f1f6b982f377d20783c59f2061",
+            "buckets": [
+              {
+                "apply_bytes_last": 16924,
+                "apply_p50_us": 12384,
+                "apply_p95_us": 15730,
+                "objects_before_below": 10,
+                "objects_before_from": 0,
+                "placements": 10,
+                "preview_p50_us": 6243,
+                "preview_p95_us": 7015
+              },
+              {
+                "apply_bytes_last": 72850,
+                "apply_p50_us": 11711,
+                "apply_p95_us": 14712,
+                "objects_before_below": 50,
+                "objects_before_from": 10,
+                "placements": 40,
+                "preview_p50_us": 5456,
+                "preview_p95_us": 5915
+              },
+              {
+                "apply_bytes_last": 252290,
+                "apply_p50_us": 19933,
+                "apply_p95_us": 24481,
+                "objects_before_below": 200,
+                "objects_before_from": 50,
+                "placements": 150,
+                "preview_p50_us": 8006,
+                "preview_p95_us": 9254
+              },
+              {
+                "apply_bytes_last": 1193795,
+                "apply_p50_us": 51710,
+                "apply_p95_us": 94961,
+                "objects_before_below": 1000,
+                "objects_before_from": 200,
+                "placements": 800,
+                "preview_p50_us": 12947,
+                "preview_p95_us": 16440
+              }
+            ],
+            "windows": [
+              {
+                "from": 0,
+                "idle_during_mean_tenths": null,
+                "idle_during_samples": 0,
+                "idle_note": "shorter than one 2 s sample; the pre-run reading governs",
+                "load_one_minute_hundredths": [
+                  1408,
+                  1408
+                ],
+                "timing_valid": true,
+                "to": 10
+              },
+              {
+                "from": 10,
+                "idle_during_mean_tenths": null,
+                "idle_during_samples": 0,
+                "idle_note": "shorter than one 2 s sample; the pre-run reading governs",
+                "load_one_minute_hundredths": [
+                  427,
+                  427
+                ],
+                "timing_valid": true,
+                "to": 50
+              },
+              {
+                "from": 50,
+                "idle_during_mean_tenths": 670,
+                "idle_during_samples": 2,
+                "idle_note": null,
+                "load_one_minute_hundredths": [
+                  1360,
+                  1360
+                ],
+                "timing_valid": true,
+                "to": 200
+              },
+              {
+                "from": 200,
+                "idle_during_mean_tenths": 409,
+                "idle_during_samples": 28,
+                "idle_note": null,
+                "load_one_minute_hundredths": [
+                  1263,
+                  1282
+                ],
+                "timing_valid": false,
+                "to": 1000
+              }
+            ]
+          },
+          "layout": "a sunflower spiral over a disc of radius 10 m centred 20 m in front of the arrival point along the arrival facing",
+          "not_measured": [],
+          "points": [
+            {
+              "count": 0,
+              "gate": {
+                "idle_before_percent": 78,
+                "idle_during_mean_tenths": 627,
+                "idle_during_min_percent": 5,
+                "idle_during_samples": 85
+              },
+              "load_one_minute_hundredths": [
+                886,
+                703
+              ],
+              "looking": {
+                "draw_calls_p50": [
+                  3,
+                  3,
+                  3
+                ],
+                "per_run_interval_p95_us": [
+                  16800,
+                  16700,
+                  16700
+                ],
+                "per_run_long_tasks": [
+                  0,
+                  0,
+                  0
+                ],
+                "per_run_max_us": [
+                  300,
+                  600,
+                  700
+                ],
+                "per_run_p50_us": [
+                  200,
+                  200,
+                  200
+                ],
+                "per_run_p95_us": [
+                  300,
+                  300,
+                  400
+                ],
+                "pooled_frames": 837,
+                "pooled_frames_over_16700_us": 0,
+                "pooled_max_us": 700,
+                "pooled_p50_us": 200,
+                "pooled_p95_us": 300,
+                "runs_valid": [
+                  true,
+                  true,
+                  true
+                ]
+              },
+              "open": {
+                "cold_complete_world_us": 239600,
+                "cold_first_frame_us": 239600,
+                "warm_complete_world_median_us": 135800,
+                "warm_complete_world_us": [
+                  144700,
+                  135800,
+                  136000,
+                  133600,
+                  108300
+                ],
+                "warm_document_to_form_median_us": 25900,
+                "warm_first_frame_median_us": 135800,
+                "warm_first_frame_us": [
+                  144700,
+                  135800,
+                  136000,
+                  133600,
+                  108300
+                ],
+                "warm_submit_to_first_frame_median_us": 96900
+              },
+              "placement_and_undo": {
+                "apply_response_bytes_median": 3851,
+                "apply_server_median_us": 15837,
+                "confirm_to_last_object_resident_median_us": 17900,
+                "objects_after_each_undo": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "place_to_verdict_median_us": 16400,
+                "placement_ack_median_us": 32900,
+                "placement_ack_us": [
+                  43300,
+                  33000,
+                  32700,
+                  32900,
+                  32300
+                ],
+                "undo_ack_median_us": 32500,
+                "undo_ack_us": [
+                  33100,
+                  32800,
+                  32300,
+                  32500,
+                  32200
+                ],
+                "undo_server_median_us": 19980
+              },
+              "reload": {
+                "control_share_millionths": 0,
+                "identical": true,
+                "pixels_within": true,
+                "reload_share_millionths": 0,
+                "scene_maps": 0,
+                "scene_objects": 0,
+                "scene_same": true,
+                "version_same": true
+              },
+              "run": {
+                "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/clustered/clustered-0-2026-09-23T03-20-16-746Z.json",
+                "as_run_sha256": "65b178ddaa91beacda92c922f5ff0d8153dc6e6da3cd5982ceca3bce209de2ea"
+              },
+              "walking": {
+                "draw_calls_p50": [
+                  3,
+                  3,
+                  3
+                ],
+                "per_run_interval_p95_us": [
+                  16700,
+                  16700,
+                  16700
+                ],
+                "per_run_long_tasks": [
+                  0,
+                  0,
+                  0
+                ],
+                "per_run_max_us": [
+                  500,
+                  500,
+                  700
+                ],
+                "per_run_p50_us": [
+                  200,
+                  200,
+                  200
+                ],
+                "per_run_p95_us": [
+                  300,
+                  300,
+                  300
+                ],
+                "pooled_frames": 7200,
+                "pooled_frames_over_16700_us": 0,
+                "pooled_max_us": 700,
+                "pooled_p50_us": 200,
+                "pooled_p95_us": 300,
+                "runs_valid": [
+                  true,
+                  true,
+                  true
+                ]
+              }
+            },
+            {
+              "count": 10,
+              "gate": {
+                "idle_before_percent": 87,
+                "idle_during_mean_tenths": 861,
+                "idle_during_min_percent": 42,
+                "idle_during_samples": 85
+              },
+              "load_one_minute_hundredths": [
+                514,
+                442
+              ],
+              "looking": {
+                "draw_calls_p50": [
+                  13,
+                  13,
+                  13
+                ],
+                "per_run_interval_p95_us": [
+                  16800,
+                  16700,
+                  16700
+                ],
+                "per_run_long_tasks": [
+                  0,
+                  0,
+                  0
+                ],
+                "per_run_max_us": [
+                  400,
+                  700,
+                  800
+                ],
+                "per_run_p50_us": [
+                  200,
+                  300,
+                  300
+                ],
+                "per_run_p95_us": [
+                  300,
+                  500,
+                  600
+                ],
+                "pooled_frames": 837,
+                "pooled_frames_over_16700_us": 0,
+                "pooled_max_us": 800,
+                "pooled_p50_us": 300,
+                "pooled_p95_us": 600,
+                "runs_valid": [
+                  true,
+                  true,
+                  true
+                ]
+              },
+              "open": {
+                "cold_complete_world_us": 349700,
+                "cold_first_frame_us": 277000,
+                "warm_complete_world_median_us": 160500,
+                "warm_complete_world_us": [
+                  160500,
+                  142600,
+                  166400,
+                  171300,
+                  149100
+                ],
+                "warm_document_to_form_median_us": 28700,
+                "warm_first_frame_median_us": 124000,
+                "warm_first_frame_us": [
+                  124000,
+                  108000,
+                  132800,
+                  137100,
+                  110000
+                ],
+                "warm_submit_to_first_frame_median_us": 91600
+              },
+              "placement_and_undo": {
+                "apply_response_bytes_median": 24833,
+                "apply_server_median_us": 16219,
+                "confirm_to_last_object_resident_median_us": 24600,
+                "objects_after_each_undo": [
+                  10,
+                  10,
+                  10,
+                  10,
+                  10
+                ],
+                "place_to_verdict_median_us": 16600,
+                "placement_ack_median_us": 31200,
+                "placement_ack_us": [
+                  31200,
+                  31100,
+                  31200,
+                  31300,
+                  31100
+                ],
+                "undo_ack_median_us": 32500,
+                "undo_ack_us": [
+                  32500,
+                  32800,
+                  32700,
+                  32500,
+                  32300
+                ],
+                "undo_server_median_us": 15972
+              },
+              "reload": {
+                "control_share_millionths": 0,
+                "identical": true,
+                "pixels_within": true,
+                "reload_share_millionths": 0,
+                "scene_maps": 0,
+                "scene_objects": 10,
+                "scene_same": true,
+                "version_same": true
+              },
+              "run": {
+                "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/clustered/clustered-10-2026-09-23T03-40-44-804Z.json",
+                "as_run_sha256": "19d6b97fd5040f69190596e66ca2f879af8502fba30ab04622271ee0d3d18665"
+              },
+              "walking": {
+                "draw_calls_p50": [
+                  23,
+                  23,
+                  23
+                ],
+                "per_run_interval_p95_us": [
+                  16700,
+                  16800,
+                  16700
+                ],
+                "per_run_long_tasks": [
+                  0,
+                  0,
+                  0
+                ],
+                "per_run_max_us": [
+                  1000,
+                  1000,
+                  1000
+                ],
+                "per_run_p50_us": [
+                  300,
+                  300,
+                  300
+                ],
+                "per_run_p95_us": [
+                  600,
+                  600,
+                  800
+                ],
+                "pooled_frames": 7201,
+                "pooled_frames_over_16700_us": 0,
+                "pooled_max_us": 1000,
+                "pooled_p50_us": 300,
+                "pooled_p95_us": 700,
+                "runs_valid": [
+                  true,
+                  true,
+                  true
+                ]
+              }
+            },
+            {
+              "count": 50,
+              "gate": {
+                "idle_before_percent": 91,
+                "idle_during_mean_tenths": 598,
+                "idle_during_min_percent": 0,
+                "idle_during_samples": 85
+              },
+              "load_one_minute_hundredths": [
+                427,
+                1065
+              ],
+              "looking": {
+                "draw_calls_p50": [
+                  53,
+                  53,
+                  53
+                ],
+                "per_run_interval_p95_us": [
+                  16800,
+                  16800,
+                  16800
+                ],
+                "per_run_long_tasks": [
+                  0,
+                  0,
+                  0
+                ],
+                "per_run_max_us": [
+                  400,
+                  400,
+                  400
+                ],
+                "per_run_p50_us": [
+                  300,
+                  300,
+                  300
+                ],
+                "per_run_p95_us": [
+                  400,
+                  400,
+                  400
+                ],
+                "pooled_frames": 837,
+                "pooled_frames_over_16700_us": 0,
+                "pooled_max_us": 400,
+                "pooled_p50_us": 300,
+                "pooled_p95_us": 400,
+                "runs_valid": [
+                  true,
+                  true,
+                  true
+                ]
+              },
+              "open": {
+                "cold_complete_world_us": 301900,
+                "cold_first_frame_us": 220400,
+                "warm_complete_world_median_us": 198200,
+                "warm_complete_world_us": [
+                  176500,
+                  185000,
+                  207700,
+                  198200,
+                  206100
+                ],
+                "warm_document_to_form_median_us": 39800,
+                "warm_first_frame_median_us": 137100,
+                "warm_first_frame_us": [
+                  121600,
+                  123300,
+                  138100,
+                  143700,
+                  137100
+                ],
+                "warm_submit_to_first_frame_median_us": 96200
+              },
+              "placement_and_undo": {
+                "apply_response_bytes_median": 76075,
+                "apply_server_median_us": 18665,
+                "confirm_to_last_object_resident_median_us": 43500,
+                "objects_after_each_undo": [
+                  50,
+                  50,
+                  50,
+                  50,
+                  50
+                ],
+                "place_to_verdict_median_us": 16700,
+                "placement_ack_median_us": 49200,
+                "placement_ack_us": [
+                  48500,
+                  49600,
+                  65900,
+                  49200,
+                  49200
+                ],
+                "undo_ack_median_us": 49400,
+                "undo_ack_us": [
+                  49100,
+                  48900,
+                  49600,
+                  49400,
+                  49500
+                ],
+                "undo_server_median_us": 16504
+              },
+              "reload": {
+                "control_share_millionths": 0,
+                "identical": true,
+                "pixels_within": true,
+                "reload_share_millionths": 0,
+                "scene_maps": 0,
+                "scene_objects": 50,
+                "scene_same": true,
+                "version_same": true
+              },
+              "run": {
+                "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/clustered/clustered-50-2026-09-23T03-43-47-483Z.json",
+                "as_run_sha256": "406c8f325f59d09c4ea543cd8074d1d518f033779962f3b45acbbc8254c63d48"
+              },
+              "walking": {
+                "draw_calls_p50": [
+                  103,
+                  103,
+                  103
+                ],
+                "per_run_interval_p95_us": [
+                  16700,
+                  16700,
+                  16700
+                ],
+                "per_run_long_tasks": [
+                  0,
+                  0,
+                  0
+                ],
+                "per_run_max_us": [
+                  500,
+                  500,
+                  500
+                ],
+                "per_run_p50_us": [
+                  300,
+                  300,
+                  300
+                ],
+                "per_run_p95_us": [
+                  400,
+                  400,
+                  400
+                ],
+                "pooled_frames": 7200,
+                "pooled_frames_over_16700_us": 0,
+                "pooled_max_us": 500,
+                "pooled_p50_us": 300,
+                "pooled_p95_us": 400,
+                "runs_valid": [
+                  true,
+                  true,
+                  true
+                ]
+              }
+            },
+            {
+              "count": 200,
+              "gate": {
+                "idle_before_percent": 77,
+                "idle_during_mean_tenths": 781,
+                "idle_during_min_percent": 26,
+                "idle_during_samples": 86
+              },
+              "load_one_minute_hundredths": [
+                511,
+                635
+              ],
+              "looking": {
+                "draw_calls_p50": [
+                  203,
+                  203,
+                  203
+                ],
+                "per_run_interval_p95_us": [
+                  16700,
+                  16800,
+                  16800
+                ],
+                "per_run_long_tasks": [
+                  0,
+                  0,
+                  0
+                ],
+                "per_run_max_us": [
+                  700,
+                  700,
+                  600
+                ],
+                "per_run_p50_us": [
+                  400,
+                  400,
+                  400
+                ],
+                "per_run_p95_us": [
+                  500,
+                  600,
+                  500
+                ],
+                "pooled_frames": 837,
+                "pooled_frames_over_16700_us": 0,
+                "pooled_max_us": 700,
+                "pooled_p50_us": 400,
+                "pooled_p95_us": 500,
+                "runs_valid": [
+                  true,
+                  true,
+                  true
+                ]
+              },
+              "open": {
+                "cold_complete_world_us": 401700,
+                "cold_first_frame_us": 250700,
+                "warm_complete_world_median_us": 283000,
+                "warm_complete_world_us": [
+                  269000,
+                  282300,
+                  285300,
+                  283000,
+                  293300
+                ],
+                "warm_document_to_form_median_us": 60800,
+                "warm_first_frame_median_us": 154600,
+                "warm_first_frame_us": [
+                  143800,
+                  155900,
+                  147000,
+                  154600,
+                  155500
+                ],
+                "warm_submit_to_first_frame_median_us": 90700
+              },
+              "placement_and_undo": {
+                "apply_response_bytes_median": 260231,
+                "apply_server_median_us": 24622,
+                "confirm_to_last_object_resident_median_us": 119100,
+                "objects_after_each_undo": [
+                  200,
+                  200,
+                  200,
+                  200,
+                  200
+                ],
+                "place_to_verdict_median_us": 15800,
+                "placement_ack_median_us": 132400,
+                "placement_ack_us": [
+                  132400,
+                  125000,
+                  132600,
+                  121000,
+                  133000
+                ],
+                "undo_ack_median_us": 122100,
+                "undo_ack_us": [
+                  120000,
+                  133100,
+                  137100,
+                  122100,
+                  117400
+                ],
+                "undo_server_median_us": 27443
+              },
+              "reload": {
+                "control_share_millionths": 0,
+                "identical": true,
+                "pixels_within": true,
+                "reload_share_millionths": 0,
+                "scene_maps": 0,
+                "scene_objects": 200,
+                "scene_same": true,
+                "version_same": true
+              },
+              "run": {
+                "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/clustered/clustered-200-2026-09-23T03-56-07-777Z.json",
+                "as_run_sha256": "6afe01534f0cb626554f5e1bd950e16f8ac368d4578f191ac296348e94381b44"
+              },
+              "walking": {
+                "draw_calls_p50": [
+                  403,
+                  403,
+                  403
+                ],
+                "per_run_interval_p95_us": [
+                  16700,
+                  16800,
+                  16700
+                ],
+                "per_run_long_tasks": [
+                  0,
+                  0,
+                  0
+                ],
+                "per_run_max_us": [
+                  1900,
+                  1700,
+                  1700
+                ],
+                "per_run_p50_us": [
+                  500,
+                  500,
+                  400
+                ],
+                "per_run_p95_us": [
+                  900,
+                  900,
+                  600
+                ],
+                "pooled_frames": 7200,
+                "pooled_frames_over_16700_us": 0,
+                "pooled_max_us": 1900,
+                "pooled_p50_us": 500,
+                "pooled_p95_us": 800,
+                "runs_valid": [
+                  true,
+                  true,
+                  true
+                ]
+              }
+            },
+            {
+              "count": 1000,
+              "gate": {
+                "idle_before_percent": 73,
+                "idle_during_mean_tenths": 608,
+                "idle_during_min_percent": 0,
+                "idle_during_samples": 95
+              },
+              "load_one_minute_hundredths": [
+                1282,
+                900
+              ],
+              "looking": {
+                "draw_calls_p50": [
+                  1003,
+                  1003,
+                  1003
+                ],
+                "per_run_interval_p95_us": [
+                  16800,
+                  16700,
+                  16700
+                ],
+                "per_run_long_tasks": [
+                  0,
+                  0,
+                  0
+                ],
+                "per_run_max_us": [
+                  1800,
+                  2000,
+                  2200
+                ],
+                "per_run_p50_us": [
+                  1100,
+                  1100,
+                  1100
+                ],
+                "per_run_p95_us": [
+                  1700,
+                  1700,
+                  1800
+                ],
+                "pooled_frames": 837,
+                "pooled_frames_over_16700_us": 0,
+                "pooled_max_us": 2200,
+                "pooled_p50_us": 1100,
+                "pooled_p95_us": 1700,
+                "runs_valid": [
+                  true,
+                  true,
+                  true
+                ]
+              },
+              "open": {
+                "cold_complete_world_us": 1103400,
+                "cold_first_frame_us": 403700,
+                "warm_complete_world_median_us": 935700,
+                "warm_complete_world_us": [
+                  993700,
+                  920600,
+                  935700,
+                  878200,
+                  1022100
+                ],
+                "warm_document_to_form_median_us": 82900,
+                "warm_first_frame_median_us": 257300,
+                "warm_first_frame_us": [
+                  269500,
+                  257300,
+                  216500,
+                  240800,
+                  302600
+                ],
+                "warm_submit_to_first_frame_median_us": 174400
+              },
+              "placement_and_undo": {
+                "apply_response_bytes_median": 1197044,
+                "apply_server_median_us": 122381,
+                "confirm_to_last_object_resident_median_us": 1394400,
+                "objects_after_each_undo": [
+                  1000,
+                  1000,
+                  1000,
+                  1000,
+                  1000
+                ],
+                "place_to_verdict_median_us": 23800,
+                "placement_ack_median_us": 1469000,
+                "placement_ack_us": [
+                  1576200,
+                  1734700,
+                  1469000,
+                  1078700,
+                  773100
+                ],
+                "undo_ack_median_us": 1145400,
+                "undo_ack_us": [
+                  1689500,
+                  1870000,
+                  1145400,
+                  1090000,
+                  764500
+                ],
+                "undo_server_median_us": 84360
+              },
+              "reload": {
+                "control_share_millionths": 0,
+                "identical": true,
+                "pixels_within": true,
+                "reload_share_millionths": 0,
+                "scene_maps": 0,
+                "scene_objects": 1000,
+                "scene_same": true,
+                "version_same": true
+              },
+              "run": {
+                "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/clustered/clustered-1000-2026-09-23T04-06-16-696Z.json",
+                "as_run_sha256": "d54942a054731d100cafc96dd4889bba0e8520fd97ecfae8367f19c79d87cdba"
+              },
+              "walking": {
+                "draw_calls_p50": [
+                  2003,
+                  2003,
+                  2003
+                ],
+                "per_run_interval_p95_us": [
+                  16700,
+                  16700,
+                  16700
+                ],
+                "per_run_long_tasks": [
+                  0,
+                  0,
+                  0
+                ],
+                "per_run_max_us": [
+                  2400,
+                  2600,
+                  2500
+                ],
+                "per_run_p50_us": [
+                  1400,
+                  1400,
+                  1600
+                ],
+                "per_run_p95_us": [
+                  1700,
+                  1700,
+                  2000
+                ],
+                "pooled_frames": 7201,
+                "pooled_frames_over_16700_us": 0,
+                "pooled_max_us": 2600,
+                "pooled_p50_us": 1500,
+                "pooled_p95_us": 1900,
+                "runs_valid": [
+                  true,
+                  true,
+                  true
+                ]
+              }
+            }
+          ],
+          "stopped": null
+        },
+        "spread": {
+          "build": {
+            "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/spread/build.jsonl",
+            "as_run_sha256": "f83d4a0ca0197678c674d8954215c6689706d0fe2388a1d41aa7cb8f1fabddbe",
+            "buckets": [
+              {
+                "apply_bytes_last": 18745,
+                "apply_p50_us": 13346,
+                "apply_p95_us": 16847,
+                "objects_before_below": 10,
+                "objects_before_from": 0,
+                "placements": 10,
+                "preview_p50_us": 7087,
+                "preview_p95_us": 7411
+              },
+              {
+                "apply_bytes_last": 71657,
+                "apply_p50_us": 15613,
+                "apply_p95_us": 19069,
+                "objects_before_below": 50,
+                "objects_before_from": 10,
+                "placements": 40,
+                "preview_p50_us": 7564,
+                "preview_p95_us": 10925
+              },
+              {
+                "apply_bytes_last": 250466,
+                "apply_p50_us": 15584,
+                "apply_p95_us": 24110,
+                "objects_before_below": 200,
+                "objects_before_from": 50,
+                "placements": 150,
+                "preview_p50_us": 6004,
+                "preview_p95_us": 15089
+              },
+              {
+                "apply_bytes_last": 1184357,
+                "apply_p50_us": 35143,
+                "apply_p95_us": 64710,
+                "objects_before_below": 1000,
+                "objects_before_from": 200,
+                "placements": 800,
+                "preview_p50_us": 7840,
+                "preview_p95_us": 12555
+              }
+            ],
+            "windows": [
+              {
+                "from": 0,
+                "idle_during_mean_tenths": null,
+                "idle_during_samples": 0,
+                "idle_note": "shorter than one 2 s sample; the pre-run reading governs",
+                "load_one_minute_hundredths": [
+                  896,
+                  896
+                ],
+                "timing_valid": true,
+                "to": 10
+              },
+              {
+                "from": 10,
+                "idle_during_mean_tenths": null,
+                "idle_during_samples": 0,
+                "idle_note": "shorter than one 2 s sample; the pre-run reading governs",
+                "load_one_minute_hundredths": [
+                  3609,
+                  3609
+                ],
+                "timing_valid": true,
+                "to": 50
+              },
+              {
+                "from": 50,
+                "idle_during_mean_tenths": 700,
+                "idle_during_samples": 1,
+                "idle_note": null,
+                "load_one_minute_hundredths": [
+                  702,
+                  725
+                ],
+                "timing_valid": true,
+                "to": 200
+              },
+              {
+                "from": 200,
+                "idle_during_mean_tenths": 801,
+                "idle_during_samples": 19,
+                "idle_note": null,
+                "load_one_minute_hundredths": [
+                  1252,
+                  854
+                ],
+                "timing_valid": true,
+                "to": 1000
+              }
+            ]
+          },
+          "layout": "a sunflower spiral over a disc of radius 500 m centred on the ground origin",
+          "not_measured": [],
+          "points": [
+            {
+              "count": 0,
+              "gate": {
+                "idle_before_percent": 93,
+                "idle_during_mean_tenths": 857,
+                "idle_during_min_percent": 54,
+                "idle_during_samples": 85
+              },
+              "load_one_minute_hundredths": [
+                532,
+                313
+              ],
+              "looking": {
+                "draw_calls_p50": [
+                  3,
+                  3,
+                  3
+                ],
+                "per_run_interval_p95_us": [
+                  16800,
+                  16700,
+                  16800
+                ],
+                "per_run_long_tasks": [
+                  0,
+                  0,
+                  0
+                ],
+                "per_run_max_us": [
+                  800,
+                  700,
+                  700
+                ],
+                "per_run_p50_us": [
+                  200,
+                  200,
+                  200
+                ],
+                "per_run_p95_us": [
+                  500,
+                  500,
+                  500
+                ],
+                "pooled_frames": 837,
+                "pooled_frames_over_16700_us": 0,
+                "pooled_max_us": 800,
+                "pooled_p50_us": 200,
+                "pooled_p95_us": 500,
+                "runs_valid": [
+                  true,
+                  true,
+                  true
+                ]
+              },
+              "open": {
+                "cold_complete_world_us": 285700,
+                "cold_first_frame_us": 285700,
+                "warm_complete_world_median_us": 120800,
+                "warm_complete_world_us": [
+                  118300,
+                  114400,
+                  124800,
+                  129600,
+                  120800
+                ],
+                "warm_document_to_form_median_us": 36800,
+                "warm_first_frame_median_us": 120800,
+                "warm_first_frame_us": [
+                  118300,
+                  114400,
+                  124800,
+                  129600,
+                  120800
+                ],
+                "warm_submit_to_first_frame_median_us": 88000
+              },
+              "placement_and_undo": {
+                "apply_response_bytes_median": 5715,
+                "apply_server_median_us": 14599,
+                "confirm_to_last_object_resident_median_us": 19300,
+                "objects_after_each_undo": [
+                  0,
+                  0,
+                  0,
+                  0,
+                  0
+                ],
+                "place_to_verdict_median_us": 15800,
+                "placement_ack_median_us": 32400,
+                "placement_ack_us": [
+                  41600,
+                  31200,
+                  34400,
+                  31500,
+                  32400
+                ],
+                "undo_ack_median_us": 32300,
+                "undo_ack_us": [
+                  32300,
+                  32100,
+                  33900,
+                  33200,
+                  31100
+                ],
+                "undo_server_median_us": 14004
+              },
+              "reload": {
+                "control_share_millionths": 0,
+                "identical": true,
+                "pixels_within": true,
+                "reload_share_millionths": 0,
+                "scene_maps": 0,
+                "scene_objects": 0,
+                "scene_same": true,
+                "version_same": true
+              },
+              "run": {
+                "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/spread/spread-0-2026-09-22T23-24-55-763Z.json",
+                "as_run_sha256": "e94203f1d1d9216c5b157fba757e8549e391a3c3606ed80b47d298145324095e"
+              },
+              "walking": {
+                "draw_calls_p50": [
+                  3,
+                  3,
+                  3
+                ],
+                "per_run_interval_p95_us": [
+                  16700,
+                  16700,
+                  16700
+                ],
+                "per_run_long_tasks": [
+                  0,
+                  0,
+                  0
+                ],
+                "per_run_max_us": [
+                  600,
+                  800,
+                  800
+                ],
+                "per_run_p50_us": [
+                  200,
+                  200,
+                  200
+                ],
+                "per_run_p95_us": [
+                  300,
+                  500,
+                  500
+                ],
+                "pooled_frames": 7201,
+                "pooled_frames_over_16700_us": 0,
+                "pooled_max_us": 800,
+                "pooled_p50_us": 200,
+                "pooled_p95_us": 500,
+                "runs_valid": [
+                  true,
+                  true,
+                  true
+                ]
+              }
+            },
+            {
+              "count": 10,
+              "gate": {
+                "idle_before_percent": 81,
+                "idle_during_mean_tenths": 659,
+                "idle_during_min_percent": 11,
+                "idle_during_samples": 85
+              },
+              "load_one_minute_hundredths": [
+                1087,
+                771
+              ],
+              "looking": {
+                "draw_calls_p50": [
+                  16,
+                  16,
+                  16
+                ],
+                "per_run_interval_p95_us": [
+                  16800,
+                  16800,
+                  16800
+                ],
+                "per_run_long_tasks": [
+                  0,
+                  0,
+                  0
+                ],
+                "per_run_max_us": [
+                  400,
+                  400,
+                  400
+                ],
+                "per_run_p50_us": [
+                  200,
+                  300,
+                  300
+                ],
+                "per_run_p95_us": [
+                  300,
+                  400,
+                  400
+                ],
+                "pooled_frames": 837,
+                "pooled_frames_over_16700_us": 0,
+                "pooled_max_us": 400,
+                "pooled_p50_us": 300,
+                "pooled_p95_us": 400,
+                "runs_valid": [
+                  true,
+                  true,
+                  true
+                ]
+              },
+              "open": {
+                "cold_complete_world_us": 375400,
+                "cold_first_frame_us": 300400,
+                "warm_complete_world_median_us": 170900,
+                "warm_complete_world_us": [
+                  170900,
+                  149200,
+                  170100,
+                  188800,
+                  183900
+                ],
+                "warm_document_to_form_median_us": 37200,
+                "warm_first_frame_median_us": 134400,
+                "warm_first_frame_us": [
+                  134400,
+                  105700,
+                  131700,
+                  148400,
+                  142400
+                ],
+                "warm_submit_to_first_frame_median_us": 100900
+              },
+              "placement_and_undo": {
+                "apply_response_bytes_median": 23842,
+                "apply_server_median_us": 16946,
+                "confirm_to_last_object_resident_median_us": 25300,
+                "objects_after_each_undo": [
+                  10,
+                  10,
+                  10,
+                  10,
+                  10
+                ],
+                "place_to_verdict_median_us": 16400,
+                "placement_ack_median_us": 32900,
+                "placement_ack_us": [
+                  32500,
+                  33300,
+                  33000,
+                  32900,
+                  32500
+                ],
+                "undo_ack_median_us": 32400,
+                "undo_ack_us": [
+                  32800,
+                  31400,
+                  32300,
+                  32900,
+                  32400
+                ],
+                "undo_server_median_us": 15784
+              },
+              "reload": {
+                "control_share_millionths": 0,
+                "identical": true,
+                "pixels_within": true,
+                "reload_share_millionths": 0,
+                "scene_maps": 0,
+                "scene_objects": 10,
+                "scene_same": true,
+                "version_same": true
+              },
+              "run": {
+                "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/spread/spread-10-2026-09-23T00-28-12-440Z.json",
+                "as_run_sha256": "7b2a1cf92dacd775830f7ea5bbb5baa86e734fc322a33fa25f49c4af0fdf7ee5"
+              },
+              "walking": {
+                "draw_calls_p50": [
+                  22,
+                  22,
+                  22
+                ],
+                "per_run_interval_p95_us": [
+                  16700,
+                  16700,
+                  16700
+                ],
+                "per_run_long_tasks": [
+                  0,
+                  0,
+                  0
+                ],
+                "per_run_max_us": [
+                  500,
+                  800,
+                  700
+                ],
+                "per_run_p50_us": [
+                  300,
+                  200,
+                  200
+                ],
+                "per_run_p95_us": [
+                  400,
+                  300,
+                  300
+                ],
+                "pooled_frames": 7201,
+                "pooled_frames_over_16700_us": 0,
+                "pooled_max_us": 800,
+                "pooled_p50_us": 200,
+                "pooled_p95_us": 300,
+                "runs_valid": [
+                  true,
+                  true,
+                  true
+                ]
+              }
+            },
+            {
+              "count": 50,
+              "gate": {
+                "idle_before_percent": 76,
+                "idle_during_mean_tenths": 633,
+                "idle_during_min_percent": 6,
+                "idle_during_samples": 86
+              },
+              "load_one_minute_hundredths": [
+                3609,
+                851
+              ],
+              "looking": {
+                "draw_calls_p50": [
+                  62,
+                  62,
+                  62
+                ],
+                "per_run_interval_p95_us": [
+                  16700,
+                  16800,
+                  16800
+                ],
+                "per_run_long_tasks": [
+                  0,
+                  0,
+                  0
+                ],
+                "per_run_max_us": [
+                  600,
+                  500,
+                  700
+                ],
+                "per_run_p50_us": [
+                  300,
+                  300,
+                  300
+                ],
+                "per_run_p95_us": [
+                  400,
+                  400,
+                  400
+                ],
+                "pooled_frames": 838,
+                "pooled_frames_over_16700_us": 0,
+                "pooled_max_us": 700,
+                "pooled_p50_us": 300,
+                "pooled_p95_us": 400,
+                "runs_valid": [
+                  true,
+                  true,
+                  true
+                ]
+              },
+              "open": {
+                "cold_complete_world_us": 341400,
+                "cold_first_frame_us": 252800,
+                "warm_complete_world_median_us": 214300,
+                "warm_complete_world_us": [
+                  214300,
+                  201800,
+                  240400,
+                  226800,
+                  201500
+                ],
+                "warm_document_to_form_median_us": 27800,
+                "warm_first_frame_median_us": 142000,
+                "warm_first_frame_us": [
+                  142000,
+                  122800,
+                  174300,
+                  150900,
+                  133200
+                ],
+                "warm_submit_to_first_frame_median_us": 113200
+              },
+              "placement_and_undo": {
+                "apply_response_bytes_median": 74882,
+                "apply_server_median_us": 25226,
+                "confirm_to_last_object_resident_median_us": 56600,
+                "objects_after_each_undo": [
+                  50,
+                  50,
+                  50,
+                  50,
+                  50
+                ],
+                "place_to_verdict_median_us": 16600,
+                "placement_ack_median_us": 66200,
+                "placement_ack_us": [
+                  65800,
+                  65600,
+                  67000,
+                  81700,
+                  66200
+                ],
+                "undo_ack_median_us": 65200,
+                "undo_ack_us": [
+                  64500,
+                  65200,
+                  65900,
+                  64400,
+                  65200
+                ],
+                "undo_server_median_us": 23313
+              },
+              "reload": {
+                "control_share_millionths": 0,
+                "identical": true,
+                "pixels_within": true,
+                "reload_share_millionths": 0,
+                "scene_maps": 0,
+                "scene_objects": 50,
+                "scene_same": true,
+                "version_same": true
+              },
+              "run": {
+                "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/spread/spread-50-2026-09-23T00-40-43-371Z.json",
+                "as_run_sha256": "ccd2955f0908162b616b3b5bf230ff5df540ff5424a146071a00463dd8956d63"
+              },
+              "walking": {
+                "draw_calls_p50": [
+                  80,
+                  80,
+                  80
+                ],
+                "per_run_interval_p95_us": [
+                  16700,
+                  16800,
+                  16800
+                ],
+                "per_run_long_tasks": [
+                  0,
+                  0,
+                  0
+                ],
+                "per_run_max_us": [
+                  700,
+                  500,
+                  800
+                ],
+                "per_run_p50_us": [
+                  300,
+                  300,
+                  300
+                ],
+                "per_run_p95_us": [
+                  400,
+                  400,
+                  400
+                ],
+                "pooled_frames": 7201,
+                "pooled_frames_over_16700_us": 0,
+                "pooled_max_us": 800,
+                "pooled_p50_us": 300,
+                "pooled_p95_us": 400,
+                "runs_valid": [
+                  true,
+                  true,
+                  true
+                ]
+              }
+            },
+            {
+              "count": 200,
+              "gate": {
+                "idle_before_percent": 73,
+                "idle_during_mean_tenths": 888,
+                "idle_during_min_percent": 67,
+                "idle_during_samples": 87
+              },
+              "load_one_minute_hundredths": [
+                725,
+                314
+              ],
+              "looking": {
+                "draw_calls_p50": [
+                  144,
+                  144,
+                  144
+                ],
+                "per_run_interval_p95_us": [
+                  16700,
+                  16700,
+                  16800
+                ],
+                "per_run_long_tasks": [
+                  0,
+                  0,
+                  0
+                ],
+                "per_run_max_us": [
+                  400,
+                  400,
+                  400
+                ],
+                "per_run_p50_us": [
+                  300,
+                  300,
+                  300
+                ],
+                "per_run_p95_us": [
+                  400,
+                  400,
+                  400
+                ],
+                "pooled_frames": 837,
+                "pooled_frames_over_16700_us": 0,
+                "pooled_max_us": 400,
+                "pooled_p50_us": 300,
+                "pooled_p95_us": 400,
+                "runs_valid": [
+                  true,
+                  true,
+                  true
+                ]
+              },
+              "open": {
+                "cold_complete_world_us": 497100,
+                "cold_first_frame_us": 323800,
+                "warm_complete_world_median_us": 279800,
+                "warm_complete_world_us": [
+                  310300,
+                  279800,
+                  260800,
+                  286000,
+                  270200
+                ],
+                "warm_document_to_form_median_us": 37600,
+                "warm_first_frame_median_us": 132500,
+                "warm_first_frame_us": [
+                  157800,
+                  132500,
+                  123000,
+                  146400,
+                  131100
+                ],
+                "warm_submit_to_first_frame_median_us": 94400
+              },
+              "placement_and_undo": {
+                "apply_response_bytes_median": 253703,
+                "apply_server_median_us": 22920,
+                "confirm_to_last_object_resident_median_us": 112000,
+                "objects_after_each_undo": [
+                  200,
+                  200,
+                  200,
+                  200,
+                  200
+                ],
+                "place_to_verdict_median_us": 18400,
+                "placement_ack_median_us": 121700,
+                "placement_ack_us": [
+                  133400,
+                  132600,
+                  121700,
+                  121000,
+                  121100
+                ],
+                "undo_ack_median_us": 122000,
+                "undo_ack_us": [
+                  124400,
+                  122000,
+                  122700,
+                  117700,
+                  117800
+                ],
+                "undo_server_median_us": 20870
+              },
+              "reload": {
+                "control_share_millionths": 0,
+                "identical": true,
+                "pixels_within": true,
+                "reload_share_millionths": 0,
+                "scene_maps": 0,
+                "scene_objects": 200,
+                "scene_same": true,
+                "version_same": true
+              },
+              "run": {
+                "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/spread/spread-200-2026-09-23T00-59-16-249Z.json",
+                "as_run_sha256": "e6f37425108975cc6afed78050442d8c5b88c1420a43a9315ce8110c5883540d"
+              },
+              "walking": {
+                "draw_calls_p50": [
+                  187,
+                  187,
+                  187
+                ],
+                "per_run_interval_p95_us": [
+                  16700,
+                  16800,
+                  16800
+                ],
+                "per_run_long_tasks": [
+                  0,
+                  0,
+                  0
+                ],
+                "per_run_max_us": [
+                  600,
+                  500,
+                  500
+                ],
+                "per_run_p50_us": [
+                  300,
+                  300,
+                  300
+                ],
+                "per_run_p95_us": [
+                  400,
+                  400,
+                  400
+                ],
+                "pooled_frames": 7201,
+                "pooled_frames_over_16700_us": 0,
+                "pooled_max_us": 600,
+                "pooled_p50_us": 300,
+                "pooled_p95_us": 400,
+                "runs_valid": [
+                  true,
+                  true,
+                  true
+                ]
+              }
+            },
+            {
+              "count": 1000,
+              "gate": {
+                "idle_before_percent": 91,
+                "idle_during_mean_tenths": 843,
+                "idle_during_min_percent": 61,
+                "idle_during_samples": 91
+              },
+              "load_one_minute_hundredths": [
+                854,
+                527
+              ],
+              "looking": {
+                "draw_calls_p50": [
+                  360,
+                  360,
+                  360
+                ],
+                "per_run_interval_p95_us": [
+                  16700,
+                  16800,
+                  16700
+                ],
+                "per_run_long_tasks": [
+                  0,
+                  0,
+                  0
+                ],
+                "per_run_max_us": [
+                  2700,
+                  2800,
+                  2200
+                ],
+                "per_run_p50_us": [
+                  1100,
+                  1200,
+                  1000
+                ],
+                "per_run_p95_us": [
+                  1900,
+                  2000,
+                  1800
+                ],
+                "pooled_frames": 837,
+                "pooled_frames_over_16700_us": 0,
+                "pooled_max_us": 2800,
+                "pooled_p50_us": 1100,
+                "pooled_p95_us": 2000,
+                "runs_valid": [
+                  true,
+                  true,
+                  true
+                ]
+              },
+              "open": {
+                "cold_complete_world_us": 771200,
+                "cold_first_frame_us": 295100,
+                "warm_complete_world_median_us": 628300,
+                "warm_complete_world_us": [
+                  650500,
+                  681800,
+                  602200,
+                  628300,
+                  590800
+                ],
+                "warm_document_to_form_median_us": 63400,
+                "warm_first_frame_median_us": 211000,
+                "warm_first_frame_us": [
+                  232800,
+                  229300,
+                  167600,
+                  211000,
+                  166100
+                ],
+                "warm_submit_to_first_frame_median_us": 147600
+              },
+              "placement_and_undo": {
+                "apply_response_bytes_median": 1187606,
+                "apply_server_median_us": 79048,
+                "confirm_to_last_object_resident_median_us": 776500,
+                "objects_after_each_undo": [
+                  1000,
+                  1000,
+                  1000,
+                  1000,
+                  1000
+                ],
+                "place_to_verdict_median_us": 15300,
+                "placement_ack_median_us": 829300,
+                "placement_ack_us": [
+                  723100,
+                  829300,
+                  771100,
+                  970100,
+                  965400
+                ],
+                "undo_ack_median_us": 790000,
+                "undo_ack_us": [
+                  790000,
+                  745900,
+                  786700,
+                  858400,
+                  799300
+                ],
+                "undo_server_median_us": 55738
+              },
+              "reload": {
+                "control_share_millionths": 0,
+                "identical": true,
+                "pixels_within": true,
+                "reload_share_millionths": 0,
+                "scene_maps": 0,
+                "scene_objects": 1000,
+                "scene_same": true,
+                "version_same": true
+              },
+              "run": {
+                "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/spread/spread-1000-2026-09-23T01-03-26-773Z.json",
+                "as_run_sha256": "ae645e694b43d3f58427e45e2c3f6ac80f19180c6288bb5b8cf4605e4242b103"
+              },
+              "walking": {
+                "draw_calls_p50": [
+                  450,
+                  450,
+                  450
+                ],
+                "per_run_interval_p95_us": [
+                  16800,
+                  16700,
+                  16700
+                ],
+                "per_run_long_tasks": [
+                  0,
+                  0,
+                  0
+                ],
+                "per_run_max_us": [
+                  2000,
+                  2500,
+                  2500
+                ],
+                "per_run_p50_us": [
+                  600,
+                  1000,
+                  1000
+                ],
+                "per_run_p95_us": [
+                  1400,
+                  1700,
+                  1700
+                ],
+                "pooled_frames": 7200,
+                "pooled_frames_over_16700_us": 0,
+                "pooled_max_us": 2500,
+                "pooled_p50_us": 800,
+                "pooled_p95_us": 1600,
+                "runs_valid": [
+                  true,
+                  true,
+                  true
+                ]
+              }
+            }
+          ],
+          "stopped": null
+        }
+      }
+    },
+    "subject": "How large a saved world grows through the product's own routes before opening, reloading, placing and taking back, walking or looking around stops meeting its registered budget, measured on one machine at one commit.",
+    "tree": {
+      "how": "slot.py refused to start any slot unless HEAD was the measured commit and git diff --quiet HEAD and git status --porcelain --untracked-files=all were clean for exulanica, web/packages, migrations, pyproject.toml and web/package.json. Every browser run file carries the tree it ran on (head, diff bytes 0); the society files carry measured_commit.",
+      "measurement_code": "outside the product paths, published under scripts/ beside this record",
+      "rule": "Every figure names the commit it ran on. Before each run the product paths (exulanica/, web/packages/, migrations) are checked unchanged from that commit with git diff --quiet and git status. Measurement drivers live outside the product paths."
+    },
+    "unbudgeted_results": {
+      "authored_version_bytes": {
+        "apply_response_bytes_at_count": {
+          "clustered": {
+            "0": 3851,
+            "10": 24833,
+            "1000": 1197044,
+            "200": 260231,
+            "50": 76075
+          },
+          "spread": {
+            "0": 5715,
+            "10": 23842,
+            "1000": 1187606,
+            "200": 253703,
+            "50": 74882
+          }
+        },
+        "note": "the apply response carries the whole authored version, every object and every edit"
+      },
+      "debug_versus_release": {
+        "artifacts": [
+          "docs/evaluation/artifacts/2026-09-22-world-scale/runs/compare/cmp-clustered-200-release-2026-09-23T03-59-15-743Z.json",
+          "docs/evaluation/artifacts/2026-09-22-world-scale/runs/compare/cmp-clustered-200-debug-2026-09-23T04-01-41-902Z.json"
+        ],
+        "debug": {
+          "draws_p50": 403,
+          "look": {
+            "pooled_frames": 837,
+            "pooled_max_us": 1300,
+            "pooled_p50_us": 700,
+            "pooled_p95_us": 1000
+          },
+          "look_per_run_p95_us": [
+            900,
+            1000,
+            1000
+          ],
+          "walk": {
+            "pooled_frames": 7200,
+            "pooled_max_us": 1400,
+            "pooled_p50_us": 800,
+            "pooled_p95_us": 1000
+          },
+          "walk_per_run_p95_us": [
+            1000,
+            900,
+            1000
+          ]
+        },
+        "debug_over_release_milli": {
+          "look_p50": 1750,
+          "look_p95": 2000,
+          "walk_p50": 1600,
+          "walk_p95": 1667
+        },
+        "gate_during_mean_tenths": {
+          "debug": 624,
+          "release": 637
+        },
+        "release": {
+          "draws_p50": 403,
+          "look": {
+            "pooled_frames": 837,
+            "pooled_max_us": 700,
+            "pooled_p50_us": 400,
+            "pooled_p95_us": 500
+          },
+          "look_per_run_p95_us": [
+            600,
+            500,
+            600
+          ],
+          "walk": {
+            "pooled_frames": 7200,
+            "pooled_max_us": 900,
+            "pooled_p50_us": 500,
+            "pooled_p95_us": 600
+          },
+          "walk_per_run_p95_us": [
+            600,
+            600,
+            600
+          ]
+        },
+        "world": "clustered-200 in its own runtime, arrival pose and the registered walk and turns"
+      },
+      "depth_worker": {
+        "comparison": "No retained evaluation record gives MoGe-2 timings on this class of machine. The only retained timing for the checkpoint is a linux/amd64 CPU run under instruction emulation (docs/evaluation/2026-09-04-linux-amd64-depth-forward.json), which docs/deployment.md calls compatibility evidence and not a performance result, so nothing is compared.",
+        "device": "MPS: MoGe printed its MPS autocast warning (moge/model/modules/conv_stack.py:170 and v2.py:284) in every run",
+        "per_photograph_ms": [
+          1809,
+          904,
+          763,
+          769
+        ],
+        "reading": "The first run's 26.0 s from process start to ready holds the model load from a cold file cache (the worker builds the model before it reports ready); later runs took 3.8 to 5.3 s. Per photograph, ready to stopped divided by photographs: 1.81 s (1), 0.90 s (3), 0.76 s (12), 0.77 s (16). Peak resident memory 2,927,632 to 2,942,144 KiB in every run.",
+        "runs": [
+          {
+            "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/worker/worker-20260923T013413.jsonl",
+            "as_run_sha256": "a27ac8e7e3812d668f666fcae2eab74b200478e955feb2d3384b519fe0eb913c",
+            "exit": 0,
+            "idle_during_mean_tenths": 910,
+            "peak_resident_kib": 2942144,
+            "photographs": 1,
+            "process_start_to_ready_ms": 25989,
+            "ready_to_stopped_ms": 1809,
+            "timing_valid": true
+          },
+          {
+            "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/worker/worker-20260923T014459.jsonl",
+            "as_run_sha256": "170860a8d7889f5d8aead2d2aaed5b6351b10d1d61dd61262ad978bd9632556d",
+            "exit": 0,
+            "idle_during_mean_tenths": 850,
+            "peak_resident_kib": 2941856,
+            "photographs": 3,
+            "process_start_to_ready_ms": 5324,
+            "ready_to_stopped_ms": 2711,
+            "timing_valid": true
+          },
+          {
+            "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/worker/worker-20260923T014823.jsonl",
+            "as_run_sha256": "db88e1897e18412a22af85e3ff8209c90d1079ec5ee65a6926ad5abce3dd1c2a",
+            "exit": 0,
+            "idle_during_mean_tenths": 938,
+            "peak_resident_kib": 2927632,
+            "photographs": 12,
+            "process_start_to_ready_ms": 3851,
+            "ready_to_stopped_ms": 9160,
+            "timing_valid": true
+          },
+          {
+            "artifact": "docs/evaluation/artifacts/2026-09-22-world-scale/runs/worker/worker-20260923T015159.jsonl",
+            "as_run_sha256": "9cc8443931c41a2be82723ea7da0a76ac40f235e042c8445301834cd6d7405f1",
+            "exit": 0,
+            "idle_during_mean_tenths": 941,
+            "peak_resident_kib": 2935920,
+            "photographs": 16,
+            "process_start_to_ready_ms": 3830,
+            "ready_to_stopped_ms": 12297,
+            "timing_valid": true
+          }
+        ]
+      },
+      "society": {
+        "events_per_tick": {
+          "128": 96,
+          "512": 480
+        },
+        "replay_ticks_per_second_tenths": {
+          "128 at 1 tick": 87,
+          "128 at 1440 ticks": 262,
+          "128 at 240 ticks": 249,
+          "128 at 60 ticks": 262,
+          "512 at 60 ticks": 73
+        },
+        "state_bytes": {
+          "128": 301696,
+          "512": 1206330
+        }
+      }
+    },
+    "written_at": "2026-09-23T06:16:46+00:00"
+  },
+  "record_sha256": "7cd4ead5e3cb75043b7d398ab097d6654af369bcf4c12ce0e843662675da658c"
+}

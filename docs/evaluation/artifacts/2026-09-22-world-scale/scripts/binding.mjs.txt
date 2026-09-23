@@ -1,0 +1,40 @@
+// Reach the renderer binding the app keeps only in a closure: atlas.ts registers
+// `binding.app.on('update', (dt) => { ... binding.update(dt, nowMs) ... })`, so the binding is a
+// variable in that callback's scope. DevTools exposes a function's scopes as [[Scopes]]; the one
+// holding an object with `controls`, `camera` and `wantsFrame` is the binding. Stored on window as
+// __wsBinding. Read-only use: the driver writes only the controls' pose, as the controls do.
+export async function reachBinding(cdp) {
+  const listed = await cdp.send('Runtime.evaluate', {
+    expression: `(__ws.app._callbacks.get('update') || []).map(h => h.callback)
+      .find(f => String(f).includes('wantsFrame')) || null`,
+  });
+  if (!listed.result.objectId) throw new Error('no update callback mentioning wantsFrame');
+  const properties = await cdp.send('Runtime.getProperties', {
+    objectId: listed.result.objectId, ownProperties: false, accessorPropertiesOnly: false,
+  });
+  const scopes = (properties.internalProperties || []).find((p) => p.name === '[[Scopes]]');
+  if (!scopes) throw new Error('the update callback exposes no [[Scopes]]');
+  const scopeList = await cdp.send('Runtime.getProperties', { objectId: scopes.value.objectId, ownProperties: true });
+  for (const scope of scopeList.result) {
+    if (!scope.value || !scope.value.objectId) continue;
+    const variables = await cdp.send('Runtime.getProperties', { objectId: scope.value.objectId, ownProperties: true });
+    for (const variable of variables.result) {
+      if (!variable.value || variable.value.type !== 'object' || !variable.value.objectId) continue;
+      const probe = await cdp.send('Runtime.callFunctionOn', {
+        objectId: variable.value.objectId,
+        functionDeclaration: `function () { return !!(this && this.controls && this.controls.state
+          && this.camera && typeof this.wantsFrame === 'function'); }`,
+        returnByValue: true,
+      });
+      if (probe.result.value === true) {
+        await cdp.send('Runtime.callFunctionOn', {
+          objectId: variable.value.objectId,
+          functionDeclaration: 'function () { window.__wsBinding = this; return true; }',
+          returnByValue: true,
+        });
+        return variable.name;
+      }
+    }
+  }
+  throw new Error('no variable in the update callback scopes looks like the binding');
+}

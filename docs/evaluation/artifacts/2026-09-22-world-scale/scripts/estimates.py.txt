@@ -1,0 +1,269 @@
+"""Grow a saved world's placed photo estimates through the product's own routes.
+
+    .venv/bin/python estimates.py upload --state STATE_JSON --to N --out JSONL
+    .venv/bin/python estimates.py place  --state STATE_JSON --to N --out JSONL
+
+upload does steps 1 and 2 and records the captures it made; the depth run (worker.py --once,
+timed in its own gated window) happens between the two; place does steps 3 to 5.
+
+For each new estimate, in the order a person's browser makes these calls:
+  1. POST /intake with synthetic room photographs (rooms.py), multipart as the browser sends it;
+  2. POST /personal-admission, operation review, the named human review and attestation, and the
+     depth right with the server's own notice, exactly as the unticked consent box sends it;
+  3. wait for the separately started derivative worker (EXULANICA_DEPTH_MODEL=moge) to write each
+     photograph's point map, read back through GET /geometry;
+  4. POST /world-entries/{id}/source-attachments with the reviewed sources;
+  5. compositions preview then apply, kind photo_point_map, on a 4 m grid in front of the arrival
+     point, carrying the saved-entry binding like every authored edit.
+The notice and attestation are imported from the product module, so the text sent is the text the
+server holds. Nothing is written to the database except through these routes.
+"""
+
+from __future__ import annotations
+
+import argparse
+import datetime as dt
+import hashlib
+import json
+import os
+import sys
+import time
+import urllib.error
+import urllib.parse
+import urllib.request
+import uuid
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+WORKTREE = HERE.parents[1]
+sys.path.insert(0, str(WORKTREE))
+sys.path.insert(0, str(HERE))
+
+from exulanica.ingest.personal_admission import DEPTH_MODEL_NOTICE, HUMAN_ATTESTATION  # noqa: E402
+from rooms import room  # noqa: E402
+
+ARRIVAL_MM = (0, 4000)
+GRID_MM = 4000
+COLUMNS = 8
+
+
+class Api:
+    def __init__(self, base: str, token: str) -> None:
+        self.base, self.token = base, token
+
+    def call(self, method: str, path: str, body: object | None = None,
+             raw: bytes | None = None, content_type: str | None = None) -> tuple[int, object, int, int]:
+        data = raw if raw is not None else (None if body is None else json.dumps(body).encode())
+        headers = {"Authorization": f"Bearer {self.token}"}
+        if data is not None:
+            headers["Content-Type"] = content_type or "application/json"
+        request = urllib.request.Request(self.base + path, data=data, method=method, headers=headers)
+        started = time.perf_counter_ns()
+        try:
+            with urllib.request.urlopen(request, timeout=900) as reply:
+                payload, status = reply.read(), reply.status
+        except urllib.error.HTTPError as error:
+            payload, status = error.read(), error.code
+        elapsed = (time.perf_counter_ns() - started) // 1000
+        try:
+            parsed = json.loads(payload) if payload else None
+        except json.JSONDecodeError:
+            parsed = payload.decode(errors="replace")[:2000]
+        return status, parsed, elapsed, len(payload)
+
+
+def multipart(files: list[tuple[str, bytes]]) -> tuple[bytes, str]:
+    boundary = f"----worldscale{uuid.uuid4().hex}"
+    parts = []
+    for name, data in files:
+        parts.append(
+            f"--{boundary}\r\nContent-Disposition: form-data; name=\"files\"; filename=\"{name}\"\r\n"
+            "Content-Type: image/jpeg\r\n\r\n".encode() + data + b"\r\n")
+    parts.append(f"--{boundary}--\r\n".encode())
+    return b"".join(parts), f"multipart/form-data; boundary={boundary}"
+
+
+def iso(moment: dt.datetime) -> str:
+    return moment.astimezone(dt.UTC).isoformat().replace("+00:00", "Z")
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("step", choices=("upload", "place"))
+    parser.add_argument("--state", required=True)
+    parser.add_argument("--to", type=int, required=True)
+    parser.add_argument("--out", required=True)
+    parser.add_argument("--photos", default=str(HERE / "photos"))
+    parser.add_argument("--wait-seconds", type=int, default=1800)
+    parser.add_argument("--dry", action="store_true")
+    args = parser.parse_args()
+    state = json.loads(Path(args.state).read_text())
+    token = Path(state["token_file"]).read_text().strip()
+    api = Api(f"http://127.0.0.1:{state['ports']['api']}", token)
+    out = Path(args.out).open("a")
+    log = lambda record: (out.write(json.dumps(record) + "\n"), out.flush(),  # noqa: E731
+                          print(json.dumps(record)[:400], flush=True))
+
+    status, entry, _, _ = api.call("POST", "/world-entries/starter", {"title": "My world"})
+    if status != 200:
+        raise SystemExit(f"starter: {status} {entry}")
+    world = entry["world_id"]
+    query = f"?world_id={urllib.parse.quote(world, safe='')}"
+    status, version, _, _ = api.call("GET", f"/world/versions/{entry['authored_version_id']}{query}")
+    placed = [p for p in version.get("point_map_instances", []) if not p.get("removed")]
+    start = len(placed)
+    if start >= args.to:
+        raise SystemExit(f"the world already holds {start} placed estimates")
+    pending = Path(args.out).with_suffix(".pending.json")
+    if args.step == "place":
+        place(args, api, entry, query, log, pending)
+        return
+    count = args.to - start
+    indices = list(range(start, args.to))
+
+    # 1. upload
+    photo_dir = Path(args.photos)
+    photo_dir.mkdir(parents=True, exist_ok=True)
+    files = []
+    for index in indices:
+        path = photo_dir / f"room-{index + 1:03d}.jpg"
+        if not path.exists():
+            room(index).save(path, "JPEG", quality=90)
+        files.append((path.name, path.read_bytes()))
+    body, content_type = multipart(files)
+    status, upload, upload_us, _ = api.call("POST", "/intake", raw=body, content_type=content_type)
+    log({"step": "intake", "status": status, "us": upload_us, "photos": count,
+         "bytes": sum(len(d) for _, d in files),
+         "accepted": len(upload.get("accepted", [])) if isinstance(upload, dict) else None,
+         "refused": upload.get("refused") if isinstance(upload, dict) else upload})
+    if status not in (200, 201, 202) or len(upload["accepted"]) != count:
+        raise SystemExit(f"intake: {status} {json.dumps(upload)[:800]}")
+    by_sha = {hashlib.sha256(d).hexdigest(): (n, len(d)) for n, d in files}
+    members = [{"capture_id": a["capture_id"], "sha256": a["blob_sha256"],
+                "bytes": by_sha[a["blob_sha256"]][1], "review": "no-person"}
+               for a in upload["accepted"]]
+
+    # 2. review with the depth right
+    now = dt.datetime.now(dt.UTC)
+    until = now + dt.timedelta(days=30)
+    admission = {
+        "members": members,
+        "purpose": "Place 3D estimates of synthetic rooms in my world.",
+        "authority": {"account_authority_basis": "These are my own synthetic test images.",
+                      "authorized_at": iso(now - dt.timedelta(seconds=5)), "valid_until": iso(until)},
+        "recorded_at": iso(now),
+        "operation": "review",
+        "reviewed_by_name": "World scale measurement",
+        "attestation": HUMAN_ATTESTATION,
+        "model_rights": [{"role": "depth", "valid_until": iso(until), "notice": DEPTH_MODEL_NOTICE}],
+    }
+    status, admitted, admit_us, _ = api.call("POST", "/personal-admission", admission)
+    log({"step": "review", "status": status, "us": admit_us,
+         "summary": {k: admitted.get(k) for k in ("batch_id", "queued_job_id")}
+         if isinstance(admitted, dict) else admitted})
+    if status != 202:
+        raise SystemExit(f"review: {status} {json.dumps(admitted)[:800]}")
+    captures = {m["capture_id"] for m in members}
+    pending.write_text(json.dumps({"members": members, "indices": indices}))
+    log({"step": "uploaded", "pending": len(members)})
+    return
+
+
+def place(args: argparse.Namespace, api: Api, entry: dict, query: str, log, pending: Path) -> None:
+    saved = json.loads(pending.read_text())
+    members, indices = saved["members"], saved["indices"]
+    count = len(members)
+    captures = {m["capture_id"] for m in members}
+
+    # 3. wait for the worker's point maps
+    deadline = time.monotonic() + args.wait_seconds
+    waited_from = time.monotonic()
+    maps: dict[str, dict] = {}
+    while time.monotonic() < deadline:
+        status, geometry, _, _ = api.call("GET", "/geometry")
+        rows = geometry if isinstance(geometry, list) else (geometry or {}).get("point_maps", [])
+        maps = {r["capture_id"]: r for r in rows if isinstance(r, dict)
+                and r.get("capture_id") in captures and r.get("state") == "available"}
+        if len(maps) == count:
+            break
+        time.sleep(2)
+    log({"step": "point_maps", "found": len(maps), "wanted": count,
+         "waited_s": round(time.monotonic() - waited_from, 1),
+         "sample": next(iter(maps.values()), None)})
+    if len(maps) != count:
+        raise SystemExit(f"only {len(maps)} of {count} point maps arrived")
+
+    # 4. attach the reviewed sources to the world
+    status, sources, _, _ = api.call("GET", "/graph/sources")
+    listed = sources if isinstance(sources, list) else (sources or {}).get("sources", [])
+    spans = {}
+    for row in listed:
+        if isinstance(row, dict) and row.get("capture_id") in captures:
+            spans[row["capture_id"]] = row.get("evidence_span_id") or row.get("image_span_id")
+    if len(spans) != count or None in spans.values():
+        raise SystemExit(f"graph sources gave {len(spans)} spans: {json.dumps(listed)[:800]}")
+    status, entry, _, _ = api.call("GET", f"/world-entries/{entry['entry_id']}")
+    already = {a["capture_id"] for a in entry["source_attachments"]}
+    missing = sorted(captures - already)
+    if not missing:
+        log({"step": "attach", "status": "already attached", "us": 0})
+    attach = {
+        "operation_id": str(uuid.uuid4()), "base_revision": entry["revision"],
+        "authored_version_id": entry["authored_version_id"],
+        "authored_state_sha256": entry["authored_state_sha256"],
+        "authored_edit_seq": entry["authored_edit_seq"],
+        "style_version_id": entry["style_version_id"],
+        "sources": [{"capture_id": c, "evidence_span_id": spans[c]} for c in missing],
+    }
+    if missing:
+        status, entry, attach_us, _ = api.call(
+            "POST", f"/world-entries/{entry['entry_id']}/source-attachments", attach)
+        log({"step": "attach", "status": status, "us": attach_us})
+        if status != 200:
+            raise SystemExit(f"attach: {status} {json.dumps(entry)[:800]}")
+    attachments = {a["capture_id"]: a["attachment_id"] for a in entry["source_attachments"]}
+
+    # 5. place each estimate
+    version_id = entry["authored_version_id"]
+    base_state, edit_seq, revision = (entry["authored_state_sha256"], entry["authored_edit_seq"],
+                                      entry["revision"])
+    ordered = [m["capture_id"] for m in members]
+    for offset, capture in enumerate(ordered):
+        index = indices[offset]
+        column, row = index % COLUMNS, index // COLUMNS
+        transform = {"x_mm": int((column - (COLUMNS - 1) / 2) * GRID_MM),
+                     "y_mm": 0, "z_mm": ARRIVAL_MM[1] - 12_000 - row * GRID_MM,
+                     "yaw_microradians": 0, "scale_milli": 1000}
+        request = {"source": {"kind": "photo_point_map", "entry_id": entry["entry_id"],
+                              "attachment_id": attachments[capture]},
+                   "placement": {"subject_id": f"estimate-{index:03d}",
+                                 "region_id": entry["authored_scene"]["region"]["region_id"],
+                                 # The product's rule: an estimate from the account holder's own
+                                 # photograph is placed as personal, never as fictional.
+                                 "transform": transform, "origin_role": "personal"}}
+        p_status, preview, p_us, _ = api.call(
+            "POST", f"/world/versions/{version_id}/compositions/preview{query}",
+            {**request, "base_state_sha256": base_state})
+        if p_status != 200 or preview.get("blocked_reason") is not None:
+            raise SystemExit(f"preview {index}: {p_status} {json.dumps(preview)[:800]}")
+        a_status, applied, a_us, a_bytes = api.call(
+            "POST", f"/world/versions/{version_id}/compositions/apply{query}",
+            {**request, "base_state_sha256": base_state,
+             "saved_entry": {"entry_id": entry["entry_id"], "base_revision": revision,
+                             "authored_state_sha256": base_state, "authored_edit_seq": edit_seq}})
+        if a_status not in (200, 201):
+            raise SystemExit(f"apply {index}: {a_status} {json.dumps(applied)[:800]}")
+        base_state, edit_seq, revision = applied["state_sha256"], applied["edit_seq"], revision + 1
+        log({"step": "place", "index": index, "capture_id": capture, "preview_us": p_us,
+             "apply_us": a_us, "apply_bytes": a_bytes, "transform": transform})
+    status, check, _, _ = api.call("GET", f"/world-entries/{entry['entry_id']}")
+    if (check["authored_state_sha256"], check["authored_edit_seq"]) != (base_state, edit_seq):
+        raise SystemExit("entry cursor disagrees with the placements")
+    log({"step": "done", "placed_total": args.to, "edit_seq": edit_seq, "revision": check["revision"],
+         "load": [round(v, 2) for v in os.getloadavg()]})
+    # This upload is placed; a later count must never read it as pending again.
+    pending.rename(pending.with_name(f"{pending.stem}-placed-{args.to}.json"))
+
+
+if __name__ == "__main__":
+    main()

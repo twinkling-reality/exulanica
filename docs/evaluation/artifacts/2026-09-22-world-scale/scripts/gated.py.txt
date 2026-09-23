@@ -1,0 +1,121 @@
+"""Run one timing-sensitive command only while the machine's CPU is measurably idle.
+
+    python3 gated.py -- COMMAND...        (run INSIDE quiet-slot, and gpu-slot for browser work)
+
+The gate root decided before any accepted run, replacing the registered load-8 rule:
+1. before: CPU idle at least 70 percent averaged over 10 s, measured with iostat immediately
+   before the command starts, retried for up to 240 s inside the slots, else exit 75;
+2. during: idle sampled every 2 s while the command runs; the command reads those samples at its
+   end and discards itself (exit 75) if its own average fell below 50 percent;
+3. the one-minute load is recorded before and after, beside the idle figures.
+The samples file is passed to the command as WS_IDLE_SAMPLES, the pre-run reading as WS_IDLE_PRE.
+Every run appends one line to runs/gates.jsonl.
+"""
+
+from __future__ import annotations
+
+import json
+import os
+import subprocess
+import sys
+import threading
+import time
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+LEDGER = HERE / "runs" / "gates.jsonl"
+# Overridable only for the gate's own positive control; an override is written into the ledger.
+PRE_IDLE = int(os.environ.get("WS_GATE_PRE", "70"))
+DURING_IDLE = 50
+PRE_WAIT_SECONDS = int(os.environ.get("WS_GATE_WAIT", "240"))
+SAMPLE_SECONDS = 2
+
+
+def load() -> list[float]:
+    return [round(v, 2) for v in os.getloadavg()]
+
+
+def interval_idle(seconds: int) -> int:
+    """CPU idle percent over the next ``seconds``: iostat's second report is the interval."""
+    done = subprocess.run(["iostat", "-C", "-w", str(seconds), "-c", "2", "-n", "0"],
+                          capture_output=True, text=True, check=True)
+    rows = [line.split() for line in done.stdout.splitlines() if line.strip()[:1].isdigit()]
+    return int(rows[-1][2])
+
+
+def main() -> None:
+    command = sys.argv[sys.argv.index("--") + 1:]
+    LEDGER.parent.mkdir(parents=True, exist_ok=True)
+    record: dict = {"command": " ".join(command)[:300], "load_before": load(),
+                    "pre_readings": [], "pre_threshold": PRE_IDLE, "pre_wait_seconds": PRE_WAIT_SECONDS}
+    deadline = time.monotonic() + PRE_WAIT_SECONDS
+    passed = False
+    while True:
+        idle = interval_idle(10)
+        record["pre_readings"].append(idle)
+        if idle >= PRE_IDLE:
+            passed = True
+            break
+        if time.monotonic() >= deadline:
+            break
+    record["pre_idle"] = record["pre_readings"][-1]
+    if not passed:
+        record["verdict"] = f"refused: idle {record['pre_idle']} below {PRE_IDLE} for {PRE_WAIT_SECONDS} s"
+        record["at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+        with LEDGER.open("a") as ledger:
+            ledger.write(json.dumps(record) + "\n")
+        print(f"gated.py: {record['verdict']}", flush=True)
+        raise SystemExit(75)
+
+    samples_path = HERE / "runs" / f"idle-{time.strftime('%Y%m%dT%H%M%S')}-{os.getpid()}.jsonl"
+    samples = samples_path.open("w")
+    monitor = subprocess.Popen(["iostat", "-C", "-w", str(SAMPLE_SECONDS), "-n", "0"],
+                               stdout=subprocess.PIPE, text=True)
+
+    def read() -> None:
+        first = True
+        assert monitor.stdout is not None
+        for line in monitor.stdout:
+            parts = line.split()
+            if not parts or not parts[0].isdigit():
+                continue
+            if first:              # the first report is the average since boot
+                first = False
+                continue
+            samples.write(json.dumps({"t": time.time(), "idle": int(parts[2])}) + "\n")
+            samples.flush()
+
+    reader = threading.Thread(target=read, daemon=True)
+    reader.start()
+    environment = dict(os.environ)
+    environment["WS_IDLE_SAMPLES"] = str(samples_path)
+    environment["WS_IDLE_PRE"] = json.dumps({"idle": record["pre_idle"], "load": load(),
+                                             "t": time.time()})
+    started = time.time()
+    done = subprocess.run(command, env=environment)
+    ended = time.time()
+    monitor.terminate()
+    monitor.wait()
+    reader.join(timeout=5)
+    samples.close()
+    during = [json.loads(line) for line in samples_path.read_text().splitlines()]
+    during = [s["idle"] for s in during if started <= s["t"] <= ended + SAMPLE_SECONDS]
+    record.update({
+        "started": started, "ended": ended, "seconds": round(ended - started, 1),
+        "during_samples": len(during),
+        "during_idle_mean": round(sum(during) / len(during), 1) if during else None,
+        "during_idle_min": min(during) if during else None,
+        "load_after": load(), "command_exit": done.returncode, "samples": samples_path.name,
+        "at": time.strftime("%Y-%m-%dT%H:%M:%S%z"),
+    })
+    record["verdict"] = ("discarded by the command" if done.returncode == 75 else
+                         "accepted" if done.returncode == 0 else f"exited {done.returncode}")
+    with LEDGER.open("a") as ledger:
+        ledger.write(json.dumps(record) + "\n")
+    print(f"gated.py: pre idle {record['pre_idle']}, during mean {record['during_idle_mean']} "
+          f"over {len(during)} samples, exit {done.returncode}", flush=True)
+    raise SystemExit(done.returncode)
+
+
+if __name__ == "__main__":
+    main()

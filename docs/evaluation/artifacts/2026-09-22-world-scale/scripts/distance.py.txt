@@ -1,0 +1,68 @@
+"""Run the distance series: three repeats, each four page sessions from the arrival point.
+
+    python3 distance.py [--repeats 3]
+
+Session order per repeat: controls (40 and 80 m, added before any registered walk and never a
+knee), then 1 km, 4 km and 8 km, each its own open and its own arrival reference. One mark per
+long sprint because a page session hung in the measuring browser after two place-and-take-back
+cycles (see the record). Each session runs through slot.py --gpu (quiet-slot, gpu-slot, gated.py).
+The world must hold no object before each session; the driver takes back every reference.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+from series import APP, STATE, live_objects  # noqa: E402
+
+SESSIONS = (("controls", "40,80"), ("1000", "1000"), ("4000", "4000"), ("8000", "8000"))
+
+
+def finished(folder: Path, label: str) -> bool:
+    for path in folder.glob(f"{label}-*.json"):
+        if path.name.endswith(("-discarded.json", "-invalid.json")):
+            continue
+        document = json.loads(path.read_text())
+        if document.get("finished_at") and document.get("phases", {}).get("endless", {}).get("ok"):
+            return True
+    return False
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--repeats", type=int, default=3)
+    args = parser.parse_args()
+    folder = HERE / "runs" / "distance"
+    folder.mkdir(parents=True, exist_ok=True)
+    log = folder / "series.log"
+    for repeat in range(args.repeats):
+        for name, marks in SESSIONS:
+            label = f"distance-{repeat}-{name}"
+            if finished(folder, label):
+                continue
+            live = live_objects()
+            if live != 0:
+                print(f"distance.py: the world holds {live} objects before {label}; stopping")
+                raise SystemExit(3)
+            command = ["python3", "slot.py", "--gpu", "--", "node", "wsdrive.mjs", "--state", STATE,
+                       "--app", APP, "--out", str(folder), "--label", label, "--objects", "0",
+                       "--phases", "endless", "--marks", marks]
+            with log.open("a") as handle:
+                handle.write(f"\n$ {' '.join(command)}\n")
+                handle.flush()
+                code = subprocess.run(command, cwd=HERE, stdout=handle,
+                                      stderr=subprocess.STDOUT).returncode
+            print(f"{label}: exit {code} at {time.strftime('%H:%M:%S')}", flush=True)
+            if code != 0:
+                raise SystemExit(code)
+
+
+if __name__ == "__main__":
+    main()

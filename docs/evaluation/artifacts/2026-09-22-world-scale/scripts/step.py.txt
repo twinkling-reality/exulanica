@@ -1,0 +1,50 @@
+"""One object-series count in one slot: grow the world if it is short, then measure the point.
+
+    python3 step.py --layout L --count N --phases P --opens K     (run through slot.py --gpu)
+
+Runs inside gated.py, so the build and the point share its readings: the build's durations and the
+point's timings are each judged against the samples taken while they ran. The build is skipped when
+the world already holds N objects, and the point refuses to run on any other count.
+"""
+
+from __future__ import annotations
+
+import argparse
+import subprocess
+import sys
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+from series import APP, ARRIVAL, STATE, live_objects  # noqa: E402
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--layout", required=True)
+    parser.add_argument("--count", type=int, required=True)
+    parser.add_argument("--phases", required=True)
+    parser.add_argument("--opens", default="5")
+    args = parser.parse_args()
+    folder = HERE / "runs" / args.layout
+    live = live_objects()
+    if live < args.count:
+        built = subprocess.run(
+            ["python3", "build_world.py", "--state", STATE, "--layout", args.layout,
+             "--to", str(args.count), "--arrival", ARRIVAL, "--out", str(folder / "build.jsonl")],
+            cwd=HERE)
+        if built.returncode != 0:
+            raise SystemExit(built.returncode)
+        live = live_objects()
+    if live != args.count:
+        print(f"step.py: the world holds {live} live objects, not {args.count}", flush=True)
+        raise SystemExit(3)
+    measured = subprocess.run(
+        ["node", "wsdrive.mjs", "--state", STATE, "--app", APP, "--out", str(folder),
+         "--label", f"{args.layout}-{args.count}", "--objects", str(args.count),
+         "--phases", args.phases, "--opens", args.opens], cwd=HERE)
+    raise SystemExit(measured.returncode)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,136 @@
+"""Summarise browser point results into the registered statistics.
+
+    python3 summarize.py RUN_JSON [RUN_JSON...]        prints one line per point and a JSON summary
+
+Pooled statistics are over every frame of every run at the point; per-run medians and 95th
+percentiles show the spread between runs. Integers only (microseconds, millionths).
+"""
+
+from __future__ import annotations
+
+import json
+import math
+import sys
+from pathlib import Path
+
+
+def q(values: list[int], p: float) -> int | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    return ordered[min(len(ordered) - 1, max(0, math.ceil(p * len(ordered)) - 1))]
+
+
+def median(values: list[int]) -> int | None:
+    return q(values, 0.5)
+
+
+def frames_block(runs: list[dict], key: str) -> dict:
+    pooled: list[int] = []
+    per_run = []
+    for run in runs:
+        block = run[key] if key else run
+        pooled.extend(block["work_us"])
+        per_run.append({"p50_us": block["work_p50_us"], "p95_us": block["work_p95_us"],
+                        "max_us": block["work_max_us"], "over_16700": block["over_16700_us"],
+                        "frames": block["frames"], "drawn": block["drawn"],
+                        "interval_p95_us": block["interval_p95_us"], "lag_p95_us": block["lag_p95_us"],
+                        "long_tasks": block["long_tasks"], "draws_p50": block["draws_p50"]})
+    return {"pooled_frames": len(pooled), "pooled_p50_us": q(pooled, 0.5),
+            "pooled_p95_us": q(pooled, 0.95), "pooled_max_us": q(pooled, 1.0),
+            "pooled_over_16700": sum(1 for w in pooled if w > 16700), "per_run": per_run}
+
+
+def summarise(path: Path) -> dict:
+    result = json.loads(path.read_text())
+    phases = result["phases"]
+    out: dict = {"label": result["label"], "build": result["build"], "file": path.name,
+                 "measurement": result.get("measurement", True), "gpu": result.get("gpu"),
+                 "loads": [(entry["what"], entry["load"][0]) for entry in result["loads"]],
+                 "notes": result["notes"], "discarded": result.get("discarded")}
+    if phases.get("open", {}).get("ok"):
+        runs = phases["open"]["value"]
+        warm = [r for r in runs if r["kind"] == "warm"]
+        out["open"] = {
+            "cold_first_frame_us": runs[0]["open_first_frame_us"],
+            "cold_complete_world_us": runs[0]["open_complete_world_us"],
+            "warm_first_frame_us": [r["open_first_frame_us"] for r in warm],
+            "warm_complete_world_us": [r["open_complete_world_us"] for r in warm],
+            "warm_first_frame_median_us": median([r["open_first_frame_us"] for r in warm]),
+            "warm_complete_world_median_us": median([r["open_complete_world_us"] for r in warm]),
+            "warm_boot_to_form_median_us": median([r["boot_to_form_us"] for r in warm]),
+            "warm_submit_to_first_frame_median_us": median([r["submit_to_first_frame_us"] for r in warm]),
+            "objects_after": [r["settled_two_seconds_later"]["counts"] for r in runs],
+        }
+    elif "open" in phases:
+        out["open_error"] = phases["open"].get("error", "")[:300]
+    if phases.get("placeundo", {}).get("ok"):
+        runs = phases["placeundo"]["value"]
+        fields = ("place_to_verdict_us", "placement_ack_us", "placement_settled_dom_us",
+                  "last_object_resident_us", "apply_server_us", "undo_ack_us",
+                  "undo_settled_dom_us", "undo_server_us", "apply_bytes")
+        out["placeundo"] = {f: [r[f] for r in runs] for f in fields}
+        out["placeundo"].update({f"{f}_median": median([r[f] for r in runs if r[f] is not None])
+                                 for f in fields})
+        out["placeundo"]["objects_after_undo"] = [r["objects_after_undo"] for r in runs]
+    elif "placeundo" in phases:
+        out["placeundo_error"] = phases["placeundo"].get("error", "")[:300]
+    if phases.get("reload", {}).get("ok"):
+        r = phases["reload"]["value"]
+        out["reload"] = {k: r[k] for k in ("identical", "version_same", "scene_same", "pixels_within",
+                                           "objects_saved", "scene_objects", "scene_maps")}
+        out["reload"]["control_share_millionths"] = r["control_difference"]["share_millionths"]
+        out["reload"]["reload_share_millionths"] = r["reload_difference"]["share_millionths"]
+    elif "reload" in phases:
+        out["reload_error"] = phases["reload"].get("error", "")[:300]
+    if phases.get("walk", {}).get("ok"):
+        runs = phases["walk"]["value"]
+        out["walk"] = {"valid": [r["valid"] for r in runs], "backed_mm": [r["backed_mm"] for r in runs],
+                       **frames_block(runs, "both")}
+    elif "walk" in phases:
+        out["walk_error"] = phases["walk"].get("error", "")[:300]
+    if phases.get("look", {}).get("ok"):
+        runs = phases["look"]["value"]
+        out["look"] = {"valid": [r["valid"] for r in runs],
+                       "quarter_turn_degrees": [r["quarter_turn_degrees"] for r in runs],
+                       **frames_block(runs, "frames")}
+    elif "look" in phases:
+        out["look_error"] = phases["look"].get("error", "")[:300]
+    if phases.get("endless", {}).get("ok"):
+        out["endless"] = phases["endless"]["value"]
+    return out
+
+
+def line(summary: dict) -> str:
+    parts = [summary["label"], summary["build"]]
+    if "open" in summary:
+        o = summary["open"]
+        parts.append(f"open first {o['warm_first_frame_median_us']} complete {o['warm_complete_world_median_us']}"
+                     f" (cold {o['cold_first_frame_us']}/{o['cold_complete_world_us']})")
+    if "placeundo" in summary:
+        p = summary["placeundo"]
+        parts.append(f"ack {p['placement_ack_us_median']} undo {p['undo_ack_us_median']} "
+                     f"verdict {p['place_to_verdict_us_median']} apply {p['apply_server_us_median']}")
+    if "reload" in summary:
+        parts.append(f"reload identical {summary['reload']['identical']}")
+    if "walk" in summary:
+        w = summary["walk"]
+        parts.append(f"walk p95 {w['pooled_p95_us']} max {w['pooled_max_us']} runs "
+                     f"{[r['p95_us'] for r in w['per_run']]}")
+    if "look" in summary:
+        k = summary["look"]
+        parts.append(f"look p95 {k['pooled_p95_us']} runs {[r['p95_us'] for r in k['per_run']]}")
+    for key in ("open_error", "placeundo_error", "reload_error", "walk_error", "look_error"):
+        if key in summary:
+            parts.append(f"{key}: {summary[key][:120]}")
+    return " | ".join(str(p) for p in parts)
+
+
+def main() -> None:
+    summaries = [summarise(Path(arg)) for arg in sys.argv[1:]]
+    for summary in summaries:
+        print(line(summary))
+
+
+if __name__ == "__main__":
+    main()

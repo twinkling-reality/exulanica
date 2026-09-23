@@ -1,0 +1,15 @@
+{"line": "{\"component\": \"derivative-worker\", \"event\": \"startup\", \"mode\": \"once\", \"worker\": \"world-scale-depth\", \"workspaces\": 1}", "t": 5.324}
+{"line": "<WORKTREE>/.venv/lib/python3.11/site-packages/moge/model/modules/conv_stack.py:170: UserWarning: In MPS autocast, but the target dtype is not supported. Disabling autocast.", "t": 5.583}
+{"line": "MPS Autocast only supports dtypes of torch.bfloat16, torch.float16 currently.", "t": 5.583}
+{"line": "  torch.autocast(device_type=x.device.type, dtype=torch.float32, enabled=True)", "t": 5.583}
+{"line": "<WORKTREE>/.venv/lib/python3.11/site-packages/moge/model/v2.py:284: UserWarning: In MPS autocast, but the target dtype is not supported. Disabling autocast.", "t": 5.607}
+{"line": "MPS Autocast only supports dtypes of torch.bfloat16, torch.float16 currently.", "t": 5.608}
+{"line": "  with torch.autocast(device_type=self.device.type, dtype=torch.float32):", "t": 5.608}
+{"line": "<WORKTREE>/.venv/lib/python3.11/site-packages/moge/model/modules/conv_stack.py:170: UserWarning: In MPS autocast, but the target dtype is not supported. Disabling autocast.", "t": 6.511}
+{"line": "MPS Autocast only supports dtypes of torch.bfloat16, torch.float16 currently.", "t": 6.511}
+{"line": "  torch.autocast(device_type=x.device.type, dtype=torch.float32, enabled=True)", "t": 6.511}
+{"line": "<WORKTREE>/.venv/lib/python3.11/site-packages/moge/model/v2.py:284: UserWarning: In MPS autocast, but the target dtype is not supported. Disabling autocast.", "t": 6.512}
+{"line": "MPS Autocast only supports dtypes of torch.bfloat16, torch.float16 currently.", "t": 6.513}
+{"line": "  with torch.autocast(device_type=self.device.type, dtype=torch.float32):", "t": 6.513}
+{"line": "{\"cancelled\": 0, \"component\": \"derivative-worker\", \"event\": \"stopped\", \"failed\": 0, \"jobs\": 2, \"unavailable\": 0}", "t": 8.035}
+{"exit": 0, "idle_during_mean": 85.0, "idle_during_samples": 4, "load_after": [4.52, 5.2, 5.06], "load_before": [4.57, 5.22, 5.07], "peak_rss_kib": 2941856, "t": 8.334, "timing_valid": true}

@@ -1,0 +1,75 @@
+"""Measure the two changes seen by eye at distance, over every accepted distance session.
+
+    .venv/bin/python shading.py            prints JSON; writes runs/distance/shading.json
+
+Both read the captures the driver wrote at each mark (engine render plus readPixels, 1440 x 900):
+  sky:  column x=720, rows 0 to 285 (the band above the horizon) of the capture WITHOUT the
+        reference object: how many distinct colours it holds, and whether every row is the
+        camera's clear colour. A gradient means the sky is drawn; one colour means it is not.
+  face: the reference cube's lit face, the box x 672..767, y 510..627, of the capture WITH it,
+        against the same box in the session's own arrival capture (mark 0), whose relative pose
+        is identical: pixels differing by more than 8 levels in any channel, and the number of
+        luminance steps of at least 6 levels along the face's middle row (y 569).
+Integers only. Pillow from the worktree environment, nothing else.
+"""
+
+from __future__ import annotations
+
+import json
+import re
+from pathlib import Path
+
+from PIL import Image
+
+HERE = Path(__file__).resolve().parent
+FOLDER = HERE / "runs" / "distance"
+SKY_COLUMN, SKY_ROWS = 720, range(0, 286)
+FACE_X, FACE_Y = range(672, 768), range(510, 628)
+MIDDLE_ROW = 569
+CLEAR = (162, 212, 223)
+
+
+def accepted_sessions() -> list[Path]:
+    out = []
+    for path in sorted(FOLDER.glob("distance-*-*.json")):
+        if path.name.endswith(("-discarded.json", "-invalid.json")) or path.name == "shading.json":
+            continue
+        document = json.loads(path.read_text())
+        if document.get("measurement") and document.get("phases", {}).get("endless", {}).get("ok"):
+            out.append(path)
+    return out
+
+
+def luminance(pixel: tuple[int, ...]) -> int:
+    red, green, blue = pixel[:3]
+    return (299 * red + 587 * green + 114 * blue) // 1000
+
+
+def main() -> None:
+    results = []
+    for session in accepted_sessions():
+        stem = session.name[:-len(".json")]
+        marks = sorted({int(m) for m in re.findall(rf"{re.escape(stem)}-mark-(\d+)-with\.png",
+                                                   " ".join(p.name for p in FOLDER.glob(f"{stem}-mark-*")))})
+        arrival = Image.open(FOLDER / f"{stem}-mark-0-with.png").convert("RGB")
+        for mark in marks:
+            without = Image.open(FOLDER / f"{stem}-mark-{mark}-without.png").convert("RGB")
+            sky = [without.getpixel((SKY_COLUMN, y)) for y in SKY_ROWS]
+            withit = Image.open(FOLDER / f"{stem}-mark-{mark}-with.png").convert("RGB")
+            differing = sum(
+                1 for x in FACE_X for y in FACE_Y
+                if max(abs(a - b) for a, b in zip(withit.getpixel((x, y)), arrival.getpixel((x, y)))) > 8)
+            row = [luminance(withit.getpixel((x, MIDDLE_ROW))) for x in FACE_X]
+            steps = sum(1 for a, b in zip(row, row[1:]) if abs(a - b) >= 6)
+            results.append({"session": stem.split("-2026")[0], "mark_m": mark,
+                            "sky_distinct_colours": len(set(sky)),
+                            "sky_all_clear_colour": all(p == CLEAR for p in sky),
+                            "face_pixels": len(FACE_X) * len(FACE_Y),
+                            "face_differing_from_arrival": differing,
+                            "face_middle_row_steps": steps})
+    (FOLDER / "shading.json").write_text(json.dumps(results, indent=1) + "\n")
+    print(json.dumps(results, indent=1))
+
+
+if __name__ == "__main__":
+    main()

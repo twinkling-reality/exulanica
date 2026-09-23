@@ -1,0 +1,121 @@
+"""The combined world in one slot: the estimates world grown to N spread objects, then measured.
+
+    python3 combined.py --objects N --maps K        (run through slot.py --gpu)
+
+The registered combined world holds at once the largest count of each separate series at which
+every budgeted metric of that series passed. It is built in the world that already holds the K
+placed estimates, by the same builder and spread layout as the objects series, so the objects sit
+exactly where they sat in spread-N. The spread layout is used, not the clustered one, because the
+clustered disc (radius 10 m, 20 m ahead of the arrival point) covers the same ground as the
+estimates' 4 m grid in front of it: one world holding both would stack them.
+Runs inside gated.py, so the build and the point are each judged against the samples taken while
+they ran. The point refuses to run on any other object or estimate count.
+
+The estimates world was grown past K (the series measured K+1 counts). --take-back takes the newest
+placements back through the product's own undo route, the objects panel's take-back control, one
+at a time with the saved-entry binding, before any object exists, and checks after each step that
+exactly one estimate went and no object changed. The K that remain must be the first K placed.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+import urllib.parse
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+from build_world import Api  # noqa: E402
+from estimates_series import placed_estimates  # noqa: E402
+from series import APP, ARRIVAL, STATE, live_objects  # noqa: E402
+
+
+def live_captures(api: Api, entry: dict) -> set[str]:
+    query = "?world_id=" + urllib.parse.quote(entry["world_id"], safe="")
+    status, version, _, _ = api.call("GET", f"/world/versions/{entry['authored_version_id']}{query}")
+    if status != 200:
+        raise SystemExit(f"version: {status}")
+    return {str((p.get("source") or {}).get("capture_id"))
+            for p in version.get("point_map_instances", []) if not p.get("removed")}
+
+
+def take_back_to(target: int, log_path: Path) -> None:
+    state = json.loads(Path(STATE).read_text())
+    api = Api(f"http://127.0.0.1:{state['ports']['api']}",
+              Path(state["token_file"]).read_text().strip())
+    if live_objects() != 0:
+        raise SystemExit("refused: take-back runs only before any object is placed")
+    steps = [json.loads(line) for line in
+             (HERE / "runs" / "estimates" / "steps.jsonl").read_text().splitlines() if line]
+    first = {s["capture_id"] for s in steps if s.get("step") == "place" and s["index"] < target}
+    with log_path.open("a") as log:
+        while placed_estimates() > target:
+            status, entries, _, _ = api.call("GET", "/world-entries")
+            entry = entries[0]
+            before = live_captures(api, entry)
+            query = "?world_id=" + urllib.parse.quote(entry["world_id"], safe="")
+            status, undone, us, size = api.call(
+                "POST", f"/world/versions/{entry['authored_version_id']}/objects/undo{query}",
+                {"base_state_sha256": entry["authored_state_sha256"],
+                 "saved_entry": {"entry_id": entry["entry_id"], "base_revision": entry["revision"],
+                                 "authored_state_sha256": entry["authored_state_sha256"],
+                                 "authored_edit_seq": entry["authored_edit_seq"]}})
+            if status not in (200, 201):
+                raise SystemExit(f"undo refused: {status} {json.dumps(undone)[:600]}")
+            after = live_captures(api, entry)
+            gone = sorted(before - after)
+            log.write(json.dumps({"step": "take_back", "status": status, "us": us, "bytes": size,
+                                  "capture_id": gone[0] if len(gone) == 1 else gone,
+                                  "estimates_after": len(after),
+                                  "edit_seq": undone.get("edit_seq")}) + "\n")
+            log.flush()
+            if len(gone) != 1 or after - before or live_objects() != 0:
+                raise SystemExit(f"take-back changed more than one estimate: {gone}")
+    remaining = live_captures(api, api.call("GET", "/world-entries")[1][0])
+    if remaining != first:
+        raise SystemExit("the estimates left are not the first placed ones")
+    print(f"combined.py: {len(remaining)} estimates remain, the first {target} placed", flush=True)
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--objects", type=int, required=True)
+    parser.add_argument("--maps", type=int, required=True)
+    parser.add_argument("--opens", default="5")
+    parser.add_argument("--take-back", action="store_true",
+                        help="take the newest estimates back to --maps first (before any object)")
+    args = parser.parse_args()
+    folder = HERE / "runs" / "combined"
+    folder.mkdir(parents=True, exist_ok=True)
+    if args.take_back and placed_estimates() > args.maps:
+        take_back_to(args.maps, folder / "take-back.jsonl")
+    maps = placed_estimates()
+    if maps != args.maps:
+        print(f"combined.py: the world holds {maps} placed estimates, not {args.maps}", flush=True)
+        raise SystemExit(3)
+    live = live_objects()
+    if live < args.objects:
+        built = subprocess.run(
+            ["python3", "build_world.py", "--state", STATE, "--layout", "spread",
+             "--to", str(args.objects), "--arrival", ARRIVAL, "--out", str(folder / "build.jsonl")],
+            cwd=HERE)
+        if built.returncode != 0:
+            raise SystemExit(built.returncode)
+        live = live_objects()
+    if live != args.objects or placed_estimates() != args.maps:
+        print(f"combined.py: the world holds {live} objects and {placed_estimates()} estimates, "
+              f"not {args.objects} and {args.maps}", flush=True)
+        raise SystemExit(3)
+    measured = subprocess.run(
+        ["node", "wsdrive.mjs", "--state", STATE, "--app", APP, "--out", str(folder),
+         "--label", f"combined-{args.objects}-{args.maps}", "--objects", str(args.objects),
+         "--maps", str(args.maps), "--phases", "open,reload,walk,look", "--opens", args.opens],
+        cwd=HERE)
+    raise SystemExit(measured.returncode)
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,15 @@
+{"line": "{\"component\": \"derivative-worker\", \"event\": \"startup\", \"mode\": \"once\", \"worker\": \"world-scale-depth\", \"workspaces\": 1}", "t": 3.851}
+{"line": "<WORKTREE>/.venv/lib/python3.11/site-packages/moge/model/modules/conv_stack.py:170: UserWarning: In MPS autocast, but the target dtype is not supported. Disabling autocast.", "t": 4.021}
+{"line": "MPS Autocast only supports dtypes of torch.bfloat16, torch.float16 currently.", "t": 4.021}
+{"line": "  torch.autocast(device_type=x.device.type, dtype=torch.float32, enabled=True)", "t": 4.021}
+{"line": "<WORKTREE>/.venv/lib/python3.11/site-packages/moge/model/v2.py:284: UserWarning: In MPS autocast, but the target dtype is not supported. Disabling autocast.", "t": 4.037}
+{"line": "MPS Autocast only supports dtypes of torch.bfloat16, torch.float16 currently.", "t": 4.037}
+{"line": "  with torch.autocast(device_type=self.device.type, dtype=torch.float32):", "t": 4.037}
+{"line": "<WORKTREE>/.venv/lib/python3.11/site-packages/moge/model/modules/conv_stack.py:170: UserWarning: In MPS autocast, but the target dtype is not supported. Disabling autocast.", "t": 4.841}
+{"line": "MPS Autocast only supports dtypes of torch.bfloat16, torch.float16 currently.", "t": 4.841}
+{"line": "  torch.autocast(device_type=x.device.type, dtype=torch.float32, enabled=True)", "t": 4.841}
+{"line": "<WORKTREE>/.venv/lib/python3.11/site-packages/moge/model/v2.py:284: UserWarning: In MPS autocast, but the target dtype is not supported. Disabling autocast.", "t": 4.843}
+{"line": "MPS Autocast only supports dtypes of torch.bfloat16, torch.float16 currently.", "t": 4.843}
+{"line": "  with torch.autocast(device_type=self.device.type, dtype=torch.float32):", "t": 4.843}
+{"line": "{\"cancelled\": 0, \"component\": \"derivative-worker\", \"event\": \"stopped\", \"failed\": 0, \"jobs\": 2, \"unavailable\": 0}", "t": 13.011}
+{"exit": 0, "idle_during_mean": 93.8, "idle_during_samples": 6, "load_after": [3.01, 4.12, 4.61], "load_before": [3.59, 4.28, 4.67], "peak_rss_kib": 2927632, "t": 13.241, "timing_valid": true}

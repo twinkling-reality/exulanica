@@ -1,0 +1,102 @@
+{
+ "exceed_streak": {
+  "frame_work_looking": 0,
+  "frame_work_walking": 0,
+  "open_complete_world": 0,
+  "open_first_frame": 0,
+  "placement_ack": 1,
+  "reload_identical": 0,
+  "undo_ack": 1
+ },
+ "finished_at": "2026-09-22T21:06:29-0400",
+ "invalidated": [
+  {
+   "file": "spread-10-2026-09-22T23-49-44-165Z-invalid.json",
+   "why": "the undo click failed (button below the panel's fold), leaving 11 objects; reload, walk and look then ran on 11; the stray object was taken back through POST .../objects/undo"
+  }
+ ],
+ "layout": "spread",
+ "points": [
+  {
+   "count": 0,
+   "file": "spread-0-2026-09-22T23-24-55-763Z.json",
+   "measured": true,
+   "phases": "open,placeundo,reload,walk,look",
+   "recorded_at": "19:27:46",
+   "values": {
+    "frame_work_looking": 500,
+    "frame_work_walking": 500,
+    "open_complete_world": 120800,
+    "open_first_frame": 120800,
+    "placement_ack": 32400,
+    "reload_identical": true,
+    "undo_ack": 32300
+   }
+  },
+  {
+   "count": 10,
+   "file": "spread-10-2026-09-23T00-28-12-440Z.json",
+   "measured": true,
+   "phases": "open,placeundo,reload,walk,look",
+   "recorded_at": "20:31:04",
+   "values": {
+    "frame_work_looking": 400,
+    "frame_work_walking": 300,
+    "open_complete_world": 170900,
+    "open_first_frame": 134400,
+    "placement_ack": 32900,
+    "reload_identical": true,
+    "undo_ack": 32400
+   }
+  },
+  {
+   "count": 50,
+   "file": "spread-50-2026-09-23T00-40-43-371Z.json",
+   "measured": true,
+   "phases": "open,placeundo,reload,walk,look",
+   "recorded_at": "20:43:35",
+   "values": {
+    "frame_work_looking": 400,
+    "frame_work_walking": 400,
+    "open_complete_world": 214300,
+    "open_first_frame": 142000,
+    "placement_ack": 66200,
+    "reload_identical": true,
+    "undo_ack": 65200
+   }
+  },
+  {
+   "count": 200,
+   "file": "spread-200-2026-09-23T00-59-16-249Z.json",
+   "measured": true,
+   "phases": "open,placeundo,reload,walk,look",
+   "recorded_at": "21:02:09",
+   "values": {
+    "frame_work_looking": 400,
+    "frame_work_walking": 400,
+    "open_complete_world": 279800,
+    "open_first_frame": 132500,
+    "placement_ack": 121700,
+    "reload_identical": true,
+    "undo_ack": 122000
+   }
+  },
+  {
+   "count": 1000,
+   "file": "spread-1000-2026-09-23T01-03-26-773Z.json",
+   "measured": true,
+   "phases": "open,placeundo,reload,walk,look",
+   "recorded_at": "21:06:29",
+   "values": {
+    "frame_work_looking": 2000,
+    "frame_work_walking": 1600,
+    "open_complete_world": 628300,
+    "open_first_frame": 211000,
+    "placement_ack": 829300,
+    "reload_identical": true,
+    "undo_ack": 790000
+   }
+  }
+ ],
+ "stopped_metrics": {}
+}

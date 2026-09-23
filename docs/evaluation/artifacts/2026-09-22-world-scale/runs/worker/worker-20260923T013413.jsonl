@@ -1,0 +1,9 @@
+{"line": "{\"component\": \"derivative-worker\", \"event\": \"startup\", \"mode\": \"once\", \"worker\": \"world-scale-depth\", \"workspaces\": 1}", "t": 25.989}
+{"line": "<WORKTREE>/.venv/lib/python3.11/site-packages/moge/model/modules/conv_stack.py:170: UserWarning: In MPS autocast, but the target dtype is not supported. Disabling autocast.", "t": 26.25}
+{"line": "MPS Autocast only supports dtypes of torch.bfloat16, torch.float16 currently.", "t": 26.25}
+{"line": "  torch.autocast(device_type=x.device.type, dtype=torch.float32, enabled=True)", "t": 26.25}
+{"line": "<WORKTREE>/.venv/lib/python3.11/site-packages/moge/model/v2.py:284: UserWarning: In MPS autocast, but the target dtype is not supported. Disabling autocast.", "t": 26.274}
+{"line": "MPS Autocast only supports dtypes of torch.bfloat16, torch.float16 currently.", "t": 26.274}
+{"line": "  with torch.autocast(device_type=self.device.type, dtype=torch.float32):", "t": 26.274}
+{"line": "{\"cancelled\": 0, \"component\": \"derivative-worker\", \"event\": \"stopped\", \"failed\": 0, \"jobs\": 2, \"unavailable\": 0}", "t": 27.798}
+{"exit": 0, "idle_during_mean": 91.0, "idle_during_samples": 14, "load_after": [3.0, 2.76, 4.33], "load_before": [3.72, 2.86, 4.42], "peak_rss_kib": 2942144, "t": 28.116, "timing_valid": true}

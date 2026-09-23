@@ -1,0 +1,979 @@
+"""Assemble the world-scale baseline record from the run files and the prose written after reading them.
+
+    .venv/bin/python write_outcome.py [--replace]
+        writes docs/evaluation/2026-09-22-world-scale-baseline.json
+
+Every measured figure comes from outcome.py's sections, a run file, shading.json, point-counts.json
+or the published manifest, and the prose interpolates those values. The few figures written into
+departure and incident prose (the loads that motivated the gate, how often the browser hang was
+reproduced) are observations made before the runs they explain and are not results. Integers only
+(microseconds, millipixels, millionths, tenths of a percent, hundredths of a load, bytes), because
+a digest input may hold no float. publish.py runs first, so the manifest this binds is the one on
+disk; the record itself is not in it.
+"""
+
+from __future__ import annotations
+
+import datetime as dt
+import hashlib
+import json
+import statistics
+import sys
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+WORKTREE = HERE.parents[1]
+sys.path.insert(0, str(WORKTREE))
+sys.path.insert(0, str(HERE))
+
+import outcome  # noqa: E402
+from exulanica.canonical import canonical_json  # noqa: E402
+
+OUT = WORKTREE / "docs" / "evaluation" / "2026-09-22-world-scale-baseline.json"
+ART = "docs/evaluation/artifacts/2026-09-22-world-scale"
+RUNS = HERE / "runs"
+COMMIT = "7e6144ea80847dd235a870ba14f4b7fbcf95dba0"
+B = outcome.BUDGET
+PRE = json.loads(outcome.PREREGISTRATION.read_text())["record"]
+RATES = PRE["ranking"]["assumed_rates"]
+#: The controls' sprint and walking speeds, read from the code (web/packages/app controls outside a
+#: city: moveSpeed 9 m/s, sprint times 2.6), in millimetres per second.
+SPRINT_MM_S, WALK_MM_S = 23_400, 9_000
+SKY_RADIUS_M = 540
+CAPTURE_TEXT = {
+    "arrival-with-reference.png": (
+        "The arrival point of distance session 0-8000 with its reference cube placed before the "
+        "camera: the sky is drawn as a gradient and the cube's lit face is smooth."),
+    "8km-with-reference.png": (
+        "The same relative capture after sprinting 8 km: the sky band is the camera's flat clear "
+        "colour and the cube's lit face carries diagonal bands."),
+    "combined-arrival.png": (
+        "The combined world at the arrival point after its reload: the 16 estimates in two rows of "
+        "eight, 12 and 16 m ahead, and the spread markers along the horizon."),
+}
+
+
+def ms(us: int) -> str:
+    return f"{us / 1000:,.1f} ms"
+
+
+def sec(us: int) -> str:
+    return f"{us / 1_000_000:,.1f} s"
+
+
+def tenths(value: float | None) -> int | None:
+    return None if value is None else round(value * 10)
+
+
+def hundredths(values: list[float]) -> list[int]:
+    return [round(v * 100) for v in values]
+
+
+def sha(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def manifest() -> dict:
+    return json.loads((HERE / "published-manifest.json").read_text())
+
+
+def artifact_for(run: Path) -> str:
+    return f"{ART}/runs/{run.parent.name}/{run.name}"
+
+
+# ------------------------------------------------------------------------------------------
+# Per-point shapes
+# ------------------------------------------------------------------------------------------
+
+
+def frames(block: dict) -> dict:
+    runs = block["per_run"]
+    return {"pooled_p50_us": block["pooled_p50_us"], "pooled_p95_us": block["pooled_p95_us"],
+            "pooled_max_us": block["pooled_max_us"], "pooled_frames": block["pooled_frames"],
+            "pooled_frames_over_16700_us": block["pooled_over_16700"],
+            "per_run_p50_us": [r["p50_us"] for r in runs],
+            "per_run_p95_us": [r["p95_us"] for r in runs],
+            "per_run_max_us": [r["max_us"] for r in runs],
+            "per_run_interval_p95_us": [r["interval_p95_us"] for r in runs],
+            "per_run_long_tasks": [r["long_tasks"] for r in runs],
+            "draw_calls_p50": [r["draws_p50"] for r in runs],
+            "runs_valid": block["valid"]}
+
+
+def point(entry: dict, folder: str) -> dict:
+    path = RUNS / folder / entry["file"]
+    out = {"count": entry["count"],
+           "run": {"artifact": artifact_for(path), "as_run_sha256": entry["file_sha256"]},
+           "gate": {"idle_before_percent": entry["gate_pre_idle"],
+                    "idle_during_mean_tenths": entry["gate_during_idle_mean_tenths"],
+                    "idle_during_min_percent": entry["gate_during_idle_min"],
+                    "idle_during_samples": entry["gate_during_samples"]},
+           "load_one_minute_hundredths": hundredths([entry["load_start"], entry["load_end"]])}
+    if "open" in entry:
+        o = entry["open"]
+        out["open"] = {"warm_first_frame_us": o["warm_first_frame_us"],
+                       "warm_first_frame_median_us": o["warm_first_frame_median_us"],
+                       "warm_complete_world_us": o["warm_complete_world_us"],
+                       "warm_complete_world_median_us": o["warm_complete_world_median_us"],
+                       "cold_first_frame_us": o["cold_first_frame_us"],
+                       "cold_complete_world_us": o["cold_complete_world_us"],
+                       "warm_document_to_form_median_us": o["warm_boot_to_form_median_us"],
+                       "warm_submit_to_first_frame_median_us": o["warm_submit_to_first_frame_median_us"]}
+    if "placeundo" in entry:
+        p = entry["placeundo"]
+        out["placement_and_undo"] = {
+            "placement_ack_us": p["placement_ack_us"],
+            "placement_ack_median_us": p["placement_ack_us_median"],
+            "undo_ack_us": p["undo_ack_us"], "undo_ack_median_us": p["undo_ack_us_median"],
+            "place_to_verdict_median_us": p["place_to_verdict_us_median"],
+            "confirm_to_last_object_resident_median_us": p["last_object_resident_us_median"],
+            "apply_server_median_us": p["apply_server_us_median"],
+            "undo_server_median_us": p["undo_server_us_median"],
+            "apply_response_bytes_median": p["apply_bytes_median"],
+            "objects_after_each_undo": p["objects_after_undo"]}
+    if "reload" in entry:
+        r = entry["reload"]
+        out["reload"] = {k: r[k] for k in ("identical", "version_same", "scene_same", "pixels_within",
+                                           "scene_objects", "scene_maps", "control_share_millionths",
+                                           "reload_share_millionths")}
+    for key, name in (("walk", "walking"), ("look", "looking")):
+        if key in entry:
+            out[name] = frames(entry[key])
+    return out
+
+
+# ------------------------------------------------------------------------------------------
+# Series
+# ------------------------------------------------------------------------------------------
+
+
+def objects_series() -> dict:
+    out = {}
+    for layout in ("spread", "clustered"):
+        section = outcome.objects(layout)
+        build = outcome.build_curve(layout)
+        out[layout] = {
+            "layout": PRE["series"]["objects"]["layouts"][layout],
+            "points": [point(p, layout) for p in section["points"] if p.get("measured")],
+            "not_measured": [p for p in section["points"] if not p.get("measured")],
+            "stopped": section["stopped"],
+            "build": {"artifact": f"{ART}/runs/{layout}/build.jsonl", "as_run_sha256": build["file_sha256"],
+                      "buckets": build["buckets"],
+                      "windows": [{"from": w["from"], "to": w["to"], "timing_valid": w["timing_valid"],
+                                   "idle_during_mean_tenths": tenths(w["idle_during_mean"]),
+                                   "idle_during_samples": w["idle_during_samples"],
+                                   "idle_note": w["idle_note"],
+                                   "load_one_minute_hundredths": hundredths([w["load_before"][0],
+                                                                             w["load_after"][0]])}
+                                  for w in build["windows"]]}}
+    return out
+
+
+def estimates_series() -> dict:
+    section = outcome.estimates()
+    steps = section["steps"]
+    counts = json.loads((RUNS / "estimates" / "point-counts.json").read_text())
+    placements = [s for s in steps if s.get("step") == "place"]
+    by_count = []
+    for low, high in ((0, 1), (1, 4), (4, 16), (16, 32)):
+        inside = [s for s in placements if low <= s["index"] < high]
+        by_count.append({"estimates_before_from": low, "estimates_before_below": high,
+                         "placements": len(inside),
+                         "preview_p50_us": outcome.q([s["preview_us"] for s in inside], 0.5),
+                         "apply_p50_us": outcome.q([s["apply_us"] for s in inside], 0.5),
+                         "apply_max_us": max(s["apply_us"] for s in inside),
+                         "apply_response_bytes_last": inside[-1]["apply_bytes"]})
+    depth = []
+    photographs = [s["pending"] for s in steps if s.get("step") == "uploaded"]
+    for index, run in enumerate(outcome.depth_worker()):
+        depth.append({"artifact": f"{ART}/runs/worker/{run['file']}", "as_run_sha256": run["file_sha256"],
+                      "photographs": photographs[index],
+                      "process_start_to_ready_ms": run["startup_seconds_milli"],
+                      "ready_to_stopped_ms": run["stopped_seconds_milli"] - run["startup_seconds_milli"],
+                      "peak_resident_kib": run["peak_rss_kib"], "exit": run["exit"],
+                      "idle_during_mean_tenths": tenths(run["idle_during_mean"]),
+                      "timing_valid": run["timing_valid"]})
+    return {"made_through": PRE["series"]["estimates"]["made_through"],
+            "points": [point(p, "estimates") for p in section["points"] if p.get("measured")],
+            "placement_server": by_count,
+            "point_maps": {k: counts[k] for k in ("point_maps", "point_count_min", "point_count_max",
+                                                  "byte_size_min", "byte_size_max", "byte_size_total")},
+            "point_map_container": "opm/2, 20 bytes a point (float32 position, four colour bytes, two uint16 tags)",
+            "depth_runs": depth,
+            "stopped": section["stopped"]}
+
+
+def distance_series() -> dict:
+    sessions = outcome.distance()["sessions"]
+    shading = json.loads((RUNS / "distance" / "shading.json").read_text())
+    marks: dict[int, dict] = {}
+    gates = []
+    for session in sessions:
+        repeat = int(session["label"].split("-")[1])
+        gates.append({"session": session["label"], "idle_before_percent": session["gate_pre_idle"],
+                      "idle_during_mean_tenths": session["gate_during"]["mean_tenths"],
+                      "idle_during_min_percent": session["gate_during"]["min"],
+                      "artifact": f"{ART}/runs/distance/{session['file']}",
+                      "as_run_sha256": session["file_sha256"]})
+        legs = {leg["mark_m"]: leg for leg in session["legs"]}
+        for ref in session["references"]:
+            if ref["mark_m"] == 0:
+                continue
+            m = marks.setdefault(ref["mark_m"], {"mark_m": ref["mark_m"], "by_repeat": {}})
+            leg = legs[ref["mark_m"]]
+            face = next(s for s in shading if s["session"] == session["label"] and s["mark_m"] == ref["mark_m"])
+            compared = ref["compared_with_mark_0"]
+            m["by_repeat"][repeat] = {
+                "registered_drawn_error_millipixels": ref["centroid_shift_millipixels"],
+                "object_only_shift_millipixels": ref["object_only_centroid_shift_millipixels"],
+                "iou_millionths": compared["iou_millionths"],
+                "object_only_iou_millionths": compared["object_only_iou_millionths"],
+                "object_free_frame_differing_millionths": compared["without_object_differing_millionths"],
+                "sprint_seconds_milli": leg["seconds_milli"], "sprint_frames": leg["frames"],
+                "sprint_work_p50_us": leg["work_p50_us"], "sprint_work_p95_us": leg["work_p95_us"],
+                "sprint_work_max_us": leg["work_max_us"], "sprint_frames_over_16700_us": leg["over_16700"],
+                "last_ten_seconds_work_p95_us": leg["last_ten_seconds_p95_us"],
+                "sky_distinct_colours": face["sky_distinct_colours"],
+                "sky_all_clear_colour": face["sky_all_clear_colour"],
+                "lit_face_differing_pixels": face["face_differing_from_arrival"],
+                "lit_face_middle_row_steps": face["face_middle_row_steps"]}
+    out = []
+    for mark in sorted(marks):
+        rows = [marks[mark]["by_repeat"][r] for r in sorted(marks[mark]["by_repeat"])]
+        entry = {"mark_m": mark, "added_after_registration": mark in (40, 80), "repeats": len(rows)}
+        for key in rows[0]:
+            entry[key] = [row[key] for row in rows]
+        entry["registered_drawn_error_median_millipixels"] = int(statistics.median(
+            entry["registered_drawn_error_millipixels"]))
+        entry["object_only_shift_median_millipixels"] = int(statistics.median(
+            entry["object_only_shift_millipixels"]))
+        out.append(entry)
+    arrival = [s for s in shading if s["mark_m"] == 0]
+    return {"route": PRE["series"]["distance"]["route"], "marks": out,
+            "arrival_sky_distinct_colours": sorted({s["sky_distinct_colours"] for s in arrival}),
+            "lit_face_pixels": shading[0]["face_pixels"], "sessions": gates,
+            "shading_artifact": f"{ART}/runs/distance/shading.json"}
+
+
+def society_series() -> dict:
+    out = {}
+    for series in ("population", "history"):
+        path = RUNS / "society" / f"{series}.json"
+        raw = json.loads(path.read_text())
+        points = []
+        for p in raw["points"]:
+            if "refused" in p:
+                points.append({"population": p["population"], "refused_by_the_engine": p["refused"]})
+                continue
+            tick = p.get("tick") or p.get("ticks_since_last")
+            points.append({
+                "population": p["population"], "ticks_elapsed": p.get("ticks_elapsed", tick["n"]),
+                "made_by_overriding_the_creation_constant": bool(p.get("patched", False)),
+                "ticks_timed": tick["n"], "tick_p50_us": tick["p50_us"], "tick_p95_us": tick["p95_us"],
+                "tick_max_us": tick["max_us"],
+                "reload_p50_us": p["reload"]["p50_us"], "reload_p95_us": p["reload"]["p95_us"],
+                "replay_us": p["replay_us"], "replay_median_us": p["replay"]["p50_us"],
+                "replay_verified": p["replay_verified"],
+                "reload_state_matches": p["reload_state_matches"],
+                "state_bytes": p["facts"]["state_bytes"],
+                "events_in_workspace": p["facts"]["events_in_workspace"]})
+        out[series] = {"artifact": f"{ART}/runs/society/{series}.json", "as_run_sha256": sha(path),
+                       "scope": "in-process server cost through SocietyRuntime and the society "
+                                "repository; HTTP, serialisation and the permission floor excluded",
+                       "profile": raw["profile"], "product_population": raw["product_population"],
+                       "gate": {"idle_before_percent": raw["gate_pre"]["idle"],
+                                "idle_during_mean_tenths": raw["gate_during"]["mean_tenths"],
+                                "idle_during_min_percent": raw["gate_during"]["min"],
+                                "idle_during_samples": raw["gate_during"]["samples"]},
+                       "points": points}
+        if series == "history":
+            out[series]["all_ticks"] = raw["all_ticks"]
+    return out
+
+
+def combined_series() -> dict:
+    c = outcome.combined()
+    return {"holds": {"objects": c["point"]["count"], "layout": "spread", "estimates": c["point"]["maps"]},
+            "point": point(c["point"], "combined"),
+            "take_back": {"artifact": f"{ART}/runs/combined/take-back.jsonl", **c["take_back"]},
+            "build": {"artifact": f"{ART}/runs/combined/build.jsonl",
+                      **{k: v for k, v in c["build"].items() if k != "idle_during_mean"},
+                      "idle_during_mean_tenths": tenths(c["build"]["idle_during_mean"])}}
+
+
+def compare_series() -> dict:
+    c = outcome.compare()
+    return {"world": "clustered-200 in its own runtime, arrival pose and the registered walk and turns",
+            "release": {k: c["release"][k] for k in ("walk", "look", "walk_per_run_p95_us",
+                                                     "look_per_run_p95_us", "draws_p50")},
+            "debug": {k: c["debug"][k] for k in ("walk", "look", "walk_per_run_p95_us",
+                                                 "look_per_run_p95_us", "draws_p50")},
+            "debug_over_release_milli": c["ratio_milli"],
+            "gate_during_mean_tenths": {"release": c["release"]["gate_during"]["mean_tenths"],
+                                        "debug": c["debug"]["gate_during"]["mean_tenths"]},
+            "artifacts": [f"{ART}/runs/compare/{c[b]['file']}" for b in ("release", "debug")]}
+
+
+# ------------------------------------------------------------------------------------------
+# Knees and ranking
+# ------------------------------------------------------------------------------------------
+
+
+def knees(series: dict, estimates: dict, distance: dict, society: dict) -> dict:
+    out = {}
+    for layout in ("spread", "clustered"):
+        k = outcome.object_knees(outcome.objects(layout))
+        out[f"objects_{layout}"] = k
+    k = outcome.object_knees(outcome.estimates())
+    out["estimates"] = {m: v for m, v in k.items() if m not in ("placement_ack", "undo_ack")}
+    registered = [m for m in distance["marks"] if not m["added_after_registration"]]
+    out["distance"] = {
+        "drawn_position_error": outcome.knee(
+            [(m["mark_m"], m["registered_drawn_error_median_millipixels"],
+              m["registered_drawn_error_millipixels"]) for m in registered],
+            B["drawn_position_error_millipixels"]),
+        "drawn_position_error_statistic": "median of the three repeats at a mark",
+        "frame_work_while_sprinting": outcome.knee(
+            [(m["mark_m"], max(m["sprint_work_p95_us"]), m["sprint_work_p95_us"]) for m in registered],
+            B["frame_work_walking"])}
+    population = [p for p in society["population"]["points"] if "tick_p95_us" in p]
+    history = [p for p in society["history"]["points"] if "tick_p95_us" in p]
+    out["society_population_at_60_ticks"] = {
+        "tick_p95": outcome.knee([(p["population"], p["tick_p95_us"], []) for p in population],
+                                 B["society_tick_p95"]),
+        "reload_p95": outcome.knee([(p["population"], p["reload_p95_us"], []) for p in population],
+                                   B["society_reload_p95"]),
+        "replay": outcome.knee([(p["population"], p["replay_median_us"], p["replay_us"]) for p in population],
+                               B["society_replay"]),
+        "refused_counts": [p["population"] for p in society["population"]["points"]
+                           if "refused_by_the_engine" in p]}
+    replay = out["society_population_at_60_ticks"]["replay"]
+    if replay.get("knee") and replay["between"][0] is None:
+        replay["note"] = ("The smallest registered population, 32, was refused by the engine, so no "
+                          "count below 128 was measured: the knee lies at or below 128, the one "
+                          "population the product creates.")
+    out["society_history_at_128"] = {
+        "tick_p95": outcome.knee([(p["ticks_elapsed"], p["tick_p95_us"], []) for p in history],
+                                 B["society_tick_p95"]),
+        "reload_p95": outcome.knee([(p["ticks_elapsed"], p["reload_p95_us"], []) for p in history],
+                                   B["society_reload_p95"]),
+        "replay": outcome.knee([(p["ticks_elapsed"], p["replay_median_us"], p["replay_us"]) for p in history],
+                               B["society_replay"])}
+    return out
+
+
+def crossing(low_count: int, low_us: int, high_count: int, high_us: int, budget: int) -> int:
+    """Where the chord between two measured points meets the budget, in tenths of a count."""
+    return round(10 * (low_count + (budget - low_us) * (high_count - low_count) / (high_us - low_us)))
+
+
+def ranking(series: dict, estimates: dict, society: dict, knee: dict) -> dict:
+    est = {p["count"]: p for p in estimates["points"]}
+    e16 = est[16]["open"]["warm_first_frame_median_us"]
+    e32 = est[32]["open"]["warm_first_frame_median_us"]
+    e4 = est[4]["open"]["warm_first_frame_median_us"]
+    est_cross = crossing(16, e16, 32, e32, B["open_first_frame"])
+    per_estimate = (e32 - e16) // 16
+    per_estimate_4_16 = (e16 - e4) // 12
+    objects = {}
+    for layout in ("spread", "clustered"):
+        pts = {p["count"]: p["placement_and_undo"] for p in series[layout]["points"]}
+        objects[layout] = {
+            "placement_ack_crossing_tenths": crossing(200, pts[200]["placement_ack_median_us"], 1000,
+                                                      pts[1000]["placement_ack_median_us"], B["placement_ack"]),
+            "undo_ack_crossing_tenths": crossing(200, pts[200]["undo_ack_median_us"], 1000,
+                                                 pts[1000]["undo_ack_median_us"], B["undo_ack"]),
+            "ack_per_object_50_to_200_us": (pts[200]["placement_ack_median_us"] - pts[50]["placement_ack_median_us"]) // 150,
+            "ack_per_object_200_to_1000_us": (pts[1000]["placement_ack_median_us"] - pts[200]["placement_ack_median_us"]) // 800}
+    first_object = min(min(v["placement_ack_crossing_tenths"], v["undo_ack_crossing_tenths"]) for v in objects.values())
+    history = {p["ticks_elapsed"]: p for p in society["history"]["points"] if "tick_p95_us" in p}
+    replay_cross = crossing(1, history[1]["replay_median_us"], 60, history[60]["replay_median_us"], B["society_replay"])
+    per_tick = (history[1440]["replay_median_us"] - history[60]["replay_median_us"]) // (1440 - 60)
+    population = {p["population"]: p for p in society["population"]["points"] if "tick_p95_us" in p}
+    sky_seconds_sprint_tenths = round(10 * SKY_RADIUS_M * 1000 / SPRINT_MM_S)
+    sky_seconds_walk_tenths = round(10 * SKY_RADIUS_M * 1000 / WALK_MM_S)
+    return {
+        "rule": PRE["ranking"]["rule"],
+        "assumed_rates": RATES,
+        "first_limits": [
+            {"rank": 1,
+             "limit": "Opening a saved world that holds photo estimates takes longer than the 2 s budget.",
+             "series": "estimates", "metrics": ["open_first_frame_us", "open_complete_world_us"],
+             "budget_us": B["open_first_frame"],
+             "knee": knee["estimates"]["open_first_frame"],
+             "last_count_within": {"count": 16, "median_us": e16},
+             "minutes_of_ordinary_use": {"from": 16 * RATES["estimate_seconds"] // 60,
+                                         "to": 32 * RATES["estimate_seconds"] // 60,
+                                         "at": f"{RATES['estimate_seconds']} s a placed estimate"},
+             "chord_crossing_estimates_tenths": est_cross,
+             "chord_crossing_minutes": est_cross * RATES["estimate_seconds"] // 600,
+             "growth_per_estimate_us": {"from_4_to_16": per_estimate_4_16, "from_16_to_32": per_estimate},
+             "register": "MEASURED knee; INFERRED crossing (straight line between the medians at 16 and 32)",
+             "why_it_grows": (
+                 "READ by the pre-registration in the code (loadAuthoredPointMaps runs before the "
+                 "renderer mounts) and consistent with what was MEASURED: every placed estimate is "
+                 "fetched and hashed before the renderer mounts, so the first "
+                 "drawn frame waits for all of them and equals the complete world at every count "
+                 f"(submit to first frame {ms(est[32]['open']['warm_submit_to_first_frame_median_us'])} "
+                 f"of the {ms(e32)} at 32). The point maps are {estimates['point_maps']['byte_size_min']:,} "
+                 f"to {estimates['point_maps']['byte_size_max']:,} bytes each."),
+             "reproduction": (
+                 "Place 32 photo estimates into one saved world on the endless ground through the "
+                 "product (intake, the review granting the depth right, the depth worker, then Place "
+                 "for each), reload the page and time the first drawn frame from the operator token's "
+                 "submit; every one of five warm opens took over 2 s.")},
+            {"rank": 2,
+             "limit": "The objects panel's report that a placement or its take-back has landed arrives later than the 250 ms budget.",
+             "series": "objects, both layouts", "metrics": ["placement_ack_us", "undo_ack_us"],
+             "budget_us": B["placement_ack"],
+             "knee": {"spread": knee["objects_spread"]["placement_ack"],
+                      "clustered": knee["objects_clustered"]["placement_ack"],
+                      "undo_spread": knee["objects_spread"]["undo_ack"],
+                      "undo_clustered": knee["objects_clustered"]["undo_ack"]},
+             "minutes_of_ordinary_use": {"from": 200 * RATES["object_placement_seconds"] // 60,
+                                         "to": 1000 * RATES["object_placement_seconds"] // 60,
+                                         "at": f"{RATES['object_placement_seconds']} s a placed object"},
+             "chord_crossings": objects,
+             "first_chord_crossing_objects_tenths": first_object,
+             "first_chord_crossing_minutes": first_object * RATES["object_placement_seconds"] // 600,
+             "register": ("MEASURED knee; INFERRED crossing (the chord between 200 and 1000; the "
+                          "acknowledgement steepens with count, so if it keeps doing so the true "
+                          "crossing is at or after the chord's)"),
+             "why_it_grows": (
+                 "INFERRED from MEASURED times: the last object becomes resident again only just "
+                 "before the report settles "
+                 f"({ms(series['spread']['points'][-1]['placement_and_undo']['confirm_to_last_object_resident_median_us'])} "
+                 f"of {ms(series['spread']['points'][-1]['placement_and_undo']['placement_ack_median_us'])} "
+                 "at spread 1000), while the server's apply takes "
+                 f"{ms(series['spread']['points'][-1]['placement_and_undo']['apply_server_median_us'])}: "
+                 "the time is the page redrawing every object after each change, the mechanism the "
+                 "pre-registration read in the code (settle awaits redrawAll)."),
+             "spread_between_runs": (
+                 "At clustered 1000 the five acknowledgements ranged from "
+                 f"{ms(min(series['clustered']['points'][-1]['placement_and_undo']['placement_ack_us']))} to "
+                 f"{ms(max(series['clustered']['points'][-1]['placement_and_undo']['placement_ack_us']))} and "
+                 "fell over the last four; every one is over the budget, so the verdict does not depend on "
+                 "the spread. Its cause is not established."),
+             "reproduction": (
+                 "Build a saved world of 1000 objects through the product's composition routes, open "
+                 "it, place one object with Place before me and Confirm, and time the panel's settled "
+                 "report; then take it back. All five placements and five take-backs took over 250 ms "
+                 "in both layouts.")},
+        ],
+        "limits_no_product_path_reaches": [
+            {"limit": "Replaying a society's history takes longer than the 2 s budget after less than a minute of playback.",
+             "metric": "society_replay_us, in-process server cost",
+             "knee": knee["society_history_at_128"]["replay"],
+             "population": 128,
+             "chord_crossing_ticks_tenths": replay_cross,
+             "growth_per_tick_us": per_tick,
+             "minutes_of_ordinary_use": "between 1 s and 1 minute of playback at speed 1 (one tick a second)",
+             "why_it_follows": ("Replay is served only by GET /world/versions/{id}/society/replay "
+                                "(exulanica/api/routes/society.py); no web client code and no server "
+                                "process calls it at the measured commit, and this runtime's readiness "
+                                "report says no saved world holds inhabitants without a registration "
+                                "file. The ranking rule orders limits no product path reaches after "
+                                "those a person meets."),
+             "register": "MEASURED knee; INFERRED crossing (chord between 1 and 60 ticks); READ callers"},
+            {"limit": "A society tick at 512 inhabitants takes longer than the 250 ms budget.",
+             "metric": "society_tick_p95_us, in-process server cost",
+             "knee": knee["society_population_at_60_ticks"]["tick_p95"],
+             "tick_p95_us": {"128": population[128]["tick_p95_us"], "512": population[512]["tick_p95_us"]},
+             "hard_ceiling_us": PRE["budgets"]["society_tick_p95_us"]["hard_ceiling"],
+             "why_it_follows": ("512 inhabitants were made by overriding the creation constant inside "
+                                "the measuring process; the engine and the database accept 512 but no "
+                                "product path creates it at the measured commit (the product makes 128)."),
+             "register": "MEASURED"},
+        ],
+        "limits_added_after_registration": [
+            {"limit": "The sky stops being drawn once the camera is farther than the sky sphere's radius from where the world opened.",
+             "measured": ("In all nine sessions at 1, 4 and 8 km the sky band of the capture is the "
+                          "camera's flat clear colour (one distinct colour in the 286 rows at x 720); "
+                          f"at the arrival point it holds {max(distance_arrival_colours())} colours "
+                          "and at 40 and 80 m it is still a gradient."),
+             "read": ("web/packages/atlas-react/src/playcanvas/composed-world.ts places the sky, a unit "
+                      "sphere scaled to 540 m, at the opening frame (setPosition(frame.x, 0, frame.z), "
+                      "setLocalScale(540, 540, 540)) and nothing moves it afterwards; the camera's far "
+                      "clip outside a city is 1,200 m (atlas-binding.ts)."),
+             "inferred": (f"The sky is lost past about {SKY_RADIUS_M} m from the opening point: "
+                          f"{sky_seconds_sprint_tenths / 10:.1f} s of sprinting or "
+                          f"{sky_seconds_walk_tenths / 10:.1f} s of walking. Where between 80 m and 1 km "
+                          "it happens was not measured."),
+             "defect": ("Probable defect: the endless ground has no edge but the sky does. Not fixed "
+                        "here."),
+             "reproduction": ("Open any saved world on the endless ground, hold W and Shift for 30 s, "
+                              "and look ahead: the sky above the horizon is one flat colour."),
+             "why_not_a_knee": "No budget measures the sky; it answers a registered open question and was added after registration."},
+            {"limit": "Lit faces of objects carry diagonal bands at 4 and 8 km that they do not have at 1 km.",
+             "measured": ("The reference cube's lit face (11,328 pixels) differs from its own arrival "
+                          "capture by more than 8 levels in "
+                          + ", ".join(f"{v:,}" for v in distance_face(4000)) + " pixels at 4 km and "
+                          + ", ".join(f"{v:,}" for v in distance_face(8000)) + " at 8 km (three repeats), "
+                          "and in none at 40 m, 80 m or 1 km."),
+             "inferred": ("Cause not established. Consistent with shadow-map or depth precision at "
+                          "large world coordinates, since the cube's own silhouette stays within about a "
+                          "pixel."),
+             "reproduction": ("Sprint 4 km from the arrival point, place a marker cube with Place before "
+                              "me and look at its lit face at the capture pose."),
+             "why_not_a_knee": "No budget measures shading; added after registration."},
+        ],
+        "registered_failure_present_at_the_arrival_point": {
+            "metric": "drawn_position_error_millipixels",
+            "knee_as_registered": knee["distance"]["drawn_position_error"],
+            "why_it_is_not_ranked_as_a_scale_limit": (
+                "The registered silhouette is the capture with the reference minus the capture "
+                "without it, so it includes the cube's soft shadow and the line where its base meets "
+                "the ground. It exceeds a pixel at the 40 and 80 m controls as well, where float32 "
+                "spacing is below a hundredth of a millimetre, so the change it measures is present "
+                "within 80 m of the arrival point and is not caused by distance. The object-only "
+                "silhouette (shadow casting off for one frame, added before any registered walk) moves "
+                "by at most about two pixels at every mark, with no trend."),
+            "statistic_sensitivity": (
+                "The registration names no statistic across repeats for this metric; the median is "
+                "used, as for every other repeated metric. Under the smallest repeat the knee is also "
+                "between 1 and 4 km; under the largest it would fall before 1 km, since one 1 km "
+                "repeat exceeds a pixel.")},
+    }
+
+
+def distance_arrival_colours() -> list[int]:
+    shading = json.loads((RUNS / "distance" / "shading.json").read_text())
+    return [s["sky_distinct_colours"] for s in shading if s["mark_m"] == 0]
+
+
+def distance_face(mark: int) -> list[int]:
+    shading = json.loads((RUNS / "distance" / "shading.json").read_text())
+    return [s["face_differing_from_arrival"] for s in shading if s["mark_m"] == mark]
+
+
+# ------------------------------------------------------------------------------------------
+# The record
+# ------------------------------------------------------------------------------------------
+
+
+def main() -> None:
+    published = manifest()
+    series = objects_series()
+    estimates = estimates_series()
+    distance = distance_series()
+    society = society_series()
+    combined = combined_series()
+    compare = compare_series()
+    knee = knees(series, estimates, distance, society)
+    ranks = ranking(series, estimates, society, knee)
+    pre = outcome.preregistration()
+    sp = {p["count"]: p for p in series["spread"]["points"]}
+    cl = {p["count"]: p for p in series["clustered"]["points"]}
+    es = {p["count"]: p for p in estimates["points"]}
+    pop = {p["population"]: p for p in society["population"]["points"] if "tick_p95_us" in p}
+    hist = {p["ticks_elapsed"]: p for p in society["history"]["points"] if "tick_p95_us" in p}
+    marks = {m["mark_m"]: m for m in distance["marks"]}
+    cpt = combined["point"]
+    first = ranks["first_limits"]
+    from publish import CAPTURES
+    captures = []
+    for source, name in CAPTURES:
+        entry = next(f for f in published["files"] if f["path"].endswith(f"captures/{name}"))
+        captures.append({"path": entry["path"], "byte_size": entry["byte_size"], "sha256": entry["sha256"],
+                         "what": CAPTURE_TEXT[name], "as_run": source.split("/")[-1]})
+    combined_raw = json.loads((RUNS / "combined" / cpt["run"]["artifact"].split("/")[-1]).read_text())
+    depth = estimates["depth_runs"]
+    per_photo = [round(r["ready_to_stopped_ms"] / r["photographs"]) for r in depth]
+    worst_frame = max([p["walking"]["pooled_p95_us"] for p in series["spread"]["points"] + series["clustered"]["points"]]
+                      + [p["looking"]["pooled_p95_us"] for p in series["spread"]["points"] + series["clustered"]["points"]])
+    record = {
+        "profile": "exulanica.world-scale-baseline/v1",
+        "written_at": dt.datetime.now(dt.UTC).replace(microsecond=0).isoformat(),
+        "subject": ("How large a saved world grows through the product's own routes before opening, "
+                    "reloading, placing and taking back, walking or looking around stops meeting its "
+                    "registered budget, measured on one machine at one commit."),
+        "question": PRE["question"],
+        "predecessor_record": {
+            "path": pre["path"], "record_sha256": pre["record_sha256"], "file_sha256": pre["file_sha256"],
+            "why": ("The pre-registration: budgets, series, statistics, knee rule, stop rules and "
+                    "ranking rule, written before the first timing run and unchanged since. Every "
+                    "verdict here is judged against it, and every departure from it is listed under "
+                    "departures.")},
+        "measured_commit": COMMIT,
+        "tree": {
+            "rule": PRE["tree_rule"],
+            "how": ("slot.py refused to start any slot unless HEAD was the measured commit and "
+                    "git diff --quiet HEAD and git status --porcelain --untracked-files=all were clean "
+                    "for exulanica, web/packages, migrations, pyproject.toml and web/package.json. "
+                    "Every browser run file carries the tree it ran on (head, diff bytes 0); the "
+                    "society files carry measured_commit."),
+            "measurement_code": "outside the product paths, published under scripts/ beside this record"},
+        "machine": {**PRE["machine"], "browser_in_runs": combined_raw["browser"],
+                    "webgl_renderer": combined_raw["gpu"]["renderer"],
+                    "drawing_buffer": combined_raw["gpu"]["buffer"],
+                    "antialias": combined_raw["gpu"]["antialias"]},
+        "outcome": {
+            "answer": [
+                (f"The first limit a person meets is opening a world that holds photo estimates. "
+                 f"Opening stays within 2 s up to 16 placed estimates ({ms(es[16]['open']['warm_first_frame_median_us'])}) "
+                 f"and exceeds it at 32 ({ms(es[32]['open']['warm_first_frame_median_us'])}, all five warm opens "
+                 f"over); it grows by about {ms(first[0]['growth_per_estimate_us']['from_16_to_32'])} "
+                 "an estimate. At the registered two minutes an estimate, that is between 32 and 64 "
+                 "minutes of placing estimates (MEASURED knee, ASSUMED rate)."),
+                (f"The second is the objects panel's acknowledgement of a placement or a take-back: "
+                 f"{ms(sp[200]['placement_and_undo']['placement_ack_median_us'])} at 200 spread objects and "
+                 f"{ms(sp[1000]['placement_and_undo']['placement_ack_median_us'])} at 1000 "
+                 f"({ms(cl[1000]['placement_and_undo']['placement_ack_median_us'])} clustered), against 250 ms. "
+                 "At the registered thirty seconds a placement, that is between 100 and 500 minutes of "
+                 "placing objects (MEASURED knee, ASSUMED rate)."),
+                ("Frame work never approaches its budget: the largest 95th percentile at any object "
+                 f"point is {ms(worst_frame)} against 16.7 ms, at 1000 objects, and every sprint to "
+                 f"8 km keeps it within {ms(max(max(m['sprint_work_p95_us']) for m in marks.values()))}, "
+                 "with a few single long frames in some legs (see the distance series). Every reload at "
+                 "every count showed the saved world exactly (MEASURED)."),
+                ("Two limits no budget measures arrive much sooner, and were found answering a "
+                 "registered open question: the sky is no longer drawn at 1 km (MEASURED), past about "
+                 "540 m from where the world opened by the code (INFERRED, about 23 s of sprinting), "
+                 "and at 4 km objects' lit faces carry diagonal bands they do not have at 1 km "
+                 "(MEASURED)."),
+                (f"The society's replay exceeds 2 s between 1 and 60 ticks of history at 128 inhabitants "
+                 f"({ms(hist[60]['replay_median_us'])} at 60), and a tick at 512 inhabitants exceeds 250 ms "
+                 f"({ms(pop[512]['tick_p95_us'])}); no product path reaches either at this commit."),
+                (f"The combined world, 200 spread objects and 16 estimates at once, passes every budget: "
+                 f"first frame {ms(cpt['open']['warm_first_frame_median_us'])}, complete world "
+                 f"{ms(cpt['open']['warm_complete_world_median_us'])}."),
+            ],
+            **ranks,
+        },
+        "knees": knee,
+        "series": {"objects": series, "estimates": estimates, "distance": distance,
+                   "inhabitants": society, "combined": combined},
+        "unbudgeted_results": {
+            "debug_versus_release": compare,
+            "authored_version_bytes": {
+                "apply_response_bytes_at_count": {
+                    layout: {str(p["count"]): p["placement_and_undo"]["apply_response_bytes_median"]
+                             for p in series[layout]["points"]} for layout in ("spread", "clustered")},
+                "note": "the apply response carries the whole authored version, every object and every edit"},
+            "depth_worker": {
+                "runs": estimates["depth_runs"],
+                "device": ("MPS: MoGe printed its MPS autocast warning (moge/model/modules/"
+                           "conv_stack.py:170 and v2.py:284) in every run"),
+                "comparison": ("No retained evaluation record gives MoGe-2 timings on this class of "
+                               "machine. The only retained timing for the checkpoint is a linux/amd64 "
+                               "CPU run under instruction emulation (docs/evaluation/"
+                               "2026-09-04-linux-amd64-depth-forward.json), which docs/deployment.md "
+                               "calls compatibility evidence and not a performance result, so nothing "
+                               "is compared."),
+                "reading": (f"The first run's {depth[0]['process_start_to_ready_ms'] / 1000:.1f} s from "
+                            "process start to ready holds the model load from a cold file cache (the "
+                            "worker builds the model before it reports ready); later runs took "
+                            f"{min(r['process_start_to_ready_ms'] for r in depth[1:]) / 1000:.1f} to "
+                            f"{max(r['process_start_to_ready_ms'] for r in depth[1:]) / 1000:.1f} s. Per "
+                            "photograph, ready to stopped divided by photographs: "
+                            + ", ".join(f"{v / 1000:.2f} s ({r['photographs']})" for v, r in zip(per_photo, depth))
+                            + ". Peak resident memory "
+                            f"{min(r['peak_resident_kib'] for r in depth):,} to "
+                            f"{max(r['peak_resident_kib'] for r in depth):,} KiB in every run."),
+                "per_photograph_ms": per_photo},
+            "society": {
+                "state_bytes": {str(k): v["state_bytes"] for k, v in pop.items()},
+                "events_per_tick": {str(k): v["events_in_workspace"] // v["ticks_elapsed"] for k, v in pop.items()},
+                "replay_ticks_per_second_tenths": {
+                    **{f"128 at {t} tick{'s' if t != 1 else ''}": round(10 * t * 1_000_000 / v["replay_median_us"]) for t, v in hist.items()},
+                    "512 at 60 ticks": round(10 * 60 * 1_000_000 / pop[512]["replay_median_us"])}},
+        },
+        "predictions": predictions(sp, cl, es, pop, hist, marks),
+        "open_questions": open_questions(sp, cl, es, marks, worst_frame),
+        "departures": departures(),
+        "incidents": incidents(),
+        "claims": claims(sp, cl, es, pop, hist, marks, cpt, worst_frame, ranks, estimates),
+        "not_measured": not_measured(),
+        "captures": captures,
+        "artifacts": {"directory": ART, "substitutions": published["substitutions"],
+                      "files": published["files"],
+                      "scripts_as_run": ("scripts/ holds the final version of every driver. The object "
+                                         "series ran instrument 63c9be03 and driver d2655157, the distance "
+                                         "series instrument 15ef8cd9; those exact versions are under "
+                                         "scripts/as-run/. spread-0 ran the instrument before digests were "
+                                         "recorded in run files; its timing code is the object series' "
+                                         "(the later change added a context-loss note and the digests)."),
+                      "raw_samples": ("Each run extract keeps every per-frame work sample, every open, "
+                                      "every placement and every gate reading; request lists are "
+                                      "summarised per route. Distance captures other than the two bound "
+                                      "here are not published; shading.json holds what was measured "
+                                      "from them.")},
+        "how_to_rerun": how_to_rerun(),
+    }
+    document = {"profile": "exulanica.digest-bound-record/v1", "record": record,
+                "record_sha256": hashlib.sha256(canonical_json(record)).hexdigest()}
+    text = json.dumps(document, indent=2, ensure_ascii=False, sort_keys=True) + "\n"
+    for forbidden in ("/" + "Users/", "Bearer" + " ", "api" + "-token", chr(0x2014), "ori" + "mera"):
+        if forbidden in text:
+            raise SystemExit(f"refusing: the record carries {forbidden!r}")
+    if OUT.exists() and "--replace" not in sys.argv:
+        raise SystemExit(f"refusing: {OUT.name} exists (pass --replace while it is unreleased)")
+    OUT.write_text(text, encoding="utf-8")
+    print(OUT.name, document["record_sha256"], hashlib.sha256(text.encode()).hexdigest(), len(text))
+
+
+def predictions(sp, cl, es, pop, hist, marks) -> list[dict]:
+    listed = PRE["predictions"]
+    return [
+        {"prediction": listed[0], "verdict": "held in part",
+         "evidence": (f"It is the first budget to fail within the object series, in both layouts, "
+                      f"between 200 and 1000. It is not linear from zero: flat to 10 objects "
+                      f"({ms(sp[0]['placement_and_undo']['placement_ack_median_us'])} at 0, "
+                      f"{ms(sp[10]['placement_and_undo']['placement_ack_median_us'])} at 10), then "
+                      f"{ms((sp[200]['placement_and_undo']['placement_ack_median_us'] - sp[50]['placement_and_undo']['placement_ack_median_us']) // 150)} "
+                      "more an object from 50 to 200 and "
+                      f"{ms((sp[1000]['placement_and_undo']['placement_ack_median_us'] - sp[200]['placement_and_undo']['placement_ack_median_us']) // 800)} "
+                      "from 200 to 1000 in the spread layout ("
+                      f"{ms((cl[200]['placement_and_undo']['placement_ack_median_us'] - cl[50]['placement_and_undo']['placement_ack_median_us']) // 150)} and "
+                      f"{ms((cl[1000]['placement_and_undo']['placement_ack_median_us'] - cl[200]['placement_and_undo']['placement_ack_median_us']) // 800)} "
+                      "clustered). The time to the last object resident tracks the acknowledgement at "
+                      "every count, as the redraw mechanism predicts."),
+         "register": "MEASURED"},
+        {"prediction": listed[1], "verdict": "held for estimates; for objects held to 200 and not at 1000",
+         "evidence": (f"First frame, spread: {ms(sp[0]['open']['warm_first_frame_median_us'])} at 0, "
+                      f"{ms(sp[200]['open']['warm_first_frame_median_us'])} at 200, "
+                      f"{ms(sp[1000]['open']['warm_first_frame_median_us'])} at 1000; clustered "
+                      f"{ms(cl[0]['open']['warm_first_frame_median_us'])}, "
+                      f"{ms(cl[200]['open']['warm_first_frame_median_us'])}, "
+                      f"{ms(cl[1000]['open']['warm_first_frame_median_us'])}. Estimates: "
+                      f"{ms(es[1]['open']['warm_first_frame_median_us'])} at 1 to "
+                      f"{ms(es[32]['open']['warm_first_frame_median_us'])} at 32, and the first frame "
+                      "equals the complete world at every estimate count."),
+         "register": "MEASURED"},
+        {"prediction": listed[2], "verdict": "held (it grows; within budget to 1000)",
+         "evidence": ("Complete world, spread: " + ", ".join(
+             f"{ms(sp[c]['open']['warm_complete_world_median_us'])} at {c}" for c in (0, 10, 50, 200, 1000))
+                      + "; clustered: " + ", ".join(
+             f"{ms(cl[c]['open']['warm_complete_world_median_us'])} at {c}" for c in (0, 10, 50, 200, 1000)) + "."),
+         "register": "MEASURED"},
+        {"prediction": listed[3], "verdict": "held",
+         "evidence": (f"Server apply median at the panel placement: spread "
+                      f"{ms(sp[0]['placement_and_undo']['apply_server_median_us'])} at 0 and "
+                      f"{ms(sp[1000]['placement_and_undo']['apply_server_median_us'])} at 1000, clustered "
+                      f"{ms(cl[1000]['placement_and_undo']['apply_server_median_us'])} at 1000; the build "
+                      "curves show the same growth. The response grows to "
+                      f"{sp[1000]['placement_and_undo']['apply_response_bytes_median']:,} bytes at 1000."),
+         "register": "MEASURED"},
+        {"prediction": listed[4], "verdict": "held, far inside the budget",
+         "evidence": (f"Walking p95, spread {ms(sp[0]['walking']['pooled_p95_us'])} at 0 and "
+                      f"{ms(sp[1000]['walking']['pooled_p95_us'])} at 1000; clustered "
+                      f"{ms(cl[0]['walking']['pooled_p95_us'])} and {ms(cl[1000]['walking']['pooled_p95_us'])}. "
+                      f"Draw calls at p50: spread {sp[1000]['walking']['draw_calls_p50'][0]}, clustered "
+                      f"{cl[1000]['walking']['draw_calls_p50'][0]} at 1000."),
+         "register": "MEASURED"},
+        {"prediction": listed[5], "verdict": "held",
+         "evidence": (f"Replay at 128: {ms(hist[1]['replay_median_us'])} at 1 tick, "
+                      f"{ms(hist[60]['replay_median_us'])} at 60, {ms(hist[240]['replay_median_us'])} at 240, "
+                      f"{ms(hist[1440]['replay_median_us'])} at 1440: close to linear in ticks. At 60 ticks, "
+                      f"{ms(pop[512]['replay_median_us'])} at 512 against {ms(pop[128]['replay_median_us'])} "
+                      f"at 128. Tick p95 {ms(pop[128]['tick_p95_us'])} at 128 and "
+                      f"{ms(pop[512]['tick_p95_us'])} at 512."),
+         "register": "MEASURED"},
+        {"prediction": listed[6], "verdict": "not answered by the registered metric; the object stays within about a pixel",
+         "evidence": ("The registered metric includes the shadow and exceeds a pixel at the 40 and "
+                      "80 m controls. The object-only shift at 8 km is "
+                      + ", ".join(str(v) for v in marks[8000]["object_only_shift_millipixels"])
+                      + " millipixels in the three repeats; across all marks it takes only values near "
+                      "0.5, 1 and 2 pixels, one row of the base line moving, with no trend."),
+         "register": "MEASURED; the reading of the base line is OBSERVED BY EYE"},
+    ]
+
+
+def open_questions(sp, cl, es, marks, worst_frame) -> list[dict]:
+    listed = PRE["open_questions"]
+    return [
+        {"question": listed[0], "answer": (f"No. The largest 95th percentile of frame work is "
+                                           f"{ms(worst_frame)}, at 1000 objects, against 16.7 ms."),
+         "register": "MEASURED"},
+        {"question": listed[1],
+         "answer": ("Motion was not measured: the protocol captures still frames. In the still frames "
+                    "the sky is no longer drawn at 1, 4 and 8 km, and the reference cube's lit face "
+                    "carries diagonal bands at 4 and 8 km and not at 1 km. Whether anything swims "
+                    "while moving is not established."),
+         "register": "MEASURED pixels, OBSERVED BY EYE bands; motion not measured"},
+        {"question": listed[2],
+         "answer": (f"Opening fails first, between 16 and 32 estimates; frame work at 32 is "
+                    f"{ms(es[32]['walking']['pooled_p95_us'])} walking and "
+                    f"{ms(es[32]['looking']['pooled_p95_us'])} looking."),
+         "register": "MEASURED"},
+        {"question": listed[3],
+         "answer": ("No. At every measured point (objects 0 to 1000 in both layouts, estimates 1 to 32, "
+                    "the combined world) the authored version, the scene's objects and the pixels at "
+                    "the arrival pose were identical after the reload; the differing pixel share was 0."),
+         "register": "MEASURED"},
+    ]
+
+
+def departures() -> list[dict]:
+    return [
+        {"what": "the quiet-machine gate",
+         "registered": PRE["load_discipline"][1],
+         "done": ("Before a run, at least 70 percent CPU idle averaged over 10 s, read with iostat "
+                  "inside the slots immediately before timing (waiting up to 240 s); during a run, "
+                  "idle sampled every 2 s and the run discarded when its mean fell below 50 percent; "
+                  "the one-minute load still recorded before and after every run; three attempts."),
+         "why": ("On this shared machine the one-minute load stayed between 13.9 and 16.5 while the "
+                 "CPU was 77 to 88 percent idle: the load counts thousands of threads other processes "
+                 "hold, none of which a measurement can pause, so no run could ever have passed the "
+                 "registered rule. Idle measures the CPU a run competes for directly."),
+         "decided": "before any accepted timing run, with positive controls of both verdicts (runs/control, not published)"},
+        {"what": "distance walks split into one mark per page session",
+         "registered": "one continuous walk per repeat, stopping at each mark",
+         "done": ("Each repeat is four sessions from the arrival point, each with its own open and "
+                  "arrival reference: the controls (40 and 80 m), 1 km, 4 km and 8 km. The 8 km session "
+                  "is the whole 0 to 8 km sprint for frame work."),
+         "why": ("The headless measuring browser stopped answering during the third sprint of a "
+                 "session after two place-and-take-back cycles, in the first registered attempt and in "
+                 "five dry runs after it: the page kept "
+                 "running while the browser process ran at 80 to 92 percent CPU and no DevTools client "
+                 "could connect. Image transfer, pointer lock, the on-device model service and storage "
+                 "writes were each excluded; the cause was not identified. It is the measuring browser, "
+                 "not the product."),
+         "decided": "before any accepted distance walk"},
+        {"what": "control marks and the object-only silhouette",
+         "registered": "marks at 1, 4 and 8 km; the silhouette is the capture with the reference minus the capture without it",
+         "done": ("Control marks at 40 and 80 m in every repeat, and the silhouette of the object alone "
+                  "(shadow casting off for one frame), both reported as added and never as knees."),
+         "why": ("Dry walks to 40 and 80 m showed the registered silhouette shifting by more than a "
+                 "pixel where float32 spacing is below a hundredth of a millimetre."),
+         "decided": "before any registered walk"},
+        {"what": "browser switches for the distance sessions",
+         "registered": "headless Chrome over the DevTools protocol",
+         "done": ("--disable-component-update, --disable-default-apps, "
+                  "--disable-client-side-phishing-detection and --disable-features for optimisation "
+                  "hints, on-device models, translation and the media router."),
+         "why": "to rule out background browser work while the hang above was investigated",
+         "decided": "before any accepted distance walk"},
+        {"what": "the combined world",
+         "registered": PRE["series"]["combined"],
+         "done": ("200 objects (the largest count at which every object budget passed, in both "
+                  "layouts) in the spread layout plus 16 estimates (the largest passing estimate "
+                  "count). Built in the estimates world: the 16 newest estimates were taken back through "
+                  "the product's undo route, the objects panel's take-back, with the saved-entry "
+                  "binding, one at a time and checked, leaving exactly the first 16 placed; then the 200 "
+                  "objects were placed where spread-200 had them."),
+         "why": ("The clustered disc (radius 10 m, 20 m ahead of the arrival point) covers the "
+                 "estimates' 4 m grid, so one world holding both would stack them. A distance is not "
+                 "something a world holds. Inhabitants are not held: this runtime's readiness report "
+                 "says no saved world holds inhabitants without a registration file, and the "
+                 "inhabitant series was registered as in-process server cost. The version the combined "
+                 "world opens also lists the 16 taken-back estimates as removed, as it would for a "
+                 "person who took them back."),
+         "decided": "before the combined world was built"},
+        {"what": "the statistic for the drawn position error",
+         "registered": "no statistic across repeats is named for this metric",
+         "done": "the median of the three repeats at each mark; the sensitivity to that choice is stated",
+         "why": "the median is the statistic registered for every other repeated metric",
+         "decided": "after the distance data were in; stated as such"},
+    ]
+
+
+def incidents() -> list[dict]:
+    return [
+        {"what": "the first spread-10 run was invalid",
+         "detail": ("An undo click fell below the objects panel's fold, so the world was left holding "
+                    "11 objects and reload, walking and looking measured 11. The run was set aside, the "
+                    "stray object taken back through the product's undo route, the driver changed to "
+                    "scroll a target into view and to check the world's count through the API, and the "
+                    "point measured again.")},
+        {"what": "the first estimates-1 run was invalid",
+         "detail": ("The instrument counted only nodes attached one at a time, and a placed estimate is "
+                    "built inside its parent before the parent joins the scene, so open and reload never "
+                    "saw the world complete. The instrument now counts named nodes across every attached "
+                    "subtree; the point was measured again.")},
+        {"what": "two driver errors refused by the product",
+         "detail": ("The first estimate placement asked for origin role fictional and was refused: an "
+                    "estimate from the account holder's own photograph is placed as personal. A stale "
+                    "upload file was then offered for a second count and refused as "
+                    "subject_already_present. Nothing was written either time; both are the product's "
+                    "checks working.")},
+        {"what": "the history series ran on a busier machine",
+         "detail": ("Its mean idle while running was 66.1 percent (minimum 17), within the gate but "
+                    "lower than any other accepted run. The same condition, 60 ticks at 128, was also "
+                    "measured by the population series at 90.1 percent idle: replay 2,085.7 ms there "
+                    "against 2,291.2 ms here, both over the budget.")},
+        {"what": "the measuring browser hang",
+         "detail": "Described under departures; it produced no accepted data and no product change."},
+    ]
+
+
+def claims(sp, cl, es, pop, hist, marks, cpt, worst_frame, ranks, estimates) -> dict:
+    first = ranks["first_limits"]
+    chords = first[1]["chord_crossings"]
+    replay_cross = ranks["limits_no_product_path_reaches"][0]["chord_crossing_ticks_tenths"]
+    faces = distance_face(4000) + distance_face(8000)
+    server_share = max(p["placement_and_undo"]["apply_server_median_us"] * 1000
+                       // p["placement_and_undo"]["placement_ack_median_us"]
+                       for p in (sp[1000], cl[1000]))
+    later = cpt["open"]["warm_first_frame_median_us"] - es[16]["open"]["warm_first_frame_median_us"]
+    depth = estimates["depth_runs"]
+    points = estimates["point_maps"]
+    return {
+        "measured": [
+            f"Opening with 16 estimates takes {ms(es[16]['open']['warm_first_frame_median_us'])} and with 32 {ms(es[32]['open']['warm_first_frame_median_us'])} (median of five warm opens; every warm open at 32 over 2 s).",
+            f"The panel acknowledges a placement in {ms(sp[200]['placement_and_undo']['placement_ack_median_us'])} at 200 spread objects and {ms(sp[1000]['placement_and_undo']['placement_ack_median_us'])} at 1000; clustered {ms(cl[200]['placement_and_undo']['placement_ack_median_us'])} and {ms(cl[1000]['placement_and_undo']['placement_ack_median_us'])}.",
+            f"Frame work never exceeds {ms(worst_frame)} at the 95th percentile in any object point; sprinting to 8 km leaves it within {ms(max(max(m['sprint_work_p95_us']) for m in marks.values()))}.",
+            "Every reload at every point showed the saved world: same version, same scene objects, no differing pixels.",
+            "At 1, 4 and 8 km the sky band is one flat colour in all nine sessions; at the arrival point it is a gradient.",
+            f"The reference cube's lit face differs from its arrival capture in {min(faces):,} to {max(faces):,} of {json.loads((RUNS / 'distance' / 'shading.json').read_text())[0]['face_pixels']:,} pixels at 4 and 8 km and in none at 1 km or nearer.",
+            f"Society replay at 128 inhabitants: {ms(hist[60]['replay_median_us'])} after 60 ticks; a tick at 512 inhabitants has a 95th percentile of {ms(pop[512]['tick_p95_us'])}.",
+            f"The combined world opens its first frame in {ms(cpt['open']['warm_first_frame_median_us'])} and its complete world in {ms(cpt['open']['warm_complete_world_median_us'])}.",
+            f"The depth model ran on MPS; peak resident memory of the depth worker was {min(r['peak_resident_kib'] for r in depth):,} to {max(r['peak_resident_kib'] for r in depth):,} KiB.",
+            f"Each placed estimate holds {points['point_count_min']:,} to {points['point_count_max']:,} points in {points['byte_size_min']:,} to {points['byte_size_max']:,} bytes.",
+        ],
+        "inferred": [
+            f"Opening crosses 2 s near {first[0]['chord_crossing_estimates_tenths'] / 10:.1f} estimates, on the straight line between the medians at 16 and 32.",
+            f"The acknowledgement crosses 250 ms at or after about {chords['clustered']['placement_ack_crossing_tenths'] // 10} clustered or {chords['spread']['placement_ack_crossing_tenths'] // 10} spread objects, on the chord between 200 and 1000.",
+            f"Replay at 128 crosses 2 s near {replay_cross // 10} ticks, on the chord between 1 and 60.",
+            "The sky is lost past about 540 m from the opening point, from the sphere's radius in the code; where between 80 m and 1 km was not measured.",
+            f"The acknowledgement's growth is the page redrawing every object, from the resident times and the code the pre-registration read; the server's apply is at most {server_share / 10:.1f} percent of it at 1000.",
+            "Per-photograph depth time is the worker's ready-to-stopped time divided by the photographs; the worker prints no per-photograph timing.",
+            f"The combined world's first frame came {ms(later)} later than the 16 estimates alone; its cause is not established.",
+            "The bands on lit faces at 4 and 8 km are consistent with shadow or depth precision at large coordinates; not established.",
+        ],
+        "observed_by_eye": [
+            "The two bound distance captures: a gradient sky and a smooth cube at the arrival point; a flat sky and a banded cube face at 8 km.",
+            "The combined capture: two rows of eight estimates ahead and the spread markers along the horizon.",
+            "At spread 1000 the markers are specks along the horizon out to 500 m; the clustered 1000 stands 20 m ahead.",
+            "The registered silhouette's change at 40 and 80 m is the cube's base line and soft shadow.",
+        ],
+        "assumed": [
+            "The rates of ordinary use in the ranking rule: two minutes a placed estimate, thirty seconds a placed object, one society tick a second.",
+            "Headless Chrome on this machine stands for a headed browser with a compositor and a display.",
+            "The release build served by vite preview's proxy stands for a production deployment.",
+            f"A real photograph's estimate costs what a synthetic one of the same point count costs ({points['point_count_min']:,} to {points['point_count_max']:,} points each here).",
+        ],
+    }
+
+
+def not_measured() -> list[str]:
+    return [
+        "Inhabitants drawn in the browser: a saved world's inhabitants are not drawn at this commit, and this runtime holds none.",
+        "Society populations of 32 and 2048: refused by the engine (100 to 512).",
+        "Society costs over HTTP: serialisation, the permission floor and the network.",
+        "Motion at distance (swimming or jitter): only still frames were captured.",
+        "Where between 80 m and 1 km the sky stops, and where between 1 and 4 km the bands start.",
+        "Where exactly between 200 and 1000 objects, and between 16 and 32 estimates, the budgets are crossed: only the registered counts were measured.",
+        "GPU execution time and browser memory: frame work is main-thread time; frame intervals stayed at the display's 16.7 ms where recorded.",
+        "Placing and taking back in the combined world, and the clustered layout combined with estimates.",
+        "More than 1000 objects, 32 estimates, 8 km or 1440 ticks of history.",
+        "Other machines, a headed browser, a production deployment, real photographs.",
+    ]
+
+
+def how_to_rerun() -> list[str]:
+    return [
+        "Restore the scripts: copy scripts/*.txt to their names without .txt and reverse the stated substitutions.",
+        "Start an isolated runtime at the measured commit (the acceptance launcher, one slot, --no-derivative-worker for the estimates runtime), build the app with vite build and serve it with preview.py up.",
+        "Objects: python3 series.py --layout spread, then --layout clustered in a fresh runtime (each count runs step.py through slot.py --gpu).",
+        "Debug against release: python3 slot.py --gpu -- python3 compare.py --label cmp-clustered-200 --objects 200, with the development server up.",
+        "Distance: python3 distance.py --repeats 3 in a world with no object.",
+        "Estimates: python3 rooms.py, then python3 estimates_series.py --counts 1,4,16,32 (depth runs through slot.py --gpu -- python3 worker.py run --once).",
+        "Combined: python3 slot.py --gpu -- python3 combined.py --objects 200 --maps 16 --take-back.",
+        "Inhabitants: python3 slot.py -- .venv/bin/python society_scale.py population --out runs/society/population.json --populations 32,128,512,2048 --ticks 60, then society_scale.py history --out runs/society/history.json --checkpoints 1,60,240,1440.",
+        "Analysis: .venv/bin/python shading.py; python3 pointcounts.py DATA_DIR; python3 outcome.py summary; python3 publish.py; .venv/bin/python write_outcome.py.",
+    ]
+
+
+if __name__ == "__main__":
+    main()

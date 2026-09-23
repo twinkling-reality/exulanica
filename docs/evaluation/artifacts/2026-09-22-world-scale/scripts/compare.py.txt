@@ -1,0 +1,40 @@
+"""Debug versus release on one world, arrival pose and walk: one slot, release then debug.
+
+    python3 compare.py --label NAME --objects N        (run through slot.py --gpu)
+
+Release is the production build served by vite preview on 19224; debug is the acceptance
+launcher's development server on 19222, which resolves playcanvas to build/playcanvas.dbg and
+serves its token in the page. Both run the registered walking and looking protocol, back to back
+inside one gated window; each judges its own idle samples. Exit 75 when either was discarded.
+"""
+
+from __future__ import annotations
+
+import argparse
+import subprocess
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+STATE = "/tmp/exulanica-0922-acceptance/exulanica-0922-world-scale/state.json"
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--label", required=True)
+    parser.add_argument("--objects", required=True)
+    args = parser.parse_args()
+    folder = HERE / "runs" / "compare"
+    folder.mkdir(parents=True, exist_ok=True)
+    codes = []
+    for build, app, extra in (("release", "http://localhost:19224/", []),
+                              ("debug", "http://localhost:19222/", ["--token-baked"])):
+        done = subprocess.run(
+            ["node", "wsdrive.mjs", "--state", STATE, "--app", app, "--out", str(folder),
+             "--label", f"{args.label}-{build}", "--objects", args.objects, "--phases", "walk,look",
+             "--build", build, *extra], cwd=HERE)
+        codes.append(done.returncode)
+    raise SystemExit(75 if 75 in codes else max(codes))
+
+
+if __name__ == "__main__":
+    main()

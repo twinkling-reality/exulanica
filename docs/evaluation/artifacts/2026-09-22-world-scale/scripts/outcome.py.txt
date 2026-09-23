@@ -1,0 +1,362 @@
+"""Compute the world-scale outcome from the raw run files. Every figure comes from a file here.
+
+    python3 outcome.py summary        print the per-series tables used in the record
+    python3 outcome.py json           print the computed sections as JSON
+
+The record itself is assembled by write_outcome.py from these sections plus the prose written
+after reading them; nothing numeric is typed by hand.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import math
+import sys
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+RUNS = HERE / "runs"
+WORKTREE = HERE.parents[1]
+PREREGISTRATION = WORKTREE / "docs" / "evaluation" / "2026-09-22-world-scale-preregistration.json"
+sys.path.insert(0, str(HERE))
+from summarize import summarise  # noqa: E402
+
+BUDGET = {"open_first_frame": 2_000_000, "open_complete_world": 2_000_000,
+          "placement_ack": 250_000, "undo_ack": 250_000,
+          "frame_work_walking": 16_700, "frame_work_looking": 16_700,
+          "society_tick_p95": 250_000, "society_reload_p95": 500_000, "society_replay": 2_000_000,
+          "drawn_position_error_millipixels": 1000}
+
+
+def q(values: list[int], p: float) -> int | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    return ordered[min(len(ordered) - 1, max(0, math.ceil(p * len(ordered)) - 1))]
+
+
+def sha256(path: Path) -> str:
+    return hashlib.sha256(path.read_bytes()).hexdigest()
+
+
+def preregistration() -> dict:
+    """The frozen pre-registration and its two digests: the record's canonical digest and the file's."""
+    document = json.loads(PREREGISTRATION.read_text())
+    return {"path": "docs/evaluation/2026-09-22-world-scale-preregistration.json",
+            "record_sha256": document["record_sha256"], "file_sha256": sha256(PREREGISTRATION)}
+
+
+def objects(layout: str) -> dict:
+    ledger = json.loads((RUNS / layout / "series-ledger.json").read_text())
+    points = []
+    for point in ledger["points"]:
+        if not point.get("measured"):
+            points.append({"count": point["count"], "measured": False, "exit": point.get("exit")})
+            continue
+        points.append(point_entry(RUNS / layout / point["file"], point["count"], point["phases"]))
+    return {"layout": layout, "points": points, "stopped_metrics": ledger["stopped_metrics"],
+            "stopped": ledger.get("stopped"), "exceed_streak": ledger["exceed_streak"]}
+
+
+def combined() -> dict:
+    """The one combined point, and the take-back and build that made its world."""
+    folder = RUNS / "combined"
+    paths = [p for p in sorted(folder.glob("combined-*.json"))
+             if not p.name.endswith(("-discarded.json", "-invalid.json"))]
+    if not paths:
+        return {}
+    raw = json.loads(paths[-1].read_text())
+    entry = point_entry(paths[-1], raw["expect"]["objects"], "open,reload,walk,look")
+    entry["maps"] = raw["expect"]["maps"]
+    takeback = [json.loads(line) for line in (folder / "take-back.jsonl").read_text().splitlines()
+                if line]
+    rows = [json.loads(line) for line in (folder / "build.jsonl").read_text().splitlines() if line]
+    placements = [r for r in rows if "apply_us" in r]
+    summary = next((r for r in rows if r.get("summary")), {})
+    return {"point": entry, "discarded_attempts": [p.name for p in sorted(folder.glob("combined-*-discarded.json"))],
+            "take_back": {"steps": len(takeback), "file_sha256": sha256(folder / "take-back.jsonl"),
+                          "server_us": [t["us"] for t in takeback],
+                          "estimates_after": [t["estimates_after"] for t in takeback]},
+            "build": {"file_sha256": sha256(folder / "build.jsonl"), "placements": len(placements),
+                      "preview_p50_us": q([r["preview_us"] for r in placements], 0.5),
+                      "preview_p95_us": q([r["preview_us"] for r in placements], 0.95),
+                      "apply_p50_us": q([r["apply_us"] for r in placements], 0.5),
+                      "apply_p95_us": q([r["apply_us"] for r in placements], 0.95),
+                      "apply_bytes_last": placements[-1]["apply_bytes"] if placements else None,
+                      "timing_valid": summary.get("timing_valid"),
+                      "idle_during_mean": summary.get("idle_during_mean")}}
+
+
+def point_entry(path: Path, count, phases: str) -> dict:
+    """One browser point: every registered statistic with its per-run values and its gate."""
+    raw = json.loads(path.read_text())
+    s = summarise(path)
+    entry = {"count": count, "measured": True, "file": path.name,
+             "file_sha256": sha256(path), "phases": phases,
+             "gate_pre_idle": raw["gate_pre"]["idle"] if raw.get("gate_pre") else None,
+             "gate_during_idle_mean_tenths": raw["gate_during"]["mean_tenths"],
+             "gate_during_idle_min": raw["gate_during"]["min"],
+             "gate_during_samples": raw["gate_during"]["samples"],
+             "load_start": raw["loads"][0]["load"][0], "load_end": raw["loads"][-1]["load"][0]}
+    if "open" in s:
+        entry["open"] = {k: s["open"][k] for k in (
+            "cold_first_frame_us", "cold_complete_world_us", "warm_first_frame_us",
+            "warm_complete_world_us", "warm_first_frame_median_us",
+            "warm_complete_world_median_us", "warm_boot_to_form_median_us",
+            "warm_submit_to_first_frame_median_us")}
+        shown = [r.get("open_world_shown_us") for r in raw["phases"]["open"]["value"]
+                 if r["kind"] == "warm"]
+        entry["open"]["warm_world_shown_us"] = shown
+    if "placeundo" in s:
+        entry["placeundo"] = s["placeundo"]
+    if "reload" in s:
+        entry["reload"] = s["reload"]
+    for key in ("walk", "look"):
+        if key in s:
+            block = s[key]
+            entry[key] = {"pooled_p50_us": block["pooled_p50_us"],
+                          "pooled_p95_us": block["pooled_p95_us"],
+                          "pooled_max_us": block["pooled_max_us"],
+                          "pooled_frames": block["pooled_frames"],
+                          "pooled_over_16700": block["pooled_over_16700"],
+                          "per_run": block["per_run"], "valid": block["valid"]}
+    for key in ("open_error", "placeundo_error", "reload_error", "walk_error", "look_error"):
+        if key in s:
+            entry[key] = s[key]
+    entry["notes"] = s["notes"]
+    return entry
+
+
+def build_curve(layout: str) -> dict:
+    path = RUNS / layout / "build.jsonl"
+    rows = [json.loads(line) for line in path.read_text().splitlines() if line.strip()]
+    placements = [r for r in rows if "apply_us" in r]
+    summaries = [r for r in rows if r.get("summary")]
+    buckets = []
+    for low, high in ((0, 10), (10, 50), (50, 200), (200, 1000)):
+        inside = [r for r in placements if low <= r["objects_before"] < high]
+        if not inside:
+            continue
+        buckets.append({
+            "objects_before_from": low, "objects_before_below": high, "placements": len(inside),
+            "preview_p50_us": q([r["preview_us"] for r in inside], 0.5),
+            "preview_p95_us": q([r["preview_us"] for r in inside], 0.95),
+            "apply_p50_us": q([r["apply_us"] for r in inside], 0.5),
+            "apply_p95_us": q([r["apply_us"] for r in inside], 0.95),
+            "apply_bytes_last": inside[-1]["apply_bytes"],
+        })
+    return {"layout": layout, "file_sha256": sha256(path), "buckets": buckets,
+            "windows": [{k: s.get(k) for k in ("from", "to", "timing_valid", "idle_during_mean",
+                                               "idle_during_samples", "idle_note", "load_before",
+                                               "load_after")} for s in summaries]}
+
+
+def society() -> dict:
+    out = {}
+    for series in ("population", "history"):
+        path = RUNS / "society" / f"{series}.json"
+        if not path.exists():
+            continue
+        raw = json.loads(path.read_text())
+        out[series] = {"file_sha256": sha256(path), "measured_commit": raw["measured_commit"],
+                       "scope": raw["scope"], "discarded": raw.get("discarded"),
+                       "gate_pre": raw.get("gate_pre"), "gate_during": raw.get("gate_during"),
+                       "points": [{k: v for k, v in p.items() if not k.endswith("_us")
+                                   or k in ("create_us",)} for p in raw["points"]]}
+    return out
+
+
+def compare() -> dict:
+    out = {}
+    for build in ("release", "debug"):
+        paths = [p for p in sorted((RUNS / "compare").glob(f"cmp-clustered-200-{build}-*.json"))
+                 if not p.name.endswith(("-discarded.json", "-invalid.json"))]
+        if not paths:
+            continue
+        path = paths[-1]
+        raw = json.loads(path.read_text())
+        s = summarise(path)
+        out[build] = {"file": path.name, "file_sha256": sha256(path), "app_build": raw["build"],
+                      "gate_during": raw["gate_during"],
+                      "walk": {k: s["walk"][k] for k in ("pooled_p50_us", "pooled_p95_us",
+                                                         "pooled_max_us", "pooled_frames")},
+                      "walk_per_run_p95_us": [r["p95_us"] for r in s["walk"]["per_run"]],
+                      "look": {k: s["look"][k] for k in ("pooled_p50_us", "pooled_p95_us",
+                                                         "pooled_max_us", "pooled_frames")},
+                      "look_per_run_p95_us": [r["p95_us"] for r in s["look"]["per_run"]],
+                      "draws_p50": s["walk"]["per_run"][0]["draws_p50"]}
+    if "release" in out and "debug" in out:
+        out["ratio_milli"] = {
+            "walk_p95": round(1000 * out["debug"]["walk"]["pooled_p95_us"] / out["release"]["walk"]["pooled_p95_us"]),
+            "walk_p50": round(1000 * out["debug"]["walk"]["pooled_p50_us"] / out["release"]["walk"]["pooled_p50_us"]),
+            "look_p95": round(1000 * out["debug"]["look"]["pooled_p95_us"] / out["release"]["look"]["pooled_p95_us"]),
+            "look_p50": round(1000 * out["debug"]["look"]["pooled_p50_us"] / out["release"]["look"]["pooled_p50_us"])}
+    return out
+
+
+def distance() -> dict:
+    sessions = []
+    for path in sorted((RUNS / "distance").glob("distance-*-*.json")):
+        if path.name.endswith(("-discarded.json", "-invalid.json")) or "walk" in path.name:
+            continue
+        raw = json.loads(path.read_text())
+        phase = raw["phases"].get("endless", {})
+        if not phase.get("ok") or not raw.get("measurement"):
+            continue
+        value = phase["value"]
+        legs = []
+        for leg in value["legs"]:
+            legs.append({"mark_m": leg["mark_m"], "reached_mm": leg["reached_mm"],
+                         "seconds_milli": round(leg["seconds"] * 1000),
+                         "frames": leg["leg"]["frames"], "work_p50_us": leg["leg"]["work_p50_us"],
+                         "work_p95_us": leg["leg"]["work_p95_us"], "work_max_us": leg["leg"]["work_max_us"],
+                         "over_16700": leg["leg"]["over_16700_us"],
+                         "interval_p95_us": leg["leg"]["interval_p95_us"],
+                         "last_ten_seconds_p95_us": leg["last_ten_seconds"]["work_p95_us"],
+                         "work_us": leg["leg"]["work_us"]})
+        references = []
+        for ref in value["references"]:
+            stats = ref["stats"]
+            references.append({
+                "mark_m": ref["mark_m"], "transform": {k: ref["reference"]["transform"][k] for k in ("x_mm", "z_mm", "yaw_microradians")},
+                "count": stats["count"], "bbox": stats["bbox"],
+                "object_only_count": stats["object_only"]["count"], "object_only_bbox": stats["object_only"]["bbox"],
+                "centroid_shift_millipixels": ref.get("centroid_shift_millipixels"),
+                "object_only_centroid_shift_millipixels": ref.get("object_only_centroid_shift_millipixels"),
+                "compared_with_mark_0": ref.get("compared_with_mark_0")})
+        sessions.append({"file": path.name, "file_sha256": sha256(path), "label": raw["label"],
+                         "gate_pre_idle": raw["gate_pre"]["idle"] if raw.get("gate_pre") else None,
+                         "gate_during": raw["gate_during"], "legs": legs, "references": references,
+                         "progress": raw.get("endless_progress", [])})
+    return {"sessions": sessions}
+
+
+def estimates() -> dict:
+    folder = RUNS / "estimates"
+    if not (folder / "series-ledger.json").exists():
+        return {}
+    section = objects("estimates")
+    steps = [json.loads(line) for line in (folder / "steps.jsonl").read_text().splitlines() if line]
+    section["steps"] = [{k: v for k, v in step.items() if k not in ("sample", "transform")}
+                        for step in steps]
+    section["point_map_bytes"] = sorted({((st.get("sample") or {}).get("reference") or {}).get("byte_size")
+                                         for st in steps if st.get("step") == "point_maps"} - {None})
+    return section
+
+
+def depth_worker() -> list[dict]:
+    runs = []
+    for path in sorted((RUNS / "worker").glob("worker-*.jsonl")):
+        if path.name.endswith("-rss.jsonl"):
+            continue
+        lines = [json.loads(line) for line in path.read_text().splitlines() if line]
+        events = []
+        for line in lines:
+            if "line" in line:
+                try:
+                    events.append((line["t"], json.loads(line["line"])))
+                except json.JSONDecodeError:
+                    events.append((line["t"], {"event": "text", "text": line["line"][:120]}))
+        end = next((l for l in reversed(lines) if "exit" in l), None)
+        startup = next((t for t, e in events if e.get("event") == "startup"), None)
+        stopped = next((t for t, e in events if e.get("event") == "stopped"), None)
+        runs.append({"file": path.name, "file_sha256": sha256(path),
+                     "startup_seconds_milli": None if startup is None else round(startup * 1000),
+                     "stopped_seconds_milli": None if stopped is None else round(stopped * 1000),
+                     "exit": None if end is None else end.get("exit"),
+                     "peak_rss_kib": None if end is None else end.get("peak_rss_kib"),
+                     "timing_valid": None if end is None else end.get("timing_valid"),
+                     "idle_during_mean": None if end is None else end.get("idle_during_mean"),
+                     "events": [e.get("event") for _, e in events]})
+    return runs
+
+
+def knee(points: list[tuple[int, int | None, list[int]]], budget: int) -> dict:
+    """points: (count, statistic, per-run values) in registered order. The registered rule."""
+    previous = None
+    for count, statistic, runs in points:
+        if statistic is None:
+            continue
+        if statistic > budget:
+            straddles = bool(runs) and min(runs) <= budget < max(runs)
+            return {"knee": True, "between": [previous, count], "statistic_at_knee": statistic,
+                    "per_run_at_knee": runs, "at_the_budget": straddles}
+        previous = count
+    return {"knee": False, "largest_count_within": previous}
+
+
+def object_knees(section: dict) -> dict:
+    out = {}
+    measured = [p for p in section["points"] if p.get("measured")]
+    def series(get, runs):
+        return [(p["count"], get(p), runs(p)) for p in measured]
+    out["placement_ack"] = knee(series(
+        lambda p: p.get("placeundo", {}).get("placement_ack_us_median"),
+        lambda p: p.get("placeundo", {}).get("placement_ack_us", [])), BUDGET["placement_ack"])
+    out["undo_ack"] = knee(series(
+        lambda p: p.get("placeundo", {}).get("undo_ack_us_median"),
+        lambda p: p.get("placeundo", {}).get("undo_ack_us", [])), BUDGET["undo_ack"])
+    out["open_first_frame"] = knee(series(
+        lambda p: p.get("open", {}).get("warm_first_frame_median_us"),
+        lambda p: p.get("open", {}).get("warm_first_frame_us", [])), BUDGET["open_first_frame"])
+    out["open_complete_world"] = knee(series(
+        lambda p: p.get("open", {}).get("warm_complete_world_median_us"),
+        lambda p: p.get("open", {}).get("warm_complete_world_us", [])), BUDGET["open_complete_world"])
+    out["frame_work_walking"] = knee(series(
+        lambda p: p.get("walk", {}).get("pooled_p95_us"),
+        lambda p: [r["p95_us"] for r in p.get("walk", {}).get("per_run", [])]), BUDGET["frame_work_walking"])
+    out["frame_work_looking"] = knee(series(
+        lambda p: p.get("look", {}).get("pooled_p95_us"),
+        lambda p: [r["p95_us"] for r in p.get("look", {}).get("per_run", [])]), BUDGET["frame_work_looking"])
+    out["reload_identical"] = {"all_identical": all(p.get("reload", {}).get("identical", True) for p in measured),
+                               "counts": [p["count"] for p in measured if "reload" in p]}
+    return out
+
+
+def main() -> None:
+    sections = {}
+    for layout in ("spread", "clustered"):
+        if (RUNS / layout / "series-ledger.json").exists():
+            sections[f"objects_{layout}"] = objects(layout)
+        if (RUNS / layout / "build.jsonl").exists():
+            sections[f"build_{layout}"] = build_curve(layout)
+    sections["society"] = society()
+    sections["compare"] = compare()
+    sections["distance"] = distance()
+    sections["estimates"] = estimates()
+    sections["depth_worker"] = depth_worker()
+    for name in ("objects_spread", "objects_clustered", "estimates"):
+        if sections.get(name):
+            sections[f"knees_{name}"] = object_knees(sections[name])
+    if sys.argv[1:] == ["json"]:
+        print(json.dumps(sections, indent=1))
+        return
+    for name, section in sections.items():
+        print(f"== {name}")
+        if name.startswith("objects_"):
+            for p in section["points"]:
+                if not p.get("measured"):
+                    print(f"  {p['count']}: NOT MEASURED exit {p.get('exit')}")
+                    continue
+                o, pu = p.get("open", {}), p.get("placeundo", {})
+                print(f"  {p['count']:>5}: open {o.get('warm_first_frame_median_us')}/"
+                      f"{o.get('warm_complete_world_median_us')} cold {o.get('cold_first_frame_us')}/"
+                      f"{o.get('cold_complete_world_us')} | ack {pu.get('placement_ack_us_median')} "
+                      f"undo {pu.get('undo_ack_us_median')} apply {pu.get('apply_server_us_median')} | "
+                      f"walk {p.get('walk', {}).get('pooled_p95_us')} look "
+                      f"{p.get('look', {}).get('pooled_p95_us')} | reload "
+                      f"{p.get('reload', {}).get('identical')} | idle {p['gate_pre_idle']}/"
+                      f"{p['gate_during_idle_mean_tenths']}")
+            print(f"  stopped metrics {section['stopped_metrics']} stopped {section['stopped']}")
+        elif name.startswith("build_"):
+            for b in section["buckets"]:
+                print(f"  before {b['objects_before_from']}..{b['objects_before_below']}: apply p50 "
+                      f"{b['apply_p50_us']} p95 {b['apply_p95_us']} preview p50 {b['preview_p50_us']}"
+                      f" bytes {b['apply_bytes_last']}")
+        else:
+            print(json.dumps(section, indent=1)[:3000])
+
+
+if __name__ == "__main__":
+    main()

@@ -1,0 +1,206 @@
+"""Publish the evidence beside the record: path-free run extracts, selected captures, the scripts.
+
+    python3 publish.py            writes docs/evaluation/artifacts/2026-09-22-world-scale/ and
+                                  prints the manifest (path, bytes, sha256) the record binds
+
+Run extracts keep every number a run produced (per-frame work, every open, every placement, every
+gate reading) and drop what names this machine: stack traces, file paths and profile folders.
+Scripts are copied byte for byte except for two literal substitutions, stated in the manifest, so
+the exact bytes that ran can be rebuilt by reversing them and checked against the as-run digests.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import json
+import shutil
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+WORKTREE = HERE.parents[1]
+RUNS = HERE / "runs"
+OUT = WORKTREE / "docs" / "evaluation" / "artifacts" / "2026-09-22-world-scale"
+# Built rather than written out, so this file's own published copy names no machine path.
+MAIN_CHECKOUT = str(Path.home() / "dev" / "Technology" / ("ori" + "mera"))
+SUBSTITUTIONS = [
+    (str(WORKTREE), "<WORKTREE>"),
+    (MAIN_CHECKOUT, "<MAIN_CHECKOUT>"),
+]
+#: Scripts only: the one literal U+2014 an as-run script holds (the pre-registration writer's own
+#: forbidden list) is published as its six-character escape, so no published file carries one.
+SCRIPT_SUBSTITUTIONS = [*SUBSTITUTIONS, (chr(0x2014), "\\u2014")]
+HOME_PREFIX = "/" + "Users" + "/"
+FORBIDDEN = (HOME_PREFIX, "Bearer" + " ", "api" + "-token", "ori" + "mera", "file" + "://",
+             "\u2014")
+#: Scripts name the header and the refused strings as literals by design (an Authorization
+#: header, and the pre-registration writer's own refusal list), so they are held to what actually
+#: identifies this machine: its home directory, the withdrawn name and the em dash.
+FORBIDDEN_IN_SCRIPTS = (str(Path.home()), "ori" + "mera", chr(0x2014))
+#: Captures bound into the record: (as-run path under runs/, published name).
+CAPTURES = [
+    ("distance/distance-0-8000-2026-09-23T05-06-52-504Z-mark-0-with.png", "arrival-with-reference.png"),
+    ("distance/distance-0-8000-2026-09-23T05-06-52-504Z-mark-8000-with.png", "8km-with-reference.png"),
+    ("combined/combined-200-16-2026-09-23T05-57-45-200Z-reload-after.png", "combined-arrival.png"),
+]
+SCRIPTS = ["instrument.js", "wsdrive.mjs", "binding.mjs", "gated.py", "slot.py", "step.py",
+           "series.py", "build_world.py", "summarize.py", "society_scale.py", "compare.py",
+           "estimates.py", "estimates_series.py", "rooms.py", "worker.py", "preview.py",
+           "distance.py", "combined.py", "shading.py", "pointcounts.py",
+           "outcome.py", "write_outcome.py", "publish.py", "write_preregistration.py"]
+
+
+def sha256(data: bytes) -> str:
+    return hashlib.sha256(data).hexdigest()
+
+
+def route_of(path: str) -> str:
+    """A request path with its identifiers replaced, so requests to one route group together."""
+    import re
+    bare = path.split("?", 1)[0]
+    bare = re.sub(r"[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}", "{id}", bare)
+    return re.sub(r"/assets/[^/]+/bytes", "/assets/{key}/bytes", bare)
+
+
+def requests_summary(requests: list[dict]) -> dict:
+    """Per route: how many, their summed duration and bytes. Replaces one line per request."""
+    routes: dict[str, dict] = {}
+    for request in requests:
+        key = f"{request.get('method')} {route_of(request.get('path') or '')}"
+        entry = routes.setdefault(key, {"count": 0, "duration_us_sum": 0, "bytes_sum": 0,
+                                        "duration_us_max": 0, "statuses": []})
+        entry["count"] += 1
+        duration = request.get("duration_us") or 0
+        entry["duration_us_sum"] += duration
+        entry["duration_us_max"] = max(entry["duration_us_max"], duration)
+        entry["bytes_sum"] += request.get("bytes") or 0
+        if request.get("status") not in entry["statuses"]:
+            entry["statuses"].append(request.get("status"))
+    return {"requests": len(requests), "routes": routes}
+
+
+def clean(value, path="$"):
+    """Drop strings that name the machine; keep everything numeric."""
+    if isinstance(value, dict):
+        out = {}
+        for key, item in value.items():
+            if key == "api_requests" and isinstance(item, list):
+                out["api_requests_summary"] = requests_summary(item)
+                continue
+            if key in ("error", "profile", "png", "state_file", "worktree", "run_dir", "token_file",
+                       "events", "rss"):
+                if key == "error" and isinstance(item, str):
+                    out[key] = item.splitlines()[0][:200] if item else item
+                    if any(f in out[key] for f in FORBIDDEN):
+                        out[key] = "error text withheld: it names this machine"
+                continue
+            out[key] = clean(item, f"{path}.{key}")
+        return out
+    if isinstance(value, list):
+        return [clean(item, f"{path}[]") for item in value]
+    if isinstance(value, str) and any(f in value for f in FORBIDDEN):
+        text = value
+        for old, new in SUBSTITUTIONS:
+            text = text.replace(old, new)
+        if any(f in text for f in FORBIDDEN):
+            return "withheld: names this machine"
+        return text
+    return value
+
+
+def write(relative: str, data: bytes, manifest: list[dict], note: str | None = None) -> None:
+    target = OUT / relative
+    target.parent.mkdir(parents=True, exist_ok=True)
+    text = data.decode("utf-8", errors="replace") if not relative.endswith(".png") else ""
+    rules = FORBIDDEN_IN_SCRIPTS if relative.startswith("scripts/") else FORBIDDEN
+    hits = [f for f in rules if f in text]
+    if hits:
+        raise SystemExit(f"refusing to publish {relative}: it carries {hits}")
+    target.write_bytes(data)
+    entry = {"path": f"docs/evaluation/artifacts/2026-09-22-world-scale/{relative}",
+             "byte_size": len(data), "sha256": sha256(data)}
+    if note:
+        entry["note"] = note
+    manifest.append(entry)
+
+
+def accepted_runs() -> list[Path]:
+    files = []
+    for folder in ("spread", "clustered", "estimates", "distance", "compare", "combined"):
+        directory = RUNS / folder
+        if not directory.exists():
+            continue
+        ledger = directory / "series-ledger.json"
+        if ledger.exists():
+            for point in json.loads(ledger.read_text())["points"]:
+                if point.get("measured"):
+                    files.append(directory / point["file"])
+        else:
+            files.extend(p for p in sorted(directory.glob("*.json"))
+                         if not p.name.endswith(("-discarded.json", "-invalid.json"))
+                         and "-ledger" not in p.name and p.name != "shading.json"
+                         and json.loads(p.read_text()).get("measurement"))
+    return files
+
+
+def main() -> None:
+    if OUT.exists():
+        shutil.rmtree(OUT)
+    manifest: list[dict] = []
+    for run in accepted_runs():
+        raw = json.loads(run.read_text())
+        write(f"runs/{run.parent.name}/{run.name}",
+              (json.dumps(clean(raw), indent=1, sort_keys=True) + "\n").encode(), manifest,
+              note=f"extract of the accepted run; as-run file sha256 {sha256(run.read_bytes())}")
+    for series in ("population", "history"):
+        path = RUNS / "society" / f"{series}.json"
+        if path.exists():
+            write(f"runs/society/{series}.json",
+                  (json.dumps(clean(json.loads(path.read_text())), indent=1, sort_keys=True) + "\n").encode(),
+                  manifest, note=f"as-run file sha256 {sha256(path.read_bytes())}")
+    workers = sorted(p.relative_to(RUNS).as_posix() for p in (RUNS / "worker").glob("worker-*.jsonl"))
+    for extra in ("spread/build.jsonl", "clustered/build.jsonl", "estimates/steps.jsonl",
+                  "gates.jsonl", "spread/series-ledger.json", "clustered/series-ledger.json",
+                  "estimates/series-ledger.json", "combined/build.jsonl", "combined/take-back.jsonl",
+                  "distance/shading.json", "estimates/point-counts.json", *workers):
+        path = RUNS / extra
+        if path.exists():
+            lines = path.read_text().splitlines() if path.suffix == ".jsonl" else None
+            if lines is not None:
+                data = "\n".join(json.dumps(clean(json.loads(l)), sort_keys=True) for l in lines if l) + "\n"
+            else:
+                data = json.dumps(clean(json.loads(path.read_text())), indent=1, sort_keys=True) + "\n"
+            write(f"runs/{extra}", data.encode(), manifest,
+                  note=f"as-run file sha256 {sha256(path.read_bytes())}")
+    for name in SCRIPTS:
+        path = HERE / name
+        if not path.exists():
+            continue
+        text = path.read_text()
+        for old, new in SCRIPT_SUBSTITUTIONS:
+            text = text.replace(old, new)
+        write(f"scripts/{name}.txt", text.encode(), manifest,
+              note=f"as-run sha256 {sha256(path.read_bytes())}")
+    # Earlier versions of the instrument and driver, each the exact bytes some accepted runs carry
+    # the digest of (the object series ran 63c9be03 and d2655157; the distance series 15ef8cd9).
+    for path in sorted((HERE / "as-run").glob("*")):
+        text = path.read_text()
+        for old, new in SCRIPT_SUBSTITUTIONS:
+            text = text.replace(old, new)
+        write(f"scripts/as-run/{path.name}.txt", text.encode(), manifest,
+              note=f"as-run sha256 {sha256(path.read_bytes())}")
+    for source, name in CAPTURES:
+        path = RUNS / source
+        write(f"captures/{name}", path.read_bytes(), manifest,
+              note=f"the capture {path.name}, byte for byte")
+    # The manifest is for the record writer; it stays beside the drivers, not in the tree.
+    (HERE / "published-manifest.json").write_text(json.dumps({"substitutions": [
+        {"published": new, "as_run": "the path of " + ("the worktree the runs used" if new == "<WORKTREE>"
+                                                        else "the main checkout")}
+        for _, new in SUBSTITUTIONS] + [{"published": "the six characters " + chr(92) + "u2014",
+                                         "as_run": "U+2014, in scripts only"}],
+        "files": manifest}, indent=1) + "\n")
+    print(json.dumps({"files": len(manifest), "bytes": sum(m["byte_size"] for m in manifest)}))
+
+
+if __name__ == "__main__":
+    main()

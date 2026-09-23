@@ -1,0 +1,249 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "browser_session": "headless Chrome over the DevTools protocol, viewport 1440 x 900 CSS pixels, device scale factor 1, a fresh profile per session. Input is trusted DevTools input: mouse clicks at an element's centre and held key events on the focused world canvas.",
+    "budgets": {
+      "drawn_position_error_millipixels": {
+        "budget": 1000,
+        "definition": "a reference object placed through the product at each distance mark, captured at a fixed pose relative to it; its silhouette (capture with it minus capture without it) is compared with the same relative capture at the arrival point: centroid shift in thousandths of a pixel, and intersection over union reported beside it",
+        "why": "one pixel is the smallest displacement this display can show"
+      },
+      "frame_work_looking_p95_us": {
+        "budget": 16700,
+        "statistic": "95th percentile of per-frame main-thread work over the turns in place",
+        "why": "the same display, turning instead of walking"
+      },
+      "frame_work_walking_p95_us": {
+        "budget": 16700,
+        "statistic": "95th percentile of per-frame main-thread work over the walk windows",
+        "why": "a 60 Hz display presents a frame every 16.7 ms; work longer than that misses the next presentation and motion stutters"
+      },
+      "open_complete_world_us": {
+        "budget": 2000000,
+        "definition": "as open_first_frame_us, ending instead at the end of the first drawn frame after every saved object and every placed estimate is resident in the scene",
+        "statistic": "median over the warm opens, with the cold open reported beside it",
+        "why": "a first frame without the person's own objects is not their world, so the world they saved gets the same 2 s"
+      },
+      "open_first_frame_us": {
+        "budget": 2000000,
+        "definition": "(the credential form in the document minus navigation start) plus (the end of the first drawn frame minus the token submit). The operator form is how this runtime authenticates; a signed-in person skips it, so the time the form waits for input is excluded and nothing else is.",
+        "statistic": "median over the warm opens, with the cold open reported beside it",
+        "why": "opening a saved world should show it within 2 s on this machine"
+      },
+      "placement_ack_us": {
+        "budget": 250000,
+        "definition": "from the trusted click on Confirm to the first animation frame after the objects panel shows the settled report that the object was added",
+        "recorded_beside": [
+          "Place before me click to the verdict reading ready",
+          "Confirm click to the new object resident in the scene",
+          "the server's apply request duration"
+        ],
+        "statistic": "median over the placements at a count, with each value listed",
+        "why": "a change a person confirms should visibly land within a quarter second"
+      },
+      "reload_identical": {
+        "budget": "all three hold",
+        "parts": [
+          "the authored version read before and after the reload has the same state_sha256 and a byte-equal object list",
+          "the scene's resident objects after the reload have the same ids and world positions to 0.1 mm as before it",
+          "at the arrival pose, the share of pixels differing by more than 3 levels in any channel is no more than the share between two captures of the same page without a reload, plus 0.1 percentage point"
+        ],
+        "why": "reopening a saved world must show the world that was saved"
+      },
+      "society_reload_p95_us": {
+        "budget": 500000,
+        "definition": "one society snapshot read plus one read of the latest 256 events",
+        "scope": "in-process server cost; HTTP, serialisation and the permission floor excluded",
+        "why": "an allocation, not a measurement: a quarter of the 2 s open budget, since the society is one of several reads when a world opens"
+      },
+      "society_replay_us": {
+        "budget": 2000000,
+        "scope": "in-process server cost; HTTP, serialisation and the permission floor excluded",
+        "statistic": "median of the replays at a checkpoint",
+        "why": "replay is the verification a person or host can ask for; it gets the open budget"
+      },
+      "society_tick_p95_us": {
+        "budget": 250000,
+        "hard_ceiling": 1000000,
+        "scope": "in-process server cost; HTTP, serialisation and the permission floor excluded",
+        "why": "hosted playback runs a tick every 1,000 ms at speed 1 and every 250 ms at speed 4 (exulanica/world/society_controls.py SPEEDS and the 1,000 ms base the control worker uses); a tick longer than the interval falls behind"
+      },
+      "undo_ack_us": {
+        "budget": 250000,
+        "definition": "from the trusted click on Confirm for taking back the last change to the first animation frame after the panel shows the settled report that it was taken back",
+        "statistic": "median over the undos at a count, with each value listed",
+        "why": "the same quarter second for taking a change back"
+      }
+    },
+    "builds": {
+      "budgeted_build": "release",
+      "debug": "the development server the acceptance launcher starts. The playcanvas package resolves to build/playcanvas.dbg through its development export.",
+      "debug_comparison": "debug is measured once against release on the same world, arrival pose and walk, and the gap is reported as its own result, so a development-server timing can be read against a release one",
+      "release": "the app built with vite build from the measured commit with VITE_EXULANICA_TOKEN unset, served by vite preview with /api proxied to the isolated API. The playcanvas package resolves to its release build."
+    },
+    "declared_limits_of_the_design": [
+      "Society figures are in-process server cost, not HTTP: serialisation, the permission floor and the network are left out, and a reader must not add them in.",
+      "Inhabitants of a saved world are not drawn by the browser at this commit, so no frame cost of inhabitants is measured.",
+      "Headless Chrome on one machine. A headed browser with a compositor and a physical display may differ; that is assumed, not measured.",
+      "The release build is served by vite preview's proxy, not by a production deployment.",
+      "Synthetic photographs, not personal ones; what a real photograph's estimate costs to draw is assumed to scale with its point count, which is recorded."
+    ],
+    "instrument": {
+      "application": "the engine application object, captured when its constructor registers it under the canvas id, so the scene graph can be read with no debug global",
+      "callback_lag": "callback entry time minus the frame timestamp the browser passed",
+      "drawn_frame": "a frame whose callbacks issued at least one WebGL draw call, counted by wrapping the draw entry points of WebGL2RenderingContext.prototype",
+      "frame_work": "the wall time of every requestAnimationFrame callback from entry to return, measured by wrapping window.requestAnimationFrame. The engine's tick is that callback, so this is the main thread's work for a frame: the engine update, the binding's decisions and render submission. Callbacks sharing one frame timestamp are summed. Frame intervals are recorded beside it and never stand in for it.",
+      "installed_by": "a script evaluated before any page script (Page.addScriptToEvaluateOnNewDocument), so no product file changes",
+      "long_tasks": "PerformanceObserver longtask entries over the same window: count and total",
+      "object_residency": "additions and removals of scene nodes named authored-object:<id>, timestamped where the engine attaches and detaches them",
+      "pixels": "the engine's render followed by gl.readPixels of the default framebuffer in the same task. Never a browser screenshot: the app renders only the frames it wants, so a screenshot can read a stale frame.",
+      "server_timing": "request sent to response received for each product request, from the DevTools network events, beside the in-page timings"
+    },
+    "knee": "the smallest registered count at which a metric's statistic exceeds its budget, reported as lying between the previous registered count and that one. When the per-run values at a count straddle the budget, the count is reported as at the budget. When no registered count exceeds it, no knee is claimed and the reason the range stops where it does is given.",
+    "load_discipline": [
+      "every browser timing run is wrapped in quiet-slot then gpu-slot, in that order; society timing runs in quiet-slot; builds run in quiet-slot",
+      "the one-minute load is read inside the slot before timing starts and again after; a run whose load before exceeds 8 is discarded and retried, three attempts at most, after which the point is recorded as not measured with its loads",
+      "the nice value of every measuring process is recorded; zsh background niceness is off",
+      "depth estimation never runs inside a timing window"
+    ],
+    "machine": {
+      "browser": "Google Chrome 153.0.8010.53, headless (new mode)",
+      "hardware_model": "Mac17,6",
+      "logical_cpus": 18,
+      "memory_bytes": 68719476736,
+      "node": "v24.15.0",
+      "os": "macOS 26.7",
+      "postgresql": "18.6",
+      "recorded_again": "the same facts and the WebGL renderer string are read again with every run"
+    },
+    "measured_commit": "7e6144ea80847dd235a870ba14f4b7fbcf95dba0",
+    "open_questions": [
+      "Whether frame work reaches its knee inside the registered object range.",
+      "Whether anything on the ground surface visibly swims or jitters at 1, 4 or 8 km.",
+      "How many photo estimates a world holds before opening or frame work fails, and which fails first.",
+      "Whether a reload ever shows a different world from the one saved."
+    ],
+    "predictions": [
+      "Placement and undo acknowledgement grow linearly with placed objects: settle awaits redrawAll, which clears every resident object and fetches, hashes, decodes and attaches each one again, one at a time (web/packages/app/src/composition/objects.ts settle, redrawAll, drawEvery; web/packages/atlas-react/src/playcanvas/scene-objects.ts place). Predicted to be the first budget to fail, in both layouts.",
+      "Open to first drawn frame does not grow with objects, which are drawn after the renderer mounts (main.ts calls objects.begin after mountRenderer), and does grow with placed estimates, which are fetched and hashed before it mounts (loadAuthoredPointMaps).",
+      "Open to complete world grows linearly with objects, for the reason in the first prediction.",
+      "The server's apply grows with objects: every edit digests every object (object_repository._append_edit, delta_sha256) and answers with every object and every edit.",
+      "Frame work while walking grows with objects in view, one entity and draw per object with no instancing, faster clustered than spread.",
+      "Society replay grows with ticks times population, since replay reruns every tick from the first; a tick grows with population.",
+      "Drawn position error for an object stays below a pixel at 8 km: float32 spacing at 8,192 m is 0.977 mm, from the endless ground's own measurement."
+    ],
+    "profile": "exulanica.world-scale-preregistration/v1",
+    "question": "How large can a saved world grow through the product's own routes before what a person does in it (opening, reloading, placing and undoing, walking, looking around) stops meeting the budgets below, and which limit does a person meet first?",
+    "ranking": {
+      "assumed_rates": {
+        "estimate_seconds": 120,
+        "object_placement_seconds": 30,
+        "society": "playback at speed 1, one tick per second",
+        "walking": "sprint, 23.4 m/s"
+      },
+      "rule": "limits a person meets through the product are ranked by the minutes of ordinary use before they appear; limits no product path reaches at this commit follow them"
+    },
+    "runtime": "one isolated API, PostgreSQL 18 server and web server on this machine, a synthetic workspace and bearer token minted per runtime, no model key, no personal photograph. The token is typed into the page's own operator field and held only in page memory.",
+    "series": {
+      "combined": "one world holding at once the largest count of each separate series at which every budgeted metric of that series passed (the smallest registered count where none passed), measured once with open, reload, walking and looking",
+      "distance": {
+        "at_each_mark": "release the keys, place the reference marker with Place before me, capture the drawn position error, take the placement back, walk on",
+        "frame_work": "over the whole walk and in the 10 s before each mark",
+        "marks_m": [
+          1000,
+          4000,
+          8000
+        ],
+        "repeats": 3,
+        "route": "from the arrival pose along its facing, holding W and Shift (23.4 m/s, the controls' sprint), in a world with no other object"
+      },
+      "estimates": {
+        "counts": [
+          1,
+          4,
+          16,
+          32
+        ],
+        "made_through": "POST /intake, then the personal admission review granting the depth right against the server's exact notice (the same step a person takes), the ingest worker with EXULANICA_DEPTH_MODEL=moge and the cached MoGe-2 checkpoint as the runtime role, then POST /world-entries/{id}/source-attachments and compositions preview and apply as photo_point_map on a 4 m grid in front of the arrival point",
+        "measured_at_each_count": [
+          "open (1 cold, 5 warm)",
+          "reload identical",
+          "walking (3 walks)",
+          "looking (3 turns)",
+          "the placement's server duration"
+        ],
+        "photographs": "procedural synthetic room images, distinct per index, no person and no real place"
+      },
+      "inhabitants": {
+        "at_each_checkpoint": [
+          "every tick's advance duration",
+          "20 reloads (snapshot plus 256 events)",
+          "3 replays",
+          "state bytes"
+        ],
+        "history_ticks_at_128": [
+          1,
+          60,
+          240,
+          1440
+        ],
+        "population_counts": [
+          32,
+          128,
+          512,
+          2048
+        ],
+        "population_note": "the product creates 128 for a saved world (SOCIETY_POPULATION); 32, 512 and 2048 are made by overriding that constant inside the measurement process only, which no product path can do",
+        "population_series_ticks": 60,
+        "scope": "in-process server cost through SocietyRuntime and the society repository",
+        "world": "a saved starter world on the endless ground with one reviewed marker plate at (3000, 5000) mm, profile exulanica-society/v2"
+      },
+      "objects": {
+        "assets": "the three reviewed markers in turn by index (cube, pillar, plate)",
+        "built_through": "POST /world/versions/{id}/compositions/preview then /apply with the runtime's token, the route pair the browser itself uses, one placement at a time",
+        "counts": [
+          0,
+          10,
+          50,
+          200,
+          1000
+        ],
+        "each_layout_in": "its own saved world, each in a fresh runtime and workspace",
+        "layouts": {
+          "clustered": "a sunflower spiral over a disc of radius 10 m centred 20 m in front of the arrival point along the arrival facing",
+          "spread": "a sunflower spiral over a disc of radius 500 m centred on the ground origin"
+        },
+        "measured_at_each_count": [
+          "open (1 cold, 5 warm)",
+          "placement and undo through the objects panel (5 pairs)",
+          "reload identical",
+          "walking (3 walks)",
+          "looking (3 turns)"
+        ]
+      }
+    },
+    "statistics": "pooled p50, p95 and maximum per point, and the per-run median and p95 to show the spread between runs; every raw sample is kept beside the record",
+    "stop_rules": [
+      "a budgeted metric that has exceeded its budget at two consecutive registered counts is not measured at larger counts of that series, because its knee is bracketed; the other metrics continue",
+      "a series stops growing when every budgeted metric in it has stopped, at its largest registered count, when growing it to the next count through the product routes would take more than 60 minutes at the measured build rate, or when the product refuses to grow it, in which case the refusal is the finding",
+      "the estimates series also stops when the placed point maps would exceed 1 GiB in total, or when the page loses its WebGL context or its renderer crashes, in which case the count reached is the finding",
+      "the population series stops after two consecutive tick budget failures or when one tick exceeds 60 s; the history series stops when one replay exceeds 600 s",
+      "no count, distance or budget in this record is changed after the first timing run; a point added later is reported as added later, with the reason, and cannot be a knee"
+    ],
+    "tree_rule": "Every figure names the commit it ran on. Before each run the product paths (exulanica/, web/packages/, migrations) are checked unchanged from that commit with git diff --quiet and git status. Measurement drivers live outside the product paths.",
+    "unbudgeted_results": [
+      "the server's preview and apply duration for every placement that builds a world",
+      "response bytes of the authored version as it grows",
+      "the depth worker's model load wall time, inference wall time per photograph and peak resident memory, run outside every timing window, compared with the figures lane records give for the same checkpoint on this class of machine",
+      "the debug-versus-release frame work gap",
+      "society state bytes, events per tick and replay rate in ticks per second"
+    ],
+    "walk_protocol": {
+      "looking": "at the arrival point, hold ArrowLeft for 4654 ms (one full turn at 1.35 rad/s)",
+      "starts_after": "the world is complete and 2 s have passed with no input",
+      "walking": "from the arrival pose, hold S for 20 s, then hold W for 20 s, heading unchanged, so the arrival view stays in front of the camera throughout; frame work pooled over both windows"
+    },
+    "written_at": "2026-09-22T22:38:12+00:00"
+  },
+  "record_sha256": "e67bd95cc63729a5ee4adfb4abb906b1d3e3993eaece3b41db6abcfd0b64c406"
+}

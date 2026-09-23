@@ -1,0 +1,375 @@
+"""In-process cost of a saved world's society: tick, reload and replay against population and history.
+
+    .venv/bin/python society_scale.py population --out FILE [--populations 32,128,512,2048] [--ticks 60]
+    .venv/bin/python society_scale.py history --out FILE [--checkpoints 1,60,240,1440]
+
+In-process server cost, not HTTP: the society repository and SocietyRuntime are called directly on a
+private PostgreSQL 18 server as the non-owner runtime role through Database.session, the connection
+the API's routes use. Serialisation, the permission floor and the network are left out.
+
+The world is a saved starter world on the endless ground (the product's create_starter_authorities)
+holding one reviewed marker plate at (3000, 5000) mm, the rest target lane I's fixture used, with
+profile exulanica-society/v2. The place row and the registration are host actions, as no product step
+makes them.
+
+The product creates 128 inhabitants for a saved world. Any other population is made by patching two
+names inside THIS process only: society_repository.SOCIETY_POPULATION (what create stores) and
+society_repository.initial_purposeful_society (create calls it without a population). Replay then
+reads the stored population, so the patched society replays as itself.
+"""
+
+from __future__ import annotations
+
+import argparse
+import functools
+import hashlib
+import io
+import json
+import math
+import os
+import sys
+import tempfile
+import time
+import uuid
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+WORKTREE = HERE.parents[1]
+sys.path.insert(0, str(WORKTREE / "scripts"))
+sys.path.insert(0, str(WORKTREE))
+
+import psycopg  # noqa: E402
+
+import test_postgres  # noqa: E402
+from exulanica.api.society_runtime import AuthoredWorldSocietyBinding, SocietyRuntime  # noqa: E402
+from exulanica.db.cli import provision  # noqa: E402
+from exulanica.db.migrate import provision_workspace  # noqa: E402
+from exulanica.db.roles import RUNTIME_ROLE  # noqa: E402
+from exulanica.db.session import Database, set_workspace  # noqa: E402
+from exulanica.selection.validation import Session  # noqa: E402
+from exulanica.store.local import LocalContentAddressedStore  # noqa: E402
+from exulanica.world import society_repository as repository_module  # noqa: E402
+from exulanica.world.assets import reviewed_assets, seed_reviewed_assets  # noqa: E402
+from exulanica.world.object_repository import WorldObjectRepository  # noqa: E402
+from exulanica.world.objects import AuthoredObject, ObjectOrigin, Transform  # noqa: E402
+from exulanica.world.society import SOCIETY_POPULATION  # noqa: E402
+from exulanica.world.society_composition import reviewed_affordance_registry  # noqa: E402
+from exulanica.world.society_repository import SocietyRepository  # noqa: E402
+from exulanica.world.starter import (  # noqa: E402
+    AUTHORED_STARTER_REGION_ID,
+    create_starter_authorities,
+)
+
+PROFILE = "exulanica-society/v2"
+SEED = "7a" * 32
+ORIGINAL_INITIALISER = repository_module.initial_purposeful_society
+
+
+def load() -> list[float]:
+    return [round(v, 2) for v in os.getloadavg()]
+
+
+DRY = "--dry" in sys.argv
+IDLE_SAMPLES = os.environ.get("WS_IDLE_SAMPLES")
+STARTED_EPOCH = time.time()
+
+
+def gate(record: dict) -> None:
+    """The quiet-machine gate is gated.py's (idle >= 70 percent over 10 s before this started)."""
+    record.setdefault("loads", []).append({"what": "gate", "load": load()})
+    if not DRY and IDLE_SAMPLES is None:
+        raise SystemExit("refused: a measurement runs through gated.py (WS_IDLE_SAMPLES)")
+
+
+def idle_during() -> dict | None:
+    if IDLE_SAMPLES is None:
+        return None
+    until = time.time()
+    values = [json.loads(line) for line in Path(IDLE_SAMPLES).read_text().splitlines() if line]
+    values = [v["idle"] for v in values if STARTED_EPOCH <= v["t"] <= until]
+    return {"samples": len(values),
+            "mean_tenths": round(sum(values) / len(values) * 10) if values else None,
+            "min": min(values) if values else None}
+
+
+def set_population(population: int) -> None:
+    """Patch the two names create reads; the identity at the product's own population."""
+    repository_module.SOCIETY_POPULATION = population
+    repository_module.initial_purposeful_society = (
+        ORIGINAL_INITIALISER if population == SOCIETY_POPULATION
+        else functools.partial(ORIGINAL_INITIALISER, population=population)
+    )
+
+
+class Harness:
+    def __init__(self) -> None:
+        self.server, self.owner_url = test_postgres.start_test_server("worldscale")
+        previous = os.environ.get("EXULANICA_DATABASE_URL")
+        os.environ["EXULANICA_DATABASE_URL"] = self.owner_url
+        try:
+            provision(io.StringIO())
+        finally:
+            if previous is None:
+                os.environ.pop("EXULANICA_DATABASE_URL", None)
+            else:
+                os.environ["EXULANICA_DATABASE_URL"] = previous
+        database_name = self.owner_url.rsplit("/", 1)[1]
+        self.runtime_url = self.server.url(database_name, RUNTIME_ROLE)
+        self.database = Database(url=self.runtime_url)
+        self.workspace = uuid.uuid4()
+        self.actor = uuid.uuid4()
+        self.session = Session(workspace_id=self.workspace, actor=self.actor)
+        with psycopg.connect(self.owner_url, autocommit=True) as owner:
+            provision_workspace(owner, self.workspace)
+        self.tmp = Path(tempfile.mkdtemp(prefix="world-scale-society-"))
+        self.store = LocalContentAddressedStore(self.tmp / "blobs")
+        seed_reviewed_assets(self.store)
+        self.registry = reviewed_affordance_registry()
+        self.plate = next(a for a in reviewed_assets() if a.asset_key == "cc0.marker-plate")
+
+    def close(self) -> None:
+        test_postgres.remove_test_server(self.server)
+
+    def world(self, connection: psycopg.Connection) -> dict:
+        """A new saved starter world with one marker plate, registered for a society."""
+        world_id = f"world:authored:{uuid.uuid4()}"
+        with connection.transaction():
+            snapshot_id, _, version_id = create_starter_authorities(
+                connection, workspace_id=self.workspace, actor=self.actor,
+                title="A world of my own", world_id=world_id,
+            )
+        place = uuid.uuid4()
+        with psycopg.connect(self.owner_url, autocommit=True) as owner:
+            set_workspace(owner, self.workspace)
+            owner.execute("insert into place(workspace_id,place_id) values(%s,%s)",
+                          (self.workspace, place))
+        binding = AuthoredWorldSocietyBinding(
+            binding_id=f"world-scale-{version_id}", workspace_id=self.workspace,
+            world_id=world_id, version_id=version_id, source_snapshot_id=snapshot_id,
+            place_id=place, region_id=AUTHORED_STARTER_REGION_ID,
+        )
+        runtime = SocietyRuntime(store=self.store, authored_bindings=[binding],
+                                 reviewed_affordances=self.registry)
+        objects = WorldObjectRepository(
+            connection, self.workspace, world_id=world_id, store=self.store,
+            on_edit=lambda vid: runtime.authored_edit(connection, self.session, vid),
+        )
+        version = objects.version(version_id)
+        objects.add_object(
+            version.version_id,
+            AuthoredObject(
+                object_id="object:cushion", asset_sha256=self.plate.content_sha256,
+                region_id=AUTHORED_STARTER_REGION_ID,
+                transform=Transform(x_mm=3000, y_mm=0, z_mm=5000, yaw_microradians=0,
+                                    scale_milli=1000),
+                origin=ObjectOrigin("authored", "fictional"),
+            ),
+            base_state_sha256=version.state_sha256, actor=self.actor,
+        )
+        return {"world_id": world_id, "version_id": version_id, "place": place,
+                "binding": binding}
+
+    def repository(self, connection: psycopg.Connection, world: dict) -> SocietyRepository:
+        runtime = SocietyRuntime(store=self.store, authored_bindings=[world["binding"]],
+                                 reviewed_affordances=self.registry)
+        return SocietyRepository(
+            connection, self.workspace, world_id=world["world_id"],
+            input_authorizer=lambda doc: runtime.authorize(connection, self.session, doc),
+        )
+
+    def create(self, connection: psycopg.Connection, world: dict) -> tuple[dict, int]:
+        runtime = SocietyRuntime(store=self.store, authored_bindings=[world["binding"]],
+                                 reviewed_affordances=self.registry)
+        document = runtime.initial_input(connection, self.session, world["version_id"],
+                                         world["place"], AUTHORED_STARTER_REGION_ID)
+        started = time.perf_counter_ns()
+        society = self.repository(connection, world).create(
+            world["version_id"], place_id=world["place"], region_id=AUTHORED_STARTER_REGION_ID,
+            seed=SEED, actor=self.actor, profile=PROFILE, initial_input=document,
+        )
+        return society, (time.perf_counter_ns() - started) // 1000
+
+
+def quantile(values: list[int], q: float) -> int | None:
+    if not values:
+        return None
+    ordered = sorted(values)
+    return ordered[min(len(ordered) - 1, max(0, math.ceil(q * len(ordered)) - 1))]
+
+
+def summary(values: list[int]) -> dict:
+    return {"n": len(values), "p50_us": quantile(values, 0.5), "p95_us": quantile(values, 0.95),
+            "max_us": quantile(values, 1.0), "min_us": quantile(values, 0.0)}
+
+
+def advance(harness: Harness, connection, world: dict, society: dict, ticks: int) -> tuple[dict, list[int]]:
+    durations = []
+    repository = harness.repository(connection, world)
+    for _ in range(ticks):
+        started = time.perf_counter_ns()
+        society = repository.advance(world["version_id"], base_tick=society["current_tick"],
+                                     base_state_sha256=society["state_sha256"])
+        durations.append((time.perf_counter_ns() - started) // 1000)
+    return society, durations
+
+
+def reloads(harness: Harness, connection, world: dict, count: int) -> tuple[list[int], str]:
+    durations = []
+    digest = None
+    for _ in range(count):
+        started = time.perf_counter_ns()
+        repository = harness.repository(connection, world)
+        snapshot = repository.snapshot(world["version_id"])
+        repository.events(world["version_id"], limit=256)
+        durations.append((time.perf_counter_ns() - started) // 1000)
+        digest = snapshot["state_sha256"]
+    return durations, digest
+
+
+def replays(harness: Harness, connection, world: dict, count: int) -> tuple[list[int], list[bool]]:
+    durations, verified = [], []
+    for _ in range(count):
+        started = time.perf_counter_ns()
+        replay = harness.repository(connection, world).replay(world["version_id"])
+        elapsed = (time.perf_counter_ns() - started) // 1000
+        durations.append(elapsed)
+        verified.append(bool(replay.get("replay_verified")))
+        if elapsed > 600_000_000:
+            break
+    return durations, verified
+
+
+def facts(connection, harness: Harness, world: dict, society: dict) -> dict:
+    state = society["state"]
+    state_bytes = len(json.dumps(state, sort_keys=True, separators=(",", ":")).encode())
+    events = connection.execute(
+        "select count(*) as n from world_society_event where workspace_id=%s", (harness.workspace,)
+    ).fetchone()
+    return {"tick": society["current_tick"], "inhabitants": len(state["inhabitants"]),
+            "state_bytes": state_bytes, "events_in_workspace": list(events.values())[0]
+            if isinstance(events, dict) else events[0]}
+
+
+def run_population(args: argparse.Namespace, record: dict) -> None:
+    harness = Harness()
+    try:
+        record["server"] = {"postgresql": harness.server.data.name}
+        consecutive_failures = 0
+        for population in [int(p) for p in args.populations.split(",")]:
+            gate(record)
+            set_population(population)
+            with harness.database.session(harness.workspace) as connection:
+                world = harness.world(connection)
+                try:
+                    society, create_us = harness.create(connection, world)
+                except ValueError as refusal:
+                    # A population the engine will not make is a result, not a crash.
+                    record["points"].append({"population": population, "refused": str(refusal)})
+                    print(json.dumps(record["points"][-1]), flush=True)
+                    continue
+                before = load()
+                society, ticks = advance(harness, connection, world, society, args.ticks)
+                reload_us, digest = reloads(harness, connection, world, 20)
+                replay_us, verified = replays(harness, connection, world, 3)
+                point = {
+                    "population": population, "patched": population != SOCIETY_POPULATION,
+                    "create_us": create_us, "tick": summary(ticks), "ticks_us": ticks,
+                    "reload": summary(reload_us), "reload_us": reload_us,
+                    "replay": summary(replay_us), "replay_us": replay_us,
+                    "replay_verified": verified, "reload_state_matches": digest == society["state_sha256"],
+                    "facts": facts(connection, harness, world, society),
+                    "load_before": before, "load_after": load(),
+                }
+            record["points"].append(point)
+            print(json.dumps({k: point[k] for k in ("population", "tick", "reload", "replay",
+                                                     "replay_verified", "facts")}), flush=True)
+            Path(args.out).write_text(json.dumps(record, indent=1))
+            over = point["tick"]["p95_us"] > 250_000
+            consecutive_failures = consecutive_failures + 1 if over else 0
+            if consecutive_failures >= 2 or point["tick"]["max_us"] > 60_000_000:
+                record["stopped"] = f"stop rule at population {population}"
+                break
+    finally:
+        set_population(SOCIETY_POPULATION)
+        harness.close()
+
+
+def run_history(args: argparse.Namespace, record: dict) -> None:
+    harness = Harness()
+    set_population(SOCIETY_POPULATION)
+    try:
+        gate(record)
+        with harness.database.session(harness.workspace) as connection:
+            world = harness.world(connection)
+            society, create_us = harness.create(connection, world)
+            record["create_us"] = create_us
+            done = 0
+            all_ticks: list[int] = []
+            for checkpoint in [int(c) for c in args.checkpoints.split(",")]:
+                before = load()
+                society, ticks = advance(harness, connection, world, society, checkpoint - done)
+                done = checkpoint
+                all_ticks.extend(ticks)
+                reload_us, digest = reloads(harness, connection, world, 20)
+                replay_us, verified = replays(harness, connection, world, 3)
+                point = {
+                    "ticks_elapsed": checkpoint, "population": SOCIETY_POPULATION,
+                    "ticks_since_last": summary(ticks), "ticks_us": ticks,
+                    "reload": summary(reload_us), "reload_us": reload_us,
+                    "replay": summary(replay_us), "replay_us": replay_us,
+                    "replay_verified": verified, "reload_state_matches": digest == society["state_sha256"],
+                    "facts": facts(connection, harness, world, society),
+                    "load_before": before, "load_after": load(),
+                }
+                record["points"].append(point)
+                print(json.dumps({k: point[k] for k in ("ticks_elapsed", "ticks_since_last",
+                                                         "reload", "replay", "replay_verified",
+                                                         "facts")}), flush=True)
+                Path(args.out).write_text(json.dumps(record, indent=1))
+                if max(replay_us) > 600_000_000:
+                    record["stopped"] = f"a replay exceeded 600 s at {checkpoint} ticks"
+                    break
+            record["all_ticks"] = summary(all_ticks)
+    finally:
+        harness.close()
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("series", choices=("population", "history"))
+    parser.add_argument("--out", required=True)
+    parser.add_argument("--populations", default="32,128,512,2048")
+    parser.add_argument("--ticks", type=int, default=60)
+    parser.add_argument("--checkpoints", default="1,60,240,1440")
+    parser.add_argument("--dry", action="store_true", help="a functional check, never a measurement")
+    args = parser.parse_args()
+    head = os.popen(f"git -C {WORKTREE} rev-parse HEAD").read().strip()
+    record = {
+        "series": args.series, "scope": "in-process server cost; not HTTP",
+        "measurement": not args.dry,
+        "measured_commit": head, "profile": PROFILE, "product_population": SOCIETY_POPULATION,
+        "started_at": time.strftime("%Y-%m-%dT%H:%M:%S%z"), "points": [],
+        "nice": os.getpriority(os.PRIO_PROCESS, 0), "python": sys.version.split()[0],
+        "script_sha256": hashlib.sha256(Path(__file__).read_bytes()).hexdigest(),
+    }
+    record["gate_pre"] = json.loads(os.environ["WS_IDLE_PRE"]) if "WS_IDLE_PRE" in os.environ else None
+    quiet = True
+    try:
+        (run_population if args.series == "population" else run_history)(args, record)
+    finally:
+        record["finished_at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+        record.setdefault("loads", []).append({"what": "end", "load": load()})
+        record["gate_during"] = idle_during()
+        during = record["gate_during"]
+        quiet = DRY or (during is not None and during["samples"] > 0 and during["mean_tenths"] >= 500)
+        if not quiet:
+            record["discarded"] = f"mean CPU idle during the run below 50 percent: {during}"
+            kept = Path(args.out).with_name(f"{Path(args.out).stem}-discarded-{int(time.time())}.json")
+            kept.write_text(json.dumps(record, indent=1))
+        Path(args.out).write_text(json.dumps(record, indent=1))
+    if not quiet:
+        raise SystemExit(75)
+
+
+if __name__ == "__main__":
+    main()

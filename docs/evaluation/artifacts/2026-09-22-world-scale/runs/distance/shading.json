@@ -1,0 +1,245 @@
+[
+ {
+  "face_differing_from_arrival": 0,
+  "face_middle_row_steps": 0,
+  "face_pixels": 11328,
+  "mark_m": 0,
+  "session": "distance-0-1000",
+  "sky_all_clear_colour": false,
+  "sky_distinct_colours": 30
+ },
+ {
+  "face_differing_from_arrival": 0,
+  "face_middle_row_steps": 0,
+  "face_pixels": 11328,
+  "mark_m": 1000,
+  "session": "distance-0-1000",
+  "sky_all_clear_colour": true,
+  "sky_distinct_colours": 1
+ },
+ {
+  "face_differing_from_arrival": 0,
+  "face_middle_row_steps": 0,
+  "face_pixels": 11328,
+  "mark_m": 0,
+  "session": "distance-0-4000",
+  "sky_all_clear_colour": false,
+  "sky_distinct_colours": 30
+ },
+ {
+  "face_differing_from_arrival": 7065,
+  "face_middle_row_steps": 6,
+  "face_pixels": 11328,
+  "mark_m": 4000,
+  "session": "distance-0-4000",
+  "sky_all_clear_colour": true,
+  "sky_distinct_colours": 1
+ },
+ {
+  "face_differing_from_arrival": 0,
+  "face_middle_row_steps": 0,
+  "face_pixels": 11328,
+  "mark_m": 0,
+  "session": "distance-0-8000",
+  "sky_all_clear_colour": false,
+  "sky_distinct_colours": 30
+ },
+ {
+  "face_differing_from_arrival": 7021,
+  "face_middle_row_steps": 7,
+  "face_pixels": 11328,
+  "mark_m": 8000,
+  "session": "distance-0-8000",
+  "sky_all_clear_colour": true,
+  "sky_distinct_colours": 1
+ },
+ {
+  "face_differing_from_arrival": 0,
+  "face_middle_row_steps": 0,
+  "face_pixels": 11328,
+  "mark_m": 0,
+  "session": "distance-0-controls",
+  "sky_all_clear_colour": false,
+  "sky_distinct_colours": 30
+ },
+ {
+  "face_differing_from_arrival": 0,
+  "face_middle_row_steps": 0,
+  "face_pixels": 11328,
+  "mark_m": 40,
+  "session": "distance-0-controls",
+  "sky_all_clear_colour": false,
+  "sky_distinct_colours": 27
+ },
+ {
+  "face_differing_from_arrival": 0,
+  "face_middle_row_steps": 0,
+  "face_pixels": 11328,
+  "mark_m": 80,
+  "session": "distance-0-controls",
+  "sky_all_clear_colour": false,
+  "sky_distinct_colours": 23
+ },
+ {
+  "face_differing_from_arrival": 0,
+  "face_middle_row_steps": 0,
+  "face_pixels": 11328,
+  "mark_m": 0,
+  "session": "distance-1-1000",
+  "sky_all_clear_colour": false,
+  "sky_distinct_colours": 30
+ },
+ {
+  "face_differing_from_arrival": 0,
+  "face_middle_row_steps": 0,
+  "face_pixels": 11328,
+  "mark_m": 1000,
+  "session": "distance-1-1000",
+  "sky_all_clear_colour": true,
+  "sky_distinct_colours": 1
+ },
+ {
+  "face_differing_from_arrival": 0,
+  "face_middle_row_steps": 0,
+  "face_pixels": 11328,
+  "mark_m": 0,
+  "session": "distance-1-4000",
+  "sky_all_clear_colour": false,
+  "sky_distinct_colours": 30
+ },
+ {
+  "face_differing_from_arrival": 6982,
+  "face_middle_row_steps": 5,
+  "face_pixels": 11328,
+  "mark_m": 4000,
+  "session": "distance-1-4000",
+  "sky_all_clear_colour": true,
+  "sky_distinct_colours": 1
+ },
+ {
+  "face_differing_from_arrival": 0,
+  "face_middle_row_steps": 0,
+  "face_pixels": 11328,
+  "mark_m": 0,
+  "session": "distance-1-8000",
+  "sky_all_clear_colour": false,
+  "sky_distinct_colours": 30
+ },
+ {
+  "face_differing_from_arrival": 7292,
+  "face_middle_row_steps": 6,
+  "face_pixels": 11328,
+  "mark_m": 8000,
+  "session": "distance-1-8000",
+  "sky_all_clear_colour": true,
+  "sky_distinct_colours": 1
+ },
+ {
+  "face_differing_from_arrival": 0,
+  "face_middle_row_steps": 0,
+  "face_pixels": 11328,
+  "mark_m": 0,
+  "session": "distance-1-controls",
+  "sky_all_clear_colour": false,
+  "sky_distinct_colours": 30
+ },
+ {
+  "face_differing_from_arrival": 0,
+  "face_middle_row_steps": 0,
+  "face_pixels": 11328,
+  "mark_m": 40,
+  "session": "distance-1-controls",
+  "sky_all_clear_colour": false,
+  "sky_distinct_colours": 26
+ },
+ {
+  "face_differing_from_arrival": 0,
+  "face_middle_row_steps": 0,
+  "face_pixels": 11328,
+  "mark_m": 80,
+  "session": "distance-1-controls",
+  "sky_all_clear_colour": false,
+  "sky_distinct_colours": 23
+ },
+ {
+  "face_differing_from_arrival": 0,
+  "face_middle_row_steps": 0,
+  "face_pixels": 11328,
+  "mark_m": 0,
+  "session": "distance-2-1000",
+  "sky_all_clear_colour": false,
+  "sky_distinct_colours": 30
+ },
+ {
+  "face_differing_from_arrival": 0,
+  "face_middle_row_steps": 0,
+  "face_pixels": 11328,
+  "mark_m": 1000,
+  "session": "distance-2-1000",
+  "sky_all_clear_colour": true,
+  "sky_distinct_colours": 1
+ },
+ {
+  "face_differing_from_arrival": 0,
+  "face_middle_row_steps": 0,
+  "face_pixels": 11328,
+  "mark_m": 0,
+  "session": "distance-2-4000",
+  "sky_all_clear_colour": false,
+  "sky_distinct_colours": 30
+ },
+ {
+  "face_differing_from_arrival": 6859,
+  "face_middle_row_steps": 5,
+  "face_pixels": 11328,
+  "mark_m": 4000,
+  "session": "distance-2-4000",
+  "sky_all_clear_colour": true,
+  "sky_distinct_colours": 1
+ },
+ {
+  "face_differing_from_arrival": 0,
+  "face_middle_row_steps": 0,
+  "face_pixels": 11328,
+  "mark_m": 0,
+  "session": "distance-2-8000",
+  "sky_all_clear_colour": false,
+  "sky_distinct_colours": 30
+ },
+ {
+  "face_differing_from_arrival": 7242,
+  "face_middle_row_steps": 4,
+  "face_pixels": 11328,
+  "mark_m": 8000,
+  "session": "distance-2-8000",
+  "sky_all_clear_colour": true,
+  "sky_distinct_colours": 1
+ },
+ {
+  "face_differing_from_arrival": 0,
+  "face_middle_row_steps": 0,
+  "face_pixels": 11328,
+  "mark_m": 0,
+  "session": "distance-2-controls",
+  "sky_all_clear_colour": false,
+  "sky_distinct_colours": 30
+ },
+ {
+  "face_differing_from_arrival": 0,
+  "face_middle_row_steps": 0,
+  "face_pixels": 11328,
+  "mark_m": 40,
+  "session": "distance-2-controls",
+  "sky_all_clear_colour": false,
+  "sky_distinct_colours": 26
+ },
+ {
+  "face_differing_from_arrival": 0,
+  "face_middle_row_steps": 0,
+  "face_pixels": 11328,
+  "mark_m": 80,
+  "session": "distance-2-controls",
+  "sky_all_clear_colour": false,
+  "sky_distinct_colours": 21
+ }
+]

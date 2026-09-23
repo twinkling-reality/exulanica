@@ -1,0 +1,815 @@
+// World-scale browser driver: headless Chrome over CDP with Node's built-in WebSocket.
+//
+//   node wsdrive.mjs --state STATE_JSON --app URL --out DIR --label NAME --objects N [--maps M]
+//                    [--phases open,placeundo,reload,walk,look] [--opens 5] [--pairs 5]
+//                    [--walks 3] [--looks 3] [--build release|debug]
+//
+// Every timing is taken on the page's own clock by instrument.js, injected before any page script.
+// The driver refuses to start when the one-minute load is above 8 (exit 75) and records the load
+// before and after every phase. Nothing here writes to the product: the world is changed only
+// through the page's own controls, and only in the placeundo phase, which undoes what it places.
+
+import { spawn } from 'node:child_process';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { join, resolve, dirname } from 'node:path';
+import os from 'node:os';
+import zlib from 'node:zlib';
+import crypto from 'node:crypto';
+import { reachBinding } from './binding.mjs';
+
+const CHROME = '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome';
+const HERE = dirname(new URL(import.meta.url).pathname);
+const INSTRUMENT = readFileSync(join(HERE, 'instrument.js'), 'utf8');
+const VIEW = { width: 1440, height: 900 };
+
+function argument(name, fallback) {
+  const at = process.argv.indexOf(`--${name}`);
+  return at > 0 ? process.argv[at + 1] : fallback;
+}
+const state = JSON.parse(readFileSync(resolve(argument('state')), 'utf8'));
+const appUrl = argument('app');
+const out = resolve(argument('out'));
+const label = argument('label');
+const expectObjects = Number(argument('objects', '0'));
+const expectMaps = Number(argument('maps', '0'));
+const phases = argument('phases', 'open,placeundo,reload,walk,look').split(',');
+const opens = Number(argument('opens', '5'));
+const pairs = Number(argument('pairs', '5'));
+const walks = Number(argument('walks', '3'));
+const looks = Number(argument('looks', '3'));
+const build = argument('build', 'release');
+// A dry run checks that the driver works. It is never a measurement: the load gate is off and the
+// output says so.
+const dry = process.argv.includes('--dry');
+const tokenBaked = process.argv.includes('--token-baked');
+const token = readFileSync(state.token_file, 'utf8').trim();
+const apiBase = `http://127.0.0.1:${state.ports.api}`;
+mkdirSync(out, { recursive: true });
+const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
+const load = () => os.loadavg().map((v) => Math.round(v * 100) / 100);
+
+const result = {
+  label, build, app: appUrl, started_at: new Date().toISOString(),
+  expect: { objects: expectObjects, maps: expectMaps },
+  tree: state.tree, workspace_id: state.workspace_id, loads: [], phases: {}, notes: [],
+  node: process.version, nice: os.getPriority(),
+  instrument_sha256: crypto.createHash('sha256').update(INSTRUMENT).digest('hex'),
+  driver_sha256: crypto.createHash('sha256').update(readFileSync(new URL(import.meta.url))).digest('hex'),
+  measurement: !dry,
+};
+const noteLoad = (what) => result.loads.push({ what, at: new Date().toISOString(), load: load() });
+noteLoad('start');
+// The quiet-machine gate is gated.py's, run inside the slots: CPU idle at least 70 percent over
+// 10 s before this starts, and this run's own mean idle at least 50 percent while it runs, read
+// from the samples gated.py records. A run without that gate is never a measurement.
+const IDLE_SAMPLES = process.env.WS_IDLE_SAMPLES ?? null;
+const startedEpoch = Date.now() / 1000;
+if (!dry && IDLE_SAMPLES === null) {
+  console.error('refused: a measurement runs through gated.py, which supplies WS_IDLE_SAMPLES');
+  process.exit(2);
+}
+result.gate_pre = process.env.WS_IDLE_PRE ? JSON.parse(process.env.WS_IDLE_PRE) : null;
+function idleDuring() {
+  if (IDLE_SAMPLES === null) return null;
+  const until = Date.now() / 1000;
+  const values = readFileSync(IDLE_SAMPLES, 'utf8').split('\n').filter(Boolean)
+    .map((line) => JSON.parse(line)).filter((s) => s.t >= startedEpoch && s.t <= until)
+    .map((s) => s.idle);
+  return { samples: values.length,
+    mean_tenths: values.length ? Math.round((values.reduce((a, b) => a + b, 0) / values.length) * 10) : null,
+    min: values.length ? Math.min(...values) : null };
+}
+
+// -- Chrome and CDP ---------------------------------------------------------------------------------
+const profile = join(out, `profile-${stamp}`);
+const chrome = spawn(CHROME, [
+  '--headless=new', `--remote-debugging-port=${state.ports.browser}`, `--user-data-dir=${profile}`,
+  `--window-size=${VIEW.width},${VIEW.height}`, '--no-first-run', '--no-default-browser-check',
+  '--disable-extensions', '--disable-background-networking', '--disable-sync',
+  '--password-store=basic', '--use-mock-keychain', '--disable-renderer-backgrounding',
+  '--disable-background-timer-throttling', '--disable-backgrounding-occluded-windows',
+  'about:blank',
+], { stdio: 'ignore', detached: true });
+const killChrome = () => { try { process.kill(-chrome.pid, 'SIGTERM'); } catch { /* gone */ } };
+process.on('exit', killChrome);
+process.on('SIGINT', () => { killChrome(); process.exit(130); });
+
+async function debuggerTarget() {
+  for (let i = 0; i < 120; i += 1) {
+    try {
+      const list = await (await fetch(`http://127.0.0.1:${state.ports.browser}/json/list`)).json();
+      const page = list.find((t) => t.type === 'page');
+      if (page) return page.webSocketDebuggerUrl;
+    } catch { /* not up yet */ }
+    await sleep(250);
+  }
+  throw new Error('headless Chrome did not expose a page target');
+}
+
+class Cdp {
+  constructor(url) {
+    this.socket = new WebSocket(url);
+    this.next = 1;
+    this.pending = new Map();
+    this.handlers = [];
+    this.closed = null;
+    this.socket.onmessage = (event) => {
+      const message = JSON.parse(event.data);
+      if (message.id && this.pending.has(message.id)) {
+        const waiter = this.pending.get(message.id);
+        this.pending.delete(message.id);
+        if (message.error) waiter.reject(new Error(`${message.error.message} ${message.error.data ?? ''}`));
+        else waiter.resolve(message.result);
+      } else if (message.method) {
+        for (const handler of this.handlers) handler(message.method, message.params);
+      }
+    };
+    this.socket.onclose = (event) => {
+      this.closed = `the CDP socket closed (code ${event.code})`;
+      for (const [id, waiter] of this.pending) { this.pending.delete(id); waiter.reject(new Error(this.closed)); }
+    };
+  }
+  open() { return new Promise((ok, fail) => { this.socket.onopen = ok; this.socket.onerror = fail; }); }
+  send(method, params = {}, timeoutMs = 120_000) {
+    if (this.closed) return Promise.reject(new Error(this.closed));
+    const id = this.next++;
+    this.socket.send(JSON.stringify({ id, method, params }));
+    return new Promise((ok, reject) => {
+      const timer = setTimeout(() => { this.pending.delete(id); reject(new Error(`${method} did not answer within ${timeoutMs} ms`)); }, timeoutMs);
+      this.pending.set(id, {
+        resolve: (value) => { clearTimeout(timer); ok(value); },
+        reject: (error) => { clearTimeout(timer); reject(error); },
+      });
+    });
+  }
+  on(handler) { this.handlers.push(handler); }
+}
+
+const cdp = new Cdp(await debuggerTarget());
+await cdp.open();
+
+// Network: every /api/ request with CDP monotonic timestamps (seconds).
+const network = new Map();
+cdp.on((method, params) => {
+  if (method === 'Network.requestWillBeSent' && params.request.url.includes('/api/')) {
+    network.set(params.requestId, {
+      method: params.request.method,
+      path: params.request.url.replace(/^https?:\/\/[^/]+/, ''),
+      sent: params.timestamp, status: null, received: null, finished: null, bytes: null,
+    });
+  } else if (method === 'Network.responseReceived' && network.has(params.requestId)) {
+    const entry = network.get(params.requestId);
+    entry.status = params.response.status;
+    entry.received = params.timestamp;
+  } else if (method === 'Network.loadingFinished' && network.has(params.requestId)) {
+    const entry = network.get(params.requestId);
+    entry.finished = params.timestamp;
+    entry.bytes = params.encodedDataLength;
+  } else if (method === 'Runtime.exceptionThrown') {
+    result.notes.push(`page exception: ${params.exceptionDetails?.exception?.description?.slice(0, 300) ?? params.exceptionDetails?.text}`);
+  } else if (method === 'Inspector.targetCrashed') {
+    result.notes.push('RENDERER CRASHED');
+  }
+});
+const networkSince = (mark) => [...network.values()].filter((e) => e.sent >= mark);
+let cdpNow = 0;
+cdp.on((method, params) => { if (params && typeof params.timestamp === 'number') cdpNow = Math.max(cdpNow, params.timestamp); });
+
+await cdp.send('Page.enable');
+await cdp.send('Runtime.enable');
+await cdp.send('Network.enable', { maxTotalBufferSize: 10_000_000, maxResourceBufferSize: 2_000_000 });
+await cdp.send('Inspector.enable').catch(() => null);
+await cdp.send('Emulation.setDeviceMetricsOverride', { ...VIEW, deviceScaleFactor: 1, mobile: false });
+await cdp.send('Emulation.setFocusEmulationEnabled', { enabled: true });
+await cdp.send('Page.addScriptToEvaluateOnNewDocument', { source: INSTRUMENT });
+result.browser = await cdp.send('Browser.getVersion');
+
+async function evaluate(expression, timeoutMs = 120_000) {
+  const reply = await cdp.send('Runtime.evaluate', {
+    expression, awaitPromise: true, returnByValue: true, userGesture: false,
+  }, timeoutMs);
+  if (reply.exceptionDetails) {
+    throw new Error(`evaluate failed: ${reply.exceptionDetails.exception?.description ?? reply.exceptionDetails.text}`);
+  }
+  return reply.result.value;
+}
+
+async function waitFor(expression, timeoutMs, what, everyMs = 25) {
+  const deadline = Date.now() + timeoutMs;
+  let last;
+  while (Date.now() < deadline) {
+    try { last = await evaluate(expression); if (last) return last; } catch (error) { last = error.message; }
+    await sleep(everyMs);
+  }
+  throw new Error(`timed out after ${timeoutMs} ms waiting for ${what} (last: ${JSON.stringify(last)?.slice(0, 300)})`);
+}
+
+const BUTTON = (text, scope = 'document') =>
+  `[...${scope}.querySelectorAll('button')].find(b => b.textContent.trim() === ${JSON.stringify(text)} && b.getClientRects().length > 0 && !b.closest('[hidden]'))`;
+const DIALOG = `[...document.querySelectorAll('.confirm')].find(d => !d.hidden && d.getClientRects().length)`;
+const PANEL = `document.querySelector('aside.object-placement')`;
+
+async function click(elementExpression, what) {
+  // A person scrolls a long panel to reach a control below the fold; so does this.
+  const target = await waitFor(`(() => { const e = ${elementExpression}; if (!e) return null;
+    e.scrollIntoView({ block: 'center', inline: 'nearest' });
+    const r = e.getBoundingClientRect(); if (r.width === 0 || r.height === 0) return null;
+    const x = r.left + r.width / 2, y = r.top + r.height / 2; const hit = document.elementFromPoint(x, y);
+    return {x, y, disabled: !!e.disabled, covered: hit !== e && !e.contains(hit) ?
+      (hit ? String(hit.className || hit.tagName).slice(0, 60) : 'nothing') : null}; })()`, 30_000, what);
+  if (target.disabled) throw new Error(`${what} is disabled`);
+  if (target.covered) throw new Error(`${what} is covered by ${target.covered}`);
+  for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) {
+    await cdp.send('Input.dispatchMouseEvent', { type, x: target.x, y: target.y, button: 'left', clickCount: 1 });
+  }
+}
+
+const KEYS = {
+  KeyW: { key: 'w', windowsVirtualKeyCode: 87 }, KeyS: { key: 's', windowsVirtualKeyCode: 83 },
+  ShiftLeft: { key: 'Shift', windowsVirtualKeyCode: 16 },
+  ArrowLeft: { key: 'ArrowLeft', windowsVirtualKeyCode: 37 },
+};
+async function key(type, code) {
+  const spec = KEYS[code];
+  await cdp.send('Input.dispatchKeyEvent', {
+    type, code, key: spec.key, windowsVirtualKeyCode: spec.windowsVirtualKeyCode,
+    nativeVirtualKeyCode: spec.windowsVirtualKeyCode,
+    ...(type === 'keyDown' && code === 'ShiftLeft' ? { modifiers: 8 } : {}),
+  });
+}
+
+async function api(method, path, body) {
+  const response = await fetch(`${apiBase}${path}`, {
+    method,
+    headers: { Authorization: `Bearer ${token}`, ...(body ? { 'Content-Type': 'application/json' } : {}) },
+    ...(body ? { body: JSON.stringify(body) } : {}),
+  });
+  const text = await response.text();
+  return { status: response.status, body: text.length ? JSON.parse(text) : null };
+}
+
+async function savedWorld() {
+  const entries = await api('GET', '/world-entries');
+  const [entry] = entries.body;
+  const version = await api('GET', `/world/versions/${entry.authored_version_id}?world_id=${encodeURIComponent(entry.world_id)}`);
+  return { entry, version: version.body };
+}
+
+// -- statistics ---------------------------------------------------------------------------------------
+const quantile = (values, q) => {
+  if (values.length === 0) return null;
+  const sorted = [...values].sort((a, b) => a - b);
+  const at = Math.min(sorted.length - 1, Math.max(0, Math.ceil(q * sorted.length) - 1));
+  return sorted[at];
+};
+const us = (ms) => (ms === null || ms === undefined ? null : Math.round(ms * 1000));
+
+/** Group the flat frame array into frames (callbacks sharing a timestamp) and summarise. */
+function summariseFrames(flat, longtasks, from, to) {
+  const byTs = new Map();
+  for (let i = 0; i < flat.length; i += 4) {
+    const [ts, start, end, draws] = flat.slice(i, i + 4);
+    if (start < from || start > to) continue;
+    const entry = byTs.get(ts) ?? { ts, start, end, work: 0, draws: 0, callbacks: 0 };
+    entry.work += end - start;
+    entry.draws += draws;
+    entry.callbacks += 1;
+    entry.start = Math.min(entry.start, start);
+    entry.end = Math.max(entry.end, end);
+    byTs.set(ts, entry);
+  }
+  const frames = [...byTs.values()].sort((a, b) => a.ts - b.ts);
+  const work = frames.map((f) => f.work);
+  const intervals = frames.slice(1).map((f, i) => f.ts - frames[i].ts);
+  const lags = frames.map((f) => f.start - f.ts);
+  const tasks = [];
+  for (let i = 0; i < longtasks.length; i += 2) {
+    if (longtasks[i] >= from && longtasks[i] <= to) tasks.push(longtasks[i + 1]);
+  }
+  return {
+    frames: frames.length,
+    drawn: frames.filter((f) => f.draws > 0).length,
+    work_p50_us: us(quantile(work, 0.5)), work_p95_us: us(quantile(work, 0.95)),
+    work_max_us: us(quantile(work, 1)),
+    over_16700_us: work.filter((w) => w > 16.7).length,
+    interval_p50_us: us(quantile(intervals, 0.5)), interval_p95_us: us(quantile(intervals, 0.95)),
+    interval_max_us: us(quantile(intervals, 1)),
+    lag_p95_us: us(quantile(lags, 0.95)),
+    draws_p50: quantile(frames.map((f) => f.draws), 0.5),
+    long_tasks: tasks.length, long_task_total_us: us(tasks.reduce((a, b) => a + b, 0)),
+    work_us: work.map(us),
+  };
+}
+
+// -- pixels -------------------------------------------------------------------------------------------
+function crc32(buffer) {
+  let c = ~0;
+  for (let i = 0; i < buffer.length; i += 1) {
+    c ^= buffer[i];
+    for (let k = 0; k < 8; k += 1) c = (c >>> 1) ^ (0xedb88320 & -(c & 1));
+  }
+  return ~c >>> 0;
+}
+function png(width, height, rgba) {
+  // Rows are read bottom-up from WebGL; write them top-down.
+  const raw = Buffer.alloc((width * 4 + 1) * height);
+  for (let y = 0; y < height; y += 1) {
+    const src = (height - 1 - y) * width * 4;
+    raw[y * (width * 4 + 1)] = 0;
+    rgba.copy(raw, y * (width * 4 + 1) + 1, src, src + width * 4);
+  }
+  const chunk = (type, data) => {
+    const length = Buffer.alloc(4); length.writeUInt32BE(data.length);
+    const body = Buffer.concat([Buffer.from(type), data]);
+    const crc = Buffer.alloc(4); crc.writeUInt32BE(crc32(body));
+    return Buffer.concat([length, body, crc]);
+  };
+  const header = Buffer.alloc(13);
+  header.writeUInt32BE(width, 0); header.writeUInt32BE(height, 4);
+  header[8] = 8; header[9] = 6; header[10] = 0; header[11] = 0; header[12] = 0;
+  return Buffer.concat([Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]), chunk('IHDR', header),
+    chunk('IDAT', zlib.deflateSync(raw, { level: 6 })), chunk('IEND', Buffer.alloc(0))]);
+}
+async function capture(name) {
+  const meta = await evaluate('__ws.capturePixels()');
+  return transfer(name, meta);
+}
+async function transfer(name, meta) {
+  const size = meta.width * meta.height * 4;
+  const parts = [];
+  for (let offset = 0; offset < size; offset += 1_000_000) {
+    parts.push(Buffer.from(await evaluate(`__ws.captureChunk(${offset}, 1000000)`), 'base64'));
+  }
+  const pixels = Buffer.concat(parts);
+  if (pixels.length !== size) throw new Error(`capture ${name}: ${pixels.length} bytes, expected ${size}`);
+  const file = join(out, `${label}-${stamp}-${name}.png`);
+  const encoded = png(meta.width, meta.height, pixels);
+  writeFileSync(file, encoded);
+  return { name, width: meta.width, height: meta.height, pixels,
+    sha256: crypto.createHash('sha256').update(pixels).digest('hex'),
+    png: file.slice(out.length + 1), png_sha256: crypto.createHash('sha256').update(encoded).digest('hex') };
+}
+function pixelDifference(a, b, threshold = 3) {
+  let differing = 0;
+  for (let i = 0; i < a.pixels.length; i += 4) {
+    if (Math.abs(a.pixels[i] - b.pixels[i]) > threshold || Math.abs(a.pixels[i + 1] - b.pixels[i + 1]) > threshold
+      || Math.abs(a.pixels[i + 2] - b.pixels[i + 2]) > threshold) differing += 1;
+  }
+  const total = a.pixels.length / 4;
+  return { differing, total, share_millionths: Math.round((differing / total) * 1e6) };
+}
+
+// -- open -----------------------------------------------------------------------------------------------
+async function openWorld(kind) {
+  const navMark = cdpNow;
+  await evaluate('window.__wsStale = true').catch(() => null);
+  if (kind === 'cold') await cdp.send('Page.navigate', { url: appUrl });
+  else await cdp.send('Page.reload', { ignoreCache: false });
+  if (tokenBaked) {
+    // The development server substitutes its token into the page, so the world opens with no
+    // form: navigation start stands in for both the form and the submit.
+    await waitFor('window.__wsStale === undefined && typeof __ws === "object"', 60_000, 'the new page');
+    await evaluate('(() => { __ws.marks.credentialForm = 0; __ws.marks.submit = 0; return true; })()');
+  } else {
+    await waitFor('window.__wsStale === undefined && typeof __ws === "object" && __ws.marks.credentialForm !== undefined', 60_000, 'the credential form');
+    await evaluate(`(() => { const i = document.querySelector('form.credential-gate input[type=password]'); i.focus(); return true; })()`);
+    await cdp.send('Input.insertText', { text: token });
+    await click(`document.querySelector('button.credential-submit')`, 'the token submit');
+    await waitFor('__ws.marks.submit !== undefined', 10_000, 'the submit mark');
+  }
+  await evaluate(`__ws.expect(${expectObjects}, ${expectMaps})`);
+  // Unbudgeted, recorded beside the registered first frame: the loading overlay is gone and the
+  // world's chrome is present, so what is drawn is no longer covered.
+  await evaluate(`__ws.watch('worldShown', "!!document.querySelector('input[aria-label=\\"World title\\"]') && document.querySelector('.startup-thinking') === null && document.getElementById('shell').getAttribute('aria-busy') !== 'true'")`);
+  const timeout = 60_000 + 200 * (expectObjects + 50 * expectMaps);
+  await waitFor('__ws.firstDraw !== null', timeout, 'the first drawn frame');
+  await waitFor('__ws.marks.completeFrame !== undefined', timeout, 'the complete world');
+  await waitFor(`__ws.marks['worldShown:frame'] !== undefined`, timeout, 'the world shown');
+  const marks = await evaluate(`({ form: __ws.marks.credentialForm, submit: __ws.marks.submit,
+    worldShown: __ws.marks.worldShown, worldShownFrame: __ws.marks['worldShown:frame'],
+    firstDraw: __ws.firstDraw, completeResident: __ws.marks.completeResident,
+    completeFrame: __ws.marks.completeFrame, appAt: __ws.appAt, graphPatched: __ws.graphPatched,
+    objAdds: __ws.obj.adds, objRemoves: __ws.obj.removes, pmAdds: __ws.pm.adds,
+    lastCounts: __ws.lastCounts, errors: __ws.errors })`);
+  if (marks.firstDraw.start < marks.submit) throw new Error('a frame drew before the token was submitted');
+  if (marks.graphPatched === false || marks.graphPatched > marks.firstDraw.end) {
+    result.notes.push(`${kind} open: the scene-graph patch landed at ${marks.graphPatched} ms, after the first frame`);
+  }
+  await sleep(2000);
+  const after = await evaluate(`({ objAdds: __ws.obj.adds, objRemoves: __ws.obj.removes,
+    counts: [__ws.sceneObjects().length, __ws.scenePointMaps().length] })`);
+  return {
+    kind,
+    open_first_frame_us: us(marks.form + (marks.firstDraw.end - marks.submit)),
+    open_complete_world_us: us(marks.form + (marks.completeFrame - marks.submit)),
+    boot_to_form_us: us(marks.form),
+    submit_to_first_frame_us: us(marks.firstDraw.end - marks.submit),
+    submit_to_complete_resident_us: us(marks.completeResident - marks.submit),
+    submit_to_complete_frame_us: us(marks.completeFrame - marks.submit),
+    open_world_shown_us: us(marks.form + (marks.worldShownFrame - marks.submit)),
+    marks,
+    settled_two_seconds_later: after,
+    api_requests: networkSince(navMark).map((e) => ({
+      method: e.method, path: e.path, status: e.status,
+      duration_us: e.finished === null ? null : Math.round((e.finished - e.sent) * 1e6), bytes: e.bytes })),
+  };
+}
+
+// -- placement and undo through the objects panel ----------------------------------------------------
+const STATUS = `document.querySelector('p.object-placement-status')`;
+async function openPanel() {
+  const start = BUTTON('Start building');
+  if (await evaluate(`!!(${start})`)) await click(start, 'Start building');
+  if (!(await evaluate(`!!(${PANEL}) && ${PANEL}.getClientRects().length > 0`))) {
+    await click(BUTTON('Add object'), 'Add object');
+  }
+  await waitFor(`!!(${PANEL}) && ${PANEL}.getClientRects().length > 0`, 10_000, 'the objects panel');
+  await evaluate(`(() => { const e = document.getElementById('object-placement-role');
+    Object.getOwnPropertyDescriptor(HTMLSelectElement.prototype, 'value').set.call(e, 'fictional');
+    e.dispatchEvent(new Event('input', {bubbles: true})); e.dispatchEvent(new Event('change', {bubbles: true}));
+    return e.value; })()`);
+}
+async function settledWatch(name, prefix) {
+  await evaluate(`(() => { window.__wsStatusNode = (${STATUS})?.firstChild ?? null;
+    __ws.watch(${JSON.stringify(name)}, "(() => { const s = ${STATUS.replace(/"/g, '\\"')}; const p = ${PANEL.replace(/"/g, '\\"')}; return !!s && s.firstChild !== window.__wsStatusNode && s.dataset.kind === 'settled' && s.textContent.startsWith(${JSON.stringify(prefix).replace(/"/g, '\\"')}) && p.dataset.busy !== 'yes'; })()");
+    return true; })()`);
+}
+const clickAfter = (count, text) => `(() => { const c = __ws.clicks.slice(${count}).find(c => c.trusted && c.label === ${JSON.stringify(text)}); return c ? c.t : null; })()`;
+const clickCount = () => evaluate('__ws.clicks.length');
+
+async function placeAndUndo(index) {
+  const before = new Set((await evaluate('__ws.sceneObjects().map(o => o[0])')));
+  await evaluate(`__ws.watch('verdictReady', "(() => { const v = document.querySelector('.composition-verdict'); const d = [...document.querySelectorAll('.confirm')].find(d => !d.hidden && d.getClientRects().length); const c = d && [...d.querySelectorAll('button')].find(b => b.textContent.trim() === 'Confirm'); return !!v && !v.innerText.includes('Checking with the world') && !!c && !c.disabled; })()")`);
+  let clicks = await clickCount();
+  await click(BUTTON('Place before me', PANEL), 'Place before me');
+  const placeClick = await waitFor(clickAfter(clicks, 'Place before me'), 5_000, 'the place click');
+  await waitFor(`__ws.marks.verdictReady !== undefined`, 120_000, 'the verdict');
+  const verdictAt = await evaluate('__ws.marks.verdictReady');
+  const verdictText = await evaluate(`document.querySelector('.composition-verdict')?.innerText ?? null`);
+  await settledWatch('placeSettled', 'Added.');
+  const netMark = cdpNow;
+  clicks = await clickCount();
+  await click(BUTTON('Confirm', DIALOG), 'Confirm');
+  const confirmAt = await waitFor(clickAfter(clicks, 'Confirm'), 5_000, 'the confirm click');
+  await waitFor(`__ws.marks['placeSettled:frame'] !== undefined`, 600_000, 'the placement to settle');
+  const placeMarks = await evaluate(`({ settled: __ws.marks.placeSettled, frame: __ws.marks['placeSettled:frame'],
+    status: (${STATUS}).textContent, events: __ws.obj.events.slice(-40000) })`);
+  const after = await evaluate('__ws.sceneObjects().map(o => o[0])');
+  const added = after.filter((id) => !before.has(id));
+  let residentAt = null;
+  for (let i = 0; i < placeMarks.events.length; i += 2) {
+    // Events carry no id: this is the last object attached before the report settled, which is
+    // when the redraw of every object finished.
+    if (placeMarks.events[i] >= confirmAt && placeMarks.events[i + 1] > 0 && placeMarks.events[i] <= placeMarks.settled) residentAt = placeMarks.events[i];
+  }
+  const applyRequest = networkSince(netMark).find((e) => e.method === 'POST' && e.path.includes('/compositions/apply'));
+  await sleep(500);
+  // Undo.
+  await click(BUTTON('Take back the last change', PANEL), 'Take back the last change');
+  await waitFor(`!!(${DIALOG})`, 10_000, 'the undo confirmation');
+  await settledWatch('undoSettled', 'Taken back.');
+  const undoNet = cdpNow;
+  clicks = await clickCount();
+  await click(BUTTON('Confirm', DIALOG), 'Confirm undo');
+  const undoConfirmAt = await waitFor(clickAfter(clicks, 'Confirm'), 5_000, 'the undo confirm click');
+  await waitFor(`__ws.marks['undoSettled:frame'] !== undefined`, 600_000, 'the undo to settle');
+  const undoMarks = await evaluate(`({ settled: __ws.marks.undoSettled, frame: __ws.marks['undoSettled:frame'] })`);
+  const undoRequest = networkSince(undoNet).find((e) => e.method === 'POST' && e.path.includes('/undo'));
+  const finalIds = await evaluate('__ws.sceneObjects().map(o => o[0])');
+  await sleep(1000);
+  return {
+    index,
+    place_to_verdict_us: us(verdictAt - placeClick),
+    placement_ack_us: us(placeMarks.frame - confirmAt),
+    placement_settled_dom_us: us(placeMarks.settled - confirmAt),
+    last_object_resident_us: residentAt === null ? null : us(residentAt - confirmAt),
+    apply_server_us: applyRequest?.finished ? Math.round((applyRequest.finished - applyRequest.sent) * 1e6) : null,
+    apply_bytes: applyRequest?.bytes ?? null,
+    undo_ack_us: us(undoMarks.frame - undoConfirmAt),
+    undo_settled_dom_us: us(undoMarks.settled - undoConfirmAt),
+    undo_server_us: undoRequest?.finished ? Math.round((undoRequest.finished - undoRequest.sent) * 1e6) : null,
+    added_ids: added, objects_after_undo: finalIds.length, verdict: verdictText?.slice(0, 200),
+    status_after_place: placeMarks.status,
+  };
+}
+
+// -- the endless ground: sprint out, and at each mark place a reference and see where it is drawn -----
+const MARKS_M = (argument('marks', '1000,4000,8000')).split(',').map(Number);
+async function framesFor(ms) {
+  const start = await evaluate('__ws.lastFrameEnd');
+  await sleep(ms);
+  return waitFor(`__ws.lastFrameEnd > ${start}`, 5000, 'a frame');
+}
+async function placeReference(markLabel) {
+  await openPanel();
+  const before = new Set(await evaluate('__ws.sceneObjects().map(o => o[0])'));
+  await evaluate(`__ws.watch('refReady', "(() => { const v = document.querySelector('.composition-verdict'); const d = [...document.querySelectorAll('.confirm')].find(d => !d.hidden && d.getClientRects().length); const c = d && [...d.querySelectorAll('button')].find(b => b.textContent.trim() === 'Confirm'); return !!v && !v.innerText.includes('Checking with the world') && !!c && !c.disabled; })()")`);
+  await click(BUTTON('Place before me', PANEL), 'Place before me');
+  await waitFor('__ws.marks.refReady !== undefined', 120_000, 'the reference verdict');
+  const verdict = await evaluate(`document.querySelector('.composition-verdict')?.innerText ?? ''`);
+  if (!verdict.startsWith('Ready')) throw new Error(`reference at ${markLabel} refused: ${verdict.slice(0, 200)}`);
+  await settledWatch('refSettled', 'Added.');
+  await click(BUTTON('Confirm', DIALOG), 'Confirm');
+  await waitFor(`__ws.marks['refSettled:frame'] !== undefined`, 120_000, 'the reference to settle');
+  await click(BUTTON('Close', PANEL), 'Close objects panel');
+  const after = await evaluate('__ws.sceneObjects()');
+  const added = after.filter((o) => !before.has(o[0]));
+  if (added.length !== 1) throw new Error(`expected one new object at ${markLabel}, found ${added.length}`);
+  const { version } = await savedWorld();
+  const stored = version.objects.find((o) => o.object_id === added[0][0] && !o.removed);
+  return { id: added[0][0], transform: stored.transform, scene: added[0], verdict: verdict.slice(0, 160) };
+}
+async function takeBack() {
+  await openPanel();
+  await click(BUTTON('Take back the last change', PANEL), 'Take back the last change');
+  await waitFor(`!!(${DIALOG})`, 10_000, 'the undo confirmation');
+  await settledWatch('refUndone', 'Taken back.');
+  await click(BUTTON('Confirm', DIALOG), 'Confirm undo');
+  await waitFor(`__ws.marks['refUndone:frame'] !== undefined`, 120_000, 'the undo to settle');
+  await click(BUTTON('Close', PANEL), 'Close objects panel');
+}
+async function frameAndCompare(reference, markLabel) {
+  // The camera 3 m south of the stored transform, facing north and a little down: the same
+  // relative pose at every mark, written to the controls in float64 as the controls hold it.
+  const x = reference.transform.x_mm / 1000;
+  const z = reference.transform.z_mm / 1000;
+  await evaluate(`(() => { const s = __wsBinding.controls.state; s.x = ${x}; s.z = ${z} + 3; s.yaw = 0; s.pitch = -0.25; __wsBinding.invalidate(); return true; })()`);
+  await framesFor(300);
+  const camera = await evaluate(CAMERA);
+  const stats = await evaluate(`__ws.silhouette(${JSON.stringify(reference.id)})`);
+  const withImage = await transfer(`${markLabel}-with`, { width: stats.width, height: stats.height, ...(await evaluate(`__ws.useCapture(${JSON.stringify(reference.id)}, 'with') && {}`)) });
+  await evaluate(`__ws.useCapture(${JSON.stringify(reference.id)}, 'without')`);
+  const withoutImage = await transfer(`${markLabel}-without`, { width: stats.width, height: stats.height });
+  return { camera, stats, images: [withImage, withoutImage].map(({ pixels, ...rest }) => rest) };
+}
+async function endless() {
+  const bindingName = await reachBinding(cdp);
+  await focusCanvas();
+  await sleep(1000);
+  const legs = [];
+  const references = [];
+  // Mark 0: the arrival point.
+  const arrival = await evaluate(CAMERA);
+  const zero = await placeReference('mark-0');
+  const zeroFrame = await frameAndCompare(zero, 'mark-0');
+  references.push({ mark_m: 0, reference: zero, ...zeroFrame });
+  await evaluate(`(() => { const s = __wsBinding.controls.state; s.x = ${arrival.x}; s.z = ${arrival.z}; s.yaw = 0; s.pitch = 0; __wsBinding.invalidate(); return true; })()`);
+  await takeBack();
+  for (const mark of MARKS_M) {
+    await focusCanvas();
+    await sleep(300);
+    const window = await recordWindow(async () => {
+      const t0 = await evaluate('performance.now()');
+      await key('keyDown', 'ShiftLeft');
+      await key('keyDown', 'KeyW');
+      let pose = await evaluate(CAMERA);
+      const deadline = Date.now() + 10 * 60_000;
+      while (Math.hypot(pose.x, pose.z) < mark && Date.now() < deadline) {
+        await sleep(200);
+        pose = await evaluate(CAMERA);
+      }
+      await key('keyUp', 'KeyW');
+      await key('keyUp', 'ShiftLeft');
+      const t1 = await evaluate('performance.now()');
+      return { t0, t1, reached: pose };
+    });
+    const { t0, t1, reached } = window.extra;
+    await sleep(1500);
+    const stopped = await evaluate(CAMERA);
+    legs.push({
+      mark_m: mark, reached_mm: Math.round(Math.hypot(reached.x, reached.z) * 1000),
+      stopped_mm: Math.round(Math.hypot(stopped.x, stopped.z) * 1000), seconds: Math.round(t1 - t0) / 1000,
+      leg: summariseFrames(window.raw.frames, window.raw.longtasks, t0, t1),
+      last_ten_seconds: summariseFrames(window.raw.frames, window.raw.longtasks, t1 - 10_000, t1),
+    });
+    const reference = await placeReference(`mark-${mark}`);
+    const framed = await frameAndCompare(reference, `mark-${mark}`);
+    const compared = await evaluate(`__ws.compareSilhouettes(${JSON.stringify(zero.id)}, ${JSON.stringify(reference.id)})`);
+    const shift = framed.stats.count && zeroFrame.stats.count ? Math.round(Math.hypot(
+      framed.stats.cx_millipixels - zeroFrame.stats.cx_millipixels,
+      framed.stats.cy_millipixels - zeroFrame.stats.cy_millipixels)) : null;
+    references.push({ mark_m: mark, reference, ...framed, compared_with_mark_0: compared,
+      centroid_shift_millipixels: shift });
+    await evaluate(`(() => { const s = __wsBinding.controls.state; s.x = ${stopped.x}; s.z = ${stopped.z}; s.yaw = 0; s.pitch = 0; __wsBinding.invalidate(); return true; })()`);
+    await takeBack();
+  }
+  return { binding_variable: bindingName, arrival, legs, references };
+}
+
+// -- walking and looking ------------------------------------------------------------------------------
+const CAMERA = `(() => { const cams = __ws.app.systems.camera.cameras.filter(c => c.enabled && c.entity.enabled && !c.renderTarget);
+  const c = cams[0]; const p = c.entity.getPosition(); const f = c.entity.forward;
+  return { n: cams.length, name: c.entity.name, x: p.x, y: p.y, z: p.z, fx: f.x, fy: f.y, fz: f.z }; })()`;
+async function focusCanvas() {
+  const point = await evaluate(`(() => { const c = document.getElementById('atlas'); const r = c.getBoundingClientRect();
+    const x = r.left + r.width / 2, y = r.top + r.height * 0.6; const hit = document.elementFromPoint(x, y);
+    return { x, y, hit: hit === c ? 'canvas' : String(hit?.className || hit?.tagName) }; })()`);
+  if (point.hit === 'canvas') {
+    for (const type of ['mouseMoved', 'mousePressed', 'mouseReleased']) {
+      await cdp.send('Input.dispatchMouseEvent', { type, x: point.x, y: point.y, button: 'left', clickCount: 1 });
+    }
+  }
+  let focused = await evaluate(`document.activeElement === document.getElementById('atlas')`);
+  let how = point.hit === 'canvas' ? 'trusted click on the canvas' : `canvas covered by ${point.hit}`;
+  if (!focused) {
+    await evaluate(`document.getElementById('atlas').focus()`);
+    focused = await evaluate(`document.activeElement === document.getElementById('atlas')`);
+    how += '; focused by script';
+  }
+  if (!focused) throw new Error('the world canvas could not take focus');
+  return how;
+}
+async function holdKeys(codes, ms) {
+  for (const code of codes) await key('keyDown', code);
+  await sleep(ms);
+  for (const code of [...codes].reverse()) await key('keyUp', code);
+}
+async function recordWindow(fn) {
+  await evaluate('(() => { __ws.frames = []; __ws.longtasks = []; __ws.recording = true; return true; })()');
+  const from = await evaluate('performance.now()');
+  const extra = await fn();
+  const to = await evaluate('performance.now()');
+  const raw = await evaluate('(() => { __ws.recording = false; return { frames: __ws.frames, longtasks: __ws.longtasks }; })()');
+  return { from, to, raw, extra };
+}
+async function walk(index) {
+  const focus = await focusCanvas();
+  await sleep(500);
+  const start = await evaluate(CAMERA);
+  let mid = null;
+  const window = await recordWindow(async () => {
+    const t0 = await evaluate('performance.now()');
+    await holdKeys(['KeyS'], 20_000);
+    const t1 = await evaluate('performance.now()');
+    mid = await evaluate(CAMERA);
+    await holdKeys(['KeyW'], 20_000);
+    const t2 = await evaluate('performance.now()');
+    return { t0, t1, t2 };
+  });
+  const end = await evaluate(CAMERA);
+  const backed = Math.hypot(mid.x - start.x, mid.z - start.z);
+  const returned = Math.hypot(end.x - start.x, end.z - start.z);
+  const valid = backed >= 100;
+  await sleep(1000);
+  return {
+    index, focus, valid, backed_mm: Math.round(backed * 1000), returned_within_mm: Math.round(returned * 1000),
+    camera_start: start, camera_mid: mid, camera_end: end,
+    back: summariseFrames(window.raw.frames, window.raw.longtasks, window.extra.t0, window.extra.t1),
+    forward: summariseFrames(window.raw.frames, window.raw.longtasks, window.extra.t1, window.extra.t2),
+    both: summariseFrames(window.raw.frames, window.raw.longtasks, window.extra.t0, window.extra.t2),
+  };
+}
+async function look(index) {
+  const focus = await focusCanvas();
+  await sleep(500);
+  const start = await evaluate(CAMERA);
+  let quarter = null;
+  const window = await recordWindow(async () => {
+    const t0 = await evaluate('performance.now()');
+    await key('keyDown', 'ArrowLeft');
+    await sleep(1163);
+    quarter = await evaluate(CAMERA);
+    await sleep(4654 - 1163);
+    await key('keyUp', 'ArrowLeft');
+    const t1 = await evaluate('performance.now()');
+    return { t0, t1 };
+  });
+  const end = await evaluate(CAMERA);
+  const turnedQuarterDeg = Math.round(Math.acos(Math.max(-1, Math.min(1,
+    start.fx * quarter.fx + start.fz * quarter.fz))) * 180 / Math.PI);
+  await sleep(1000);
+  return {
+    index, focus, valid: turnedQuarterDeg >= 60, quarter_turn_degrees: turnedQuarterDeg,
+    camera_start: start, camera_end: end,
+    frames: summariseFrames(window.raw.frames, window.raw.longtasks, window.extra.t0, window.extra.t1),
+  };
+}
+
+// -- reload identity ----------------------------------------------------------------------------------
+async function sceneSnapshot() {
+  const objects = await evaluate('__ws.sceneObjects()');
+  const maps = await evaluate('__ws.scenePointMaps()');
+  const q = (v) => Math.round(v * 10000); // 0.1 mm
+  return {
+    objects: objects.map(([id, x, y, z]) => [id, q(x), q(y), q(z)]).sort((a, b) => (a[0] < b[0] ? -1 : 1)),
+    maps: maps.map(([id, x, y, z]) => [id, q(x), q(y), q(z)]).sort((a, b) => (a[0] < b[0] ? -1 : 1)),
+  };
+}
+async function reloadIdentical() {
+  const worldA = await savedWorld();
+  const sceneA = await sceneSnapshot();
+  const cameraA = await evaluate(CAMERA);
+  const a1 = await capture('reload-before-1');
+  await sleep(1000);
+  const a2 = await capture('reload-before-2');
+  const reopened = await openWorld('warm');
+  const worldB = await savedWorld();
+  const sceneB = await sceneSnapshot();
+  const cameraB = await evaluate(CAMERA);
+  const b = await capture('reload-after');
+  const control = pixelDifference(a1, a2);
+  const across = pixelDifference(a1, b);
+  const versionSame = worldA.version.state_sha256 === worldB.version.state_sha256
+    && JSON.stringify(worldA.version.objects) === JSON.stringify(worldB.version.objects);
+  const sceneSame = JSON.stringify(sceneA) === JSON.stringify(sceneB);
+  const pixelsSame = across.share_millionths <= control.share_millionths + 1000;
+  return {
+    version_same: versionSame, scene_same: sceneSame, pixels_within: pixelsSame,
+    identical: versionSame && sceneSame && pixelsSame,
+    state_sha256: worldA.version.state_sha256, objects_saved: worldA.version.objects.filter((o) => !o.removed).length,
+    scene_objects: sceneA.objects.length, scene_maps: sceneA.maps.length,
+    camera_before: cameraA, camera_after: cameraB,
+    control_difference: control, reload_difference: across,
+    captures: [a1, a2, b].map(({ pixels, ...rest }) => rest),
+    reopen: reopened,
+  };
+}
+
+// -- run ------------------------------------------------------------------------------------------------
+async function phase(name, body) {
+  noteLoad(`${name} before`);
+  const began = Date.now();
+  try {
+    result.phases[name] = { ok: true, value: await body() };
+  } catch (error) {
+    result.phases[name] = { ok: false, error: String(error.stack ?? error) };
+    result.notes.push(`${name} failed: ${String(error).slice(0, 300)}`);
+  }
+  result.phases[name].wall_ms = Date.now() - began;
+  noteLoad(`${name} after`);
+  writeFileSync(join(out, `${label}-${stamp}.json`), JSON.stringify(result, null, 1));
+}
+
+try {
+  if (phases.includes('open')) {
+    await phase('open', async () => {
+      const runs = [await openWorld('cold')];
+      result.gpu = await evaluate(`(() => { const gl = __ws.app.graphicsDevice.gl; const i = gl.getExtension('WEBGL_debug_renderer_info');
+        return { renderer: i ? gl.getParameter(i.UNMASKED_RENDERER_WEBGL) : gl.getParameter(gl.RENDERER),
+          buffer: [gl.drawingBufferWidth, gl.drawingBufferHeight], antialias: gl.getContextAttributes().antialias }; })()`);
+      for (let i = 0; i < opens; i += 1) runs.push(await openWorld('warm'));
+      return runs;
+    });
+  } else {
+    await phase('open', async () => [await openWorld('cold')]);
+  }
+  if (phases.includes('placeundo')) {
+    await phase('placeundo', async () => {
+      await openPanel();
+      const runs = [];
+      try {
+        for (let i = 0; i < pairs; i += 1) runs.push(await placeAndUndo(i));
+        await click(BUTTON('Close', PANEL), 'Close objects panel');
+        await sleep(1500);
+      } finally {
+        // Every pair takes back what it placed. If one failed half way, the world is no longer
+        // the world this point is about, and every later phase would measure the wrong one.
+        const { version } = await savedWorld();
+        const live = version.objects.filter((o) => !o.removed).length;
+        if (live !== expectObjects) {
+          result.world_left_wrong = live;
+          result.notes.push(`WORLD LEFT AT ${live} OBJECTS, NOT ${expectObjects}: later phases are invalid`);
+        }
+      }
+      return runs;
+    });
+    if (result.world_left_wrong !== undefined) throw new Error('the world was left with the wrong object count');
+  }
+  if (phases.includes('reload')) await phase('reload', reloadIdentical);
+  if (phases.includes('endless')) await phase('endless', endless);
+  if (phases.includes('walk')) {
+    await phase('walk', async () => {
+      const runs = [];
+      for (let i = 0; i < walks; i += 1) runs.push(await walk(i));
+      return runs;
+    });
+  }
+  if (phases.includes('look')) {
+    await phase('look', async () => {
+      const runs = [];
+      for (let i = 0; i < looks; i += 1) runs.push(await look(i));
+      return runs;
+    });
+  }
+} finally {
+  result.finished_at = new Date().toISOString();
+  noteLoad('end');
+  try {
+    const lost = await evaluate('__ws.contextLost');
+    if (lost && lost.length > 0) result.notes.push(`WebGL context lost ${lost.length} times: ${JSON.stringify(lost).slice(0, 200)}`);
+  } catch { /* the page may be gone, which a crash note already says */ }
+  result.gate_during = idleDuring();
+  const quietEnough = dry || (result.gate_during.samples > 0 && result.gate_during.mean_tenths >= 500);
+  if (!quietEnough) {
+    result.discarded = `mean CPU idle during the run ${result.gate_during.mean_tenths / 10} percent `
+      + `over ${result.gate_during.samples} samples is below 50`;
+  }
+  const name = quietEnough ? `${label}-${stamp}.json` : `${label}-${stamp}-discarded.json`;
+  writeFileSync(join(out, name), JSON.stringify(result, null, 1));
+  // The in-progress file written after each phase carries no verdict; only the final name counts.
+  if (!quietEnough) { try { rmSync(join(out, `${label}-${stamp}.json`)); } catch { /* none */ } }
+  console.log(`${label}: wrote ${name}`);
+  killChrome();
+  process.exit(quietEnough ? 0 : 75);
+}

@@ -1,0 +1,96 @@
+{
+ "exceed_streak": {
+  "frame_work_looking": 0,
+  "frame_work_walking": 0,
+  "open_complete_world": 0,
+  "open_first_frame": 0,
+  "placement_ack": 1,
+  "reload_identical": 0,
+  "undo_ack": 1
+ },
+ "finished_at": "2026-09-23T00:09:26-0400",
+ "layout": "clustered",
+ "points": [
+  {
+   "count": 0,
+   "file": "clustered-0-2026-09-23T03-20-16-746Z.json",
+   "measured": true,
+   "phases": "open,placeundo,reload,walk,look",
+   "recorded_at": "23:23:07",
+   "values": {
+    "frame_work_looking": 300,
+    "frame_work_walking": 300,
+    "open_complete_world": 135800,
+    "open_first_frame": 135800,
+    "placement_ack": 32900,
+    "reload_identical": true,
+    "undo_ack": 32500
+   }
+  },
+  {
+   "count": 10,
+   "file": "clustered-10-2026-09-23T03-40-44-804Z.json",
+   "measured": true,
+   "phases": "open,placeundo,reload,walk,look",
+   "recorded_at": "23:43:36",
+   "values": {
+    "frame_work_looking": 600,
+    "frame_work_walking": 700,
+    "open_complete_world": 160500,
+    "open_first_frame": 124000,
+    "placement_ack": 31200,
+    "reload_identical": true,
+    "undo_ack": 32500
+   }
+  },
+  {
+   "count": 50,
+   "file": "clustered-50-2026-09-23T03-43-47-483Z.json",
+   "measured": true,
+   "phases": "open,placeundo,reload,walk,look",
+   "recorded_at": "23:46:38",
+   "values": {
+    "frame_work_looking": 400,
+    "frame_work_walking": 400,
+    "open_complete_world": 198200,
+    "open_first_frame": 137100,
+    "placement_ack": 49200,
+    "reload_identical": true,
+    "undo_ack": 49400
+   }
+  },
+  {
+   "count": 200,
+   "file": "clustered-200-2026-09-23T03-56-07-777Z.json",
+   "measured": true,
+   "phases": "open,placeundo,reload,walk,look",
+   "recorded_at": "23:59:00",
+   "values": {
+    "frame_work_looking": 500,
+    "frame_work_walking": 800,
+    "open_complete_world": 283000,
+    "open_first_frame": 154600,
+    "placement_ack": 132400,
+    "reload_identical": true,
+    "undo_ack": 122100
+   }
+  },
+  {
+   "count": 1000,
+   "file": "clustered-1000-2026-09-23T04-06-16-696Z.json",
+   "measured": true,
+   "phases": "open,placeundo,reload,walk,look",
+   "recorded_at": "00:09:26",
+   "values": {
+    "frame_work_looking": 1700,
+    "frame_work_walking": 1900,
+    "open_complete_world": 935700,
+    "open_first_frame": 257300,
+    "placement_ack": 1469000,
+    "reload_identical": true,
+    "undo_ack": 1145400
+   }
+  }
+ ],
+ "stopped_metrics": {}
+}

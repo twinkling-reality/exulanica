@@ -1,0 +1,45 @@
+"""Read every stored point map's header for its point count and size, after the estimates series.
+
+    python3 pointcounts.py DATA_DIR        writes runs/estimates/point-counts.json
+
+DATA_DIR is the estimates runtime's data directory (state.json data_dir). The store is content
+addressed under blobs/sha-256; a point map is the file that starts with the OPM1 magic, followed by
+a little-endian length and the JSON header whose pointCount the renderer reads. Read only.
+"""
+
+from __future__ import annotations
+
+import json
+import struct
+import sys
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+
+
+def main() -> None:
+    store = Path(sys.argv[1]) / "blobs"
+    rows = []
+    for path in sorted(store.rglob("*")):
+        if not path.is_file():
+            continue
+        with path.open("rb") as handle:
+            head = handle.read(8)
+            if head[:4] != b"OPM1":
+                continue
+            header = json.loads(handle.read(struct.unpack_from("<I", head, 4)[0]))
+        rows.append({"content_sha256": path.name, "byte_size": path.stat().st_size,
+                     "point_count": header["pointCount"], "version": header["version"]})
+    out = {"point_maps": len(rows),
+           "point_count_min": min(r["point_count"] for r in rows),
+           "point_count_max": max(r["point_count"] for r in rows),
+           "byte_size_min": min(r["byte_size"] for r in rows),
+           "byte_size_max": max(r["byte_size"] for r in rows),
+           "byte_size_total": sum(r["byte_size"] for r in rows),
+           "maps": rows}
+    (HERE / "runs" / "estimates" / "point-counts.json").write_text(json.dumps(out, indent=1) + "\n")
+    print(json.dumps({k: v for k, v in out.items() if k != "maps"}))
+
+
+if __name__ == "__main__":
+    main()

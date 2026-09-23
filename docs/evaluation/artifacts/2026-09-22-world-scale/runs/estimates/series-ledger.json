@@ -1,0 +1,76 @@
+{
+ "exceed_streak": {
+  "frame_work_looking": 0,
+  "frame_work_walking": 0,
+  "open_complete_world": 1,
+  "open_first_frame": 1,
+  "reload_identical": 0
+ },
+ "finished_at": "2026-09-23T01:55:36-0400",
+ "invalidated": [
+  {
+   "file": "estimates-1-2026-09-23T05-35-55-836Z-invalid.json",
+   "why": "the instrument missed estimate nodes attached before its scene hook or inside a parent populated before it joined the scene, so open and reload waited for a completion it could not see; walk and look ran but the point is re-measured whole"
+  }
+ ],
+ "layout": "estimates",
+ "points": [
+  {
+   "count": 1,
+   "file": "estimates-1-2026-09-23T05-42-07-009Z.json",
+   "measured": true,
+   "phases": "open,reload,walk,look",
+   "recorded_at": "01:44:48",
+   "values": {
+    "frame_work_looking": 600,
+    "frame_work_walking": 500,
+    "open_complete_world": 238600,
+    "open_first_frame": 238600,
+    "reload_identical": true
+   }
+  },
+  {
+   "count": 4,
+   "file": "estimates-4-2026-09-23T05-45-29-427Z.json",
+   "measured": true,
+   "phases": "open,reload,walk,look",
+   "recorded_at": "01:48:12",
+   "values": {
+    "frame_work_looking": 700,
+    "frame_work_walking": 800,
+    "open_complete_world": 414400,
+    "open_first_frame": 414400,
+    "reload_identical": true
+   }
+  },
+  {
+   "count": 16,
+   "file": "estimates-16-2026-09-23T05-49-01-239Z.json",
+   "measured": true,
+   "phases": "open,reload,walk,look",
+   "recorded_at": "01:51:48",
+   "values": {
+    "frame_work_looking": 1000,
+    "frame_work_walking": 1000,
+    "open_complete_world": 1103600,
+    "open_first_frame": 1103600,
+    "reload_identical": true
+   }
+  },
+  {
+   "count": 32,
+   "file": "estimates-32-2026-09-23T05-52-42-519Z.json",
+   "measured": true,
+   "phases": "open,reload,walk,look",
+   "recorded_at": "01:55:36",
+   "values": {
+    "frame_work_looking": 1100,
+    "frame_work_walking": 1300,
+    "open_complete_world": 2028600,
+    "open_first_frame": 2028600,
+    "reload_identical": true
+   }
+  }
+ ],
+ "stopped_metrics": {}
+}

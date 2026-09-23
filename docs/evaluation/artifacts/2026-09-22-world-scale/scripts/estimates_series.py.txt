@@ -1,0 +1,155 @@
+"""Run the photo-estimate series end to end with the registered stop rules applied mechanically.
+
+    python3 estimates_series.py --counts 1,4,16,32
+
+For each count:
+1. estimates.py upload: intake and the review granting the depth right (not timed);
+2. worker.py run --once inside quiet-slot then gpu-slot through gated.py: the depth run, timed
+   as its own result (wall time, peak resident memory, device), never beside a browser run;
+3. estimates.py place inside quiet-slot through gated.py: attach and compose, server durations;
+4. wsdrive.mjs inside quiet-slot then gpu-slot: open, reload, walking, looking, with the placed
+   estimates expected resident.
+Stops: a budgeted metric over budget at two consecutive counts stops for larger counts; the series
+stops when placed point maps would exceed 1 GiB, when the page loses its WebGL context or crashes,
+or when the product refuses.
+"""
+
+from __future__ import annotations
+
+import argparse
+import json
+import subprocess
+import sys
+import time
+from pathlib import Path
+
+HERE = Path(__file__).resolve().parent
+sys.path.insert(0, str(HERE))
+from series import adopt, values  # noqa: E402
+from summarize import summarise  # noqa: E402
+
+STATE = "/tmp/exulanica-0922-acceptance/exulanica-0922-world-scale/state.json"
+APP = "http://localhost:19224/"
+VENV_PYTHON = str(HERE.parents[1] / ".venv" / "bin" / "python")
+GIB = 1 << 30
+
+
+def api_get(path: str):
+    import urllib.request
+    state = json.loads(Path(STATE).read_text())
+    token = Path(state["token_file"]).read_text().strip()
+    request = urllib.request.Request(f"http://127.0.0.1:{state['ports']['api']}{path}",
+                                     headers={"Authorization": f"Bearer {token}"})
+    with urllib.request.urlopen(request) as reply:
+        return json.loads(reply.read())
+
+
+def placed_estimates() -> int:
+    import urllib.parse
+    entry = api_get("/world-entries")[0]
+    version = api_get(f"/world/versions/{entry['authored_version_id']}?world_id="
+                      + urllib.parse.quote(entry["world_id"], safe=""))
+    return sum(1 for p in version.get("point_map_instances", []) if not p.get("removed"))
+
+
+def pending_ready(pending: Path) -> bool:
+    """An upload whose photographs all have point maps and none of which is placed yet."""
+    import urllib.parse
+    members = json.loads(pending.read_text())["members"]
+    maps = {g["capture_id"] for g in api_get("/geometry") if g.get("state") == "available"}
+    entry = api_get("/world-entries")[0]
+    version = api_get(f"/world/versions/{entry['authored_version_id']}?world_id="
+                      + urllib.parse.quote(entry["world_id"], safe=""))
+    placed = {str((p.get("source") or {}).get("capture_id")) for p in version.get("point_map_instances", [])
+              if not p.get("removed")}
+    return all(m["capture_id"] in maps and m["capture_id"] not in placed for m in members)
+
+
+def run(command: list[str], log: Path) -> int:
+    with log.open("a") as handle:
+        handle.write(f"\n$ {' '.join(command)}\n")
+        handle.flush()
+        return subprocess.run(command, cwd=HERE, stdout=handle, stderr=subprocess.STDOUT).returncode
+
+
+def main() -> None:
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--counts", default="1,4,16,32")
+    args = parser.parse_args()
+    folder = HERE / "runs" / "estimates"
+    folder.mkdir(parents=True, exist_ok=True)
+    log = folder / "series.log"
+    ledger_path = folder / "series-ledger.json"
+    ledger = json.loads(ledger_path.read_text()) if ledger_path.exists() else {
+        "layout": "estimates", "points": [], "stopped_metrics": {}, "exceed_streak": {}}
+    steps = folder / "steps.jsonl"
+    for count in [int(c) for c in args.counts.split(",")]:
+        label = f"estimates-{count}"
+        if any(p["count"] == count and p["measured"] for p in ledger["points"]):
+            continue
+        # 1 GiB rule, from the point maps already placed.
+        rows = [json.loads(line) for line in steps.read_text().splitlines()] if steps.exists() else []
+        sample = next((r["sample"] for r in reversed(rows) if r.get("step") == "point_maps"
+                       and r.get("sample")), None)
+        size = ((sample or {}).get("reference") or {}).get("byte_size")
+        if isinstance(size, int) and size * count > GIB:
+            ledger["stopped"] = f"{count} point maps of {size} bytes exceed 1 GiB"
+            break
+        placed = placed_estimates()
+        pending = steps.with_suffix(".pending.json")
+        if placed < count:
+            # Resume without uploading twice: a pending upload whose photographs have point maps
+            # goes straight to placing.
+            if not (pending.exists() and pending_ready(pending)):
+                code = run([VENV_PYTHON, "estimates.py", "upload", "--state", STATE, "--to",
+                            str(count), "--out", str(steps)], log)
+                if code != 0:
+                    ledger["stopped"] = f"upload to {count} exited {code}"
+                    break
+                code = run(["python3", "slot.py", "--gpu", "--", "python3", "worker.py", "run",
+                            "--once"], log)
+                if code != 0:
+                    ledger["stopped"] = f"the depth run for {count} exited {code}"
+                    break
+            code = run(["python3", "slot.py", "--", VENV_PYTHON, "estimates.py", "place", "--state",
+                        STATE, "--to", str(count), "--out", str(steps)], log)
+            if code != 0:
+                ledger["stopped"] = f"placing to {count} exited {code}"
+                break
+        if placed_estimates() != count:
+            ledger["stopped"] = f"the world holds {placed_estimates()} estimates, not {count}"
+            break
+        stopped = ledger["stopped_metrics"]
+        phases = ["open"]
+        if not stopped.get("reload_identical"):
+            phases.append("reload")
+        if not stopped.get("frame_work_walking"):
+            phases.append("walk")
+        if not stopped.get("frame_work_looking"):
+            phases.append("look")
+        opens = "0" if stopped.get("open_first_frame") and stopped.get("open_complete_world") else "5"
+        before = set(folder.glob(f"{label}-*.json"))
+        code = run(["python3", "slot.py", "--gpu", "--", "node", "wsdrive.mjs", "--state", STATE,
+                    "--app", APP, "--out", str(folder), "--label", label, "--objects", "0",
+                    "--maps", str(count), "--phases", ",".join(phases), "--opens", opens], log)
+        produced = [p for p in sorted(set(folder.glob(f"{label}-*.json")) - before)
+                    if not p.name.endswith("-discarded.json")]
+        if code != 0 or not produced:
+            ledger["points"].append({"count": count, "measured": False, "exit": code})
+            ledger["stopped"] = f"the point at {count} exited {code} with no result"
+            ledger_path.write_text(json.dumps(ledger, indent=1))
+            break
+        summary = summarise(produced[-1])
+        adopt(ledger, count, produced[-1].name, values(summary), ",".join(phases))
+        if any("CRASHED" in note or "context" in note.lower() for note in summary["notes"]):
+            ledger["stopped"] = f"the page lost its context or crashed at {count}: {summary['notes']}"
+            ledger_path.write_text(json.dumps(ledger, indent=1))
+            break
+        ledger_path.write_text(json.dumps(ledger, indent=1))
+        print(f"{label}: {json.dumps(values(summary))}", flush=True)
+    ledger["finished_at"] = time.strftime("%Y-%m-%dT%H:%M:%S%z")
+    ledger_path.write_text(json.dumps(ledger, indent=1))
+
+
+if __name__ == "__main__":
+    main()

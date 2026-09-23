@@ -1,0 +1,90 @@
+"""Synthetic room photographs for the estimate series: one per index, deterministic, no person.
+
+    .venv/bin/python rooms.py OUT_DIR COUNT
+
+Each image is a one-point-perspective room (floor, ceiling, back wall, two side walls with a
+shading ramp) holding four boxes at different depths, with colours and positions varied by index,
+so every photograph is distinct bytes and has depth for a depth model to estimate. Nothing in it is
+a person, a sign or a real place. EXIF names it synthetic. Same arguments, same bytes.
+"""
+
+from __future__ import annotations
+
+import hashlib
+import random
+import sys
+from pathlib import Path
+
+from PIL import Image, ImageDraw
+
+WIDTH, HEIGHT = 1280, 960
+
+
+def lerp(a: tuple[int, int, int], b: tuple[int, int, int], t: float) -> tuple[int, int, int]:
+    return tuple(int(a[i] + (b[i] - a[i]) * t) for i in range(3))
+
+
+def room(index: int) -> Image.Image:
+    rng = random.Random(f"world-scale-room-{index}")
+    image = Image.new("RGB", (WIDTH, HEIGHT))
+    draw = ImageDraw.Draw(image)
+    # Vanishing point and back wall rectangle.
+    vx, vy = WIDTH * (0.42 + 0.16 * rng.random()), HEIGHT * (0.40 + 0.12 * rng.random())
+    bw, bh = WIDTH * (0.30 + 0.10 * rng.random()), HEIGHT * (0.30 + 0.08 * rng.random())
+    left, right = vx - bw / 2, vx + bw / 2
+    top, bottom = vy - bh / 2, vy + bh / 2
+    wall = (rng.randint(150, 220), rng.randint(140, 210), rng.randint(120, 200))
+    floor = (rng.randint(90, 150), rng.randint(70, 120), rng.randint(50, 100))
+    ceiling = (230, 228, 222)
+    # Floor, ceiling and side walls as shaded bands toward the vanishing rectangle.
+    steps = 64
+    for s in range(steps):
+        t0, t1 = s / steps, (s + 1) / steps
+        def at(t: float, x: float, y: float, tx: float, ty: float) -> tuple[float, float]:
+            return x + (tx - x) * t, y + (ty - y) * t
+        shade = 0.55 + 0.45 * t1
+        draw.polygon([at(t0, 0, HEIGHT, left, bottom), at(t0, WIDTH, HEIGHT, right, bottom),
+                      at(t1, WIDTH, HEIGHT, right, bottom), at(t1, 0, HEIGHT, left, bottom)],
+                     fill=lerp((20, 20, 20), floor, shade))
+        draw.polygon([at(t0, 0, 0, left, top), at(t0, WIDTH, 0, right, top),
+                      at(t1, WIDTH, 0, right, top), at(t1, 0, 0, left, top)],
+                     fill=lerp((120, 120, 120), ceiling, shade))
+        draw.polygon([at(t0, 0, 0, left, top), at(t0, 0, HEIGHT, left, bottom),
+                      at(t1, 0, HEIGHT, left, bottom), at(t1, 0, 0, left, top)],
+                     fill=lerp((40, 40, 40), wall, shade * 0.9))
+        draw.polygon([at(t0, WIDTH, 0, right, top), at(t0, WIDTH, HEIGHT, right, bottom),
+                      at(t1, WIDTH, HEIGHT, right, bottom), at(t1, WIDTH, 0, right, top)],
+                     fill=lerp((40, 40, 40), wall, shade * 0.8))
+    draw.rectangle([left, top, right, bottom], fill=wall)
+    # Four boxes standing on the floor at different depths, drawn far to near so nearer ones cover.
+    boxes = sorted(((0.15 + 0.7 * rng.random(), rng.random()) for _ in range(4)), reverse=True)
+    for depth, across in boxes:                     # depth 0 near the camera, 1 at the back wall
+        floor_y = HEIGHT + (bottom - HEIGHT) * depth
+        span_left = 0 + (left - 0) * depth
+        span_right = WIDTH + (right - WIDTH) * depth
+        scale = 1 - 0.8 * depth
+        w, h = 260 * scale * (0.6 + rng.random()), 300 * scale * (0.5 + rng.random())
+        x = span_left + (span_right - span_left - w) * across
+        colour = (rng.randint(40, 230), rng.randint(40, 230), rng.randint(40, 230))
+        draw.rectangle([x, floor_y - h, x + w, floor_y], fill=colour, outline=(25, 25, 25), width=3)
+        draw.polygon([(x, floor_y - h), (x + w, floor_y - h), (x + w * 0.92, floor_y - h * 1.12),
+                      (x + w * 0.08, floor_y - h * 1.12)], fill=lerp(colour, (255, 255, 255), 0.35))
+    return image
+
+
+def main() -> None:
+    out = Path(sys.argv[1])
+    count = int(sys.argv[2])
+    out.mkdir(parents=True, exist_ok=True)
+    for index in range(count):
+        exif = Image.Exif()
+        exif[0x0110] = "Synthetic room"          # Model
+        exif[0x0131] = "world-scale rooms.py"    # Software
+        exif[0x0132] = f"2026:09:{1 + index % 28:02d} 1{index % 10}:00:00"
+        path = out / f"room-{index + 1:03d}.jpg"
+        room(index).save(path, "JPEG", quality=90, exif=exif.tobytes())
+        print(path.name, path.stat().st_size, hashlib.sha256(path.read_bytes()).hexdigest())
+
+
+if __name__ == "__main__":
+    main()
