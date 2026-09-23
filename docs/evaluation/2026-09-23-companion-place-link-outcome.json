@@ -1,0 +1,1786 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "arms": {
+      "after": {
+        "answers": [
+          {
+            "abstained": null,
+            "calls": [
+              {
+                "completion_tokens": 109,
+                "latency_ms": 1859,
+                "prompt_tokens": 1020,
+                "reasoning_tokens": null,
+                "requested_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+                "role": "structured_extraction",
+                "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+                "usd": "0.00026940",
+                "used_fallback": false
+              },
+              {
+                "completion_tokens": 0,
+                "latency_ms": 7858,
+                "prompt_tokens": 2,
+                "reasoning_tokens": null,
+                "requested_model": "Qwen/Qwen3-Embedding-8B",
+                "role": "embedding",
+                "served_model": null,
+                "usd": "2E-8",
+                "used_fallback": false
+              },
+              {
+                "completion_tokens": 2471,
+                "latency_ms": 24001,
+                "prompt_tokens": 1858,
+                "reasoning_tokens": null,
+                "requested_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+                "role": "reasoning_cheap",
+                "served_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+                "usd": "0.00070452",
+                "used_fallback": false
+              }
+            ],
+            "clauses": [
+              {
+                "citations": [
+                  "[4MQHMVF2JD]"
+                ],
+                "text": "The sign reads '[place A]'.",
+                "type": "historical",
+                "value_refs": []
+              }
+            ],
+            "deterministic": false,
+            "names": {
+              "[place A]": "01a0cee6-3a47-7a10-901f-5e5873a1fc9e"
+            },
+            "plan": {
+              "capture": null,
+              "content": null,
+              "entities": null,
+              "epistemic": "confirmed",
+              "intent": "captures",
+              "limit": 10,
+              "place": {
+                "ids": [
+                  "01a0cee6-3a47-7a10-901f-5e5873a1fc9e"
+                ]
+              },
+              "semantic_query": "sign",
+              "time": []
+            },
+            "prompt_version": "selection-7",
+            "question": "What does the sign say at Mireland Hall?",
+            "question_id": "sign",
+            "score": {
+              "conditions": {
+                "answered": true,
+                "composed": true,
+                "names_the_confirmed_place_citing_its_photograph": true
+              },
+              "right": true
+            },
+            "status": 200,
+            "usd": "0.00097394"
+          },
+          {
+            "abstained": null,
+            "calls": [
+              {
+                "completion_tokens": 108,
+                "latency_ms": 1564,
+                "prompt_tokens": 1021,
+                "reasoning_tokens": null,
+                "requested_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+                "role": "structured_extraction",
+                "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+                "usd": "0.00026900",
+                "used_fallback": false
+              },
+              {
+                "completion_tokens": 2686,
+                "latency_ms": 24764,
+                "prompt_tokens": 1314,
+                "reasoning_tokens": null,
+                "requested_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+                "role": "reasoning_cheap",
+                "served_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+                "usd": "0.00072348",
+                "used_fallback": false
+              }
+            ],
+            "clauses": [
+              {
+                "citations": [
+                  "GZD565HXQG",
+                  "C3YEMC4SWN"
+                ],
+                "text": "These photographs were taken at place A.",
+                "type": "historical",
+                "value_refs": []
+              }
+            ],
+            "deterministic": false,
+            "names": {
+              "[place A]": "01a0cee6-3a47-7a10-901f-5e5873a1fc9e"
+            },
+            "plan": {
+              "capture": null,
+              "content": null,
+              "entities": null,
+              "epistemic": "confirmed",
+              "intent": "captures",
+              "limit": 10,
+              "place": {
+                "ids": [
+                  "01a0cee6-3a47-7a10-901f-5e5873a1fc9e"
+                ]
+              },
+              "semantic_query": null,
+              "time": []
+            },
+            "prompt_version": "selection-7",
+            "question": "Which of my photographs were taken at Mireland Hall?",
+            "question_id": "which",
+            "score": {
+              "conditions": {
+                "answered": true,
+                "cites_exactly_the_confirmed_photographs": true,
+                "composed": true
+              },
+              "right": true
+            },
+            "status": 200,
+            "usd": "0.00099248"
+          },
+          {
+            "abstained": null,
+            "calls": [
+              {
+                "completion_tokens": 108,
+                "latency_ms": 2582,
+                "prompt_tokens": 1021,
+                "reasoning_tokens": null,
+                "requested_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+                "role": "structured_extraction",
+                "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+                "usd": "0.00026900",
+                "used_fallback": false
+              },
+              {
+                "completion_tokens": 2352,
+                "latency_ms": 20485,
+                "prompt_tokens": 1312,
+                "reasoning_tokens": null,
+                "requested_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+                "role": "reasoning_cheap",
+                "served_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+                "usd": "0.00064320",
+                "used_fallback": false
+              }
+            ],
+            "clauses": [
+              {
+                "citations": [
+                  "92J394JFC2",
+                  "7BNJCDP98Q"
+                ],
+                "text": "Your photographs were taken on 2026-08-14 and 2026-08-16.",
+                "type": "historical",
+                "value_refs": [
+                  "date_0",
+                  "date_1"
+                ]
+              }
+            ],
+            "deterministic": false,
+            "names": {
+              "[place A]": "01a0cee6-3a47-7a10-901f-5e5873a1fc9e"
+            },
+            "plan": {
+              "capture": null,
+              "content": null,
+              "entities": null,
+              "epistemic": "confirmed",
+              "intent": "captures",
+              "limit": 10,
+              "place": {
+                "ids": [
+                  "01a0cee6-3a47-7a10-901f-5e5873a1fc9e"
+                ]
+              },
+              "semantic_query": null,
+              "time": []
+            },
+            "prompt_version": "selection-7",
+            "question": "When were my photographs at Mireland Hall taken?",
+            "question_id": "when",
+            "score": {
+              "conditions": {
+                "answered": true,
+                "cites_a_confirmed_photograph": true,
+                "composed": true,
+                "states_photograph_1_date": true,
+                "states_photograph_2_date": true
+              },
+              "right": true
+            },
+            "status": 200,
+            "usd": "0.00091220"
+          }
+        ],
+        "asked": 3,
+        "confirmed_entity_id": "01a0cee6-3a47-7a10-901f-5e5873a1fc9e",
+        "confirmed_photographs": [
+          1,
+          2
+        ],
+        "derivative_jobs_cost": {
+          "input_tokens": 8248,
+          "model_calls": 11,
+          "output_tokens": 2915,
+          "usd_estimate": "0.00576244"
+        },
+        "reported_usd": "0.00864106",
+        "right": 3,
+        "sources_sha256": {
+          "exulanica/selection/packet.py": "0cc288dbaf14adee5797988d2f26412724649f1a00a27c0ff4e05cfcfc128e09",
+          "exulanica/selection/question.py": "44529215b4e37a78b46e21f77156d4336021b3c9786a1b1623e8de2a403e9f3e"
+        },
+        "tree": {
+          "branch": "lane/0923-companion",
+          "changed_paths": "49",
+          "diff_head_bytes": "185021",
+          "diff_head_sha256": "493de09e833dafcb9b24be71d945cbded6c2b51a2c54aec75eda2a5cff5b8850",
+          "head": "e07b0de26d0a0b203fc26852511a8ae479ee2b52",
+          "status_sha256": "2c9ac1dfd3ffb44e790be4000a8ca2223de9d69002ba84abf875089bf48ca669"
+        },
+        "vision": {
+          "1": {
+            "outcome": "written",
+            "proposed_label": "Mireland Hall",
+            "sign_usage": {
+              "cache_hit": false,
+              "cached_input_tokens": 0,
+              "input_tokens": 820,
+              "model_id": "MiniMaxAI/MiniMax-M3",
+              "output_tokens": 26,
+              "reasoning_tokens": 0,
+              "role": "vision",
+              "usd_estimate": "0.00027720"
+            },
+            "usage": {
+              "cache_hit": false,
+              "cached_input_tokens": 0,
+              "input_tokens": 2090,
+              "model_id": "MiniMaxAI/MiniMax-M3",
+              "output_tokens": 820,
+              "reasoning_tokens": 0,
+              "role": "vision",
+              "usd_estimate": "0.00161100"
+            },
+            "written_label": "MIRELAND HALL"
+          },
+          "2": {
+            "outcome": "written",
+            "proposed_label": "Mireland Hall",
+            "sign_usage": {
+              "cache_hit": false,
+              "cached_input_tokens": 640,
+              "input_tokens": 820,
+              "model_id": "MiniMaxAI/MiniMax-M3",
+              "output_tokens": 26,
+              "reasoning_tokens": 0,
+              "role": "vision",
+              "usd_estimate": "0.00027720"
+            },
+            "usage": {
+              "cache_hit": false,
+              "cached_input_tokens": 640,
+              "input_tokens": 2088,
+              "model_id": "MiniMaxAI/MiniMax-M3",
+              "output_tokens": 734,
+              "reasoning_tokens": 0,
+              "role": "vision",
+              "usd_estimate": "0.00150720"
+            },
+            "written_label": "MIRELAND HALL"
+          },
+          "3": {
+            "outcome": "sign_partly_hidden",
+            "proposed_label": "MIRELAND",
+            "sign_usage": {
+              "cache_hit": false,
+              "cached_input_tokens": 640,
+              "input_tokens": 820,
+              "model_id": "MiniMaxAI/MiniMax-M3",
+              "output_tokens": 27,
+              "reasoning_tokens": 0,
+              "role": "vision",
+              "usd_estimate": "0.00027840"
+            },
+            "usage": {
+              "cache_hit": false,
+              "cached_input_tokens": 640,
+              "input_tokens": 2084,
+              "model_id": "MiniMaxAI/MiniMax-M3",
+              "output_tokens": 697,
+              "reasoning_tokens": 0,
+              "role": "vision",
+              "usd_estimate": "0.00146160"
+            },
+            "written_label": null
+          },
+          "4": {
+            "outcome": "nothing_proposed",
+            "proposed_label": null,
+            "sign_usage": null,
+            "usage": {
+              "cache_hit": false,
+              "cached_input_tokens": 0,
+              "input_tokens": 1262,
+              "model_id": "MiniMaxAI/MiniMax-M3",
+              "output_tokens": 664,
+              "reasoning_tokens": 0,
+              "role": "vision",
+              "usd_estimate": "0.00117540"
+            },
+            "written_label": null
+          }
+        },
+        "workspace_id": "6363da92-1f5b-420d-920d-ddc543c77d98"
+      },
+      "before": {
+        "answers": [
+          {
+            "abstained": null,
+            "calls": [
+              {
+                "completion_tokens": 109,
+                "latency_ms": 1699,
+                "prompt_tokens": 1020,
+                "reasoning_tokens": null,
+                "requested_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+                "role": "structured_extraction",
+                "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+                "usd": "0.00026940",
+                "used_fallback": false
+              },
+              {
+                "completion_tokens": 0,
+                "latency_ms": 9586,
+                "prompt_tokens": 2,
+                "reasoning_tokens": null,
+                "requested_model": "Qwen/Qwen3-Embedding-8B",
+                "role": "embedding",
+                "served_model": null,
+                "usd": "2E-8",
+                "used_fallback": false
+              },
+              {
+                "completion_tokens": 1912,
+                "latency_ms": 19943,
+                "prompt_tokens": 1398,
+                "reasoning_tokens": null,
+                "requested_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+                "role": "reasoning_cheap",
+                "served_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+                "usd": "0.00054276",
+                "used_fallback": false
+              }
+            ],
+            "clauses": [
+              {
+                "citations": [
+                  "43JGQSXJKM"
+                ],
+                "text": "The sign says this photograph.",
+                "type": "historical",
+                "value_refs": []
+              }
+            ],
+            "deterministic": false,
+            "names": {
+              "[place A]": "01a0cee4-42dc-76e4-8f3c-89f59a45073e"
+            },
+            "plan": {
+              "capture": null,
+              "content": null,
+              "entities": null,
+              "epistemic": "confirmed",
+              "intent": "captures",
+              "limit": 10,
+              "place": {
+                "ids": [
+                  "01a0cee4-42dc-76e4-8f3c-89f59a45073e"
+                ]
+              },
+              "semantic_query": "sign",
+              "time": []
+            },
+            "prompt_version": "selection-6",
+            "question": "What does the sign say at Mireland Hall?",
+            "question_id": "sign",
+            "score": {
+              "conditions": {
+                "answered": true,
+                "composed": true,
+                "names_the_confirmed_place_citing_its_photograph": false
+              },
+              "right": false
+            },
+            "status": 200,
+            "usd": "0.00081218"
+          },
+          {
+            "abstained": null,
+            "calls": [
+              {
+                "completion_tokens": 108,
+                "latency_ms": 2328,
+                "prompt_tokens": 1021,
+                "reasoning_tokens": null,
+                "requested_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+                "role": "structured_extraction",
+                "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+                "usd": "0.00026900",
+                "used_fallback": false
+              },
+              {
+                "completion_tokens": 1446,
+                "latency_ms": 13944,
+                "prompt_tokens": 1219,
+                "reasoning_tokens": null,
+                "requested_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+                "role": "reasoning_cheap",
+                "served_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+                "usd": "0.00042018",
+                "used_fallback": false
+              }
+            ],
+            "clauses": [
+              {
+                "citations": [],
+                "text": "No description mentions [place A], so no photograph can be identified as taken there.",
+                "type": "meta",
+                "value_refs": []
+              }
+            ],
+            "deterministic": false,
+            "names": {
+              "[place A]": "01a0cee4-42dc-76e4-8f3c-89f59a45073e"
+            },
+            "plan": {
+              "capture": null,
+              "content": null,
+              "entities": null,
+              "epistemic": "confirmed",
+              "intent": "captures",
+              "limit": 10,
+              "place": {
+                "ids": [
+                  "01a0cee4-42dc-76e4-8f3c-89f59a45073e"
+                ]
+              },
+              "semantic_query": null,
+              "time": []
+            },
+            "prompt_version": "selection-6",
+            "question": "Which of my photographs were taken at Mireland Hall?",
+            "question_id": "which",
+            "score": {
+              "conditions": {
+                "answered": true,
+                "cites_exactly_the_confirmed_photographs": false,
+                "composed": true
+              },
+              "right": false
+            },
+            "status": 200,
+            "usd": "0.00068918"
+          },
+          {
+            "abstained": null,
+            "calls": [
+              {
+                "completion_tokens": 108,
+                "latency_ms": 1393,
+                "prompt_tokens": 1021,
+                "reasoning_tokens": null,
+                "requested_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+                "role": "structured_extraction",
+                "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+                "usd": "0.00026900",
+                "used_fallback": false
+              },
+              {
+                "completion_tokens": 616,
+                "latency_ms": 6346,
+                "prompt_tokens": 1216,
+                "reasoning_tokens": null,
+                "requested_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+                "role": "reasoning_cheap",
+                "served_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+                "usd": "0.00022080",
+                "used_fallback": false
+              }
+            ],
+            "clauses": [
+              {
+                "citations": [],
+                "text": "The provided evidence does not contain any information about place A.",
+                "type": "meta",
+                "value_refs": []
+              }
+            ],
+            "deterministic": false,
+            "names": {
+              "[place A]": "01a0cee4-42dc-76e4-8f3c-89f59a45073e"
+            },
+            "plan": {
+              "capture": null,
+              "content": null,
+              "entities": null,
+              "epistemic": "confirmed",
+              "intent": "captures",
+              "limit": 10,
+              "place": {
+                "ids": [
+                  "01a0cee4-42dc-76e4-8f3c-89f59a45073e"
+                ]
+              },
+              "semantic_query": null,
+              "time": []
+            },
+            "prompt_version": "selection-6",
+            "question": "When were my photographs at Mireland Hall taken?",
+            "question_id": "when",
+            "score": {
+              "conditions": {
+                "answered": true,
+                "cites_a_confirmed_photograph": false,
+                "composed": true,
+                "states_photograph_1_date": false,
+                "states_photograph_2_date": false
+              },
+              "right": false
+            },
+            "status": 200,
+            "usd": "0.00048980"
+          }
+        ],
+        "asked": 3,
+        "confirmed_entity_id": "01a0cee4-42dc-76e4-8f3c-89f59a45073e",
+        "confirmed_photographs": [
+          1,
+          2
+        ],
+        "derivative_jobs_cost": {
+          "input_tokens": 8169,
+          "model_calls": 11,
+          "output_tokens": 2885,
+          "usd_estimate": "0.00572449"
+        },
+        "reported_usd": "0.00771565",
+        "right": 0,
+        "sources_sha256": {
+          "exulanica/selection/packet.py": "0cc288dbaf14adee5797988d2f26412724649f1a00a27c0ff4e05cfcfc128e09",
+          "exulanica/selection/question.py": "a4447ff232315a583fcd4ea067dbbb85173cf34d435ab4737494cc4c3d636879"
+        },
+        "tree": {
+          "branch": "lane/0923-companion",
+          "changed_paths": "49",
+          "diff_head_bytes": "181056",
+          "diff_head_sha256": "4c8214292b4961418f32745bec9518d95bc7f36c6749a185e7051e8100f48679",
+          "head": "e07b0de26d0a0b203fc26852511a8ae479ee2b52",
+          "status_sha256": "d9487966d4fbbaf380837647e18930e544480d55a263f00688de225fab7bd6d4"
+        },
+        "vision": {
+          "1": {
+            "outcome": "written",
+            "proposed_label": "Mireland Hall",
+            "sign_usage": {
+              "cache_hit": false,
+              "cached_input_tokens": 0,
+              "input_tokens": 820,
+              "model_id": "MiniMaxAI/MiniMax-M3",
+              "output_tokens": 26,
+              "reasoning_tokens": 0,
+              "role": "vision",
+              "usd_estimate": "0.00027720"
+            },
+            "usage": {
+              "cache_hit": false,
+              "cached_input_tokens": 0,
+              "input_tokens": 2084,
+              "model_id": "MiniMaxAI/MiniMax-M3",
+              "output_tokens": 840,
+              "reasoning_tokens": 0,
+              "role": "vision",
+              "usd_estimate": "0.00163320"
+            },
+            "written_label": "MIRELAND HALL"
+          },
+          "2": {
+            "outcome": "written",
+            "proposed_label": "Mireland Hall",
+            "sign_usage": {
+              "cache_hit": false,
+              "cached_input_tokens": 0,
+              "input_tokens": 820,
+              "model_id": "MiniMaxAI/MiniMax-M3",
+              "output_tokens": 27,
+              "reasoning_tokens": 0,
+              "role": "vision",
+              "usd_estimate": "0.00027840"
+            },
+            "usage": {
+              "cache_hit": false,
+              "cached_input_tokens": 0,
+              "input_tokens": 2086,
+              "model_id": "MiniMaxAI/MiniMax-M3",
+              "output_tokens": 783,
+              "reasoning_tokens": 0,
+              "role": "vision",
+              "usd_estimate": "0.00156540"
+            },
+            "written_label": "MIRELAND HALL"
+          },
+          "3": {
+            "outcome": "sign_partly_hidden",
+            "proposed_label": "MIRELAND",
+            "sign_usage": {
+              "cache_hit": false,
+              "cached_input_tokens": 0,
+              "input_tokens": 820,
+              "model_id": "MiniMaxAI/MiniMax-M3",
+              "output_tokens": 26,
+              "reasoning_tokens": 0,
+              "role": "vision",
+              "usd_estimate": "0.00027720"
+            },
+            "usage": {
+              "cache_hit": false,
+              "cached_input_tokens": 0,
+              "input_tokens": 2082,
+              "model_id": "MiniMaxAI/MiniMax-M3",
+              "output_tokens": 754,
+              "reasoning_tokens": 0,
+              "role": "vision",
+              "usd_estimate": "0.00152940"
+            },
+            "written_label": null
+          },
+          "4": {
+            "outcome": "nothing_proposed",
+            "proposed_label": null,
+            "sign_usage": null,
+            "usage": {
+              "cache_hit": false,
+              "cached_input_tokens": 0,
+              "input_tokens": 1268,
+              "model_id": "MiniMaxAI/MiniMax-M3",
+              "output_tokens": 508,
+              "reasoning_tokens": 0,
+              "role": "vision",
+              "usd_estimate": "0.00099000"
+            },
+            "written_label": null
+          }
+        },
+        "workspace_id": "be4fcb67-1058-450c-8158-7651273521c0"
+      }
+    },
+    "browser": {
+      "before_fixes": {
+        "console": [],
+        "found": [
+          "The composer wrote the placeholder as 'PLACE A', capitalised and without its brackets, and the page showed it as written; the page reads an answer's own labels in any case, with or without brackets, since.",
+          "The photograph's arrival redrew its face and dropped keyboard focus from the way back; the redraw keeps it since."
+        ],
+        "reported_usd": null,
+        "steps": [
+          {
+            "error": null,
+            "name": "open the app",
+            "notes": [],
+            "ok": true,
+            "requests": [
+              {
+                "method": "GET",
+                "path": "/api/graph",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/world-entries",
+                "status": 200
+              },
+              {
+                "method": "POST",
+                "path": "/api/world-entries/starter",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/world/styles/catalog",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/world/styles/current",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/world/styles/versions",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/world/interactions/current",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/geometry",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/world/versions/9c484d8a-bd09-4a28-84c1-0d6ce2b7ff29",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/companion/memory/recent",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/formation",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/formation",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/world/assets",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/world/versions/9c484d8a-bd09-4a28-84c1-0d6ce2b7ff29",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/world/assets",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/world/versions/9c484d8a-bd09-4a28-84c1-0d6ce2b7ff29",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/formation/01a0cee5-8980-7029-9659-c64cdfab08a0",
+                "status": "failed: net::ERR_ABORTED"
+              },
+              {
+                "method": "GET",
+                "path": "/api/formation/01a0cee5-8980-7029-9659-c64cdfab08a0",
+                "status": "failed: net::ERR_ABORTED"
+              },
+              {
+                "method": "GET",
+                "path": "/api/graph",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/world/versions/9c484d8a-bd09-4a28-84c1-0d6ce2b7ff29/society",
+                "status": 404
+              },
+              {
+                "method": "GET",
+                "path": "/api/world/versions/9c484d8a-bd09-4a28-84c1-0d6ce2b7ff29/society/control",
+                "status": 404
+              },
+              {
+                "method": "GET",
+                "path": "/api/person-regions/01a0cee5-889b-7a36-9101-8d87417271f3",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/person-regions/01a0cee5-88d1-721e-bc4c-42a4a5bb42bd",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/person-regions/01a0cee5-88ff-7c09-9acb-9b4c933ccb79",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/person-regions/01a0cee5-892f-7856-a10d-869d1d55a790",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/graph/sources",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/evidence/01a0cee5-889d-747e-8693-d694670330a4/masked",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/evidence/01a0cee5-88d2-79cb-8154-c608e0944fd3/masked",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/evidence/01a0cee5-8901-7c70-a6ac-45af343d5d51/masked",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/evidence/01a0cee5-8931-7bf8-84fa-a6c5ebf810e7/masked",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/world-entries/01a0cee9-d496-7efb-9b7c-c05aeb9a1fae",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/personal-admission",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/world/versions/9c484d8a-bd09-4a28-84c1-0d6ce2b7ff29",
+                "status": 200
+              }
+            ],
+            "screenshots": []
+          },
+          {
+            "drawn": {
+              "brackets_left": false,
+              "chips": [
+                {
+                  "disabled": false,
+                  "text": "EOpen the photograph"
+                }
+              ],
+              "clauses": [
+                "The sign reads PLACE A."
+              ],
+              "mode": "answer",
+              "names": [],
+              "provenance": "Answered by nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B in 20.2 s.",
+              "question": "What does the sign say at Mireland Hall?"
+            },
+            "error": null,
+            "name": "ask sign",
+            "notes": [],
+            "ok": true,
+            "requests": [
+              {
+                "method": "POST",
+                "path": "/api/selection/appearance",
+                "status": 200
+              },
+              {
+                "method": "POST",
+                "path": "/api/selection/ask",
+                "status": 200
+              },
+              {
+                "method": "POST",
+                "path": "/api/selection/packet",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/place-name-rights/01a0cee6-3a47-7a10-901f-5e5873a1fc9e",
+                "status": 200
+              },
+              {
+                "method": "POST",
+                "path": "/api/companion/memory/answers",
+                "status": 201
+              }
+            ],
+            "screenshots": [
+              "docs/evaluation/artifacts/2026-09-23-companion-place-link/before-fixes-02-answer-sign.png"
+            ]
+          },
+          {
+            "back": {
+              "brackets_left": false,
+              "chips": [
+                {
+                  "disabled": false,
+                  "text": "EOpen the photograph"
+                }
+              ],
+              "clauses": [
+                "The sign reads PLACE A."
+              ],
+              "mode": "answer",
+              "names": [],
+              "provenance": "Answered by nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B in 20.2 s.",
+              "question": "What does the sign say at Mireland Hall?"
+            },
+            "error": null,
+            "evidence": "shown",
+            "name": "open the photograph sign cites",
+            "notes": [],
+            "ok": true,
+            "requests": [
+              {
+                "method": "GET",
+                "path": "/api/evidence/01a0cee5-889d-747e-8693-d694670330a4/masked",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/place-name-rights/01a0cee6-3a47-7a10-901f-5e5873a1fc9e",
+                "status": 200
+              }
+            ],
+            "screenshots": [
+              "not bound: 03-photograph-sign.png"
+            ],
+            "view": {
+              "back": "Back to the answer",
+              "caption": "Taken on 2026-08-14.",
+              "focused": false,
+              "image": {
+                "height": 960,
+                "scheme": "blob",
+                "width": 1280
+              },
+              "title": "The photograph this answer cites",
+              "unavailable": null
+            }
+          },
+          {
+            "drawn": {
+              "brackets_left": false,
+              "chips": [
+                {
+                  "disabled": false,
+                  "text": "EOpen the photograph"
+                },
+                {
+                  "disabled": false,
+                  "text": "Open the photograph"
+                }
+              ],
+              "clauses": [
+                "2 of your photographs were taken at MIRELAND HALL."
+              ],
+              "mode": "answer",
+              "names": [
+                {
+                  "entity_id": "01a0cee6-3a47-7a10-901f-5e5873a1fc9e",
+                  "placeholder": "[place A]",
+                  "text": "MIRELAND HALL",
+                  "unresolved": null
+                }
+              ],
+              "provenance": "Answered by nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B in 18.1 s.",
+              "question": "Which of my photographs were taken at Mireland Hall?"
+            },
+            "error": null,
+            "name": "ask which",
+            "notes": [],
+            "ok": true,
+            "requests": [
+              {
+                "method": "POST",
+                "path": "/api/selection/appearance",
+                "status": 200
+              },
+              {
+                "method": "POST",
+                "path": "/api/selection/ask",
+                "status": 200
+              },
+              {
+                "method": "POST",
+                "path": "/api/selection/packet",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/place-name-rights/01a0cee6-3a47-7a10-901f-5e5873a1fc9e",
+                "status": 200
+              },
+              {
+                "method": "POST",
+                "path": "/api/companion/memory/answers",
+                "status": 201
+              }
+            ],
+            "screenshots": [
+              "not bound: 04-answer-which.png"
+            ]
+          },
+          {
+            "drawn": {
+              "brackets_left": false,
+              "chips": [
+                {
+                  "disabled": false,
+                  "text": "EOpen the photograph"
+                },
+                {
+                  "disabled": false,
+                  "text": "Open the photograph"
+                }
+              ],
+              "clauses": [
+                "Your photographs at MIRELAND HALL were taken on 2026-08-14 and 2026-08-16."
+              ],
+              "mode": "answer",
+              "names": [
+                {
+                  "entity_id": "01a0cee6-3a47-7a10-901f-5e5873a1fc9e",
+                  "placeholder": "[place A]",
+                  "text": "MIRELAND HALL",
+                  "unresolved": null
+                }
+              ],
+              "provenance": "Answered by nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B in 21.3 s.",
+              "question": "When were my photographs at Mireland Hall taken?"
+            },
+            "error": null,
+            "name": "ask when",
+            "notes": [],
+            "ok": true,
+            "requests": [
+              {
+                "method": "POST",
+                "path": "/api/selection/appearance",
+                "status": 200
+              },
+              {
+                "method": "POST",
+                "path": "/api/selection/ask",
+                "status": 200
+              },
+              {
+                "method": "POST",
+                "path": "/api/selection/packet",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/place-name-rights/01a0cee6-3a47-7a10-901f-5e5873a1fc9e",
+                "status": 200
+              },
+              {
+                "method": "POST",
+                "path": "/api/companion/memory/answers",
+                "status": 201
+              }
+            ],
+            "screenshots": [
+              "not bound: 05-answer-when.png"
+            ]
+          }
+        ],
+        "viewport": {
+          "height": 860,
+          "width": 1280
+        }
+      },
+      "final": {
+        "console": [],
+        "injected": "The refused photograph's read was answered 410 by the capture script through the DevTools Fetch domain, because no route deletes a photograph; the product's server was not asked that time. The shown photograph's read was the server's own masked route.",
+        "reported_usd": "0.00282130",
+        "runtime": "the after arm's runtime and workspace, after that arm's questions",
+        "steps": [
+          {
+            "error": null,
+            "name": "open the app",
+            "notes": [],
+            "ok": true,
+            "requests": [
+              {
+                "method": "GET",
+                "path": "/api/graph",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/world-entries",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/world/styles/catalog",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/world/styles/current",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/world/styles/versions",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/world/interactions/current",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/geometry",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/world/versions/9c484d8a-bd09-4a28-84c1-0d6ce2b7ff29",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/companion/memory/recent",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/formation",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/formation",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/world/assets",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/world/versions/9c484d8a-bd09-4a28-84c1-0d6ce2b7ff29",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/world/assets",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/world/versions/9c484d8a-bd09-4a28-84c1-0d6ce2b7ff29",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/formation/01a0cee5-8980-7029-9659-c64cdfab08a0",
+                "status": "failed: net::ERR_ABORTED"
+              },
+              {
+                "method": "GET",
+                "path": "/api/formation/01a0cee5-8980-7029-9659-c64cdfab08a0",
+                "status": "failed: net::ERR_ABORTED"
+              },
+              {
+                "method": "GET",
+                "path": "/api/graph",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/world/versions/9c484d8a-bd09-4a28-84c1-0d6ce2b7ff29/society",
+                "status": 404
+              },
+              {
+                "method": "GET",
+                "path": "/api/world/versions/9c484d8a-bd09-4a28-84c1-0d6ce2b7ff29/society/control",
+                "status": 404
+              },
+              {
+                "method": "GET",
+                "path": "/api/person-regions/01a0cee5-889b-7a36-9101-8d87417271f3",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/person-regions/01a0cee5-88d1-721e-bc4c-42a4a5bb42bd",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/person-regions/01a0cee5-88ff-7c09-9acb-9b4c933ccb79",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/person-regions/01a0cee5-892f-7856-a10d-869d1d55a790",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/graph/sources",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/evidence/01a0cee5-889d-747e-8693-d694670330a4/masked",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/evidence/01a0cee5-88d2-79cb-8154-c608e0944fd3/masked",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/evidence/01a0cee5-8901-7c70-a6ac-45af343d5d51/masked",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/evidence/01a0cee5-8931-7bf8-84fa-a6c5ebf810e7/masked",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/world-entries/01a0cee9-d496-7efb-9b7c-c05aeb9a1fae",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/personal-admission",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/world/versions/9c484d8a-bd09-4a28-84c1-0d6ce2b7ff29",
+                "status": 200
+              }
+            ],
+            "screenshots": []
+          },
+          {
+            "drawn": {
+              "brackets_left": false,
+              "chips": [
+                {
+                  "disabled": false,
+                  "text": "EOpen the photograph"
+                }
+              ],
+              "clauses": [
+                "The sign on the building reads 'MIRELAND HALL'."
+              ],
+              "mode": "answer",
+              "names": [
+                {
+                  "entity_id": "01a0cee6-3a47-7a10-901f-5e5873a1fc9e",
+                  "placeholder": "[place A]",
+                  "text": "MIRELAND HALL",
+                  "unresolved": null
+                }
+              ],
+              "provenance": "Answered by nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B in 23.5 s.",
+              "question": "What does the sign say at Mireland Hall?"
+            },
+            "error": null,
+            "name": "ask sign",
+            "notes": [],
+            "ok": true,
+            "requests": [
+              {
+                "calls": [
+                  {
+                    "completion_tokens": 7,
+                    "latency_ms": 697,
+                    "prompt_tokens": 568,
+                    "reasoning_tokens": null,
+                    "requested_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+                    "role": "structured_extraction",
+                    "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+                    "usd": "0.00011780",
+                    "used_fallback": false
+                  }
+                ],
+                "method": "POST",
+                "path": "/api/selection/appearance",
+                "status": 200
+              },
+              {
+                "calls": [
+                  {
+                    "completion_tokens": 109,
+                    "latency_ms": 1586,
+                    "prompt_tokens": 1020,
+                    "reasoning_tokens": null,
+                    "requested_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+                    "role": "structured_extraction",
+                    "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+                    "usd": "0.00026940",
+                    "used_fallback": false
+                  },
+                  {
+                    "completion_tokens": 0,
+                    "latency_ms": 10907,
+                    "prompt_tokens": 2,
+                    "reasoning_tokens": null,
+                    "requested_model": "Qwen/Qwen3-Embedding-8B",
+                    "role": "embedding",
+                    "served_model": null,
+                    "usd": "2E-8",
+                    "used_fallback": false
+                  },
+                  {
+                    "completion_tokens": 1984,
+                    "latency_ms": 11022,
+                    "prompt_tokens": 1851,
+                    "reasoning_tokens": null,
+                    "requested_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+                    "role": "reasoning_cheap",
+                    "served_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+                    "usd": "0.00058722",
+                    "used_fallback": false
+                  }
+                ],
+                "method": "POST",
+                "path": "/api/selection/ask",
+                "status": 200
+              },
+              {
+                "method": "POST",
+                "path": "/api/selection/packet",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/place-name-rights/01a0cee6-3a47-7a10-901f-5e5873a1fc9e",
+                "status": 200
+              },
+              {
+                "method": "POST",
+                "path": "/api/companion/memory/answers",
+                "status": 201
+              }
+            ],
+            "screenshots": [
+              "docs/evaluation/artifacts/2026-09-23-companion-place-link/final-02-answer-sign.png"
+            ]
+          },
+          {
+            "error": null,
+            "evidence": "unavailable",
+            "injected": {
+              "by": "this script, through the DevTools Fetch domain",
+              "paths": [
+                "/api/evidence/01a0cee5-889d-747e-8693-d694670330a4/masked"
+              ],
+              "status": 410
+            },
+            "name": "open the photograph sign cites, its read answered 410 by this script",
+            "notes": [],
+            "ok": true,
+            "requests": [
+              {
+                "method": "GET",
+                "path": "/api/evidence/01a0cee5-889d-747e-8693-d694670330a4/masked",
+                "status": 410
+              },
+              {
+                "method": "GET",
+                "path": "/api/place-name-rights/01a0cee6-3a47-7a10-901f-5e5873a1fc9e",
+                "status": 200
+              }
+            ],
+            "screenshots": [
+              "docs/evaluation/artifacts/2026-09-23-companion-place-link/final-03-photograph-refused-sign.png"
+            ],
+            "view": {
+              "back": "Back to the answer",
+              "caption": null,
+              "focused": true,
+              "image": null,
+              "title": "The photograph this answer cites",
+              "unavailable": "This photograph cannot be shown.",
+              "unavailable_detail": "this evidence was deleted"
+            }
+          },
+          {
+            "back": {
+              "brackets_left": false,
+              "chips": [
+                {
+                  "disabled": false,
+                  "text": "EOpen the photograph"
+                }
+              ],
+              "clauses": [
+                "The sign on the building reads 'MIRELAND HALL'."
+              ],
+              "mode": "answer",
+              "names": [
+                {
+                  "entity_id": "01a0cee6-3a47-7a10-901f-5e5873a1fc9e",
+                  "placeholder": "[place A]",
+                  "text": "MIRELAND HALL",
+                  "unresolved": null
+                }
+              ],
+              "provenance": "Answered by nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B in 23.5 s.",
+              "question": "What does the sign say at Mireland Hall?"
+            },
+            "error": null,
+            "evidence": "shown",
+            "name": "open the photograph sign cites",
+            "notes": [],
+            "ok": true,
+            "requests": [
+              {
+                "method": "GET",
+                "path": "/api/evidence/01a0cee5-889d-747e-8693-d694670330a4/masked",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/place-name-rights/01a0cee6-3a47-7a10-901f-5e5873a1fc9e",
+                "status": 200
+              }
+            ],
+            "screenshots": [
+              "docs/evaluation/artifacts/2026-09-23-companion-place-link/final-04-photograph-sign.png"
+            ],
+            "view": {
+              "back": "Back to the answer",
+              "caption": "Taken on 2026-08-14.",
+              "focused": true,
+              "image": {
+                "height": 960,
+                "scheme": "blob",
+                "width": 1280
+              },
+              "title": "The photograph this answer cites",
+              "unavailable": null,
+              "unavailable_detail": null
+            }
+          },
+          {
+            "drawn": {
+              "brackets_left": false,
+              "chips": [
+                {
+                  "disabled": false,
+                  "text": "EOpen the photograph"
+                },
+                {
+                  "disabled": false,
+                  "text": "Open the photograph"
+                }
+              ],
+              "clauses": [
+                "These 2 photographs were taken at MIRELAND HALL."
+              ],
+              "mode": "answer",
+              "names": [
+                {
+                  "entity_id": "01a0cee6-3a47-7a10-901f-5e5873a1fc9e",
+                  "placeholder": "[place A]",
+                  "text": "MIRELAND HALL",
+                  "unresolved": null
+                }
+              ],
+              "provenance": "Answered by nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B in 11.5 s.",
+              "question": "Which of my photographs were taken at Mireland Hall?"
+            },
+            "error": null,
+            "name": "ask which",
+            "notes": [],
+            "ok": true,
+            "requests": [
+              {
+                "calls": [
+                  {
+                    "completion_tokens": 7,
+                    "latency_ms": 384,
+                    "prompt_tokens": 569,
+                    "reasoning_tokens": null,
+                    "requested_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+                    "role": "structured_extraction",
+                    "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+                    "usd": "0.00011800",
+                    "used_fallback": false
+                  }
+                ],
+                "method": "POST",
+                "path": "/api/selection/appearance",
+                "status": 200
+              },
+              {
+                "calls": [
+                  {
+                    "completion_tokens": 108,
+                    "latency_ms": 1991,
+                    "prompt_tokens": 1021,
+                    "reasoning_tokens": null,
+                    "requested_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+                    "role": "structured_extraction",
+                    "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+                    "usd": "0.00026900",
+                    "used_fallback": false
+                  },
+                  {
+                    "completion_tokens": 1769,
+                    "latency_ms": 9510,
+                    "prompt_tokens": 1313,
+                    "reasoning_tokens": null,
+                    "requested_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+                    "role": "reasoning_cheap",
+                    "served_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+                    "usd": "0.00050334",
+                    "used_fallback": false
+                  }
+                ],
+                "method": "POST",
+                "path": "/api/selection/ask",
+                "status": 200
+              },
+              {
+                "method": "POST",
+                "path": "/api/selection/packet",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/place-name-rights/01a0cee6-3a47-7a10-901f-5e5873a1fc9e",
+                "status": 200
+              },
+              {
+                "method": "POST",
+                "path": "/api/companion/memory/answers",
+                "status": 201
+              }
+            ],
+            "screenshots": [
+              "docs/evaluation/artifacts/2026-09-23-companion-place-link/final-05-answer-which.png"
+            ]
+          },
+          {
+            "drawn": {
+              "brackets_left": false,
+              "chips": [
+                {
+                  "disabled": false,
+                  "text": "EOpen the photograph"
+                },
+                {
+                  "disabled": false,
+                  "text": "Open the photograph"
+                }
+              ],
+              "clauses": [
+                "Your photographs at MIRELAND HALL were taken on 2026-08-14 and 2026-08-16."
+              ],
+              "mode": "answer",
+              "names": [
+                {
+                  "entity_id": "01a0cee6-3a47-7a10-901f-5e5873a1fc9e",
+                  "placeholder": "[place A]",
+                  "text": "MIRELAND HALL",
+                  "unresolved": null
+                }
+              ],
+              "provenance": "Answered by nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B in 13.7 s.",
+              "question": "When were my photographs at Mireland Hall taken?"
+            },
+            "error": null,
+            "name": "ask when",
+            "notes": [],
+            "ok": true,
+            "requests": [
+              {
+                "calls": [
+                  {
+                    "completion_tokens": 7,
+                    "latency_ms": 809,
+                    "prompt_tokens": 569,
+                    "reasoning_tokens": null,
+                    "requested_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+                    "role": "structured_extraction",
+                    "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+                    "usd": "0.00011800",
+                    "used_fallback": false
+                  }
+                ],
+                "method": "POST",
+                "path": "/api/selection/appearance",
+                "status": 200
+              },
+              {
+                "calls": [
+                  {
+                    "completion_tokens": 108,
+                    "latency_ms": 2603,
+                    "prompt_tokens": 1021,
+                    "reasoning_tokens": null,
+                    "requested_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+                    "role": "structured_extraction",
+                    "served_model": "Qwen/Qwen3-235B-A22B-Instruct-2507",
+                    "usd": "0.00026900",
+                    "used_fallback": false
+                  },
+                  {
+                    "completion_tokens": 2045,
+                    "latency_ms": 11060,
+                    "prompt_tokens": 1312,
+                    "reasoning_tokens": null,
+                    "requested_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+                    "role": "reasoning_cheap",
+                    "served_model": "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+                    "usd": "0.00056952",
+                    "used_fallback": false
+                  }
+                ],
+                "method": "POST",
+                "path": "/api/selection/ask",
+                "status": 200
+              },
+              {
+                "method": "POST",
+                "path": "/api/selection/packet",
+                "status": 200
+              },
+              {
+                "method": "GET",
+                "path": "/api/place-name-rights/01a0cee6-3a47-7a10-901f-5e5873a1fc9e",
+                "status": 200
+              },
+              {
+                "method": "POST",
+                "path": "/api/companion/memory/answers",
+                "status": 201
+              }
+            ],
+            "screenshots": [
+              "docs/evaluation/artifacts/2026-09-23-companion-place-link/final-06-answer-when.png"
+            ]
+          }
+        ],
+        "viewport": {
+          "height": 860,
+          "width": 1280
+        },
+        "web_sources_sha256": {
+          "web/packages/app/src/companion-names.ts": "ef7e1b2ae1a999825b36be6f468605deb66c28e266c4f6de50f681ece1cc4e77",
+          "web/packages/app/src/composition/companion.ts": "41e9466c7dd82c81233775a05fef23899f9ea877ad379439b1e0fe812112450f",
+          "web/packages/app/src/ui/companion-encounter.ts": "a724a1999544476c0bf36d5d33dc0725c5f35a6aaecd551300ed5d7aa83d250a",
+          "web/packages/app/src/ui/companion-evidence.ts": "b10de9e8a50544027e6bb2376691254792edc2d694db0cf71893946414553aa3",
+          "web/packages/app/src/ui/companion-speech.ts": "ea2dff073d7bfd8fec4f5eecf60c566d17b07652377912ad6ad74b44181c4b14"
+        }
+      }
+    },
+    "captures": [
+      {
+        "byte_size": 647859,
+        "path": "docs/evaluation/artifacts/2026-09-23-companion-place-link/final-02-answer-sign.png",
+        "sha256": "b2f5aec208e26760409e7b1ad94a713277eaf2318ff48a6189d9463d8aae1406",
+        "shows": "the Companion's answer to \"What does the sign say at Mireland Hall?\""
+      },
+      {
+        "byte_size": 435421,
+        "path": "docs/evaluation/artifacts/2026-09-23-companion-place-link/final-03-photograph-refused-sign.png",
+        "sha256": "fab6e9bc6ad198b2e16565dcf3d6f57cb586dbc959060d65d295a5939746f62b",
+        "shows": "a photograph whose read was answered 410, said in words with no picture"
+      },
+      {
+        "byte_size": 600582,
+        "path": "docs/evaluation/artifacts/2026-09-23-companion-place-link/final-04-photograph-sign.png",
+        "sha256": "3c275c1de9841f4c787724632b0496ebac1f057cca79588eb0d16bdb8e7403ef",
+        "shows": "the cited photograph, drawn inside the Companion"
+      },
+      {
+        "byte_size": 653527,
+        "path": "docs/evaluation/artifacts/2026-09-23-companion-place-link/final-05-answer-which.png",
+        "sha256": "9faa634622d3f8497cb2eb3ae0db9b17ceeba99ba2ba1e887d06e2cc3ba6391c",
+        "shows": "the Companion's answer to \"Which of my photographs were taken at Mireland Hall?\""
+      },
+      {
+        "byte_size": 656647,
+        "path": "docs/evaluation/artifacts/2026-09-23-companion-place-link/final-06-answer-when.png",
+        "sha256": "1acab6298c7513d1859558235bc19abbea5f6f54eed81ac58bf6d453c596c96b",
+        "shows": "the Companion's answer to \"When were my photographs at Mireland Hall taken?\""
+      },
+      {
+        "byte_size": 644875,
+        "path": "docs/evaluation/artifacts/2026-09-23-companion-place-link/before-fixes-02-answer-sign.png",
+        "sha256": "f06b8ef384f821f93e6cc5dcc40b958346b0ca543422e27078777f77bfc2e37d",
+        "shows": "the Companion's answer to \"What does the sign say at Mireland Hall?\""
+      }
+    ],
+    "measured_with_sha256": "0031773135331394aed85f82ae7ae162ae25106a7246be6199969e9138a0e5af",
+    "not_established": [
+      "One draw per question per arm: a difference between the arms is one observation each, not a rate.",
+      "Each arm is a fresh workspace, so the vision stage runs twice and may propose differently; each arm records its own decisions, and the confirmed photographs the rule uses are that arm's.",
+      "The planner is not held fixed: each arm plans its own questions, and each answer's plan is recorded.",
+      "Synthetic drawings of one place with one name, English questions, the manifest's chains. No personal photograph.",
+      "The restored name and the opened photograph are checked in the browser on the after arm; the before arm is read from the API.",
+      "An answer remembered across a reload is not measured."
+    ],
+    "predecessor_record": {
+      "path": "docs/evaluation/2026-09-23-companion-place-link-preregistration.json",
+      "record_sha256": "084ca1816354eb2cc339b66ccc1fe5fb9cdeea320f6118205e050fb0c02a36c2"
+    },
+    "profile_note": "Outcome of the Companion place-link measurement, scored once by the rule its pre-registration states. One draw per question per arm.",
+    "spend": {
+      "bound_usd": "1",
+      "not_recorded": "Two browser runs kept no response bodies, so their model calls were not read: the run before the fixes, bound here, and a second run between it and the final one, not bound. Each asked the same three questions through the same routes, which the final run reports at the cost above.",
+      "reported_usd": {
+        "after_arm": "0.00864106",
+        "before_arm": "0.00771565",
+        "browser_before_fixes": null,
+        "browser_final": "0.00282130"
+      }
+    },
+    "verdict": {
+      "after": "3 of 3 right",
+      "before": "0 of 3 right",
+      "by_question": {
+        "sign": {
+          "after": true,
+          "before": false
+        },
+        "when": {
+          "after": true,
+          "before": false
+        },
+        "which": {
+          "after": true,
+          "before": false
+        }
+      }
+    }
+  },
+  "record_sha256": "bf8cf1d8fa79fe8c05ec69ccefb7d0798c1d90cda3e4dbfb620ab6aee3967aa8"
+}

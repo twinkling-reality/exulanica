@@ -5,11 +5,14 @@ import type {
   CompanionAnswer,
 } from '../companion-ask-api.js';
 import { contentRowFields } from '../companion-content.js';
+import type { CompanionNames, SpokenPiece } from '../companion-names.js';
 import { el, replace } from './dom.js';
 import { fill, say } from './copy.js';
 
 export interface CompanionSpeechOptions {
   readonly speakerName: string;
+  /** Turns each placeholder the Companion's words carry back into the account holder's name. */
+  readonly names: CompanionNames;
 }
 
 export interface CompanionSpeech {
@@ -142,6 +145,23 @@ function renderContentSurface(answer: CompanionAnswer): Node[] {
   return nodes;
 }
 
+/**
+ * Spoken text as nodes: a name the account holder saved, or the words said in its place, is its
+ * own element, so a surface and a test can tell a restored name from the sentence around it.
+ */
+function spoken(pieces: readonly SpokenPiece[]): (Node | string)[] {
+  return pieces.map((piece) => {
+    if (piece.kind === 'text') return piece.text;
+    return el('span', {
+      class: 'companion-name',
+      'data-placeholder': piece.placeholder,
+      'data-entity-id': piece.entityId ?? undefined,
+      'data-unresolved': piece.kind === 'unresolved' ? piece.reason : undefined,
+      text: piece.text,
+    });
+  });
+}
+
 /*
  * The band holds speech, and only speech.
  *
@@ -176,7 +196,9 @@ export function buildCompanionSpeech(options: CompanionSpeechOptions): Companion
         class: 'companion-speaker',
         text: options.speakerName,
       }),
-      el('p', { class: 'companion-utterance', text: turn.utterance ?? say(turn.utteranceKey) }),
+      el('p', { class: 'companion-utterance' }, spoken(
+        options.names.restore(turn.utterance ?? say(turn.utteranceKey), undefined),
+      )),
     ];
 
     replace(root, content);
@@ -189,8 +211,9 @@ export function buildCompanionSpeech(options: CompanionSpeechOptions): Companion
    * it left the API: a historical clause carries a citation that resolves, and a digit that no
    * value reference covers is refused outright. Rewriting any of it here would put prose nobody
    * checked inside the one surface whose claim is that its sentences are backed, so this renders
-   * the clauses and adds only two things the server did not write: a label for which KIND of
-   * silence an abstention is, and a line saying which model answered.
+   * the clauses and adds only three things the server did not write: each name the account
+   * holder saved, in place of the placeholder the server sent instead of it; a label for which
+   * KIND of silence an abstention is; and a line saying which model answered.
    */
   const renderAnswer = (answer: CompanionAnswer): void => {
     root.setAttribute('aria-labelledby', 'companion-speaker-name');
@@ -201,7 +224,11 @@ export function buildCompanionSpeech(options: CompanionSpeechOptions): Companion
     ];
 
     for (const clause of answer.clauses) {
-      const paragraph = el('p', { class: 'companion-utterance', text: clause.text });
+      const paragraph = el(
+        'p',
+        { class: 'companion-utterance' },
+        spoken(options.names.restore(clause.text, answer.names)),
+      );
       paragraph.dataset['clause'] = clause.type;
       content.push(paragraph);
     }

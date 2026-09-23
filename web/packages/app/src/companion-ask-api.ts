@@ -163,6 +163,12 @@ export interface CompanionAnswer {
    * decides where it may go reads it for itself.
    */
   readonly places?: readonly string[];
+  /**
+   * Each placeholder the clauses may carry, `[place A]`, and the entity it stands for, as the
+   * server's redaction assigned them. Ids only: `companion-names.ts` reads every name from the
+   * account holder's own library, never from this answer. Absent when the answer names nothing.
+   */
+  readonly names?: Readonly<Record<string, string>>;
   readonly provenance: AnswerProvenance;
   readonly promptVersion: string;
   readonly calls: readonly ModelCall[];
@@ -288,6 +294,15 @@ function placesOf(body: WireAnswer, content: CompanionContentSurface | undefined
   return found;
 }
 
+/** The placeholder-to-entity map as the server sent it, keeping only entries that name an id. */
+function namesOf(body: WireAnswer): Record<string, string> {
+  const names: Record<string, string> = {};
+  for (const [label, id] of Object.entries(body.names ?? {})) {
+    if (typeof id === 'string' && id.length > 0) names[label] = id;
+  }
+  return names;
+}
+
 export class CompanionAskClient {
   readonly #where: CompanionAskOptions;
 
@@ -406,6 +421,7 @@ export class CompanionAskClient {
 
     const abstained = body.abstained;
     const places = placesOf(body, content);
+    const names = namesOf(body);
     return {
       question,
       clauses,
@@ -416,6 +432,7 @@ export class CompanionAskClient {
       evidence,
       content,
       ...(places.length === 0 ? {} : { places }),
+      ...(Object.keys(names).length === 0 ? {} : { names }),
       provenance: provenanceOf(
         calls,
         body.deterministic === true,

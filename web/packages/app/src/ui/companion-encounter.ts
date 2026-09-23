@@ -1,11 +1,14 @@
 import type { Turn } from '@exulanica/companion-runtime';
 import type { AskUnavailable, CompanionAnswer } from '../companion-ask-api.js';
+import { companionNames, type CompanionNames } from '../companion-names.js';
+import type { OpenedEvidence } from '../evidence.js';
 import type { PlaceNameRightsSource } from '../place-name-rights-api.js';
 import {
   buildCompanionChoiceRail,
   type CompanionChoiceHandlers,
   type CompanionStarterActions,
 } from './companion-choice-rail.js';
+import { buildCompanionEvidence, type ShownEvidence } from './companion-evidence.js';
 import type { CompanionPlacement } from './companion-placement.js';
 import { buildCompanionSpeech } from './companion-speech.js';
 import { el, replace } from './dom.js';
@@ -16,8 +19,8 @@ export type CompanionHandlers = CompanionChoiceHandlers;
 
 export type PanelState = 'enter' | 'summon' | 'open';
 
-/** Which of the encounter's four faces is on the screen. */
-export type PanelMode = 'turn' | 'asking' | 'answer' | 'failed';
+/** Which of the encounter's five faces is on the screen. */
+export type PanelMode = 'turn' | 'asking' | 'answer' | 'failed' | 'evidence';
 
 export interface CompanionEncounterOptions {
   readonly speakerName?: string;
@@ -44,6 +47,12 @@ export interface CompanionEncounterOptions {
   readonly onAnswerShown?: (answer: CompanionAnswer) => void;
   /** Where the places an answer is about may send their names. The rail shows it per place. */
   readonly placeNames?: PlaceNameRightsSource;
+  /**
+   * The account holder's names, for every placeholder the Companion's words carry. Absent, the
+   * encounter holds no library, and each placeholder is said in words as one whose name this page
+   * has not loaded, never shown as brackets.
+   */
+  readonly names?: CompanionNames;
 }
 
 export interface CompanionEncounter {
@@ -63,6 +72,14 @@ export interface CompanionEncounter {
    */
   askStarted(question: string): void;
   showAnswer(answer: CompanionAnswer): void;
+  /**
+   * Show the photograph a citation names, in place of the face that cited it, with the way back.
+   *
+   * `opening` is the read already under way, and its result is drawn only while this photograph
+   * is still the one open: going back, opening another, or sending the Companion away before it
+   * arrives leaves it undrawn. `capturedAt` is the date the citation carries, or null.
+   */
+  showEvidence(opening: Promise<OpenedEvidence>, capturedAt: string | null): void;
   /** Say that the question did not reach an answer. Never a sentence from the copy table alone. */
   reportAskFailure(failure: AskUnavailable): void;
   /** Whether an answer, rather than the turn, is what the panel is currently showing. */
@@ -143,7 +160,10 @@ export function buildCompanionEncounter(
     ]),
     dismissButton,
   ]);
-  const speech = buildCompanionSpeech({ speakerName });
+  const speech = buildCompanionSpeech({
+    speakerName,
+    names: options.names ?? companionNames(() => null),
+  });
   const choices = buildCompanionChoiceRail(
     handlers,
     options.placeNames === undefined ? {} : { placeNames: options.placeNames },
@@ -180,6 +200,14 @@ export function buildCompanionEncounter(
   /** A durability notice, held on the same terms and for the same reason. */
   let memoryNotice: { readonly reasonKey: string; readonly detail: string } | null = null;
   let lastQuestion: string | null = null;
+  /*
+   * The photograph a citation opened, held beside the answer and the turn rather than in place of
+   * either, so `Back` redraws what cited it instead of asking again. Every opening takes a new
+   * ticket and a read is drawn only under the ticket it was opened with, which is what keeps a
+   * late photograph off a face that has moved on.
+   */
+  let evidence: (ShownEvidence & { readonly ticket: number }) | null = null;
+  let evidenceTickets = 0;
   let currentPlacement: CompanionPlacement | null = null;
   let firstUsePrompt: FirstUsePrompt | null = null;
   const draw = (children: readonly Node[]): void => {
@@ -261,6 +289,31 @@ export function buildCompanionEncounter(
     draw([toolbar, speech.root]);
   }
 
+  function renderEvidence(shown: ShownEvidence): void {
+    mode = 'evidence';
+    // Every redraw builds the face again, so the way back keeps the keyboard when it had it:
+    // measured in the running app, the photograph's arrival otherwise dropped focus to the page.
+    const holding = document.activeElement?.classList.contains('companion-evidence-back') === true;
+    const view = buildCompanionEvidence(shown, () => closeEvidence());
+    draw([toolbar, view.root]);
+    if (holding) view.back.focus({ preventScroll: true });
+  }
+
+  /** Forget the open photograph and return to the face that opened it, without drawing. */
+  function dropEvidence(): void {
+    if (evidence === null) return;
+    mode = evidence.origin;
+    evidence = null;
+    root.removeAttribute('data-evidence');
+  }
+
+  /** Back to the face that opened the photograph. */
+  function closeEvidence(): void {
+    if (evidence === null) return;
+    dropEvidence();
+    reflect();
+  }
+
   function renderFailure(failure: AskUnavailable): void {
     mode = 'failed';
     speech.reportAskFailure(failure);
@@ -294,7 +347,8 @@ export function buildCompanionEncounter(
       renderPrompt();
       return;
     }
-    if (pendingFailure !== null) renderFailure(pendingFailure);
+    if (evidence !== null) renderEvidence(evidence);
+    else if (pendingFailure !== null) renderFailure(pendingFailure);
     else if (answer !== null) renderAnswer(answer);
     else if (mode === 'asking' && lastQuestion !== null) renderAsking(lastQuestion);
     else if (lastTurn !== null) renderTurn(lastTurn);
@@ -325,7 +379,9 @@ export function buildCompanionEncounter(
     if (event.key !== 'Escape' || state !== 'open') return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    options.onDismiss?.();
+    // A photograph is opened over what cited it, so Escape closes the photograph first.
+    if (mode === 'evidence') closeEvidence();
+    else options.onDismiss?.();
   });
 
   return {
@@ -351,6 +407,9 @@ export function buildCompanionEncounter(
     setState(next) {
       const wasOpen = state === 'open';
       if (next !== 'open' && wasOpen) modalFocus.setVisible(false);
+      // Sending the Companion away closes a photograph it had open: summoning it again shows what
+      // cited the photograph, not the photograph.
+      if (next !== 'open') dropEvidence();
       if (next === 'open' && !wasOpen) root.hidden = true;
       state = next;
       root.dataset['state'] = next;
@@ -375,6 +434,8 @@ export function buildCompanionEncounter(
     },
     askStarted(question) {
       answer = null;
+      evidence = null;
+      root.removeAttribute('data-evidence');
       pendingFailure = null;
       memoryNotice = null;
       lastQuestion = question;
@@ -384,6 +445,8 @@ export function buildCompanionEncounter(
     },
     restoreAnswer(remembered) {
       answer = remembered;
+      evidence = null;
+      root.removeAttribute('data-evidence');
       pendingFailure = null;
       mode = 'answer';
       root.setAttribute('data-answering', 'answered');
@@ -395,6 +458,8 @@ export function buildCompanionEncounter(
     },
     showAnswer(shown) {
       answer = shown;
+      evidence = null;
+      root.removeAttribute('data-evidence');
       pendingFailure = null;
       mode = 'answer';
       root.setAttribute('data-answering', 'answered');
@@ -419,10 +484,33 @@ export function buildCompanionEncounter(
     },
     reportAskFailure(failure) {
       answer = null;
+      evidence = null;
+      root.removeAttribute('data-evidence');
       pendingFailure = failure;
       mode = 'failed';
       root.setAttribute('data-answering', 'failed');
       reflect();
+    },
+    showEvidence(opening, capturedAt) {
+      // A citation is pressed on the face that shows it; any other face has none to open.
+      if (state !== 'open' || !(mode === 'answer' || mode === 'turn' || mode === 'failed')) return;
+      const ticket = (evidenceTickets += 1);
+      evidence = { ticket, origin: mode === 'answer' ? 'answer' : 'turn', opened: null, capturedAt };
+      root.setAttribute('data-evidence', 'opening');
+      reflect();
+      // The chip that was pressed left with the face it was on, so the way back takes the keyboard.
+      root.querySelector<HTMLButtonElement>('.companion-evidence-back')?.focus({
+        preventScroll: true,
+      });
+      const arrived = (opened: OpenedEvidence): void => {
+        if (evidence?.ticket !== ticket) return;
+        evidence = { ...evidence, opened };
+        root.setAttribute('data-evidence', opened.ok ? 'shown' : 'unavailable');
+        reflect();
+      };
+      opening.then(arrived, (error: unknown) => {
+        arrived({ ok: false, reason: error instanceof Error ? error.message : String(error) });
+      });
     },
     showingAnswer: () => answer !== null,
     noteMemoryFailure(reasonKey, detail) {

@@ -233,6 +233,31 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
   'answer.evidenceNotLocated': 'This citation could not be located just now.',
   'answer.backToQuestion': 'Back to the question',
 
+  // The photograph a citation names, drawn inside the Companion. One that does not open is said,
+  // with the server's reason under it, and nothing is drawn in its place.
+  'evidence.title.answer': 'The photograph this answer cites',
+  'evidence.title.turn': 'The photograph this question is about',
+  'evidence.opening': 'Opening the photograph.',
+  'evidence.alt': 'The cited photograph',
+  'evidence.unavailable': 'This photograph cannot be shown.',
+  'evidence.takenOn': 'Taken on {date}.',
+  'evidence.backToAnswer': 'Back to the answer',
+
+  // A name the account holder saved, said in words where the Companion's text holds a
+  // placeholder the page cannot turn back into the name (`companion-names.ts`). One noun per
+  // placeholder class, and one sentence per reason.
+  'name.class.person': 'a person',
+  'name.class.voice': 'a voice',
+  'name.class.place': 'a place',
+  'name.class.object': 'an object',
+  'name.class.conversation': 'a conversation',
+  'name.class.event': 'an event',
+  'name.unresolved.not_named': '{thing} you have not named',
+  'name.unresolved.merged': '{thing} you merged into another',
+  'name.unresolved.removed': '{thing} no longer in your library',
+  'name.unresolved.not_loaded': '{thing} whose name this page has not loaded',
+  'name.unresolved.not_identified': '{thing} this answer does not name',
+
   // Who wrote the sentence, which is not always a model. When the composer's output fails
   // validation twice it is discarded and the answer is rendered from the query result instead;
   // naming the model on that answer would credit it with a sentence it did not write.

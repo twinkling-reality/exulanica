@@ -19,6 +19,7 @@ import { MemoryUnavailable, rememberedAsAnswer } from '../companion-memory-api.j
 
 import { createCompanionController, type CompanionController } from '../companion.js';
 import type { CompanionAnswer, CompanionProposal, ModelCall } from '../companion-ask-api.js';
+import { companionNames } from '../companion-names.js';
 import type { EvidenceCache } from '../evidence.js';
 import { say } from '../ui/copy.js';
 import {
@@ -328,7 +329,11 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
     },
     onEvidence: (index) => {
       const handle = controller.evidenceAt(index);
-      if (handle !== null) void deps.evidence.open(handle);
+      if (handle === null) return;
+      // Drawn inside the Companion: the masked read's photograph, or the reason it is not one.
+      // The date is the citation's own, which only an answer's citations carry.
+      const cited = controller.answer()?.evidence[index];
+      panel.showEvidence(deps.evidence.open(handle), cited?.capturedAt ?? null);
     },
     onSay: (text) => {
       controller.say(text);
@@ -351,6 +356,9 @@ export function mountCompanion(deps: CompanionDependencies): MountedCompanion {
      * problem and not theirs to wait on.
      */
     onDismiss: () => dismiss(),
+    // Every placeholder the Companion's words carry becomes the account holder's own name, read
+    // from the library this session loaded, at the moment it is drawn.
+    names: companionNames(() => state.snapshot ?? null),
     ...(deps.placeNames === undefined ? {} : { placeNames: deps.placeNames }),
     ...(deps.onFirstUseAction === undefined ? {} : {
       onFirstUseAction: deps.onFirstUseAction,

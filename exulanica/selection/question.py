@@ -147,7 +147,14 @@ __all__ = [
 #: *   **"Who was with me at" a place filtered by a person nobody named**, 5 draws of 5: the model
 #:     stood somebody from the catalogue in for "me". An id is now only for what the question
 #:     names.
-PROMPT_VERSION: Final = "selection-6"
+#:
+#: ``selection-7`` tells the composer where the account holder confirmed a photograph was taken.
+#: Asked "Which of my photographs were taken at" a confirmed place, the composer found both
+#: photographs in its packet and answered that it had no information about photographs taken at
+#: that place: each line was a bare photograph with no description, and the prompt says such a
+#: line tells it nothing. ``selection-7`` puts the confirmed place on the photograph's line, by its
+#: placeholder, and the prompt says what that line is and what it is not.
+PROMPT_VERSION: Final = "selection-7"
 
 #: How many entities the planner may be shown. A bound, because the catalogue goes into a prompt
 #: and a library with a thousand named people would otherwise cost more than the answer.
@@ -613,6 +620,10 @@ all about what the picture shows: not who is in it, not whether anybody is in it
 of. Never write that a photograph shows a person, a place or a thing unless the packet says so \
 in words. "This photograph features an individual" about a line with no description is invented, \
 and inventing a person is the worst thing you can do here.
+- A photograph's line may say `user_confirmed_place: [place A]`. That is the user's own \
+confirmation that the photograph was taken at that place, not something anybody saw in it. It \
+supports a historical clause saying the photograph was taken there, citing that line's token, \
+and it says nothing about what the photograph shows.
 - If the evidence has nothing to do with the question, say that plainly in a 'meta' clause and \
 stop. A photograph library cannot answer a question about the world outside it, and reciting \
 what happens to be in front of you is not an answer to the question that was asked. "51 \
@@ -1108,10 +1119,22 @@ def _without_names(
     Tokens are untouched, so a citation in the composed answer still resolves against the packet
     the caller kept. The text is a sign, a caption or another stored claim, and a saved name can be
     painted on a building or written on a shirt as easily as typed into a question.
+
+    A place the account holder confirmed a photograph was taken at is given its placeholder by its
+    id, from its own saved name alone, so another entity saved under the same words cannot take
+    its place. A place with no saved name gets none and is not stated.
     """
     names = tuple(names)
+    by_entity = {saved.entity_id: saved for saved in names}
     items = []
     for item in packet.items:
+        confirmed = []
+        for place in item.confirmed_places:
+            saved = by_entity.get(place.entity_id)
+            if saved is not None and place.entity_id not in placeholders:
+                placeholders = redact_names(saved.name, (saved,), placeholders).placeholders
+            confirmed.append(replace(place, placeholder=placeholders.get(place.entity_id)))
+        item = replace(item, confirmed_places=tuple(confirmed))
         if item.text is None:
             items.append(item)
             continue
@@ -1154,6 +1177,11 @@ def _render_packet(packet: EvidencePacket) -> str:
     ]
     for item in packet.items:
         lines.append(f"  [{item.token}]  provenance={item.trust}")
+        for place in item.confirmed_places:
+            # Only by placeholder. A place the request gave none has no line: its saved name is
+            # the one thing this line may never carry.
+            if place.placeholder is not None:
+                lines.append(f"      user_confirmed_place: {place.placeholder}")
         if item.text is not None:
             lines.append(f'      untrusted_text: """{item.text}"""')
     lines.extend(

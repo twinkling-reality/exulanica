@@ -45,12 +45,13 @@ from typing import Final
 import psycopg
 
 from exulanica.evidence import EvidenceAddress
-from exulanica.selection.executor import SelectionResult
+from exulanica.selection.executor import SelectionResult, Support
 from exulanica.store.resolve import address_from_span_row
 
 __all__ = [
     "MAX_PACKET_ITEMS",
     "TOKEN_LENGTH",
+    "ConfirmedPlace",
     "ContentEvidenceItem",
     "ContentEvidencePacket",
     "EvidenceItem",
@@ -82,6 +83,35 @@ _TRUST: Final[dict[str, str]] = {
 }
 
 
+#: The support dimension of a photograph the Selection holds because of a place's confirmed link
+#: (:class:`~exulanica.selection.executor.Support`).
+_PLACE_DIMENSION: Final = "place"
+
+
+@dataclass(frozen=True, slots=True)
+class ConfirmedPlace:
+    """A place the account holder confirmed a cited photograph was taken at.
+
+    Read from the link that put the photograph in the Selection. A packet is built only from
+    confirmed links (:func:`build_packet` carries nothing from a Selection that admitted
+    proposals), and only a person's own decision writes a confirmed link
+    (``confirmed_needs_a_human`` in ``exulanica/migrations/0001_spine.sql``). So this is the
+    account holder's statement about where the photograph was taken, never something a model saw
+    in it, and the composer is told it as that.
+
+    People and objects linked the same way are not carried. Telling a hosted model that somebody
+    the account holder named is in a photograph is a decision about people, and this packet does
+    not make it.
+    """
+
+    entity_id: uuid.UUID
+    #: How the composer is told the place: the request's placeholder for it, ``[place A]``. Set
+    #: when the request's saved names are replaced, and ``None`` in a packet as built, so no packet
+    #: can carry a place's saved name. A place with no saved name has no placeholder and is not
+    #: stated at all.
+    placeholder: str | None = None
+
+
 @dataclass(frozen=True, slots=True)
 class EvidenceItem:
     """One thing the model may cite, and the address it resolves to."""
@@ -96,6 +126,10 @@ class EvidenceItem:
     text: str | None
     #: One of the values of :data:`_TRUST`, or ``capture_supported`` for a bare photograph.
     trust: str
+    #: The places the account holder confirmed this photograph was taken at, on the line of the
+    #: span the link rests on (the whole photograph, for a place the vision stage proposed). Empty
+    #: on a claim's line and on a photograph no place link selected.
+    confirmed_places: tuple[ConfirmedPlace, ...] = ()
 
     @property
     def uri(self) -> str:
@@ -251,12 +285,10 @@ def build_packet(
             items=(), values=(), total_matched=result.total_matched, citable=False
         )
 
-    spans: list[tuple[uuid.UUID, uuid.UUID | None, uuid.UUID, str | None]] = []
+    spans: list[tuple[Support, uuid.UUID, str | None]] = []
     for capture in result.captures:
         for support in capture.support:
-            spans.append(
-                (support.span_id, support.assertion_id, capture.capture_id, capture.captured_at)
-            )
+            spans.append((support, capture.capture_id, capture.captured_at))
             if len(spans) >= MAX_PACKET_ITEMS:
                 break
         if len(spans) >= MAX_PACKET_ITEMS:
@@ -272,7 +304,7 @@ def build_packet(
 def _load_items(
     connection: psycopg.Connection,
     workspace_id: uuid.UUID,
-    spans: Sequence[tuple[uuid.UUID, uuid.UUID | None, uuid.UUID, str | None]],
+    spans: Sequence[tuple[Support, uuid.UUID, str | None]],
 ) -> tuple[EvidenceItem, ...]:
     """Read the span rows and the claim text, and rebuild each address.
 
@@ -280,10 +312,18 @@ def _load_items(
     digest does not equal the stored one. That check is not decoration here: the token in the
     answer resolves to this address, and an address that no longer hashes to what was stored is
     a citation that has silently stopped verifying.
+
+    A place link supports its photograph's whole line rather than adding one, so stating it
+    changes no item count and no token.
     """
     if not spans:
         return ()
-    span_ids = list({span_id for span_id, _, _, _ in spans})
+    places: dict[tuple[uuid.UUID, uuid.UUID | None], dict[uuid.UUID, None]] = {}
+    for support, _, _ in spans:
+        if support.dimension == _PLACE_DIMENSION and support.entity_id is not None:
+            key = (support.span_id, support.assertion_id)
+            places.setdefault(key, {})[support.entity_id] = None
+    span_ids = list({support.span_id for support, _, _ in spans})
     rows = {
         row["span_id"]: row
         for row in connection.execute(
@@ -295,7 +335,7 @@ def _load_items(
             (workspace_id, span_ids),
         ).fetchall()
     }
-    assertion_ids = [a for _, a, _, _ in spans if a is not None]
+    assertion_ids = [s.assertion_id for s, _, _ in spans if s.assertion_id is not None]
     claims = {}
     if assertion_ids:
         claims = {
@@ -311,7 +351,8 @@ def _load_items(
     taken: set[str] = set()
     items: list[EvidenceItem] = []
     seen: set[tuple[uuid.UUID, uuid.UUID | None]] = set()
-    for span_id, assertion_id, capture_id, captured_at in spans:
+    for support, capture_id, captured_at in spans:
+        span_id, assertion_id = support.span_id, support.assertion_id
         if (span_id, assertion_id) in seen or span_id not in rows:
             continue
         seen.add((span_id, assertion_id))
@@ -331,6 +372,10 @@ def _load_items(
                 trust=_TRUST.get(claim["kind"], "model_inference")
                 if claim
                 else "capture_supported",
+                confirmed_places=tuple(
+                    ConfirmedPlace(entity_id=place)
+                    for place in places.get((span_id, assertion_id), {})
+                ),
             )
         )
     return tuple(items)

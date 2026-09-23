@@ -641,7 +641,7 @@ def test_planner_content_examples_fit_the_schema(question, terms):
     assert plan.semantic_query == terms
     assert f'"{question}" -> "{terms}"' in _PLANNER_SYSTEM
     assert "Never copy the whole question" in _PLANNER_SYSTEM
-    assert PROMPT_VERSION == "selection-6"
+    assert PROMPT_VERSION == "selection-7"
 
 
 def test_the_planner_is_told_a_window_cannot_start_and_end_at_the_same_instant():

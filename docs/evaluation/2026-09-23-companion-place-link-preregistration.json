@@ -1,0 +1,177 @@
+{
+  "profile": "exulanica.digest-bound-record/v1",
+  "record": {
+    "admission": {
+      "account_authority_basis": "synthetic drawings made by scripts/measure_companion_place_link.py from the place proposal experiment's scene generator; no personal photograph",
+      "corpus_class": "synthetic",
+      "granted_by": "the acceptance runtime's synthetic account holder, through the measurement script, for synthetic drawings",
+      "granted_roles": [
+        "vision",
+        "embedding",
+        "reasoning_cheap"
+      ],
+      "purpose": "End-to-end Companion place measurement on synthetic drawings: a place proposed from a sign, confirmed, and asked about",
+      "route": "POST /personal-admission"
+    },
+    "change": {
+      "arms": {
+        "after": {
+          "exulanica/selection/question.py": "44529215b4e37a78b46e21f77156d4336021b3c9786a1b1623e8de2a403e9f3e",
+          "prompt_version": "selection-7"
+        },
+        "before": {
+          "exulanica/selection/question.py": "a4447ff232315a583fcd4ea067dbbb85173cf34d435ab4737494cc4c3d636879",
+          "note": "main's question.py. packet.py already carries the link, which nothing in main's question.py reads, so the composer is sent what main sends it.",
+          "prompt_version": "selection-6"
+        }
+      },
+      "what": "exulanica/selection/packet.py carries, on each photograph line a place's confirmed link selected, the place's entity id; exulanica/selection/question.py gives it the request's placeholder and renders it as 'user_confirmed_place: [place A]', and the composer prompt says the line is the account holder's confirmation of where the photograph was taken and nothing about what it shows."
+    },
+    "draws_per_question_per_arm": 1,
+    "every_answer_also": [
+      "answered: HTTP 200 and abstained is null",
+      "composed: deterministic is false, so the sentence is the composer's"
+    ],
+    "flow": [
+      "POST /intake for each photograph, refused unless its bytes are the registered ones",
+      "POST /personal-admission with detection permission and the granted model rights",
+      "the derivative job to a terminal event; each photograph's place decision read from its stored vision artifact",
+      "POST /identity/name on the first photograph whose place was written, with the written label, and POST /identity/confirm for every other written one",
+      "POST /selection/ask with each question in words, once per arm"
+    ],
+    "models": {
+      "embedding": [
+        "Qwen/Qwen3-Embedding-8B"
+      ],
+      "reasoning_cheap": [
+        "nvidia/NVIDIA-Nemotron-3-Nano-30B-A3B",
+        "nvidia/Nemotron-3_5-Lightning"
+      ],
+      "structured_extraction": [
+        "Qwen/Qwen3-235B-A22B-Instruct-2507",
+        "deepseek-ai/DeepSeek-V4-Flash-0731"
+      ],
+      "vision": [
+        "MiniMaxAI/MiniMax-M3",
+        "openbmb/MiniCPM-V-4_5"
+      ]
+    },
+    "not_covered": [
+      "One draw per question per arm: a difference between the arms is one observation each, not a rate.",
+      "Each arm is a fresh workspace, so the vision stage runs twice and may propose differently; each arm records its own decisions, and the confirmed photographs the rule uses are that arm's.",
+      "The planner is not held fixed: each arm plans its own questions, and each answer's plan is recorded.",
+      "Synthetic drawings of one place with one name, English questions, the manifest's chains. No personal photograph.",
+      "The restored name and the opened photograph are checked in the browser on the after arm; the before arm is read from the API.",
+      "An answer remembered across a reload is not measured."
+    ],
+    "profile_note": "Pre-registration of the Companion place-link measurement, written before any model call on its photographs. Scored once by scripts/measure_companion_place_link.py (score), whose digest is bound below.",
+    "questions": [
+      {
+        "id": "sign",
+        "right_when": [
+          "names_the_confirmed_place_citing_its_photograph: a historical clause carries a placeholder that the answer's names map to the confirmed place's entity, and cites a confirmed photograph"
+        ],
+        "supported_answer": "The sign on photographs 1 and 2 reads MIRELAND HALL, the name the account holder confirmed for the place. A composed answer can carry it only as the placeholder the answer's names map to the confirmed place, which the browser shows as the confirmed name.",
+        "text": "What does the sign say at Mireland Hall?"
+      },
+      {
+        "id": "which",
+        "right_when": [
+          "cites_exactly_the_confirmed_photographs: the photographs the historical clauses cite, resolved through the answer's own citations and selection, are exactly the confirmed photographs"
+        ],
+        "supported_answer": "The photographs the account holder confirmed were taken at the place: photographs 1 and 2, if the vision stage writes the place for both as it did on the places lane's run of these drawings. Never photograph 3, whose board's last word is covered and which no confirmation links to the place, and never photograph 4, which has no text.",
+        "text": "Which of my photographs were taken at Mireland Hall?"
+      },
+      {
+        "id": "when",
+        "right_when": [
+          "states_photograph_N_date, for each confirmed photograph N: the answer's text states that photograph's date, as the ISO date or as its day of the month with its month's English name, with no other year written",
+          "cites_a_confirmed_photograph: a historical clause cites a confirmed photograph"
+        ],
+        "supported_answer": "The capture dates of the confirmed photographs, as the packet's date values state them: 2026-08-14 for photograph 1 and 2026-08-16 for photograph 2.",
+        "text": "When were my photographs at Mireland Hall taken?"
+      }
+    ],
+    "recipe": {
+      "drawn_by": "scripts/measure_companion_place_link.py draw",
+      "note": "The places lane's end-to-end scenes at the same indices, with capture times written in the Exif IFD, where exulanica/ingest/exif.py reads them; each time is checked with the product's EXIF reader when drawn.",
+      "photographs": [
+        {
+          "arm": "positive",
+          "board_text": "MIRELAND HALL",
+          "bytes": 139013,
+          "captured_at_utc": "2026-08-14T10:20:00Z",
+          "file": "mireland-01-nameplate.jpg",
+          "hidden_words": [],
+          "kind": "nameplate",
+          "photograph": 1,
+          "place_name": "MIRELAND HALL",
+          "scene_index": 100,
+          "sha256": "68da8a7d1a13434c84d0938981178c53265a45380d3554b21a09af2f42773782"
+        },
+        {
+          "arm": "positive",
+          "board_text": "MIRELAND HALL",
+          "bytes": 141299,
+          "captured_at_utc": "2026-08-16T14:05:00Z",
+          "file": "mireland-02-nameplate-tree.jpg",
+          "hidden_words": [],
+          "kind": "nameplate_tree_beside",
+          "photograph": 2,
+          "place_name": "MIRELAND HALL",
+          "scene_index": 101,
+          "sha256": "55857d1a1e65b6938a0a2d71013d2971ee5e822f0343503acde05553b9aa9cbc"
+        },
+        {
+          "arm": "negative",
+          "board_text": "MIRELAND HALL",
+          "bytes": 137717,
+          "captured_at_utc": "2026-08-15T08:40:00Z",
+          "file": "mireland-03-covered.jpg",
+          "hidden_words": [
+            "HALL"
+          ],
+          "kind": "covered_last",
+          "photograph": 3,
+          "place_name": null,
+          "scene_index": 102,
+          "sha256": "a9f6fce5847f1e8a67d264c27062923392b35358ddde0ac4db022b4f28755bb6"
+        },
+        {
+          "arm": "negative",
+          "board_text": null,
+          "bytes": 131878,
+          "captured_at_utc": "2026-08-17T16:30:00Z",
+          "file": "mireland-04-no-text.jpg",
+          "hidden_words": [],
+          "kind": "no_text",
+          "photograph": 4,
+          "place_name": null,
+          "scene_index": 103,
+          "sha256": "33ac722f30ff29e293de8af5eeb3c37d9b4daf0c08fc5a6f19bedc1721c46f8b"
+        }
+      ],
+      "place_name": "MIRELAND HALL",
+      "scenes_from": "scene() in scripts/make_place_proposal_d_photographs.py"
+    },
+    "sources_sha256": {
+      "exulanica/selection/packet.py": "0cc288dbaf14adee5797988d2f26412724649f1a00a27c0ff4e05cfcfc128e09",
+      "scripts/make_place_photographs.py": "7acba32366e9a1e695306e3fea05f2487c0bcf3fd5903441ea4dcb9ef9e187b3",
+      "scripts/make_place_proposal_d_photographs.py": "cf15efc114ee4eb6b0cb3c6daa6ebb47de1b4440ecaca3dd50408910c6a4bff9",
+      "scripts/measure_companion_place_link.py": "0031773135331394aed85f82ae7ae162ae25106a7246be6199969e9138a0e5af",
+      "scripts/write_companion_place_link_preregistration.py": "5294460bee9524805576351d7d19c718ba50f1dfda013e32ce672e2440f2a96b"
+    },
+    "spend": {
+      "bound_usd": "1",
+      "per_run_ceiling_usd": "0.25",
+      "read_from": "the usage the provider reported, as the execution blocks and the job metrics carry it"
+    },
+    "tree": {
+      "main": "7c224f3186a2867096aef8545192f855cae92223",
+      "note": "The measured tree is main with this change: every path lane A's package changed between the worktree head and main was checked out from main, index and file together, and the change is the worktree's own edits.",
+      "worktree_head": "e07b0de26d0a0b203fc26852511a8ae479ee2b52"
+    },
+    "written_before_any_model_call": true
+  },
+  "record_sha256": "084ca1816354eb2cc339b66ccc1fe5fb9cdeea320f6118205e050fb0c02a36c2"
+}
