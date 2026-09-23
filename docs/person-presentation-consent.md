@@ -11,6 +11,28 @@ regions") is too coarse: the retained bowl photographs contain the arms, hands a
 diners at the frame edge, no faces, and the reviewer's statement said no visible people. The
 system needs an explicit list of person regions and a consent state per person, not a yes/no.
 
+<details>
+<summary>Sections</summary>
+
+- [Principles](#principles)
+- [States](#states)
+- [Stages](#stages)
+- [Checks that make it real](#checks-that-make-it-real)
+- [Out of scope for the first pass](#out-of-scope-for-the-first-pass)
+- [Relationship to the current gate](#relationship-to-the-current-gate)
+- [What exists](#what-exists)
+- [Three things true of the code and false of a running deployment](#three-things-true-of-the-code-and-false-of-a-running-deployment)
+- [What the privacy feature has and has not touched](#what-the-privacy-feature-has-and-has-not-touched)
+- [What the World Read bundle now says about people, and what it deliberately does not](#what-the-world-read-bundle-now-says-about-people-and-what-it-deliberately-does-not)
+- [Two defects found and closed on 2026-09-07, and how they were found](#two-defects-found-and-closed-on-2026-09-07-and-how-they-were-found)
+- [What the bundle now says about a screening receipt](#what-the-bundle-now-says-about-a-screening-receipt)
+- [The screening rule, decided 2026-09-07](#the-screening-rule-decided-2026-09-07)
+- [The review screen, wired 2026-09-07](#the-review-screen-wired-2026-09-07)
+- [Training use is a separate consent plane](#training-use-is-a-separate-consent-plane)
+- [A place's name is a separate consent plane](#a-places-name-is-a-separate-consent-plane)
+
+</details>
+
 ## Principles
 
 - **Default deny.** A person region is hidden until a consent says otherwise. Absence of a

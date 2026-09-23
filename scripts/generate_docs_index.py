@@ -1,154 +1,166 @@
-"""Generate the public documentation catalog.
+"""Generate the public catalog from the tracked documentation and its ownership map.
 
-The navigational hub is `docs/README.md`. This file lists living contracts,
-capability guides, and decision records so the catalog cannot drift from those
-families. Evaluation artifacts, briefs, records, and patches stay in the tree
-for digest and link tests; they are not a reading list.
+    uv run python scripts/generate_docs_index.py
+    uv run python scripts/generate_docs_index.py --check
 
-A catalog of a published repository lists what the repository holds, so the
-documents come from `git ls-files` and not from walking `docs/`. Walking the
-directory catalogued whatever happened to be on that disk, which meant the
-operator's own uncommitted working documents: MEASURED 2026-09-19 at 15e8198c,
-`docs/` held 232 markdown files in the main checkout and 110 in a worktree of
-the same commit. The catalog agreed only because ROOT_CATALOG_EXCLUDE named
-twelve of the uncommitted ones by hand, and the thirteenth would have broken
-the test in one checkout and not the other.
-
-    uv run python scripts/generate_docs_index.py          # rewrite docs/all-documents.md
-    uv run python scripts/generate_docs_index.py --check   # exit 1 if it is out of date
+The map supplies classification and responsibility, never a second capability-status inventory.
+Discovery uses git so ignored working notes cannot enter a published catalog.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import re
 import subprocess
-import sys
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent.parent
 TARGET = ROOT / "docs" / "all-documents.md"
-
-SECTIONS: tuple[tuple[str, str, str], ...] = (
-    ("", "Living contracts and reference", "What the system is. Edited when the system changes."),
-    ("capabilities", "Capability guides", "Written for somebody choosing to use the product."),
-    ("adr", "Decision records", "Numbered, and the number is the identifier. Never renumbered."),
-)
-
-#: Dated logs, tickets, and run narratives, plus the two files that are not entries in their own
-#: catalog. Most of these are gitignored and so are already outside the tree this reads; they stay
-#: named here because that is a decision about the reading list and not about what git holds.
-ROOT_CATALOG_EXCLUDE = frozenset({
-    "README.md",
-    TARGET.name,
-    "engineering-log.md",
-    "engineering-log-reconstructed.md",
-    "judge-access.md",
-    "naming.md",
-    "infrastructure-backlog.md",
-    "first-place-2026-09-11.md",
-    "goal-brief-2026-09-05-unblocked-backend-program.md",
-    "goal-brief-2026-09-08-remaining-work.md",
-    "phase-10-tickets.md",
-    "reference-gpu-compute.md",
-    "reconstruction-throughput.md",
-    "frontier-demonstration.md",
-})
-
-_STATUS = re.compile(r"^\s*(?:\*\*)?Status(?:\*\*)?\s*[:.]\s*(.+?)\s*$", re.I)
-
-
-def summarise(path: Path) -> str:
-    """One line for the catalog: the document's own status if it states one, else its opening line."""
-    status = None
-    opening = ""
-    for raw in path.read_text(encoding="utf-8", errors="replace").splitlines()[:40]:
-        line = raw.strip()
-        if not line or line.startswith(("#", "---", "|", "<!--")):
-            continue
-        matched = _STATUS.match(line)
-        if matched and status is None:
-            status = matched.group(1)
-            continue
-        if not opening:
-            opening = line
-        if status and opening:
-            break
-    text = status or opening or "no summary line"
-    text = re.sub(r"[*`_\[\]]", "", text)
-    text = re.sub(r"\((?:https?://|[a-z0-9./-]+\.md)[^)]*\)", "", text)
-    text = re.sub(r"\s+", " ", text).strip(" .,;")
-    return (text[:137] + "...") if len(text) > 140 else text
+NAVIGATION = ROOT / "docs" / "navigation.json"
+ROLES = frozenset({"overview", "guide", "contract", "reference", "standard", "archive"})
+RETAINED = frozenset({"evaluation", "briefs", "records", "patches", "artifacts"})
+INDEXES = frozenset({"docs/README.md", "docs/all-documents.md"})
 
 
 def tracked_documents() -> list[str]:
-    """Every documentation file the repository holds, repo relative and sorted."""
+    """Return repository-held Markdown paths, independent of ignored local files."""
     listed = subprocess.run(
         ["git", "ls-files", "-z", "--", "docs"], cwd=ROOT, check=True, capture_output=True
     ).stdout.decode()
-    return sorted(
-        rel for rel in filter(None, listed.split("\0")) if rel.endswith((".md", ".patch"))
-    )
+    return sorted(rel for rel in listed.split("\0") if rel.endswith(".md"))
 
 
-def documents(directory: str) -> list[Path]:
-    prefix = f"docs/{directory}/" if directory else "docs/"
-    found = []
-    for rel in tracked_documents():
-        if not rel.startswith(prefix):
-            continue
-        tail = rel[len(prefix):]
-        if not directory and ("/" in tail or tail in ROOT_CATALOG_EXCLUDE):
-            continue
-        found.append(ROOT / rel)
-    return found
+def public_documents(tracked: list[str]) -> set[str]:
+    """Separate the maintained reading surface from decisions and retained evidence."""
+    return {
+        rel for rel in tracked if rel not in INDEXES and rel.split("/")[1] not in RETAINED | {"adr"}
+    }
+
+
+def validate_navigation(navigation: dict, tracked: list[str]) -> list[dict]:
+    """Refuse missing, duplicated or unclassified documents before rendering a catalog."""
+    if set(navigation) != {"version", "groups"} or navigation["version"] != 1:
+        raise ValueError("navigation requires version 1 and groups")
+    groups = navigation["groups"]
+    if not isinstance(groups, list) or not groups:
+        raise ValueError("navigation groups must be a nonempty list")
+    ids: set[str] = set()
+    registered: set[str] = set()
+    for group in groups:
+        if not isinstance(group, dict) or set(group) != {"id", "title", "purpose", "documents"}:
+            raise ValueError("each group requires id, title, purpose and documents")
+        identifier = group["id"]
+        if not isinstance(identifier, str) or not re.fullmatch(r"[a-z]+(?:-[a-z]+)*", identifier):
+            raise ValueError("group ids must be lowercase hyphenated names")
+        if identifier in ids:
+            raise ValueError(f"duplicate group: {identifier}")
+        ids.add(identifier)
+        for field in ("title", "purpose"):
+            if not isinstance(group[field], str) or not group[field].strip():
+                raise ValueError(f"group {identifier} needs {field}")
+        if not isinstance(group["documents"], list) or not group["documents"]:
+            raise ValueError(f"group {identifier} needs documents")
+        for document in group["documents"]:
+            if not isinstance(document, dict) or set(document) != {"path", "role", "owns"}:
+                raise ValueError("each document requires path, role and owns")
+            path = document["path"]
+            if (
+                not isinstance(path, str)
+                or not re.fullmatch(r"[a-z0-9][a-z0-9./_-]*\.md", path)
+                or any(part in {".", "..", ""} for part in path.split("/"))
+            ):
+                raise ValueError(f"invalid document path: {path}")
+            rel = f"docs/{path}"
+            if rel in registered:
+                raise ValueError(f"document has multiple homes: {rel}")
+            registered.add(rel)
+            if document["role"] not in ROLES:
+                raise ValueError(f"unknown role for {rel}: {document['role']}")
+            if not isinstance(document["owns"], str) or not document["owns"].strip():
+                raise ValueError(f"document needs a responsibility: {rel}")
+    expected = public_documents(tracked)
+    if registered != expected:
+        raise ValueError(
+            f"unclassified documents: {sorted(expected - registered)}; "
+            f"untracked or excluded entries: {sorted(registered - expected)}"
+        )
+    return groups
+
+
+def title(path: Path) -> str:
+    """Use the document's title, never a truncated status sentence."""
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if line.startswith("# "):
+            return line[2:].strip().replace("|", "\\|")
+    raise ValueError(f"document has no title: {path.relative_to(ROOT)}")
 
 
 def render() -> str:
-    known = {d for d, _, _ in SECTIONS if d}
+    tracked = tracked_documents()
+    groups = validate_navigation(json.loads(NAVIGATION.read_text(encoding="utf-8")), tracked)
+    decisions = [rel for rel in tracked if rel.startswith("docs/adr/")]
+    total = sum(len(group["documents"]) for group in groups) + len(decisions)
     lines = [
         "# Documentation catalog",
         "",
-        "Generated by `scripts/generate_docs_index.py`. Do not edit by hand: a test regenerates it",
-        "and fails if this file disagrees with the catalog rules.",
+        "Generated by `scripts/generate_docs_index.py` from [navigation.json](navigation.json).",
+        "Edit the ownership map and source documents, then regenerate. Do not edit this file by hand.",
         "",
-        "This catalog lists living contracts, capability guides, and decision records.",
-        "Start from [README.md](README.md).",
+        "Start from the [documentation hub](README.md). Each document has one subject home and",
+        "an explicit responsibility. A role describes how to use a document, not whether a feature",
+        "is implemented. Contracts and scoped evidence establish capability claims.",
+        "",
+        f"**{total} documents** in the public catalog.",
         "",
     ]
-    total = 0
-    for directory, heading, purpose in SECTIONS:
-        found = documents(directory)
-        if not found:
-            continue
-        total += len(found)
-        lines += [f"## {heading}", "", f"{purpose}", "", f"{len(found)} documents.", ""]
-        for path in found:
-            rel = path.relative_to(ROOT / "docs").as_posix()
-            label = path.stem if path.suffix == ".md" else path.name
-            lines.append(f"- [{label}]({rel}) : {summarise(path)}")
+    for group in groups:
+        lines += [f"- [{group['title']}](#{group['id']})"]
+    lines += ["- [Decision records](#decisions)", ""]
+    for group in groups:
+        lines += [
+            f'<a id="{group["id"]}"></a>',
+            "",
+            f"## {group['title']}",
+            "",
+            group["purpose"],
+            "",
+            "| Document | Role | Owns |",
+            "| --- | --- | --- |",
+        ]
+        for document in group["documents"]:
+            path = document["path"]
+            responsibility = document["owns"].replace("|", "\\|")
+            lines.append(
+                f"| [{title(ROOT / 'docs' / path)}]({path}) | {document['role']} | {responsibility} |"
+            )
         lines.append("")
-    filed = known | {"evaluation", "briefs", "records", "patches", "artifacts"}
-    stray = [
-        rel[len("docs/"):]
-        for rel in tracked_documents()
-        if rel.endswith(".md") and "/" in rel[len("docs/"):] and rel.split("/")[1] not in filed
+    lines += [
+        '<a id="decisions"></a>',
+        "",
+        "## Decision records",
+        "",
+        "Decisions retain alternatives and rationale. Read the relevant living contract first;",
+        "a record's original status is not proof of the implementation's present capability.",
+        "",
+        "| Record | Decision |",
+        "| --- | --- |",
     ]
-    if stray:
-        lines += ["## Filed nowhere the catalog knows about", "",
-                  "These are in a directory this generator has no section for, which means either the",
-                  "section is missing or the document is misfiled.", ""]
-        lines += [f"- `{s}`" for s in sorted(stray)] + [""]
-    where = next(i for i, line in enumerate(lines) if line.startswith("## "))
-    lines[where:where] = [f"**{total} documents** in the public catalog.", ""]
-    return "\n".join(lines).rstrip("\n") + "\n"
+    for rel in decisions:
+        path = Path(rel)
+        lines.append(f"| [{path.stem}]({path.relative_to('docs')}) | {title(ROOT / rel)} |")
+    return "\n".join(lines).rstrip() + "\n"
 
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--check", action="store_true", help="exit 1 if the file is out of date")
+    parser.add_argument("--check", action="store_true", help="fail if the catalog is out of date")
     arguments = parser.parse_args()
-    rendered = render()
+    try:
+        rendered = render()
+    except (ValueError, OSError) as error:
+        print(f"documentation catalog: {error}")
+        return 1
     if arguments.check:
         current = TARGET.read_text(encoding="utf-8") if TARGET.exists() else ""
         if current != rendered:
@@ -157,9 +169,9 @@ def main() -> int:
         print(f"{TARGET.relative_to(ROOT)} is current")
         return 0
     TARGET.write_text(rendered, encoding="utf-8")
-    print(f"wrote {TARGET.relative_to(ROOT)}, {len(rendered.splitlines())} lines")
+    print(f"wrote {TARGET.relative_to(ROOT)}")
     return 0
 
 
 if __name__ == "__main__":
-    sys.exit(main())
+    raise SystemExit(main())

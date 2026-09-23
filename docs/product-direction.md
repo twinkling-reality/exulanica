@@ -4,6 +4,32 @@ Exulanica is a persistent, programmable personal world model. This document owns
 delivery order and acceptance criteria. Living contracts describe supported operations; scoped
 evaluation records establish what a particular execution demonstrated.
 
+<details>
+<summary>Sections</summary>
+
+- [Product purpose](#product-purpose)
+- [Inspectable representations and durable worlds](#inspectable-representations-and-durable-worlds)
+- [Living-world experience requirements](#living-world-experience-requirements)
+- [Worlds as project foundations](#worlds-as-project-foundations)
+- [Modular simulation and scientific tooling](#modular-simulation-and-scientific-tooling)
+- [Performance and language evaluation](#performance-and-language-evaluation)
+- [Configurable world rules](#configurable-world-rules)
+- [Architecture and implementation boundaries](#architecture-and-implementation-boundaries)
+- [How a world is made](#how-a-world-is-made)
+- [Implementation status](#implementation-status)
+- [Synthetic life](#synthetic-life)
+- [Optional Earth content](#optional-earth-content)
+- [World state contract](#world-state-contract)
+- [First milestone](#first-milestone)
+- [Delivery gates for the first demonstration](#delivery-gates-for-the-first-demonstration)
+- [Model selection and compute priorities](#model-selection-and-compute-priorities)
+- [Subsequent milestones](#subsequent-milestones)
+- [Improvement over time and training boundaries](#improvement-over-time-and-training-boundaries)
+- [Package and API boundaries](#package-and-api-boundaries)
+- [Evaluation](#evaluation)
+
+</details>
+
 ## Product purpose
 
 Create a world. Shape how it works. Build something with it.

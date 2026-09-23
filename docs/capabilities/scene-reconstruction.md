@@ -21,8 +21,8 @@ requires an actual source-to-viewer demonstration and visual acceptance.
 Reconstruction does not fill what the camera never saw. A model may not invent a walkable floor,
 an unseen back, or a completed room and present it as recovered geometry. Generated receipts can
 exist as labeled, non-citable metadata; the renderer does not draw those bytes as the place.
-That rule lives in [product-specification.md](../product-specification.md) section 5. The rejected
-alternatives sit in [adr/0008-generated-geometry.md](../adr/0008-generated-geometry.md).
+The [quality contract](../reconstruction-quality-gate.md) defines validation. The decision and
+rejected alternatives are in [adr/0008-generated-geometry.md](../adr/0008-generated-geometry.md).
 
 See [reconstruction operations](../scene-reconstruction-operations.md),
 [identity and evidence](../domain-and-evidence-model.md), and the

@@ -17,6 +17,22 @@ development entry in `web/packages/app/src/composition/generated-tile.ts` and
 `web/packages/app/src/dev/`. The container is tess's, documented in `web/packages/loom-tess/README.md`;
 the sets are the texture lane's, documented in [texture-package.md](texture-package.md).
 
+<details>
+<summary>Sections</summary>
+
+- [1. What a person sees](#1-what-a-person-sees)
+- [2. The texture set reader](#2-the-texture-set-reader)
+- [3. Materials and the UV rule](#3-materials-and-the-uv-rule)
+- [4. Loading a tile](#4-loading-a-tile)
+- [5. Standing and walking](#5-standing-and-walking)
+- [6. The look, measured](#6-the-look-measured)
+- [7. The evaluation entry](#7-the-evaluation-entry)
+- [8. Budget](#8-budget)
+- [8.1 The paired walk, stated before it is taken](#81-the-paired-walk-stated-before-it-is-taken)
+- [9. After this runtime](#9-after-this-runtime)
+
+</details>
+
 ## 1. What a person sees
 
 On the app's development server, `/?preview=1&tile=tile-conformance` opens the normal shell with

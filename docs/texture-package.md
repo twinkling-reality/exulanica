@@ -27,6 +27,28 @@ The implementation is `web/packages/loom-texture` (the makers and the offline ba
 `exulanica/world/texture_assets.py` (the backend reader and resolver) and
 `exulanica/migrations/0065_texture_set_digests.sql` (the pins).
 
+<details>
+<summary>Sections</summary>
+
+- [1. The sets](#1-the-sets)
+- [2. Recipes, makers and the object store](#2-recipes-makers-and-the-object-store)
+- [3. The container, and why PNG is not digested](#3-the-container-and-why-png-is-not-digested)
+- [4. Determinism](#4-determinism)
+- [5. Tiling](#5-tiling)
+- [6. Physical extent and UV scale](#6-physical-extent-and-uv-scale)
+- [7. Budgets](#7-budgets)
+- [8. The manifest, the contract with the grammar lane](#8-the-manifest-the-contract-with-the-grammar-lane)
+- [9. The backend reader and resolver](#9-the-backend-reader-and-resolver)
+- [10. Migration 0065](#10-migration-0065)
+- [11. Rebaking a set](#11-rebaking-a-set)
+- [12. Follow-ups](#12-follow-ups)
+- [13. Synthetic dataset](#13-synthetic-dataset)
+- [14. A workspace's own recipes and bakes](#14-a-workspaces-own-recipes-and-bakes)
+- [15. What is not verified](#15-what-is-not-verified)
+- [16. Material classes, and the v2 container](#16-material-classes-and-the-v2-container)
+
+</details>
+
 ## 1. The sets
 
 Seventeen sets, named by the surface a street draws. Deciding which building gets which surface is

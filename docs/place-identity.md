@@ -6,6 +6,22 @@ has run. A place may also carry a frame a provider declared instead of one a rec
 measured; that path is reachable through the product's own routes and no real external dataset
 has been admitted through it.
 
+<details>
+<summary>Sections</summary>
+
+- [Scene and place](#scene-and-place)
+- [The one hard constraint, stated first](#the-one-hard-constraint-stated-first)
+- [What a place is](#what-a-place-is)
+- [What a place is in the schema, decided 2026-09-07](#what-a-place-is-in-the-schema-decided-2026-09-07)
+- [A place a provider documented, decided 2026-09-22](#a-place-a-provider-documented-decided-2026-09-22)
+- [The alignment, and what makes it refusable](#the-alignment-and-what-makes-it-refusable)
+- [Forward migration](#forward-migration)
+- [What Atlas does with it](#what-atlas-does-with-it)
+- [The exit, and why it is still open](#the-exit-and-why-it-is-still-open)
+- [Relationship to the rest of Phase 10](#relationship-to-the-rest-of-phase-10)
+
+</details>
+
 ## Scene and place
 
 Every reconstruction in this repository is a **scene**: one set of photographs, taken on one

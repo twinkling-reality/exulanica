@@ -8,17 +8,18 @@ visitor, how the hosted deployment is shaped, how it resets between visitors, wh
 live run and what happens when it does, and the checks that are run before anyone is shown
 anything.
 
-It is separate from [demo-runbook.md](demo-runbook.md), which records only what this repository can
-and cannot do today. Nothing in section 2 exists yet. It is recorded now because the reset design
-constrains the data model, and retrofitting it later is what produces a demonstration that a
-previous visitor has broken.
+The [demonstration audit archive](demo-runbook.md) retains a historical readiness inspection.
+The hosted design below is a set of requirements, not evidence of a configured deployment.
+[Deployment](deployment.md) owns service configuration; each demonstration must establish its
+actual setup, reset behavior and supported user journey.
 
 ---
 
 ## 1. Pre-seeded versus computed live
 
-**DECISION**, carried from [product-specification.md](product-specification.md) section 4.1 without
-softening.
+The selected demonstration declares which operations are retained and which execute live. The
+[product acceptance gates](product-direction.md#delivery-gates-for-the-first-demonstration) define
+the complete journey; this contract defines disclosure within it.
 
 **Pre-seeded, and disclosed on the page itself:** photograph ingest and its vision observations,
 embeddings, scene grouping, whatever reconstruction artifacts exist, and the persisted layout. This

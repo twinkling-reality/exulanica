@@ -44,10 +44,6 @@ ALLOWED_PATHS: dict[str, str] = {
         "records a dated local-discovery result that searched private .orimera "
         "state and found the synthetic orimera-corpus fixture"
     ),
-    "docs/frontier-roadmap.md": (
-        "states the cutover exit gate: Orimera survives only as historical SQL, "
-        "git history, and the ADR evidence table"
-    ),
     "docs/person-presentation-consent.md": (
         "records a corrected pre-rename launch configuration that still named "
         "ORIMERA_ and orimera.api.app"

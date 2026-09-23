@@ -128,7 +128,6 @@ _OPERATOR_PROCESS: tuple[str, ...] = (
     "docs/briefs/2026-09-12-helsinki-terminal-lod-successor.md",
     "docs/briefs/2026-09-12-helsinki-visual-feasibility.md",
     "docs/briefs/2026-09-12-melbourne-c4-29-visual-feasibility.md",
-    "docs/frontier-demonstration.md",
     "docs/goal-brief-2026-09-05-unblocked-backend-program.md",
     "docs/goal-brief-2026-09-08-remaining-work.md",
     "docs/judge-access.md",
@@ -152,10 +151,7 @@ _LOCAL_CAMPAIGN: tuple[str, ...] = (
     "docs/evaluation/2026-09-09-companion-memory.json",
     "docs/evaluation/2026-09-09-companion-question.json",
     "docs/evaluation/2026-09-09-graph-read-memo.json",
-    "docs/evaluation/2026-09-10-companion-prompts.json",
-    "docs/evaluation/2026-09-10-companion-proposals-on-the-copy.json",
     "docs/evaluation/2026-09-10-companion-proposals.json",
-    "docs/evaluation/2026-09-10-drafting-reliability.json",
     "docs/evaluation/2026-09-11-companion-matching.json",
     "docs/evaluation/2026-09-11-developer-proof.json",
     "docs/evaluation/2026-09-11-first-place.json",
@@ -732,7 +728,8 @@ def test_the_lists_of_unresolved_references_have_not_grown_silently():
     fact about the repository rather than about a test, so it is worth a line in whatever record
     the change belongs to, and the number here is edited deliberately in the same commit.
     """
-    assert (len(ALLOWED_DANGLING), len(_OPERATOR_PROCESS), len(_LOCAL_CAMPAIGN)) == (12, 12, 18)
+    # Retired narrative removed one private brief and three local-only campaign references.
+    assert (len(ALLOWED_DANGLING), len(_OPERATOR_PROCESS), len(_LOCAL_CAMPAIGN)) == (12, 11, 15)
     assert (len(NAMED_RELATIVE_TO), len(NAMED_ABSENT_BY_DESIGN)) == (1, 0), (
         "rule 4's explanations changed size; edit this line in the same change, and say why"
     )
@@ -781,21 +778,13 @@ def test_the_generated_inventory_matches_the_tree():
     assert "](evaluation/" not in catalog
 
 
-def test_every_decision_record_appears_in_the_readme_table():
-    """The hand-written half of the index, which no generator can produce.
-
-    The ADR table carries what was DECIDED, one line each, and a status line extracted from the file
-    cannot say that. So it stays hand-written, and this keeps it honest: MEASURED 2026-09-09, it had
-    silently stopped at ADR-0017 while the tree held 22 records, so five decisions were invisible to
-    every reader who started from the index.
-    """
-    readme = (ROOT / "docs" / "README.md").read_text(encoding="utf-8")
+def test_every_decision_record_appears_in_the_catalog():
+    """Every retained decision remains discoverable without a second handwritten inventory."""
+    inventory = (ROOT / "docs" / "all-documents.md").read_text(encoding="utf-8")
     records = sorted(
         os.path.basename(rel) for rel in _tracked()
         if rel.startswith("docs/adr/") and rel.endswith(".md")
     )
     assert records, "no decision records found, so this rule has stopped applying"
-    missing = [name for name in records if f"](adr/{name})" not in readme]
-    assert not missing, (
-        "decision records absent from the table in docs/README.md:\n  " + "\n  ".join(missing)
-    )
+    missing = [name for name in records if f"](adr/{name})" not in inventory]
+    assert not missing, "decision records absent from the catalog: " + ", ".join(missing)

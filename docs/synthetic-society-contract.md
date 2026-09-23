@@ -12,6 +12,29 @@ it, and a person's own saved world gets a v2 society when the person asks for on
 fictional simulation, separate from personal evidence. They do not model real residents, infer
 demographic facts or demonstrate general social intelligence.
 
+<details>
+<summary>Sections</summary>
+
+- [Connection to the personal world](#connection-to-the-personal-world)
+- [Identity, branches and compatibility](#identity-branches-and-compatibility)
+- [V2 input authority](#v2-input-authority)
+- [Goals, routes and actions](#goals-routes-and-actions)
+- [Opt-in local activity failures](#opt-in-local-activity-failures)
+- [A saved world's own ground](#a-saved-worlds-own-ground)
+- [Authored edits and inability to act](#authored-edits-and-inability-to-act)
+- [Events, persistence and replay](#events-persistence-and-replay)
+- [Server integration and HTTP](#server-integration-and-http)
+- [V3 bounded observations and communication](#v3-bounded-observations-and-communication)
+- [Explicit model proposals and exact replay](#explicit-model-proposals-and-exact-replay)
+- [Validation](#validation)
+- [Persisted playback controls and bounded host progression](#persisted-playback-controls-and-bounded-host-progression)
+- [Typed user-directed actions](#typed-user-directed-actions)
+- [V4 living society: routines, places and occupancy](#v4-living-society-routines-places-and-occupancy)
+- [The surface under a walker where the records state several heights](#the-surface-under-a-walker-where-the-records-state-several-heights)
+- [Traffic boundary](#traffic-boundary)
+
+</details>
+
 ## Connection to the personal world
 
 The product direction is a persistent society inside a person's composed world. Inhabitants

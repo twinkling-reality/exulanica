@@ -27,6 +27,21 @@ environment-instances 1.0. Durable authored environment placements are the
 environment-instances extension. A signed package does not grant source reuse
 rights, carry missing asset bytes or establish a runnable import.
 
+<details>
+<summary>Sections</summary>
+
+- [Standards and compatibility boundary](#standards-and-compatibility-boundary)
+- [Snapshot, publication, and receipt](#snapshot-publication-and-receipt)
+- [Inventory and privacy boundary](#inventory-and-privacy-boundary)
+- [Integrity format](#integrity-format)
+- [Commands](#commands)
+- [Exit evidence](#exit-evidence)
+- [Authored-world extension 1.0](#authored-world-extension-10)
+- [Environment-instances extension 1.0](#environment-instances-extension-10)
+- [Explicit training dataset profile](#explicit-training-dataset-profile)
+
+</details>
+
 ## Standards and compatibility boundary
 
 `wmp/profile.json` is the versioned Exulanica profile. The identifier is `exulanica-wmp-1.0`.

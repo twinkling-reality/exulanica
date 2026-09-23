@@ -1,6 +1,6 @@
 # Security floor
 
-- Status: mixed, labelled per claim. See [README.md](README.md) for the status convention.
+- Status: mixed, labelled per claim. See [documentation standard](documentation-standard.md#evidence-labels) for the status convention.
 - Date: 2026-09-16.
 - Relationship to other documents: this is what the code enforces for four controls that
   [privacy-consent-threat-model.md](privacy-consent-threat-model.md) and

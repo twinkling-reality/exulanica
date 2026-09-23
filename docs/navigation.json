@@ -1,0 +1,144 @@
+{
+  "version": 1,
+  "groups": [
+    {
+      "id": "orientation",
+      "title": "Product and architecture",
+      "purpose": "Begin here for scope, system boundaries and contributor workflow.",
+      "documents": [
+        {"path": "product-direction.md", "role": "overview", "owns": "Product scope, delivery order and acceptance gates"},
+        {"path": "architecture-overview.md", "role": "overview", "owns": "System responsibilities, boundaries and source-code entry points"},
+        {"path": "development-setup.md", "role": "guide", "owns": "Installation, local services and focused verification"},
+        {"path": "documentation-standard.md", "role": "standard", "owns": "Documentation ownership, lifecycle and review rubric"},
+        {"path": "world-memory-model.md", "role": "contract", "owns": "World-state planes, identity, representations and research claims"}
+      ]
+    },
+    {
+      "id": "capabilities",
+      "title": "Capability guides",
+      "purpose": "Choose a feature or integrate as an external developer.",
+      "documents": [
+        {"path": "capabilities/world-creation.md", "role": "guide", "owns": "Creation experience and its supported boundaries"},
+        {"path": "capabilities/scene-reconstruction.md", "role": "guide", "owns": "Media-to-scene experience and coverage limits"},
+        {"path": "capabilities/companion.md", "role": "guide", "owns": "Companion role, tools and continuity requirements"},
+        {"path": "capabilities/simulation.md", "role": "guide", "owns": "Simulation uses and supported behavior boundaries"},
+        {"path": "capabilities/world-api.md", "role": "guide", "owns": "Authenticated developer operations and version-safe edits"},
+        {"path": "capabilities/developer-client.md", "role": "guide", "owns": "Independent Python client setup and demonstrated workflow"}
+      ]
+    },
+    {
+      "id": "world-state",
+      "title": "World state and creation",
+      "purpose": "Read the contract for the state or operation being changed.",
+      "documents": [
+        {"path": "world-composition-contract.md", "role": "contract", "owns": "Relationships between personal sources, imports and authored content"},
+        {"path": "saved-world-entry.md", "role": "contract", "owns": "Owned starter creation, saved-world reopening and photo references"},
+        {"path": "world-objects-contract.md", "role": "contract", "owns": "Authored objects, alternate versions, edit registry, undo and concurrency"},
+        {"path": "spatial-world-authority.md", "role": "contract", "owns": "Durable spatial topology and publication authority"},
+        {"path": "place-identity.md", "role": "contract", "owns": "Place identity, coordinate frames and cross-capture alignment"},
+        {"path": "world-memory-package.md", "role": "contract", "owns": "Portable package profiles, integrity, projections and permissions"},
+        {"path": "world-variation-and-segments.md", "role": "reference", "owns": "Relationship between subject identity, variation and representation"},
+        {"path": "representation-decisions.md", "role": "reference", "owns": "Coordinate and projection decisions, limits and revision conditions"}
+      ]
+    },
+    {
+      "id": "perception",
+      "title": "Sources, perception and evidence",
+      "purpose": "Trace source rights and observations through reconstruction and serving.",
+      "documents": [
+        {"path": "domain-and-evidence-model.md", "role": "contract", "owns": "Evidence addresses, provenance, identity assertions and schema"},
+        {"path": "personal-admission.md", "role": "contract", "owns": "Personal-source admission, model rights and re-screening"},
+        {"path": "person-presentation-consent.md", "role": "contract", "owns": "Person-region masking and presentation rights"},
+        {"path": "screening-currency.md", "role": "contract", "owns": "Screening dependency identity and transaction ordering"},
+        {"path": "asset-read-currency.md", "role": "contract", "owns": "Authorization and lineage currency when serving asset bytes"},
+        {"path": "world-read-recipient-evidence.md", "role": "contract", "owns": "Evidence projection for a receiving client"},
+        {"path": "world-read-posed-views.md", "role": "contract", "owns": "Authorized posed-image delivery and projection"},
+        {"path": "capture-overlap-and-recovery-state.md", "role": "contract", "owns": "Capture coverage verdicts and recovery-state representation"},
+        {"path": "scene-reconstruction-operations.md", "role": "guide", "owns": "Reconstruction processing and durable artifact flow"},
+        {"path": "scene-segments.md", "role": "contract", "owns": "Source-addressed regions and lifted scene segments"},
+        {"path": "scene-placement-alignment.md", "role": "contract", "owns": "Correspondence-based point-map placement and refusal"},
+        {"path": "reconstruction-quality-gate.md", "role": "contract", "owns": "Reconstruction quality validation and recorded rung"},
+        {"path": "gsplat-scene-jobs.md", "role": "contract", "owns": "Scene-training input identity, checkpoints and evaluation"},
+        {"path": "scene-splat-publication.md", "role": "contract", "owns": "Durable training queue and scene publication"},
+        {"path": "retained-reference-workflow.md", "role": "guide", "owns": "Reusing retained source collections and reconstruction artifacts"}
+      ]
+    },
+    {
+      "id": "interaction",
+      "title": "Interaction and Companion",
+      "purpose": "Follow user controls, model proposals and browser representations.",
+      "documents": [
+        {"path": "interaction-model.md", "role": "contract", "owns": "Interaction semantics, navigation and selection design"},
+        {"path": "companion-question.md", "role": "contract", "owns": "Grounded question, conversation and appearance-proposal path"},
+        {"path": "interaction-policy-backend.md", "role": "contract", "owns": "Reviewed interaction-policy capabilities and mutations"},
+        {"path": "atlas-frontend-integration.md", "role": "contract", "owns": "Frontend authority boundaries and review lifecycle"},
+        {"path": "atlas-spatial-architecture.md", "role": "contract", "owns": "Atlas spatial grammar and navigation design"},
+        {"path": "atlas-visual-language.md", "role": "reference", "owns": "Visual language and semantic presentation rules"},
+        {"path": "atlas-reconstruction-inspection.md", "role": "contract", "owns": "Scene inspection, source selection and representation views"},
+        {"path": "atlas-world-customization-contract.md", "role": "contract", "owns": "Protected topology and appearance customization lifecycle"},
+        {"path": "world-style-backend.md", "role": "contract", "owns": "Appearance registry, proposals and persisted style authority"},
+        {"path": "physical-streaming-runtime.md", "role": "contract", "owns": "Physical residency, measured detail selection and context recovery"}
+      ]
+    },
+    {
+      "id": "simulation",
+      "title": "Simulation and generated environments",
+      "purpose": "Follow generation, canonical simulation and derived rendering separately.",
+      "documents": [
+        {"path": "synthetic-society-contract.md", "role": "contract", "owns": "Synthetic identity, state, actions, composition and replay"},
+        {"path": "society-experiments.md", "role": "contract", "owns": "Experiment definitions, attempts, interventions and results"},
+        {"path": "character-representation-contract.md", "role": "contract", "owns": "Character appearance, rigging, subject bindings and movement"},
+        {"path": "grammar-package.md", "role": "contract", "owns": "Generation vocabulary, seeds, stages and validation"},
+        {"path": "owned-district-and-admission.md", "role": "contract", "owns": "External environment admission and source interpretation"},
+        {"path": "generated-corridor-street.md", "role": "reference", "owns": "Generated corridor structure and reproduction"},
+        {"path": "generated-tile-runtime.md", "role": "contract", "owns": "Generated-tile loading, rendering and navigation"},
+        {"path": "corridor-navigation-artifacts.md", "role": "reference", "owns": "Relationship between render and navigation artifacts"},
+        {"path": "generated-appearance.md", "role": "contract", "owns": "Model-generated appearance candidates and publication boundaries"},
+        {"path": "texture-package.md", "role": "contract", "owns": "Texture containers, recipes, storage and deterministic publication"},
+        {"path": "lettering.md", "role": "contract", "owns": "Glyph catalogs, layout and lettering geometry"},
+        {"path": "traffic-contract.md", "role": "contract", "owns": "Traffic inputs, state transitions and simulation invariants"}
+      ]
+    },
+    {
+      "id": "operations",
+      "title": "Runtime, security and model selection",
+      "purpose": "Configure services and maintain permission, resource and provider boundaries.",
+      "documents": [
+        {"path": "deployment.md", "role": "guide", "owns": "API, account, worker and deployment configuration"},
+        {"path": "derivative-worker-operations.md", "role": "guide", "owns": "Derivative worker execution, progress, shutdown and recovery"},
+        {"path": "security-floor.md", "role": "contract", "owns": "Route permissions, quotas and outbound access"},
+        {"path": "privacy-consent-threat-model.md", "role": "contract", "owns": "Consent, deletion, threat boundaries and privacy claims"},
+        {"path": "model-and-service-selection.md", "role": "reference", "owns": "Implemented model roles, selection evidence and candidate comparisons"},
+        {"path": "license-matrix.md", "role": "reference", "owns": "Model, dependency and asset license decisions"}
+      ]
+    },
+    {
+      "id": "verification",
+      "title": "Verification and evidence",
+      "purpose": "Define acceptance methods and locate bounded execution evidence.",
+      "documents": [
+        {"path": "evaluation-methodology.md", "role": "reference", "owns": "Evaluation tasks, metrics and evidence requirements"},
+        {"path": "evaluation-corpus-contract.md", "role": "contract", "owns": "Evaluation input discovery, split access and source boundaries"},
+        {"path": "evaluation-harness.md", "role": "guide", "owns": "Clean replay, run archives and result collection"},
+        {"path": "visual-gate-targets.md", "role": "contract", "owns": "Visual-gate artifacts, metrics and target bindings"},
+        {"path": "visual-gate-rubric.md", "role": "contract", "owns": "Human visual judgement procedure and evidence rules"},
+        {"path": "visual-gate-corridor-walk.md", "role": "reference", "owns": "Recorded corridor walk framing and target coverage"},
+        {"path": "visual-gate-third-authentication-condition.md", "role": "reference", "owns": "Browser identity condition rationale and limits"},
+        {"path": "demo-integrity.md", "role": "guide", "owns": "Demonstration disclosure, failure handling and rehearsal"}
+      ]
+    },
+    {
+      "id": "history",
+      "title": "Historical context",
+      "purpose": "Research and run findings retain their original scope; they do not override living contracts.",
+      "documents": [
+        {"path": "frontier-roadmap.md", "role": "archive", "owns": "Historical engineering sequence and its successor contracts"},
+        {"path": "product-specification.md", "role": "archive", "owns": "Product research provenance and successor constraints"},
+        {"path": "demo-runbook.md", "role": "archive", "owns": "Demonstration readiness audit and successor operating guides"},
+        {"path": "runtime-verification.md", "role": "archive", "owns": "Recorded provider behavior for the measured model revisions"},
+        {"path": "platform-findings.md", "role": "archive", "owns": "Recorded infrastructure and provider findings"},
+        {"path": "reconstruction-findings.md", "role": "archive", "owns": "Recorded reconstruction experiments and their limitations"}
+      ]
+    }
+  ]
+}

@@ -1,19 +1,35 @@
 # Deployment
 
-- Status: mixed, labelled per claim. See [README.md](README.md) for the status convention.
-- Date: 2026-09-04.
-- Relationship to other documents: this expands
-  [architecture-overview.md](architecture-overview.md) sections 2, 2.1, 4 and 7 into an operational
-  plan. Where a platform fact appears in both, the architecture overview is the source and this
-  document does not restate the verification.
-  [runtime-verification.md](runtime-verification.md) overrides both on any conflict.
+This document owns service configuration, deployment requirements and operating boundaries.
+[Architecture](architecture-overview.md) owns system shape; [security](security-floor.md) owns
+permissions and egress. Provider findings apply only to their measured requests and revisions,
+not as an unconditional override of these contracts.
 
-The demonstration has to run without an operator for roughly **46 days** after a release is cut.
-This is a single operator project, and that is the longest gap between hands-on attention the
-schedule realistically produces. Nobody looks at the application during that window. Every choice in
-this document is shaped by that gap rather than by steady-state operations.
+The hosting comparisons and unattended-operation estimates retain assumptions from deployment
+research. They are not evidence that a named host is configured or running. Use the environment,
+account, health and worker contracts below to establish an actual deployment; verify provider
+availability and prices when making a hosting decision.
 
 ---
+
+<details>
+<summary>Sections</summary>
+
+- [1. What is decided, and what is not](#1-what-is-decided-and-what-is-not)
+- [2. Topology](#2-topology)
+- [3. Where the database runs, and why](#3-where-the-database-runs-and-why)
+- [4. Static assets and large derived files](#4-static-assets-and-large-derived-files)
+- [5. Environment configuration](#5-environment-configuration)
+- [6. Health check](#6-health-check)
+- [7. Model catalog preflight](#7-model-catalog-preflight)
+- [8. Cost control](#8-cost-control)
+- [8.5 A seeded deployment for a reviewer](#85-a-seeded-deployment-for-a-reviewer)
+- [9. Unattended operation](#9-unattended-operation)
+- [10. Choosing the target: options, tradeoffs and the criteria that settle it](#10-choosing-the-target-options-tradeoffs-and-the-criteria-that-settle-it)
+- [11. Consolidated open items](#11-consolidated-open-items)
+- [12. Scalability: four changes that were measured and declined](#12-scalability-four-changes-that-were-measured-and-declined)
+
+</details>
 
 ## 1. What is decided, and what is not
 

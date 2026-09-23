@@ -15,6 +15,21 @@ once the corpus is frozen and the harness runs.
 
 ---
 
+<details>
+<summary>Sections</summary>
+
+- [0. Two facts that shape every number below](#0-two-facts-that-shape-every-number-below)
+- [1. The gold corpus](#1-the-gold-corpus)
+- [2. Metrics](#2-metrics)
+- [3. The honesty constraint](#3-the-honesty-constraint)
+- [4. Learning evaluation](#4-learning-evaluation)
+- [5. Adversarial and prompt-injection suite](#5-adversarial-and-prompt-injection-suite)
+- [6. Acceptance targets for the curated MVP](#6-acceptance-targets-for-the-curated-mvp)
+- [7. Open items](#7-open-items)
+- [8. Sources](#8-sources)
+
+</details>
+
 ## 0. Two facts that shape every number below
 
 **VERIFIED.** Nebius Token Factory has zero audio capability. The live OpenAPI spec contains zero

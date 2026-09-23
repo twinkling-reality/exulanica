@@ -17,7 +17,7 @@ store. Test counts and measurement dates below are historical, not a fresh execu
 ```bash
 uv sync --extra reconstruction --extra segmentation --extra pose --extra server
 cp .env.example .env         # then fill in the two keys below
-uv run pytest                # database tests skip; see below for the full suite
+uv run ruff check .          # static validation; select behavior-focused tests below
 ```
 
 The full suite is run with all four extras. Without `reconstruction` (numpy) and `pose`
@@ -41,7 +41,7 @@ services. `--offline` skips vision, but ingest still writes to the configured da
 ```bash
 uv run pytest
 uv run ruff check .                 # lints backend, tests and scripts
-uv run lint-imports                 # the backend layering contract, four rules
+uv run lint-imports                 # backend layering contracts
 uv run exulanica-preflight            # checks every manifest id against the live catalog
 uv run uvicorn --factory exulanica.api.app:create_app   # the HTTP API, on port 8000
 uv run exulanica-preflight --catalog-file <snapshot.json>   # same check, offline
@@ -354,3 +354,10 @@ synthetic fixture, not the authenticated backend or a personal-world acceptance 
 landing server before starting the application on its default port, or use the port printed by
 Vite. There is no single command that starts Exulanica end to end.
 See [capability boundaries](README.md#capability-boundaries) and the [product roadmap](product-direction.md).
+
+## Documentation changes
+
+Start with the [documentation standard](documentation-standard.md) and locate the existing owner
+in the [catalog](all-documents.md). Edit that owner, update the navigation map if needed and run the
+focused documentation checks in the standard. Do not run the full backend or browser suite for
+prose-only changes. Historical evaluations remain evidence for their recorded revisions.

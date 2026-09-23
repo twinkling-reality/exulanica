@@ -20,6 +20,25 @@ milestone. The implementation is migration `0042_authored_world_objects.sql`,
 `exulanica/world/assets.py`, migration `0050_durable_environment_composition.sql`,
 `exulanica/world/environment_instances.py`, and the `/world/versions` and `/world/assets` routes.
 
+<details>
+<summary>Sections</summary>
+
+- [1. The decision: a separate plane, bound to the snapshot the way appearance is](#1-the-decision-a-separate-plane-bound-to-the-snapshot-the-way-appearance-is)
+- [2. An alternate version](#2-an-alternate-version)
+- [3. A created object](#3-a-created-object)
+- [4. The reviewed asset registry](#4-the-reviewed-asset-registry)
+- [5. Concurrency, undo, and reopening](#5-concurrency-undo-and-reopening)
+- [6. HTTP surface](#6-http-surface)
+- [7. Wire shape](#7-wire-shape)
+- [8. Package projection](#8-package-projection)
+- [9. Verification](#9-verification)
+- [10. Opening the first alternate from composed sources](#10-opening-the-first-alternate-from-composed-sources)
+- [11. Durable environment instances](#11-durable-environment-instances)
+- [Bounded scene-extraction preparation](#bounded-scene-extraction-preparation)
+- [Authored district object coordinates](#authored-district-object-coordinates)
+
+</details>
+
 ## 1. The decision: a separate plane, bound to the snapshot the way appearance is
 
 The question this document had to answer first was whether an alternate world version and an

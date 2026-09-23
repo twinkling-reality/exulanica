@@ -1,7 +1,7 @@
 # Interaction and spatial model
 
 Status: mixed. Every claim carries exactly one label, per the convention in
-[README.md](README.md): **VERIFIED** (primary source URL and retrieval date), **DECISION** (with the
+[documentation standard](documentation-standard.md#evidence-labels): **VERIFIED** (primary source URL and retrieval date), **DECISION** (with the
 alternative rejected), **ASSUMPTION** (with the experiment that settles it), **OPEN**.
 
 Retrieval date for every VERIFIED claim on this page: **2026-08-27**.
@@ -14,6 +14,23 @@ first-run assumptions below do not replace it.
 otherwise assume exists, and most of this document is downstream of them.
 
 ---
+
+<details>
+<summary>Sections</summary>
+
+- [1. The Atlas is the whole application](#1-the-atlas-is-the-whole-application)
+- [2. Navigation](#2-navigation)
+- [3. Two verbs, and the contextual affordance system](#3-two-verbs-and-the-contextual-affordance-system)
+- [4. The Companion](#4-the-companion)
+- [5. Update proposals and confirmation](#5-update-proposals-and-confirmation)
+- [6. World Index, Atlas Map, review queue](#6-world-index-atlas-map-review-queue)
+- [7. Dynamic recomposition as a view transformation](#7-dynamic-recomposition-as-a-view-transformation)
+- [8. Processing as spatial formation](#8-processing-as-spatial-formation)
+- [9. Accessibility and reduced motion](#9-accessibility-and-reduced-motion)
+- [10. Renderer decision](#10-renderer-decision)
+- [11. Open items owned by this document](#11-open-items-owned-by-this-document)
+
+</details>
 
 ## 1. The Atlas is the whole application
 

@@ -4,41 +4,34 @@ Status: mixed. Every claim below carries exactly one status label, and a claim t
 against what was actually built also carries **CORRECTED**.
 Retrieval date for every VERIFIED external source: **2026-08-27**.
 
-This is the core contract of the product. Everything else in Exulanica (the Atlas, the Companion, the
-reconstruction ladder, the query layer) is a view over what is defined here. The spine described in
-section 1 is intended to be frozen at v1 and extended additively only.
+This contract owns evidence addresses, provenance, identity assertions and their schema. It is
+one part of the [world model architecture](world-memory-model.md), alongside authored state,
+simulation and representations. The spine's compatibility rules do not turn a database schema into
+the complete product specification.
 
-Label convention is the one in [README.md](README.md):
+[Documentation standards](documentation-standard.md#evidence-labels) define the evidence labels
+used below. The source implementation includes [the evidence modules](../exulanica/evidence/) and
+[database migrations](../exulanica/migrations/). A recorded provider observation applies to its
+own input and revision; resolve disagreements by tracing the affected schema, caller and evidence.
 
-- **VERIFIED** cites a primary source URL and a retrieval date.
-- **DECISION** records a choice and the strongest alternative rejected.
-- **ASSUMPTION** is unvalidated and names the experiment that settles it.
-- **OPEN** is unresolved. Nothing marked OPEN may be relied on.
-- **CLOSED** marks an item that was OPEN and no longer is. Each one names the ADR that settled it,
-  the artefact that enforces it, and the test that fails when it is violated. A decision recorded
-  only in prose is not CLOSED.
-- **CORRECTED** marks a claim that was wrong in an earlier version of this document and has been
-  rewritten against what was actually built. Each one names the artefact and the test.
+The still-image implementation uses the photograph form of the evidence address described in
+section 1.5. Broader media and synthetic creation are separate capabilities, not implied by that
+address format.
 
-**Corrections against the implementation, 2026-08-27.** Migration
-`exulanica/migrations/0001_spine.sql` and the `exulanica/evidence/` modules were built from this
-document, and building them found errors in it. Where this document disagreed with what runs, the
-built artefact wins and the paragraph is marked **CORRECTED**; where it disagreed with
-[runtime-verification.md](runtime-verification.md), that document wins, as its own header says. None of these
-corrections is a redesign.
+<details>
+<summary>Sections</summary>
 
-**The caveat this header used to carry is withdrawn, 2026-09-04.** It said no PostgreSQL server had
-executed the migration in this environment and that every SQL claim below was therefore text-level.
-That has not been true for some time: the suite applies all thirty-four migrations to a real
-PostgreSQL 18 server with pgvector on every run that sets `EXULANICA_TEST_DATABASE_URL`, and 1445 of
-1447 tests pass that way, with nothing substituted. A claim below about a trigger, a check
-constraint or a row-level-security policy is executed unless the paragraph says otherwise.
+- [1. The evidence address](#1-the-evidence-address)
+- [2. The epistemic model](#2-the-epistemic-model)
+- [3. Occurrence versus entity](#3-occurrence-versus-entity)
+- [4. Core schema](#4-core-schema)
+- [5. Idempotency and versioning of derivatives](#5-idempotency-and-versioning-of-derivatives)
+- [6. Deletion, tombstones, and cascade](#6-deletion-tombstones-and-cascade)
+- [7. The provenance ledger and Assembly Replay](#7-the-provenance-ledger-and-assembly-replay)
+- [8. The World Memory Package is a projection, not the store](#8-the-world-memory-package-is-a-projection-not-the-store)
+- [9. Where this document is not settled](#9-where-this-document-is-not-settled)
 
-Corpus context that shapes this document, already settled in
-[product-specification.md](product-specification.md) section 2: **the capture corpus is still
-photographs, not video, and there is no audio.** Section 1.5 is the load-bearing consequence.
-
----
+</details>
 
 ## 1. The evidence address
 
@@ -1040,9 +1033,9 @@ create index on text_chunk using gin (body gin_trgm_ops);
 
 **DECISION (emb-1), CORRECTED.** This document specified `halfvec(1024)`. Runtime verification
 **measured**
-`Qwen/Qwen3-Embedding-8B`, still the only embedding-typed model in the catalog, returning
-**4096-dimensional** vectors ([runtime-verification.md](runtime-verification.md) section 7), and that document
-overrides on conflict. pgvector indexes `halfvec` to at most 4000 dimensions, so a 4096-dimension
+`Qwen/Qwen3-Embedding-8B` returning **4096-dimensional** vectors
+([recorded provider findings](runtime-verification.md), section 7). The schema below defines the
+stored width; catalog availability requires a separate check. pgvector indexes `halfvec` to at most 4000 dimensions, so a 4096-dimension
 column cannot carry an HNSW or IVFFlat index at all. The real choice is therefore between truncating
 the model's output to fit an index and storing the real width with exact search.
 
@@ -1916,5 +1909,5 @@ timebase item specifically at first video ingest.
 | Provider zero-data-retention across all endpoints in use | ASSUMPTION A-8 | Written confirmation from the provider for the specific model IDs, committed to the repository, asserted at service boot |
 | pgvector behaviour at production scale | ASSUMPTION A-27 / A-30 | Experiment X-18. Safe at demo scale regardless |
 | Workspace is one user at MVP | ASSUMPTION A-30 | A product decision, not a technical one |
-| When a biometric embedding may exist at all | **OPEN** | A risk-appetite decision, not a technical one. Three incompatible rules were proposed and the evidence does not choose between them. Tracked as open item P-1 in `product-specification.md` section 10. **Identity work must not begin before it is answered** |
+| When a biometric embedding may exist at all | **OPEN** | A risk-appetite decision, not a technical one. Three incompatible rules were proposed and the evidence does not choose between them. Owned by [privacy and consent](privacy-consent-threat-model.md#10-open-when-may-a-biometric-embedding-exist-at-all). **Identity work must not begin before it is answered** |
 | C2PA as a future device-signing option | not a dependency | The existence of the specification and the hard-binding concept are verified; exact clause numbering is unverified. Noted as future-compatible, never as an MVP dependency |

@@ -40,15 +40,17 @@ operable inside the existing modal focus boundary.
 
 ## Conversational proposals
 
-`web/packages/app/src/world-style-proposals.ts` is an in-process typed inbox for a future upstream
-proposal service. It does not call a model or convert prose. A service supplies an already
+`web/packages/app/src/world-style-proposals.ts` is an in-process typed inbox for structured
+proposals. It does not call a model or convert prose. A caller supplies an already
 structured profile proposal. Companion input must include an origin reference, at least one opaque
 reference ID, a model ID, and a prompt version. The normal local and backend validation paths then
 produce the same preview UI used by Settings. A refinement is another upstream proposal carrying
 the prior proposal ID.
 
-No production conversational proposal service exists in this repository. That is an external
-integration dependency, not a mocked browser feature.
+The application connects the backend appearance-proposal route to this inbox. The
+[Companion question contract](companion-question.md#appearance-proposals) owns request classification
+and drafting. The inbox supplies the review boundary, not evidence that every model proposal is
+useful or that general structural language editing is supported.
 
 ## Source media
 

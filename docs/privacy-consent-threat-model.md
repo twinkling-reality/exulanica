@@ -13,6 +13,23 @@ compliance with anything, and the project makes no compliance claim (see section
 
 ---
 
+<details>
+<summary>Sections</summary>
+
+- [1. What is processed](#1-what-is-processed)
+- [2. The legal landscape](#2-the-legal-landscape)
+- [3. Architectural guards versus policy promises](#3-architectural-guards-versus-policy-promises)
+- [4. Consent](#4-consent)
+- [5. Deletion](#5-deletion)
+- [6. Honest disclosure](#6-honest-disclosure)
+- [7. Prompt injection](#7-prompt-injection)
+- [8. Misuse boundaries](#8-misuse-boundaries)
+- [9. Demo corpus policy](#9-demo-corpus-policy)
+- [10. OPEN: when may a biometric embedding exist at all](#10-open-when-may-a-biometric-embedding-exist-at-all)
+- [11. What this document does not settle](#11-what-this-document-does-not-settle)
+
+</details>
+
 ## 1. What is processed
 
 This section exists because the legal analysis below is worthless if it is applied to the wrong
@@ -1240,7 +1257,8 @@ short TTL is a defensible answer to "why did you hold a non-consenting person's 
 **That recommendation is recorded, not adopted.** It is a risk-appetite decision, it belongs to a human,
 and it must be made before identity work begins.
 
-Tracked as open item **P-1** in [product-specification.md](product-specification.md) section 10.
+This section owns the unresolved biometric-embedding policy question. Historical product
+research does not decide it or override the implemented admission and presentation rights.
 
 Two consequences of leaving it open, so that nobody is surprised later:
 
@@ -1257,7 +1275,7 @@ Two consequences of leaving it open, so that nobody is surprised later:
 
 | # | Item | Status | Settled by |
 | --- | --- | --- | --- |
-| 1 | The rule for when a biometric embedding may exist | OPEN | A human decision. Section 10 here, and open item P-1 in `product-specification.md` |
+| 1 | The rule for when a biometric embedding may exist | OPEN | An explicit policy decision under section 10 of this contract |
 | 2 | The amended EU AI Act application dates under Regulation (EU) 2026/1744 | OPEN | Reading amended Article 113 in the operative text. EUR-Lex timed out three times during research |
 | 3 | The exact text of the 2024 BIPA s.20 amendment (Public Act 103-769) | OPEN | Reading it on ILGA, which returned HTTP 500 during research |
 | 4 | The CJEU *Ryneš* ratio as applied to personal capture in public | OPEN | Reading the judgment. Only the secondary summary was read |

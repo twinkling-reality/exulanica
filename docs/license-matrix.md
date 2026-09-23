@@ -13,6 +13,24 @@ Apache-2.0 release and an invalid one.
 
 ---
 
+<details>
+<summary>Sections</summary>
+
+- [1. How to read this](#1-how-to-read-this)
+- [2. The NVIDIA license distinction](#2-the-nvidia-license-distinction)
+- [3. The matrices](#3-the-matrices)
+- [4. The license traps most likely to be hit by accident](#4-the-license-traps-most-likely-to-be-hit-by-accident)
+- [5. Nebius catalog strings versus HuggingFace model cards](#5-nebius-catalog-strings-versus-huggingface-model-cards)
+- [6. API-only use: what it does and does not cover](#6-api-only-use-what-it-does-and-does-not-cover)
+- [7. THIRD_PARTY_NOTICES and the NOTICE-file obligations](#7-third_party_notices-and-the-notice-file-obligations)
+- [8. Consolidated OPEN and UNVERIFIED items](#8-consolidated-open-and-unverified-items)
+- [9. Mechanical enforcement](#9-mechanical-enforcement)
+- [10. Provenance](#10-provenance)
+- [11. HEIC decoder inspection and pin, 2026-09-12](#11-heic-decoder-inspection-and-pin-2026-09-12)
+- [12. Generated appearance models, 2026-09-17](#12-generated-appearance-models-2026-09-17)
+
+</details>
+
 ## 1. How to read this
 
 ### Verdict vocabulary
@@ -48,11 +66,11 @@ Where a row's source is given as a HuggingFace card, the retrieval URL was
 
 ### Note on the audio rows
 
-The corpus is photographs and there is no audio (see `product-specification.md` section 2), and Nebius Token
-Factory has zero audio capability. The ASR, diarization and speaker-embedding rows below therefore
-describe a **deferred** capability, not the current critical path. They are retained because the
-analysis is already done, because the deferral could be revisited, and because two of the sharpest
-traps in the whole matrix live there.
+The ASR, diarization and speaker-embedding rows retain license research for possible audio
+capabilities. They do not establish an audio pipeline or provider availability. Still-image intake
+and the executed model roles are described in [personal admission](personal-admission.md) and
+[model selection](model-and-service-selection.md). Evaluate the exact artifact and its terms before
+admitting an additional media pipeline.
 
 ---
 

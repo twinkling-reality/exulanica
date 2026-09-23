@@ -16,6 +16,22 @@ choice), four projection contracts, licensed catalogs, and one identity rule.
 together and what it measures. `city.v1.json` and `city.v2.json` remain as pinned migration
 source schemas; they are not registered.
 
+<details>
+<summary>Sections</summary>
+
+- [1. Where it sits, and why below `evidence`](#1-where-it-sits-and-why-below-evidence)
+- [2. What the contracts prevent](#2-what-the-contracts-prevent)
+- [3. The generic contract, and adding a grammar](#3-the-generic-contract-and-adding-a-grammar)
+- [4. The draw](#4-the-draw)
+- [5. The seed](#5-the-seed)
+- [6. Records](#6-records)
+- [7. The city stages](#7-the-city-stages)
+- [8. Catalogs](#8-catalogs)
+- [9. The `invented` truth class](#9-the-invented-truth-class)
+- [10. Open gaps](#10-open-gaps)
+
+</details>
+
 ## 1. Where it sits, and why below `evidence`
 
 The exhaustive import-linter layer list in `pyproject.toml` reads, from `reconstruction`

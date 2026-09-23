@@ -11,6 +11,46 @@ Targets are declared twice and held to each other by a test: `GATE_TARGETS` in
 `tests/test_visual_gate_targets.py` asserts the two sets are equal in both directions, so neither
 can gain a page the other cannot.
 
+<details>
+<summary>Sections</summary>
+
+- [Which container each section's figures are about](#which-container-each-sections-figures-are-about)
+- [The two targets](#the-two-targets)
+- [What a record says](#what-a-record-says)
+- [What the gate will not do](#what-the-gate-will-not-do)
+- [What the stated walk cannot yet prove](#what-the-stated-walk-cannot-yet-prove)
+- [What it would take to point this gate at the corridor's street](#what-it-would-take-to-point-this-gate-at-the-corridors-street)
+- [The run with the rings off the collision field, predicted before it was run](#the-run-with-the-rings-off-the-collision-field-predicted-before-it-was-run)
+- [What that run did, measured, and the hole a walk came to rest against](#what-that-run-did-measured-and-the-hole-a-walk-came-to-rest-against)
+- [The openings run, predicted before it was run](#the-openings-run-predicted-before-it-was-run)
+- [What the openings run did, measured](#what-the-openings-run-did-measured)
+- [Why no component is ever seeded as support, measured](#why-no-component-is-ever-seeded-as-support-measured)
+- [The corridor run, predicted before it was run](#the-corridor-run-predicted-before-it-was-run)
+- [What the corridor run did, measured, and the halt that fired first](#what-the-corridor-run-did-measured-and-the-halt-that-fired-first)
+- [The walk from the tile's edge, predicted before the server was asked for a frame](#the-walk-from-the-tiles-edge-predicted-before-the-server-was-asked-for-a-frame)
+- [What the retained baseline's frames carry, and what the generated ones carry](#what-the-retained-baselines-frames-carry-and-what-the-generated-ones-carry)
+- [The first scored run of a real street, measured](#the-first-scored-run-of-a-real-street-measured)
+- [The first scored run of a real street, predicted before the server was restarted](#the-first-scored-run-of-a-real-street-predicted-before-the-server-was-restarted)
+- [A third authentication condition, `preview-shell-credentialed-tiles`](#a-third-authentication-condition-preview-shell-credentialed-tiles)
+- [What the first walk of a composed world did, measured](#what-the-first-walk-of-a-composed-world-did-measured)
+- [The first walk of a composed world, predicted before the server was restarted](#the-first-walk-of-a-composed-world-predicted-before-the-server-was-restarted)
+- [Making the falsification rule a mechanism, and what it found in the first minute](#making-the-falsification-rule-a-mechanism-and-what-it-found-in-the-first-minute)
+- [Why the neighbour fetch asks for a disk, and why that is not waste](#why-the-neighbour-fetch-asks-for-a-disk-and-why-that-is-not-waste)
+- [What the walk from the tile's edge did, measured](#what-the-walk-from-the-tiles-edge-did-measured)
+- [What the corridor run did, measured, once the gate could reach the street](#what-the-corridor-run-did-measured-once-the-gate-could-reach-the-street)
+- [The reason the product gave, now in the record, and the wrong fix that came first](#the-reason-the-product-gave-now-in-the-record-and-the-wrong-fix-that-came-first)
+- [A hint about the frontage tie-break, with its n beside it](#a-hint-about-the-frontage-tie-break-with-its-n-beside-it)
+- [A key that passes on a surface declaring it has no material](#a-key-that-passes-on-a-surface-declaring-it-has-no-material)
+- [Run five: the eight mechanical keys, measured on a generated page](#run-five-the-eight-mechanical-keys-measured-on-a-generated-page)
+- [The run with the rings carried, predicted before it was run](#the-run-with-the-rings-carried-predicted-before-it-was-run)
+- [What that run did, measured, and where a bench stopped it](#what-that-run-did-measured-and-where-a-bench-stopped-it)
+- [The run with rings, predicted before it was run](#the-run-with-rings-predicted-before-it-was-run)
+- [The first run of the generated target, predicted before it was run](#the-first-run-of-the-generated-target-predicted-before-it-was-run)
+- [What that run did, measured](#what-that-run-did-measured)
+- [A definition with two readings, known and deliberately left](#a-definition-with-two-readings-known-and-deliberately-left)
+
+</details>
+
 ## Which container each section's figures are about
 
 The pinned development tile has been rebaked FIVE times while this document was being written, and

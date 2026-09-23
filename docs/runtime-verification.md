@@ -1,14 +1,16 @@
-# Runtime verification
+# Provider runtime findings
 
-Status: VERIFIED by execution of `uv run scripts/verify_platform.py`.
-Reproduce with the same command.
+Historical execution findings from `scripts/verify_platform.py`. The observations below apply
+to their recorded requests and model revisions; they do not establish provider behavior for a
+different execution. [Model selection](model-and-service-selection.md) owns the implemented stack.
 
 The archived responses hold account-identifying response headers, so they are stored in the
 gitignored internal workspace rather than committed. Every field that carries a finding is quoted
 below.
 
 This document records what was learned by actually calling the platform, as opposed to reading its
-documentation. Where it contradicts an earlier document, this one wins.
+documentation. A discrepancy requires comparing the actual revisions, inputs and execution
+evidence; this file does not unconditionally override another contract.
 
 ## 1. The NVIDIA claim is evidenced
 
