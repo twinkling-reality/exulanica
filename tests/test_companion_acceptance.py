@@ -276,11 +276,17 @@ def test_missing_model_echo_and_usage_remain_null(client, transport, retained_pa
 
 
 class _UnusedModel:
-    """A model client these tests hand in and must never touch: composing is replaced below.
+    """A model client these tests hand in and must never call: composing is replaced below.
 
     ``answer_question`` refuses ``None`` for any plan that is not CONTENT, so these tests pass
-    an object that fails on first use instead, which also proves no model call happens.
+    an object that fails on first use instead, which also proves no model call happens. The one
+    thing it answers is ``manifest``: the composer's right check names the models the
+    ``reasoning_cheap`` role can reach before anything is composed, and reading the manifest
+    sends nothing. Every other attribute, and so every way to make a request, still fails.
     """
+
+    def __init__(self, manifest: object) -> None:
+        self.manifest = manifest
 
     def __getattr__(self, name: str) -> object:
         raise AssertionError(f"the model client was used: {name}")
@@ -288,7 +294,7 @@ class _UnusedModel:
 
 @pytest.mark.parametrize("mutation", ["deleted", "withdrawn", "caption_changed", "count_changed"])
 def test_evidence_changed_while_composing_cannot_support_final_answer(
-    monkeypatch, retained_packet, mutation
+    monkeypatch, retained_packet, manifest, mutation
 ):
     from exulanica.selection import question as module
 
@@ -316,7 +322,7 @@ def test_evidence_changed_while_composing_cannot_support_final_answer(
     monkeypatch.setattr(module, "compose_answer", lambda *a, **k: (answer, False, ()))
     result = answer_question(
         None,
-        _UnusedModel(),
+        _UnusedModel(manifest),
         "What do they hold?",
         Session(workspace_id=uuid.UUID(int=1), actor=uuid.UUID(int=2)),
         plan=SelectionPlan(intent="captures"),
@@ -330,7 +336,7 @@ def test_evidence_changed_while_composing_cannot_support_final_answer(
 
 
 def test_fresh_packet_random_tokens_do_not_invalidate_unchanged_answer(
-    monkeypatch, retained_packet
+    monkeypatch, retained_packet, manifest
 ):
     from exulanica.selection import question as module
 
@@ -358,7 +364,7 @@ def test_fresh_packet_random_tokens_do_not_invalidate_unchanged_answer(
     monkeypatch.setattr(module, "compose_answer", lambda *a, **k: (answer, False, ()))
     result = answer_question(
         None,
-        _UnusedModel(),
+        _UnusedModel(manifest),
         "What do they hold?",
         Session(workspace_id=uuid.UUID(int=1), actor=uuid.UUID(int=2)),
         plan=SelectionPlan(intent="captures"),
