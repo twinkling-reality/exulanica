@@ -41,7 +41,6 @@ function instrument(binding: AtlasBinding, log: string[]): void {
   if (binding.authoredSociety !== null) {
     record(log, binding.authoredSociety, 'authoredSociety', ['refreshNearby', 'tickSociety', 'nativeCharacterFrames']);
   }
-  if (binding.googleTiles !== null) record(log, binding.googleTiles, 'googleTiles', ['update']);
   if (binding.authoredPointMaps !== null) record(log, binding.authoredPointMaps, 'authoredPointMaps', ['frame']);
   // A native character runtime as the app enables one: it only receives frames.
   (binding as unknown as { nativeCharacters: unknown }).nativeCharacters = {
@@ -70,7 +69,7 @@ async function framesOf(kind: WorldKind, frames: number): Promise<string[][]> {
 }
 
 describe('the order of work inside a frame', () => {
-  for (const kind of ['authored-endless', 'authored-with-estimate', 'personal-regions', 'owned-district', 'google-reference'] as const) {
+  for (const kind of ['authored-endless', 'authored-with-estimate', 'personal-regions', 'owned-district'] as const) {
     it(`runs ${kind}'s first and second frames in the pinned order`, async () => {
       const [first, second] = await framesOf(kind, 2);
       const text = `first frame\n${first!.join('\n')}\n\nsecond frame\n${second!.join('\n')}\n`;

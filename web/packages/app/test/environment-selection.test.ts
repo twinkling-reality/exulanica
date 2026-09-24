@@ -344,7 +344,7 @@ describe('mounted NYC semantic selection lifecycle', () => {
       mounted.dispose();
       return count;
     };
-    // The Google reference view: no ground of its own, so the NYC footprints are drawn.
+    // A world with no geographic ground of its own: the NYC footprints are drawn.
     expect(await built({ ownedDistrict: null, generatedTile: null })).toBe(1);
     // A generated city is not New York: no footprint line may draw over it.
     expect(await built({ ownedDistrict: null, generatedTile: { metrics: {}, dispose: () => undefined } })).toBe(0);

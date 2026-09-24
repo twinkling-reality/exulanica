@@ -12,7 +12,6 @@
  */
 import { readFileSync } from 'node:fs';
 import * as pc from 'playcanvas';
-import { vi } from 'vitest';
 import { makeScene } from '@exulanica/atlas-core';
 import { AtlasBinding, type AtlasBindingOptions } from '../../src/playcanvas/atlas-binding.js';
 import { decodeOpm, type PointMap } from '../../src/playcanvas/opm.js';
@@ -41,11 +40,6 @@ export function worldOptions(kind: WorldKind): Partial<AtlasBindingOptions> {
   return optionsWith(kind, fixtureMap());
 }
 
-/** The Google reference is built with a fetch that refuses, so no request leaves the test. */
-export function refuseNetwork(): void {
-  vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('no network in the harness'); }));
-}
-
 export interface HarnessBinding {
   readonly binding: AtlasBinding;
   readonly canvas: HTMLCanvasElement;
@@ -56,7 +50,6 @@ export async function buildBinding(
   kind: WorldKind,
   extra: Partial<AtlasBindingOptions> = {},
 ): Promise<HarnessBinding> {
-  if (kind === 'google-reference' || kind === 'authored-and-google') refuseNetwork();
   const canvas = document.createElement('canvas');
   const overlay = document.createElement('div');
   document.body.append(canvas, overlay);
@@ -193,7 +186,6 @@ export function describeBuiltWorld(binding: AtlasBinding): Record<string, unknow
     present: {
       ownedDistrict: binding.ownedDistrict !== null,
       generatedTile: binding.generatedTile !== null,
-      googleTiles: binding.googleTiles !== null,
       authoredSociety: binding.authoredSociety !== null,
       authoredPointMaps: binding.authoredPointMaps !== null,
       overlay: binding.overlay !== null,

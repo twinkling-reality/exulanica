@@ -14,7 +14,7 @@ import {
   atmosphereFor,
 } from '../../src/playcanvas/atmosphere.js';
 import { describeWorldKind } from '../../src/playcanvas/world-kind.js';
-import { DISTRICT_DOCUMENT, ENDLESS_REGION, GOOGLE_ON, stubTileMount } from './world-kinds.js';
+import { DISTRICT_DOCUMENT, ENDLESS_REGION, stubTileMount } from './world-kinds.js';
 
 describe('the two looks', () => {
   it('are the composed world\'s and the city\'s, as data', () => {
@@ -38,7 +38,6 @@ describe('the two looks', () => {
     expect(atmosphereFor(describeWorldKind({ authoredRegion: ENDLESS_REGION }))).toBe(COMPOSED_WORLD_ATMOSPHERE);
     expect(atmosphereFor(describeWorldKind({ ownedDistrict: district }))).toBe(CITY_ATMOSPHERE);
     expect(atmosphereFor(describeWorldKind({ generatedTile: stubTileMount() }))).toBe(CITY_ATMOSPHERE);
-    expect(atmosphereFor(describeWorldKind({ googleTiles: GOOGLE_ON }))).toBe(CITY_ATMOSPHERE);
   });
 });
 

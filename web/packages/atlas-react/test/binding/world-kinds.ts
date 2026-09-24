@@ -40,8 +40,6 @@ export const WORLD_KINDS = [
   'personal-regions',
   'owned-district',
   'generated-tile',
-  'google-reference',
-  'authored-and-google',
 ] as const;
 export type WorldKind = (typeof WORLD_KINDS)[number];
 
@@ -128,11 +126,6 @@ export function stubTileMount(): GeneratedTileMount & { readonly disposed: () =>
   };
 }
 
-/** A Google configuration that is switched on. The suites refuse its network; the GPU page never builds it. */
-export const GOOGLE_ON = Object.freeze({
-  enabled: true, apiKey: 'harness-key', longitude: -73.99, latitude: 40.74, altitude: 10,
-});
-
 /** One placed depth estimate standing 1.5 m east and 3 m north of the starter origin. */
 export function estimateOf(map: PointMap): AuthoredPointMapPlacement {
   return Object.freeze({
@@ -152,7 +145,5 @@ export function worldOptions(kind: WorldKind, opm: PointMap): Partial<AtlasBindi
     case 'personal-regions': return { scene: PERSONAL_SCENE, pointMaps: new Map([[FIRST_REGION, opm]]) };
     case 'owned-district': return { ownedDistrict: { document: DISTRICT_DOCUMENT as never, residentBytes: 100 } };
     case 'generated-tile': return { generatedTile: stubTileMount() };
-    case 'google-reference': return { googleTiles: GOOGLE_ON };
-    case 'authored-and-google': return { authoredRegion: ENDLESS_REGION, googleTiles: GOOGLE_ON };
   }
 }

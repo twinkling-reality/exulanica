@@ -30,7 +30,6 @@ function instrument(binding: AtlasBinding, log: string[]): void {
   wrap(binding.ownedDistrict, 'ownedDistrict', 'destroy');
   wrap(binding.authoredSociety, 'authoredSociety', 'destroy');
   wrap(binding.generatedTile, 'generatedTile', 'dispose');
-  wrap(binding.googleTiles, 'googleTiles', 'dispose');
   wrap(binding.controls, 'controls', 'destroy');
   wrap(binding.overlay, 'overlay', 'destroy');
   wrap(binding.mapOverlay, 'mapOverlay', 'destroy');

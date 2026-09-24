@@ -135,7 +135,6 @@
  "present": {
   "ownedDistrict": true,
   "generatedTile": false,
-  "googleTiles": false,
   "authoredSociety": false,
   "authoredPointMaps": false,
   "overlay": true,

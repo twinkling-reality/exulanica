@@ -53,14 +53,9 @@ function groundValues(ground: WorldGround): Readonly<Record<string, string>> {
   };
 }
 
-/** A reference drawn over the world is said after the ground, because it is not the ground. */
-function withReference(kind: WorldKind, sentence: string): string {
-  return kind.google === null ? sentence : `${sentence} ${say('world.about.reference')}`;
-}
-
 /** What this world is, said the same way wherever it is said. */
 export function aboutWorld(kind: WorldKind): string {
-  return withReference(kind, fill(GROUND_COPY[kind.ground.form].about, groundValues(kind.ground)));
+  return fill(GROUND_COPY[kind.ground.form].about, groundValues(kind.ground));
 }
 
 /**
@@ -70,5 +65,5 @@ export function aboutWorld(kind: WorldKind): string {
 export function aboutWorldLayers(kind: WorldKind, memoryLayerVisible: boolean): string {
   const copy = GROUND_COPY[kind.ground.form];
   const layered = memoryLayerVisible ? copy.memoryShown : copy.memoryHidden;
-  return layered === undefined ? aboutWorld(kind) : withReference(kind, say(layered));
+  return layered === undefined ? aboutWorld(kind) : say(layered);
 }

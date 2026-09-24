@@ -114,11 +114,6 @@ import {
   type CameraState,
   type InputMode,
 } from './controls.js';
-import type { GoogleTilesConfig } from './google-tiles-config.js';
-import {
-  createGoogleTilesEnvironment,
-  type GoogleTilesEnvironment,
-} from './google-tiles-environment.js';
 import type { SourceMediaCatalog } from './source-media.js';
 import { sourceMediaForIsland } from './source-media.js';
 import { createWorldField, type WorldField } from './world-field.js';
@@ -435,8 +430,6 @@ export interface AtlasBindingOptions {
   readonly residencyBudget?: number;
   /** Ceiling on the backing-store pixel ratio. Never raises a display above its own ratio. */
   readonly maxPixelRatio?: number;
-  /** Optional visualization-only Google reference. It never participates in Atlas interaction. */
-  readonly googleTiles?: GoogleTilesConfig;
   /** Admitted owned geography. One semantic document drives rendering and collision. */
   readonly ownedDistrict?: OwnedDistrictGround;
   /**
@@ -551,8 +544,6 @@ export class AtlasBinding {
   /** Geographic display layers use their own root and never inherit Atlas origin rebasing. */
   readonly environmentRoot: pc.Entity;
   readonly renderRoot: pc.Entity;
-  /** Null unless explicitly feature-flagged with a key by the application. */
-  googleTiles: GoogleTilesEnvironment<unknown> | null = null;
   /** The kind of world this binding draws, decided once by `create`. */
   worldKind!: WorldKind;
   readonly ownedDistrict: OwnedDistrictRuntime | null;
@@ -1153,19 +1144,6 @@ export class AtlasBinding {
     binding.renderRoot.enabled = kind.memoryLayerVisible;
     if (kind.ground.form === 'generated-tile') {
       binding.generatedTile = kind.ground.tile.attach({ app, environmentRoot, camera });
-    }
-    if (kind.google !== null) {
-      binding.googleTiles = createGoogleTilesEnvironment(
-        app,
-        environmentRoot,
-        options.overlayParent,
-        kind.google,
-        {
-          invalidate: () => binding.invalidate(),
-          unavailable: () => binding.invalidate(),
-        },
-      ) as GoogleTilesEnvironment<unknown>;
-      void binding.googleTiles.attach();
     }
     binding.initializeRepresentation(options.representationSubjects ?? []);
     binding.atmosphere.fogInDisplaySpace(kind.displaySpaceFog);
@@ -2544,13 +2522,6 @@ export class AtlasBinding {
     this.field.update(nowMs);
 
     this.centred = this.memoryLayerVisible && this.controls.mode === 'traverse' ? this.findCentredPhotograph() : null;
-    const tileForward = this.controls.forward();
-    this.googleTiles?.update(
-      [s.x, s.y, s.z],
-      Math.max(1, this.device.height),
-      this.camera.camera?.fov ?? 70,
-      [tileForward.x, tileForward.y, tileForward.z],
-    );
     const memoryOverlayVisible = this.memoryLayerVisible || this.mapState !== null || this.inspection !== null;
     if (this.overlay) this.overlay.root.hidden = !memoryOverlayVisible;
     const cameraComponent = this.camera.camera;
@@ -2632,8 +2603,6 @@ export class AtlasBinding {
     this.authoredSociety = null;
     this.generatedTile?.dispose();
     this.generatedTile = null;
-    this.googleTiles?.dispose();
-    this.googleTiles = null;
     this.controls.destroy();
     this.overlay?.destroy();
     this.mapOverlay?.destroy();

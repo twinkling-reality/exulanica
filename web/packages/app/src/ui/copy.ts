@@ -323,8 +323,6 @@ const COPY: Readonly<Record<string, string>> = Object.freeze({
   'world.about.generated-tile':
     'A generated street tile, opened for development evaluation. Its streets and building forms '
     + 'are generated, not recorded from a real place.',
-  // Said after the ground's sentence when a Google photorealistic reference is drawn over it.
-  'world.about.reference': 'A photorealistic map reference is drawn over it for looking only.',
   // A district's geographic view, with its memory layer composed over it or kept apart.
   'world.about.district-memory-shown':
     'City and memory layers are intentionally composed. Purple memory forms are not city semantics.',

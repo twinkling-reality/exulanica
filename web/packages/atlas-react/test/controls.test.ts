@@ -196,7 +196,7 @@ describe('first-person keyboard ownership', () => {
 
   /*
    * `flatNavigationSurface` samples everywhere and never returns null, so an unconditional snap
-   * also caught the deliberate aerial poses: the Google-tiles overview at y = 95 landed near the
+   * also caught the deliberate aerial poses: a city overview at y = 95 landed near the
    * ground with its downward pitch intact. Grounding is now something a caller asks for.
    */
   it('leaves a declared aerial start pose alone and still seeds recovery on the ground', () => {

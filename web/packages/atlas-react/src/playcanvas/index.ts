@@ -90,46 +90,6 @@ export {
 export type { CameraState, ControlsConfig, InputMode } from './controls.js';
 export { DEFAULT_CONTROLS, FirstPersonControls } from './controls.js';
 
-export type { GoogleTilesConfig, GoogleTilesEnvironment as GoogleTilesViteEnvironment } from './google-tiles-config.js';
-export {
-  GOOGLE_REFERENCE_ORIGIN,
-  googleTilesConfig,
-  googleTilesConfigured,
-} from './google-tiles-config.js';
-export {
-  GOOGLE_TILES_HOST,
-  GOOGLE_TILES_ROOT_PATH,
-  GoogleTilesProvider,
-  admitGoogleTilesUrl,
-  redactedGoogleTilesError,
-} from './google-tiles-provider.js';
-export { GoogleTileRequestQueue, GoogleTileResidency } from './google-tiles-residency.js';
-export type { GoogleLocalFrame, Matrix4, Triple } from './google-tiles-frame.js';
-export {
-  IDENTITY_MATRIX,
-  ecefToGoogleLocal,
-  googleLocalFrame,
-  googleLocalToEcef,
-  googleRenderOrigin,
-  localTileTransform,
-  multiplyMatrices,
-  wgs84ToEcef,
-} from './google-tiles-frame.js';
-export {
-  GoogleAttributionLedger,
-  GoogleAttributionSurface,
-  googleGltfMetadata,
-} from './google-tiles-attribution.js';
-export type {
-  GoogleTileHost,
-  GoogleTilesAttribution,
-  GoogleTilesEnvironmentOptions,
-} from './google-tiles-environment.js';
-export {
-  GoogleTilesEnvironment,
-  PlayCanvasGoogleTileHost,
-  createGoogleTilesEnvironment,
-} from './google-tiles-environment.js';
 export {
   NYCSemanticOverlay,
   crs84IntegerToLocal,

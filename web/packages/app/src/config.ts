@@ -25,10 +25,6 @@
  */
 
 import {
-  googleTilesConfig,
-  type GoogleTilesConfig,
-} from '@exulanica/atlas-react/playcanvas';
-import {
   parseOwnedDistrict,
   parseDistrictInterpretation,
   districtInterpretationAvailability,
@@ -210,11 +206,6 @@ function walkPose(parameters: URLSearchParams): WalkPose | null | 'malformed' {
 /** Keep preview provenance visible in browser chrome without adding permanent world chrome. */
 export function applicationTitle(preview: boolean): string {
   return preview ? PREVIEW_TITLE : PRODUCT_TITLE;
-}
-
-/** Optional visualization-only provider configuration. Never persisted or logged. */
-export function googlePhotorealisticTiles(): GoogleTilesConfig {
-  return googleTilesConfig(import.meta.env);
 }
 
 export async function ownedDistrict(options: {

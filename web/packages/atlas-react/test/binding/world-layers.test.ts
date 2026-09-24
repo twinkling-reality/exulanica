@@ -5,8 +5,7 @@
  * For every kind the app hands the binding, this builds the real binding on the null device. Where
  * `worldLayers` withholds the switch, hiding the layer must leave no drawn mesh at all, which is
  * why offering it there blanks the world. Where it offers the switch, the world must have a ground
- * of its own (a district, a tile or a Google reference) drawn outside the layer, under the
- * environment root.
+ * of its own (a district or a tile) drawn outside the layer, under the environment root.
  */
 import { describe, expect, it } from 'vitest';
 import * as pc from 'playcanvas';
@@ -30,10 +29,9 @@ describe('the memory layer switch each kind of world offers', () => {
         expect(drawn(binding.app.root).length).toBeGreaterThan(0);
         binding.setMemoryLayerVisible(false);
         if (worldLayers(describeWorldKind(worldOptions(kind))).memoryLayer) {
-          // The world's own ground is drawn by its runtime into the environment root (a Google
-          // reference adds its tiles there as they load, which the harness's refused network never
-          // does), and the environment root stays drawn outside the layer.
-          const own = [binding.ownedDistrict, binding.generatedTile, binding.googleTiles].filter((value) => value !== null);
+          // The world's own ground is drawn by its runtime into the environment root, and the
+          // environment root stays drawn outside the layer.
+          const own = [binding.ownedDistrict, binding.generatedTile].filter((value) => value !== null);
           expect(own.length).toBe(1);
           expect(binding.environmentRoot.enabled).toBe(true);
           expect(binding.renderRoot.findOne((node) => node === binding.environmentRoot)).toBeNull();

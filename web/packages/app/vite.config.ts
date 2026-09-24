@@ -171,8 +171,7 @@ const previewApi: Plugin = {
           answer: { clauses: [
             {
               text: `${label} is the selected official NYC BUILDING footprint. `
-                + `Its NYC Open Data identifiers are DOITT_ID ${doitt} and BIN ${bin}. `
-                + 'The Google layer is visual reference only and supplied none of this identity.',
+                + `Its NYC Open Data identifiers are DOITT_ID ${doitt} and BIN ${bin}.`,
               type: 'meta',
               citations: [],
               value_refs: [],

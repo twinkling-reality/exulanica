@@ -42,16 +42,15 @@ import type {
   SourceMediaCatalog,
   TrainedSceneGeometry,
   RecoveredSceneCamera,
-  GoogleTilesConfig,
 } from '@exulanica/atlas-react/playcanvas';
 import { AtlasBinding, describeWorldKind, type WorldKind } from '@exulanica/atlas-react/playcanvas';
 
 export interface MountedAtlas {
   readonly binding: AtlasBinding;
   /**
-   * What kind of world the binding draws: its ground and any reference over it. Decided by the
-   * renderer's own `describeWorldKind` over the very options the binding was created from, so a
-   * surface that says what this world is cannot disagree with what is drawn.
+   * What kind of world the binding draws: its ground. Decided by the renderer's own
+   * `describeWorldKind` over the very options the binding was created from, so a surface that
+   * says what this world is cannot disagree with what is drawn.
    */
   readonly worldKind: WorldKind;
   readonly placements: readonly PlacementCheck[];
@@ -78,7 +77,6 @@ export async function mountAtlas(
     readonly placedPointMaps?: readonly PlacedScenePointMap[];
     readonly trainedGeometry?: readonly TrainedSceneGeometry[];
     readonly recoveredCameras?: readonly RecoveredSceneCamera[];
-    readonly googleTiles?: GoogleTilesConfig;
     readonly ownedDistrict?: {
       readonly document: OwnedDistrict;
       readonly residentBytes: number;
@@ -102,7 +100,6 @@ export async function mountAtlas(
     ...(presentation?.placedPointMaps === undefined
       ? {}
       : { placedPointMaps: presentation.placedPointMaps }),
-    ...(presentation?.googleTiles === undefined ? {} : { googleTiles: presentation.googleTiles }),
     ...(presentation?.ownedDistrict === undefined
       ? {}
       : { ownedDistrict: presentation.ownedDistrict }),

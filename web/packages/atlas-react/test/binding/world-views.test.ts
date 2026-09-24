@@ -17,9 +17,7 @@ import type { AtlasBinding } from '../../src/playcanvas/atlas-binding.js';
 import { describeWorldKind, worldViews } from '../../src/playcanvas/world-kind.js';
 import { DEFAULT_FOLLOW_CAMERA } from '../../src/playcanvas/player-camera.js';
 import { FLAT_REGION } from './world-kinds.js';
-import {
-  FIRST_REGION, PERSONAL_SCENE, WORLD_KINDS, buildBinding, worldOptions, type WorldKind,
-} from './binding-harness.js';
+import { WORLD_KINDS, buildBinding, worldOptions, type WorldKind } from './binding-harness.js';
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -141,28 +139,6 @@ describe('the camera views each kind of world offers', () => {
         binding.setCityView('street');
         run(3);
         expect(pose(binding).y).toBeCloseTo(street.y, 6);
-      } finally {
-        binding.destroy();
-      }
-    });
-
-    it(`${kind}: lands on the ground after travelling to a region, even from an overview`, async () => {
-      // The harness district is 20 metres square, and its navigation refuses travel to a region
-      // 144 metres away, as it should; the Google kinds admit the regions.
-      if (!viewsOf(kind).cityViews || kind === 'owned-district') return;
-      const { binding } = await buildBinding(kind, { scene: PERSONAL_SCENE });
-      const run = frames(binding);
-      try {
-        run(3);
-        binding.setCityView('overview');
-        expect(binding.controls.hold).toBe('altitude');
-        expect(binding.navigateToIsland(FIRST_REGION, true).ok).toBe(true);
-        run(120);
-        const navigation = binding.navigationWorld;
-        const arrived = pose(binding);
-        expect(binding.controls.hold).toBe('ground');
-        const ground = navigation.surface.sample(arrived.x, arrived.z);
-        expect(arrived.y).toBeCloseTo(ground!.height + navigation.eyeHeight, 6);
       } finally {
         binding.destroy();
       }

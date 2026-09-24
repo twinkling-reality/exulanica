@@ -1,4 +1,3 @@
-import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 import {
   crs84IntegerToLocal,
@@ -52,18 +51,6 @@ describe('independent NYC Open Data semantic geometry', () => {
       [0, -1, 0],
     )?.bin).toBe('bin:1006070');
     expect(featureAtLocalPoint([local!], [centre[0] + 1000, centre[1]])).toBeNull();
-  });
-
-  it('has no Google tile object in its input or selection contract', () => {
-    expect(Object.keys(feature).sort()).toEqual([
-      'bbox', 'bin', 'footprint', 'id', 'name', 'providerFeatureId', 'renderBatchId',
-    ]);
-    expect(JSON.stringify(feature).toLowerCase()).not.toContain('google');
-    const implementation = readFileSync(
-      new URL('../src/playcanvas/nyc-semantic-overlay.ts', import.meta.url),
-      'utf8',
-    );
-    expect(implementation).not.toMatch(/google-tiles|GoogleTile|googleTiles/);
   });
 
   it('builds only exact closed line edges for a concave exterior and its hole', () => {

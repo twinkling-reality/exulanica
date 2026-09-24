@@ -7,9 +7,9 @@ import type { WorldKind } from './world-kind.js';
  * THE LIGHT AND AIR A WORLD IS DRAWN IN.
  *
  * Two looks, as data: a composed world (a saved world's starter ground, or the regions of a
- * photo-built world) and a city (an owned district, a generated tile or a Google reference).
- * Each states how far the camera sees, what it clears to, the ambient light and exposure, where
- * fog starts and ends, and the sun. They are the values each kind was built with; where one was
+ * photo-built world) and a city (an owned district or a generated tile). Each states how far the
+ * camera sees, what it clears to, the ambient light and exposure, where fog starts and ends, and
+ * the sun. They are the values each kind was built with; where one was
  * measured, its comment says how. They are drawn in the binding's GPU scenes
  * (`test/binding/gpu/binding-pixels.ts`), whose digests are pinned in
  * `test/binding/gpu/pins/digests.json` for the browser and GPU named there; CI has no GPU, so

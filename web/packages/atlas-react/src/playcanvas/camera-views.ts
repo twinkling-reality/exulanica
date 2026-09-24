@@ -42,7 +42,7 @@ export interface HeldView {
  *
  * Street level is where the world stands a person on its ground (`groundEntry`), so it is always
  * inside the walkable field. The overview frames what the world is built around: a district's
- * buildings, or otherwise the walkable field and the regions on it.
+ * buildings.
  */
 export function cityView(
   kind: WorldKind,
@@ -52,22 +52,19 @@ export function cityView(
 ): HeldView | null {
   if (!worldViews(kind).cityViews) return null;
   const pose = view === 'overview'
-    ? overviewOf(kind, navigationWorld)
+    ? overviewOf(kind)
     : groundEntry(kind, scene, navigationWorld);
   return Object.freeze({ pose, hold: CITY_VIEW_HOLD[view] });
 }
 
-/** Where the session opens: the overview for a kind that opens from above, else its ground entry. */
+/** Where the session opens: standing at the world's ground entry. */
 export function worldStart(kind: WorldKind, scene: AtlasScene, navigationWorld: NavigationWorld): HeldView {
-  return kind.aerialStart
-    ? Object.freeze({ pose: overviewOf(kind, navigationWorld), hold: CITY_VIEW_HOLD.overview })
-    : Object.freeze({ pose: groundEntry(kind, scene, navigationWorld), hold: CITY_VIEW_HOLD.street });
+  return Object.freeze({ pose: groundEntry(kind, scene, navigationWorld), hold: CITY_VIEW_HOLD.street });
 }
 
-function overviewOf(kind: WorldKind, navigationWorld: NavigationWorld): CameraState {
-  return kind.ground.form === 'owned-district'
-    ? ownedDistrictOverviewCameraState(kind.ground.district.document)
-    : fieldOverviewCameraState(navigationWorld);
+function overviewOf(kind: WorldKind): CameraState {
+  if (kind.ground.form === 'owned-district') return ownedDistrictOverviewCameraState(kind.ground.district.document);
+  throw new TypeError(`No overview for a world standing on ${kind.ground.form}`);
 }
 
 /**
@@ -192,19 +189,6 @@ export function ownedDistrictOverviewCameraState(district: OwnedDistrict): Camer
   const south = Math.max(...district.buildings.map((building) => building.bbox_cm[3] / 100));
   const tallest = Math.max(...district.buildings.map((building) => building.height_cm / 100));
   return framedOverview((west + east) / 2, (north + south) / 2, Math.max(east - west, south - north), tallest);
-}
-
-/**
- * Frame the walkable field's centre and every region on it. The field's own radius is not the
- * span: an endless starter's field reaches kilometres, and an overview of that shows nothing.
- */
-export function fieldOverviewCameraState(world: NavigationWorld): CameraState {
-  let reach = 0;
-  for (const region of world.regions) {
-    reach = Math.max(reach, Math.hypot(region.centre.x - world.centre.x, region.centre.z - world.centre.z)
-      + region.footprintRadius);
-  }
-  return framedOverview(world.centre.x, world.centre.z, 2 * reach, 0);
 }
 
 /** Deterministic clear spawn on visible owned support, never an invisible safety floor. */

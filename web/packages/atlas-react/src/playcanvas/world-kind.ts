@@ -11,17 +11,15 @@ import {
   type OwnedDistrict,
 } from '@exulanica/atlas-core';
 import type { GeneratedTileMount } from './generated-tile/binding-contract.js';
-import type { GoogleTilesConfig } from './google-tiles-config.js';
 import type { AuthoredGroundSupport, EndlessAuthoredGroundSupport } from './world-field.js';
 
 /*
  * WHAT KIND OF WORLD THE BINDING IS DRAWING, DECIDED ONCE.
  *
  * The options the app hands `AtlasBinding.create` name at most one ground (an authored starter
- * region, an owned district or a generated tile; none means the regions of a photo-built world)
- * and possibly a Google reference over it. Every decision that follows from which one it is
- * (city scale, where fog is mixed, how the session opens, what is drawn at first, where a person
- * can walk) is read from the one description `describeWorldKind` returns, which also carries the
+ * region, an owned district or a generated tile; none means the regions of a photo-built world).
+ * Every decision that follows from which one it is (city scale, where fog is mixed, what is drawn
+ * at first, where a person can walk) is read from the one description `describeWorldKind` returns, which also carries the
  * ground's own data, so the binding never asks the options what kind of world it is.
  */
 
@@ -42,44 +40,27 @@ export type WorldGround =
 
 export interface WorldKind {
   readonly ground: WorldGround;
-  /** The Google photorealistic reference drawn over the world, for looking only, or null. */
-  readonly google: GoogleTilesConfig | null;
-  /** City scale: a geographic ground or a Google reference, lit and paced as a street is. */
+  /** City scale: a geographic ground, lit and paced as a street is. */
   readonly city: boolean;
   /**
    * Lit materials fog in display space, toward the sky's own colour. Every kind but a generated
    * tile, whose sky is a skybox the engine tone-maps along with its fog.
    */
   readonly displaySpaceFog: boolean;
-  /**
-   * The session opens from above, at the overview (`camera-views.ts`), rather than standing on the
-   * ground. Only where the ground states no arrival of its own and a Google reference is drawn:
-   * regions under a reference. A starter's spawn and a district's clear spawn are where they open.
-   */
-  readonly aerialStart: boolean;
   /** The binding's own ground field is drawn. A district or a tile draws its own ground. */
   readonly fieldVisible: boolean;
   /** The memory layer (the render root) starts shown. Off wherever another ground is drawn. */
   readonly memoryLayerVisible: boolean;
 }
 
-/** The options the kind is decided from: which ground, and whether a Google reference is on. */
+/** The options the kind is decided from: which ground. */
 export interface WorldKindOptions {
   readonly authoredRegion?: AuthoredRegion;
   readonly ownedDistrict?: OwnedDistrictGround;
   readonly generatedTile?: GeneratedTileMount;
-  readonly googleTiles?: GoogleTilesConfig;
 }
 
-/**
- * Describe the world these options ask for, or refuse a combination no world can be.
- *
- * An authored region WITH a Google reference is accepted, and is exactly what the rules below
- * make it: authored navigation and the authored spawn, stood on the ground, the Google reference
- * drawn at city scale, and the memory layer (with the authored ground in it) hidden. That is what
- * the binding did before this description existed; refusing it would be a change of behaviour and
- * is not made here.
- */
+/** Describe the world these options ask for, or refuse a combination no world can be. */
 export function describeWorldKind(options: WorldKindOptions): WorldKind {
   if (options.ownedDistrict !== undefined && options.generatedTile !== undefined) {
     throw new TypeError('A generated tile replaces the owned district; pass one or the other');
@@ -88,9 +69,6 @@ export function describeWorldKind(options: WorldKindOptions): WorldKind {
       (options.ownedDistrict !== undefined || options.generatedTile !== undefined)) {
     throw new TypeError('An authored starter region cannot replace geographic ground');
   }
-  const google = options.googleTiles?.enabled === true && options.googleTiles.apiKey.length > 0
-    ? options.googleTiles
-    : null;
   const ground: WorldGround = options.generatedTile !== undefined
     ? { form: 'generated-tile', tile: options.generatedTile }
     : options.ownedDistrict !== undefined
@@ -103,12 +81,10 @@ export function describeWorldKind(options: WorldKindOptions): WorldKind {
   const geographic = ground.form === 'owned-district' || ground.form === 'generated-tile';
   return Object.freeze({
     ground: Object.freeze(ground),
-    google,
-    city: geographic || google !== null,
+    city: geographic,
     displaySpaceFog: ground.form !== 'generated-tile',
-    aerialStart: ground.form === 'scene-regions' && google !== null,
     fieldVisible: !geographic,
-    memoryLayerVisible: !geographic && google === null,
+    memoryLayerVisible: !geographic,
   });
 }
 
@@ -131,8 +107,7 @@ export function authoredRegionOf(kind: WorldKind): AuthoredRegion | null {
 export interface WorldViews {
   /**
    * An overview from above and a stance at street level. A district frames both on its own
-   * buildings and a Google reference on its fixed city viewpoints; a world with neither has
-   * nothing to frame them on.
+   * buildings; a world without one has nothing to frame them on.
    */
   readonly cityViews: boolean;
   /**
@@ -141,19 +116,17 @@ export interface WorldViews {
    * (`player-camera.ts`). So it is offered on every ground where that is all there is to keep out
    * of: a starter, the regions of a photo-built world and a district. Not on a generated tile,
    * whose buildings are drawn with no collision the camera could read, so a boom behind the person
-   * would pass through their facades; and not under a Google reference, whose photographed ground
-   * the binding has no surface for, so the drawn figure would stand on a plane the picture does not
-   * show. There the view stays first person, where a distance has nothing to set.
+   * would pass through their facades. There the view stays first person, where a distance has
+   * nothing to set.
    */
   readonly thirdPerson: boolean;
 }
 
-/** The views this kind of world carries out, read from its ground and its reference only. */
+/** The views this kind of world carries out, read from its ground only. */
 export function worldViews(kind: WorldKind): WorldViews {
-  const district = kind.ground.form === 'owned-district';
   return Object.freeze({
-    cityViews: district || kind.google !== null,
-    thirdPerson: kind.google === null && kind.ground.form !== 'generated-tile',
+    cityViews: kind.ground.form === 'owned-district',
+    thirdPerson: kind.ground.form !== 'generated-tile',
   });
 }
 
@@ -162,9 +135,9 @@ export interface WorldLayers {
   /**
    * A switch for the memory layer: the render root, holding the regions and their motes, the
    * binding's own ground field and the composed world with its sky. Offered only where another
-   * ground is drawn outside it, a district, a tile or a Google reference, which is what `city`
-   * names. In any other world the memory layer holds the ground itself, so switching it off leaves
-   * nothing drawn. `test/binding/world-layers.test.ts` holds both halves for every kind.
+   * ground is drawn outside it, a district or a tile, which is what `city` names. In any other
+   * world the memory layer holds the ground itself, so switching it off leaves nothing drawn.
+   * `test/binding/world-layers.test.ts` holds both halves for every kind.
    */
   readonly memoryLayer: boolean;
 }

@@ -1133,8 +1133,7 @@ async function mount(): Promise<void> {
     reflectShell: () => reflectShell(),
     showTravelStatus,
   });
-  const geographicDistrict = renderer.atlas.binding.ownedDistrict !== null ||
-    renderer.atlas.binding.googleTiles !== null;
+  const geographicDistrict = renderer.atlas.binding.ownedDistrict !== null;
   void character.attach(renderer.atlas.binding);
   if (geographicDistrict && segments !== null) {
     segments.root.hidden = true;

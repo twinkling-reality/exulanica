@@ -15,7 +15,7 @@ import { describe, expect, it } from 'vitest';
 import * as barrel from '../../src/playcanvas/index.js';
 
 /** Lines in atlas-binding.ts, measured on the file this budget was last lowered with. */
-const ATLAS_BINDING_LINE_BUDGET = 3321;
+const ATLAS_BINDING_LINE_BUDGET = 3290;
 /** How far under budget the file may drift before the budget must be lowered to follow it. */
 const SLACK = 40;
 

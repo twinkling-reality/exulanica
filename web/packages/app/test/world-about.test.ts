@@ -26,7 +26,6 @@ const FLAT_V1: AuthoredRegion = {
   ground: { kind: 'flat', halfWidthMm: 12_000, halfDepthMm: 12_000, elevationMm: 0 },
   spawn: { xMm: 0, yMm: 0, zMm: 4000, yawMicroradians: 0 },
 };
-const GOOGLE = { enabled: true, apiKey: 'test-key', longitude: -73.99, latitude: 40.74, altitude: 10 };
 const DISTRICT = { document: {} as never, residentBytes: 100 };
 const TILE = { attach: () => ({}) } as unknown as GeneratedTileMount;
 
@@ -96,25 +95,6 @@ describe('the About panel says what the open world is, by its kind', () => {
       + 'forms are generated, not recorded from a real place.');
     expectPlainSentence(sentence);
     expect(sentence).not.toMatch(/sidewalk|BUILDING footprints|source-backed/i);
-  });
-
-  it('google-reference: the photo-built world, then the reference drawn over it for looking only', () => {
-    const sentence = aboutWorld(kind({ googleTiles: GOOGLE }));
-    expect(sentence).toBe(`${aboutWorld(kind({}))} A photorealistic map reference is drawn over it for looking only.`);
-    expectNoDistrictClaim(sentence);
-  });
-
-  it('authored-and-google: the starter\'s ground first, the reference after it', () => {
-    const sentence = aboutWorld(kind({ authoredRegion: ENDLESS, googleTiles: GOOGLE }));
-    expect(sentence.startsWith(aboutWorld(kind({ authoredRegion: ENDLESS })))).toBe(true);
-    expect(sentence.endsWith('A photorealistic map reference is drawn over it for looking only.')).toBe(true);
-    expectNoDistrictClaim(sentence);
-  });
-
-  it('a reference switched off or with no key is not described, because none is drawn', () => {
-    expect(aboutWorld(kind({ authoredRegion: ENDLESS, googleTiles: { ...GOOGLE, enabled: false } })))
-      .toBe(aboutWorld(kind({ authoredRegion: ENDLESS })));
-    expect(aboutWorld(kind({ googleTiles: { ...GOOGLE, apiKey: '' } }))).toBe(aboutWorld(kind({})));
   });
 
   it('hiding or showing the memory layer changes no sentence of a ground without a layer of its own', () => {

@@ -40,10 +40,11 @@ persistence and modification. The backend admission plan carries the broader ope
 Those booleans are a reviewed source decision for this exact use, not a general statement that all
 NYC or third-party map data may be extracted, trained on, or redistributed.
 
-Google photorealistic tiles remain a reference-only optional visualization under the separate
-provider policy. They do not supply owned-district collision, semantic identity, persistence,
-extraction, model inputs, or export. The binding can draw them, and the app passes it none:
-`googlePhotorealisticTiles` in `web/packages/app/src/config.ts` is read only by its own test.
+The web client carries no third-party photorealistic tiles. A provider feed licensed for viewing
+only cannot become ground a person edits, saves or builds on (the source evaluation in
+[the world composition contract](world-composition-contract.md#data-source-fitness-and-visual-quality)),
+so collision, semantic identity, persistence and export come only from admitted sources such as
+the owned district described here.
 
 ## The admission chain, and the place an admitted source belongs to
 

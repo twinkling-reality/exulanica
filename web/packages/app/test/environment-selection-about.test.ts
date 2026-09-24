@@ -119,7 +119,6 @@ describe('About this place states the kind of world that is open', () => {
 const ENDLESS = STARTER_REGION;
 const FLAT = { ...STARTER_REGION, module: { key: 'region.authored-ground' as const, version: 1 as const },
   ground: { kind: 'flat' as const, halfWidthMm: 12_000, halfDepthMm: 12_000, elevationMm: 0 } };
-const GOOGLE = { enabled: true, apiKey: 'test-key', longitude: -73.99, latitude: 40.74, altitude: 10 };
 const DISTRICT = { document: {} as never, residentBytes: 100 };
 const TILE = { attach: () => ({}) } as unknown as GeneratedTileMount;
 
@@ -131,16 +130,12 @@ const WORLD_KINDS = {
   'personal-regions': {},
   'owned-district': { ownedDistrict: DISTRICT },
   'generated-tile': { generatedTile: TILE },
-  'google-reference': { googleTiles: GOOGLE },
-  'authored-and-google': { authoredRegion: ENDLESS, googleTiles: GOOGLE },
 } as const;
 
 /**
  * Which views each kind of world offers, and why. A district frames the city views on its own
- * buildings and a Google reference on its walkable field. The third-person camera is offered on
- * every ground whose solid parts the follow camera can keep out of: not a generated tile, whose
- * buildings state no collision, and not under a Google reference, whose photographed ground the
- * binding has no surface for.
+ * buildings. The third-person camera is offered on every ground whose solid parts the follow
+ * camera can keep out of: not a generated tile, whose buildings state no collision.
  */
 const THIRD_PERSON = ['Third person (C)', 'Third-person framing'];
 const OFFERED: Readonly<Record<keyof typeof WORLD_KINDS, readonly string[]>> = {
@@ -150,13 +145,9 @@ const OFFERED: Readonly<Record<keyof typeof WORLD_KINDS, readonly string[]>> = {
   'personal-regions': THIRD_PERSON,
   'owned-district': ['City overview', 'Street level', ...THIRD_PERSON],
   'generated-tile': [],
-  'google-reference': ['City overview', 'Street level'],
-  'authored-and-google': ['City overview', 'Street level'],
 };
 /** Where the memory layer switch is offered: where another ground is drawn outside the layer. */
-const MEMORY_SWITCH: ReadonlySet<keyof typeof WORLD_KINDS> = new Set([
-  'owned-district', 'generated-tile', 'google-reference', 'authored-and-google',
-]);
+const MEMORY_SWITCH: ReadonlySet<keyof typeof WORLD_KINDS> = new Set(['owned-district', 'generated-tile']);
 /** The controls whose views depend on the kind of world. */
 const KIND_VIEWS = ['City overview', 'Street level', 'Third person (C)', 'Third-person framing'];
 /** Turning the view and movement assistance work in every world. */

@@ -107,8 +107,8 @@ describe('the society drive', () => {
     }
   });
 
-  it('builds no crowd where there is no society to hold: a world of regions, a tile, a reference', async () => {
-    for (const kind of ['personal-regions', 'generated-tile', 'google-reference'] as const) {
+  it('builds no crowd where there is no society to hold: a world of regions, a tile', async () => {
+    for (const kind of ['personal-regions', 'generated-tile'] as const) {
       const { binding } = await buildBinding(kind);
       try {
         expect(binding.authoredSociety).toBeNull();
